@@ -412,7 +412,11 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
       client.watch_nginx_logs().await?;
     }
     Commands::Version => {
+      println!("=== [nanocli] ===");
       version::print_version();
+      println!("=== [nanocld] ===");
+      let daemon_version = client.get_version().await?;
+      println!("Arch: {}\nVersion: {}\nCommit ID: {}", daemon_version.arch, daemon_version.version, daemon_version.commit_id);
     }
   }
   Ok(())
