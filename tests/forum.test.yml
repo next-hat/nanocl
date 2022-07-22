@@ -1,0 +1,64 @@
+type: namespace
+name: simple-forum
+
+networks:
+  - name: forum
+
+clusters:
+  - name: dev
+    auto_start: true
+    proxy_templates:
+      - test-forum
+    joins:
+      - cargo: forum-db
+        network: forum
+      - cargo: forum
+        network: forum
+    vars:
+      CLUSTER: DEV
+
+  # - name: production
+  #   auto_start: true
+  #   proxy_templates:
+  #     - test-forum
+  #   joins:
+  #     - cargo: forum-db
+  #       network: forum
+  #     - cargo: forum
+  #       network: forum
+  #   vars:
+  #     CLUSTER: DEV
+
+cargoes:
+  - name: forum-db
+    image: mariadb:10.5
+    hostname: "db.express-forum.com"
+    domainname: "db.express-forum.com"
+    envs:
+      - "TZ=Europe/Paris"
+      - "MYSQL_ALLOW_EMPTY_PASSWORD=yes"
+      - "MYSQL_DATABASE=flarum"
+      - "MYSQL_USER=flarum"
+      - "MYSQL_PASSWORD=flarum"
+
+  - name: forum
+    image: crazymax/flarum:latest
+    domainname: "express-forum.com"
+    binds:
+      - test-forum:/opt/flarum
+    envs:
+      - "TZ=Europe/Paris"
+      - "PUID=1000"
+      - "PGID=1000"
+      - "DB_HOST=db.express-forum.com"
+      - "DB_NAME=flarum"
+      - "DB_USER=flarum"
+      - "DB_PASSWORD=flarum"
+      - "MEMORY_LIMIT=256M"
+      - "UPLOAD_MAX_SIZE=16M"
+      - "OPCACHE_MEM_SIZE=128"
+      - "REAL_IP_FROM=0.0.0.0/32"
+      - "REAL_IP_HEADER=X-Forwarded-For"
+      - "LOG_IP_VAR=remote_addr"
+      - "FLARUM_DEBUG=false"
+      - "FLARUM_BASE_URL=http://express-forum.com"

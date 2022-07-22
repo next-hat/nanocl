@@ -1,0 +1,4 @@
+server {
+  listen     {{networks.forum.gateway}}:3306;
+  proxy_pass {{cargoes.forum-db.target_ip}}:3306;
+}

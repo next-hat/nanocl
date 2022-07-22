@@ -1,0 +1,33 @@
+[package]
+name = "nanocl"
+version = "0.1.1"
+edition = "2021"
+authors = ["nanocl contributors <team@next-hat.com>"]
+description = "self-sufficient hybrid-cloud"
+readme = "README.md"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+
+[features]
+default = []
+genman = ["dep:clap_mangen"]
+
+[dependencies]
+futures = "0.3"
+tabled = "0.7.0"
+serde_yaml = "0.8"
+indicatif = "0.16.2"
+serde_json = "1.0.81"
+thiserror = "1.0.24"
+clap_complete = "3.2.1"
+serde = { version = "1.0", features = ["derive"] }
+clap = { version = "3.1.8", features = ["derive"] }
+chrono = { version = "0.4.19", features = ["serde"] }
+uuid = { version = "0.8", features = ["serde", "v4"] }
+ntex = { version = "=0.5.19", features = ["openssl", "rustls", "tokio"] }
+# Optional deps
+clap_mangen = { version = "0.1", optional = true }
