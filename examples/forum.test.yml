@@ -16,7 +16,8 @@ clusters:
         network: forum
     vars:
       CLUSTER: DEV
-
+      REMOTE_ADDR: 172.17.103.122
+      DOMAIN: express-forum.com
   # - name: production
   #   auto_start: true
   #   proxy_templates:
@@ -31,7 +32,7 @@ clusters:
 
 cargoes:
   - name: forum-db
-    image: mariadb:10.5
+    image: mariadb:10.6
     hostname: "db.express-forum.com"
     domainname: "db.express-forum.com"
     envs:
@@ -43,14 +44,15 @@ cargoes:
 
   - name: forum
     image: crazymax/flarum:latest
-    domainname: "express-forum.com"
+    domainname: "{{vars.DOMAIN}}"
+    dns_entry: "{{vars.REMOTE_ADDR}}:{{vars.DOMAIN}}"
     binds:
       - test-forum:/opt/flarum
     envs:
       - "TZ=Europe/Paris"
       - "PUID=1000"
       - "PGID=1000"
-      - "DB_HOST=db.express-forum.com"
+      - "DB_HOST=db.{{vars.DOMAIN}}"
       - "DB_NAME=flarum"
       - "DB_USER=flarum"
       - "DB_PASSWORD=flarum"
@@ -61,4 +63,4 @@ cargoes:
       - "REAL_IP_HEADER=X-Forwarded-For"
       - "LOG_IP_VAR=remote_addr"
       - "FLARUM_DEBUG=false"
-      - "FLARUM_BASE_URL=http://express-forum.com"
+      - "FLARUM_BASE_URL=http://{{vars.DOMAIN}}"

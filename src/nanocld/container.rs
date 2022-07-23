@@ -8,14 +8,6 @@ use super::models::{Port, EndpointSettings, optional_string};
 
 use super::client::Nanocld;
 
-/// A summary of the container's network settings
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct ContainerSummaryNetworkSettings {
-  #[serde(rename = "Networks")]
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub networks: Option<HashMap<String, EndpointSettings>>,
-}
-
 fn optional_name(s: &Option<Vec<String>>) -> String {
   match s {
     None => String::from(""),
@@ -60,6 +52,14 @@ fn display_container_summary_network_settings(
       String::from("")
     }
   }
+}
+
+/// A summary of the container's network settings
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ContainerSummaryNetworkSettings {
+  #[serde(rename = "Networks")]
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub networks: Option<HashMap<String, EndpointSettings>>,
 }
 
 #[derive(Debug, Tabled, Clone, Default, PartialEq, Serialize, Deserialize)]

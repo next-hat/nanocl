@@ -5,7 +5,7 @@ use clap::{App, AppSettings, Parser, Subcommand};
 use crate::nanocld::{
   git_repository::GitRepositoryPartial,
   namespace::NamespacePartial,
-  cluster::{ClusterPartial, ClusterNetworkPartial},
+  cluster::{ClusterPartial, ClusterNetworkPartial, ClusterVarPartial},
   cargo::CargoPartial,
   container_image::ContainerImagePartial,
   nginx_template::NginxTemplateModes,
@@ -88,6 +88,51 @@ pub struct ClusterInspectOptions {
   pub(crate) name: String,
 }
 
+#[derive(Debug, Parser)]
+pub struct ClusterNginxTemplateCommandsOption {
+  /// Name of cluster
+  pub(crate) cl_name: String,
+  /// Name of nginx template
+  pub(crate) nt_name: String,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ClusterNginxTemplateCommands {
+  /// Add a new template
+  Add(ClusterNginxTemplateCommandsOption),
+  /// Remove a existing template
+  #[clap(alias("rm"))]
+  Remove(ClusterNginxTemplateCommandsOption),
+}
+
+/// Control cluster nginx templates
+#[derive(Debug, Parser)]
+pub struct ClusterNginxTemplateArgs {
+  #[clap(subcommand)]
+  pub(crate) commands: ClusterNginxTemplateCommands,
+}
+
+#[derive(Debug, Parser)]
+pub struct ClusterVariableRemoveOptions {
+  pub(crate) name: String,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ClusterVariableCommands {
+  /// Create a new variable for the cluster
+  Create(ClusterVarPartial),
+  /// Delete existing variable from the cluster
+  #[clap(alias = "rm")]
+  Remove(ClusterVariableRemoveOptions),
+}
+
+#[derive(Debug, Parser)]
+pub struct ClusterVariableOptions {
+  pub(crate) cluster: String,
+  #[clap(subcommand)]
+  pub(crate) commands: ClusterVariableCommands,
+}
+
 /// Cluster sub commands
 #[derive(Debug, Subcommand)]
 pub enum ClusterCommands {
@@ -103,6 +148,12 @@ pub enum ClusterCommands {
   Start(ClusterStartOptions),
   /// Inspect cluster by it's name
   Inspect(ClusterInspectOptions),
+  /// Control cluster nginx templates
+  NginxTemplate(ClusterNginxTemplateArgs),
+  /// Control cluster networks
+  Network(ClusterNetworkArgs),
+  /// Control cluster variables
+  Variable(ClusterVariableOptions),
 }
 
 /// Cluster network delete topions
@@ -149,6 +200,12 @@ pub struct CargoStartOptions {
   pub name: String,
 }
 
+#[derive(Debug, Parser)]
+pub struct CargoInspectOption {
+  /// Name of cargo to inspect
+  pub(crate) name: String,
+}
+
 #[derive(Debug, Subcommand)]
 #[clap(
   about,
@@ -164,6 +221,8 @@ pub enum CargoCommands {
   /// Remove cargo by it's name
   #[clap(alias("rm"))]
   Remove(CargoDeleteOptions),
+  /// Inspect a cargo
+  Inspect(CargoInspectOption),
 }
 
 /// manage cargoes
@@ -215,11 +274,7 @@ pub struct ClusterArgs {
 /// manage cluster networks
 #[derive(Debug, Parser)]
 pub struct ClusterNetworkArgs {
-  /// namespace to target by default global is used
-  #[clap(long)]
-  pub namespace: Option<String>,
   /// cluster to target
-  #[clap(long)]
   pub cluster: String,
   #[clap(subcommand)]
   pub commands: ClusterNetworkCommands,
@@ -337,7 +392,6 @@ pub enum Commands {
   Revert(RevertArgs),
   GitRepository(GitRepositoryArgs),
   NginxTemplate(NginxTemplateArgs),
-  ClusterNetwork(ClusterNetworkArgs),
   ContainerImage(ContainerImageArgs),
   #[clap(name = "lsc")]
   ListContainer(ListContainerOptions),

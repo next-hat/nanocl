@@ -1,4 +1,5 @@
 use clap::Parser;
+use serde_json::json;
 use tabled::Tabled;
 use serde::{Serialize, Deserialize};
 
@@ -6,6 +7,7 @@ use super::{
   client::Nanocld,
   error::{NanocldError, is_api_error},
   models::{PgGenericCount, GenericNamespaceQuery},
+  cargo::CargoItem,
 };
 
 fn tbd_vec_string(o: &[String]) -> String {
@@ -23,6 +25,17 @@ pub struct ClusterItem {
   // pub(crate) networks: Option<Vec<ClusterNetworkItem>>,
 }
 
+#[derive(Debug, Tabled, Serialize, Deserialize)]
+pub struct ClusterCargoItem {
+  #[tabled(skip)]
+  pub(crate) key: String,
+  #[tabled(skip)]
+  pub(crate) cargo_key: String,
+  #[tabled(skip)]
+  pub(crate) cluster_key: String,
+  pub(crate) network_key: String,
+}
+
 /// Cluster item with his relations
 #[derive(Debug, Tabled, Serialize, Deserialize)]
 pub struct ClusterItemWithRelation {
@@ -32,7 +45,11 @@ pub struct ClusterItemWithRelation {
   #[tabled(display_with = "tbd_vec_string")]
   pub(crate) proxy_templates: Vec<String>,
   #[tabled(skip)]
+  pub(crate) variables: Vec<ClusterVarItem>,
+  #[tabled(skip)]
   pub(crate) networks: Option<Vec<ClusterNetworkItem>>,
+  #[tabled(skip)]
+  pub(crate) cargoes: Option<Vec<(ClusterCargoItem, CargoItem)>>,
 }
 
 #[derive(Debug, Parser, Serialize, Deserialize)]
@@ -50,8 +67,18 @@ pub struct ClusterNetworkItem {
   pub(crate) default_gateway: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Parser, Serialize, Deserialize)]
 pub struct ClusterVarPartial {
+  pub(crate) name: String,
+  pub(crate) value: String,
+}
+
+#[derive(Debug, Tabled, Serialize, Deserialize)]
+pub struct ClusterVarItem {
+  #[tabled(skip)]
+  pub(crate) key: String,
+  #[tabled(skip)]
+  pub(crate) cluster_key: String,
   pub(crate) name: String,
   pub(crate) value: String,
 }
@@ -262,8 +289,7 @@ impl Nanocld {
     Ok(item)
   }
 
-  // Todo be edit and delete cluster vars
-  pub async fn _delete_cluster_var(
+  pub async fn delete_cluster_var(
     &self,
     c_name: &str,
     v_name: &str,
@@ -352,5 +378,44 @@ impl Nanocld {
     let count = res.json::<PgGenericCount>().await?;
 
     Ok(count)
+  }
+
+  pub async fn add_nginx_template_to_cluster(
+    &self,
+    cl_name: &str,
+    nt_name: &str,
+    namespace: Option<String>,
+  ) -> Result<(), NanocldError> {
+    let mut res = self
+      .post(format!("/clusters/{}/nginx_templates", cl_name))
+      .query(&GenericNamespaceQuery { namespace })
+      .unwrap()
+      .send_json(&json!({
+        "name": nt_name.to_owned(),
+      }))
+      .await?;
+    println!("{:#?}", res);
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+
+    Ok(())
+  }
+
+  pub async fn remove_nginx_template_to_cluster(
+    &self,
+    cl_name: &str,
+    nt_name: &str,
+    namespace: Option<String>,
+  ) -> Result<(), NanocldError> {
+    let mut res = self
+      .delete(format!("/clusters/{}/nginx_templates/{}", cl_name, nt_name))
+      .query(&GenericNamespaceQuery { namespace })
+      .unwrap()
+      .send()
+      .await?;
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+
+    Ok(())
   }
 }

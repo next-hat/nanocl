@@ -8,6 +8,7 @@ use nanocld::{
   cluster::{ClusterPartial, ClusterNetworkPartial, ClusterJoinPartial},
   cargo::CargoPartial,
   error::NanocldError,
+  client::Nanocld,
 };
 use ntex::http::StatusCode;
 use serde::{Serialize, Deserialize};
@@ -78,6 +79,52 @@ pub struct NamespaceWithCount {
   networks: usize,
 }
 
+async fn execute_create_container_image(
+  name: &str,
+  client: &Nanocld,
+) -> Result<(), CliError> {
+  let mut stream = client.create_container_image(name).await?;
+  let style = ProgressStyle::default_spinner();
+  let pg = ProgressBar::new(0);
+  pg.set_style(style);
+  let mut is_new_action = false;
+  while let Some(info) = stream.next().await {
+    let status = info.status.unwrap_or_default();
+    let id = info.id.unwrap_or_default();
+    match status.as_str() {
+      "Downloading" => {
+        if !is_new_action {
+          is_new_action = true;
+          pg.println(format!("{} {}", &status, &id).trim());
+        }
+      }
+      "Extracting" => {
+        if !is_new_action {
+          is_new_action = true;
+          pg.println(format!("{} {}", &status, &id).trim());
+        } else {
+        }
+      }
+      "Pull complete" => {
+        is_new_action = false;
+        pg.println(format!("{} {}", &status, &id).trim());
+      }
+      "Download complete" => {
+        is_new_action = false;
+        pg.println(format!("{} {}", &status, &id).trim());
+      }
+      _ => pg.println(format!("{} {}", &status, &id).trim()),
+    };
+    if let Some(error) = info.error {
+      eprintln!("{}", error);
+      break;
+    }
+    pg.tick();
+  }
+  pg.finish_and_clear();
+  Ok(())
+}
+
 async fn execute_args(args: &Cli) -> Result<(), CliError> {
   let client = nanocld::client::Nanocld::connect_with_unix_default().await;
   match &args.command {
@@ -103,6 +150,10 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
       print_table(data);
     }
     Commands::Run(args) => {
+      if let Err(_err) = client.inspect_image(&args.image).await {
+        execute_create_container_image(&args.image, &client).await?;
+      }
+
       let cluster = ClusterPartial {
         name: args.cluster.to_owned(),
         proxy_templates: None,
@@ -124,13 +175,24 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
       let cluster_network = ClusterNetworkPartial {
         name: args.network.to_owned(),
       };
-      client
+      if let Err(err) = client
         .create_cluster_network(
           &args.cluster,
           &cluster_network,
           args.namespace.to_owned(),
         )
-        .await?;
+        .await
+      {
+        if let NanocldError::Api(err) = err {
+          if err.status != StatusCode::CONFLICT {
+            return Err(CliError::Client(nanocld::error::NanocldError::Api(
+              err,
+            )));
+          }
+        } else {
+          return Err(CliError::Client(err));
+        }
+      }
 
       let cargo = CargoPartial {
         name: args.name.to_owned(),
@@ -141,9 +203,19 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
         hostname: None,
         environnements: None,
       };
-      client
-        .create_cargo(&cargo, args.namespace.to_owned())
-        .await?;
+      if let Err(err) =
+        client.create_cargo(&cargo, args.namespace.to_owned()).await
+      {
+        if let NanocldError::Api(err) = err {
+          if err.status != StatusCode::CONFLICT {
+            return Err(CliError::Client(nanocld::error::NanocldError::Api(
+              err,
+            )));
+          }
+        } else {
+          return Err(CliError::Client(err));
+        }
+      }
 
       let cluster_join = ClusterJoinPartial {
         network: args.network.to_owned(),
@@ -219,39 +291,85 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
         let cluster = client
           .inspect_cluster(&options.name, args.namespace.to_owned())
           .await?;
-        println!("=== CLUSTER ===");
+        println!("\n> CLUSTER");
         print_table(vec![&cluster]);
-        println!("=== NETWORKS ===");
+        println!("\n> VARIABLES");
+        print_table(cluster.variables);
+        println!("\n> NETWORKS");
         print_table(cluster.networks.unwrap_or_default());
-        println!("===============");
+        println!("\n> CARGOES");
+        print_table(cluster.cargoes.unwrap_or_default());
       }
-    },
-    Commands::ClusterNetwork(args) => match &args.commands {
-      ClusterNetworkCommands::List => {
-        let items = client
-          .list_cluster_network(&args.cluster, args.namespace.to_owned())
-          .await?;
-        print_table(items);
-      }
-      ClusterNetworkCommands::Create(item) => {
-        let item = client
-          .create_cluster_network(
-            &args.cluster,
-            item,
-            args.namespace.to_owned(),
-          )
-          .await?;
-        println!("{}", item.key);
-      }
-      ClusterNetworkCommands::Remove(options) => {
-        client
-          .delete_cluster_network(
-            &args.cluster,
-            &options.name,
-            args.namespace.to_owned(),
-          )
-          .await?;
-      }
+      ClusterCommands::NginxTemplate(nt_args) => match &nt_args.commands {
+        ClusterNginxTemplateCommands::Add(nt_add_opts) => {
+          client
+            .add_nginx_template_to_cluster(
+              &nt_add_opts.cl_name,
+              &nt_add_opts.nt_name,
+              args.namespace.to_owned(),
+            )
+            .await?;
+        }
+        ClusterNginxTemplateCommands::Remove(nt_rm_opts) => {
+          client
+            .remove_nginx_template_to_cluster(
+              &nt_rm_opts.cl_name,
+              &nt_rm_opts.nt_name,
+              args.namespace.to_owned(),
+            )
+            .await?;
+        }
+      },
+      ClusterCommands::Network(network_opts) => match &network_opts.commands {
+        ClusterNetworkCommands::List => {
+          let items = client
+            .list_cluster_network(
+              &network_opts.cluster,
+              args.namespace.to_owned(),
+            )
+            .await?;
+          print_table(items);
+        }
+        ClusterNetworkCommands::Create(item) => {
+          let item = client
+            .create_cluster_network(
+              &network_opts.cluster,
+              item,
+              args.namespace.to_owned(),
+            )
+            .await?;
+          println!("{}", item.key);
+        }
+        ClusterNetworkCommands::Remove(options) => {
+          client
+            .delete_cluster_network(
+              &network_opts.cluster,
+              &options.name,
+              args.namespace.to_owned(),
+            )
+            .await?;
+        }
+      },
+      ClusterCommands::Variable(var_opts) => match &var_opts.commands {
+        ClusterVariableCommands::Create(var) => {
+          client
+            .create_cluster_var(
+              &var_opts.cluster,
+              var,
+              args.namespace.to_owned(),
+            )
+            .await?;
+        }
+        ClusterVariableCommands::Remove(rm_args) => {
+          client
+            .delete_cluster_var(
+              &var_opts.cluster,
+              &rm_args.name,
+              args.namespace.to_owned(),
+            )
+            .await?;
+        }
+      },
     },
     Commands::GitRepository(args) => match &args.commands {
       GitRepositoryCommands::List => {
@@ -268,17 +386,48 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
           .await?;
       }
       GitRepositoryCommands::Build(options) => {
+        let pg = ProgressBar::new(0);
+        let style = ProgressStyle::default_spinner();
+        let mut is_new_action = false;
+        pg.set_style(style);
         client
-          .build_git_repository(options.name.to_owned(), |output| {
-            print!("{}", output.stream.unwrap_or_default());
-            if let Some(status) = output.status {
-              println!("{}", status);
+          .build_git_repository(options.name.to_owned(), |info| {
+            let status = info.status.unwrap_or_default();
+            let id = info.id.unwrap_or_default();
+            match status.as_str() {
+              "Downloading" => {
+                if !is_new_action {
+                  is_new_action = true;
+                  pg.println(format!("{} {}", &status, &id).trim());
+                }
+              }
+              "Extracting" => {
+                if !is_new_action {
+                  is_new_action = true;
+                  pg.println(format!("{} {}", &status, &id).trim());
+                } else {
+                }
+              }
+              "Pull complete" => {
+                is_new_action = false;
+                pg.println(format!("{} {}", &status, &id).trim());
+              }
+              "Download complete" => {
+                is_new_action = false;
+                pg.println(format!("{} {}", &status, &id).trim());
+              }
+              _ => pg.println(format!("{} {}", &status, &id).trim()),
+            };
+            if let Some(output) = info.stream {
+              pg.println(output.trim());
             }
-            if let Some(err) = output.error {
-              eprintln!("{}", err);
+            if let Some(error) = info.error {
+              eprintln!("{}", error);
             }
+            pg.tick();
           })
           .await?;
+        pg.finish_and_clear();
       }
     },
     Commands::Cargo(args) => match &args.commands {
@@ -294,6 +443,16 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
         client
           .delete_cargo(&options.name, args.namespace.to_owned())
           .await?;
+      }
+      CargoCommands::Inspect(options) => {
+        let cargo = client
+          .inspect_cargo(&options.name, args.namespace.to_owned())
+          .await?;
+
+        println!("\n> CARGO");
+        print_table([&cargo]);
+        println!("\n> CONTAINERS");
+        print_table(cargo.containers);
       }
     },
     Commands::NginxTemplate(args) => match &args.commands {
@@ -364,45 +523,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
         client.deploy_container_image(&options.name).await?;
       }
       ContainerImageCommands::Create(options) => {
-        let mut stream = client.create_container_image(&options.name).await?;
-        let style = ProgressStyle::default_spinner();
-        let pg = ProgressBar::new(0);
-        pg.set_style(style);
-        let mut is_new_action = false;
-        while let Some(info) = stream.next().await {
-          let status = info.status.unwrap_or_default();
-          let id = info.id.unwrap_or_default();
-          match status.as_str() {
-            "Downloading" => {
-              if !is_new_action {
-                is_new_action = true;
-                pg.println(format!("{} {}", &status, &id));
-              }
-            }
-            "Extracting" => {
-              if !is_new_action {
-                is_new_action = true;
-                pg.println(format!("{} {}", &status, &id));
-              } else {
-              }
-            }
-            "Pull complete" => {
-              is_new_action = false;
-              pg.println(format!("{} {}", &status, &id));
-            }
-            "Download complete" => {
-              is_new_action = false;
-              pg.println(format!("{} {}", &status, &id));
-            }
-            _ => pg.println(format!("{} {}", &status, &id)),
-          };
-          if let Some(error) = info.error {
-            eprintln!("{}", error);
-            break;
-          }
-          pg.tick();
-        }
-        pg.finish_and_clear();
+        execute_create_container_image(&options.name, &client).await?;
       }
       ContainerImageCommands::Remove(args) => {
         client.remove_container_image(&args.name).await?;
@@ -416,7 +537,10 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
       version::print_version();
       println!("=== [nanocld] ===");
       let daemon_version = client.get_version().await?;
-      println!("Arch: {}\nVersion: {}\nCommit ID: {}", daemon_version.arch, daemon_version.version, daemon_version.commit_id);
+      println!(
+        "Arch: {}\nVersion: {}\nCommit ID: {}",
+        daemon_version.arch, daemon_version.version, daemon_version.commit_id
+      );
     }
   }
   Ok(())

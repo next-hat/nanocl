@@ -64,10 +64,6 @@ nanocl-nginx-template(1)
 
 :   Manage nginx templates
 
-nanocl-cluster-network(1)
-
-:   manage cluster networks
-
 nanocl-container-image(1)
 
 :   Manage container images

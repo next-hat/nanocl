@@ -6,6 +6,7 @@ use super::{
   client::Nanocld,
   error::{NanocldError, is_api_error},
   models::{PgGenericCount, GenericNamespaceQuery},
+  container::ContainerSummary,
 };
 
 #[derive(Debug, Parser, Serialize, Deserialize)]
@@ -42,14 +43,32 @@ pub struct CargoItem {
   #[serde(rename = "image_name")]
   pub(crate) image: String,
   // #[serde(rename = "network_name")]
-  // #[tabled(display_with = "optional_string")]
   // pub(crate) network: Option<String>,
   #[serde(rename = "namespace_name")]
   pub(crate) namespace: String,
 }
 
-// Helper for tabled may be needed later
-fn _optional_string(s: &Option<String>) -> String {
+/// Cargo item with his relation
+#[derive(Debug, Tabled, Serialize, Deserialize)]
+pub struct CargoItemWithRelation {
+  pub(crate) key: String,
+  #[tabled(skip)]
+  pub(crate) namespace_name: String,
+  pub(crate) name: String,
+  pub(crate) image_name: String,
+  #[tabled(display_with = "optional_string")]
+  pub(crate) domainname: Option<String>,
+  #[tabled(display_with = "optional_string")]
+  pub(crate) hostname: Option<String>,
+  #[tabled(display_with = "optional_string")]
+  pub(crate) dns_entry: Option<String>,
+  #[tabled(skip)]
+  pub(crate) binds: Vec<String>,
+  #[tabled(skip)]
+  pub(crate) containers: Vec<ContainerSummary>,
+}
+
+fn optional_string(s: &Option<String>) -> String {
   match s {
     None => String::from(""),
     Some(s) => s.to_owned(),
@@ -129,7 +148,7 @@ impl Nanocld {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<CargoItem, NanocldError> {
+  ) -> Result<CargoItemWithRelation, NanocldError> {
     let mut res = self
       .get(format!("/cargoes/{name}/inspect", name = name))
       .query(&GenericNamespaceQuery { namespace })
@@ -138,7 +157,7 @@ impl Nanocld {
       .await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let item = res.json::<CargoItem>().await?;
+    let item = res.json::<CargoItemWithRelation>().await?;
 
     Ok(item)
   }

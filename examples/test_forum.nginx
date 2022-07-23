@@ -1,8 +1,8 @@
 server {
-  server_name {{vars.PRE_DOMAIN}}express-forum.com;
-  listen 192.168.8.100:80;
+  server_name {{vars.DOMAIN}};
+  listen {{vars.REMOTE_ADDR}}:80;
 
-  if ($host != {{vars.PRE_DOMAIN}}express-forum.com) {
+  if ($host != {{vars.DOMAIN}}) {
       return 404;
   }
 
