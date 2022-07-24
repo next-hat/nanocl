@@ -382,6 +382,26 @@ pub struct RunArgs {
   pub(crate) name: String,
 }
 
+#[derive(Debug, Parser)]
+pub struct ExecArgs {
+  #[clap(long, short)]
+  pub(crate) detach: Option<String>,
+  #[clap(long, short)]
+  pub(crate) env: Option<Vec<String>>,
+  #[clap(long, short)]
+  pub(crate) interactive: Option<bool>,
+  #[clap(long, short)]
+  pub(crate) tty: Option<bool>,
+  #[clap(long, short)]
+  pub(crate) user: Option<String>,
+  #[clap(long, short)]
+  pub(crate) workdir: Option<String>,
+  /// Name of container to exec into
+  pub(crate) name: String,
+  #[clap(multiple = true, raw = true)]
+  pub(crate) cmd: Vec<String>,
+}
+
 #[derive(Debug, Subcommand)]
 pub enum Commands {
   Docker(DockerOptions),
@@ -396,6 +416,7 @@ pub enum Commands {
   #[clap(name = "lsc")]
   ListContainer(ListContainerOptions),
   Run(RunArgs),
+  Exec(ExecArgs),
   /// Connect to nginx logging
   NginxLog,
   /// Show the Nanocl version information

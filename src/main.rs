@@ -9,6 +9,7 @@ use nanocld::{
   cargo::CargoPartial,
   error::NanocldError,
   client::Nanocld,
+  container::ContainerExecQuery,
 };
 use ntex::http::StatusCode;
 use serde::{Serialize, Deserialize};
@@ -541,6 +542,24 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
         "Arch: {}\nVersion: {}\nCommit ID: {}",
         daemon_version.arch, daemon_version.version, daemon_version.commit_id
       );
+    }
+    Commands::Exec(args) => {
+      let config = ContainerExecQuery {
+        attach_stdin: None,
+        attach_stdout: Some(true),
+        attach_stderr: Some(true),
+        detach_keys: None,
+        tty: Some(true),
+        env: None,
+        cmd: Some(args.cmd.to_owned()),
+        privileged: None,
+        user: None,
+        working_dir: None,
+      };
+
+      let exec = client.create_exec(&args.name, config).await?;
+
+      client.start_exec(&exec.id).await?;
     }
   }
   Ok(())

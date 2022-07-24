@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 use clap::Parser;
+use futures::{TryStreamExt, StreamExt};
+use ntex::rt;
+use ntex::util::Bytes;
 use serde::{Serialize, Deserialize};
 use tabled::Tabled;
 
@@ -156,6 +159,50 @@ pub struct ListContainerOptions {
   cargo: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ContainerExecQuery {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) attach_stdin: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) attach_stdout: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) attach_stderr: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) detach_keys: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) tty: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) env: Option<Vec<String>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) cmd: Option<Vec<String>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) privileged: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) user: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub(crate) working_dir: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExecItem {
+  #[serde(rename = "Id")]
+  pub(crate) id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum LogOutputStreamTypes {
+  StdErr,
+  StdIn,
+  StdOut,
+  Console,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LogOutputStream {
+  types: LogOutputStreamTypes,
+  message: String,
+}
+
 impl Nanocld {
   pub async fn list_containers(
     &self,
@@ -173,5 +220,48 @@ impl Nanocld {
     let data = res.json::<Vec<ContainerSummary>>().await?;
 
     Ok(data)
+  }
+
+  pub async fn create_exec(
+    &self,
+    name: &str,
+    config: ContainerExecQuery,
+  ) -> Result<ExecItem, NanocldError> {
+    let mut res = self
+      .post(format!("/containers/{}/exec", name))
+      .send_json(&config)
+      .await?;
+    let status = res.status();
+
+    is_api_error(&mut res, &status).await?;
+
+    let exec = res.json::<ExecItem>().await?;
+
+    Ok(exec)
+  }
+
+  pub async fn start_exec(&self, id: &str) -> Result<(), NanocldError> {
+    let mut res = self.post(format!("/exec/{}/start", &id)).send().await?;
+    let status = res.status();
+
+    is_api_error(&mut res, &status).await?;
+
+    let mut stream = res.into_stream();
+
+    while let Some(output) = stream.next().await {
+      match output {
+        Err(err) => {
+          eprintln!("{err}");
+        }
+        Ok(output) => {
+          print!("{}", &String::from_utf8(output.to_vec()).unwrap());
+          // let payload =
+          //   serde_json::from_slice::<LogOutputStream>(&output.to_vec())
+          //     .unwrap();
+          // print!("{}", payload.message);
+        }
+      }
+    }
+    Ok(())
   }
 }

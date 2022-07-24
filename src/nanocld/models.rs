@@ -22,6 +22,7 @@ pub struct PgGenericCount {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GenericNamespaceQuery {
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) namespace: Option<String>,
 }
 
