@@ -255,10 +255,6 @@ impl Nanocld {
         }
         Ok(output) => {
           print!("{}", &String::from_utf8(output.to_vec()).unwrap());
-          // let payload =
-          //   serde_json::from_slice::<LogOutputStream>(&output.to_vec())
-          //     .unwrap();
-          // print!("{}", payload.message);
         }
       }
     }
