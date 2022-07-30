@@ -455,6 +455,14 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
         println!("\n> CONTAINERS");
         print_table(cargo.containers);
       }
+      CargoCommands::Patch(opts) => match &opts.commands {
+        CargoPatchCommands::Set(p) => {
+          let cargo = client
+            .update_cargo(&opts.name, args.namespace.to_owned(), p)
+            .await?;
+          println!("{:#?}", cargo);
+        }
+      },
     },
     Commands::NginxTemplate(args) => match &args.commands {
       NginxTemplateCommand::List => {

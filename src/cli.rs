@@ -6,7 +6,7 @@ use crate::nanocld::{
   git_repository::GitRepositoryPartial,
   namespace::NamespacePartial,
   cluster::{ClusterPartial, ClusterNetworkPartial, ClusterVarPartial},
-  cargo::CargoPartial,
+  cargo::{CargoPartial, CargoPatchPartial},
   container_image::ContainerImagePartial,
   nginx_template::NginxTemplateModes,
   container::ListContainerOptions,
@@ -207,6 +207,18 @@ pub struct CargoInspectOption {
 }
 
 #[derive(Debug, Subcommand)]
+pub enum CargoPatchCommands {
+  Set(CargoPatchPartial),
+}
+
+#[derive(Debug, Parser)]
+pub struct CargoPatchOption {
+  pub(crate) name: String,
+  #[clap(subcommand)]
+  pub(crate) commands: CargoPatchCommands,
+}
+
+#[derive(Debug, Subcommand)]
 #[clap(
   about,
   version,
@@ -221,8 +233,10 @@ pub enum CargoCommands {
   /// Remove cargo by it's name
   #[clap(alias("rm"))]
   Remove(CargoDeleteOptions),
-  /// Inspect a cargo
+  /// Inspect a cargo by it's name
   Inspect(CargoInspectOption),
+  /// Update a cargo by it's name
+  Patch(CargoPatchOption),
 }
 
 /// manage cargoes

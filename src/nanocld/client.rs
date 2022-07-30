@@ -41,4 +41,8 @@ impl Nanocld {
   pub(crate) fn post(&self, url: String) -> ClientRequest {
     self.client.post(self.gen_url(url))
   }
+
+  pub(crate) fn patch(&self, url: String) -> ClientRequest {
+    self.client.patch(self.gen_url(url))
+  }
 }

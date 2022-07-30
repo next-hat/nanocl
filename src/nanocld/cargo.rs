@@ -68,6 +68,24 @@ pub struct CargoItemWithRelation {
   pub(crate) containers: Vec<ContainerSummary>,
 }
 
+#[derive(Debug, Parser, Serialize, Deserialize)]
+pub struct CargoPatchPartial {
+  #[clap(long)]
+  pub(crate) name: Option<String>,
+  #[clap(long = "image")]
+  pub(crate) image_name: Option<String>,
+  #[clap(long = "bind")]
+  pub(crate) binds: Option<Vec<String>>,
+  #[clap(long)]
+  pub(crate) dns_entry: Option<String>,
+  #[clap(long)]
+  pub(crate) domainname: Option<String>,
+  #[clap(long)]
+  pub(crate) hostname: Option<String>,
+  #[clap(long = "env")]
+  pub(crate) environnements: Option<Vec<String>>,
+}
+
 fn optional_string(s: &Option<String>) -> String {
   match s {
     None => String::from(""),
@@ -160,5 +178,25 @@ impl Nanocld {
     let item = res.json::<CargoItemWithRelation>().await?;
 
     Ok(item)
+  }
+
+  pub async fn update_cargo(
+    &self,
+    name: &str,
+    namespace: Option<String>,
+    payload: &CargoPatchPartial,
+  ) -> Result<CargoItem, NanocldError> {
+    let mut res = self
+      .patch(format!("/cargoes/{name}"))
+      .query(&GenericNamespaceQuery { namespace })
+      .unwrap()
+      .send_json(payload)
+      .await?;
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+
+    let cargo = res.json::<CargoItem>().await?;
+
+    Ok(cargo)
   }
 }
