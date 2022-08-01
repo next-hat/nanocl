@@ -12,7 +12,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-test
+Manage your hybrid cloud with nanocl
 
 OPTIONS
 =======
@@ -34,31 +34,31 @@ SUBCOMMANDS
 
 nanocl-docker(1)
 
-:   alias to self-managed dockerd
+:   Alias to self-managed dockerd can be used for debug
 
 nanocl-namespace(1)
 
-:   manage namespaces
+:   Manage namespaces
 
 nanocl-cluster(1)
 
-:   manage clusters
+:   Manage clusters
 
 nanocl-cargo(1)
 
-:   manage cargoes
+:   Manage cargoes
 
 nanocl-apply(1)
 
-:   apply a configuration file
+:   Apply a configuration file
 
 nanocl-revert(1)
 
-:   revert a configuration file
+:   Revert a configuration file
 
 nanocl-git-repository(1)
 
-:   manage git repositories
+:   Manage git repositories
 
 nanocl-nginx-template(1)
 
@@ -78,7 +78,7 @@ nanocl-run(1)
 
 nanocl-exec(1)
 
-:   
+:   Execute command inside a container
 
 nanocl-nginx-log(1)
 

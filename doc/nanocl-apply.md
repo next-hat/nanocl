@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl-apply - apply a configuration file
+nanocl-apply - Apply a configuration file
 
 SYNOPSIS
 ========
@@ -11,7 +11,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-apply a configuration file
+Apply a configuration file
 
 OPTIONS
 =======

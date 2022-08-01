@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl-revert - revert a configuration file
+nanocl-revert - Revert a configuration file
 
 SYNOPSIS
 ========
@@ -11,7 +11,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-revert a configuration file
+Revert a configuration file
 
 OPTIONS
 =======

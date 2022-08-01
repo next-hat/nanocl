@@ -29,7 +29,7 @@ mod yml;
 mod errors;
 mod version;
 mod nanocld;
-#[cfg(feature = "genman")]
+// #[cfg(feature = "genman")]
 mod man;
 
 use cli::*;

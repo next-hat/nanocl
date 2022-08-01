@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl-namespace - manage namespaces
+nanocl-namespace - Manage namespaces
 
 SYNOPSIS
 ========
@@ -11,7 +11,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-manage namespaces
+Manage namespaces
 
 OPTIONS
 =======

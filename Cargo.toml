@@ -14,7 +14,8 @@ opt-level = 3
 
 [features]
 default = []
-genman = ["dep:clap_mangen"]
+genman = [
+]
 
 [dependencies]
 futures = "0.3"
@@ -30,4 +31,4 @@ chrono = { version = "0.4.19", features = ["serde"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 ntex = { version = "=0.5.24", features = ["rustls", "tokio"] }
 # Optional deps
-clap_mangen = { version = "0.1", optional = true }
+clap_mangen = { version = "0.1" }

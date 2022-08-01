@@ -18,7 +18,7 @@ use crate::nanocld::{
   about,
   version,
   name = "nanocl",
-  long_about = "test",
+  long_about = "Manage your hybrid cloud with nanocl",
   global_setting = AppSettings::DeriveDisplayOrder,
 )]
 pub struct Cli {
@@ -47,8 +47,13 @@ pub struct GitRepositoryDeleteOptions {
   pub name: String,
 }
 
-/// Cluster delete options
+/// Remove cluster by it's name
 #[derive(Debug, Parser)]
+#[clap(
+  name = "nanocl-cluster-delete",
+  long_about = "Remove cluster by it's name with all related relations, note \
+  this will also delete your containers."
+)]
 pub struct ClusterDeleteOptions {
   /// Name of cluster to delete
   pub name: String,
@@ -76,14 +81,25 @@ pub enum GitRepositoryCommands {
   Build(GitRepositoryBuildOptions),
 }
 
-/// Cluster start options
+/// Start cluster by it's name
 #[derive(Debug, Parser)]
+#[clap(
+  name = "nanocl-cluster-start",
+  long_about = "Start a cluster by it's name note: \
+  this will create and start all non running joined cargo and reapply \
+  proxy and dns settings"
+)]
 pub struct ClusterStartOptions {
   /// Name of cluster to start
   pub(crate) name: String,
 }
 
+/// Inspect cluster by it's name
 #[derive(Debug, Parser)]
+#[clap(
+  name = "nanocl-cluster-inspect",
+  long_about = "Get cluster information from it's name in current namespace"
+)]
 pub struct ClusterInspectOptions {
   pub(crate) name: String,
 }
@@ -289,10 +305,15 @@ pub struct GitRepositoryArgs {
 
 /// Manage clusters
 #[derive(Debug, Parser)]
+#[clap(
+  name = "nanocl-cluster",
+  long_about = "Create, Update, Inspect or Delete cluster"
+)]
 pub struct ClusterArgs {
-  /// namespace to target by default global is used
+  /// Namespace to target by default global is used
   #[clap(long)]
   pub namespace: Option<String>,
+  /// Available subcommands
   #[clap(subcommand)]
   pub commands: ClusterCommands,
 }
