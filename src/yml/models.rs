@@ -12,7 +12,7 @@ pub(crate) struct Cargo {
   pub(crate) domainname: Option<String>,
   pub(crate) hostname: Option<String>,
   pub(crate) binds: Option<Vec<String>>,
-  #[serde(rename(deserialize = "envs"))]
+  pub(crate) replicas: Option<i32>,
   pub(crate) environnements: Option<Vec<String>>,
 }
 

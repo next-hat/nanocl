@@ -32,6 +32,9 @@ pub struct CargoPartial {
   /// Environement variable
   #[clap(long = "-env")]
   pub(crate) environnements: Option<Vec<String>>,
+  /// Number of replicas default to 1
+  #[clap(long)]
+  pub(crate) replicas: Option<i32>,
 }
 
 /// Cargo item is an definition to container create image and start them
@@ -42,6 +45,7 @@ pub struct CargoItem {
   pub(crate) name: String,
   #[serde(rename = "image_name")]
   pub(crate) image: String,
+  pub(crate) replicas: i32,
   // #[serde(rename = "network_name")]
   // pub(crate) network: Option<String>,
   #[serde(rename = "namespace_name")]
@@ -56,6 +60,7 @@ pub struct CargoItemWithRelation {
   pub(crate) namespace_name: String,
   pub(crate) name: String,
   pub(crate) image_name: String,
+  pub(crate) replicas: i32,
   #[tabled(display_with = "optional_string")]
   pub(crate) domainname: Option<String>,
   #[tabled(display_with = "optional_string")]
@@ -76,6 +81,8 @@ pub struct CargoPatchPartial {
   pub(crate) image_name: Option<String>,
   #[clap(long = "bind")]
   pub(crate) binds: Option<Vec<String>>,
+  #[clap(long)]
+  pub(crate) replicas: Option<i32>,
   #[clap(long)]
   pub(crate) dns_entry: Option<String>,
   #[clap(long)]

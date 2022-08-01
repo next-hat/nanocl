@@ -199,6 +199,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
         name: args.name.to_owned(),
         image_name: args.image.to_owned(),
         binds: None,
+        replicas: None,
         dns_entry: None,
         domainname: None,
         hostname: None,
