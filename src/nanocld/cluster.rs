@@ -83,7 +83,7 @@ pub struct ClusterVarItem {
   pub(crate) value: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Parser, Serialize, Deserialize)]
 pub struct ClusterJoinPartial {
   pub(crate) network: String,
   pub(crate) cargo: String,

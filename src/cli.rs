@@ -133,6 +133,16 @@ pub struct ClusterVariableOptions {
   pub(crate) commands: ClusterVariableCommands,
 }
 
+#[derive(Debug, Parser)]
+pub struct ClusterJoinOptions {
+  /// Name of the cluster to join
+  pub(crate) cluster_name: String,
+  /// Name of the network inside the cluster to join
+  pub(crate) network_name: String,
+  /// Name of the cargo
+  pub(crate) cargo_name: String,
+}
+
 /// Cluster sub commands
 #[derive(Debug, Subcommand)]
 pub enum ClusterCommands {
@@ -154,9 +164,11 @@ pub enum ClusterCommands {
   Network(ClusterNetworkArgs),
   /// Control cluster variables
   Variable(ClusterVariableOptions),
+  /// Create containers instances of a cargo inside given cluster and network
+  Join(ClusterJoinOptions),
 }
 
-/// Cluster network delete topions
+/// Cluster network delete options
 #[derive(Debug, Parser)]
 pub struct ClusterNetworkDeleteOptions {
   /// Name of the cluster where network is
@@ -165,7 +177,7 @@ pub struct ClusterNetworkDeleteOptions {
   pub name: String,
 }
 
-/// Cluster network option
+/// Cluster network options
 #[derive(Debug, Parser)]
 pub struct ClusterNetworkOptions {
   /// Name of the cluster where network is
@@ -173,7 +185,7 @@ pub struct ClusterNetworkOptions {
   pub cluster_name: String,
 }
 
-/// Cluster network commads
+/// Cluster network commands
 #[derive(Debug, Subcommand)]
 pub enum ClusterNetworkCommands {
   /// List existing cluster network
@@ -239,7 +251,7 @@ pub enum CargoCommands {
   Patch(CargoPatchOption),
 }
 
-/// manage cargoes
+/// Manage cargoes
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl-cargo")]
 pub struct CargoArgs {
@@ -250,14 +262,14 @@ pub struct CargoArgs {
   pub commands: CargoCommands,
 }
 
-/// alias to self-managed dockerd
+/// Alias to self-managed dockerd can be used for debug
 #[derive(Debug, Parser)]
 pub struct DockerOptions {
   #[clap(multiple = true, raw = true)]
   pub args: Vec<String>,
 }
 
-/// manage namespaces
+/// Manage namespaces
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl-namespace")]
 pub struct NamespaceArgs {
@@ -265,7 +277,7 @@ pub struct NamespaceArgs {
   pub commands: NamespaceCommands,
 }
 
-/// manage git repositories
+/// Manage git repositories
 #[derive(Debug, Parser)]
 pub struct GitRepositoryArgs {
   /// namespace to target by default global is used
@@ -275,7 +287,7 @@ pub struct GitRepositoryArgs {
   pub commands: GitRepositoryCommands,
 }
 
-/// manage clusters
+/// Manage clusters
 #[derive(Debug, Parser)]
 pub struct ClusterArgs {
   /// namespace to target by default global is used
@@ -285,7 +297,7 @@ pub struct ClusterArgs {
   pub commands: ClusterCommands,
 }
 
-/// manage cluster networks
+/// Manage cluster networks
 #[derive(Debug, Parser)]
 pub struct ClusterNetworkArgs {
   /// cluster to target
@@ -294,7 +306,7 @@ pub struct ClusterNetworkArgs {
   pub commands: ClusterNetworkCommands,
 }
 
-/// apply a configuration file
+/// Apply a configuration file
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl-apply")]
 pub struct ApplyArgs {
@@ -303,7 +315,7 @@ pub struct ApplyArgs {
   pub(crate) file_path: String,
 }
 
-/// revert a configuration file
+/// Revert a configuration file
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl-revert")]
 pub struct RevertArgs {
@@ -396,6 +408,7 @@ pub struct RunArgs {
   pub(crate) name: String,
 }
 
+/// Execute command inside a container
 #[derive(Debug, Parser)]
 pub struct ExecArgs {
   #[clap(long, short)]

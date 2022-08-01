@@ -301,6 +301,19 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
         println!("\n> CARGOES");
         print_table(cluster.cargoes.unwrap_or_default());
       }
+      ClusterCommands::Join(join_args) => {
+        let join_opts = ClusterJoinPartial {
+          network: join_args.network_name.to_owned(),
+          cargo: join_args.cargo_name.to_owned(),
+        };
+        client
+          .join_cluster_cargo(
+            &join_args.cluster_name,
+            &join_opts,
+            args.namespace.to_owned(),
+          )
+          .await?;
+      }
       ClusterCommands::NginxTemplate(nt_args) => match &nt_args.commands {
         ClusterNginxTemplateCommands::Add(nt_add_opts) => {
           client

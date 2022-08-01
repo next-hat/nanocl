@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 use clap::Parser;
-use futures::{TryStreamExt, StreamExt};
-use ntex::rt;
-use ntex::util::Bytes;
-use serde::{Serialize, Deserialize};
 use tabled::Tabled;
+use futures::{TryStreamExt, StreamExt};
+use serde::{Serialize, Deserialize};
 
 use super::error::{NanocldError, is_api_error};
 use super::models::{Port, EndpointSettings, optional_string};
