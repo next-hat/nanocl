@@ -10,6 +10,7 @@ use crate::nanocld::{
   container_image::ContainerImagePartial,
   nginx_template::NginxTemplateModes,
   container::ListContainerOptions,
+  node::NodePartial,
 };
 
 /// A self-sufficient hybrid-cloud manager
@@ -452,7 +453,7 @@ pub struct ExecArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum NodeCommands {
-  Create,
+  Create(NodePartial),
 }
 
 #[derive(Debug, Parser)]

@@ -147,7 +147,9 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
       let _status = cmd.wait();
     }
     Commands::Node(args) => match &args.subcommands {
-      NodeCommands::Create => {}
+      NodeCommands::Create(node) => {
+        println!("{:#?}", node);
+      }
     },
     Commands::ListContainer(args) => {
       let data = client.list_containers(args).await?;
