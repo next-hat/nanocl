@@ -8,6 +8,8 @@ version=`cat ./Cargo.toml | grep -m 1 "version = \"" | sed 's/[^0-9.]*\([0-9.]*\
 release_path="./target/${pkg_name}_${version}_${arch}"
 commit_id=`git rev-parse --verify HEAD | cut -c1-8`
 
+export RUSTFLAGS="-C target-feature=-crt-static"
+
 if [ -n `git diff --no-ext-diff --quiet --exit-code` ]; then
   echo "You seems to have changes please commit them before release"
   # exit 1

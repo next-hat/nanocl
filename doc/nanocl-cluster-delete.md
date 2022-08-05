@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl-cluster-delete - Cluster delete options
+nanocl-cluster-delete - Remove cluster by its name
 
 SYNOPSIS
 ========
@@ -11,7 +11,8 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-Cluster delete options
+Remove cluster by its name with all related relations, note this will
+also delete your containers.
 
 OPTIONS
 =======

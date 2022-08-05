@@ -80,6 +80,10 @@ nanocl-exec(1)
 
 :   Execute command inside a container
 
+nanocl-node(1)
+
+:   
+
 nanocl-nginx-log(1)
 
 :   Connect to nginx logging
@@ -95,4 +99,4 @@ nanocl-help(1)
 VERSION
 =======
 
-v0.1.1
+v0.1.2

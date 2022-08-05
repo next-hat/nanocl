@@ -12,7 +12,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-Manage clusters
+Create, Update, Inspect or Delete cluster
 
 OPTIONS
 =======
@@ -23,7 +23,7 @@ OPTIONS
 
 **\--namespace**=*NAMESPACE*
 
-:   namespace to target by default global is used
+:   Namespace to target by default global is used
 
 SUBCOMMANDS
 ===========

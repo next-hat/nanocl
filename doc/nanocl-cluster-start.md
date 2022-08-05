@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl-cluster-start - Cluster start options
+nanocl-cluster-start - Start cluster by its name
 
 SYNOPSIS
 ========
@@ -11,7 +11,8 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-Cluster start options
+Start a cluster by its name note: this will create and start all non
+running joined cargo and reapply proxy and dns settings
 
 OPTIONS
 =======

@@ -10,3 +10,4 @@ pub mod nginx_log;
 pub mod nginx_template;
 pub mod container;
 pub mod system;
+pub mod node;

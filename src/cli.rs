@@ -451,6 +451,17 @@ pub struct ExecArgs {
 }
 
 #[derive(Debug, Subcommand)]
+pub enum NodeCommands {
+  Create,
+}
+
+#[derive(Debug, Parser)]
+pub struct NodeArgs {
+  #[clap(subcommand)]
+  pub(crate) subcommands: NodeCommands,
+}
+
+#[derive(Debug, Subcommand)]
 pub enum Commands {
   Docker(DockerOptions),
   Namespace(NamespaceArgs),
@@ -465,6 +476,7 @@ pub enum Commands {
   ListContainer(ListContainerOptions),
   Run(RunArgs),
   Exec(ExecArgs),
+  Node(NodeArgs),
   /// Connect to nginx logging
   NginxLog,
   /// Show the Nanocl version information
