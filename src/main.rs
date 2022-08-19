@@ -557,6 +557,15 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
         client.remove_container_image(&args.name).await?;
       }
     },
+    Commands::Vm(args) => match &args.subcommands {
+      VirtualMachineCommands::Image(image_args) => {
+        match &image_args.subcommands {
+          VirtualMachineImageCommands::Import(import_payload) => {
+            client.vm_image_import(import_payload).await?;
+          }
+        }
+      }
+    },
     Commands::NginxLog => {
       client.watch_nginx_logs().await?;
     }

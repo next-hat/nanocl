@@ -11,6 +11,7 @@ use crate::nanocld::{
   nginx_template::NginxTemplateModes,
   container::ListContainerOptions,
   node::NodePartial,
+  virtual_machine_image::VmImageImportPayload,
 };
 
 /// A self-sufficient hybrid-cloud manager
@@ -463,6 +464,28 @@ pub struct NodeArgs {
 }
 
 #[derive(Debug, Subcommand)]
+pub enum VirtualMachineImageCommands {
+  Import(VmImageImportPayload),
+}
+
+#[derive(Debug, Parser)]
+pub struct VirtualMachineImageArgs {
+  #[clap(subcommand)]
+  pub(crate) subcommands: VirtualMachineImageCommands,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum VirtualMachineCommands {
+  Image(VirtualMachineImageArgs),
+}
+
+#[derive(Debug, Parser)]
+pub struct VirtualMachineArgs {
+  #[clap(subcommand)]
+  pub(crate) subcommands: VirtualMachineCommands,
+}
+
+#[derive(Debug, Subcommand)]
 pub enum Commands {
   Docker(DockerOptions),
   Namespace(NamespaceArgs),
@@ -473,6 +496,7 @@ pub enum Commands {
   GitRepository(GitRepositoryArgs),
   NginxTemplate(NginxTemplateArgs),
   ContainerImage(ContainerImageArgs),
+  Vm(VirtualMachineArgs),
   #[clap(name = "lsc")]
   ListContainer(ListContainerOptions),
   Run(RunArgs),

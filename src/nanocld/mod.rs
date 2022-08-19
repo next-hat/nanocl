@@ -11,3 +11,4 @@ pub mod nginx_template;
 pub mod container;
 pub mod system;
 pub mod node;
+pub mod virtual_machine_image;
