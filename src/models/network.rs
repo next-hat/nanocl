@@ -1,41 +1,5 @@
 use std::collections::HashMap;
-
 use serde::{Serialize, Deserialize};
-
-// Helper for tabled may be needed later
-pub fn optional_string(s: &Option<String>) -> String {
-  match s {
-    None => String::from(""),
-    Some(s) => s.to_owned(),
-  }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PgGenericDelete {
-  pub(crate) count: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PgGenericCount {
-  pub(crate) count: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GenericNamespaceQuery {
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub(crate) namespace: Option<String>,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct ProgressDetail {
-  #[serde(rename = "current")]
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub current: Option<i64>,
-
-  #[serde(rename = "total")]
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub total: Option<i64>,
-}
 
 #[allow(non_camel_case_types)]
 #[derive(
@@ -53,7 +17,7 @@ pub enum PortTypeEnum {
 }
 
 /// An open port on a container
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Port {
   /// Host IP address that the container's port is mapped to
   #[serde(rename = "IP")]
@@ -75,7 +39,7 @@ pub struct Port {
 }
 
 /// EndpointIPAMConfig represents an endpoint's IPAM configuration.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EndpointIpamConfig {
   #[serde(rename = "IPv4Address")]
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -91,7 +55,7 @@ pub struct EndpointIpamConfig {
 }
 
 /// Configuration for a network endpoint.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EndpointSettings {
   #[serde(rename = "IPAMConfig")]
   #[serde(skip_serializing_if = "Option::is_none")]

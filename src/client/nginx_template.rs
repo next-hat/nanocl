@@ -1,36 +1,9 @@
-use clap::{Parser, arg_enum};
-use tabled::Tabled;
-use serde::{Serialize, Deserialize};
+use crate::models::*;
 
 use super::{
-  client::Nanocld,
+  http_client::Nanocld,
   error::{NanocldError, is_api_error},
 };
-
-arg_enum! {
-  /// Nginx template mode
-  /// # Examples
-  /// ```
-  /// NginxTemplateModes::Http; // For http forward
-  /// NginxTemplateModes::Stream; // For low level tcp/udp forward
-  /// ```
-  #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-  #[serde(rename_all = "snake_case")]
-  pub enum NginxTemplateModes {
-    Http,
-    Stream,
-  }
-}
-
-#[derive(Debug, Tabled, Parser, Serialize, Deserialize)]
-pub struct NginxTemplatePartial {
-  /// Name of template to create
-  pub(crate) name: String,
-  /// Mode of template http|stream
-  pub(crate) mode: NginxTemplateModes,
-  /// Content of template
-  pub(crate) content: String,
-}
 
 impl Nanocld {
   pub async fn create_nginx_template(

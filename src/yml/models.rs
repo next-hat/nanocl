@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
-use crate::nanocld::cluster::ClusterJoinPartial;
+use crate::models::ClusterJoinPartial;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Cargo {

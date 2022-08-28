@@ -1,43 +1,37 @@
+mod cli;
+mod yml;
+mod models;
+mod errors;
+mod version;
+mod client;
+// #[cfg(feature = "genman")]
+mod man;
+
+use std::{
+  io::BufRead,
+  process::{Command, Stdio},
+};
+
 use clap::Parser;
 use errors::CliError;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use indicatif::{ProgressBar, ProgressStyle};
-use nanocld::{
-  nginx_template::NginxTemplatePartial,
-  cluster::{ClusterPartial, ClusterNetworkPartial, ClusterJoinPartial},
-  cargo::CargoPartial,
-  error::NanocldError,
-  client::Nanocld,
-  container::ContainerExecQuery,
-};
 use ntex::http::StatusCode;
 use serde::{Serialize, Deserialize};
-
-use std::{
-  process::{Command, Stdio},
-  io::BufRead,
-};
-
 use tabled::{
   object::{Segment, Rows},
   Padding, Alignment, Table, Style, Modify, Tabled,
 };
 
-mod cli;
-mod yml;
-mod errors;
-mod version;
-mod nanocld;
-// #[cfg(feature = "genman")]
-mod man;
-
-use cli::*;
+use models::*;
+use client::Nanocld;
+use client::error::NanocldError;
 
 fn process_error(args: &Cli, err: errors::CliError) {
   match err {
     CliError::Client(err) => match err {
-      nanocld::error::NanocldError::SendRequest(err) => match err {
+      client::error::NanocldError::SendRequest(err) => match err {
         ntex::http::client::error::SendRequestError::Connect(_) => {
           eprintln!(
             "Cannot connect to the nanocl daemon at {host}. Is the nanocl daemon running?",
@@ -46,7 +40,7 @@ fn process_error(args: &Cli, err: errors::CliError) {
         }
         _ => eprintln!("{}", err),
       },
-      nanocld::error::NanocldError::Api(err) => {
+      client::error::NanocldError::Api(err) => {
         eprintln!("Daemon [{}]: {}", err.status, err.msg);
       }
       _ => eprintln!("{}", err),
@@ -127,7 +121,7 @@ async fn execute_create_container_image(
 }
 
 async fn execute_args(args: &Cli) -> Result<(), CliError> {
-  let client = nanocld::client::Nanocld::connect_with_unix_default().await;
+  let client = client::Nanocld::connect_with_unix_default().await;
   match &args.command {
     Commands::Docker(options) => {
       let mut opts = vec![
@@ -170,7 +164,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
       {
         if let NanocldError::Api(err) = err {
           if err.status != StatusCode::CONFLICT {
-            return Err(CliError::Client(nanocld::error::NanocldError::Api(
+            return Err(CliError::Client(client::error::NanocldError::Api(
               err,
             )));
           }
@@ -191,7 +185,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
       {
         if let NanocldError::Api(err) = err {
           if err.status != StatusCode::CONFLICT {
-            return Err(CliError::Client(nanocld::error::NanocldError::Api(
+            return Err(CliError::Client(client::error::NanocldError::Api(
               err,
             )));
           }
@@ -215,7 +209,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
       {
         if let NanocldError::Api(err) = err {
           if err.status != StatusCode::CONFLICT {
-            return Err(CliError::Client(nanocld::error::NanocldError::Api(
+            return Err(CliError::Client(client::error::NanocldError::Api(
               err,
             )));
           }

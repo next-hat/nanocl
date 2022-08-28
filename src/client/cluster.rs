@@ -1,98 +1,11 @@
-use clap::Parser;
 use serde_json::json;
-use tabled::Tabled;
-use serde::{Serialize, Deserialize};
+
+use crate::models::*;
 
 use super::{
-  client::Nanocld,
+  http_client::Nanocld,
   error::{NanocldError, is_api_error},
-  models::{PgGenericCount, GenericNamespaceQuery},
-  cargo::CargoItem,
 };
-
-fn tbd_vec_string(o: &[String]) -> String {
-  o.join(", ")
-}
-
-#[derive(Debug, Tabled, Serialize, Deserialize)]
-pub struct ClusterItem {
-  pub(crate) key: String,
-  pub(crate) namespace: String,
-  pub(crate) name: String,
-  #[tabled(display_with = "tbd_vec_string")]
-  pub(crate) proxy_templates: Vec<String>,
-  // #[tabled(display_with = "display_option")]
-  // pub(crate) networks: Option<Vec<ClusterNetworkItem>>,
-}
-
-#[derive(Debug, Tabled, Serialize, Deserialize)]
-pub struct ClusterCargoItem {
-  #[tabled(skip)]
-  pub(crate) key: String,
-  #[tabled(skip)]
-  pub(crate) cargo_key: String,
-  #[tabled(skip)]
-  pub(crate) cluster_key: String,
-  pub(crate) network_key: String,
-}
-
-/// Cluster item with his relations
-#[derive(Debug, Tabled, Serialize, Deserialize)]
-pub struct ClusterItemWithRelation {
-  pub(crate) key: String,
-  pub(crate) name: String,
-  pub(crate) namespace: String,
-  #[tabled(display_with = "tbd_vec_string")]
-  pub(crate) proxy_templates: Vec<String>,
-  #[tabled(skip)]
-  pub(crate) variables: Vec<ClusterVarItem>,
-  #[tabled(skip)]
-  pub(crate) networks: Option<Vec<ClusterNetworkItem>>,
-  #[tabled(skip)]
-  pub(crate) cargoes: Option<Vec<(ClusterCargoItem, CargoItem)>>,
-}
-
-#[derive(Debug, Parser, Serialize, Deserialize)]
-pub struct ClusterPartial {
-  pub name: String,
-  #[clap(long)]
-  pub proxy_templates: Option<Vec<String>>,
-}
-
-#[derive(Debug, Tabled, Serialize, Deserialize)]
-pub struct ClusterNetworkItem {
-  pub(crate) key: String,
-  pub(crate) name: String,
-  pub(crate) cluster_key: String,
-  pub(crate) default_gateway: String,
-}
-
-#[derive(Debug, Parser, Serialize, Deserialize)]
-pub struct ClusterVarPartial {
-  pub(crate) name: String,
-  pub(crate) value: String,
-}
-
-#[derive(Debug, Tabled, Serialize, Deserialize)]
-pub struct ClusterVarItem {
-  #[tabled(skip)]
-  pub(crate) key: String,
-  #[tabled(skip)]
-  pub(crate) cluster_key: String,
-  pub(crate) name: String,
-  pub(crate) value: String,
-}
-
-#[derive(Debug, Parser, Serialize, Deserialize)]
-pub struct ClusterJoinPartial {
-  pub(crate) network: String,
-  pub(crate) cargo: String,
-}
-
-#[derive(Debug, Parser, Serialize, Deserialize)]
-pub struct ClusterNetworkPartial {
-  pub(crate) name: String,
-}
 
 impl Nanocld {
   pub async fn list_cluster(

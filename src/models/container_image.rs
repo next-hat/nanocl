@@ -1,75 +1,63 @@
+/// Standard lib
 use std::collections::HashMap;
-
-use chrono::prelude::*;
-
-use clap::Parser;
-use futures::{TryStreamExt, StreamExt};
-use ntex::{
-  channel::mpsc::{self, Receiver},
-  rt,
-};
+use chrono::Utc;
+/// Imported lib
 use tabled::Tabled;
-use serde::{Serialize, Deserialize, Deserializer, de::DeserializeOwned};
+use chrono::DateTime;
+use clap::{Parser, Subcommand};
+use serde::{Serialize, Deserialize};
 
-use super::{
-  client::Nanocld,
-  error::{NanocldError, is_api_error},
-  models::ProgressDetail,
-};
+use super::utils::serde::*;
+use super::utils::tabled::*;
+
+#[derive(Debug, Parser)]
+pub struct ContainerImageRemoveOpts {
+  /// id or name of image to delete
+  pub(crate) name: String,
+}
 
 #[derive(Debug, Parser, Serialize, Deserialize)]
 pub struct ContainerImagePartial {
   pub(crate) name: String,
 }
 
-fn deserialize_nonoptional_vec<
-  'de,
-  D: Deserializer<'de>,
-  T: DeserializeOwned,
->(
-  d: D,
-) -> Result<Vec<T>, D::Error> {
-  serde::Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or_default())
+#[derive(Debug, Parser)]
+pub struct ContainerImageDeployOpts {
+  pub(crate) name: String,
 }
 
-fn deserialize_nonoptional_map<
-  'de,
-  D: Deserializer<'de>,
-  T: DeserializeOwned,
->(
-  d: D,
-) -> Result<HashMap<String, T>, D::Error> {
-  serde::Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or_default())
+#[derive(Debug, Subcommand)]
+pub enum ContainerImageCommands {
+  #[clap(alias("ls"))]
+  List,
+  Create(ContainerImagePartial),
+  #[clap(alias("rm"))]
+  Remove(ContainerImageRemoveOpts),
+  #[clap(alias("dp"))]
+  Deploy(ContainerImageDeployOpts),
 }
 
-fn display_sha_id(id: &str) -> String {
-  let no_sha = id.replace("sha256:", "");
-  let (id, _) = no_sha.split_at(12);
-  id.to_string()
+/// Manage container images
+#[derive(Debug, Parser)]
+pub struct ContainerImageArgs {
+  #[clap(subcommand)]
+  pub(crate) commands: ContainerImageCommands,
 }
 
-fn display_timestamp(timestamp: &i64) -> String {
-  // Create a NaiveDateTime from the timestamp
-  let naive = NaiveDateTime::from_timestamp(*timestamp, 0);
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgressDetail {
+  #[serde(rename = "current")]
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub current: Option<i64>,
 
-  // Create a normal DateTime from the NaiveDateTime
-  let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
-
-  // Format the datetime how you want
-  let newdate = datetime.format("%Y-%m-%d %H:%M:%S");
-  newdate.to_string()
+  #[serde(rename = "total")]
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub total: Option<i64>,
 }
 
-fn display_repo_tags(repos: &[String]) -> String {
-  repos[0].to_string()
-}
-
-fn print_size(size: &i64) -> String {
-  let result = *size as f64 * 1e-9;
-  format!("{:.5} GB", result)
-}
-
-#[derive(Debug, Tabled, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(
+  Debug, Tabled, Clone, Default, PartialEq, Eq, Serialize, Deserialize,
+)]
 pub struct ContainerImageSummary {
   #[serde(rename = "Id")]
   #[tabled(display_with = "display_sha_id")]
@@ -94,7 +82,7 @@ pub struct ContainerImageSummary {
   pub created: i64,
 
   #[serde(rename = "Size")]
-  #[tabled(display_with = "print_size")]
+  #[tabled(display_with = "display_size")]
   pub size: i64,
 
   #[serde(rename = "SharedSize")]
@@ -115,7 +103,7 @@ pub struct ContainerImageSummary {
   pub containers: i64,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CreateImageStreamInfo {
   #[serde(rename = "id")]
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -139,7 +127,7 @@ pub struct CreateImageStreamInfo {
 }
 
 /// A test to perform to check that the container is healthy.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HealthConfig {
   /// The test to perform. Possible values are:  - `[]` inherit healthcheck from image or parent image - `[\"NONE\"]` disable healthcheck - `[\"CMD\", args...]` exec arguments directly - `[\"CMD-SHELL\", command]` run command with system's default shell
   #[serde(rename = "Test")]
@@ -168,7 +156,7 @@ pub struct HealthConfig {
 }
 
 /// Configuration for a container that is portable between hosts.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContainerConfig {
   /// The hostname to use for the container, as a valid RFC 1123 hostname.
   #[serde(rename = "Hostname")]
@@ -395,7 +383,7 @@ pub struct ContainerImageInspect {
 }
 
 /// Additional metadata of the image in the local cache. This information is local to the daemon, and not part of the image itself.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImageInspectMetadata {
   /// Date and time at which the image was last tagged in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.  This information is only available if the image was tagged locally, and omitted otherwise.
   #[serde(rename = "LastTagTime")]
@@ -404,7 +392,7 @@ pub struct ImageInspectMetadata {
 }
 
 /// Information about the image's RootFS, including the layer IDs.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImageInspectRootFs {
   #[serde(rename = "Type")]
   pub typ: String,
@@ -415,7 +403,7 @@ pub struct ImageInspectRootFs {
 }
 
 /// Information about the storage driver used to store the container's and image's filesystem.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GraphDriverData {
   /// Name of the storage driver.
   #[serde(rename = "Name")]
@@ -425,92 +413,4 @@ pub struct GraphDriverData {
   #[serde(rename = "Data")]
   #[serde(deserialize_with = "deserialize_nonoptional_map")]
   pub data: HashMap<String, String>,
-}
-
-impl Nanocld {
-  pub async fn list_container_image(
-    &self,
-  ) -> Result<Vec<ContainerImageSummary>, NanocldError> {
-    let mut res = self.get(String::from("/containers/images")).send().await?;
-
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-
-    let body = res.json::<Vec<ContainerImageSummary>>().await?;
-
-    Ok(body)
-  }
-
-  pub async fn create_container_image(
-    &self,
-    name: &str,
-  ) -> Result<Receiver<CreateImageStreamInfo>, NanocldError> {
-    let mut res = self
-      .post(String::from("/containers/images"))
-      .send_json(&ContainerImagePartial {
-        name: name.to_owned(),
-      })
-      .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-
-    let (tx, rx_body) = mpsc::channel::<CreateImageStreamInfo>();
-    rt::spawn(async move {
-      let mut stream = res.into_stream();
-      while let Some(result) = stream.next().await {
-        let result = result.unwrap();
-        let result = &String::from_utf8(result.to_vec()).unwrap();
-        let json =
-          serde_json::from_str::<CreateImageStreamInfo>(result).unwrap();
-        let _ = tx.send(json);
-      }
-      tx.close();
-    });
-
-    Ok(rx_body)
-  }
-
-  pub async fn remove_container_image(
-    &self,
-    name: &str,
-  ) -> Result<(), NanocldError> {
-    let mut res = self
-      .delete(format!("/containers/images/{}", name))
-      .send()
-      .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-
-    Ok(())
-  }
-
-  pub async fn deploy_container_image(
-    &self,
-    name: &str,
-  ) -> Result<(), NanocldError> {
-    let mut res = self
-      .post(format!("/containers/images/{}/deploy", name))
-      .send()
-      .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    Ok(())
-  }
-
-  pub async fn inspect_image(
-    &self,
-    name: &str,
-  ) -> Result<ContainerImageInspect, NanocldError> {
-    let mut res = self
-      .get(format!("/containers/images/{}", name))
-      .send()
-      .await?;
-
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-
-    let ct_image = res.json::<ContainerImageInspect>().await?;
-
-    Ok(ct_image)
-  }
 }

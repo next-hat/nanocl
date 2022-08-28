@@ -1,10 +1,19 @@
-use clap::{Parser, arg_enum};
+use clap::{arg_enum, Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
-use super::client::Nanocld;
+#[derive(Debug, Subcommand)]
+pub enum NodeCommands {
+  Create(NodePartial),
+}
+
+#[derive(Debug, Parser)]
+pub struct NodeArgs {
+  #[clap(subcommand)]
+  pub(crate) subcommands: NodeCommands,
+}
 
 arg_enum! {
-  #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+  #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
   #[serde(rename_all = "lowercase")]
   pub enum SshAuthMode {
     Passwd,
@@ -13,7 +22,7 @@ arg_enum! {
 }
 
 arg_enum! {
-  #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+  #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
   #[serde(rename_all = "snake_case")]
   pub enum NodeMode {
     Master,
@@ -45,10 +54,4 @@ pub struct NodeItem {
   pub(crate) ssh_auth_mode: SshAuthMode,
   pub(crate) ssh_user: String,
   pub(crate) ssh_credential: String,
-}
-
-impl Nanocld {
-  pub async fn list_nodes() {}
-
-  pub async fn create_node() {}
 }

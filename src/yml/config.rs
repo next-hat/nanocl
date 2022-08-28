@@ -4,14 +4,10 @@ use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use ntex::http::StatusCode;
 
-use crate::nanocld::cargo::CargoPartial;
-use crate::nanocld::client::Nanocld;
-use crate::nanocld::cluster::{
-  ClusterNetworkPartial, ClusterPartial, ClusterVarPartial,
-};
-
+use crate::client::Nanocld;
+use crate::models::*;
 use crate::errors::CliError;
-use crate::nanocld::error::NanocldError;
+use crate::client::error::NanocldError;
 
 use super::parser::get_config_type;
 use super::models::{YmlConfigTypes, NamespaceConfig};
