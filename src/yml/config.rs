@@ -6,7 +6,7 @@ use ntex::http::StatusCode;
 
 use crate::client::Nanocld;
 use crate::models::*;
-use crate::errors::CliError;
+use crate::cli::errors::CliError;
 use crate::client::error::NanocldError;
 
 use super::parser::get_config_type;

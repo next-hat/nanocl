@@ -40,7 +40,7 @@ pub enum ClusterCommands {
   /// Control cluster networks
   Network(ClusterNetworkArgs),
   /// Control cluster variables
-  Variable(ClusterVariableOptions),
+  Variable(ClusterVariableArgs),
   /// Create containers instances of a cargo inside given cluster and network
   Join(ClusterJoinOptions),
 }
@@ -67,7 +67,7 @@ pub enum ClusterVariableCommands {
 }
 
 #[derive(Debug, Parser)]
-pub struct ClusterVariableOptions {
+pub struct ClusterVariableArgs {
   pub(crate) cluster: String,
   #[clap(subcommand)]
   pub(crate) commands: ClusterVariableCommands,

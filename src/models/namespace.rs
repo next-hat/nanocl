@@ -31,3 +31,11 @@ pub struct NamespacePartial {
 pub struct NamespaceItem {
   pub name: String,
 }
+
+#[derive(Debug, Tabled, Serialize, Deserialize)]
+pub struct NamespaceWithCount {
+  pub(crate) name: String,
+  pub(crate) cargoes: usize,
+  pub(crate) clusters: usize,
+  pub(crate) networks: usize,
+}

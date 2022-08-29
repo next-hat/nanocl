@@ -31,7 +31,7 @@ pub enum CargoPatchCommands {
 }
 
 #[derive(Debug, Parser)]
-pub struct CargoPatchOption {
+pub struct CargoPatchArgs {
   pub(crate) name: String,
   #[clap(subcommand)]
   pub(crate) commands: CargoPatchCommands,
@@ -55,7 +55,7 @@ pub enum CargoCommands {
   /// Inspect a cargo by it's name
   Inspect(CargoInspectOption),
   /// Update a cargo by it's name
-  Patch(CargoPatchOption),
+  Patch(CargoPatchArgs),
 }
 
 /// Manage cargoes
