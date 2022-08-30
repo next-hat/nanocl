@@ -49,15 +49,6 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::Cluster(args) => {
       cli::exec_cluster(&client, args).await?;
     }
-    Commands::Node(args) => match &args.subcommands {
-      NodeCommands::Create(node) => {
-        todo!("create node {:#?}", node);
-      }
-    },
-    Commands::ListContainer(args) => {
-      let data = client.list_containers(args).await?;
-      print_table(data);
-    }
     Commands::GitRepository(args) => {
       cli::exec_git_repository(&client, args).await?;
     }
@@ -67,49 +58,30 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::NginxTemplate(args) => {
       cli::exec_nginx_template(&client, args).await?;
     }
-    Commands::Apply(args) => {
-      let mut file_path = std::env::current_dir()?;
-      file_path.push(&args.file_path);
-      yml::config::apply(file_path, &client).await?;
-    }
-    Commands::Revert(args) => {
-      let mut file_path = std::env::current_dir()?;
-      file_path.push(&args.file_path);
-      yml::config::revert(file_path, &client).await?;
-    }
     Commands::ContainerImage(args) => {
       cli::exec_container_image(&client, args).await?;
     }
-    Commands::NginxLog => {
-      client.watch_nginx_logs().await?;
-    }
     Commands::Version => {
-      println!("=== [nanocli] ===");
-      version::print_version();
-      println!("=== [nanocld] ===");
-      let daemon_version = client.get_version().await?;
-      println!(
-        "Arch: {}\nVersion: {}\nCommit ID: {}",
-        daemon_version.arch, daemon_version.version, daemon_version.commit_id
-      );
+      cli::exec_version(&client).await?;
     }
     Commands::Exec(args) => {
-      let config = ContainerExecQuery {
-        attach_stdin: None,
-        attach_stdout: Some(true),
-        attach_stderr: Some(true),
-        detach_keys: None,
-        tty: Some(true),
-        env: None,
-        cmd: Some(args.cmd.to_owned()),
-        privileged: None,
-        user: None,
-        working_dir: None,
-      };
-
-      let exec = client.create_exec(&args.name, config).await?;
-
-      client.start_exec(&exec.id).await?;
+      cli::exec_exec(&client, args).await?;
+    }
+    Commands::Apply(args) => {
+      cli::exec_apply(&client, args).await?;
+    }
+    Commands::Revert(args) => {
+      cli::exec_revert(&client, args).await?;
+    }
+    Commands::Node(args) => {
+      cli::exec_node(&client, args).await?;
+    }
+    Commands::ListContainer(args) => {
+      let data = client.list_containers(args).await?;
+      print_table(data);
+    }
+    Commands::NginxLog => {
+      client.watch_nginx_logs().await?;
     }
   }
   Ok(())
