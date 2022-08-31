@@ -1,6 +1,5 @@
+mod http_client;
 pub mod error;
-pub mod client;
-pub mod models;
 pub mod cargo;
 pub mod cluster;
 pub mod namespace;
@@ -11,3 +10,5 @@ pub mod nginx_template;
 pub mod container;
 pub mod system;
 pub mod node;
+
+pub use http_client::*;

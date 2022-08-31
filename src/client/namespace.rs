@@ -1,21 +1,9 @@
-use clap::Parser;
-use tabled::Tabled;
-use serde::{Serialize, Deserialize};
+use crate::models::*;
 
-use super::client::Nanocld;
-use super::error::{NanocldError, is_api_error};
-
-#[derive(Tabled, Serialize, Deserialize)]
-pub struct NamespaceItem {
-  pub name: String,
-}
-
-#[derive(Debug, Parser)]
-#[clap(name = "nanocl-namespace-create")]
-pub struct NamespacePartial {
-  /// name of the namespace to create
-  pub name: String,
-}
+use super::{
+  http_client::Nanocld,
+  error::{NanocldError, is_api_error},
+};
 
 impl Nanocld {
   pub async fn list_namespace(

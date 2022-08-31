@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::nanocld::error::NanocldError;
+use crate::client::error::NanocldError;
 
 #[derive(Debug, Error)]
 pub enum CliError {

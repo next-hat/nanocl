@@ -1,69 +1,45 @@
+/// Std lib
 use std::collections::HashMap;
-use clap::Parser;
+/// Imported lib
 use tabled::Tabled;
-use futures::{TryStreamExt, StreamExt};
+use clap::Parser;
 use serde::{Serialize, Deserialize};
 
-use super::error::{NanocldError, is_api_error};
-use super::models::{Port, EndpointSettings, optional_string};
+use super::utils::tabled::*;
+use super::network::{Port, EndpointSettings};
 
-use super::client::Nanocld;
-
-fn optional_name(s: &Option<Vec<String>>) -> String {
-  match s {
-    None => String::from(""),
-    Some(s) => s
-      .iter()
-      .map(|s| s.replace('/', ""))
-      .collect::<Vec<_>>()
-      .join(", "),
-  }
-}
-
-fn display_optional_ports(s: &Option<Vec<Port>>) -> String {
-  match s {
-    None => String::from(""),
-    Some(ports) => ports.iter().fold(String::new(), |mut acc, port| {
-      acc = format!(
-        "{}{}:{} ",
-        acc,
-        port.public_port.unwrap_or_default(),
-        port.private_port
-      );
-      acc
-    }),
-  }
-}
-
-fn display_container_summary_network_settings(
-  s: &Option<ContainerSummaryNetworkSettings>,
-) -> String {
-  match s {
-    None => String::from(""),
-    Some(summary) => {
-      if let Some(network) = &summary.networks {
-        let mut ips = String::new();
-        for key in network.keys() {
-          let netinfo = network.get(key).unwrap();
-          let ip = netinfo.ip_address.to_owned().unwrap_or_default();
-          ips = format!("{}{} ", ips, ip,);
-        }
-        return ips;
-      }
-      String::from("")
-    }
-  }
+/// Execute command inside a container
+#[derive(Debug, Parser)]
+pub struct ExecArgs {
+  #[clap(long, short)]
+  pub(crate) detach: Option<String>,
+  #[clap(long, short)]
+  pub(crate) env: Option<Vec<String>>,
+  #[clap(long, short)]
+  pub(crate) interactive: Option<bool>,
+  #[clap(long, short)]
+  pub(crate) tty: Option<bool>,
+  #[clap(long, short)]
+  pub(crate) user: Option<String>,
+  #[clap(long, short)]
+  pub(crate) workdir: Option<String>,
+  /// Name of container to exec into
+  pub(crate) name: String,
+  #[clap(multiple = true, raw = true)]
+  pub(crate) cmd: Vec<String>,
 }
 
 /// A summary of the container's network settings
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContainerSummaryNetworkSettings {
   #[serde(rename = "Networks")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub networks: Option<HashMap<String, EndpointSettings>>,
 }
 
-#[derive(Debug, Tabled, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(
+  Debug, Tabled, Clone, Default, PartialEq, Eq, Serialize, Deserialize,
+)]
 pub struct ContainerSummary {
   /// The ID of this container
   #[serde(rename = "Id")]
@@ -74,7 +50,7 @@ pub struct ContainerSummary {
   /// The names that this container has been given
   #[serde(rename = "Names")]
   #[serde(skip_serializing_if = "Option::is_none")]
-  #[tabled(display_with = "optional_name")]
+  #[tabled(display_with = "optional_container_name")]
   pub names: Option<Vec<String>>,
 
   /// The name of the image used when creating this container
@@ -199,63 +175,4 @@ pub enum LogOutputStreamTypes {
 pub struct LogOutputStream {
   types: LogOutputStreamTypes,
   message: String,
-}
-
-impl Nanocld {
-  pub async fn list_containers(
-    &self,
-    options: &ListContainerOptions,
-  ) -> Result<Vec<ContainerSummary>, NanocldError> {
-    let mut res = self
-      .get(String::from("/containers"))
-      .query(options)
-      .unwrap()
-      .send()
-      .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-
-    let data = res.json::<Vec<ContainerSummary>>().await?;
-
-    Ok(data)
-  }
-
-  pub async fn create_exec(
-    &self,
-    name: &str,
-    config: ContainerExecQuery,
-  ) -> Result<ExecItem, NanocldError> {
-    let mut res = self
-      .post(format!("/containers/{}/exec", name))
-      .send_json(&config)
-      .await?;
-    let status = res.status();
-
-    is_api_error(&mut res, &status).await?;
-
-    let exec = res.json::<ExecItem>().await?;
-
-    Ok(exec)
-  }
-
-  pub async fn start_exec(&self, id: &str) -> Result<(), NanocldError> {
-    let mut res = self.post(format!("/exec/{}/start", &id)).send().await?;
-    let status = res.status();
-
-    is_api_error(&mut res, &status).await?;
-
-    let mut stream = res.into_stream();
-
-    while let Some(output) = stream.next().await {
-      match output {
-        Err(err) => {
-          eprintln!("{err}");
-        }
-        Ok(output) => {
-          print!("{}", &String::from_utf8(output.to_vec()).unwrap());
-        }
-      }
-    }
-    Ok(())
-  }
 }
