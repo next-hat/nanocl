@@ -10,6 +10,7 @@ mod nginx_log;
 mod nginx_template;
 mod system;
 mod node;
+mod yml;
 
 use std::io;
 use serde::{Serialize, Deserialize};
@@ -27,6 +28,7 @@ pub use nginx_log::*;
 pub use nginx_template::*;
 pub use system::*;
 pub use node::*;
+pub use yml::*;
 
 /// A self-sufficient hybrid-cloud manager
 #[derive(Debug, Parser)]

@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 use crate::models::ClusterJoinPartial;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Cargo {
+pub(crate) struct YmlCargo {
   pub(crate) name: String,
   #[serde(rename(deserialize = "image"))]
   pub(crate) image_name: String,
@@ -17,18 +17,18 @@ pub(crate) struct Cargo {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Network {
+pub(crate) struct YmlNetwork {
   pub(crate) name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct GitRepository {
+pub(crate) struct YmlGitRepository {
   pub(crate) name: String,
   pub(crate) url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Cluster {
+pub(crate) struct YmlCluster {
   pub(crate) name: String,
   pub(crate) auto_start: Option<bool>,
   pub(crate) proxy_templates: Option<Vec<String>>,
@@ -38,15 +38,15 @@ pub(crate) struct Cluster {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct NamespaceConfig {
+pub(crate) struct YmlNamespaceConfig {
   // name of the namespace
   pub(crate) name: String,
   // list of cargo to deploy
-  pub(crate) cargoes: Vec<Cargo>,
+  pub(crate) cargoes: Vec<YmlCargo>,
   // list of network to create when deploy
-  pub(crate) networks: Vec<Network>,
+  pub(crate) networks: Vec<YmlNetwork>,
   // List of configuration a bit like github workflow matrix
-  pub(crate) clusters: Vec<Cluster>,
+  pub(crate) clusters: Vec<YmlCluster>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

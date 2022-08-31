@@ -1,5 +1,4 @@
 mod cli;
-mod yml;
 mod models;
 mod version;
 mod client;
