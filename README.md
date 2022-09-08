@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://download.next-hat.com/ressources/images/logo.png" >
-  <h1>Nanocl DAEMON</h1>
+  <h1>Nanocl</h1>
   <h3>Hybrid Cloud Orchestrator</h3>
   
   <p>
