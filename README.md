@@ -1,46 +1,61 @@
 <div align="center">
   <img src="https://download.next-hat.com/ressources/images/logo.png" >
-  <h1>Nanocl CLI</h1>
+  <h1>Nanocl DAEMON</h1>
+  <h3>Hybrid Cloud Orchestrator</h3>
+  
+  <p>
+  
+  
+  [![Stars](https://img.shields.io/github/stars/nxthat/nanocld?style=social)](https://github.com/nxthat/nanocld)
+  [![Build With](https://img.shields.io/badge/built_with-Rust-dca282.svg)](https://github.com/nxthat/nanocld)
+  [![Chat on Discord](https://img.shields.io/discord/1011267493114949693?label=chat&logo=discord)](https://discord.gg/WV4Aac8uZg)
+  
+  </p>
+  
 </div>
 
 <blockquote class="tags">
  <strong>Tags</strong>
  </br>
  <span id="nxtmdoc-meta-keywords">
-  test, deploy, manage, monitor
+  test, deploy, monitor, orchestrate
  </span>
 </blockquote>
 
 </br>
 </br>
 
-## Official Nanocl CLI repository
+## ❓ What is nanocl ?
 
-<table>
-  <tr>
-    <th align="left">
-      <img class="nxtmdoc-delete" width="506" height="1" />
-      <p>Title</p>
-    </th>
-    <th align="left">
-      <img class="nxtmdoc-delete" width="506" height="1" />
-      <p>Description</p>
-    </th>
-  </tr>
-  <tr>
-    <td>
-      <a href="https://docs.next-hat.com/nanocl/installation">Installation</a>
-    </td>
-    <td>
-      How to install
-    </td>
-  </tr>
-    <tr>
-    <td>
-      <a href="https://docs.next-hat.com/nanocl/guides/get-started">Get started</a>
-    </td>
-    <td>
-      How to start to use nanocl !
-    </td>
-  </tr>
-</table>
+Nanocl is an (HCO) Hybrid Cloud Orchestrator.
+</br>
+It is used to manage and monitor not only containers but virtual machine as well.
+</br>
+You can build an entire CI/CD pipeline from tests to high availability production.
+
+<img src="https://download.next-hat.com/ressources/images/infra.png" />
+
+## ✨ Features
+- [x] Manage containers (CRUD)
+- [x] Manage networks (CRUD)
+- [x] Manage clusters (CRUD)
+- [x] Http proxy
+- [x] Udp/Tcp proxy
+- [x] Store a git repository state as image
+- [x] Single-node mode
+- [x] Monitor http request
+- [ ] Monitor tcp/udp packets
+- [ ] Manage virtual machine (CRUD)
+- [ ] Git repository hooks
+- [ ] Highly-scalable distributed mode
+- [ ] Self hosted git ?
+
+## 🎉 Let's get started
+
+- [Installation](https://docs.next-hat.com/setups/nanocl/get-nanocl)
+- [Get Started](https://docs.next-hat.com/guides/nanocl/get-started/1.orientation-and-setup)
+
+## 🔨 Contribution
+
+If you want to contribute see [development](./DEVELOPING.md) section to see how
+to setup a dev environement for nanocl
