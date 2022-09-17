@@ -1,0 +1,35 @@
+# Run Clippy
+
+name: Clippy
+
+on: [push, pull_request]
+
+jobs:
+  eslint_and_clippy:
+    strategy:
+      fail-fast: true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+     
+      # Cache Rust
+      - uses: actions/cache@v3
+        with:
+          path: ./src-tauri/target
+          key: ${{ hashFiles('./Cargo.lock') }}
+
+     # Cache Rust
+      - uses: actions/cache@v3
+        with:
+          path: ~/.cargo
+          key: ${{ hashFiles('./Cargo.lock') }}
+     
+      - name: Install Rust with Clippy
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+ 
+      - name: Run Clippy
+        run: cargo clippy
