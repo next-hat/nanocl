@@ -23,7 +23,7 @@ tabled = "0.7.0"
 serde_yaml = "0.8"
 indicatif = "0.16.2"
 serde_json = "1.0.81"
-thiserror = "1.0.24"
+thiserror = "1.0.35"
 clap_complete = "3.2.5"
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "3.2.22", features = ["derive"] }
