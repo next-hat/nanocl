@@ -580,9 +580,9 @@ checksum = "729eb334247daa1803e0a094d0a5c55711b85571179f5ec6e53eccfdf7008958"
 
 [[package]]
 name = "ntex"
-version = "0.5.24"
+version = "0.5.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1b81a195aa2f0daad8c2eeecfca6b2b1b71b52f03ad51892afb2495c5cd850c"
+checksum = "02200c9e8d9bb13e1269241af290e043a8e59927ad4486672dcccbda8230d6b4"
 dependencies = [
  "async-channel",
  "async-oneshot",
