@@ -29,6 +29,6 @@ serde = { version = "1.0", features = ["derive"] }
 clap = { version = "3.2.22", features = ["derive"] }
 chrono = { version = "0.4.19", features = ["serde"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
-ntex = { version = "=0.5.24", features = ["rustls", "tokio"] }
+ntex = { version = "=0.5.25", features = ["rustls", "tokio"] }
 # Optional deps
 clap_mangen = { version = "0.1" }
