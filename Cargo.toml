@@ -19,8 +19,8 @@ genman = [
 
 [dependencies]
 futures = "0.3"
-tabled = "0.7.0"
 serde_yaml = "0.9"
+tabled = "0.8.0"
 indicatif = "0.17.1"
 serde_json = "1.0.81"
 thiserror = "1.0.35"
@@ -28,7 +28,7 @@ clap_complete = "3.2.5"
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "3.2.22", features = ["derive"] }
 chrono = { version = "0.4.19", features = ["serde"] }
-uuid = { version = "0.8", features = ["serde", "v4"] }
+uuid = { version = "1.1", features = ["serde", "v4"] }
 ntex = { version = "=0.5.25", features = ["rustls", "tokio"] }
 # Optional deps
 clap_mangen = { version = "0.1" }
