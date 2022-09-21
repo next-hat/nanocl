@@ -1,6 +1,9 @@
+use std::fs;
 use clap::IntoApp;
 
 include!("./src/models/mod.rs");
+
+const MAN_PATH: &str = "./target/man";
 
 pub fn generate_man_command(
   name: &str,
@@ -12,7 +15,7 @@ pub fn generate_man_command(
   man.render(&mut man_buffer)?;
   let out_dir = std::env::current_dir()?;
   std::fs::write(
-    out_dir.join(&format!("./target/man/{name}.1", name = name)),
+    out_dir.join(&format!("{MAN_PATH}/{name}.1", name = name)),
     man_buffer,
   )?;
 
@@ -48,6 +51,7 @@ pub fn generate_man() -> std::io::Result<()> {
 }
 
 fn main() -> std::io::Result<()> {
+  fs::create_dir_all(MAN_PATH)?;
   generate_man()?;
   Ok(())
 }
