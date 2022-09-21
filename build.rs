@@ -1,6 +1,6 @@
 use clap::IntoApp;
 
-use crate::models::*;
+include!("./src/models/mod.rs");
 
 pub fn generate_man_command(
   name: &str,
@@ -44,5 +44,10 @@ pub fn generate_man() -> std::io::Result<()> {
   // NamespaceCommands::into_app()
   // generate_man_command("nanocl-namespace-list")
 
+  Ok(())
+}
+
+fn main() -> std::io::Result<()> {
+  generate_man()?;
   Ok(())
 }

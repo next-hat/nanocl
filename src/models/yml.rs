@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
-use crate::models::ClusterJoinPartial;
+use super::ClusterJoinPartial;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct YmlCargo {

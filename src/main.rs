@@ -2,8 +2,6 @@ mod cli;
 mod models;
 mod version;
 mod client;
-// #[cfg(feature = "genman")]
-mod man;
 
 use clap::Parser;
 use cli::errors::CliError;
@@ -13,21 +11,25 @@ use cli::utils::print_table;
 
 fn process_error(args: &Cli, err: CliError) {
   match err {
-    CliError::Client(err) => match err {
-      client::error::NanocldError::SendRequest(err) => match err {
-        ntex::http::client::error::SendRequestError::Connect(_) => {
-          eprintln!(
+    CliError::Client(err) => {
+      match err {
+        client::error::NanocldError::SendRequest(err) => {
+          match err {
+            ntex::http::client::error::SendRequestError::Connect(_) => {
+              eprintln!(
             "Cannot connect to the nanocl daemon at {host}. Is the nanocl daemon running?",
             host = args.host
           )
+            }
+            _ => eprintln!("{}", err),
+          }
+        }
+        client::error::NanocldError::Api(err) => {
+          eprintln!("Daemon [{}]: {}", err.status, err.msg);
         }
         _ => eprintln!("{}", err),
-      },
-      client::error::NanocldError::Api(err) => {
-        eprintln!("Daemon [{}]: {}", err.status, err.msg);
       }
-      _ => eprintln!("{}", err),
-    },
+    }
     _ => eprintln!("{}", err),
   }
   std::process::exit(1);
@@ -88,16 +90,9 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
 
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
-  #[cfg(feature = "genman")]
-  {
-    man::generate_man()?;
-  }
-  #[cfg(not(feature = "genman"))]
-  {
-    let args = Cli::parse();
-    if let Err(err) = execute_args(&args).await {
-      process_error(&args, err);
-    }
+  let args = Cli::parse();
+  if let Err(err) = execute_args(&args).await {
+    process_error(&args, err);
   }
   Ok(())
 }

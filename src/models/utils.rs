@@ -25,7 +25,7 @@ pub mod serde {
 
 pub mod tabled {
   use chrono::{NaiveDateTime, DateTime, Utc};
-  use crate::models::{Port, ContainerSummaryNetworkSettings};
+  use super::super::{Port, ContainerSummaryNetworkSettings};
 
   pub fn optional_string(s: &Option<String>) -> String {
     match s {
@@ -41,11 +41,12 @@ pub mod tabled {
   pub fn optional_container_name(s: &Option<Vec<String>>) -> String {
     match s {
       None => String::from(""),
-      Some(s) => s
-        .iter()
-        .map(|s| s.replace('/', ""))
-        .collect::<Vec<_>>()
-        .join(", "),
+      Some(s) => {
+        s.iter()
+          .map(|s| s.replace('/', ""))
+          .collect::<Vec<_>>()
+          .join(", ")
+      }
     }
   }
 
@@ -79,15 +80,17 @@ pub mod tabled {
   pub fn display_optional_ports(s: &Option<Vec<Port>>) -> String {
     match s {
       None => String::from(""),
-      Some(ports) => ports.iter().fold(String::new(), |mut acc, port| {
-        acc = format!(
-          "{}{}:{} ",
-          acc,
-          port.public_port.unwrap_or_default(),
-          port.private_port
-        );
-        acc
-      }),
+      Some(ports) => {
+        ports.iter().fold(String::new(), |mut acc, port| {
+          acc = format!(
+            "{}{}:{} ",
+            acc,
+            port.public_port.unwrap_or_default(),
+            port.private_port
+          );
+          acc
+        })
+      }
     }
   }
 
