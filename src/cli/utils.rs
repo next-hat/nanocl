@@ -7,8 +7,7 @@ use crate::models::{YmlFile, YmlConfigTypes};
 
 pub fn print_table<T>(iter: impl IntoIterator<Item = T>)
 where
-  T: tabled::Tabled,
-{
+  T: tabled::Tabled, {
   let table = Table::new(iter)
     .with(Style::empty())
     .with(
@@ -18,7 +17,7 @@ where
     )
     .with(Modify::new(Rows::first()).with(str::to_uppercase))
     .to_string();
-  print!("{}", table);
+  println!("{}", table);
 }
 
 pub fn get_config_type(str: &str) -> Result<YmlConfigTypes, serde_yaml::Error> {
