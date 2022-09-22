@@ -1,0 +1,26 @@
+name: global
+type: namespace
+
+networks:
+  - name: next-hat-doc
+
+clusters:
+  - name: next-hat-doc-prod
+    auto_start: true
+    proxy_templates:
+      - next-hat-doc
+    vars:
+      DOMAIN: docs.next-hat.com
+      CLUSTER: PROD
+    joins:
+      - cargo: next-hat-doc
+        network: next-hat-doc
+
+cargoes:
+  - name: next-hat-doc
+    image: nxtmdoc:master
+    binds:
+      - /opt/next-hat-doc:/opt/nxtmdoc
+    envs:
+      - NODE_ENV=production
+      - CLUSTER={{vars.CLUSTER}}

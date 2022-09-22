@@ -9,6 +9,5 @@ release_path="./target/${pkg_name}_${version}_${arch}"
 
 for file in ./target/man/*; do
   file_name=`basename ${file}`
-  gzip < $file > ${release_path}/usr/local/man/man1/$file_name.gz
   pandoc --from man --to markdown < $file > ./doc/${file_name%.1}.md
 done

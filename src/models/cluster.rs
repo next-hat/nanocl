@@ -46,8 +46,11 @@ pub enum ClusterCommands {
 }
 
 #[derive(Debug, Parser, Serialize, Deserialize)]
+#[clap(name = "nanocl-cluster-create", long_about = "Create a new cluster")]
 pub struct ClusterPartial {
+  /// Name of the new cluster
   pub name: String,
+  /// List of proxy templates to use when deploying a cargo
   #[clap(long)]
   pub proxy_templates: Option<Vec<String>>,
 }

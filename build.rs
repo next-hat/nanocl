@@ -36,6 +36,7 @@ pub fn generate_man() -> std::io::Result<()> {
     "nanocl-cluster-delete",
     ClusterDeleteOptions::into_app(),
   )?;
+  generate_man_command("nanocl-cluster-create", ClusterPartial::into_app())?;
   generate_man_command(
     "nanocl-cluster-start",
     ClusterStartOptions::into_app(),
