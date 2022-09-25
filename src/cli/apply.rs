@@ -35,7 +35,43 @@ async fn apply_namespace(
         name: cluster.name.to_owned(),
         proxy_templates: cluster.proxy_templates.to_owned(),
       };
-      if cluster_exists.is_err() {
+      if let Ok(curr_cluster) = cluster_exists {
+        println!(" current cluster {:#?} ", curr_cluster);
+        if let Some(proxy_templates) = cluster.proxy_templates.to_owned() {
+          let cluster_name = &curr_cluster.name;
+          let namespace_name = &namespace.name;
+          proxy_templates
+            .into_iter()
+            .filter_map(|template| {
+              let is_existing = curr_cluster
+                .proxy_templates
+                .iter()
+                .cloned()
+                .find(|user_template| user_template == &template);
+
+              if is_existing.is_none() {
+                Some(template)
+              } else {
+                None
+              }
+            })
+            .map(|proxy| async move {
+              client
+                .add_nginx_template_to_cluster(
+                  cluster_name,
+                  &proxy,
+                  Some(namespace_name.to_owned()),
+                )
+                .await?;
+              Ok::<_, CliError>(())
+            })
+            .collect::<FuturesUnordered<_>>()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<()>, CliError>>()?;
+        }
+      } else {
         client
           .create_cluster(&item, Some(namespace.name.to_owned()))
           .await?;

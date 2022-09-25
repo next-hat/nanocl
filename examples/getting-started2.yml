@@ -8,20 +8,22 @@ clusters:
   - name: dev
     auto_start: true
     proxy_templates:
-      - getting-started
+      - getting-started2
     vars:
-      DOMAIN: leone-industry.com
+      DOMAIN2: leone-industry2.com
       CLUSTER: DEV
       REMOTE_ADDR: 172.31.210.176
+      TEST2: "TEST_ADDED_VAR"
     joins:
-      - cargo: getting-started
+      - cargo: getting-started2
         network: front
 
 cargoes:
-  - name: getting-started
+  - name: getting-started2
     image: getting-started:master
-    dns_entry: "{{vars.REMOTE_ADDR}}:{{vars.DOMAIN}}"
+    dns_entry: "{{vars.REMOTE_ADDR}}:{{vars.DOMAIN2}}"
     environnements:
+      - TEST2={{vars.TEST2}}
       - NODE_ENV=production
       - APP=LANDING
       - CLUSTER={{vars.CLUSTER}}

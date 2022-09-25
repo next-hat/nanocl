@@ -45,33 +45,34 @@ async fn revert_namespace(
     .collect::<Result<Vec<()>, CliError>>()?;
 
   // Delete clusters
-  namespace
-    .clusters
-    .iter()
-    .map(|cluster| async {
-      let result = client
-        .delete_cluster(&cluster.name, Some(namespace.name.to_owned()))
-        .await;
-      if let Err(err) = result {
-        match err {
-          NanocldError::Api(ref api_err) => {
-            if api_err.status == StatusCode::NOT_FOUND {
-              return Ok::<(), CliError>(());
-            }
-            return Err::<(), CliError>(CliError::Client(err));
-          }
-          _ => {
-            return Err::<(), CliError>(CliError::Client(err));
-          }
-        }
-      }
-      Ok::<(), CliError>(())
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<_>>()
-    .await
-    .into_iter()
-    .collect::<Result<Vec<()>, CliError>>()?;
+  // TODO Add option to delete clusters aswell
+  // namespace
+  //   .clusters
+  //   .iter()
+  //   .map(|cluster| async {
+  //     let result = client
+  //       .delete_cluster(&cluster.name, Some(namespace.name.to_owned()))
+  //       .await;
+  //     if let Err(err) = result {
+  //       match err {
+  //         NanocldError::Api(ref api_err) => {
+  //           if api_err.status == StatusCode::NOT_FOUND {
+  //             return Ok::<(), CliError>(());
+  //           }
+  //           return Err::<(), CliError>(CliError::Client(err));
+  //         }
+  //         _ => {
+  //           return Err::<(), CliError>(CliError::Client(err));
+  //         }
+  //       }
+  //     }
+  //     Ok::<(), CliError>(())
+  //   })
+  //   .collect::<FuturesUnordered<_>>()
+  //   .collect::<Vec<_>>()
+  //   .await
+  //   .into_iter()
+  //   .collect::<Result<Vec<()>, CliError>>()?;
   Ok(())
 }
 

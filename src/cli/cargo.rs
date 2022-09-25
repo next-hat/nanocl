@@ -48,6 +48,10 @@ async fn exec_cargo_inspect(
 
   println!("\n> CARGO");
   print_table([&cargo]);
+  if let Some(environnements) = cargo.environnements {
+    println!("\n> ENVIRONNEMENTS");
+    print_table(environnements);
+  }
   println!("\n> CONTAINERS");
   print_table(cargo.containers);
   Ok(())

@@ -112,6 +112,16 @@ pub struct CargoItem {
   pub(crate) namespace: String,
 }
 
+#[derive(Debug, Tabled, Serialize, Deserialize)]
+pub struct CargoEnvItem {
+  #[tabled(skip)]
+  pub(crate) key: String,
+  #[tabled(skip)]
+  pub(crate) cargo_key: String,
+  pub(crate) name: String,
+  pub(crate) value: String,
+}
+
 /// Cargo item with his relation
 #[derive(Debug, Tabled, Serialize, Deserialize)]
 pub struct CargoItemWithRelation {
@@ -131,6 +141,8 @@ pub struct CargoItemWithRelation {
   pub(crate) binds: Vec<String>,
   #[tabled(skip)]
   pub(crate) containers: Vec<ContainerSummary>,
+  #[tabled(skip)]
+  pub(crate) environnements: Option<Vec<CargoEnvItem>>,
 }
 
 #[derive(Debug, Parser, Serialize, Deserialize)]
