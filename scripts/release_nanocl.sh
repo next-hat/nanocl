@@ -46,7 +46,7 @@ pub fn print_version() {
 }
 EOM
 echo "[BUILD] Creating release"
-cargo make release > /dev/null
+env OPENSSL_LIB_DIR=/usr/local/lib/ OPENSSL_INCLUDE_DIR=/usr/local/include OPENSSL_STATIC=yes cargo make release > /dev/null
 cp ./target/release/${pkg_name} ${release_path}/usr/local/bin
 # generate DEBIAN controll
 cat > ${release_path}/DEBIAN/control <<- EOM
