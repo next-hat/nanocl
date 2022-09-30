@@ -2,16 +2,15 @@
   <img src="https://download.next-hat.com/ressources/images/logo.png" >
   <h1>Nanocl</h1>
   <h3>Hybrid Cloud Orchestrator</h3>
-  
+
   <p>
-  
-  
+
   [![Stars](https://img.shields.io/github/stars/nxthat/nanocld?style=social)](https://github.com/nxthat/nanocld)
   [![Build With](https://img.shields.io/badge/built_with-Rust-dca282.svg)](https://github.com/nxthat/nanocld)
   [![Chat on Discord](https://img.shields.io/discord/1011267493114949693?label=chat&logo=discord)](https://discord.gg/WV4Aac8uZg)
-  
+
   </p>
-  
+
 </div>
 
 <blockquote class="tags">
@@ -27,10 +26,13 @@
 
 ## ❓ What is nanocl ?
 
-Nanocl is an (HCO) Hybrid Cloud Orchestrator.
-</br>
-It is used to manage and monitor not only containers but virtual machine as well.
-</br>
+Nanocl, is an open source system for managing [containerized applications](https://docs.next-hat.com/docs/guides/nanocl/overview) multiple hosts. <br />
+It provides basic mechanisms for deployment, maintenance, and scaling. <br />
+
+Nanocl is builds upon Rust to have the best perfomance and a smallest footprint. <br />
+It's use the best ideas and practices from the community. <br />
+
+Nanocl can be considered as an (HCO) Hybrid Cloud Orchestrator. <br />
 You can build an entire CI/CD pipeline from tests to high availability production.
 
 <img src="https://download.next-hat.com/ressources/images/infra.png" />
@@ -52,10 +54,10 @@ You can build an entire CI/CD pipeline from tests to high availability productio
 
 ## 🎉 Let's get started
 
-- [Installation](https://docs.next-hat.com/setups/nanocl/get-nanocl)
-- [Get Started](https://docs.next-hat.com/guides/nanocl/get-started/1.orientation-and-setup)
+- [Installation](https://docs.next-hat.com/docs/setups/nanocl)
+- [Get Started](https://docs.next-hat.com/docs/guides/nanocl/get-started)
 
 ## 🔨 Contribution
 
-If you want to contribute see [development](./DEVELOPING.md) section to see how
-to setup a dev environement for nanocl
+If you want to contribute see [Build From Source](https://docs.next-hat.com/docs/setups/nanocl/linux/from-sources)
+section on our official documentation to see how to setup a dev environement for nanocl
