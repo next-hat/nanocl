@@ -14,6 +14,10 @@ use crate::models::{
 use super::utils::get_config_type;
 use super::errors::CliError;
 
+/**
+ * # Apply namespace
+ * Apply a namespace configuration file
+ */
 async fn apply_namespace(
   namespace: &YmlNamespaceConfig,
   client: &Nanocld,

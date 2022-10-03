@@ -26,11 +26,12 @@
 
 ## ❓ What is nanocl ?
 
-Nanocl, is an open source system for managing [containerized applications](https://docs.next-hat.com/docs/guides/nanocl/overview) multiple hosts. <br />
+Nanocl, is an open source system for managing [containerized applications](https://docs.next-hat.com/docs/guides/nanocl/overview) on multiple hosts. <br />
 It provides basic mechanisms for deployment, maintenance, and scaling. <br />
 
-Nanocl is builds upon Rust to have the best perfomance and a smallest footprint. <br />
+Nanocl is builds upon `Rust` to have the best perfomance and a smallest footprint. <br />
 It's use the best ideas and practices from the community. <br />
+You can see it as a `Kubernetes` alternative written is `Rust`.
 
 Nanocl can be considered as an (HCO) Hybrid Cloud Orchestrator. <br />
 You can build an entire CI/CD pipeline from tests to high availability production.
