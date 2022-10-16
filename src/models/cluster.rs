@@ -196,7 +196,7 @@ pub struct ClusterItem {
 }
 
 #[derive(Debug, Tabled, Serialize, Deserialize)]
-pub struct ClusterCargoItem {
+pub struct CargoInstanceItem {
   #[tabled(skip)]
   pub(crate) key: String,
   #[tabled(skip)]
@@ -219,7 +219,7 @@ pub struct ClusterItemWithRelation {
   #[tabled(skip)]
   pub(crate) networks: Option<Vec<ClusterNetworkItem>>,
   #[tabled(skip)]
-  pub(crate) cargoes: Option<Vec<(ClusterCargoItem, CargoItem)>>,
+  pub(crate) cargoes: Option<Vec<CargoItem>>,
 }
 
 #[derive(Debug, Tabled, Serialize, Deserialize)]
