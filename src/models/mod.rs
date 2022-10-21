@@ -11,6 +11,7 @@ mod nginx_template;
 mod system;
 mod node;
 mod yml;
+mod controller;
 
 use std::io;
 use serde::{Serialize, Deserialize};
@@ -24,6 +25,7 @@ pub use container::*;
 pub use namespace::*;
 pub use container_image::*;
 pub use git_repository::*;
+pub use controller::*;
 pub use nginx_log::*;
 pub use nginx_template::*;
 pub use system::*;
@@ -64,6 +66,7 @@ pub enum Commands {
   Run(RunArgs),
   Exec(ExecArgs),
   Node(NodeArgs),
+  Controller(ControllerArgs),
   /// Connect to nginx logging
   NginxLog,
   /// Show the Nanocl version information

@@ -11,25 +11,21 @@ use cli::utils::print_table;
 
 fn process_error(args: &Cli, err: CliError) {
   match err {
-    CliError::Client(err) => {
-      match err {
-        client::error::NanocldError::SendRequest(err) => {
-          match err {
-            ntex::http::client::error::SendRequestError::Connect(_) => {
-              eprintln!(
+    CliError::Client(err) => match err {
+      client::error::NanocldError::SendRequest(err) => match err {
+        ntex::http::client::error::SendRequestError::Connect(_) => {
+          eprintln!(
             "Cannot connect to the nanocl daemon at {host}. Is the nanocl daemon running?",
             host = args.host
           )
-            }
-            _ => eprintln!("{}", err),
-          }
-        }
-        client::error::NanocldError::Api(err) => {
-          eprintln!("Daemon [{}]: {}", err.status, err.msg);
         }
         _ => eprintln!("{}", err),
+      },
+      client::error::NanocldError::Api(err) => {
+        eprintln!("Daemon [{}]: {}", err.status, err.msg);
       }
-    }
+      _ => eprintln!("{}", err),
+    },
     _ => eprintln!("{}", err),
   }
   std::process::exit(1);
@@ -83,6 +79,9 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     }
     Commands::NginxLog => {
       client.watch_nginx_logs().await?;
+    }
+    Commands::Controller(args) => {
+      cli::exec_controller(&client, args).await?;
     }
   }
   Ok(())

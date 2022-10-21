@@ -11,10 +11,12 @@ mod version;
 mod apply;
 mod revert;
 mod node;
+mod controller;
 
 pub mod errors;
 pub mod utils;
 
+pub use controller::*;
 pub use run::*;
 pub use docker::*;
 pub use cluster::*;

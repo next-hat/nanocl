@@ -111,4 +111,22 @@ impl Nanocld {
 
     Ok(cargo)
   }
+
+  pub async fn delete_cargo_instance(
+    &self,
+    name: &str,
+    cluster_name: &str,
+    namespace: Option<String>,
+  ) -> Result<(), NanocldError> {
+    let mut res = self
+      .delete(format!("/clusters/{cluster_name}/cargoes/{name}"))
+      .query(&GenericNamespaceQuery { namespace })
+      .unwrap()
+      .send()
+      .await?;
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+
+    Ok(())
+  }
 }
