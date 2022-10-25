@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand, AppSettings};
+use clap::{Parser, Subcommand};
 use tabled::Tabled;
 use serde::{Serialize, Deserialize};
 
@@ -38,11 +38,7 @@ pub struct CargoPatchArgs {
 }
 
 #[derive(Debug, Subcommand)]
-#[clap(
-  about,
-  version,
-  global_setting = AppSettings::DeriveDisplayOrder,
-)]
+#[clap(about, version)]
 pub enum CargoCommands {
   /// List existing cargo
   #[clap(alias("ls"))]
@@ -86,11 +82,11 @@ pub struct CargoPartial {
   /// proxy config is an optional string as follow domain_name=your_domain,host_ip=your_host_ip
   // #[clap(long)]
   // pub(crate) proxy_config: Option<CargoProxyConfigPartial>,
-  #[clap(long = "-bind")]
+  #[clap(long = "bind")]
   /// Directory or volumes to create
   pub(crate) binds: Option<Vec<String>>,
   /// Environement variable
-  #[clap(long = "-env")]
+  #[clap(long = "env")]
   pub(crate) environnements: Option<Vec<String>>,
   /// Number of replicas default to 1
   #[clap(long)]

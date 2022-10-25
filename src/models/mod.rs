@@ -9,14 +9,11 @@ mod git_repository;
 mod nginx_log;
 mod nginx_template;
 mod system;
-mod node;
 mod yml;
 mod controller;
 
-use std::io;
 use serde::{Serialize, Deserialize};
-use clap_complete::{generate, Generator};
-use clap::{App, AppSettings, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 pub use cargo::*;
 pub use cluster::*;
@@ -29,18 +26,11 @@ pub use controller::*;
 pub use nginx_log::*;
 pub use nginx_template::*;
 pub use system::*;
-pub use node::*;
 pub use yml::*;
 
 /// A self-sufficient hybrid-cloud manager
 #[derive(Debug, Parser)]
-#[clap(
-  about,
-  version,
-  name = "nanocl",
-  long_about = "Manage your hybrid cloud with nanocl",
-  global_setting = AppSettings::DeriveDisplayOrder,
-)]
+#[clap(about, version, name = "nanocl")]
 pub struct Cli {
   /// Nanocld host
   #[clap(long, short = 'H', default_value = "unix://run/nanocl/nanocl.sock")]
@@ -52,7 +42,6 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-  Docker(DockerOptions),
   Namespace(NamespaceArgs),
   Cluster(ClusterArgs),
   Cargo(CargoArgs),
@@ -65,25 +54,15 @@ pub enum Commands {
   ListContainer(ListContainerOptions),
   Run(RunArgs),
   Exec(ExecArgs),
-  Node(NodeArgs),
   Controller(ControllerArgs),
-  /// Connect to nginx logging
-  NginxLog,
   /// Show the Nanocl version information
   Version,
-  // TODO shell ompletion
+  // TODO shell completion
   // Completion {
   //   /// Shell to generate completion for
   //   #[clap(arg_enum)]
   //   shell: Shell,
   // },
-}
-
-/// Alias to self-managed dockerd can be used for debug
-#[derive(Debug, Parser)]
-pub struct DockerOptions {
-  #[clap(multiple = true, raw = true)]
-  pub args: Vec<String>,
 }
 
 /// Apply a configuration file
@@ -135,12 +114,4 @@ pub struct PgGenericCount {
 pub struct GenericNamespaceQuery {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) namespace: Option<String>,
-}
-
-/// TODO for shell completion
-pub fn _print_completion<G>(gen: G, app: &mut App)
-where
-  G: Generator,
-{
-  generate(gen, app, app.get_name().to_string(), &mut io::stdout());
 }

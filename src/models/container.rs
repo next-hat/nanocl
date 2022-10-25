@@ -25,7 +25,7 @@ pub struct ExecArgs {
   pub(crate) workdir: Option<String>,
   /// Name of container to exec into
   pub(crate) name: String,
-  #[clap(multiple = true, raw = true)]
+  /// Command to execute
   pub(crate) cmd: Vec<String>,
 }
 

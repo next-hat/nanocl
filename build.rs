@@ -1,5 +1,5 @@
 use std::fs;
-use clap::IntoApp;
+use clap::*;
 
 include!("./src/models/mod.rs");
 
@@ -23,29 +23,23 @@ pub fn generate_man_command(
 }
 
 pub fn generate_man() -> std::io::Result<()> {
-  generate_man_command("nanocl", Cli::into_app())?;
-  generate_man_command("nanocl-namespace", NamespaceArgs::into_app())?;
-  generate_man_command(
-    "nanocl-namespace-create",
-    NamespacePartial::into_app(),
-  )?;
-  generate_man_command("nanocl-apply", ApplyArgs::into_app())?;
-  generate_man_command("nanocl-revert", RevertArgs::into_app())?;
-  generate_man_command("nanocl-cluster", ClusterArgs::into_app())?;
+  generate_man_command("nanocl", Cli::command())?;
+  generate_man_command("nanocl-namespace", NamespaceArgs::command())?;
+  generate_man_command("nanocl-namespace-create", NamespacePartial::command())?;
+  generate_man_command("nanocl-apply", ApplyArgs::command())?;
+  generate_man_command("nanocl-revert", RevertArgs::command())?;
+  generate_man_command("nanocl-cluster", ClusterArgs::command())?;
   generate_man_command(
     "nanocl-cluster-delete",
-    ClusterDeleteOptions::into_app(),
+    ClusterDeleteOptions::command(),
   )?;
-  generate_man_command("nanocl-cluster-create", ClusterPartial::into_app())?;
-  generate_man_command(
-    "nanocl-cluster-start",
-    ClusterStartOptions::into_app(),
-  )?;
+  generate_man_command("nanocl-cluster-create", ClusterPartial::command())?;
+  generate_man_command("nanocl-cluster-start", ClusterStartOptions::command())?;
   generate_man_command(
     "nanocl-cluster-inspect",
-    ClusterInspectOptions::into_app(),
+    ClusterInspectOptions::command(),
   )?;
-  // NamespaceCommands::into_app()
+  // NamespaceCommands::command()
   // generate_man_command("nanocl-namespace-list")
 
   Ok(())
