@@ -1,4 +1,4 @@
-use clap::{arg_enum, Parser, Subcommand};
+use clap::{ValueEnum, Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Subcommand)]
@@ -13,15 +13,13 @@ pub struct ControllerOptions {
   pub(crate) r#type: ControllerType,
 }
 
-arg_enum! {
-  #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-  #[serde(rename_all = "snake_case")]
-  pub enum ControllerType {
-    Dns,
-    // GeoDns, // Todo GeoDns and Addition of dnsmasq
-    Vpn,
-    Proxy,
-  }
+#[derive(Serialize, Deserialize, Debug, ValueEnum, PartialEq, Eq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum ControllerType {
+  Dns,
+  // GeoDns, // Todo GeoDns and Addition of dnsmasq
+  Vpn,
+  Proxy,
 }
 
 #[derive(Debug, Parser)]

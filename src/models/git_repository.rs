@@ -1,5 +1,5 @@
 use tabled::Tabled;
-use clap::{arg_enum, Parser, Subcommand};
+use clap::{ValueEnum, Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
 use super::container_image::ProgressDetail;
@@ -43,13 +43,24 @@ pub struct GitRepositoryArgs {
   pub commands: GitRepositoryCommands,
 }
 
-arg_enum! {
-  #[derive(Debug, Tabled, Serialize, Deserialize)]
-  #[serde(rename_all = "lowercase")]
-  pub enum GitRepositorySourceType {
-    Github,
-    Gitlab,
-    Local,
+#[derive(Clone, Debug, Tabled, ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GitRepositorySourceType {
+  Github,
+  Gitlab,
+  Local,
+}
+
+impl std::fmt::Display for GitRepositorySourceType {
+  fn fmt(
+    &self,
+    f: &mut std::fmt::Formatter<'_>,
+  ) -> Result<(), std::fmt::Error> {
+    match &self {
+      GitRepositorySourceType::Github => write!(f, "github"),
+      GitRepositorySourceType::Gitlab => write!(f, "gitlab"),
+      GitRepositorySourceType::Local => write!(f, "local"),
+    }
   }
 }
 
