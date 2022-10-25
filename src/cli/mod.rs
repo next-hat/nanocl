@@ -1,6 +1,5 @@
 mod nginx_template;
 mod namespace;
-mod docker;
 mod cluster;
 mod cargo;
 mod container_image;
@@ -10,7 +9,6 @@ mod git_repository;
 mod version;
 mod apply;
 mod revert;
-mod node;
 mod controller;
 
 pub mod errors;
@@ -18,7 +16,6 @@ pub mod utils;
 
 pub use controller::*;
 pub use run::*;
-pub use docker::*;
 pub use cluster::*;
 pub use namespace::*;
 pub use container_image::*;
@@ -29,4 +26,3 @@ pub use exec::*;
 pub use version::*;
 pub use apply::*;
 pub use revert::*;
-pub use node::*;

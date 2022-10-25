@@ -54,13 +54,10 @@ pub enum Commands {
   ListContainer(ListContainerOptions),
   Run(RunArgs),
   Exec(ExecArgs),
-  Node(NodeArgs),
   Controller(ControllerArgs),
-  /// Connect to nginx logging
-  NginxLog,
   /// Show the Nanocl version information
   Version,
-  // TODO shell ompletion
+  // TODO shell completion
   // Completion {
   //   /// Shell to generate completion for
   //   #[clap(arg_enum)]
