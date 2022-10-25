@@ -19,8 +19,8 @@ default = []
 chrono = { version = "0.4.19", features = ["serde"] }
 clap = { version = "4.0.18", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
-clap_mangen = { version = "0.1" }
 clap_complete = "4.0.3"
+clap_mangen = { version = "0.2" }
 tabled = "0.10.0"
 
 [dependencies]
