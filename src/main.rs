@@ -2,6 +2,8 @@ mod cli;
 mod models;
 mod version;
 mod client;
+mod utils;
+mod config;
 
 use clap::Parser;
 use cli::errors::CliError;
@@ -34,6 +36,7 @@ fn process_error(args: &Cli, err: CliError) {
 async fn execute_args(args: &Cli) -> Result<(), CliError> {
   let client = client::Nanocld::connect_with_unix_default().await;
   match &args.command {
+    Commands::Setup(args) => cli::exec_setup(args).await,
     Commands::Run(args) => cli::exec_run(&client, args).await,
     Commands::Namespace(args) => cli::exec_namespace(&client, args).await,
     Commands::Cluster(args) => cli::exec_cluster(&client, args).await,
