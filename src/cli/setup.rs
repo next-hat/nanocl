@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use bollard::container::{CreateContainerOptions, Config, StartContainerOptions};
@@ -113,8 +114,14 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
         ..Default::default()
       };
 
+      let mut labels = HashMap::new();
+      labels.insert("namespace", "system");
+      labels.insert("cluster", "system-nano");
+      labels.insert("cargo", "system-master");
+
       let config = Config {
         image: Some("nanocl-daemon:0.1.5"),
+        labels: Some(labels),
         host_config: Some(host_config),
         ..Default::default()
       };
