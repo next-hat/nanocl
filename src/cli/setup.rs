@@ -8,11 +8,9 @@ use futures::StreamExt;
 use indicatif::{ProgressStyle, ProgressBar};
 use ntex::http::StatusCode;
 use std::default::Default;
-
 use bollard::image::ImportImageOptions;
 use bollard::errors::Error;
 use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
 use tokio_util::codec;
 
 use crate::client::error::ApiError;
@@ -92,9 +90,7 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
         None,
       );
 
-      while let Some(response) = stream.next().await {
-        println!("res: {:#?}", &response);
-      }
+      while let Some(_) = stream.next().await {}
 
       let options = Some(CreateContainerOptions {
         name: "system-nanocl-daemon",
@@ -117,10 +113,10 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
       let mut labels = HashMap::new();
       labels.insert("namespace", "system");
       labels.insert("cluster", "system-nano");
-      labels.insert("cargo", "system-master");
+      labels.insert("cargo", "system-daemon");
 
       let config = Config {
-        image: Some("nanocl-daemon:0.1.5"),
+        image: Some("nanocl-daemon:0.1.6"),
         labels: Some(labels),
         host_config: Some(host_config),
         ..Default::default()
@@ -135,8 +131,10 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
         )
         .await?;
     }
-    // Host is filled perform remote installation
-    Some(host) => {}
+    // Host is exists perform remote installation
+    Some(_host) => {
+      todo!("Remote installation is not available yet.");
+    }
   }
   Ok(())
 }
