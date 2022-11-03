@@ -49,7 +49,7 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
       }
       pg.finish_and_clear();
 
-      let daemon_url = "https://github.com/nxthat/nanocld/releases/download/v0.1.5/nanocl-daemon.0.1.5.tar.gz";
+      let daemon_url = "https://github.com/nxthat/nanocld/releases/download/v0.1.6/nanocl-daemon.0.1.6.tar.gz";
 
       let daemon_url =
         url::Url::from_str(daemon_url).map_err(|err| ApiError {
@@ -69,8 +69,6 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
         pg.tick();
       }
       pg.finish_and_clear();
-
-      println!("Download finished : {}", &download_response.path);
 
       let file = File::open(format!("/tmp/{}", &download_response.path))
         .await
