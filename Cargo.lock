@@ -139,9 +139,9 @@ checksum = "c1db59621ec70f09c5e9b597b220c7a2b43611f4710dc03ceb8748637775692c"
 
 [[package]]
 name = "cc"
-version = "1.0.73"
+version = "1.0.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fff2a6927b3bb87f9595d67196a70493f627687a71d87a0d692242c33f58c11"
+checksum = "581f5dba903aac52ea3feb5ec4810848460ee833876f1f9b0fdeab1f19091574"
 
 [[package]]
 name = "cfg-if"
@@ -620,9 +620,9 @@ checksum = "c4a1e36c821dbe04574f602848a19f742f4fb3c98d40449f11bcad18d6b17421"
 
 [[package]]
 name = "hyper"
-version = "0.14.20"
+version = "0.14.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02c929dc5c39e335a03c405292728118860721b10190d98c2a0f0efd5baafbac"
+checksum = "abfba89e19b959ca163c7752ba59d737c1ceea53a5d31a149c805446fc958064"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -657,9 +657,9 @@ dependencies = [
 
 [[package]]
 name = "iana-time-zone"
-version = "0.1.52"
+version = "0.1.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c422fb4f6e80490d0afcacf5c3de2c22ab8e631e0cd7cb2d4a3baf844720a52a"
+checksum = "64c122667b287044802d6ce17ee2ddf13207ed924c712de9a66a5814d5b64765"
 dependencies = [
  "android_system_properties",
  "core-foundation-sys",
@@ -818,16 +818,15 @@ checksum = "729eb334247daa1803e0a094d0a5c55711b85571179f5ec6e53eccfdf7008958"
 
 [[package]]
 name = "ntex"
-version = "0.5.27"
+version = "0.5.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3c6214553ae77f8548e10aaa5597d9f0a4c74bb3b85366fb24012b2b9edfeab"
+checksum = "1bc8fb9eb84b4e52c9761c2a5e0a9d2524d3b8f8ec48c032b7a35a139c97cec3"
 dependencies = [
  "async-channel",
  "async-oneshot",
  "base64",
  "bitflags",
  "encoding_rs",
- "http",
  "httparse",
  "httpdate",
  "log",
@@ -925,20 +924,22 @@ dependencies = [
 
 [[package]]
 name = "ntex-http"
-version = "0.1.1"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fa0041a7c513bd631f181487fcd733b11298d6f3f54dc8878037c3dfab7af82"
+checksum = "816d61a0dbc466191611d82a56039bab35fe2e0c01bee6f5a251f7fc66998fd7"
 dependencies = [
  "fxhash",
  "http",
+ "itoa",
  "log",
+ "ntex-bytes",
 ]
 
 [[package]]
 name = "ntex-io"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00d66903a5483c1595da976962cce51e8c73d2a24f47eb29d600482570430846"
+checksum = "60bcc69fdc0af9c749d0116a67c7503943a13d2092fb3ba95b7010d05bdb23e8"
 dependencies = [
  "bitflags",
  "log",
@@ -1063,9 +1064,9 @@ dependencies = [
 
 [[package]]
 name = "num_cpus"
-version = "1.13.1"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19e64526ebdee182341572e50e9ad03965aa510cd94427a4549448f285e957a1"
+checksum = "f6058e64324c71e02bc2b150e4f3bc8286db6c83092132ffa3f6b1eab0f9def5"
 dependencies = [
  "hermit-abi",
  "libc",
@@ -1079,9 +1080,9 @@ checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 
 [[package]]
 name = "once_cell"
-version = "1.15.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
+checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
 name = "os_str_bytes"

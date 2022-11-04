@@ -22,6 +22,7 @@ pub enum ControllerType {
   Proxy,
 }
 
+/// Manage nanocl controllers
 #[derive(Debug, Parser)]
 pub struct ControllerArgs {
   #[clap(subcommand)]
