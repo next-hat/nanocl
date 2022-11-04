@@ -11,6 +11,7 @@ mod nginx_template;
 mod system;
 mod yml;
 mod controller;
+mod setup;
 
 use serde::{Serialize, Deserialize};
 use clap::{Parser, Subcommand};
@@ -27,6 +28,7 @@ pub use nginx_log::*;
 pub use nginx_template::*;
 pub use system::*;
 pub use yml::*;
+pub use setup::*;
 
 /// A self-sufficient hybrid-cloud manager
 #[derive(Debug, Parser)]
@@ -55,6 +57,7 @@ pub enum Commands {
   Run(RunArgs),
   Exec(ExecArgs),
   Controller(ControllerArgs),
+  Setup(SetupArgs),
   /// Show the Nanocl version information
   Version,
   // TODO shell completion

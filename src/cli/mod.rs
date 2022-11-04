@@ -10,10 +10,12 @@ mod version;
 mod apply;
 mod revert;
 mod controller;
+mod setup;
 
 pub mod errors;
 pub mod utils;
 
+pub use setup::*;
 pub use controller::*;
 pub use run::*;
 pub use cluster::*;
