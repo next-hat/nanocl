@@ -3,8 +3,14 @@ name = "nanocl"
 version = "0.1.4"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
-description = "self-sufficient hybrid-cloud"
+description = "self-sufficient hybrid-cloud orchestrator"
 readme = "README.md"
+
+[[bin]]
+name = "nanocl"
+test = false
+bench = false
+path = "src/main.rs"
 
 [profile.dev]
 opt-level = 0

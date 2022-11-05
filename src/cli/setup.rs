@@ -186,7 +186,6 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
       )?;
       install_store_image(&docker_api).await?;
       install_daemon_image(&docker_api).await?;
-
       spawn_deamon(&config, &docker_api).await?;
     }
     // Host is exists perform remote installation
