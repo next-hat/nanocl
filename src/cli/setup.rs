@@ -72,11 +72,11 @@ async fn install_store_image(
 async fn install_daemon_image(
   docker_api: &bollard::Docker,
 ) -> Result<(), CliError> {
-  if image_exists("nanocl-daemon:0.1.6", docker_api).await? {
+  if image_exists("nanocl-daemon:0.1.7", docker_api).await? {
     return Ok(());
   }
 
-  let daemon_image_url = "https://github.com/nxthat/nanocld/releases/download/v0.1.6/nanocl-daemon.0.1.6.tar.gz";
+  let daemon_image_url = "https://github.com/nxthat/nanocld/releases/download/v0.1.7/nanocl-daemon.0.1.7.tar.gz";
   let daemon_image_url =
     url::Url::from_str(daemon_image_url).map_err(|err| ApiError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -156,7 +156,7 @@ async fn spawn_deamon(
   labels.insert("cargo", "system-daemon");
 
   let config = Config {
-    image: Some("nanocl-daemon:0.1.6"),
+    image: Some("nanocl-daemon:0.1.7"),
     labels: Some(labels),
     host_config: Some(host_config),
     ..Default::default()
