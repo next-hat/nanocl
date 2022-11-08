@@ -2,7 +2,7 @@ mod utils;
 mod cargo;
 mod cluster;
 mod network;
-mod container;
+mod cargo_instance;
 mod namespace;
 mod container_image;
 mod git_repository;
@@ -19,7 +19,7 @@ use clap::{Parser, Subcommand};
 pub use cargo::*;
 pub use cluster::*;
 pub use network::*;
-pub use container::*;
+pub use cargo_instance::*;
 pub use namespace::*;
 pub use container_image::*;
 pub use git_repository::*;
@@ -52,13 +52,11 @@ pub enum Commands {
   GitRepository(GitRepositoryArgs),
   NginxTemplate(NginxTemplateArgs),
   ContainerImage(ContainerImageArgs),
-  #[clap(name = "lsc")]
-  ListContainer(ListContainerOptions),
   Run(RunArgs),
   Exec(ExecArgs),
   Controller(ControllerArgs),
   Setup(SetupArgs),
-  /// Show the Nanocl version information
+  /// Show nanocl version information
   Version,
   // TODO shell completion
   // Completion {

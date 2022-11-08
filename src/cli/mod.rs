@@ -11,10 +11,12 @@ mod apply;
 mod revert;
 mod controller;
 mod setup;
+mod cargo_instance;
 
 pub mod errors;
 pub mod utils;
 
+pub use cargo_instance::*;
 pub use setup::*;
 pub use controller::*;
 pub use run::*;

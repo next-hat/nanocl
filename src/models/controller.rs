@@ -3,8 +3,10 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Subcommand)]
 pub enum ControllerCommands {
+  /// Install and register a controller
   Add(ControllerOptions),
   #[clap(alias("rm"))]
+  /// Remove and unregister a controller
   Remove(ControllerOptions),
 }
 

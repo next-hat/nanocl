@@ -10,7 +10,7 @@ use super::{
 impl Nanocld {
   pub async fn list_containers(
     &self,
-    options: &ListContainerOptions,
+    options: &ListCargoInstanceOptions,
   ) -> Result<Vec<ContainerSummary>, NanocldError> {
     let mut res = self
       .get(String::from("/containers"))

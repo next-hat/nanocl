@@ -1,9 +1,9 @@
-use clap::{Parser, Subcommand};
 use tabled::Tabled;
+use clap::{Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
-use super::container::ContainerSummary;
 use super::utils::tabled::*;
+use super::cargo_instance::{CargoInstanceArgs, ContainerSummary};
 
 /// Cargo delete options
 #[derive(Debug, Parser)]
@@ -52,6 +52,8 @@ pub enum CargoCommands {
   Inspect(CargoInspectOption),
   /// Update a cargo by it's name
   Patch(CargoPatchArgs),
+  /// Manage cargo instances
+  Instance(CargoInstanceArgs),
 }
 
 /// Manage cargoes
