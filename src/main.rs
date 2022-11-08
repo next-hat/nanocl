@@ -9,7 +9,6 @@ use clap::Parser;
 use cli::errors::CliError;
 
 use models::*;
-use cli::utils::print_table;
 
 fn process_error(args: &Cli, err: CliError) {
   match err {
@@ -54,11 +53,6 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::Exec(args) => cli::exec_exec(&client, args).await,
     Commands::Apply(args) => cli::exec_apply(&client, args).await,
     Commands::Revert(args) => cli::exec_revert(&client, args).await,
-    Commands::ListContainer(args) => {
-      let data = client.list_containers(args).await?;
-      print_table(data);
-      Ok(())
-    }
     Commands::Controller(args) => cli::exec_controller(&client, args).await,
   }
 }

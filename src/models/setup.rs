@@ -1,6 +1,6 @@
 use clap::Parser;
 
-/// Download and Install required dependencies
+/// Setup given host to run nanocl
 #[derive(Debug, Parser)]
 pub struct SetupArgs {
   /// Remote host to setup nanocl

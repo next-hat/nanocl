@@ -4,6 +4,7 @@ use crate::models::{
   CargoDeleteOptions, CargoInspectOption, CargoPatchArgs, CargoPatchCommands,
 };
 
+use super::exec_cargo_instance;
 use super::utils::print_table;
 use super::errors::CliError;
 
@@ -96,5 +97,6 @@ pub async fn exec_cargo(
       exec_cargo_inspect(client, args, options).await
     }
     CargoCommands::Patch(pargs) => exec_cargo_patch(client, args, pargs).await,
+    CargoCommands::Instance(args) => exec_cargo_instance(client, args).await,
   }
 }

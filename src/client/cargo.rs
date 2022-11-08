@@ -12,8 +12,7 @@ impl Nanocld {
   ) -> Result<Vec<CargoItem>, NanocldError> {
     let mut res = self
       .get(String::from("/cargoes"))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -30,8 +29,7 @@ impl Nanocld {
   ) -> Result<CargoItem, NanocldError> {
     let mut res = self
       .post(String::from("/cargoes"))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send_json(item)
       .await?;
     let status = res.status();
@@ -48,8 +46,7 @@ impl Nanocld {
   ) -> Result<(), NanocldError> {
     let mut res = self
       .delete(format!("/cargoes/{name}", name = cargo_name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -64,8 +61,7 @@ impl Nanocld {
   ) -> Result<PgGenericCount, NanocldError> {
     let mut res = self
       .get(String::from("/cargoes/count"))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -81,8 +77,7 @@ impl Nanocld {
   ) -> Result<CargoItemWithRelation, NanocldError> {
     let mut res = self
       .get(format!("/cargoes/{name}/inspect", name = name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -100,8 +95,7 @@ impl Nanocld {
   ) -> Result<CargoItem, NanocldError> {
     let mut res = self
       .patch(format!("/cargoes/{name}"))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send_json(payload)
       .await?;
     let status = res.status();
@@ -120,8 +114,7 @@ impl Nanocld {
   ) -> Result<(), NanocldError> {
     let mut res = self
       .delete(format!("/clusters/{cluster_name}/cargoes/{name}"))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();

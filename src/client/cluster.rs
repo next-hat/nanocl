@@ -14,8 +14,7 @@ impl Nanocld {
   ) -> Result<Vec<ClusterItem>, NanocldError> {
     let mut res = self
       .get(String::from("/clusters"))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -32,8 +31,7 @@ impl Nanocld {
   ) -> Result<ClusterItem, NanocldError> {
     let mut res = self
       .post(String::from("/clusters"))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send_json(&item)
       .await?;
     let status = res.status();
@@ -50,8 +48,7 @@ impl Nanocld {
   ) -> Result<ClusterItemWithRelation, NanocldError> {
     let mut res = self
       .get(format!("/clusters/{name}/inspect", name = name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -68,8 +65,7 @@ impl Nanocld {
   ) -> Result<(), NanocldError> {
     let mut res = self
       .delete(format!("/clusters/{name}", name = name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -85,8 +81,7 @@ impl Nanocld {
   ) -> Result<Vec<ClusterNetworkItem>, NanocldError> {
     let mut res = self
       .get(format!("/clusters/{name}/networks", name = cluster_name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -104,8 +99,7 @@ impl Nanocld {
   ) -> Result<ClusterNetworkItem, NanocldError> {
     let mut res = self
       .post(format!("/clusters/{name}/networks", name = cluster_name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send_json(item)
       .await
       .map_err(NanocldError::SendRequest)?;
@@ -128,8 +122,7 @@ impl Nanocld {
         c_name = cluster_name,
         n_name = network_name
       ))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -150,8 +143,7 @@ impl Nanocld {
         c_name = c_name,
         n_name = n_name
       ))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -169,8 +161,7 @@ impl Nanocld {
   ) -> Result<(), NanocldError> {
     let mut res = self
       .post(format!("/clusters/{c_name}/variables", c_name = c_name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send_json(&item)
       .await?;
     let status = res.status();
@@ -191,8 +182,7 @@ impl Nanocld {
         c_name = c_name,
         v_name = v_name
       ))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -214,8 +204,7 @@ impl Nanocld {
         c_name = c_name,
         v_name = v_name
       ))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -232,8 +221,7 @@ impl Nanocld {
   ) -> Result<(), NanocldError> {
     let mut res = self
       .post(format!("/clusters/{c_name}/join", c_name = c_name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send_json(item)
       .await?;
     let status = res.status();
@@ -249,8 +237,7 @@ impl Nanocld {
   ) -> Result<(), NanocldError> {
     let mut res = self
       .post(format!("/clusters/{c_name}/start", c_name = c_name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -265,8 +252,7 @@ impl Nanocld {
   ) -> Result<PgGenericCount, NanocldError> {
     let mut res = self
       .get(String::from("/clusters/count"))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -282,8 +268,7 @@ impl Nanocld {
   ) -> Result<PgGenericCount, NanocldError> {
     let mut res = self
       .get(String::from("/networks/count"))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();
@@ -301,8 +286,7 @@ impl Nanocld {
   ) -> Result<(), NanocldError> {
     let mut res = self
       .post(format!("/clusters/{}/nginx_templates", cl_name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send_json(&json!({
         "name": nt_name.to_owned(),
       }))
@@ -322,8 +306,7 @@ impl Nanocld {
   ) -> Result<(), NanocldError> {
     let mut res = self
       .delete(format!("/clusters/{}/nginx_templates/{}", cl_name, nt_name))
-      .query(&GenericNamespaceQuery { namespace })
-      .unwrap()
+      .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;
     let status = res.status();

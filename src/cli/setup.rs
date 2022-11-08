@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use bollard::container::{CreateContainerOptions, Config, StartContainerOptions};
+use bollard::container::{
+  CreateContainerOptions, Config, StartContainerOptions, WaitContainerOptions,
+  RemoveContainerOptions,
+};
 use bollard::image::CreateImageOptions;
 use bollard::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};
 use futures::StreamExt;
@@ -72,11 +75,11 @@ async fn install_store_image(
 async fn install_daemon_image(
   docker_api: &bollard::Docker,
 ) -> Result<(), CliError> {
-  if image_exists("nanocl-daemon:0.1.6", docker_api).await? {
+  if image_exists("nanocl-daemon:0.1.7", docker_api).await? {
     return Ok(());
   }
 
-  let daemon_image_url = "https://github.com/nxthat/nanocld/releases/download/v0.1.6/nanocl-daemon.0.1.6.tar.gz";
+  let daemon_image_url = "https://github.com/nxthat/nanocld/releases/download/v0.1.7/nanocl-daemon.0.1.7.tar.gz";
   let daemon_image_url =
     url::Url::from_str(daemon_image_url).map_err(|err| ApiError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -124,18 +127,61 @@ async fn install_daemon_image(
   Ok(())
 }
 
-async fn spawn_deamon(
+async fn init_daemon(
   config: &DaemonConfig,
   docker_api: &bollard::Docker,
 ) -> Result<(), CliError> {
-  if instance_exists("system-nanocl-daemon", docker_api).await? {
-    return Ok(());
-  }
+  let host_config = HostConfig {
+    binds: Some(vec![
+      format!("{}:/run/nanocl/docker.sock", &config.docker_host),
+      String::from("/run/nanocl:/run/nanocl"),
+      String::from("/var/lib/nanocl:/var/lib/nanocl"),
+    ]),
+    network_mode: Some(String::from("host")),
+    ..Default::default()
+  };
+
+  let config = Config {
+    cmd: Some(vec!["--init"]),
+    image: Some("nanocl-daemon:0.1.7"),
+    host_config: Some(host_config),
+    ..Default::default()
+  };
 
   let options = Some(CreateContainerOptions {
     name: "system-nanocl-daemon",
   });
 
+  let c_res = docker_api.create_container(options, config).await?;
+
+  docker_api
+    .start_container(
+      "system-nanocl-daemon",
+      None::<StartContainerOptions<String>>,
+    )
+    .await?;
+
+  let mut stream =
+    docker_api.wait_container(&c_res.id, None::<WaitContainerOptions<String>>);
+
+  while let Some(chunk) = stream.next().await {
+    println!("{:#?}", &chunk);
+  }
+
+  let options = Some(RemoveContainerOptions {
+    force: true,
+    ..Default::default()
+  });
+
+  docker_api.remove_container(&c_res.id, options).await?;
+
+  Ok(())
+}
+
+async fn spawn_deamon(
+  config: &DaemonConfig,
+  docker_api: &bollard::Docker,
+) -> Result<(), CliError> {
   let host_config = HostConfig {
     binds: Some(vec![
       format!("{}:/run/nanocl/docker.sock", &config.docker_host),
@@ -156,11 +202,15 @@ async fn spawn_deamon(
   labels.insert("cargo", "system-daemon");
 
   let config = Config {
-    image: Some("nanocl-daemon:0.1.6"),
+    image: Some("nanocl-daemon:0.1.7"),
     labels: Some(labels),
     host_config: Some(host_config),
     ..Default::default()
   };
+
+  let options = Some(CreateContainerOptions {
+    name: "system-nanocl-daemon",
+  });
 
   docker_api.create_container(options, config).await?;
 
@@ -186,6 +236,10 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
       )?;
       install_store_image(&docker_api).await?;
       install_daemon_image(&docker_api).await?;
+      if instance_exists("system-nanocl-daemon", &docker_api).await? {
+        return Ok(());
+      }
+      init_daemon(&config, &docker_api).await?;
       spawn_deamon(&config, &docker_api).await?;
     }
     // Host is exists perform remote installation

@@ -10,12 +10,11 @@ use super::{
 impl Nanocld {
   pub async fn list_containers(
     &self,
-    options: &ListContainerOptions,
+    options: &ListCargoInstanceOptions,
   ) -> Result<Vec<ContainerSummary>, NanocldError> {
     let mut res = self
       .get(String::from("/containers"))
-      .query(options)
-      .unwrap()
+      .query(options)?
       .send()
       .await?;
     let status = res.status();
@@ -60,7 +59,11 @@ impl Nanocld {
           eprintln!("{err}");
         }
         Ok(output) => {
-          print!("{}", &String::from_utf8(output.to_vec()).unwrap());
+          let Ok(output) = String::from_utf8(output.to_vec()) else {
+            eprintln!("Unable to convert current stream into string");
+            break;
+          };
+          print!("{}", output);
         }
       }
     }

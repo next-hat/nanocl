@@ -55,9 +55,15 @@ impl Nanocld {
     let mut stream = res.into_stream();
     while let Some(result) = stream.next().await {
       let result = result.map_err(NanocldError::Payload)?;
-      let result = &String::from_utf8(result.to_vec()).unwrap();
-      let json =
-        serde_json::from_str::<GithubRepositoryBuildStream>(result).unwrap();
+      let Ok(result) = &String::from_utf8(result.to_vec()) else {
+        eprintln!("Unable to convert stream into string");
+        break;
+      };
+      let Ok(json) =
+        serde_json::from_str::<GithubRepositoryBuildStream>(result) else {
+          eprintln!("Unable to convert string into json");
+          break;
+        };
       callback(json);
     }
 

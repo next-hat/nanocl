@@ -2,11 +2,27 @@
 use std::collections::HashMap;
 /// Imported lib
 use tabled::Tabled;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
 use super::utils::tabled::*;
 use super::network::{Port, EndpointSettings};
+
+/// Manage cargoes
+#[derive(Debug, Parser)]
+#[clap(name = "nanocl-cargo")]
+pub struct CargoInstanceArgs {
+  #[clap(subcommand)]
+  pub commands: CargoInstanceCommands,
+}
+
+#[derive(Debug, Subcommand)]
+#[clap(about, version)]
+pub enum CargoInstanceCommands {
+  /// List existing cargo
+  #[clap(alias("ls"))]
+  List(ListCargoInstanceOptions),
+}
 
 /// Execute command inside a container
 #[derive(Debug, Parser)]
@@ -121,7 +137,7 @@ pub struct ContainerSummary {
 
 /// List container by namespace cluster or cargo
 #[derive(Debug, Parser, Serialize, Deserialize)]
-pub struct ListContainerOptions {
+pub struct ListCargoInstanceOptions {
   /// Namespace where the container is stored
   #[clap(long)]
   namespace: Option<String>,
