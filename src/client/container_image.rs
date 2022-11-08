@@ -42,10 +42,19 @@ impl Nanocld {
     rt::spawn(async move {
       let mut stream = res.into_stream();
       while let Some(result) = stream.next().await {
-        let result = result.unwrap();
-        let result = &String::from_utf8(result.to_vec()).unwrap();
-        let json =
-          serde_json::from_str::<CreateImageStreamInfo>(result).unwrap();
+        let Ok(result) = result else {
+          eprintln!("Stream unable to receive stream data");
+          break;
+        };
+        let Ok(result) = &String::from_utf8(result.to_vec()) else {
+          eprintln!("Error Unable to convert incomming stream to string");
+          break;
+        };
+        let Ok(json) =
+          serde_json::from_str::<CreateImageStreamInfo>(result) else {
+            eprintln!("Error Unable to convert incomming stream to json");
+            break;
+          };
         let _ = tx.send(json);
       }
       tx.close();

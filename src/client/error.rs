@@ -36,6 +36,10 @@ pub enum NanocldError {
   SendRequest(#[from] SendRequestError),
   #[error(transparent)]
   JsonPayload(#[from] JsonPayloadError),
+  #[error(transparent)]
+  SerdeUrlEncode(#[from] serde_urlencoded::ser::Error),
+  #[error(transparent)]
+  Utf8Error(#[from] std::string::FromUtf8Error),
 }
 
 pub async fn is_api_error(
