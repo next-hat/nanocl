@@ -167,9 +167,7 @@ async fn init_daemon(
   let mut stream =
     docker_api.wait_container(&c_res.id, None::<WaitContainerOptions<String>>);
 
-  while let Some(chunk) = stream.next().await {
-    println!("{:#?}", &chunk);
-  }
+  while let Some(_chunk) = stream.next().await {}
 
   let options = Some(RemoveContainerOptions {
     force: true,

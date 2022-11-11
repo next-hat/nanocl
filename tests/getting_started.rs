@@ -4,12 +4,6 @@ pub mod common;
 pub mod getting_started {
   use super::common;
 
-  async fn exec_setup() -> Result<(), common::TestError> {
-    let output = common::spawn_cli(vec!["setup"]).await?;
-    assert!(output.status.success());
-    Ok(())
-  }
-
   async fn exec_run() -> Result<(), common::TestError> {
     let output = common::spawn_cli(vec![
       "run",
@@ -45,7 +39,6 @@ pub mod getting_started {
 
   #[ntex::test]
   async fn exec_getting_started() -> Result<(), common::TestError> {
-    exec_setup().await?;
     exec_run().await?;
     exec_inspect_cargo().await?;
     exec_clean().await?;
