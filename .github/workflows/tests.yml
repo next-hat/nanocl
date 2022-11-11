@@ -36,5 +36,6 @@ jobs:
       run: >-
         echo "docker_host: /run/docker.sock" > /etc/nanocl/nanocl.conf;
         cargo run setup;
+        sudo chmod 777 -R /run/nanocl;
     - name: Run tests
       run: cargo make test
