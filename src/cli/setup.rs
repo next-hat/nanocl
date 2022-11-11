@@ -23,6 +23,8 @@ use crate::config::{read_daemon_config_file, DaemonConfig};
 
 use super::errors::CliError;
 
+const DAEMON_VERSION: &str = "0.1.8";
+
 async fn instance_exists(
   name: &str,
   docker_api: &bollard::Docker,
@@ -75,13 +77,14 @@ async fn install_store_image(
 async fn install_daemon_image(
   docker_api: &bollard::Docker,
 ) -> Result<(), CliError> {
-  if image_exists("nanocl-daemon:0.1.7", docker_api).await? {
+  let image = format!("nanocl-daemon:{version}", version = DAEMON_VERSION);
+  if image_exists(&image, docker_api).await? {
     return Ok(());
   }
 
-  let daemon_image_url = "https://github.com/nxthat/nanocld/releases/download/v0.1.7/nanocl-daemon.0.1.7.tar.gz";
+  let daemon_image_url = format!("https://github.com/nxthat/nanocld/releases/download/v{version}/nanocl-daemon.{version}.tar.gz", version = DAEMON_VERSION);
   let daemon_image_url =
-    url::Url::from_str(daemon_image_url).map_err(|err| ApiError {
+    url::Url::from_str(&daemon_image_url).map_err(|err| ApiError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("{err}"),
     })?;
@@ -140,10 +143,10 @@ async fn init_daemon(
     network_mode: Some(String::from("host")),
     ..Default::default()
   };
-
+  let image = format!("nanocl-daemon:{version}", version = DAEMON_VERSION);
   let config = Config {
     cmd: Some(vec!["--init"]),
-    image: Some("nanocl-daemon:0.1.7"),
+    image: Some(&image),
     host_config: Some(host_config),
     ..Default::default()
   };
@@ -195,14 +198,14 @@ async fn spawn_deamon(
     network_mode: Some(String::from("host")),
     ..Default::default()
   };
-
+  let image = format!("nanocl-daemon:{version}", version = DAEMON_VERSION);
   let mut labels = HashMap::new();
   labels.insert("namespace", "system");
   labels.insert("cluster", "system-nano");
   labels.insert("cargo", "system-daemon");
 
   let config = Config {
-    image: Some("nanocl-daemon:0.1.7"),
+    image: Some(image.as_ref()),
     labels: Some(labels),
     host_config: Some(host_config),
     ..Default::default()
