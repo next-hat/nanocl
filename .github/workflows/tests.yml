@@ -34,9 +34,7 @@ jobs:
       run: sudo chmod 777 /run/docker.sock && sudo mkdir /run/nanocl && sudo mkdir /var/lib/nanocl && sudo mkdir -p ./vm_images && sudo chmod 777 -R /run/nanocl && sudo chmod 777 -R /var/lib/nanocl && sudo mkdir -p /etc/nanocl && sudo chmod 777 -R /etc/nanocl
     - name: Setup
       run: >-
-        cat > /etc/nanocl/nanocl.conf <<- EOM
-        docker_host: /run/docker.sock
-        EOM;
+        echo "docker_host: /run/docker.sock" > /etc/nanocl/nanocl.conf;
         cargo run setup;
     - name: Run tests
       run: cargo make test
