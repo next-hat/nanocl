@@ -48,6 +48,7 @@ async fn exec_command(
   .map_err(|err| TestError {
     msg: format!("Spawn error {}", &err),
   })??;
+  println!("{:#?}", &output);
   Ok(output)
 }
 
