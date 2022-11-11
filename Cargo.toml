@@ -1,10 +1,11 @@
 [package]
 name = "nanocl"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
-description = "self-sufficient hybrid-cloud orchestrator"
+description = "The Self-Sufficient Hybrid-Cloud Orchestrator"
 readme = "README.md"
+license = "MIT OR Apache-2.0"
 
 [[bin]]
 name = "nanocl"
