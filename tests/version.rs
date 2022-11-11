@@ -7,6 +7,7 @@ pub mod version {
   #[ntex::test]
   async fn exec_version() -> Result<(), common::TestError> {
     let output = common::spawn_cli(vec!["version"]).await?;
+    println!("{:#?}", &output);
     assert!(output.status.success());
     Ok(())
   }
