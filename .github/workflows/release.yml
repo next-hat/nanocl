@@ -18,13 +18,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Set branch name
-      run: echo "BRANCH_NAME=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV
     # Cache Docker images
     - uses: actions/cache@v3
       with:
         path: /var/lib/docker/image
         key: docker-image-cache
+    - name: Set branch name
+      run: echo "BRANCH_NAME=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV
     - name: Print branch name
       run: echo $BRANCH_NAME
     - name: Set version
