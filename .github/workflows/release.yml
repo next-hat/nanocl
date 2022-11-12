@@ -19,7 +19,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Prepare docker cache
-      run: sudo chmod 777 -R /var/lib/docker
+      run: sudo systemctl stop docker && sudo chmod 777 -R /var/lib/docker
     # Cache Docker images
     - uses: actions/cache@v3
       with:
