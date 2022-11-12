@@ -44,7 +44,7 @@ jobs:
         file: ./Dockerfile
         load: true
         push: false
-        tags: nanocl:$IMAGE_VERSION
+        tags: nanocl:${{ IMAGE_VERSION }}
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache
     - name: Export image
