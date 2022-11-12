@@ -1,5 +1,5 @@
 # stage 1 - generate recipe file for dependencies
-from rust:1.64.0-alpine3.16 as planner
+from rust:1.65.0-alpine3.16 as planner
 
 WORKDIR /app
 RUN apk add gcc g++ make
@@ -8,7 +8,7 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 # state 2 - build our dependencies
-from rust:1.64.0-alpine3.16 as cacher
+from rust:1.65.0-alpine3.16 as cacher
 WORKDIR /app
 COPY --from=planner /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/cargo-chef
 COPY --from=planner /app/recipe.json ./recipe.json
@@ -17,7 +17,7 @@ COPY ./Cargo.lock ./Cargo.toml ./
 RUN cargo chef cook --release --recipe-path recipe.json
 
 # stage 3 - build our project
-from rust:1.64.0-alpine3.16 as builder
+from rust:1.65.0-alpine3.16 as builder
 WORKDIR /app
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
 COPY --from=cacher /app .
