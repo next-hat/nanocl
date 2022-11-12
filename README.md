@@ -2,7 +2,7 @@
   <img src="https://download.next-hat.com/ressources/images/logo.png" >
   <h1>Nanocl</h1>
   <h3>Hybrid Cloud Orchestrator</h3>
-
+  <h3>CLI</h3>
   <p>
 
   [![Stars](https://img.shields.io/github/stars/nxthat/nanocl?label=%E2%AD%90%20stars%20%E2%AD%90)](https://github.com/nxthat/nanocl)
@@ -35,14 +35,14 @@
  </span>
 </blockquote>
 
-</br>
-
 ## ❓ What is nanocl ?
 
-It's an open source [Hybrid Cloud Orchestrator](https://docs.next-hat.com/docs/guides/nanocl/overview) ! <br />
-For managing `containers` and `virtual machines` on multiple hosts. <br />
+Nanocl, stand for `Nano Cloud` and it's a lie because you will be able to create big ones. <br />
+I see it as an open source [Hybrid Cloud Orchestrator](https://docs.next-hat.com/docs/guides/nanocl/overview) ! <br />
+To help orchestrate `containers` and `virtual machines` on multiple hosts. <br />
 It provides basic mechanisms for deployment, maintenance, and scaling. <br />
-Helping you to create an `Hybrid Cloud` with optional `Vpn` and `Dns` controllers.
+You will be able to create an your own `Hybrid Cloud` with optional `Vpn` and `Dns` controllers. <br />
+Deploying your `applications` and `servers` behind a `Vpn` as never been that easy !
 
 Builds upon `Rust` to have the best performance and a smallest footprint. <br />
 It's use the best ideas and practices from the community. <br />
