@@ -39,17 +39,19 @@
 
 ## ❓ What is nanocl ?
 
-[Nanocl](https://docs.next-hat.com/docs/guides/nanocl/overview), is an open source system for managing `containerized applications` and `virtual machines` on multiple hosts. <br />
+It's an open source [Hybrid Cloud Orchestrator](https://docs.next-hat.com/docs/guides/nanocl/overview) ! <br />
+For managing `containers` and `virtual machines` on multiple hosts. <br />
 It provides basic mechanisms for deployment, maintenance, and scaling. <br />
+Helping you to create an `Hybrid Cloud` with optional `Vpn` and `Dns` controllers.
 
 Builds upon `Rust` to have the best performance and a smallest footprint. <br />
 It's use the best ideas and practices from the community. <br />
-You can see it as a `Kubernetes` alternative with more feature and a network security layer.
-
-`Nanocl` can be considered as an (HCO) `Hybrid Cloud Orchestrator`. <br />
-You can build an entire CI/CD pipeline from `tests` to `high availability production`.
+You can build an entire CI/CD pipeline from `tests` to `high availability production`. <br />
+See it as a `Kubernetes` alternative with more feature and a network security layer.
 
 This repository is the `CLI` version you can see the `Daemon` [here](https://github.com/nxthat/nanocld).
+
+## 📙 Overview
 
 <img src="https://download.next-hat.com/ressources/images/infra.png" />
 
