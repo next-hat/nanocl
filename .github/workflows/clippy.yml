@@ -17,7 +17,7 @@ jobs:
       # Cache Rust
       - uses: actions/cache@v3
         with:
-          path: ./src-tauri/target
+          path: ./target
           key: ${{ hashFiles('./Cargo.lock') }}
 
      # Cache Rust
