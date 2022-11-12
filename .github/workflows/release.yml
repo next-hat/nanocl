@@ -18,15 +18,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Prepare docker cache
-      run: sudo systemctl stop docker && sudo chmod 777 -R /var/lib/docker
-    # Cache Docker images
-    - uses: actions/cache@v3
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Cache register
+      uses: actions/cache@v2
       with:
-        path: /var/lib/docker/image
-        key: docker-image-cache
-    - name: Post docker cache
-      run: sudo systemctl start docker
+        path: /tmp/.buildx-cache
+        key: buildx-cache
     - name: Set branch name
       run: echo "BRANCH_NAME=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV
     - name: Print branch name
@@ -35,8 +35,18 @@ jobs:
       run: echo "IMAGE_VERSION=$(echo ${BRANCH_NAME##*-})" >> $GITHUB_ENV
     - name: Print version
       run: echo $IMAGE_VERSION
-    - name: Build image
-      run: docker build -t nanocl:$IMAGE_VERSION .
+    #- name: Build image
+    #  run: docker build -t nanocl:$IMAGE_VERSION .
+    - name: Build Docker image
+      uses: docker/build-push-action@v3
+      with:
+        context: ./
+        file: ./Dockerfile
+        load: true
+        push: false
+        tags: nanocl:$IMAGE_VERSION
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache
     - name: Export image
       run: docker save nanocl:$IMAGE_VERSION | gzip > /tmp/nanocl:$IMAGE_VERSION.tar.gz
     - name: Test if release already exists
