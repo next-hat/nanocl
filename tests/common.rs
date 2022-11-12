@@ -12,10 +12,12 @@ impl Debug for TestError {
   }
 }
 
+pub type TestResult<T> = Result<T, TestError>;
+
 async fn exec_command(
   cmd: &str,
   args: Vec<String>,
-) -> Result<std::process::Output, TestError> {
+) -> TestResult<std::process::Output> {
   let cmd = cmd.to_owned();
   let output = rt::spawn(async move {
     let output = Command::new(&cmd)
@@ -52,14 +54,12 @@ async fn exec_command(
   Ok(output)
 }
 
-pub async fn spawn_cli(
-  args: Vec<&str>,
-) -> Result<std::process::Output, TestError> {
+pub async fn spawn_cli(args: Vec<&str>) -> TestResult<std::process::Output> {
   let args = args.into_iter().map(|item| item.to_owned()).collect();
   exec_command("./target/debug/nanocl", args).await
 }
 
-pub async fn get_cargo_ip_addr(name: &str) -> Result<String, TestError> {
+pub async fn get_cargo_ip_addr(name: &str) -> TestResult<String> {
   let path = std::env::current_dir().unwrap();
   let binary_path = format!("{}/target/debug/nanocl", &path.display());
   // cargo run cargo inspect my-cargo | grep -E -o "([0-9]{1,3}[\.]){3}[0-9]{1,3}"
@@ -71,17 +71,30 @@ pub async fn get_cargo_ip_addr(name: &str) -> Result<String, TestError> {
     exec_command("bash", vec![String::from("-c"), bash_expr]).await?;
 
   assert!(output.status.success());
-  let ip_addr = String::from_utf8(output.stdout.to_vec()).unwrap();
-  println!("Ip address !! {:?}", &output);
+  let ip_addr = String::from_utf8(output.stdout.to_vec())
+    .unwrap()
+    .trim()
+    .to_owned();
   Ok(ip_addr)
 }
 
-pub async fn exec_curl(host: &str) -> Result<(), TestError> {
-  println!("curl on host : {}", host);
+pub async fn exec_curl(host: &str) -> TestResult<String> {
+  println!("exec curl on host : {host}");
   let output =
     exec_command("bash", vec![String::from("-c"), format!("curl {}", &host)])
       .await?;
-  println!("{:#?}", &output);
   assert!(output.status.success());
-  Ok(())
+
+  let output = String::from_utf8(output.stdout.to_vec())
+    .unwrap()
+    .trim()
+    .to_owned();
+  println!("[OUTPUT]\n{output}");
+  Ok(output)
+}
+
+pub async fn curl_cargo_instance(name: &str, port: &str) -> TestResult<String> {
+  let ip_addr = get_cargo_ip_addr(name).await?;
+  let host = format!("http://{}:{}", &ip_addr, port);
+  exec_curl(&host).await
 }

@@ -57,7 +57,7 @@ pub mod tabled {
 
   pub fn display_timestamp(timestamp: &i64) -> String {
     // Create a NaiveDateTime from the timestamp
-    let naive = NaiveDateTime::from_timestamp(*timestamp, 0);
+    let naive = NaiveDateTime::from_timestamp_opt(*timestamp, 0).unwrap();
 
     // Create a normal DateTime from the NaiveDateTime
     let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
