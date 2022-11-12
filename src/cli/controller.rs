@@ -18,7 +18,7 @@ async fn add(
     ControllerType::Proxy => {
       let join_options = ClusterJoinPartial {
         network: String::from("internal0"),
-        cargo: String::from("nproxy"),
+        cargo: String::from("proxy"),
       };
       client
         .join_cluster_cargo(cluster, &join_options, namespace.to_owned())
@@ -27,7 +27,7 @@ async fn add(
     ControllerType::Dns => {
       let join_options = ClusterJoinPartial {
         network: String::from("internal0"),
-        cargo: String::from("ndns"),
+        cargo: String::from("dns"),
       };
       client
         .join_cluster_cargo(cluster, &join_options, namespace.to_owned())
@@ -48,13 +48,13 @@ async fn remove(
 
   match options.r#type {
     ControllerType::Proxy => {
-      let name = "nproxy";
+      let name = "proxy";
       client
         .delete_cargo_instance(name, cluster, namespace)
         .await?;
     }
     ControllerType::Dns => {
-      let name = "ndns";
+      let name = "dns";
       client
         .delete_cargo_instance(name, cluster, namespace)
         .await?;
