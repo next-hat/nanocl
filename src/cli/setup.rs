@@ -251,6 +251,7 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
   match &args.host {
     // Host is empty perform local installation
     None => {
+      println!("connecting to docker : {}", &config.docker_host);
       // Connect to docker daemon
       let docker_api = bollard::Docker::connect_with_unix(
         &config.docker_host,
