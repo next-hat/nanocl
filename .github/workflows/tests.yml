@@ -31,7 +31,7 @@ jobs:
     - uses: taiki-e/install-action@cargo-llvm-cov
     - uses: taiki-e/install-action@nextest
     - name: Create user
-      run: sudo useradd -U nanocl && sudo usermod -aG nanocl $USER && newgrp nanocl
+      run: sudo useradd -U nanocl && sudo usermod -aG nanocl $USER
     - name: Ci file perm
       run: >-
         sudo chown nanocl:nanocl /run/docker.sock;
@@ -41,6 +41,7 @@ jobs:
         sudo chmod 770 /etc/nanocl;
     - name: Setup
       run: >-
+        newgrp nanocl;
         echo "docker_host: /run/docker.sock" > /etc/nanocl/nanocl.conf;
         sudo chmod 777 -R /etc/nanocl;
         sudo chown nanocl:nanocl /run/docker.sock;
