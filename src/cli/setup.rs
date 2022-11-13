@@ -257,12 +257,16 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
         120,
         bollard::API_DEFAULT_VERSION,
       )?;
+      println!("INSTALL STORE IMAGE");
       install_store_image(&docker_api).await?;
+      println!("INSTALL DAEMON IMAGE IMAGE");
       install_daemon_image(&docker_api).await?;
       if instance_exists("system-nanocl-daemon", &docker_api).await? {
         return Ok(());
       }
+      println!("INIT DAEMON");
       init_daemon(&config, &docker_api).await?;
+      println!("SPAWN DAEMON");
       spawn_deamon(&config, &docker_api).await?;
     }
     // Host is exists perform remote installation
