@@ -35,8 +35,10 @@ jobs:
     - name: Ci file perm
       run: >-
         sudo chown nanocl:nanocl /run/docker.sock;
+        sudo chmod 770 /run/docker.sock;
         sudo mkdir -p /etc/nanocl;
         sudo chown nanocl:nanocl /etc/nanocl;
+        sudo chmod 770 /etc/nanocl;
     - name: Setup
       run: >-
         echo "docker_host: /run/docker.sock" > /etc/nanocl/nanocl.conf;
