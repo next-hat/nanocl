@@ -7,6 +7,7 @@ newgrp nanocl;
 sudo mkdir /etc/nanocl;
 sudo chmod 770 /etc/nanocl;
 sudo chown :nanocl /etc/nanocl;
-echo "docker_host: /run/docker.sock" > /etc/nanocl/nanocl.conf;
+echo "docker_host: /run/docker.sock\n" > /etc/nanocl/nanocl.conf;
 sudo chown :nanocl /etc/nanocl/nanocl.conf;
+sudo chmod 770 /etc/nanocl/nanocl.conf;
 sudo chown :nanocl /run/docker.sock;
