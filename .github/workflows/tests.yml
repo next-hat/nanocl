@@ -37,7 +37,7 @@ jobs:
       run: sudo ./scripts/prepare_ci.sh
     # Run our CLI SETUP COMMAND
     - name: Setup
-      run: cargo run setup
+      run: cargo run setup & sleep 2 && sudo chmod 777 -R /run/nanocl
     # Run test
     - name: Run tests
       run: cargo make test
