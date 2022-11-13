@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use users::{get_user_by_name, get_group_by_name};
+use users::get_group_by_name;
 use bollard::container::{
   CreateContainerOptions, Config, StartContainerOptions, WaitContainerOptions,
   RemoveContainerOptions,
@@ -145,13 +145,12 @@ async fn init_daemon(
     ..Default::default()
   };
   let image = format!("nanocl-daemon:{version}", version = DAEMON_VERSION);
-  let (uid, gid) = get_user_ids()?;
-  let nanocl_uid = format!("NANOCL_UID={uid}");
+  let gid = get_gid()?;
   let nanocl_gid = format!("NANOCL_GID={gid}");
   let config = Config {
     cmd: Some(vec!["--init"]),
     image: Some(&image),
-    env: Some(vec![nanocl_uid.as_ref(), nanocl_gid.as_ref()]),
+    env: Some(vec![nanocl_gid.as_ref()]),
     host_config: Some(host_config),
     ..Default::default()
   };
@@ -206,13 +205,12 @@ async fn spawn_deamon(
   labels.insert("namespace", "system");
   labels.insert("cluster", "system-nano");
   labels.insert("cargo", "system-daemon");
-  let (uid, gid) = get_user_ids()?;
-  let nanocl_uid = format!("NANOCL_UID={uid}");
+  let gid = get_gid()?;
   let nanocl_gid = format!("NANOCL_GID={gid}");
   let config = Config {
     image: Some(image.as_ref()),
     labels: Some(labels),
-    env: Some(vec![nanocl_uid.as_ref(), nanocl_gid.as_ref()]),
+    env: Some(vec![nanocl_gid.as_ref()]),
     host_config: Some(host_config),
     ..Default::default()
   };
@@ -232,18 +230,14 @@ async fn spawn_deamon(
   Ok(())
 }
 
-fn get_user_ids() -> Result<(u32, u32), CliError> {
-  let user = get_user_by_name("nanocl").ok_or(CliError::Custom {
-    msg: String::from("user nanocl must exists"),
-  })?;
+fn get_gid() -> Result<u32, CliError> {
   let group = get_group_by_name("nanocl").ok_or(CliError::Custom {
     msg: String::from("group nanocl must exists"),
   })?;
 
-  let uid = user.uid();
   let gid = group.gid();
 
-  Ok((uid, gid))
+  Ok(gid)
 }
 
 pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
