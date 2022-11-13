@@ -22,7 +22,7 @@ jobs:
       id: buildx
       uses: docker/setup-buildx-action@v2
     - name: Cache register
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: /tmp/.buildx-cache
         key: buildx-cache
@@ -35,7 +35,7 @@ jobs:
     - name: Print version
       run: echo $IMAGE_VERSION
     - name: Build image
-      run: docker buildx build --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache -t nanocl:$IMAGE_VERSION .
+      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache -t nanocl:$IMAGE_VERSION .
     - name: Export image
       run: docker save nanocl:$IMAGE_VERSION | gzip > /tmp/nanocl:$IMAGE_VERSION.tar.gz
     - name: Test if release already exists
