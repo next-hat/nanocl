@@ -14,4 +14,6 @@ pub enum CliError {
   Docker(#[from] bollard::errors::Error),
   #[error(transparent)]
   Api(#[from] ApiError),
+  #[error("{msg:?}")]
+  Custom { msg: String },
 }
