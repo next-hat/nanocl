@@ -33,7 +33,7 @@ jobs:
     - name: Ci file perm
       run: sudo chmod 777 /run/docker.sock && sudo mkdir /run/nanocl && sudo mkdir /var/lib/nanocl && sudo mkdir -p ./vm_images && sudo chmod 777 -R /run/nanocl && sudo chmod 777 -R /var/lib/nanocl && sudo mkdir -p /etc/nanocl && sudo chmod 777 -R /etc/nanocl
     - name: Create user
-      run: sudo useradd nanocl -g nanocl && sudo usermod -a -G nanocl $USER && newgrp nanocl
+      run: sudo useradd -U nanocl && sudo usermod -a -G nanocl $USER && newgrp nanocl
     - name: Setup
       run: >-
         echo "docker_host: /run/docker.sock" > /etc/nanocl/nanocl.conf;
