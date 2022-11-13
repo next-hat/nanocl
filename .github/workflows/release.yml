@@ -66,5 +66,3 @@ jobs:
       run: gh release delete v$IMAGE_VERSION
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
-    - name: Ensure docker cache
-      run: sudo chmod 777 -R /var/lib/docker
