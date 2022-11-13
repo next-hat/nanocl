@@ -137,9 +137,9 @@ async fn init_daemon(
 ) -> Result<(), CliError> {
   let host_config = HostConfig {
     binds: Some(vec![
-      format!("{}:/run/nanocl/docker.sock", &config.docker_host),
       String::from("/run/nanocl:/run/nanocl"),
       String::from("/var/lib/nanocl:/var/lib/nanocl"),
+      format!("{}:/run/nanocl/docker.sock", &config.docker_host),
     ]),
     network_mode: Some(String::from("host")),
     ..Default::default()
@@ -189,9 +189,9 @@ async fn spawn_deamon(
 ) -> Result<(), CliError> {
   let host_config = HostConfig {
     binds: Some(vec![
-      format!("{}:/run/nanocl/docker.sock", &config.docker_host),
       String::from("/run/nanocl:/run/nanocl"),
       String::from("/var/lib/nanocl:/var/lib/nanocl"),
+      format!("{}:/run/nanocl/docker.sock", &config.docker_host),
     ]),
     restart_policy: Some(RestartPolicy {
       name: Some(RestartPolicyNameEnum::UNLESS_STOPPED),
