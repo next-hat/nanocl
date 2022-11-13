@@ -38,6 +38,12 @@ jobs:
     # Run our CLI SETUP COMMAND
     - name: Setup
       run: cargo run setup & sleep 2 && sudo chmod 777 -R /run/nanocl
+    # Debug
+    - name: Debug
+      run: >-
+        sleep 5;
+        docker container ls;
+        ls -l /run/nanocl;
     # Run test
     - name: Run tests
-      run: sleep 2 && sudo chmod 777 -R /run/nanocl && cargo make test
+      run: sleep 5 && sudo chmod 777 -R /run/nanocl && cargo make test
