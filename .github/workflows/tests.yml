@@ -37,7 +37,8 @@ jobs:
       run: sudo ./scripts/prepare_ci.sh
     # Run our CLI SETUP COMMAND
     - name: Setup
-      run: cargo run setup;
+      run: >-
+        sudo usermod -aG nanocl $USER && newgrp && cargo run setup;
     # Debug
     - name: Debug
       run: >-
