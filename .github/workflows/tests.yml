@@ -40,4 +40,4 @@ jobs:
       run: cargo run setup & sleep 2 && sudo chmod 777 -R /run/nanocl
     # Run test
     - name: Run tests
-      run: cargo make test
+      run: sleep 2 && sudo chmod 777 -R /run/nanocl && cargo make test
