@@ -46,4 +46,4 @@ jobs:
         docker container ls -a;
     # Run test
     - name: Run tests
-      run: newgrp nanocl && cargo make test
+      run: sudo newgrp nanocl && cargo make test
