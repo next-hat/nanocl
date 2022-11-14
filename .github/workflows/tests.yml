@@ -42,7 +42,7 @@ jobs:
     # Change permission because newgrp is not working
     - name: Change perm
       run: >-
-        sleep 2;
+        sleep 10;
         docker container ls -a;
         sudo chmod 777 -R /run/nanocl;
         ls -l /run/nanocl
