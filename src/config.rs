@@ -17,7 +17,7 @@ impl Default for DaemonConfig {
 }
 
 fn default_host() -> String {
-  "/run/nanocl/docker.sock".to_owned()
+  "/run/docker.sock".to_owned()
 }
 
 pub fn read_daemon_config_file(

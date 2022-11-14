@@ -1,6 +1,6 @@
 [package]
 name = "nanocl"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Self-Sufficient Hybrid-Cloud Orchestrator CLI"
@@ -50,3 +50,4 @@ tokio-util = "0.7.4"
 futures-util = "0.3.25"
 hyper = "0.14.20"
 serde_urlencoded = "0.7.1"
+users = "0.11.0"

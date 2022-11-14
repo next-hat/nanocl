@@ -13,28 +13,39 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    # Install rust
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         override: true
         components: llvm-tools-preview
+    # Cache tests
     - uses: actions/cache@v3
       with:
         path: ./target/llvm-cov-target
         key: llvm-cov-key
-    - uses: actions/cache@v3
-      with:
-        path: ./fake_path/var/lib
-        key: image-and-container-key
+    # Cache rust
     - uses: Swatinem/rust-cache@v2
+    # Install cargo make
     - uses: davidB/rust-cargo-make@v1
+    # Install llvm-cov
     - uses: taiki-e/install-action@cargo-llvm-cov
+    # Install nextest
     - uses: taiki-e/install-action@nextest
-    - name: Ci file perm
-      run: sudo chmod 777 /run/docker.sock && sudo mkdir /run/nanocl && sudo mkdir /var/lib/nanocl && sudo mkdir -p ./vm_images && sudo chmod 777 -R /run/nanocl && sudo chmod 777 -R /var/lib/nanocl && sudo mkdir -p /etc/nanocl && sudo chmod 777 -R /etc/nanocl
+    # Prepare CI
+    - name: Prepare CI
+      run: sudo ./scripts/prepare_ci.sh
+    # Run our CLI setup command to install a daemon
     - name: Setup
       run: >-
-        echo "docker_host: /run/docker.sock" > /etc/nanocl/nanocl.conf;
-        cargo run setup && sleep 5 && sudo chmod 777 -R /run/nanocl;
+        cargo run setup;
+    # Change permission because newgrp is not working
+    - name: Change perm
+      run: >-
+        sleep 10;
+        docker container ls -a;
+        sudo chmod 777 -R /run/nanocl;
+        ls -l /run/nanocl
+    # Run test
     - name: Run tests
-      run: cargo make test-debug
+      run: cargo make test

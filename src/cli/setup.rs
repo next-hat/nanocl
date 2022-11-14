@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use users::get_group_by_name;
 use bollard::container::{
   CreateContainerOptions, Config, StartContainerOptions, WaitContainerOptions,
   RemoveContainerOptions,
@@ -23,7 +24,7 @@ use crate::config::{read_daemon_config_file, DaemonConfig};
 
 use super::errors::CliError;
 
-const DAEMON_VERSION: &str = "0.1.8";
+const DAEMON_VERSION: &str = "0.1.12";
 
 async fn instance_exists(
   name: &str,
@@ -136,17 +137,20 @@ async fn init_daemon(
 ) -> Result<(), CliError> {
   let host_config = HostConfig {
     binds: Some(vec![
-      format!("{}:/run/nanocl/docker.sock", &config.docker_host),
       String::from("/run/nanocl:/run/nanocl"),
       String::from("/var/lib/nanocl:/var/lib/nanocl"),
+      format!("{}:/run/docker.sock", &config.docker_host),
     ]),
     network_mode: Some(String::from("host")),
     ..Default::default()
   };
   let image = format!("nanocl-daemon:{version}", version = DAEMON_VERSION);
+  let gid = get_gid()?;
+  let nanocl_gid = format!("NANOCL_GID={gid}");
   let config = Config {
     cmd: Some(vec!["--init"]),
     image: Some(&image),
+    env: Some(vec![nanocl_gid.as_ref()]),
     host_config: Some(host_config),
     ..Default::default()
   };
@@ -164,8 +168,11 @@ async fn init_daemon(
     )
     .await?;
 
-  let mut stream =
-    docker_api.wait_container(&c_res.id, None::<WaitContainerOptions<String>>);
+  let options = WaitContainerOptions {
+    condition: "next-exit",
+  };
+
+  let mut stream = docker_api.wait_container(&c_res.id, Some(options));
 
   while let Some(_chunk) = stream.next().await {}
 
@@ -185,9 +192,9 @@ async fn spawn_deamon(
 ) -> Result<(), CliError> {
   let host_config = HostConfig {
     binds: Some(vec![
-      format!("{}:/run/nanocl/docker.sock", &config.docker_host),
       String::from("/run/nanocl:/run/nanocl"),
       String::from("/var/lib/nanocl:/var/lib/nanocl"),
+      format!("{}:/run/docker.sock", &config.docker_host),
     ]),
     restart_policy: Some(RestartPolicy {
       name: Some(RestartPolicyNameEnum::UNLESS_STOPPED),
@@ -201,10 +208,12 @@ async fn spawn_deamon(
   labels.insert("namespace", "system");
   labels.insert("cluster", "system-nano");
   labels.insert("cargo", "system-daemon");
-
+  let gid = get_gid()?;
+  let nanocl_gid = format!("NANOCL_GID={gid}");
   let config = Config {
     image: Some(image.as_ref()),
     labels: Some(labels),
+    env: Some(vec![nanocl_gid.as_ref()]),
     host_config: Some(host_config),
     ..Default::default()
   };
@@ -222,6 +231,16 @@ async fn spawn_deamon(
     )
     .await?;
   Ok(())
+}
+
+fn get_gid() -> Result<u32, CliError> {
+  let group = get_group_by_name("nanocl").ok_or(CliError::Custom {
+    msg: String::from("group nanocl must exists"),
+  })?;
+
+  let gid = group.gid();
+
+  Ok(gid)
 }
 
 pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {

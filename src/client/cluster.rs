@@ -291,7 +291,6 @@ impl Nanocld {
         "name": nt_name.to_owned(),
       }))
       .await?;
-    println!("{:#?}", res);
     let status = res.status();
     is_api_error(&mut res, &status).await?;
 
