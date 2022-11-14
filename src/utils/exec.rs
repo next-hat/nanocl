@@ -2,7 +2,7 @@ use ntex::rt;
 use std::process::{Command, Output};
 use std::io::{Error as IoError, ErrorKind};
 
-pub async fn exec(
+pub async fn _exec(
   cmd: &str,
   args: &Vec<&str>,
   current_dir: Option<&str>,

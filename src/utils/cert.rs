@@ -1,14 +1,14 @@
 use crate::cli::errors::CliError;
 
-use super::exec::exec;
+use super::exec::_exec;
 
-pub struct CaCertOptions {
+pub struct _CaCertOptions {
   organization_name: String,
   common_name: String,
 }
 
-pub async fn gen_ca_cert(
-  options: CaCertOptions,
+pub async fn _gen_ca_cert(
+  options: _CaCertOptions,
   directory: String,
 ) -> Result<(), CliError> {
   let ca_cnf = format!("# OpenSSL CA configuration file gen by nanocl\
@@ -58,7 +58,7 @@ pub async fn gen_ca_cert(
 
   println!("{ca_cnf}");
 
-  let output = exec(
+  let output = _exec(
     "openssl",
     &vec!["genrsa", "--out", "my-safe-directory/ca.key", "2048"],
     Some(&directory),

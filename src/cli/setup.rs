@@ -168,8 +168,11 @@ async fn init_daemon(
     )
     .await?;
 
-  let mut stream =
-    docker_api.wait_container(&c_res.id, None::<WaitContainerOptions<String>>);
+  let options = WaitContainerOptions {
+    condition: "next-exit",
+  };
+
+  let mut stream = docker_api.wait_container(&c_res.id, Some(options));
 
   while let Some(_chunk) = stream.next().await {}
 
@@ -245,23 +248,18 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
   match &args.host {
     // Host is empty perform local installation
     None => {
-      println!("connecting to docker : {}", &config.docker_host);
       // Connect to docker daemon
       let docker_api = bollard::Docker::connect_with_unix(
         &config.docker_host,
         120,
         bollard::API_DEFAULT_VERSION,
       )?;
-      println!("INSTALL STORE IMAGE");
       install_store_image(&docker_api).await?;
-      println!("INSTALL DAEMON IMAGE IMAGE");
       install_daemon_image(&docker_api).await?;
       if instance_exists("system-nanocl-daemon", &docker_api).await? {
         return Ok(());
       }
-      println!("INIT DAEMON");
       init_daemon(&config, &docker_api).await?;
-      println!("SPAWN DAEMON");
       spawn_deamon(&config, &docker_api).await?;
     }
     // Host is exists perform remote installation
