@@ -24,7 +24,7 @@ use crate::config::{read_daemon_config_file, DaemonConfig};
 
 use super::errors::CliError;
 
-const DAEMON_VERSION: &str = "0.1.11";
+const DAEMON_VERSION: &str = "0.1.12";
 
 async fn instance_exists(
   name: &str,
@@ -139,7 +139,7 @@ async fn init_daemon(
     binds: Some(vec![
       String::from("/run/nanocl:/run/nanocl"),
       String::from("/var/lib/nanocl:/var/lib/nanocl"),
-      format!("{}:/run/nanocl/docker.sock", &config.docker_host),
+      format!("{}:/run/docker.sock", &config.docker_host),
     ]),
     network_mode: Some(String::from("host")),
     ..Default::default()
@@ -191,7 +191,7 @@ async fn spawn_deamon(
     binds: Some(vec![
       String::from("/run/nanocl:/run/nanocl"),
       String::from("/var/lib/nanocl:/var/lib/nanocl"),
-      format!("{}:/run/nanocl/docker.sock", &config.docker_host),
+      format!("{}:/run/docker.sock", &config.docker_host),
     ]),
     restart_policy: Some(RestartPolicy {
       name: Some(RestartPolicyNameEnum::UNLESS_STOPPED),

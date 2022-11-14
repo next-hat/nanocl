@@ -35,10 +35,10 @@ jobs:
     # Prepare CI
     - name: Prepare CI
       run: sudo ./scripts/prepare_ci.sh
-    # Run our CLI SETUP COMMAND
+    # Run our CLI setup command to install a daemon
     - name: Setup
       run: >-
-        sudo usermod -aG nanocl $USER && newgrp && cargo run setup;
+        cargo run setup;
     # Debug
     - name: Debug
       run: >-
@@ -47,4 +47,4 @@ jobs:
         ls -l /run/nanocl;
     # Run test
     - name: Run tests
-      run: sleep 5 && sudo chmod 777 -R /run/nanocl && cargo make test
+      run: cargo make test
