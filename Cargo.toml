@@ -41,7 +41,7 @@ clap_complete = "4.0.5"
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "4.0.18", features = ["derive"] }
 chrono = { version = "0.4.19", features = ["serde"] }
-uuid = { version = "1.1", features = ["serde", "v4"] }
+uuid = { version = "1.2", features = ["serde", "v4"] }
 ntex = { version = "=0.5.29", features = ["rustls", "tokio"] }
 url = { version = "2.3.1", features = ["serde"] }
 bollard = "0.13.0"
