@@ -15,6 +15,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 # stage 3 - build our dependencies
 from rust:1.65.0-alpine3.16 as cacher
+
 WORKDIR /app
 COPY --from=planner /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/cargo-chef
 COPY --from=planner /app .
@@ -23,6 +24,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 # stage 4 - build our project
 from rust:1.65.0-alpine3.16 as builder
+
 WORKDIR /app
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
 COPY --from=cacher /app .
@@ -34,5 +36,7 @@ RUN cargo build --release
 from alpine:3.16.2
 
 COPY --from=builder /app/target/release/nanocl /usr/local/bin/nanocl
+COPY ./entrypoint.sh /entrypoint.sh
+RUN apk add util-linux
 
-ENTRYPOINT ["/usr/local/bin/nanocl"]
+ENTRYPOINT ["/entrypoint.sh"]
