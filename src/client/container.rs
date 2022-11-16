@@ -11,7 +11,7 @@ impl Nanocld {
   pub async fn list_containers(
     &self,
     options: &ListCargoInstanceOptions,
-  ) -> Result<Vec<ContainerSummary>, NanocldError> {
+  ) -> Result<Vec<CargoInstanceSummary>, NanocldError> {
     let mut res = self
       .get(String::from("/containers"))
       .query(options)?
@@ -20,7 +20,7 @@ impl Nanocld {
     let status = res.status();
     is_api_error(&mut res, &status).await?;
 
-    let data = res.json::<Vec<ContainerSummary>>().await?;
+    let data = res.json::<Vec<CargoInstanceSummary>>().await?;
 
     Ok(data)
   }
@@ -28,7 +28,7 @@ impl Nanocld {
   pub async fn create_exec(
     &self,
     name: &str,
-    config: ContainerExecQuery,
+    config: CargoInstanceExecQuery,
   ) -> Result<ExecItem, NanocldError> {
     let mut res = self
       .post(format!("/containers/{}/exec", name))

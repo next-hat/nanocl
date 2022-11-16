@@ -1,5 +1,5 @@
 use crate::client::Nanocld;
-use crate::models::{ExecArgs, ContainerExecQuery};
+use crate::models::{ExecArgs, CargoInstanceExecQuery};
 
 use super::errors::CliError;
 
@@ -7,7 +7,7 @@ pub async fn exec_exec(
   client: &Nanocld,
   args: &ExecArgs,
 ) -> Result<(), CliError> {
-  let config = ContainerExecQuery {
+  let config = CargoInstanceExecQuery {
     attach_stdin: None,
     attach_stdout: Some(true),
     attach_stderr: Some(true),

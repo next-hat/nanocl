@@ -3,4 +3,3 @@
 
 useradd -U nanocl;
 usermod -aG nanocl $USER;
-newgrp nanocl;

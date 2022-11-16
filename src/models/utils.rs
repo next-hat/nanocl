@@ -25,7 +25,7 @@ pub mod serde {
 
 pub mod tabled {
   use chrono::{NaiveDateTime, DateTime, Utc};
-  use super::super::{Port, ContainerSummaryNetworkSettings};
+  use super::super::{Port, CargoInstanceSummaryNetworkSettings};
 
   pub fn optional_string(s: &Option<String>) -> String {
     match s {
@@ -92,7 +92,7 @@ pub mod tabled {
   }
 
   pub fn display_container_summary_network_settings(
-    s: &Option<ContainerSummaryNetworkSettings>,
+    s: &Option<CargoInstanceSummaryNetworkSettings>,
   ) -> String {
     match s {
       None => String::from(""),

@@ -54,7 +54,7 @@ Package: ${pkg_name}
 Version: ${version}
 Architecture: ${arch}
 Maintainer: next-hat team@next-hat.com
-Description: A self-sufficient vms and containers manager
+Description: A self-sufficient vms and containers orchestrator
 EOM
 
 mkdir -p ./target/debian
