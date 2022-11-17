@@ -39,6 +39,8 @@ jobs:
     - name: Setup
       run: >-
         cargo run setup;
+        cargo run controller add dns;
+        cargo run controller add proxy;
     # Change permission because newgrp is not working
     - name: Change perm
       run: >-
