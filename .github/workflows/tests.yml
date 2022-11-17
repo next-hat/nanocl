@@ -39,15 +39,10 @@ jobs:
     - name: Setup
       run: >-
         cargo run setup;
+        sleep 10;
+        sudo chmod 777 -R /run/nanocl;
         cargo run controller add dns;
         cargo run controller add proxy;
-    # Change permission because newgrp is not working
-    - name: Change perm
-      run: >-
-        sleep 10;
-        docker container ls -a;
-        sudo chmod 777 -R /run/nanocl;
-        ls -l /run/nanocl
     # Run test
     - name: Run tests
       run: cargo make test
