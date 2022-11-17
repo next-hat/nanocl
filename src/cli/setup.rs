@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::str::FromStr;
 
 use users::get_group_by_name;
 use bollard::container::{
@@ -10,16 +9,10 @@ use bollard::image::CreateImageOptions;
 use bollard::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};
 use futures::StreamExt;
 use indicatif::{ProgressStyle, ProgressBar};
-use ntex::http::StatusCode;
 use std::default::Default;
-use bollard::image::ImportImageOptions;
-use bollard::errors::Error;
-use tokio::fs::File;
-use tokio_util::codec;
 
-use crate::client::error::ApiError;
 use crate::models::SetupArgs;
-use crate::utils::file;
+use crate::utils::cargo_image;
 use crate::config::{read_daemon_config_file, DaemonConfig};
 
 use super::errors::CliError;
@@ -84,50 +77,7 @@ async fn install_daemon_image(
   }
 
   let daemon_image_url = format!("https://github.com/nxthat/nanocld/releases/download/v{version}/nanocl-daemon.{version}.tar.gz", version = DAEMON_VERSION);
-  let daemon_image_url =
-    url::Url::from_str(&daemon_image_url).map_err(|err| ApiError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("{err}"),
-    })?;
-
-  let mut download_response = file::download(&daemon_image_url, "/tmp").await?;
-  let style = ProgressStyle::default_spinner();
-  let pg = ProgressBar::new(0);
-  pg.set_style(style);
-  while let Some(chunk) = download_response.stream.next().await {
-    if let Err(err) = chunk {
-      eprintln!("Error while downloading daemon {err}");
-      std::process::exit(1);
-    }
-    pg.tick();
-  }
-
-  let file = File::open(format!("/tmp/{}", &download_response.path)).await?;
-
-  let byte_stream =
-    codec::FramedRead::new(file, codec::BytesCodec::new()).map(|r| {
-      let bytes = r.unwrap().freeze();
-      Ok::<_, Error>(bytes)
-    });
-  let body = hyper::Body::wrap_stream(byte_stream);
-  let mut stream = docker_api.import_image(
-    ImportImageOptions {
-      ..Default::default()
-    },
-    body,
-    None,
-  );
-
-  while let Some(chunk) = stream.next().await {
-    if let Err(err) = chunk {
-      eprintln!("Error while importing daemon image: {err}");
-      std::process::exit(1);
-    } else {
-      pg.tick();
-    }
-  }
-
-  pg.finish_and_clear();
+  cargo_image::import_tar_from_url(docker_api, &daemon_image_url).await?;
   Ok(())
 }
 
