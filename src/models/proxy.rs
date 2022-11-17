@@ -14,6 +14,7 @@ pub struct ProxyTemplateOptions {
   pub(crate) name: String,
 }
 
+/// Manage proxy rules
 #[derive(Debug, Parser)]
 pub struct ProxyArgs {
   #[clap(subcommand)]
@@ -35,9 +36,9 @@ pub struct ProxyLinkerOptions {
 pub enum ProxyCommands {
   /// Manage templates
   Template(ProxyTemplateArgs),
-  /// Link a template
+  /// Link a template to a cluster
   Link(ProxyLinkerOptions),
-  /// Unlink a template
+  /// Unlink a template from a cluster
   #[clap(alias("rm"))]
   Unlink(ProxyLinkerOptions),
 }

@@ -278,14 +278,14 @@ impl Nanocld {
     Ok(count)
   }
 
-  pub async fn add_nginx_template_to_cluster(
+  pub async fn link_proxy_template_to_cluster(
     &self,
     cl_name: &str,
     nt_name: &str,
     namespace: Option<String>,
   ) -> Result<(), NanocldError> {
     let mut res = self
-      .post(format!("/clusters/{}/nginx_templates", cl_name))
+      .post(format!("/clusters/{}/proxy/templates", cl_name))
       .query(&GenericNamespaceQuery { namespace })?
       .send_json(&json!({
         "name": nt_name.to_owned(),
@@ -297,14 +297,14 @@ impl Nanocld {
     Ok(())
   }
 
-  pub async fn remove_nginx_template_to_cluster(
+  pub async fn unlink_proxy_template_to_cluster(
     &self,
     cl_name: &str,
     nt_name: &str,
     namespace: Option<String>,
   ) -> Result<(), NanocldError> {
     let mut res = self
-      .delete(format!("/clusters/{}/nginx_templates/{}", cl_name, nt_name))
+      .delete(format!("/clusters/{}/proxy/templates/{}", cl_name, nt_name))
       .query(&GenericNamespaceQuery { namespace })?
       .send()
       .await?;

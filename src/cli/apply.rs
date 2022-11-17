@@ -61,7 +61,7 @@ async fn apply_namespace(
             })
             .map(|proxy| async move {
               client
-                .add_nginx_template_to_cluster(
+                .link_proxy_template_to_cluster(
                   cluster_name,
                   &proxy,
                   Some(namespace_name.to_owned()),

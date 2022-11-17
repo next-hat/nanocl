@@ -3,7 +3,7 @@ use serde_json;
 use crate::common::TestResult;
 
 async fn exec_run() -> TestResult<()> {
-  let output = common::spawn_cli(vec![
+  let output = common::exec_nanocl(vec![
     "run",
     "--cluster",
     "dev",
@@ -19,43 +19,44 @@ async fn exec_run() -> TestResult<()> {
 }
 
 async fn exec_cargo_inspect() -> TestResult<()> {
-  let output = common::spawn_cli(vec!["cargo", "inspect", "my-cargo"]).await?;
+  let output =
+    common::exec_nanocl(vec!["cargo", "inspect", "my-cargo"]).await?;
   assert!(output.status.success());
   Ok(())
 }
 
 async fn exec_cargo_list() -> TestResult<()> {
-  let output = common::spawn_cli(vec!["cargo", "ls"]).await?;
+  let output = common::exec_nanocl(vec!["cargo", "ls"]).await?;
   assert!(output.status.success());
   Ok(())
 }
 
 async fn exec_cargo_help() -> TestResult<()> {
-  let output = common::spawn_cli(vec!["cargo", "help"]).await?;
+  let output = common::exec_nanocl(vec!["cargo", "help"]).await?;
   assert!(output.status.success());
   Ok(())
 }
 
 async fn exec_cluster_list() -> TestResult<()> {
-  let output = common::spawn_cli(vec!["cluster", "ls"]).await?;
+  let output = common::exec_nanocl(vec!["cluster", "ls"]).await?;
   assert!(output.status.success());
   Ok(())
 }
 
 async fn exec_cluster_inspect() -> TestResult<()> {
-  let output = common::spawn_cli(vec!["cluster", "inspect", "dev"]).await?;
+  let output = common::exec_nanocl(vec!["cluster", "inspect", "dev"]).await?;
   assert!(output.status.success());
   Ok(())
 }
 
 async fn exec_cluster_help() -> TestResult<()> {
-  let output = common::spawn_cli(vec!["cluster", "help"]).await?;
+  let output = common::exec_nanocl(vec!["cluster", "help"]).await?;
   assert!(output.status.success());
   Ok(())
 }
 
 async fn download_get_started_image() -> TestResult<()> {
-  let output = common::spawn_cli(vec![
+  let output = common::exec_nanocl(vec![
     "cargo",
     "image",
     "create",
@@ -68,7 +69,7 @@ async fn download_get_started_image() -> TestResult<()> {
 
 async fn exec_cargo_patch_image() -> TestResult<()> {
   // nanocl cargo patch my-cargo set --image get-started:master
-  let output = common::spawn_cli(vec![
+  let output = common::exec_nanocl(vec![
     "cargo",
     "patch",
     "my-cargo",
@@ -82,7 +83,7 @@ async fn exec_cargo_patch_image() -> TestResult<()> {
 }
 
 async fn exec_cargo_patch_env_port() -> TestResult<()> {
-  let output = common::spawn_cli(vec![
+  let output = common::exec_nanocl(vec![
     "cargo",
     "patch",
     "my-cargo",
@@ -96,7 +97,7 @@ async fn exec_cargo_patch_env_port() -> TestResult<()> {
 }
 
 async fn exec_cluster_variable_create() -> TestResult<()> {
-  let output = common::spawn_cli(vec![
+  let output = common::exec_nanocl(vec![
     "cluster", "variable", "dev", "create", "CLUSTER", "DEV",
   ])
   .await?;
@@ -105,7 +106,7 @@ async fn exec_cluster_variable_create() -> TestResult<()> {
 }
 
 async fn exec_cargo_patch_env_cluster() -> TestResult<()> {
-  let output = common::spawn_cli(vec![
+  let output = common::exec_nanocl(vec![
     "cargo",
     "patch",
     "my-cargo",
@@ -134,9 +135,9 @@ async fn exec_cargo_patch_env_cluster() -> TestResult<()> {
 }
 
 async fn clean() -> TestResult<()> {
-  let output = common::spawn_cli(vec!["cluster", "rm", "dev"]).await?;
+  let output = common::exec_nanocl(vec!["cluster", "rm", "dev"]).await?;
   assert!(output.status.success());
-  let output = common::spawn_cli(vec!["cargo", "rm", "my-cargo"]).await?;
+  let output = common::exec_nanocl(vec!["cargo", "rm", "my-cargo"]).await?;
   assert!(output.status.success());
   Ok(())
 }

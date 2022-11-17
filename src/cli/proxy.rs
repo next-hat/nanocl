@@ -7,7 +7,6 @@ use crate::models::{
 };
 
 use super::errors::CliError;
-use super::utils::print_table;
 
 pub async fn exec_proxy_template(
   client: &Nanocld,
@@ -16,7 +15,19 @@ pub async fn exec_proxy_template(
   match &args.commands {
     ProxyTemplateCommand::List => {
       let items = client.list_proxy_template().await?;
-      print_table(items);
+      let output =
+        items
+          .iter()
+          .fold(String::default(), |mut acc, proxy_template| {
+            acc += &format!(
+              "NAME    : {}\nMODE    : {}\nCONTENT :\n{}\n",
+              &proxy_template.name,
+              &proxy_template.mode,
+              &proxy_template.content
+            );
+            acc
+          });
+      print!("{}", output);
     }
     ProxyTemplateCommand::Remove(options) => {
       client
@@ -70,7 +81,7 @@ async fn exec_cluster_proxy_template_link(
   options: &ProxyLinkerOptions,
 ) -> Result<(), CliError> {
   client
-    .add_nginx_template_to_cluster(
+    .link_proxy_template_to_cluster(
       &options.cl_name,
       &options.nt_name,
       options.namespace.to_owned(),
@@ -84,7 +95,7 @@ async fn exec_cluster_proxy_template_unlink(
   options: &ProxyLinkerOptions,
 ) -> Result<(), CliError> {
   client
-    .remove_nginx_template_to_cluster(
+    .unlink_proxy_template_to_cluster(
       &options.cl_name,
       &options.nt_name,
       options.namespace.to_owned(),
