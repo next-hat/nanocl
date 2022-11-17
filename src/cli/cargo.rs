@@ -46,14 +46,13 @@ async fn exec_cargo_inspect(
   let cargo = client
     .inspect_cargo(&options.name, args.namespace.to_owned())
     .await?;
-
-  println!("\n> CARGO");
+  println!("> CARGO");
   print_table([&cargo]);
   if let Some(environnements) = cargo.environnements {
     println!("\n> ENVIRONNEMENTS");
     print_table(environnements);
   }
-  println!("\n> CONTAINERS");
+  println!("\n> INSTANCES");
   print_table(cargo.containers);
   Ok(())
 }

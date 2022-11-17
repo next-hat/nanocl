@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
 use super::utils::tabled::*;
-use super::cargo_instance::{CargoInstanceArgs, ContainerSummary};
+use super::cargo_instance::{CargoInstanceArgs, CargoInstanceSummary};
 
 /// Cargo delete options
 #[derive(Debug, Parser)]
@@ -138,7 +138,7 @@ pub struct CargoItemWithRelation {
   #[tabled(skip)]
   pub(crate) binds: Vec<String>,
   #[tabled(skip)]
-  pub(crate) containers: Vec<ContainerSummary>,
+  pub(crate) containers: Vec<CargoInstanceSummary>,
   #[tabled(skip)]
   pub(crate) environnements: Option<Vec<CargoEnvItem>>,
 }

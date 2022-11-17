@@ -47,7 +47,7 @@ pub struct ExecArgs {
 
 /// A summary of the container's network settings
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ContainerSummaryNetworkSettings {
+pub struct CargoInstanceSummaryNetworkSettings {
   #[serde(rename = "Networks")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub networks: Option<HashMap<String, EndpointSettings>>,
@@ -56,7 +56,7 @@ pub struct ContainerSummaryNetworkSettings {
 #[derive(
   Debug, Tabled, Clone, Default, PartialEq, Eq, Serialize, Deserialize,
 )]
-pub struct ContainerSummary {
+pub struct CargoInstanceSummary {
   /// The ID of this container
   #[serde(rename = "Id")]
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -132,7 +132,7 @@ pub struct ContainerSummary {
   #[serde(rename = "NetworkSettings")]
   #[serde(skip_serializing_if = "Option::is_none")]
   #[tabled(display_with = "display_container_summary_network_settings")]
-  pub network_settings: Option<ContainerSummaryNetworkSettings>,
+  pub network_settings: Option<CargoInstanceSummaryNetworkSettings>,
 }
 
 /// List container by namespace cluster or cargo
@@ -150,7 +150,7 @@ pub struct ListCargoInstanceOptions {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ContainerExecQuery {
+pub struct CargoInstanceExecQuery {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(crate) attach_stdin: Option<bool>,
   #[serde(skip_serializing_if = "Option::is_none")]

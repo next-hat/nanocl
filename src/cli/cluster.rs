@@ -63,7 +63,7 @@ async fn exec_cluster_inspect(
   let cluster = client
     .inspect_cluster(&options.name, args.namespace.to_owned())
     .await?;
-  println!("\n> CLUSTER");
+  println!("> CLUSTER");
   print_table(vec![&cluster]);
   println!("\n> VARIABLES");
   print_table(cluster.variables);
