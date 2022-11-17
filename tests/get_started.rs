@@ -59,7 +59,7 @@ async fn exec_git_repository_create() -> TestResult<()> {
     "git-repository",
     "create",
     "--url",
-    "https://github.com/nxthat/nanocl-getting-started",
+    "https://github.com/nxthat/nanocl-get-started",
     "get-started",
   ])
   .await?;
