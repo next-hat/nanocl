@@ -144,6 +144,9 @@ async fn clean() -> TestResult<()> {
 
 #[ntex::test]
 async fn scenario() -> TestResult<()> {
+  // Ensure Proxy and Dns controller are installed
+  common::exec_nanocl(vec!["controller", "add", "proxy"]).await?;
+  common::exec_nanocl(vec!["controller", "add", "dns"]).await?;
   exec_run().await?;
   exec_cargo_inspect().await?;
   common::curl_cargo_instance("my-cargo", "80").await?;
