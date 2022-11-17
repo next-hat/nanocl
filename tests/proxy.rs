@@ -14,10 +14,6 @@ async fn with_get_started() -> TestResult<()> {
   .await?;
   assert!(output.status.success());
 
-  // Ensure Proxy and Dns controller are installed
-  common::exec_nanocl(vec!["controller", "add", "proxy"]).await?;
-  common::exec_nanocl(vec!["controller", "add", "dns"]).await?;
-
   // List proxy template
   let output = common::exec_nanocl(vec!["proxy", "template", "ls"]).await?;
   assert!(output.status.success());
