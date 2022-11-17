@@ -1,4 +1,3 @@
-mod nginx_template;
 mod namespace;
 mod cluster;
 mod cargo;
@@ -10,11 +9,13 @@ mod apply;
 mod revert;
 mod controller;
 mod setup;
+mod proxy;
 mod cargo_instance;
 
 pub mod errors;
 pub mod utils;
 
+pub use proxy::*;
 pub use cargo_instance::*;
 pub use setup::*;
 pub use controller::*;
@@ -23,7 +24,6 @@ pub use cluster::*;
 pub use namespace::*;
 pub use cargo_image::*;
 pub use cargo::*;
-pub use nginx_template::*;
 pub use exec::*;
 pub use version::*;
 pub use apply::*;

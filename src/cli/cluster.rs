@@ -2,11 +2,9 @@ use crate::client::Nanocld;
 use crate::models::{
   ClusterArgs, ClusterCommands, ClusterPartial, ClusterDeleteOptions,
   ClusterStartOptions, ClusterInspectOptions, ClusterJoinOptions,
-  ClusterJoinPartial, ClusterNginxTemplateCommands, ClusterNginxTemplateArgs,
-  ClusterNginxTemplateCommandsOption, ClusterNetworkArgs,
-  ClusterNetworkPartial, ClusterNetworkCommands, ClusterNetworkDeleteOptions,
-  ClusterVariableArgs, ClusterVariableCommands, ClusterVarPartial,
-  ClusterVariableRemoveOptions,
+  ClusterJoinPartial, ClusterNetworkArgs, ClusterNetworkPartial,
+  ClusterNetworkCommands, ClusterNetworkDeleteOptions, ClusterVariableArgs,
+  ClusterVariableCommands, ClusterVarPartial, ClusterVariableRemoveOptions,
 };
 
 use super::errors::CliError;
@@ -91,51 +89,6 @@ async fn exec_cluster_join(
     )
     .await?;
   Ok(())
-}
-
-async fn exec_cluster_nginx_template_add(
-  client: &Nanocld,
-  args: &ClusterArgs,
-  options: &ClusterNginxTemplateCommandsOption,
-) -> Result<(), CliError> {
-  client
-    .add_nginx_template_to_cluster(
-      &options.cl_name,
-      &options.nt_name,
-      args.namespace.to_owned(),
-    )
-    .await?;
-  Ok(())
-}
-
-async fn exec_cluster_nginx_template_remove(
-  client: &Nanocld,
-  args: &ClusterArgs,
-  options: &ClusterNginxTemplateCommandsOption,
-) -> Result<(), CliError> {
-  client
-    .remove_nginx_template_to_cluster(
-      &options.cl_name,
-      &options.nt_name,
-      args.namespace.to_owned(),
-    )
-    .await?;
-  Ok(())
-}
-
-async fn exec_cluster_nginx_template(
-  client: &Nanocld,
-  args: &ClusterArgs,
-  ntargs: &ClusterNginxTemplateArgs,
-) -> Result<(), CliError> {
-  match &ntargs.commands {
-    ClusterNginxTemplateCommands::Add(options) => {
-      exec_cluster_nginx_template_add(client, args, options).await
-    }
-    ClusterNginxTemplateCommands::Remove(options) => {
-      exec_cluster_nginx_template_remove(client, args, options).await
-    }
-  }
 }
 
 async fn exec_cluster_network_list(
@@ -260,9 +213,6 @@ pub async fn exec_cluster(
     }
     ClusterCommands::Join(options) => {
       exec_cluster_join(client, args, options).await
-    }
-    ClusterCommands::NginxTemplate(ntargs) => {
-      exec_cluster_nginx_template(client, args, ntargs).await
     }
     ClusterCommands::Network(nargs) => {
       exec_cluster_network(client, args, nargs).await

@@ -26,22 +26,20 @@ pub enum ClusterCommands {
   /// List existing cluster
   #[clap(alias("ls"))]
   List,
-  /// Create new cluster
+  /// Create a new cluster
   Create(ClusterPartial),
-  /// Remove cluster by it's name
+  /// Remove one cluster
   #[clap(alias("rm"))]
   Remove(ClusterDeleteOptions),
-  /// Start cluster by it's name
+  /// Start one cluster
   Start(ClusterStartOptions),
-  /// Inspect cluster by it's name
+  /// Display detailed information on one cluster
   Inspect(ClusterInspectOptions),
-  /// Control cluster nginx templates
-  NginxTemplate(ClusterNginxTemplateArgs),
-  /// Control cluster networks
+  /// Manage cluster networks
   Network(ClusterNetworkArgs),
-  /// Control cluster variables
+  /// Manage cluster variables
   Variable(ClusterVariableArgs),
-  /// Create containers instances of a cargo inside given cluster and network
+  /// Create cargo instances inside given cluster and network
   Join(ClusterJoinOptions),
 }
 
@@ -128,30 +126,6 @@ pub struct ClusterStartOptions {
 )]
 pub struct ClusterInspectOptions {
   pub(crate) name: String,
-}
-
-#[derive(Debug, Parser)]
-pub struct ClusterNginxTemplateCommandsOption {
-  /// Name of cluster
-  pub(crate) cl_name: String,
-  /// Name of nginx template
-  pub(crate) nt_name: String,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum ClusterNginxTemplateCommands {
-  /// Add a new template
-  Add(ClusterNginxTemplateCommandsOption),
-  /// Remove a existing template
-  #[clap(alias("rm"))]
-  Remove(ClusterNginxTemplateCommandsOption),
-}
-
-/// Control cluster nginx templates
-#[derive(Debug, Parser)]
-pub struct ClusterNginxTemplateArgs {
-  #[clap(subcommand)]
-  pub(crate) commands: ClusterNginxTemplateCommands,
 }
 
 /// Cluster network delete options

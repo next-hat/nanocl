@@ -6,8 +6,7 @@ mod cargo_instance;
 mod namespace;
 mod cargo_image;
 mod git_repository;
-mod nginx_log;
-mod nginx_template;
+mod proxy;
 mod system;
 mod yml;
 mod controller;
@@ -24,8 +23,7 @@ pub use namespace::*;
 pub use cargo_image::*;
 pub use git_repository::*;
 pub use controller::*;
-pub use nginx_log::*;
-pub use nginx_template::*;
+pub use proxy::*;
 pub use system::*;
 pub use yml::*;
 pub use setup::*;
@@ -49,9 +47,9 @@ pub enum Commands {
   Cargo(CargoArgs),
   Apply(ApplyArgs),
   Revert(RevertArgs),
-  NginxTemplate(NginxTemplateArgs),
   Run(RunArgs),
   Exec(ExecArgs),
+  Proxy(ProxyArgs),
   Controller(ControllerArgs),
   Setup(SetupArgs),
   /// Show nanocl version information
