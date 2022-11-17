@@ -8,12 +8,12 @@ use super::{
 };
 
 impl Nanocld {
-  pub async fn list_containers(
+  pub async fn list_cargo_instance(
     &self,
     options: &ListCargoInstanceOptions,
   ) -> Result<Vec<CargoInstanceSummary>, NanocldError> {
     let mut res = self
-      .get(String::from("/containers"))
+      .get(String::from("/cargoes/instances"))
       .query(options)?
       .send()
       .await?;
@@ -25,13 +25,13 @@ impl Nanocld {
     Ok(data)
   }
 
-  pub async fn create_exec(
+  pub async fn create_cargo_instance_exec(
     &self,
     name: &str,
     config: CargoInstanceExecQuery,
   ) -> Result<ExecItem, NanocldError> {
     let mut res = self
-      .post(format!("/containers/{}/exec", name))
+      .post(format!("/cargoes/instances/{}/exec", name))
       .send_json(&config)
       .await?;
     let status = res.status();
@@ -45,8 +45,14 @@ impl Nanocld {
     Ok(exec)
   }
 
-  pub async fn start_exec(&self, id: &str) -> Result<(), NanocldError> {
-    let mut res = self.post(format!("/exec/{}/start", &id)).send().await?;
+  pub async fn start_cargo_instance_exec(
+    &self,
+    id: &str,
+  ) -> Result<(), NanocldError> {
+    let mut res = self
+      .post(format!("/cargoes/instances/exec/{}/start", &id))
+      .send()
+      .await?;
     let status = res.status();
 
     is_api_error(&mut res, &status).await?;

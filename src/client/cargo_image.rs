@@ -12,26 +12,26 @@ use super::{
 };
 
 impl Nanocld {
-  pub async fn list_container_image(
+  pub async fn list_cargo_image(
     &self,
-  ) -> Result<Vec<ContainerImageSummary>, NanocldError> {
-    let mut res = self.get(String::from("/containers/images")).send().await?;
+  ) -> Result<Vec<CargoImageSummary>, NanocldError> {
+    let mut res = self.get(String::from("/cargoes/images")).send().await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
 
-    let body = res.json::<Vec<ContainerImageSummary>>().await?;
+    let body = res.json::<Vec<CargoImageSummary>>().await?;
 
     Ok(body)
   }
 
-  pub async fn create_container_image(
+  pub async fn create_cargo_image(
     &self,
     name: &str,
   ) -> Result<Receiver<CreateImageStreamInfo>, NanocldError> {
     let mut res = self
-      .post(String::from("/containers/images"))
-      .send_json(&ContainerImagePartial {
+      .post(String::from("/cargoes/images"))
+      .send_json(&CargoImagePartial {
         name: name.to_owned(),
       })
       .await?;
@@ -63,12 +63,12 @@ impl Nanocld {
     Ok(rx_body)
   }
 
-  pub async fn remove_container_image(
+  pub async fn remove_cargo_image(
     &self,
     name: &str,
   ) -> Result<(), NanocldError> {
     let mut res = self
-      .delete(format!("/containers/images/{}", name))
+      .delete(format!("/cargoes/images/{}", name))
       .send()
       .await?;
     let status = res.status();
@@ -77,12 +77,12 @@ impl Nanocld {
     Ok(())
   }
 
-  pub async fn deploy_container_image(
+  pub async fn _deploy_cargo_image(
     &self,
     name: &str,
   ) -> Result<(), NanocldError> {
     let mut res = self
-      .post(format!("/containers/images/{}/deploy", name))
+      .post(format!("/cargoes/images/{}/deploy", name))
       .send()
       .await?;
     let status = res.status();
@@ -90,19 +90,16 @@ impl Nanocld {
     Ok(())
   }
 
-  pub async fn inspect_image(
+  pub async fn inspect_cargo_image(
     &self,
     name: &str,
-  ) -> Result<ContainerImageInspect, NanocldError> {
-    let mut res = self
-      .get(format!("/containers/images/{}", name))
-      .send()
-      .await?;
+  ) -> Result<CargoImageInspect, NanocldError> {
+    let mut res = self.get(format!("/cargoes/images/{}", name)).send().await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
 
-    let ct_image = res.json::<ContainerImageInspect>().await?;
+    let ct_image = res.json::<CargoImageInspect>().await?;
 
     Ok(ct_image)
   }

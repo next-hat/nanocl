@@ -11,7 +11,7 @@ pub async fn exec_cargo_instance(
 ) -> Result<(), CliError> {
   match &args.commands {
     CargoInstanceCommands::List(opts) => {
-      let data = client.list_containers(opts).await?;
+      let data = client.list_cargo_instance(opts).await?;
       print_table(data);
       Ok(())
     }

@@ -20,8 +20,10 @@ pub async fn exec_exec(
     working_dir: None,
   };
 
-  let exec = client.create_exec(&args.name, config).await?;
+  let exec = client
+    .create_cargo_instance_exec(&args.name, config)
+    .await?;
 
-  client.start_exec(&exec.id).await?;
+  client.start_cargo_instance_exec(&exec.id).await?;
   Ok(())
 }

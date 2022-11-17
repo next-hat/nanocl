@@ -34,8 +34,15 @@ pub mod tabled {
     }
   }
 
-  pub fn display_vec_string(o: &[String]) -> String {
-    o.join(", ")
+  pub fn display_vec_string(vec: &[String]) -> String {
+    vec.join(", ")
+  }
+
+  pub fn display_optional_vec_string(vec: &Option<Vec<String>>) -> String {
+    match vec {
+      None => String::default(),
+      Some(vec) => display_vec_string(vec),
+    }
   }
 
   pub fn optional_container_name(s: &Option<Vec<String>>) -> String {
@@ -71,11 +78,24 @@ pub mod tabled {
     repos[0].to_string()
   }
 
+  pub fn _display_optional_i64(i64: &Option<i64>) -> String {
+    match i64 {
+      None => String::default(),
+      Some(i64) => format!("{i64}"),
+    }
+  }
+
   pub fn display_size(size: &i64) -> String {
     let result = *size as f64 * 1e-9;
     format!("{:.5} GB", result)
   }
 
+  pub fn display_optional_size(size: &Option<i64>) -> String {
+    match size {
+      None => String::from("0 GB"),
+      Some(size) => display_size(size),
+    }
+  }
   pub fn display_optional_ports(s: &Option<Vec<Port>>) -> String {
     match s {
       None => String::from(""),

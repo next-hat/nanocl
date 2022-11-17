@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
 use super::utils::tabled::*;
+use super::cargo_image::CargoImageArgs;
 use super::cargo_instance::{CargoInstanceArgs, CargoInstanceSummary};
 
 /// Cargo delete options
@@ -54,6 +55,8 @@ pub enum CargoCommands {
   Patch(CargoPatchArgs),
   /// Manage cargo instances
   Instance(CargoInstanceArgs),
+  /// Manage cargo image
+  Image(CargoImageArgs),
 }
 
 /// Manage cargoes

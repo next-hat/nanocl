@@ -3,40 +3,40 @@ use indicatif::{ProgressStyle, ProgressBar};
 
 use crate::client::Nanocld;
 use crate::models::{
-  ContainerImageArgs, ContainerImageCommands, ContainerImageDeployOpts,
-  ContainerImageRemoveOpts,
+  CargoImageArgs, CargoImageCommands, CargoImageDeployOpts,
+  CargoImageRemoveOpts, CargoImageInspectOpts,
 };
 
 use super::errors::CliError;
 use super::utils::print_table;
 
-async fn exec_container_list(client: &Nanocld) -> Result<(), CliError> {
-  let items = client.list_container_image().await?;
+async fn exec_cargo_instance_list(client: &Nanocld) -> Result<(), CliError> {
+  let items = client.list_cargo_image().await?;
   print_table(items);
   Ok(())
 }
 
-async fn exec_deploy_container_image(
+async fn _exec_deploy_cargo_image(
   client: &Nanocld,
-  options: &ContainerImageDeployOpts,
+  options: &CargoImageDeployOpts,
 ) -> Result<(), CliError> {
-  client.deploy_container_image(&options.name).await?;
+  client._deploy_cargo_image(&options.name).await?;
   Ok(())
 }
 
-async fn exec_remove_container_image(
+async fn exec_remove_cargo_image(
   client: &Nanocld,
-  args: &ContainerImageRemoveOpts,
+  args: &CargoImageRemoveOpts,
 ) -> Result<(), CliError> {
-  client.remove_container_image(&args.name).await?;
+  client.remove_cargo_image(&args.name).await?;
   Ok(())
 }
 
-pub async fn exec_create_container_image(
+pub async fn exec_create_cargo_image(
   client: &Nanocld,
   name: &str,
 ) -> Result<(), CliError> {
-  let mut stream = client.create_container_image(name).await?;
+  let mut stream = client.create_cargo_image(name).await?;
   let style = ProgressStyle::default_spinner();
   let pg = ProgressBar::new(0);
   pg.set_style(style);
@@ -78,20 +78,32 @@ pub async fn exec_create_container_image(
   Ok(())
 }
 
-pub async fn exec_container_image(
+async fn exec_inspect_cargo_image(
   client: &Nanocld,
-  cmd: &ContainerImageArgs,
+  opts: &CargoImageInspectOpts,
+) -> Result<(), CliError> {
+  let res = client.inspect_cargo_image(&opts.name).await?;
+  print_table(vec![res]);
+  Ok(())
+}
+
+pub async fn exec_cargo_image(
+  client: &Nanocld,
+  cmd: &CargoImageArgs,
 ) -> Result<(), CliError> {
   match &cmd.commands {
-    ContainerImageCommands::List => exec_container_list(client).await,
-    ContainerImageCommands::Deploy(options) => {
-      exec_deploy_container_image(client, options).await
+    CargoImageCommands::List => exec_cargo_instance_list(client).await,
+    // CargoImageCommands::Deploy(options) => {
+    //   exec_deploy_cargo_image(client, options).await
+    // }
+    CargoImageCommands::Inspect(opts) => {
+      exec_inspect_cargo_image(client, opts).await
     }
-    ContainerImageCommands::Create(options) => {
-      exec_create_container_image(client, &options.name).await
+    CargoImageCommands::Create(opts) => {
+      exec_create_cargo_image(client, &opts.name).await
     }
-    ContainerImageCommands::Remove(args) => {
-      exec_remove_container_image(client, args).await
+    CargoImageCommands::Remove(args) => {
+      exec_remove_cargo_image(client, args).await
     }
   }
 }

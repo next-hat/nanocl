@@ -2,7 +2,7 @@ use tabled::Tabled;
 use clap::{ValueEnum, Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
-use super::container_image::ProgressDetail;
+use super::cargo_image::ProgressDetail;
 
 /// Git repository delete options
 #[derive(Debug, Parser)]
