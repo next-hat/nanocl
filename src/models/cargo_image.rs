@@ -11,37 +11,47 @@ use super::utils::serde::*;
 use super::utils::tabled::*;
 
 #[derive(Debug, Parser)]
-pub struct ContainerImageRemoveOpts {
+pub struct CargoImageRemoveOpts {
   /// id or name of image to delete
   pub(crate) name: String,
 }
 
 #[derive(Debug, Parser, Serialize, Deserialize)]
-pub struct ContainerImagePartial {
+pub struct CargoImagePartial {
   pub(crate) name: String,
 }
 
 #[derive(Debug, Parser)]
-pub struct ContainerImageDeployOpts {
+pub struct CargoImageDeployOpts {
+  pub(crate) name: String,
+}
+
+#[derive(Debug, Parser)]
+pub struct CargoImageInspectOpts {
   pub(crate) name: String,
 }
 
 #[derive(Debug, Subcommand)]
-pub enum ContainerImageCommands {
+pub enum CargoImageCommands {
+  /// List cargo images
   #[clap(alias("ls"))]
   List,
-  Create(ContainerImagePartial),
+  /// Create a new cargo image
+  Create(CargoImagePartial),
+  /// Remove an existing cargo image
   #[clap(alias("rm"))]
-  Remove(ContainerImageRemoveOpts),
-  #[clap(alias("dp"))]
-  Deploy(ContainerImageDeployOpts),
+  Remove(CargoImageRemoveOpts),
+  // #[clap(alias("dp"))]
+  // Deploy(CargoImageDeployOpts),
+  /// Inspect a cargo image
+  Inspect(CargoImageInspectOpts),
 }
 
 /// Manage container images
 #[derive(Debug, Parser)]
-pub struct ContainerImageArgs {
+pub struct CargoImageArgs {
   #[clap(subcommand)]
-  pub(crate) commands: ContainerImageCommands,
+  pub(crate) commands: CargoImageCommands,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -58,7 +68,7 @@ pub struct ProgressDetail {
 #[derive(
   Debug, Tabled, Clone, Default, PartialEq, Eq, Serialize, Deserialize,
 )]
-pub struct ContainerImageSummary {
+pub struct CargoImageSummary {
   #[serde(rename = "Id")]
   #[tabled(display_with = "display_sha_id")]
   pub id: String,
@@ -284,99 +294,119 @@ pub struct ContainerConfig {
 }
 
 /// Information about an image in the local image cache.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ContainerImageInspect {
+#[derive(Tabled, Debug, Serialize, Deserialize)]
+pub struct CargoImageInspect {
   /// ID is the content-addressable ID of an image.  This identified is a content-addressable digest calculated from the image's configuration (which includes the digests of layers used by the image).  Note that this digest differs from the `RepoDigests` below, which holds digests of image manifests that reference the image.
+  #[tabled(display_with = "optional_string")]
   #[serde(rename = "Id")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub id: Option<String>,
 
   /// List of image names/tags in the local image cache that reference this image.  Multiple image tags can refer to the same imagem and this list may be empty if no tags reference the image, in which case the image is \"untagged\", in which case it can still be referenced by its ID.
+  #[tabled(display_with = "display_optional_vec_string")]
   #[serde(rename = "RepoTags")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub repo_tags: Option<Vec<String>>,
 
   /// List of content-addressable digests of locally available image manifests that the image is referenced from. Multiple manifests can refer to the same image.  These digests are usually only available if the image was either pulled from a registry, or if the image was pushed to a registry, which is when the manifest is generated and its digest calculated.
+  #[tabled(display_with = "display_optional_vec_string")]
   #[serde(rename = "RepoDigests")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub repo_digests: Option<Vec<String>>,
 
   /// ID of the parent image.  Depending on how the image was created, this field may be empty and is only set for images that were built/created locally. This field is empty if the image was pulled from an image registry.
+  #[tabled(skip)]
   #[serde(rename = "Parent")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub parent: Option<String>,
 
   /// Optional message that was set when committing or importing the image.
+  #[tabled(display_with = "optional_string")]
   #[serde(rename = "Comment")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub comment: Option<String>,
 
   /// Date and time at which the image was created, formatted in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+  #[tabled(display_with = "optional_string")]
   #[serde(rename = "Created")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub created: Option<String>,
 
   /// The ID of the container that was used to create the image.  Depending on how the image was created, this field may be empty.
+  #[tabled(skip)]
   #[serde(rename = "Container")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub container: Option<String>,
 
+  #[tabled(skip)]
   #[serde(rename = "ContainerConfig")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub container_config: Option<ContainerConfig>,
 
   /// The version of Docker that was used to build the image.  Depending on how the image was created, this field may be empty.
+  #[tabled(skip)]
   #[serde(rename = "DockerVersion")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub docker_version: Option<String>,
 
   /// Name of the author that was specified when committing the image, or as specified through MAINTAINER (deprecated) in the Dockerfile.
+  #[tabled(skip)]
   #[serde(rename = "Author")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub author: Option<String>,
 
+  #[tabled(skip)]
   #[serde(rename = "Config")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub config: Option<ContainerConfig>,
 
   /// Hardware CPU architecture that the image runs on.
+  #[tabled(skip)]
   #[serde(rename = "Architecture")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub architecture: Option<String>,
 
   /// CPU architecture variant (presently ARM-only).
+  #[tabled(skip)]
   #[serde(rename = "Variant")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub variant: Option<String>,
 
   /// Operating System the image is built to run on.
+  #[tabled(skip)]
   #[serde(rename = "Os")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub os: Option<String>,
 
   /// Operating System version the image is built to run on (especially for Windows).
+  #[tabled(skip)]
   #[serde(rename = "OsVersion")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub os_version: Option<String>,
 
   /// Total size of the image including all layers it is composed of.
+  #[tabled(display_with = "display_optional_size")]
   #[serde(rename = "Size")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub size: Option<i64>,
 
   /// Total size of the image including all layers it is composed of.  In versions of Docker before v1.10, this field was calculated from the image itself and all of its parent images. Docker v1.10 and up store images self-contained, and no longer use a parent-chain, making this field an equivalent of the Size field.  This field is kept for backward compatibility, but may be removed in a future version of the API.
+  #[tabled(display_with = "display_optional_size")]
   #[serde(rename = "VirtualSize")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub virtual_size: Option<i64>,
 
+  #[tabled(skip)]
   #[serde(rename = "GraphDriver")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub graph_driver: Option<GraphDriverData>,
 
+  #[tabled(skip)]
   #[serde(rename = "RootFS")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub root_fs: Option<ImageInspectRootFs>,
 
+  #[tabled(skip)]
   #[serde(rename = "Metadata")]
   #[serde(skip_serializing_if = "Option::is_none")]
   pub metadata: Option<ImageInspectMetadata>,

@@ -67,8 +67,7 @@ pub async fn download(
       msg: String::from("url have empty path cannot determine file name lol."),
     })?;
   let client = Client::build()
-    .disable_timeout()
-    // .timeout(ntex::time::Millis::from_secs(100))
+    .timeout(ntex::time::Millis::from_secs(2000))
     .finish();
   let mut res =
     client

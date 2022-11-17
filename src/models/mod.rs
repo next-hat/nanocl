@@ -4,7 +4,7 @@ mod cluster;
 mod network;
 mod cargo_instance;
 mod namespace;
-mod container_image;
+mod cargo_image;
 mod git_repository;
 mod nginx_log;
 mod nginx_template;
@@ -21,7 +21,7 @@ pub use cluster::*;
 pub use network::*;
 pub use cargo_instance::*;
 pub use namespace::*;
-pub use container_image::*;
+pub use cargo_image::*;
 pub use git_repository::*;
 pub use controller::*;
 pub use nginx_log::*;
@@ -51,7 +51,6 @@ pub enum Commands {
   Revert(RevertArgs),
   GitRepository(GitRepositoryArgs),
   NginxTemplate(NginxTemplateArgs),
-  ContainerImage(ContainerImageArgs),
   Run(RunArgs),
   Exec(ExecArgs),
   Controller(ControllerArgs),

@@ -46,9 +46,6 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::NginxTemplate(args) => {
       cli::exec_nginx_template(&client, args).await
     }
-    Commands::ContainerImage(args) => {
-      cli::exec_container_image(&client, args).await
-    }
     Commands::Version => cli::exec_version(&client).await,
     Commands::Exec(args) => cli::exec_exec(&client, args).await,
     Commands::Apply(args) => cli::exec_apply(&client, args).await,

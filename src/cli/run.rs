@@ -9,14 +9,14 @@ use crate::client::Nanocld;
 use crate::client::error::NanocldError;
 
 use super::errors::CliError;
-use super::container_image::exec_create_container_image;
+use super::cargo_image::exec_create_cargo_image;
 
 pub async fn exec_run(
   client: &Nanocld,
   args: &RunArgs,
 ) -> Result<(), CliError> {
-  if let Err(_err) = client.inspect_image(&args.image).await {
-    exec_create_container_image(client, &args.image).await?;
+  if let Err(_err) = client.inspect_cargo_image(&args.image).await {
+    exec_create_cargo_image(client, &args.image).await?;
   }
   let cluster = ClusterPartial {
     name: args.cluster.to_owned(),
