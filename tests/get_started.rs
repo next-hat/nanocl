@@ -54,28 +54,14 @@ async fn exec_cluster_help() -> TestResult<()> {
   Ok(())
 }
 
-async fn exec_git_repository_create() -> TestResult<()> {
+async fn download_get_started_image() -> TestResult<()> {
   let output = common::spawn_cli(vec![
-    "git-repository",
+    "cargo",
+    "image",
     "create",
-    "--url",
-    "https://github.com/nxthat/nanocl-get-started",
-    "get-started",
+    "nexthat/nanocl-get-started:latest",
   ])
   .await?;
-  assert!(output.status.success());
-  Ok(())
-}
-
-async fn exec_git_repository_build() -> TestResult<()> {
-  let output =
-    common::spawn_cli(vec!["git-repository", "build", "get-started"]).await?;
-  assert!(output.status.success());
-  Ok(())
-}
-
-async fn exec_git_repository_help() -> TestResult<()> {
-  let output = common::spawn_cli(vec!["git-repository", "help"]).await?;
   assert!(output.status.success());
   Ok(())
 }
@@ -88,7 +74,7 @@ async fn exec_cargo_patch_image() -> TestResult<()> {
     "my-cargo",
     "set",
     "--image",
-    "get-started:master",
+    "nexthat/nanocl-get-started:latest",
   ])
   .await?;
   assert!(output.status.success());
@@ -150,9 +136,6 @@ async fn exec_cargo_patch_env_cluster() -> TestResult<()> {
 async fn clean() -> TestResult<()> {
   let output = common::spawn_cli(vec!["cluster", "rm", "dev"]).await?;
   assert!(output.status.success());
-  let output =
-    common::spawn_cli(vec!["git-repository", "rm", "get-started"]).await?;
-  assert!(output.status.success());
   let output = common::spawn_cli(vec!["cargo", "rm", "my-cargo"]).await?;
   assert!(output.status.success());
   Ok(())
@@ -168,9 +151,7 @@ async fn scenario() -> TestResult<()> {
   exec_cluster_list().await?;
   exec_cluster_inspect().await?;
   exec_cluster_help().await?;
-  exec_git_repository_create().await?;
-  exec_git_repository_build().await?;
-  exec_git_repository_help().await?;
+  download_get_started_image().await?;
   exec_cargo_patch_image().await?;
   exec_cargo_inspect().await?;
   common::curl_cargo_instance("my-cargo", "9000").await?;

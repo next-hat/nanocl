@@ -49,7 +49,6 @@ pub enum Commands {
   Cargo(CargoArgs),
   Apply(ApplyArgs),
   Revert(RevertArgs),
-  GitRepository(GitRepositoryArgs),
   NginxTemplate(NginxTemplateArgs),
   Run(RunArgs),
   Exec(ExecArgs),
