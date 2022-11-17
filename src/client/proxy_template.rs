@@ -6,26 +6,26 @@ use super::{
 };
 
 impl Nanocld {
-  pub async fn create_nginx_template(
+  pub async fn create_proxy_template(
     &self,
-    item: NginxTemplatePartial,
-  ) -> Result<NginxTemplatePartial, NanocldError> {
+    item: ProxyTemplatePartial,
+  ) -> Result<ProxyTemplatePartial, NanocldError> {
     let mut res = self
-      .post(String::from("/nginx_templates"))
+      .post(String::from("/proxy/templates"))
       .send_json(&item)
       .await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let item = res.json::<NginxTemplatePartial>().await?;
+    let item = res.json::<ProxyTemplatePartial>().await?;
     Ok(item)
   }
 
-  pub async fn delete_nginx_template(
+  pub async fn delete_proxy_template(
     &self,
     name: String,
   ) -> Result<(), NanocldError> {
     let mut res = self
-      .delete(format!("/nginx_templates/{name}", name = name))
+      .delete(format!("/proxy/templates/{name}", name = name))
       .send()
       .await?;
     let status = res.status();
@@ -33,13 +33,13 @@ impl Nanocld {
     Ok(())
   }
 
-  pub async fn list_nginx_template(
+  pub async fn list_proxy_template(
     &self,
-  ) -> Result<Vec<NginxTemplatePartial>, NanocldError> {
-    let mut res = self.get(String::from("/nginx_templates")).send().await?;
+  ) -> Result<Vec<ProxyTemplatePartial>, NanocldError> {
+    let mut res = self.get(String::from("/proxy/templates")).send().await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let items = res.json::<Vec<NginxTemplatePartial>>().await?;
+    let items = res.json::<Vec<ProxyTemplatePartial>>().await?;
     Ok(items)
   }
 }

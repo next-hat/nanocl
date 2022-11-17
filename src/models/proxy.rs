@@ -4,23 +4,52 @@ use serde::{Serialize, Deserialize};
 
 /// Manage nginx templates
 #[derive(Debug, Parser)]
-pub struct NginxTemplateArgs {
+pub struct ProxyTemplateArgs {
   #[clap(subcommand)]
-  pub(crate) commands: NginxTemplateCommand,
+  pub(crate) commands: ProxyTemplateCommand,
 }
 
 #[derive(Debug, Parser)]
-pub struct NginxTemplateOptions {
+pub struct ProxyTemplateOptions {
   pub(crate) name: String,
 }
 
+/// Manage proxy rules
 #[derive(Debug, Parser)]
-pub struct NginxTemplateCreateOptions {
+pub struct ProxyArgs {
+  #[clap(subcommand)]
+  pub commands: ProxyCommands,
+}
+
+#[derive(Debug, Parser)]
+pub struct ProxyLinkerOptions {
+  /// Namespace where the cluster and the template is stored
+  #[clap(long)]
+  pub(crate) namespace: Option<String>,
+  /// Name of cluster
+  pub(crate) cl_name: String,
+  /// Name of nginx template
+  pub(crate) nt_name: String,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProxyCommands {
+  /// Manage templates
+  Template(ProxyTemplateArgs),
+  /// Link a template to a cluster
+  Link(ProxyLinkerOptions),
+  /// Unlink a template from a cluster
+  #[clap(alias("rm"))]
+  Unlink(ProxyLinkerOptions),
+}
+
+#[derive(Debug, Parser)]
+pub struct ProxyTemplateCreateOptions {
   /// Name of template to create
   pub(crate) name: String,
   /// Mode of template http|stream
   #[clap(long, short)]
-  pub(crate) mode: NginxTemplateModes,
+  pub(crate) mode: ProxyTemplateModes,
   /// Create by reading stdi
   #[clap(long = "stdi")]
   pub(crate) is_reading_stdi: bool,
@@ -30,15 +59,15 @@ pub struct NginxTemplateCreateOptions {
 }
 
 #[derive(Debug, Subcommand)]
-pub enum NginxTemplateCommand {
+pub enum ProxyTemplateCommand {
   /// List existing template
   #[clap(alias("ls"))]
   List,
   /// Create a new template
-  Create(NginxTemplateCreateOptions),
+  Create(ProxyTemplateCreateOptions),
   /// Remove a template
   #[clap(alias("rm"))]
-  Remove(NginxTemplateOptions),
+  Remove(ProxyTemplateOptions),
   // Todo
   // Inspect(NginxTemplateOption),
 }
@@ -51,26 +80,26 @@ pub enum NginxTemplateCommand {
 /// ```
 #[derive(Serialize, Deserialize, Debug, ValueEnum, PartialEq, Eq, Clone)]
 #[serde(rename_all = "snake_case")]
-pub enum NginxTemplateModes {
+pub enum ProxyTemplateModes {
   Http,
   Stream,
 }
 
-impl std::fmt::Display for NginxTemplateModes {
+impl std::fmt::Display for ProxyTemplateModes {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      NginxTemplateModes::Http => write!(f, "http"),
-      NginxTemplateModes::Stream => write!(f, "stream"),
+      ProxyTemplateModes::Http => write!(f, "http"),
+      ProxyTemplateModes::Stream => write!(f, "stream"),
     }
   }
 }
 
 #[derive(Debug, Tabled, Parser, Serialize, Deserialize)]
-pub struct NginxTemplatePartial {
+pub struct ProxyTemplatePartial {
   /// Name of template to create
   pub(crate) name: String,
   /// Mode of template http|stream
-  pub(crate) mode: NginxTemplateModes,
+  pub(crate) mode: ProxyTemplateModes,
   /// Content of template
   pub(crate) content: String,
 }

@@ -2,24 +2,24 @@ pub mod common;
 use crate::common::TestResult;
 
 async fn test_create() -> TestResult<()> {
-  common::spawn_cli(vec!["cargo", "image", "create", "busybox:1.35.0-musl"])
+  common::exec_nanocl(vec!["cargo", "image", "create", "busybox:1.35.0-musl"])
     .await?;
   Ok(())
 }
 
 async fn test_list() -> TestResult<()> {
-  common::spawn_cli(vec!["cargo", "image", "ls"]).await?;
+  common::exec_nanocl(vec!["cargo", "image", "ls"]).await?;
   Ok(())
 }
 
 async fn test_inspect() -> TestResult<()> {
-  common::spawn_cli(vec!["cargo", "image", "inspect", "busybox:1.35.0-musl"])
+  common::exec_nanocl(vec!["cargo", "image", "inspect", "busybox:1.35.0-musl"])
     .await?;
   Ok(())
 }
 
 async fn test_remove() -> TestResult<()> {
-  common::spawn_cli(vec!["cargo", "image", "rm", "busybox:1.35.0-musl"])
+  common::exec_nanocl(vec!["cargo", "image", "rm", "busybox:1.35.0-musl"])
     .await?;
   Ok(())
 }

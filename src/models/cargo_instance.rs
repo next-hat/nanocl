@@ -24,7 +24,7 @@ pub enum CargoInstanceCommands {
   List(ListCargoInstanceOptions),
 }
 
-/// Execute command inside a container
+/// Run a command in a running cargo instance
 #[derive(Debug, Parser)]
 pub struct ExecArgs {
   #[clap(long, short)]
