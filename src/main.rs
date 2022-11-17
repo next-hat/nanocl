@@ -39,9 +39,6 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::Run(args) => cli::exec_run(&client, args).await,
     Commands::Namespace(args) => cli::exec_namespace(&client, args).await,
     Commands::Cluster(args) => cli::exec_cluster(&client, args).await,
-    Commands::GitRepository(args) => {
-      cli::exec_git_repository(&client, args).await
-    }
     Commands::Cargo(args) => cli::exec_cargo(&client, args).await,
     Commands::NginxTemplate(args) => {
       cli::exec_nginx_template(&client, args).await
