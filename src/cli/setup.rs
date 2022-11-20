@@ -17,7 +17,7 @@ use crate::config::{read_daemon_config_file, DaemonConfig};
 
 use super::errors::CliError;
 
-const DAEMON_VERSION: &str = "0.1.18";
+const DAEMON_VERSION: &str = "0.1.19";
 
 async fn instance_exists(
   name: &str,
