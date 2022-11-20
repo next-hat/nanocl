@@ -40,6 +40,7 @@ jobs:
       run: >-
         cargo run setup &&
         sleep 10 &&
+        docker container ls -a &&
         sudo chmod 777 -R /run/nanocl &&
         cargo run controller add dns &&
         cargo run controller add proxy;
