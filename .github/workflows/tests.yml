@@ -38,10 +38,10 @@ jobs:
     # Run our CLI setup command to install a daemon
     - name: Setup
       run: >-
-        cargo run setup;
-        sleep 10;
-        sudo chmod 777 -R /run/nanocl;
-        cargo run controller add dns;
+        cargo run setup &&
+        sleep 10 &&
+        sudo chmod 777 -R /run/nanocl &&
+        cargo run controller add dns &&
         cargo run controller add proxy;
     # Run test
     - name: Run tests
