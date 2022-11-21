@@ -31,7 +31,7 @@
  <strong>Tags</strong>
  </br>
  <span id="nxtmdoc-meta-keywords">
-   Test, Deploy, Monitor, Scale, Orchestrate 
+   Test, Deploy, Monitor, Scale, Orchestrate
  </span>
 </blockquote>
 

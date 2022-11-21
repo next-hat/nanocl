@@ -85,6 +85,7 @@ pub async fn get_cargo_ip_addr(name: &str) -> TestResult<String> {
 }
 
 pub async fn exec_curl(args: Vec<&str>) -> TestResult<String> {
+  println!("Executing curl with args : {}", &args.join(" "));
   let output = exec_command(
     "bash",
     vec![String::from("-c"), format!("curl {}", &args.join(" "))],

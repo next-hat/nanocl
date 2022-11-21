@@ -159,13 +159,13 @@ async fn scenario() -> TestResult<()> {
   exec_cargo_patch_image().await?;
   exec_cargo_inspect().await?;
 
-  // wait 2 sec to be sure our instance is started
-  common::sleep_milli(2000);
+  // wait to be sure our instance is started
+  common::sleep_milli(5000);
   common::curl_cargo_instance("my-cargo", "9000").await?;
   exec_cargo_patch_env_port().await?;
   exec_cargo_inspect().await?;
-  // wait 2 sec to be sure our instance is updated
-  common::sleep_milli(2000);
+  // wait to be sure our instance is updated
+  common::sleep_milli(5000);
   common::curl_cargo_instance("my-cargo", "9001").await?;
   exec_cluster_variable_create().await?;
   exec_cargo_patch_env_cluster().await?;
