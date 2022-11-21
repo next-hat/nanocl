@@ -1,7 +1,10 @@
-pub mod common;
 use serde_json;
+
+pub mod common;
+
 use crate::common::TestResult;
 
+/// Exec `nanocl run`
 async fn exec_run() -> TestResult<()> {
   let output = common::exec_nanocl(vec![
     "run",
@@ -155,9 +158,14 @@ async fn scenario() -> TestResult<()> {
   download_get_started_image().await?;
   exec_cargo_patch_image().await?;
   exec_cargo_inspect().await?;
+
+  // wait 2 sec to be sure our instance is started
+  common::sleep_milli(2000);
   common::curl_cargo_instance("my-cargo", "9000").await?;
   exec_cargo_patch_env_port().await?;
   exec_cargo_inspect().await?;
+  // wait 2 sec to be sure our instance is updated
+  common::sleep_milli(2000);
   common::curl_cargo_instance("my-cargo", "9001").await?;
   exec_cluster_variable_create().await?;
   exec_cargo_patch_env_cluster().await?;

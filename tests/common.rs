@@ -1,6 +1,8 @@
-use ntex::rt;
 use std::fmt::Debug;
+use std::{thread, time};
 use std::process::{Command, Stdio};
+
+use ntex::rt;
 
 pub struct TestError {
   pub(crate) msg: String,
@@ -57,6 +59,10 @@ pub async fn exec_command(
 pub async fn exec_nanocl(args: Vec<&str>) -> TestResult<std::process::Output> {
   let args = args.into_iter().map(|item| item.to_owned()).collect();
   exec_command("./target/debug/nanocl", args).await
+}
+
+pub fn sleep_milli(time: u64) {
+  thread::sleep(time::Duration::from_millis(time));
 }
 
 pub async fn get_cargo_ip_addr(name: &str) -> TestResult<String> {
