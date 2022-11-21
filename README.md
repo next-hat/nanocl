@@ -35,35 +35,37 @@
  </span>
 </blockquote>
 
-## ❓ What is nanocl ?
-
-Nanocl, stand for `Nano Cloud` and it's a lie because you will be able to create big ones. <br />
-I see it as an open source [Hybrid Cloud Orchestrator](https://docs.next-hat.com/docs/guides/nanocl/overview) ! <br />
-To help orchestrate `containers` and `virtual machines` on multiple hosts. <br />
-It provides basic mechanisms for deployment, maintenance, and scaling. <br />
-You will be able to create an your own `Hybrid Cloud` with optional `Vpn` and `Dns` controllers. <br />
-Deploying your `applications` and `servers` behind a `Vpn` as never been that easy !
-
-Builds upon `Rust` to have the best performance and a smallest footprint. <br />
-It's use the best ideas and practices from the community. <br />
-You can build an entire CI/CD pipeline from `tests` to `high availability production`. <br />
-See it as a `Kubernetes` alternative with more `features` and a `network security layer`.
-
-This repository is the `CLI` version you can see the `DAEMON` [here](https://github.com/nxthat/nanocld).
-
 ## 📙 Overview
 
 <img src="https://download.next-hat.com/ressources/images/infra.png" />
+
+## ❓ What is nanocl ?
+
+Nanocl, stand for `Nano Cloud` and it's a lie because you will be able to create big ones.
+I see it as an open-source Hybrid Cloud Orchestrator!
+To help orchestrate containers and virtual machines on multiple hosts.
+It provides basic mechanisms for deployment, maintenance, and scaling.
+You will be able to create your own Hybrid Cloud with optional Vpn and DNS controllers.
+Deploying your applications, services or servers publicly or behind a Vpn has never been that easy!
+
+Builds upon `Rust` to have the best performance and the smallest footprint.
+It uses the best ideas and practices from the community.
+You can build an entire CI/CD pipeline from tests to high-availability production.
+See it as a Kubernetes alternative with more features and a network security layer.
+
+This repository is the CLI version you can see the DAEMON [here](https://github.com/nxthat/nanocld).
 
 ## ✨ Features
 - [x] Manage clusters (CRUD)
 - [x] Manage networks (CRUD)
 - [x] Manage containers (CRUD)
+- [X] Manage DNS entries
 - [x] Http proxy
 - [x] Udp/Tcp proxy
 - [x] Monitor http request
 - [x] Single-node mode
 - [x] Store a git repository state as image
+- [ ] Manage VPN
 - [ ] Highly-scalable distributed node mode
 - [ ] Manage virtual machine (CRUD)
 - [ ] Monitor tcp/udp packets
@@ -75,5 +77,5 @@ This repository is the `CLI` version you can see the `DAEMON` [here](https://git
 
 ## 🔨 Contribution
 
-If you want to contribute see [Build From Source](https://docs.next-hat.com/docs/setups/nanocl/linux/from-sources)
-section on our official documentation to see how to setup a dev environnement for nanocl
+If you want to contribute see how to [build from source](https://docs.next-hat.com/docs/setups/nanocl/linux/from-sources)
+section on our official documentation to see how to setup a environnement for nanocl
