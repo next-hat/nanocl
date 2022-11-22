@@ -1,21 +1,25 @@
 NAME
 ====
 
-nanocl - self-sufficient hybrid-cloud
+nanocl - The Self-Sufficient Hybrid-Cloud Orchestrator CLI
 
 SYNOPSIS
 ========
 
-**nanocl** \[**-h**\|**\--help**\] \[**-V**\|**\--version**\]
-\[**-H**\|**\--host**\] \<*subcommands*\>
+**nanocl** \[**-H**\|**\--host**\] \[**-h**\|**\--help**\]
+\[**-V**\|**\--version**\] \<*subcommands*\>
 
 DESCRIPTION
 ===========
 
-Manage your hybrid cloud with nanocl
+The Self-Sufficient Hybrid-Cloud Orchestrator CLI
 
 OPTIONS
 =======
+
+**-H**, **\--host**=*HOST* \[default: unix://run/nanocl/nanocl.sock\]
+
+:   Nanocld host
 
 **-h**, **\--help**
 
@@ -25,16 +29,8 @@ OPTIONS
 
 :   Print version information
 
-**-H**, **\--host**=*HOST* \[default: unix://run/nanocl/nanocl.sock\]
-
-:   Nanocld host
-
 SUBCOMMANDS
 ===========
-
-nanocl-docker(1)
-
-:   Alias to self-managed dockerd can be used for debug
 
 nanocl-namespace(1)
 
@@ -56,41 +52,29 @@ nanocl-revert(1)
 
 :   Revert a configuration file
 
-nanocl-git-repository(1)
-
-:   Manage git repositories
-
-nanocl-nginx-template(1)
-
-:   Manage nginx templates
-
-nanocl-container-image(1)
-
-:   Manage container images
-
-nanocl-lsc(1)
-
-:   List container by namespace cluster or cargo
-
 nanocl-run(1)
 
 :   Run a cargo in given environement
 
 nanocl-exec(1)
 
-:   Execute command inside a container
+:   Run a command in a running cargo instance
 
-nanocl-node(1)
+nanocl-proxy(1)
 
-:   
+:   Manage proxy rules
 
-nanocl-nginx-log(1)
+nanocl-controller(1)
 
-:   Connect to nginx logging
+:   Manage nanocl controllers
+
+nanocl-setup(1)
+
+:   Setup given host to run nanocl
 
 nanocl-version(1)
 
-:   Show the Nanocl version information
+:   Show nanocl version information
 
 nanocl-help(1)
 
@@ -99,4 +83,4 @@ nanocl-help(1)
 VERSION
 =======
 
-v0.1.2
+v0.1.8
