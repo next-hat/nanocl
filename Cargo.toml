@@ -44,7 +44,7 @@ serde = { version = "1.0", features = ["derive"] }
 clap = { version = "4.0.29", features = ["derive"] }
 chrono = { version = "0.4.19", features = ["serde"] }
 uuid = { version = "1.2", features = ["serde", "v4"] }
-ntex = { version = "=0.5.29", features = ["rustls", "tokio"] }
+ntex = { version = "=0.5.31", features = ["rustls", "tokio"] }
 url = { version = "2.3.1", features = ["serde"] }
 bollard = "0.13.0"
 tokio = { version = "1.22.0", features = ["fs"] }
