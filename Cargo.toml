@@ -26,7 +26,7 @@ default = []
 
 [build-dependencies]
 chrono = { version = "0.4.19", features = ["serde"] }
-clap = { version = "4.0.26", features = ["derive"] }
+clap = { version = "4.0.29", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 clap_complete = "4.0.6"
 clap_mangen = { version = "0.2" }
@@ -41,7 +41,7 @@ serde_json = "1.0.89"
 thiserror = "1.0.37"
 clap_complete = "4.0.6"
 serde = { version = "1.0", features = ["derive"] }
-clap = { version = "4.0.26", features = ["derive"] }
+clap = { version = "4.0.29", features = ["derive"] }
 chrono = { version = "0.4.19", features = ["serde"] }
 uuid = { version = "1.2", features = ["serde", "v4"] }
 ntex = { version = "=0.5.31", features = ["rustls", "tokio"] }
