@@ -1,8 +1,8 @@
 server {
-    server_name {{vars.DOMAIN}};
-    listen {{networks.front.gateway}}:80;
+    server_name test.get-started.internal;
+    listen 127.0.0.1:80;
 
-    if ($host != {{vars.DOMAIN}}) {
+    if ($host != test.get-started.internal) {
         return 404;
     }
 
@@ -12,6 +12,6 @@ server {
       proxy_http_version 1.1;
       proxy_set_header x-forwarded-for $proxy_add_x_forwarded_for;
       proxy_set_header host $host;
-      proxy_pass http://{{cargoes.getting-started.target_ip}}:9000;
+      proxy_pass http://{{cargoes.test-get-started.target_ip}}:9000;
   }
 }

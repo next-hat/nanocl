@@ -26,7 +26,7 @@ async fn with_get_started() -> TestResult<()> {
     "--mode",
     "http",
     "-f",
-    "./examples/test_proxy.nginx",
+    "./tests/test_proxy.nginx",
     "test-get-started",
   ])
   .await?;
