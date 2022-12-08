@@ -1,5 +1,7 @@
-name: global
+mode: deployment
 type: namespace
+name: global
+version: 1
 
 networks:
   - name: front
@@ -8,19 +10,18 @@ clusters:
   - name: dev
     auto_start: true
     proxy_templates:
-      - getting-started
+      - get-started
     vars:
       DOMAIN: leone-industry.com
       CLUSTER: DEV
-      REMOTE_ADDR: 172.31.210.176
     joins:
       - cargo: getting-started
         network: front
 
 cargoes:
   - name: getting-started
-    image: getting-started:master
-    dns_entry: "{{vars.REMOTE_ADDR}}:{{vars.DOMAIN}}"
+    image: nexthat/nanocl-get-started
+    dns_entry: "{{networks.front.gateway}}:{{vars.DOMAIN}}"
     environnements:
       - NODE_ENV=production
       - APP=LANDING
