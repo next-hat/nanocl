@@ -47,7 +47,7 @@ uuid = { version = "1.2", features = ["serde", "v4"] }
 ntex = { version = "=0.5.31", features = ["rustls", "tokio"] }
 url = { version = "2.3.1", features = ["serde"] }
 bollard = "0.13.0"
-tokio = { version = "1.22.0", features = ["fs"] }
+tokio = { version = "1.23.0", features = ["fs"] }
 tokio-util = "0.7.4"
 futures-util = "0.3.25"
 hyper = "0.14.20"
