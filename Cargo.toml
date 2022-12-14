@@ -31,6 +31,7 @@ serde = { version = "1.0", features = ["derive"] }
 clap_complete = "4.0.6"
 clap_mangen = { version = "0.2" }
 tabled = "0.10.0"
+bollard = { version = "*", git = "https://github.com/leon3s/bollard" }
 
 [dependencies]
 futures = "0.3"
@@ -46,7 +47,7 @@ chrono = { version = "0.4.19", features = ["serde"] }
 uuid = { version = "1.2", features = ["serde", "v4"] }
 ntex = { version = "=0.5.31", features = ["rustls", "tokio"] }
 url = { version = "2.3.1", features = ["serde"] }
-bollard = "0.13.0"
+bollard = { version = "*", git = "https://github.com/leon3s/bollard" }
 tokio = { version = "1.22.0", features = ["fs"] }
 tokio-util = "0.7.4"
 futures-util = "0.3.25"

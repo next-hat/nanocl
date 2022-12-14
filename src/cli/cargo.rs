@@ -1,7 +1,7 @@
 use crate::client::Nanocld;
 use crate::models::{
-  CargoPatchPartial, CargoArgs, CargoCommands, CargoPartial,
-  CargoDeleteOptions, CargoInspectOption, CargoPatchArgs, CargoPatchCommands,
+  CargoPatchPartial, CargoArgs, CargoCommands, NewCargo, CargoDeleteOptions,
+  CargoInspectOption, CargoPatchArgs, CargoPatchCommands,
 };
 
 use super::{exec_cargo_instance, exec_cargo_image};
@@ -20,9 +20,11 @@ async fn exec_cargo_list(
 async fn exec_cargo_create(
   client: &Nanocld,
   args: &CargoArgs,
-  item: &CargoPartial,
+  item: &NewCargo,
 ) -> Result<(), CliError> {
-  let item = client.create_cargo(item, args.namespace.to_owned()).await?;
+  let item = client
+    .create_cargo(&item.into(), args.namespace.to_owned())
+    .await?;
   println!("{}", item.key);
   Ok(())
 }

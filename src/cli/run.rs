@@ -56,13 +56,13 @@ pub async fn exec_run(
 
   let cargo = CargoPartial {
     name: args.name.to_owned(),
-    image_name: args.image.to_owned(),
-    binds: None,
     replicas: None,
     dns_entry: None,
-    domainname: None,
-    hostname: None,
     environnements: None,
+    config: crate::models::CargoConfig {
+      image: Some(args.image.to_owned()),
+      ..Default::default()
+    },
   };
   if let Err(err) = client.create_cargo(&cargo, args.namespace.to_owned()).await
   {
