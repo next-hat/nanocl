@@ -208,7 +208,7 @@ pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
       )?;
       install_store_image(&docker_api).await?;
       install_daemon_image(&docker_api).await?;
-      if instance_exists("system-nanocl-daemon", &docker_api).await? {
+      if instance_exists("system-nano-daemon", &docker_api).await? {
         return Ok(());
       }
       init_daemon(&config, &docker_api).await?;
