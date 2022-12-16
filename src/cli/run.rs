@@ -56,7 +56,7 @@ pub async fn exec_run(
 
   let cargo = CargoPartial {
     name: args.name.to_owned(),
-    replicas: None,
+    replicas: Some(1),
     dns_entry: None,
     environnements: None,
     config: crate::models::CargoConfig {
