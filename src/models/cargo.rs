@@ -348,7 +348,7 @@ pub struct CargoConfig {
 }
 
 /// A test to perform to check that the container is healthy.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HealthConfig {
   /// The test to perform. Possible values are:  - `[]` inherit healthcheck from image or parent image - `[\"NONE\"]` disable healthcheck - `[\"CMD\", args...]` exec arguments directly - `[\"CMD-SHELL\", command]` run command with system's default shell
   #[serde(rename = "Test")]
@@ -964,7 +964,7 @@ pub struct EndpointSettings {
 }
 
 /// EndpointIPAMConfig represents an endpoint's IPAM configuration.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EndpointIpamConfig {
   #[serde(rename = "IPv4Address")]
   #[serde(skip_serializing_if = "Option::is_none")]
