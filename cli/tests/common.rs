@@ -32,7 +32,7 @@ pub async fn exec_command(
           "Unable to spawn command `{} {}`\n\
         got error : {}",
           &cmd,
-          args.join(" ").to_string(),
+          args.join(" "),
           err,
         ),
       })?
@@ -42,7 +42,7 @@ pub async fn exec_command(
           "Unable to wait with output command `{} {}`\n\
         got error : {}",
           &cmd,
-          args.join(" ").to_string(),
+          args.join(" "),
           err,
         ),
       })?;
@@ -58,7 +58,7 @@ pub async fn exec_command(
 
 pub async fn exec_nanocl(args: Vec<&str>) -> TestResult<std::process::Output> {
   let args = args.into_iter().map(|item| item.to_owned()).collect();
-  exec_command("./target/debug/nanocl", args).await
+  exec_command("../target/debug/nanocl", args).await
 }
 
 pub fn sleep_milli(time: u64) {

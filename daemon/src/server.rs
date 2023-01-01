@@ -76,11 +76,11 @@ pub async fn start<'a>(
       .configure(services::cargo::ntex_config);
 
     // configure openapi if dev feature is enabled
-    #[cfg(feature = "dev")]
-    {
-      use crate::openapi;
-      app = app.configure(openapi::ntex_config);
-    }
+    // #[cfg(feature = "dev")]
+    // {
+    //   use crate::openapi;
+    //   app = app.configure(openapi::ntex_config);
+    // }
 
     app
   });

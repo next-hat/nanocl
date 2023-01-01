@@ -30,6 +30,10 @@ args = ["nextest", "run", "-p", "nanocld"]
 command = "cargo"
 args = ["test", "--", "--nocapture"]
 
+[tasks.test]
+command = "cargo"
+args = ["nextest", "run"]
+
 [tasks.release]
 command = "cargo"
 args = ["build", "--release"]

@@ -3,6 +3,10 @@ use ntex::web;
 #[cfg(feature = "dev")]
 use utoipa::OpenApi;
 #[cfg(feature = "dev")]
+use nanocl_models::cargo::*;
+#[cfg(feature = "dev")]
+use nanocl_models::cargo_config::*;
+#[cfg(feature = "dev")]
 use crate::models::*;
 #[cfg(feature = "dev")]
 use crate::services::*;

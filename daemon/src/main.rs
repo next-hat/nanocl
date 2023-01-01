@@ -13,7 +13,7 @@ mod errors;
 mod schema;
 mod models;
 mod server;
-mod openapi;
+// mod openapi;
 mod services;
 mod repositories;
 
