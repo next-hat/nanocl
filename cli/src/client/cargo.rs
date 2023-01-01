@@ -1,4 +1,6 @@
-use crate::models::*;
+use nanocl_models::cargo::{Cargo, CargoPartial};
+
+use crate::models::GenericNamespaceQuery;
 
 use super::{
   http_client::Nanocld,

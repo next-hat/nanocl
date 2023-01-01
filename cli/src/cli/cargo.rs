@@ -1,12 +1,11 @@
 use crate::client::Nanocld;
-use crate::models::{
-  CargoArgs, CargoCreateOpts, CargoCommands, CargoPartial, CargoPatchCommands,
-  CargoConfigPartial, CargoDeleteOpts,
-};
+
+use nanocl_models::cargo::CargoPartial;
+use nanocl_models::cargo_config::CargoConfigPartial;
+
+use crate::models::{CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts};
 
 use super::errors::CliError;
-use super::utils::print_table;
-use super::cargo_image::exec_cargo_image;
 
 async fn exec_cargo_create(
   client: &Nanocld,

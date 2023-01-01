@@ -1046,6 +1046,7 @@ dependencies = [
  "futures-util",
  "hyper",
  "indicatif",
+ "nanocl-models",
  "ntex",
  "serde",
  "serde_json",

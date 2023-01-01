@@ -1,8 +1,6 @@
 use clap::{Parser, Subcommand};
-use serde::{Serialize, Deserialize};
 
 use super::cargo_image::CargoImageArgs;
-use super::cargo_config::{CargoConfig, CargoConfigPartial};
 
 /// Cargo delete options
 #[derive(Debug, Parser)]
@@ -76,25 +74,4 @@ pub struct CargoArgs {
   pub namespace: Option<String>,
   #[clap(subcommand)]
   pub commands: CargoCommands,
-}
-
-/// Structure to create a cargo used as body
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "PascalCase")]
-#[cfg_attr(feature = "dev", derive(ToSchema))]
-pub struct CargoPartial {
-  pub(crate) name: String,
-  pub(crate) config: CargoConfigPartial,
-}
-
-/// Cargo with his current config
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-#[cfg_attr(feature = "dev", derive(ToSchema))]
-pub struct Cargo {
-  pub(crate) key: String,
-  pub(crate) namespace_name: String,
-  pub(crate) name: String,
-  pub(crate) config_key: String,
-  pub(crate) config: CargoConfig,
 }

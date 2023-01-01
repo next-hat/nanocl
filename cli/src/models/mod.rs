@@ -1,6 +1,5 @@
 mod utils;
 mod cargo;
-mod cargo_config;
 mod network;
 mod namespace;
 mod cargo_image;
@@ -13,7 +12,6 @@ use serde::{Serialize, Deserialize};
 use clap::{Parser, Subcommand};
 
 pub use cargo::*;
-pub use cargo_config::*;
 pub use network::*;
 pub use namespace::*;
 pub use cargo_image::*;
