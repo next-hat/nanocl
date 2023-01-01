@@ -1,13 +1,5 @@
-use std::collections::HashMap;
-
-use chrono::Utc;
-use tabled::Tabled;
-use chrono::DateTime;
 use clap::{Parser, Subcommand};
 use serde::{Serialize, Deserialize};
-
-use super::utils::serde::*;
-use super::utils::tabled::*;
 
 #[derive(Debug, Parser)]
 pub struct CargoImageRemoveOpts {
