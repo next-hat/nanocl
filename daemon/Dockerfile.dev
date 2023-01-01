@@ -1,0 +1,34 @@
+# Create Builder image
+FROM rust:1.64.0-alpine3.16
+
+# Install required dependencies
+RUN apk add openssl
+RUN apk add libpq-dev
+RUN apk add gcc
+RUN apk add g++
+RUN apk add make
+RUN apk add tzdata
+RUN apk add util-linux
+
+# Create a non root user
+RUN adduser --disabled-password nanocl
+RUN addgroup nanocl ping
+
+RUN mkdir -p /run/nanocl
+RUN mkdir -p /home/nanocl/daemon
+WORKDIR /home/nanocl/daemon
+
+USER nanocl
+
+RUN cargo install cargo-watch
+
+ENV TZ=Europe/Paris
+ENV RUSTFLAGS="-C target-feature=-crt-static"
+
+EXPOSE 8383/tcp
+COPY entrypoint.dev.sh /entrypoint.sh
+ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
+
+USER root
+
+CMD ["cargo", "watch", "-x", "run"]
