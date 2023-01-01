@@ -1,5 +1,5 @@
-[env]
-ARCH = { value = "new", condition = { env_not_set = ["ARCH"] } }
+[config]
+default_to_workspace = false
 
 [tasks.format]
 install_crate = "rustfmt"
@@ -10,17 +10,21 @@ args = ["fmt"]
 command = "cargo"
 args = ["clean"]
 
-[tasks.run]
+[tasks.run-daemon]
 command = "cargo"
-args = ["run"]
+args = ["run", "--bin", "nanocld"]
+
+[tasks.cov-ci]
+command = "cargo"
+args = ["llvm-cov", "nextest", "--all", "--output-path", "./lcov.info", "--lcov"]
 
 [tasks.cov]
 command = "cargo"
-args = ["llvm-cov", "nextest"]
+args = ["llvm-cov", "nextest", "--all"]
 
-[tasks.test]
+[tasks.test-daemon]
 command = "cargo"
-args = ["nextest", "run"]
+args = ["nextest", "run", "-p", "nanocld"]
 
 [tasks.test-debug]
 command = "cargo"
@@ -29,7 +33,3 @@ args = ["test", "--", "--nocapture"]
 [tasks.release]
 command = "cargo"
 args = ["build", "--release"]
-
-[tasks.man]
-command = "cargo"
-args = ["run", "--features", "genman"]

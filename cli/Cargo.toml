@@ -1,0 +1,49 @@
+[package]
+name = "nanocl"
+version = "0.1.8"
+edition = "2021"
+authors = ["nanocl contributors <team@next-hat.com>"]
+description = "The Self-Sufficient Hybrid-Cloud Orchestrator CLI"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
+repository = "https://github.com/nxthat/nanocl"
+
+[[bin]]
+name = "nanocl"
+test = false
+bench = false
+path = "src/main.rs"
+
+[features]
+default = []
+
+[build-dependencies]
+chrono = { version = "0.4.19", features = ["serde"] }
+clap = { version = "4.0.29", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+clap_complete = "4.0.6"
+clap_mangen = { version = "0.2" }
+tabled = "0.10.0"
+
+[dependencies]
+futures = "0.3"
+serde_yaml = "0.9"
+tabled = "0.10.0"
+indicatif = "0.17.1"
+serde_json = "1.0.89"
+thiserror = "1.0.37"
+clap_complete = "4.0.6"
+serde = { version = "1.0", features = ["derive"] }
+clap = { version = "4.0.29", features = ["derive"] }
+chrono = { version = "0.4.19", features = ["serde"] }
+uuid = { version = "1.2", features = ["serde", "v4"] }
+ntex = { version = "0.6.0-beta.0", features = ["rustls", "tokio"] }
+url = { version = "2.3.1", features = ["serde"] }
+bollard = { version = "*", git = "https://github.com/leon3s/bollard" }
+tokio = { version = "1.22.0", features = ["fs"] }
+tokio-util = "0.7.4"
+futures-util = "0.3.25"
+hyper = "0.14.20"
+serde_urlencoded = "0.7.1"
+users = "0.11.0"
