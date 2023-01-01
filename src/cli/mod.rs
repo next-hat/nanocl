@@ -1,30 +1,14 @@
 mod namespace;
-mod cluster;
 mod cargo;
 mod cargo_image;
-mod exec;
-mod run;
 mod version;
-mod apply;
-mod revert;
-mod controller;
 mod setup;
-mod proxy;
-mod cargo_instance;
 
 pub mod errors;
 pub mod utils;
 
-pub use proxy::*;
-pub use cargo_instance::*;
 pub use setup::*;
-pub use controller::*;
-pub use run::*;
-pub use cluster::*;
 pub use namespace::*;
 pub use cargo_image::*;
 pub use cargo::*;
-pub use exec::*;
 pub use version::*;
-pub use apply::*;
-pub use revert::*;

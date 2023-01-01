@@ -14,17 +14,11 @@ async fn exec_namespace_list(client: &Nanocld) -> Result<(), CliError> {
   let namespaces = items
     .iter()
     .map(|item| async {
-      let cargo_count = client.count_cargo(Some(item.name.to_owned())).await?;
-      let cluster_count =
-        client.count_cluster(Some(item.name.to_owned())).await?;
-      let network_count = client
-        .count_cluster_network_by_nsp(Some(item.name.to_owned()))
-        .await?;
       let new_item = NamespaceWithCount {
         name: item.name.to_owned(),
-        cargoes: cargo_count.count,
-        clusters: cluster_count.count,
-        networks: network_count.count,
+        cargoes: 1,
+        clusters: 1,
+        networks: 1,
       };
       Ok::<_, CliError>(new_item)
     })

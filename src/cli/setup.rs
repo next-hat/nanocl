@@ -107,6 +107,7 @@ async fn init_daemon(
 
   let options = Some(CreateContainerOptions {
     name: "system-nanocl-daemon",
+    ..Default::default()
   });
 
   let c_res = docker_api.create_container(options, config).await?;
@@ -170,6 +171,7 @@ async fn spawn_deamon(
 
   let options = Some(CreateContainerOptions {
     name: "system-nanocl-daemon",
+    ..Default::default()
   });
 
   docker_api.create_container(options, config).await?;

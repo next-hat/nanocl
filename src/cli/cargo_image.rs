@@ -12,15 +12,8 @@ use super::utils::print_table;
 
 async fn exec_cargo_instance_list(client: &Nanocld) -> Result<(), CliError> {
   let items = client.list_cargo_image().await?;
-  print_table(items);
-  Ok(())
-}
-
-async fn _exec_deploy_cargo_image(
-  client: &Nanocld,
-  options: &CargoImageDeployOpts,
-) -> Result<(), CliError> {
-  client._deploy_cargo_image(&options.name).await?;
+  println!("{:#?}", items);
+  // print_table(items);
   Ok(())
 }
 
@@ -83,7 +76,8 @@ async fn exec_inspect_cargo_image(
   opts: &CargoImageInspectOpts,
 ) -> Result<(), CliError> {
   let res = client.inspect_cargo_image(&opts.name).await?;
-  print_table(vec![res]);
+  println!("{:#?}", res);
+  // print_table(vec![res]);
   Ok(())
 }
 

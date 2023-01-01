@@ -1,14 +1,11 @@
 mod utils;
 mod cargo;
-mod cluster;
+mod cargo_config;
 mod network;
-mod cargo_instance;
 mod namespace;
 mod cargo_image;
-mod git_repository;
 mod proxy;
 mod system;
-mod yml;
 mod controller;
 mod setup;
 
@@ -16,16 +13,13 @@ use serde::{Serialize, Deserialize};
 use clap::{Parser, Subcommand};
 
 pub use cargo::*;
-pub use cluster::*;
+pub use cargo_config::*;
 pub use network::*;
-pub use cargo_instance::*;
 pub use namespace::*;
 pub use cargo_image::*;
-pub use git_repository::*;
 pub use controller::*;
 pub use proxy::*;
 pub use system::*;
-pub use yml::*;
 pub use setup::*;
 
 /// A self-sufficient hybrid-cloud manager
@@ -43,14 +37,7 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Commands {
   Namespace(NamespaceArgs),
-  Cluster(ClusterArgs),
   Cargo(CargoArgs),
-  Apply(ApplyArgs),
-  Revert(RevertArgs),
-  Run(RunArgs),
-  Exec(ExecArgs),
-  Proxy(ProxyArgs),
-  Controller(ControllerArgs),
   Setup(SetupArgs),
   /// Show nanocl version information
   Version,

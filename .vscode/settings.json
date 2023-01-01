@@ -8,4 +8,5 @@
   "editor.formatOnSave": true,
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,
+  "rust-analyzer.checkOnSave.command": "clippy"
 }

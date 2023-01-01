@@ -25,7 +25,7 @@ pub mod serde {
 
 pub mod tabled {
   use chrono::{NaiveDateTime, DateTime, Utc};
-  use super::super::{Port, CargoInstanceSummaryNetworkSettings};
+  use super::super::Port;
 
   pub fn optional_string(s: &Option<String>) -> String {
     match s {
@@ -96,6 +96,7 @@ pub mod tabled {
       Some(size) => display_size(size),
     }
   }
+
   pub fn display_optional_ports(s: &Option<Vec<Port>>) -> String {
     match s {
       None => String::from(""),
@@ -108,26 +109,6 @@ pub mod tabled {
         );
         acc
       }),
-    }
-  }
-
-  pub fn display_container_summary_network_settings(
-    s: &Option<CargoInstanceSummaryNetworkSettings>,
-  ) -> String {
-    match s {
-      None => String::from(""),
-      Some(summary) => {
-        if let Some(network) = &summary.networks {
-          let mut ips = String::new();
-          for key in network.keys() {
-            let netinfo = network.get(key).unwrap();
-            let ip = netinfo.ip_address.to_owned().unwrap_or_default();
-            ips = format!("{}{} ", ips, ip,);
-          }
-          return ips;
-        }
-        String::from("")
-      }
     }
   }
 }

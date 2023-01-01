@@ -14,13 +14,13 @@ use super::{
 impl Nanocld {
   pub async fn list_cargo_image(
     &self,
-  ) -> Result<Vec<CargoImageSummary>, NanocldError> {
+  ) -> Result<Vec<bollard::models::ImageSummary>, NanocldError> {
     let mut res = self.get(String::from("/cargoes/images")).send().await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
 
-    let body = res.json::<Vec<CargoImageSummary>>().await?;
+    let body = res.json::<Vec<bollard::models::ImageSummary>>().await?;
 
     Ok(body)
   }
@@ -28,7 +28,7 @@ impl Nanocld {
   pub async fn create_cargo_image(
     &self,
     name: &str,
-  ) -> Result<Receiver<CreateImageStreamInfo>, NanocldError> {
+  ) -> Result<Receiver<bollard::models::CreateImageInfo>, NanocldError> {
     let mut res = self
       .post(String::from("/cargoes/images"))
       .send_json(&CargoImagePartial {
@@ -38,7 +38,7 @@ impl Nanocld {
     let status = res.status();
     is_api_error(&mut res, &status).await?;
 
-    let (tx, rx_body) = mpsc::channel::<CreateImageStreamInfo>();
+    let (tx, rx_body) = mpsc::channel::<bollard::models::CreateImageInfo>();
     rt::spawn(async move {
       let mut stream = res.into_stream();
       while let Some(result) = stream.next().await {
@@ -51,7 +51,7 @@ impl Nanocld {
           break;
         };
         let Ok(json) =
-          serde_json::from_str::<CreateImageStreamInfo>(result) else {
+          serde_json::from_str::<bollard::models::CreateImageInfo>(result) else {
             eprintln!("Error Unable to convert incomming stream to json");
             break;
           };
@@ -77,29 +77,16 @@ impl Nanocld {
     Ok(())
   }
 
-  pub async fn _deploy_cargo_image(
-    &self,
-    name: &str,
-  ) -> Result<(), NanocldError> {
-    let mut res = self
-      .post(format!("/cargoes/images/{}/deploy", name))
-      .send()
-      .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    Ok(())
-  }
-
   pub async fn inspect_cargo_image(
     &self,
     name: &str,
-  ) -> Result<CargoImageInspect, NanocldError> {
+  ) -> Result<bollard::models::ImageInspect, NanocldError> {
     let mut res = self.get(format!("/cargoes/images/{}", name)).send().await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
 
-    let ct_image = res.json::<CargoImageInspect>().await?;
+    let ct_image = res.json::<bollard::models::ImageInspect>().await?;
 
     Ok(ct_image)
   }

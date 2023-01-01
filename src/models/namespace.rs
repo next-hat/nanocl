@@ -27,12 +27,14 @@ pub struct NamespacePartial {
   pub name: String,
 }
 
-#[derive(Tabled, Serialize, Deserialize)]
+#[derive(Debug, Tabled, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct NamespaceItem {
   pub name: String,
 }
 
 #[derive(Debug, Tabled, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct NamespaceWithCount {
   pub(crate) name: String,
   pub(crate) cargoes: usize,

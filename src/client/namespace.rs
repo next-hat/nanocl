@@ -11,10 +11,12 @@ impl Nanocld {
   ) -> Result<Vec<NamespaceItem>, NanocldError> {
     let mut res = self.get(String::from("/namespaces")).send().await?;
 
+    println!("res: {:?}", &res);
     let status = res.status();
     is_api_error(&mut res, &status).await?;
     let items = res.json::<Vec<NamespaceItem>>().await?;
 
+    println!("items: {:?}", &items);
     Ok(items)
   }
 

@@ -36,16 +36,9 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
   let client = client::Nanocld::connect_with_unix_default().await;
   match &args.command {
     Commands::Setup(args) => cli::exec_setup(args).await,
-    Commands::Run(args) => cli::exec_run(&client, args).await,
     Commands::Namespace(args) => cli::exec_namespace(&client, args).await,
-    Commands::Cluster(args) => cli::exec_cluster(&client, args).await,
     Commands::Cargo(args) => cli::exec_cargo(&client, args).await,
     Commands::Version => cli::exec_version(&client).await,
-    Commands::Exec(args) => cli::exec_exec(&client, args).await,
-    Commands::Apply(args) => cli::exec_apply(&client, args).await,
-    Commands::Revert(args) => cli::exec_revert(&client, args).await,
-    Commands::Proxy(args) => cli::exec_proxy(&client, args).await,
-    Commands::Controller(args) => cli::exec_controller(&client, args).await,
   }
 }
 
