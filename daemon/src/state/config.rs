@@ -1,5 +1,5 @@
 use crate::cli::Cli;
-use crate::errors::DaemonError;
+use crate::error::DaemonError;
 use crate::models::{DaemonConfig, DaemonConfigFile};
 
 fn merge_config(args: &Cli, config: &DaemonConfigFile) -> DaemonConfig {

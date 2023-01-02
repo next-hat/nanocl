@@ -5,11 +5,11 @@ use nanocl_models::cargo::{Cargo, CargoPartial};
 use nanocl_models::generic::GenericDelete;
 
 use crate::utils;
-use crate::errors::HttpResponseError;
+use crate::error::HttpResponseError;
 use crate::models::{Pool, CargoDbModel, NamespaceItem, CargoUpdateDbModel};
 
 use super::cargo_config;
-use super::errors::db_blocking_error;
+use super::error::db_blocking_error;
 
 /// ## Find cargo items by namespace
 ///

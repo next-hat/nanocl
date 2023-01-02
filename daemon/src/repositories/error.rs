@@ -1,7 +1,7 @@
 use ntex::web;
 use ntex::{http::StatusCode, web::error::BlockingError};
 
-use crate::errors::HttpResponseError;
+use crate::error::HttpResponseError;
 
 /// Convert diesel::result::Error into HttpResponseError
 ///

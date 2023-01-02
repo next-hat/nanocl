@@ -8,7 +8,7 @@ mod version;
 
 mod utils;
 mod state;
-mod errors;
+mod error;
 mod schema;
 mod models;
 mod server;
@@ -36,7 +36,7 @@ async fn main() -> std::io::Result<()> {
   // Init internal config and dependencies
   let daemon_state = match state::init(&args).await {
     Err(err) => {
-      let exit_code = errors::parse_main_error(err);
+      let exit_code = error::parse_main_error(err);
       std::process::exit(exit_code);
     }
     Ok(state) => state,

@@ -1,5 +1,5 @@
 /// Functions helper to manipulate database models.
-pub mod errors;
+pub mod error;
 /// Manage namespace
 pub mod namespace;
 /// Manage cargo

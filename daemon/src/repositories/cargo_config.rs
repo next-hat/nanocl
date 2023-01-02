@@ -5,9 +5,9 @@ use diesel::prelude::*;
 use nanocl_models::cargo_config::{CargoConfig, CargoConfigPartial};
 
 use crate::utils;
-use crate::errors::HttpResponseError;
+use crate::error::HttpResponseError;
 use crate::models::{Pool, CargoConfigDbModel};
-use crate::repositories::errors::db_blocking_error;
+use crate::repositories::error::db_blocking_error;
 
 pub async fn create(
   cargo_key: String,

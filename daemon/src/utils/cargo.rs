@@ -7,7 +7,7 @@ use bollard::container::{ListContainersOptions, RemoveContainerOptions};
 use nanocl_models::cargo::{Cargo, CargoPartial, CargoSummary};
 
 use crate::repositories;
-use crate::errors::HttpResponseError;
+use crate::error::HttpResponseError;
 use crate::models::Pool;
 
 /// Create containers based on the cargo config

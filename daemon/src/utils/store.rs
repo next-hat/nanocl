@@ -17,7 +17,7 @@ use nanocl_models::cargo::CargoPartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::{utils, repositories};
-use crate::errors::{DaemonError, HttpResponseError};
+use crate::error::{DaemonError, HttpResponseError};
 use crate::models::{Pool, DBConn, ArgState, DaemonConfig};
 
 /// Generate HostConfig struct for container creation

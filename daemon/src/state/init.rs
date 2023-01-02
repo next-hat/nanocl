@@ -15,7 +15,7 @@ use crate::cli::Cli;
 use crate::{utils, repositories};
 use crate::models::{Pool, NamespacePartial, DaemonConfig, ArgState, DaemonState};
 
-use crate::errors::DaemonError;
+use crate::error::DaemonError;
 
 use super::config;
 

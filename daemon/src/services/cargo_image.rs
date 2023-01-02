@@ -6,7 +6,7 @@ use ntex::web;
 use nanocl_models::cargo_image::CargoImagePartial;
 
 use crate::utils;
-use crate::errors::HttpResponseError;
+use crate::error::HttpResponseError;
 
 /// Endpoint to list installed cargo images
 #[cfg_attr(feature = "dev", utoipa::path(

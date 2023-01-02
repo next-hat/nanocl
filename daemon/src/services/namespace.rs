@@ -4,7 +4,7 @@ use ntex::web;
 use crate::repositories;
 use crate::models::{Pool, NamespacePartial};
 
-use crate::errors::HttpResponseError;
+use crate::error::HttpResponseError;
 
 /// List all namespace
 #[cfg_attr(feature = "dev", utoipa::path(

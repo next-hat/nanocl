@@ -9,7 +9,7 @@ use bollard::models::{ImageInspect, ImageSummary};
 
 use nanocl_models::generic::GenericDelete;
 
-use crate::errors::HttpResponseError;
+use crate::error::HttpResponseError;
 
 /// List all cargo/container images
 ///

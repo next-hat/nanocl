@@ -8,8 +8,8 @@ use nanocl_models::generic::GenericDelete;
 use crate::models::{Pool, NamespacePartial, NamespaceItem};
 
 use crate::utils;
-use crate::errors::HttpResponseError;
-use super::errors::db_blocking_error;
+use crate::error::HttpResponseError;
+use super::error::db_blocking_error;
 
 /// Create new namespace
 ///
