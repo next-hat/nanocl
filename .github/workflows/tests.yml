@@ -44,4 +44,4 @@ jobs:
         sleep 5
     # Run test
     - name: Run tests
-      run: cargo make codecov
+      run: cargo make covgen
