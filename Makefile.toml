@@ -14,7 +14,7 @@ args = ["clean"]
 # Run daemon
 [tasks.run-daemon]
 command = "cargo"
-args = ["run", "--bin", "nanocld"]
+args = ["run", "--bin", "nanocld", "${@}"]
 
 # Run cli
 [tasks.run-cli]

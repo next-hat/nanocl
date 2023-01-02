@@ -1,7 +1,12 @@
+use ntex::http::StatusCode;
+use std::collections::HashMap;
+
 use futures::StreamExt;
-use indicatif::{ProgressStyle, ProgressBar};
+use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
+use bollard::service::ProgressDetail;
 
 use nanocl_client::NanoclClient;
+use nanocl_client::error::ApiError;
 
 use crate::models::{
   CargoImageArgs, CargoImageCommands, CargoImageRemoveOpts,
@@ -27,49 +32,91 @@ async fn exec_remove_cargo_image(
   Ok(())
 }
 
-pub async fn exec_create_cargo_image(
+fn calculate_percentage(current: u64, total: u64) -> u64 {
+  ((current as f64 / total as f64) * 100_f64).round() as u64
+}
+
+fn update_progress(
+  multiprogress: &MultiProgress,
+  layers: &mut HashMap<String, ProgressBar>,
+  id: &str,
+  progress: &ProgressDetail,
+) {
+  let total: u64 = progress
+    .total
+    .unwrap_or_default()
+    .try_into()
+    .unwrap_or_default();
+  let current: u64 = progress
+    .current
+    .unwrap_or_default()
+    .try_into()
+    .unwrap_or_default();
+  if let Some(pg) = layers.get(id) {
+    let percent = calculate_percentage(current, total);
+    pg.set_position(percent);
+  } else {
+    let pg = ProgressBar::new(100);
+    let style = ProgressStyle::with_template(
+      "[{elapsed_precise}] [{bar:20.cyan/blue}] {pos:>7}% {msg}",
+    )
+    .unwrap()
+    .progress_chars("=> ");
+    pg.set_style(style);
+    multiprogress.add(pg.to_owned());
+    let percent = calculate_percentage(current, total);
+    pg.set_position(percent);
+    layers.insert(id.to_owned(), pg);
+  }
+}
+
+async fn exec_create_cargo_image(
   client: &NanoclClient,
   name: &str,
 ) -> Result<(), CliError> {
   let mut stream = client.create_cargo_image(name).await?;
-  let style = ProgressStyle::default_spinner();
-  let pg = ProgressBar::new(0);
-  pg.set_style(style);
-  let mut is_new_action = false;
+  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
+  let multiprogress = MultiProgress::new();
+  multiprogress.set_move_cursor(false);
   while let Some(info) = stream.next().await {
+    // If there is any error we stop the stream
+    if let Some(error) = info.error {
+      return Err(CliError::Api(ApiError {
+        msg: format!(
+          "Error while downloading image {} got error {}",
+          &name, &error
+        ),
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+      }));
+    }
     let status = info.status.unwrap_or_default();
     let id = info.id.unwrap_or_default();
+    let progress = info.progress_detail.unwrap_or_default();
     match status.as_str() {
+      "Pulling fs layer" => {
+        update_progress(&multiprogress, &mut layers, &id, &progress);
+      }
       "Downloading" => {
-        if !is_new_action {
-          is_new_action = true;
-          pg.println(format!("{} {}", &status, &id).trim());
+        update_progress(&multiprogress, &mut layers, &id, &progress);
+      }
+      "Download complete" => {
+        if let Some(pg) = layers.get(&id) {
+          pg.set_position(100);
         }
       }
       "Extracting" => {
-        if !is_new_action {
-          is_new_action = true;
-          pg.println(format!("{} {}", &status, &id).trim());
-        } else {
+        update_progress(&multiprogress, &mut layers, &id, &progress);
+      }
+      _ => {
+        if layers.get(&id).is_none() {
+          let _ = multiprogress.println(&status);
         }
       }
-      "Pull complete" => {
-        is_new_action = false;
-        pg.println(format!("{} {}", &status, &id).trim());
-      }
-      "Download complete" => {
-        is_new_action = false;
-        pg.println(format!("{} {}", &status, &id).trim());
-      }
-      _ => pg.println(format!("{} {}", &status, &id).trim()),
     };
-    if let Some(error) = info.error {
-      eprintln!("{}", error);
-      break;
+    if let Some(pg) = layers.get(&id) {
+      pg.set_message(format!("[{}] {}", &id, &status));
     }
-    pg.tick();
   }
-  pg.finish_and_clear();
   Ok(())
 }
 
