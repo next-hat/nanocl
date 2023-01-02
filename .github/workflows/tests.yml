@@ -34,13 +34,12 @@ jobs:
     - uses: taiki-e/install-action@nextest
     # Prepare CI
     - name: Prepare CI
-      run: sudo ./scripts/prepare_ci.sh
-    # Run our CLI setup command to install a daemon
+      run: sudo ./scripts/prepare_tests.sh
+    # Setup daemon for the tests
     - name: Setup
-      run: >-
-        cargo make run-daemon -- --init &&
-        sudo chmod 777 -R /run/nanocl &&
-        cargo make run-daemon & &&
+      run: |
+        cargo make run-daemon -- --init
+        cargo make run-daemon &
         sleep 5
     # Run test
     - name: Run tests
