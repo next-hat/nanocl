@@ -4,7 +4,7 @@ use diesel::prelude::*;
 
 use nanocl_models::cargo_config::{CargoConfig, CargoConfigPartial};
 
-use crate::controllers;
+use crate::utils;
 use crate::errors::HttpResponseError;
 use crate::models::{Pool, CargoConfigDbModel};
 use crate::repositories::errors::db_blocking_error;
@@ -26,7 +26,7 @@ pub async fn create(
       }
     })?,
   };
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   let dbmodel = web::block(move || {
     diesel::insert_into(dsl::cargo_configs)
       .values(&dbmodel)
@@ -54,7 +54,7 @@ pub async fn find_by_key(
 ) -> Result<CargoConfig, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
 
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   let dbmodel = web::block(move || {
     dsl::cargo_configs
       .filter(dsl::key.eq(key))

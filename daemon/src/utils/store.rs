@@ -74,28 +74,6 @@ fn gen_store_cargo_conf(
   }
 }
 
-/// Create system store cargo instance
-///
-/// ## Arguments
-/// [name](str) The name of the cargo instance
-/// [config](DaemonConfig) Reference to daemon config
-/// [docker_api](Docker) Reference to docker api
-async fn create_system_store(
-  name: &str,
-  config: &DaemonConfig,
-  docker_api: &Docker,
-) -> Result<(), DockerError> {
-  let options = Some(CreateContainerOptions {
-    name,
-    ..Default::default()
-  });
-  let config = gen_store_cargo_conf(name, config);
-  docker_api
-    .create_container(options, config.container.to_owned())
-    .await?;
-  Ok(())
-}
-
 /// Create a connection pool for postgres database
 ///
 /// ## Arguments

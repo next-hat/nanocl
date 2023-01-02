@@ -24,25 +24,6 @@ pub fn resolve_nsp(nsp: &Option<String>) -> String {
   }
 }
 
-/// ## Generate a key from given namespace
-/// Return the generated key of a model from the given namespace
-///
-/// ## Arguments
-/// - [nsp](Option<String>) The namespace
-/// - [m](str) The name of the model
-///
-/// ## Return
-/// - [key](String) The key based on options
-///
-/// ## Example
-/// ```rust,norun
-/// let key = gen_key_from_nsp(None, "prod");
-/// ```
-pub fn gen_key_from_nsp(nsp: &Option<String>, m: &str) -> String {
-  let nsp = resolve_nsp(nsp);
-  nsp + "-" + m
-}
-
 /// ## Generate key
 /// Return the generated key from 2 strings
 ///

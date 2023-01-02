@@ -9,7 +9,10 @@ license = "MIT OR Apache-2.0"
 homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
 repository = "https://github.com/nxthat/nanocl"
 
+[features]
+serde = ["dep:serde", "uuid/serde"]
+
 [dependencies]
-bollard = "0.13.0"
-serde = { version = "1.0.152", features = ["derive"] }
-uuid = { version = "1.2.2", features = ["serde"] }
+bollard = "*"
+uuid = { version = "1.2.2" }
+serde = { version = "1.0.152", features = ["derive"], optional = true }

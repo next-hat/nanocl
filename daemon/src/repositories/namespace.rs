@@ -3,9 +3,9 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use crate::controllers;
 use crate::models::{Pool, NamespacePartial, NamespaceItem, GenericDelete};
 
+use crate::utils;
 use crate::errors::HttpResponseError;
 use super::errors::db_blocking_error;
 
@@ -33,7 +33,7 @@ pub async fn create(
 ) -> Result<NamespaceItem, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   let res = web::block(move || {
     let item = NamespaceItem { name: item.name };
     diesel::insert_into(dsl::namespaces)
@@ -67,7 +67,7 @@ pub async fn list(
 ) -> Result<Vec<NamespaceItem>, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   let res = web::block(move || dsl::namespaces.load(&mut conn)).await;
 
   match res {
@@ -96,7 +96,7 @@ pub async fn inspect_by_name(
 ) -> Result<NamespaceItem, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   let res = web::block(move || {
     dsl::namespaces
       .filter(dsl::name.eq(name))
@@ -130,7 +130,7 @@ pub async fn delete_by_name(
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   let res = web::block(move || {
     diesel::delete(dsl::namespaces.filter(dsl::name.eq(name)))
       .execute(&mut conn)
@@ -149,7 +149,7 @@ pub async fn find_by_name(
 ) -> Result<NamespaceItem, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   let res = web::block(move || {
     dsl::namespaces
       .filter(dsl::name.eq(name))

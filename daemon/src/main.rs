@@ -5,7 +5,6 @@ use clap::Parser;
 
 mod cli;
 mod version;
-mod controllers;
 
 mod utils;
 mod state;

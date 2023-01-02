@@ -3,12 +3,11 @@ use indicatif::{ProgressStyle, ProgressBar};
 
 use crate::client::Nanocld;
 use crate::models::{
-  CargoImageArgs, CargoImageCommands, CargoImageDeployOpts,
-  CargoImageRemoveOpts, CargoImageInspectOpts,
+  CargoImageArgs, CargoImageCommands, CargoImageRemoveOpts,
+  CargoImageInspectOpts,
 };
 
 use super::errors::CliError;
-use super::utils::print_table;
 
 async fn exec_cargo_instance_list(client: &Nanocld) -> Result<(), CliError> {
   let items = client.list_cargo_image().await?;

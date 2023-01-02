@@ -3,7 +3,7 @@ use diesel::prelude::*;
 
 use nanocl_models::cargo::{Cargo, CargoPartial};
 
-use crate::{utils, controllers};
+use crate::utils;
 use crate::errors::HttpResponseError;
 use crate::models::{
   Pool, CargoDbModel, GenericDelete, NamespaceItem, CargoUpdateDbModel,
@@ -27,7 +27,7 @@ pub async fn find_by_namespace(
   nsp: NamespaceItem,
   pool: &Pool,
 ) -> Result<Vec<CargoDbModel>, HttpResponseError> {
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
 
   let items =
     web::block(move || CargoDbModel::belonging_to(&nsp).load(&mut conn))
@@ -54,7 +54,7 @@ pub async fn create(
     config_key: config.key,
   };
 
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   let item = web::block(move || {
     diesel::insert_into(dsl::cargoes)
       .values(&new_item)
@@ -81,7 +81,7 @@ pub async fn delete_by_key(
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   let res = web::block(move || {
     diesel::delete(dsl::cargoes)
       .filter(dsl::key.eq(key))
@@ -98,7 +98,7 @@ pub async fn find_by_key(
 ) -> Result<CargoDbModel, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   let item = web::block(move || {
     dsl::cargoes.filter(dsl::key.eq(key)).get_result(&mut conn)
   })
@@ -123,7 +123,7 @@ pub async fn update_by_key(
   };
 
   let keycopy = key.to_owned();
-  let mut conn = controllers::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
   web::block(move || {
     diesel::update(dsl::cargoes.filter(dsl::key.eq(key)))
       .set(&new_item)

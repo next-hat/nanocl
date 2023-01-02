@@ -8,6 +8,6 @@ if [ $? -ne 0 ]; then
   chmod -R 770 /run/nanocl
 fi
 
-sh -c "sleep 5 && chmod -R 770 /run/nanocl" &
+sh -c "sleep 4 && chmod -R 770 /run/nanocl" &
 
 exec runuser -u root -g nanocl -- /usr/local/bin/nanocld $@

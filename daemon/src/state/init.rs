@@ -12,7 +12,7 @@ use nanocl_models::cargo::CargoPartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::cli::Cli;
-use crate::{utils, controllers, repositories};
+use crate::{utils, repositories};
 use crate::models::{Pool, NamespacePartial, DaemonConfig, ArgState, DaemonState};
 
 use crate::errors::DaemonError;
@@ -60,21 +60,20 @@ async fn ensure_store(
   docker_api: &Docker,
 ) -> Result<Pool, DaemonError> {
   log::info!("Booting store");
-  controllers::store::boot(config, docker_api).await?;
+  utils::store::boot(config, docker_api).await?;
   // We wait 500ms to ensure store is booted
   // It's a tricky hack to avoid some error printed by postgresql connector for now.
   thread::sleep(time::Duration::from_millis(500));
-  log::info!("Store booted");
-  let postgres_ip = controllers::store::get_store_ip_addr(docker_api).await?;
+  let postgres_ip = utils::store::get_store_ip_addr(docker_api).await?;
   log::info!("Connecting to store");
   // Connect to postgresql
-  let pool = controllers::store::create_pool(postgres_ip.to_owned()).await;
-  let mut conn = controllers::store::get_pool_conn(&pool)?;
+  let pool = utils::store::create_pool(postgres_ip.to_owned()).await;
+  let mut conn = utils::store::get_pool_conn(&pool)?;
   log::info!("Store connected");
-  log::info!("Running migrations");
   // This will run the necessary migrations.
   // See the documentation for `MigrationHarness` for
   // all available methods.
+  log::info!("Running migrations");
   conn.run_pending_migrations(MIGRATIONS)?;
   Ok(pool)
 }
@@ -155,9 +154,7 @@ async fn register_daemon(arg: &ArgState) -> Result<(), DaemonError> {
 async fn register_dependencies(arg: &ArgState) -> Result<(), DaemonError> {
   register_namespace(&arg.default_namespace, &arg.pool).await?;
   register_namespace(&arg.sys_namespace, &arg.pool).await?;
-  controllers::store::register(arg).await?;
-  controllers::proxy::register(arg).await?;
-  controllers::dns::register(arg).await?;
+  utils::store::register(arg).await?;
   register_daemon(arg).await?;
   Ok(())
 }
@@ -176,9 +173,7 @@ pub async fn init(args: &Cli) -> Result<DaemonState, DaemonError> {
   let arg_state = ArgState {
     pool: pool.to_owned(),
     config: config.to_owned(),
-    docker_api: docker_api.to_owned(),
     default_namespace: String::from("global"),
-    sys_network: String::from("internal0"),
     sys_namespace: String::from("system"),
   };
   register_dependencies(&arg_state).await?;

@@ -13,11 +13,6 @@ pub struct CargoImagePartial {
 }
 
 #[derive(Debug, Parser)]
-pub struct CargoImageDeployOpts {
-  pub(crate) name: String,
-}
-
-#[derive(Debug, Parser)]
 pub struct CargoImageInspectOpts {
   pub(crate) name: String,
 }
@@ -32,8 +27,6 @@ pub enum CargoImageCommands {
   /// Remove an existing cargo image
   #[clap(alias("rm"))]
   Remove(CargoImageRemoveOpts),
-  // #[clap(alias("dp"))]
-  // Deploy(CargoImageDeployOpts),
   /// Inspect a cargo image
   Inspect(CargoImageInspectOpts),
 }
