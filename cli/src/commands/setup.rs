@@ -15,7 +15,7 @@ use crate::models::SetupArgs;
 use crate::utils::cargo_image;
 use crate::config::{read_daemon_config_file, DaemonConfig};
 
-use super::errors::CliError;
+use crate::error::CliError;
 
 const DAEMON_VERSION: &str = "0.1.19";
 

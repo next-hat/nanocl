@@ -3,9 +3,10 @@ use nanocl_client::NanoclClient;
 use nanocl_models::cargo::CargoPartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
+use crate::error::CliError;
 use crate::models::{CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts};
 
-use super::{errors::CliError, cargo_image};
+use super::cargo_image;
 
 async fn exec_cargo_create(
   client: &NanoclClient,

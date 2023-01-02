@@ -6,7 +6,7 @@ use crate::models::{
   NamespaceArgs, NamespaceCommands, NamespaceWithCount, NamespacePartial,
 };
 
-use super::errors::CliError;
+use crate::error::CliError;
 use super::utils::print_table;
 
 async fn exec_namespace_list(client: &NanoclClient) -> Result<(), CliError> {

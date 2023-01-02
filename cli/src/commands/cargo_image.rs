@@ -13,7 +13,7 @@ use crate::models::{
   CargoImageInspectOpts,
 };
 
-use super::errors::CliError;
+use crate::error::CliError;
 
 async fn exec_cargo_instance_list(
   client: &NanoclClient,

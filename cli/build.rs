@@ -44,19 +44,11 @@ pub fn generate_man_pages() -> std::io::Result<()> {
       name: "nanocl-namespace-create",
       command: NamespacePartial::command(),
     },
-    ManPage {
-      name: "nanocl-apply",
-      command: ApplyArgs::command(),
-    },
-    ManPage {
-      name: "nanocl-revert",
-      command: RevertArgs::command(),
-    },
   ];
 
   fs::create_dir_all(MAN_PATH)?;
   for page in man_pages {
-    generate_man_page(&page.name, &page.command)?;
+    generate_man_page(page.name, &page.command)?;
   }
   Ok(())
 }

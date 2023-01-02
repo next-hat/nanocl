@@ -4,7 +4,6 @@ mod cargo_image;
 mod version;
 mod setup;
 
-pub mod errors;
 pub mod utils;
 
 pub use setup::*;

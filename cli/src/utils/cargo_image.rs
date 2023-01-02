@@ -9,7 +9,7 @@ use tokio::fs::File;
 use tokio_util::codec;
 use indicatif::{ProgressStyle, ProgressBar};
 
-use crate::cli::errors::CliError;
+use crate::error::CliError;
 use nanocl_client::error::ApiError;
 
 use super::file;

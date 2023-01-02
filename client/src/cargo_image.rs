@@ -1,7 +1,7 @@
 use ntex::rt;
 use ntex::channel::mpsc;
 use ntex::http::StatusCode;
-use futures::{TryStreamExt, StreamExt};
+use futures::TryStreamExt;
 
 use nanocl_models::cargo_image::CargoImagePartial;
 

@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::cli::errors::CliError;
+use crate::error::CliError;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DaemonConfig {

@@ -2,7 +2,7 @@ use nanocl_client::NanoclClient;
 
 use crate::version;
 
-use super::errors::CliError;
+use crate::error::CliError;
 
 pub async fn exec_version(client: &NanoclClient) -> Result<(), CliError> {
   println!("=== [nanocli] ===");

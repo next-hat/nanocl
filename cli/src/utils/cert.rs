@@ -1,4 +1,4 @@
-use crate::cli::errors::CliError;
+use crate::error::CliError;
 
 use super::exec::_exec;
 
