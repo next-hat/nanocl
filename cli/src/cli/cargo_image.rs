@@ -1,7 +1,8 @@
 use futures::StreamExt;
 use indicatif::{ProgressStyle, ProgressBar};
 
-use crate::client::Nanocld;
+use nanocl_client::NanoclClient;
+
 use crate::models::{
   CargoImageArgs, CargoImageCommands, CargoImageRemoveOpts,
   CargoImageInspectOpts,
@@ -9,7 +10,9 @@ use crate::models::{
 
 use super::errors::CliError;
 
-async fn exec_cargo_instance_list(client: &Nanocld) -> Result<(), CliError> {
+async fn exec_cargo_instance_list(
+  client: &NanoclClient,
+) -> Result<(), CliError> {
   let items = client.list_cargo_image().await?;
   println!("{:#?}", items);
   // print_table(items);
@@ -17,7 +20,7 @@ async fn exec_cargo_instance_list(client: &Nanocld) -> Result<(), CliError> {
 }
 
 async fn exec_remove_cargo_image(
-  client: &Nanocld,
+  client: &NanoclClient,
   args: &CargoImageRemoveOpts,
 ) -> Result<(), CliError> {
   client.remove_cargo_image(&args.name).await?;
@@ -25,7 +28,7 @@ async fn exec_remove_cargo_image(
 }
 
 pub async fn exec_create_cargo_image(
-  client: &Nanocld,
+  client: &NanoclClient,
   name: &str,
 ) -> Result<(), CliError> {
   let mut stream = client.create_cargo_image(name).await?;
@@ -71,7 +74,7 @@ pub async fn exec_create_cargo_image(
 }
 
 async fn exec_inspect_cargo_image(
-  client: &Nanocld,
+  client: &NanoclClient,
   opts: &CargoImageInspectOpts,
 ) -> Result<(), CliError> {
   let res = client.inspect_cargo_image(&opts.name).await?;
@@ -81,7 +84,7 @@ async fn exec_inspect_cargo_image(
 }
 
 pub async fn exec_cargo_image(
-  client: &Nanocld,
+  client: &NanoclClient,
   cmd: &CargoImageArgs,
 ) -> Result<(), CliError> {
   match &cmd.commands {

@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 
-use crate::client::Nanocld;
+use nanocl_client::NanoclClient;
 use crate::models::{
   NamespaceArgs, NamespaceCommands, NamespaceWithCount, NamespacePartial,
 };
@@ -9,7 +9,7 @@ use crate::models::{
 use super::errors::CliError;
 use super::utils::print_table;
 
-async fn exec_namespace_list(client: &Nanocld) -> Result<(), CliError> {
+async fn exec_namespace_list(client: &NanoclClient) -> Result<(), CliError> {
   let items = client.list_namespace().await?;
   let namespaces = items
     .iter()
@@ -32,7 +32,7 @@ async fn exec_namespace_list(client: &Nanocld) -> Result<(), CliError> {
 }
 
 async fn exec_namespace_create(
-  client: &Nanocld,
+  client: &NanoclClient,
   item: &NamespacePartial,
 ) -> Result<(), CliError> {
   let item = client.create_namespace(&item.name).await?;
@@ -41,7 +41,7 @@ async fn exec_namespace_create(
 }
 
 pub async fn exec_namespace(
-  client: &Nanocld,
+  client: &NanoclClient,
   args: &NamespaceArgs,
 ) -> Result<(), CliError> {
   match &args.commands {

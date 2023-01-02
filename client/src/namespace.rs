@@ -1,20 +1,20 @@
-use crate::models::*;
+use nanocl_models::namespace::Namespace;
 
 use super::{
-  http_client::Nanocld,
-  error::{NanocldError, is_api_error},
+  http_client::NanoclClient,
+  error::{NanoclClientError, is_api_error},
 };
 
-impl Nanocld {
+impl NanoclClient {
   pub async fn list_namespace(
     &self,
-  ) -> Result<Vec<NamespaceItem>, NanocldError> {
+  ) -> Result<Vec<Namespace>, NanoclClientError> {
     let mut res = self.get(String::from("/namespaces")).send().await?;
 
     println!("res: {:?}", &res);
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let items = res.json::<Vec<NamespaceItem>>().await?;
+    let items = res.json::<Vec<Namespace>>().await?;
 
     println!("items: {:?}", &items);
     Ok(items)
@@ -23,15 +23,15 @@ impl Nanocld {
   pub async fn create_namespace(
     &self,
     name: &str,
-  ) -> Result<NamespaceItem, NanocldError> {
-    let new_item = NamespaceItem { name: name.into() };
+  ) -> Result<Namespace, NanoclClientError> {
+    let new_item = Namespace { name: name.into() };
     let mut res = self
       .post(String::from("/namespaces"))
       .send_json(&new_item)
       .await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let item = res.json::<NamespaceItem>().await?;
+    let item = res.json::<Namespace>().await?;
 
     Ok(item)
   }
@@ -39,7 +39,7 @@ impl Nanocld {
   pub async fn inspect_namespace(
     &self,
     name: &str,
-  ) -> Result<NamespaceItem, NanocldError> {
+  ) -> Result<Namespace, NanoclClientError> {
     let mut res = self
       .get(format!("/namespaces/{name}/inspect", name = name))
       .send()
@@ -47,7 +47,7 @@ impl Nanocld {
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let item = res.json::<NamespaceItem>().await?;
+    let item = res.json::<Namespace>().await?;
 
     Ok(item)
   }

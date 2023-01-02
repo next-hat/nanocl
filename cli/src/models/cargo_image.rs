@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand};
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Parser)]
 pub struct CargoImageRemoveOpts {
@@ -7,8 +6,8 @@ pub struct CargoImageRemoveOpts {
   pub(crate) name: String,
 }
 
-#[derive(Debug, Parser, Serialize, Deserialize)]
-pub struct CargoImagePartial {
+#[derive(Debug, Parser)]
+pub struct CargoImageCreateOpts {
   pub(crate) name: String,
 }
 
@@ -23,7 +22,7 @@ pub enum CargoImageCommands {
   #[clap(alias("ls"))]
   List,
   /// Create a new cargo image
-  Create(CargoImagePartial),
+  Create(CargoImageCreateOpts),
   /// Remove an existing cargo image
   #[clap(alias("rm"))]
   Remove(CargoImageRemoveOpts),

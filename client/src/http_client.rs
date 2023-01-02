@@ -2,12 +2,12 @@ use ntex::rt;
 use ntex::http::Client;
 use ntex::http::client::{Connector, ClientRequest};
 
-pub struct Nanocld {
+pub struct NanoclClient {
   client: Client,
   url: String,
 }
 
-impl Nanocld {
+impl NanoclClient {
   pub async fn connect_with_unix_default() -> Self {
     let client = Client::build()
       .connector(
@@ -20,7 +20,7 @@ impl Nanocld {
       .timeout(ntex::time::Millis::from_secs(20))
       .finish();
 
-    Nanocld {
+    NanoclClient {
       client,
       url: String::from("http://localhost"),
     }

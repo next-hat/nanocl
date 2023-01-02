@@ -1,19 +1,19 @@
 mod cli;
 mod models;
 mod version;
-mod client;
 mod utils;
 mod config;
 
 use clap::Parser;
 use cli::errors::CliError;
+use nanocl_client::NanoclClient;
 
 use models::*;
 
 fn process_error(args: &Cli, err: CliError) {
   match err {
     CliError::Client(err) => match err {
-      client::error::NanocldError::SendRequest(err) => match err {
+      nanocl_client::error::NanoclClientError::SendRequest(err) => match err {
         ntex::http::client::error::SendRequestError::Connect(_) => {
           eprintln!(
             "Cannot connect to the nanocl daemon at {host}. Is the nanocl daemon running?",
@@ -22,7 +22,7 @@ fn process_error(args: &Cli, err: CliError) {
         }
         _ => eprintln!("{}", err),
       },
-      client::error::NanocldError::Api(err) => {
+      nanocl_client::error::NanoclClientError::Api(err) => {
         eprintln!("Daemon [{}]: {}", err.status, err.msg);
       }
       _ => eprintln!("{}", err),
@@ -33,7 +33,7 @@ fn process_error(args: &Cli, err: CliError) {
 }
 
 async fn execute_args(args: &Cli) -> Result<(), CliError> {
-  let client = client::Nanocld::connect_with_unix_default().await;
+  let client = NanoclClient::connect_with_unix_default().await;
   match &args.command {
     Commands::Setup(args) => cli::exec_setup(args).await,
     Commands::Namespace(args) => cli::exec_namespace(&client, args).await,

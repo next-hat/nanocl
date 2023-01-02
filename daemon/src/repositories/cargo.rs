@@ -2,12 +2,11 @@ use ntex::web;
 use diesel::prelude::*;
 
 use nanocl_models::cargo::{Cargo, CargoPartial};
+use nanocl_models::generic::GenericDelete;
 
 use crate::utils;
 use crate::errors::HttpResponseError;
-use crate::models::{
-  Pool, CargoDbModel, GenericDelete, NamespaceItem, CargoUpdateDbModel,
-};
+use crate::models::{Pool, CargoDbModel, NamespaceItem, CargoUpdateDbModel};
 
 use super::cargo_config;
 use super::errors::db_blocking_error;

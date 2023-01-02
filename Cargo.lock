@@ -1046,6 +1046,7 @@ dependencies = [
  "futures-util",
  "hyper",
  "indicatif",
+ "nanocl-client",
  "nanocl-models",
  "ntex",
  "serde",
@@ -1059,6 +1060,20 @@ dependencies = [
  "url",
  "users",
  "uuid",
+]
+
+[[package]]
+name = "nanocl-client"
+version = "0.0.1"
+dependencies = [
+ "bollard",
+ "futures",
+ "nanocl-models",
+ "ntex",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "thiserror",
 ]
 
 [[package]]

@@ -6,9 +6,9 @@ use crate::version;
 #[web::get("/version")]
 async fn get_version() -> web::HttpResponse {
   web::HttpResponse::Ok().json(&json!({
-    "arch": version::ARCH,
-    "version": version::VERSION,
-    "commit_id": version::COMMIT_ID,
+    "Arch": version::ARCH,
+    "Version": version::VERSION,
+    "CommitId": version::COMMIT_ID,
   }))
 }
 

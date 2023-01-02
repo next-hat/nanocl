@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::client::error::{NanocldError, ApiError};
+use nanocl_client::error::{NanoclClientError, ApiError};
 
 #[derive(Debug, Error)]
 pub enum CliError {
@@ -9,7 +9,7 @@ pub enum CliError {
   #[error(transparent)]
   Parse(#[from] serde_yaml::Error),
   #[error(transparent)]
-  Client(#[from] NanocldError),
+  Client(#[from] NanoclClientError),
   #[error(transparent)]
   Docker(#[from] bollard::errors::Error),
   #[error(transparent)]

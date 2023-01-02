@@ -1,14 +1,14 @@
-use crate::models::*;
+use nanocl_models::system::Version;
 
 use super::{
-  http_client::Nanocld,
-  error::{NanocldError, is_api_error},
+  http_client::NanoclClient,
+  error::{NanoclClientError, is_api_error},
 };
 
-impl Nanocld {
+impl NanoclClient {
   /// ## Get version
   /// Get daemon version informations
-  pub async fn get_version(&self) -> Result<Version, NanocldError> {
+  pub async fn get_version(&self) -> Result<Version, NanoclClientError> {
     let mut res = self.get(String::from("/version")).send().await?;
     let status = res.status();
 

@@ -7,8 +7,9 @@ use futures::StreamExt;
 use bollard::Docker;
 use bollard::models::{ImageInspect, ImageSummary};
 
+use nanocl_models::generic::GenericDelete;
+
 use crate::errors::HttpResponseError;
-use crate::models::GenericDelete;
 
 /// List all cargo/container images
 ///

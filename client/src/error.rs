@@ -16,8 +16,8 @@ pub struct ApiResponseError {
 
 #[derive(Debug, Error)]
 pub struct ApiError {
-  pub(crate) status: StatusCode,
-  pub(crate) msg: String,
+  pub status: StatusCode,
+  pub msg: String,
 }
 
 impl std::fmt::Display for ApiError {
@@ -27,7 +27,7 @@ impl std::fmt::Display for ApiError {
 }
 
 #[derive(Debug, Error)]
-pub enum NanocldError {
+pub enum NanoclClientError {
   #[error(transparent)]
   Api(#[from] ApiError),
   #[error(transparent)]
@@ -45,10 +45,10 @@ pub enum NanocldError {
 pub async fn is_api_error(
   res: &mut ClientResponse,
   status: &StatusCode,
-) -> Result<(), NanocldError> {
+) -> Result<(), NanoclClientError> {
   if status.is_server_error() || status.is_client_error() {
     let err = res.json::<ApiResponseError>().await?;
-    return Err(NanocldError::Api(ApiError {
+    return Err(NanoclClientError::Api(ApiError {
       status: *status,
       msg: err.msg,
     }));

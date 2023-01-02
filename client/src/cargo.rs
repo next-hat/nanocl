@@ -1,21 +1,20 @@
+use nanocl_models::generic::GenericNspQuery;
 use nanocl_models::cargo::{Cargo, CargoPartial};
 
-use crate::models::GenericNamespaceQuery;
-
 use super::{
-  http_client::Nanocld,
-  error::{NanocldError, is_api_error},
+  http_client::NanoclClient,
+  error::{NanoclClientError, is_api_error},
 };
 
-impl Nanocld {
+impl NanoclClient {
   pub async fn create_cargo(
     &self,
     item: &CargoPartial,
     namespace: Option<String>,
-  ) -> Result<Cargo, NanocldError> {
+  ) -> Result<Cargo, NanoclClientError> {
     let mut res = self
       .post(String::from("/cargoes"))
-      .query(&GenericNamespaceQuery { namespace })?
+      .query(&GenericNspQuery { namespace })?
       .send_json(item)
       .await?;
     let status = res.status();
@@ -29,10 +28,10 @@ impl Nanocld {
     &self,
     name: String,
     namespace: Option<String>,
-  ) -> Result<(), NanocldError> {
+  ) -> Result<(), NanoclClientError> {
     let mut res = self
       .delete(format!("/cargoes/{}", name))
-      .query(&GenericNamespaceQuery { namespace })?
+      .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
     let status = res.status();

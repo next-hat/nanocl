@@ -1,8 +1,9 @@
 [workspace]
 members = [
-  "cli",
+  "models",
+  "client",
   "daemon",
-  "models"
+  "cli",
 ]
 
 [profile.dev]
@@ -13,4 +14,5 @@ opt-level = 3
 
 [patch.crates-io]
 nanocl-models = { path = "models" }
+nanocl-client = { path = "client" }
 bollard = { git = "https://github.com/leon3s/bollard" }

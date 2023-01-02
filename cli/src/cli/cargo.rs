@@ -1,14 +1,14 @@
-use crate::client::Nanocld;
+use nanocl_client::NanoclClient;
 
 use nanocl_models::cargo::CargoPartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::models::{CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts};
 
-use super::errors::CliError;
+use super::{errors::CliError, cargo_image};
 
 async fn exec_cargo_create(
-  client: &Nanocld,
+  client: &NanoclClient,
   args: &CargoArgs,
   options: &CargoCreateOpts,
 ) -> Result<(), CliError> {
@@ -31,7 +31,7 @@ async fn exec_cargo_create(
 }
 
 async fn exec_cargo_delete(
-  client: &Nanocld,
+  client: &NanoclClient,
   args: &CargoArgs,
   options: &CargoDeleteOpts,
 ) -> Result<(), CliError> {
@@ -44,7 +44,7 @@ async fn exec_cargo_delete(
 }
 
 pub async fn exec_cargo(
-  client: &Nanocld,
+  client: &NanoclClient,
   args: &CargoArgs,
 ) -> Result<(), CliError> {
   match &args.commands {
@@ -53,6 +53,9 @@ pub async fn exec_cargo(
     }
     CargoCommands::Remove(options) => {
       exec_cargo_delete(client, args, options).await
+    }
+    CargoCommands::Image(options) => {
+      cargo_image::exec_cargo_image(client, options).await
     }
     _ => todo!("Not implemented yet"),
   }

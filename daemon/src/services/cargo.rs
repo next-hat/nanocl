@@ -3,10 +3,11 @@
 use ntex::web;
 
 use nanocl_models::cargo::CargoPartial;
+use nanocl_models::generic::GenericNspQuery;
 
 use crate::utils;
 use crate::errors::HttpResponseError;
-use crate::models::{Pool, GenericNspQuery};
+use crate::models::Pool;
 
 /// Endpoint to create a new cargo
 #[cfg_attr(feature = "dev", utoipa::path(

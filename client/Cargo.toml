@@ -1,0 +1,20 @@
+[package]
+name = "nanocl-client"
+version = "0.0.1"
+edition = "2021"
+authors = ["nanocl contributors <team@next-hat.com>"]
+description = "Nanocl http client"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
+repository = "https://github.com/nxthat/nanocl"
+
+[dependencies]
+bollard = "*"
+futures = "0.3.25"
+nanocl-models = { version = "*", features = ["serde"] }
+ntex = { version = "0.6.0-beta.0", features = ["tokio"] }
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.91"
+serde_urlencoded = "0.7.1"
+thiserror = "1.0.38"

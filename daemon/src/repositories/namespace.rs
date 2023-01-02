@@ -3,7 +3,9 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use crate::models::{Pool, NamespacePartial, NamespaceItem, GenericDelete};
+use nanocl_models::generic::GenericDelete;
+
+use crate::models::{Pool, NamespacePartial, NamespaceItem};
 
 use crate::utils;
 use crate::errors::HttpResponseError;

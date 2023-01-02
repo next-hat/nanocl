@@ -19,7 +19,7 @@ args = ["run", "--bin", "nanocld"]
 # Run cli
 [tasks.run-cli]
 command = "cargo"
-args = ["run", "--bin", "nanocl"]
+args = ["run", "--bin", "nanocl", "${@}"]
 
 # Test daemon
 [tasks.test-daemon]

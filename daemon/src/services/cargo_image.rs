@@ -3,8 +3,9 @@
 */
 use ntex::web;
 
+use nanocl_models::cargo_image::CargoImagePartial;
+
 use crate::utils;
-use crate::models::CargoImagePartial;
 use crate::errors::HttpResponseError;
 
 /// Endpoint to list installed cargo images
@@ -115,8 +116,9 @@ pub mod tests {
   use bollard::service::ImageInspect;
   use futures::{TryStreamExt, StreamExt};
 
+  use nanocl_models::generic::GenericDelete;
+
   use crate::utils::tests::*;
-  use crate::models::GenericDelete;
 
   /// Test utils to list cargo images
   pub async fn list(srv: &TestServer) -> TestReqRet {

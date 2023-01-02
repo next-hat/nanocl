@@ -1,7 +1,7 @@
 /// Manage nanocl namespace
 use ntex::web;
 
-use crate::repositories::{namespace, self};
+use crate::repositories;
 use crate::models::{Pool, NamespacePartial};
 
 use crate::errors::HttpResponseError;
@@ -18,7 +18,7 @@ use crate::errors::HttpResponseError;
 async fn list_namespace(
   pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let items = namespace::list(&pool).await?;
+  let items = repositories::namespace::list(&pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&items))
 }
@@ -39,7 +39,7 @@ async fn create_namespace(
   pool: web::types::State<Pool>,
   web::types::Json(payload): web::types::Json<NamespacePartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let item = namespace::create(payload, &pool).await?;
+  let item = repositories::namespace::create(payload, &pool).await?;
 
   Ok(web::HttpResponse::Created().json(&item))
 }
@@ -61,7 +61,7 @@ async fn delete_namespace_by_name(
   id: web::types::Path<String>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let id_or_name = id.into_inner();
-  let res = namespace::delete_by_name(id_or_name, &pool).await?;
+  let res = repositories::namespace::delete_by_name(id_or_name, &pool).await?;
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
@@ -83,7 +83,7 @@ async fn inspect_namespace_by_name(
   pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = name.into_inner();
-  let item = namespace::inspect_by_name(name, &pool).await?;
+  let item = repositories::namespace::inspect_by_name(name, &pool).await?;
 
   let _cargoes =
     repositories::cargo::find_by_namespace(item.to_owned(), &pool).await?;
@@ -113,12 +113,14 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod test_namespace {
+  use super::*;
+
   use serde_json::json;
 
-  use crate::models::{NamespacePartial, GenericDelete};
-  use crate::utils::tests::*;
+  use nanocl_models::generic::GenericDelete;
 
-  use super::ntex_config;
+  use crate::models::NamespacePartial;
+  use crate::utils::tests::*;
 
   async fn test_list(srv: &TestServer) -> TestRet {
     let resp = srv.get("/namespaces").send().await?;
