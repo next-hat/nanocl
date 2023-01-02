@@ -1,9 +1,6 @@
-mod utils;
 mod cargo;
-mod network;
 mod namespace;
 mod cargo_image;
-mod proxy;
 mod system;
 mod controller;
 mod setup;
@@ -12,11 +9,9 @@ use serde::{Serialize, Deserialize};
 use clap::{Parser, Subcommand};
 
 pub use cargo::*;
-pub use network::*;
 pub use namespace::*;
 pub use cargo_image::*;
 pub use controller::*;
-pub use proxy::*;
 pub use system::*;
 pub use setup::*;
 
