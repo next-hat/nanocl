@@ -24,22 +24,18 @@ clap = { version = "4.0.29", features = ["derive"] }
 clap_mangen = { version = "0.2" }
 
 [dependencies]
+nanocl-models = { version = "0.0.1", features = ["serde"] }
+bollard = { version = "*" }
 r2d2 = "0.8"
 log = "0.4.17"
-regex = "1.5.6"
 futures = "0.3"
-bollard = { version = "*" }
-nanocl-models = { version = "0.0.1", features = ["serde"] }
 serde_yaml = "0.9"
 env_logger = { version = "0.10" }
-mustache = "0.9.0"
 thiserror = "1.0.37"
 serde_json = "1.0.88"
 diesel_migrations = "2.0.0"
 clap = { version = "4.0.29", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
-chrono = { version = "0.4.22", features = ["serde"]}
-notify = { version = "5.0.0", features = ["serde"] }
 serde = { version = "1.0.148", features = ["derive"] }
 uuid = { version = "1.2", features = ["serde", "v4"] }
 ntex = { version = "0.6.0-beta.0", features = ["rustls", "tokio"] }
@@ -48,8 +44,6 @@ diesel = { version = "2.0.1", features = ["postgres", "r2d2", "chrono", "uuid", 
 rustls = "0.20.7"
 rustls-pemfile = "1.0.1"
 tokio = { version = "1.22.0", features = ["fs"] }
-serde_with = "2.1.0"
-time = { version = "0.3.17", features = ["formatting", "macros", "parsing", "serde", "serde-well-known"] }
 
 # Dependency required with dev feature
 utoipa = { version = "2.2.0", features = ["uuid", "chrono"], optional = true }
