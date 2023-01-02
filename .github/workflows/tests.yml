@@ -38,6 +38,7 @@ jobs:
     # Setup daemon for the tests
     - name: Setup
       run: |
+        docker pull nexthat/nanocl-get-started:latest
         docker pull cockroachdb/cockroach:v21.2.17
         cargo make run-daemon -- --init
         cargo make run-daemon &
