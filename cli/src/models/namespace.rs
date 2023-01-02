@@ -1,12 +1,18 @@
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
-use serde::{Serialize, Deserialize};
+
+use nanocl_models::namespace::Namespace;
 
 /// Namespace commands
 #[derive(Debug, Subcommand)]
 pub enum NamespaceCommands {
   /// Create new namespace
-  Create(NamespacePartial),
+  Create(NamespaceOpts),
+  /// Inspect a namespace
+  Inspect(NamespaceOpts),
+  /// Remove a namespace
+  #[clap(alias("rm"))]
+  Remove(NamespaceOpts),
   /// List existing namespaces
   #[clap(alias("ls"))]
   List,
@@ -22,22 +28,18 @@ pub struct NamespaceArgs {
 
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl-namespace-create")]
-pub struct NamespacePartial {
+pub struct NamespaceOpts {
   /// name of the namespace to create
   pub name: String,
 }
 
-#[derive(Debug, Tabled, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct NamespaceItem {
-  pub name: String,
+#[derive(Tabled)]
+pub struct NamespaceRow {
+  pub(crate) name: String,
 }
 
-#[derive(Debug, Tabled, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct NamespaceWithCount {
-  pub(crate) name: String,
-  pub(crate) cargoes: usize,
-  pub(crate) clusters: usize,
-  pub(crate) networks: usize,
+impl From<Namespace> for NamespaceRow {
+  fn from(item: Namespace) -> Self {
+    Self { name: item.name }
+  }
 }
