@@ -7,12 +7,25 @@ use nanocl_models::cargo_image::CargoImagePartial;
 
 use crate::error::ApiError;
 
-use super::{
-  http_client::NanoclClient,
-  error::{NanoclClientError, is_api_error},
-};
+use super::http_client::NanoclClient;
+use super::error::{NanoclClientError, is_api_error};
 
 impl NanoclClient {
+  /// ## List all cargo images
+  ///
+  /// ## Returns
+  /// * [Result](Result)
+  ///   * [Ok](Ok) - [Vec](Vec) of [ImageSummary](bollard::models::ImageSummary)
+  ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
+  ///
+  /// ## Example
+  /// ```rust,norun
+  /// use nanocl_client::NanoclClient;
+  ///
+  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let images = client.list_cargo_image().await;
+  /// ```
+  ///
   pub async fn list_cargo_image(
     &self,
   ) -> Result<Vec<bollard::models::ImageSummary>, NanoclClientError> {
@@ -26,6 +39,30 @@ impl NanoclClient {
     Ok(body)
   }
 
+  /// ## Create a cargo image
+  /// This method will create a cargo image and return a stream of [CreateImageInfo](bollard::models::CreateImageInfo)
+  /// that can be used to follow the progress of the image creation.
+  /// The stream will be closed when the image creation is done.
+  ///
+  /// ## Arguments
+  /// * [name](str) - The name of the image to create
+  ///
+  /// ## Returns
+  /// * [Result](Result)
+  ///   * [Ok](Ok) - [mpsc::Receiver](mpsc::Receiver) of [CreateImageInfo](bollard::models::CreateImageInfo) as Stream
+  ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
+  ///
+  /// ## Example
+  /// ```rust,norun
+  /// use nanocl_client::NanoclClient;
+  ///
+  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let mut stream = client.create_cargo_image("my-image").await;
+  /// while let Some(info) = stream.try_next().await {
+  ///  println!("{:?}", info);
+  /// }
+  /// ```
+  ///
   pub async fn create_cargo_image(
     &self,
     name: &str,
@@ -83,7 +120,26 @@ impl NanoclClient {
     Ok(rx_body)
   }
 
-  pub async fn remove_cargo_image(
+  /// ## Delete a cargo image
+  /// This method will delete a cargo image by it's name.
+  ///
+  /// ## Arguments
+  /// * [name](str) - The name of the image to delete
+  ///
+  /// ## Returns
+  /// * [Result](Result)
+  ///   * [Ok](Ok) - The image was successfully deleted
+  ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
+  ///
+  /// ## Example
+  /// ```rust,norun
+  /// use nanocl_client::NanoclClient;
+  ///
+  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// client.delete_cargo_image("my-image:mylabel").await;
+  /// ```
+  ///
+  pub async fn delete_cargo_image(
     &self,
     name: &str,
   ) -> Result<(), NanoclClientError> {
@@ -97,6 +153,25 @@ impl NanoclClient {
     Ok(())
   }
 
+  /// ## Inspect a cargo image
+  /// This method will inspect a cargo image by it's name.
+  ///
+  /// ## Arguments
+  /// * [name](str) - The name of the image to inspect
+  ///
+  /// ## Returns
+  /// * [Result](Result)
+  ///   * [Ok](Ok) - [ImageInspect](bollard::models::ImageInspect) of the image
+  ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
+  ///
+  /// ## Example
+  /// ```rust,norun
+  /// use nanocl_client::NanoclClient;
+  ///
+  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let image = client.inspect_cargo_image("my-image:mylabel").await;
+  /// ```
+  ///
   pub async fn inspect_cargo_image(
     &self,
     name: &str,
@@ -109,5 +184,24 @@ impl NanoclClient {
     let ct_image = res.json::<bollard::models::ImageInspect>().await?;
 
     Ok(ct_image)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use futures::StreamExt;
+
+  #[ntex::test]
+  async fn test_basic() {
+    const IMAGE: &str = "busybox:1.26.1";
+    let client = NanoclClient::connect_with_unix_default().await;
+
+    let mut stream = client.create_cargo_image(IMAGE).await.unwrap();
+    while let Some(_info) = stream.next().await {}
+
+    client.list_cargo_image().await.unwrap();
+    client.inspect_cargo_image(IMAGE).await.unwrap();
+    client.delete_cargo_image(IMAGE).await.unwrap();
   }
 }

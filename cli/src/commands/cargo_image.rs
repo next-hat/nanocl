@@ -1,9 +1,9 @@
-use ntex::http::StatusCode;
 use std::collections::HashMap;
 
+use ntex::http::StatusCode;
 use futures::StreamExt;
-use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
 use bollard::service::ProgressDetail;
+use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
 
 use nanocl_client::NanoclClient;
 use nanocl_client::error::ApiError;
@@ -28,7 +28,7 @@ async fn exec_remove_cargo_image(
   client: &NanoclClient,
   args: &CargoImageRemoveOpts,
 ) -> Result<(), CliError> {
-  client.remove_cargo_image(&args.name).await?;
+  client.delete_cargo_image(&args.name).await?;
   Ok(())
 }
 
@@ -136,9 +136,6 @@ pub async fn exec_cargo_image(
 ) -> Result<(), CliError> {
   match &cmd.commands {
     CargoImageCommands::List => exec_cargo_instance_list(client).await,
-    // CargoImageCommands::Deploy(options) => {
-    //   exec_deploy_cargo_image(client, options).await
-    // }
     CargoImageCommands::Inspect(opts) => {
       exec_inspect_cargo_image(client, opts).await
     }
@@ -148,5 +145,43 @@ pub async fn exec_cargo_image(
     CargoImageCommands::Remove(args) => {
       exec_remove_cargo_image(client, args).await
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  use crate::models::CargoImageCreateOpts;
+
+  #[ntex::test]
+  async fn test_basic() {
+    const IMAGE: &str = "busybox:1.26.0";
+    let client = NanoclClient::connect_with_unix_default().await;
+    let args = CargoImageArgs {
+      commands: CargoImageCommands::List,
+    };
+    exec_cargo_image(&client, &args).await.unwrap();
+
+    let args = CargoImageArgs {
+      commands: CargoImageCommands::Create(CargoImageCreateOpts {
+        name: IMAGE.to_owned(),
+      }),
+    };
+    exec_cargo_image(&client, &args).await.unwrap();
+
+    let args = CargoImageArgs {
+      commands: CargoImageCommands::Inspect(CargoImageInspectOpts {
+        name: IMAGE.to_owned(),
+      }),
+    };
+    exec_cargo_image(&client, &args).await.unwrap();
+
+    let args = CargoImageArgs {
+      commands: CargoImageCommands::Remove(CargoImageRemoveOpts {
+        name: IMAGE.to_owned(),
+      }),
+    };
+    exec_cargo_image(&client, &args).await.unwrap();
   }
 }
