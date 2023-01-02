@@ -51,3 +51,15 @@ pub async fn exec_namespace(
     }
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  /// Test the namespace list command
+  #[ntex::test]
+  async fn test_exec_namespace_list() {
+    let client = nanocl_client::NanoclClient::connect_with_unix_default().await;
+    exec_namespace_list(&client).await.unwrap();
+  }
+}

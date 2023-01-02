@@ -17,8 +17,5 @@ pub use cargo::*;
 mod cargo_config;
 pub use cargo_config::*;
 
-mod system;
-pub use system::*;
-
 pub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;

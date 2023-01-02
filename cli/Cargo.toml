@@ -11,7 +11,7 @@ repository = "https://github.com/nxthat/nanocl"
 
 [[bin]]
 name = "nanocl"
-test = false
+test = true
 bench = false
 path = "src/main.rs"
 

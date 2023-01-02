@@ -18,10 +18,13 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
+  use super::*;
+
   use ntex::http::StatusCode;
 
-  use super::*;
-  use crate::{utils::tests::*, models::Version};
+  use nanocl_models::system::Version;
+
+  use crate::utils::tests::*;
 
   #[ntex::test]
   pub async fn get_version() -> TestRet {
