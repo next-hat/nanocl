@@ -37,9 +37,7 @@ async fn exec_cargo_delete(
   options: &CargoDeleteOpts,
 ) -> Result<(), CliError> {
   for name in &options.names {
-    client
-      .delete_cargo(name.to_owned(), args.namespace.to_owned())
-      .await?;
+    client.delete_cargo(name, args.namespace.to_owned()).await?;
   }
   Ok(())
 }
