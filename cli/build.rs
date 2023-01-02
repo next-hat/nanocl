@@ -10,7 +10,7 @@ struct ManPage<'a> {
 }
 
 /// Path where to generate the files
-const MAN_PATH: &str = "./target/man";
+const MAN_PATH: &str = "../target/man";
 
 /// Function to generate a man page
 fn generate_man_page<'a>(
@@ -23,7 +23,7 @@ fn generate_man_page<'a>(
   man.render(&mut man_buffer)?;
   let out_dir = std::env::current_dir()?;
   std::fs::write(
-    out_dir.join(&format!("{MAN_PATH}/{name}.1", name = name)),
+    out_dir.join(format!("{MAN_PATH}/{name}.1", name = name)),
     man_buffer,
   )?;
 
