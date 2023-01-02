@@ -6,34 +6,52 @@ install_crate = "rustfmt"
 command = "cargo"
 args = ["fmt"]
 
+# Clean dependencies and build cache
 [tasks.clean]
 command = "cargo"
 args = ["clean"]
 
+# Run daemon
 [tasks.run-daemon]
 command = "cargo"
 args = ["run", "--bin", "nanocld"]
 
-[tasks.cov-ci]
+# Run cli
+[tasks.run-cli]
 command = "cargo"
-args = ["llvm-cov", "nextest", "--all", "--output-path", "./lcov.info", "--lcov"]
+args = ["run", "--bin", "nanocl"]
 
-[tasks.cov]
-command = "cargo"
-args = ["llvm-cov", "nextest", "--all"]
-
+# Test daemon
 [tasks.test-daemon]
 command = "cargo"
 args = ["nextest", "run", "-p", "nanocld"]
 
-[tasks.test-debug]
+# Test Cli
+[tasks.test-cli]
 command = "cargo"
-args = ["test", "--", "--nocapture"]
+args = ["nextest", "run", "-p", "nanocl"]
 
+# Test all
 [tasks.test]
 command = "cargo"
 args = ["nextest", "run"]
 
+# Test all with debug output
+[tasks.test-debug]
+command = "cargo"
+args = ["test", "--", "--nocapture"]
+
+# Test coverage
+[tasks.cov]
+command = "cargo"
+args = ["llvm-cov", "nextest", "--all"]
+
+# Test all with coverage for codecov
+[tasks.codecov]
+command = "cargo"
+args = ["llvm-cov", "nextest", "--all", "--output-path", "./lcov.info", "--lcov"]
+
+# Release
 [tasks.release]
 command = "cargo"
 args = ["build", "--release"]

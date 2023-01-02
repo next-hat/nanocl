@@ -20,9 +20,6 @@ pub use cargo::*;
 mod cargo_config;
 pub use cargo_config::*;
 
-mod proxy_template;
-pub use proxy_template::*;
-
 mod cargo_image;
 pub use cargo_image::*;
 

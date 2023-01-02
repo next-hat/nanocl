@@ -70,8 +70,6 @@ pub async fn start<'a>(
       .configure(services::namespace::ntex_config)
       // configure cargo image service
       .configure(services::cargo_image::ntex_config)
-      // configure nginx template service
-      .configure(services::proxy_template::ntex_config)
       // configure cargo service
       .configure(services::cargo::ntex_config);
 
