@@ -38,13 +38,10 @@ jobs:
     # Run our CLI setup command to install a daemon
     - name: Setup
       run: >-
-        cargo run setup &&
-        sleep 10 &&
-        docker container ls -a &&
-        docker logs system-nanocl-daemon &&
-        sudo chmod 777 -R /run/nanocl &&
-        cargo run controller add dns &&
-        cargo run controller add proxy;
+        cargo make run-daemon -- --init;
+        sudo chmod 777 -R /run/nanocl;
+        cargo make run-daemon &;
+        sleep 5;
     # Run test
     - name: Run tests
-      run: cargo make test
+      run: cargo make codecov
