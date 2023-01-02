@@ -1,12 +1,12 @@
 use crate::schema::cargoes;
 
-use super::namespace::NamespaceItem;
+use super::namespace::NamespaceDbModel;
 
 /// Structure to create a cargo in the database
 #[derive(Debug, Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = cargoes)]
-#[diesel(belongs_to(NamespaceItem, foreign_key = namespace_name))]
+#[diesel(belongs_to(NamespaceDbModel, foreign_key = namespace_name))]
 pub struct CargoDbModel {
   pub(crate) key: String,
   pub(crate) name: String,

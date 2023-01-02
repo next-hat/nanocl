@@ -1,24 +1,6 @@
-use serde::{Serialize, Deserialize};
+use nanocl_models::config::DaemonConfig;
 
 use crate::error::CliError;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DaemonConfig {
-  #[serde(default = "default_host")]
-  pub(crate) docker_host: String,
-}
-
-impl Default for DaemonConfig {
-  fn default() -> Self {
-    Self {
-      docker_host: default_host(),
-    }
-  }
-}
-
-fn default_host() -> String {
-  "/run/docker.sock".to_owned()
-}
 
 pub fn read_daemon_config_file(
   config_dir: &String,

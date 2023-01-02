@@ -3,7 +3,6 @@ use nanocl_client::NanoclClient;
 
 mod utils;
 mod error;
-mod config;
 mod models;
 mod version;
 mod commands;

@@ -5,8 +5,7 @@ use utoipa::ToSchema;
 
 use crate::schema::namespaces;
 
-/// Namespace to encapsulate cargoes
-/// this structure ensure read and write in database
+/// Structure to create a namespace in database
 #[derive(
   Debug, Clone, Serialize, Deserialize, Identifiable, Insertable, Queryable,
 )]
@@ -14,14 +13,6 @@ use crate::schema::namespaces;
 #[diesel(table_name = namespaces)]
 #[serde(rename_all = "PascalCase")]
 #[cfg_attr(feature = "dev", derive(ToSchema))]
-pub struct NamespaceItem {
-  pub(crate) name: String,
-}
-
-/// Partial namespace
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-#[cfg_attr(feature = "dev", derive(ToSchema))]
-pub struct NamespacePartial {
+pub struct NamespaceDbModel {
   pub(crate) name: String,
 }

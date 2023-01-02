@@ -4,40 +4,35 @@ use ntex::web;
 use diesel::prelude::*;
 
 use nanocl_models::generic::GenericDelete;
-
-use crate::models::{Pool, NamespacePartial, NamespaceItem};
+use nanocl_models::namespace::NamespacePartial;
 
 use crate::utils;
 use crate::error::HttpResponseError;
+use crate::models::{Pool, NamespaceDbModel};
+
 use super::error::db_blocking_error;
 
-/// Create new namespace
+/// Create a new namespace
 ///
-/// # Arguments
+/// ## Arguments
 ///
 /// * [name](String) - Partial namespace
-/// * `pool` - Posgresql database pool
+/// * [pool](Pool) - Posgresql database pool
 ///
-/// # Examples
+/// ## Return
+/// * [Result](Result)
+///   * [Ok](NamespaceDbModel) - a [NamespaceDbModel](NamespaceDbModel)
+///   * [Err](HttpResponseError)
 ///
-/// ```rust,norun
-///
-/// use crate::repositories;
-///
-/// let new_namespace = NamespaceCreate {
-///   name: String::from("new-nsp"),
-/// };
-/// repositories::namespace::create(new_namespace, &pool).await;
-/// ```
 pub async fn create(
   item: NamespacePartial,
   pool: &Pool,
-) -> Result<NamespaceItem, HttpResponseError> {
+) -> Result<NamespaceDbModel, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
   let mut conn = utils::store::get_pool_conn(pool)?;
   let res = web::block(move || {
-    let item = NamespaceItem { name: item.name };
+    let item = NamespaceDbModel { name: item.name };
     diesel::insert_into(dsl::namespaces)
       .values(&item)
       .execute(&mut conn)?;
@@ -53,20 +48,18 @@ pub async fn create(
 
 /// List all namespace
 ///
-/// # Arguments
+/// ## Arguments
 ///
-/// * `pool` - Posgresql database pool
+/// * [pool](Pool) - Posgresql database pool
 ///
-/// # Examples
+/// ## Return
+/// * [Result](Result)
+///   * [Ok](Vec<NamespaceDbModel>) Vector of [NamespaceDbModel](NamespaceDbModel)
+///   * [Err](HttpResponseError)
 ///
-/// ```rust,norun
-///
-/// use crate::repositories;
-/// repositories::namespace::list(&pool).await;
-/// ```
 pub async fn list(
   pool: &Pool,
-) -> Result<Vec<NamespaceItem>, HttpResponseError> {
+) -> Result<Vec<NamespaceDbModel>, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
   let mut conn = utils::store::get_pool_conn(pool)?;
@@ -78,54 +71,17 @@ pub async fn list(
   }
 }
 
-/// Inspect namespace by id or name
+/// Delete namespace by name
 ///
-/// # Arguments
+/// ## Arguments
+/// * [name](String) Name of the namespace
+/// * [pool](Pool) - Posgresql database pool
 ///
-/// * `id_or_name` Id or name of the namespace
-/// * `pool` - Posgresql database pool
+/// ## Return
+/// * [Result](Result)
+///   * [Ok](GenericDelete) - a [GenericDelete](GenericDelete)
+///   * [Err](HttpResponseError)
 ///
-/// # Examples
-///
-/// ```rust,norun
-/// use crate::repositories;
-///
-/// repositories::namespace::inspect_by_name(String::from("default"), &pool).await;
-/// ```
-pub async fn inspect_by_name(
-  name: String,
-  pool: &Pool,
-) -> Result<NamespaceItem, HttpResponseError> {
-  use crate::schema::namespaces::dsl;
-
-  let mut conn = utils::store::get_pool_conn(pool)?;
-  let res = web::block(move || {
-    dsl::namespaces
-      .filter(dsl::name.eq(name))
-      .get_result(&mut conn)
-  })
-  .await;
-
-  match res {
-    Err(err) => Err(db_blocking_error(err)),
-    Ok(item) => Ok(item),
-  }
-}
-
-/// Delete namespace by id or name
-///
-/// # Arguments
-///
-/// * `id_or_name` Id or name of the namespace
-/// * `pool` - Posgresql database pool
-///
-/// # Examples
-///
-/// ```rust,norun
-/// use crate::repositories;
-///
-/// repositories::namespace::delete_by_name(String::from("default"), &pool).await;
-/// ```
 pub async fn delete_by_name(
   name: String,
   pool: &Pool,
@@ -145,10 +101,21 @@ pub async fn delete_by_name(
   }
 }
 
+/// Find namespace by name
+///
+/// ## Arguments
+/// * [name](String) Name of the namespace
+/// * [pool](Pool) - Posgresql database pool
+///
+/// ## Return
+/// * [Result](Result)
+///   * [Ok](NamespaceDbModel) - a [NamespaceDbModel](NamespaceDbModel)
+///   * [Err](HttpResponseError)
+///
 pub async fn find_by_name(
   name: String,
   pool: &Pool,
-) -> Result<NamespaceItem, HttpResponseError> {
+) -> Result<NamespaceDbModel, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
   let mut conn = utils::store::get_pool_conn(pool)?;

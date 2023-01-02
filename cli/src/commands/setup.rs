@@ -1,3 +1,5 @@
+use std::default::Default;
+
 use std::collections::HashMap;
 
 use users::get_group_by_name;
@@ -9,11 +11,12 @@ use bollard::image::CreateImageOptions;
 use bollard::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};
 use futures::StreamExt;
 use indicatif::{ProgressStyle, ProgressBar};
-use std::default::Default;
 
-use crate::models::SetupArgs;
+use nanocl_models::config::DaemonConfig;
+
+use crate::utils::config;
 use crate::utils::cargo_image;
-use crate::config::{read_daemon_config_file, DaemonConfig};
+use crate::models::SetupArgs;
 
 use crate::error::CliError;
 
@@ -196,7 +199,7 @@ fn get_gid() -> Result<u32, CliError> {
 }
 
 pub async fn exec_setup(args: &SetupArgs) -> Result<(), CliError> {
-  let config = read_daemon_config_file(&String::from("/etc/nanocl"))?;
+  let config = config::read_daemon_config_file(&String::from("/etc/nanocl"))?;
   match &args.host {
     // Host is empty perform local installation
     None => {

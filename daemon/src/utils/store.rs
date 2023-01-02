@@ -13,12 +13,13 @@ use bollard::{
   service::{RestartPolicy, RestartPolicyNameEnum},
 };
 
+use nanocl_models::config::DaemonConfig;
 use nanocl_models::cargo::CargoPartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::{utils, repositories};
 use crate::error::{DaemonError, HttpResponseError};
-use crate::models::{Pool, DBConn, ArgState, DaemonConfig};
+use crate::models::{Pool, DBConn, ArgState};
 
 /// Generate HostConfig struct for container creation
 ///

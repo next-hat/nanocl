@@ -8,12 +8,14 @@ use bollard::network::{CreateNetworkOptions, InspectNetworkOptions};
 
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
+use nanocl_models::config::DaemonConfig;
+use nanocl_models::namespace::NamespacePartial;
 use nanocl_models::cargo::CargoPartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::cli::Cli;
 use crate::{utils, repositories};
-use crate::models::{Pool, NamespacePartial, DaemonConfig, ArgState, DaemonState};
+use crate::models::{Pool, ArgState, DaemonState};
 
 use crate::error::DaemonError;
 
@@ -87,7 +89,7 @@ async fn register_namespace(
   name: &str,
   pool: &Pool,
 ) -> Result<(), DaemonError> {
-  match repositories::namespace::inspect_by_name(name.to_owned(), pool).await {
+  match repositories::namespace::find_by_name(name.to_owned(), pool).await {
     Err(_err) => {
       let new_nsp = NamespacePartial {
         name: name.to_owned(),

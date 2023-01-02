@@ -1,7 +1,8 @@
 use bollard::Docker;
 
+use nanocl_models::config::DaemonConfig;
+
 use super::Pool;
-use super::config::DaemonConfig;
 
 pub struct DaemonState {
   pub(crate) pool: Pool,

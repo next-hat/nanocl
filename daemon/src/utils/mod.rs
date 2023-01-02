@@ -12,7 +12,9 @@ pub mod tests {
   use ntex::http::client::ClientResponse;
   use ntex::http::client::error::SendRequestError;
 
-  use crate::models::{Pool, DaemonConfig};
+  use nanocl_models::config::DaemonConfig;
+
+  use crate::models::Pool;
 
   pub use ntex::web::test::TestServer;
   pub type TestReqRet = Result<ClientResponse, SendRequestError>;

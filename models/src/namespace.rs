@@ -7,3 +7,9 @@ use serde::{Serialize, Deserialize};
 pub struct Namespace {
   pub name: String,
 }
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct NamespacePartial {
+  pub name: String,
+}

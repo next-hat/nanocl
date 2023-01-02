@@ -2,9 +2,6 @@ use diesel::PgConnection;
 use r2d2::PooledConnection;
 use diesel::r2d2::ConnectionManager;
 
-mod config;
-pub use config::*;
-
 mod state;
 pub use state::*;
 

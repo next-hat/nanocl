@@ -6,7 +6,7 @@ use nanocl_models::generic::GenericDelete;
 
 use crate::utils;
 use crate::error::HttpResponseError;
-use crate::models::{Pool, CargoDbModel, NamespaceItem, CargoUpdateDbModel};
+use crate::models::{Pool, CargoDbModel, NamespaceDbModel, CargoUpdateDbModel};
 
 use super::cargo_config;
 use super::error::db_blocking_error;
@@ -23,7 +23,7 @@ use super::error::db_blocking_error;
 ///  - [Err](HttpResponseError) - Error during the operation
 ///
 pub async fn find_by_namespace(
-  nsp: NamespaceItem,
+  nsp: NamespaceDbModel,
   pool: &Pool,
 ) -> Result<Vec<CargoDbModel>, HttpResponseError> {
   let mut conn = utils::store::get_pool_conn(pool)?;

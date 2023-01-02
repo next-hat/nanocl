@@ -1,6 +1,7 @@
+use nanocl_models::config::{DaemonConfig, DaemonConfigFile};
+
 use crate::cli::Cli;
 use crate::error::DaemonError;
-use crate::models::{DaemonConfig, DaemonConfigFile};
 
 fn merge_config(args: &Cli, config: &DaemonConfigFile) -> DaemonConfig {
   let hosts = if let Some(ref hosts) = args.hosts {

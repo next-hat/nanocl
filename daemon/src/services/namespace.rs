@@ -1,12 +1,14 @@
 /// Manage nanocl namespace
 use ntex::web;
 
+use nanocl_models::namespace::NamespacePartial;
+
 use crate::repositories;
-use crate::models::{Pool, NamespacePartial};
+use crate::models::Pool;
 
 use crate::error::HttpResponseError;
 
-/// List all namespace
+/// Endpoint to list all namespace
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   path = "/namespaces",
@@ -23,7 +25,7 @@ async fn list_namespace(
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
-/// Create new namespace
+/// Endpoint to create new namespace
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   path = "/namespaces",
@@ -44,7 +46,7 @@ async fn create_namespace(
   Ok(web::HttpResponse::Created().json(&item))
 }
 
-/// Delete namespace by it's name
+/// Endpoint to delete a namespace by it's name
 #[cfg_attr(feature = "dev", utoipa::path(
     delete,
     path = "/namespaces/{name}",
@@ -83,7 +85,7 @@ async fn inspect_namespace_by_name(
   pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = name.into_inner();
-  let item = repositories::namespace::inspect_by_name(name, &pool).await?;
+  let item = repositories::namespace::find_by_name(name, &pool).await?;
 
   let _cargoes =
     repositories::cargo::find_by_namespace(item.to_owned(), &pool).await?;
@@ -91,19 +93,6 @@ async fn inspect_namespace_by_name(
   Ok(web::HttpResponse::Ok().json(&item))
 }
 
-/// # ntex config
-/// Bind namespace routes to ntex http server
-///
-/// # Arguments
-/// [config](web::ServiceConfig) mutable service config
-///
-/// # Examples
-/// ```rust,norun
-/// use ntex::web;
-/// use crate::controllers;
-///
-/// web::App::new().configure(controllers::namespace::ntex_config)
-/// ```
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_namespace);
   config.service(create_namespace);
@@ -117,9 +106,9 @@ mod test_namespace {
 
   use serde_json::json;
 
+  use nanocl_models::namespace::NamespacePartial;
   use nanocl_models::generic::GenericDelete;
 
-  use crate::models::NamespacePartial;
   use crate::utils::tests::*;
 
   async fn test_list(srv: &TestServer) -> TestRet {
