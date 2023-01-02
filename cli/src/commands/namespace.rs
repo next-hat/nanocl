@@ -1,10 +1,6 @@
-use futures::StreamExt;
-use futures::stream::FuturesUnordered;
-
 use nanocl_client::NanoclClient;
-use crate::models::{
-  NamespaceArgs, NamespaceCommands, NamespaceWithCount, NamespacePartial,
-};
+
+use crate::models::{NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow};
 
 use crate::error::CliError;
 use super::utils::print_table;
@@ -12,31 +8,36 @@ use super::utils::print_table;
 async fn exec_namespace_list(client: &NanoclClient) -> Result<(), CliError> {
   let items = client.list_namespace().await?;
   let namespaces = items
-    .iter()
-    .map(|item| async {
-      let new_item = NamespaceWithCount {
-        name: item.name.to_owned(),
-        cargoes: 1,
-        clusters: 1,
-        networks: 1,
-      };
-      Ok::<_, CliError>(new_item)
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<_>>()
-    .await
     .into_iter()
-    .collect::<Result<Vec<NamespaceWithCount>, CliError>>()?;
+    .map(NamespaceRow::from)
+    .collect::<Vec<NamespaceRow>>();
   print_table(namespaces);
   Ok(())
 }
 
 async fn exec_namespace_create(
   client: &NanoclClient,
-  item: &NamespacePartial,
+  options: &NamespaceOpts,
 ) -> Result<(), CliError> {
-  let item = client.create_namespace(&item.name).await?;
+  let item = client.create_namespace(&options.name).await?;
   println!("{}", item.name);
+  Ok(())
+}
+
+async fn exec_namespace_inspect(
+  client: &NanoclClient,
+  options: &NamespaceOpts,
+) -> Result<(), CliError> {
+  let item = client.inspect_namespace(&options.name).await?;
+  println!("{}", item.name);
+  Ok(())
+}
+
+async fn exec_namespace_delete(
+  client: &NanoclClient,
+  options: &NamespaceOpts,
+) -> Result<(), CliError> {
+  client.delete_namespace(&options.name).await?;
   Ok(())
 }
 
@@ -46,8 +47,14 @@ pub async fn exec_namespace(
 ) -> Result<(), CliError> {
   match &args.commands {
     NamespaceCommands::List => exec_namespace_list(client).await,
-    NamespaceCommands::Create(item) => {
-      exec_namespace_create(client, item).await
+    NamespaceCommands::Create(options) => {
+      exec_namespace_create(client, options).await
+    }
+    NamespaceCommands::Inspect(options) => {
+      exec_namespace_inspect(client, options).await
+    }
+    NamespaceCommands::Remove(options) => {
+      exec_namespace_delete(client, options).await
     }
   }
 }
@@ -56,10 +63,34 @@ pub async fn exec_namespace(
 mod tests {
   use super::*;
 
-  /// Test the namespace list command
   #[ntex::test]
-  async fn test_exec_namespace_list() {
-    let client = nanocl_client::NanoclClient::connect_with_unix_default().await;
-    exec_namespace_list(&client).await.unwrap();
+  async fn test_basic() {
+    const NAMESPACE: &str = "clint";
+    let client = NanoclClient::connect_with_unix_default().await;
+    let args = NamespaceArgs {
+      commands: NamespaceCommands::List,
+    };
+    exec_namespace(&client, &args).await.unwrap();
+
+    let args = NamespaceArgs {
+      commands: NamespaceCommands::Create(NamespaceOpts {
+        name: NAMESPACE.to_string(),
+      }),
+    };
+    exec_namespace(&client, &args).await.unwrap();
+
+    let args = NamespaceArgs {
+      commands: NamespaceCommands::Inspect(NamespaceOpts {
+        name: NAMESPACE.to_string(),
+      }),
+    };
+    exec_namespace(&client, &args).await.unwrap();
+
+    let args = NamespaceArgs {
+      commands: NamespaceCommands::Remove(NamespaceOpts {
+        name: NAMESPACE.to_string(),
+      }),
+    };
+    exec_namespace(&client, &args).await.unwrap();
   }
 }

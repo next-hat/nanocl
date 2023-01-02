@@ -42,7 +42,7 @@ pub fn generate_man_pages() -> std::io::Result<()> {
     },
     ManPage {
       name: "nanocl-namespace-create",
-      command: NamespacePartial::command(),
+      command: NamespaceOpts::command(),
     },
   ];
 
