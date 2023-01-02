@@ -45,7 +45,7 @@ Nanocl, stand for `Nano Cloud` and it's a lie because you will be able to create
 I see it as an open-source Hybrid Cloud Orchestrator!
 To help orchestrate containers and virtual machines on multiple hosts.
 It provides basic mechanisms for deployment, maintenance, and scaling.
-You will be able to create your own Hybrid Cloud with optional Vpn and DNS controllers.
+Using Nanocl toolskit you will be able to create your own Hybrid Cloud with optional Vpn and DNS controllers.
 Deploying your applications, services or servers publicly or behind a Vpn has never been that easy!
 
 Builds upon `Rust` to have the best performance and the smallest footprint.

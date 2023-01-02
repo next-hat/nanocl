@@ -1,0 +1,23 @@
+# Create Builder image
+FROM rust:1.64.0-alpine3.16
+
+# Install required dependencies
+RUN apk add openssl
+RUN apk add libpq-dev
+RUN apk add gcc
+RUN apk add g++
+RUN apk add make
+RUN apk add tzdata
+RUN apk add util-linux
+RUN cargo install cargo-watch
+
+RUN mkdir -p /run/nanocl
+RUN mkdir -p /nanocl
+WORKDIR /nanocl
+
+ENV TZ=Europe/Paris
+ENV RUSTFLAGS="-C target-feature=-crt-static"
+
+EXPOSE 8383/tcp
+
+CMD ["cargo", "watch", "-x", "run --bin nanocld"]

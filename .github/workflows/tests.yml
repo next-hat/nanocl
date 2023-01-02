@@ -34,17 +34,21 @@ jobs:
     - uses: taiki-e/install-action@nextest
     # Prepare CI
     - name: Prepare CI
-      run: sudo ./scripts/prepare_ci.sh
-    # Run our CLI setup command to install a daemon
+      run: sudo ./scripts/prepare_tests.sh
+    # Setup daemon for the tests
     - name: Setup
-      run: >-
-        cargo run setup &&
-        sleep 10 &&
-        docker container ls -a &&
-        docker logs system-nanocl-daemon &&
-        sudo chmod 777 -R /run/nanocl &&
-        cargo run controller add dns &&
-        cargo run controller add proxy;
-    # Run test
+      run: |
+        docker pull cockroachdb/cockroach:v21.2.17
+        cargo make run-daemon -- --init
+        cargo make run-daemon &
+        sleep 5
+    # Run coverage
     - name: Run tests
-      run: cargo make test
+      run: cargo make covgen
+    # Upload it to codecov
+    - uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV }}
+        files: ./lcov.info
+        flags: unittests # optional
+        verbose: true # optional (default = false)

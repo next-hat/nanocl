@@ -1,35 +1,57 @@
-[env]
-ARCH = { value = "new", condition = { env_not_set = ["ARCH"] } }
+[config]
+default_to_workspace = false
 
 [tasks.format]
 install_crate = "rustfmt"
 command = "cargo"
 args = ["fmt"]
 
+# Clean dependencies and build cache
 [tasks.clean]
 command = "cargo"
 args = ["clean"]
 
-[tasks.run]
+# Run daemon
+[tasks.run-daemon]
 command = "cargo"
-args = ["run"]
+args = ["run", "--bin", "nanocld", "${@}"]
 
-[tasks.cov]
+# Run cli
+[tasks.run-cli]
 command = "cargo"
-args = ["llvm-cov", "nextest"]
+args = ["run", "--bin", "nanocl", "${@}"]
 
+# Test daemon
+[tasks.test-daemon]
+command = "cargo"
+args = ["nextest", "run", "-p", "nanocld"]
+
+# Test Cli
+[tasks.test-cli]
+command = "cargo"
+args = ["nextest", "run", "-p", "nanocl"]
+
+# Test all
 [tasks.test]
 command = "cargo"
 args = ["nextest", "run"]
 
+# Test all with debug output
 [tasks.test-debug]
 command = "cargo"
 args = ["test", "--", "--nocapture"]
 
+# Test coverage
+[tasks.cov]
+command = "cargo"
+args = ["llvm-cov", "nextest", "--all"]
+
+# Test all with coverage for codecov
+[tasks.covgen]
+command = "cargo"
+args = ["llvm-cov", "nextest", "--all", "--output-path", "./lcov.info", "--lcov"]
+
+# Release
 [tasks.release]
 command = "cargo"
 args = ["build", "--release"]
-
-[tasks.man]
-command = "cargo"
-args = ["run", "--features", "genman"]
