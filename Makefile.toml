@@ -47,7 +47,7 @@ command = "cargo"
 args = ["llvm-cov", "nextest", "--all"]
 
 # Test all with coverage for codecov
-[tasks.codecov]
+[tasks.covgen]
 command = "cargo"
 args = ["llvm-cov", "nextest", "--all", "--output-path", "./lcov.info", "--lcov"]
 
