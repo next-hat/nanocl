@@ -4,6 +4,7 @@ use ntex::http::StatusCode;
 use bollard::service::ContainerSummary;
 use bollard::container::{ListContainersOptions, RemoveContainerOptions};
 
+use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 use nanocl_models::cargo::{Cargo, CargoPartial, CargoSummary};
 
 use crate::repositories;
@@ -106,7 +107,7 @@ pub async fn list_instance(
 /// Create a new cargo with his containers
 ///
 /// ## Arguments
-/// - [cargo_partial](CargoPartial) - The cargo partial
+/// - [cargo_partial](CargoConfigPartial) - The cargo partial
 /// - [namespace](String) - The namespace
 /// - [docker_api](bollard::Docker) - The docker api
 /// - [pool](Pool) - The database pool
@@ -117,14 +118,17 @@ pub async fn list_instance(
 ///   - [Err](HttpResponseError) - The cargo has not been created
 ///
 pub async fn create(
-  cargo_partial: CargoPartial,
   namespace: String,
+  config: &CargoConfigPartial,
   docker_api: &bollard::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
+  let cargo_partial = CargoPartial {
+    name: config.name.to_owned(),
+    config: config.to_owned(),
+  };
   let cargo =
-    repositories::cargo::create(namespace, cargo_partial.to_owned(), pool)
-      .await?;
+    repositories::cargo::create(namespace, cargo_partial, pool).await?;
 
   if let Err(err) = create_instance(&cargo, 1, docker_api).await {
     repositories::cargo::delete_by_key(cargo.key.to_owned(), pool).await?;
@@ -264,10 +268,38 @@ pub async fn delete(
 ///
 pub async fn patch(
   cargo_key: &str,
-  cargo_partial: CargoPartial,
+  config: &CargoConfigPatch,
   docker_api: &bollard::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
+  let cargo =
+    repositories::cargo::find_by_key(cargo_key.to_owned(), pool).await?;
+
+  let cargo_config =
+    repositories::cargo_config::find_by_key(cargo.config_key.to_owned(), pool)
+      .await?;
+
+  let cargo_partial = CargoPartial {
+    name: config.name.to_owned().unwrap_or(cargo.name),
+    config: CargoConfigPartial {
+      name: config.name.to_owned().unwrap_or(cargo_config.name),
+      dns_entry: if config.dns_entry.is_some() {
+        config.dns_entry.to_owned()
+      } else {
+        cargo_config.dns_entry.to_owned()
+      },
+      container: config
+        .container
+        .to_owned()
+        .unwrap_or(cargo_config.container),
+      replication: if config.replication.is_some() {
+        config.replication.to_owned()
+      } else {
+        cargo_config.replication.to_owned()
+      },
+    },
+  };
+
   let cargo = repositories::cargo::update_by_key(
     cargo_key.to_owned(),
     cargo_partial,

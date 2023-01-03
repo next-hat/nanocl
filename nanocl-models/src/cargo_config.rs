@@ -41,6 +41,17 @@ pub struct CargoConfigPartial {
   pub replication: Option<CargoReplication>,
 }
 
+/// Used to patch a cargo
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct CargoConfigPatch {
+  pub name: Option<String>,
+  pub dns_entry: Option<String>,
+  pub container: Option<bollard::container::Config<String>>,
+  pub replication: Option<CargoReplication>,
+}
+
 /// A cargo is a replicated container
 /// CargoConfig is used to define the configuration of the cargo
 /// It's used to create a [CargoConfig](CargoConfig)

@@ -1,6 +1,5 @@
 use nanocl_client::NanoclClient;
 
-use nanocl_models::cargo::CargoPartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::error::CliError;
@@ -13,16 +12,13 @@ async fn exec_cargo_create(
   args: &CargoArgs,
   options: &CargoCreateOpts,
 ) -> Result<(), CliError> {
-  let cargo = CargoPartial {
+  let cargo = CargoConfigPartial {
     name: options.name.to_owned(),
-    config: CargoConfigPartial {
-      name: options.name.to_owned(),
-      container: bollard::container::Config {
-        image: Some(options.image.to_owned()),
-        ..Default::default()
-      },
+    container: bollard::container::Config {
+      image: Some(options.image.to_owned()),
       ..Default::default()
     },
+    ..Default::default()
   };
   let item = client
     .create_cargo(&cargo, args.namespace.to_owned())

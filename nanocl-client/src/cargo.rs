@@ -1,5 +1,6 @@
 use nanocl_models::generic::GenericNspQuery;
-use nanocl_models::cargo::{Cargo, CargoPartial, CargoSummary};
+use nanocl_models::cargo::{Cargo, CargoSummary};
+use nanocl_models::cargo_config::{CargoConfigPatch, CargoConfigPartial};
 
 use super::http_client::NanoclClient;
 use super::error::{NanoclClientError, is_api_error};
@@ -8,7 +9,7 @@ impl NanoclClient {
   /// ## Create a new cargo
   ///
   /// ## Arguments
-  /// * [item](CargoPartial) - The cargo to create
+  /// * [item](CargoConfigPartial) - The cargo config to create
   /// * [namespace](Option<String>) - The namespace to create the cargo in
   ///
   /// ## Returns
@@ -21,15 +22,19 @@ impl NanoclClient {
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
-  /// let new_cargo = CargoPartial {
-  ///  name: String::from("test"),
+  /// let new_cargo = CargoConfigPartial {
+  ///  name: String::from("my-cargo"),
+  ///  container: bollard::container::Config {
+  ///    image: Some(String::from("alpine"))
+  ///    ..Default::default()
+  ///   }
   /// };
   /// let cargo = client.create_cargo(new_cargo, None).await;
   /// ```
   ///
   pub async fn create_cargo(
     &self,
-    item: &CargoPartial,
+    item: &CargoConfigPartial,
     namespace: Option<String>,
   ) -> Result<Cargo, NanoclClientError> {
     let mut res = self
@@ -229,7 +234,8 @@ impl NanoclClient {
   /// This will update the cargo's config
   ///
   /// ## Arguments
-  /// * [cargo](CargoPartial) - The cargo to patch
+  /// * [name](str) - The name of the cargo to patch
+  /// * [cargo](CargoConfigPatch) - The config to patch the cargo with
   /// * [namespace](Option<String>) - The namespace to patch the cargo from
   ///
   /// ## Returns
@@ -242,21 +248,22 @@ impl NanoclClient {
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
-  /// let cargo = CargoPartial {
-  ///   name: "my-cargo".into(),
+  /// let cargo_config = CargoConfigPatch {
+  ///   name: "my-cargo-renamed".into(),
   /// };
-  /// client.patch_cargo(cargo, None).await.unwrap();
+  /// client.patch_cargo("my-cargo", cargo, None).await.unwrap();
   /// ```
   ///
   pub async fn patch_cargo(
     &self,
-    cargo: CargoPartial,
+    name: &str,
+    config: CargoConfigPatch,
     namespace: Option<String>,
   ) -> Result<(), NanoclClientError> {
     let mut res = self
-      .patch(format!("/cargoes/{}", cargo.name))
+      .patch(format!("/cargoes/{}", name))
       .query(&GenericNspQuery { namespace })?
-      .send_json(&cargo)
+      .send_json(&config)
       .await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
@@ -278,16 +285,13 @@ mod tests {
 
     client.list_cargoes(None).await.unwrap();
 
-    let new_cargo = CargoPartial {
+    let new_cargo = CargoConfigPartial {
       name: CARGO.into(),
-      config: CargoConfigPartial {
-        name: CARGO.into(),
-        container: bollard::container::Config {
-          image: Some("nexthat/nanocl-get-started:latest".into()),
-          ..Default::default()
-        },
+      container: bollard::container::Config {
+        image: Some("nexthat/nanocl-get-started:latest".into()),
         ..Default::default()
       },
+      ..Default::default()
     };
     client.create_cargo(&new_cargo, None).await.unwrap();
 
@@ -296,20 +300,16 @@ mod tests {
 
     client.start_cargo(CARGO, None).await.unwrap();
 
-    let new_cargo = CargoPartial {
-      name: CARGO.into(),
-      config: CargoConfigPartial {
-        name: CARGO.into(),
-        container: bollard::container::Config {
-          image: Some("nexthat/nanocl-get-started:latest".into()),
-          env: Some(vec!["TEST=1".into()]),
-          ..Default::default()
-        },
+    let new_cargo = CargoConfigPatch {
+      container: Some(bollard::container::Config {
+        image: Some("nexthat/nanocl-get-started:latest".into()),
+        env: Some(vec!["TEST=1".into()]),
         ..Default::default()
-      },
+      }),
+      ..Default::default()
     };
 
-    client.patch_cargo(new_cargo, None).await.unwrap();
+    client.patch_cargo(CARGO, new_cargo, None).await.unwrap();
 
     client.stop_cargo(CARGO, None).await.unwrap();
     client.delete_cargo(CARGO, None).await.unwrap();

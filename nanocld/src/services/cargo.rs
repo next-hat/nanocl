@@ -2,7 +2,7 @@
 /// Endpoints to manage cargoes
 use ntex::web;
 
-use nanocl_models::cargo::CargoPartial;
+use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 use nanocl_models::generic::GenericNspQuery;
 
 use crate::utils;
@@ -12,7 +12,7 @@ use crate::models::Pool;
 /// Endpoint to create a new cargo
 #[cfg_attr(feature = "dev", utoipa::path(
     post,
-    request_body = CargoPartial,
+    request_body = CargoConfigPartial,
     path = "/cargoes",
     params(
       ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo will be stored"),
@@ -28,14 +28,14 @@ pub async fn create_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<CargoPartial>,
+  web::types::Json(payload): web::types::Json<CargoConfigPartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
 
   println!("Creating cargo: {:?}", &payload);
 
   let cargo =
-    utils::cargo::create(payload, namespace, &docker_api, &pool).await?;
+    utils::cargo::create(namespace, &payload, &docker_api, &pool).await?;
 
   Ok(web::HttpResponse::Created().json(&cargo))
 }
@@ -151,16 +151,15 @@ pub async fn patch_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
   id: web::types::Path<String>,
+  payload: web::types::Json<CargoConfigPatch>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  payload: web::types::Json<CargoPartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);
 
-  println!("Patching cargo: {}", &key);
+  log::debug!("Patching cargo: {}", &key);
 
-  let cargo =
-    utils::cargo::patch(&key, payload.into_inner(), &docker_api, &pool).await?;
+  let cargo = utils::cargo::patch(&key, &payload, &docker_api, &pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
@@ -207,8 +206,8 @@ mod tests {
 
   use crate::services::cargo_image::tests::ensure_test_image;
 
-  use nanocl_models::cargo::{Cargo, CargoPartial, CargoSummary};
-  use nanocl_models::cargo_config::CargoConfigPartial;
+  use nanocl_models::cargo::{Cargo, CargoSummary};
+  use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
   use crate::utils::tests::*;
 
@@ -218,23 +217,23 @@ mod tests {
     let srv = generate_server(ntex_config).await;
     ensure_test_image().await?;
 
+    const CARGO_NAME: &str = "daemon-test-cargo1";
+
     let mut res = srv
       .post("/cargoes")
-      .send_json(&CargoPartial {
-        name: "test-cargo-cd".to_string(),
-        config: CargoConfigPartial {
-          container: bollard::container::Config {
-            image: Some("nexthat/nanocl-get-started:latest".to_string()),
-            ..Default::default()
-          },
+      .send_json(&CargoConfigPartial {
+        name: CARGO_NAME.to_string(),
+        container: bollard::container::Config {
+          image: Some("nexthat/nanocl-get-started:latest".to_string()),
           ..Default::default()
         },
+        ..Default::default()
       })
       .await?;
     assert_eq!(res.status(), 201);
 
     let response = res.json::<Cargo>().await?;
-    assert_eq!(response.name, "test-cargo-cd");
+    assert_eq!(response.name, CARGO_NAME);
     assert_eq!(response.namespace_name, "global");
     assert_eq!(
       response.config.container.image,
@@ -245,7 +244,7 @@ mod tests {
     assert_eq!(res.status(), 200);
     let cargoes = res.json::<Vec<CargoSummary>>().await?;
     assert_eq!(cargoes.len(), 1);
-    assert_eq!(cargoes[0].name, "test-cargo-cd");
+    assert_eq!(cargoes[0].name, CARGO_NAME);
     assert_eq!(cargoes[0].namespace_name, "global");
     assert_eq!(cargoes[0].running_instances, 0);
 
@@ -257,22 +256,19 @@ mod tests {
 
     let mut res = srv
       .patch(format!("/cargoes/{}", response.name))
-      .send_json(&CargoPartial {
-        name: "test-cargo-cd".to_string(),
-        config: CargoConfigPartial {
-          container: bollard::container::Config {
-            image: Some("nexthat/nanocl-get-started:latest".to_string()),
-            env: Some(vec!["TEST=1".to_string()]),
-            ..Default::default()
-          },
+      .send_json(&CargoConfigPatch {
+        container: Some(bollard::container::Config {
+          image: Some("nexthat/nanocl-get-started:latest".to_string()),
+          env: Some(vec!["TEST=1".to_string()]),
           ..Default::default()
-        },
+        }),
+        ..Default::default()
       })
       .await?;
     assert_eq!(res.status(), 200);
 
     let patch_response = res.json::<Cargo>().await?;
-    assert_eq!(patch_response.name, "test-cargo-cd");
+    assert_eq!(patch_response.name, CARGO_NAME);
     assert_eq!(patch_response.namespace_name, "global");
     assert_eq!(
       patch_response.config.container.image,
