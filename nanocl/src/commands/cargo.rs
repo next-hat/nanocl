@@ -3,10 +3,26 @@ use nanocl_client::NanoclClient;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::error::CliError;
-use crate::models::{CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts};
+use crate::models::{
+  CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts, CargoRow,
+  CargoStartOpts,
+};
 
 use super::cargo_image;
+use super::utils::print_table;
 
+/// Execute cargo command
+///
+/// ## Arguments
+/// * [client](NanoclClient) - Nanocl client
+/// * [args](CargoArgs) - Cargo arguments
+/// * [options](CargoCommands) - Cargo command
+///
+/// ## Returns
+/// * [Result](Result) - Result of the operation
+///   * [Ok](Ok) - Operation was successful
+///   * [Err](CliError) - Operation failed
+///
 async fn exec_cargo_create(
   client: &NanoclClient,
   args: &CargoArgs,
@@ -38,11 +54,38 @@ async fn exec_cargo_delete(
   Ok(())
 }
 
+async fn exec_cargo_list(
+  client: &NanoclClient,
+  args: &CargoArgs,
+) -> Result<(), CliError> {
+  let items = client.list_cargoes(args.namespace.to_owned()).await?;
+
+  let rows = items
+    .into_iter()
+    .map(CargoRow::from)
+    .collect::<Vec<CargoRow>>();
+  print_table(&rows);
+
+  Ok(())
+}
+
+async fn exec_cargo_start(
+  client: &NanoclClient,
+  args: &CargoArgs,
+  options: &CargoStartOpts,
+) -> Result<(), CliError> {
+  client
+    .start_cargo(&options.name, args.namespace.to_owned())
+    .await?;
+  Ok(())
+}
+
 pub async fn exec_cargo(
   client: &NanoclClient,
   args: &CargoArgs,
 ) -> Result<(), CliError> {
   match &args.commands {
+    CargoCommands::List => exec_cargo_list(client, args).await,
     CargoCommands::Create(options) => {
       exec_cargo_create(client, args, options).await
     }
@@ -51,6 +94,9 @@ pub async fn exec_cargo(
     }
     CargoCommands::Image(options) => {
       cargo_image::exec_cargo_image(client, options).await
+    }
+    CargoCommands::Start(options) => {
+      exec_cargo_start(client, args, options).await
     }
     _ => todo!("Not implemented yet"),
   }

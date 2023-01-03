@@ -1,5 +1,7 @@
+use tabled::Tabled;
 use clap::{Parser, Subcommand};
 
+use nanocl_models::cargo::CargoSummary;
 use super::cargo_image::CargoImageArgs;
 
 /// Cargo delete options
@@ -54,6 +56,8 @@ pub enum CargoCommands {
   List,
   /// Create a new cargo
   Create(CargoCreateOpts),
+  /// Start a cargo by it's name
+  Start(CargoStartOpts),
   /// Remove cargo by it's name
   #[clap(alias("rm"))]
   Remove(CargoDeleteOpts),
@@ -74,4 +78,28 @@ pub struct CargoArgs {
   pub namespace: Option<String>,
   #[clap(subcommand)]
   pub commands: CargoCommands,
+}
+
+#[derive(Tabled)]
+pub struct CargoRow {
+  pub(crate) name: String,
+  pub(crate) namespace: String,
+  pub(crate) image: String,
+  pub(crate) running_instances: i64,
+  pub(crate) expected_instances: i64,
+}
+
+impl From<CargoSummary> for CargoRow {
+  fn from(cargo: CargoSummary) -> Self {
+    Self {
+      name: cargo.name,
+      namespace: cargo.namespace_name,
+      image: cargo.config.container.image.unwrap_or_default(),
+      running_instances: cargo.running_instances,
+      expected_instances: match cargo.config.replication {
+        None => 1,
+        Some(replication) => replication.min_replicas.unwrap_or(1),
+      },
+    }
+  }
 }
