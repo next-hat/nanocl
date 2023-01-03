@@ -32,6 +32,13 @@ pub struct CargoStartOpts {
   pub name: String,
 }
 
+/// Cargo stop options
+#[derive(Debug, Parser)]
+pub struct CargoStopOpts {
+  // Name of cargo to stop
+  pub name: String,
+}
+
 #[derive(Debug, Parser)]
 pub struct CargoInspectOpts {
   /// Name of cargo to inspect
@@ -58,6 +65,8 @@ pub enum CargoCommands {
   Create(CargoCreateOpts),
   /// Start a cargo by it's name
   Start(CargoStartOpts),
+  /// Stop a cargo by it's name
+  Stop(CargoStopOpts),
   /// Remove cargo by it's name
   #[clap(alias("rm"))]
   Remove(CargoDeleteOpts),

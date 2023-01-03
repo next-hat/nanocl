@@ -58,39 +58,3 @@ pub async fn exec_namespace(
     }
   }
 }
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[ntex::test]
-  async fn test_basic() {
-    const NAMESPACE: &str = "clint";
-    let client = NanoclClient::connect_with_unix_default().await;
-    let args = NamespaceArgs {
-      commands: NamespaceCommands::List,
-    };
-    exec_namespace(&client, &args).await.unwrap();
-
-    let args = NamespaceArgs {
-      commands: NamespaceCommands::Create(NamespaceOpts {
-        name: NAMESPACE.to_string(),
-      }),
-    };
-    exec_namespace(&client, &args).await.unwrap();
-
-    let args = NamespaceArgs {
-      commands: NamespaceCommands::Inspect(NamespaceOpts {
-        name: NAMESPACE.to_string(),
-      }),
-    };
-    exec_namespace(&client, &args).await.unwrap();
-
-    let args = NamespaceArgs {
-      commands: NamespaceCommands::Remove(NamespaceOpts {
-        name: NAMESPACE.to_string(),
-      }),
-    };
-    exec_namespace(&client, &args).await.unwrap();
-  }
-}

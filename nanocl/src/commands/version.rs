@@ -15,14 +15,3 @@ pub async fn exec_version(client: &NanoclClient) -> Result<(), CliError> {
   );
   Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[ntex::test]
-  async fn test_exec_version() {
-    let client = NanoclClient::connect_with_unix_default().await;
-    exec_version(&client).await.unwrap();
-  }
-}

@@ -5,7 +5,7 @@ use nanocl_models::cargo_config::CargoConfigPartial;
 use crate::error::CliError;
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts, CargoRow,
-  CargoStartOpts,
+  CargoStartOpts, CargoStopOpts,
 };
 
 use super::cargo_image;
@@ -80,6 +80,17 @@ async fn exec_cargo_start(
   Ok(())
 }
 
+async fn exec_cargo_stop(
+  client: &NanoclClient,
+  args: &CargoArgs,
+  options: &CargoStopOpts,
+) -> Result<(), CliError> {
+  client
+    .stop_cargo(&options.name, args.namespace.to_owned())
+    .await?;
+  Ok(())
+}
+
 pub async fn exec_cargo(
   client: &NanoclClient,
   args: &CargoArgs,
@@ -97,6 +108,9 @@ pub async fn exec_cargo(
     }
     CargoCommands::Start(options) => {
       exec_cargo_start(client, args, options).await
+    }
+    CargoCommands::Stop(options) => {
+      exec_cargo_stop(client, args, options).await
     }
     _ => todo!("Not implemented yet"),
   }
