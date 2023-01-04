@@ -314,4 +314,52 @@ mod tests {
     client.stop_cargo(CARGO, None).await.unwrap();
     client.delete_cargo(CARGO, None).await.unwrap();
   }
+
+  #[ntex::test]
+  async fn test_create_cargo_wrong_image() {
+    let client = NanoclClient::connect_with_unix_default().await;
+
+    let new_cargo = CargoConfigPartial {
+      name: "client-test-cargowi".into(),
+      container: bollard::container::Config {
+        image: Some("random_image:ggwp".into()),
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+    let err = client.create_cargo(&new_cargo, None).await.unwrap_err();
+    match err {
+      NanoclClientError::Api(err) => {
+        assert_eq!(err.status, 400);
+      }
+      _ => panic!("Wrong error type"),
+    }
+  }
+
+  #[ntex::test]
+  async fn test_create_cargo_duplicate_name() {
+    let client = NanoclClient::connect_with_unix_default().await;
+
+    let new_cargo = CargoConfigPartial {
+      name: "client-test-cargodup".into(),
+      container: bollard::container::Config {
+        image: Some("nexthat/nanocl-get-started:latest".into()),
+        ..Default::default()
+      },
+      ..Default::default()
+    };
+    client.create_cargo(&new_cargo, None).await.unwrap();
+
+    let err = client.create_cargo(&new_cargo, None).await.unwrap_err();
+    match err {
+      NanoclClientError::Api(err) => {
+        assert_eq!(err.status, 409);
+      }
+      _ => panic!("Wrong error type"),
+    }
+    client
+      .delete_cargo("client-test-cargodup", None)
+      .await
+      .unwrap();
+  }
 }
