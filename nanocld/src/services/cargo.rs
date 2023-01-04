@@ -2,8 +2,8 @@
 /// Endpoints to manage cargoes
 use ntex::web;
 
-use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 use nanocl_models::generic::GenericNspQuery;
+use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
 use crate::utils;
 use crate::error::HttpResponseError;

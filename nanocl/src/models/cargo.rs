@@ -1,7 +1,10 @@
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
 
-use nanocl_models::cargo::CargoSummary;
+use nanocl_models::{
+  cargo::{CargoSummary, ContainerConfig},
+  cargo_config::CargoConfigPatch,
+};
 use super::cargo_image::CargoImageArgs;
 
 /// Cargo delete options
@@ -45,14 +48,29 @@ pub struct CargoInspectOpts {
   pub(crate) name: String,
 }
 
-#[derive(Debug, Subcommand)]
-pub enum CargoPatchCommands {}
-
-#[derive(Debug, Parser)]
-pub struct CargoPatchArgs {
+#[derive(Debug, Clone, Parser)]
+pub struct CargoPatchOpts {
   pub(crate) name: String,
-  #[clap(subcommand)]
-  pub(crate) commands: CargoPatchCommands,
+  #[clap(short = 'n', long = "name")]
+  pub(crate) new_name: Option<String>,
+  #[clap(short, long = "image")]
+  pub(crate) image: Option<String>,
+  #[clap(short, long = "env")]
+  pub(crate) env: Option<Vec<String>>,
+}
+
+impl From<CargoPatchOpts> for CargoConfigPatch {
+  fn from(val: CargoPatchOpts) -> Self {
+    CargoConfigPatch {
+      name: val.new_name,
+      container: Some(ContainerConfig {
+        image: val.image,
+        env: val.env,
+        ..Default::default()
+      }),
+      ..Default::default()
+    }
+  }
 }
 
 #[derive(Debug, Subcommand)]
@@ -73,7 +91,7 @@ pub enum CargoCommands {
   /// Inspect a cargo by it's name
   Inspect(CargoInspectOpts),
   /// Update a cargo by it's name
-  Patch(CargoPatchArgs),
+  Patch(CargoPatchOpts),
   /// Manage cargo image
   Image(CargoImageArgs),
 }

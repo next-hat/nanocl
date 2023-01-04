@@ -95,6 +95,12 @@ mod tests {
     // Try to start a cargo
     let args = Cli::parse_from(["nanocl", "cargo", "start", CARGO_NAME]);
     assert!(execute_args(&args).await.is_ok());
+    // Try to patch a cargo
+    let args = Cli::parse_from([
+      "nanocl", "cargo", "patch", CARGO_NAME, "--image", IMAGE_NAME, "--env",
+      "TEST=1",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
     // Try to stop a cargo
     let args = Cli::parse_from(["nanocl", "cargo", "stop", CARGO_NAME]);
     assert!(execute_args(&args).await.is_ok());
