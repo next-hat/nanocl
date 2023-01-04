@@ -214,3 +214,19 @@ pub async fn register(arg: &ArgState) -> Result<(), DaemonError> {
 
   Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_gen_store_cargo_conf() {
+    let config = DaemonConfig::default();
+    let store_config = gen_store_cargo_conf("store", &config);
+    assert_eq!(store_config.name, "store");
+    assert_eq!(
+      store_config.container.image,
+      Some("cockroachdb/cockroach:v21.2.17".into())
+    );
+  }
+}
