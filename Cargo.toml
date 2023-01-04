@@ -3,7 +3,7 @@ members = [
   "nanocl-models",
   "nanocl-client",
   "nanocld",
-  "nanocl",
+  "nanocl"
 ]
 
 [profile.dev]

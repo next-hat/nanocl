@@ -1,28 +1,22 @@
-mode: deployment
-type: namespace
-name: global
-version: 1
+ApiVersion: v1
+Type: deployment
 
-networks:
-  - name: front
+Namespace: global
 
-clusters:
-  - name: dev
-    auto_start: true
-    proxy_templates:
-      - get-started
-    vars:
-      DOMAIN: leone-industry.com
-      CLUSTER: DEV
-    joins:
-      - cargo: getting-started
-        network: front
+Proxy:
+  - Name: getting-started
+    Watch:
+      - getting-started
+    Rules:
+      - Mode: Http
+        Domain: get-started.com
+        ListenOn: {{system.public_ip}}
 
-cargoes:
-  - name: getting-started
-    image: nexthat/nanocl-get-started
-    dns_entry: "{{networks.front.gateway}}:{{vars.DOMAIN}}"
-    environnements:
-      - NODE_ENV=production
-      - APP=LANDING
-      - CLUSTER={{vars.CLUSTER}}
+Cargoes:
+  - Name: getting-started
+    Container:
+      Image: nexthat/nanocl-get-started
+      Env :
+        - NODE_ENV=production
+        - APP=LANDING
+        - CLUSTER={{vars.CLUSTER}}
