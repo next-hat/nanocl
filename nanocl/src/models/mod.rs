@@ -1,7 +1,6 @@
 mod cargo;
 mod namespace;
 mod cargo_image;
-mod system;
 mod setup;
 
 use clap::{Parser, Subcommand};
@@ -9,7 +8,6 @@ use clap::{Parser, Subcommand};
 pub use cargo::*;
 pub use namespace::*;
 pub use cargo_image::*;
-pub use system::*;
 pub use setup::*;
 
 /// A self-sufficient hybrid-cloud manager

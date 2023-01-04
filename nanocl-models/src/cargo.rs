@@ -28,10 +28,3 @@ pub struct CargoSummary {
   pub config: CargoConfig,
   pub running_instances: i64,
 }
-
-#[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoDeleteBody {
-  pub(crate) force: bool,
-}

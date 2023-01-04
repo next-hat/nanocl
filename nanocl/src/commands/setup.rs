@@ -90,8 +90,8 @@ async fn init_daemon(
 ) -> Result<(), CliError> {
   let host_config = HostConfig {
     binds: Some(vec![
-      String::from("/run/nanocl:/run/nanocl"),
-      String::from("/var/lib/nanocl:/var/lib/nanocl"),
+      // String::from("/run/nanocl:/run/nanocl"),
+      // String::from("/var/lib/nanocl:/var/lib/nanocl"),
       format!("{}:/run/docker.sock", &config.docker_host),
     ]),
     network_mode: Some(String::from("host")),
@@ -146,8 +146,8 @@ async fn spawn_deamon(
 ) -> Result<(), CliError> {
   let host_config = HostConfig {
     binds: Some(vec![
-      String::from("/run/nanocl:/run/nanocl"),
-      String::from("/var/lib/nanocl:/var/lib/nanocl"),
+      // String::from("/run/nanocl:/run/nanocl"),
+      // String::from("/var/lib/nanocl:/var/lib/nanocl"),
       format!("{}:/run/docker.sock", &config.docker_host),
     ]),
     restart_policy: Some(RestartPolicy {
@@ -165,6 +165,7 @@ async fn spawn_deamon(
   let gid = get_gid()?;
   let nanocl_gid = format!("NANOCL_GID={gid}");
   let config = Config {
+    cmd: Some(vec!["--hosts", "tcp://0.0.0.0:8080"]),
     image: Some(image.as_ref()),
     labels: Some(labels),
     env: Some(vec![nanocl_gid.as_ref()]),

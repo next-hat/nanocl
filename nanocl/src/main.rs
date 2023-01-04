@@ -108,4 +108,11 @@ mod tests {
     let args = Cli::parse_from(["nanocl", "cargo", "rm", CARGO_NAME]);
     assert!(execute_args(&args).await.is_ok());
   }
+
+  /// Test Setup command
+  #[ntex::test]
+  async fn test_setup() {
+    let args = Cli::parse_from(["nanocl", "setup"]);
+    assert!(execute_args(&args).await.is_ok());
+  }
 }
