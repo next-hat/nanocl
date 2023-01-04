@@ -10,12 +10,10 @@ pub struct Cli {
   /// Ensure state is inited
   #[clap(long)]
   pub(crate) init: bool,
-  /// Daemon host to listen to you can use tcp:// and unix://
-  /// [default: unix:///run/nanocl.sock]
+  /// Hosts to listen to use tcp:// and unix:// [default: unix:///run/nanocl.sock]
   #[clap(short = 'H', long = "hosts")]
   pub(crate) hosts: Option<Vec<String>>,
-  /// Docker daemon socket to connect
-  /// [default: unix:///run/docker.sock]
+  /// Docker daemon socket to connect [default: unix:///run/docker.sock]
   #[clap(long)]
   pub(crate) docker_host: Option<String>,
   /// State directory
