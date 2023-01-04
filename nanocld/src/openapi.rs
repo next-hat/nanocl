@@ -42,7 +42,6 @@ use crate::errors::ApiError;
   components(
     schemas(ApiError),
     schemas(GenericDelete),
-    schemas(GenericCount),
 
     // Proxy template
     schemas(ProxyTemplateItem),

@@ -4,7 +4,7 @@ from rust:1.64.0-alpine3.16 as planner
 WORKDIR /app
 RUN apk add gcc g++ make
 RUN cargo install cargo-chef --locked
-COPY ./Cargo.lock ./Cargo.toml ./
+COPY ./Cargo.toml ./
 RUN cargo chef prepare --recipe-path recipe.json
 
 # state 2 - build our dependencies

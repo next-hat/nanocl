@@ -10,12 +10,11 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 use nanocl_models::config::DaemonConfig;
 use nanocl_models::namespace::NamespacePartial;
-use nanocl_models::cargo::CargoPartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::cli::Cli;
 use crate::{utils, repositories};
-use crate::models::{Pool, ArgState, DaemonState};
+use crate::models::{Pool, ArgState, DaemonState, CargoPartial};
 
 use crate::error::DaemonError;
 

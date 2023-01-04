@@ -31,12 +31,10 @@ pub async fn create_cargo(
   web::types::Json(payload): web::types::Json<CargoConfigPartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-
   log::debug!("Creating cargo: {:?}", &payload);
-
   let cargo =
     utils::cargo::create(namespace, &payload, &docker_api, &pool).await?;
-
+  log::debug!("Cargo created: {:?}", &cargo);
   Ok(web::HttpResponse::Created().json(&cargo))
 }
 
@@ -63,11 +61,8 @@ pub async fn delete_cargo(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);
-
   log::debug!("Deleting cargo: {}", &key);
-
   utils::cargo::delete(&key, &docker_api, &pool).await?;
-
   Ok(web::HttpResponse::NoContent().finish())
 }
 
@@ -93,11 +88,8 @@ pub async fn start_cargo(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);
-
   log::debug!("Starting cargo: {}", &key);
-
   utils::cargo::start(&key, &docker_api).await?;
-
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -123,11 +115,8 @@ pub async fn stop_cargo(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);
-
   log::debug!("Stopping cargo: {}", &key);
-
   utils::cargo::stop(&key, &docker_api).await?;
-
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -156,11 +145,8 @@ pub async fn patch_cargo(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);
-
   log::debug!("Patching cargo: {}", &key);
-
   let cargo = utils::cargo::patch(&key, &payload, &docker_api, &pool).await?;
-
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -183,11 +169,9 @@ pub async fn list_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-
   log::debug!("Listing cargoes in namespace: {}", &namespace);
-
   let cargoes = utils::cargo::list(&namespace, &docker_api, &pool).await?;
-
+  log::debug!("Found {} cargoes: {:#?}", &cargoes.len(), &cargoes);
   Ok(web::HttpResponse::Ok().json(&cargoes))
 }
 

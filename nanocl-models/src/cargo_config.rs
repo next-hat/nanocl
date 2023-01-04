@@ -6,7 +6,6 @@ use serde::{Serialize, Deserialize};
 /// Auto is used to automatically define that the number of replicas in the cluster
 /// Number is used to manually set the number of replicas
 /// Note: auto will ensure at least 1 replica exists in the cluster
-#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 #[cfg_attr(feature = "dev", derive(ToSchema))]
@@ -21,7 +20,6 @@ pub enum ReplicaValue {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-#[cfg_attr(feature = "dev", derive(ToSchema))]
 pub struct CargoReplication {
   pub min_replicas: Option<i64>,
   pub max_replicas: Option<i64>,
@@ -33,7 +31,6 @@ pub struct CargoReplication {
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-#[cfg_attr(feature = "dev", derive(ToSchema))]
 pub struct CargoConfigPartial {
   pub name: String,
   pub dns_entry: Option<String>,
@@ -58,7 +55,6 @@ pub struct CargoConfigPatch {
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-#[cfg_attr(feature = "dev", derive(ToSchema))]
 pub struct CargoConfig {
   pub key: uuid::Uuid,
   pub name: String,

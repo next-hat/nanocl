@@ -1,7 +1,6 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-#[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoImagePartial {

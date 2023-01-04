@@ -14,12 +14,11 @@ use bollard::{
 };
 
 use nanocl_models::config::DaemonConfig;
-use nanocl_models::cargo::CargoPartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::{utils, repositories};
 use crate::error::{DaemonError, HttpResponseError};
-use crate::models::{Pool, DBConn, ArgState};
+use crate::models::{Pool, DBConn, ArgState, CargoPartial};
 
 /// Generate HostConfig struct for container creation
 ///
