@@ -60,7 +60,7 @@ pub async fn _gen_ca_cert(
 
   let output = _exec(
     "openssl",
-    &vec!["genrsa", "--out", "my-safe-directory/ca.key", "2048"],
+    &["genrsa", "--out", "my-safe-directory/ca.key", "2048"],
     Some(&directory),
   )
   .await?;

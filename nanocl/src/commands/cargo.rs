@@ -64,8 +64,7 @@ async fn exec_cargo_list(
     .into_iter()
     .map(CargoRow::from)
     .collect::<Vec<CargoRow>>();
-  print_table(&rows);
-
+  print_table(rows);
   Ok(())
 }
 

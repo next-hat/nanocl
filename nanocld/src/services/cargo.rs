@@ -32,7 +32,7 @@ pub async fn create_cargo(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
 
-  println!("Creating cargo: {:?}", &payload);
+  log::debug!("Creating cargo: {:?}", &payload);
 
   let cargo =
     utils::cargo::create(namespace, &payload, &docker_api, &pool).await?;
@@ -64,7 +64,7 @@ pub async fn delete_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);
 
-  println!("Deleting cargo: {}", &key);
+  log::debug!("Deleting cargo: {}", &key);
 
   utils::cargo::delete(&key, &docker_api, &pool).await?;
 
@@ -94,7 +94,7 @@ pub async fn start_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);
 
-  println!("Starting cargo: {}", &key);
+  log::debug!("Starting cargo: {}", &key);
 
   utils::cargo::start(&key, &docker_api).await?;
 
@@ -124,7 +124,7 @@ pub async fn stop_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);
 
-  println!("Stopping cargo: {}", &key);
+  log::debug!("Stopping cargo: {}", &key);
 
   utils::cargo::stop(&key, &docker_api).await?;
 
@@ -184,7 +184,7 @@ pub async fn list_cargo(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
 
-  println!("Listing cargoes in namespace: {}", &namespace);
+  log::debug!("Listing cargoes in namespace: {}", &namespace);
 
   let cargoes = utils::cargo::list(&namespace, &docker_api, &pool).await?;
 

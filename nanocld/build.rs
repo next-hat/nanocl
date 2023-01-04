@@ -15,7 +15,7 @@ pub fn generate_man_command(
   man.render(&mut man_buffer)?;
   let out_dir = std::env::current_dir()?;
   std::fs::write(
-    out_dir.join(&format!("{MAN_PATH}/{name}.1", name = name)),
+    out_dir.join(format!("{MAN_PATH}/{name}.1", name = name)),
     man_buffer,
   )?;
 

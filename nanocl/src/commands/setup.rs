@@ -47,7 +47,7 @@ async fn install_store_image(
 ) -> Result<(), CliError> {
   let store_image = "cockroachdb/cockroach:v21.2.17";
 
-  if image_exists(store_image, &docker_api).await? {
+  if image_exists(store_image, docker_api).await? {
     return Ok(());
   }
 

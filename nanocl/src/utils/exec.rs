@@ -4,7 +4,7 @@ use std::io::{Error as IoError, ErrorKind};
 
 pub async fn _exec(
   cmd: &str,
-  args: &Vec<&str>,
+  args: &[&str],
   current_dir: Option<&str>,
 ) -> Result<Output, IoError> {
   let cmd = cmd.to_owned();

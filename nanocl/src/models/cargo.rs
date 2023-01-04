@@ -91,11 +91,10 @@ pub struct CargoArgs {
 
 #[derive(Tabled)]
 pub struct CargoRow {
-  pub(crate) name: String,
   pub(crate) namespace: String,
+  pub(crate) name: String,
   pub(crate) image: String,
-  pub(crate) running_instances: i64,
-  pub(crate) expected_instances: i64,
+  pub(crate) instances: String,
 }
 
 impl From<CargoSummary> for CargoRow {
@@ -104,10 +103,13 @@ impl From<CargoSummary> for CargoRow {
       name: cargo.name,
       namespace: cargo.namespace_name,
       image: cargo.config.container.image.unwrap_or_default(),
-      running_instances: cargo.running_instances,
-      expected_instances: match cargo.config.replication {
-        None => 1,
-        Some(replication) => replication.min_replicas.unwrap_or(1),
+      instances: match cargo.config.replication {
+        None => format!("{}/{}", cargo.running_instances, 1),
+        Some(replication) => format!(
+          "{}/{}",
+          cargo.running_instances,
+          replication.min_replicas.unwrap_or(1)
+        ),
       },
     }
   }
