@@ -1,5 +1,5 @@
 server {
-    server_name {{vars.DOMAIN}};
+    server_name test.com;
     listen {{networks.front.gateway}}:80;
 
     if ($host != {{vars.DOMAIN}}) {
@@ -13,5 +13,14 @@ server {
       proxy_set_header x-forwarded-for $proxy_add_x_forwarded_for;
       proxy_set_header host $host;
       proxy_pass http://{{cargoes.getting-started.target_ip}}:9000;
+  }
+
+  location /doc {
+    proxy_set_header upgrade $http_upgrade;
+    proxy_set_header connection "upgrade";
+    proxy_http_version 1.1;
+    proxy_set_header x-forwarded-for $proxy_add_x_forwarded_for;
+    proxy_set_header host $host;
+    proxy_pass http://{{cargoes.next-hat-doc.target_ip}}:8080;
   }
 }

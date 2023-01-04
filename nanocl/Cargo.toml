@@ -38,7 +38,7 @@ serde_json = "1.0.89"
 thiserror = "1.0.37"
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "4.0.29", features = ["derive"] }
-ntex = { version = "0.6.0-beta.0", features = ["rustls", "tokio"] }
+ntex = { version = "0.6.0", features = ["rustls", "tokio"] }
 url = { version = "2.3.1", features = ["serde"] }
 tokio = { version = "1.22.0", features = ["fs"] }
 hyper = "0.14.20"

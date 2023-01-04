@@ -11,6 +11,13 @@ Proxy:
       - Mode: Http
         Domain: get-started.com
         ListenOn: {{system.public_ip}}
+        Location:
+          - Path: /
+            TargetCargo: getting-started
+            TargetPort: 9000
+          - Path: /doc
+            TargetCargo: next-hat-doc
+            TargetPort: 8080
 
 Cargoes:
   - Name: getting-started
