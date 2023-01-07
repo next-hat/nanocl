@@ -5,7 +5,7 @@ use nanocl_models::cargo_config::CargoConfigPartial;
 use crate::error::CliError;
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts, CargoRow,
-  CargoStartOpts, CargoStopOpts, CargoPatchOpts,
+  CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
 };
 
 use super::cargo_image;
@@ -102,6 +102,19 @@ async fn exec_cargo_patch(
   Ok(())
 }
 
+async fn exec_cargo_inspect(
+  client: &NanoclClient,
+  args: &CargoArgs,
+  options: &CargoInspectOpts,
+) -> Result<(), CliError> {
+  let cargo = client
+    .inspect_cargo(&options.name, args.namespace.to_owned())
+    .await?;
+  let cargo = serde_yaml::to_string(&cargo)?;
+  println!("{}", &cargo);
+  Ok(())
+}
+
 pub async fn exec_cargo(
   client: &NanoclClient,
   args: &CargoArgs,
@@ -126,6 +139,8 @@ pub async fn exec_cargo(
     CargoCommands::Patch(options) => {
       exec_cargo_patch(client, args, options).await
     }
-    _ => todo!("Not implemented yet"),
+    CargoCommands::Inspect(options) => {
+      exec_cargo_inspect(client, args, options).await
+    }
   }
 }

@@ -5,7 +5,7 @@ use bollard::service::ContainerSummary;
 use bollard::container::{ListContainersOptions, RemoveContainerOptions};
 
 use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
-use nanocl_models::cargo::{Cargo, CargoSummary};
+use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
 
 use crate::repositories;
 use crate::error::HttpResponseError;
@@ -397,4 +397,34 @@ pub async fn list(
   }
 
   Ok(cargo_summaries)
+}
+
+pub async fn inspect(
+  key: &str,
+  docker_api: &bollard::Docker,
+  pool: &Pool,
+) -> Result<CargoInspect, HttpResponseError> {
+  let cargo = repositories::cargo::find_by_key(key.to_owned(), pool).await?;
+
+  let config =
+    repositories::cargo_config::find_by_key(cargo.config_key.to_owned(), pool)
+      .await?;
+  let containers = list_instance(&cargo.key, docker_api).await?;
+
+  let mut running_instances = 0;
+  for container in &containers {
+    if container.state == Some("running".into()) {
+      running_instances += 1;
+    }
+  }
+
+  Ok(CargoInspect {
+    key: cargo.key,
+    name: cargo.name,
+    config_key: cargo.config_key,
+    namespace_name: cargo.namespace_name,
+    config,
+    running_instances,
+    containers,
+  })
 }

@@ -10,17 +10,22 @@ use nanocl_client::error::ApiError;
 
 use crate::models::{
   CargoImageArgs, CargoImageCommands, CargoImageRemoveOpts,
-  CargoImageInspectOpts,
+  CargoImageInspectOpts, CargoImageRow,
 };
 
 use crate::error::CliError;
+
+use super::utils::print_table;
 
 async fn exec_cargo_instance_list(
   client: &NanoclClient,
 ) -> Result<(), CliError> {
   let items = client.list_cargo_image().await?;
-  println!("{:#?}", items);
-  // print_table(items);
+  let rows = items
+    .into_iter()
+    .map(CargoImageRow::from)
+    .collect::<Vec<CargoImageRow>>();
+  print_table(rows);
   Ok(())
 }
 
@@ -124,8 +129,9 @@ async fn exec_inspect_cargo_image(
   client: &NanoclClient,
   opts: &CargoImageInspectOpts,
 ) -> Result<(), CliError> {
-  let res = client.inspect_cargo_image(&opts.name).await?;
-  println!("{:#?}", res);
+  let image = client.inspect_cargo_image(&opts.name).await?;
+  let image = serde_yaml::to_string(&image)?;
+  println!("{}", &image);
   // print_table(vec![res]);
   Ok(())
 }

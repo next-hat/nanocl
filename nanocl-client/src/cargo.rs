@@ -1,5 +1,5 @@
 use nanocl_models::generic::GenericNspQuery;
-use nanocl_models::cargo::{Cargo, CargoSummary};
+use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
 use nanocl_models::cargo_config::{CargoConfigPatch, CargoConfigPartial};
 
 use super::http_client::NanoclClient;
@@ -109,7 +109,7 @@ impl NanoclClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<Cargo, NanoclClientError> {
+  ) -> Result<CargoInspect, NanoclClientError> {
     let mut res = self
       .get(format!("/cargoes/{}/inspect", name))
       .query(&GenericNspQuery { namespace })?
@@ -117,7 +117,7 @@ impl NanoclClient {
       .await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let item = res.json::<Cargo>().await?;
+    let item = res.json::<CargoInspect>().await?;
 
     Ok(item)
   }
@@ -280,13 +280,13 @@ mod tests {
 
   #[ntex::test]
   async fn test_basic() {
-    const CARGO: &str = "client-test-cargo";
+    const CARGO_NAME: &str = "client-test-cargo";
     let client = NanoclClient::connect_with_unix_default().await;
 
     client.list_cargoes(None).await.unwrap();
 
     let new_cargo = CargoConfigPartial {
-      name: CARGO.into(),
+      name: CARGO_NAME.into(),
       container: bollard::container::Config {
         image: Some("nexthat/nanocl-get-started:latest".into()),
         ..Default::default()
@@ -298,7 +298,8 @@ mod tests {
     // let cargo = client.inspect_cargo(CARGO, None).await.unwrap();
     // assert_eq!(cargo.name, CARGO);
 
-    client.start_cargo(CARGO, None).await.unwrap();
+    client.start_cargo(CARGO_NAME, None).await.unwrap();
+    client.inspect_cargo(CARGO_NAME, None).await.unwrap();
 
     let new_cargo = CargoConfigPatch {
       container: Some(bollard::container::Config {
@@ -309,10 +310,13 @@ mod tests {
       ..Default::default()
     };
 
-    client.patch_cargo(CARGO, new_cargo, None).await.unwrap();
+    client
+      .patch_cargo(CARGO_NAME, new_cargo, None)
+      .await
+      .unwrap();
 
-    client.stop_cargo(CARGO, None).await.unwrap();
-    client.delete_cargo(CARGO, None).await.unwrap();
+    client.stop_cargo(CARGO_NAME, None).await.unwrap();
+    client.delete_cargo(CARGO_NAME, None).await.unwrap();
   }
 
   #[ntex::test]

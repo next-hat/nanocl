@@ -81,16 +81,16 @@ pub enum CargoCommands {
   List,
   /// Create a new cargo
   Create(CargoCreateOpts),
-  /// Start a cargo by it's name
+  /// Start a cargo by its name
   Start(CargoStartOpts),
-  /// Stop a cargo by it's name
+  /// Stop a cargo by its name
   Stop(CargoStopOpts),
-  /// Remove cargo by it's name
+  /// Remove cargo by its name
   #[clap(alias("rm"))]
   Remove(CargoDeleteOpts),
-  /// Inspect a cargo by it's name
+  /// Inspect a cargo by its name
   Inspect(CargoInspectOpts),
-  /// Update a cargo by it's name
+  /// Update a cargo by its name
   Patch(CargoPatchOpts),
   /// Manage cargo image
   Image(CargoImageArgs),

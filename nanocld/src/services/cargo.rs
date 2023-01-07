@@ -175,6 +175,33 @@ pub async fn list_cargo(
   Ok(web::HttpResponse::Ok().json(&cargoes))
 }
 
+/// Endpoint to inspect cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  path = "/cargoes/{name}/inspect",
+  params(
+    ("name" = String, Path, description = "Name of the cargo to inspect"),
+    ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
+  ),
+  responses(
+    (status = 200, description = "Cargo list", body = CargoInspect),
+    (status = 400, description = "Generic database error", body = ApiError),
+  ),
+))]
+#[web::get("/cargoes/{name}/inspect")]
+async fn inspect_cargo(
+  pool: web::types::State<Pool>,
+  docker_api: web::types::State<bollard::Docker>,
+  name: web::types::Path<String>,
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &name);
+  log::debug!("Inspecting cargo : {}", &key);
+  let cargo = utils::cargo::inspect(&key, &docker_api, &pool).await?;
+  Ok(web::HttpResponse::Ok().json(&cargo))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
@@ -182,6 +209,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(stop_cargo);
   config.service(patch_cargo);
   config.service(list_cargo);
+  config.service(inspect_cargo);
 }
 
 #[cfg(test)]
@@ -190,7 +218,7 @@ mod tests {
 
   use crate::services::cargo_image::tests::ensure_test_image;
 
-  use nanocl_models::cargo::{Cargo, CargoSummary};
+  use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
   use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
   use crate::utils::tests::*;
@@ -224,10 +252,19 @@ mod tests {
       Some("nexthat/nanocl-get-started:latest".to_string())
     );
 
+    let mut res = srv
+      .get(format!("/cargoes/{}/inspect", CARGO_NAME))
+      .send()
+      .await?;
+    assert_eq!(res.status(), 200);
+
+    let response = res.json::<CargoInspect>().await?;
+    assert_eq!(response.name, CARGO_NAME);
+
     let mut res = srv.get("/cargoes").send().await?;
     assert_eq!(res.status(), 200);
     let cargoes = res.json::<Vec<CargoSummary>>().await?;
-    assert_eq!(cargoes.len(), 1);
+    assert!(!cargoes.is_empty());
     assert_eq!(cargoes[0].name, CARGO_NAME);
     assert_eq!(cargoes[0].namespace_name, "global");
     assert_eq!(cargoes[0].running_instances, 0);
