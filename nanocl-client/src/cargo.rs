@@ -1,5 +1,5 @@
 use nanocl_models::generic::GenericNspQuery;
-use nanocl_models::cargo::{Cargo, CargoSummary};
+use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
 use nanocl_models::cargo_config::{CargoConfigPatch, CargoConfigPartial};
 
 use super::http_client::NanoclClient;
@@ -109,7 +109,7 @@ impl NanoclClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<Cargo, NanoclClientError> {
+  ) -> Result<CargoInspect, NanoclClientError> {
     let mut res = self
       .get(format!("/cargoes/{}/inspect", name))
       .query(&GenericNspQuery { namespace })?
@@ -117,7 +117,7 @@ impl NanoclClient {
       .await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let item = res.json::<Cargo>().await?;
+    let item = res.json::<CargoInspect>().await?;
 
     Ok(item)
   }
