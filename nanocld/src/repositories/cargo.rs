@@ -4,6 +4,7 @@ use diesel::prelude::*;
 use nanocl_models::cargo::Cargo;
 use nanocl_models::generic::GenericDelete;
 
+use crate::schema::cargoes;
 use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::{
@@ -144,4 +145,23 @@ pub async fn update_by_key(
   };
 
   Ok(cargo)
+}
+
+pub async fn count_by_namespace(
+  namespace: String,
+  pool: &Pool,
+) -> Result<i64, HttpResponseError> {
+  use crate::schema::cargoes::dsl;
+
+  let mut conn = utils::store::get_pool_conn(pool)?;
+  let count = web::block(move || {
+    cargoes::table
+      .filter(dsl::namespace_name.eq(namespace))
+      .count()
+      .get_result(&mut conn)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  Ok(count)
 }

@@ -52,7 +52,8 @@ async fn create_instance(
     // Add cargo label to the container to track it
     let mut labels =
       cargo.config.container.labels.to_owned().unwrap_or_default();
-    labels.insert("cargo".to_string(), cargo.key.to_owned());
+    labels.insert("cargo".into(), cargo.key.to_owned());
+    labels.insert("namespace".into(), cargo.namespace_name.to_owned());
 
     let config = bollard::container::Config {
       labels: Some(labels),
@@ -71,7 +72,7 @@ async fn create_instance(
   Ok(())
 }
 
-/// List containers based on the cargo config
+/// List containers based on the cargo key
 ///
 /// ## Arguments
 /// - [cargo_key](String) - The cargo key
@@ -79,8 +80,8 @@ async fn create_instance(
 ///
 /// ## Returns
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<ContainerSummary>) - The containers has been listed
-///   - [Err](HttpResponseError) - The containers has not been listed
+///   - [Ok](Vec<ContainerSummary>) - The containers have been listed
+///   - [Err](HttpResponseError) - The containers have not been listed
 ///
 pub async fn list_instance(
   cargo_key: &str,
