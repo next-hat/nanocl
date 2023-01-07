@@ -28,8 +28,11 @@ async fn exec_namespace_inspect(
   client: &NanoclClient,
   options: &NamespaceOpts,
 ) -> Result<(), CliError> {
-  let item = client.inspect_namespace(&options.name).await?;
-  println!("{}", item.name);
+  let namespace = client
+  .inspect_namespace(&options.name)
+  .await?;
+  let namespace = serde_yaml::to_string(&namespace)?;
+  println!("{}", &namespace);
   Ok(())
 }
 

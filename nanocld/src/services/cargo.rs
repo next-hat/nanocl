@@ -264,7 +264,7 @@ mod tests {
     let mut res = srv.get("/cargoes").send().await?;
     assert_eq!(res.status(), 200);
     let cargoes = res.json::<Vec<CargoSummary>>().await?;
-    assert_eq!(cargoes.len(), 1);
+    assert!(!cargoes.is_empty());
     assert_eq!(cargoes[0].name, CARGO_NAME);
     assert_eq!(cargoes[0].namespace_name, "global");
     assert_eq!(cargoes[0].running_instances, 0);

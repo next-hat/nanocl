@@ -107,9 +107,11 @@ async fn exec_cargo_inspect(
   args: &CargoArgs,
   options: &CargoInspectOpts,
 ) -> Result<(), CliError> {
-  client
+  let cargo = client
     .inspect_cargo(&options.name, args.namespace.to_owned())
     .await?;
+  let cargo = serde_yaml::to_string(&cargo)?;
+  println!("{}", &cargo);
   Ok(())
 }
 
