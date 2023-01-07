@@ -132,7 +132,6 @@ async fn exec_inspect_cargo_image(
   let image = client.inspect_cargo_image(&opts.name).await?;
   let image = serde_yaml::to_string(&image)?;
   println!("{}", &image);
-  // print_table(vec![res]);
   Ok(())
 }
 

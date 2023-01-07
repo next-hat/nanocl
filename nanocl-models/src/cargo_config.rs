@@ -34,8 +34,8 @@ pub struct CargoReplication {
 pub struct CargoConfigPartial {
   pub name: String,
   pub dns_entry: Option<String>,
-  pub container: bollard::container::Config<String>,
   pub replication: Option<CargoReplication>,
+  pub container: bollard::container::Config<String>,
 }
 
 /// Used to patch a cargo
@@ -60,6 +60,6 @@ pub struct CargoConfig {
   pub name: String,
   pub cargo_key: String,
   pub dns_entry: Option<String>,
-  pub container: bollard::container::Config<String>,
   pub replication: Option<CargoReplication>,
+  pub container: bollard::container::Config<String>,
 }
