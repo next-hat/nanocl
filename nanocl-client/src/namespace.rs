@@ -1,4 +1,4 @@
-use nanocl_models::namespace::Namespace;
+use nanocl_models::namespace::{Namespace, NamespaceSummary};
 
 use super::http_client::NanoclClient;
 
@@ -9,7 +9,7 @@ impl NanoclClient {
   ///
   /// ## Returns
   /// * [Result](Result)
-  ///   * [Ok](Ok) - A [Vec](Vec) of [namespaces](Namespace)
+  ///   * [Ok](Ok) - A [Vec](Vec) of [namespaces](NamespaceSummary)
   ///   * [Err](NanoclClientError) - The namespaces could not be listed
   ///
   /// ## Example
@@ -22,15 +22,12 @@ impl NanoclClient {
   ///
   pub async fn list_namespace(
     &self,
-  ) -> Result<Vec<Namespace>, NanoclClientError> {
+  ) -> Result<Vec<NamespaceSummary>, NanoclClientError> {
     let mut res = self.get(String::from("/namespaces")).send().await?;
 
-    println!("res: {:?}", &res);
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let items = res.json::<Vec<Namespace>>().await?;
-
-    println!("items: {:?}", &items);
+    let items = res.json::<Vec<NamespaceSummary>>().await?;
     Ok(items)
   }
 

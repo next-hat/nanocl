@@ -1,7 +1,7 @@
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
 
-use nanocl_models::namespace::Namespace;
+use nanocl_models::namespace::NamespaceSummary;
 
 /// Namespace commands
 #[derive(Debug, Subcommand)]
@@ -36,10 +36,16 @@ pub struct NamespaceOpts {
 #[derive(Tabled)]
 pub struct NamespaceRow {
   pub(crate) name: String,
+  pub(crate) cargoes: i64,
+  pub(crate) instances: i64,
 }
 
-impl From<Namespace> for NamespaceRow {
-  fn from(item: Namespace) -> Self {
-    Self { name: item.name }
+impl From<NamespaceSummary> for NamespaceRow {
+  fn from(item: NamespaceSummary) -> Self {
+    Self {
+      name: item.name,
+      cargoes: item.cargoes,
+      instances: item.instances,
+    }
   }
 }

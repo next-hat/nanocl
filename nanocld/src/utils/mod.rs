@@ -2,6 +2,7 @@ pub mod key;
 pub mod store;
 pub mod cargo;
 pub mod cargo_image;
+pub mod namespace;
 
 #[cfg(test)]
 pub mod tests {

@@ -3,7 +3,7 @@ use ntex::web;
 
 use nanocl_models::namespace::NamespacePartial;
 
-use crate::repositories;
+use crate::{repositories, utils};
 use crate::models::Pool;
 
 use crate::error::HttpResponseError;
@@ -19,8 +19,9 @@ use crate::error::HttpResponseError;
 #[web::get("/namespaces")]
 async fn list_namespace(
   pool: web::types::State<Pool>,
+  docker_api: web::types::State<bollard::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let items = repositories::namespace::list(&pool).await?;
+  let items = utils::namespace::list(&docker_api, &pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&items))
 }
