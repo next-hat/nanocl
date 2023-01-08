@@ -83,15 +83,18 @@ async fn delete_namespace_by_name(
 #[web::get("/namespaces/{id}/inspect")]
 async fn inspect_namespace_by_name(
   name: web::types::Path<String>,
+  docker_api: web::types::State<bollard::Docker>,
   pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = name.into_inner();
-  let item = repositories::namespace::find_by_name(name, &pool).await?;
 
-  let _cargoes =
-    repositories::cargo::find_by_namespace(item.to_owned(), &pool).await?;
+  log::debug!("Inspecting namespace {}", name);
 
-  Ok(web::HttpResponse::Ok().json(&item))
+  let namespace = utils::namespace::inspect(&name, &docker_api, &pool).await?;
+
+  log::debug!("Namespace found: {:?}", &namespace);
+
+  Ok(web::HttpResponse::Ok().json(&namespace))
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {

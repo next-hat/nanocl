@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 
-use bollard::container::ListContainersOptions;
-use bollard::service::ContainerSummary;
-use nanocl_models::namespace::NamespaceSummary;
 use ntex::http::StatusCode;
+use bollard::models::ContainerSummary;
+use bollard::container::ListContainersOptions;
+
+use nanocl_models::namespace::{NamespaceSummary, NamespaceInspect};
 
 use crate::repositories;
 use crate::models::Pool;
 use crate::error::HttpResponseError;
+
+use super::cargo;
 
 /// List containers based on the namespace
 ///
@@ -60,4 +63,26 @@ pub async fn list(
     })
   }
   Ok(new_items)
+}
+
+pub async fn inspect(
+  namespace: &str,
+  docker_api: &bollard::Docker,
+  pool: &Pool,
+) -> Result<NamespaceInspect, HttpResponseError> {
+  let namespace =
+    repositories::namespace::find_by_name(namespace.to_owned(), pool).await?;
+  log::debug!("Found namespace to inspect {:?}", &namespace);
+  let cargo_db_models =
+    repositories::cargo::find_by_namespace(namespace.to_owned(), pool).await?;
+  log::debug!("Found namespace cargoes to inspect {:?}", &cargo_db_models);
+  let mut cargoes = Vec::new();
+  for cargo in cargo_db_models {
+    let cargo = cargo::inspect(&cargo.key, docker_api, pool).await?;
+    cargoes.push(cargo);
+  }
+  Ok(NamespaceInspect {
+    name: namespace.name,
+    cargoes,
+  })
 }

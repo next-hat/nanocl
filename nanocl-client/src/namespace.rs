@@ -1,4 +1,4 @@
-use nanocl_models::namespace::{Namespace, NamespaceSummary};
+use nanocl_models::namespace::{Namespace, NamespaceSummary, NamespaceInspect};
 
 use super::http_client::NanoclClient;
 
@@ -65,7 +65,7 @@ impl NanoclClient {
   ///
   /// ## Returns
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The desired [namespace](Namespace)
+  ///   * [Ok](Ok) - The desired [namespace](NamespaceInspect)
   ///   * [Err](NanoclClientError) - The namespace could not be inspected
   ///
   /// ## Example
@@ -79,7 +79,7 @@ impl NanoclClient {
   pub async fn inspect_namespace(
     &self,
     name: &str,
-  ) -> Result<Namespace, NanoclClientError> {
+  ) -> Result<NamespaceInspect, NanoclClientError> {
     let mut res = self
       .get(format!("/namespaces/{name}/inspect", name = name))
       .send()
@@ -87,7 +87,7 @@ impl NanoclClient {
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let item = res.json::<Namespace>().await?;
+    let item = res.json::<NamespaceInspect>().await?;
 
     Ok(item)
   }

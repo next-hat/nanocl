@@ -56,9 +56,8 @@ fn gen_store_cargo_conf(
   name: &str,
   config: &DaemonConfig,
 ) -> CargoConfigPartial {
-  let key = utils::key::gen_key("system", name);
   let mut labels = HashMap::new();
-  labels.insert("cargo".into(), key);
+  labels.insert("cargo".into(), name.into());
   labels.insert("namespace".into(), "system".into());
   let host_config = Some(gen_store_host_conf(config));
   CargoConfigPartial {
