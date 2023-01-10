@@ -132,58 +132,71 @@ impl EventEmitter {
 /*
 #[derive(Clone)]
 pub struct EventEmitter {
-    // fields
+    // ... existing fields ...
     timeout: Duration,
-    running_tasks: Arc<Mutex<HashSet<usize>>>,
+    clients: Arc<Mutex<HashMap<usize, mpsc::UnboundedSender<Bytes>>>>,
+    sender: mpsc::UnboundedSender<Event>,
+    client_status: Arc<Mutex<HashMap<usize, Instant>>>,
+    task_running: Arc<AtomicBool>,
 }
 
 impl EventEmitter {
-    // existing methods
-
-    fn check_client_alive(&self, id: usize) {
-        if let Some(mut tasks) = Self::lock_mutex(&self.running_tasks) {
-            tasks.insert(id);
-        }
-        let timeout = self.timeout;
-        let event_emitter = self.to_owned();
-        let id = id;
-        rt::spawn(async move {
-            let mut delay = delay_for(timeout).fuse();
-            loop {
-                select! {
-                    _ = &mut delay => {
-                        event_emitter.remove_client(id);
-                        break;
-                    },
-                    message = event_emitter.clients[&id].next().fuse() => {
-                        if let Some(_message) = message {
-                            delay = delay_for(timeout).fuse();
-                        } else {
-                            event_emitter.remove_client(id);
-                            break;
-                        }
-                    }
-                }
-            }
-            if let Some(mut tasks) = Self::lock_mutex(&event_emitter.running_tasks) {
-                tasks.remove(&id);
-            }
-        });
-    }
-
-    fn add_client(&self, client: mpsc::UnboundedSender<Bytes>) {
-        if let Some(mut clients) = Self::lock_mutex(&self.clients) {
-            let id = clients.len() + 1;
-            clients.insert(id, client);
-            self.check_client_alive(id);
-        }
-    }
-    pub fn new() -> EventEmitter {
-        let event_emitter = EventEmitter {
-            // ...
-            running_tasks: Arc::new(Mutex::new(HashSet::new())),
+    // ... existing methods ...
+    async fn check_clients_timeout(&self) {
+        let clients = match Self::lock_mutex(&self.clients) {
+            None => HashMap::default(),
+            Some(clients) => clients.to_owned(),
         };
-        event_emitter
+        let client_status = match Self::lock_mutex(&self.client_status) {
+            None => HashMap::default(),
+            Some(client_status) => client_status.to_owned(),
+        };
+        let now = Instant::now();
+        for (id, instant) in client_status {
+            if now.duration_since(instant) >= self.timeout {
+                clients.remove(&id);
+                client_status.remove(&id);
+            }
+        }
+
+fn add_client(&self, client: mpsc::UnboundedSender<Bytes>) {
+  if let Some(mut clients) = Self::lock_mutex(&self.clients) {
+    let id = clients.len() + 1;
+    clients.insert(id, client);
+  if let Some(mut client_status) = Self::lock_mutex(&self.client_status) {
+    client_status.insert(id, Instant::now());
     }
+  }
+}
+
+fn remove_client(&self, id: usize) {
+if let Some(mut clients) = Self::lock_mutex(&self.clients) {
+clients.remove(&id);
+}
+  if let Some(mut client_status) = Self::lock_mutex(&self.client_status) {
+    client_status.remove(&id);
+  }
+}
+
+pub fn new() -> EventEmitter {
+  let (tx, rx) = mpsc::unbounded::<Event>();
+  let clients = Arc::new(Mutex::new(HashMap::new()));
+  let client_status = Arc::new(Mutex::new(HashMap::new()));
+  let task_running = Arc::new(AtomicBool::new(false));
+  let event_emitter = EventEmitter {
+  // ...
+    clients,
+    sender: tx,
+  client_status,
+  task_running,
+};
+  rt::spawn(async move {
+      loop {
+        delay_for(Duration::from_secs(5)).await;
+        event_emitter.check_clients_timeout().await;
+    }
+});
+    event_emitter
+  }
 }
  */
