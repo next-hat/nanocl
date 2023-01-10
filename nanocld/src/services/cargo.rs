@@ -5,6 +5,7 @@ use ntex::web;
 use nanocl_models::generic::GenericNspQuery;
 use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
+use crate::event::{EventEmitter, Event};
 use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::Pool;
@@ -27,6 +28,7 @@ use crate::models::Pool;
 pub async fn create_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
+  event_emitter: web::types::State<EventEmitter>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<CargoConfigPartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -35,6 +37,11 @@ pub async fn create_cargo(
   let cargo =
     utils::cargo::create(namespace, &payload, &docker_api, &pool).await?;
   log::debug!("Cargo created: {:?}", &cargo);
+
+  event_emitter
+    .send(Event::CargoCreated(cargo.clone()))
+    .await?;
+
   Ok(web::HttpResponse::Created().json(&cargo))
 }
 
@@ -222,6 +229,11 @@ mod tests {
   use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
   use crate::utils::tests::*;
+
+  #[ntex::test]
+  async fn test_event() -> TestRet {
+    Ok(())
+  }
 
   /// Test to create start patch stop and delete a cargo with valid data
   #[ntex::test]

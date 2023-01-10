@@ -8,7 +8,7 @@ use super::cargo_config::CargoConfig;
 pub type ContainerConfig<T> = bollard::container::Config<T>;
 
 /// Cargo with his current config
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Cargo {

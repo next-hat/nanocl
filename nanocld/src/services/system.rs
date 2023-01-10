@@ -1,7 +1,7 @@
 use ntex::web;
 use serde_json::json;
 
-use crate::version;
+use crate::{version, error::HttpResponseError, event::EventEmitter};
 
 #[web::get("/version")]
 async fn get_version() -> web::HttpResponse {
@@ -12,7 +12,22 @@ async fn get_version() -> web::HttpResponse {
   }))
 }
 
+/// Join events stream
+#[web::get("/events")]
+async fn watch_events(
+  event_emitter: web::types::State<EventEmitter>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let stream = event_emitter.subscribe();
+
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("text/event-stream")
+      .streaming(stream),
+  )
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
+  config.service(watch_events);
   config.service(get_version);
 }
 

@@ -1,10 +1,12 @@
 use ntex::web;
 
+use crate::event;
 use crate::services;
 use crate::models::DaemonState;
 
 pub async fn start(
   daemon_state: DaemonState,
+  event_emitter: event::EventEmitter,
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("Preparing server");
   let hosts = daemon_state.config.hosts.to_owned();
@@ -16,6 +18,8 @@ pub async fn start(
       .state(daemon_state.pool.clone())
       // bind docker api
       .state(daemon_state.docker_api.clone())
+      // bind our event state
+      .state(event_emitter.clone())
       // Default logger middleware
       .wrap(web::middleware::Logger::default())
       // Set Json body max size
@@ -82,6 +86,7 @@ mod tests {
 
   use super::*;
 
+  use crate::event;
   use crate::cli::Cli;
   use crate::state;
   use crate::utils::tests::*;
@@ -93,7 +98,8 @@ mod tests {
     let args =
       Cli::parse_from(vec!["nanocl", "-H", "unix:///tmp/nanocl_test.sock"]);
     let daemon_state = state::init(&args).await?;
-    let server = start(daemon_state).await;
+    let event_emitter = event::EventEmitter::new();
+    let server = start(daemon_state, event_emitter).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     Ok(())
   }
@@ -104,7 +110,8 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9999"]);
     let daemon_state = state::init(&args).await?;
-    let server = start(daemon_state).await;
+    let event_emitter = event::EventEmitter::new();
+    let server = start(daemon_state, event_emitter).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     Ok(())
   }
@@ -116,10 +123,11 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9888"]);
     let daemon_state = state::init(&args).await?;
-    let server = start(daemon_state).await;
+    let event_emitter = event::EventEmitter::new();
+    let server = start(daemon_state, event_emitter.clone()).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     let daemon_state = state::init(&args).await?;
-    let server2 = start(daemon_state).await;
+    let server2 = start(daemon_state, event_emitter).await;
     assert!(server2.is_err(), "Expect server to fail to run");
     Ok(())
   }
@@ -131,7 +139,8 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "unix:///root/test.sock"]);
     let daemon_state = state::init(&args).await?;
-    let server = start(daemon_state).await;
+    let event_emitter = event::EventEmitter::new();
+    let server = start(daemon_state, event_emitter).await;
     assert!(server.is_err(), "Expect server to fail to run");
     Ok(())
   }
@@ -143,7 +152,8 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "not_valid"]);
     let daemon_state = state::init(&args).await?;
-    let server = start(daemon_state).await;
+    let event_emitter = event::EventEmitter::new();
+    let server = start(daemon_state, event_emitter).await;
     assert!(server.is_err(), "Expect server to fail to run");
     Ok(())
   }

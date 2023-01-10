@@ -9,6 +9,7 @@ mod version;
 mod utils;
 mod state;
 mod error;
+mod event;
 mod schema;
 mod models;
 mod server;
@@ -47,8 +48,11 @@ async fn main() -> std::io::Result<()> {
     return Ok(());
   }
 
+  // Start event loop
+  let event_emitter = event::EventEmitter::new();
+
   // start http server
-  let srv = server::start(daemon_state).await?;
+  let srv = server::start(daemon_state, event_emitter).await?;
   srv.await?;
   log::info!("shutdown");
   Ok(())

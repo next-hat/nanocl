@@ -15,6 +15,7 @@ pub mod tests {
 
   use nanocl_models::config::DaemonConfig;
 
+  use crate::event::EventEmitter;
   use crate::models::Pool;
 
   pub use ntex::web::test::TestServer;
@@ -59,6 +60,7 @@ pub mod tests {
       state_dir: String::from("/var/lib/nanocl"),
       ..Default::default()
     };
+    let event_emitter = EventEmitter::new();
     // Create docker_api
     let docker_api = gen_docker_client();
     // Create postgres pool
@@ -69,6 +71,7 @@ pub mod tests {
         .state(daemon_config.clone())
         .state(pool.clone())
         .state(docker_api.clone())
+        .state(event_emitter.clone())
         .configure(config)
     })
   }
