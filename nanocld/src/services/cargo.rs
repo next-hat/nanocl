@@ -1,3 +1,5 @@
+use std::sync::{Mutex, Arc};
+
 /// Cargo service
 /// Endpoints to manage cargoes
 use ntex::web;
@@ -28,7 +30,7 @@ use crate::models::Pool;
 pub async fn create_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
-  event_emitter: web::types::State<EventEmitter>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<CargoConfigPartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -39,8 +41,9 @@ pub async fn create_cargo(
   log::debug!("Cargo created: {:?}", &cargo);
 
   event_emitter
-    .send(Event::CargoCreated(cargo.clone()))
-    .await?;
+    .lock()
+    .unwrap()
+    .send(Event::CargoCreated(cargo.clone()));
 
   Ok(web::HttpResponse::Created().json(&cargo))
 }

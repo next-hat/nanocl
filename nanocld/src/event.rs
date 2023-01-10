@@ -1,14 +1,19 @@
+use std::collections::HashMap;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
+use std::task::Context;
+use std::task::Poll;
+use std::time::Duration;
 
+use futures::Stream;
 use ntex::rt;
-use ntex::util::HashMap;
+use ntex::time::interval;
 use ntex::web;
 use ntex::util::Bytes;
-use ntex::channel::mpsc::Sender;
-use ntex::channel::mpsc::Receiver;
-use ntex::channel::mpsc::channel;
+use ntex::web::Error;
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 use futures::channel::mpsc;
 use futures::{stream, StreamExt, SinkExt};
 
@@ -22,181 +27,83 @@ pub enum Event {
   CargoCreated(Cargo),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct EventEmitter {
-  clients: Arc<Mutex<HashMap<usize, mpsc::UnboundedSender<Bytes>>>>,
-  sender: mpsc::UnboundedSender<Event>,
+  clients: Vec<Sender<Bytes>>,
 }
 
 impl EventEmitter {
-  fn lock_mutex<T>(mutex: &'_ Arc<Mutex<T>>) -> Option<MutexGuard<'_, T>> {
-    match mutex.lock() {
-      Err(err) => {
-        eprintln!("Unable to lock clients mutex {:#?}", err);
-        None
-      }
-      Ok(guard) => Some(guard),
-    }
-  }
-
-  async fn handle_event(&self, e: Event) {
-    let clients = match Self::lock_mutex(&self.clients) {
-      None => HashMap::default(),
-      Some(clients) => clients.to_owned(),
-    };
-    log::debug!("Sending events {:#?} to clients {:#?}", &e, &clients);
+  async fn handle_event(&mut self, e: Event) {
+    log::debug!("Sending events {:#?} to clients {:#?}", &e, &self.clients);
     let mut data = serde_json::to_vec(&e).unwrap();
     data.push(b'\n');
     let bytes = Bytes::from(data);
-    let mut stream = stream::iter(clients);
-    while let Some((id, mut client)) = stream.next().await {
-      if let Err(_err) = client.send(bytes.to_owned()).await {
-        self.remove_client(id);
+    let mut stream = stream::iter(self.clients.to_owned());
+    while let Some(client) = stream.next().await {
+      client.send(bytes.to_owned()).await.unwrap_or(());
+    }
+  }
+
+  fn add_client(&mut self, client: Sender<Bytes>) {
+    self.clients.push(client);
+  }
+
+  fn check_connection(&mut self) {
+    let mut new_clients = Vec::new();
+    for client in &self.clients {
+      let result = client.clone().try_send(Bytes::from(""));
+      if let Ok(()) = result {
+        new_clients.push(client.clone());
       }
     }
+    log::debug!("new clients : {:#?}", &new_clients.len());
+    self.clients = new_clients;
   }
 
-  fn remove_client(&self, id: usize) {
-    if let Some(mut c) = Self::lock_mutex(&self.clients) {
-      c.remove(&id);
-    }
-  }
-
-  fn add_client(&self, client: mpsc::UnboundedSender<Bytes>) {
-    if let Some(mut clients) = Self::lock_mutex(&self.clients) {
-      let id = clients.len() + 1;
-      clients.insert(id, client);
-    }
-  }
-
-  fn pipe_stream(
-    mut source: mpsc::UnboundedReceiver<Bytes>,
-    dest: Sender<Result<Bytes, web::error::Error>>,
-  ) {
+  fn spawn_check_connection(this: Arc<Mutex<Self>>) {
     rt::spawn(async move {
-      while let Some(bytes) = source.next().await {
-        if let Err(err) = dest.send(Ok::<_, web::error::Error>(bytes)) {
-          eprintln!("Error while piping stream : {:} closing.", err);
-          source.close();
-          dest.close();
-          break;
-        }
-      }
+      let task = interval(Duration::from_secs(1));
+      task.tick().await;
+      this.lock().unwrap().check_connection();
+      Self::spawn_check_connection(this);
     });
   }
 
-  fn r#loop(&self, mut receiver: mpsc::UnboundedReceiver<Event>) {
-    // Handle events in a background thread
-    let this = self.to_owned();
-    rt::Arbiter::new().exec_fn(|| {
-      rt::spawn(async move {
-        // Start the event loop
-        while let Some(event) = receiver.next().await {
-          this.handle_event(event).await;
-        }
-        // If the event loop stop, we stop the current thread
-        rt::Arbiter::current().stop();
-      });
-      rt::spawn(async move {});
-    });
-  }
+  pub fn new() -> Arc<Mutex<EventEmitter>> {
+    let event_emitter = Arc::new(Mutex::new(EventEmitter::default()));
 
-  pub fn new() -> EventEmitter {
-    let (tx, rx) = mpsc::unbounded::<Event>();
-    let event_emitter = EventEmitter {
-      sender: tx,
-      clients: Arc::new(Mutex::new(HashMap::default())),
-    };
-    event_emitter.r#loop(rx);
+    Self::spawn_check_connection(event_emitter.to_owned());
     event_emitter
   }
 
-  pub async fn send(&self, e: Event) -> Result<(), HttpResponseError> {
-    let mut sender = self.sender.to_owned();
+  pub fn send(&mut self, e: Event) {
+    let mut this = self.to_owned();
     rt::spawn(async move {
-      let _ = sender.send(e).await;
+      this.handle_event(e).await;
     });
-    Ok(())
   }
 
-  pub fn subscribe(&self) -> Receiver<Result<Bytes, web::error::Error>> {
-    let (event_sender, event_receiver) = mpsc::unbounded::<Bytes>();
-    let (client_sender, client_receiver) =
-      channel::<Result<Bytes, web::error::Error>>();
-    Self::pipe_stream(event_receiver, client_sender);
-    self.add_client(event_sender);
-    client_receiver
+  pub fn subscribe(&mut self) -> Client {
+    let (client_sender, client_receiver) = channel::<Bytes>(100);
+    self.add_client(client_sender);
+    Client(client_receiver)
   }
 }
 
-/*
-#[derive(Clone)]
-pub struct EventEmitter {
-    // ... existing fields ...
-    timeout: Duration,
-    clients: Arc<Mutex<HashMap<usize, mpsc::UnboundedSender<Bytes>>>>,
-    sender: mpsc::UnboundedSender<Event>,
-    client_status: Arc<Mutex<HashMap<usize, Instant>>>,
-    task_running: Arc<AtomicBool>,
-}
+// wrap Receiver in own type, with correct error type
+pub struct Client(Receiver<Bytes>);
 
-impl EventEmitter {
-    // ... existing methods ...
-    async fn check_clients_timeout(&self) {
-        let clients = match Self::lock_mutex(&self.clients) {
-            None => HashMap::default(),
-            Some(clients) => clients.to_owned(),
-        };
-        let client_status = match Self::lock_mutex(&self.client_status) {
-            None => HashMap::default(),
-            Some(client_status) => client_status.to_owned(),
-        };
-        let now = Instant::now();
-        for (id, instant) in client_status {
-            if now.duration_since(instant) >= self.timeout {
-                clients.remove(&id);
-                client_status.remove(&id);
-            }
-        }
+impl Stream for Client {
+  type Item = Result<Bytes, Error>;
 
-fn add_client(&self, client: mpsc::UnboundedSender<Bytes>) {
-  if let Some(mut clients) = Self::lock_mutex(&self.clients) {
-    let id = clients.len() + 1;
-    clients.insert(id, client);
-  if let Some(mut client_status) = Self::lock_mutex(&self.client_status) {
-    client_status.insert(id, Instant::now());
+  fn poll_next(
+    mut self: Pin<&mut Self>,
+    cx: &mut Context<'_>,
+  ) -> Poll<Option<Self::Item>> {
+    match Pin::new(&mut self.0).poll_recv(cx) {
+      Poll::Ready(Some(v)) => Poll::Ready(Some(Ok(v))),
+      Poll::Ready(None) => Poll::Ready(None),
+      Poll::Pending => Poll::Pending,
     }
   }
 }
-
-fn remove_client(&self, id: usize) {
-if let Some(mut clients) = Self::lock_mutex(&self.clients) {
-clients.remove(&id);
-}
-  if let Some(mut client_status) = Self::lock_mutex(&self.client_status) {
-    client_status.remove(&id);
-  }
-}
-
-pub fn new() -> EventEmitter {
-  let (tx, rx) = mpsc::unbounded::<Event>();
-  let clients = Arc::new(Mutex::new(HashMap::new()));
-  let client_status = Arc::new(Mutex::new(HashMap::new()));
-  let task_running = Arc::new(AtomicBool::new(false));
-  let event_emitter = EventEmitter {
-  // ...
-    clients,
-    sender: tx,
-  client_status,
-  task_running,
-};
-  rt::spawn(async move {
-      loop {
-        delay_for(Duration::from_secs(5)).await;
-        event_emitter.check_clients_timeout().await;
-    }
-});
-    event_emitter
-  }
-}
- */

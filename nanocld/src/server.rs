@@ -1,3 +1,6 @@
+use std::sync::Arc;
+use std::sync::Mutex;
+
 use ntex::web;
 
 use crate::event;
@@ -6,7 +9,7 @@ use crate::models::DaemonState;
 
 pub async fn start(
   daemon_state: DaemonState,
-  event_emitter: event::EventEmitter,
+  event_emitter: Arc<Mutex<event::EventEmitter>>,
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("Preparing server");
   let hosts = daemon_state.config.hosts.to_owned();

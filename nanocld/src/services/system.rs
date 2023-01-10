@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use ntex::web;
 use serde_json::json;
 
@@ -15,9 +17,9 @@ async fn get_version() -> web::HttpResponse {
 /// Join events stream
 #[web::get("/events")]
 async fn watch_events(
-  event_emitter: web::types::State<EventEmitter>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let stream = event_emitter.subscribe();
+  let stream = event_emitter.lock().unwrap().subscribe();
 
   Ok(
     web::HttpResponse::Ok()
