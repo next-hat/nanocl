@@ -10,21 +10,22 @@ use std::time::Duration;
 use futures::Stream;
 use ntex::rt;
 use ntex::time::interval;
-use ntex::web;
 use ntex::util::Bytes;
 use ntex::web::Error;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use futures::channel::mpsc;
-use futures::{stream, StreamExt, SinkExt};
+use futures::{stream, StreamExt};
 
-use nanocl_models::cargo::Cargo;
+use nanocl_models::cargo::CargoInspect;
 use serde::{Serialize, Deserialize};
-
-use crate::error::HttpResponseError;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Event {
-  CargoCreated(Cargo),
+  NamespaceCreated(String),
+  CargoCreated(Box<CargoInspect>),
+  CargoDeleted(String),
+  CargoStarted(Box<CargoInspect>),
+  CargoStopped(Box<CargoInspect>),
+  CargoPatched(Box<CargoInspect>),
 }
 
 #[derive(Clone, Default)]

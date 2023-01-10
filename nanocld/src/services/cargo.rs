@@ -3,6 +3,7 @@ use std::sync::{Mutex, Arc};
 /// Cargo service
 /// Endpoints to manage cargoes
 use ntex::web;
+use ntex::rt;
 
 use nanocl_models::generic::GenericNspQuery;
 use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
@@ -39,12 +40,16 @@ pub async fn create_cargo(
   let cargo =
     utils::cargo::create(namespace, &payload, &docker_api, &pool).await?;
   log::debug!("Cargo created: {:?}", &cargo);
-
-  event_emitter
-    .lock()
-    .unwrap()
-    .send(Event::CargoCreated(cargo.clone()));
-
+  let key = cargo.key.to_owned();
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
+      .await
+      .unwrap();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoCreated(Box::new(cargo)));
+  });
   Ok(web::HttpResponse::Created().json(&cargo))
 }
 
@@ -66,6 +71,7 @@ pub async fn create_cargo(
 pub async fn delete_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -73,6 +79,9 @@ pub async fn delete_cargo(
   let key = utils::key::gen_key(&namespace, &id);
   log::debug!("Deleting cargo: {}", &key);
   utils::cargo::delete(&key, &docker_api, &pool).await?;
+  rt::spawn(async move {
+    event_emitter.lock().unwrap().send(Event::CargoDeleted(key));
+  });
   Ok(web::HttpResponse::NoContent().finish())
 }
 
@@ -92,7 +101,9 @@ pub async fn delete_cargo(
   ))]
 #[web::post("/cargoes/{name}/start")]
 pub async fn start_cargo(
+  pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -100,6 +111,15 @@ pub async fn start_cargo(
   let key = utils::key::gen_key(&namespace, &id);
   log::debug!("Starting cargo: {}", &key);
   utils::cargo::start(&key, &docker_api).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
+      .await
+      .unwrap();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoStarted(Box::new(cargo)));
+  });
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -119,7 +139,9 @@ pub async fn start_cargo(
   ))]
 #[web::post("/cargoes/{name}/stop")]
 pub async fn stop_cargo(
+  pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -127,6 +149,15 @@ pub async fn stop_cargo(
   let key = utils::key::gen_key(&namespace, &id);
   log::debug!("Stopping cargo: {}", &key);
   utils::cargo::stop(&key, &docker_api).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
+      .await
+      .unwrap();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoStopped(Box::new(cargo)));
+  });
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -149,6 +180,7 @@ pub async fn stop_cargo(
 pub async fn patch_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   id: web::types::Path<String>,
   payload: web::types::Json<CargoConfigPatch>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -157,6 +189,15 @@ pub async fn patch_cargo(
   let key = utils::key::gen_key(&namespace, &id);
   log::debug!("Patching cargo: {}", &key);
   let cargo = utils::cargo::patch(&key, &payload, &docker_api, &pool).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
+      .await
+      .unwrap();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoPatched(Box::new(cargo)));
+  });
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
