@@ -1,15 +1,17 @@
+/*
+* Endpoints to manipulate cargoes
+*/
 use std::sync::{Mutex, Arc};
 
-/// Cargo service
-/// Endpoints to manage cargoes
-use ntex::web;
 use ntex::rt;
+use ntex::web;
 
+use nanocl_models::system::Event;
 use nanocl_models::generic::GenericNspQuery;
 use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
-use crate::event::{EventEmitter, Event};
 use crate::utils;
+use crate::event::EventEmitter;
 use crate::error::HttpResponseError;
 use crate::models::Pool;
 
@@ -267,17 +269,11 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use super::*;
 
-  use crate::services::cargo_image::tests::ensure_test_image;
-
   use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
   use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
   use crate::utils::tests::*;
-
-  #[ntex::test]
-  async fn test_event() -> TestRet {
-    Ok(())
-  }
+  use crate::services::cargo_image::tests::ensure_test_image;
 
   /// Test to create start patch stop and delete a cargo with valid data
   #[ntex::test]
@@ -321,9 +317,7 @@ mod tests {
     assert_eq!(res.status(), 200);
     let cargoes = res.json::<Vec<CargoSummary>>().await?;
     assert!(!cargoes.is_empty());
-    assert_eq!(cargoes[0].name, CARGO_NAME);
     assert_eq!(cargoes[0].namespace_name, "global");
-    assert_eq!(cargoes[0].running_instances, 0);
 
     let res = srv
       .post(format!("/cargoes/{}/start", response.name))

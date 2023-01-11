@@ -26,6 +26,8 @@ pub struct Cli {
 pub enum Commands {
   Namespace(NamespaceArgs),
   Cargo(CargoArgs),
+  // Watch daemon events
+  Events,
   Setup(SetupArgs),
   /// Show nanocl version information
   Version,

@@ -1,30 +1,19 @@
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::task::Context;
 use std::task::Poll;
+use std::task::Context;
 use std::time::Duration;
 
-use futures::Stream;
 use ntex::rt;
-use ntex::time::interval;
-use ntex::util::Bytes;
 use ntex::web::Error;
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use ntex::util::Bytes;
+use ntex::time::interval;
+use futures::Stream;
 use futures::{stream, StreamExt};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
-use nanocl_models::cargo::CargoInspect;
-use serde::{Serialize, Deserialize};
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Event {
-  NamespaceCreated(String),
-  CargoCreated(Box<CargoInspect>),
-  CargoDeleted(String),
-  CargoStarted(Box<CargoInspect>),
-  CargoStopped(Box<CargoInspect>),
-  CargoPatched(Box<CargoInspect>),
-}
+use nanocl_models::system::Event;
 
 #[derive(Clone, Default)]
 pub struct EventEmitter {
@@ -48,15 +37,15 @@ impl EventEmitter {
   }
 
   fn check_connection(&mut self) {
-    let mut new_clients = Vec::new();
+    let mut alive_clients = Vec::new();
     for client in &self.clients {
       let result = client.clone().try_send(Bytes::from(""));
       if let Ok(()) = result {
-        new_clients.push(client.clone());
+        alive_clients.push(client.clone());
       }
     }
-    log::debug!("alive c lients : {:#?}", &new_clients.len());
-    self.clients = new_clients;
+    log::debug!("alive clients : {:#?}", &alive_clients.len());
+    self.clients = alive_clients;
   }
 
   fn spawn_check_connection(this: Arc<Mutex<Self>>) {
@@ -112,6 +101,8 @@ impl Stream for Client {
 mod tests {
 
   use super::*;
+
+  use nanocl_models::cargo::CargoInspect;
 
   use crate::utils::tests::*;
 

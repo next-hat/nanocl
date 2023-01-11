@@ -78,11 +78,11 @@ impl NanoclClient {
     is_api_error(&mut res, &status).await?;
 
     let name = name.to_owned();
-    let (tx, rx_body) = mpsc::channel::<bollard::models::CreateImageInfo>();
+    let (sx, rx) = mpsc::channel::<bollard::models::CreateImageInfo>();
     rt::spawn(async move {
-      let mut stream = res.into_stream();
-      let mut payload = String::new();
       let mut payload_size = 0;
+      let mut payload = String::new();
+      let mut stream = res.into_stream();
       while let Some(result) = stream.try_next().await.map_err(| err | ApiError {
         msg: format!("Unable to receive stream data while creating image {} got error : {}", name, err),
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -110,14 +110,14 @@ impl NanoclClient {
             status: StatusCode::INTERNAL_SERVER_ERROR,
           })?;
           payload_size = 0;
-          let _ = tx.send(json);
+          let _ = sx.send(json);
         }
       }
-      tx.close();
+      sx.close();
       Ok::<(), NanoclClientError>(())
     });
 
-    Ok(rx_body)
+    Ok(rx)
   }
 
   /// ## Delete a cargo image

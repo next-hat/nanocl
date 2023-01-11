@@ -1,3 +1,6 @@
+/*
+* Endpoints for system information
+*/
 use std::sync::{Arc, Mutex};
 
 use ntex::web;
