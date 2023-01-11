@@ -79,4 +79,19 @@ mod tests {
     );
     Ok(())
   }
+
+  #[ntex::test]
+  async fn watch_events() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+    let resp = srv.get("/events").send().await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::OK,
+      "Expect status to be {} got {}",
+      StatusCode::OK,
+      status
+    );
+    Ok(())
+  }
 }
