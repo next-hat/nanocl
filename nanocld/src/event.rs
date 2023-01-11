@@ -1,8 +1,6 @@
-use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::MutexGuard;
 use std::task::Context;
 use std::task::Poll;
 use std::time::Duration;
@@ -57,16 +55,17 @@ impl EventEmitter {
         new_clients.push(client.clone());
       }
     }
-    log::debug!("new clients : {:#?}", &new_clients.len());
+    log::debug!("alive c lients : {:#?}", &new_clients.len());
     self.clients = new_clients;
   }
 
   fn spawn_check_connection(this: Arc<Mutex<Self>>) {
     rt::spawn(async move {
-      let task = interval(Duration::from_secs(1));
-      task.tick().await;
-      this.lock().unwrap().check_connection();
-      Self::spawn_check_connection(this);
+      loop {
+        let task = interval(Duration::from_secs(10));
+        task.tick().await;
+        this.lock().unwrap().check_connection();
+      }
     });
   }
 
@@ -106,5 +105,78 @@ impl Stream for Client {
       Poll::Ready(None) => Poll::Ready(None),
       Poll::Pending => Poll::Pending,
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+
+  use super::*;
+
+  use crate::utils::tests::*;
+
+  #[ntex::test]
+  async fn basic_test() -> TestRet {
+    // Create the event emitter
+    let event_emitter = EventEmitter::new();
+
+    // Create a client
+    let mut client = event_emitter.lock().unwrap().subscribe();
+
+    // Send namespace created event
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::NamespaceCreated("test".to_string()));
+
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    // Send cargo created event
+    let cargo = CargoInspect::default();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoCreated(Box::new(cargo)));
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    // Send cargo deleted event
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoDeleted("global-event-test".into()));
+
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    // Send cargo started event
+    let cargo = CargoInspect::default();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoStarted(Box::new(cargo)));
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    // Send cargo stopped event
+    let cargo = CargoInspect::default();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoStopped(Box::new(cargo)));
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    // Send cargo patched event
+    let cargo = CargoInspect::default();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoPatched(Box::new(cargo)));
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    Ok(())
   }
 }
