@@ -66,7 +66,6 @@ impl NanoclClient {
       let mut buffer = BytesMut::new();
       let mut stream = res.into_stream();
       while let Some(item) = stream.try_next().await.unwrap() {
-        println!("GOT: {:?}", item);
         buffer.extend_from_slice(&item);
         if item.last() == Some(&b'\n') {
           let event = serde_json::from_slice::<Event>(&buffer).unwrap();
