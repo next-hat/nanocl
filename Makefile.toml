@@ -44,12 +44,12 @@ args = ["test", "--", "--nocapture"]
 # Test coverage
 [tasks.cov]
 command = "cargo"
-args = ["llvm-cov", "nextest", "--all"]
+args = ["llvm-cov", "nextest", "-j", "4"]
 
 # Test all with coverage for codecov
 [tasks.covgen]
 command = "cargo"
-args = ["llvm-cov", "nextest", "--all", "--output-path", "./lcov.info", "--lcov"]
+args = ["llvm-cov", "nextest", "-j", "4", "--output-path", "./lcov.info", "--lcov"]
 
 # Release
 [tasks.release]

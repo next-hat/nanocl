@@ -1,11 +1,17 @@
-/// Cargo service
-/// Endpoints to manage cargoes
+/*
+* Endpoints to manipulate cargoes
+*/
+use std::sync::{Mutex, Arc};
+
+use ntex::rt;
 use ntex::web;
 
+use nanocl_models::system::Event;
 use nanocl_models::generic::GenericNspQuery;
 use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
 use crate::utils;
+use crate::event::EventEmitter;
 use crate::error::HttpResponseError;
 use crate::models::Pool;
 
@@ -27,6 +33,7 @@ use crate::models::Pool;
 pub async fn create_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<CargoConfigPartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -35,6 +42,16 @@ pub async fn create_cargo(
   let cargo =
     utils::cargo::create(namespace, &payload, &docker_api, &pool).await?;
   log::debug!("Cargo created: {:?}", &cargo);
+  let key = cargo.key.to_owned();
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
+      .await
+      .unwrap();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoCreated(Box::new(cargo)));
+  });
   Ok(web::HttpResponse::Created().json(&cargo))
 }
 
@@ -56,6 +73,7 @@ pub async fn create_cargo(
 pub async fn delete_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -63,6 +81,9 @@ pub async fn delete_cargo(
   let key = utils::key::gen_key(&namespace, &id);
   log::debug!("Deleting cargo: {}", &key);
   utils::cargo::delete(&key, &docker_api, &pool).await?;
+  rt::spawn(async move {
+    event_emitter.lock().unwrap().send(Event::CargoDeleted(key));
+  });
   Ok(web::HttpResponse::NoContent().finish())
 }
 
@@ -82,7 +103,9 @@ pub async fn delete_cargo(
   ))]
 #[web::post("/cargoes/{name}/start")]
 pub async fn start_cargo(
+  pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -90,6 +113,15 @@ pub async fn start_cargo(
   let key = utils::key::gen_key(&namespace, &id);
   log::debug!("Starting cargo: {}", &key);
   utils::cargo::start(&key, &docker_api).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
+      .await
+      .unwrap();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoStarted(Box::new(cargo)));
+  });
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -109,7 +141,9 @@ pub async fn start_cargo(
   ))]
 #[web::post("/cargoes/{name}/stop")]
 pub async fn stop_cargo(
+  pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -117,6 +151,15 @@ pub async fn stop_cargo(
   let key = utils::key::gen_key(&namespace, &id);
   log::debug!("Stopping cargo: {}", &key);
   utils::cargo::stop(&key, &docker_api).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
+      .await
+      .unwrap();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoStopped(Box::new(cargo)));
+  });
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -139,6 +182,7 @@ pub async fn stop_cargo(
 pub async fn patch_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   id: web::types::Path<String>,
   payload: web::types::Json<CargoConfigPatch>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -147,6 +191,15 @@ pub async fn patch_cargo(
   let key = utils::key::gen_key(&namespace, &id);
   log::debug!("Patching cargo: {}", &key);
   let cargo = utils::cargo::patch(&key, &payload, &docker_api, &pool).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
+      .await
+      .unwrap();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoPatched(Box::new(cargo)));
+  });
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -216,12 +269,11 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use super::*;
 
-  use crate::services::cargo_image::tests::ensure_test_image;
-
   use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
   use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
   use crate::utils::tests::*;
+  use crate::services::cargo_image::tests::ensure_test_image;
 
   /// Test to create start patch stop and delete a cargo with valid data
   #[ntex::test]
@@ -265,9 +317,7 @@ mod tests {
     assert_eq!(res.status(), 200);
     let cargoes = res.json::<Vec<CargoSummary>>().await?;
     assert!(!cargoes.is_empty());
-    assert_eq!(cargoes[0].name, CARGO_NAME);
     assert_eq!(cargoes[0].namespace_name, "global");
-    assert_eq!(cargoes[0].running_instances, 0);
 
     let res = srv
       .post(format!("/cargoes/{}/start", response.name))

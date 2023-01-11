@@ -1,9 +1,11 @@
-/// Manage nanocl namespace
+/*
+* Endpoints to manipulate namespaces
+*/
 use ntex::web;
 
 use nanocl_models::namespace::NamespacePartial;
 
-use crate::{repositories, utils};
+use crate::{utils, repositories};
 use crate::models::Pool;
 
 use crate::error::HttpResponseError;
