@@ -2,7 +2,6 @@
   <img src="https://download.next-hat.com/ressources/images/logo.png" >
   <h1>Nanocl</h1>
   <h3>Hybrid Cloud Orchestrator</h3>
-  <h3>CLI</h3>
   <p>
 
   [![Stars](https://img.shields.io/github/stars/nxthat/nanocl?label=%E2%AD%90%20stars%20%E2%AD%90)](https://github.com/nxthat/nanocl)
@@ -25,6 +24,12 @@
 
   </p>
 
+  <p>
+
+  [![codecov](https://codecov.io/gh/nxthat/nanocl/branch/nightly/graph/badge.svg?token=4I60HOW6HM)](https://codecov.io/gh/nxthat/nanocl)
+
+  </p>
+
 </div>
 
 <blockquote class="tags">
@@ -41,25 +46,28 @@
 
 ## ❓ What is nanocl ?
 
-Nanocl, stand for `Nano Cloud` and it's a lie because you will be able to create big ones.
-I see it as an open-source Hybrid Cloud Orchestrator!
-To help orchestrate containers and virtual machines on multiple hosts.
-It provides basic mechanisms for deployment, maintenance, and scaling.
-Using Nanocl toolskit you will be able to create your own Hybrid Cloud with optional Vpn and DNS controllers.
-Deploying your applications, services or servers publicly or behind a Vpn has never been that easy!
+Nanocl is an open-source platform for orchestrating containers and virtual machines across multiple hosts.
+It’s a shortcut for Nano Cloud! And that's a lie because it can create big ones.
+Your Hybrid Cloud has never been easier to set up!
+I like to call it an `HCO` for Hybrid Cloud Orchestrator.
+On dedicated servers or in your home lab, Nanocl can manage your hosts, network, and the applications running inside.
+It enables you to separate your applications using namespaces, clusters, and networks to ensure the best isolation.
+With Nanocl, you can manage your infrastructure and scale it depending on your need.
+By taking advantage of Nanocl and container methodologies for shipping, testing, and deploying code,
+you can significantly reduce the delay between writing code and shipping it in production.
+With logs, auto fail-over automatic backups, and zero downtime, you can sleep while Nanocl takes care of your infrastructure.
+Your own AWS at home? With Nanocl, it’s now possible and for free!
 
 Builds upon `Rust` to have the best performance and the smallest footprint.
 It uses the best ideas and practices from the community.
 You can build an entire CI/CD pipeline from tests to high-availability production.
 See it as a Kubernetes alternative with more features and a network security layer.
 
-This repository is the CLI version you can see the DAEMON [here](https://github.com/nxthat/nanocld).
-
 ## ✨ Features
 - [x] Manage clusters (CRUD)
 - [x] Manage networks (CRUD)
 - [x] Manage containers (CRUD)
-- [X] Manage DNS entries
+- [x] Manage DNS entries
 - [x] Http proxy
 - [x] Udp/Tcp proxy
 - [x] Monitor http request
