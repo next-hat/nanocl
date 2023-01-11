@@ -31,7 +31,7 @@ pub struct CargoSummary {
   pub running_instances: i64,
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoInspect {
