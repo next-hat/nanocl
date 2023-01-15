@@ -6,3 +6,5 @@ pub mod namespace;
 pub mod cargo;
 /// Manage cargo config
 pub mod cargo_config;
+/// Manage resource
+pub mod resource;
