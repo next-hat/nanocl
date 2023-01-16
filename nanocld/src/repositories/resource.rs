@@ -1,4 +1,5 @@
 use nanocl_models::generic::GenericDelete;
+use ntex::http::StatusCode;
 use ntex::web;
 use diesel::prelude::*;
 
@@ -6,8 +7,7 @@ use crate::repositories::error::db_blocking_error;
 use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::{
-  Pool, ResourceDbModel, ResourceConfigDbModel, ResourcePartial, ResourceKind,
-  Resource,
+  Pool, ResourceDbModel, ResourceConfigDbModel, ResourcePartial, Resource,
 };
 
 pub async fn create_config(
@@ -67,7 +67,7 @@ pub async fn create(
   Ok(item)
 }
 
-pub async fn delete_config_by_resource_key(
+pub async fn delete_resource_by_config_key(
   key: String,
   pool: &Pool,
 ) -> Result<(), HttpResponseError> {
@@ -98,5 +98,48 @@ pub async fn delete_by_key(
   .await
   .map_err(db_blocking_error)?;
   Ok(GenericDelete { count: res })
+}
+
+
+pub async fn find_by_key(key: String, pool: &Pool) -> Result<ResourceDbModel, HttpResponseError> {
+  use crate::schema::resources::dsl;
+  let mut conn = utils::store::get_pool_conn(pool)?;
+  let item = web::block(move || {
+      dsl::resources
+          .filter(dsl::key.eq(key))
+          .get_result(&mut conn)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+  Ok(item)
+}
+
+
+pub async fn find_resource_by_key(
+  key: uuid::Uuid,
+  pool: &Pool,
+) -> Result<Resource, HttpResponseError> {
+  use crate::schema::resource_configs::dsl as rc_dsl;
+  let mut conn = utils::store::get_pool_conn(pool)?;
+  let dbmodel = web::block(move || {
+    rc_dsl::resource_configs
+      .filter(rc_dsl::key.eq(key))
+      .first::<ResourceConfigDbModel>(&mut conn)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  let config = serde_json::from_value::<serde_json::Value>(dbmodel.config)
+    .map_err(|e| HttpResponseError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      msg: format!("Failed to deserialize config: {}", e),
+    })?;
+
+  Ok(Resource {
+    name: dbmodel.resource_key,
+    config_key: dbmodel.key,
+    config,
+    kind: crate::models::ResourceKind::ProxyRule,
+  })
 }
 
