@@ -8,3 +8,5 @@ pub mod cargo;
 pub mod cargo_config;
 /// Manage resource
 pub mod resource;
+/// Manage resource config
+pub mod resource_config;

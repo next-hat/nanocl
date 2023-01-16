@@ -1,17 +1,17 @@
 // @generated automatically by Diesel CLI.
 
 pub mod sql_types {
-    #[derive(diesel::sql_types::SqlType)]
-    #[diesel(postgres_type(name = "node_modes"))]
-    pub struct NodeModes;
+  #[derive(diesel::sql_types::SqlType)]
+  #[diesel(postgres_type(name = "node_modes"))]
+  pub struct NodeModes;
 
-    #[derive(diesel::sql_types::SqlType)]
-    #[diesel(postgres_type(name = "resource_kind"))]
-    pub struct ResourceKind;
+  #[derive(diesel::sql_types::SqlType)]
+  #[diesel(postgres_type(name = "resource_kind"))]
+  pub struct ResourceKind;
 
-    #[derive(diesel::sql_types::SqlType)]
-    #[diesel(postgres_type(name = "ssh_auth_modes"))]
-    pub struct SshAuthModes;
+  #[derive(diesel::sql_types::SqlType)]
+  #[diesel(postgres_type(name = "ssh_auth_modes"))]
+  pub struct SshAuthModes;
 }
 
 diesel::table! {
@@ -56,7 +56,7 @@ diesel::table! {
     resource_configs (key) {
         key -> Uuid,
         resource_key -> Varchar,
-        config -> Jsonb,
+        data -> Jsonb,
     }
 }
 
@@ -71,11 +71,13 @@ diesel::table! {
     }
 }
 
+joinable!(resources -> resource_configs(config_key));
+
 diesel::allow_tables_to_appear_in_same_query!(
-    cargo_configs,
-    cargoes,
-    namespaces,
-    nodes,
-    resource_configs,
-    resources,
+  cargo_configs,
+  cargoes,
+  namespaces,
+  nodes,
+  resource_configs,
+  resources,
 );
