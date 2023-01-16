@@ -41,7 +41,7 @@ uuid = { version = "1.2", features = ["serde", "v4"] }
 ntex = { version = "0.6.0", features = ["rustls", "tokio"] }
 diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
 diesel = { version = "2.0.1", features = ["postgres", "r2d2", "chrono", "uuid", "serde_json"] }
-rustls = "0.20.7"
+rustls = "0.20.8"
 rustls-pemfile = "1.0.1"
 tokio = { version = "1.23.1", features = ["fs"] }
 
