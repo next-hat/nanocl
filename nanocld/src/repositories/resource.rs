@@ -94,3 +94,32 @@ pub async fn find(pool: &Pool) -> Result<Vec<Resource>, HttpResponseError> {
     .collect::<Vec<Resource>>();
   Ok(items)
 }
+
+pub async fn inspect(
+  key: String,
+  pool: &Pool,
+) -> Result<Resource, HttpResponseError> {
+    use crate::schema::resources;
+    use crate::schema::resource_configs;
+
+    let mut conn = utils::store::get_pool_conn(pool)?;
+
+    let res: (ResourceDbModel, ResourceConfigDbModel) =
+      web::block(move || {
+        resources::table
+          .inner_join(resource_configs::table)
+          .filter(resources::key.eq(key))
+          .first(&mut conn)
+      })
+      .await
+      .map_err(db_blocking_error)?;
+
+    let item = Resource {
+      name: res.0.key,
+      kind: res.0.kind,
+      config_key: res.0.config_key,
+      config: res.1.data,
+    };
+
+    Ok(item)
+}

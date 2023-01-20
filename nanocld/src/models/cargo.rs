@@ -1,4 +1,4 @@
-use crate::schema::{cargoes, cargo_configs};
+use crate::schema::cargoes;
 
 use nanocl_models::cargo_config::CargoConfigPartial;
 

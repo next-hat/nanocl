@@ -1,7 +1,6 @@
 /*
 * Endpoints to manipulate resources
 */
-
 use ntex::web;
 
 use crate::models::ResourcePartial;
@@ -79,10 +78,36 @@ pub async fn list_resource(
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
+// Endpoint to inspect resource
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  path = "/resources/{name}/inspect",
+  params(
+    ("name" = String, Path, description = "Name of the resource to inspect"),
+  ),
+  responses(
+    (status = 200, description = "Resource", body = Resource),
+    (status = 400, description = "Generic database error", body = ApiError),
+    (status = 404, description = "Resource not found", body = ApiError),
+  ),
+))]
+#[web::get("/resources/{name}")]
+pub async fn inspect_resource(
+  pool: web::types::State<Pool>,
+  name: web::types::Path<String>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let key = name.into_inner();
+  log::debug!("Inspecting resource: {}", &key); // item?
+  let resource = repositories::resource::inspect(key.to_owned(), &pool).await?;
+  log::debug!("Resource found: {:?}", &resource);
+  Ok(web::HttpResponse::Ok().json(&resource))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_resource);
   config.service(delete_resource);
   config.service(list_resource);
+  config.service(inspect_resource);
 }
 
 #[cfg(test)]
@@ -115,6 +140,14 @@ mod tests {
     let mut resp = srv.get("/resources").send_json(&payload).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let _ = resp.json::<Vec<Resource>>().await.unwrap();
+
+    // Inspect
+    let mut resp = srv.get("/resources/test_resource").send().await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let resource = resp.json::<Resource>().await.unwrap();
+    assert_eq!(resource.name, "test_resource");
+    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.config, json!({"test":"value"}));
 
     // Delete
     let resp = srv.delete("/resources/test_resource").send().await.unwrap();

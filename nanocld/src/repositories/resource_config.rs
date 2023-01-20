@@ -1,14 +1,10 @@
-use nanocl_models::generic::GenericDelete;
-
 use ntex::web;
 use diesel::prelude::*;
 
 use crate::repositories::error::db_blocking_error;
 use crate::utils;
 use crate::error::HttpResponseError;
-use crate::models::{
-  Pool, ResourceDbModel, ResourceConfigDbModel, ResourcePartial, Resource,
-};
+use crate::models::{Pool, ResourceConfigDbModel};
 
 pub async fn create(
   item: ResourceConfigDbModel,

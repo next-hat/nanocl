@@ -35,7 +35,3 @@ pub struct Resource {
   pub(crate) config_key: uuid::Uuid,
   pub(crate) config: serde_json::Value,
 }
-
-pub struct ResourcePathPartial {
-  
-}
