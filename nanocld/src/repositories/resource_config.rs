@@ -23,29 +23,6 @@ pub async fn create(
   Ok(dbmodel)
 }
 
-pub async fn find_by_resource_key(
-  key: uuid::Uuid,
-  pool: &Pool,
-) -> Result<ResourceUpdateModel, HttpResponseError> {
-  use crate::schema::resource_configs::dsl;
-
-  let mut conn = utils::store::get_pool_conn(pool)?;
-  let dbmodel = web::block(move || {
-    dsl::resource_configs
-      .filter(dsl::key.eq(key))
-      .first::<ResourceConfigDbModel>(&mut conn)
-  })
-  .await
-  .map_err(db_blocking_error)?;
-
-  let resource_update_model = ResourceUpdateModel {
-    key: Some(dbmodel.resource_key),
-    config_key: Some(dbmodel.key),
-  };
-
-  Ok(resource_update_model)
-}
-
 pub async fn delete_by_resource_key(
   key: String,
   pool: &Pool,

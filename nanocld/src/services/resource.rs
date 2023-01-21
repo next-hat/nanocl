@@ -103,7 +103,6 @@ pub async fn inspect_resource(
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
-
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_resource);
   config.service(delete_resource);

@@ -7,9 +7,10 @@ use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::{
   Pool, Resource, ResourcePartial, ResourceDbModel, ResourceConfigDbModel,
+  ResourceUpdateModel,
 };
 
-use super::resource_config::{self, find_by_resource_key};
+use super::resource_config;
 use super::error::db_blocking_error;
 
 pub async fn create(
@@ -120,5 +121,44 @@ pub async fn inspect(
     config: res.1.data,
   };
 
+  Ok(item)
+}
+
+pub async fn patch(
+  key: String,
+  item: ResourcePartial,
+  pool: &Pool,
+) -> Result<Resource, HttpResponseError> {
+  use crate::schema::resources;
+
+  let config = ResourceConfigDbModel {
+    key: uuid::Uuid::new_v4(),
+    resource_key: item.name.to_owned(),
+    data: item.config,
+  };
+
+  let config = resource_config::create(config.to_owned(), pool).await?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
+
+  let resource_update = ResourceUpdateModel {
+    key: None,
+    config_key: Some(config.key.to_owned()),
+  };
+
+  web::block(move || {
+    diesel::update(resources::table)
+      .filter(resources::key.eq(key))
+      .set(&resource_update)
+      .execute(&mut conn)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  let item = Resource {
+    name: item.name,
+    kind: item.kind,
+    config_key: config.key,
+    config: config.data,
+  };
   Ok(item)
 }
