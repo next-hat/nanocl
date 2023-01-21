@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use crate::repositories::error::db_blocking_error;
 use crate::utils;
 use crate::error::HttpResponseError;
-use crate::models::{Pool, ResourceConfigDbModel, ResourceUpdateModel};
+use crate::models::{Pool, ResourceConfigDbModel};
 
 pub async fn create(
   item: ResourceConfigDbModel,

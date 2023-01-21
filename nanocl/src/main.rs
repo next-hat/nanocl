@@ -114,7 +114,7 @@ mod tests {
   }
 
   /// Test Setup command
-  // #[ntex::test]
+  #[ntex::test]
   async fn _test_setup() {
     let args = Cli::parse_from(["nanocl", "setup"]);
     assert!(execute_args(&args).await.is_ok());
