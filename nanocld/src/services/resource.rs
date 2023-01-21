@@ -3,7 +3,7 @@
 */
 use ntex::web;
 
-use crate::models::ResourcePartial;
+use crate::models::{ResourcePartial, ResourceUpdateModel};
 use crate::repositories;
 
 use crate::error::HttpResponseError;
@@ -103,11 +103,13 @@ pub async fn inspect_resource(
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_resource);
   config.service(delete_resource);
   config.service(list_resource);
   config.service(inspect_resource);
+  config.service(patch_resource);
 }
 
 #[cfg(test)]

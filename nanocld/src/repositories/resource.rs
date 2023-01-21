@@ -9,7 +9,7 @@ use crate::models::{
   Pool, Resource, ResourcePartial, ResourceDbModel, ResourceConfigDbModel,
 };
 
-use super::resource_config;
+use super::resource_config::{self, find_by_resource_key};
 use super::error::db_blocking_error;
 
 pub async fn create(
@@ -99,27 +99,26 @@ pub async fn inspect(
   key: String,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
-    use crate::schema::resources;
-    use crate::schema::resource_configs;
+  use crate::schema::resources;
+  use crate::schema::resource_configs;
 
-    let mut conn = utils::store::get_pool_conn(pool)?;
+  let mut conn = utils::store::get_pool_conn(pool)?;
 
-    let res: (ResourceDbModel, ResourceConfigDbModel) =
-      web::block(move || {
-        resources::table
-          .inner_join(resource_configs::table)
-          .filter(resources::key.eq(key))
-          .first(&mut conn)
-      })
-      .await
-      .map_err(db_blocking_error)?;
+  let res: (ResourceDbModel, ResourceConfigDbModel) = web::block(move || {
+    resources::table
+      .inner_join(resource_configs::table)
+      .filter(resources::key.eq(key))
+      .first(&mut conn)
+  })
+  .await
+  .map_err(db_blocking_error)?;
 
-    let item = Resource {
-      name: res.0.key,
-      kind: res.0.kind,
-      config_key: res.0.config_key,
-      config: res.1.data,
-    };
+  let item = Resource {
+    name: res.0.key,
+    kind: res.0.kind,
+    config_key: res.0.config_key,
+    config: res.1.data,
+  };
 
-    Ok(item)
+  Ok(item)
 }

@@ -35,3 +35,8 @@ pub struct Resource {
   pub(crate) config_key: uuid::Uuid,
   pub(crate) config: serde_json::Value,
 }
+
+pub struct ResourceUpdateModel {
+  pub(crate) key: Option<String>,
+  pub(crate) config_key: Option<uuid::Uuid>,
+}
