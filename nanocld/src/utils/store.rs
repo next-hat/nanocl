@@ -18,7 +18,7 @@ use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::{utils, repositories};
 use crate::error::{DaemonError, HttpResponseError};
-use crate::models::{Pool, DBConn, ArgState, CargoPartial};
+use crate::models::{Pool, DBConn, ArgState};
 
 /// Generate HostConfig struct for container creation
 ///
@@ -187,14 +187,17 @@ pub async fn boot(
   Ok(())
 }
 
-/// Register store as a cargo
+/// # Register store as a cargo
 ///
 /// ## Arguments
-/// [arg](ArgState) Reference to argument state
+///
+/// - [arg](ArgState) Reference to argument state
 ///
 /// ## Returns
+///
 /// - [Result](Result) Result of the registration process
 /// - [DaemonError](DaemonError) Error if unable to register store
+///
 pub async fn register(arg: &ArgState) -> Result<(), DaemonError> {
   let name = "store";
   let key = utils::key::gen_key(&arg.sys_namespace, name);
@@ -205,11 +208,7 @@ pub async fn register(arg: &ArgState) -> Result<(), DaemonError> {
     return Ok(());
   }
   let config = gen_store_cargo_conf(name, &arg.config);
-  let cargo = CargoPartial {
-    name: config.name.to_owned(),
-    config,
-  };
-  repositories::cargo::create(arg.sys_namespace.to_owned(), cargo, &arg.pool)
+  repositories::cargo::create(arg.sys_namespace.to_owned(), config, &arg.pool)
     .await?;
 
   Ok(())

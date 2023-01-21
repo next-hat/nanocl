@@ -9,7 +9,7 @@ use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
 
 use crate::repositories;
 use crate::error::HttpResponseError;
-use crate::models::{Pool, CargoPartial};
+use crate::models::Pool;
 
 /// ## Create instance
 ///
@@ -132,12 +132,8 @@ pub async fn create(
   docker_api: &bollard::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
-  let cargo_partial = CargoPartial {
-    name: config.name.to_owned(),
-    config: config.to_owned(),
-  };
   let cargo =
-    repositories::cargo::create(namespace, cargo_partial, pool).await?;
+    repositories::cargo::create(namespace, config.to_owned(), pool).await?;
 
   if let Err(err) = create_instance(&cargo, 1, docker_api).await {
     repositories::cargo::delete_by_key(cargo.key.to_owned(), pool).await?;
@@ -285,24 +281,21 @@ pub async fn patch(
     repositories::cargo_config::find_by_key(cargo.config_key.to_owned(), pool)
       .await?;
 
-  let cargo_partial = CargoPartial {
+  let cargo_partial = CargoConfigPartial {
     name: config.name.to_owned().unwrap_or(cargo.name),
-    config: CargoConfigPartial {
-      name: config.name.to_owned().unwrap_or(cargo_config.name),
-      dns_entry: if config.dns_entry.is_some() {
-        config.dns_entry.to_owned()
-      } else {
-        cargo_config.dns_entry.to_owned()
-      },
-      container: config
-        .container
-        .to_owned()
-        .unwrap_or(cargo_config.container),
-      replication: if config.replication.is_some() {
-        config.replication.to_owned()
-      } else {
-        cargo_config.replication.to_owned()
-      },
+    dns_entry: if config.dns_entry.is_some() {
+      config.dns_entry.to_owned()
+    } else {
+      cargo_config.dns_entry.to_owned()
+    },
+    container: config
+      .container
+      .to_owned()
+      .unwrap_or(cargo_config.container),
+    replication: if config.replication.is_some() {
+      config.replication.to_owned()
+    } else {
+      cargo_config.replication.to_owned()
     },
   };
 

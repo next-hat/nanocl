@@ -1,16 +1,15 @@
-use nanocl_models::cargo_config::{CargoConfig, CargoConfigPartial};
 use ntex::web;
 use ntex::http::StatusCode;
 use diesel::prelude::*;
 
 use nanocl_models::cargo::Cargo;
 use nanocl_models::generic::GenericDelete;
+use nanocl_models::cargo_config::{CargoConfig, CargoConfigPartial};
 
 use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::{
-  Pool, CargoPartial, CargoDbModel, NamespaceDbModel, CargoUpdateDbModel,
-  CargoConfigDbModel,
+  Pool, CargoDbModel, NamespaceDbModel, CargoUpdateDbModel, CargoConfigDbModel,
 };
 
 use super::cargo_config;
@@ -71,25 +70,31 @@ pub async fn find_by_namespace(
 /// ## Examples
 ///
 /// ```rust,norun
-/// use nanocl_models::cargo::CargoPartial;
+/// use nanocl_models::cargo::CargoConfigPartial;
 ///
-/// let item = CargoPartial {
-///   name: String::from("test"),
+/// let item = CargoConfigPartial {
 ///   //... fill required data
+///   name: String::from("test"),
+///   container: bollard::container::Config {
+///     image: Some(String::from("test")),
+///     ..Default::default()
+///   },
+///   ..Default::default()
 /// };
 /// let cargo = create(String::from("test"), item, &pool).await;
 /// ```
 ///
 pub async fn create(
   nsp: String,
-  item: CargoPartial,
+  item: CargoConfigPartial,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
   let key = utils::key::gen_key(&nsp, &item.name);
 
-  let config = cargo_config::create(key.to_owned(), item.config, pool).await?;
+  let config =
+    cargo_config::create(key.to_owned(), item.to_owned(), pool).await?;
 
   let new_item = CargoDbModel {
     key,
@@ -200,7 +205,7 @@ pub async fn find_by_key(
 /// ## Arguments
 ///
 /// - [key](String) - Cargo key
-/// - [item](CargoPartial) - Cargo item
+/// - [item](CargoConfigPartial) - Cargo config
 /// - [pool](Pool) - Database connection pool
 ///
 /// ## Returns
@@ -212,22 +217,28 @@ pub async fn find_by_key(
 /// ## Examples
 ///
 /// ```rust,norun
-/// use nanocl_models::cargo::CargoPartial;
-/// let item = CargoPartial {
-///  name: String::from("test"),
+/// use nanocl_models::cargo::CargoConfigPartial;
+/// let item = CargoConfigPartial {
 ///  //... fill required data
+///  name: String::from("test"),
+///  container: bollard::container::Config {
+///   image: Some(String::from("test")),
+///   ..Default::default()
+///  },
+///  ..Default::default()
 /// };
 /// let cargo = update_by_key(String::from("test"), item, &pool).await;
 /// ```
 ///
 pub async fn update_by_key(
   key: String,
-  item: CargoPartial,
+  item: CargoConfigPartial,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
-  let config = cargo_config::create(key.to_owned(), item.config, pool).await?;
+  let config =
+    cargo_config::create(key.to_owned(), item.to_owned(), pool).await?;
 
   let new_item = CargoUpdateDbModel {
     name: Some(item.name),
