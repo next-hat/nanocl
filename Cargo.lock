@@ -954,7 +954,10 @@ name = "nanocl-models"
 version = "0.0.1"
 dependencies = [
  "bollard",
+ "diesel",
+ "diesel-derive-enum",
  "serde",
+ "serde_json",
  "uuid",
 ]
 

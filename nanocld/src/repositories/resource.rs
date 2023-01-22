@@ -6,9 +6,10 @@ use nanocl_models::generic::GenericDelete;
 use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::{
-  Pool, Resource, ResourcePartial, ResourceDbModel, ResourceConfigDbModel,
-  ResourceUpdateModel,
+  Pool, ResourceDbModel, ResourceConfigDbModel, ResourceUpdateModel,
 };
+
+use nanocl_models::resource::{Resource, ResourcePartial};
 
 use super::resource_config;
 use super::error::db_blocking_error;
