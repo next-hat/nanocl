@@ -1382,7 +1382,6 @@ dependencies = [
  "futures",
  "hyper",
  "indicatif",
- "nanocl-models",
  "nanocl_client",
  "nanocl_models",
  "ntex",
@@ -1396,18 +1395,6 @@ dependencies = [
  "tokio-util",
  "url",
  "users",
-]
-
-[[package]]
-name = "nanocl-models"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af6818fd54abbd730e8eb2fbe30dd943420bf5fff4a126c3da76e2362943134e"
-dependencies = [
- "bollard",
- "serde",
- "serde_json",
- "uuid",
 ]
 
 [[package]]
