@@ -1,3 +1,4 @@
+use nanocl_models::generic::GenericDelete;
 use ntex::web;
 use ntex::http::StatusCode;
 use diesel::prelude::*;
@@ -77,4 +78,21 @@ pub async fn find_by_key(
     replication: config.replication,
     container: config.container,
   })
+}
+
+pub async fn delete_by_cargo_key(
+  key: String,
+  pool: &Pool,
+) -> Result<GenericDelete, HttpResponseError> {
+  use crate::schema::cargo_configs::dsl;
+
+  let mut conn = utils::store::get_pool_conn(pool)?;
+  let res = web::block(move || {
+    diesel::delete(dsl::cargo_configs)
+      .filter(dsl::cargo_key.eq(key))
+      .execute(&mut conn)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+  Ok(GenericDelete { count: res })
 }

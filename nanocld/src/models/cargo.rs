@@ -1,14 +1,6 @@
 use crate::schema::cargoes;
 
-use nanocl_models::cargo_config::CargoConfigPartial;
-
 use super::namespace::NamespaceDbModel;
-
-/// Structure to create a a new Cargo
-pub struct CargoPartial {
-  pub name: String,
-  pub config: CargoConfigPartial,
-}
 
 /// Structure to create a cargo in the database
 #[derive(Debug, Queryable, Identifiable, Insertable, Associations)]
