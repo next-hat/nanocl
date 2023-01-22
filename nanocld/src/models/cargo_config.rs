@@ -1,6 +1,6 @@
-use super::cargo::CargoDbModel;
-
 use crate::schema::cargo_configs;
+
+use super::cargo::CargoDbModel;
 
 /// A cargo config item is the object stored in database
 #[derive(Queryable, Identifiable, Insertable, Associations)]
