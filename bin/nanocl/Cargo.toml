@@ -29,8 +29,8 @@ bollard = { version = "*" }
 chrono = "0.4.23"
 
 [dependencies]
-nanocl-client = "0.0.1"
-nanocl-models = { version = "0.0.1", features = ["serde"] }
+nanocl_client = { version = "0.0.1", features = ["tokio"] }
+nanocl_models = { version = "0.0.1", features = ["serde"] }
 bollard = { version = "0.14" }
 futures = "0.3"
 serde_yaml = "0.9"
@@ -38,9 +38,9 @@ tabled = "0.10.0"
 indicatif = "0.17.3"
 serde_json = "1.0.89"
 thiserror = "1.0.37"
+ntex = { version = "0.6.0", features = ["rustls", "tokio"] }
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "4.1.1", features = ["derive"] }
-ntex = { version = "0.6.0", features = ["rustls", "tokio"] }
 url = { version = "2.3.1", features = ["serde"] }
 tokio = { version = "1.23.1", features = ["fs"] }
 hyper = "0.14.20"

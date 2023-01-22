@@ -1,5 +1,5 @@
 [package]
-name = "nanocl-models"
+name = "nanocl_models"
 version = "0.0.1"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
