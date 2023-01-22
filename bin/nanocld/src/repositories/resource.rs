@@ -2,6 +2,7 @@ use ntex::web;
 use diesel::prelude::*;
 
 use nanocl_models::generic::GenericDelete;
+use nanocl_models::resource::{Resource, ResourcePartial};
 
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
@@ -9,11 +10,38 @@ use crate::models::{
   Pool, ResourceDbModel, ResourceConfigDbModel, ResourceUpdateModel,
 };
 
-use nanocl_models::resource::{Resource, ResourcePartial};
-
 use super::resource_config;
 use super::error::db_blocking_error;
 
+/// ## Create resource
+///
+/// Create a resource item in database
+///
+/// ## Arguments
+///
+/// - [item](ResourcePartial) - Resource item
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](Resource) - Resource created
+///   - [Err](HttpResponseError) - Error during the operation
+///
+/// ## Examples
+///
+/// ```rust,norun
+/// use nanocl_models::resource::ResourcePartial;
+/// use crate::repositories;
+///
+/// let item = ResourcePartial {
+///  name: String::from("my-resource"),
+///  // fill your values
+/// };
+///
+/// let item = repositories::resource::create(item, &pool).await;
+/// ```
+///
 pub async fn create(
   item: ResourcePartial,
   pool: &Pool,
@@ -54,6 +82,29 @@ pub async fn create(
   Ok(item)
 }
 
+/// ## Delete resource by key
+///
+/// Delete a resource item in database by key
+///
+/// ## Arguments
+///
+/// - [key](String) - Resource key
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](GenericDelete) - Number of deleted items
+///   - [Err](HttpResponseError) - Error during the operation
+///
+/// ## Examples
+///
+/// ```rust,norun
+/// use crate::repositories;
+///
+/// repositories::resource::delete_by_key(String::from("my-resource"), &pool).await;
+/// ```
+///
 pub async fn delete_by_key(
   key: String,
   pool: &Pool,
@@ -71,6 +122,28 @@ pub async fn delete_by_key(
   Ok(GenericDelete { count: res })
 }
 
+/// ## Find resources
+///
+/// Find all resources in database
+///
+/// ## Arguments
+///
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](Vec<Resource>) - List of resources
+///   - [Err](HttpResponseError) - Error during the operation
+///
+/// ## Examples
+///
+/// ```rust,norun
+/// use crate::repositories;
+///
+/// let items = repositories::resource::find(&pool).await;
+/// ```
+///
 pub async fn find(pool: &Pool) -> Result<Vec<Resource>, HttpResponseError> {
   use crate::schema::resources;
 
@@ -97,7 +170,30 @@ pub async fn find(pool: &Pool) -> Result<Vec<Resource>, HttpResponseError> {
   Ok(items)
 }
 
-pub async fn inspect(
+/// ## Inspect resource by key
+///
+/// Inspect a resource item in database by key
+///
+/// ## Arguments
+///
+/// - [key](String) - Resource key
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///  - [Ok](Resource) - Resource item
+/// - [Err](HttpResponseError) - Error during the operation
+///
+/// ## Examples
+///
+/// ```rust,norun
+/// use crate::repositories;
+///
+/// let item = repositories::resource::inspect_by_key(String::from("my-resource"), &pool).await;
+/// ```
+///
+pub async fn inspect_by_key(
   key: String,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
@@ -125,14 +221,39 @@ pub async fn inspect(
   Ok(item)
 }
 
-pub async fn patch(
+/// ## Update resource by key
+///
+/// Update a resource item in database by key
+///
+/// ## Arguments
+///
+/// - [key](String) - Resource key
+/// - [item](serde_json::Value) - Resource item
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///  - [Ok](Resource) - Resource item
+/// - [Err](HttpResponseError) - Error during the operation
+///
+/// ## Examples
+///
+/// ```rust,norun
+/// use crate::repositories;
+///
+/// let item = repositories::resource::update_by_id(String::from("my-resource"), json!({"foo": "bar"}), &pool).await;
+/// ```
+///
+pub async fn update_by_id(
   key: String,
   item: serde_json::Value,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
   use crate::schema::resources;
 
-  let resource = repositories::resource::inspect(key.to_owned(), pool).await?;
+  let resource =
+    repositories::resource::inspect_by_key(key.to_owned(), pool).await?;
 
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
