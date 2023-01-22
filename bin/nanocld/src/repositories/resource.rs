@@ -3,7 +3,7 @@ use diesel::prelude::*;
 
 use nanocl_models::generic::GenericDelete;
 
-use crate::utils;
+use crate::{utils, repositories};
 use crate::error::HttpResponseError;
 use crate::models::{
   Pool, ResourceDbModel, ResourceConfigDbModel, ResourceUpdateModel,
@@ -127,15 +127,17 @@ pub async fn inspect(
 
 pub async fn patch(
   key: String,
-  item: ResourcePartial,
+  item: serde_json::Value,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
   use crate::schema::resources;
 
+  let resource = repositories::resource::inspect(key.to_owned(), pool).await?;
+
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
-    resource_key: item.name.to_owned(),
-    data: item.config,
+    resource_key: key.to_owned(),
+    data: item,
   };
 
   let config = resource_config::create(config.to_owned(), pool).await?;
@@ -156,8 +158,8 @@ pub async fn patch(
   .map_err(db_blocking_error)?;
 
   let item = Resource {
-    name: item.name,
-    kind: item.kind,
+    name: resource.name,
+    kind: resource.kind,
     config_key: config.key,
     config: config.data,
   };

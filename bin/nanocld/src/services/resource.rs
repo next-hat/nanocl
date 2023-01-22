@@ -143,7 +143,7 @@ pub async fn patch_resource(
   pool: web::types::State<Pool>,
   name: web::types::Path<String>,
   event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
-  web::types::Json(payload): web::types::Json<ResourcePartial>,
+  web::types::Json(payload): web::types::Json<serde_json::Value>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let key = name.into_inner();
   log::debug!("Patching resource: {} with payload: {:?}", &key, &payload);
@@ -207,11 +207,7 @@ mod tests {
     assert_eq!(resource.config, json!({"test":"value"}));
 
     // Patch
-    let patch_payload = ResourcePartial {
-      name: "test_resource".to_owned(),
-      kind: ResourceKind::ProxyRule,
-      config: json!({"test":"new_value"}),
-    };
+    let patch_payload = json!({"test":"new_value"});
     let mut resp = srv
       .patch("/resources/test_resource")
       .send_json(&patch_payload)
