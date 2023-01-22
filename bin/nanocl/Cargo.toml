@@ -25,7 +25,7 @@ clap_complete = "4.1.0"
 clap_mangen = { version = "0.2" }
 tabled = "0.10.0"
 nanocl_models = { version = "*", features = ["serde"] }
-bollard = { version = "*" }
+bollard = { version = "0.14" }
 chrono = "0.4.23"
 
 [dependencies]
