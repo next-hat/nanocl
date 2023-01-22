@@ -247,6 +247,7 @@ pub async fn delete(
   }
 
   repositories::cargo::delete_by_key(cargo_key.to_owned(), pool).await?;
+  repositories::cargo_config::delete_by_cargo_key(cargo_key.to_owned(), pool).await?;
 
   Ok(())
 }
