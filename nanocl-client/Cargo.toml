@@ -10,7 +10,7 @@ homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
 repository = "https://github.com/nxthat/nanocl"
 
 [dependencies]
-bollard = "*"
+bollard = "0.14"
 futures = "0.3.25"
 nanocl-models = { version = "*", features = ["serde"] }
 ntex = { version = "0.6.0", features = ["tokio"] }
