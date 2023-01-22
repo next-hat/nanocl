@@ -2,6 +2,7 @@
 use serde::{Serialize, Deserialize};
 
 use super::cargo::CargoInspect;
+use super::resource::Resource;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -21,4 +22,7 @@ pub enum Event {
   CargoStarted(Box<CargoInspect>),
   CargoStopped(Box<CargoInspect>),
   CargoPatched(Box<CargoInspect>),
+  ResourceCreated(Box<Resource>),
+  ResourceDeleted(String),
+  ResourcePatched(Box<Resource>),
 }

@@ -24,7 +24,7 @@ clap = { version = "4.1.1", features = ["derive"] }
 clap_mangen = { version = "0.2" }
 
 [dependencies]
-nanocl-models = { version = "0.0.1", features = ["serde"] }
+nanocl-models = { version = "0.0.1", features = ["serde", "diesel"] }
 bollard = { version = "*" }
 r2d2 = "0.8"
 log = "0.4.17"

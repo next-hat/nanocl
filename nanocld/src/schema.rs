@@ -1,11 +1,4 @@
 // @generated automatically by Diesel CLI.
-
-pub mod sql_types {
-  #[derive(diesel::sql_types::SqlType)]
-  #[diesel(postgres_type(name = "resource_kind"))]
-  pub struct ResourceKind;
-}
-
 diesel::table! {
     cargo_configs (key) {
         key -> Uuid,
@@ -39,7 +32,7 @@ diesel::table! {
 
 diesel::table! {
     use diesel::sql_types::*;
-    use super::sql_types::ResourceKind;
+    use nanocl_models::schema::sql_types::ResourceKind;
 
     resources (key) {
         key -> Varchar,

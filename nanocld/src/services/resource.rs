@@ -1,9 +1,14 @@
+use std::sync::{Arc, Mutex};
+
+use nanocl_models::system::Event;
 /*
 * Endpoints to manipulate resources
 */
-use ntex::web;
+use ntex::{web, rt};
 
-use crate::models::ResourcePartial;
+use nanocl_models::resource::ResourcePartial;
+
+use crate::event::EventEmitter;
 use crate::repositories;
 
 use crate::error::HttpResponseError;
@@ -25,10 +30,18 @@ use crate::models::Pool;
 pub async fn create_resource(
   pool: web::types::State<Pool>,
   web::types::Json(payload): web::types::Json<ResourcePartial>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Creating resource: {:?}", &payload);
   let resource = repositories::resource::create(payload, &pool).await?;
   log::debug!("Resource created: {:?}", &resource);
+  let resource_copy = resource.to_owned();
+  rt::spawn(async move {
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::ResourceCreated(Box::new(resource_copy)));
+  });
   Ok(web::HttpResponse::Created().json(&resource))
 }
 
@@ -49,11 +62,19 @@ pub async fn create_resource(
 pub async fn delete_resource(
   pool: web::types::State<Pool>,
   name: web::types::Path<String>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let key = name.into_inner();
   log::debug!("Deleting resource: {}", &key);
   repositories::resource::delete_by_key(key.to_owned(), &pool).await?;
-  repositories::resource_config::delete_by_resource_key(key, &pool).await?;
+  repositories::resource_config::delete_by_resource_key(key.to_owned(), &pool)
+    .await?;
+  rt::spawn(async move {
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::ResourceDeleted(key));
+  });
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -121,12 +142,20 @@ pub async fn inspect_resource(
 pub async fn patch_resource(
   pool: web::types::State<Pool>,
   name: web::types::Path<String>,
+  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
   web::types::Json(payload): web::types::Json<ResourcePartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let key = name.into_inner();
   log::debug!("Patching resource: {} with payload: {:?}", &key, &payload);
   let resource = repositories::resource::patch(key, payload, &pool).await?;
   log::debug!("Resource patched: {:?}", &resource);
+  let resource_copy = resource.to_owned();
+  rt::spawn(async move {
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::ResourcePatched(Box::new(resource_copy)));
+  });
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
@@ -146,7 +175,7 @@ mod tests {
   use serde_json::json;
 
   use crate::utils::tests::*;
-  use crate::models::{ResourceKind, Resource};
+  use nanocl_models::resource::{ResourceKind, Resource};
 
   #[ntex::test]
   async fn basic() -> TestRet {
