@@ -63,21 +63,6 @@ It uses the best ideas and practices from the community.
 You can build an entire CI/CD pipeline from tests to high-availability production.
 See it as a Kubernetes alternative with more features and a network security layer.
 
-## ✨ Features
-- [x] Manage clusters (CRUD)
-- [x] Manage networks (CRUD)
-- [x] Manage containers (CRUD)
-- [x] Manage DNS entries
-- [x] Http proxy
-- [x] Udp/Tcp proxy
-- [x] Monitor http request
-- [x] Single-node mode
-- [x] Store a git repository state as image
-- [ ] Manage VPN
-- [ ] Highly-scalable distributed node mode
-- [ ] Manage virtual machine (CRUD)
-- [ ] Monitor tcp/udp packets
-
 ## 🎉 Let's get started
 
 - [Installation](https://docs.next-hat.com/docs/setups/nanocl)

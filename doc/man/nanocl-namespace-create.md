@@ -16,7 +16,7 @@ OPTIONS
 
 **-h**, **\--help**
 
-:   Print help information
+:   Print help
 
 \<*NAME*\>
 

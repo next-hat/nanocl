@@ -10,7 +10,7 @@ struct ManPage<'a> {
 }
 
 /// Path where to generate the files
-const MAN_PATH: &str = "../target/man";
+const MAN_PATH: &str = "../../target/man";
 
 /// Function to generate a man page
 fn generate_man_page<'a>(

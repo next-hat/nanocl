@@ -3,7 +3,7 @@ use std::fs;
 
 include!("./src/cli.rs");
 
-const MAN_PATH: &str = "./target/man";
+const MAN_PATH: &str = "../../target/man";
 
 pub fn generate_man_command(
   name: &str,

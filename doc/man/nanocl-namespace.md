@@ -18,7 +18,7 @@ OPTIONS
 
 **-h**, **\--help**
 
-:   Print help information
+:   Print help
 
 SUBCOMMANDS
 ===========
@@ -26,6 +26,14 @@ SUBCOMMANDS
 nanocl-namespace-create(1)
 
 :   Create new namespace
+
+nanocl-namespace-inspect(1)
+
+:   Inspect a namespace
+
+nanocl-namespace-remove(1)
+
+:   Remove a namespace
 
 nanocl-namespace-list(1)
 

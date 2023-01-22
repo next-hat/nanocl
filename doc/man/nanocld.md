@@ -1,15 +1,14 @@
 NAME
 ====
 
-nanocld - Nanocl daemon Self Sufficient Hybrid Cloud Orchestrator
+Nanocl - Nanocl daemon Self Sufficient Hybrid Cloud Orchestrator
 
 SYNOPSIS
 ========
 
-**nanocld** \[**-h**\|**\--help**\] \[**-V**\|**\--version**\]
-\[**\--genopenapi**\] \[**\--install-components**\]
-\[**-H**\|**\--host**\] \[**\--docker-host**\] \[**\--state-dir**\]
-\[**\--config-dir**\] \[**\--github-user**\] \[**\--github-token**\]
+**Nanocl** \[**\--init**\] \[**-H**\|**\--hosts**\]
+\[**\--docker-host**\] \[**\--state-dir**\] \[**\--config-dir**\]
+\[**-h**\|**\--help**\] \[**-V**\|**\--version**\]
 
 DESCRIPTION
 ===========
@@ -19,32 +18,18 @@ Nanocl daemon Self Sufficient Hybrid Cloud Orchestrator
 OPTIONS
 =======
 
-**-h**, **\--help**
+**\--init**=*INIT*
 
-:   Print help information
+:   Ensure state is inited
 
-**-V**, **\--version**
+**-H**, **\--hosts**=*HOSTS*
 
-:   Print version information
-
-**\--genopenapi**
-
-:   Only available if nanocld have been builded with feature openapi
-
-**\--install-components**
-
-:   Only install required components this have to be called after fresh
-    installation
-
-**-H**, **\--host**=*HOSTS*
-
-:   Daemon host to listen to you can use tcp:// and unix:// \[default:
-    unix:///run/nanocl/nanocl.sock\]
+:   Hosts to listen to use tcp:// and unix:// \[default:
+    unix:///run/nanocl.sock\]
 
 **\--docker-host**=*DOCKER\_HOST*
 
-:   Docker daemon socket to connect \[default:
-    unix:///run/docker.sock\]
+:   Docker daemon socket to connect \[default: unix:///run/docker.sock\]
 
 **\--state-dir**=*STATE\_DIR*
 
@@ -54,15 +39,20 @@ OPTIONS
 
 :   Config directory
 
-**\--github-user**=*GITHUB\_USER*
+**-h**, **\--help**
 
-:   Github user used to make request with identity
+:   Print help
 
-**\--github-token**=*GITHUB\_TOKEN*
+**-V**, **\--version**
 
-:   Generated token for given github user
+:   Print version
 
 VERSION
 =======
 
-v0.1.2
+v0.1.19
+
+AUTHORS
+=======
+
+nexthat team \<team\@next-hat.com\>

@@ -1,4 +1,4 @@
 #!/bin/sh
-## name: generate_man.sh
+## name: build_nanocld_image.sh
 
-docker build -t nanocld:nightly -f ./nanocld/Dockerfile ./nanocld
+docker build -t nanocld:nightly -f ./bin/nanocld/Dockerfile ./bin/nanocld

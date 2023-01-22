@@ -23,11 +23,11 @@ OPTIONS
 
 **-h**, **\--help**
 
-:   Print help information
+:   Print help
 
 **-V**, **\--version**
 
-:   Print version information
+:   Print version
 
 SUBCOMMANDS
 ===========
@@ -36,37 +36,13 @@ nanocl-namespace(1)
 
 :   Manage namespaces
 
-nanocl-cluster(1)
-
-:   Manage clusters
-
 nanocl-cargo(1)
 
 :   Manage cargoes
 
-nanocl-apply(1)
+nanocl-events(1)
 
-:   Apply a configuration file
-
-nanocl-revert(1)
-
-:   Revert a configuration file
-
-nanocl-run(1)
-
-:   Run a cargo in given environement
-
-nanocl-exec(1)
-
-:   Run a command in a running cargo instance
-
-nanocl-proxy(1)
-
-:   Manage proxy rules
-
-nanocl-controller(1)
-
-:   Manage nanocl controllers
+:   
 
 nanocl-setup(1)
 
