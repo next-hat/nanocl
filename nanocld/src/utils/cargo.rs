@@ -9,8 +9,10 @@ use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
 
 use crate::repositories;
 use crate::error::HttpResponseError;
-use crate::models::{Pool, CargoPartial};
+use crate::models::Pool;
 
+/// ## Create instance
+///
 /// Create containers based on the cargo config
 /// The number of containers created is based on the number of instances
 /// defined in the cargo config
@@ -23,11 +25,13 @@ use crate::models::{Pool, CargoPartial};
 /// The cargo key is used to track the containers
 ///
 /// ## Arguments
+///
 /// - [cargo](Cargo) - The cargo
 /// - [number](i64) - The number of containers to create
 /// - [docker_api](bollard::Docker) - The docker api
 ///
 /// ## Returns
+///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Ok) - The containers has been created
 ///   - [Err](HttpResponseError) - The containers has not been created
@@ -72,13 +76,15 @@ async fn create_instance(
   Ok(())
 }
 
-/// List containers based on the cargo key
+/// ## List containers based on the cargo key
 ///
 /// ## Arguments
+///
 /// - [cargo_key](String) - The cargo key
 /// - [docker_api](bollard::Docker) - The docker api
 ///
 /// ## Returns
+///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Vec<ContainerSummary>) - The containers have been listed
 ///   - [Err](HttpResponseError) - The containers have not been listed
@@ -105,15 +111,17 @@ pub async fn list_instance(
   Ok(containers)
 }
 
-/// Create a new cargo with his containers
+/// ## Create a new cargo with his containers
 ///
 /// ## Arguments
+///
 /// - [cargo_partial](CargoConfigPartial) - The cargo partial
 /// - [namespace](String) - The namespace
 /// - [docker_api](bollard::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
+///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Cargo) - The cargo has been created
 ///   - [Err](HttpResponseError) - The cargo has not been created
@@ -124,12 +132,8 @@ pub async fn create(
   docker_api: &bollard::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
-  let cargo_partial = CargoPartial {
-    name: config.name.to_owned(),
-    config: config.to_owned(),
-  };
   let cargo =
-    repositories::cargo::create(namespace, cargo_partial, pool).await?;
+    repositories::cargo::create(namespace, config.to_owned(), pool).await?;
 
   if let Err(err) = create_instance(&cargo, 1, docker_api).await {
     repositories::cargo::delete_by_key(cargo.key.to_owned(), pool).await?;
@@ -139,15 +143,18 @@ pub async fn create(
   Ok(cargo)
 }
 
-/// Start containers of the given cargo
+/// ## Start containers of the given cargo
+///
 /// The containers are started in parallel
 /// If one container fails to start, the other containers will continue to start
 ///
 /// ## Arguments
+///
 /// - [cargo_key](str) - The cargo key
 /// - [docker_api](bollard::Docker) - The docker api
 ///
 /// ## Returns
+///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](()) - The containers has been started
 ///   - [Err](HttpResponseError) - The containers has not been started
@@ -171,21 +178,18 @@ pub async fn start(
   Ok(())
 }
 
-/// Stop containers of the given cargo
+/// ## Stop containers of the given cargo
 ///
 /// ## Arguments
+///
 /// - [cargo_key](str) - The cargo key
 /// - [docker_api](bollard::Docker) - The docker api
 ///
 /// ## Returns
+///
 /// - [Result](Result) - The result of the operation
 ///  - [Ok](Ok) - The containers has been stopped
 ///  - [Err](HttpResponseError) - The containers has not been stopped
-///
-/// ## Example
-/// ```rust,norun
-/// stop("global-test", &docker_api).await.expect("Unable to stop cargo);
-/// ```
 ///
 pub async fn stop(
   cargo_key: &str,
@@ -209,19 +213,16 @@ pub async fn stop(
 /// Delete containers of the given cargo and the cargo itself
 ///
 /// ## Arguments
+///
 /// - [cargo_key](str) - The cargo key
 /// - [docker_api](bollard::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
+///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Ok) - The cargo has been deleted
 ///   - [Err](HttpResponseError) - The cargo has not been deleted
-///
-/// ## Example
-/// ```rust,norun
-/// delete("global-test", &docker_api, &pool).await.expect("Unable to delete cargo);
-/// ```
 ///
 pub async fn delete(
   cargo_key: &str,
@@ -281,24 +282,21 @@ pub async fn patch(
     repositories::cargo_config::find_by_key(cargo.config_key.to_owned(), pool)
       .await?;
 
-  let cargo_partial = CargoPartial {
+  let cargo_partial = CargoConfigPartial {
     name: config.name.to_owned().unwrap_or(cargo.name),
-    config: CargoConfigPartial {
-      name: config.name.to_owned().unwrap_or(cargo_config.name),
-      dns_entry: if config.dns_entry.is_some() {
-        config.dns_entry.to_owned()
-      } else {
-        cargo_config.dns_entry.to_owned()
-      },
-      container: config
-        .container
-        .to_owned()
-        .unwrap_or(cargo_config.container),
-      replication: if config.replication.is_some() {
-        config.replication.to_owned()
-      } else {
-        cargo_config.replication.to_owned()
-      },
+    dns_entry: if config.dns_entry.is_some() {
+      config.dns_entry.to_owned()
+    } else {
+      cargo_config.dns_entry.to_owned()
+    },
+    container: config
+      .container
+      .to_owned()
+      .unwrap_or(cargo_config.container),
+    replication: if config.replication.is_some() {
+      config.replication.to_owned()
+    } else {
+      cargo_config.replication.to_owned()
     },
   };
 
@@ -351,15 +349,18 @@ pub async fn patch(
   Ok(cargo)
 }
 
-/// List cargo in given namespace
+/// ## List cargo in given namespace
+///
 /// The containers are filtered by the cargo key
 ///
 /// ## Arguments
+///
 /// - [nsp](str) - The namespace name
 /// - [docker_api](bollard::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
+///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Vec<ContainerSummary>) - The containers of the cargo
 ///   - [Err](HttpResponseError) - The containers of the cargo has not been listed
@@ -401,16 +402,28 @@ pub async fn list(
   Ok(cargo_summaries)
 }
 
+/// ## Inspect cargo
+///
+/// Return information about the cargo
+///
+/// ## Arguments
+///
+/// - [key](str) - The cargo key
+/// - [docker_api](bollard::Docker) - The docker api
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](CargoInspect) - The cargo information
+///   - [Err](HttpResponseError) - The cargo has not been inspected
+///
 pub async fn inspect(
   key: &str,
   docker_api: &bollard::Docker,
   pool: &Pool,
 ) -> Result<CargoInspect, HttpResponseError> {
-  let cargo = repositories::cargo::find_by_key(key.to_owned(), pool).await?;
-
-  let config =
-    repositories::cargo_config::find_by_key(cargo.config_key.to_owned(), pool)
-      .await?;
+  let cargo = repositories::cargo::inspect_by_key(key.to_owned(), pool).await?;
   let containers = list_instance(&cargo.key, docker_api).await?;
 
   let mut running_instances = 0;
@@ -425,7 +438,7 @@ pub async fn inspect(
     name: cargo.name,
     config_key: cargo.config_key,
     namespace_name: cargo.namespace_name,
-    config,
+    config: cargo.config,
     running_instances,
     containers,
   })

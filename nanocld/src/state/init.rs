@@ -14,7 +14,7 @@ use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::cli::Cli;
 use crate::{utils, repositories};
-use crate::models::{Pool, ArgState, DaemonState, CargoPartial};
+use crate::models::{Pool, ArgState, DaemonState};
 
 use crate::error::DaemonError;
 
@@ -129,15 +129,10 @@ async fn register_daemon(arg: &ArgState) -> Result<(), DaemonError> {
     ..Default::default()
   };
 
-  let config = CargoConfigPartial {
+  let store_cargo = CargoConfigPartial {
     name: "daemon".into(),
     container,
     ..Default::default()
-  };
-
-  let store_cargo = CargoPartial {
-    name: config.name.to_owned(),
-    config,
   };
 
   repositories::cargo::create(
