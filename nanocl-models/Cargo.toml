@@ -14,7 +14,7 @@ serde = ["dep:serde", "uuid/serde"]
 diesel = ["dep:diesel", "dep:diesel-derive-enum"]
 
 [dependencies]
-bollard = "*"
+bollard = "0.14"
 uuid = { version = "1.2.2" }
 serde = { version = "1.0.152", features = ["derive"], optional = true }
 serde_json = "1.0.91"
