@@ -42,7 +42,7 @@ pub enum NanoclClientError {
   Utf8Error(#[from] std::string::FromUtf8Error),
 }
 
-pub async fn is_api_error(
+pub(crate) async fn is_api_error(
   res: &mut ClientResponse,
   status: &StatusCode,
 ) -> Result<(), NanoclClientError> {

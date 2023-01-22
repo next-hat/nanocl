@@ -29,9 +29,9 @@ bollard = { version = "*" }
 chrono = "0.4.23"
 
 [dependencies]
-nanocl-client = "*"
-nanocl-models = { version = "*", features = ["serde"] }
-bollard = { version = "*" }
+nanocl-client = "0.0.1"
+nanocl-models = { version = "0.0.1", features = ["serde"] }
+bollard = { version = "0.14" }
 futures = "0.3"
 serde_yaml = "0.9"
 tabled = "0.10.0"

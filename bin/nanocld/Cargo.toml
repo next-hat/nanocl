@@ -25,7 +25,7 @@ clap_mangen = { version = "0.2" }
 
 [dependencies]
 nanocl-models = { version = "0.0.1", features = ["serde", "diesel"] }
-bollard = { version = "*" }
+bollard = { version = "0.14" }
 r2d2 = "0.8"
 log = "0.4.17"
 futures = "0.3"
