@@ -1,18 +1,30 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-#[cfg(feature = "diesel")]
-use diesel_derive_enum::DbEnum;
-
 /// Resource kinds
 /// It is used to define the kind of a resource
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "diesel", derive(DbEnum))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-#[cfg_attr(feature = "diesel", DbValueStyle = "snake_case")]
 pub enum ResourceKind {
   ProxyRule,
+}
+
+impl From<String> for ResourceKind {
+  fn from(kind: String) -> Self {
+    match kind.as_str() {
+      "proxy_rules" => ResourceKind::ProxyRule,
+      _ => panic!("Unknown resource kind: {}", kind),
+    }
+  }
+}
+
+impl From<ResourceKind> for String {
+  fn from(kind: ResourceKind) -> Self {
+    match kind {
+      ResourceKind::ProxyRule => "proxy_rules".into(),
+    }
+  }
 }
 
 /// Resource partial is a payload used to create a new resource

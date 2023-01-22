@@ -1,6 +1,5 @@
 use diesel::prelude::*;
 
-use nanocl_models::resource::ResourceKind;
 use serde::{Deserialize, Serialize};
 
 use crate::schema::resources;
@@ -12,7 +11,7 @@ use crate::schema::resources;
 #[diesel(table_name = resources)]
 pub struct ResourceDbModel {
   pub(crate) key: String,
-  pub(crate) kind: ResourceKind,
+  pub(crate) kind: String,
   pub(crate) config_key: uuid::Uuid,
 }
 

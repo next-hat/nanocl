@@ -58,7 +58,7 @@ pub async fn create(
 
   let new_item = ResourceDbModel {
     key: item.name.to_owned(),
-    kind: item.kind,
+    kind: item.kind.into(),
     config_key: config.key.to_owned(),
   };
 
@@ -74,7 +74,7 @@ pub async fn create(
 
   let item = Resource {
     name: item.key,
-    kind: item.kind,
+    kind: item.kind.into(),
     config_key: config.key,
     config: config.data,
   };
@@ -162,7 +162,7 @@ pub async fn find(pool: &Pool) -> Result<Vec<Resource>, HttpResponseError> {
     .into_iter()
     .map(|e| Resource {
       name: e.0.key,
-      kind: e.0.kind,
+      kind: e.0.kind.into(),
       config_key: e.0.config_key,
       config: e.1.data,
     })
@@ -213,7 +213,7 @@ pub async fn inspect_by_key(
 
   let item = Resource {
     name: res.0.key,
-    kind: res.0.kind,
+    kind: res.0.kind.into(),
     config_key: res.0.config_key,
     config: res.1.data,
   };
