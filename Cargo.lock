@@ -211,12 +211,6 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
-
-[[package]]
-name = "base64"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
@@ -1473,13 +1467,13 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9f9ff56314e3a77ddd8d7212f0e6f29985b7d8a0dea89e0bf0e8e1f057d5126"
+checksum = "5aae3865c98256aae0d6db9b56002e0a860dfdf1e589a39709a25bb3761d263c"
 dependencies = [
  "async-channel",
  "async-oneshot",
- "base64 0.20.0",
+ "base64 0.21.0",
  "bitflags",
  "encoding_rs",
  "httparse",
@@ -1519,9 +1513,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-async-std"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7602e804adcef623b2c8d23e4132b5a9ed0faf2275068f562fa2c7dc2caf8cb"
+checksum = "e51b8d01022ee7a87ff9d8f9a78c567777dd134732ec88a452101077c706d285"
 dependencies = [
  "async-oneshot",
  "async-std",
@@ -1534,9 +1528,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-bytes"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7e08274673de5a82c4120c561b9768738ed536f4b3bd80b3311cf2352f9c97a"
+checksum = "f5ab7c2ea2a2cf00edb6c307c625f1a037de4e0bc2863127b4b3a73af348f24e"
 dependencies = [
  "bitflags",
  "bytes",
@@ -1555,9 +1549,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-connect"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1d9651a5a08dd9dadff64b4735ca1667fa2568f77d27f4d13ee5ecb730a9be1"
+checksum = "7ebeb43837a991a064a929e5bc3616abe6ceac1e336d6ced721f0ca94afee5fc"
 dependencies = [
  "log",
  "ntex-async-std",
@@ -1577,9 +1571,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-glommio"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb1742946e539627dc5c6c9067bf6e09806350db29252594dc969378f64dead8"
+checksum = "a2f244aae9c217b8e7628a8d9d7ab0a20fe96a49f6d13f444c2a646bde72829d"
 dependencies = [
  "async-oneshot",
  "futures-lite",
@@ -1626,9 +1620,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-io"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a57aaa19a1df294337799625a81ebe3a36a617124f238c4c86ff4d607aefc9e"
+checksum = "14c2615105c489193c8e1a889d58c1c357d48688c3d5b2c4689f4ac57336523a"
 dependencies = [
  "bitflags",
  "log",
@@ -1637,6 +1631,7 @@ dependencies = [
  "ntex-service",
  "ntex-util",
  "pin-project-lite",
+ "smallvec",
 ]
 
 [[package]]
@@ -1690,9 +1685,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-tls"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37b6ed5b63a0458f1457c3f71eef3d33487795b022beb08ff4cab1f66600995b"
+checksum = "76ec6e139929a0cfa3a6480e805e7904f626b58ad334035dacbf7f22dc4a8e36"
 dependencies = [
  "log",
  "ntex-bytes",
@@ -1705,9 +1700,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-tokio"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "719d40eee452a382e79d75190d8ffa4da96c74ca6055bf68b153ba3bf230889b"
+checksum = "512925f906db0c6abe2e1dd6b11d20978ea64b480d0df4796e46216ef9147c12"
 dependencies = [
  "log",
  "ntex-bytes",
