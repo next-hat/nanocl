@@ -3,9 +3,11 @@ mod cargo;
 mod cargo_image;
 mod setup;
 mod resource;
+mod yml;
 
 use clap::{Parser, Subcommand};
 
+pub use yml::*;
 pub use cargo::*;
 pub use namespace::*;
 pub use cargo_image::*;

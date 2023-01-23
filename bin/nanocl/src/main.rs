@@ -114,6 +114,30 @@ mod tests {
     assert!(execute_args(&args).await.is_ok());
   }
 
+  /// Test Resource commands
+  #[ntex::test]
+  async fn test_resource() {
+    // Create a new resource
+    let args = Cli::parse_from([
+      "nanocl",
+      "resource",
+      "create",
+      "../../examples/resource_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+    // List resources
+    let args = Cli::parse_from(["nanocl", "resource", "ls"]);
+    assert!(execute_args(&args).await.is_ok());
+    // Inspect resource
+    let args =
+      Cli::parse_from(["nanocl", "resource", "inspect", "resource-example"]);
+    assert!(execute_args(&args).await.is_ok());
+    // Remove resource
+    let args =
+      Cli::parse_from(["nanocl", "resource", "rm", "resource-example"]);
+    assert!(execute_args(&args).await.is_ok());
+  }
+
   /// Test Setup command
   #[ntex::test]
   async fn test_setup() {

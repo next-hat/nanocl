@@ -1,5 +1,5 @@
-ApiVersion: v1
 Type: deployment
+ApiVersion: v1
 
 Namespace: global
 
@@ -18,9 +18,6 @@ Resources:
               - Path: /
                 TargetCargo: getting-started
                 TargetPort: 9000
-              - Path: /doc
-                TargetCargo: next-hat-doc
-                TargetPort: 8080
 
 Cargoes:
   - Name: getting-started

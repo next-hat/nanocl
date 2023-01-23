@@ -10,6 +10,14 @@ pub enum ResourceKind {
   ProxyRule,
 }
 
+impl std::fmt::Display for ResourceKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      ResourceKind::ProxyRule => write!(f, "proxy_rules"),
+    }
+  }
+}
+
 impl From<String> for ResourceKind {
   fn from(kind: String) -> Self {
     match kind.as_str() {

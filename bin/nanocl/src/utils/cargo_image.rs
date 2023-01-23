@@ -12,7 +12,7 @@ use indicatif::{ProgressStyle, ProgressBar};
 use crate::error::CliError;
 use nanocl_client::error::ApiError;
 
-use super::file;
+use super::http_file;
 
 pub async fn import_tar_from_url(
   docker_api: &Docker,
@@ -23,7 +23,7 @@ pub async fn import_tar_from_url(
     msg: format!("{err}"),
   })?;
 
-  let mut dwres = file::download(&url, "/tmp").await?;
+  let mut dwres = http_file::download(&url, "/tmp").await?;
   let style = ProgressStyle::default_spinner();
   let pg = ProgressBar::new(0);
   pg.set_style(style);

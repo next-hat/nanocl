@@ -241,18 +241,20 @@ async fn register_dependencies(arg: &ArgState) -> Result<(), DaemonError> {
 
 /// Init function called before http server start
 /// to initialize our state
-pub async fn init(config: &DaemonConfig) -> Result<DaemonState, DaemonError> {
+pub async fn init(
+  daemon_conf: &DaemonConfig,
+) -> Result<DaemonState, DaemonError> {
   let docker_api = bollard::Docker::connect_with_unix(
-    &config.docker_host,
+    &daemon_conf.docker_host,
     120,
     bollard::API_DEFAULT_VERSION,
   )?;
   ensure_system_network(&docker_api).await?;
   println!("gg");
-  let pool = ensure_store(&config, &docker_api).await?;
+  let pool = ensure_store(daemon_conf, &docker_api).await?;
   let arg_state = ArgState {
     pool: pool.to_owned(),
-    config: config.to_owned(),
+    config: daemon_conf.to_owned(),
     default_namespace: String::from("global"),
     sys_namespace: String::from("system"),
   };
@@ -261,7 +263,7 @@ pub async fn init(config: &DaemonConfig) -> Result<DaemonState, DaemonError> {
   Ok(DaemonState {
     pool,
     docker_api,
-    config: config.to_owned(),
+    config: daemon_conf.to_owned(),
   })
 }
 
