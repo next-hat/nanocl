@@ -12,16 +12,29 @@ use crate::error::HttpResponseError;
 
 use super::cargo;
 
+/// ## List existing container in a namespace
+///
 /// List containers based on the namespace
 ///
 /// ## Arguments
+///
 /// - [namespace](String) - The namespace
 /// - [docker_api](bollard::Docker) - The docker api
 ///
 /// ## Returns
+///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Vec<ContainerSummary>) - The containers have been listed
 ///   - [Err](HttpResponseError) - The containers have not been listed
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use bollard::Docker;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let result = namespace::list_instance("my-namespace", &docker_api).await;
+/// ```
 ///
 pub async fn list_instance(
   namespace: &str,
@@ -45,6 +58,30 @@ pub async fn list_instance(
   Ok(containers)
 }
 
+/// ## List namespaces
+///
+/// List all existing namespaces
+///
+/// ## Arguments
+///
+/// - [docker_api](bollard::Docker) - The docker api
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](Vec<NamespaceSummary>) - The namespaces have been listed
+///   - [Err](HttpResponseError) - The namespaces have not been listed
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use bollard::Docker;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let result = namespace::list(&docker_api, &pool).await;
+/// ```
+///
 pub async fn list(
   docker_api: &bollard::Docker,
   pool: &Pool,
@@ -65,6 +102,31 @@ pub async fn list(
   Ok(new_items)
 }
 
+/// ## Inspect a namespace
+///
+/// Get detailed information about a namespace
+///
+/// ## Arguments
+///
+/// - [namespace](String) - The namespace
+/// - [docker_api](bollard::Docker) - The docker api
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](NamespaceInspect) - The namespace has been inspected
+///   - [Err](HttpResponseError) - The namespace has not been inspected
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use bollard::Docker;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let result = namespace::inspect("my-namespace", &docker_api, &pool).await;
+/// ```
+///
 pub async fn inspect(
   namespace: &str,
   docker_api: &bollard::Docker,
