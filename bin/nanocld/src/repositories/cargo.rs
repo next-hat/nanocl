@@ -13,7 +13,7 @@ use crate::models::{
 };
 
 use super::cargo_config;
-use super::error::db_blocking_error;
+use super::error::{db_blocking_error, db_error};
 
 /// ## Find cargo items by namespace
 ///
@@ -42,12 +42,16 @@ pub async fn find_by_namespace(
   nsp: NamespaceDbModel,
   pool: &Pool,
 ) -> Result<Vec<CargoDbModel>, HttpResponseError> {
-  let mut conn = utils::store::get_pool_conn(pool)?;
-
-  let items =
-    web::block(move || CargoDbModel::belonging_to(&nsp).load(&mut conn))
-      .await
-      .map_err(db_blocking_error)?;
+  let pool = pool.to_owned();
+  let items = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let items = CargoDbModel::belonging_to(&nsp)
+      .load(&mut conn)
+      .map_err(db_error("cargo"))?;
+    Ok::<_, HttpResponseError>(items)
+  })
+  .await
+  .map_err(db_blocking_error)?;
   Ok(items)
 }
 
@@ -91,10 +95,11 @@ pub async fn create(
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
+  let pool = pool.to_owned();
   let key = utils::key::gen_key(&nsp, &item.name);
 
   let config =
-    cargo_config::create(key.to_owned(), item.to_owned(), pool).await?;
+    cargo_config::create(key.to_owned(), item.to_owned(), &pool).await?;
 
   let new_item = CargoDbModel {
     key,
@@ -103,12 +108,13 @@ pub async fn create(
     config_key: config.key,
   };
 
-  let mut conn = utils::store::get_pool_conn(pool)?;
   let item = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::insert_into(dsl::cargoes)
       .values(&new_item)
-      .execute(&mut conn)?;
-    Ok(new_item)
+      .execute(&mut conn)
+      .map_err(db_error("cargo"))?;
+    Ok::<_, HttpResponseError>(new_item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -151,14 +157,18 @@ pub async fn delete_by_key(
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
-  let mut conn = utils::store::get_pool_conn(pool)?;
+  let pool = pool.to_owned();
   let res = web::block(move || {
-    diesel::delete(dsl::cargoes)
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let res = diesel::delete(dsl::cargoes)
       .filter(dsl::key.eq(key))
       .execute(&mut conn)
+      .map_err(db_error("cargo"))?;
+    Ok::<_, HttpResponseError>(res)
   })
   .await
   .map_err(db_blocking_error)?;
+
   Ok(GenericDelete { count: res })
 }
 
@@ -189,12 +199,18 @@ pub async fn find_by_key(
 ) -> Result<CargoDbModel, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
-  let mut conn = utils::store::get_pool_conn(pool)?;
+  let pool = pool.to_owned();
   let item = web::block(move || {
-    dsl::cargoes.filter(dsl::key.eq(key)).get_result(&mut conn)
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let item = dsl::cargoes
+      .filter(dsl::key.eq(key))
+      .get_result(&mut conn)
+      .map_err(db_error("cargo"))?;
+    Ok::<_, HttpResponseError>(item)
   })
   .await
   .map_err(db_blocking_error)?;
+
   Ok(item)
 }
 
@@ -237,8 +253,11 @@ pub async fn update_by_key(
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
+  let pool = pool.to_owned();
+
+  let cargodb = find_by_key(key.to_owned(), &pool).await?;
   let config =
-    cargo_config::create(key.to_owned(), item.to_owned(), pool).await?;
+    cargo_config::create(key.to_owned(), item.to_owned(), &pool).await?;
 
   let new_item = CargoUpdateDbModel {
     name: Some(item.name),
@@ -246,17 +265,16 @@ pub async fn update_by_key(
     ..Default::default()
   };
 
-  let keycopy = key.to_owned();
-  let mut conn = utils::store::get_pool_conn(pool)?;
   web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::update(dsl::cargoes.filter(dsl::key.eq(key)))
       .set(&new_item)
       .execute(&mut conn)
+      .map_err(db_error("cargo"))?;
+    Ok::<_, HttpResponseError>(())
   })
   .await
   .map_err(db_blocking_error)?;
-
-  let cargodb = find_by_key(keycopy, pool).await?;
 
   let cargo = Cargo {
     key: cargodb.key,
@@ -297,12 +315,15 @@ pub async fn count_by_namespace(
 ) -> Result<i64, HttpResponseError> {
   use crate::schema::cargoes;
 
-  let mut conn = utils::store::get_pool_conn(pool)?;
+  let pool = pool.to_owned();
   let count = web::block(move || {
-    cargoes::table
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let count = cargoes::table
       .filter(cargoes::namespace_name.eq(namespace))
       .count()
       .get_result(&mut conn)
+      .map_err(db_error("cargo"))?;
+    Ok::<_, HttpResponseError>(count)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -317,12 +338,15 @@ pub async fn inspect_by_key(
   use crate::schema::cargoes;
   use crate::schema::cargo_configs;
 
-  let mut conn = utils::store::get_pool_conn(pool)?;
+  let pool = pool.to_owned();
   let item: (CargoDbModel, CargoConfigDbModel) = web::block(move || {
-    cargoes::table
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let item = cargoes::table
       .inner_join(cargo_configs::table)
       .filter(cargoes::key.eq(key))
-      .first(&mut conn)
+      .get_result(&mut conn)
+      .map_err(db_error("cargo"))?;
+    Ok::<_, HttpResponseError>(item)
   })
   .await
   .map_err(db_blocking_error)?;

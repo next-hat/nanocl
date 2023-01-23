@@ -4,6 +4,7 @@ use diesel::prelude::*;
 use nanocl_models::generic::GenericDelete;
 use nanocl_models::resource::{Resource, ResourcePartial};
 
+use crate::repositories::error::db_error;
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
 use crate::models::{
@@ -48,13 +49,14 @@ pub async fn create(
 ) -> Result<Resource, HttpResponseError> {
   use crate::schema::resources::dsl;
 
+  let pool = pool.to_owned();
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     resource_key: item.name.to_owned(),
     data: item.config,
   };
 
-  let config = resource_config::create(config.to_owned(), pool).await?;
+  let config = resource_config::create(config.to_owned(), &pool).await?;
 
   let new_item = ResourceDbModel {
     key: item.name.to_owned(),
@@ -62,12 +64,13 @@ pub async fn create(
     config_key: config.key.to_owned(),
   };
 
-  let mut conn = utils::store::get_pool_conn(pool)?;
   let item = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::insert_into(dsl::resources)
       .values(&new_item)
-      .execute(&mut conn)?;
-    Ok(new_item)
+      .execute(&mut conn)
+      .map_err(db_error("resource"))?;
+    Ok::<_, HttpResponseError>(new_item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -111,15 +114,19 @@ pub async fn delete_by_key(
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::resources::dsl;
 
-  let mut conn = utils::store::get_pool_conn(pool)?;
-  let res = web::block(move || {
-    diesel::delete(dsl::resources)
+  let pool = pool.to_owned();
+  let count = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let count = diesel::delete(dsl::resources)
       .filter(dsl::key.eq(key))
       .execute(&mut conn)
+      .map_err(db_error("resource"))?;
+    Ok::<_, HttpResponseError>(count)
   })
   .await
   .map_err(db_blocking_error)?;
-  Ok(GenericDelete { count: res })
+
+  Ok(GenericDelete { count })
 }
 
 /// ## Find resources
@@ -147,13 +154,15 @@ pub async fn delete_by_key(
 pub async fn find(pool: &Pool) -> Result<Vec<Resource>, HttpResponseError> {
   use crate::schema::resources;
 
-  let mut conn = utils::store::get_pool_conn(pool)?;
-
+  let pool = pool.to_owned();
   let res: Vec<(ResourceDbModel, ResourceConfigDbModel)> =
     web::block(move || {
-      resources::table
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let res = resources::table
         .inner_join(crate::schema::resource_configs::table)
         .load(&mut conn)
+        .map_err(db_error("resource"))?;
+      Ok::<_, HttpResponseError>(res)
     })
     .await
     .map_err(db_blocking_error)?;
@@ -200,13 +209,15 @@ pub async fn inspect_by_key(
   use crate::schema::resources;
   use crate::schema::resource_configs;
 
-  let mut conn = utils::store::get_pool_conn(pool)?;
-
+  let pool = pool.to_owned();
   let res: (ResourceDbModel, ResourceConfigDbModel) = web::block(move || {
-    resources::table
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let res = resources::table
       .inner_join(resource_configs::table)
       .filter(resources::key.eq(key))
-      .first(&mut conn)
+      .get_result(&mut conn)
+      .map_err(db_error("resource"))?;
+    Ok::<_, HttpResponseError>(res)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -252,8 +263,9 @@ pub async fn update_by_id(
 ) -> Result<Resource, HttpResponseError> {
   use crate::schema::resources;
 
+  let pool = pool.to_owned();
   let resource =
-    repositories::resource::inspect_by_key(key.to_owned(), pool).await?;
+    repositories::resource::inspect_by_key(key.to_owned(), &pool).await?;
 
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
@@ -261,8 +273,7 @@ pub async fn update_by_id(
     data: item,
   };
 
-  let config = resource_config::create(config.to_owned(), pool).await?;
-  let mut conn = utils::store::get_pool_conn(pool)?;
+  let config = resource_config::create(config.to_owned(), &pool).await?;
 
   let resource_update = ResourceUpdateModel {
     key: None,
@@ -270,10 +281,13 @@ pub async fn update_by_id(
   };
 
   web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::update(resources::table)
       .filter(resources::key.eq(key))
       .set(&resource_update)
       .execute(&mut conn)
+      .map_err(db_error("resource"))?;
+    Ok::<_, HttpResponseError>(())
   })
   .await
   .map_err(db_blocking_error)?;
