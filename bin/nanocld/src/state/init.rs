@@ -107,6 +107,7 @@ async fn sync_containers(
   docker_api: &Docker,
   pool: &Pool,
 ) -> Result<(), DaemonError> {
+  log::debug!("Syncing existing container");
   let options = Some(ListContainersOptions::<&str> {
     all: true,
     ..Default::default()
@@ -157,12 +158,13 @@ async fn sync_containers(
       // If the cargo is already in our store and the config is different we update it
       Ok(cargo) => {
         if cargo.config.container != config {
-          println!(
+          log::debug!(
             "updating cargo {} in namespace {}",
-            metadata[1], metadata[0]
+            metadata[1],
+            metadata[0]
           );
           repositories::cargo::update_by_key(
-            metadata[1].to_owned(),
+            cargo_key.to_owned(),
             new_cargo,
             pool,
           )
@@ -172,9 +174,10 @@ async fn sync_containers(
       }
       // unless we create his config
       Err(_err) => {
-        println!(
+        log::debug!(
           "creating cargo {} in namespace {}",
-          metadata[1], metadata[0]
+          metadata[1],
+          metadata[0]
         );
         repositories::cargo::create(metadata[0].to_owned(), new_cargo, pool)
           .await?;

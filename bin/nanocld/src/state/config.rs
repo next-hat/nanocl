@@ -50,9 +50,37 @@ fn read_config_file(
   Ok(config)
 }
 
+/// ## Init Daemon config
+///
 /// Init Daemon config
 /// It will read /etc/nanocl/nanocl.conf
-/// and parse Cli arguments we merge them together with a priority to the config file
+/// and parse Cli arguments we merge them together with a priority to Cli arguments
+///
+/// ## Arguments
+///
+/// - [args](Cli) - Cli arguments
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](DaemonConfig) - The created cargo config
+///   - [Err](DaemonError) - Error during the operation
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use crate::cli::Cli;
+/// use crate::state::config;
+///
+/// let args = Cli {
+///   hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
+///   state_dir: Some(String::from("/var/lib/nanocl")),
+///   docker_host: Some(String::from("/run/docker.sock")),
+/// };
+///
+/// let result = config::init(args);
+/// ```
+///
 pub fn init(args: &Cli) -> Result<DaemonConfig, DaemonError> {
   let file_config = match read_config_file(&args.config_dir) {
     Err(err) => {
