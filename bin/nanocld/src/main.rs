@@ -12,17 +12,19 @@ mod error;
 mod event;
 mod schema;
 mod models;
+mod config;
 mod server;
-// mod openapi;
 mod services;
 mod repositories;
 
-/// nanocl daemon
+/// ## The Nanocl daemon
 ///
 /// Provides an api to manage network and containers accross physical hosts
 /// there are these advantages :
-/// - Opensource
-/// - Easy
+/// - It's Opensource
+/// - It's Easy to use
+/// - It keep an history of all your containers and networks
+///
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
   // Parse command line arguments
@@ -34,10 +36,18 @@ async fn main() -> std::io::Result<()> {
   }
   env_logger::Builder::new().parse_env("LOG_LEVEL").init();
 
-  // Init internal config and dependencies
-  let daemon_state = match state::init(&args).await {
+  let config = match config::init(&args) {
     Err(err) => {
-      let exit_code = error::parse_main_error(err);
+      log::error!("Error while parsing config {} : {}", &args.config_dir, &err);
+      std::process::exit(1);
+    }
+    Ok(config) => config,
+  };
+
+  // Init internal config and dependencies
+  let daemon_state = match state::init(&config).await {
+    Err(err) => {
+      let exit_code = error::parse_daemon_error(&config, &err);
       std::process::exit(exit_code);
     }
     Ok(state) => state,
@@ -48,7 +58,7 @@ async fn main() -> std::io::Result<()> {
     return Ok(());
   }
 
-  // Start event loop
+  // Init event_emitter
   let event_emitter = event::EventEmitter::new();
 
   // start http server

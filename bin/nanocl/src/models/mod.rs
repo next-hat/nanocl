@@ -1,7 +1,8 @@
-mod cargo;
 mod namespace;
+mod cargo;
 mod cargo_image;
 mod setup;
+mod resource;
 
 use clap::{Parser, Subcommand};
 
@@ -9,6 +10,7 @@ pub use cargo::*;
 pub use namespace::*;
 pub use cargo_image::*;
 pub use setup::*;
+pub use resource::*;
 
 /// A self-sufficient hybrid-cloud manager
 #[derive(Debug, Parser)]
@@ -24,14 +26,19 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+  /// Manage namespaces
   Namespace(NamespaceArgs),
+  /// Manage cargoes
   Cargo(CargoArgs),
-  // Watch daemon events
+  /// Manage resources
+  Resource(ResourceArgs),
+  /// Watch daemon events
   Events,
+  /// Setup nanocl
   Setup(SetupArgs),
   /// Show nanocl version information
   Version,
-  // TODO shell completion
+  // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for
   //   #[clap(arg_enum)]

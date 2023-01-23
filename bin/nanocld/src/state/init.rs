@@ -15,13 +15,10 @@ use nanocl_models::config::DaemonConfig;
 use nanocl_models::namespace::NamespacePartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
-use crate::cli::Cli;
 use crate::{utils, repositories};
 use crate::models::{Pool, ArgState, DaemonState};
 
 use crate::error::DaemonError;
-
-use super::config;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 
@@ -244,14 +241,14 @@ async fn register_dependencies(arg: &ArgState) -> Result<(), DaemonError> {
 
 /// Init function called before http server start
 /// to initialize our state
-pub async fn init(args: &Cli) -> Result<DaemonState, DaemonError> {
-  let config = config::init(args)?;
+pub async fn init(config: &DaemonConfig) -> Result<DaemonState, DaemonError> {
   let docker_api = bollard::Docker::connect_with_unix(
     &config.docker_host,
     120,
     bollard::API_DEFAULT_VERSION,
   )?;
   ensure_system_network(&docker_api).await?;
+  println!("gg");
   let pool = ensure_store(&config, &docker_api).await?;
   let arg_state = ArgState {
     pool: pool.to_owned(),
@@ -263,8 +260,8 @@ pub async fn init(args: &Cli) -> Result<DaemonState, DaemonError> {
   sync_containers(&docker_api, &pool).await?;
   Ok(DaemonState {
     pool,
-    config,
     docker_api,
+    config: config.to_owned(),
   })
 }
 
@@ -273,6 +270,7 @@ pub async fn init(args: &Cli) -> Result<DaemonState, DaemonError> {
 mod tests {
   use super::*;
 
+  use crate::config;
   use crate::cli::Cli;
   use crate::utils::tests::*;
 
@@ -288,8 +286,10 @@ mod tests {
       config_dir: String::from("/etc/nanocl"),
     };
 
+    let config = config::init(&args)?;
+
     // test function init
-    let _ = init(&args).await?;
+    let _ = init(&config).await?;
 
     Ok(())
   }

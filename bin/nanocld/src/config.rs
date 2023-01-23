@@ -82,13 +82,7 @@ fn read_config_file(
 /// ```
 ///
 pub fn init(args: &Cli) -> Result<DaemonConfig, DaemonError> {
-  let file_config = match read_config_file(&args.config_dir) {
-    Err(err) => {
-      log::error!("{}", err);
-      std::process::exit(1);
-    }
-    Ok(file_config) => file_config,
-  };
+  let file_config = read_config_file(&args.config_dir)?;
 
   // Merge cli args and config file with priority to args
   Ok(merge_config(args, &file_config))

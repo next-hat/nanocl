@@ -46,7 +46,7 @@ pub async fn start(
       let addr = host.replace("unix://", "");
       server = match server.bind_uds(&addr) {
         Err(err) => {
-          log::error!("Error binding to unix socket: {}", err);
+          log::error!("Error binding to unix socket {}: {}", &addr, &err);
           return Err(err);
         }
         Ok(server) => server,
@@ -56,7 +56,7 @@ pub async fn start(
       let addr = host.replace("tcp://", "");
       server = match server.bind(&addr) {
         Err(err) => {
-          log::error!("Error binding to tcp socket: {}", err);
+          log::error!("Error binding to tcp host {}: {}", &addr, &err);
           return Err(err);
         }
         Ok(server) => server,
@@ -91,9 +91,10 @@ mod tests {
 
   use super::*;
 
-  use crate::event;
-  use crate::cli::Cli;
   use crate::state;
+  use crate::event;
+  use crate::config;
+  use crate::cli::Cli;
   use crate::utils::tests::*;
 
   /// Test to create a server on unix socket
@@ -102,7 +103,8 @@ mod tests {
     before();
     let args =
       Cli::parse_from(vec!["nanocl", "-H", "unix:///tmp/nanocl_test.sock"]);
-    let daemon_state = state::init(&args).await?;
+    let daemon_conf = config::init(&args)?;
+    let daemon_state = state::init(&daemon_conf).await?;
     let event_emitter = event::EventEmitter::new();
     let server = start(daemon_state, event_emitter).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
@@ -114,7 +116,8 @@ mod tests {
   async fn test_server_on_tcp_socket() -> TestRet {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9999"]);
-    let daemon_state = state::init(&args).await?;
+    let daemon_conf = config::init(&args)?;
+    let daemon_state = state::init(&daemon_conf).await?;
     let event_emitter = event::EventEmitter::new();
     let server = start(daemon_state, event_emitter).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
@@ -127,11 +130,13 @@ mod tests {
   async fn test_server_on_same_tcp_socket() -> TestRet {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9888"]);
-    let daemon_state = state::init(&args).await?;
+    let daemon_conf = config::init(&args)?;
+    let daemon_state = state::init(&daemon_conf).await?;
     let event_emitter = event::EventEmitter::new();
     let server = start(daemon_state, event_emitter.clone()).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
-    let daemon_state = state::init(&args).await?;
+    let daemon_conf = config::init(&args)?;
+    let daemon_state = state::init(&daemon_conf).await?;
     let server2 = start(daemon_state, event_emitter).await;
     assert!(server2.is_err(), "Expect server to fail to run");
     Ok(())
@@ -143,7 +148,8 @@ mod tests {
   async fn test_server_on_invalid_unix_socket() -> TestRet {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "unix:///root/test.sock"]);
-    let daemon_state = state::init(&args).await?;
+    let daemon_conf = config::init(&args)?;
+    let daemon_state = state::init(&daemon_conf).await?;
     let event_emitter = event::EventEmitter::new();
     let server = start(daemon_state, event_emitter).await;
     assert!(server.is_err(), "Expect server to fail to run");
@@ -156,7 +162,8 @@ mod tests {
   async fn test_server_on_invalid_host() -> TestRet {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "not_valid"]);
-    let daemon_state = state::init(&args).await?;
+    let daemon_conf = config::init(&args)?;
+    let daemon_state = state::init(&daemon_conf).await?;
     let event_emitter = event::EventEmitter::new();
     let server = start(daemon_state, event_emitter).await;
     assert!(server.is_err(), "Expect server to fail to run");

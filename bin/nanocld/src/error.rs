@@ -1,9 +1,12 @@
 use ntex::web;
 use ntex::http::StatusCode;
-use serde_json::json;
-use thiserror::Error;
 
+use thiserror::Error;
+use serde_json::json;
 use bollard::errors::Error as DockerError;
+
+use nanocl_models::config::DaemonConfig;
+
 #[cfg(feature = "dev")]
 use utoipa::ToSchema;
 
@@ -81,22 +84,12 @@ pub enum DaemonError {
   HttpResponse(#[from] HttpResponseError),
 }
 
-pub fn parse_main_error(err: DaemonError) -> i32 {
+pub fn parse_daemon_error(config: &DaemonConfig, err: &DaemonError) -> i32 {
   match err {
-    DaemonError::Docker(err) => match err {
-      bollard::errors::Error::HyperResponseError { err } => {
-        if err.is_connect() {
-          log::error!("unable to connect to docker host {err}");
-          return 1;
-        }
-        log::error!("{}", err);
-        1
-      }
-      _ => {
-        log::error!("{}", err);
-        1
-      }
-    },
+    DaemonError::Docker(err) => {
+      log::error!("[DOCKER] {}: {}", &config.docker_host, &err);
+      1
+    }
     _ => {
       log::error!("{}", err);
       1
