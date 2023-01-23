@@ -20,13 +20,29 @@ use crate::{utils, repositories};
 use crate::error::{DaemonError, HttpResponseError};
 use crate::models::{Pool, DBConn, ArgState};
 
-/// Generate HostConfig struct for container creation
+/// ## Generate store host config
+///
+/// Generate a host config struct for the store container
 ///
 /// ## Arguments
+///
 /// [config](DaemonConfig) Daemon config reference
 ///
 /// ## Returns
-/// [HostConfig](HostConfig) HostConfig struct for container creation
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](HostConfig) - The host config has been generated
+///   - [Err](DaemonError) - The host config has not been generated
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use nanocl_models::config::DaemonConfig;
+///
+/// let config = DaemonConfig::default();
+/// let host_config = gen_store_host_conf(&config);
+/// ```
+///
 fn gen_store_host_conf(config: &DaemonConfig) -> HostConfig {
   let path = Path::new(&config.state_dir).join("store/data");
 
@@ -43,15 +59,31 @@ fn gen_store_host_conf(config: &DaemonConfig) -> HostConfig {
   }
 }
 
-/// Generate container config for system store
-/// This function will generate a container config for the system store
+/// ## Generate a cargo config for the store
+///
+/// The store is a cockroachdb instance
+/// It will generate a cargo for our store to register it in the system namespace
 ///
 /// ## Arguments
+///
 /// [name](str) The name of the container
 /// [config](DaemonConfig) Reference to daemon config
 ///
 /// ## Returns
-/// [Config](Config) The container config
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](CargoConfigPartial) - The cargo config has been generated
+///   - [Err](DaemonError) - The cargo config has not been generated
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use nanocl_models::config::DaemonConfig;
+///
+/// let config = DaemonConfig::default();
+/// let cargo_config = gen_store_cargo_conf("system-store", &config);
+/// ```
+///
 fn gen_store_cargo_conf(
   name: &str,
   config: &DaemonConfig,
@@ -74,13 +106,26 @@ fn gen_store_cargo_conf(
   }
 }
 
-/// Create a connection pool for postgres database
+/// ## Create pool
+///
+/// Create a pool connection to cockroachdb
 ///
 /// ## Arguments
+///
 /// [host](String) Host to connect to
 ///
 /// ## Returns
+///
 /// - [Pool](Pool) R2d2 pool connection for postgres
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use crate::utils;
+///
+/// let pool = utils::create_pool("localhost".to_string()).await;
+/// ```
+///
 pub async fn create_pool(host: String) -> Pool {
   web::block(move || {
     let db_url =
@@ -92,14 +137,29 @@ pub async fn create_pool(host: String) -> Pool {
   .expect("cannot connect to postgresql.")
 }
 
+/// ## Get connection from the pool
+///
 /// Get connection from the connection pool
 ///
 /// ## Arguments
+///
 /// [pool](Pool) a pool wrapped in ntex State
 ///
 /// ## Returns
-/// - [DBConn](DBConn) A connection to the database
-/// - [HttpResponseError](HttpResponseError) Error if unable to get connection
+///
+/// - [Result](Result) Result of the operation
+///   - [Ok](DBConn) - The connection has been retrieved
+///   - [Err](HttpResponseError) - The connection has not been retrieved
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use crate::utils;
+///
+/// let pool = utils::store::create_pool("localhost".to_string()).await;
+/// let conn = utils::store::get_pool_conn(&pool);
+/// ```
+///
 pub fn get_pool_conn(pool: &Pool) -> Result<DBConn, HttpResponseError> {
   let conn = match pool.get() {
     Ok(conn) => conn,
@@ -113,14 +173,29 @@ pub fn get_pool_conn(pool: &Pool) -> Result<DBConn, HttpResponseError> {
   Ok(conn)
 }
 
-/// Get store ip address
+/// ## Get store ip address
+///
+/// Get the ip address of the store container
 ///
 /// ## Arguments
+///
 /// [docker_api](Docker) Reference to docker api
 ///
 /// ## Returns
-/// - [String](String) Ip address of the store
-/// - [HttpResponseError](HttpResponseError) Error if unable to get ip address
+///
+/// - [Result](Result) Result of the operation
+///   - [Ok](String) - The ip address of the store
+///   - [Err](HttpResponseError) - The ip address of the store has not been retrieved
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use crate::utils;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let ip_address = utils::store::get_store_ip_addr(&docker_api).await;
+/// ```
+///
 pub async fn get_store_ip_addr(
   docker_api: &Docker,
 ) -> Result<String, HttpResponseError> {
@@ -151,15 +226,32 @@ pub async fn get_store_ip_addr(
   Ok(ip_address.to_owned())
 }
 
-/// Boot the store and ensure it's running
+/// ## Ensure store is running
+///
+/// Verify is store is running and boot it if not
 ///
 /// ## Arguments
+///
 /// [config](DaemonConfig) Reference to Daemon config
 /// [docker_api](Docker) Reference to docker
 ///
 /// ## Returns
-/// - [Result](Result) Result of the boot process
-/// - [DockerError](DockerError) Error if unable to boot store
+///
+/// - [Result](Result) Result of the operation
+///   - [Ok](()) - The store is running
+///   - [Err](DockerError) - The store is not running
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use nanocl_models::config::DaemonConfig;
+/// use crate::utils;
+///
+/// let config = DaemonConfig::default();
+/// let docker_api = bollard::Docker::connect_with_local_defaults().unwrap();
+/// let result = utils::store::boot(&config, &docker_api).await;
+/// ```
+///
 pub async fn boot(
   config: &DaemonConfig,
   docker_api: &Docker,
@@ -187,7 +279,10 @@ pub async fn boot(
   Ok(())
 }
 
-/// # Register store as a cargo
+/// ## Register store
+///
+/// Register store container as a cargo in the database
+///
 ///
 /// ## Arguments
 ///
@@ -195,8 +290,19 @@ pub async fn boot(
 ///
 /// ## Returns
 ///
-/// - [Result](Result) Result of the registration process
-/// - [DaemonError](DaemonError) Error if unable to register store
+/// - [Result](Result) Result of the operation
+///   - [Ok](()) - The store has been registered
+///   - [Err](DaemonError) - The store has not been registered
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use crate::utils;
+/// use crate::models::ArgState;
+///
+/// let arg = ArgState::default();
+/// let result = utils::store::register(&arg).await;
+/// ```
 ///
 pub async fn register(arg: &ArgState) -> Result<(), DaemonError> {
   let name = "store";
