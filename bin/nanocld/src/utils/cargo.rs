@@ -56,8 +56,11 @@ async fn create_instance(
     // Add cargo label to the container to track it
     let mut labels =
       cargo.config.container.labels.to_owned().unwrap_or_default();
-    labels.insert("cargo".into(), cargo.key.to_owned());
-    labels.insert("namespace".into(), cargo.namespace_name.to_owned());
+    labels.insert("io.nanocl.cargo".into(), cargo.key.to_owned());
+    labels.insert(
+      "io.nanocl.namespace".into(),
+      cargo.namespace_name.to_owned(),
+    );
 
     let config = bollard::container::Config {
       labels: Some(labels),
@@ -93,7 +96,7 @@ pub async fn list_instance(
   cargo_key: &str,
   docker_api: &bollard::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpResponseError> {
-  let label = format!("cargo={}", cargo_key);
+  let label = format!("io.nanocl.cargo={}", cargo_key);
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
   let options = Some(ListContainersOptions {
@@ -231,8 +234,6 @@ pub async fn delete(
 ) -> Result<(), HttpResponseError> {
   let containers = list_instance(cargo_key, docker_api).await?;
 
-  println!("containers : {:?}", &containers);
-
   for container in containers {
     docker_api
       .remove_container(
@@ -247,7 +248,8 @@ pub async fn delete(
   }
 
   repositories::cargo::delete_by_key(cargo_key.to_owned(), pool).await?;
-  repositories::cargo_config::delete_by_cargo_key(cargo_key.to_owned(), pool).await?;
+  repositories::cargo_config::delete_by_cargo_key(cargo_key.to_owned(), pool)
+    .await?;
 
   Ok(())
 }
@@ -384,6 +386,7 @@ pub async fn list(
 
     let mut running_instances = 0;
     for container in containers {
+      println!("{:?}", container);
       if container.state == Some("running".into()) {
         running_instances += 1;
       }

@@ -23,12 +23,6 @@ pub fn generate_man_command(
 }
 
 fn main() -> std::io::Result<()> {
-  // if cfg!(debug_assertions) {
-  //   println!("Development feature enabled");
-  //   println!("cargo:rustc-cfg=feature={:?}", "dev");
-  // } else {
-  //   println!("Production feature enabled");
-  // }
   fs::create_dir_all(MAN_PATH)?;
   generate_man_command("nanocld", Cli::command())?;
   Ok(())

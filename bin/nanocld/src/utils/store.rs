@@ -57,8 +57,8 @@ fn gen_store_cargo_conf(
   config: &DaemonConfig,
 ) -> CargoConfigPartial {
   let mut labels = HashMap::new();
-  labels.insert("cargo".into(), name.into());
-  labels.insert("namespace".into(), "system".into());
+  labels.insert("io.nanocl.cargo".into(), name.into());
+  labels.insert("io.nanocl.namespace".into(), "system".into());
   let host_config = Some(gen_store_host_conf(config));
   CargoConfigPartial {
     name: name.into(),

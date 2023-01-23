@@ -27,7 +27,7 @@ pub async fn list_instance(
   namespace: &str,
   docker_api: &bollard::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpResponseError> {
-  let label = format!("namespace={}", namespace);
+  let label = format!("io.nanocl.namespace={}", namespace);
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
   let options = Some(ListContainersOptions {

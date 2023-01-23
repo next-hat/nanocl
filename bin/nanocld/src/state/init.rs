@@ -4,6 +4,9 @@ use std::{time, thread};
 use std::collections::HashMap;
 
 use bollard::Docker;
+use bollard::container::{
+  ListContainersOptions, InspectContainerOptions, NetworkingConfig,
+};
 use bollard::network::{CreateNetworkOptions, InspectNetworkOptions};
 
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
@@ -100,6 +103,88 @@ async fn register_namespace(
   }
 }
 
+async fn sync_containers(
+  docker_api: &Docker,
+  pool: &Pool,
+) -> Result<(), DaemonError> {
+  let options = Some(ListContainersOptions::<&str> {
+    all: true,
+    ..Default::default()
+  });
+  let containers = docker_api.list_containers(options).await?;
+  let mut cargo_inspected: HashMap<String, bool> = HashMap::new();
+  for container_summary in containers {
+    // extract cargo name and namespace
+    let labels = container_summary.labels.unwrap_or_default();
+    let Some(cargo_key) = labels.get("io.nanocl.cargo") else {
+      // We don't have cargo label, we skip it
+      continue;
+    };
+    let metadata = cargo_key.split('-').collect::<Vec<&str>>();
+    if metadata.len() < 2 {
+      // We don't have cargo label well formated, we skip it
+      continue;
+    }
+    // If we already inspected this cargo we skip it
+    if cargo_inspected.contains_key(metadata[1]) {
+      continue;
+    }
+
+    // We inspect the container to have all the information we need
+    let container = docker_api
+      .inspect_container(
+        &container_summary.id.unwrap_or_default(),
+        None::<InspectContainerOptions>,
+      )
+      .await?;
+    let config = container.config.unwrap_or_default();
+    let mut config: bollard::container::Config<String> = config.into();
+    config.host_config = container.host_config;
+    let network_settings = container.network_settings.unwrap_or_default();
+    if let Some(endpoints_config) = network_settings.networks {
+      config.networking_config = Some(NetworkingConfig { endpoints_config });
+    }
+
+    let new_cargo = CargoConfigPartial {
+      name: metadata[1..].join("-"),
+      container: config.to_owned(),
+      ..Default::default()
+    };
+
+    cargo_inspected.insert(metadata[1].to_owned(), true);
+    match repositories::cargo::inspect_by_key(cargo_key.to_owned(), pool).await
+    {
+      // If the cargo is already in our store and the config is different we update it
+      Ok(cargo) => {
+        if cargo.config.container != config {
+          println!(
+            "updating cargo {} in namespace {}",
+            metadata[1], metadata[0]
+          );
+          repositories::cargo::update_by_key(
+            metadata[1].to_owned(),
+            new_cargo,
+            pool,
+          )
+          .await?;
+        }
+        continue;
+      }
+      // unless we create his config
+      Err(_err) => {
+        println!(
+          "creating cargo {} in namespace {}",
+          metadata[1], metadata[0]
+        );
+        repositories::cargo::create(metadata[0].to_owned(), new_cargo, pool)
+          .await?;
+      }
+    }
+  }
+
+  Ok(())
+}
+
 /// Ensure exsistance of our deamon in the store.
 /// We are running inside us it's that crazy ?
 async fn register_daemon(arg: &ArgState) -> Result<(), DaemonError> {
@@ -110,7 +195,6 @@ async fn register_daemon(arg: &ArgState) -> Result<(), DaemonError> {
   {
     return Ok(());
   }
-  println!("state dir {}", &arg.config.state_dir);
   let path = Path::new(&arg.config.state_dir);
   let binds = vec![format!("{}:/var/lib/nanocl", path.display())];
 
@@ -173,6 +257,7 @@ pub async fn init(args: &Cli) -> Result<DaemonState, DaemonError> {
     sys_namespace: String::from("system"),
   };
   register_dependencies(&arg_state).await?;
+  sync_containers(&docker_api, &pool).await?;
   Ok(DaemonState {
     pool,
     config,
