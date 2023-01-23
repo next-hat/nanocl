@@ -11,14 +11,28 @@ use nanocl_models::generic::GenericDelete;
 
 use crate::error::HttpResponseError;
 
-/// List all cargo/container images
+/// ## List cargo image
+///
+/// List all cargo images installed
 ///
 /// ## Arguments
 /// - [docker_api](bollard::Docker) docker api client
 ///
 /// ## Return
-/// - [Result](Vec<ImageSummary>) - List of images
-/// - [Result](HttpResponseError) - An http response error if something went wrong
+/// - [Result](Result) - The result of the operation
+///   - [Ok](Vec<ImageSummary>) - A list of image summary
+///   - [Err](HttpResponseError) - An http response error if something went wrong
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use bollard::Docker;
+/// use crate::utils::cargo_image;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let result = cargo_image::list(&docker_api).await;
+/// ```
+///
 pub async fn list(
   docker_api: &Docker,
 ) -> Result<Vec<ImageSummary>, HttpResponseError> {
@@ -32,15 +46,31 @@ pub async fn list(
   Ok(items)
 }
 
-/// Inspect a cargo/container image
+/// # Inspect cargo image
+///
+/// Get detailed information on a cargo image
 ///
 /// ## Arguments
+///
 /// - [image_name](str) name of the image to inspect
 /// - [docker_api](bollard::Docker) docker api client
 ///
 /// ## Return
-/// - [Result](ImageInspect) - Image inspect
-/// - [Result](HttpResponseError) - An http response error if something went wrong
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](ImageInspect) - Image inspect
+///   - [Err](HttpResponseError) - An http response error if something went wrong
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use bollard::Docker;
+/// use crate::utils::cargo_image;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let result = cargo_image::inspect("nginx:latest", &docker_api).await;
+/// ```
+///
 pub async fn inspect(
   image_name: &str,
   docker_api: &Docker,
@@ -50,15 +80,36 @@ pub async fn inspect(
   Ok(image)
 }
 
-/// Download a cargo/container image
+/// # Download cargo image
+///
+/// Download a cargo/container image from the docker registry
 ///
 /// ## Arguments
+///
 /// - [image_name](str) name of the image to download
 /// - [tag](str) tag of the image to download
 /// - [docker_api](bollard::Docker) docker api client
 ///
+///
 /// ## Return
-/// - [Result](HttpResponseError) - An http response error if something went wrong
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](Receiver<Result<Bytes, web::error::Error>>) - A stream of bytes
+///   - [Err](HttpResponseError) - An http response error if something went wrong
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use bollard::Docker;
+/// use futures::StreamExt;
+/// use crate::utils::cargo_image;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let stream = cargo_image::download("nginx:latest", &docker_api).await.unwrap();
+/// while let Some(result) = stream.next().await {
+///  // Do something with the result
+/// }
+/// ```
 ///
 pub async fn download(
   from_image: &str,
@@ -123,15 +174,31 @@ pub async fn download(
   Ok(rx_body)
 }
 
-/// Delete a cargo/container image
+/// Delete cargo image
+///
+/// Delete an installed cargo/container image
 ///
 /// ## Arguments
+///
 /// - [image_name](str) name of the image to delete
 /// - [docker_api](bollard::Docker) docker api client
 ///
 /// ## Return
-/// - [Result](HttpResponseError) - An http response error if something went wrong
-/// - [Result](GenericDelete) - Delete response
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](GenericDelete) - A generic delete response
+///   - [Err](HttpResponseError) - An http response error if something went wrong
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use bollard::Docker;
+/// use crate::utils::cargo_image;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let result = cargo_image::delete("nginx:latest", &docker_api).await;
+/// ```
+///
 pub async fn delete(
   id_or_name: &str,
   docker_api: &Docker,
@@ -142,15 +209,28 @@ pub async fn delete(
   Ok(res)
 }
 
-/// Parse image info from a string
+/// # Parse image info
+///
+/// Get the image name and tag from a string
 ///
 /// ## Arguments
-/// - [image_info](str) image info string
+///
+/// - [image_info](str) The string to parse
 ///
 /// ## Return
-/// - [Result](String) - Image name
-/// - [Result](String) - Image tag
-/// - [Result](HttpResponseError) - An http response error if something went wrong
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](String, String) - The image name and tag
+///   - [Err](HttpResponseError) - An http response error if something went wrong
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use crate::utils::cargo_image;
+///
+/// let (name, tag) = cargo_image::parse_image_info("nginx:latest").unwrap();
+/// ```
+///
 pub fn parse_image_info(
   image_info: &str,
 ) -> Result<(String, String), HttpResponseError> {
