@@ -20,6 +20,8 @@ pub struct EventEmitter {
   clients: Vec<Sender<Bytes>>,
 }
 
+pub type EventEmitterPtr = Arc<Mutex<EventEmitter>>;
+
 impl EventEmitter {
   async fn handle_event(&mut self, e: Event) {
     log::debug!("Sending events {:#?} to clients {:#?}", &e, &self.clients);

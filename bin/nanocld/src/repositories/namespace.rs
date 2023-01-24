@@ -1,5 +1,7 @@
 //! Repository to manage namespaces in database
 //! We can create delete list or inspect a namespace
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -188,4 +190,49 @@ pub async fn find_by_name(
   .map_err(db_blocking_error)?;
 
   Ok(item)
+}
+
+/// ## Exist namespace by name
+///
+/// Check if a namespace exist by name in database
+///
+/// ## Arguments
+///
+/// - [name](String) - Name of the namespace to check
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](bool) - Existence of the namespace
+///   - [Err](HttpResponseError) - Error during the operation
+///
+/// ## Examples
+///
+/// ```rust,norun
+/// use crate::repositories;
+///
+/// let exist = repositories::namespace::exist_by_name("my-namespace".into(), &pool).await.unwrap();
+/// ```
+///
+pub async fn exist_by_name(
+  name: String,
+  pool: &Pool,
+) -> Result<bool, HttpResponseError> {
+  use crate::schema::namespaces::dsl;
+
+  let pool = pool.to_owned();
+  let exist = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let exist = Arc::new(dsl::namespaces)
+      .filter(dsl::name.eq(name))
+      .get_result::<NamespaceDbModel>(&mut conn)
+      .optional()
+      .map_err(db_error("namespace"))?;
+    Ok::<_, HttpResponseError>(exist)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  Ok(exist.is_some())
 }

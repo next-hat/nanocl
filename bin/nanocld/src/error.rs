@@ -49,7 +49,7 @@ pub trait IntoHttpResponseError {
 impl web::WebResponseError for HttpResponseError {
   // builds the actual response to send back when an error occurs
   fn error_response(&self, _: &web::HttpRequest) -> web::HttpResponse {
-    log::error!("Error response: {}", self);
+    log::error!("[{}] error: {}", self.status, self.msg);
     let err_json = json!({ "msg": self.msg });
     web::HttpResponse::build(self.status).json(&err_json)
   }

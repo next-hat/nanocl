@@ -1,7 +1,6 @@
 /*
 * Endpoints to manipulate cargoes
 */
-use std::sync::{Mutex, Arc};
 
 use ntex::rt;
 use ntex::web;
@@ -11,7 +10,7 @@ use nanocl_models::generic::GenericNspQuery;
 use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
 use crate::utils;
-use crate::event::EventEmitter;
+use crate::event::EventEmitterPtr;
 use crate::error::HttpResponseError;
 use crate::models::Pool;
 
@@ -33,7 +32,7 @@ use crate::models::Pool;
 pub async fn create_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
-  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
+  event_emitter: web::types::State<EventEmitterPtr>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<CargoConfigPartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -73,7 +72,7 @@ pub async fn create_cargo(
 pub async fn delete_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
-  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
+  event_emitter: web::types::State<EventEmitterPtr>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -105,7 +104,7 @@ pub async fn delete_cargo(
 pub async fn start_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
-  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
+  event_emitter: web::types::State<EventEmitterPtr>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -143,7 +142,7 @@ pub async fn start_cargo(
 pub async fn stop_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
-  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
+  event_emitter: web::types::State<EventEmitterPtr>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -182,7 +181,7 @@ pub async fn stop_cargo(
 pub async fn patch_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard::Docker>,
-  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
+  event_emitter: web::types::State<EventEmitterPtr>,
   id: web::types::Path<String>,
   payload: web::types::Json<CargoConfigPatch>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,

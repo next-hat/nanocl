@@ -1,15 +1,13 @@
-use std::sync::{Arc, Mutex};
-
-use nanocl_models::system::Event;
 /*
 * Endpoints to manipulate resources
 */
 use ntex::{web, rt};
 
+use nanocl_models::system::Event;
 use nanocl_models::resource::ResourcePartial;
 
-use crate::event::EventEmitter;
 use crate::repositories;
+use crate::event::EventEmitterPtr;
 
 use crate::error::HttpResponseError;
 use crate::models::Pool;
@@ -30,7 +28,7 @@ use crate::models::Pool;
 pub async fn create_resource(
   pool: web::types::State<Pool>,
   web::types::Json(payload): web::types::Json<ResourcePartial>,
-  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
+  event_emitter: web::types::State<EventEmitterPtr>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Creating resource: {:?}", &payload);
   let resource = repositories::resource::create(payload, &pool).await?;
@@ -62,7 +60,7 @@ pub async fn create_resource(
 pub async fn delete_resource(
   pool: web::types::State<Pool>,
   name: web::types::Path<String>,
-  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
+  event_emitter: web::types::State<EventEmitterPtr>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let key = name.into_inner();
   log::debug!("Deleting resource: {}", &key);
@@ -143,7 +141,7 @@ pub async fn inspect_resource(
 pub async fn patch_resource(
   pool: web::types::State<Pool>,
   name: web::types::Path<String>,
-  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
+  event_emitter: web::types::State<EventEmitterPtr>,
   web::types::Json(payload): web::types::Json<serde_json::Value>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let key = name.into_inner();

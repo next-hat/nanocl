@@ -598,9 +598,9 @@ dependencies = [
 
 [[package]]
 name = "diesel"
-version = "2.0.2"
+version = "2.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68c186a7418a2aac330bb76cde82f16c36b03a66fb91db32d20214311f9f6545"
+checksum = "4391a22b19c916e50bec4d6140f29bdda3e3bb187223fe6e3ea0b6e4d1021c04"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -909,9 +909,9 @@ dependencies = [
 
 [[package]]
 name = "gimli"
-version = "0.27.0"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dec7af912d60cdbd3677c1af9352ebae6fb8394d165568a2234df0fa00f87793"
+checksum = "221996f774192f0f718773def8201c4ae31f02616a54ccfc2d358bb0e5cefdec"
 
 [[package]]
 name = "glommio"
@@ -1467,9 +1467,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aae3865c98256aae0d6db9b56002e0a860dfdf1e589a39709a25bb3761d263c"
+checksum = "133a8b1a338ef98f9996b3f20e6b16e4f23d6944cb2657da6215f3ee91f14787"
 dependencies = [
  "async-channel",
  "async-oneshot",
@@ -1586,9 +1586,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-h2"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "418fcd1556952563c817be0a1d69cd529c58e0e64345660a479bf367fc3f7e88"
+checksum = "0f5a001029f1e2c3dbdb4bbfdefdfa4cc38325e24765b05c6ea9b5346c7b881b"
 dependencies = [
  "bitflags",
  "fxhash",
@@ -1620,9 +1620,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-io"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14c2615105c489193c8e1a889d58c1c357d48688c3d5b2c4689f4ac57336523a"
+checksum = "8ce9c4945d0ca3e5c469b49b2ce55f68c2c94860ace0f2fdfb26626433b9862e"
 dependencies = [
  "bitflags",
  "log",
@@ -1676,18 +1676,18 @@ dependencies = [
 
 [[package]]
 name = "ntex-service"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d1fb1a9463b88a97c0cc6675ecb39ef999cfc5596d0c8647f93206ac0e1bf44"
+checksum = "1f2bb63ae7a48c48a707ca02a12dde66dce46615b74b98b83c045b2ce45888fe"
 dependencies = [
  "pin-project-lite",
 ]
 
 [[package]]
 name = "ntex-tls"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76ec6e139929a0cfa3a6480e805e7904f626b58ad334035dacbf7f22dc4a8e36"
+checksum = "9d6230c3c07bcefebf993d71c9cd6e3c197a22531c781989a692428b11d13f01"
 dependencies = [
  "log",
  "ntex-bytes",
@@ -1767,9 +1767,9 @@ checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 
 [[package]]
 name = "object"
-version = "0.30.2"
+version = "0.30.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b8c786513eb403643f2a88c244c2aaa270ef2153f55094587d0c48a3cf22a83"
+checksum = "ea86265d3d3dcb6a27fc51bd29a4bf387fae9d2986b823079d4986af253eb439"
 dependencies = [
  "memchr",
 ]

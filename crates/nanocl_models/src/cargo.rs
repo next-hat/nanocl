@@ -5,8 +5,6 @@ use bollard::models::ContainerSummary;
 
 use super::cargo_config::CargoConfig;
 
-pub type ContainerConfig<T> = bollard::container::Config<T>;
-
 /// A Cargo is a replicable container
 /// It is used to run one or multiple instances of the same container
 /// You can define the number of replicas you want to run

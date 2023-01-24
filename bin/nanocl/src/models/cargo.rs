@@ -2,9 +2,10 @@ use tabled::Tabled;
 use clap::{Parser, Subcommand};
 
 use nanocl_models::{
-  cargo::{CargoSummary, ContainerConfig},
-  cargo_config::CargoConfigPatch,
+  cargo::CargoSummary,
+  cargo_config::{CargoConfigPatch, ContainerConfig},
 };
+
 use super::cargo_image::CargoImageArgs;
 
 /// Cargo delete options

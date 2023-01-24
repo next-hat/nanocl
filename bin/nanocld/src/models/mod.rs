@@ -2,8 +2,8 @@ use diesel::PgConnection;
 use r2d2::PooledConnection;
 use diesel::r2d2::ConnectionManager;
 
-mod state;
-pub use state::*;
+mod boot;
+pub use boot::*;
 
 mod namespace;
 pub use namespace::*;

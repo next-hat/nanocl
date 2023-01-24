@@ -7,7 +7,7 @@ mod cli;
 mod version;
 
 mod utils;
-mod state;
+mod boot;
 mod error;
 mod event;
 mod schema;
@@ -44,8 +44,8 @@ async fn main() -> std::io::Result<()> {
     Ok(config) => config,
   };
 
-  // Init internal config and dependencies
-  let daemon_state = match state::init(&config).await {
+  // Boot and init internal dependencies
+  let daemon_state = match boot::init(&config).await {
     Err(err) => {
       let exit_code = error::parse_daemon_error(&config, &err);
       std::process::exit(exit_code);
@@ -58,12 +58,19 @@ async fn main() -> std::io::Result<()> {
     return Ok(());
   }
 
-  // Init event_emitter
-  let event_emitter = event::EventEmitter::new();
-
-  // start http server
-  let srv = server::start(daemon_state, event_emitter).await?;
-  srv.await?;
+  // Start http server and wait for shutdown
+  // Server should never shutdown unless it's explicitly asked
+  match server::generate(daemon_state).await {
+    Err(_err) => {
+      std::process::exit(1);
+    }
+    Ok(server) => {
+      if let Err(err) = server.await {
+        log::error!("Error while running server {}", &err);
+        std::process::exit(1);
+      }
+    }
+  }
   log::info!("shutdown");
   Ok(())
 }

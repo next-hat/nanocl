@@ -22,6 +22,7 @@ async fn get_version() -> web::HttpResponse {
 async fn watch_events(
   event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
+  // TODO: spawn a future to lock the event_emitter and subscribe to the stream
   let stream = event_emitter.lock().unwrap().subscribe();
 
   Ok(

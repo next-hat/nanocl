@@ -1,15 +1,10 @@
-use std::sync::Arc;
-use std::sync::Mutex;
-
 use ntex::web;
 
-use crate::event;
 use crate::services;
-use crate::models::DaemonState;
+use crate::models::BootState;
 
-pub async fn start(
-  daemon_state: DaemonState,
-  event_emitter: Arc<Mutex<event::EventEmitter>>,
+pub async fn generate(
+  daemon_state: BootState,
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("Preparing server");
   let hosts = daemon_state.config.hosts.to_owned();
@@ -22,7 +17,7 @@ pub async fn start(
       // bind docker api
       .state(daemon_state.docker_api.clone())
       // bind our event state
-      .state(event_emitter.clone())
+      .state(daemon_state.event_emitter.clone())
       // Default logger middleware
       .wrap(web::middleware::Logger::default())
       // Set Json body max size
@@ -74,12 +69,6 @@ pub async fn start(
     }
     count += 1;
   }
-  #[cfg(feature = "dev")]
-  {
-    server = server.bind("0.0.0.0:29875")?;
-    log::info!("Dev mode enabled, listening on http://localhost:29875");
-  };
-  // server = server.bind_rustls("0.0.0.0:8443", server_config)?;
   log::info!("Server ready");
   Ok(server.run())
 }
@@ -91,8 +80,7 @@ mod tests {
 
   use super::*;
 
-  use crate::state;
-  use crate::event;
+  use crate::boot;
   use crate::config;
   use crate::cli::Cli;
   use crate::utils::tests::*;
@@ -104,9 +92,8 @@ mod tests {
     let args =
       Cli::parse_from(vec!["nanocl", "-H", "unix:///tmp/nanocl_test.sock"]);
     let daemon_conf = config::init(&args)?;
-    let daemon_state = state::init(&daemon_conf).await?;
-    let event_emitter = event::EventEmitter::new();
-    let server = start(daemon_state, event_emitter).await;
+    let daemon_state = boot::init(&daemon_conf).await?;
+    let server = generate(daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     Ok(())
   }
@@ -117,9 +104,8 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9999"]);
     let daemon_conf = config::init(&args)?;
-    let daemon_state = state::init(&daemon_conf).await?;
-    let event_emitter = event::EventEmitter::new();
-    let server = start(daemon_state, event_emitter).await;
+    let daemon_state = boot::init(&daemon_conf).await?;
+    let server = generate(daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     Ok(())
   }
@@ -131,13 +117,12 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9888"]);
     let daemon_conf = config::init(&args)?;
-    let daemon_state = state::init(&daemon_conf).await?;
-    let event_emitter = event::EventEmitter::new();
-    let server = start(daemon_state, event_emitter.clone()).await;
+    let daemon_state = boot::init(&daemon_conf).await?;
+    let server = generate(daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     let daemon_conf = config::init(&args)?;
-    let daemon_state = state::init(&daemon_conf).await?;
-    let server2 = start(daemon_state, event_emitter).await;
+    let daemon_state = boot::init(&daemon_conf).await?;
+    let server2 = generate(daemon_state).await;
     assert!(server2.is_err(), "Expect server to fail to run");
     Ok(())
   }
@@ -149,9 +134,8 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "unix:///root/test.sock"]);
     let daemon_conf = config::init(&args)?;
-    let daemon_state = state::init(&daemon_conf).await?;
-    let event_emitter = event::EventEmitter::new();
-    let server = start(daemon_state, event_emitter).await;
+    let daemon_state = boot::init(&daemon_conf).await?;
+    let server = generate(daemon_state).await;
     assert!(server.is_err(), "Expect server to fail to run");
     Ok(())
   }
@@ -163,9 +147,8 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "not_valid"]);
     let daemon_conf = config::init(&args)?;
-    let daemon_state = state::init(&daemon_conf).await?;
-    let event_emitter = event::EventEmitter::new();
-    let server = start(daemon_state, event_emitter).await;
+    let daemon_state = boot::init(&daemon_conf).await?;
+    let server = generate(daemon_state).await;
     assert!(server.is_err(), "Expect server to fail to run");
     Ok(())
   }
