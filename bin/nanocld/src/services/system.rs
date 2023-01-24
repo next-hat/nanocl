@@ -31,9 +31,21 @@ async fn watch_events(
   )
 }
 
+// This is a dummy endpoint you can use to test if the server is accessible.
+async fn ping() -> Result<web::HttpResponse, HttpResponseError> {
+  Ok(web::HttpResponse::Ok().json(&json!({
+    "msg": "pong",
+  })))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(watch_events);
   config.service(get_version);
+  config.service(
+    web::resource("/_ping")
+      .route(web::get().to(ping))
+      .route(web::head().to(ping)),
+  );
 }
 
 #[cfg(test)]
@@ -87,6 +99,36 @@ mod tests {
   async fn watch_events() -> TestRet {
     let srv = generate_server(ntex_config).await;
     let resp = srv.get("/events").send().await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::OK,
+      "Expect status to be {} got {}",
+      StatusCode::OK,
+      status
+    );
+    Ok(())
+  }
+
+  #[ntex::test]
+  async fn test_ping() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+    let mut resp = srv.get("/_ping").send().await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::OK,
+      "Expect status to be {} got {}",
+      StatusCode::OK,
+      status
+    );
+    let body: serde_json::Value = resp
+      .json()
+      .await
+      .expect("To receive a valid version json payload");
+    assert_eq!(body["msg"], "pong");
+
+    let resp = srv.head("/_ping").send().await?;
     let status = resp.status();
     assert_eq!(
       status,
