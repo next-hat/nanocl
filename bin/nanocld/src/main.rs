@@ -6,9 +6,9 @@ use clap::Parser;
 mod cli;
 mod version;
 
-mod utils;
 mod boot;
 mod error;
+mod utils;
 mod event;
 mod schema;
 mod models;
@@ -17,7 +17,7 @@ mod server;
 mod services;
 mod repositories;
 
-/// ## The Nanocl daemon
+/// # The Nanocl daemon
 ///
 /// Provides an api to manage network and containers accross physical hosts
 /// there are these advantages :
@@ -58,13 +58,13 @@ async fn main() -> std::io::Result<()> {
     return Ok(());
   }
 
-  // Start http server and wait for shutdown
-  // Server should never shutdown unless it's explicitly asked
   match server::generate(daemon_state).await {
     Err(_err) => {
       std::process::exit(1);
     }
     Ok(server) => {
+      // Start http server and wait for shutdown
+      // Server should never shutdown unless it's explicitly asked
       if let Err(err) = server.await {
         log::error!("Error while running server {}", &err);
         std::process::exit(1);
