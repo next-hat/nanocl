@@ -1620,9 +1620,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-io"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ce9c4945d0ca3e5c469b49b2ce55f68c2c94860ace0f2fdfb26626433b9862e"
+checksum = "3475da369dfab21392f77c953431c657f0ea78add86b7eec2c898046772bd247"
 dependencies = [
  "bitflags",
  "log",
@@ -1631,7 +1631,6 @@ dependencies = [
  "ntex-service",
  "ntex-util",
  "pin-project-lite",
- "smallvec",
 ]
 
 [[package]]
@@ -1685,9 +1684,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-tls"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d6230c3c07bcefebf993d71c9cd6e3c197a22531c781989a692428b11d13f01"
+checksum = "5ed9e478615494985e9a71794ad9e08d78b7de56268d47c19a626cbb630e70ce"
 dependencies = [
  "log",
  "ntex-bytes",
