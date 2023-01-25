@@ -34,13 +34,16 @@ jobs:
     - uses: taiki-e/install-action@nextest
     # Prepare CI
     - name: Prepare CI
-      run: sudo ./scripts/prepare_tests.sh
+      run: |
+        sudo ./scripts/prepare_tests.sh
+        sudo ./scripts/install_docker.ubuntu.sh
     # Setup daemon for the tests
     - name: Setup
       run: |
         docker pull nexthat/nanocl-get-started:latest
         docker pull cockroachdb/cockroach:v21.2.17
         cargo make run-daemon -- --init
+        docker network ls
         cargo make run-daemon &
         sleep 5
     # Run coverage

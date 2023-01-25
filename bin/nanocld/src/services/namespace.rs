@@ -5,7 +5,7 @@ use ntex::web;
 
 use nanocl_models::namespace::NamespacePartial;
 
-use crate::{utils, repositories};
+use crate::utils;
 use crate::models::Pool;
 
 use crate::error::HttpResponseError;
@@ -24,7 +24,6 @@ async fn list_namespace(
   docker_api: web::types::State<bollard::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let items = utils::namespace::list(&docker_api, &pool).await?;
-
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -41,11 +40,13 @@ async fn list_namespace(
 ))]
 #[web::post("/namespaces")]
 async fn create_namespace(
-  pool: web::types::State<Pool>,
   web::types::Json(payload): web::types::Json<NamespacePartial>,
+  docker_api: web::types::State<bollard::Docker>,
+  pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let item = repositories::namespace::create(payload, &pool).await?;
-
+  log::debug!("Creating namespace: {:?}", &payload);
+  let item = utils::namespace::create(&payload, &docker_api, &pool).await?;
+  log::debug!("Namespace created: {:?}", &item);
   Ok(web::HttpResponse::Created().json(&item))
 }
 
@@ -62,11 +63,14 @@ async fn create_namespace(
 ))]
 #[web::delete("/namespaces/{name}")]
 async fn delete_namespace_by_name(
+  name: web::types::Path<String>,
+  docker_api: web::types::State<bollard::Docker>,
   pool: web::types::State<Pool>,
-  id: web::types::Path<String>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let id_or_name = id.into_inner();
-  let res = repositories::namespace::delete_by_name(id_or_name, &pool).await?;
+  let name = name.into_inner();
+  log::debug!("Deleting namespace {}", &name);
+  let res = utils::namespace::delete_by_name(&name, &docker_api, &pool).await?;
+  log::debug!("Namespace {} deleted: {:?}", &name, &res);
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
@@ -89,13 +93,9 @@ async fn inspect_namespace_by_name(
   pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = name.into_inner();
-
   log::debug!("Inspecting namespace {}", name);
-
   let namespace = utils::namespace::inspect(&name, &docker_api, &pool).await?;
-
   log::debug!("Namespace found: {:?}", &namespace);
-
   Ok(web::HttpResponse::Ok().json(&namespace))
 }
 

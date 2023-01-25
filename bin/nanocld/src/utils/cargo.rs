@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ntex::http::StatusCode;
-use bollard::service::ContainerSummary;
+use bollard::service::{ContainerSummary, HostConfig};
 use bollard::container::{ListContainersOptions, RemoveContainerOptions};
 
 use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
@@ -62,8 +62,20 @@ async fn create_instance(
       cargo.namespace_name.to_owned(),
     );
 
+    // Merge the cargo config with the container config
+    // And set his network mode to the cargo namespace
     let config = bollard::container::Config {
       labels: Some(labels),
+      host_config: Some(HostConfig {
+        network_mode: Some(cargo.namespace_name.to_owned()),
+        ..cargo
+          .config
+          .to_owned()
+          .container
+          .host_config
+          .unwrap_or_default()
+          .to_owned()
+      }),
       ..cargo.config.container.to_owned()
     };
 
@@ -445,4 +457,45 @@ pub async fn inspect(
     running_instances,
     containers,
   })
+}
+
+/// ## Delete all cargoes in given namespace
+///
+/// ## Arguments
+///
+/// - [namespace](str) - The namespace name
+/// - [docker_api](bollard::Docker) - The docker api
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The cargoes has been deleted
+///   - [Err](HttpResponseError) - The cargo has not been deleted
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use crate::repositories;
+///
+/// let namespace = "my-namespace";
+/// let docker_api = bollard::Docker::connect_with_local_defaults().unwrap();
+/// repositories::cargo::delete_by_namespace(namespace, &docker_api, &pool).await?;
+/// ```
+///
+pub async fn delete_by_namespace(
+  namespace: &str,
+  docker_api: &bollard::Docker,
+  pool: &Pool,
+) -> Result<(), HttpResponseError> {
+  let namespace =
+    repositories::namespace::find_by_name(namespace.to_owned(), pool).await?;
+
+  let cargoes = repositories::cargo::find_by_namespace(namespace, pool).await?;
+
+  for cargo in cargoes {
+    delete(&cargo.key, docker_api, pool).await?;
+  }
+
+  Ok(())
 }

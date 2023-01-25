@@ -13,6 +13,7 @@ pub struct Namespace {
   pub name: String,
 }
 
+#[derive(Debug, Clone)]
 /// A Namespace partial is a payload used to create a new namespace
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]

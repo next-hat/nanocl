@@ -6,9 +6,9 @@ use bollard::container::{ListContainersOptions, InspectContainerOptions};
 use nanocl_models::namespace::NamespacePartial;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
-use crate::repositories;
-use crate::models::Pool;
+use crate::{utils, repositories};
 use crate::error::DaemonError;
+use crate::models::Pool;
 
 /// Ensure existance of the system network that controllers will use.
 /// It's ensure existance of a network in your system called `nanoclinternal0`
@@ -49,6 +49,8 @@ pub(crate) async fn ensure_network(
 /// User can registed they own namespace to ensure better encaptusation.
 pub(crate) async fn register_namespace(
   name: &str,
+  create_network: bool,
+  docker_api: &bollard::Docker,
   pool: &Pool,
 ) -> Result<(), DaemonError> {
   if repositories::namespace::exist_by_name(name.to_owned(), pool).await? {
@@ -57,7 +59,11 @@ pub(crate) async fn register_namespace(
   let new_nsp = NamespacePartial {
     name: name.to_owned(),
   };
-  repositories::namespace::create(new_nsp, pool).await?;
+  if create_network {
+    utils::namespace::create(&new_nsp, docker_api, pool).await?;
+  } else {
+    repositories::namespace::create(new_nsp, pool).await?;
+  }
   Ok(())
 }
 
