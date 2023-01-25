@@ -34,7 +34,9 @@ jobs:
     - uses: taiki-e/install-action@nextest
     # Prepare CI
     - name: Prepare CI
-      run: sudo ./scripts/prepare_tests.sh
+      run: |
+        sudo ./scripts/prepare_tests.sh
+        sudo ./scripts/install_docker.ubuntu.sh
     # Setup daemon for the tests
     - name: Setup
       run: |
