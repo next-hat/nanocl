@@ -1,16 +1,105 @@
 use std::collections::HashMap;
 
+use bollard::network::CreateNetworkOptions;
+use nanocl_models::generic::GenericDelete;
 use ntex::http::StatusCode;
 use bollard::models::ContainerSummary;
 use bollard::container::ListContainersOptions;
 
-use nanocl_models::namespace::{NamespaceSummary, NamespaceInspect};
+use nanocl_models::namespace::{
+  Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
+};
 
+use crate::utils;
 use crate::repositories;
 use crate::models::Pool;
 use crate::error::HttpResponseError;
 
 use super::cargo;
+
+/// ## Create a namespace
+///
+/// Create a new namespace with his associated network
+///
+/// ## Arguments
+///
+/// - [namespace](NamespacePartial) - The namespace name
+/// - [docker_api](bollard::Docker) - The docker api
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///  - [Ok](Namespace) - The namespace has been created
+///  - [Err](HttpResponseError) - The namespace has not been created
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use bollard::Docker;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let result = namespace::create("my-namespace", &docker_api, &pool).await;
+/// ```
+///
+pub async fn create(
+  namespace: &NamespacePartial,
+  docker_api: &bollard::Docker,
+  pool: &Pool,
+) -> Result<Namespace, HttpResponseError> {
+  if repositories::namespace::exist_by_name(namespace.name.to_owned(), pool)
+    .await?
+  {
+    return Err(HttpResponseError {
+      msg: format!("namespace {} error: already exist", &namespace.name),
+      status: StatusCode::CONFLICT,
+    });
+  }
+  let config = CreateNetworkOptions {
+    name: namespace.name.to_owned(),
+    ..Default::default()
+  };
+  docker_api.create_network(config).await?;
+  let res = repositories::namespace::create(namespace.to_owned(), pool).await?;
+  Ok(Namespace { name: res.name })
+}
+
+/// ## Remove a namespace
+///
+/// Remove a namespace and his associated network with all his cargoes
+///
+/// ## Arguments
+///
+/// - [name](String) - The namespace name
+/// - [docker_api](bollard::Docker) - The docker api
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](GenericDelete) - The namespace has been removed
+///   - [Err](HttpResponseError) - The namespace has not been removed
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use bollard::Docker;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let result = namespace::delete_by_name("my-namespace", &docker_api, &pool).await;
+/// ```
+///
+pub async fn delete_by_name(
+  name: &str,
+  docker_api: &bollard::Docker,
+  pool: &Pool,
+) -> Result<GenericDelete, HttpResponseError> {
+  utils::cargo::delete_by_namespace(name, docker_api, pool).await?;
+  if let Err(err) = docker_api.remove_network(name).await {
+    log::error!("Unable to remove network {} got error: {}", name, err);
+  }
+  repositories::namespace::delete_by_name(name.to_owned(), pool).await
+}
 
 /// ## List existing container in a namespace
 ///

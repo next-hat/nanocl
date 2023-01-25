@@ -9,6 +9,7 @@ pub struct GenericNspQuery {
   pub namespace: Option<String>,
 }
 
+#[derive(Debug)]
 /// Generic delete response
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
