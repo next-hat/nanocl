@@ -18,7 +18,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::Resource(args) => commands::exec_resource(&client, args).await,
     Commands::Cargo(args) => commands::exec_cargo(&client, args).await,
     Commands::Events => commands::exec_events(&client).await,
-    Commands::Version => commands::exec_version(&client).await,
+    Commands::Version(args) => commands::exec_version(&client, args).await,
   }
 }
 
@@ -39,6 +39,8 @@ mod tests {
   #[ntex::test]
   async fn test_version() {
     let args = Cli::parse_from(["nanocl", "version"]);
+    assert!(execute_args(&args).await.is_ok());
+    let args = Cli::parse_from(["nanocl", "version", "check"]);
     assert!(execute_args(&args).await.is_ok());
   }
 

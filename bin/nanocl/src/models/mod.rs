@@ -4,6 +4,7 @@ mod cargo_image;
 mod setup;
 mod resource;
 mod yml;
+mod version;
 
 use clap::{Parser, Subcommand};
 
@@ -13,6 +14,7 @@ pub use namespace::*;
 pub use cargo_image::*;
 pub use setup::*;
 pub use resource::*;
+pub use version::*;
 
 /// A self-sufficient hybrid-cloud manager
 #[derive(Debug, Parser)]
@@ -39,7 +41,7 @@ pub enum Commands {
   /// Setup nanocl
   Setup(SetupArgs),
   /// Show nanocl version information
-  Version,
+  Version(VersionArgs),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for
