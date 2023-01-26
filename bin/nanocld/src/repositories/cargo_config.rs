@@ -1,9 +1,9 @@
-use nanocl_models::generic::GenericDelete;
+use nanocl_stubs::generic::GenericDelete;
 use ntex::web;
 use ntex::http::StatusCode;
 use diesel::prelude::*;
 
-use nanocl_models::cargo_config::{CargoConfig, CargoConfigPartial};
+use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
 
 use crate::utils;
 use crate::error::HttpResponseError;
@@ -29,7 +29,7 @@ use crate::repositories::error::{db_blocking_error, db_error};
 /// ## Examples
 ///
 /// ```rust,norun
-/// use nanocl_models::cargo_config::CargoConfigPartial;
+/// use nanocl_stubs::cargo_config::CargoConfigPartial;
 ///
 /// let item = CargoConfigPartial {
 ///  // Fill config

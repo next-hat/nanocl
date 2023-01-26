@@ -1,6 +1,6 @@
-use nanocl_client::NanoclClient;
+use nanoclrs::NanoclClient;
 
-use nanocl_models::cargo_config::CargoConfigPartial;
+use nanocl_stubs::cargo_config::CargoConfigPartial;
 
 use crate::error::CliError;
 use crate::models::{

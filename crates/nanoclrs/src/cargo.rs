@@ -1,6 +1,6 @@
-use nanocl_models::generic::GenericNspQuery;
-use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
-use nanocl_models::cargo_config::{CargoConfigPatch, CargoConfigPartial};
+use nanocl_stubs::generic::GenericNspQuery;
+use nanocl_stubs::cargo::{Cargo, CargoSummary, CargoInspect};
+use nanocl_stubs::cargo_config::{CargoConfigPatch, CargoConfigPartial};
 
 use super::http_client::NanoclClient;
 use super::error::{NanoclClientError, is_api_error};
@@ -19,7 +19,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanocl_client::NanoclClient;
+  /// use nanoclrs::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let new_cargo = CargoConfigPartial {
@@ -63,7 +63,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanocl_client::NanoclClient;
+  /// use nanoclrs::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.delete_cargo("my-cargo", None).await.unwrap();
@@ -99,7 +99,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanocl_client::NanoclClient;
+  /// use nanoclrs::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let cargo = client.inspect_cargo("my-cargo", None).await.unwrap();
@@ -136,7 +136,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanocl_client::NanoclClient;
+  /// use nanoclrs::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.start_cargo("my-cargo", None).await.unwrap();
@@ -172,7 +172,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanocl_client::NanoclClient;
+  /// use nanoclrs::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.stop_cargo("my-cargo", None).await.unwrap();
@@ -207,7 +207,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanocl_client::NanoclClient;
+  /// use nanoclrs::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let cargoes = client.list_cargoes(None).await.unwrap();
@@ -245,7 +245,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanocl_client::NanoclClient;
+  /// use nanoclrs::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let cargo_config = CargoConfigPatch {
@@ -276,7 +276,7 @@ impl NanoclClient {
 mod tests {
   use super::*;
 
-  use nanocl_models::cargo_config::CargoConfigPartial;
+  use nanocl_stubs::cargo_config::CargoConfigPartial;
 
   #[ntex::test]
   async fn test_basic() {

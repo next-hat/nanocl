@@ -7,7 +7,7 @@ use futures::StreamExt;
 use bollard::Docker;
 use bollard::models::{ImageInspect, ImageSummary};
 
-use nanocl_models::generic::GenericDelete;
+use nanocl_stubs::generic::GenericDelete;
 
 use crate::error::HttpResponseError;
 

@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use nanocl_client::NanoclClient;
+use nanoclrs::NanoclClient;
 
 use crate::error::CliError;
 

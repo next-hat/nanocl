@@ -12,7 +12,7 @@ use bollard::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};
 use futures::StreamExt;
 use indicatif::{ProgressStyle, ProgressBar};
 
-use nanocl_models::config::DaemonConfig;
+use nanocl_stubs::config::DaemonConfig;
 
 use crate::utils::config;
 use crate::utils::cargo_image;

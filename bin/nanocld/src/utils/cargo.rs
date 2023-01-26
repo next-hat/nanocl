@@ -4,8 +4,8 @@ use ntex::http::StatusCode;
 use bollard::service::{ContainerSummary, HostConfig};
 use bollard::container::{ListContainersOptions, RemoveContainerOptions};
 
-use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
-use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
+use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
+use nanocl_stubs::cargo::{Cargo, CargoSummary, CargoInspect};
 
 use crate::repositories;
 use crate::error::HttpResponseError;

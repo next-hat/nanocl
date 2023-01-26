@@ -1,4 +1,4 @@
-use nanocl_models::config::DaemonConfig;
+use nanocl_stubs::config::DaemonConfig;
 
 use crate::event::EventEmitterPtr;
 

@@ -1,5 +1,6 @@
-# Nanocl models
+# Nanocl stubs
 
-Shared model used by nanocl daemon client and cli.
+## Overview
 
+Nanocl shared data model
 These models are the data structure used as input and output of the daemon.

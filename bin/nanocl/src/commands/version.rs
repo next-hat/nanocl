@@ -1,4 +1,4 @@
-use nanocl_client::NanoclClient;
+use nanoclrs::NanoclClient;
 
 use crate::version;
 

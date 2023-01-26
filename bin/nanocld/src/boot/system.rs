@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use bollard::network::{CreateNetworkOptions, InspectNetworkOptions};
 use bollard::container::{ListContainersOptions, InspectContainerOptions};
 
-use nanocl_models::namespace::NamespacePartial;
-use nanocl_models::cargo_config::CargoConfigPartial;
+use nanocl_stubs::namespace::NamespacePartial;
+use nanocl_stubs::cargo_config::CargoConfigPartial;
 
 use crate::{utils, repositories};
 use crate::error::DaemonError;

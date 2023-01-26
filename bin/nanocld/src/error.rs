@@ -5,7 +5,7 @@ use thiserror::Error;
 use serde_json::json;
 use bollard::errors::Error as DockerError;
 
-use nanocl_models::config::DaemonConfig;
+use nanocl_stubs::config::DaemonConfig;
 
 #[cfg(feature = "dev")]
 use utoipa::ToSchema;

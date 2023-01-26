@@ -24,7 +24,7 @@ use crate::models::{Pool, ResourceConfigDbModel};
 /// ## Examples
 ///
 /// ```rust,norun
-/// use nanocl_models::resource::ResourceConfigDbModel;
+/// use nanocl_stubs::resource::ResourceConfigDbModel;
 /// use crate::repositories;
 ///
 /// let item = ResourceConfigDbModel {

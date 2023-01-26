@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use nanocl_models::resource::ResourcePartial;
+use nanocl_stubs::resource::ResourcePartial;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]

@@ -13,7 +13,7 @@ pub mod tests {
   use ntex::http::client::ClientResponse;
   use ntex::http::client::error::SendRequestError;
 
-  use nanocl_models::config::DaemonConfig;
+  use nanocl_stubs::config::DaemonConfig;
 
   use crate::event::EventEmitter;
   use crate::models::Pool;

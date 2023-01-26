@@ -5,9 +5,9 @@
 use ntex::rt;
 use ntex::web;
 
-use nanocl_models::system::Event;
-use nanocl_models::generic::GenericNspQuery;
-use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
+use nanocl_stubs::system::Event;
+use nanocl_stubs::generic::GenericNspQuery;
+use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
 use crate::utils;
 use crate::event::EventEmitterPtr;
@@ -268,8 +268,8 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use super::*;
 
-  use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
-  use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
+  use nanocl_stubs::cargo::{Cargo, CargoSummary, CargoInspect};
+  use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
   use crate::utils::tests::*;
   use crate::services::cargo_image::tests::ensure_test_image;

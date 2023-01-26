@@ -1,6 +1,6 @@
 use std::fs;
 
-use nanocl_client::NanoclClient;
+use nanoclrs::NanoclClient;
 
 use crate::utils;
 use crate::error::CliError;

@@ -1,4 +1,4 @@
-use nanocl_models::config::{DaemonConfig, DaemonConfigFile};
+use nanocl_stubs::config::{DaemonConfig, DaemonConfigFile};
 
 use crate::cli::Cli;
 use crate::error::DaemonError;

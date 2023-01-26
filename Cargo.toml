@@ -1,7 +1,7 @@
 [workspace]
 members = [
-  "crates/nanocl_models",
-  "crates/nanocl_client",
+  "crates/nanocl_stubs",
+  "crates/nanoclrs",
   "bin/nanocld",
   "bin/nanocl"
 ]
@@ -13,5 +13,5 @@ opt-level = 0
 opt-level = 3
 
 [patch.crates-io]
-nanocl_models = { path = "crates/nanocl_models" }
-nanocl_client = { path = "crates/nanocl_client" }
+nanocl_stubs = { path = "crates/nanocl_stubs" }
+nanoclrs = { path = "crates/nanoclrs" }

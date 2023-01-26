@@ -10,7 +10,7 @@ use tokio_util::codec;
 use indicatif::{ProgressStyle, ProgressBar};
 
 use crate::error::CliError;
-use nanocl_client::error::ApiError;
+use nanoclrs::error::ApiError;
 
 use super::http_file;
 

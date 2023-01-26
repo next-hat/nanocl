@@ -1,8 +1,8 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_models::generic::GenericDelete;
-use nanocl_models::resource::{Resource, ResourcePartial};
+use nanocl_stubs::generic::GenericDelete;
+use nanocl_stubs::resource::{Resource, ResourcePartial};
 
 use crate::repositories::error::db_error;
 use crate::{utils, repositories};
@@ -32,7 +32,7 @@ use super::error::db_blocking_error;
 /// ## Examples
 ///
 /// ```rust,norun
-/// use nanocl_models::resource::ResourcePartial;
+/// use nanocl_stubs::resource::ResourcePartial;
 /// use crate::repositories;
 ///
 /// let item = ResourcePartial {

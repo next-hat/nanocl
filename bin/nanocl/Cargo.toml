@@ -24,13 +24,13 @@ serde = { version = "1.0", features = ["derive"] }
 clap_complete = "4.1.1"
 clap_mangen = { version = "0.2" }
 tabled = "0.10.0"
-nanocl_models = { version = "*", features = ["serde"] }
+nanocl_stubs = { version = "*", features = ["serde"] }
 bollard = { version = "0.14" }
 chrono = "0.4.23"
 
 [dependencies]
-nanocl_client = { version = "0.0.1", features = ["tokio"] }
-nanocl_models = { version = "0.0.1", features = ["serde"] }
+nanoclrs = { version = "0.0.1", features = ["tokio"] }
+nanocl_stubs = { version = "0.0.1", features = ["serde"] }
 bollard = { version = "0.14" }
 futures = "0.3"
 serde_yaml = "0.9"

@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use nanocl_models::resource::{ResourceKind, Resource};
+use nanocl_stubs::resource::{ResourceKind, Resource};
 use tabled::Tabled;
 
 /// Resource commands
