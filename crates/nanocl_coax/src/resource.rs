@@ -17,7 +17,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let namespaces = client.list_resource().await;
@@ -50,7 +50,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   /// use nanocl_stubs::resource::ResourceKind;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -90,7 +90,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let resource = client.inspect_resource("my-resource").await;
@@ -125,7 +125,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let resource = client.patch_resource("my-resource", serde_json::json!({})).await;
@@ -163,7 +163,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let resource = client.delete_resource("my-resource").await;

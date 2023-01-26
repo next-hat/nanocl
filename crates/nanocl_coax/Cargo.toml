@@ -1,9 +1,9 @@
 [package]
-name = "nanoclrs"
+name = "nanocl_coax"
 version = "0.0.1"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
-description = "Nanocl http client"
+description = "The Nanocl api"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"

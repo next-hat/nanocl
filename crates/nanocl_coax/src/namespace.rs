@@ -14,7 +14,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let namespaces = client.list_namespace().await;
@@ -70,7 +70,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let namespace = client.inspect_namespace("my-namespace").await?;
@@ -105,7 +105,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.delete_namespace("my-namespace").await?;

@@ -18,7 +18,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let version = client.get_version().await;
@@ -46,7 +46,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let mut stream = client.watch_events().await?;

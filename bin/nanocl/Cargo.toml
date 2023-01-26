@@ -29,7 +29,7 @@ bollard = { version = "0.14" }
 chrono = "0.4.23"
 
 [dependencies]
-nanoclrs = { version = "0.0.1", features = ["tokio"] }
+nanocl_coax = { version = "0.0.1", features = ["tokio"] }
 nanocl_stubs = { version = "0.0.1", features = ["serde"] }
 bollard = { version = "0.14" }
 futures = "0.3"

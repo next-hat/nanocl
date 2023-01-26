@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use nanoclrs::error::{NanoclClientError, ApiError};
+use nanocl_coax::error::{NanoclClientError, ApiError};
 
 use crate::models::Cli;
 
@@ -24,7 +24,7 @@ impl CliError {
   pub fn exit(&self, args: &Cli) {
     match self {
       CliError::Client(err) => match err {
-        nanoclrs::error::NanoclClientError::SendRequest(err) => match err {
+        nanocl_coax::error::NanoclClientError::SendRequest(err) => match err {
           ntex::http::client::error::SendRequestError::Connect(_) => {
             eprintln!(
               "Cannot connect to the nanocl daemon at {host}. Is the nanocl daemon running?",
@@ -33,7 +33,7 @@ impl CliError {
           }
           _ => eprintln!("{}", err),
         },
-        nanoclrs::error::NanoclClientError::Api(err) => {
+        nanocl_coax::error::NanoclClientError::Api(err) => {
           eprintln!("Daemon [{}]: {}", err.status, err.msg);
         }
         _ => eprintln!("{}", err),

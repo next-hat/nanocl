@@ -1,5 +1,5 @@
 use clap::Parser;
-use nanoclrs::NanoclClient;
+use nanocl_coax::NanoclClient;
 
 mod utils;
 mod error;

@@ -19,7 +19,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let new_cargo = CargoConfigPartial {
@@ -63,7 +63,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.delete_cargo("my-cargo", None).await.unwrap();
@@ -99,7 +99,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let cargo = client.inspect_cargo("my-cargo", None).await.unwrap();
@@ -136,7 +136,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.start_cargo("my-cargo", None).await.unwrap();
@@ -172,7 +172,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.stop_cargo("my-cargo", None).await.unwrap();
@@ -207,7 +207,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let cargoes = client.list_cargoes(None).await.unwrap();
@@ -245,7 +245,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let cargo_config = CargoConfigPatch {

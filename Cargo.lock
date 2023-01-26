@@ -1376,8 +1376,8 @@ dependencies = [
  "futures",
  "hyper",
  "indicatif",
+ "nanocl_coax",
  "nanocl_stubs",
- "nanoclrs",
  "ntex",
  "serde",
  "serde_json",
@@ -1389,6 +1389,20 @@ dependencies = [
  "tokio-util",
  "url",
  "users",
+]
+
+[[package]]
+name = "nanocl_coax"
+version = "0.0.1"
+dependencies = [
+ "bollard",
+ "futures",
+ "nanocl_stubs",
+ "ntex",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "thiserror",
 ]
 
 [[package]]
@@ -1427,20 +1441,6 @@ dependencies = [
  "url",
  "utoipa",
  "uuid",
-]
-
-[[package]]
-name = "nanoclrs"
-version = "0.0.1"
-dependencies = [
- "bollard",
- "futures",
- "nanocl_stubs",
- "ntex",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "thiserror",
 ]
 
 [[package]]

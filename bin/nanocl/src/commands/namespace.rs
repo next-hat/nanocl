@@ -1,4 +1,4 @@
-use nanoclrs::NanoclClient;
+use nanocl_coax::NanoclClient;
 
 use crate::models::{NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow};
 

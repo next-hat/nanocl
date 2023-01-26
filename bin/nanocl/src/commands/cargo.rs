@@ -1,4 +1,4 @@
-use nanoclrs::NanoclClient;
+use nanocl_coax::NanoclClient;
 
 use nanocl_stubs::cargo_config::CargoConfigPartial;
 

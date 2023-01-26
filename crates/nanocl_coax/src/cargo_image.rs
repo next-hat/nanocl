@@ -20,7 +20,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let images = client.list_cargo_image().await;
@@ -54,7 +54,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let mut stream = client.create_cargo_image("my-image").await;
@@ -133,7 +133,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.delete_cargo_image("my-image:mylabel").await;
@@ -166,7 +166,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```rust,norun
-  /// use nanoclrs::NanoclClient;
+  /// use nanocl_coax::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let image = client.inspect_cargo_image("my-image:mylabel").await;
