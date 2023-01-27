@@ -1,13 +1,13 @@
 use clap::{Parser, Subcommand};
 
-/// Resource commands
+/// Version commands
 #[derive(Debug, Subcommand)]
 pub enum VersionCommands {
   /// Check the latest version of nanocl
   Check,
 }
 
-/// Manage resources
+/// Show nanocl version information
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl-version")]
 pub struct VersionArgs {
