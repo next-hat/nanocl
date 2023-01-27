@@ -100,7 +100,7 @@ pub struct ProxyRuleHttpConfig {
   /// The domain
   pub domain: Option<String>,
   /// Ip to listen on
-  pub listen_on: String,
+  pub r#type: String,
   /// The locations to handle multiple paths
   pub locations: Vec<ProxyRuleLocation>,
 }
@@ -121,8 +121,6 @@ pub struct ProxyRule {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceProxyRule {
-  /// The name of the proxy rule
-  pub name: String,
   /// Cargo to watch for changes
   pub watch: Vec<String>,
   /// The rules

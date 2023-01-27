@@ -8,11 +8,11 @@ Resources:
       Watch:
         - some-cargo
       Rules:
-        - Mode: Http
+        - Mode: http
           Config:
             Domain: get-started.com
             Type: public
-            Location:
+            Locations:
               - Path: /
                 TargetCargo: getting-started
                 TargetPort: 9000
