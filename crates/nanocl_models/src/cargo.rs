@@ -3,6 +3,8 @@ use serde::{Serialize, Deserialize};
 
 use bollard::models::ContainerSummary;
 
+pub use bollard::exec::CreateExecOptions as CargoExecConfig;
+
 use super::cargo_config::CargoConfig;
 
 /// A Cargo is a replicable container
@@ -71,4 +73,27 @@ pub struct CargoInspect {
   pub running_instances: i64,
   /// List of containers
   pub containers: Vec<ContainerSummary>,
+}
+
+/// Kind of ExecOutput
+#[derive(Serialize, Deserialize)]
+pub enum ExecOutputKind {
+  /// Data is a standard input
+  StdIn,
+  /// Data is a standard output
+  StdOut,
+  /// Data is a standard error
+  StdErr,
+  /// Data is a console output
+  Console,
+}
+
+/// ExecOutput is the output of an exec command
+/// It contains the kind of the output and the data
+#[derive(Serialize, Deserialize)]
+pub struct ExecOutput {
+  /// Kind of the output
+  pub kind: ExecOutputKind,
+  /// Data of the output
+  pub data: String,
 }

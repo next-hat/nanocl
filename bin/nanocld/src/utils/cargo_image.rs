@@ -1,7 +1,7 @@
 use ntex::rt;
-use ntex::util::Bytes;
 use ntex::web;
-use ntex::channel::mpsc::{self, Receiver};
+use ntex::util::Bytes;
+use ntex::channel::mpsc;
 use ntex::http::StatusCode;
 use futures::StreamExt;
 use bollard::Docker;
@@ -115,7 +115,8 @@ pub async fn download(
   from_image: &str,
   tag: &str,
   docker_api: &Docker,
-) -> Result<Receiver<Result<Bytes, web::error::Error>>, HttpResponseError> {
+) -> Result<mpsc::Receiver<Result<Bytes, web::error::Error>>, HttpResponseError>
+{
   let from_image = from_image.to_owned();
   let tag = tag.to_owned();
   let docker_api = docker_api.to_owned();
@@ -165,6 +166,7 @@ pub async fn download(
             .send(Ok::<_, web::error::Error>(Bytes::from(response)))
             .is_err()
           {
+            // If the client is disconnected we stop the operation
             break;
           }
         }

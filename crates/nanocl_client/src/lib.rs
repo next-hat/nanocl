@@ -8,3 +8,5 @@ pub mod system;
 pub mod resource;
 
 pub use http_client::*;
+
+pub use nanocl_models as models;

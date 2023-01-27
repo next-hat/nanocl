@@ -1,11 +1,21 @@
 use std::collections::HashMap;
 
+use ntex::rt;
+use ntex::web;
+use ntex::util::Bytes;
+use ntex::channel::mpsc;
 use ntex::http::StatusCode;
+use futures::StreamExt;
+use bollard::container::LogOutput;
 use bollard::service::{ContainerSummary, HostConfig};
 use bollard::container::{ListContainersOptions, RemoveContainerOptions};
+use bollard::exec::{StartExecOptions, StartExecResults};
 
 use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
-use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
+use nanocl_models::cargo::{
+  Cargo, CargoSummary, CargoInspect, ExecOutput, ExecOutputKind,
+  CargoExecConfig,
+};
 
 use crate::repositories;
 use crate::error::HttpResponseError;
@@ -498,4 +508,85 @@ pub async fn delete_by_namespace(
   }
 
   Ok(())
+}
+
+/// ## Exec command
+///
+/// Execute a command in a container the cargo name can be used if the cargo has only one instance
+///
+pub async fn exec_command(
+  name: &str,
+  args: &CargoExecConfig<String>,
+  docker_api: &bollard::Docker,
+) -> Result<mpsc::Receiver<Result<Bytes, web::error::Error>>, HttpResponseError>
+{
+  let result = docker_api.create_exec(name, args.to_owned()).await?;
+
+  let stream = docker_api
+    .start_exec(&result.id, Some(StartExecOptions::default()))
+    .await?;
+
+  let (tx, rx) = mpsc::channel();
+  rt::spawn(async move {
+    // Todo: Handle tty and inputs from cli
+    match stream {
+      StartExecResults::Detached => {}
+      StartExecResults::Attached { mut output, .. } => {
+        while let Some(chunk) = output.next().await {
+          let Ok(data) = chunk else {
+            break;
+          };
+          match data {
+            LogOutput::StdErr { message } => {
+              let payload = serde_json::to_string(&ExecOutput {
+                kind: ExecOutputKind::StdErr,
+                data: String::from_utf8(message.to_vec()).unwrap_or_default(),
+              })
+              .unwrap_or_default()
+                + "\n";
+
+              if tx.send(Ok(Bytes::from(payload))).is_err() {
+                break;
+              }
+            }
+            LogOutput::StdOut { message } => {
+              let payload = serde_json::to_string(&ExecOutput {
+                kind: ExecOutputKind::StdOut,
+                data: String::from_utf8(message.to_vec()).unwrap_or_default(),
+              })
+              .unwrap_or_default()
+                + "\n";
+              if tx.send(Ok(Bytes::from(payload))).is_err() {
+                break;
+              }
+            }
+            LogOutput::StdIn { message } => {
+              let payload = serde_json::to_string(&ExecOutput {
+                kind: ExecOutputKind::StdIn,
+                data: String::from_utf8(message.to_vec()).unwrap_or_default(),
+              })
+              .unwrap_or_default()
+                + "\n";
+              if tx.send(Ok(Bytes::from(payload))).is_err() {
+                break;
+              }
+            }
+            LogOutput::Console { message } => {
+              let payload = serde_json::to_string(&ExecOutput {
+                kind: ExecOutputKind::Console,
+                data: String::from_utf8(message.to_vec()).unwrap_or_default(),
+              })
+              .unwrap_or_default()
+                + "\n";
+              if tx.send(Ok(Bytes::from(payload))).is_err() {
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  Ok(rx)
 }
