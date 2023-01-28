@@ -30,7 +30,7 @@ fn gen_store_host_conf(config: &DaemonConfig) -> HostConfig {
       name: Some(RestartPolicyNameEnum::UNLESS_STOPPED),
       maximum_retry_count: None,
     }),
-    network_mode: Some(String::from("system-nano-internal0")),
+    network_mode: Some(String::from("system")),
     ..Default::default()
   }
 }
