@@ -137,6 +137,7 @@ pub struct ProxyWatch {
 pub struct ResourceProxyRule {
   /// Cargo to watch for changes
   pub watch: Vec<ProxyWatch>,
-  /// The rules
-  pub rules: Vec<ProxyRule>,
+  /// The rule
+  #[serde(flatten)]
+  pub rule: ProxyRule,
 }

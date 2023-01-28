@@ -1,4 +1,4 @@
-type: resource
+Type: Resource
 ApiVersion: v1
 
 Resources:
@@ -7,12 +7,11 @@ Resources:
     Config:
       Watch:
         - Name: getting-started
-      Rules:
-        - Http:
-            Domain: get-started.com
-            Type: Public
-            Locations:
-              - Path: /
-                Target:
-                  Name: getting-started
-                  Port: 9000
+      Http:
+        Domain: get-started.com
+        Type: Public
+        Locations:
+          - Path: /
+            Target:
+              Name: getting-started
+              Port: 9000

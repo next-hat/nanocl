@@ -1,4 +1,4 @@
-Type: deployment
+Type: Deployment
 ApiVersion: v1
 
 Namespace: global

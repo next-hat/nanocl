@@ -3,7 +3,6 @@ use futures::StreamExt;
 use nanocl_client::NanoclClient;
 
 use nanocl_models::cargo::ExecOutputKind;
-use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::error::CliError;
 use crate::models::{
