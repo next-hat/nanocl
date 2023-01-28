@@ -112,7 +112,7 @@ pub async fn get_store_ip_addr(
       status: StatusCode::INTERNAL_SERVER_ERROR,
     })?;
   let ip_address = networks
-    .get("system-nano-internal0")
+    .get("system")
     .ok_or(HttpResponseError {
       msg: String::from("unable to get store network nanocl"),
       status: StatusCode::INTERNAL_SERVER_ERROR,
