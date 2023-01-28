@@ -51,7 +51,7 @@ pub async fn create(
     config: serde_json::to_value(item.to_owned()).map_err(|e| {
       HttpResponseError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Failed to serialize config: {}", e),
+        msg: format!("Failed to serialize config: {e}"),
       }
     })?,
   };
@@ -120,7 +120,7 @@ pub async fn find_by_key(
   let config = serde_json::from_value::<CargoConfigPartial>(dbmodel.config)
     .map_err(|e| HttpResponseError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to deserialize config: {}", e),
+      msg: format!("Failed to deserialize config: {e}"),
     })?;
 
   Ok(CargoConfig {

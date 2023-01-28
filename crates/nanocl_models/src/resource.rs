@@ -8,12 +8,14 @@ use serde::{Serialize, Deserialize};
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum ResourceKind {
   ProxyRule,
+  Unknown,
 }
 
 impl std::fmt::Display for ResourceKind {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       ResourceKind::ProxyRule => write!(f, "proxy_rules"),
+      ResourceKind::Unknown => write!(f, "unknown"),
     }
   }
 }
@@ -22,7 +24,7 @@ impl From<String> for ResourceKind {
   fn from(kind: String) -> Self {
     match kind.as_str() {
       "proxy_rules" => ResourceKind::ProxyRule,
-      _ => panic!("Unknown resource kind: {}", kind),
+      _ => ResourceKind::Unknown,
     }
   }
 }
@@ -31,6 +33,7 @@ impl From<ResourceKind> for String {
   fn from(kind: ResourceKind) -> Self {
     match kind {
       ResourceKind::ProxyRule => "proxy_rules".into(),
+      ResourceKind::Unknown => "unknown".into(),
     }
   }
 }

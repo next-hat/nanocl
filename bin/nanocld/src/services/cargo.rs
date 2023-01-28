@@ -334,7 +334,7 @@ mod tests {
     );
 
     let mut res = srv
-      .get(format!("/cargoes/{}/inspect", CARGO_NAME))
+      .get(format!("/cargoes/{CARGO_NAME}/inspect"))
       .send()
       .await?;
     assert_eq!(res.status(), 200);
@@ -401,7 +401,7 @@ mod tests {
     const CARGO_NAME: &str = "store";
 
     let res = srv
-      .post(format!("/cargoes/{}/exec", CARGO_NAME))
+      .post(format!("/cargoes/{CARGO_NAME}/exec"))
       .query(&GenericNspQuery {
         namespace: Some("system".into()),
       })

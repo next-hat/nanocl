@@ -1,12 +1,11 @@
+use ntex::rt;
+use ntex::channel::mpsc;
 use futures::{TryStreamExt, StreamExt};
 use nanocl_models::generic::GenericNspQuery;
 use nanocl_models::cargo::{
   Cargo, CargoSummary, CargoInspect, CargoExecConfig, ExecOutput,
 };
 use nanocl_models::cargo_config::{CargoConfigPatch, CargoConfigPartial};
-use ntex::channel::mpsc;
-use ntex::rt;
-use serde::Serialize;
 
 use super::http_client::NanoclClient;
 use super::error::{NanoclClientError, is_api_error};
@@ -81,7 +80,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<(), NanoclClientError> {
     let mut res = self
-      .delete(format!("/cargoes/{}", name))
+      .delete(format!("/cargoes/{name}"))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -117,7 +116,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<CargoInspect, NanoclClientError> {
     let mut res = self
-      .get(format!("/cargoes/{}/inspect", name))
+      .get(format!("/cargoes/{name}/inspect"))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -154,7 +153,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<(), NanoclClientError> {
     let mut res = self
-      .post(format!("/cargoes/{}/start", name))
+      .post(format!("/cargoes/{name}/start"))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -190,7 +189,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<(), NanoclClientError> {
     let mut res = self
-      .post(format!("/cargoes/{}/stop", name))
+      .post(format!("/cargoes/{name}/stop"))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -267,7 +266,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<(), NanoclClientError> {
     let mut res = self
-      .patch(format!("/cargoes/{}", name))
+      .patch(format!("/cargoes/{name}"))
       .query(&GenericNspQuery { namespace })?
       .send_json(&config)
       .await?;
@@ -316,7 +315,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<mpsc::Receiver<ExecOutput>, NanoclClientError> {
     let mut res = self
-      .post(format!("/cargoes/{}/exec", name))
+      .post(format!("/cargoes/{name}/exec"))
       .query(&GenericNspQuery { namespace })?
       .send_json(&exec)
       .await?;
@@ -329,7 +328,6 @@ impl NanoclClient {
       let mut payload: Vec<u8> = Vec::new();
       while let Some(Ok(item)) = stream.next().await {
         payload.extend(&item);
-        println!("{:?}", payload);
         if item.last() == Some(&b'\n') {
           let Ok(item) = serde_json::from_slice::<ExecOutput>(&payload) else {
             break;

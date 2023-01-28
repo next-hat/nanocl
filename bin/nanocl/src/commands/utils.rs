@@ -16,5 +16,5 @@ where
     )
     .with(Modify::new(Rows::first()).with(str::to_uppercase))
     .to_string();
-  println!("{}", table);
+  println!("{table}");
 }

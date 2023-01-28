@@ -93,7 +93,7 @@ async fn create_instance(
       .create_container::<String, String>(Some(create_options), config)
       .await
       .map_err(|e| HttpResponseError {
-        msg: format!("Unable to create container: {}", e),
+        msg: format!("Unable to create container: {e}"),
         status: StatusCode::BAD_REQUEST,
       })?;
   }
@@ -118,7 +118,7 @@ pub async fn list_instance(
   cargo_key: &str,
   docker_api: &bollard::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpResponseError> {
-  let label = format!("io.nanocl.cargo={}", cargo_key);
+  let label = format!("io.nanocl.cargo={cargo_key}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
   let options = Some(ListContainersOptions {
@@ -128,7 +128,7 @@ pub async fn list_instance(
   });
   let containers = docker_api.list_containers(options).await.map_err(|e| {
     HttpResponseError {
-      msg: format!("Unable to list containers got error : {}", e),
+      msg: format!("Unable to list containers got error : {e}"),
       status: StatusCode::INTERNAL_SERVER_ERROR,
     }
   })?;
@@ -195,7 +195,7 @@ pub async fn start(
       .start_container::<String>(&container.id.unwrap_or_default(), None)
       .await
       .map_err(|e| HttpResponseError {
-        msg: format!("Unable to start container got error : {}", e),
+        msg: format!("Unable to start container got error : {e}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?;
   }
@@ -227,7 +227,7 @@ pub async fn stop(
       .stop_container(&container.id.unwrap_or_default(), None)
       .await
       .map_err(|e| HttpResponseError {
-        msg: format!("Unable to stop container got error : {}", e),
+        msg: format!("Unable to stop container got error : {e}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?;
   }
@@ -264,7 +264,7 @@ pub async fn delete(
       )
       .await
       .map_err(|e| HttpResponseError {
-        msg: format!("Unable to remove container got error : {}", e),
+        msg: format!("Unable to remove container got error : {e}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?;
   }
@@ -345,7 +345,7 @@ pub async fn patch(
       )
       .await
       .map_err(|e| HttpResponseError {
-        msg: format!("Unable to rename container got error : {}", e),
+        msg: format!("Unable to rename container got error : {e}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?;
   }
@@ -365,7 +365,7 @@ pub async fn patch(
       )
       .await
       .map_err(|e| HttpResponseError {
-        msg: format!("Unable to remove container got error : {}", e),
+        msg: format!("Unable to remove container got error : {e}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?;
   }
@@ -408,7 +408,6 @@ pub async fn list(
 
     let mut running_instances = 0;
     for container in containers {
-      println!("{:?}", container);
       if container.state == Some("running".into()) {
         running_instances += 1;
       }

@@ -32,15 +32,15 @@ impl CliError {
               host = args.host
             )
             }
-            _ => eprintln!("{}", err),
+            _ => eprintln!("{err}"),
           }
         }
         nanocl_client::error::NanoclClientError::Api(err) => {
           eprintln!("Daemon [{}]: {}", err.status, err.msg);
         }
-        _ => eprintln!("{}", err),
+        _ => eprintln!("{err}"),
       },
-      _ => eprintln!("{}", self),
+      _ => eprintln!("{self}"),
     }
     std::process::exit(1);
   }

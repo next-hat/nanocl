@@ -136,7 +136,7 @@ pub mod tests {
   /// Test utils to inspect cargo image
   pub async fn inspect(srv: &TestServer, id_or_name: &str) -> TestReqRet {
     srv
-      .get(format!("/cargoes/images/{}", id_or_name))
+      .get(format!("/cargoes/images/{id_or_name}"))
       .send()
       .await
   }
@@ -144,7 +144,7 @@ pub mod tests {
   /// Test utils to delete cargo image
   pub async fn delete(srv: &TestServer, id_or_name: &str) -> TestReqRet {
     srv
-      .delete(format!("/cargoes/images/{}", id_or_name))
+      .delete(format!("/cargoes/images/{id_or_name}"))
       .send()
       .await
   }
@@ -230,8 +230,7 @@ pub mod tests {
       .unwrap();
     assert_eq!(
       content_type, "nanocl/streaming-v1",
-      "Expect content type header to be nanocl/streaming-v1 got {}",
-      content_type
+      "Expect content type header to be nanocl/streaming-v1 got {content_type}"
     );
     let mut stream = res.into_stream();
     while let Some(chunk) = stream.next().await {

@@ -84,7 +84,7 @@ impl NanoclClient {
       let mut payload = String::new();
       let mut stream = res.into_stream();
       while let Some(result) = stream.try_next().await.map_err(| err | ApiError {
-        msg: format!("Unable to receive stream data while creating image {} got error : {}", name, err),
+        msg: format!("Unable to receive stream data while creating image {name} got error : {err}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })? {
         // Convert result as a string
@@ -96,17 +96,17 @@ impl NanoclClient {
         // convert the size to a usize
         if payload_size == 0 {
           payload_size = size.parse::<usize>().map_err(| err | ApiError {
-            msg: format!("Unable to parse size while creating image {} got error : {}", name, err),
+            msg: format!("Unable to parse size while creating image {name} got error : {err}"),
             status: StatusCode::INTERNAL_SERVER_ERROR,
           })?;
         }
         // ensure the data size is the same as the payload size
         if data.len() != payload_size {
-          payload = format!("{}{}", payload, data);
+          payload = format!("{payload}{data}");
         } else {
           // Otherwise we can convert the data into json and send it
           let json = serde_json::from_str::<bollard::models::CreateImageInfo>(data).map_err(| err | ApiError {
-            msg: format!("Unable to parse json while creating image {} got error : {}", name, err),
+            msg: format!("Unable to parse json while creating image {name} got error : {err}"),
             status: StatusCode::INTERNAL_SERVER_ERROR,
           })?;
           payload_size = 0;
@@ -144,7 +144,7 @@ impl NanoclClient {
     name: &str,
   ) -> Result<(), NanoclClientError> {
     let mut res = self
-      .delete(format!("/cargoes/images/{}", name))
+      .delete(format!("/cargoes/images/{name}"))
       .send()
       .await?;
     let status = res.status();
@@ -176,7 +176,7 @@ impl NanoclClient {
     &self,
     name: &str,
   ) -> Result<bollard::models::ImageInspect, NanoclClientError> {
-    let mut res = self.get(format!("/cargoes/images/{}", name)).send().await?;
+    let mut res = self.get(format!("/cargoes/images/{name}")).send().await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;

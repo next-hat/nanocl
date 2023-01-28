@@ -137,7 +137,7 @@ pub async fn download(
       match result {
         Err(err) => {
           let err = ntex::web::Error::new(web::error::InternalError::default(
-            format!("{:?}", err),
+            format!("{err:?}"),
             StatusCode::INTERNAL_SERVER_ERROR,
           ));
           let _ = tx.send(Err::<_, web::error::Error>(err));
@@ -148,7 +148,7 @@ pub async fn download(
             Err(err) => {
               let err =
                 ntex::web::Error::new(web::error::InternalError::default(
-                  format!("{:?}", err),
+                  format!("{err:?}"),
                   StatusCode::INTERNAL_SERVER_ERROR,
                 ));
               let _ = tx.send(Err::<_, web::error::Error>(err));
@@ -160,7 +160,7 @@ pub async fn download(
           // The length is an usize
           // The stream is terminated by a newline
           let len = data.len();
-          let response = format!("{}\n{}\n", len, data);
+          let response = format!("{len}\n{data}\n");
 
           if tx
             .send(Ok::<_, web::error::Error>(Bytes::from(response)))

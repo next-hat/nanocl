@@ -37,7 +37,7 @@ async fn print_latest_version() -> Result<(), CliError> {
   let version = get_latest_version().await?;
   match &version {
     Some(version) => {
-      println!("{}", version);
+      println!("{version}");
     }
     None => {
       // VERY LIKELY will never happen

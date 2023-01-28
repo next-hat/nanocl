@@ -139,7 +139,7 @@ pub async fn download(
     .await
     .map_err(|err| ApiError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("{}", err),
+      msg: err.to_string(),
     })?;
     let mut offset: u64 = 0;
     while let Some(chunk) = stream.try_next().await.map_err(|err| ApiError {
@@ -178,7 +178,7 @@ pub async fn download(
     } else {
       fs::remove_file(&file_path).map_err(|err| ApiError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Unable to delete created file {:?}", err),
+        msg: format!("Unable to delete created file {err:?}"),
       })?;
     }
     Ok::<(), ApiError>(())
