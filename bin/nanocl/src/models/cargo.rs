@@ -4,7 +4,9 @@ use clap::{Parser, Subcommand};
 
 use nanocl_models::{
   cargo::CargoSummary,
-  cargo_config::{CargoConfigPatch, ContainerConfig},
+  cargo_config::{
+    CargoConfigPatch, ContainerConfig, CargoConfigPartial, ContainerHostConfig,
+  },
 };
 
 use super::cargo_image::CargoImageOpts;
@@ -27,8 +29,32 @@ pub struct CargoCreateOpts {
   #[clap(long = "net")]
   pub network: Option<String>,
   /// Volumes of the cargo
-  #[clap(short)]
+  #[clap(short, long = "volume")]
   pub volumes: Option<Vec<String>>,
+  /// Environment variables of the cargo
+  #[clap(short, long = "env")]
+  pub(crate) env: Option<Vec<String>>,
+}
+
+impl From<CargoCreateOpts> for CargoConfigPartial {
+  fn from(val: CargoCreateOpts) -> Self {
+    Self {
+      name: val.name,
+      container: ContainerConfig {
+        image: Some(val.image),
+        // network: val.network,
+        // volumes: val.volumes,
+        env: val.env,
+        host_config: Some(ContainerHostConfig {
+          network_mode: val.network,
+          binds: val.volumes,
+          ..Default::default()
+        }),
+        ..Default::default()
+      },
+      ..Default::default()
+    }
+  }
 }
 
 /// Start Cargo options
