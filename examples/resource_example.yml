@@ -1,18 +1,18 @@
-Type: resource
+type: resource
 ApiVersion: v1
 
 Resources:
   - Name: resource-example
-    Kind: proxy_rule
+    Kind: ProxyRule
     Config:
       Watch:
-        - some-cargo
+        - Name: getting-started
       Rules:
-        - Mode: http
-          Config:
+        - Http:
             Domain: get-started.com
-            Type: public
+            Type: Public
             Locations:
               - Path: /
-                TargetCargo: getting-started
-                TargetPort: 9000
+                Target:
+                  Name: getting-started
+                  Port: 9000

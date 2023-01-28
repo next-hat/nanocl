@@ -4,20 +4,21 @@ ApiVersion: v1
 Namespace: global
 
 Resources:
-  - Name: getting-started
-    Kind: proxy_rule
+  - Name: proxy-get-started
+    Kind: ProxyRule
     Config:
       Watch:
-        - getting-started
+        - name: getting-started
       Rules:
         - Mode: Http
           Config:
             Domain: get-started.com
-            ListenOn: {{system.public_ip}}
+            Type: public
             Location:
               - Path: /
-                TargetCargo: getting-started
-                TargetPort: 9000
+                Target:
+                  Name: getting-started
+                  Port: 9000
 
 Cargoes:
   - Name: getting-started

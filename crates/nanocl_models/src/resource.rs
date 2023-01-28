@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 /// It is used to define the kind of a resource
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum ResourceKind {
   ProxyRule,
   Unknown,
@@ -14,8 +14,8 @@ pub enum ResourceKind {
 impl std::fmt::Display for ResourceKind {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      ResourceKind::ProxyRule => write!(f, "proxy_rules"),
-      ResourceKind::Unknown => write!(f, "unknown"),
+      ResourceKind::ProxyRule => write!(f, "ProxyRule"),
+      ResourceKind::Unknown => write!(f, "Unknown"),
     }
   }
 }
@@ -23,7 +23,7 @@ impl std::fmt::Display for ResourceKind {
 impl From<String> for ResourceKind {
   fn from(kind: String) -> Self {
     match kind.as_str() {
-      "proxy_rules" => ResourceKind::ProxyRule,
+      "ProxyRule" => ResourceKind::ProxyRule,
       _ => ResourceKind::Unknown,
     }
   }
@@ -32,8 +32,8 @@ impl From<String> for ResourceKind {
 impl From<ResourceKind> for String {
   fn from(kind: ResourceKind) -> Self {
     match kind {
-      ResourceKind::ProxyRule => "proxy_rules".into(),
-      ResourceKind::Unknown => "unknown".into(),
+      ResourceKind::ProxyRule => "ProxyRule".into(),
+      ResourceKind::Unknown => "Unknown".into(),
     }
   }
 }
@@ -52,7 +52,7 @@ pub struct ResourcePartial {
 }
 
 /// Resource is a configuration with a name and a kind
-/// It is used to define ProxyRules and other resources
+/// It is used to define [proxy rules](ProxyRule) and other kind of config
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -70,16 +70,29 @@ pub struct Resource {
 /// Proxy rules modes
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
-pub enum ProxyRuleMode {
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum ProxyRule {
   /// Redirect http trafic
-  Http,
+  Http(ProxyRuleHttp),
   /// Redirect https trafic
-  Https,
+  Https(ProxyRuleHttp),
   /// Redirect tcp trafic
   Tcp,
   /// Redirect udp trafic
   Udp,
+}
+
+/// Defines a proxy rule target
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProxyTarget {
+  /// The cargo namespace
+  pub namespace: Option<String>,
+  /// The cargo name
+  pub name: String,
+  /// The cargo port
+  pub port: u16,
 }
 
 /// Defines a proxy rule location
@@ -90,42 +103,40 @@ pub struct ProxyRuleLocation {
   /// The path
   pub path: String,
   /// The target cargo
-  pub target_cargo: String,
-  /// The target port
-  pub target_port: u16,
+  pub target: ProxyTarget,
 }
 
 /// Defines a proxy rule http config
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct ProxyRuleHttpConfig {
+pub struct ProxyRuleHttp {
   /// The domain
   pub domain: Option<String>,
-  /// Ip to listen on
+  /// Type of private | public | internal
   pub r#type: String,
   /// The locations to handle multiple paths
   pub locations: Vec<ProxyRuleLocation>,
 }
 
-/// Defines a proxy rule
+/// Define cargo to watch for changes
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct ProxyRule {
-  /// The mode of the rule
-  pub mode: ProxyRuleMode,
-  /// The config depending on the mode
-  pub config: serde_json::Value,
+pub struct ProxyWatch {
+  /// The cargo namespace
+  pub namespace: Option<String>,
+  /// The cargo name
+  pub name: String,
 }
 
-/// Defines a resource kind `ProxyRule`
+/// Define proxy rules to apply
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceProxyRule {
   /// Cargo to watch for changes
-  pub watch: Vec<String>,
+  pub watch: Vec<ProxyWatch>,
   /// The rules
   pub rules: Vec<ProxyRule>,
 }
