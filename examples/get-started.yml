@@ -1,4 +1,4 @@
-Type: Deployment
+Type: Cargo
 ApiVersion: v1
 
 Namespace: global
@@ -8,17 +8,15 @@ Resources:
     Kind: ProxyRule
     Config:
       Watch:
-        - name: getting-started
-      Rules:
-        - Mode: Http
-          Config:
-            Domain: get-started.com
-            Type: public
-            Location:
-              - Path: /
-                Target:
-                  Name: getting-started
-                  Port: 9000
+        - Name: getting-started
+      Http:
+        Domain: get-started.com
+        Type: Public
+        Locations:
+          - Path: /
+            Target:
+              Name: getting-started
+              Port: 9000
 
 Cargoes:
   - Name: getting-started
