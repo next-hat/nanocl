@@ -11,8 +11,9 @@ use crate::error::DaemonError;
 use crate::models::Pool;
 
 /// Ensure existance of the system network that controllers will use.
-/// It's ensure existance of a network in your system called `nanoclinternal0`
-/// Also registered inside docker as `system-nano-internal0`
+/// It's ensure existance of a network in your system called `nanocl.system`
+/// Also registered inside docker as `system` since it's the name of the namespace.
+/// This network is created to be sure a store is running inside.
 pub(crate) async fn ensure_network(
   name: &str,
   docker_api: &bollard::Docker,
