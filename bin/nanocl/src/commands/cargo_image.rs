@@ -9,7 +9,7 @@ use nanocl_client::NanoclClient;
 use nanocl_client::error::ApiError;
 
 use crate::models::{
-  CargoImageArgs, CargoImageCommands, CargoImageRemoveOpts,
+  CargoImageOpts, CargoImageCommands, CargoImageRemoveOpts,
   CargoImageInspectOpts, CargoImageRow,
 };
 
@@ -137,7 +137,7 @@ async fn exec_inspect_cargo_image(
 
 pub async fn exec_cargo_image(
   client: &NanoclClient,
-  cmd: &CargoImageArgs,
+  cmd: &CargoImageOpts,
 ) -> Result<(), CliError> {
   match &cmd.commands {
     CargoImageCommands::List => exec_cargo_instance_list(client).await,

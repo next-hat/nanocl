@@ -1,3 +1,4 @@
+use bollard::exec::CreateExecOptions;
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
 
@@ -6,7 +7,7 @@ use nanocl_models::{
   cargo_config::{CargoConfigPatch, ContainerConfig},
 };
 
-use super::cargo_image::CargoImageArgs;
+use super::cargo_image::CargoImageOpts;
 
 /// Cargo delete options
 #[derive(Debug, Parser)]
@@ -15,6 +16,7 @@ pub struct CargoDeleteOpts {
   pub names: Vec<String>,
 }
 
+/// Create cargo options
 #[derive(Debug, Parser)]
 pub struct CargoCreateOpts {
   /// Name of the cargo
@@ -29,26 +31,28 @@ pub struct CargoCreateOpts {
   pub volumes: Option<Vec<String>>,
 }
 
-/// Cargo start options
+/// Start Cargo options
 #[derive(Debug, Parser)]
 pub struct CargoStartOpts {
   // Name of cargo to start
   pub name: String,
 }
 
-/// Cargo stop options
+/// Stop Cargo options
 #[derive(Debug, Parser)]
 pub struct CargoStopOpts {
   // Name of cargo to stop
   pub name: String,
 }
 
+/// Inspect Cargo options
 #[derive(Debug, Parser)]
 pub struct CargoInspectOpts {
   /// Name of cargo to inspect
   pub(crate) name: String,
 }
 
+/// Patch Cargo options
 #[derive(Debug, Clone, Parser)]
 pub struct CargoPatchOpts {
   pub(crate) name: String,
@@ -74,6 +78,26 @@ impl From<CargoPatchOpts> for CargoConfigPatch {
   }
 }
 
+/// Execute a command inside a cargo options
+#[derive(Debug, Clone, Parser)]
+pub struct CargoExecOpts {
+  /// Name of cargo to execute command
+  pub name: String,
+  /// Command to execute
+  pub command: Vec<String>,
+}
+
+impl From<CargoExecOpts> for CreateExecOptions<String> {
+  fn from(val: CargoExecOpts) -> Self {
+    CreateExecOptions {
+      cmd: Some(val.command),
+      attach_stderr: Some(true),
+      attach_stdout: Some(true),
+      ..Default::default()
+    }
+  }
+}
+
 #[derive(Debug, Subcommand)]
 #[clap(about, version)]
 pub enum CargoCommands {
@@ -94,7 +118,9 @@ pub enum CargoCommands {
   /// Update a cargo by its name
   Patch(CargoPatchOpts),
   /// Manage cargo image
-  Image(CargoImageArgs),
+  Image(CargoImageOpts),
+  /// Execute a command insiade a cargo
+  Exec(CargoExecOpts),
 }
 
 /// Manage cargoes

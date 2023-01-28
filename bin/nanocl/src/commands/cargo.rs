@@ -1,11 +1,15 @@
+use bollard::exec::CreateExecOptions;
+use futures::StreamExt;
 use nanocl_client::NanoclClient;
 
+use nanocl_models::cargo::ExecOutputKind;
 use nanocl_models::cargo_config::CargoConfigPartial;
 
 use crate::error::CliError;
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
+  CargoExecOpts,
 };
 
 use super::cargo_image;
@@ -115,6 +119,33 @@ async fn exec_cargo_inspect(
   Ok(())
 }
 
+async fn exec_cargo_exec(
+  client: &NanoclClient,
+  args: &CargoArgs,
+  options: &CargoExecOpts,
+) -> Result<(), CliError> {
+  let exec: CreateExecOptions<String> = options.to_owned().into();
+  println!("exec: {:?}", exec);
+  let mut stream = client
+    .exec_cargo(&options.name, exec, args.namespace.to_owned())
+    .await?;
+
+  while let Some(output) = stream.next().await {
+    match output.kind {
+      ExecOutputKind::StdOut => {
+        print!("{}", &output.data);
+      }
+      ExecOutputKind::StdErr => {
+        eprint!("{}", output.data);
+      }
+      ExecOutputKind::StdIn => println!("TODO: StdIn {}", &output.data),
+      ExecOutputKind::Console => print!("{}", &output.data),
+    }
+  }
+
+  Ok(())
+}
+
 pub async fn exec_cargo(
   client: &NanoclClient,
   args: &CargoArgs,
@@ -141,6 +172,9 @@ pub async fn exec_cargo(
     }
     CargoCommands::Inspect(options) => {
       exec_cargo_inspect(client, args, options).await
+    }
+    CargoCommands::Exec(options) => {
+      exec_cargo_exec(client, args, options).await
     }
   }
 }
