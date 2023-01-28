@@ -19,7 +19,7 @@ pub struct CargoDeleteOpts {
 }
 
 /// Create cargo options
-#[derive(Debug, Parser)]
+#[derive(Debug, Clone, Parser)]
 pub struct CargoCreateOpts {
   /// Name of the cargo
   pub name: String,

@@ -32,14 +32,7 @@ async fn exec_cargo_create(
   args: &CargoArgs,
   options: &CargoCreateOpts,
 ) -> Result<(), CliError> {
-  let cargo = CargoConfigPartial {
-    name: options.name.to_owned(),
-    container: bollard::container::Config {
-      image: Some(options.image.to_owned()),
-      ..Default::default()
-    },
-    ..Default::default()
-  };
+  let cargo = options.to_owned().into();
   let item = client
     .create_cargo(&cargo, args.namespace.to_owned())
     .await?;
@@ -125,7 +118,6 @@ async fn exec_cargo_exec(
   options: &CargoExecOpts,
 ) -> Result<(), CliError> {
   let exec: CreateExecOptions<String> = options.to_owned().into();
-  println!("exec: {:?}", exec);
   let mut stream = client
     .exec_cargo(&options.name, exec, args.namespace.to_owned())
     .await?;
