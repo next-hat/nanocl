@@ -69,15 +69,9 @@ pub async fn create(
       status: StatusCode::CONFLICT,
     });
   }
-  let mut options: HashMap<String, String> = HashMap::new();
-  options.insert(
-    String::from("com.docker.network.bridge.name"),
-    format!("nanocl.{}", &namespace.name),
-  );
   let config = CreateNetworkOptions {
     name: namespace.name.to_owned(),
     driver: String::from("bridge"),
-    options,
     ..Default::default()
   };
   docker_api.create_network(config).await?;
