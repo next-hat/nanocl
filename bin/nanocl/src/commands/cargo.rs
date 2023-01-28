@@ -125,7 +125,6 @@ async fn exec_cargo_exec(
   options: &CargoExecOpts,
 ) -> Result<(), CliError> {
   let exec: CreateExecOptions<String> = options.to_owned().into();
-  println!("exec: {:?}", exec);
   let mut stream = client
     .exec_cargo(&options.name, exec, args.namespace.to_owned())
     .await?;

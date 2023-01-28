@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use bollard::network::CreateNetworkOptions;
+use bollard::network::InspectNetworkOptions;
 use nanocl_models::generic::GenericDelete;
 use ntex::http::StatusCode;
 use bollard::models::ContainerSummary;
@@ -55,8 +56,28 @@ pub async fn create(
       status: StatusCode::CONFLICT,
     });
   }
+  if docker_api
+    .inspect_network(&namespace.name, None::<InspectNetworkOptions<String>>)
+    .await
+    .is_ok()
+  {
+    return Err(HttpResponseError {
+      msg: format!(
+        "namespace {} error: network exist with same name",
+        &namespace.name
+      ),
+      status: StatusCode::CONFLICT,
+    });
+  }
+  let mut options: HashMap<String, String> = HashMap::new();
+  options.insert(
+    String::from("com.docker.network.bridge.name"),
+    format!("nanocl.{}", &namespace.name),
+  );
   let config = CreateNetworkOptions {
     name: namespace.name.to_owned(),
+    driver: String::from("bridge"),
+    options,
     ..Default::default()
   };
   docker_api.create_network(config).await?;

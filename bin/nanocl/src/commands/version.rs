@@ -49,7 +49,9 @@ async fn print_latest_version() -> Result<(), CliError> {
 }
 
 async fn get_latest_version() -> Result<Option<String>, CliError> {
-  let tags = github_get_tags().await.unwrap();
+  let tags = github_get_tags().await.map_err(|e| CliError::Custom {
+    msg: format!("Failed to get tags from GitHub: {e}"),
+  })?;
   let last_version = tags.first().map(|tag| tag.name.clone());
 
   Ok(last_version)

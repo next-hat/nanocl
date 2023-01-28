@@ -15,7 +15,7 @@ pub async fn init(
     120,
     bollard::API_DEFAULT_VERSION,
   )?;
-  super::system::ensure_network(&docker_api).await?;
+  super::system::ensure_network("system", &docker_api).await?;
   let pool = super::store::ensure(daemon_conf, &docker_api).await?;
   super::system::register_namespace("global", true, &docker_api, &pool).await?;
   super::system::register_namespace("system", false, &docker_api, &pool)
