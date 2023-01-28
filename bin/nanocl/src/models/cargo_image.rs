@@ -35,7 +35,7 @@ pub enum CargoImageCommands {
 
 /// Manage container images
 #[derive(Debug, Parser)]
-pub struct CargoImageArgs {
+pub struct CargoImageOpts {
   #[clap(subcommand)]
   pub(crate) commands: CargoImageCommands,
 }

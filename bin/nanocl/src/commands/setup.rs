@@ -74,12 +74,12 @@ async fn install_store_image(
 async fn install_daemon_image(
   docker_api: &bollard::Docker,
 ) -> Result<(), CliError> {
-  let image = format!("nanocl-daemon:{version}", version = DAEMON_VERSION);
+  let image = format!("nanocl-daemon:{DAEMON_VERSION}");
   if image_exists(&image, docker_api).await? {
     return Ok(());
   }
 
-  let daemon_image_url = format!("https://github.com/nxthat/nanocld/releases/download/v{version}/nanocl-daemon.{version}.tar.gz", version = DAEMON_VERSION);
+  let daemon_image_url = format!("https://github.com/nxthat/nanocld/releases/download/v{DAEMON_VERSION}/nanocl-daemon.{DAEMON_VERSION}.tar.gz");
   cargo_image::import_tar_from_url(docker_api, &daemon_image_url).await?;
   Ok(())
 }
@@ -97,7 +97,7 @@ async fn init_daemon(
     network_mode: Some(String::from("host")),
     ..Default::default()
   };
-  let image = format!("nanocl-daemon:{version}", version = DAEMON_VERSION);
+  let image = format!("nanocl-daemon:{DAEMON_VERSION}");
   let gid = get_gid()?;
   let nanocl_gid = format!("NANOCL_GID={gid}");
   let config = Config {
@@ -157,7 +157,7 @@ async fn spawn_deamon(
     network_mode: Some(String::from("host")),
     ..Default::default()
   };
-  let image = format!("nanocl-daemon:{version}", version = DAEMON_VERSION);
+  let image = format!("nanocl-daemon:{DAEMON_VERSION}");
   let mut labels = HashMap::new();
   labels.insert("namespace", "system");
   labels.insert("cluster", "system-nano");

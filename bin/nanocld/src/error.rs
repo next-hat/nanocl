@@ -29,7 +29,7 @@ impl From<DockerError> for HttpResponseError {
           .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
       },
       _ => HttpResponseError {
-        msg: format!("{}", err),
+        msg: format!("{err}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       },
     }

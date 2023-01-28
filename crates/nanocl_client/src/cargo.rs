@@ -1,5 +1,10 @@
+use ntex::rt;
+use ntex::channel::mpsc;
+use futures::{TryStreamExt, StreamExt};
 use nanocl_models::generic::GenericNspQuery;
-use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
+use nanocl_models::cargo::{
+  Cargo, CargoSummary, CargoInspect, CargoExecConfig, ExecOutput,
+};
 use nanocl_models::cargo_config::{CargoConfigPatch, CargoConfigPartial};
 
 use super::http_client::NanoclClient;
@@ -75,7 +80,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<(), NanoclClientError> {
     let mut res = self
-      .delete(format!("/cargoes/{}", name))
+      .delete(format!("/cargoes/{name}"))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -111,7 +116,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<CargoInspect, NanoclClientError> {
     let mut res = self
-      .get(format!("/cargoes/{}/inspect", name))
+      .get(format!("/cargoes/{name}/inspect"))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -148,7 +153,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<(), NanoclClientError> {
     let mut res = self
-      .post(format!("/cargoes/{}/start", name))
+      .post(format!("/cargoes/{name}/start"))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -184,7 +189,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<(), NanoclClientError> {
     let mut res = self
-      .post(format!("/cargoes/{}/stop", name))
+      .post(format!("/cargoes/{name}/stop"))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -261,7 +266,7 @@ impl NanoclClient {
     namespace: Option<String>,
   ) -> Result<(), NanoclClientError> {
     let mut res = self
-      .patch(format!("/cargoes/{}", name))
+      .patch(format!("/cargoes/{name}"))
       .query(&GenericNspQuery { namespace })?
       .send_json(&config)
       .await?;
@@ -269,6 +274,73 @@ impl NanoclClient {
     is_api_error(&mut res, &status).await?;
 
     Ok(())
+  }
+
+  /// ## Exec command inside a cargo
+  ///
+  /// ## Arguments
+  ///
+  /// - [name](str) - The name of the cargo to exec the command in
+  /// - [exec](CargoExecConfig) - The config for the exec command
+  /// - [namespace](Option<String>) - The namespace where belong the cargo
+  ///
+  /// ## Returns
+  ///
+  /// - [Result](Result)
+  ///  - [Ok](Ok) - A [mpsc::Receiver](mpsc::Receiver) of [ExecOutput](ExecOutput)
+  /// - [Err](NanoclClientError) - The command could not be executed
+  ///
+  /// ## Example
+  ///
+  /// ```rust,norun
+  /// use futures::StreamExt;
+  /// use nanocl_client::NanoclClient;
+  /// use nanocl_client::models::cargo_config::CargoExecConfig;
+  ///
+  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let exec = CargoExecConfig {
+  ///  cmd: vec!["echo".into(), "hello".into()],
+  /// ..Default::default()
+  /// };
+  /// let mut rx = client.exec_cargo("my-cargo", exec, None).await.unwrap();
+  /// while let Some(output) = rx.next().await {
+  ///  println!("{}", output);
+  /// };
+  /// ```
+  ///
+  pub async fn exec_cargo(
+    &self,
+    name: &str,
+    exec: CargoExecConfig<String>,
+    namespace: Option<String>,
+  ) -> Result<mpsc::Receiver<ExecOutput>, NanoclClientError> {
+    let mut res = self
+      .post(format!("/cargoes/{name}/exec"))
+      .query(&GenericNspQuery { namespace })?
+      .send_json(&exec)
+      .await?;
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+    let (sx, rx) = mpsc::channel();
+    let mut stream = res.into_stream();
+
+    rt::spawn(async move {
+      let mut payload: Vec<u8> = Vec::new();
+      while let Some(Ok(item)) = stream.next().await {
+        payload.extend(&item);
+        if item.last() == Some(&b'\n') {
+          let Ok(item) = serde_json::from_slice::<ExecOutput>(&payload) else {
+            break;
+          };
+          if sx.send(item).is_err() {
+            break;
+          }
+          payload.clear();
+        }
+      }
+    });
+
+    Ok(rx)
   }
 }
 
@@ -365,5 +437,20 @@ mod tests {
       .delete_cargo("client-test-cargodup", None)
       .await
       .unwrap();
+  }
+
+  #[ntex::test]
+  async fn test_exec_cargo() {
+    let client = NanoclClient::connect_with_unix_default().await;
+
+    let exec = CargoExecConfig {
+      cmd: Some(vec!["echo".into(), "hello".into()]),
+      ..Default::default()
+    };
+    let mut rx = client
+      .exec_cargo("store", exec, Some("system".into()))
+      .await
+      .unwrap();
+    while let Some(_out) = rx.next().await {}
   }
 }

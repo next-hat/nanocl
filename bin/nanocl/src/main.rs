@@ -140,6 +140,23 @@ mod tests {
     assert!(execute_args(&args).await.is_ok());
   }
 
+  /// Test cargo exec command
+  #[ntex::test]
+  async fn test_cargo_exec() {
+    let args = Cli::parse_from([
+      "nanocl",
+      "cargo",
+      "--namespace",
+      "system",
+      "exec",
+      "store",
+      "--",
+      "echo",
+      "hello",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+  }
+
   /// Test Setup command
   #[ntex::test]
   async fn test_setup() {

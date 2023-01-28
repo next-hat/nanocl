@@ -81,7 +81,7 @@ impl NanoclClient {
     name: &str,
   ) -> Result<NamespaceInspect, NanoclClientError> {
     let mut res = self
-      .get(format!("/namespaces/{name}/inspect", name = name))
+      .get(format!("/namespaces/{name}/inspect"))
       .send()
       .await?;
 
@@ -115,10 +115,7 @@ impl NanoclClient {
     &self,
     name: &str,
   ) -> Result<(), NanoclClientError> {
-    let mut res = self
-      .delete(format!("/namespaces/{name}", name = name))
-      .send()
-      .await?;
+    let mut res = self.delete(format!("/namespaces/{name}")).send().await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;

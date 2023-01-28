@@ -354,7 +354,7 @@ pub async fn inspect_by_key(
   let config = serde_json::from_value::<CargoConfigPartial>(item.1.config)
     .map_err(|err| HttpResponseError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Error parsing cargo config: {}", err),
+      msg: format!("Error parsing cargo config: {err}"),
     })?;
 
   let config = CargoConfig {

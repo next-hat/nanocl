@@ -100,7 +100,7 @@ impl NanoclClient {
     &self,
     key: &str,
   ) -> Result<Resource, NanoclClientError> {
-    let mut res = self.get(format!("/resources/{}", key)).send().await?;
+    let mut res = self.get(format!("/resources/{key}")).send().await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
     let resource = res.json::<Resource>().await?;
@@ -137,7 +137,7 @@ impl NanoclClient {
     config: &serde_json::Value,
   ) -> Result<Resource, NanoclClientError> {
     let mut res = self
-      .patch(format!("/resources/{}", key))
+      .patch(format!("/resources/{key}"))
       .send_json(config)
       .await?;
     let status = res.status();
@@ -173,7 +173,7 @@ impl NanoclClient {
     &self,
     key: &str,
   ) -> Result<(), NanoclClientError> {
-    let mut res = self.delete(format!("/resources/{}", key)).send().await?;
+    let mut res = self.delete(format!("/resources/{key}")).send().await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
     Ok(())

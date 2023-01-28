@@ -7,6 +7,7 @@ use ntex::web;
 
 use nanocl_models::system::Event;
 use nanocl_models::generic::GenericNspQuery;
+use nanocl_models::cargo::CargoExecConfig;
 use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
 use crate::utils;
@@ -254,6 +255,32 @@ async fn inspect_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  path = "/cargoes/{name}/exec",
+  params(
+    ("name" = String, Path, description = "Name of the cargo to exec command into"),
+    ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
+  ),
+  responses(
+    (status = 200, description = "Cargo list", body = CargoInspect),
+    (status = 400, description = "Generic database error", body = ApiError),
+  ),
+))]
+#[web::post("/cargoes/{name}/exec")]
+async fn exec_command(
+  name: web::types::Path<String>,
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Json(payload): web::types::Json<CargoExecConfig<String>>,
+  docker_api: web::types::State<bollard::Docker>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &name);
+  log::debug!("Executing command on cargo : {}", &key);
+  let steam = utils::cargo::exec_command(&key, &payload, &docker_api).await?;
+  Ok(web::HttpResponse::Ok().streaming(steam))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
@@ -262,13 +289,16 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(patch_cargo);
   config.service(list_cargo);
   config.service(inspect_cargo);
+  config.service(exec_command);
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
 
-  use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect};
+  use ntex::http::StatusCode;
+  use futures::{TryStreamExt, StreamExt};
+  use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect, ExecOutput};
   use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
   use crate::utils::tests::*;
@@ -304,7 +334,7 @@ mod tests {
     );
 
     let mut res = srv
-      .get(format!("/cargoes/{}/inspect", CARGO_NAME))
+      .get(format!("/cargoes/{CARGO_NAME}/inspect"))
       .send()
       .await?;
     assert_eq!(res.status(), 200);
@@ -361,6 +391,40 @@ mod tests {
       .await?;
     assert_eq!(res.status(), 204);
 
+    Ok(())
+  }
+
+  #[ntex::test]
+  async fn test_exec() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+
+    const CARGO_NAME: &str = "store";
+
+    let res = srv
+      .post(format!("/cargoes/{CARGO_NAME}/exec"))
+      .query(&GenericNspQuery {
+        namespace: Some("system".into()),
+      })
+      .unwrap()
+      .send_json(&CargoExecConfig {
+        cmd: Some(vec!["ls", "/", "-lra"]),
+        ..Default::default()
+      })
+      .await?;
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let mut stream = res.into_stream();
+    let mut payload = Vec::new();
+    while let Some(data) = stream.next().await {
+      let Ok(data) = data else {
+        break;
+      };
+      payload.extend_from_slice(&data);
+      if data.last() == Some(&b'\n') {
+        let _ = serde_json::from_slice::<ExecOutput>(&payload)?;
+        payload.clear();
+      }
+    }
     Ok(())
   }
 }

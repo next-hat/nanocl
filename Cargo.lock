@@ -554,9 +554,9 @@ dependencies = [
 
 [[package]]
 name = "cxx"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b61a7545f753a88bcbe0a70de1fcc0221e10bfc752f576754fa91e663db1622e"
+checksum = "322296e2f2e5af4270b54df9e85a02ff037e271af20ba3e7fe1575515dc840b8"
 dependencies = [
  "cc",
  "cxxbridge-flags",
@@ -566,9 +566,9 @@ dependencies = [
 
 [[package]]
 name = "cxx-build"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f464457d494b5ed6905c63b0c4704842aba319084a0a3561cdc1359536b53200"
+checksum = "017a1385b05d631e7875b1f151c9f012d37b53491e2a87f65bff5c262b2111d8"
 dependencies = [
  "cc",
  "codespan-reporting",
@@ -581,15 +581,15 @@ dependencies = [
 
 [[package]]
 name = "cxxbridge-flags"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43c7119ce3a3701ed81aca8410b9acf6fc399d2629d057b87e2efa4e63a3aaea"
+checksum = "c26bbb078acf09bc1ecda02d4223f03bdd28bd4874edcb0379138efc499ce971"
 
 [[package]]
 name = "cxxbridge-macro"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65e07508b90551e610910fa648a1878991d367064997a596135b86df30daf07e"
+checksum = "357f40d1f06a24b60ae1fe122542c1fb05d28d32acb2aed064e84bc2ad1e252e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1513,9 +1513,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-async-std"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e51b8d01022ee7a87ff9d8f9a78c567777dd134732ec88a452101077c706d285"
+checksum = "e984625782348a5bc423eb9bc72923a70b95cf5e849079e09a785c9f411f87d1"
 dependencies = [
  "async-oneshot",
  "async-std",
@@ -1571,9 +1571,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-glommio"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2f244aae9c217b8e7628a8d9d7ab0a20fe96a49f6d13f444c2a646bde72829d"
+checksum = "f32828a770aff9038c7bf20e6a6d6c7679f281a4742f6ca5b2acd460ec553d36"
 dependencies = [
  "async-oneshot",
  "futures-lite",
@@ -1620,9 +1620,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-io"
-version = "0.2.3"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3475da369dfab21392f77c953431c657f0ea78add86b7eec2c898046772bd247"
+checksum = "8921207af9c5d4f4e719171a65e901697df35ed8e838408f7839a2afeab4e93d"
 dependencies = [
  "bitflags",
  "log",
@@ -1699,9 +1699,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-tokio"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "512925f906db0c6abe2e1dd6b11d20978ea64b480d0df4796e46216ef9147c12"
+checksum = "74d8836dcbe30ddf1cdf81d3385950dcd93958b1eb26b420b8354d74078091f7"
 dependencies = [
  "log",
  "ntex-bytes",
