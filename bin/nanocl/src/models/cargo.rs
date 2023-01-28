@@ -25,9 +25,6 @@ pub struct CargoCreateOpts {
   pub name: String,
   /// Image of the cargo
   pub image: String,
-  /// Network of the cargo
-  #[clap(long = "net")]
-  pub network: Option<String>,
   /// Volumes of the cargo
   #[clap(short, long = "volume")]
   pub volumes: Option<Vec<String>>,
@@ -46,7 +43,6 @@ impl From<CargoCreateOpts> for CargoConfigPartial {
         // volumes: val.volumes,
         env: val.env,
         host_config: Some(ContainerHostConfig {
-          network_mode: val.network,
           binds: val.volumes,
           ..Default::default()
         }),
