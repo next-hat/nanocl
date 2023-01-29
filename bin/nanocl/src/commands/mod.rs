@@ -5,6 +5,7 @@ mod version;
 mod setup;
 mod events;
 mod resource;
+mod state;
 
 pub mod utils;
 
@@ -15,3 +16,4 @@ pub use cargo_image::*;
 pub use cargo::*;
 pub use version::*;
 pub use resource::*;
+pub use state::*;

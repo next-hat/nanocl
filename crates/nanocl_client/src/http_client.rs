@@ -45,4 +45,8 @@ impl NanoclClient {
   pub(crate) fn patch(&self, url: String) -> ClientRequest {
     self.client.patch(self.gen_url(url))
   }
+
+  pub(crate) fn put(&self, url: String) -> ClientRequest {
+    self.client.put(self.gen_url(url))
+  }
 }

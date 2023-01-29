@@ -1,0 +1,13 @@
+Type: Cargo
+ApiVersion: v1
+
+Namespace: global
+
+Cargoes:
+  - Name: getting-started
+    Container:
+      Image: nexthat/nanocl-get-started
+      Env :
+        - NODE_ENV=production
+        - APP=LANDING
+        - CLUSTER={{vars.CLUSTER}}

@@ -5,8 +5,6 @@ use tabled::Tabled;
 /// Resource commands
 #[derive(Debug, Subcommand)]
 pub enum ResourceCommands {
-  /// Create new resource
-  Create(ResourceCreateOpts),
   /// Remove existing resource
   #[clap(alias("rm"))]
   Remove(ResourceRemoveOpts),

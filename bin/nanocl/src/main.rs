@@ -18,6 +18,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::Resource(args) => commands::exec_resource(&client, args).await,
     Commands::Cargo(args) => commands::exec_cargo(&client, args).await,
     Commands::Events => commands::exec_events(&client).await,
+    Commands::State(args) => commands::exec_state(&client, args).await,
     Commands::Version(args) => commands::exec_version(&client, args).await,
   }
 }

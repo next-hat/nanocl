@@ -9,11 +9,13 @@ pub enum CliError {
   #[error(transparent)]
   Io(#[from] std::io::Error),
   #[error(transparent)]
-  Parse(#[from] serde_yaml::Error),
+  ParseYml(#[from] serde_yaml::Error),
   #[error(transparent)]
   Client(#[from] NanoclClientError),
   #[error(transparent)]
   Docker(#[from] bollard::errors::Error),
+  #[error(transparent)]
+  ParseJson(#[from] serde_json::Error),
   #[error(transparent)]
   Api(#[from] ApiError),
   #[error("{msg:?}")]

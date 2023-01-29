@@ -1,7 +1,7 @@
-Type: Cargo
+Type: Deployment
 ApiVersion: v1
 
-Namespace: global
+Namespace: test
 
 Resources:
   - Name: proxy-get-started
@@ -15,6 +15,7 @@ Resources:
         Locations:
           - Path: /
             Target:
+              Namespace: test
               Name: getting-started
               Port: 9000
 

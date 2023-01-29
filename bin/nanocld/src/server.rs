@@ -32,6 +32,8 @@ pub async fn generate(
       .configure(services::cargo::ntex_config)
       // configure resource service
       .configure(services::resource::ntex_config)
+      // configure state service
+      .configure(services::state::ntex_config)
   });
   let mut count = 0;
   let len = hosts.len();
