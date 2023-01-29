@@ -21,7 +21,7 @@ async fn exec_create(
 
   let meta = utils::yml::get_file_meta(&data)?;
 
-  if meta.r#type != "resource" {
+  if meta.r#type != "Resource" {
     return Err(CliError::Custom {
       msg: format!("Invalid file type expected resource got: {}", &meta.r#type),
     });
