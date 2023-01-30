@@ -252,3 +252,48 @@ pub async fn inspect(
     cargoes,
   })
 }
+
+/// ## Create a namespace if not exists
+///
+///
+/// ## Arguments
+///
+/// - [name](String) - The namespace name
+/// - [docker_api](bollard::Docker) - The docker api
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///  - [Ok](()) - The namespace will exists
+///  - [Err](HttpResponseError) - An error occured
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use bollard::Docker;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let result = namespace::create_if_not_exists("my-namespace", &docker_api, &pool).await;
+/// ```
+///
+pub async fn create_if_not_exists(
+  name: &str,
+  docker_api: &bollard::Docker,
+  pool: &Pool,
+) -> Result<(), HttpResponseError> {
+  if repositories::namespace::find_by_name(name.to_owned(), pool)
+    .await
+    .is_err()
+  {
+    create(
+      &NamespacePartial {
+        name: name.to_owned(),
+      },
+      docker_api,
+      pool,
+    )
+    .await?;
+  }
+  Ok(())
+}

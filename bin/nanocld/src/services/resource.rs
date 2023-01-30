@@ -147,7 +147,7 @@ pub async fn patch_resource(
   let key = name.into_inner();
   log::debug!("Patching resource: {} with payload: {:?}", &key, &payload);
   let resource =
-    repositories::resource::update_by_id(key, payload, &pool).await?;
+    repositories::resource::update_by_key(key, payload, &pool).await?;
   log::debug!("Resource patched: {:?}", &resource);
   let resource_copy = resource.to_owned();
   rt::spawn(async move {

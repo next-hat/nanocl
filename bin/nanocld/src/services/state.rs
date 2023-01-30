@@ -1,19 +1,75 @@
 use ntex::web;
-use ntex::util::BytesMut;
+use ntex::http::StatusCode;
+
+use crate::utils;
+use crate::models::Pool;
+
+use nanocl_models::state::{
+  StateConfig, StateDeployment, StateCargo, StateResources,
+};
 
 use crate::error::HttpResponseError;
 
 #[web::put("/state/apply")]
 async fn apply(
-  mut payload: web::types::Payload,
+  web::types::Json(payload): web::types::Json<serde_json::Value>,
+  docker_api: web::types::State<bollard::Docker>,
+  pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let mut body = BytesMut::new();
-  while let Some(Ok(item)) = ntex::util::stream_recv(&mut payload).await {
-    body.extend_from_slice(&item);
+  let meta = serde_json::from_value::<StateConfig>(payload.to_owned())
+    .map_err(|err| HttpResponseError {
+      status: StatusCode::BAD_REQUEST,
+      msg: format!("unable to serialize payload {err}"),
+    })?;
+
+  match meta.r#type.as_str() {
+    "Deployment" => {
+      println!("Deployment");
+      let data =
+        serde_json::from_value::<StateDeployment>(payload).map_err(|err| {
+          HttpResponseError {
+            status: StatusCode::BAD_REQUEST,
+            msg: format!(
+              "unable to serialize payload for type {} error: {err}",
+              meta.r#type
+            ),
+          }
+        })?;
+      utils::state::deployment(data, &docker_api, &pool).await?;
+    }
+    "Cargo" => {
+      let data =
+        serde_json::from_value::<StateCargo>(payload).map_err(|err| {
+          HttpResponseError {
+            status: StatusCode::BAD_REQUEST,
+            msg: format!(
+              "unable to serialize payload for type {} error: {err}",
+              meta.r#type
+            ),
+          }
+        })?;
+      utils::state::cargo(data, &docker_api, &pool).await?;
+    }
+    "Resource" => {
+      let data =
+        serde_json::from_value::<StateResources>(payload).map_err(|err| {
+          HttpResponseError {
+            status: StatusCode::BAD_REQUEST,
+            msg: format!(
+              "unable to serialize payload for type {} error: {err}",
+              meta.r#type
+            ),
+          }
+        })?;
+      utils::state::resource(data, &pool).await?;
+    }
+    _ => {
+      return Err(HttpResponseError {
+        status: StatusCode::BAD_REQUEST,
+        msg: format!("unknown type {}", meta.r#type),
+      });
+    }
   }
-
-  println!("body: {body:?}");
-
   Ok(web::HttpResponse::Ok().finish())
 }
 

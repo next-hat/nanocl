@@ -17,7 +17,7 @@ use nanocl_models::cargo::{
   CargoExecConfig,
 };
 
-use crate::repositories;
+use crate::{utils, repositories};
 use crate::error::HttpResponseError;
 use crate::models::Pool;
 
@@ -152,13 +152,14 @@ pub async fn list_instance(
 ///   - [Err](HttpResponseError) - The cargo has not been created
 ///
 pub async fn create(
-  namespace: String,
+  namespace: &str,
   config: &CargoConfigPartial,
   docker_api: &bollard::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
   let cargo =
-    repositories::cargo::create(namespace, config.to_owned(), pool).await?;
+    repositories::cargo::create(namespace.to_owned(), config.to_owned(), pool)
+      .await?;
 
   if let Err(err) = create_instance(&cargo, 1, docker_api).await {
     repositories::cargo::delete_by_key(cargo.key.to_owned(), pool).await?;
@@ -588,4 +589,40 @@ pub async fn exec_command(
   });
 
   Ok(rx)
+}
+
+/// ## Create or patch cargo
+///
+/// Create a cargo if it does not exist or patch it if it exists
+///
+/// ## Arguments
+///
+/// - [namespace](str) - The namespace name
+/// - [cargo](CargoConfigPartial) - The cargo config
+/// - [docker_api](bollard::Docker) - The docker api
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The cargo has been created or patched
+///   - [Err](HttpResponseError) - The cargo has not been created or patched
+///
+pub async fn create_or_patch(
+  namespace: &str,
+  cargo: &CargoConfigPartial,
+  docker_api: &bollard::Docker,
+  pool: &Pool,
+) -> Result<(), HttpResponseError> {
+  let key = utils::key::gen_key(namespace, &cargo.name);
+  if repositories::cargo::find_by_key(key.to_owned(), pool)
+    .await
+    .is_ok()
+  {
+    utils::cargo::patch(&key, &cargo.to_owned().into(), docker_api, pool)
+      .await?;
+  } else {
+    utils::cargo::create(namespace, cargo, docker_api, pool).await?;
+  }
+  Ok(())
 }

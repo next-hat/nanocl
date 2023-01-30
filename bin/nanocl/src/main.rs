@@ -123,8 +123,9 @@ mod tests {
     // Create a new resource
     let args = Cli::parse_from([
       "nanocl",
-      "resource",
-      "create",
+      "state",
+      "apply",
+      "-f",
       "../../examples/resource_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());

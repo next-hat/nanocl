@@ -40,7 +40,7 @@ pub async fn create_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   log::debug!("Creating cargo: {:?}", &payload);
   let cargo =
-    utils::cargo::create(namespace, &payload, &docker_api, &pool).await?;
+    utils::cargo::create(&namespace, &payload, &docker_api, &pool).await?;
   log::debug!("Cargo created: {:?}", &cargo);
   let key = cargo.key.to_owned();
   rt::spawn(async move {

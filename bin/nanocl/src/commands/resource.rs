@@ -14,7 +14,7 @@ use super::utils::print_table;
 // but we can create them using a apply command
 // which will apply a state file
 //
-// async fn exec_create(
+// async fn exec_create
 //   client: &NanoclClient,
 //   opts: &ResourceCreateOpts,
 // ) -> Result<(), CliError> {

@@ -7,10 +7,7 @@ impl NanoclClient {
     &self,
     data: &serde_json::Value,
   ) -> Result<(), NanoclClientError> {
-    let mut res = self
-      .put("/state/apply".into())
-      .send_body(data.to_string())
-      .await?;
+    let mut res = self.put("/state/apply".into()).send_json(data).await?;
 
     let status = res.status();
 
@@ -22,10 +19,7 @@ impl NanoclClient {
     &self,
     data: &serde_json::Value,
   ) -> Result<(), NanoclClientError> {
-    let mut res = self
-      .put("/state/revert".into())
-      .send_body(data.to_string())
-      .await?;
+    let mut res = self.put("/state/revert".into()).send_json(data).await?;
 
     let status = res.status();
 

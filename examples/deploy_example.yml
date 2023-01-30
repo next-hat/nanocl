@@ -1,7 +1,7 @@
 Type: Deployment
 ApiVersion: v1
 
-Namespace: test
+Namespace: global
 
 Resources:
   - Name: proxy-get-started
@@ -26,4 +26,3 @@ Cargoes:
       Env :
         - NODE_ENV=production
         - APP=LANDING
-        - CLUSTER={{vars.CLUSTER}}
