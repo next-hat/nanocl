@@ -305,18 +305,13 @@ pub async fn create_or_patch(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
-  if inspect_by_key(resource.name.to_owned(), &pool)
-    .await
-    .is_ok()
-  {
-    return Ok(
-      update_by_key(
-        resource.name.to_owned(),
-        resource.config.to_owned(),
-        &pool,
-      )
-      .await?,
-    );
+  if inspect_by_key(resource.name.to_owned(), pool).await.is_ok() {
+    return update_by_key(
+      resource.name.to_owned(),
+      resource.config.to_owned(),
+      pool,
+    )
+    .await;
   }
-  Ok(create(resource.to_owned(), &pool).await?)
+  create(resource.to_owned(), pool).await
 }

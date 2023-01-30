@@ -8,19 +8,18 @@ Resources:
     Kind: ProxyRule
     Config:
       Watch:
-        - Name: getting-started
+        - Name: get-started
       Http:
         Domain: get-started.com
         Type: Public
         Locations:
           - Path: /
             Target:
-              Namespace: test
-              Name: getting-started
+              Name: get-started
               Port: 9000
 
 Cargoes:
-  - Name: getting-started
+  - Name: get-started
     Container:
       Image: nexthat/nanocl-get-started
       Env :

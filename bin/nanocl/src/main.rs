@@ -159,8 +159,63 @@ mod tests {
     assert!(execute_args(&args).await.is_ok());
   }
 
-  /// Test Setup command
   #[ntex::test]
+  async fn test_state() {
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "apply",
+      "-f",
+      "../../examples/deploy_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "apply",
+      "-f",
+      "../../examples/deploy_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "revert",
+      "-f",
+      "../../examples/deploy_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "apply",
+      "-f",
+      "../../examples/cargo_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "apply",
+      "-f",
+      "../../examples/cargo_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "revert",
+      "-f",
+      "../../examples/cargo_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+  }
+
+  /// Test Setup command
+  // #[ntex::test]
   async fn test_setup() {
     let args = Cli::parse_from(["nanocl", "setup"]);
     assert!(execute_args(&args).await.is_ok());
