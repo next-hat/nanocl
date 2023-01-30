@@ -43,7 +43,7 @@ diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
 diesel = { version = "2.0.1", features = ["postgres", "r2d2", "chrono", "uuid", "serde_json"] }
 rustls = "0.20.8"
 rustls-pemfile = "1.0.1"
-tokio = { version = "1.23.1", features = ["fs"] }
+tokio = { version = "1.25.0", features = ["fs"] }
 
 # Dependency required with dev feature
 utoipa = { version = "2.2.0", features = ["uuid", "chrono"], optional = true }
