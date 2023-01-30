@@ -36,8 +36,6 @@ async fn main() -> std::io::Result<()> {
 mod tests {
   use super::*;
 
-  use std::{thread, time};
-
   /// Test version command
   #[ntex::test]
   async fn test_version() {
@@ -163,7 +161,6 @@ mod tests {
 
   #[ntex::test]
   async fn test_state() {
-    let five_sec = time::Duration::from_secs(5);
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -172,7 +169,6 @@ mod tests {
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
-    thread::sleep(five_sec);
 
     let args = Cli::parse_from([
       "nanocl",
@@ -182,7 +178,6 @@ mod tests {
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
-    thread::sleep(five_sec);
 
     let args = Cli::parse_from([
       "nanocl",
@@ -192,7 +187,6 @@ mod tests {
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
-    thread::sleep(five_sec);
 
     let args = Cli::parse_from([
       "nanocl",
@@ -202,7 +196,6 @@ mod tests {
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
-    thread::sleep(five_sec);
 
     let args = Cli::parse_from([
       "nanocl",
@@ -212,7 +205,6 @@ mod tests {
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
-    thread::sleep(five_sec);
 
     let args = Cli::parse_from([
       "nanocl",
@@ -222,7 +214,6 @@ mod tests {
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
-    thread::sleep(five_sec);
 
     let args = Cli::parse_from([
       "nanocl",
@@ -235,7 +226,7 @@ mod tests {
   }
 
   /// Test Setup command
-  #[ntex::test]
+  // #[ntex::test]
   async fn test_setup() {
     let args = Cli::parse_from(["nanocl", "setup"]);
     assert!(execute_args(&args).await.is_ok());

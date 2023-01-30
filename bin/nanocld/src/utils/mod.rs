@@ -9,6 +9,7 @@ pub mod namespace;
 pub mod tests {
   use super::*;
 
+  use std::fs;
   use std::env;
   use ntex::web::{*, self};
   use ntex::http::client::ClientResponse;
@@ -46,6 +47,15 @@ pub mod tests {
       bollard::API_DEFAULT_VERSION,
     )
     .unwrap()
+  }
+
+  pub fn parse_state_file(
+    path: &str,
+  ) -> Result<serde_json::Value, Box<dyn std::error::Error + 'static>> {
+    let data = fs::read_to_string(path)?;
+    let data: serde_yaml::Value = serde_yaml::from_str(&data)?;
+    let data = serde_json::to_value(data)?;
+    Ok(data)
   }
 
   pub async fn gen_postgre_pool() -> Pool {

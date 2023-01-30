@@ -49,3 +49,53 @@ pub fn ntex_config(cfg: &mut web::ServiceConfig) {
   cfg.service(apply);
   cfg.service(revert);
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  use crate::utils::tests::*;
+
+  #[ntex::test]
+  async fn basic_test() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+
+    let data = parse_state_file("../../examples/cargo_example.yml")?;
+
+    let req = srv.put("/state/apply").send_json(&data).await.unwrap();
+
+    assert_eq!(req.status(), 200);
+
+    let data = parse_state_file("../../examples/cargo_example.yml")?;
+
+    let req = srv.put("/state/apply").send_json(&data).await.unwrap();
+
+    assert_eq!(req.status(), 200);
+
+    let data = parse_state_file("../../examples/cargo_example.yml")?;
+
+    let req = srv.put("/state/revert").send_json(&data).await.unwrap();
+
+    assert_eq!(req.status(), 200);
+
+    let data = parse_state_file("../../examples/resource_example.yml")?;
+
+    let req = srv.put("/state/apply").send_json(&data).await.unwrap();
+
+    assert_eq!(req.status(), 200);
+
+    let data = parse_state_file("../../examples/resource_example.yml")?;
+
+    let req = srv.put("/state/apply").send_json(&data).await.unwrap();
+
+    assert_eq!(req.status(), 200);
+
+    let data = parse_state_file("../../examples/resource_example.yml")?;
+
+    let req = srv.put("/state/revert").send_json(&data).await.unwrap();
+
+    assert_eq!(req.status(), 200);
+
+    Ok(())
+  }
+}
