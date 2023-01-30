@@ -16,7 +16,7 @@ async-std = ["ntex/async-std"]
 
 [dependencies]
 bollard = "0.14"
-futures = "0.3.25"
+futures = "0.3.26"
 nanocl_models = { version = "0.0.1", features = ["serde"] }
 ntex = { version = "0.6.1" }
 serde = { version = "1.0.152", features = ["derive"] }
