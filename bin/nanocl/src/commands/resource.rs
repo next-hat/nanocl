@@ -1,40 +1,43 @@
-use std::fs;
-
 use nanocl_client::NanoclClient;
 
-use crate::utils;
 use crate::error::CliError;
 use crate::models::{
-  ResourceArgs, ResourceCommands, ResourceRow, ResourceCreateOpts,
-  ResourceRemoveOpts, ResourceInspectOpts,
+  ResourceArgs, ResourceCommands, ResourceRow, ResourceRemoveOpts,
+  ResourceInspectOpts,
 };
 
 use super::utils::print_table;
 
-async fn exec_create(
-  client: &NanoclClient,
-  opts: &ResourceCreateOpts,
-) -> Result<(), CliError> {
-  let mut file_path = std::env::current_dir()?;
-  file_path.push(&opts.file_path);
-  let data = fs::read_to_string(file_path)?;
+// Since Resource are random json config
+// we can't really validate them using the cli
+// so we cannot create them using a create command
+// but we can create them using a apply command
+// which will apply a state file
+//
+// async fn exec_create
+//   client: &NanoclClient,
+//   opts: &ResourceCreateOpts,
+// ) -> Result<(), CliError> {
+//   let mut file_path = std::env::current_dir()?;
+//   file_path.push(&opts.file_path);
+//   let data = fs::read_to_string(file_path)?;
 
-  let meta = utils::yml::get_file_meta(&data)?;
+//   let meta = utils::state::get_file_meta(&data)?;
 
-  if meta.r#type != "Resource" {
-    return Err(CliError::Custom {
-      msg: format!("Invalid file type expected resource got: {}", &meta.r#type),
-    });
-  }
+//   if meta.r#type != "Resource" {
+//     return Err(CliError::Custom {
+//       msg: format!("Invalid file type expected resource got: {}", &meta.r#type),
+//     });
+//   }
 
-  let resources = utils::yml::get_resources(&data)?;
+//   let resources = utils::state::get_resources(&data)?;
 
-  for resource in resources.resources {
-    client.create_resource(&resource).await?;
-  }
+//   for resource in resources.resources {
+//     client.create_resource(&resource).await?;
+//   }
 
-  Ok(())
-}
+//   Ok(())
+// }
 
 async fn exec_list(client: &NanoclClient) -> Result<(), CliError> {
   let resources = client.list_resource().await?;
@@ -76,7 +79,7 @@ pub async fn exec_resource(
   args: &ResourceArgs,
 ) -> Result<(), CliError> {
   match &args.commands {
-    ResourceCommands::Create(opts) => exec_create(client, opts).await,
+    // ResourceCommands::Create(opts) => exec_create(client, opts).await,
     ResourceCommands::List => exec_list(client).await,
     ResourceCommands::Remove(opts) => exec_remove(client, opts).await,
     ResourceCommands::Inspect(opts) => exec_inspect(client, opts).await,

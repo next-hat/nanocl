@@ -39,6 +39,13 @@ async fn ping() -> Result<web::HttpResponse, HttpResponseError> {
   })))
 }
 
+pub async fn unhandled() -> Result<web::HttpResponse, HttpResponseError> {
+  Err(HttpResponseError {
+    status: ntex::http::StatusCode::NOT_FOUND,
+    msg: "Route or method unhandled".into(),
+  })
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(watch_events);
   config.service(get_version);
@@ -136,6 +143,21 @@ mod tests {
       StatusCode::OK,
       "Expect status to be {} got {}",
       StatusCode::OK,
+      status
+    );
+    Ok(())
+  }
+
+  #[ntex::test]
+  async fn test_unhandled_route() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+    let resp = srv.get("/unhandled").send().await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::NOT_FOUND,
+      "Expect status to be {} got {}",
+      StatusCode::NOT_FOUND,
       status
     );
     Ok(())

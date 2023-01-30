@@ -1,0 +1,9 @@
+Type: Cargo
+ApiVersion: v1
+
+Namespace: example-namespace
+
+Cargoes:
+  - Name: example-cargo
+    Container:
+      Image: nexthat/nanocl-get-started

@@ -1,5 +1,6 @@
 pub mod key;
 pub mod store;
+pub mod state;
 pub mod cargo;
 pub mod cargo_image;
 pub mod namespace;
@@ -8,13 +9,15 @@ pub mod namespace;
 pub mod tests {
   use super::*;
 
+  use std::fs;
   use std::env;
-  use ntex::web::*;
+  use ntex::web::{*, self};
   use ntex::http::client::ClientResponse;
   use ntex::http::client::error::SendRequestError;
 
   use nanocl_models::config::DaemonConfig;
 
+  use crate::services;
   use crate::event::EventEmitter;
   use crate::models::Pool;
 
@@ -46,6 +49,15 @@ pub mod tests {
     .unwrap()
   }
 
+  pub fn parse_state_file(
+    path: &str,
+  ) -> Result<serde_json::Value, Box<dyn std::error::Error + 'static>> {
+    let data = fs::read_to_string(path)?;
+    let data: serde_yaml::Value = serde_yaml::from_str(&data)?;
+    let data = serde_json::to_value(data)?;
+    Ok(data)
+  }
+
   pub async fn gen_postgre_pool() -> Pool {
     let docker_api = gen_docker_client();
     let ip_addr = store::get_store_ip_addr(&docker_api).await.unwrap();
@@ -73,6 +85,7 @@ pub mod tests {
         .state(docker_api.clone())
         .state(event_emitter.clone())
         .configure(config)
+        .default_service(web::route().to(services::system::unhandled))
     })
   }
 }

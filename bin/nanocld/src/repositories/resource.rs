@@ -256,7 +256,7 @@ pub async fn inspect_by_key(
 /// let item = repositories::resource::update_by_id(String::from("my-resource"), json!({"foo": "bar"}), &pool).await;
 /// ```
 ///
-pub async fn update_by_id(
+pub async fn update_by_key(
   key: String,
   item: serde_json::Value,
   pool: &Pool,
@@ -299,4 +299,19 @@ pub async fn update_by_id(
     config: config.data,
   };
   Ok(item)
+}
+
+pub async fn create_or_patch(
+  resource: &ResourcePartial,
+  pool: &Pool,
+) -> Result<Resource, HttpResponseError> {
+  if inspect_by_key(resource.name.to_owned(), pool).await.is_ok() {
+    return update_by_key(
+      resource.name.to_owned(),
+      resource.config.to_owned(),
+      pool,
+    )
+    .await;
+  }
+  create(resource.to_owned(), pool).await
 }

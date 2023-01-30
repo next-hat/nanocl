@@ -5,8 +5,6 @@ use tabled::Tabled;
 /// Resource commands
 #[derive(Debug, Subcommand)]
 pub enum ResourceCommands {
-  /// Create new resource
-  Create(ResourceCreateOpts),
   /// Remove existing resource
   #[clap(alias("rm"))]
   Remove(ResourceRemoveOpts),
@@ -38,12 +36,6 @@ impl From<Resource> for ResourceRow {
       kind: resource.kind,
     }
   }
-}
-
-#[derive(Debug, Parser)]
-pub struct ResourceCreateOpts {
-  /// The path to the resource file
-  pub file_path: String,
 }
 
 #[derive(Debug, Parser)]

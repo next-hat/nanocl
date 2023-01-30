@@ -39,7 +39,7 @@ impl From<ResourceKind> for String {
 }
 
 /// Resource partial is a payload used to create a new resource
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourcePartial {

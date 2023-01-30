@@ -62,6 +62,17 @@ pub struct CargoConfigPatch {
   pub replication: Option<CargoReplication>,
 }
 
+impl From<CargoConfigPartial> for CargoConfigPatch {
+  fn from(cargo_config: CargoConfigPartial) -> Self {
+    Self {
+      name: Some(cargo_config.name),
+      dns_entry: cargo_config.dns_entry,
+      container: Some(cargo_config.container),
+      replication: cargo_config.replication,
+    }
+  }
+}
+
 /// A cargo config is the configuration of a cargo
 /// It used to know the state of the cargo
 /// It keep tracking of an history when you patch an existing cargo

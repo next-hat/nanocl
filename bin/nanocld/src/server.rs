@@ -32,6 +32,10 @@ pub async fn generate(
       .configure(services::cargo::ntex_config)
       // configure resource service
       .configure(services::resource::ntex_config)
+      // configure state service
+      .configure(services::state::ntex_config)
+      // Default service that return a 404
+      .default_service(web::route().to(services::system::unhandled))
   });
   let mut count = 0;
   let len = hosts.len();

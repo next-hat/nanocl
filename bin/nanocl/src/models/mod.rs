@@ -1,20 +1,20 @@
+mod setup;
 mod namespace;
 mod cargo;
 mod cargo_image;
-mod setup;
 mod resource;
-mod yml;
 mod version;
+mod state;
 
-use clap::{Parser, Subcommand};
-
-pub use yml::*;
-pub use cargo::*;
-pub use namespace::*;
-pub use cargo_image::*;
 pub use setup::*;
+pub use namespace::*;
+pub use cargo::*;
+pub use cargo_image::*;
 pub use resource::*;
 pub use version::*;
+pub use state::*;
+
+use clap::{Parser, Subcommand};
 
 /// A self-sufficient hybrid-cloud manager
 #[derive(Debug, Parser)]
@@ -40,6 +40,8 @@ pub enum Commands {
   Events,
   /// Setup nanocl
   Setup(SetupArgs),
+  /// Apply or Reverse a state from a configuration file
+  State(StateArgs),
   /// Show nanocl version information
   Version(VersionArgs),
   // TODO: shell completion
