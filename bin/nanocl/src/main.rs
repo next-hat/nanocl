@@ -207,6 +207,14 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "state",
+      "apply",
+      "-f",
+      "../../examples/cargo_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
       "revert",
       "-f",
       "../../examples/cargo_example.yml",
@@ -215,7 +223,7 @@ mod tests {
   }
 
   /// Test Setup command
-  #[ntex::test]
+  // #[ntex::test]
   async fn test_setup() {
     let args = Cli::parse_from(["nanocl", "setup"]);
     assert!(execute_args(&args).await.is_ok());

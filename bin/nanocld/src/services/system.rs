@@ -147,4 +147,19 @@ mod tests {
     );
     Ok(())
   }
+
+  #[ntex::test]
+  async fn test_unhandled_route() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+    let resp = srv.get("/unhandled").send().await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::NOT_FOUND,
+      "Expect status to be {} got {}",
+      StatusCode::NOT_FOUND,
+      status
+    );
+    Ok(())
+  }
 }

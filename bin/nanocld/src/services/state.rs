@@ -1,5 +1,4 @@
 use ntex::web;
-use ntex::http::StatusCode;
 
 use crate::utils;
 use crate::models::{Pool, StateData};

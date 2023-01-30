@@ -10,12 +10,13 @@ pub mod tests {
   use super::*;
 
   use std::env;
-  use ntex::web::*;
+  use ntex::web::{*, self};
   use ntex::http::client::ClientResponse;
   use ntex::http::client::error::SendRequestError;
 
   use nanocl_models::config::DaemonConfig;
 
+  use crate::services;
   use crate::event::EventEmitter;
   use crate::models::Pool;
 
@@ -74,6 +75,7 @@ pub mod tests {
         .state(docker_api.clone())
         .state(event_emitter.clone())
         .configure(config)
+        .default_service(web::route().to(services::system::unhandled))
     })
   }
 }

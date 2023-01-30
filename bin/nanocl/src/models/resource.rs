@@ -39,12 +39,6 @@ impl From<Resource> for ResourceRow {
 }
 
 #[derive(Debug, Parser)]
-pub struct ResourceCreateOpts {
-  /// The path to the resource file
-  pub file_path: String,
-}
-
-#[derive(Debug, Parser)]
 pub struct ResourceRemoveOpts {
   /// The names of the resources to delete
   pub names: Vec<String>,

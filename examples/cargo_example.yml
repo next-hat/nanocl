@@ -1,13 +1,9 @@
 Type: Cargo
 ApiVersion: v1
 
-Namespace: global
+Namespace: example-namespace
 
 Cargoes:
-  - Name: getting-started
+  - Name: example-cargo
     Container:
       Image: nexthat/nanocl-get-started
-      Env :
-        - NODE_ENV=production
-        - APP=LANDING
-        - CLUSTER={{vars.CLUSTER}}
