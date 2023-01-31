@@ -49,4 +49,4 @@ rustls-pemfile = "1.0.1"
 tokio = { version = "1.23.1", features = ["fs"] }
 
 # Dependency required with dev feature
-utoipa = { version = "2.2.0", features = ["uuid", "chrono"], optional = true }
+utoipa = { version = "3.0.1", features = ["uuid", "chrono"], optional = true }
