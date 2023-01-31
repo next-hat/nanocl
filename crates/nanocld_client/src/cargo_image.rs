@@ -3,7 +3,7 @@ use ntex::channel::mpsc;
 use ntex::http::StatusCode;
 use futures::TryStreamExt;
 
-use nanocl_models::cargo_image::CargoImagePartial;
+use nanocl_stubs::cargo_image::CargoImagePartial;
 
 use crate::error::ApiError;
 
@@ -22,7 +22,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let images = client.list_cargo_image().await;
@@ -60,7 +60,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let mut stream = client.create_cargo_image("my-image").await;
@@ -143,7 +143,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.delete_cargo_image("my-image:mylabel").await;
@@ -180,7 +180,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let image = client.inspect_cargo_image("my-image:mylabel").await;

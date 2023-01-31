@@ -1,4 +1,4 @@
-use nanocl_client::NanoclClient;
+use nanocld_client::NanoclClient;
 use ntex::http::Client;
 use ntex::http::client::error::SendRequestError;
 use ntex::time::Millis;

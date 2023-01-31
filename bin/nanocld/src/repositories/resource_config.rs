@@ -1,7 +1,7 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_models::resource::ResourceConfig;
+use nanocl_stubs::resource::ResourceConfig;
 
 use crate::utils;
 use crate::error::HttpResponseError;
@@ -27,7 +27,7 @@ use super::error::{db_blocking_error, db_error};
 /// ## Examples
 ///
 /// ```rust,norun
-/// use nanocl_models::resource::ResourceConfigDbModel;
+/// use nanocl_stubs::resource::ResourceConfigDbModel;
 /// use crate::repositories;
 ///
 /// let item = ResourceConfigDbModel {

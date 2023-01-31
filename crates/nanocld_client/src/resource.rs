@@ -1,4 +1,4 @@
-use nanocl_models::resource::{Resource, ResourcePartial, ResourceConfig};
+use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceConfig};
 
 use super::http_client::NanoclClient;
 use super::error::{NanoclClientError, is_api_error};
@@ -17,7 +17,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let namespaces = client.list_resource().await;
@@ -50,8 +50,8 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
-  /// use nanocl_models::resource::ResourceKind;
+  /// use nanocld_client::NanoclClient;
+  /// use nanocl_stubs::resource::ResourceKind;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let resource = client.create_resource(&ResourcePartial {
@@ -90,7 +90,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let resource = client.inspect_resource("my-resource").await;
@@ -125,7 +125,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let resource = client.patch_resource("my-resource", serde_json::json!({})).await;
@@ -163,7 +163,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let resource = client.delete_resource("my-resource").await;
@@ -211,7 +211,7 @@ impl NanoclClient {
 
 #[cfg(test)]
 mod tests {
-  use nanocl_models::resource::ResourceKind;
+  use nanocl_stubs::resource::ResourceKind;
 
   use super::*;
 

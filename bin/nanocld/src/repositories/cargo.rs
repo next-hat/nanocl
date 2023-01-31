@@ -2,9 +2,9 @@ use ntex::web;
 use ntex::http::StatusCode;
 use diesel::prelude::*;
 
-use nanocl_models::cargo::Cargo;
-use nanocl_models::generic::GenericDelete;
-use nanocl_models::cargo_config::{CargoConfig, CargoConfigPartial};
+use nanocl_stubs::cargo::Cargo;
+use nanocl_stubs::generic::GenericDelete;
+use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
 
 use crate::utils;
 use crate::error::HttpResponseError;
@@ -31,7 +31,7 @@ use super::error::{db_blocking_error, db_error};
 /// ## Examples
 ///
 /// ```rust,norun
-/// use nanocl_models::namespace::NamespaceItem;
+/// use nanocl_stubs::namespace::NamespaceItem;
 /// let nsp = NamespaceItem {
 ///  name: String::from("test"),
 /// };
@@ -74,7 +74,7 @@ pub async fn find_by_namespace(
 /// ## Examples
 ///
 /// ```rust,norun
-/// use nanocl_models::cargo::CargoConfigPartial;
+/// use nanocl_stubs::cargo::CargoConfigPartial;
 ///
 /// let item = CargoConfigPartial {
 ///   //... fill required data
@@ -233,7 +233,7 @@ pub async fn find_by_key(
 /// ## Examples
 ///
 /// ```rust,norun
-/// use nanocl_models::cargo::CargoConfigPartial;
+/// use nanocl_stubs::cargo::CargoConfigPartial;
 /// let item = CargoConfigPartial {
 ///  //... fill required data
 ///  name: String::from("test"),

@@ -3,7 +3,7 @@
 */
 use ntex::web;
 
-use nanocl_models::namespace::NamespacePartial;
+use nanocl_stubs::namespace::NamespacePartial;
 
 use crate::utils;
 use crate::models::Pool;
@@ -112,8 +112,8 @@ mod test_namespace {
 
   use serde_json::json;
 
-  use nanocl_models::namespace::NamespacePartial;
-  use nanocl_models::generic::GenericDelete;
+  use nanocl_stubs::namespace::NamespacePartial;
+  use nanocl_stubs::generic::GenericDelete;
 
   use crate::utils::tests::*;
 

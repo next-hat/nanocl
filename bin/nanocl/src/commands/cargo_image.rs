@@ -5,8 +5,8 @@ use futures::StreamExt;
 use bollard::service::ProgressDetail;
 use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
 
-use nanocl_client::NanoclClient;
-use nanocl_client::error::ApiError;
+use nanocld_client::NanoclClient;
+use nanocld_client::error::ApiError;
 
 use crate::models::{
   CargoImageOpts, CargoImageCommands, CargoImageRemoveOpts,

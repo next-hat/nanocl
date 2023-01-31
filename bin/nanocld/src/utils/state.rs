@@ -1,6 +1,6 @@
 use ntex::http::StatusCode;
 
-use nanocl_models::state::{
+use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateConfig,
 };
 

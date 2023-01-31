@@ -1,7 +1,7 @@
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
 
-use nanocl_models::namespace::NamespaceSummary;
+use nanocl_stubs::namespace::NamespaceSummary;
 
 /// Namespace commands
 #[derive(Debug, Subcommand)]

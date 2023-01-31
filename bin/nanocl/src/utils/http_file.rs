@@ -12,7 +12,7 @@ use ntex::http::Client;
 use serde::{Serialize, Deserialize};
 use futures::channel::mpsc::{UnboundedReceiver, unbounded};
 
-use nanocl_client::error::ApiError;
+use nanocld_client::error::ApiError;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum DownloadFileStatus {

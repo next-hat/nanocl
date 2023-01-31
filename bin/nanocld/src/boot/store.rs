@@ -7,9 +7,9 @@ use bollard::container::CreateContainerOptions;
 use bollard::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
-use nanocl_models::cargo_config::CargoConfigPartial;
-use nanocl_models::cargo_config::ContainerConfig;
-use nanocl_models::config::DaemonConfig;
+use nanocl_stubs::cargo_config::CargoConfigPartial;
+use nanocl_stubs::cargo_config::ContainerConfig;
+use nanocl_stubs::config::DaemonConfig;
 
 use crate::utils;
 use crate::models::Pool;

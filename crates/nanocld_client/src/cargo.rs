@@ -1,11 +1,11 @@
 use ntex::rt;
 use ntex::channel::mpsc;
 use futures::{TryStreamExt, StreamExt};
-use nanocl_models::generic::GenericNspQuery;
-use nanocl_models::cargo::{
+use nanocl_stubs::generic::GenericNspQuery;
+use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, CargoExecConfig, ExecOutput,
 };
-use nanocl_models::cargo_config::{
+use nanocl_stubs::cargo_config::{
   CargoConfigPatch, CargoConfigPartial, CargoConfig,
 };
 
@@ -27,7 +27,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let new_cargo = CargoConfigPartial {
@@ -71,7 +71,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.delete_cargo("my-cargo", None).await.unwrap();
@@ -107,7 +107,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let cargo = client.inspect_cargo("my-cargo", None).await.unwrap();
@@ -144,7 +144,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.start_cargo("my-cargo", None).await.unwrap();
@@ -180,7 +180,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.stop_cargo("my-cargo", None).await.unwrap();
@@ -215,7 +215,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let cargoes = client.list_cargoes(None).await.unwrap();
@@ -253,7 +253,7 @@ impl NanoclClient {
   ///
   /// ## Example
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let cargo_config = CargoConfigPatch {
@@ -297,8 +297,8 @@ impl NanoclClient {
   ///
   /// ```no_run,ignore
   /// use futures::StreamExt;
-  /// use nanocl_client::NanoclClient;
-  /// use nanocl_client::models::cargo_config::CargoExecConfig;
+  /// use nanocld_client::NanoclClient;
+  /// use nanocld_client::models::cargo_config::CargoExecConfig;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let exec = CargoExecConfig {
@@ -362,7 +362,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let histories = client.list_history("my-cargo", None).await.unwrap();
@@ -400,7 +400,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let cargo = client.reset_cargo("my-cargo", "my-history-id", None).await.unwrap();
@@ -428,7 +428,7 @@ impl NanoclClient {
 mod tests {
   use super::*;
 
-  use nanocl_models::cargo_config::CargoConfigPartial;
+  use nanocl_stubs::cargo_config::CargoConfigPartial;
 
   #[ntex::test]
   async fn test_basic() {

@@ -3,7 +3,7 @@ use ntex::channel::mpsc;
 use ntex::util::BytesMut;
 use futures::TryStreamExt;
 
-use nanocl_models::system::{Event, Version};
+use nanocl_stubs::system::{Event, Version};
 
 use super::http_client::NanoclClient;
 use super::error::{NanoclClientError, is_api_error};
@@ -20,7 +20,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let version = client.get_version().await;
@@ -50,7 +50,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let mut stream = client.watch_events().await?;

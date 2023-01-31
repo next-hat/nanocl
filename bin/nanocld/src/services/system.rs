@@ -62,7 +62,7 @@ mod tests {
 
   use ntex::http::StatusCode;
 
-  use nanocl_models::system::Version;
+  use nanocl_stubs::system::Version;
 
   use crate::utils::tests::*;
 

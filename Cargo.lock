@@ -1376,8 +1376,8 @@ dependencies = [
  "futures",
  "hyper",
  "indicatif",
- "nanocl_client",
- "nanocl_models",
+ "nanocl_stubs",
+ "nanocld_client",
  "ntex",
  "serde",
  "serde_json",
@@ -1392,21 +1392,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nanocl_client"
-version = "0.0.1"
-dependencies = [
- "bollard",
- "futures",
- "nanocl_models",
- "ntex",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "thiserror",
-]
-
-[[package]]
-name = "nanocl_models"
+name = "nanocl_stubs"
 version = "0.0.1"
 dependencies = [
  "bollard",
@@ -1428,7 +1414,7 @@ dependencies = [
  "env_logger",
  "futures",
  "log",
- "nanocl_models",
+ "nanocl_stubs",
  "ntex",
  "r2d2",
  "rustls",
@@ -1441,6 +1427,20 @@ dependencies = [
  "url",
  "utoipa",
  "uuid",
+]
+
+[[package]]
+name = "nanocld_client"
+version = "0.0.1"
+dependencies = [
+ "bollard",
+ "futures",
+ "nanocl_stubs",
+ "ntex",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "thiserror",
 ]
 
 [[package]]

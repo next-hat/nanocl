@@ -2,7 +2,7 @@ use bollard::exec::CreateExecOptions;
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
 
-use nanocl_models::{
+use nanocl_stubs::{
   cargo::CargoSummary,
   cargo_config::{
     CargoConfigPatch, ContainerConfig, CargoConfigPartial, ContainerHostConfig,

@@ -3,7 +3,7 @@
 */
 use ntex::web;
 
-use nanocl_models::cargo_image::CargoImagePartial;
+use nanocl_stubs::cargo_image::CargoImagePartial;
 
 use crate::utils;
 use crate::error::HttpResponseError;
@@ -116,7 +116,7 @@ pub mod tests {
   use bollard::service::ImageInspect;
   use futures::{TryStreamExt, StreamExt};
 
-  use nanocl_models::generic::GenericDelete;
+  use nanocl_stubs::generic::GenericDelete;
 
   use crate::utils::tests::*;
 
