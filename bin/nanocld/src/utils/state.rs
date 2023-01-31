@@ -1,9 +1,13 @@
+use ntex::rt;
 use ntex::http::StatusCode;
 
+use nanocl_stubs::system::Event;
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateConfig,
 };
 
+use crate::event::EventEmitterPtr;
+use crate::repositories::resource;
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
 use crate::models::{Pool, StateData};
@@ -54,6 +58,7 @@ pub async fn apply_deployment(
   data: StateDeployment,
   docker_api: &bollard::Docker,
   pool: &Pool,
+  event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
   // If we have a namespace and it doesn't exist, create it
   // Unless we use `global` as default for the creation of cargoes
@@ -69,17 +74,46 @@ pub async fn apply_deployment(
     for cargo in cargoes {
       utils::cargo::create_or_patch(&namespace, &cargo, docker_api, pool)
         .await?;
+      let key = utils::key::gen_key(&namespace, &cargo.name);
+      let p = pool.to_owned();
+      let ev = event_emitter.to_owned();
+      let docker = docker_api.to_owned();
+      rt::spawn(async move {
+        let cargo = utils::cargo::inspect(&key, &docker, &p).await.unwrap();
+        ev.lock()
+          .unwrap()
+          .send(Event::CargoPatched(Box::new(cargo)));
+      });
       utils::cargo::start(
         &utils::key::gen_key(&namespace, &cargo.name),
         docker_api,
       )
       .await?;
+      let key = utils::key::gen_key(&namespace, &cargo.name);
+      let p = pool.to_owned();
+      let ev = event_emitter.to_owned();
+      let docker = docker_api.to_owned();
+      rt::spawn(async move {
+        let cargo = utils::cargo::inspect(&key, &docker, &p).await.unwrap();
+        ev.lock()
+          .unwrap()
+          .send(Event::CargoStarted(Box::new(cargo)));
+      });
     }
   }
 
   if let Some(resources) = data.resources {
     for resource in resources {
+      let key = resource.name.to_owned();
       repositories::resource::create_or_patch(&resource, pool).await?;
+      let p = pool.to_owned();
+      let ev = event_emitter.to_owned();
+      rt::spawn(async move {
+        let item = resource::inspect_by_key(key, &p).await.unwrap();
+        ev.lock()
+          .unwrap()
+          .send(Event::ResourcePatched(Box::new(item)));
+      });
     }
   }
 
@@ -90,6 +124,7 @@ pub async fn apply_cargo(
   data: StateCargo,
   docker_api: &bollard::Docker,
   pool: &Pool,
+  event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
   // If we have a namespace and it doesn't exist, create it
   // Unless we use `global` as default for the creation of cargoes
@@ -103,11 +138,31 @@ pub async fn apply_cargo(
 
   for cargo in data.cargoes {
     utils::cargo::create_or_patch(&namespace, &cargo, docker_api, pool).await?;
+    let key = utils::key::gen_key(&namespace, &cargo.name);
+    let p = pool.to_owned();
+    let ev = event_emitter.to_owned();
+    let docker = docker_api.to_owned();
+    rt::spawn(async move {
+      let cargo = utils::cargo::inspect(&key, &docker, &p).await.unwrap();
+      ev.lock()
+        .unwrap()
+        .send(Event::CargoPatched(Box::new(cargo)));
+    });
     utils::cargo::start(
       &utils::key::gen_key(&namespace, &cargo.name),
       docker_api,
     )
     .await?;
+    let key = utils::key::gen_key(&namespace, &cargo.name);
+    let p = pool.to_owned();
+    let ev = event_emitter.to_owned();
+    let docker = docker_api.to_owned();
+    rt::spawn(async move {
+      let cargo = utils::cargo::inspect(&key, &docker, &p).await.unwrap();
+      ev.lock()
+        .unwrap()
+        .send(Event::CargoStarted(Box::new(cargo)));
+    });
   }
 
   Ok(())
@@ -116,9 +171,22 @@ pub async fn apply_cargo(
 pub async fn apply_resource(
   data: StateResources,
   pool: &Pool,
+  event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
   for resource in data.resources {
+    let key = resource.name.to_owned();
     repositories::resource::create_or_patch(&resource, pool).await?;
+    let pool = pool.to_owned();
+    let event_emitter = event_emitter.to_owned();
+    rt::spawn(async move {
+      let resource = repositories::resource::inspect_by_key(key, &pool)
+        .await
+        .unwrap();
+      event_emitter
+        .lock()
+        .unwrap()
+        .send(Event::ResourcePatched(Box::new(resource)));
+    });
   }
   Ok(())
 }
@@ -127,6 +195,7 @@ pub async fn revert_deployment(
   data: StateDeployment,
   docker_api: &bollard::Docker,
   pool: &Pool,
+  event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
   let namespace = if let Some(namespace) = data.namespace {
     namespace
@@ -138,12 +207,27 @@ pub async fn revert_deployment(
     for cargo in cargoes {
       let key = utils::key::gen_key(&namespace, &cargo.name);
       utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
+      let event_emitter = event_emitter.to_owned();
+      rt::spawn(async move {
+        event_emitter
+          .lock()
+          .unwrap()
+          .send(Event::CargoDeleted(*Box::new(key)));
+      });
     }
   }
 
   if let Some(resources) = data.resources {
     for resource in resources {
+      let key = resource.name.to_owned();
       repositories::resource::delete_by_key(resource.name, pool).await?;
+      let event_emitter = event_emitter.to_owned();
+      rt::spawn(async move {
+        event_emitter
+          .lock()
+          .unwrap()
+          .send(Event::ResourceDeleted(*Box::new(key)));
+      });
     }
   }
 
@@ -154,6 +238,7 @@ pub async fn revert_cargo(
   data: StateCargo,
   docker_api: &bollard::Docker,
   pool: &Pool,
+  event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
   let namespace = if let Some(namespace) = data.namespace {
     namespace
@@ -164,6 +249,13 @@ pub async fn revert_cargo(
   for cargo in data.cargoes {
     let key = utils::key::gen_key(&namespace, &cargo.name);
     utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
+    let event_emitter = event_emitter.to_owned();
+    rt::spawn(async move {
+      event_emitter
+        .lock()
+        .unwrap()
+        .send(Event::CargoDeleted(*Box::new(key)));
+    });
   }
 
   Ok(())
@@ -172,9 +264,18 @@ pub async fn revert_cargo(
 pub async fn revert_resource(
   data: StateResources,
   pool: &Pool,
+  event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
   for resource in data.resources {
+    let key = resource.name.to_owned();
     repositories::resource::delete_by_key(resource.name, pool).await?;
+    let event_emitter = event_emitter.to_owned();
+    rt::spawn(async move {
+      event_emitter
+        .lock()
+        .unwrap()
+        .send(Event::ResourceDeleted(*Box::new(key)));
+    });
   }
   Ok(())
 }

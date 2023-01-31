@@ -300,6 +300,7 @@ async fn reset_cargo(
   docker_api: web::types::State<bollard::Docker>,
   path: web::types::Path<CargoResetPath>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  event_emitter: web::types::State<EventEmitterPtr>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo_key = utils::key::gen_key(&namespace, &path.name);
@@ -319,6 +320,16 @@ async fn reset_cargo(
     &pool,
   )
   .await?;
+  let key = cargo_key.to_owned();
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
+      .await
+      .unwrap();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoPatched(Box::new(cargo)));
+  });
   log::debug!("Resetting cargo : {} done", &cargo_key);
   Ok(web::HttpResponse::Ok().json(&cargo))
 }

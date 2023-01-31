@@ -1,5 +1,6 @@
 use ntex::web;
 
+use crate::event::EventEmitterPtr;
 use crate::utils;
 use crate::models::{Pool, StateData};
 
@@ -10,16 +11,19 @@ async fn apply(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   docker_api: web::types::State<bollard::Docker>,
   pool: web::types::State<Pool>,
+  event_emitter: web::types::State<EventEmitterPtr>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   match utils::state::parse_state(&payload)? {
     StateData::Deployment(data) => {
-      utils::state::apply_deployment(data, &docker_api, &pool).await?;
+      utils::state::apply_deployment(data, &docker_api, &pool, &event_emitter)
+        .await?;
     }
     StateData::Cargo(data) => {
-      utils::state::apply_cargo(data, &docker_api, &pool).await?;
+      utils::state::apply_cargo(data, &docker_api, &pool, &event_emitter)
+        .await?;
     }
     StateData::Resource(data) => {
-      utils::state::apply_resource(data, &pool).await?;
+      utils::state::apply_resource(data, &pool, &event_emitter).await?;
     }
   }
   Ok(web::HttpResponse::Ok().finish())
@@ -30,16 +34,19 @@ async fn revert(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   docker_api: web::types::State<bollard::Docker>,
   pool: web::types::State<Pool>,
+  event_emitter: web::types::State<EventEmitterPtr>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   match utils::state::parse_state(&payload)? {
     StateData::Deployment(data) => {
-      utils::state::revert_deployment(data, &docker_api, &pool).await?;
+      utils::state::revert_deployment(data, &docker_api, &pool, &event_emitter)
+        .await?;
     }
     StateData::Cargo(data) => {
-      utils::state::revert_cargo(data, &docker_api, &pool).await?;
+      utils::state::revert_cargo(data, &docker_api, &pool, &event_emitter)
+        .await?;
     }
     StateData::Resource(data) => {
-      utils::state::revert_resource(data, &pool).await?;
+      utils::state::revert_resource(data, &pool, &event_emitter).await?;
     }
   }
   Ok(web::HttpResponse::Ok().finish())
