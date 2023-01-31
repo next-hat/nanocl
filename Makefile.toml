@@ -34,7 +34,7 @@ args = ["nextest", "run", "-p", "nanocl"]
 # Test all
 [tasks.test]
 command = "cargo"
-args = ["nextest", "run"]
+args = ["nextest", "run", "-j", "1"]
 
 # Test all with debug output
 [tasks.test-debug]

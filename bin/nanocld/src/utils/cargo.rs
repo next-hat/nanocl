@@ -254,6 +254,7 @@ pub async fn delete(
   cargo_key: &str,
   docker_api: &bollard::Docker,
   pool: &Pool,
+  force: Option<bool>,
 ) -> Result<(), HttpResponseError> {
   let containers = list_instance(cargo_key, docker_api).await?;
 
@@ -261,7 +262,10 @@ pub async fn delete(
     docker_api
       .remove_container(
         &container.id.unwrap_or_default(),
-        None::<RemoveContainerOptions>,
+        Some(RemoveContainerOptions {
+          force: force.unwrap_or(false),
+          ..Default::default()
+        }),
       )
       .await
       .map_err(|e| HttpResponseError {
@@ -353,6 +357,9 @@ pub async fn patch(
 
   // Create instance with the new config
   create_instance(&cargo, 1, docker_api).await?;
+
+  // start created containers
+  start(cargo_key, docker_api).await?;
 
   // Delete old containers
   for container in containers {
@@ -504,7 +511,7 @@ pub async fn delete_by_namespace(
   let cargoes = repositories::cargo::find_by_namespace(namespace, pool).await?;
 
   for cargo in cargoes {
-    delete(&cargo.key, docker_api, pool).await?;
+    delete(&cargo.key, docker_api, pool, None).await?;
   }
 
   Ok(())
@@ -623,6 +630,7 @@ pub async fn create_or_patch(
       .await?;
   } else {
     utils::cargo::create(namespace, cargo, docker_api, pool).await?;
+    utils::cargo::start(&key, docker_api).await?;
   }
   Ok(())
 }

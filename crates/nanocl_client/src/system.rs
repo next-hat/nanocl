@@ -12,12 +12,14 @@ impl NanoclClient {
   /// ## Get the version of the daemon
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The [version](Version) of the daemon
   ///   * [Err](NanoclClientError) - The version could not be retrieved
   ///
   /// ## Example
-  /// ```rust,norun
+  ///
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -40,12 +42,14 @@ impl NanoclClient {
   /// It will emit an event when the daemon state change
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
-  ///  * [Ok](Ok) - A [Receiver](mpsc::Receiver) of [Event](Event)s
-  ///  * [Err](NanoclClientError) - The events could not be retrieved
+  ///   * [Ok](Ok) - A [Receiver](mpsc::Receiver) of [Event](Event)s
+  ///   * [Err](NanoclClientError) - The events could not be retrieved
   ///
   /// ## Example
-  /// ```rust,norun
+  ///
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;

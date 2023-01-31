@@ -8,12 +8,14 @@ impl NanoclClient {
   /// ## List all namespaces
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - A [Vec](Vec) of [namespaces](NamespaceSummary)
   ///   * [Err](NanoclClientError) - The namespaces could not be listed
   ///
   /// ## Example
-  /// ```rust,norun
+  ///
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -34,9 +36,11 @@ impl NanoclClient {
   /// ## Create a new namespace
   ///
   /// ## Arguments
+  ///
   /// * [name](str) - The name of the namespace to create
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The created [namespace](Namespace)
   ///   * [Err](NanoclClientError) - The namespace could not be created
@@ -58,18 +62,22 @@ impl NanoclClient {
   }
 
   /// ## Inspect a namespace
+  ///
   /// Inspect a namespace by it's name to get more information about it
   ///
   /// ## Arguments
+  ///
   /// * [name](str) - The name of the namespace to inspect
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The desired [namespace](NamespaceInspect)
   ///   * [Err](NanoclClientError) - The namespace could not be inspected
   ///
   /// ## Example
-  /// ```rust,norun
+  ///
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -93,18 +101,22 @@ impl NanoclClient {
   }
 
   /// ## Delete a namespace
+  ///
   /// Delete a namespace by it's name
   ///
   /// ## Arguments
+  ///
   /// * [name](str) - The name of the namespace to delete
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The namespace was deleted
   ///   * [Err](NanoclClientError) - The namespace could not be deleted
   ///
   /// ## Example
-  /// ```rust,norun
+  ///
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;

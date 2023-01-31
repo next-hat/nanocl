@@ -5,7 +5,9 @@ use nanocl_models::generic::GenericNspQuery;
 use nanocl_models::cargo::{
   Cargo, CargoSummary, CargoInspect, CargoExecConfig, ExecOutput,
 };
-use nanocl_models::cargo_config::{CargoConfigPatch, CargoConfigPartial};
+use nanocl_models::cargo_config::{
+  CargoConfigPatch, CargoConfigPartial, CargoConfig,
+};
 
 use super::http_client::NanoclClient;
 use super::error::{NanoclClientError, is_api_error};
@@ -23,7 +25,8 @@ impl NanoclClient {
   ///   * [Err](NanoclClientError) - The cargo could not be created
   ///
   /// ## Example
-  /// ```rust,norun
+  ///
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -67,7 +70,7 @@ impl NanoclClient {
   ///   * [Err](NanoclClientError) - The cargo could not be deleted
   ///
   /// ## Example
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -103,7 +106,7 @@ impl NanoclClient {
   ///   * [Err](NanoclClientError) - The cargo could not be inspected
   ///
   /// ## Example
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -140,7 +143,7 @@ impl NanoclClient {
   ///   * [Err](NanoclClientError) - The cargo could not be started
   ///
   /// ## Example
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -176,7 +179,7 @@ impl NanoclClient {
   ///   * [Err](NanoclClientError) - The cargo could not be stopped
   ///
   /// ## Example
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -211,7 +214,7 @@ impl NanoclClient {
   ///   * [Err](NanoclClientError) - The cargoes could not be listed
   ///
   /// ## Example
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -249,7 +252,7 @@ impl NanoclClient {
   ///   * [Err](NanoclClientError) - The cargo could not be patched
   ///
   /// ## Example
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -292,7 +295,7 @@ impl NanoclClient {
   ///
   /// ## Example
   ///
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use futures::StreamExt;
   /// use nanocl_client::NanoclClient;
   /// use nanocl_client::models::cargo_config::CargoExecConfig;
@@ -342,6 +345,83 @@ impl NanoclClient {
 
     Ok(rx)
   }
+
+  /// ## List all the cargo histories
+  ///
+  /// ## Arguments
+  ///
+  /// * [name](str) - The name of the cargo to list the histories
+  /// * [namespace](Option<String>) - The namespace where belong the cargo
+  ///
+  /// ## Returns
+  ///
+  /// * [Result](Result)
+  ///   * [Ok](Ok) - A [Vec](Vec) of [CargoConfig](CargoConfig)
+  ///   * [Err](NanoclClientError) - The cargo could not be listed
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocl_client::NanoclClient;
+  ///
+  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let histories = client.list_history("my-cargo", None).await.unwrap();
+  /// ```
+  ///
+  pub async fn list_history_cargo(
+    &self,
+    name: &str,
+    namespace: Option<String>,
+  ) -> Result<Vec<CargoConfig>, NanoclClientError> {
+    let histories = self
+      .get(format!("/cargoes/{name}/histories"))
+      .query(&GenericNspQuery { namespace })?
+      .send()
+      .await?
+      .json::<Vec<CargoConfig>>()
+      .await?;
+    Ok(histories)
+  }
+
+  /// ## Reset a cargo to a specific history
+  ///
+  /// ## Arguments
+  ///
+  /// * [name](str) - The name of the cargo to reset
+  /// * [id](str) - The id of the history to reset to
+  /// * [namespace](Option<String>) - The namespace where belong the cargo
+  ///
+  /// ## Returns
+  ///
+  /// * [Result](Result)
+  ///   * [Ok](Ok) - The [Cargo](Cargo) reseted
+  ///   * [Err](NanoclClientError) - The cargo could not be reseted
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocl_client::NanoclClient;
+  ///
+  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let cargo = client.reset_cargo("my-cargo", "my-history-id", None).await.unwrap();
+  /// ```
+  ///
+  pub async fn reset_cargo(
+    &self,
+    name: &str,
+    id: &str,
+    namespace: Option<String>,
+  ) -> Result<Cargo, NanoclClientError> {
+    let mut res = self
+      .patch(format!("/cargoes/{name}/histories/{id}/reset"))
+      .query(&GenericNspQuery { namespace })?
+      .send()
+      .await?;
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+    let cargo = res.json::<Cargo>().await?;
+    Ok(cargo)
+  }
 }
 
 #[cfg(test)]
@@ -367,9 +447,6 @@ mod tests {
     };
     client.create_cargo(&new_cargo, None).await.unwrap();
 
-    // let cargo = client.inspect_cargo(CARGO, None).await.unwrap();
-    // assert_eq!(cargo.name, CARGO);
-
     client.start_cargo(CARGO_NAME, None).await.unwrap();
     client.inspect_cargo(CARGO_NAME, None).await.unwrap();
 
@@ -384,6 +461,15 @@ mod tests {
 
     client
       .patch_cargo(CARGO_NAME, new_cargo, None)
+      .await
+      .unwrap();
+
+    let histories = client.list_history_cargo(CARGO_NAME, None).await.unwrap();
+    assert!(histories.len() > 1);
+
+    let history = histories.first().unwrap();
+    client
+      .reset_cargo(CARGO_NAME, &history.key.to_string(), None)
       .await
       .unwrap();
 
