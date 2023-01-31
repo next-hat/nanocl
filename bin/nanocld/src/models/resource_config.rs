@@ -1,3 +1,5 @@
+use nanocl_models::resource::ResourceConfig;
+
 use crate::schema::resource_configs;
 use super::resource::ResourceDbModel;
 
@@ -10,4 +12,14 @@ pub struct ResourceConfigDbModel {
   pub(crate) key: uuid::Uuid,
   pub(crate) resource_key: String,
   pub(crate) data: serde_json::Value,
+}
+
+impl From<ResourceConfigDbModel> for ResourceConfig {
+  fn from(item: ResourceConfigDbModel) -> Self {
+    ResourceConfig {
+      key: item.key,
+      resource_key: item.resource_key,
+      data: item.data,
+    }
+  }
 }

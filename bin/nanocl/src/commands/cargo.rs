@@ -156,9 +156,11 @@ async fn exec_cargo_reset(
   args: &CargoArgs,
   opts: &CargoResetOpts,
 ) -> Result<(), CliError> {
-  client
+  let cargo = client
     .reset_cargo(&opts.name, &opts.history_id, args.namespace.to_owned())
     .await?;
+  let cargo = serde_yaml::to_string(&cargo)?;
+  println!("{cargo}");
   Ok(())
 }
 

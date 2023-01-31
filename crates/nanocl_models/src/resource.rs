@@ -141,3 +141,12 @@ pub struct ResourceProxyRule {
   #[serde(flatten)]
   pub rule: ProxyRule,
 }
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ResourceConfig {
+  pub key: uuid::Uuid,
+  pub resource_key: String,
+  pub data: serde_json::Value,
+}
