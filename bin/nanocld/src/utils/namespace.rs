@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use bollard::network::CreateNetworkOptions;
 use bollard::network::InspectNetworkOptions;
-use nanocl_models::generic::GenericDelete;
+use nanocl_stubs::generic::GenericDelete;
 use ntex::http::StatusCode;
 use bollard::models::ContainerSummary;
 use bollard::container::ListContainersOptions;
 
-use nanocl_models::namespace::{
+use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
 };
 

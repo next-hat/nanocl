@@ -11,8 +11,8 @@ use bollard::service::{ContainerSummary, HostConfig};
 use bollard::container::{ListContainersOptions, RemoveContainerOptions};
 use bollard::exec::{StartExecOptions, StartExecResults};
 
-use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
-use nanocl_models::cargo::{
+use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
+use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, ExecOutput, ExecOutputKind,
   CargoExecConfig,
 };

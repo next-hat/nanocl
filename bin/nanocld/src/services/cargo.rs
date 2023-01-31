@@ -6,10 +6,10 @@ use ntex::rt;
 use ntex::web;
 use ntex::http::StatusCode;
 
-use nanocl_models::system::Event;
-use nanocl_models::generic::GenericNspQuery;
-use nanocl_models::cargo::CargoExecConfig;
-use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
+use nanocl_stubs::system::Event;
+use nanocl_stubs::generic::GenericNspQuery;
+use nanocl_stubs::cargo::CargoExecConfig;
+use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
 use crate::{utils, repositories};
 use crate::event::EventEmitterPtr;
@@ -342,8 +342,8 @@ mod tests {
 
   use ntex::http::StatusCode;
   use futures::{TryStreamExt, StreamExt};
-  use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect, ExecOutput};
-  use nanocl_models::cargo_config::{
+  use nanocl_stubs::cargo::{Cargo, CargoSummary, CargoInspect, ExecOutput};
+  use nanocl_stubs::cargo_config::{
     CargoConfigPartial, CargoConfigPatch, CargoConfig,
   };
 

@@ -1,4 +1,4 @@
-use nanocl_client::NanoclClient;
+use nanocld_client::NanoclClient;
 
 use crate::error::CliError;
 use crate::models::{

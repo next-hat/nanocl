@@ -10,4 +10,4 @@ pub mod state;
 
 pub use http_client::*;
 
-pub use nanocl_models as models;
+pub use nanocl_stubs as models;

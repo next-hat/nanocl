@@ -13,7 +13,7 @@ use futures::Stream;
 use futures::{stream, StreamExt};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
-use nanocl_models::system::Event;
+use nanocl_stubs::system::Event;
 
 #[derive(Clone, Default)]
 pub struct EventEmitter {
@@ -104,7 +104,7 @@ mod tests {
 
   use super::*;
 
-  use nanocl_models::cargo::CargoInspect;
+  use nanocl_stubs::cargo::CargoInspect;
 
   use crate::utils::tests::*;
 

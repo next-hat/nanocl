@@ -1,4 +1,4 @@
-use nanocl_models::resource::ResourceConfig;
+use nanocl_stubs::resource::ResourceConfig;
 
 use crate::schema::resource_configs;
 use super::resource::ResourceDbModel;

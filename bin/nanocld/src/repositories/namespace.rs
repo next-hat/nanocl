@@ -5,8 +5,8 @@ use std::sync::Arc;
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_models::generic::GenericDelete;
-use nanocl_models::namespace::NamespacePartial;
+use nanocl_stubs::generic::GenericDelete;
+use nanocl_stubs::namespace::NamespacePartial;
 
 use crate::utils;
 use crate::error::HttpResponseError;
@@ -33,7 +33,7 @@ use super::error::{db_error, db_blocking_error};
 ///
 /// ```rust,norun
 /// use crate::repositories;
-/// use nanocl_models::namespace::NamespacePartial;
+/// use nanocl_stubs::namespace::NamespacePartial;
 ///
 /// let item = NamespacePartial {
 ///   name: "my-namespace".into(),

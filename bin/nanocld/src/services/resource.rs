@@ -3,8 +3,8 @@
 */
 use ntex::{web, rt};
 
-use nanocl_models::system::Event;
-use nanocl_models::resource::ResourcePartial;
+use nanocl_stubs::system::Event;
+use nanocl_stubs::resource::ResourcePartial;
 
 use crate::repositories;
 use crate::event::EventEmitterPtr;
@@ -221,7 +221,7 @@ mod tests {
   use ntex::http::StatusCode;
 
   use crate::utils::tests::*;
-  use nanocl_models::resource::{ResourceKind, Resource, ResourceConfig};
+  use nanocl_stubs::resource::{ResourceKind, Resource, ResourceConfig};
 
   #[ntex::test]
   async fn basic() -> TestRet {

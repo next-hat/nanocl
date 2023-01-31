@@ -1,4 +1,4 @@
-use nanocl_models::state::{StateDeployment, StateCargo, StateResources};
+use nanocl_stubs::state::{StateDeployment, StateCargo, StateResources};
 
 #[derive(Debug)]
 pub enum StateData {

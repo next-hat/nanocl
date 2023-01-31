@@ -1,4 +1,4 @@
-use nanocl_client::NanoclClient;
+use nanocld_client::NanoclClient;
 
 use crate::models::{NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow};
 
@@ -28,9 +28,7 @@ async fn exec_namespace_inspect(
   client: &NanoclClient,
   options: &NamespaceOpts,
 ) -> Result<(), CliError> {
-  let namespace = client
-  .inspect_namespace(&options.name)
-  .await?;
+  let namespace = client.inspect_namespace(&options.name).await?;
   let namespace = serde_yaml::to_string(&namespace)?;
   println!("{}", &namespace);
   Ok(())

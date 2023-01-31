@@ -1,4 +1,4 @@
-use nanocl_models::namespace::{Namespace, NamespaceSummary, NamespaceInspect};
+use nanocl_stubs::namespace::{Namespace, NamespaceSummary, NamespaceInspect};
 
 use super::http_client::NanoclClient;
 
@@ -16,7 +16,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let namespaces = client.list_namespace().await;
@@ -78,7 +78,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// let namespace = client.inspect_namespace("my-namespace").await?;
@@ -117,7 +117,7 @@ impl NanoclClient {
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocl_client::NanoclClient;
+  /// use nanocld_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
   /// client.delete_namespace("my-namespace").await?;

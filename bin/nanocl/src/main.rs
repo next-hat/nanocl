@@ -1,5 +1,5 @@
 use clap::Parser;
-use nanocl_client::NanoclClient;
+use nanocld_client::NanoclClient;
 
 mod utils;
 mod error;
@@ -36,7 +36,7 @@ async fn main() -> std::io::Result<()> {
 mod tests {
   use super::*;
 
-  use nanocl_client::NanoclClient;
+  use nanocld_client::NanoclClient;
 
   /// Test version command
   #[ntex::test]
