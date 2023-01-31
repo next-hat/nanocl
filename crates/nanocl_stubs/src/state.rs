@@ -1,3 +1,4 @@
+#[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
 use crate::cargo_config::CargoConfigPartial;

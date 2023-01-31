@@ -76,7 +76,8 @@ pub struct CargoInspect {
 }
 
 /// Kind of ExecOutput
-#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ExecOutputKind {
   /// Data is a standard input
   StdIn,
@@ -90,7 +91,8 @@ pub enum ExecOutputKind {
 
 /// ExecOutput is the output of an exec command
 /// It contains the kind of the output and the data
-#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ExecOutput {
   /// Kind of the output
   pub kind: ExecOutputKind,

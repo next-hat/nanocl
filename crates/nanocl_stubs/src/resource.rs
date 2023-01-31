@@ -138,7 +138,7 @@ pub struct ResourceProxyRule {
   /// Cargo to watch for changes
   pub watch: Vec<ProxyWatch>,
   /// The rule
-  #[serde(flatten)]
+  #[cfg_attr(feature = "serde", serde(flatten))]
   pub rule: ProxyRule,
 }
 
