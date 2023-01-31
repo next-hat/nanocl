@@ -159,6 +159,30 @@ mod tests {
     let args =
       Cli::parse_from(["nanocl", "resource", "inspect", "resource-example"]);
     assert!(execute_args(&args).await.is_ok());
+
+    // History
+    let args =
+      Cli::parse_from(["nanocl", "resource", "history", "resource-example"]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let client = NanoclClient::connect_with_unix_default().await;
+    let history = client
+      .list_history_resource("resource-example")
+      .await
+      .unwrap()
+      .first()
+      .unwrap()
+      .to_owned();
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "resource",
+      "reset",
+      "resource-example",
+      &history.key.to_string(),
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
     // Remove resource
     let args =
       Cli::parse_from(["nanocl", "resource", "rm", "resource-example"]);

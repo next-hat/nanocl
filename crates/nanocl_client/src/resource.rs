@@ -1,4 +1,4 @@
-use nanocl_models::resource::{Resource, ResourcePartial};
+use nanocl_models::resource::{Resource, ResourcePartial, ResourceConfig};
 
 use super::http_client::NanoclClient;
 use super::error::{NanoclClientError, is_api_error};
@@ -178,6 +178,35 @@ impl NanoclClient {
     is_api_error(&mut res, &status).await?;
     Ok(())
   }
+
+  pub async fn list_history_resource(
+    &self,
+    key: &str,
+  ) -> Result<Vec<ResourceConfig>, NanoclClientError> {
+    let mut res = self
+      .get(format!("/resources/{key}/histories"))
+      .send()
+      .await?;
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+    let history = res.json::<Vec<ResourceConfig>>().await?;
+    Ok(history)
+  }
+
+  pub async fn reset_resource(
+    &self,
+    name: &str,
+    key: &str,
+  ) -> Result<Resource, NanoclClientError> {
+    let mut res = self
+      .patch(format!("/resources/{name}/histories/{key}/reset"))
+      .send()
+      .await?;
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+    let resource = res.json::<Resource>().await?;
+    Ok(resource)
+  }
 }
 
 #[cfg(test)]
@@ -216,9 +245,20 @@ mod tests {
       .patch_resource("my-resource", &serde_json::json!({"config": "gg"}))
       .await
       .unwrap();
+
     assert_eq!(resource.name, "my-resource");
     assert_eq!(resource.kind, ResourceKind::ProxyRule);
     assert_eq!(resource.config, serde_json::json!({"config": "gg"}));
+
+    // history
+    let history = client.list_history_resource("my-resource").await.unwrap();
+    assert!(history.len() > 1);
+
+    // reset
+    let _ = client
+      .reset_resource("my-resource", &history[0].key.to_string())
+      .await
+      .unwrap();
 
     // delete
     client.delete_resource("my-resource").await.unwrap();

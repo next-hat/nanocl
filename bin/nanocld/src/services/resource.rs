@@ -159,23 +159,69 @@ pub async fn patch_resource(
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
+#[web::get("/resources/{name}/histories")]
+pub async fn list_resource_history(
+  pool: web::types::State<Pool>,
+  name: web::types::Path<String>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let key = name.into_inner();
+  log::debug!("Listing resource histories: {}", &key);
+  let items =
+    repositories::resource_config::list_by_resource(key, &pool).await?;
+  log::debug!("Resource histories found : {:#?}", &items);
+  Ok(web::HttpResponse::Ok().json(&items))
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ResourceResetPath {
+  pub name: String,
+  pub id: uuid::Uuid,
+}
+
+#[web::patch("/resources/{name}/histories/{id}/reset")]
+pub async fn reset_resource(
+  pool: web::types::State<Pool>,
+  path: web::types::Path<ResourceResetPath>,
+  event_emitter: web::types::State<EventEmitterPtr>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let history =
+    repositories::resource_config::find_by_key(path.id, &pool).await?;
+
+  let resource = repositories::resource::update_by_key(
+    path.name.to_owned(),
+    history.data,
+    &pool,
+  )
+  .await?;
+  let resource_cpy = resource.to_owned();
+  rt::spawn(async move {
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::ResourcePatched(Box::new(resource_cpy)));
+  });
+  Ok(web::HttpResponse::Ok().json(&resource))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_resource);
   config.service(delete_resource);
   config.service(list_resource);
   config.service(inspect_resource);
   config.service(patch_resource);
+  config.service(list_resource_history);
+  config.service(reset_resource);
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
 
-  use ntex::http::StatusCode;
   use serde_json::json;
+  use ntex::http::StatusCode;
 
   use crate::utils::tests::*;
-  use nanocl_models::resource::{ResourceKind, Resource};
+  use nanocl_models::resource::{ResourceKind, Resource, ResourceConfig};
 
   #[ntex::test]
   async fn basic() -> TestRet {
@@ -205,6 +251,32 @@ mod tests {
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, ResourceKind::ProxyRule);
     assert_eq!(resource.config, json!({"test":"value"}));
+
+    // History
+    let mut resp = srv
+      .get("/resources/test_resource/histories")
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let history = resp
+      .json::<Vec<ResourceConfig>>()
+      .await
+      .unwrap()
+      .first()
+      .unwrap()
+      .to_owned();
+
+    // History reset
+    let resp = srv
+      .patch(format!(
+        "/resources/test_resource/histories/{}/reset",
+        history.key
+      ))
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
 
     // Patch
     let patch_payload = json!({"test":"new_value"});

@@ -8,7 +8,7 @@ use nanocl_models::cargo_config::{CargoConfig, CargoConfigPartial};
 use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::{Pool, CargoConfigDbModel};
-use crate::repositories::error::{db_blocking_error, db_error};
+use super::error::{db_error, db_blocking_error};
 
 /// ## Create cargo config
 ///

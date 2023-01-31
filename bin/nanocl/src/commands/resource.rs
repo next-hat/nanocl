@@ -3,7 +3,7 @@ use nanocl_client::NanoclClient;
 use crate::error::CliError;
 use crate::models::{
   ResourceArgs, ResourceCommands, ResourceRow, ResourceRemoveOpts,
-  ResourceInspectOpts,
+  ResourceInspectOpts, ResourceResetOpts, ResourceHistoryOpts,
 };
 
 use super::utils::print_table;
@@ -74,6 +74,26 @@ async fn exec_inspect(
   Ok(())
 }
 
+async fn exec_history(
+  client: &NanoclClient,
+  opts: &ResourceHistoryOpts,
+) -> Result<(), CliError> {
+  let history = client.list_history_resource(&opts.name).await?;
+  let history = serde_yaml::to_string(&history)?;
+  println!("{history}");
+  Ok(())
+}
+
+async fn exec_reset(
+  client: &NanoclClient,
+  opts: &ResourceResetOpts,
+) -> Result<(), CliError> {
+  let resource = client.reset_resource(&opts.name, &opts.key).await?;
+  let resource = serde_yaml::to_string(&resource)?;
+  println!("{resource}");
+  Ok(())
+}
+
 pub async fn exec_resource(
   client: &NanoclClient,
   args: &ResourceArgs,
@@ -83,5 +103,7 @@ pub async fn exec_resource(
     ResourceCommands::List => exec_list(client).await,
     ResourceCommands::Remove(opts) => exec_remove(client, opts).await,
     ResourceCommands::Inspect(opts) => exec_inspect(client, opts).await,
+    ResourceCommands::History(opts) => exec_history(client, opts).await,
+    ResourceCommands::Reset(opts) => exec_reset(client, opts).await,
   }
 }

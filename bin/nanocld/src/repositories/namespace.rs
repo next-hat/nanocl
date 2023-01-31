@@ -8,12 +8,11 @@ use diesel::prelude::*;
 use nanocl_models::generic::GenericDelete;
 use nanocl_models::namespace::NamespacePartial;
 
-use crate::repositories::error::db_error;
 use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::{Pool, NamespaceDbModel};
 
-use super::error::db_blocking_error;
+use super::error::{db_error, db_blocking_error};
 
 /// ## Create namespace
 ///

@@ -1,10 +1,13 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use crate::repositories::error::{db_blocking_error, db_error};
+use nanocl_models::resource::ResourceConfig;
+
 use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::{Pool, ResourceConfigDbModel};
+
+use super::error::{db_blocking_error, db_error};
 
 /// ## Create resource config
 ///
@@ -95,4 +98,51 @@ pub async fn delete_by_resource_key(
   .map_err(db_blocking_error)?;
 
   Ok(())
+}
+
+pub async fn list_by_resource(
+  key: String,
+  pool: &Pool,
+) -> Result<Vec<ResourceConfig>, HttpResponseError> {
+  use crate::schema::resource_configs::dsl;
+
+  let pool = pool.to_owned();
+  let models = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let items = dsl::resource_configs
+      .filter(dsl::resource_key.eq(key))
+      .load::<ResourceConfigDbModel>(&mut conn)
+      .map_err(db_error("resource config"))?;
+    Ok::<_, HttpResponseError>(items)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  let models = models
+    .into_iter()
+    .map(ResourceConfig::from)
+    .collect::<Vec<_>>();
+
+  Ok(models)
+}
+
+pub async fn find_by_key(
+  key: uuid::Uuid,
+  pool: &Pool,
+) -> Result<ResourceConfig, HttpResponseError> {
+  use crate::schema::resource_configs::dsl;
+
+  let pool = pool.to_owned();
+  let model = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let item = dsl::resource_configs
+      .filter(dsl::key.eq(key))
+      .first::<ResourceConfigDbModel>(&mut conn)
+      .map_err(db_error("resource config"))?;
+    Ok::<_, HttpResponseError>(item)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  Ok(ResourceConfig::from(model))
 }
