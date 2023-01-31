@@ -1,4 +1,6 @@
-# Nanocl client
+# Nanocld client
 
-The nanocl client library writen in Rust powered by ntex !
+## Overview
 
+The nanocl deamon api client library writen in Rust powered by ntex ! </br>
+Give you a set a function to communication to the nanocl daemon with ease.
