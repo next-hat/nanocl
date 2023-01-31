@@ -1,8 +1,8 @@
-use nanocl_models::generic::GenericDelete;
 use ntex::web;
 use ntex::http::StatusCode;
 use diesel::prelude::*;
 
+use nanocl_models::generic::GenericDelete;
 use nanocl_models::cargo_config::{CargoConfig, CargoConfigPartial};
 
 use crate::utils;
@@ -173,4 +173,45 @@ pub async fn delete_by_cargo_key(
   .map_err(db_blocking_error)?;
 
   Ok(GenericDelete { count: res })
+}
+
+pub async fn list_by_cargo(
+  key: String,
+  pool: &Pool,
+) -> Result<Vec<CargoConfig>, HttpResponseError> {
+  use crate::schema::cargo_configs::dsl;
+
+  let pool = pool.to_owned();
+  let dbmodels = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let configs = dsl::cargo_configs
+      .filter(dsl::cargo_key.eq(key))
+      .get_results::<CargoConfigDbModel>(&mut conn)
+      .map_err(db_error("cargo config"))?;
+    Ok::<_, HttpResponseError>(configs)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  let configs = dbmodels
+    .into_iter()
+    .map(|dbmodel| {
+      let config = serde_json::from_value::<CargoConfigPartial>(dbmodel.config)
+        .map_err(|e| HttpResponseError {
+          status: StatusCode::INTERNAL_SERVER_ERROR,
+          msg: format!("Failed to deserialize config: {e}"),
+        })?;
+
+      Ok(CargoConfig {
+        key: dbmodel.key,
+        name: config.name,
+        cargo_key: dbmodel.cargo_key,
+        dns_entry: config.dns_entry,
+        replication: config.replication,
+        container: config.container,
+      })
+    })
+    .collect::<Result<Vec<CargoConfig>, HttpResponseError>>()?;
+
+  Ok(configs)
 }

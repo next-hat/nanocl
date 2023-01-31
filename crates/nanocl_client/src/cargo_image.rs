@@ -14,12 +14,14 @@ impl NanoclClient {
   /// ## List all cargo images
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [Vec](Vec) of [ImageSummary](bollard::models::ImageSummary)
   ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
   ///
   /// ## Example
-  /// ```rust,norun
+  ///
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -40,20 +42,24 @@ impl NanoclClient {
   }
 
   /// ## Create a cargo image
+  ///
   /// This method will create a cargo image and return a stream of [CreateImageInfo](bollard::models::CreateImageInfo)
   /// that can be used to follow the progress of the image creation.
   /// The stream will be closed when the image creation is done.
   ///
   /// ## Arguments
+  ///
   /// * [name](str) - The name of the image to create
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [mpsc::Receiver](mpsc::Receiver) of [CreateImageInfo](bollard::models::CreateImageInfo) as Stream
   ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
   ///
   /// ## Example
-  /// ```rust,norun
+  ///
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -121,18 +127,22 @@ impl NanoclClient {
   }
 
   /// ## Delete a cargo image
+  ///
   /// This method will delete a cargo image by it's name.
   ///
   /// ## Arguments
+  ///
   /// * [name](str) - The name of the image to delete
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The image was successfully deleted
   ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
   ///
   /// ## Example
-  /// ```rust,norun
+  ///
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -154,18 +164,22 @@ impl NanoclClient {
   }
 
   /// ## Inspect a cargo image
+  ///
   /// This method will inspect a cargo image by it's name.
   ///
   /// ## Arguments
+  ///
   /// * [name](str) - The name of the image to inspect
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [ImageInspect](bollard::models::ImageInspect) of the image
   ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
   ///
   /// ## Example
-  /// ```rust,norun
+  ///
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;

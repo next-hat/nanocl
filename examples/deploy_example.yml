@@ -25,3 +25,4 @@ Cargoes:
       Env :
         - NODE_ENV=production
         - APP=LANDING
+        - TEST=gg

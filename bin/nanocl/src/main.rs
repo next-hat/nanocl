@@ -36,6 +36,8 @@ async fn main() -> std::io::Result<()> {
 mod tests {
   use super::*;
 
+  use nanocl_client::NanoclClient;
+
   /// Test version command
   #[ntex::test]
   async fn test_version() {
@@ -109,6 +111,27 @@ mod tests {
       "TEST=1",
     ]);
     assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from(["nanocl", "cargo", "history", CARGO_NAME]);
+    assert!(execute_args(&args).await.is_ok());
+    let client = NanoclClient::connect_with_unix_default().await;
+    let history = client
+      .list_history_cargo(CARGO_NAME, None)
+      .await
+      .unwrap()
+      .first()
+      .unwrap()
+      .to_owned();
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "cargo",
+      "reset",
+      CARGO_NAME,
+      &history.key.to_string(),
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
     // Try to stop a cargo
     let args = Cli::parse_from(["nanocl", "cargo", "stop", CARGO_NAME]);
     assert!(execute_args(&args).await.is_ok());

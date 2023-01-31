@@ -124,6 +124,20 @@ impl From<CargoExecOpts> for CreateExecOptions<String> {
   }
 }
 
+#[derive(Debug, Parser)]
+pub struct CargoHistoryOpts {
+  /// Name of cargo to browse history
+  pub name: String,
+}
+
+#[derive(Debug, Parser)]
+pub struct CargoResetOpts {
+  /// Name of cargo to reset
+  pub name: String,
+  /// Reset to a specific historic
+  pub history_id: String,
+}
+
 #[derive(Debug, Subcommand)]
 #[clap(about, version)]
 pub enum CargoCommands {
@@ -147,6 +161,10 @@ pub enum CargoCommands {
   Image(CargoImageOpts),
   /// Execute a command insiade a cargo
   Exec(CargoExecOpts),
+  /// List cargo history
+  History(CargoHistoryOpts),
+  /// Reset cargo to a specific history
+  Reset(CargoResetOpts),
 }
 
 /// Manage cargoes

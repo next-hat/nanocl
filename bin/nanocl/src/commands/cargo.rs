@@ -8,7 +8,7 @@ use crate::error::CliError;
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
-  CargoExecOpts,
+  CargoExecOpts, CargoHistoryOpts, CargoResetOpts,
 };
 
 use super::cargo_image;
@@ -35,7 +35,7 @@ async fn exec_cargo_create(
   let item = client
     .create_cargo(&cargo, args.namespace.to_owned())
     .await?;
-  println!("{}", item.key);
+  println!("{}", &item.key);
   Ok(())
 }
 
@@ -107,7 +107,7 @@ async fn exec_cargo_inspect(
     .inspect_cargo(&options.name, args.namespace.to_owned())
     .await?;
   let cargo = serde_yaml::to_string(&cargo)?;
-  println!("{}", &cargo);
+  println!("{cargo}");
   Ok(())
 }
 
@@ -134,6 +134,31 @@ async fn exec_cargo_exec(
     }
   }
 
+  Ok(())
+}
+
+async fn exec_cargo_history(
+  client: &NanoclClient,
+  args: &CargoArgs,
+  opts: &CargoHistoryOpts,
+) -> Result<(), CliError> {
+  let histories = client
+    .list_history_cargo(&opts.name, args.namespace.to_owned())
+    .await?;
+
+  let histories = serde_yaml::to_string(&histories)?;
+  println!("{histories}");
+  Ok(())
+}
+
+async fn exec_cargo_reset(
+  client: &NanoclClient,
+  args: &CargoArgs,
+  opts: &CargoResetOpts,
+) -> Result<(), CliError> {
+  client
+    .reset_cargo(&opts.name, &opts.history_id, args.namespace.to_owned())
+    .await?;
   Ok(())
 }
 
@@ -166,6 +191,12 @@ pub async fn exec_cargo(
     }
     CargoCommands::Exec(options) => {
       exec_cargo_exec(client, args, options).await
+    }
+    CargoCommands::History(opts) => {
+      exec_cargo_history(client, args, opts).await
+    }
+    CargoCommands::Reset(options) => {
+      exec_cargo_reset(client, args, options).await
     }
   }
 }

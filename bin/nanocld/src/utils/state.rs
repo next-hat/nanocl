@@ -137,8 +137,7 @@ pub async fn revert_deployment(
   if let Some(cargoes) = data.cargoes {
     for cargo in cargoes {
       let key = utils::key::gen_key(&namespace, &cargo.name);
-      utils::cargo::stop(&key, docker_api).await?;
-      utils::cargo::delete(&key, docker_api, pool).await?;
+      utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
     }
   }
 
@@ -168,8 +167,7 @@ pub async fn revert_cargo(
 
   for cargo in data.cargoes {
     let key = utils::key::gen_key(&namespace, &cargo.name);
-    utils::cargo::stop(&key, docker_api).await?;
-    utils::cargo::delete(&key, docker_api, pool).await?;
+    utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
   }
 
   if namespace != "global" {

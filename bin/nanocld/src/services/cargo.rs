@@ -4,16 +4,17 @@
 
 use ntex::rt;
 use ntex::web;
+use ntex::http::StatusCode;
 
 use nanocl_models::system::Event;
 use nanocl_models::generic::GenericNspQuery;
 use nanocl_models::cargo::CargoExecConfig;
 use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 
-use crate::utils;
+use crate::{utils, repositories};
 use crate::event::EventEmitterPtr;
 use crate::error::HttpResponseError;
-use crate::models::Pool;
+use crate::models::{Pool, CargoResetPath};
 
 /// Endpoint to create a new cargo
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -80,7 +81,7 @@ pub async fn delete_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);
   log::debug!("Deleting cargo: {}", &key);
-  utils::cargo::delete(&key, &docker_api, &pool).await?;
+  utils::cargo::delete(&key, &docker_api, &pool, None).await?;
   rt::spawn(async move {
     event_emitter.lock().unwrap().send(Event::CargoDeleted(key));
   });
@@ -281,6 +282,47 @@ async fn exec_command(
   Ok(web::HttpResponse::Ok().streaming(steam))
 }
 
+#[web::get("/cargoes/{name}/histories")]
+async fn list_cargo_history(
+  pool: web::types::State<Pool>,
+  name: web::types::Path<String>,
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &name);
+  let histories = repositories::cargo_config::list_by_cargo(key, &pool).await?;
+  Ok(web::HttpResponse::Ok().json(&histories))
+}
+
+#[web::patch("/cargoes/{name}/histories/{id}/reset")]
+async fn reset_cargo(
+  pool: web::types::State<Pool>,
+  docker_api: web::types::State<bollard::Docker>,
+  path: web::types::Path<CargoResetPath>,
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let cargo_key = utils::key::gen_key(&namespace, &path.name);
+  log::debug!("Resetting cargo : {}", &cargo_key);
+  let config_id =
+    uuid::Uuid::parse_str(&path.id).map_err(|err| HttpResponseError {
+      status: StatusCode::BAD_REQUEST,
+      msg: format!("Invalid config id : {err}"),
+    })?;
+  let config =
+    repositories::cargo_config::find_by_key(config_id.to_owned(), &pool)
+      .await?;
+  let cargo = utils::cargo::patch(
+    &cargo_key,
+    &config.to_owned().into(),
+    &docker_api,
+    &pool,
+  )
+  .await?;
+  log::debug!("Resetting cargo : {} done", &cargo_key);
+  Ok(web::HttpResponse::Ok().json(&cargo))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
@@ -289,6 +331,8 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(patch_cargo);
   config.service(list_cargo);
   config.service(inspect_cargo);
+  config.service(list_cargo_history);
+  config.service(reset_cargo);
   config.service(exec_command);
 }
 
@@ -299,7 +343,9 @@ mod tests {
   use ntex::http::StatusCode;
   use futures::{TryStreamExt, StreamExt};
   use nanocl_models::cargo::{Cargo, CargoSummary, CargoInspect, ExecOutput};
-  use nanocl_models::cargo_config::{CargoConfigPartial, CargoConfigPatch};
+  use nanocl_models::cargo_config::{
+    CargoConfigPartial, CargoConfigPatch, CargoConfig,
+  };
 
   use crate::utils::tests::*;
   use crate::services::cargo_image::tests::ensure_test_image;
@@ -378,6 +424,22 @@ mod tests {
       patch_response.config.container.env,
       Some(vec!["TEST=1".to_string()])
     );
+
+    let mut res = srv
+      .get(format!("/cargoes/{}/histories", response.name))
+      .send()
+      .await?;
+    assert_eq!(res.status(), 200);
+    let histories = res.json::<Vec<CargoConfig>>().await?;
+    assert!(histories.len() > 1);
+
+    let id = histories[0].key;
+    let res = srv
+      .patch(format!("/cargoes/{}/histories/{id}/reset", response.name))
+      .send()
+      .await?;
+
+    assert_eq!(res.status(), 200);
 
     let res = srv
       .post(format!("/cargoes/{}/stop", response.name))

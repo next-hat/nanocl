@@ -93,3 +93,14 @@ pub struct CargoConfig {
   /// Container configuration of the cargo
   pub container: ContainerConfig<String>,
 }
+
+impl From<CargoConfig> for CargoConfigPatch {
+  fn from(cargo_config: CargoConfig) -> Self {
+    Self {
+      name: Some(cargo_config.name),
+      dns_entry: cargo_config.dns_entry,
+      container: Some(cargo_config.container),
+      replication: cargo_config.replication,
+    }
+  }
+}

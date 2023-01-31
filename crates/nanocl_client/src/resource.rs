@@ -10,13 +10,13 @@ impl NanoclClient {
   ///
   /// ## Returns
   ///
-  /// - [Result](Result) - The result of the operation
-  ///   - [Ok](Vec<Resource>) - The resources
-  ///   - [Err](NanoclClientError) - An error if the operation failed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Vec<Resource>) - The resources
+  ///   * [Err](NanoclClientError) - An error if the operation failed
   ///
   /// ## Example
   ///
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -39,17 +39,17 @@ impl NanoclClient {
   ///
   /// ## Arguments
   ///
-  /// - [data](ResourcePartial) - The data of the resource to create
+  /// * [data](ResourcePartial) - The data of the resource to create
   ///
   /// ## Returns
   ///
-  /// - [Result](Result) - The result of the operation
-  ///   - [Ok](Resource) - The created resource
-  ///   - [Err](NanoclClientError) - An error if the operation failed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Resource) - The created resource
+  ///   * [Err](NanoclClientError) - An error if the operation failed
   ///
   /// ## Example
   ///
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   /// use nanocl_models::resource::ResourceKind;
   ///
@@ -79,17 +79,17 @@ impl NanoclClient {
   ///
   /// ## Arguments
   ///
-  /// - [key](str) - The key of the resource to inspect
+  /// * [key](str) - The key of the resource to inspect
   ///
   /// ## Returns
   ///
-  /// - [Result](Result) - The result of the operation
-  ///   - [Ok](Resource) - The inspected resource
-  ///   - [Err](NanoclClientError) - An error if the operation failed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Resource) - The inspected resource
+  ///   * [Err](NanoclClientError) - An error if the operation failed
   ///
   /// ## Example
   ///
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -113,18 +113,18 @@ impl NanoclClient {
   ///
   /// ## Arguments
   ///
-  /// - [key](str) - The key of the resource to patch
-  /// - [data](ResourcePartial) - The data to patch
+  /// * [key](str) - The key of the resource to patch
+  /// * [data](ResourcePartial) - The data to patch
   ///
   /// ## Returns
   ///
-  /// - [Result](Result) - The result of the operation
-  ///  - [Ok](Resource) - The patched resource
-  /// - [Err](NanoclClientError) - An error if the operation failed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Resource) - The patched resource
+  ///   * [Err](NanoclClientError) - An error if the operation failed
   ///
   /// ## Example
   ///
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
@@ -152,17 +152,17 @@ impl NanoclClient {
   ///
   /// ## Arguments
   ///
-  /// - [key](str) - The key of the resource to delete
+  /// * [key](str) - The key of the resource to delete
   ///
   /// ## Returns
   ///
-  /// - [Result](Result) - The result of the operation
-  ///   - [Ok](()) - The operation succeeded
-  ///   - [Err](NanoclClientError) - An error if the operation failed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok(())) - The operation succeeded
+  ///   * [Err](NanoclClientError) - An error if the operation failed
   ///
   /// ## Example
   ///
-  /// ```rust,norun
+  /// ```no_run,ignore
   /// use nanocl_client::NanoclClient;
   ///
   /// let client = NanoclClient::connect_with_unix_default().await;
