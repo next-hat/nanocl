@@ -54,7 +54,7 @@ async fn exec_cargo_list(
   client: &NanoclClient,
   args: &CargoArgs,
 ) -> Result<(), CliError> {
-  let items = client.list_cargoes(args.namespace.to_owned()).await?;
+  let items = client.list_cargo(args.namespace.to_owned()).await?;
 
   let rows = items
     .into_iter()

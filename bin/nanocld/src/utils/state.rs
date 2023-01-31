@@ -147,10 +147,6 @@ pub async fn revert_deployment(
     }
   }
 
-  if namespace != "global" {
-    utils::namespace::delete_by_name(&namespace, docker_api, pool).await?;
-  }
-
   Ok(())
 }
 
@@ -168,10 +164,6 @@ pub async fn revert_cargo(
   for cargo in data.cargoes {
     let key = utils::key::gen_key(&namespace, &cargo.name);
     utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
-  }
-
-  if namespace != "global" {
-    utils::namespace::delete_by_name(&namespace, docker_api, pool).await?;
   }
 
   Ok(())

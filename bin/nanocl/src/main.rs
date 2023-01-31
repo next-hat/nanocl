@@ -11,7 +11,7 @@ use error::CliError;
 use models::{Cli, Commands};
 
 async fn execute_args(args: &Cli) -> Result<(), CliError> {
-  let client = NanoclClient::connect_with_unix_default().await;
+  let client = NanoclClient::connect_with_unix_default();
   match &args.command {
     Commands::Setup(args) => commands::exec_setup(args).await,
     Commands::Namespace(args) => commands::exec_namespace(&client, args).await,
@@ -114,7 +114,7 @@ mod tests {
 
     let args = Cli::parse_from(["nanocl", "cargo", "history", CARGO_NAME]);
     assert!(execute_args(&args).await.is_ok());
-    let client = NanoclClient::connect_with_unix_default().await;
+    let client = NanoclClient::connect_with_unix_default();
     let history = client
       .list_history_cargo(CARGO_NAME, None)
       .await
@@ -165,7 +165,7 @@ mod tests {
       Cli::parse_from(["nanocl", "resource", "history", "resource-example"]);
     assert!(execute_args(&args).await.is_ok());
 
-    let client = NanoclClient::connect_with_unix_default().await;
+    let client = NanoclClient::connect_with_unix_default();
     let history = client
       .list_history_resource("resource-example")
       .await

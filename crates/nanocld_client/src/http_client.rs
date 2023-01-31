@@ -2,13 +2,14 @@ use ntex::rt;
 use ntex::http::Client;
 use ntex::http::client::{Connector, ClientRequest};
 
+#[derive(Clone)]
 pub struct NanoclClient {
   client: Client,
   url: String,
 }
 
 impl NanoclClient {
-  pub async fn connect_with_unix_default() -> Self {
+  pub fn connect_with_unix_default() -> Self {
     let client = Client::build()
       .connector(
         Connector::default()

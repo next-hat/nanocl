@@ -29,7 +29,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let new_cargo = CargoConfigPartial {
   ///  name: String::from("my-cargo"),
   ///  container: bollard::container::Config {
@@ -73,7 +73,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// client.delete_cargo("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -109,7 +109,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let cargo = client.inspect_cargo("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -146,7 +146,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// client.start_cargo("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -182,7 +182,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// client.stop_cargo("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -217,11 +217,11 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let cargoes = client.list_cargoes(None).await.unwrap();
   /// ```
   ///
-  pub async fn list_cargoes(
+  pub async fn list_cargo(
     &self,
     namespace: Option<String>,
   ) -> Result<Vec<CargoSummary>, NanoclClientError> {
@@ -255,7 +255,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let cargo_config = CargoConfigPatch {
   ///   name: "my-cargo-renamed".into(),
   /// };
@@ -300,7 +300,7 @@ impl NanoclClient {
   /// use nanocld_client::NanoclClient;
   /// use nanocld_client::models::cargo_config::CargoExecConfig;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let exec = CargoExecConfig {
   ///  cmd: vec!["echo".into(), "hello".into()],
   /// ..Default::default()
@@ -364,7 +364,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let histories = client.list_history("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -402,7 +402,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let cargo = client.reset_cargo("my-cargo", "my-history-id", None).await.unwrap();
   /// ```
   ///
@@ -433,9 +433,9 @@ mod tests {
   #[ntex::test]
   async fn test_basic() {
     const CARGO_NAME: &str = "client-test-cargo";
-    let client = NanoclClient::connect_with_unix_default().await;
+    let client = NanoclClient::connect_with_unix_default();
 
-    client.list_cargoes(None).await.unwrap();
+    client.list_cargo(None).await.unwrap();
 
     let new_cargo = CargoConfigPartial {
       name: CARGO_NAME.into(),
@@ -479,7 +479,7 @@ mod tests {
 
   #[ntex::test]
   async fn test_create_cargo_wrong_image() {
-    let client = NanoclClient::connect_with_unix_default().await;
+    let client = NanoclClient::connect_with_unix_default();
 
     let new_cargo = CargoConfigPartial {
       name: "client-test-cargowi".into(),
@@ -500,7 +500,7 @@ mod tests {
 
   #[ntex::test]
   async fn test_create_cargo_duplicate_name() {
-    let client = NanoclClient::connect_with_unix_default().await;
+    let client = NanoclClient::connect_with_unix_default();
 
     let new_cargo = CargoConfigPartial {
       name: "client-test-cargodup".into(),
@@ -527,7 +527,7 @@ mod tests {
 
   #[ntex::test]
   async fn test_exec_cargo() {
-    let client = NanoclClient::connect_with_unix_default().await;
+    let client = NanoclClient::connect_with_unix_default();
 
     let exec = CargoExecConfig {
       cmd: Some(vec!["echo".into(), "hello".into()]),

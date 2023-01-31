@@ -50,7 +50,8 @@ async fn create_instance(
   cargo: &Cargo,
   number: i64,
   docker_api: &bollard::Docker,
-) -> Result<(), HttpResponseError> {
+) -> Result<Vec<String>, HttpResponseError> {
+  let mut instances = Vec::new();
   for current in 0..number {
     let name = if current > 0 {
       format!("{}-{}", cargo.key, current)
@@ -89,16 +90,17 @@ async fn create_instance(
       ..cargo.config.container.to_owned()
     };
 
-    docker_api
+    let res = docker_api
       .create_container::<String, String>(Some(create_options), config)
       .await
       .map_err(|e| HttpResponseError {
         msg: format!("Unable to create container: {e}"),
         status: StatusCode::BAD_REQUEST,
       })?;
+    instances.push(res.id);
   }
 
-  Ok(())
+  Ok(instances)
 }
 
 /// ## List containers based on the cargo key
@@ -356,10 +358,66 @@ pub async fn patch(
   }
 
   // Create instance with the new config
-  create_instance(&cargo, 1, docker_api).await?;
+  let new_instances = match create_instance(&cargo, 1, docker_api).await {
+    Err(err) => {
+      // If the creation of the new instance failed, we rename the old containers
+      for container in containers.iter().cloned() {
+        let names = container.names.unwrap_or_default();
+        let name = names[0].replace("-backup", "");
+
+        docker_api
+          .rename_container(
+            &container.id.unwrap_or_default(),
+            bollard::container::RenameContainerOptions { name },
+          )
+          .await
+          .map_err(|e| HttpResponseError {
+            msg: format!("Unable to rename container got error : {e}"),
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+          })?;
+        log::error!("Unable to create cargo instance {} : {err}", cargo.key);
+      }
+      Vec::new()
+    }
+    Ok(instances) => instances,
+  };
 
   // start created containers
-  start(cargo_key, docker_api).await?;
+  if let Err(err) = start(cargo_key, docker_api).await {
+    log::error!("Unable to start cargo instance {} : {err}", cargo.key);
+    // If the start of the new instance failed, we remove the new containers
+    for instance in new_instances {
+      docker_api
+        .remove_container(
+          &instance,
+          Some(RemoveContainerOptions {
+            force: true,
+            ..Default::default()
+          }),
+        )
+        .await
+        .map_err(|e| HttpResponseError {
+          msg: format!("Unable to remove container got error : {e}"),
+          status: StatusCode::INTERNAL_SERVER_ERROR,
+        })?;
+    }
+    // We rename the old containers
+    for container in containers.iter().cloned() {
+      let names = container.names.unwrap_or_default();
+      let name = names[0].replace("-backup", "");
+
+      docker_api
+        .rename_container(
+          &container.id.unwrap_or_default(),
+          bollard::container::RenameContainerOptions { name },
+        )
+        .await
+        .map_err(|e| HttpResponseError {
+          msg: format!("Unable to rename container got error : {e}"),
+          status: StatusCode::INTERNAL_SERVER_ERROR,
+        })?;
+    }
+  }
 
   // Delete old containers
   for container in containers {

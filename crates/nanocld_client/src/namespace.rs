@@ -18,7 +18,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let namespaces = client.list_namespace().await;
   /// ```
   ///
@@ -80,7 +80,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let namespace = client.inspect_namespace("my-namespace").await?;
   /// ```
   ///
@@ -119,7 +119,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// client.delete_namespace("my-namespace").await?;
   /// ```
   ///
@@ -142,7 +142,7 @@ mod tests {
   #[ntex::test]
   async fn test_basic() {
     const NAMESPACE: &str = "clientnt";
-    let client = NanoclClient::connect_with_unix_default().await;
+    let client = NanoclClient::connect_with_unix_default();
 
     client.list_namespace().await.unwrap();
 

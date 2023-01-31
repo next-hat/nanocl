@@ -22,7 +22,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let version = client.get_version().await;
   /// ```
   ///
@@ -52,7 +52,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let mut stream = client.watch_events().await?;
   /// while let Some(event) = stream.next().await {
   ///  println!("{:?}", event);
@@ -84,6 +84,14 @@ impl NanoclClient {
 
     Ok(rx)
   }
+
+  pub async fn ping(&self) -> Result<(), NanoclClientError> {
+    let mut res = self.get(String::from("/_ping")).send().await?;
+    let status = res.status();
+
+    is_api_error(&mut res, &status).await?;
+    Ok(())
+  }
 }
 
 #[cfg(test)]
@@ -92,7 +100,7 @@ mod tests {
 
   #[ntex::test]
   async fn test_get_version() {
-    let client = NanoclClient::connect_with_unix_default().await;
+    let client = NanoclClient::connect_with_unix_default();
     let version = client.get_version().await;
 
     assert!(version.is_ok());
@@ -100,7 +108,7 @@ mod tests {
 
   #[ntex::test]
   async fn test_watch_events() {
-    let client = NanoclClient::connect_with_unix_default().await;
+    let client = NanoclClient::connect_with_unix_default();
     let _stream = client.watch_events().await.unwrap();
     // Todo : find a way to test this on CI because it's limited to 2 threads
     // let _event = stream.next().await.unwrap();

@@ -19,7 +19,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let namespaces = client.list_resource().await;
   /// ```
   ///
@@ -53,7 +53,7 @@ impl NanoclClient {
   /// use nanocld_client::NanoclClient;
   /// use nanocl_stubs::resource::ResourceKind;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let resource = client.create_resource(&ResourcePartial {
   ///   name: "my-resource".into(),
   ///   kind: ResourceKind::ProxyRules,
@@ -92,7 +92,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let resource = client.inspect_resource("my-resource").await;
   /// ```
   ///
@@ -127,7 +127,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let resource = client.patch_resource("my-resource", serde_json::json!({})).await;
   /// ```
   ///
@@ -165,7 +165,7 @@ impl NanoclClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanoclClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default().await;
+  /// let client = NanoclClient::connect_with_unix_default();
   /// let resource = client.delete_resource("my-resource").await;
   /// ```
   ///
@@ -217,7 +217,7 @@ mod tests {
 
   #[ntex::test]
   async fn test_basic() {
-    let client = NanoclClient::connect_with_unix_default().await;
+    let client = NanoclClient::connect_with_unix_default();
 
     // list
     client.list_resource().await.unwrap();
