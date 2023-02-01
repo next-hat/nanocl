@@ -5,7 +5,7 @@ use clap::*;
 
 include!("./src/cli.rs");
 
-const MAN_PATH: &str = "../../target/man";
+const MAN_PATH: &str = "./target/man";
 
 /// Set the git commit hash as an environment variable
 fn set_env_git_commit_hash() -> Result<()> {
