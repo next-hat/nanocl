@@ -15,73 +15,7 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use nanocl_stubs::system::Event;
 
-#[derive(Clone, Default)]
-pub struct EventEmitter {
-  clients: Vec<Sender<Bytes>>,
-}
-
-pub type EventEmitterPtr = Arc<Mutex<EventEmitter>>;
-
-impl EventEmitter {
-  async fn handle_event(&mut self, e: Event) {
-    log::debug!("Sending events {:#?} to clients {:#?}", &e, &self.clients);
-    let mut data = serde_json::to_vec(&e).unwrap();
-    data.push(b'\n');
-    let bytes = Bytes::from(data);
-    let mut stream = stream::iter(self.clients.to_owned());
-    while let Some(client) = stream.next().await {
-      client.send(bytes.to_owned()).await.unwrap_or(());
-    }
-  }
-
-  fn add_client(&mut self, client: Sender<Bytes>) {
-    self.clients.push(client);
-  }
-
-  fn check_connection(&mut self) {
-    let mut alive_clients = Vec::new();
-    for client in &self.clients {
-      let result = client.clone().try_send(Bytes::from(""));
-      if let Ok(()) = result {
-        alive_clients.push(client.clone());
-      }
-    }
-    log::debug!("alive clients : {:#?}", &alive_clients.len());
-    self.clients = alive_clients;
-  }
-
-  fn spawn_check_connection(this: Arc<Mutex<Self>>) {
-    rt::spawn(async move {
-      loop {
-        let task = interval(Duration::from_secs(10));
-        task.tick().await;
-        this.lock().unwrap().check_connection();
-      }
-    });
-  }
-
-  pub fn new() -> Arc<Mutex<EventEmitter>> {
-    let event_emitter = Arc::new(Mutex::new(EventEmitter::default()));
-
-    Self::spawn_check_connection(event_emitter.to_owned());
-    event_emitter
-  }
-
-  pub fn send(&mut self, e: Event) {
-    let mut this = self.to_owned();
-    rt::spawn(async move {
-      this.handle_event(e).await;
-    });
-  }
-
-  pub fn subscribe(&mut self) -> Client {
-    let (client_sender, client_receiver) = channel::<Bytes>(100);
-    self.add_client(client_sender);
-    Client(client_receiver)
-  }
-}
-
-// wrap Receiver in own type, with correct error type
+// Wrap Receiver in our own type, with correct error type
 pub struct Client(Receiver<Bytes>);
 
 impl Stream for Client {
@@ -96,6 +30,79 @@ impl Stream for Client {
       Poll::Ready(None) => Poll::Ready(None),
       Poll::Pending => Poll::Pending,
     }
+  }
+}
+
+#[derive(Clone, Default)]
+pub struct EventEmitter {
+  clients: Vec<Sender<Bytes>>,
+}
+
+pub type EventEmitterPtr = Arc<Mutex<EventEmitter>>;
+
+impl EventEmitter {
+  /// Convert an event to a string and send it to all clients
+  async fn handle_event(&mut self, e: Event) {
+    log::debug!("Sending events {:#?} to clients {:#?}", &e, &self.clients);
+    let mut data = serde_json::to_vec(&e).unwrap();
+    data.push(b'\n');
+    let bytes = Bytes::from(data);
+    let mut stream = stream::iter(self.clients.to_owned());
+    while let Some(client) = stream.next().await {
+      client.send(bytes.to_owned()).await.unwrap_or(());
+    }
+  }
+
+  /// Add a client to the list of clients
+  fn add_client(&mut self, client: Sender<Bytes>) {
+    self.clients.push(client);
+  }
+
+  /// Check if clients are still connected
+  fn check_connection(&mut self) {
+    let mut alive_clients = Vec::new();
+    for client in &self.clients {
+      let result = client.clone().try_send(Bytes::from(""));
+      if let Ok(()) = result {
+        alive_clients.push(client.clone());
+      }
+    }
+    log::debug!("alive clients : {:#?}", &alive_clients.len());
+    self.clients = alive_clients;
+  }
+
+  /// Spawn a task that will check if clients are still connected
+  fn spawn_check_connection(this: Arc<Mutex<Self>>) {
+    rt::spawn(async move {
+      loop {
+        let task = interval(Duration::from_secs(10));
+        task.tick().await;
+        this.lock().unwrap().check_connection();
+      }
+    });
+  }
+
+  /// Create a new event emitter
+  pub fn new() -> Arc<Mutex<EventEmitter>> {
+    let event_emitter = Arc::new(Mutex::new(EventEmitter::default()));
+
+    Self::spawn_check_connection(event_emitter.to_owned());
+    event_emitter
+  }
+
+  /// Send an event to all clients
+  pub fn send(&mut self, e: Event) {
+    let mut this = self.to_owned();
+    rt::spawn(async move {
+      this.handle_event(e).await;
+    });
+  }
+
+  /// Subscribe to events
+  pub fn subscribe(&mut self) -> Client {
+    let (client_sender, client_receiver) = channel::<Bytes>(100);
+    self.add_client(client_sender);
+    Client(client_receiver)
   }
 }
 
