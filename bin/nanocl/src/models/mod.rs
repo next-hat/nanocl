@@ -1,4 +1,3 @@
-mod setup;
 mod namespace;
 mod cargo;
 mod cargo_image;
@@ -6,7 +5,6 @@ mod resource;
 mod version;
 mod state;
 
-pub use setup::*;
 pub use namespace::*;
 pub use cargo::*;
 pub use cargo_image::*;
@@ -38,8 +36,6 @@ pub enum Commands {
   Resource(ResourceArgs),
   /// Watch daemon events
   Events,
-  /// Setup nanocl
-  Setup(SetupArgs),
   /// Apply or Reverse a state from a configuration file
   State(StateArgs),
   /// Show nanocl version information

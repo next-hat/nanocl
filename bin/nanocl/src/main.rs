@@ -13,7 +13,6 @@ use models::{Cli, Commands};
 async fn execute_args(args: &Cli) -> Result<(), CliError> {
   let client = NanoclClient::connect_with_unix_default();
   match &args.command {
-    Commands::Setup(args) => commands::exec_setup(args).await,
     Commands::Namespace(args) => commands::exec_namespace(&client, args).await,
     Commands::Resource(args) => commands::exec_resource(&client, args).await,
     Commands::Cargo(args) => commands::exec_cargo(&client, args).await,
@@ -269,13 +268,6 @@ mod tests {
       "-f",
       "../../examples/cargo_example.yml",
     ]);
-    assert!(execute_args(&args).await.is_ok());
-  }
-
-  /// Test Setup command
-  #[ntex::test]
-  async fn test_setup() {
-    let args = Cli::parse_from(["nanocl", "setup"]);
     assert!(execute_args(&args).await.is_ok());
   }
 }
