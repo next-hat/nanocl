@@ -76,6 +76,8 @@ async fn create_instance(
     // Merge the cargo config with the container config
     // And set his network mode to the cargo namespace
     let config = bollard::container::Config {
+      attach_stderr: Some(true),
+      attach_stdout: Some(true),
       labels: Some(labels),
       host_config: Some(HostConfig {
         network_mode: Some(cargo.namespace_name.to_owned()),

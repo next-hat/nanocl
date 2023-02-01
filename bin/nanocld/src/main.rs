@@ -34,7 +34,10 @@ async fn main() -> std::io::Result<()> {
   if std::env::var("LOG_LEVEL").is_err() {
     std::env::set_var("LOG_LEVEL", "nanocld=info,warn,error,nanocld=debug");
   }
-  env_logger::Builder::new().parse_env("LOG_LEVEL").init();
+  env_logger::Builder::new()
+    .parse_env("LOG_LEVEL")
+    .format_target(false)
+    .init();
 
   let config = match config::init(&args) {
     Err(err) => {
@@ -59,14 +62,15 @@ async fn main() -> std::io::Result<()> {
   }
 
   match server::generate(daemon_state).await {
-    Err(_err) => {
+    Err(err) => {
+      log::error!("Error while generating server {err}");
       std::process::exit(1);
     }
     Ok(server) => {
       // Start http server and wait for shutdown
       // Server should never shutdown unless it's explicitly asked
       if let Err(err) = server.await {
-        log::error!("Error while running server {}", &err);
+        log::error!("Error while running server {err}");
         std::process::exit(1);
       }
     }
