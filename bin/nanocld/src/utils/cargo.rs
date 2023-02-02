@@ -78,6 +78,7 @@ async fn create_instance(
     let config = bollard::container::Config {
       attach_stderr: Some(true),
       attach_stdout: Some(true),
+      tty: Some(true),
       labels: Some(labels),
       host_config: Some(HostConfig {
         network_mode: Some(cargo.namespace_name.to_owned()),
