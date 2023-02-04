@@ -10,7 +10,6 @@ use bollard::image::ImportImageOptions;
 use bollard::errors::Error;
 
 use std::default::Default;
-use futures_util::stream::StreamExt;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio_util::codec;
@@ -131,23 +130,14 @@ async fn import_images(
     buf.extend_from_slice(&item);
   }
 
-  let byte_stream =
-    codec::FramedRead::new(buf, codec::BytesCodec::new()).map(|r| {
-      let bytes = r.unwrap().freeze();
-      Ok::<_, Error>(bytes)
-    });
-  let body = hyper::Body::wrap_stream(byte_stream);
-  let options = ImportImageOptions {
-    ..Default::default()
-  };
-  let result = docker_api.import_image(options, body, None);
-  match result {
-    Ok(output) => Ok(web::HttpResponse::Ok().body(output)),
-    Err(e) => {
-      println!("Error while importing image: {}", e);
-      Ok(web::HttpResponse::InternalServerError().body(e.to_string()))
-    }
+  let byte_stream = hyper::body::Bytes::from(buf.to_vec());
+  let body = hyper::Body::from(byte_stream);
+  let options = ImportImageOptions { quiet: false };
+  let mut stream = docker_api.import_image(options, body, None);
+  while let Some(Ok(res)) = stream.next().await {
+    log::debug!("Import image: {:?}", res);
   }
+  Ok(web::HttpResponse::Ok().into())
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
