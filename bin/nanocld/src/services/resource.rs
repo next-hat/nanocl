@@ -1,10 +1,11 @@
+use ntex::http::StatusCode;
 /*
 * Endpoints to manipulate resources
 */
 use ntex::{web, rt};
 
 use nanocl_stubs::system::Event;
-use nanocl_stubs::resource::ResourcePartial;
+use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
 use crate::repositories;
 use crate::event::EventEmitterPtr;
@@ -90,10 +91,11 @@ pub async fn delete_resource(
 #[web::get("/resources")]
 pub async fn list_resource(
   pool: web::types::State<Pool>,
+  web::types::Query(query): web::types::Query<ResourceQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  log::debug!("Listing resources");
-  let items = repositories::resource::find(&pool).await?;
-  log::debug!("Resources found : {:#?}", &items);
+  log::debug!("Listing resources with query: {query:#?}");
+  let items = repositories::resource::find(&pool, Some(query)).await?;
+  log::debug!("Found {} resources", &items.len());
   Ok(web::HttpResponse::Ok().json(&items))
 }
 

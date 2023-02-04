@@ -37,3 +37,23 @@ pub enum Event {
   /// ResourcePatched is sent when a resource is patched
   ResourcePatched(Box<Resource>),
 }
+
+impl std::fmt::Display for Event {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    match self {
+      Event::NamespaceCreated(key) => write!(f, "NamespaceCreated({key})"),
+      Event::CargoCreated(cargo) => write!(f, "CargoCreated({})", cargo.key),
+      Event::CargoDeleted(key) => write!(f, "CargoDeleted({key})"),
+      Event::CargoStarted(cargo) => write!(f, "CargoStarted({})", cargo.key),
+      Event::CargoStopped(cargo) => write!(f, "CargoStopped({})", cargo.key),
+      Event::CargoPatched(cargo) => write!(f, "CargoPatched({})", cargo.key),
+      Event::ResourceCreated(resource) => {
+        write!(f, "ResourceCreated({})", resource.name)
+      }
+      Event::ResourceDeleted(key) => write!(f, "ResourceDeleted({key})"),
+      Event::ResourcePatched(resource) => {
+        write!(f, "ResourcePatched({})", resource.name)
+      }
+    }
+  }
+}

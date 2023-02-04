@@ -1,3 +1,5 @@
+use std::default;
+
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
@@ -149,4 +151,10 @@ pub struct ResourceConfig {
   pub key: uuid::Uuid,
   pub resource_key: String,
   pub data: serde_json::Value,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct ResourceQuery {
+  pub kind: Option<ResourceKind>,
+  pub contains: Option<String>,
 }

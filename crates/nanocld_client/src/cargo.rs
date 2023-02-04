@@ -330,6 +330,7 @@ impl NanoclClient {
     rt::spawn(async move {
       let mut payload: Vec<u8> = Vec::new();
       while let Some(Ok(item)) = stream.next().await {
+        println!("item: {item:?}");
         payload.extend(&item);
         if item.last() == Some(&b'\n') {
           let Ok(item) = serde_json::from_slice::<ExecOutput>(&payload) else {

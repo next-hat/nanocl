@@ -29,6 +29,7 @@ pub fn parse_state(
           status: StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
+      println!("data: {data:#?}");
       Ok(StateData::Deployment(data))
     }
     "Cargo" => {
@@ -103,6 +104,7 @@ pub async fn apply_deployment(
   }
 
   if let Some(resources) = data.resources {
+    println!("Resources: {resources:#?}");
     for resource in resources {
       let key = resource.name.to_owned();
       repositories::resource::create_or_patch(&resource, pool).await?;
