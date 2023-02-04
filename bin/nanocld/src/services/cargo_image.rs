@@ -199,6 +199,14 @@ pub mod tests {
     Ok(())
   }
 
+  /// Test to import cargo image
+  pub async fn test_import_images(
+    srv: &TestServer,
+    payload: &[u8],
+  ) -> TestReqRet {
+    srv.post("/cargoes/images/import").send_body(payload).await
+  }
+
   /// Basic test to list cargo images
   #[ntex::test]
   pub async fn basic_list() -> TestRet {
@@ -235,6 +243,16 @@ pub mod tests {
       status
     );
 
+    Ok(())
+  }
+
+  /// Basic test for importing cargo image
+  #[ntex::test]
+  pub async fn test_import_images() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+    let payload = vec![1, 2, 3];
+    let res = test_import_images(&srv, &payload).await?;
+    assert_eq!(res.status(), StatusCode::OK);
     Ok(())
   }
 
