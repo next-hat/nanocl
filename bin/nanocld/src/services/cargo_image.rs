@@ -3,7 +3,7 @@
 */
 use ntex::web;
 
-use nanocl_stubs::cargo_image::CargoImagePartial;
+use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
 
 use crate::utils;
 use crate::error::HttpResponseError;
@@ -20,8 +20,9 @@ use crate::error::HttpResponseError;
 #[web::get("/cargoes/images")]
 async fn list_cargo_image(
   docker_api: web::types::State<bollard::Docker>,
+  web::types::Query(query): web::types::Query<ListCargoImagesOptions>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let images = utils::cargo_image::list(&docker_api).await?;
+  let images = utils::cargo_image::list(&docker_api, query.into()).await?;
 
   Ok(web::HttpResponse::Ok().json(&images))
 }
