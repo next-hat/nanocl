@@ -1,18 +1,11 @@
-use futures::StreamExt;
 /*
 * Endpoints to manipulate cargo images
 */
 use ntex::web;
+use futures::StreamExt;
+use bollard::image::ImportImageOptions;
 
 use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
-
-use bollard::image::ImportImageOptions;
-use bollard::errors::Error;
-
-use std::default::Default;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
-use tokio_util::codec;
 
 use crate::utils;
 use crate::error::HttpResponseError;
