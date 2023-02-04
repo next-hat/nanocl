@@ -20,7 +20,7 @@ use super::utils::print_table;
 async fn exec_cargo_instance_list(
   client: &NanoclClient,
 ) -> Result<(), CliError> {
-  let items = client.list_cargo_image().await?;
+  let items = client.list_cargo_image(None).await?;
   let rows = items
     .into_iter()
     .map(CargoImageRow::from)

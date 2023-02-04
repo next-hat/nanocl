@@ -1376,7 +1376,7 @@ dependencies = [
  "futures",
  "hyper",
  "indicatif",
- "nanocl_stubs",
+ "nanocl_stubs 0.0.1",
  "nanocld_client",
  "ntex",
  "serde",
@@ -1394,6 +1394,18 @@ dependencies = [
 [[package]]
 name = "nanocl_stubs"
 version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da3df0c2a32f611638e10aa41d254293608035401f4524ea8ec87549d3421137"
+dependencies = [
+ "bollard",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "nanocl_stubs"
+version = "0.0.2"
 dependencies = [
  "bollard",
  "serde",
@@ -1414,7 +1426,7 @@ dependencies = [
  "env_logger",
  "futures",
  "log",
- "nanocl_stubs",
+ "nanocl_stubs 0.0.2",
  "ntex",
  "r2d2",
  "rustls",
@@ -1435,7 +1447,7 @@ version = "0.0.2"
 dependencies = [
  "bollard",
  "futures",
- "nanocl_stubs",
+ "nanocl_stubs 0.0.2",
  "ntex",
  "serde",
  "serde_json",

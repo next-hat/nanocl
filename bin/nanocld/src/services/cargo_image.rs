@@ -1,3 +1,4 @@
+use futures::StreamExt;
 /*
 * Endpoints to manipulate cargo images
 */
@@ -101,11 +102,27 @@ async fn delete_cargo_image_by_name(
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
+#[web::post("/cargoes/images/import")]
+async fn import_images(
+  docker_api: web::types::State<bollard::Docker>,
+  mut payload: web::types::Payload,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let mut buf = ntex::util::BytesMut::new();
+  while let Some(Ok(item)) = payload.next().await {
+    buf.extend_from_slice(&item);
+  }
+
+  // docker_api.import_image(options, root_fs, credentials)
+
+  Ok(web::HttpResponse::Ok().into())
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_cargo_image);
   config.service(create_cargo_image);
   config.service(delete_cargo_image_by_name);
   config.service(inspect_cargo_image);
+  config.service(import_images);
 }
 
 /// Cargo image unit tests
