@@ -6,6 +6,15 @@ use ntex::web;
 
 use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
 
+use bollard::image::ImportImageOptions;
+use bollard::errors::Error;
+
+use std::default::Default;
+use futures_util::stream::StreamExt;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use tokio_util::codec;
+
 use crate::utils;
 use crate::error::HttpResponseError;
 
@@ -36,7 +45,7 @@ async fn list_cargo_image(
     ("id_or_name" = String, Path, description = "id or name of the image"),
   ),
   responses(
-    (status = 200, description = "Advenced information about a given cargo image", body = ImageInspect),
+    (status = 200, description = "Advanced information about a given cargo image", body = ImageInspect),
     (status = 400, description = "Generic database error", body = ApiError),
     (status = 404, description = "Image id or name not valid", body = ApiError),
   ),
@@ -102,6 +111,16 @@ async fn delete_cargo_image_by_name(
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
+/// Endpoint to import a cargo image
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  path = "/cargoes/images/import",
+  descriptions(
+    (status = 200, description = "Image import successful", body = GenericImport),
+    (status = 400, description = "Invalid image data", body = ApiError),
+    (status = 404, description = "Image data not found", body = ApiError),
+  ),
+))]
 #[web::post("/cargoes/images/import")]
 async fn import_images(
   docker_api: web::types::State<bollard::Docker>,
@@ -112,9 +131,23 @@ async fn import_images(
     buf.extend_from_slice(&item);
   }
 
-  // docker_api.import_image(options, root_fs, credentials)
-
-  Ok(web::HttpResponse::Ok().into())
+  let byte_stream =
+    codec::FramedRead::new(buf, codec::BytesCodec::new()).map(|r| {
+      let bytes = r.unwrap().freeze();
+      Ok::<_, Error>(bytes)
+    });
+  let body = hyper::Body::wrap_stream(byte_stream);
+  let options = ImportImageOptions {
+    ..Default::default()
+  };
+  let result = docker_api.import_image(options, body, None);
+  match result {
+    Ok(output) => Ok(web::HttpResponse::Ok().body(output)),
+    Err(e) => {
+      println!("Error while importing image: {}", e);
+      Ok(web::HttpResponse::InternalServerError().body(e.to_string()))
+    }
+  }
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {

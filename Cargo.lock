@@ -1049,9 +1049,9 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
-version = "0.14.23"
+version = "0.14.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "034711faac9d2166cb1baf1a2fb0b60b1f277f8492fd72176c17f3515e1abd3c"
+checksum = "5e011372fa0b68db8350aa7a248930ecc7839bf46d8485577d69f117a75f164c"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -1376,8 +1376,7 @@ dependencies = [
  "futures",
  "hyper",
  "indicatif",
- "nanocl_stubs 0.0.1",
- "nanocl_stubs 0.0.2",
+ "nanocl_stubs",
  "nanocld_client",
  "ntex",
  "serde",
@@ -1390,18 +1389,6 @@ dependencies = [
  "tokio-util",
  "url",
  "users",
-]
-
-[[package]]
-name = "nanocl_stubs"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da3df0c2a32f611638e10aa41d254293608035401f4524ea8ec87549d3421137"
-dependencies = [
- "bollard",
- "serde",
- "serde_json",
- "uuid",
 ]
 
 [[package]]
@@ -1426,8 +1413,10 @@ dependencies = [
  "diesel_migrations",
  "env_logger",
  "futures",
+ "futures-util",
+ "hyper",
  "log",
- "nanocl_stubs 0.0.2",
+ "nanocl_stubs",
  "ntex",
  "r2d2",
  "rustls",
@@ -1437,6 +1426,7 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "tokio",
+ "tokio-util",
  "url",
  "utoipa",
  "uuid",
@@ -1448,7 +1438,7 @@ version = "0.0.2"
 dependencies = [
  "bollard",
  "futures",
- "nanocl_stubs 0.0.2",
+ "nanocl_stubs",
  "ntex",
  "serde",
  "serde_json",
