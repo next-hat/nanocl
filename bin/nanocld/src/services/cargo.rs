@@ -81,9 +81,13 @@ pub async fn delete_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);
   log::debug!("Deleting cargo: {}", &key);
+  let cargo = utils::cargo::inspect(&key, &docker_api, &pool).await?;
   utils::cargo::delete(&key, &docker_api, &pool, None).await?;
   rt::spawn(async move {
-    event_emitter.lock().unwrap().send(Event::CargoDeleted(key));
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoDeleted(Box::new(cargo)));
   });
   Ok(web::HttpResponse::NoContent().finish())
 }

@@ -1,8 +1,7 @@
-use ntex::http::StatusCode;
 /*
 * Endpoints to manipulate resources
 */
-use ntex::{web, rt};
+use ntex::{rt, web};
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
@@ -65,6 +64,8 @@ pub async fn delete_resource(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let key = name.into_inner();
   log::debug!("Deleting resource: {}", &key);
+  let resource =
+    repositories::resource::inspect_by_key(key.to_owned(), &pool).await?;
   repositories::resource::delete_by_key(key.to_owned(), &pool).await?;
   repositories::resource_config::delete_by_resource_key(key.to_owned(), &pool)
     .await?;
@@ -72,7 +73,7 @@ pub async fn delete_resource(
     event_emitter
       .lock()
       .unwrap()
-      .send(Event::ResourceDeleted(key));
+      .send(Event::ResourceDeleted(Box::new(resource)));
   });
   Ok(web::HttpResponse::Accepted().finish())
 }

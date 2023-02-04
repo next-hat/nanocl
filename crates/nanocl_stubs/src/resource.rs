@@ -1,5 +1,3 @@
-use std::default;
-
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 

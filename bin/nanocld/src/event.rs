@@ -137,7 +137,7 @@ mod tests {
     event_emitter
       .lock()
       .unwrap()
-      .send(Event::CargoCreated(Box::new(cargo)));
+      .send(Event::CargoCreated(Box::new(cargo.to_owned())));
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
 
@@ -145,7 +145,7 @@ mod tests {
     event_emitter
       .lock()
       .unwrap()
-      .send(Event::CargoDeleted("global-event-test".into()));
+      .send(Event::CargoDeleted(Box::new(cargo)));
 
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
