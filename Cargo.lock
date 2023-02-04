@@ -1377,6 +1377,7 @@ dependencies = [
  "hyper",
  "indicatif",
  "nanocl_stubs 0.0.1",
+ "nanocl_stubs 0.0.2",
  "nanocld_client",
  "ntex",
  "serde",
