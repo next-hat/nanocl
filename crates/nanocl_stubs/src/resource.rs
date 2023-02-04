@@ -150,3 +150,9 @@ pub struct ResourceConfig {
   pub resource_key: String,
   pub data: serde_json::Value,
 }
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct ResourceQuery {
+  pub kind: Option<ResourceKind>,
+  pub contains: Option<String>,
+}

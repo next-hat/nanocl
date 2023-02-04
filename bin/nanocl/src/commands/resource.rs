@@ -40,7 +40,7 @@ use super::utils::print_table;
 // }
 
 async fn exec_list(client: &NanoclClient) -> Result<(), CliError> {
-  let resources = client.list_resource().await?;
+  let resources = client.list_resource(None).await?;
 
   let row = resources
     .into_iter()

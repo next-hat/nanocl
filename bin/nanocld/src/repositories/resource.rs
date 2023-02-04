@@ -1,8 +1,9 @@
 use ntex::web;
+use ntex::http::StatusCode;
 use diesel::prelude::*;
 
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::resource::{Resource, ResourcePartial};
+use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceQuery};
 
 use crate::repositories::error::db_error;
 use crate::{utils, repositories};
@@ -151,17 +152,44 @@ pub async fn delete_by_key(
 /// let items = repositories::resource::find(&pool).await;
 /// ```
 ///
-pub async fn find(pool: &Pool) -> Result<Vec<Resource>, HttpResponseError> {
+pub async fn find(
+  pool: &Pool,
+  query: Option<ResourceQuery>,
+) -> Result<Vec<Resource>, HttpResponseError> {
   use crate::schema::resources;
+  use crate::schema::resource_configs;
 
   let pool = pool.to_owned();
   let res: Vec<(ResourceDbModel, ResourceConfigDbModel)> =
     web::block(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let res = resources::table
-        .inner_join(crate::schema::resource_configs::table)
-        .load(&mut conn)
-        .map_err(db_error("resource"))?;
+      let req = match query {
+        Some(qs) => {
+          let mut req = resources::table
+            .inner_join(resource_configs::table)
+            .into_boxed();
+          if let Some(kind) = &qs.kind {
+            req = req.filter(resources::kind.eq(kind.to_string()));
+          }
+          if let Some(contains) = &qs.contains {
+            let contains = serde_json::from_str::<serde_json::Value>(contains)
+              .map_err(|err| HttpResponseError {
+                status: StatusCode::BAD_REQUEST,
+                msg: format!("Invalid contains query: {err}"),
+              })?;
+            println!("{contains:#?}");
+            req = req.filter(resource_configs::data.contains(contains));
+          }
+
+          req.load(&mut conn)
+        }
+        None => resources::table
+          .inner_join(resource_configs::table)
+          .load(&mut conn),
+      };
+
+      let res = req.map_err(db_error("resource"))?;
+
       Ok::<_, HttpResponseError>(res)
     })
     .await
@@ -169,13 +197,17 @@ pub async fn find(pool: &Pool) -> Result<Vec<Resource>, HttpResponseError> {
 
   let items = res
     .into_iter()
-    .map(|e| Resource {
-      name: e.0.key,
-      kind: e.0.kind.into(),
-      config_key: e.0.config_key,
-      config: e.1.data,
+    .map(|e| {
+      let resource = e.0;
+      let config = e.1;
+      Ok::<_, HttpResponseError>(Resource {
+        name: resource.key,
+        kind: resource.kind.into(),
+        config_key: resource.config_key,
+        config: config.data,
+      })
     })
-    .collect::<Vec<Resource>>();
+    .collect::<Result<Vec<Resource>, HttpResponseError>>()?;
   Ok(items)
 }
 

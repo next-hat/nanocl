@@ -23,7 +23,7 @@ pub enum Event {
   /// NamespaceDeleted is sent when a namespace is deleted
   CargoCreated(Box<CargoInspect>),
   /// CargoDeleted is sent when a cargo is deleted
-  CargoDeleted(String),
+  CargoDeleted(Box<CargoInspect>),
   /// CargoStarted is sent when a cargo is started
   CargoStarted(Box<CargoInspect>),
   /// CargoStopped is sent when a cargo is stopped
@@ -33,7 +33,29 @@ pub enum Event {
   /// ResourceCreated is sent when a resource is created
   ResourceCreated(Box<Resource>),
   /// ResourceDeleted is sent when a resource is deleted
-  ResourceDeleted(String),
+  ResourceDeleted(Box<Resource>),
   /// ResourcePatched is sent when a resource is patched
   ResourcePatched(Box<Resource>),
+}
+
+impl std::fmt::Display for Event {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    match self {
+      Event::NamespaceCreated(key) => write!(f, "NamespaceCreated({key})"),
+      Event::CargoCreated(cargo) => write!(f, "CargoCreated({})", cargo.key),
+      Event::CargoDeleted(cargo) => write!(f, "CargoDeleted({})", cargo.key),
+      Event::CargoStarted(cargo) => write!(f, "CargoStarted({})", cargo.key),
+      Event::CargoStopped(cargo) => write!(f, "CargoStopped({})", cargo.key),
+      Event::CargoPatched(cargo) => write!(f, "CargoPatched({})", cargo.key),
+      Event::ResourceCreated(resource) => {
+        write!(f, "ResourceCreated({})", resource.name)
+      }
+      Event::ResourceDeleted(resource) => {
+        write!(f, "ResourceDeleted({})", resource.name)
+      }
+      Event::ResourcePatched(resource) => {
+        write!(f, "ResourcePatched({})", resource.name)
+      }
+    }
+  }
 }

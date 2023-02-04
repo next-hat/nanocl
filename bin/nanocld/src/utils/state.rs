@@ -29,6 +29,7 @@ pub fn parse_state(
           status: StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
+      println!("data: {data:#?}");
       Ok(StateData::Deployment(data))
     }
     "Cargo" => {
@@ -103,6 +104,7 @@ pub async fn apply_deployment(
   }
 
   if let Some(resources) = data.resources {
+    println!("Resources: {resources:#?}");
     for resource in resources {
       let key = resource.name.to_owned();
       repositories::resource::create_or_patch(&resource, pool).await?;
@@ -206,13 +208,14 @@ pub async fn revert_deployment(
   if let Some(cargoes) = data.cargoes {
     for cargo in cargoes {
       let key = utils::key::gen_key(&namespace, &cargo.name);
+      let cargo = utils::cargo::inspect(&key, docker_api, pool).await?;
       utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
       let event_emitter = event_emitter.to_owned();
       rt::spawn(async move {
         event_emitter
           .lock()
           .unwrap()
-          .send(Event::CargoDeleted(*Box::new(key)));
+          .send(Event::CargoDeleted(Box::new(cargo)));
       });
     }
   }
@@ -220,13 +223,15 @@ pub async fn revert_deployment(
   if let Some(resources) = data.resources {
     for resource in resources {
       let key = resource.name.to_owned();
-      repositories::resource::delete_by_key(resource.name, pool).await?;
+      let resource = repositories::resource::inspect_by_key(key, pool).await?;
+      repositories::resource::delete_by_key(resource.name.to_owned(), pool)
+        .await?;
       let event_emitter = event_emitter.to_owned();
       rt::spawn(async move {
         event_emitter
           .lock()
           .unwrap()
-          .send(Event::ResourceDeleted(*Box::new(key)));
+          .send(Event::ResourceDeleted(Box::new(resource)));
       });
     }
   }
@@ -248,13 +253,14 @@ pub async fn revert_cargo(
 
   for cargo in data.cargoes {
     let key = utils::key::gen_key(&namespace, &cargo.name);
+    let cargo = utils::cargo::inspect(&key, docker_api, pool).await?;
     utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
     let event_emitter = event_emitter.to_owned();
     rt::spawn(async move {
       event_emitter
         .lock()
         .unwrap()
-        .send(Event::CargoDeleted(*Box::new(key)));
+        .send(Event::CargoDeleted(Box::new(cargo)));
     });
   }
 
@@ -268,13 +274,15 @@ pub async fn revert_resource(
 ) -> Result<(), HttpResponseError> {
   for resource in data.resources {
     let key = resource.name.to_owned();
-    repositories::resource::delete_by_key(resource.name, pool).await?;
+    let resource = repositories::resource::inspect_by_key(key, pool).await?;
+    repositories::resource::delete_by_key(resource.name.to_owned(), pool)
+      .await?;
     let event_emitter = event_emitter.to_owned();
     rt::spawn(async move {
       event_emitter
         .lock()
         .unwrap()
-        .send(Event::ResourceDeleted(*Box::new(key)));
+        .send(Event::ResourceDeleted(Box::new(resource)));
     });
   }
   Ok(())

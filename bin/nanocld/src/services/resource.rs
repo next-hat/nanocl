@@ -1,10 +1,10 @@
 /*
 * Endpoints to manipulate resources
 */
-use ntex::{web, rt};
+use ntex::{rt, web};
 
 use nanocl_stubs::system::Event;
-use nanocl_stubs::resource::ResourcePartial;
+use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
 use crate::repositories;
 use crate::event::EventEmitterPtr;
@@ -64,6 +64,8 @@ pub async fn delete_resource(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let key = name.into_inner();
   log::debug!("Deleting resource: {}", &key);
+  let resource =
+    repositories::resource::inspect_by_key(key.to_owned(), &pool).await?;
   repositories::resource::delete_by_key(key.to_owned(), &pool).await?;
   repositories::resource_config::delete_by_resource_key(key.to_owned(), &pool)
     .await?;
@@ -71,7 +73,7 @@ pub async fn delete_resource(
     event_emitter
       .lock()
       .unwrap()
-      .send(Event::ResourceDeleted(key));
+      .send(Event::ResourceDeleted(Box::new(resource)));
   });
   Ok(web::HttpResponse::Accepted().finish())
 }
@@ -90,10 +92,11 @@ pub async fn delete_resource(
 #[web::get("/resources")]
 pub async fn list_resource(
   pool: web::types::State<Pool>,
+  web::types::Query(query): web::types::Query<ResourceQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  log::debug!("Listing resources");
-  let items = repositories::resource::find(&pool).await?;
-  log::debug!("Resources found : {:#?}", &items);
+  log::debug!("Listing resources with query: {query:#?}");
+  let items = repositories::resource::find(&pool, Some(query)).await?;
+  log::debug!("Found {} resources", &items.len());
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
