@@ -29,7 +29,7 @@ bollard = { version = "0.14" }
 chrono = "0.4.23"
 
 [dependencies]
-nanocld_client = { version = "0.0.2", features = ["tokio"] }
+nanocld_client = { version = "0.0.3", features = ["tokio"] }
 nanocl_stubs = { version = "0.0.2", features = ["serde"] }
 bollard = { version = "0.14" }
 futures = "0.3"

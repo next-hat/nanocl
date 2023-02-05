@@ -43,7 +43,7 @@ pub type EventEmitterPtr = Arc<Mutex<EventEmitter>>;
 impl EventEmitter {
   /// Convert an event to a string and send it to all clients
   async fn handle_event(&mut self, e: Event) {
-    log::debug!("Sending events {:#?} to clients {:#?}", &e, &self.clients);
+    log::debug!("Sending events {e}");
     let mut data = serde_json::to_vec(&e).unwrap();
     data.push(b'\n');
     let bytes = Bytes::from(data);
@@ -137,7 +137,7 @@ mod tests {
     event_emitter
       .lock()
       .unwrap()
-      .send(Event::CargoCreated(Box::new(cargo)));
+      .send(Event::CargoCreated(Box::new(cargo.to_owned())));
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
 
@@ -145,7 +145,7 @@ mod tests {
     event_emitter
       .lock()
       .unwrap()
-      .send(Event::CargoDeleted("global-event-test".into()));
+      .send(Event::CargoDeleted(Box::new(cargo)));
 
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();

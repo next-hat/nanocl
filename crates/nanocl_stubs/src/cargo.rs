@@ -55,7 +55,7 @@ pub struct CargoSummary {
 /// It is used to inspect a cargo
 /// It contains all the information about the cargo
 /// It also contains the list of containers
-#[derive(Default, Debug)]
+#[derive(Default, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoInspect {

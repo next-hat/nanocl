@@ -1,4 +1,6 @@
-use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceConfig};
+use nanocl_stubs::resource::{
+  Resource, ResourcePartial, ResourceConfig, ResourceQuery,
+};
 
 use super::http_client::NanoclClient;
 use super::error::{NanoclClientError, is_api_error};
@@ -25,8 +27,13 @@ impl NanoclClient {
   ///
   pub async fn list_resource(
     &self,
+    query: Option<ResourceQuery>,
   ) -> Result<Vec<Resource>, NanoclClientError> {
-    let mut res = self.get("/resources".into()).send().await?;
+    let mut req = self.get("/resources".into());
+    if let Some(query) = query {
+      req = req.query(&query)?;
+    }
+    let mut res = req.send().await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
     let resources = res.json::<Vec<Resource>>().await?;
@@ -220,7 +227,7 @@ mod tests {
     let client = NanoclClient::connect_with_unix_default();
 
     // list
-    client.list_resource().await.unwrap();
+    client.list_resource(None).await.unwrap();
 
     // create
     let resource = client

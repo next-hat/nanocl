@@ -81,7 +81,16 @@ async fn create_instance(
       tty: Some(true),
       labels: Some(labels),
       host_config: Some(HostConfig {
-        network_mode: Some(cargo.namespace_name.to_owned()),
+        network_mode: Some(
+          cargo
+            .config
+            .to_owned()
+            .container
+            .host_config
+            .unwrap_or_default()
+            .network_mode
+            .unwrap_or(cargo.namespace_name.to_owned()),
+        ),
         ..cargo
           .config
           .to_owned()
