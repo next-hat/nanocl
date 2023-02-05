@@ -1,9 +1,13 @@
 use nanocl_stubs::config::{DaemonConfig, DaemonConfigFile};
 
+use crate::utils;
 use crate::cli::Cli;
 use crate::error::DaemonError;
 
-fn merge_config(args: &Cli, config: &DaemonConfigFile) -> DaemonConfig {
+fn gen_daemon_conf(
+  args: &Cli,
+  config: &DaemonConfigFile,
+) -> std::io::Result<DaemonConfig> {
   let hosts = if let Some(ref hosts) = args.hosts {
     hosts.to_owned()
   } else if let Some(ref hosts) = config.hosts {
@@ -28,11 +32,20 @@ fn merge_config(args: &Cli, config: &DaemonConfigFile) -> DaemonConfig {
     String::from("/run/docker.sock")
   };
 
-  DaemonConfig {
+  let host_gateway = if let Some(ref host_gateway) = args.host_gateway {
+    host_gateway.to_owned()
+  } else if let Some(ref host_gateway) = config.host_gateway {
+    host_gateway.to_owned()
+  } else {
+    utils::network::get_default_gateway()?.to_string()
+  };
+
+  Ok(DaemonConfig {
     hosts,
     state_dir,
     docker_host,
-  }
+    host_gateway,
+  })
 }
 
 fn read_config_file(
@@ -83,9 +96,8 @@ fn read_config_file(
 ///
 pub fn init(args: &Cli) -> Result<DaemonConfig, DaemonError> {
   let file_config = read_config_file(&args.config_dir)?;
-
   // Merge cli args and config file with priority to args
-  Ok(merge_config(args, &file_config))
+  Ok(gen_daemon_conf(args, &file_config)?)
 }
 
 /// Config unit test
@@ -104,15 +116,17 @@ mod tests {
       docker_host: Some(String::from("/run/docker.sock")),
       config_dir: String::from("/etc/nanocl"),
       init: false,
+      host_gateway: None,
     };
 
     let config = DaemonConfigFile {
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/run/docker.sock")),
+      host_gateway: None,
     };
 
-    let merged = merge_config(&args, &config);
+    let merged = gen_daemon_conf(&args, &config).unwrap();
 
     assert_eq!(merged.hosts, args.hosts.unwrap());
     assert_eq!(merged.state_dir, args.state_dir.unwrap());
@@ -184,6 +198,7 @@ mod tests {
       docker_host: Some(String::from("/run/docker.sock")),
       config_dir: String::from("/etc/nanocl"),
       init: false,
+      host_gateway: None,
     };
 
     let config = init(&args).unwrap();

@@ -105,7 +105,7 @@ pub(crate) async fn ensure(
   let postgres_ip = utils::store::get_store_ip_addr(docker_api).await?;
   log::info!("Connecting to store");
   // Connect to postgresql
-  let pool = utils::store::create_pool(postgres_ip.to_owned()).await;
+  let pool = utils::store::create_pool(postgres_ip).await;
   let mut conn = utils::store::get_pool_conn(&pool)?;
   log::info!("Store connected");
   // This will run the necessary migrations.

@@ -4,6 +4,7 @@ pub mod state;
 pub mod cargo;
 pub mod cargo_image;
 pub mod namespace;
+pub mod network;
 
 #[cfg(test)]
 pub mod tests {
