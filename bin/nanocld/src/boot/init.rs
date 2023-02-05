@@ -48,6 +48,7 @@ mod tests {
       docker_host: None,
       state_dir: None,
       config_dir: String::from("/etc/nanocl"),
+      host_gateway: None,
     };
 
     let config = config::init(&args)?;
