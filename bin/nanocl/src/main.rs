@@ -85,6 +85,16 @@ mod tests {
     // Try to remove cargo image
     let args = Cli::parse_from(["nanocl", "cargo", "image", "rm", IMAGE_NAME]);
     assert!(execute_args(&args).await.is_ok());
+    // Try to import a cargo image from a tarball
+    let args = Cli::parse_from([
+      "nanocl",
+      "cargo",
+      "image",
+      "import",
+      "-f",
+      "../../tests/busybox.tar.gz",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
   }
 
   /// Test Cargo commands

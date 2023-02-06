@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use tokio_util::codec;
 use futures::StreamExt;
 use ntex::http::StatusCode;
 use bollard::service::ProgressDetail;
@@ -12,7 +13,7 @@ use crate::utils::print::*;
 use crate::error::CliError;
 use crate::models::{
   CargoImageOpts, CargoImageCommands, CargoImageRemoveOpts,
-  CargoImageInspectOpts, CargoImageRow,
+  CargoImageInspectOpts, CargoImageRow, CargoImageImportOpts,
 };
 
 async fn exec_cargo_instance_list(
@@ -132,6 +133,22 @@ async fn exec_inspect_cargo_image(
   Ok(())
 }
 
+async fn exec_import_cargo_image(
+  client: &NanoclClient,
+  opts: &CargoImageImportOpts,
+) -> Result<(), CliError> {
+  let file = tokio::fs::File::open(&opts.file_path).await.unwrap();
+
+  let byte_stream =
+    codec::FramedRead::new(file, codec::BytesCodec::new()).map(|r| {
+      let bytes = ntex::util::Bytes::from(r?.freeze().to_vec());
+      Ok::<ntex::util::Bytes, std::io::Error>(bytes)
+    });
+
+  client.import_from_tarball(byte_stream).await?;
+  Ok(())
+}
+
 pub async fn exec_cargo_image(
   client: &NanoclClient,
   cmd: &CargoImageOpts,
@@ -146,6 +163,9 @@ pub async fn exec_cargo_image(
     }
     CargoImageCommands::Remove(args) => {
       exec_remove_cargo_image(client, args).await
+    }
+    CargoImageCommands::Import(opts) => {
+      exec_import_cargo_image(client, opts).await
     }
   }
 }

@@ -39,3 +39,11 @@ impl From<ListCargoImagesOptions>
     }
   }
 }
+
+/// Cargo Image is used to pull a new container image from a tar archive
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct CargoImageImportOptions {
+  /// Show progress during import
+  pub quiet: Option<bool>,
+}

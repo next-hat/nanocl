@@ -1,4 +1,7 @@
+use std::error::Error;
+
 use ntex::rt;
+use ntex::util::{Bytes, Stream};
 use ntex::channel::mpsc;
 use ntex::http::StatusCode;
 use futures::TryStreamExt;
@@ -204,12 +207,31 @@ impl NanoclClient {
 
     Ok(ct_image)
   }
+
+  pub async fn import_from_tarball<S, E>(
+    &self,
+    stream: S,
+  ) -> Result<(), NanoclClientError>
+  where
+    S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
+    E: Error + 'static,
+  {
+    let mut res = self
+      .post("/cargoes/images/import".into())
+      .send_stream(stream)
+      .await?;
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+
+    Ok(())
+  }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
   use futures::StreamExt;
+  use tokio_util::codec;
 
   #[ntex::test]
   async fn test_basic() {
@@ -222,5 +244,20 @@ mod tests {
     client.list_cargo_image(None).await.unwrap();
     client.inspect_cargo_image(IMAGE).await.unwrap();
     client.delete_cargo_image(IMAGE).await.unwrap();
+    let curr_path = std::env::current_dir().unwrap();
+    let filepath =
+      std::path::Path::new(&curr_path).join("../../tests/busybox.tar.gz");
+
+    let file = tokio::fs::File::open(&filepath).await.unwrap();
+
+    let byte_stream = codec::FramedRead::new(file, codec::BytesCodec::new())
+      .map(|r| {
+        let bytes = ntex::util::Bytes::from(r?.freeze().to_vec());
+        Ok::<ntex::util::Bytes, std::io::Error>(bytes)
+      });
+    // let stream = futures::stream::(vec![Ok::<Bytes, std::io::Error>(
+    //   Bytes::from(file),
+    // )]);
+    client.import_from_tarball(byte_stream).await.unwrap();
   }
 }

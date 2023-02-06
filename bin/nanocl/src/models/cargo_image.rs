@@ -31,6 +31,15 @@ pub enum CargoImageCommands {
   Remove(CargoImageRemoveOpts),
   /// Inspect a cargo image
   Inspect(CargoImageInspectOpts),
+  /// Import a cargo image from a tarball
+  Import(CargoImageImportOpts),
+}
+
+#[derive(Debug, Parser)]
+pub struct CargoImageImportOpts {
+  /// path to tar archive
+  #[clap(short = 'f')]
+  pub(crate) file_path: String,
 }
 
 /// Manage container images

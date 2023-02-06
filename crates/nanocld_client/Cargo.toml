@@ -10,10 +10,14 @@ homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
 repository = "https://github.com/nxthat/nanocl"
 
 [features]
-default = ["tokio"]
+default = []
 tokio = ["ntex/tokio"]
 glommio = ["ntex/glommio"]
 async-std = ["ntex/async-std"]
+
+[dev-dependencies]
+tokio-util = "0.7.4"
+tokio = { version = "1.25.0", features = ["fs"] }
 
 [dependencies]
 bollard = "0.14"
