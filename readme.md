@@ -40,9 +40,9 @@
 
 ## Overview
 
-Nanocl is the next-generation container and virtual machine orchestrator that helps you manage your containers and virtual machines across multiple hosts with ease.</br>
-With Nanocl, you can share resources in a highly efficient manner, deploy your applications, services, and databases publicly, privately, or under a VPN, and unleash your infrastructure, whether you are in a home lab setup or a large enterprise.</br>
-Its cutting-edge technology crafted with precision using Rust, provides the best performance and the smallest footprint.</br>
+Nanocl is the next-generation container and virtual machine orchestrator that helps you manage your containers and virtual machines across multiple hosts with ease.
+With Nanocl, you can share resources in a highly efficient manner, deploy your applications, services, and databases publicly, privately, or under a VPN, and unleash your infrastructure, whether you are in a home lab setup or a large enterprise.
+Its cutting-edge technology crafted with precision using Rust, provides the best performance and the smallest footprint.
 
 ## Key Benefits
 
