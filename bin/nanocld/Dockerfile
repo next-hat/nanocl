@@ -12,7 +12,7 @@ FROM rust:1.67.0-alpine3.17 as cacher
 WORKDIR /app
 COPY --from=planner /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/cargo-chef
 COPY --from=planner /app .
-RUN apk add musl-dev libpq-dev
+RUN apk add musl-dev libpq-dev openssl-dev
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN cargo chef cook --release --recipe-path recipe.json
 
@@ -25,9 +25,11 @@ COPY ./bin/nanocld/migrations ./migrations
 COPY ./bin/nanocld/src ./src
 COPY ./bin/nanocld/build.rs .
 COPY .git ./.git
-RUN apk add musl-dev libpq-dev git
+RUN apk add musl-dev libpq-dev openssl-dev git upx
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN cargo build --release
+RUN strip target/release/nanocld
+RUN upx /app/target/release/nanocld
 
 # stage 4 - create runtime image
 FROM alpine:3.17

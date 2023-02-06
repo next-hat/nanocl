@@ -32,10 +32,10 @@ fn gen_daemon_conf(
     String::from("/run/docker.sock")
   };
 
-  let host_gateway = if let Some(ref host_gateway) = args.host_gateway {
-    host_gateway.to_owned()
-  } else if let Some(ref host_gateway) = config.host_gateway {
-    host_gateway.to_owned()
+  let gateway = if let Some(ref gateway) = args.gateway {
+    gateway.to_owned()
+  } else if let Some(ref gateway) = config.gateway {
+    gateway.to_owned()
   } else {
     utils::network::get_default_ip()?.to_string()
   };
@@ -44,7 +44,7 @@ fn gen_daemon_conf(
     hosts,
     state_dir,
     docker_host,
-    host_gateway,
+    gateway,
   })
 }
 
@@ -116,14 +116,14 @@ mod tests {
       docker_host: Some(String::from("/run/docker.sock")),
       config_dir: String::from("/etc/nanocl"),
       init: false,
-      host_gateway: None,
+      gateway: None,
     };
 
     let config = DaemonConfigFile {
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/run/docker.sock")),
-      host_gateway: None,
+      gateway: None,
     };
 
     let merged = gen_daemon_conf(&args, &config).unwrap();
@@ -198,7 +198,7 @@ mod tests {
       docker_host: Some(String::from("/run/docker.sock")),
       config_dir: String::from("/etc/nanocl"),
       init: false,
-      host_gateway: None,
+      gateway: None,
     };
 
     let config = init(&args).unwrap();

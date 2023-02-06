@@ -40,13 +40,21 @@ nanocl-cargo(1)
 
 :   Manage cargoes
 
+nanocl-resource(1)
+
+:   Manage resources
+
 nanocl-events(1)
 
-:   
+:   Watch daemon events
 
-nanocl-setup(1)
+nanocl-state(1)
 
-:   Setup given host to run nanocl
+:   Apply or Reverse a state from a configuration file
+
+nanocl-info(1)
+
+:   Show nanocl host information
 
 nanocl-version(1)
 

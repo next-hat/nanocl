@@ -68,7 +68,11 @@ fn convert_size(size: u64) -> String {
 
 impl From<ImageSummary> for CargoImageRow {
   fn from(value: ImageSummary) -> Self {
-    let binding = value.repo_tags[0].to_owned();
+    let binding = value
+      .repo_tags
+      .get(0)
+      .unwrap_or(&String::from("<none>"))
+      .to_owned();
     let vals: Vec<_> = binding.split(':').collect();
     let id = value.id.replace("sha256:", "");
     let id = id[0..12].to_owned();
@@ -78,8 +82,8 @@ impl From<ImageSummary> for CargoImageRow {
     let size_string = convert_size(size.try_into().unwrap());
 
     Self {
-      repositories: vals[0].to_owned(),
-      tag: vals[1].to_owned(),
+      repositories: vals.first().unwrap_or(&"<none>").to_string(),
+      tag: vals.get(1).unwrap_or(&"<none>").to_string(),
       image_id: id,
       created,
       size: size_string,

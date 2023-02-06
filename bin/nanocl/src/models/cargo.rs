@@ -159,7 +159,7 @@ pub enum CargoCommands {
   Patch(CargoPatchOpts),
   /// Manage cargo image
   Image(CargoImageOpts),
-  /// Execute a command insiade a cargo
+  /// Execute a command inside a cargo
   Exec(CargoExecOpts),
   /// List cargo history
   History(CargoHistoryOpts),

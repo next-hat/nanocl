@@ -24,7 +24,7 @@ async fn get_info(
   docker_api: web::types::State<bollard::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let docker = docker_api.info().await?;
-  let host_gateway = config.host_gateway.clone();
+  let host_gateway = config.gateway.clone();
   let info = HostInfo {
     host_gateway,
     docker,

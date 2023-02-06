@@ -23,8 +23,9 @@ pub struct Cli {
   /// Config directory
   #[clap(long, default_value = "/etc/nanocl")]
   pub(crate) config_dir: String,
-  /// Host gateway automatically detected to host default gateway if not set
-  pub(crate) host_gateway: Option<String>,
+  /// Gateway automatically detected to host default source ip gateway if not set
+  #[clap(long)]
+  pub(crate) gateway: Option<String>,
 }
 
 /// Cli arguments unit test
