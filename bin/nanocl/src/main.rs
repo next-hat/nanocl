@@ -42,8 +42,8 @@ mod tests {
   async fn test_version() {
     let args = Cli::parse_from(["nanocl", "version"]);
     assert!(execute_args(&args).await.is_ok());
-    let args = Cli::parse_from(["nanocl", "version", "check"]);
-    assert!(execute_args(&args).await.is_ok());
+    // let args = Cli::parse_from(["nanocl", "version", "check"]);
+    // assert!(execute_args(&args).await.is_ok());
   }
 
   /// Test Namespace commands

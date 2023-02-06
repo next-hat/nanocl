@@ -3,7 +3,7 @@ use ntex::channel::mpsc;
 use ntex::http::StatusCode;
 use futures::TryStreamExt;
 
-use nanocl_stubs::cargo_image::CargoImagePartial;
+use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
 
 use crate::error::ApiError;
 
@@ -30,8 +30,13 @@ impl NanoclClient {
   ///
   pub async fn list_cargo_image(
     &self,
+    opts: Option<ListCargoImagesOptions>,
   ) -> Result<Vec<bollard::models::ImageSummary>, NanoclClientError> {
-    let mut res = self.get(String::from("/cargoes/images")).send().await?;
+    let mut req = self.get(String::from("/cargoes/images"));
+    if let Some(opts) = opts {
+      req = req.query(&opts)?;
+    }
+    let mut res = req.send().await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
@@ -214,7 +219,7 @@ mod tests {
     let mut stream = client.create_cargo_image(IMAGE).await.unwrap();
     while let Some(_info) = stream.next().await {}
 
-    client.list_cargo_image().await.unwrap();
+    client.list_cargo_image(None).await.unwrap();
     client.inspect_cargo_image(IMAGE).await.unwrap();
     client.delete_cargo_image(IMAGE).await.unwrap();
   }

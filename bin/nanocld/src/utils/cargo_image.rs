@@ -35,13 +35,9 @@ use crate::error::HttpResponseError;
 ///
 pub async fn list(
   docker_api: &Docker,
+  opts: bollard::image::ListImagesOptions<String>,
 ) -> Result<Vec<ImageSummary>, HttpResponseError> {
-  let items = docker_api
-    .list_images(Some(bollard::image::ListImagesOptions::<String> {
-      all: true,
-      ..Default::default()
-    }))
-    .await?;
+  let items = docker_api.list_images(Some(opts)).await?;
 
   Ok(items)
 }

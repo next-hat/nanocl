@@ -48,4 +48,6 @@ pub struct NamespaceInspect {
   pub name: String,
   /// Number of cargoes
   pub cargoes: Vec<CargoInspect>,
+  // Network of the namespace
+  // pub network: NetworkInspect,
 }
