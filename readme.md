@@ -63,16 +63,13 @@ Its cutting-edge technology crafted with precision using Rust, provides the best
 * Leverage the power of CockroachDB for unlimited scalability
 * Get real-time visibility into your infrastructure with logs and history tracking
 
-
-With Nanocl, you can be sure that your infrastructure is scalable and secure. Nanocl uses CockroachDB as a store, ensuring high performance and scalability, and it includes built-in TLS and VPN support for network security by default.
-
 ## Easy Deployment and Management
 
 You can manage your infrastructure and scale it depending on your need, ensuring that your services are always running smoothly.
 Nanocl makes it easy to deploy your applications, services, or databases, with its intuitive user interface and streamlined deployment process. Whether you need to deploy publicly, privately, or under a VPN, Nanocl has got you covered.
 
 
-## High Performance and Security
+## High Performance, Scallability and Security
 
 With Nanocl, you can be sure that your infrastructure is scalable and secure.</br>
 Tailor made with Rust, Nanocl has the best performance and the smallest footprint.</br>
