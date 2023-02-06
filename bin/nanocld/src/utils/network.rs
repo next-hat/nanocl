@@ -26,7 +26,7 @@ pub(crate) fn get_default_ip() -> std::io::Result<IpAddr> {
     "No default route found",
   ))?;
 
-  println!("Default interface: {default_interface}");
+  log::info!("Default interface: {default_interface}");
   // Get the IP address of the default interface.
   // Using getifaddrs call from libc
   let mut ip = None;
@@ -59,7 +59,7 @@ pub(crate) fn get_default_ip() -> std::io::Result<IpAddr> {
     "No IP address found for the default interface",
   ))?;
 
-  log::debug!("Default IP address: {ip}");
-  log::debug!("You can override it with the --host-gateway option.");
+  log::info!("Default gateway address: {ip}");
+  log::info!("You can override it with the --gateway option.");
   Ok(ip)
 }

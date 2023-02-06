@@ -1,5 +1,7 @@
 use std::error::Error;
 
+use futures::stream::IntoStream;
+use ntex::http::client::ClientResponse;
 use ntex::rt;
 use ntex::util::{Bytes, Stream};
 use ntex::channel::mpsc;
@@ -211,7 +213,7 @@ impl NanoclClient {
   pub async fn import_from_tarball<S, E>(
     &self,
     stream: S,
-  ) -> Result<(), NanoclClientError>
+  ) -> Result<IntoStream<ClientResponse>, NanoclClientError>
   where
     S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
     E: Error + 'static,
@@ -222,8 +224,8 @@ impl NanoclClient {
       .await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-
-    Ok(())
+    let stream = res.into_stream();
+    Ok(stream)
   }
 }
 
@@ -258,6 +260,9 @@ mod tests {
     // let stream = futures::stream::(vec![Ok::<Bytes, std::io::Error>(
     //   Bytes::from(file),
     // )]);
-    client.import_from_tarball(byte_stream).await.unwrap();
+    let mut stream = client.import_from_tarball(byte_stream).await.unwrap();
+    while let Some(info) = stream.next().await {
+      println!("{info:?}");
+    }
   }
 }

@@ -145,7 +145,10 @@ async fn exec_import_cargo_image(
       Ok::<ntex::util::Bytes, std::io::Error>(bytes)
     });
 
-  client.import_from_tarball(byte_stream).await?;
+  let mut stream = client.import_from_tarball(byte_stream).await?;
+  while let Some(info) = stream.next().await {
+    println!("{info:?}");
+  }
   Ok(())
 }
 

@@ -47,3 +47,18 @@ pub struct CargoImageImportOptions {
   /// Show progress during import
   pub quiet: Option<bool>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct CargoImageImportContext {
+  pub writed: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum CargoImageImportInfo {
+  BuildInfo(bollard::models::BuildInfo),
+  Context(CargoImageImportContext),
+}

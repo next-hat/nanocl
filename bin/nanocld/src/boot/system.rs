@@ -72,7 +72,7 @@ pub(crate) async fn sync_containers(
   docker_api: &bollard::Docker,
   pool: &Pool,
 ) -> Result<(), DaemonError> {
-  log::debug!("Syncing existing container");
+  log::info!("Syncing existing container");
   let options = Some(ListContainersOptions::<&str> {
     all: true,
     ..Default::default()
@@ -158,5 +158,6 @@ pub(crate) async fn sync_containers(
     }
   }
 
+  log::info!("Container synced");
   Ok(())
 }
