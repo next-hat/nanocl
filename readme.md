@@ -33,20 +33,16 @@
 </div>
 
 <blockquote class="tags">
- <strong>Tags</strong>
- </br>
  <span id="nxtmdoc-meta-keywords">
    Test, Deploy, Monitor, Scale, Orchestrate
  </span>
 </blockquote>
 
-
 ## Overview
 
-
-Nanocl is an open-source platform for orchestrating containers and virtual machines across multiple hosts, making it easier for you to manage your infrastructure.</br>
-With Nanocl, you can manage your services running inside large companies at scale or in your home lab.</br>
-With its cutting-edge technology crafted with precision using Rust, Nanocl provides the best performance and a small footprint.
+Nanocl is the next-generation container and virtual machine orchestrator that helps you manage your containers and virtual machines across multiple hosts with ease.</br>
+With Nanocl, you can share resources in a highly efficient manner, deploy your applications, services, and databases publicly, privately, or under a VPN, and unleash your infrastructure, whether you are in a home lab setup or a large enterprise.</br>
+Its cutting-edge technology crafted with precision using Rust, provides the best performance and the smallest footprint.</br>
 
 ## Key Benefits
 
