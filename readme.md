@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://download.next-hat.com/ressources/images/logo.png" >
-  <h1>Unleash Your Infrastructure with Nanocl</h1>
-  <h3>- The Hybrid Cloud Orchestrator -</h3>
+  <h1>Unleash Your Infrastructure</h1>
+  <h3>The Hybrid Cloud Orchestrator</h3>
   <p>
 
   [![Stars](https://img.shields.io/github/stars/nxthat/nanocl?label=%E2%AD%90%20stars%20%E2%AD%90)](https://github.com/nxthat/nanocl)
@@ -32,16 +32,16 @@
 
 </div>
 
-<blockquote class="tags">
- <span id="nxtmdoc-meta-keywords">
+<blockquote>
+ <span>
    Test, Deploy, Monitor, Scale, Orchestrate
  </span>
 </blockquote>
 
 ## Overview
 
-Nanocl is the next-generation container and virtual machine orchestrator that helps you manage your containers and virtual machines across multiple hosts with ease.
-With Nanocl, you can share resources in a highly efficient manner, deploy your applications, services, and databases publicly, privately, or under a VPN, and unleash your infrastructure, whether you are in a home lab setup or a large enterprise.
+Nanocl is the next-generation container and virtual machine orchestrator that helps you manage your containers and virtual machines across multiple hosts with ease.</br>
+With Nanocl, you can share resources in a highly efficient manner, deploy your applications, services, and databases publicly, privately, or under a VPN, and unleash your infrastructure, whether you are in a home lab setup or a large enterprise.</br>
 Its cutting-edge technology crafted with precision using Rust, provides the best performance and the smallest footprint.
 
 ## Key Benefits
@@ -73,9 +73,10 @@ Nanocl makes it easy to deploy your applications, services, or databases, with i
 
 With Nanocl, you can be sure that your infrastructure is scalable and secure.</br>
 Tailor made with Rust, Nanocl has the best performance and the smallest footprint.</br>
-With CockroachDB as a store, ensuring high performance and scalability.</br>
+Using CockroachDB as a store, ensuring high performance and scalability.</br>
 It uses the best ideas and practices from the community to provide high performance and security for your infrastructure.</br>
-With built-in TLS and VPN, Nanocl ensures that your infrastructure is always secure, using the best security practices. With logs, auto fail-over, automatic backups, and zero downtime, you can sleep while Nanocl takes care of your infrastructure.
+Built-in TLS and VPN, Nanocl ensures that your infrastructure is always secure, using the best security practices.</br>
+With logs, auto fail-over, automatic backups, and zero downtime, you can sleep while Nanocl takes care of your infrastructure.
 
 ## Unleash Your Infrastructure
 
