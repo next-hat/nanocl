@@ -37,7 +37,7 @@ fn gen_daemon_conf(
   } else if let Some(ref host_gateway) = config.host_gateway {
     host_gateway.to_owned()
   } else {
-    utils::network::get_default_gateway()?.to_string()
+    utils::network::get_default_ip()?.to_string()
   };
 
   Ok(DaemonConfig {

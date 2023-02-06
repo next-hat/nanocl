@@ -54,3 +54,4 @@ utoipa = { version = "3.0.1", features = ["uuid", "chrono"], optional = true }
 hyper = "0.14.24"
 tokio-util = "0.7.4"
 futures-util = "0.3.26"
+libc = "0.2.139"

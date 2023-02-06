@@ -1440,6 +1440,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hyper",
+ "libc",
  "log",
  "nanocl_stubs",
  "ntex",
