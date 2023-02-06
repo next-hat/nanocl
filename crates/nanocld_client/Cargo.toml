@@ -10,7 +10,7 @@ homepage = "https://docs.next-hat.com/docs/guides/nanocl"
 repository = "https://github.com/nxthat/nanocl"
 
 [features]
-default = []
+default = ["tokio"]
 tokio = ["ntex/tokio"]
 glommio = ["ntex/glommio"]
 async-std = ["ntex/async-std"]
