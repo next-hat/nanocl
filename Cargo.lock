@@ -1401,7 +1401,6 @@ dependencies = [
  "futures",
  "hyper",
  "indicatif",
- "nanocl_stubs",
  "nanocld_client",
  "ntex",
  "serde",
@@ -1418,7 +1417,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "bollard",
  "serde",

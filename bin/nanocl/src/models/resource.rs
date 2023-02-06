@@ -1,6 +1,6 @@
-use clap::{Parser, Subcommand};
-use nanocl_stubs::resource::{ResourceKind, Resource};
 use tabled::Tabled;
+use clap::{Parser, Subcommand};
+use nanocld_client::stubs::resource::{ResourceKind, Resource};
 
 /// Resource commands
 #[derive(Debug, Subcommand)]

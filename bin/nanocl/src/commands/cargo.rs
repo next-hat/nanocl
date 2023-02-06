@@ -2,7 +2,7 @@ use futures::StreamExt;
 use bollard::exec::CreateExecOptions;
 
 use nanocld_client::NanoclClient;
-use nanocl_stubs::cargo::ExecOutputKind;
+use nanocld_client::stubs::cargo::ExecOutputKind;
 
 use crate::utils::print::*;
 use crate::error::CliError;

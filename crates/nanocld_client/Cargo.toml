@@ -6,7 +6,7 @@ authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Nanocl daemon api client"
 readme = "readme.md"
 license = "MIT OR Apache-2.0"
-homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
+homepage = "https://docs.next-hat.com/docs/guides/nanocl"
 repository = "https://github.com/nxthat/nanocl"
 
 [features]
@@ -22,7 +22,7 @@ tokio = { version = "1.25.0", features = ["fs"] }
 [dependencies]
 bollard = "0.14"
 futures = "0.3.25"
-nanocl_stubs = { version = "0.0.2", features = ["serde"], path = "../nanocl_stubs" }
+nanocl_stubs = { version = "0.0.3", features = ["serde"] }
 ntex = { version = "0.6.1" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = "1.0.91"

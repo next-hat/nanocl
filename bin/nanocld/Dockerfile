@@ -30,7 +30,7 @@ ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN cargo build --release
 
 # stage 4 - create runtime image
-from alpine:3.17
+FROM alpine:3.17
 
 RUN apk add libgcc libpq util-linux
 
