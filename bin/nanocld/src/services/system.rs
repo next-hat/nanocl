@@ -3,6 +3,7 @@
 */
 use std::sync::{Arc, Mutex};
 
+use nanocl_stubs::{config::DaemonConfig, system::HostInfo};
 use ntex::web;
 use serde_json::json;
 
@@ -15,6 +16,20 @@ async fn get_version() -> web::HttpResponse {
     "Version": version::VERSION,
     "CommitId": version::COMMIT_ID,
   }))
+}
+
+#[web::get("/info")]
+async fn get_info(
+  config: web::types::State<DaemonConfig>,
+  docker_api: web::types::State<bollard::Docker>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let docker = docker_api.info().await?;
+  let host_gateway = config.host_gateway.clone();
+  let info = HostInfo {
+    host_gateway,
+    docker,
+  };
+  Ok(web::HttpResponse::Ok().json(&info))
 }
 
 /// Join events stream
@@ -49,6 +64,7 @@ pub async fn unhandled() -> Result<web::HttpResponse, HttpResponseError> {
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(watch_events);
   config.service(get_version);
+  config.service(get_info);
   config.service(
     web::resource("/_ping")
       .route(web::get().to(ping))
@@ -160,6 +176,25 @@ mod tests {
       StatusCode::NOT_FOUND,
       status
     );
+    Ok(())
+  }
+
+  #[ntex::test]
+  async fn test_system_info() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+    let mut resp = srv.get("/info").send().await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::OK,
+      "Expect status to be {} got {}",
+      StatusCode::OK,
+      status
+    );
+    let body: HostInfo = resp
+      .json()
+      .await
+      .expect("To receive a valid version json payload");
     Ok(())
   }
 }

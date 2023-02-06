@@ -177,7 +177,6 @@ pub async fn find(
                 status: StatusCode::BAD_REQUEST,
                 msg: format!("Invalid contains query: {err}"),
               })?;
-            println!("{contains:#?}");
             req = req.filter(resource_configs::data.contains(contains));
           }
 

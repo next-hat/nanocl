@@ -279,7 +279,6 @@ pub mod tests {
     let curr_path = std::env::current_dir().unwrap();
     let path =
       std::path::Path::new(&curr_path).join("../../tests/busybox.tar.gz");
-    println!("{}", &path.display());
     // Read file into a stream
     let mut file = std::fs::File::open(path).unwrap();
 

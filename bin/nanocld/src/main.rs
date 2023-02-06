@@ -56,8 +56,6 @@ async fn main() -> std::io::Result<()> {
     Ok(state) => state,
   };
 
-  println!("{:#?}", daemon_state.config);
-
   // If init is true we don't start the server
   if args.init {
     return Ok(());

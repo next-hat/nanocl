@@ -1,8 +1,21 @@
+use bollard::service::SystemInfo;
+
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
 use super::cargo::CargoInspect;
 use super::resource::Resource;
+
+/// HostInfo contains information about the host and the docker daemon
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct HostInfo {
+  /// Docker contains information about the docker daemon
+  #[serde(flatten)]
+  pub docker: SystemInfo,
+  /// HostGateway is the gateway address of the host
+  pub host_gateway: String,
+}
 
 /// Version contain details about the current version nanocl
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
