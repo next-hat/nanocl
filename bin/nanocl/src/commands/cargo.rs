@@ -1,9 +1,10 @@
-use bollard::exec::CreateExecOptions;
 use futures::StreamExt;
-use nanocld_client::NanoclClient;
+use bollard::exec::CreateExecOptions;
 
+use nanocld_client::NanoclClient;
 use nanocl_stubs::cargo::ExecOutputKind;
 
+use crate::utils::print::*;
 use crate::error::CliError;
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts, CargoRow,
@@ -12,7 +13,6 @@ use crate::models::{
 };
 
 use super::cargo_image;
-use super::utils::print_table;
 
 /// Execute cargo command
 ///
@@ -106,8 +106,7 @@ async fn exec_cargo_inspect(
   let cargo = client
     .inspect_cargo(&options.name, args.namespace.to_owned())
     .await?;
-  let cargo = serde_yaml::to_string(&cargo)?;
-  println!("{cargo}");
+  print_yml(cargo)?;
   Ok(())
 }
 

@@ -191,8 +191,8 @@ mod tests {
       StatusCode::OK,
       status
     );
-    let body: HostInfo = resp
-      .json()
+    let _ = resp
+      .json::<HostInfo>()
       .await
       .expect("To receive a valid version json payload");
     Ok(())

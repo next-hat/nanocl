@@ -19,6 +19,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::Events => commands::exec_events(&client).await,
     Commands::State(args) => commands::exec_state(&client, args).await,
     Commands::Version(args) => commands::exec_version(&client, args).await,
+    Commands::Info => commands::exec_info(&client).await,
   }
 }
 
@@ -268,6 +269,12 @@ mod tests {
       "-f",
       "../../examples/cargo_example.yml",
     ]);
+    assert!(execute_args(&args).await.is_ok());
+  }
+
+  #[ntex::test]
+  async fn test_info() {
+    let args = Cli::parse_from(["nanocl", "info"]);
     assert!(execute_args(&args).await.is_ok());
   }
 }

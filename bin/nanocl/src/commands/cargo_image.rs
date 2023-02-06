@@ -1,21 +1,19 @@
 use std::collections::HashMap;
 
-use ntex::http::StatusCode;
 use futures::StreamExt;
+use ntex::http::StatusCode;
 use bollard::service::ProgressDetail;
 use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
 
 use nanocld_client::NanoclClient;
 use nanocld_client::error::ApiError;
 
+use crate::utils::print::*;
+use crate::error::CliError;
 use crate::models::{
   CargoImageOpts, CargoImageCommands, CargoImageRemoveOpts,
   CargoImageInspectOpts, CargoImageRow,
 };
-
-use crate::error::CliError;
-
-use super::utils::print_table;
 
 async fn exec_cargo_instance_list(
   client: &NanoclClient,
@@ -130,8 +128,7 @@ async fn exec_inspect_cargo_image(
   opts: &CargoImageInspectOpts,
 ) -> Result<(), CliError> {
   let image = client.inspect_cargo_image(&opts.name).await?;
-  let image = serde_yaml::to_string(&image)?;
-  println!("{}", &image);
+  print_yml(image)?;
   Ok(())
 }
 

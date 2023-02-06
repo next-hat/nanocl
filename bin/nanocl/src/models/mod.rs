@@ -38,6 +38,8 @@ pub enum Commands {
   Events,
   /// Apply or Reverse a state from a configuration file
   State(StateArgs),
+  /// Show nanocl host information
+  Info,
   /// Show nanocl version information
   Version(VersionArgs),
   // TODO: shell completion

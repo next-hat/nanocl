@@ -3,6 +3,8 @@ use tabled::{
   Padding, Alignment, Table, Style, Modify,
 };
 
+use crate::error::CliError;
+
 pub fn print_table<T>(iter: impl IntoIterator<Item = T>)
 where
   T: tabled::Tabled,
@@ -17,4 +19,13 @@ where
     .with(Modify::new(Rows::first()).with(str::to_uppercase))
     .to_string();
   println!("{table}");
+}
+
+pub fn print_yml<T>(data: T) -> Result<(), CliError>
+where
+  T: serde::Serialize,
+{
+  let yml = serde_yaml::to_string(&data)?;
+  println!("{yml}");
+  Ok(())
 }

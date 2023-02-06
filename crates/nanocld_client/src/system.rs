@@ -3,7 +3,7 @@ use ntex::channel::mpsc;
 use ntex::util::BytesMut;
 use futures::TryStreamExt;
 
-use nanocl_stubs::system::{Event, Version};
+use nanocl_stubs::system::{Event, Version, HostInfo};
 
 use super::http_client::NanoclClient;
 use super::error::{NanoclClientError, is_api_error};
@@ -85,12 +85,60 @@ impl NanoclClient {
     Ok(rx)
   }
 
+  /// ## Ping the daemon
+  ///
+  /// Check if the daemon is running
+  ///
+  /// ## Returns
+  ///
+  /// * [Result](Result)
+  ///   * [Ok](Ok) - The daemon is running
+  ///   * [Err](NanoclClientError) - The daemon is not running
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanoclClient;
+  ///
+  /// let client = NanoclClient::connect_with_unix_default();
+  /// let version = client.ping().await.unwrap();
+  /// ```
+  ///
   pub async fn ping(&self) -> Result<(), NanoclClientError> {
     let mut res = self.get(String::from("/_ping")).send().await?;
     let status = res.status();
 
     is_api_error(&mut res, &status).await?;
     Ok(())
+  }
+
+  /// ## Get the host info
+  ///
+  /// Get details about the host and docker daemon
+  ///
+  /// ## Returns
+  ///
+  /// * [Result](Result)
+  ///   * [Ok](Ok) - The [HostInfo](HostInfo)
+  ///   * [Err](NanoclClientError) - The host info could not be retrieved
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanoclClient;
+  ///
+  /// let client = NanoclClient::connect_with_unix_default();
+  /// let info = client.info().await.unwrap();
+  /// ```
+  ///
+  pub async fn info(&self) -> Result<HostInfo, NanoclClientError> {
+    let mut res = self.get(String::from("/info")).send().await?;
+    let status = res.status();
+
+    is_api_error(&mut res, &status).await?;
+    let info = res.json::<HostInfo>().await?;
+
+    Ok(info)
   }
 }
 
@@ -112,5 +160,13 @@ mod tests {
     let _stream = client.watch_events().await.unwrap();
     // Todo : find a way to test this on CI because it's limited to 2 threads
     // let _event = stream.next().await.unwrap();
+  }
+
+  #[ntex::test]
+  async fn test_info() {
+    let client = NanoclClient::connect_with_unix_default();
+    let info = client.info().await.unwrap();
+
+    assert!(info.docker.containers.unwrap() > 0);
   }
 }

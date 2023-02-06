@@ -1,12 +1,11 @@
 use nanocld_client::NanoclClient;
 
+use crate::utils::print::*;
 use crate::error::CliError;
 use crate::models::{
   ResourceArgs, ResourceCommands, ResourceRow, ResourceRemoveOpts,
   ResourceInspectOpts, ResourceResetOpts, ResourceHistoryOpts,
 };
-
-use super::utils::print_table;
 
 // Since Resource are random json config
 // we can't really validate them using the cli
@@ -68,9 +67,7 @@ async fn exec_inspect(
 ) -> Result<(), CliError> {
   let resource = client.inspect_resource(&opts.name).await?;
 
-  let resource = serde_yaml::to_string(&resource)?;
-  println!("{}", &resource);
-
+  print_yml(resource)?;
   Ok(())
 }
 
@@ -79,8 +76,8 @@ async fn exec_history(
   opts: &ResourceHistoryOpts,
 ) -> Result<(), CliError> {
   let history = client.list_history_resource(&opts.name).await?;
-  let history = serde_yaml::to_string(&history)?;
-  println!("{history}");
+
+  print_yml(history)?;
   Ok(())
 }
 
@@ -89,8 +86,8 @@ async fn exec_reset(
   opts: &ResourceResetOpts,
 ) -> Result<(), CliError> {
   let resource = client.reset_resource(&opts.name, &opts.key).await?;
-  let resource = serde_yaml::to_string(&resource)?;
-  println!("{resource}");
+
+  print_yml(resource)?;
   Ok(())
 }
 

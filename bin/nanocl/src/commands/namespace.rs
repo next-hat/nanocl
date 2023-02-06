@@ -1,9 +1,8 @@
 use nanocld_client::NanoclClient;
 
-use crate::models::{NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow};
-
+use crate::utils::print::*;
 use crate::error::CliError;
-use super::utils::print_table;
+use crate::models::{NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow};
 
 async fn exec_namespace_list(client: &NanoclClient) -> Result<(), CliError> {
   let items = client.list_namespace().await?;
@@ -29,8 +28,7 @@ async fn exec_namespace_inspect(
   options: &NamespaceOpts,
 ) -> Result<(), CliError> {
   let namespace = client.inspect_namespace(&options.name).await?;
-  let namespace = serde_yaml::to_string(&namespace)?;
-  println!("{}", &namespace);
+  print_yml(namespace)?;
   Ok(())
 }
 
