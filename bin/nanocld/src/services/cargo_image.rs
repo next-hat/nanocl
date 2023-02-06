@@ -1,8 +1,13 @@
 /*
 * Endpoints to manipulate cargo images
 */
+use std::io::Write;
+
 use ntex::web;
+use ntex::http::StatusCode;
 use futures::StreamExt;
+use tokio_util::codec;
+use ntex_multipart::Multipart;
 use bollard::image::ImportImageOptions;
 
 use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
@@ -116,20 +121,67 @@ async fn delete_cargo_image_by_name(
 #[web::post("/cargoes/images/import")]
 async fn import_images(
   docker_api: web::types::State<bollard::Docker>,
-  mut payload: web::types::Payload,
+  mut payload: Multipart,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let mut buf = ntex::util::BytesMut::new();
-  while let Some(Ok(item)) = payload.next().await {
-    buf.extend_from_slice(&item);
+  // generate a random filename
+  let filename = uuid::Uuid::new_v4().to_string();
+  let filepath = format!("/tmp/{filename}");
+  while let Some(field) = payload.next().await {
+    let mut field = field.map_err(|err| HttpResponseError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      msg: format!("Error while reading the multipart field {err}"),
+    })?;
+    let filepath = filepath.clone();
+    // File::create is blocking operation, use threadpool
+    let mut f = web::block(move || std::fs::File::create(filepath))
+      .await
+      .map_err(|err| HttpResponseError {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        msg: format!("Error while creating the file {err}"),
+      })?;
+    // Field in turn is stream of *Bytes* object
+    while let Some(chunk) = field.next().await {
+      let data = chunk.map_err(|err| HttpResponseError {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        msg: format!("Error while reading the payload {err}"),
+      })?;
+      // filesystem operations are blocking, we have to use threadpool
+      f = web::block(move || f.write_all(&data).map(|_| f))
+        .await
+        .map_err(|err| HttpResponseError {
+          status: StatusCode::INTERNAL_SERVER_ERROR,
+          msg: format!("Error while writing the file {err}"),
+        })?;
+    }
   }
 
-  let byte_stream = hyper::body::Bytes::from(buf.to_vec());
-  let body = hyper::Body::from(byte_stream);
+  let file = tokio::fs::File::open(&filepath).await.map_err(|err| {
+    HttpResponseError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      msg: format!("Error while opening the file {err}"),
+    }
+  })?;
+
+  let byte_stream =
+    codec::FramedRead::new(file, codec::BytesCodec::new()).map(|r| {
+      let bytes = r?.freeze();
+      Ok::<_, std::io::Error>(bytes)
+    });
+
+  let body = hyper::Body::wrap_stream(byte_stream);
   let options = ImportImageOptions { quiet: false };
   let mut stream = docker_api.import_image(options, body, None);
   while let Some(Ok(res)) = stream.next().await {
     log::debug!("Import image: {:?}", res);
   }
+
+  web::block(move || std::fs::remove_file(filepath))
+    .await
+    .map_err(|err| HttpResponseError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      msg: format!("Error while removing the file {err}"),
+    })?;
+
   Ok(web::HttpResponse::Ok().into())
 }
 
@@ -146,9 +198,11 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 pub mod tests {
   use super::*;
 
+  use std::io::Read;
+
   use ntex::http::StatusCode;
   use bollard::service::ImageInspect;
-  use futures::{TryStreamExt, StreamExt};
+  use futures::{StreamExt, TryStreamExt};
 
   use nanocl_stubs::generic::GenericDelete;
 
@@ -199,20 +253,59 @@ pub mod tests {
     Ok(())
   }
 
-  /// Test to import cargo image
-  pub async fn test_import_images(
-    srv: &TestServer,
-    payload: &[u8],
-  ) -> TestReqRet {
-    srv.post("/cargoes/images/import").send_body(payload).await
-  }
-
   /// Basic test to list cargo images
   #[ntex::test]
   pub async fn basic_list() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
     let resp = list(&srv).await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::OK,
+      "Expect basic to return status {} got {}",
+      StatusCode::OK,
+      status
+    );
+
+    Ok(())
+  }
+
+  /// Test to upload a cargo image as tarball
+  #[ntex::test]
+  pub async fn upload_tarball() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+
+    let curr_path = std::env::current_dir().unwrap();
+    let path =
+      std::path::Path::new(&curr_path).join("../../tests/busybox.tar.gz");
+    println!("{}", &path.display());
+    // Read file into a stream
+    let mut file = std::fs::File::open(path).unwrap();
+
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf).unwrap();
+    buf.extend_from_slice(
+      "\r\n--abbc761f78ff4d7cb7573b5a23f96ef0--\r\n".as_bytes(),
+    );
+
+    let mut payload = b"\r\n--abbc761f78ff4d7cb7573b5a23f96ef0\r\n\
+    Content-Type: application/octet-stream\r\n\
+    Content-Disposition: form-data; name=\"file\"; filename=\"busybox.tar.gz\"\r\n\r\n"
+      .to_vec();
+    payload.extend_from_slice(&buf);
+
+    let resp = srv
+      .post("/cargoes/images/import")
+      .set_header(
+        ntex::http::header::CONTENT_TYPE,
+        ntex::http::header::HeaderValue::from_static(
+          "multipart/mixed; boundary=\"abbc761f78ff4d7cb7573b5a23f96ef0\"",
+        ),
+      )
+      .send_body(payload)
+      .await?;
+
     let status = resp.status();
     assert_eq!(
       status,
@@ -243,16 +336,6 @@ pub mod tests {
       status
     );
 
-    Ok(())
-  }
-
-  /// Basic test for importing cargo image
-  #[ntex::test]
-  pub async fn test_import_images() -> TestRet {
-    let srv = generate_server(ntex_config).await;
-    let payload = vec![1, 2, 3];
-    let res = test_import_images(&srv, &payload).await?;
-    assert_eq!(res.status(), StatusCode::OK);
     Ok(())
   }
 
