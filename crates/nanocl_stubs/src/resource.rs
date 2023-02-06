@@ -151,7 +151,9 @@ pub struct ResourceConfig {
   pub data: serde_json::Value,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceQuery {
   pub kind: Option<ResourceKind>,
   pub contains: Option<String>,

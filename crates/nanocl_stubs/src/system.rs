@@ -11,7 +11,7 @@ use super::resource::Resource;
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct HostInfo {
   /// Docker contains information about the docker daemon
-  #[serde(flatten)]
+  #[cfg_attr(feature = "serde", serde(flatten))]
   pub docker: SystemInfo,
   /// HostGateway is the gateway address of the host
   pub host_gateway: String,
