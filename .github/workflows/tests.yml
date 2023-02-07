@@ -37,7 +37,7 @@ jobs:
       run: |
         sudo ./scripts/prepare_tests.sh
         sudo ./scripts/install_docker.ubuntu.sh
-        sudo mkdir /tmp
+        sudo mkdir -p /tmp
         sudo chmod 777 /tmp
     # Setup daemon for the tests
     - name: Setup
