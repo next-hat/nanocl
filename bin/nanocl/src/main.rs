@@ -92,9 +92,11 @@ mod tests {
       "image",
       "import",
       "-f",
-      "../../tests/busybox.tar.gz",
+      "./tests/busybox.tar.gz",
     ]);
-    assert!(execute_args(&args).await.is_ok());
+    let res = execute_args(&args).await;
+    println!("res : {res:#?}");
+    assert!(res.is_ok());
   }
 
   /// Test Cargo commands

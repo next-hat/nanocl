@@ -54,6 +54,7 @@ async fn inspect_cargo_image(
   name: web::types::Path<String>,
   docker_api: web::types::State<bollard::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
+  println!("Inspect image : {name}");
   let image =
     utils::cargo_image::inspect(&name.into_inner(), &docker_api).await?;
 
@@ -76,6 +77,7 @@ async fn create_cargo_image(
   docker_api: web::types::State<bollard::Docker>,
   web::types::Json(payload): web::types::Json<CargoImagePartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
+  println!("Pulling cargo image {}", &payload.name);
   let (from_image, tag) = utils::cargo_image::parse_image_info(&payload.name)?;
   let rx_body =
     utils::cargo_image::download(&from_image, &tag, &docker_api).await?;
