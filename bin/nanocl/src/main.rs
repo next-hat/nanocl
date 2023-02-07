@@ -92,7 +92,7 @@ mod tests {
       "image",
       "import",
       "-f",
-      "./tests/busybox.tar.gz",
+      "../../tests/busybox.tar.gz",
     ]);
     let res = execute_args(&args).await;
     println!("res : {res:#?}");
