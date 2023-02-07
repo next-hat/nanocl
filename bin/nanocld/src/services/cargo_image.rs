@@ -135,8 +135,10 @@ async fn import_images(
     ntex::channel::mpsc::channel::<Result<ntex::util::Bytes, std::io::Error>>();
   rt::spawn(async move {
     // File::create is blocking operation, use threadpool
-    let mut f =
-      std::fs::File::create(&filepath).map_err(|err| HttpResponseError {
+    let file_path_ptr = filepath.clone();
+    let mut f = web::block(|| std::fs::File::create(file_path_ptr))
+      .await
+      .map_err(|err| HttpResponseError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Error while creating the file {err}"),
       })?;
