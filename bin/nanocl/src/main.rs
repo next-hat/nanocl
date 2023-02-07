@@ -86,13 +86,16 @@ mod tests {
     let args = Cli::parse_from(["nanocl", "cargo", "image", "rm", IMAGE_NAME]);
     assert!(execute_args(&args).await.is_ok());
     // Try to import a cargo image from a tarball
+    let fp = std::env::current_dir()
+      .unwrap()
+      .join("../../tests/busybox.tar.gz");
     let args = Cli::parse_from([
       "nanocl",
       "cargo",
       "image",
       "import",
       "-f",
-      "../../tests/busybox.tar.gz",
+      &fp.display().to_string(),
     ]);
     let res = execute_args(&args).await;
     println!("res : {res:#?}");
