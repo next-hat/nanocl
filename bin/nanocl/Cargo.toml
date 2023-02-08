@@ -29,7 +29,7 @@ bollard-next = { version = "0.14.1" }
 chrono = "0.4.23"
 
 [dependencies]
-nanocld_client = { version = "0.0.7", features = ["tokio"] }
+nanocld_client = { version = "0.0.8", features = ["tokio"] }
 bollard-next = { version = "0.14.1" }
 futures = "0.3"
 serde_yaml = "0.9"

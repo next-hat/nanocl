@@ -138,6 +138,12 @@ pub struct CargoResetOpts {
   pub history_id: String,
 }
 
+#[derive(Debug, Parser)]
+pub struct CargoLogsOpts {
+  /// Name of cargo to show logs
+  pub name: String,
+}
+
 #[derive(Debug, Subcommand)]
 #[clap(about, version)]
 pub enum CargoCommands {
@@ -165,6 +171,8 @@ pub enum CargoCommands {
   History(CargoHistoryOpts),
   /// Reset cargo to a specific history
   Reset(CargoResetOpts),
+  /// Show logs
+  Logs(CargoLogsOpts),
 }
 
 /// Manage cargoes

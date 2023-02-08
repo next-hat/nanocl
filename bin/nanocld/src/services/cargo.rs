@@ -339,6 +339,19 @@ async fn reset_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
+#[web::get("/cargoes/{name}/logs")]
+async fn logs_cargo(
+  docker_api: web::types::State<bollard_next::Docker>,
+  name: web::types::Path<String>,
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &name);
+  log::debug!("Getting cargo logs : {}", &key);
+  let steam = utils::cargo::get_logs(&key, &docker_api).await?;
+  Ok(web::HttpResponse::Ok().streaming(steam))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
@@ -350,6 +363,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_cargo_history);
   config.service(reset_cargo);
   config.service(exec_command);
+  config.service(logs_cargo);
 }
 
 #[cfg(test)]
@@ -358,7 +372,7 @@ mod tests {
 
   use ntex::http::StatusCode;
   use futures::{TryStreamExt, StreamExt};
-  use nanocl_stubs::cargo::{Cargo, CargoSummary, CargoInspect, ExecOutput};
+  use nanocl_stubs::cargo::{Cargo, CargoSummary, CargoInspect, CargoOutput};
   use nanocl_stubs::cargo_config::{
     CargoConfigPartial, CargoConfigPatch, CargoConfig,
   };
@@ -499,9 +513,36 @@ mod tests {
       };
       payload.extend_from_slice(&data);
       if data.last() == Some(&b'\n') {
-        let _ = serde_json::from_slice::<ExecOutput>(&payload)?;
+        let _ = serde_json::from_slice::<CargoOutput>(&payload)?;
         payload.clear();
       }
+    }
+    Ok(())
+  }
+
+  #[ntex::test]
+  async fn test_logs() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+
+    const CARGO_NAME: &str = "store";
+
+    let res = srv
+      .get(format!("/cargoes/{CARGO_NAME}/logs"))
+      .query(&GenericNspQuery {
+        namespace: Some("system".into()),
+      })
+      .unwrap()
+      .send()
+      .await?;
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let mut stream = res.into_stream();
+    let mut payload = Vec::new();
+    let data = stream.next().await.unwrap().unwrap();
+    payload.extend_from_slice(&data);
+    if data.last() == Some(&b'\n') {
+      let _ = serde_json::from_slice::<CargoOutput>(&payload)?;
+      payload.clear();
     }
     Ok(())
   }

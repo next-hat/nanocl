@@ -2,14 +2,14 @@ use futures::StreamExt;
 use bollard_next::exec::CreateExecOptions;
 
 use nanocld_client::NanoclClient;
-use nanocld_client::stubs::cargo::ExecOutputKind;
+use nanocld_client::stubs::cargo::CargoOutputKind;
 
 use crate::utils::print::*;
 use crate::error::CliError;
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
-  CargoExecOpts, CargoHistoryOpts, CargoResetOpts,
+  CargoExecOpts, CargoHistoryOpts, CargoResetOpts, CargoLogsOpts,
 };
 
 use super::cargo_image;
@@ -122,14 +122,14 @@ async fn exec_cargo_exec(
 
   while let Some(output) = stream.next().await {
     match output.kind {
-      ExecOutputKind::StdOut => {
+      CargoOutputKind::StdOut => {
         print!("{}", &output.data);
       }
-      ExecOutputKind::StdErr => {
+      CargoOutputKind::StdErr => {
         eprint!("{}", output.data);
       }
-      ExecOutputKind::StdIn => println!("TODO: StdIn {}", &output.data),
-      ExecOutputKind::Console => print!("{}", &output.data),
+      CargoOutputKind::StdIn => println!("TODO: StdIn {}", &output.data),
+      CargoOutputKind::Console => print!("{}", &output.data),
     }
   }
 
@@ -147,6 +147,36 @@ async fn exec_cargo_history(
 
   let histories = serde_yaml::to_string(&histories)?;
   println!("{histories}");
+  Ok(())
+}
+
+async fn exec_cargo_logs(
+  client: &NanoclClient,
+  args: &CargoArgs,
+  options: &CargoLogsOpts,
+) -> Result<(), CliError> {
+  let mut stream = client
+    .logs_cargo(&options.name, args.namespace.to_owned())
+    .await?;
+  while let Some(log) = stream.next().await {
+    let log = match log {
+      Ok(log) => log,
+      Err(e) => {
+        eprintln!("Error: {e}");
+        break;
+      }
+    };
+    match log.kind {
+      CargoOutputKind::StdOut => {
+        print!("{}", &log.data);
+      }
+      CargoOutputKind::StdErr => {
+        eprint!("{}", log.data);
+      }
+      CargoOutputKind::StdIn => println!("TODO: StdIn {}", &log.data),
+      CargoOutputKind::Console => print!("{}", &log.data),
+    }
+  }
   Ok(())
 }
 
@@ -198,6 +228,9 @@ pub async fn exec_cargo(
     }
     CargoCommands::Reset(options) => {
       exec_cargo_reset(client, args, options).await
+    }
+    CargoCommands::Logs(options) => {
+      exec_cargo_logs(client, args, options).await
     }
   }
 }

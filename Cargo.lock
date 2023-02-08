@@ -1382,7 +1382,8 @@ dependencies = [
  "futures",
  "hyper",
  "indicatif",
- "nanocld_client",
+ "nanocld_client 0.0.7",
+ "nanocld_client 0.0.8",
  "ntex",
  "serde",
  "serde_json",
@@ -1399,6 +1400,18 @@ dependencies = [
 [[package]]
 name = "nanocl_stubs"
 version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e234f6586f2056d7cb4d7485277b2d27253a3759e6dd765bd4b39bcdcb41398"
+dependencies = [
+ "bollard-next",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "nanocl_stubs"
+version = "0.0.8"
 dependencies = [
  "bollard-next",
  "serde",
@@ -1422,7 +1435,7 @@ dependencies = [
  "hyper",
  "libc",
  "log",
- "nanocl_stubs",
+ "nanocl_stubs 0.0.8",
  "ntex",
  "r2d2",
  "rustls",
@@ -1441,10 +1454,26 @@ dependencies = [
 [[package]]
 name = "nanocld_client"
 version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fd7a6fa6ea084583646db420d9da1be975b9c33c52432fca1d852b368470012"
 dependencies = [
  "bollard-next",
  "futures",
- "nanocl_stubs",
+ "nanocl_stubs 0.0.7",
+ "ntex",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "thiserror",
+]
+
+[[package]]
+name = "nanocld_client"
+version = "0.0.8"
+dependencies = [
+ "bollard-next",
+ "futures",
+ "nanocl_stubs 0.0.8",
  "ntex",
  "serde",
  "serde_json",
@@ -2124,9 +2153,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.92"
+version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7434af0dc1cbd59268aa98b4c22c131c0584d2232f6fb166efb993e2832e896a"
+checksum = "cad406b69c91885b5107daf2c29572f6c8cdb3c66826821e286c533490c0bc76"
 dependencies = [
  "itoa",
  "ryu",

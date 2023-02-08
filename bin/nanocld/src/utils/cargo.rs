@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bollard_next::container::LogsOptions;
 use ntex::rt;
 use ntex::web;
 use ntex::util::Bytes;
@@ -13,7 +14,7 @@ use bollard_next::exec::{StartExecOptions, StartExecResults};
 
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, ExecOutput, ExecOutputKind,
+  Cargo, CargoSummary, CargoInspect, CargoOutput, CargoOutputKind,
   CargoExecConfig,
 };
 
@@ -615,8 +616,8 @@ pub async fn exec_command(
           };
           match data {
             LogOutput::StdErr { message } => {
-              let payload = serde_json::to_string(&ExecOutput {
-                kind: ExecOutputKind::StdErr,
+              let payload = serde_json::to_string(&CargoOutput {
+                kind: CargoOutputKind::StdErr,
                 data: String::from_utf8(message.to_vec()).unwrap_or_default(),
               })
               .unwrap_or_default()
@@ -627,8 +628,8 @@ pub async fn exec_command(
               }
             }
             LogOutput::StdOut { message } => {
-              let payload = serde_json::to_string(&ExecOutput {
-                kind: ExecOutputKind::StdOut,
+              let payload = serde_json::to_string(&CargoOutput {
+                kind: CargoOutputKind::StdOut,
                 data: String::from_utf8(message.to_vec()).unwrap_or_default(),
               })
               .unwrap_or_default()
@@ -638,8 +639,8 @@ pub async fn exec_command(
               }
             }
             LogOutput::StdIn { message } => {
-              let payload = serde_json::to_string(&ExecOutput {
-                kind: ExecOutputKind::StdIn,
+              let payload = serde_json::to_string(&CargoOutput {
+                kind: CargoOutputKind::StdIn,
                 data: String::from_utf8(message.to_vec()).unwrap_or_default(),
               })
               .unwrap_or_default()
@@ -649,8 +650,8 @@ pub async fn exec_command(
               }
             }
             LogOutput::Console { message } => {
-              let payload = serde_json::to_string(&ExecOutput {
-                kind: ExecOutputKind::Console,
+              let payload = serde_json::to_string(&CargoOutput {
+                kind: CargoOutputKind::Console,
                 data: String::from_utf8(message.to_vec()).unwrap_or_default(),
               })
               .unwrap_or_default()
@@ -703,4 +704,82 @@ pub async fn create_or_patch(
     utils::cargo::start(&key, docker_api).await?;
   }
   Ok(())
+}
+
+pub async fn get_logs(
+  name: &str,
+  docker_api: &bollard_next::Docker,
+) -> Result<mpsc::Receiver<Result<Bytes, web::error::Error>>, HttpResponseError>
+{
+  let (tx, rx) = mpsc::channel();
+  let mut stream = docker_api.logs(
+    name,
+    Some(LogsOptions::<String> {
+      follow: true,
+      stdout: true,
+      stderr: true,
+      ..Default::default()
+    }),
+  );
+  rt::spawn(async move {
+    while let Some(log) = stream.next().await {
+      let log = match log {
+        Ok(log) => log,
+        Err(err) => {
+          let _ = tx.send(Err(web::error::Error::new(
+            web::error::ErrorInternalServerError(err),
+          )));
+          break;
+        }
+      };
+      match log {
+        LogOutput::StdErr { message } => {
+          let payload = serde_json::to_string(&CargoOutput {
+            kind: CargoOutputKind::StdErr,
+            data: String::from_utf8(message.to_vec()).unwrap_or_default(),
+          })
+          .unwrap_or_default()
+            + "\n";
+
+          if tx.send(Ok(Bytes::from(payload))).is_err() {
+            break;
+          }
+        }
+        LogOutput::StdOut { message } => {
+          let payload = serde_json::to_string(&CargoOutput {
+            kind: CargoOutputKind::StdOut,
+            data: String::from_utf8(message.to_vec()).unwrap_or_default(),
+          })
+          .unwrap_or_default()
+            + "\n";
+          if tx.send(Ok(Bytes::from(payload))).is_err() {
+            break;
+          }
+        }
+        LogOutput::StdIn { message } => {
+          let payload = serde_json::to_string(&CargoOutput {
+            kind: CargoOutputKind::StdIn,
+            data: String::from_utf8(message.to_vec()).unwrap_or_default(),
+          })
+          .unwrap_or_default()
+            + "\n";
+          if tx.send(Ok(Bytes::from(payload))).is_err() {
+            break;
+          }
+        }
+        LogOutput::Console { message } => {
+          let payload = serde_json::to_string(&CargoOutput {
+            kind: CargoOutputKind::Console,
+            data: String::from_utf8(message.to_vec()).unwrap_or_default(),
+          })
+          .unwrap_or_default()
+            + "\n";
+          if tx.send(Ok(Bytes::from(payload))).is_err() {
+            break;
+          }
+        }
+      }
+    }
+  });
+  Ok(rx)
 }

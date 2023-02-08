@@ -78,7 +78,8 @@ pub struct CargoInspect {
 /// Kind of ExecOutput
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum ExecOutputKind {
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum CargoOutputKind {
   /// Data is a standard input
   StdIn,
   /// Data is a standard output
@@ -93,9 +94,10 @@ pub enum ExecOutputKind {
 /// It contains the kind of the output and the data
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ExecOutput {
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct CargoOutput {
   /// Kind of the output
-  pub kind: ExecOutputKind,
+  pub kind: CargoOutputKind,
   /// Data of the output
   pub data: String,
 }
