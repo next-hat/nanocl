@@ -9,7 +9,7 @@ pub struct BootState {
   /// The database connection pool
   pub(crate) pool: Pool,
   /// The docker client
-  pub(crate) docker_api: bollard::Docker,
+  pub(crate) docker_api: bollard_next::Docker,
   /// The config of the daemon
   pub(crate) config: DaemonConfig,
   /// The event emitter

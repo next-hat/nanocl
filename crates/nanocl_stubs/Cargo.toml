@@ -13,7 +13,7 @@ repository = "https://github.com/nxthat/nanocl"
 serde = ["dep:serde", "uuid/serde"]
 
 [dependencies]
-bollard = { version = "0.14", git = "https://github.com/leon3s/bollard" }
+bollard-next = { version = "0.14.1" }
 uuid = { version = "1.2.2" }
 serde = { version = "1.0.152", features = ["derive"], optional = true }
 serde_json = "1.0.91"

@@ -32,7 +32,7 @@ impl NanoclClient {
   /// let client = NanoclClient::connect_with_unix_default();
   /// let new_cargo = CargoConfigPartial {
   ///  name: String::from("my-cargo"),
-  ///  container: bollard::container::Config {
+  ///  container: bollard_next::container::Config {
   ///    image: Some(String::from("alpine"))
   ///    ..Default::default()
   ///   }
@@ -439,7 +439,7 @@ mod tests {
 
     let new_cargo = CargoConfigPartial {
       name: CARGO_NAME.into(),
-      container: bollard::container::Config {
+      container: bollard_next::container::Config {
         image: Some("nexthat/nanocl-get-started:latest".into()),
         ..Default::default()
       },
@@ -451,7 +451,7 @@ mod tests {
     client.inspect_cargo(CARGO_NAME, None).await.unwrap();
 
     let new_cargo = CargoConfigPatch {
-      container: Some(bollard::container::Config {
+      container: Some(bollard_next::container::Config {
         image: Some("nexthat/nanocl-get-started:latest".into()),
         env: Some(vec!["TEST=1".into()]),
         ..Default::default()
@@ -483,7 +483,7 @@ mod tests {
 
     let new_cargo = CargoConfigPartial {
       name: "client-test-cargowi".into(),
-      container: bollard::container::Config {
+      container: bollard_next::container::Config {
         image: Some("random_image:ggwp".into()),
         ..Default::default()
       },
@@ -504,7 +504,7 @@ mod tests {
 
     let new_cargo = CargoConfigPartial {
       name: "client-test-cargodup".into(),
-      container: bollard::container::Config {
+      container: bollard_next::container::Config {
         image: Some("nexthat/nanocl-get-started:latest".into()),
         ..Default::default()
       },

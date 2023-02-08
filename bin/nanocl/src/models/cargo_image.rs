@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
-use bollard::models::ImageSummary;
+use bollard_next::models::ImageSummary;
 
 #[derive(Debug, Parser)]
 pub struct CargoImageRemoveOpts {

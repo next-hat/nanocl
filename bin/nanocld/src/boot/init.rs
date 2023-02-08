@@ -10,10 +10,10 @@ use crate::error::DaemonError;
 pub async fn init(
   daemon_conf: &DaemonConfig,
 ) -> Result<BootState, DaemonError> {
-  let docker_api = bollard::Docker::connect_with_unix(
+  let docker_api = bollard_next::Docker::connect_with_unix(
     &daemon_conf.docker_host,
     120,
-    bollard::API_DEFAULT_VERSION,
+    bollard_next::API_DEFAULT_VERSION,
   )?;
   super::system::ensure_network("system", &docker_api).await?;
   let pool = super::store::ensure(daemon_conf, &docker_api).await?;

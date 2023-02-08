@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use tokio_util::codec;
 use futures::StreamExt;
 use ntex::http::StatusCode;
-use bollard::service::ProgressDetail;
+use bollard_next::service::ProgressDetail;
 use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
 
 use nanocld_client::NanoclClient;

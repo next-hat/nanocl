@@ -13,7 +13,7 @@ pub enum CliError {
   #[error(transparent)]
   Client(#[from] NanoclClientError),
   #[error(transparent)]
-  Docker(#[from] bollard::errors::Error),
+  Docker(#[from] bollard_next::errors::Error),
   #[error(transparent)]
   ParseJson(#[from] serde_json::Error),
   #[error(transparent)]

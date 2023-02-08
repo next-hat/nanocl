@@ -56,7 +56,7 @@ pub fn parse_state(
 
 pub async fn apply_deployment(
   data: StateDeployment,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
   event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
@@ -122,7 +122,7 @@ pub async fn apply_deployment(
 
 pub async fn apply_cargo(
   data: StateCargo,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
   event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
@@ -193,7 +193,7 @@ pub async fn apply_resource(
 
 pub async fn revert_deployment(
   data: StateDeployment,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
   event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
@@ -239,7 +239,7 @@ pub async fn revert_deployment(
 
 pub async fn revert_cargo(
   data: StateCargo,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
   event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {

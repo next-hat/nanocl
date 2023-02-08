@@ -4,8 +4,8 @@ use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use ntex::http::StatusCode;
 use futures::StreamExt;
-use bollard::Docker;
-use bollard::models::{ImageInspect, ImageSummary};
+use bollard_next::Docker;
+use bollard_next::models::{ImageInspect, ImageSummary};
 
 use nanocl_stubs::generic::GenericDelete;
 
@@ -16,7 +16,7 @@ use crate::error::HttpResponseError;
 /// List all cargo images installed
 ///
 /// ## Arguments
-/// - [docker_api](bollard::Docker) docker api client
+/// - [docker_api](bollard_next::Docker) docker api client
 ///
 /// ## Return
 /// - [Result](Result) - The result of the operation
@@ -26,7 +26,7 @@ use crate::error::HttpResponseError;
 /// ## Example
 ///
 /// ```rust,norun
-/// use bollard::Docker;
+/// use bollard_next::Docker;
 /// use crate::utils::cargo_image;
 ///
 /// let docker_api = Docker::connect_with_local_defaults().unwrap();
@@ -35,7 +35,7 @@ use crate::error::HttpResponseError;
 ///
 pub async fn list(
   docker_api: &Docker,
-  opts: bollard::image::ListImagesOptions<String>,
+  opts: bollard_next::image::ListImagesOptions<String>,
 ) -> Result<Vec<ImageSummary>, HttpResponseError> {
   let items = docker_api.list_images(Some(opts)).await?;
 
@@ -49,7 +49,7 @@ pub async fn list(
 /// ## Arguments
 ///
 /// - [image_name](str) name of the image to inspect
-/// - [docker_api](bollard::Docker) docker api client
+/// - [docker_api](bollard_next::Docker) docker api client
 ///
 /// ## Return
 ///
@@ -60,7 +60,7 @@ pub async fn list(
 /// ## Example
 ///
 /// ```rust,norun
-/// use bollard::Docker;
+/// use bollard_next::Docker;
 /// use crate::utils::cargo_image;
 ///
 /// let docker_api = Docker::connect_with_local_defaults().unwrap();
@@ -84,7 +84,7 @@ pub async fn inspect(
 ///
 /// - [image_name](str) name of the image to download
 /// - [tag](str) tag of the image to download
-/// - [docker_api](bollard::Docker) docker api client
+/// - [docker_api](bollard_next::Docker) docker api client
 ///
 ///
 /// ## Return
@@ -96,7 +96,7 @@ pub async fn inspect(
 /// ## Example
 ///
 /// ```rust,norun
-/// use bollard::Docker;
+/// use bollard_next::Docker;
 /// use futures::StreamExt;
 /// use crate::utils::cargo_image;
 ///
@@ -120,7 +120,7 @@ pub async fn download(
 
   rt::spawn(async move {
     let mut stream = docker_api.create_image(
-      Some(bollard::image::CreateImageOptions {
+      Some(bollard_next::image::CreateImageOptions {
         from_image,
         tag,
         ..Default::default()
@@ -179,7 +179,7 @@ pub async fn download(
 /// ## Arguments
 ///
 /// - [image_name](str) name of the image to delete
-/// - [docker_api](bollard::Docker) docker api client
+/// - [docker_api](bollard_next::Docker) docker api client
 ///
 /// ## Return
 ///
@@ -190,7 +190,7 @@ pub async fn download(
 /// ## Example
 ///
 /// ```rust,norun
-/// use bollard::Docker;
+/// use bollard_next::Docker;
 /// use crate::utils::cargo_image;
 ///
 /// let docker_api = Docker::connect_with_local_defaults().unwrap();

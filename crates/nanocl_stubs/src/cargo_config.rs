@@ -1,8 +1,8 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-pub type ContainerConfig<T> = bollard::container::Config<T>;
-pub type ContainerHostConfig = bollard::models::HostConfig;
+pub type ContainerConfig<T> = bollard_next::container::Config<T>;
+pub type ContainerHostConfig = bollard_next::models::HostConfig;
 
 /// Auto is used to automatically define that the number of replicas in the cluster
 /// Number is used to manually set the number of replicas
@@ -57,7 +57,7 @@ pub struct CargoConfigPatch {
   /// New DNS entry of the cargo
   pub dns_entry: Option<String>,
   /// New replication configuration of the cargo
-  pub container: Option<bollard::container::Config<String>>,
+  pub container: Option<bollard_next::container::Config<String>>,
   /// New container configuration of the cargo
   pub replication: Option<CargoReplication>,
 }

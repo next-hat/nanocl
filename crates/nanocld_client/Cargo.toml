@@ -1,6 +1,6 @@
 [package]
 name = "nanocld_client"
-version = "0.0.6"
+version = "0.0.7"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Nanocl daemon api client"
@@ -20,9 +20,9 @@ tokio-util = "0.7.4"
 tokio = { version = "1.25.0", features = ["fs"] }
 
 [dependencies]
-bollard = { version = "0.14", git = "https://github.com/leon3s/bollard" }
+bollard-next = { version = "0.14.1" }
 futures = "0.3.25"
-nanocl_stubs = { version = "0.0.5", features = ["serde"] }
+nanocl_stubs = { version = "0.0.6", features = ["serde"] }
 ntex = { version = "0.6.1" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = "1.0.91"

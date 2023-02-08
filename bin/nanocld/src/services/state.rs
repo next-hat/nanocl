@@ -9,7 +9,7 @@ use crate::error::HttpResponseError;
 #[web::put("/state/apply")]
 async fn apply(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   pool: web::types::State<Pool>,
   event_emitter: web::types::State<EventEmitterPtr>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -32,7 +32,7 @@ async fn apply(
 #[web::put("/state/revert")]
 async fn revert(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   pool: web::types::State<Pool>,
   event_emitter: web::types::State<EventEmitterPtr>,
 ) -> Result<web::HttpResponse, HttpResponseError> {

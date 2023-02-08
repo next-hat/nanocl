@@ -21,7 +21,7 @@ impl NanoclClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - [Vec](Vec) of [ImageSummary](bollard::models::ImageSummary)
+  ///   * [Ok](Ok) - [Vec](Vec) of [ImageSummary](bollard_next::models::ImageSummary)
   ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
   ///
   /// ## Example
@@ -36,7 +36,7 @@ impl NanoclClient {
   pub async fn list_cargo_image(
     &self,
     opts: Option<ListCargoImagesOptions>,
-  ) -> Result<Vec<bollard::models::ImageSummary>, NanoclClientError> {
+  ) -> Result<Vec<bollard_next::models::ImageSummary>, NanoclClientError> {
     let mut req = self.get(String::from("/cargoes/images"));
     if let Some(opts) = opts {
       req = req.query(&opts)?;
@@ -46,14 +46,16 @@ impl NanoclClient {
     let status = res.status();
     is_api_error(&mut res, &status).await?;
 
-    let body = res.json::<Vec<bollard::models::ImageSummary>>().await?;
+    let body = res
+      .json::<Vec<bollard_next::models::ImageSummary>>()
+      .await?;
 
     Ok(body)
   }
 
   /// ## Create a cargo image
   ///
-  /// This method will create a cargo image and return a stream of [CreateImageInfo](bollard::models::CreateImageInfo)
+  /// This method will create a cargo image and return a stream of [CreateImageInfo](bollard_next::models::CreateImageInfo)
   /// that can be used to follow the progress of the image creation.
   /// The stream will be closed when the image creation is done.
   ///
@@ -64,7 +66,7 @@ impl NanoclClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - [mpsc::Receiver](mpsc::Receiver) of [CreateImageInfo](bollard::models::CreateImageInfo) as Stream
+  ///   * [Ok](Ok) - [mpsc::Receiver](mpsc::Receiver) of [CreateImageInfo](bollard_next::models::CreateImageInfo) as Stream
   ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
   ///
   /// ## Example
@@ -82,8 +84,10 @@ impl NanoclClient {
   pub async fn create_cargo_image(
     &self,
     name: &str,
-  ) -> Result<mpsc::Receiver<bollard::models::CreateImageInfo>, NanoclClientError>
-  {
+  ) -> Result<
+    mpsc::Receiver<bollard_next::models::CreateImageInfo>,
+    NanoclClientError,
+  > {
     let mut res = self
       .post(String::from("/cargoes/images"))
       .send_json(&CargoImagePartial {
@@ -94,7 +98,7 @@ impl NanoclClient {
     is_api_error(&mut res, &status).await?;
 
     let name = name.to_owned();
-    let (sx, rx) = mpsc::channel::<bollard::models::CreateImageInfo>();
+    let (sx, rx) = mpsc::channel::<bollard_next::models::CreateImageInfo>();
     rt::spawn(async move {
       let mut payload_size = 0;
       let mut payload = String::new();
@@ -121,7 +125,7 @@ impl NanoclClient {
           payload = format!("{payload}{data}");
         } else {
           // Otherwise we can convert the data into json and send it
-          let json = serde_json::from_str::<bollard::models::CreateImageInfo>(data).map_err(| err | ApiError {
+          let json = serde_json::from_str::<bollard_next::models::CreateImageInfo>(data).map_err(| err | ApiError {
             msg: format!("Unable to parse json while creating image {name} got error : {err}"),
             status: StatusCode::INTERNAL_SERVER_ERROR,
           })?;
@@ -184,7 +188,7 @@ impl NanoclClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - [ImageInspect](bollard::models::ImageInspect) of the image
+  ///   * [Ok](Ok) - [ImageInspect](bollard_next::models::ImageInspect) of the image
   ///   * [Err](Err) - [NanoclClientError](NanoclClientError) if the request failed
   ///
   /// ## Example
@@ -199,13 +203,13 @@ impl NanoclClient {
   pub async fn inspect_cargo_image(
     &self,
     name: &str,
-  ) -> Result<bollard::models::ImageInspect, NanoclClientError> {
+  ) -> Result<bollard_next::models::ImageInspect, NanoclClientError> {
     let mut res = self.get(format!("/cargoes/images/{name}")).send().await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
 
-    let ct_image = res.json::<bollard::models::ImageInspect>().await?;
+    let ct_image = res.json::<bollard_next::models::ImageInspect>().await?;
 
     Ok(ct_image)
   }

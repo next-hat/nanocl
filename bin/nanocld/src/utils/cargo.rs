@@ -6,10 +6,10 @@ use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use ntex::http::StatusCode;
 use futures::StreamExt;
-use bollard::container::LogOutput;
-use bollard::service::{ContainerSummary, HostConfig};
-use bollard::container::{ListContainersOptions, RemoveContainerOptions};
-use bollard::exec::{StartExecOptions, StartExecResults};
+use bollard_next::container::LogOutput;
+use bollard_next::service::{ContainerSummary, HostConfig};
+use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
+use bollard_next::exec::{StartExecOptions, StartExecResults};
 
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 use nanocl_stubs::cargo::{
@@ -38,7 +38,7 @@ use crate::models::Pool;
 ///
 /// - [cargo](Cargo) - The cargo
 /// - [number](i64) - The number of containers to create
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
@@ -49,7 +49,7 @@ use crate::models::Pool;
 async fn create_instance(
   cargo: &Cargo,
   number: i64,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
 ) -> Result<Vec<String>, HttpResponseError> {
   let mut instances = Vec::new();
   for current in 0..number {
@@ -59,7 +59,7 @@ async fn create_instance(
       cargo.key.to_owned()
     };
 
-    let create_options = bollard::container::CreateContainerOptions {
+    let create_options = bollard_next::container::CreateContainerOptions {
       name,
       ..Default::default()
     };
@@ -75,7 +75,7 @@ async fn create_instance(
 
     // Merge the cargo config with the container config
     // And set his network mode to the cargo namespace
-    let config = bollard::container::Config {
+    let config = bollard_next::container::Config {
       attach_stderr: Some(true),
       attach_stdout: Some(true),
       tty: Some(true),
@@ -120,7 +120,7 @@ async fn create_instance(
 /// ## Arguments
 ///
 /// - [cargo_key](String) - The cargo key
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
@@ -130,7 +130,7 @@ async fn create_instance(
 ///
 pub async fn list_instance(
   cargo_key: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpResponseError> {
   let label = format!("io.nanocl.cargo={cargo_key}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
@@ -156,7 +156,7 @@ pub async fn list_instance(
 ///
 /// - [cargo_partial](CargoConfigPartial) - The cargo partial
 /// - [namespace](String) - The namespace
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -168,7 +168,7 @@ pub async fn list_instance(
 pub async fn create(
   namespace: &str,
   config: &CargoConfigPartial,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
   let cargo =
@@ -191,7 +191,7 @@ pub async fn create(
 /// ## Arguments
 ///
 /// - [cargo_key](str) - The cargo key
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
@@ -201,7 +201,7 @@ pub async fn create(
 ///
 pub async fn start(
   cargo_key: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
 ) -> Result<(), HttpResponseError> {
   let containers = list_instance(cargo_key, docker_api).await?;
 
@@ -223,7 +223,7 @@ pub async fn start(
 /// ## Arguments
 ///
 /// - [cargo_key](str) - The cargo key
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
@@ -233,7 +233,7 @@ pub async fn start(
 ///
 pub async fn stop(
   cargo_key: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
 ) -> Result<(), HttpResponseError> {
   let containers = list_instance(cargo_key, docker_api).await?;
 
@@ -255,7 +255,7 @@ pub async fn stop(
 /// ## Arguments
 ///
 /// - [cargo_key](str) - The cargo key
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -266,7 +266,7 @@ pub async fn stop(
 ///
 pub async fn delete(
   cargo_key: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
   force: Option<bool>,
 ) -> Result<(), HttpResponseError> {
@@ -304,7 +304,7 @@ pub async fn delete(
 /// ## Arguments
 /// - [cargo_key](str) - The cargo key
 /// - [cargo_partial](CargoPartial) - The cargo partial
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -315,7 +315,7 @@ pub async fn delete(
 pub async fn patch(
   cargo_key: &str,
   config: &CargoConfigPatch,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
   let cargo =
@@ -360,7 +360,7 @@ pub async fn patch(
     docker_api
       .rename_container(
         &container.id.unwrap_or_default(),
-        bollard::container::RenameContainerOptions { name },
+        bollard_next::container::RenameContainerOptions { name },
       )
       .await
       .map_err(|e| HttpResponseError {
@@ -380,7 +380,7 @@ pub async fn patch(
         docker_api
           .rename_container(
             &container.id.unwrap_or_default(),
-            bollard::container::RenameContainerOptions { name },
+            bollard_next::container::RenameContainerOptions { name },
           )
           .await
           .map_err(|e| HttpResponseError {
@@ -421,7 +421,7 @@ pub async fn patch(
       docker_api
         .rename_container(
           &container.id.unwrap_or_default(),
-          bollard::container::RenameContainerOptions { name },
+          bollard_next::container::RenameContainerOptions { name },
         )
         .await
         .map_err(|e| HttpResponseError {
@@ -458,7 +458,7 @@ pub async fn patch(
 /// ## Arguments
 ///
 /// - [nsp](str) - The namespace name
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -469,7 +469,7 @@ pub async fn patch(
 ///
 pub async fn list(
   nsp: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Vec<CargoSummary>, HttpResponseError> {
   let namespace =
@@ -511,7 +511,7 @@ pub async fn list(
 /// ## Arguments
 ///
 /// - [key](str) - The cargo key
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -522,7 +522,7 @@ pub async fn list(
 ///
 pub async fn inspect(
   key: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<CargoInspect, HttpResponseError> {
   let cargo = repositories::cargo::inspect_by_key(key.to_owned(), pool).await?;
@@ -551,7 +551,7 @@ pub async fn inspect(
 /// ## Arguments
 ///
 /// - [namespace](str) - The namespace name
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -566,13 +566,13 @@ pub async fn inspect(
 /// use crate::repositories;
 ///
 /// let namespace = "my-namespace";
-/// let docker_api = bollard::Docker::connect_with_local_defaults().unwrap();
+/// let docker_api = bollard_next::Docker::connect_with_local_defaults().unwrap();
 /// repositories::cargo::delete_by_namespace(namespace, &docker_api, &pool).await?;
 /// ```
 ///
 pub async fn delete_by_namespace(
   namespace: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<(), HttpResponseError> {
   let namespace =
@@ -594,7 +594,7 @@ pub async fn delete_by_namespace(
 pub async fn exec_command(
   name: &str,
   args: &CargoExecConfig<String>,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
 ) -> Result<mpsc::Receiver<Result<Bytes, web::error::Error>>, HttpResponseError>
 {
   let result = docker_api.create_exec(name, args.to_owned()).await?;
@@ -676,7 +676,7 @@ pub async fn exec_command(
 ///
 /// - [namespace](str) - The namespace name
 /// - [cargo](CargoConfigPartial) - The cargo config
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -688,7 +688,7 @@ pub async fn exec_command(
 pub async fn create_or_patch(
   namespace: &str,
   cargo: &CargoConfigPartial,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<(), HttpResponseError> {
   let key = utils::key::gen_key(namespace, &cargo.name);

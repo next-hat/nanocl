@@ -3,8 +3,8 @@ use std::time;
 use std::thread;
 use std::path::Path;
 
-use bollard::container::CreateContainerOptions;
-use bollard::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};
+use bollard_next::container::CreateContainerOptions;
+use bollard_next::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
 use nanocl_stubs::cargo_config::CargoConfigPartial;
@@ -64,8 +64,8 @@ fn gen_store_cargo_conf(
 /// Verify is store is running and boot it if not
 async fn boot(
   config: &DaemonConfig,
-  docker_api: &bollard::Docker,
-) -> Result<(), bollard::errors::Error> {
+  docker_api: &bollard_next::Docker,
+) -> Result<(), bollard_next::errors::Error> {
   let container_name = "system-store";
 
   if docker_api
@@ -95,7 +95,7 @@ async fn boot(
 /// It will return a connection Pool that will be use in our State.
 pub(crate) async fn ensure(
   config: &DaemonConfig,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
 ) -> Result<Pool, DaemonError> {
   log::info!("Booting store");
   boot(config, docker_api).await?;

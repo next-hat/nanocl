@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use bollard::network::{CreateNetworkOptions, InspectNetworkOptions};
-use bollard::container::{ListContainersOptions, InspectContainerOptions};
+use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
+use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 
 use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
@@ -16,7 +16,7 @@ use crate::models::Pool;
 /// This network is created to be sure a store is running inside.
 pub(crate) async fn ensure_network(
   name: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
 ) -> Result<(), DaemonError> {
   // Ensure network existance
   if docker_api
@@ -49,7 +49,7 @@ pub(crate) async fn ensure_network(
 pub(crate) async fn register_namespace(
   name: &str,
   create_network: bool,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<(), DaemonError> {
   if repositories::namespace::exist_by_name(name.to_owned(), pool).await? {
@@ -69,7 +69,7 @@ pub(crate) async fn register_namespace(
 /// Convert existing containers with our labels to cargo.
 /// We use it to be sure that all existing containers are registered as cargo.
 pub(crate) async fn sync_containers(
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<(), DaemonError> {
   log::info!("Syncing existing container");
@@ -104,7 +104,7 @@ pub(crate) async fn sync_containers(
       )
       .await?;
     let config = container.config.unwrap_or_default();
-    let mut config: bollard::container::Config<String> = config.into();
+    let mut config: bollard_next::container::Config<String> = config.into();
     config.host_config = container.host_config;
 
     // TODO: handle network config

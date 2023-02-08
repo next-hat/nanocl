@@ -1,9 +1,9 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard::models::ContainerSummary;
+use bollard_next::models::ContainerSummary;
 
-pub use bollard::exec::CreateExecOptions as CargoExecConfig;
+pub use bollard_next::exec::CreateExecOptions as CargoExecConfig;
 
 use super::cargo_config::CargoConfig;
 
