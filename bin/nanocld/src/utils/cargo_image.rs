@@ -128,10 +128,7 @@ pub async fn download(
       None,
       None,
     );
-    println!("starting stream");
-
     while let Some(result) = stream.next().await {
-      println!("result {result:#?}");
       match result {
         Err(err) => {
           let err = ntex::web::Error::new(web::error::InternalError::default(
@@ -160,8 +157,6 @@ pub async fn download(
           let len = data.len();
           let response = format!("{len}\n{data}\n");
 
-          println!("send response {response}");
-
           if tx
             .send(Ok::<_, web::error::Error>(Bytes::from(response)))
             .is_err()
@@ -172,8 +167,7 @@ pub async fn download(
         }
       }
     }
-    println!("done");
-    let _ = tx.send(Ok(Bytes::default()));
+    tx.close();
   });
   Ok(rx_body)
 }

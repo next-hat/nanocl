@@ -54,7 +54,6 @@ async fn inspect_cargo_image(
   name: web::types::Path<String>,
   docker_api: web::types::State<bollard::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  println!("Inspect image : {name}");
   let image =
     utils::cargo_image::inspect(&name.into_inner(), &docker_api).await?;
 
@@ -77,7 +76,6 @@ async fn create_cargo_image(
   docker_api: web::types::State<bollard::Docker>,
   web::types::Json(payload): web::types::Json<CargoImagePartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  println!("Pulling cargo image {}", &payload.name);
   let (from_image, tag) = utils::cargo_image::parse_image_info(&payload.name)?;
   let rx_body =
     utils::cargo_image::download(&from_image, &tag, &docker_api).await?;
@@ -156,9 +154,9 @@ async fn import_images(
       })?;
 
       let _ = tx.send(Ok(ntex::util::Bytes::from(
-        serde_json::to_string(&CargoImageImportInfo::Context(
+        serde_json::to_string(&CargoImageImportInfo::Context(Box::new(
           CargoImageImportContext { writed: total_size },
-        ))
+        )))
         .map_err(|err| HttpResponseError {
           status: StatusCode::INTERNAL_SERVER_ERROR,
           msg: format!("Error while serializing the context {err}"),
@@ -189,12 +187,11 @@ async fn import_images(
         msg: format!("Error while importing the image {err}"),
       })?;
       let _ = tx.send(Ok(ntex::util::Bytes::from(
-        serde_json::to_string(&CargoImageImportInfo::BuildInfo(res)).map_err(
-          |err| HttpResponseError {
+        serde_json::to_string(&CargoImageImportInfo::BuildInfo(Box::new(res)))
+          .map_err(|err| HttpResponseError {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             msg: format!("Error while serializing the context {err}"),
-          },
-        )?,
+          })?,
       )));
     }
     web::block(move || std::fs::remove_file(filepath))
@@ -203,11 +200,15 @@ async fn import_images(
         status: StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Error while removing the file {err}"),
       })?;
-    let _ = tx.send(Ok(ntex::util::Bytes::from("Done")));
+    tx.close();
     Ok::<_, HttpResponseError>(())
   });
 
-  Ok(web::HttpResponse::Ok().streaming(rx))
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("nanocl/streaming-v1")
+      .streaming(rx),
+  )
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
