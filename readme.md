@@ -66,7 +66,7 @@ Its cutting-edge technology crafted with precision using Rust, provides the best
 ## Easy Deployment and Management
 
 You can manage your infrastructure and scale it depending on your need, ensuring that your services are always running smoothly.
-Nanocl makes it easy to deploy your applications, services, or databases, with its intuitive user interface and streamlined deployment process. Whether you need to deploy publicly, privately, or under a VPN, Nanocl has got you covered.
+Nanocl makes it easy to deploy your applications, services, or databases, with its intuitive user interface and streamlined deployment process. Whether you need to deploy publicly, privately, or under a VPN, Nanocl has you covered.
 
 
 ## High Performance, Scallability and Security

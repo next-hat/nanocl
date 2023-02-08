@@ -25,8 +25,7 @@ for file in ./target/man/*; do
   pandoc --from man --to markdown < $file > ./doc/man/${file_name%.1}.md
 done
 
-# env OPENSSL_LIB_DIR=/usr/local/lib/ OPENSSL_INCLUDE_DIR=/usr/local/include OPENSSL_STATIC=yes cargo make release > /dev/null
-cargo build --bin nanocl --release --target=x86_64-unknown-linux-musl
+env OPENSSL_LIB_DIR=/usr/local/lib/ OPENSSL_INCLUDE_DIR=/usr/local/include OPENSSL_STATIC=yes cargo build --bin nanocl --release --target=x86_64-unknown-linux-musl
 strip ./target/x86_64-unknown-linux-musl/release/${pkg_name}
 upx ./target/x86_64-unknown-linux-musl/release/${pkg_name}
 cp ./target/x86_64-unknown-linux-musl/release/${pkg_name} ${release_path}/usr/local/bin
