@@ -3,7 +3,7 @@ use ntex::http::StatusCode;
 
 use thiserror::Error;
 use serde_json::json;
-use bollard::errors::Error as DockerError;
+use bollard_next::errors::Error as DockerError;
 
 use nanocl_stubs::config::DaemonConfig;
 

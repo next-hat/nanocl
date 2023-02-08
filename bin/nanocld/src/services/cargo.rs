@@ -33,7 +33,7 @@ use crate::models::{Pool, CargoResetPath};
 #[web::post("/cargoes")]
 pub async fn create_cargo(
   pool: web::types::State<Pool>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   event_emitter: web::types::State<EventEmitterPtr>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<CargoConfigPartial>,
@@ -73,7 +73,7 @@ pub async fn create_cargo(
 #[web::delete("/cargoes/{name}")]
 pub async fn delete_cargo(
   pool: web::types::State<Pool>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   event_emitter: web::types::State<EventEmitterPtr>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -109,7 +109,7 @@ pub async fn delete_cargo(
 #[web::post("/cargoes/{name}/start")]
 pub async fn start_cargo(
   pool: web::types::State<Pool>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   event_emitter: web::types::State<EventEmitterPtr>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -148,7 +148,7 @@ pub async fn start_cargo(
 #[web::post("/cargoes/{name}/stop")]
 pub async fn stop_cargo(
   pool: web::types::State<Pool>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   event_emitter: web::types::State<EventEmitterPtr>,
   id: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -187,7 +187,7 @@ pub async fn stop_cargo(
 #[web::patch("/cargoes/{name}")]
 pub async fn patch_cargo(
   pool: web::types::State<Pool>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   event_emitter: web::types::State<EventEmitterPtr>,
   id: web::types::Path<String>,
   payload: web::types::Json<CargoConfigPatch>,
@@ -224,7 +224,7 @@ pub async fn patch_cargo(
 #[web::get("/cargoes")]
 pub async fn list_cargo(
   pool: web::types::State<Pool>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
@@ -250,7 +250,7 @@ pub async fn list_cargo(
 #[web::get("/cargoes/{name}/inspect")]
 async fn inspect_cargo(
   pool: web::types::State<Pool>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   name: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -278,7 +278,7 @@ async fn exec_command(
   name: web::types::Path<String>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<CargoExecConfig<String>>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
@@ -302,7 +302,7 @@ async fn list_cargo_history(
 #[web::patch("/cargoes/{name}/histories/{id}/reset")]
 async fn reset_cargo(
   pool: web::types::State<Pool>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   path: web::types::Path<CargoResetPath>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   event_emitter: web::types::State<EventEmitterPtr>,
@@ -378,7 +378,7 @@ mod tests {
       .post("/cargoes")
       .send_json(&CargoConfigPartial {
         name: CARGO_NAME.to_string(),
-        container: bollard::container::Config {
+        container: bollard_next::container::Config {
           image: Some("nexthat/nanocl-get-started:latest".to_string()),
           ..Default::default()
         },
@@ -419,7 +419,7 @@ mod tests {
     let mut res = srv
       .patch(format!("/cargoes/{}", response.name))
       .send_json(&CargoConfigPatch {
-        container: Some(bollard::container::Config {
+        container: Some(bollard_next::container::Config {
           image: Some("nexthat/nanocl-get-started:latest".to_string()),
           env: Some(vec!["TEST=1".to_string()]),
           ..Default::default()

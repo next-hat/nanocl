@@ -1,6 +1,6 @@
 [package]
 name = "nanocl_stubs"
-version = "0.0.4"
+version = "0.0.7"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "Nanocl shared models"
@@ -13,7 +13,7 @@ repository = "https://github.com/nxthat/nanocl"
 serde = ["dep:serde", "uuid/serde"]
 
 [dependencies]
-bollard = "0.14"
+bollard-next = { version = "0.14.1" }
 uuid = { version = "1.2.2" }
 serde = { version = "1.0.152", features = ["derive"], optional = true }
 serde_json = "1.0.91"

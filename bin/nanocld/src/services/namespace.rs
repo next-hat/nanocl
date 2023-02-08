@@ -21,7 +21,7 @@ use crate::error::HttpResponseError;
 #[web::get("/namespaces")]
 async fn list_namespace(
   pool: web::types::State<Pool>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let items = utils::namespace::list(&docker_api, &pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
@@ -41,7 +41,7 @@ async fn list_namespace(
 #[web::post("/namespaces")]
 async fn create_namespace(
   web::types::Json(payload): web::types::Json<NamespacePartial>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Creating namespace: {:?}", &payload);
@@ -64,7 +64,7 @@ async fn create_namespace(
 #[web::delete("/namespaces/{name}")]
 async fn delete_namespace_by_name(
   name: web::types::Path<String>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = name.into_inner();
@@ -89,7 +89,7 @@ async fn delete_namespace_by_name(
 #[web::get("/namespaces/{id}/inspect")]
 async fn inspect_namespace_by_name(
   name: web::types::Path<String>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = name.into_inner();

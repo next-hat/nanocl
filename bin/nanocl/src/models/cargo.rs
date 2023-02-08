@@ -1,4 +1,4 @@
-use bollard::exec::CreateExecOptions;
+use bollard_next::exec::CreateExecOptions;
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
 

@@ -79,7 +79,7 @@ pub async fn find_by_namespace(
 /// let item = CargoConfigPartial {
 ///   //... fill required data
 ///   name: String::from("test"),
-///   container: bollard::container::Config {
+///   container: bollard_next::container::Config {
 ///     image: Some(String::from("test")),
 ///     ..Default::default()
 ///   },
@@ -237,7 +237,7 @@ pub async fn find_by_key(
 /// let item = CargoConfigPartial {
 ///  //... fill required data
 ///  name: String::from("test"),
-///  container: bollard::container::Config {
+///  container: bollard_next::container::Config {
 ///   image: Some(String::from("test")),
 ///   ..Default::default()
 ///  },

@@ -29,7 +29,7 @@ pub struct ListCargoImagesOptions {
 }
 
 impl From<ListCargoImagesOptions>
-  for bollard::image::ListImagesOptions<String>
+  for bollard_next::image::ListImagesOptions<String>
 {
   fn from(options: ListCargoImagesOptions) -> Self {
     Self {
@@ -59,6 +59,6 @@ pub struct CargoImageImportContext {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum CargoImageImportInfo {
-  BuildInfo(Box<bollard::models::BuildInfo>),
+  BuildInfo(Box<bollard_next::models::BuildInfo>),
   Context(Box<CargoImageImportContext>),
 }

@@ -7,7 +7,7 @@ use ntex::{web, rt};
 use ntex::http::StatusCode;
 use futures::StreamExt;
 use tokio_util::codec;
-use bollard::image::ImportImageOptions;
+use bollard_next::image::ImportImageOptions;
 
 use nanocl_stubs::cargo_image::{
   CargoImagePartial, ListCargoImagesOptions, CargoImageImportOptions,
@@ -28,7 +28,7 @@ use crate::error::HttpResponseError;
 ))]
 #[web::get("/cargoes/images")]
 async fn list_cargo_image(
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   web::types::Query(query): web::types::Query<ListCargoImagesOptions>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let images = utils::cargo_image::list(&docker_api, query.into()).await?;
@@ -52,7 +52,7 @@ async fn list_cargo_image(
 #[web::get("/cargoes/images/{id_or_name}*")]
 async fn inspect_cargo_image(
   name: web::types::Path<String>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let image =
     utils::cargo_image::inspect(&name.into_inner(), &docker_api).await?;
@@ -73,7 +73,7 @@ async fn inspect_cargo_image(
 ))]
 #[web::post("/cargoes/images")]
 async fn create_cargo_image(
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   web::types::Json(payload): web::types::Json<CargoImagePartial>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let (from_image, tag) = utils::cargo_image::parse_image_info(&payload.name)?;
@@ -102,7 +102,7 @@ async fn create_cargo_image(
 ))]
 #[web::delete("/cargoes/images/{id_or_name}*")]
 async fn delete_cargo_image_by_name(
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   id_or_name: web::types::Path<String>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let id_or_name = id_or_name.into_inner();
@@ -122,7 +122,7 @@ async fn delete_cargo_image_by_name(
 ))]
 #[web::post("/cargoes/images/import")]
 async fn import_images(
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
   mut payload: web::types::Payload,
   web::types::Query(query): web::types::Query<CargoImageImportOptions>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
@@ -225,7 +225,7 @@ pub mod tests {
   use super::*;
 
   use ntex::http::StatusCode;
-  use bollard::service::ImageInspect;
+  use bollard_next::service::ImageInspect;
   use futures::{StreamExt, TryStreamExt};
 
   use nanocl_stubs::generic::GenericDelete;

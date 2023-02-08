@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use bollard::exec::CreateExecOptions;
+use bollard_next::exec::CreateExecOptions;
 
 use nanocld_client::NanoclClient;
 use nanocld_client::stubs::cargo::ExecOutputKind;

@@ -21,7 +21,7 @@ async fn get_version() -> web::HttpResponse {
 #[web::get("/info")]
 async fn get_info(
   config: web::types::State<DaemonConfig>,
-  docker_api: web::types::State<bollard::Docker>,
+  docker_api: web::types::State<bollard_next::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let docker = docker_api.info().await?;
   let host_gateway = config.gateway.clone();

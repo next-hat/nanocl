@@ -39,13 +39,13 @@ pub mod tests {
       .try_init();
   }
 
-  pub fn gen_docker_client() -> bollard::Docker {
+  pub fn gen_docker_client() -> bollard_next::Docker {
     let socket_path = env::var("DOCKER_SOCKET_PATH")
       .unwrap_or_else(|_| String::from("/run/docker.sock"));
-    bollard::Docker::connect_with_unix(
+    bollard_next::Docker::connect_with_unix(
       &socket_path,
       120,
-      bollard::API_DEFAULT_VERSION,
+      bollard_next::API_DEFAULT_VERSION,
     )
     .unwrap()
   }

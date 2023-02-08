@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use bollard::network::CreateNetworkOptions;
-use bollard::network::InspectNetworkOptions;
+use bollard_next::network::CreateNetworkOptions;
+use bollard_next::network::InspectNetworkOptions;
 use nanocl_stubs::generic::GenericDelete;
 use ntex::http::StatusCode;
-use bollard::models::ContainerSummary;
-use bollard::container::ListContainersOptions;
+use bollard_next::models::ContainerSummary;
+use bollard_next::container::ListContainersOptions;
 
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
@@ -25,7 +25,7 @@ use super::cargo;
 /// ## Arguments
 ///
 /// - [namespace](NamespacePartial) - The namespace name
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -37,7 +37,7 @@ use super::cargo;
 /// ## Example
 ///
 /// ```rust,norun
-/// use bollard::Docker;
+/// use bollard_next::Docker;
 ///
 /// let docker_api = Docker::connect_with_local_defaults().unwrap();
 /// let result = namespace::create("my-namespace", &docker_api, &pool).await;
@@ -45,7 +45,7 @@ use super::cargo;
 ///
 pub async fn create(
   namespace: &NamespacePartial,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Namespace, HttpResponseError> {
   if repositories::namespace::exist_by_name(namespace.name.to_owned(), pool)
@@ -86,7 +86,7 @@ pub async fn create(
 /// ## Arguments
 ///
 /// - [name](String) - The namespace name
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -98,7 +98,7 @@ pub async fn create(
 /// ## Example
 ///
 /// ```rust,norun
-/// use bollard::Docker;
+/// use bollard_next::Docker;
 ///
 /// let docker_api = Docker::connect_with_local_defaults().unwrap();
 /// let result = namespace::delete_by_name("my-namespace", &docker_api, &pool).await;
@@ -106,7 +106,7 @@ pub async fn create(
 ///
 pub async fn delete_by_name(
   name: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<GenericDelete, HttpResponseError> {
   utils::cargo::delete_by_namespace(name, docker_api, pool).await?;
@@ -123,7 +123,7 @@ pub async fn delete_by_name(
 /// ## Arguments
 ///
 /// - [namespace](String) - The namespace
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
@@ -134,7 +134,7 @@ pub async fn delete_by_name(
 /// ## Example
 ///
 /// ```rust,norun
-/// use bollard::Docker;
+/// use bollard_next::Docker;
 ///
 /// let docker_api = Docker::connect_with_local_defaults().unwrap();
 /// let result = namespace::list_instance("my-namespace", &docker_api).await;
@@ -142,7 +142,7 @@ pub async fn delete_by_name(
 ///
 pub async fn list_instance(
   namespace: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpResponseError> {
   let label = format!("io.nanocl.namespace={namespace}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
@@ -168,7 +168,7 @@ pub async fn list_instance(
 ///
 /// ## Arguments
 ///
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -180,14 +180,14 @@ pub async fn list_instance(
 /// ## Example
 ///
 /// ```rust,norun
-/// use bollard::Docker;
+/// use bollard_next::Docker;
 ///
 /// let docker_api = Docker::connect_with_local_defaults().unwrap();
 /// let result = namespace::list(&docker_api, &pool).await;
 /// ```
 ///
 pub async fn list(
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Vec<NamespaceSummary>, HttpResponseError> {
   let items = repositories::namespace::list(pool).await?;
@@ -213,7 +213,7 @@ pub async fn list(
 /// ## Arguments
 ///
 /// - [namespace](String) - The namespace
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -225,7 +225,7 @@ pub async fn list(
 /// ## Example
 ///
 /// ```rust,norun
-/// use bollard::Docker;
+/// use bollard_next::Docker;
 ///
 /// let docker_api = Docker::connect_with_local_defaults().unwrap();
 /// let result = namespace::inspect("my-namespace", &docker_api, &pool).await;
@@ -233,7 +233,7 @@ pub async fn list(
 ///
 pub async fn inspect(
   namespace: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<NamespaceInspect, HttpResponseError> {
   let namespace =
@@ -259,7 +259,7 @@ pub async fn inspect(
 /// ## Arguments
 ///
 /// - [name](String) - The namespace name
-/// - [docker_api](bollard::Docker) - The docker api
+/// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
 /// ## Returns
@@ -271,7 +271,7 @@ pub async fn inspect(
 /// ## Example
 ///
 /// ```rust,norun
-/// use bollard::Docker;
+/// use bollard_next::Docker;
 ///
 /// let docker_api = Docker::connect_with_local_defaults().unwrap();
 /// let result = namespace::create_if_not_exists("my-namespace", &docker_api, &pool).await;
@@ -279,7 +279,7 @@ pub async fn inspect(
 ///
 pub async fn create_if_not_exists(
   name: &str,
-  docker_api: &bollard::Docker,
+  docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<(), HttpResponseError> {
   if repositories::namespace::find_by_name(name.to_owned(), pool)
