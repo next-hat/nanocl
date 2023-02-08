@@ -83,6 +83,7 @@ async fn exec_create_cargo_image(
   let multiprogress = MultiProgress::new();
   multiprogress.set_move_cursor(false);
   while let Some(info) = stream.next().await {
+    let info = info?;
     // If there is any error we stop the stream
     if let Some(error) = info.error {
       return Err(CliError::Api(ApiError {

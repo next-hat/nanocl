@@ -1,7 +1,6 @@
-use ntex::rt;
-use ntex::http::StatusCode;
-use ntex::channel::mpsc::{self, Receiver};
-use futures::{TryStreamExt, StreamExt};
+use ntex::channel::mpsc;
+use ntex::channel::mpsc::Receiver;
+
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, CargoExecConfig, CargoOutput,
@@ -319,7 +318,8 @@ impl NanoclClient {
     name: &str,
     exec: CargoExecConfig<String>,
     namespace: Option<String>,
-  ) -> Result<mpsc::Receiver<CargoOutput>, NanoclClientError> {
+  ) -> Result<mpsc::Receiver<Result<CargoOutput, ApiError>>, NanoclClientError>
+  {
     let mut res = self
       .post(format!("/cargoes/{name}/exec"))
       .query(&GenericNspQuery { namespace })?
@@ -327,24 +327,8 @@ impl NanoclClient {
       .await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let (sx, rx) = mpsc::channel();
-    let mut stream = res.into_stream();
 
-    rt::spawn(async move {
-      let mut payload: Vec<u8> = Vec::new();
-      while let Some(Ok(item)) = stream.next().await {
-        payload.extend(&item);
-        if item.last() == Some(&b'\n') {
-          let Ok(item) = serde_json::from_slice::<CargoOutput>(&payload) else {
-            break;
-          };
-          if sx.send(item).is_err() {
-            break;
-          }
-          payload.clear();
-        }
-      }
-    });
+    let rx = self.stream(res).await;
 
     Ok(rx)
   }
@@ -438,8 +422,7 @@ impl NanoclClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<Receiver<Result<CargoOutput, NanoclClientError>>, NanoclClientError>
-  {
+  ) -> Result<Receiver<Result<CargoOutput, ApiError>>, NanoclClientError> {
     let mut res = self
       .get(format!("/cargoes/{name}/logs"))
       .query(&GenericNspQuery { namespace })?
@@ -448,43 +431,9 @@ impl NanoclClient {
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-    let (tx, sx) = ntex::channel::mpsc::channel();
-    rt::spawn(async move {
-      let mut stream = res.into_stream();
-      let mut payload: Vec<u8> = Vec::new();
-      while let Some(item) = stream.next().await {
-        let item = match item {
-          Ok(item) => item.to_vec(),
-          Err(err) => {
-            let _ = tx.send(Err(NanoclClientError::Api(ApiError {
-              status: StatusCode::INTERNAL_SERVER_ERROR,
-              msg: err.to_string(),
-            })));
-            break;
-          }
-        };
-        payload.extend(&item);
-        if item.last() != Some(&b'\n') {
-          continue;
-        }
-        let item = match serde_json::from_slice::<CargoOutput>(&item) {
-          Ok(item) => item,
-          Err(err) => {
-            let _ = tx.send(Err(NanoclClientError::Api(ApiError {
-              status: StatusCode::INTERNAL_SERVER_ERROR,
-              msg: err.to_string(),
-            })));
-            break;
-          }
-        };
-        if tx.send(Ok(item)).is_err() {
-          break;
-        }
-        payload = Vec::new();
-      }
-    });
+    let rx = self.stream(res).await;
 
-    Ok(sx)
+    Ok(rx)
   }
 }
 
@@ -492,6 +441,7 @@ impl NanoclClient {
 mod tests {
   use super::*;
 
+  use futures::StreamExt;
   use nanocl_stubs::cargo_config::CargoConfigPartial;
 
   #[ntex::test]

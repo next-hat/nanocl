@@ -121,6 +121,7 @@ async fn exec_cargo_exec(
     .await?;
 
   while let Some(output) = stream.next().await {
+    let output = output?;
     match output.kind {
       CargoOutputKind::StdOut => {
         print!("{}", &output.data);

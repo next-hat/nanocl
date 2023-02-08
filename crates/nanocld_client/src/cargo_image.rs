@@ -1,12 +1,10 @@
 use std::error::Error;
 
-use futures::stream::IntoStream;
-use ntex::http::client::ClientResponse;
-use ntex::rt;
-use ntex::util::{Bytes, Stream};
 use ntex::channel::mpsc;
-use ntex::http::StatusCode;
+use ntex::util::{Bytes, Stream};
+use ntex::http::client::ClientResponse;
 use futures::TryStreamExt;
+use futures::stream::IntoStream;
 
 use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
 
@@ -85,7 +83,7 @@ impl NanoclClient {
     &self,
     name: &str,
   ) -> Result<
-    mpsc::Receiver<bollard_next::models::CreateImageInfo>,
+    mpsc::Receiver<Result<bollard_next::models::CreateImageInfo, ApiError>>,
     NanoclClientError,
   > {
     let mut res = self
@@ -97,32 +95,7 @@ impl NanoclClient {
     let status = res.status();
     is_api_error(&mut res, &status).await?;
 
-    let name = name.to_owned();
-    let (sx, rx) = mpsc::channel::<bollard_next::models::CreateImageInfo>();
-    rt::spawn(async move {
-      let mut payload: Vec<u8> = Vec::new();
-      let mut stream = res.into_stream();
-      while let Some(result) = stream.try_next().await.map_err(| err | ApiError {
-        msg: format!("Unable to receive stream data while creating image {name} got error : {err}"),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-      })? {
-        payload.extend(result.to_vec());
-        if result.last() != Some(&b'\n') {
-          continue;
-        }
-          // Otherwise we can convert the data into json and send it
-          let json = serde_json::from_slice::<bollard_next::models::CreateImageInfo>(&payload).map_err(| err | ApiError {
-            msg: format!("Unable to parse json while creating image {name} got error : {err}"),
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-          })?;
-          payload = Vec::new();
-          if sx.send(json).is_err() {
-            break;
-          }
-        }
-      sx.close();
-      Ok::<(), NanoclClientError>(())
-    });
+    let rx = self.stream(res).await;
 
     Ok(rx)
   }

@@ -1,6 +1,10 @@
 use ntex::rt;
-use ntex::http::Client;
-use ntex::http::client::{Connector, ClientRequest};
+use ntex::channel::mpsc::Receiver;
+use ntex::http::{Client, StatusCode};
+use ntex::http::client::{Connector, ClientRequest, ClientResponse};
+use futures::{StreamExt, TryStreamExt};
+
+use crate::error::ApiError;
 
 #[derive(Clone)]
 pub struct NanoclClient {
@@ -49,5 +53,51 @@ impl NanoclClient {
 
   pub(crate) fn put(&self, url: String) -> ClientRequest {
     self.client.put(self.gen_url(url))
+  }
+
+  pub(crate) async fn stream<T>(
+    &self,
+    res: ClientResponse,
+  ) -> Receiver<Result<T, ApiError>>
+  where
+    T: serde::de::DeserializeOwned + Send + 'static,
+  {
+    let mut stream = res.into_stream();
+    let (tx, rx) = ntex::channel::mpsc::channel();
+    rt::spawn(async move {
+      let mut payload: Vec<u8> = Vec::new();
+      while let Some(item) = stream.next().await {
+        let bytes = match item {
+          Ok(bytes) => bytes,
+          Err(e) => {
+            let _ = tx.send(Err(ApiError {
+              status: StatusCode::INTERNAL_SERVER_ERROR,
+              msg: format!("Unable to read stream got error : {e}"),
+            }));
+            break;
+          }
+        };
+        payload.extend(bytes.to_vec());
+        if bytes.last() != Some(&b'\n') {
+          continue;
+        }
+        let t = match serde_json::from_slice::<T>(&payload) {
+          Ok(t) => t,
+          Err(e) => {
+            let _ = tx.send(Err(ApiError {
+              status: StatusCode::INTERNAL_SERVER_ERROR,
+              msg: format!("Unable to parse stream got error : {e}"),
+            }));
+            break;
+          }
+        };
+        payload.clear();
+        if tx.send(Ok(t)).is_err() {
+          break;
+        }
+      }
+      tx.close();
+    });
+    rx
   }
 }
