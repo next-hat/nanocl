@@ -75,7 +75,7 @@ pub enum ProxyRule {
   /// Redirect http trafic
   Http(ProxyRuleHttp),
   /// Redirect https trafic
-  Https(ProxyRuleHttp),
+  Https(ProxyRuleHttps),
   /// Redirect tcp trafic
   Tcp,
   /// Redirect udp trafic
@@ -117,6 +117,26 @@ pub struct ProxyRuleHttp {
   pub r#type: String,
   /// The locations to handle multiple paths
   pub locations: Vec<ProxyRuleLocation>,
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProxyRuleHttps {
+  /// The domain
+  pub domain: Option<String>,
+  /// Type of private | public | internal
+  pub r#type: String,
+  /// The locations to handle multiple paths
+  pub locations: Vec<ProxyRuleLocation>,
+  /// Path to the ssl certificate
+  pub ssl_certificate: String,
+  /// Path to the ssl certificate key
+  pub ssl_certificate_key: String,
+  /// Path to the ssl dhparam
+  pub ssl_dh_param: Option<String>,
+  /// Path to conf file to include
+  pub includes: Option<Vec<String>>,
 }
 
 /// Define cargo to watch for changes

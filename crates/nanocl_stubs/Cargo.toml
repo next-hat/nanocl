@@ -1,6 +1,6 @@
 [package]
 name = "nanocl_stubs"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "Nanocl shared models"
