@@ -1,5 +1,5 @@
-use ntex::http::StatusCode;
 use ntex::rt;
+use ntex::http::StatusCode;
 use ntex::channel::mpsc::{self, Receiver};
 use futures::{TryStreamExt, StreamExt};
 use nanocl_stubs::generic::GenericNspQuery;
@@ -426,6 +426,14 @@ impl NanoclClient {
     Ok(cargo)
   }
 
+  /// ## Get the logs of a cargo
+  /// The logs are streamed as a [Receiver](Receiver) of [CargoOutput](CargoOutput)
+  ///
+  /// ## Arguments
+  ///
+  /// * [name](str) - The name of the cargo to get the logs
+  /// * [namespace](Option<String>) - The namespace where belong the cargo
+  ///
   pub async fn logs_cargo(
     &self,
     name: &str,
@@ -600,7 +608,10 @@ mod tests {
   async fn test_logs_cargo() {
     let client = NanoclClient::connect_with_unix_default();
 
-    let mut rx = client.logs_cargo("store", None).await.unwrap();
+    let mut rx = client
+      .logs_cargo("store", Some("system".into()))
+      .await
+      .unwrap();
     let _out = rx.next().await.unwrap().unwrap();
   }
 }

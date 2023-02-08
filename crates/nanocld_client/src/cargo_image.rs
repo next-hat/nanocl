@@ -100,39 +100,26 @@ impl NanoclClient {
     let name = name.to_owned();
     let (sx, rx) = mpsc::channel::<bollard_next::models::CreateImageInfo>();
     rt::spawn(async move {
-      let mut payload_size = 0;
-      let mut payload = String::new();
+      let mut payload: Vec<u8> = Vec::new();
       let mut stream = res.into_stream();
       while let Some(result) = stream.try_next().await.map_err(| err | ApiError {
         msg: format!("Unable to receive stream data while creating image {name} got error : {err}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })? {
-        // Convert result as a string
-        let chunk = String::from_utf8(result.to_vec())?;
-        // Split on new line first line should be the size and second line the data
-        let mut lines = chunk.splitn(2, '\n');
-        let size = lines.next().unwrap_or_default();
-        let data = lines.next().unwrap_or_default().trim();
-        // convert the size to a usize
-        if payload_size == 0 {
-          payload_size = size.parse::<usize>().map_err(| err | ApiError {
-            msg: format!("Unable to parse size while creating image {name} got error : {err}"),
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-          })?;
+        payload.extend(result.to_vec());
+        if result.last() != Some(&b'\n') {
+          continue;
         }
-        // ensure the data size is the same as the payload size
-        if data.len() != payload_size {
-          payload = format!("{payload}{data}");
-        } else {
           // Otherwise we can convert the data into json and send it
-          let json = serde_json::from_str::<bollard_next::models::CreateImageInfo>(data).map_err(| err | ApiError {
+          let json = serde_json::from_slice::<bollard_next::models::CreateImageInfo>(&payload).map_err(| err | ApiError {
             msg: format!("Unable to parse json while creating image {name} got error : {err}"),
             status: StatusCode::INTERNAL_SERVER_ERROR,
           })?;
-          payload_size = 0;
-          let _ = sx.send(json);
+          payload = Vec::new();
+          if sx.send(json).is_err() {
+            break;
+          }
         }
-      }
       sx.close();
       Ok::<(), NanoclClientError>(())
     });

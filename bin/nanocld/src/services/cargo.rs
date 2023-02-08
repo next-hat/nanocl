@@ -283,8 +283,7 @@ async fn exec_command(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
   log::debug!("Executing command on cargo : {}", &key);
-  let steam = utils::cargo::exec_command(&key, &payload, &docker_api).await?;
-  Ok(web::HttpResponse::Ok().streaming(steam))
+  utils::cargo::exec_command(&key, &payload, &docker_api).await
 }
 
 #[web::get("/cargoes/{name}/histories")]
@@ -348,7 +347,7 @@ async fn logs_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
   log::debug!("Getting cargo logs : {}", &key);
-  let steam = utils::cargo::get_logs(&key, &docker_api).await?;
+  let steam = utils::cargo::get_logs(&key, &docker_api)?;
   Ok(web::HttpResponse::Ok().streaming(steam))
 }
 

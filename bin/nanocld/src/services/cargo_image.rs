@@ -3,7 +3,7 @@
 */
 use std::io::Write;
 
-use ntex::{web, rt};
+use ntex::{rt, web};
 use ntex::http::StatusCode;
 use futures::StreamExt;
 use tokio_util::codec;
@@ -152,7 +152,6 @@ async fn import_images(
         status: StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Error while writing the file {err}"),
       })?;
-
       let _ = tx.send(Ok(ntex::util::Bytes::from(
         serde_json::to_string(&CargoImageImportInfo::Context(Box::new(
           CargoImageImportContext { writed: total_size },

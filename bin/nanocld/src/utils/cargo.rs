@@ -1,26 +1,25 @@
 use std::collections::HashMap;
 
-use bollard_next::container::LogsOptions;
-use ntex::rt;
 use ntex::web;
 use ntex::util::Bytes;
-use ntex::channel::mpsc;
 use ntex::http::StatusCode;
 use futures::StreamExt;
 use bollard_next::container::LogOutput;
+use bollard_next::container::LogsOptions;
 use bollard_next::service::{ContainerSummary, HostConfig};
 use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 use bollard_next::exec::{StartExecOptions, StartExecResults};
 
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, CargoOutput, CargoOutputKind,
-  CargoExecConfig,
+  Cargo, CargoSummary, CargoInspect, CargoOutput, CargoExecConfig,
 };
 
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
 use crate::models::Pool;
+
+use super::stream::transform_stream;
 
 /// ## Create instance
 ///
@@ -432,7 +431,7 @@ pub async fn patch(
     }
   }
 
-  // Delete old containers
+  // Delete old cors
   for container in containers {
     docker_api
       .remove_container(
@@ -596,77 +595,24 @@ pub async fn exec_command(
   name: &str,
   args: &CargoExecConfig<String>,
   docker_api: &bollard_next::Docker,
-) -> Result<mpsc::Receiver<Result<Bytes, web::error::Error>>, HttpResponseError>
-{
+) -> Result<web::HttpResponse, HttpResponseError> {
   let result = docker_api.create_exec(name, args.to_owned()).await?;
 
-  let stream = docker_api
+  let res = docker_api
     .start_exec(&result.id, Some(StartExecOptions::default()))
     .await?;
 
-  let (tx, rx) = mpsc::channel();
-  rt::spawn(async move {
-    // Todo: Handle tty and inputs from cli
-    match stream {
-      StartExecResults::Detached => {}
-      StartExecResults::Attached { mut output, .. } => {
-        while let Some(chunk) = output.next().await {
-          let Ok(data) = chunk else {
-            break;
-          };
-          match data {
-            LogOutput::StdErr { message } => {
-              let payload = serde_json::to_string(&CargoOutput {
-                kind: CargoOutputKind::StdErr,
-                data: String::from_utf8(message.to_vec()).unwrap_or_default(),
-              })
-              .unwrap_or_default()
-                + "\n";
-
-              if tx.send(Ok(Bytes::from(payload))).is_err() {
-                break;
-              }
-            }
-            LogOutput::StdOut { message } => {
-              let payload = serde_json::to_string(&CargoOutput {
-                kind: CargoOutputKind::StdOut,
-                data: String::from_utf8(message.to_vec()).unwrap_or_default(),
-              })
-              .unwrap_or_default()
-                + "\n";
-              if tx.send(Ok(Bytes::from(payload))).is_err() {
-                break;
-              }
-            }
-            LogOutput::StdIn { message } => {
-              let payload = serde_json::to_string(&CargoOutput {
-                kind: CargoOutputKind::StdIn,
-                data: String::from_utf8(message.to_vec()).unwrap_or_default(),
-              })
-              .unwrap_or_default()
-                + "\n";
-              if tx.send(Ok(Bytes::from(payload))).is_err() {
-                break;
-              }
-            }
-            LogOutput::Console { message } => {
-              let payload = serde_json::to_string(&CargoOutput {
-                kind: CargoOutputKind::Console,
-                data: String::from_utf8(message.to_vec()).unwrap_or_default(),
-              })
-              .unwrap_or_default()
-                + "\n";
-              if tx.send(Ok(Bytes::from(payload))).is_err() {
-                break;
-              }
-            }
-          }
-        }
-      }
+  match res {
+    StartExecResults::Detached => Ok(web::HttpResponse::Ok().finish()),
+    StartExecResults::Attached { output, .. } => {
+      let stream = transform_stream::<LogOutput, CargoOutput>(output);
+      Ok(
+        web::HttpResponse::Ok()
+          .content_type("nanocl/streaming-v1")
+          .streaming(stream),
+      )
     }
-  });
-
-  Ok(rx)
+  }
 }
 
 /// ## Create or patch cargo
@@ -706,13 +652,14 @@ pub async fn create_or_patch(
   Ok(())
 }
 
-pub async fn get_logs(
+pub fn get_logs(
   name: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<mpsc::Receiver<Result<Bytes, web::error::Error>>, HttpResponseError>
-{
-  let (tx, rx) = mpsc::channel();
-  let mut stream = docker_api.logs(
+) -> Result<
+  impl StreamExt<Item = Result<Bytes, HttpResponseError>>,
+  HttpResponseError,
+> {
+  let stream = docker_api.logs(
     name,
     Some(LogsOptions::<String> {
       follow: true,
@@ -721,65 +668,6 @@ pub async fn get_logs(
       ..Default::default()
     }),
   );
-  rt::spawn(async move {
-    while let Some(log) = stream.next().await {
-      let log = match log {
-        Ok(log) => log,
-        Err(err) => {
-          let _ = tx.send(Err(web::error::Error::new(
-            web::error::ErrorInternalServerError(err),
-          )));
-          break;
-        }
-      };
-      match log {
-        LogOutput::StdErr { message } => {
-          let payload = serde_json::to_string(&CargoOutput {
-            kind: CargoOutputKind::StdErr,
-            data: String::from_utf8(message.to_vec()).unwrap_or_default(),
-          })
-          .unwrap_or_default()
-            + "\n";
-
-          if tx.send(Ok(Bytes::from(payload))).is_err() {
-            break;
-          }
-        }
-        LogOutput::StdOut { message } => {
-          let payload = serde_json::to_string(&CargoOutput {
-            kind: CargoOutputKind::StdOut,
-            data: String::from_utf8(message.to_vec()).unwrap_or_default(),
-          })
-          .unwrap_or_default()
-            + "\n";
-          if tx.send(Ok(Bytes::from(payload))).is_err() {
-            break;
-          }
-        }
-        LogOutput::StdIn { message } => {
-          let payload = serde_json::to_string(&CargoOutput {
-            kind: CargoOutputKind::StdIn,
-            data: String::from_utf8(message.to_vec()).unwrap_or_default(),
-          })
-          .unwrap_or_default()
-            + "\n";
-          if tx.send(Ok(Bytes::from(payload))).is_err() {
-            break;
-          }
-        }
-        LogOutput::Console { message } => {
-          let payload = serde_json::to_string(&CargoOutput {
-            kind: CargoOutputKind::Console,
-            data: String::from_utf8(message.to_vec()).unwrap_or_default(),
-          })
-          .unwrap_or_default()
-            + "\n";
-          if tx.send(Ok(Bytes::from(payload))).is_err() {
-            break;
-          }
-        }
-      }
-    }
-  });
-  Ok(rx)
+  let stream = transform_stream::<LogOutput, CargoOutput>(stream);
+  Ok(stream)
 }

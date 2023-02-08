@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard_next::models::ContainerSummary;
+use bollard_next::{models::ContainerSummary, container::LogOutput};
 
 pub use bollard_next::exec::CreateExecOptions as CargoExecConfig;
 
@@ -100,4 +100,27 @@ pub struct CargoOutput {
   pub kind: CargoOutputKind,
   /// Data of the output
   pub data: String,
+}
+
+impl From<LogOutput> for CargoOutput {
+  fn from(output: LogOutput) -> Self {
+    match output {
+      LogOutput::StdOut { message } => Self {
+        kind: CargoOutputKind::StdOut,
+        data: String::from_utf8_lossy(&message).to_string(),
+      },
+      LogOutput::StdErr { message } => Self {
+        kind: CargoOutputKind::StdErr,
+        data: String::from_utf8_lossy(&message).to_string(),
+      },
+      LogOutput::Console { message } => Self {
+        kind: CargoOutputKind::Console,
+        data: String::from_utf8_lossy(&message).to_string(),
+      },
+      LogOutput::StdIn { message } => Self {
+        kind: CargoOutputKind::StdIn,
+        data: String::from_utf8_lossy(&message).to_string(),
+      },
+    }
+  }
 }
