@@ -254,7 +254,7 @@ mod tests {
 
     let byte_stream = codec::FramedRead::new(file, codec::BytesCodec::new())
       .map(|r| {
-        let bytes = ntex::util::Bytes::from(r?.freeze().to_vec());
+        let bytes = ntex::util::Bytes::from(r?.to_vec());
         Ok::<ntex::util::Bytes, std::io::Error>(bytes)
       });
     // let stream = futures::stream::(vec![Ok::<Bytes, std::io::Error>(
