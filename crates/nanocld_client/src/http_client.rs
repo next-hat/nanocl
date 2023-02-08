@@ -18,7 +18,7 @@ impl NanoclClient {
           }))
           .finish(),
       )
-      .timeout(ntex::time::Millis::from_secs(20))
+      .timeout(ntex::time::Millis::from_secs(50))
       .finish();
 
     NanoclClient {

@@ -59,6 +59,6 @@ pub struct CargoImageImportContext {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum CargoImageImportInfo {
-  BuildInfo(bollard::models::BuildInfo),
-  Context(CargoImageImportContext),
+  BuildInfo(Box<bollard::models::BuildInfo>),
+  Context(Box<CargoImageImportContext>),
 }

@@ -128,7 +128,6 @@ pub async fn download(
       None,
       None,
     );
-
     while let Some(result) = stream.next().await {
       match result {
         Err(err) => {
@@ -168,6 +167,7 @@ pub async fn download(
         }
       }
     }
+    tx.close();
   });
   Ok(rx_body)
 }
