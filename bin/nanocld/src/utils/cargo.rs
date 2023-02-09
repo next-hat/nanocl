@@ -6,9 +6,10 @@ use ntex::http::StatusCode;
 use futures::StreamExt;
 use bollard_next::container::LogOutput;
 use bollard_next::container::LogsOptions;
-use bollard_next::service::{ContainerSummary, HostConfig};
-use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 use bollard_next::exec::{StartExecOptions, StartExecResults};
+use bollard_next::service::{ContainerSummary, HostConfig};
+use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
+use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
 use nanocl_stubs::cargo::{
@@ -73,6 +74,33 @@ async fn create_instance(
       cargo.namespace_name.to_owned(),
     );
 
+    let base_host_config = HostConfig {
+      restart_policy: Some(
+        cargo
+          .config
+          .to_owned()
+          .container
+          .host_config
+          .unwrap_or_default()
+          .restart_policy
+          .unwrap_or(RestartPolicy {
+            name: Some(RestartPolicyNameEnum::ALWAYS),
+            maximum_retry_count: None,
+          }),
+      ),
+      network_mode: Some(
+        cargo
+          .config
+          .to_owned()
+          .container
+          .host_config
+          .unwrap_or_default()
+          .network_mode
+          .unwrap_or(cargo.namespace_name.to_owned()),
+      ),
+      ..Default::default()
+    };
+
     // Merge the cargo config with the container config
     // And set his network mode to the cargo namespace
     let config = bollard_next::container::Config {
@@ -81,6 +109,19 @@ async fn create_instance(
       tty: Some(true),
       labels: Some(labels),
       host_config: Some(HostConfig {
+        restart_policy: Some(
+          cargo
+            .config
+            .to_owned()
+            .container
+            .host_config
+            .unwrap_or_default()
+            .restart_policy
+            .unwrap_or(RestartPolicy {
+              name: Some(RestartPolicyNameEnum::ALWAYS),
+              maximum_retry_count: None,
+            }),
+        ),
         network_mode: Some(
           cargo
             .config

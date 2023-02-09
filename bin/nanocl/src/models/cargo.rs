@@ -180,7 +180,7 @@ pub enum CargoCommands {
 #[clap(name = "nanocl-cargo")]
 pub struct CargoArgs {
   /// namespace to target by default global is used
-  #[clap(long)]
+  #[clap(long, short)]
   pub namespace: Option<String>,
   #[clap(subcommand)]
   pub commands: CargoCommands,
