@@ -74,33 +74,6 @@ async fn create_instance(
       cargo.namespace_name.to_owned(),
     );
 
-    let base_host_config = HostConfig {
-      restart_policy: Some(
-        cargo
-          .config
-          .to_owned()
-          .container
-          .host_config
-          .unwrap_or_default()
-          .restart_policy
-          .unwrap_or(RestartPolicy {
-            name: Some(RestartPolicyNameEnum::ALWAYS),
-            maximum_retry_count: None,
-          }),
-      ),
-      network_mode: Some(
-        cargo
-          .config
-          .to_owned()
-          .container
-          .host_config
-          .unwrap_or_default()
-          .network_mode
-          .unwrap_or(cargo.namespace_name.to_owned()),
-      ),
-      ..Default::default()
-    };
-
     // Merge the cargo config with the container config
     // And set his network mode to the cargo namespace
     let config = bollard_next::container::Config {
