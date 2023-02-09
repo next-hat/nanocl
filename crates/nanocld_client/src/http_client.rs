@@ -1,4 +1,5 @@
 use ntex::rt;
+use ntex::time::Millis;
 use ntex::channel::mpsc::Receiver;
 use ntex::http::{Client, StatusCode};
 use ntex::http::client::{Connector, ClientRequest, ClientResponse};
@@ -20,9 +21,10 @@ impl NanoclClient {
           .connector(ntex::service::fn_service(|_| async {
             Ok::<_, _>(rt::unix_connect("/run/nanocl/nanocl.sock").await?)
           }))
+          .timeout(Millis::from_secs(10))
           .finish(),
       )
-      .timeout(ntex::time::Millis::from_secs(50))
+      .timeout(Millis::from_secs(10))
       .finish();
 
     NanoclClient {
