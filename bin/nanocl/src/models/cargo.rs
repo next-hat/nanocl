@@ -1,6 +1,7 @@
-use bollard_next::exec::CreateExecOptions;
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
+
+use bollard_next::exec::CreateExecOptions;
 
 use nanocld_client::stubs::{
   cargo::CargoSummary,
