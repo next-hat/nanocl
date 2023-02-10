@@ -88,16 +88,13 @@ mod tests {
     // Try to import a cargo image from a tarball
     // NOTE: It's bugging out in CI, but works locally
     // It's timeouting on the `client.import_image` call
-    let fp = std::env::current_dir()
-      .unwrap()
-      .join("../../tests/busybox.tar.gz");
     let args = Cli::parse_from([
       "nanocl",
       "cargo",
       "image",
       "import",
       "-f",
-      &fp.display().to_string(),
+      "../../tests/busybox.tar.gz",
     ]);
     assert!(execute_args(&args).await.is_ok());
   }
