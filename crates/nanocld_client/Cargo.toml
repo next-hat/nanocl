@@ -16,7 +16,7 @@ glommio = ["ntex/glommio"]
 async-std = ["ntex/async-std"]
 
 [dev-dependencies]
-tokio-util = "0.7.4"
+tokio-util = "0.7.7"
 tokio = { version = "1.25.0", features = ["fs"] }
 
 [dependencies]
