@@ -1,0 +1,10 @@
+services:
+  nanocd-dev:
+    image: nanocd-dev:latest
+    build:
+      context: .
+      dockerfile: ./bin/nanocld/Dockerfile.dev
+    volumes:
+      - .:/nanocl
+    working_dir: /nanocl
+    command: -x run --bin nanocld
