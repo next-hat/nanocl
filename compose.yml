@@ -1,10 +1,32 @@
+version: "3.9"
+
 services:
-  nanocd-dev:
-    image: nanocd-dev:latest
+  nanocld-dev:
+    container_name: nanocld-dev
+    image: nanocld-dev:latest
     build:
       context: .
       dockerfile: ./bin/nanocld/Dockerfile.dev
     volumes:
-      - .:/nanocl
-    working_dir: /nanocl
-    command: -x run --bin nanocld
+      - .:/project
+      - /run/docker.sock:/run/docker.sock
+      - /run/nanocl:/run/nanocl
+    entrypoint: cargo watch
+    working_dir: /project
+    labels:
+      - io.nanocl.namespace=system
+      - io.nanocl.cargo=system-nanocld-dev
+    networks:
+      - system
+    environment:
+      - RUSTFLAGS=-C target-feature=-crt-static
+    command:
+      - -x
+      - run --bin nanocld
+
+networks:
+  system:
+    name: system
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: nanocl.system

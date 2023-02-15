@@ -2,15 +2,15 @@
 FROM rust:1.67.0-alpine3.17
 
 # Install required dependencies
+RUN apk add gcc g++ make libgcc libpq util-linux tzdata
 RUN cargo install cargo-watch
 
 RUN mkdir -p /run/nanocl
-RUN mkdir -p /nanocl
-WORKDIR /nanocl
+RUN mkdir -p /project
+WORKDIR /project
 
 ENV TZ=Europe/Paris
+
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 
-EXPOSE 8383/tcp
-
-CMD ["cargo", "watch"]
+ENTRYPOINT ["cargo", "watch"]
