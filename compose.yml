@@ -16,11 +16,13 @@ services:
     labels:
       - io.nanocl.namespace=system
       - io.nanocl.cargo=system-nanocld-dev
-    networks:
-      - system
+    # Network mode must be host to be able to access to the default gateway
+    network_mode: host
     environment:
       - RUSTFLAGS=-C target-feature=-crt-static
     command:
+      - -w
+      - ./bin/nanocld
       - -x
       - run --bin nanocld
 

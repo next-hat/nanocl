@@ -84,7 +84,8 @@ Nanocl is the perfect solution for organizations that want to unleash their infr
 
 ## Free and Open Source with Commercial Support
 
-Nanocl is free and open source, making it accessible to everyone, whether you are in a home lab setup or a large enterprise. If you need commercial support, you can purchase it through Next Hat company.
+Nanocl is free and open source, making it accessible to everyone, whether you are in a home lab setup or a large enterprise.
+  If you need commercial support, you can purchase it through Next Hat company.
 
 ## Getting Started
 

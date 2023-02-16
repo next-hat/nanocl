@@ -3,10 +3,10 @@ name: Release
 on:
   push:
     branches:
-      - 'release-*'
+      - 'nightly-*'
   pull_request:
     branches:
-      - 'release-*'
+      - 'nightly-*'
     types: [opened, synchronize, closed]
 
 env:
@@ -30,39 +30,33 @@ jobs:
       run: echo "BRANCH_NAME=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV
     - name: Print branch name
       run: echo $BRANCH_NAME
+    - name: Get bin name
+      run: echo "BINARY_NAME=$(echo $BRANCH_NAME | awk -F- 'print $2')" >> $GITHUB_ENV
     - name: Set version
-      run: echo "IMAGE_VERSION=$(echo ${BRANCH_NAME##*-})" >> $GITHUB_ENV
-    - name: Print version
-      run: echo $IMAGE_VERSION
+      run: echo "VERSION=$(echo $BRANCH_NAME | awk -F- '{print $3}')" >> $GITHUB_ENV
+    - name: Print BINARY_NAME and VERSION
+      run: |
+        echo $BINARY_NAME
+        echo $VERSION
     - name: Build image
-      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache -t nanocl:$IMAGE_VERSION .
+      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache -t $BINARY_NAME:nightly-$VERSION .
     - name: Export image
-      run: docker save nanocl:$IMAGE_VERSION | gzip > /tmp/nanocl:$IMAGE_VERSION.tar.gz
+      run: docker save $BINARY_NAME:nightly-$IMAGE_VERSION | gzip > /tmp/$BINARY_NAME-nightly-$IMAGE_VERSION.tar.gz
     - name: Test if release already exists
       id: release-exists
       continue-on-error: true
-      run: gh release view v$IMAGE_VERSION
+      run: gh release view $BINARY_NAME-nightly-$IMAGE_VERSION
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Create new draft release
       if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-      run: gh release create -d v$IMAGE_VERSION --generate-notes /tmp/nanocl:$IMAGE_VERSION.tar.gz#Image
+      run: gh release create -d v$IMAGE_VERSION --generate-notes /tmp/$BINARY_NAME-nightly-$IMAGE_VERSION.tar.gz#nanocld-image
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Update draft release
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: >-
         gh release delete-asset -y v$IMAGE_VERSION nanocl.$IMAGE_VERSION.tar.gz;
-        gh release upload v$IMAGE_VERSION /tmp/nanocl:$IMAGE_VERSION.tar.gz#Image;
-      env:
-        GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
-    - name: Publish release
-      if: ((github.event.action == 'closed' && github.event.pull_request.merged == true))
-      run: gh release edit v$IMAGE_VERSION --draft=false
-      env:
-        GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
-    - name: Delete release
-      if: ((github.event.action == 'closed' && github.event.pull_request.merged != true))
-      run: gh release delete v$IMAGE_VERSION
+        gh release upload v$IMAGE_VERSION /tmp/$BINARY_NAME-nightly-$IMAGE_VERSION.tar.gz#nanocld-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}

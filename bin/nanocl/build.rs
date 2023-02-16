@@ -73,8 +73,15 @@ pub fn generate_man_pages() -> Result<()> {
   Ok(())
 }
 
+fn set_channel() -> Result<()> {
+  let channel = std::env::var("NANOCL_CHANNEL").unwrap_or("stable".into());
+  println!("cargo:rustc-env=CHANNEL={channel}");
+  Ok(())
+}
+
 fn main() -> Result<()> {
   set_env_target_arch()?;
+  set_channel()?;
   set_env_git_commit_hash()?;
   generate_man_pages()?;
   Ok(())
