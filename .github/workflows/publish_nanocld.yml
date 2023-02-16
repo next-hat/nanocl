@@ -1,0 +1,16 @@
+name: Publish nanocld release
+
+on:
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release_image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download saved image
+        run: echo "Name: ${{ github.event.release.name }} Description: ${{ github.event.release.body }}"

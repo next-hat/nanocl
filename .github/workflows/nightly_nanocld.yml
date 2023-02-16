@@ -1,12 +1,12 @@
-name: Release
+name: Draft nanocld release
 
 on:
   push:
     branches:
-      - 'nightly-*'
+      - 'nightly-nanocld-*'
   pull_request:
     branches:
-      - 'nightly-*'
+      - 'nightly-nanocld-*'
     types: [opened, synchronize, closed]
 
 env:
@@ -40,19 +40,19 @@ jobs:
         echo $VERSION
     - name: Build image
       run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache -t $BINARY_NAME:nightly-$VERSION -f ./bin/nanocld/Dockerfile .
-    - name: Tag image
-      run: |
-        docker tag $BINARY_NAME:nightly-$VERSION nexthat/$BINARY_NAME:nightly
-        docker tag $BINARY_NAME:nightly-$VERSION nexthat/$BINARY_NAME:nightly-$VERSION
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v1
-      with:
-        username: ${{ secrets.DOCKERHUB_USER }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Pull image
-      run: |
-        docker push nexthat/$BINARY_NAME:nightly
-        docker push nexthat/$BINARY_NAME:nightly-$VERSION
+    # - name: Tag image
+    #   run: |
+    #     docker tag $BINARY_NAME:nightly-$VERSION nexthat/$BINARY_NAME:nightly
+    #     docker tag $BINARY_NAME:nightly-$VERSION nexthat/$BINARY_NAME:nightly-$VERSION
+    # - name: Log in to Docker Hub
+    #   uses: docker/login-action@v1
+    #   with:
+    #     username: ${{ secrets.DOCKERHUB_USER }}
+    #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+    # - name: Pull image
+    #   run: |
+    #     docker push nexthat/$BINARY_NAME:nightly
+    #     docker push nexthat/$BINARY_NAME:nightly-$VERSION
     - name: Export image
       run: docker save $BINARY_NAME:nightly-$IMAGE_VERSION | gzip > /tmp/$BINARY_NAME-nightly-$IMAGE_VERSION.tar.gz
     - name: Test if release already exists
