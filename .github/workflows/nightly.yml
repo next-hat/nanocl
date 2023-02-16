@@ -40,6 +40,19 @@ jobs:
         echo $VERSION
     - name: Build image
       run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache -t $BINARY_NAME:nightly-$VERSION -f ./bin/nanocld/Dockerfile .
+    - name: Tag image
+      run: |
+        docker tag $BINARY_NAME:nightly-$VERSION $BINARY_NAME:nightly
+        docker tag $BINARY_NAME:nightly-$VERSION $BINARY_NAME:nightly-$VERSION
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_USER }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Pull image
+      run: |
+        docker push $BINARY_NAME:nightly
+        docker push $BINARY_NAME:nightly-$VERSION
     - name: Export image
       run: docker save $BINARY_NAME:nightly-$IMAGE_VERSION | gzip > /tmp/$BINARY_NAME-nightly-$IMAGE_VERSION.tar.gz
     - name: Test if release already exists
@@ -50,13 +63,13 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Create new draft release
       if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-      run: gh release create -d v$IMAGE_VERSION --generate-notes /tmp/$BINARY_NAME-nightly-$IMAGE_VERSION.tar.gz#nanocld-image
+      run: gh release create -d $BINARY_NAME-nightly-$IMAGE_VERSION --generate-notes /tmp/$BINARY_NAME-nightly-$IMAGE_VERSION.tar.gz#nanocld-image
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Update draft release
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: >-
-        gh release delete-asset -y v$IMAGE_VERSION nanocl.$IMAGE_VERSION.tar.gz;
-        gh release upload v$IMAGE_VERSION /tmp/$BINARY_NAME-nightly-$IMAGE_VERSION.tar.gz#nanocld-image;
+        gh release delete-asset -y $BINARY_NAME-nightly-$IMAGE_VERSION nanocl.$IMAGE_VERSION.tar.gz;
+        gh release upload $BINARY_NAME-nightly-$IMAGE_VERSION /tmp/$BINARY_NAME-nightly-$IMAGE_VERSION.tar.gz#nanocld-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
