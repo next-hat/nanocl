@@ -1,0 +1,29 @@
+name: Publish nanocld release
+
+on:
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release_image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print info
+        run: echo "Name: ${{ github.event.release.name }} Description: ${{ github.event.release.body }}"
+      - name: Get bin name
+        run: echo "CHANNEL=$(echo ${{ github.event.release.name }} | awk -F- '{print $1}')" >> $GITHUB_ENV
+      - name: Get bin name
+        run: echo "BINARY_NAME=$(echo ${{ github.event.release.name }} | awk -F- '{print $2}')" >> $GITHUB_ENV
+      - name: Set version
+        run: echo "VERSION=$(echo ${{ github.event.release.name }} | awk -F- '{print $3}')" >> $GITHUB_ENV
+      - name: Print info
+        run: |
+          echo $CHANNEL
+          echo $BINARY_NAME
+          echo $VERSION
+      - name: Publish nightly
+        if: env.CHANNEL == 'nightly'

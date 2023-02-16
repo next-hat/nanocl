@@ -7,12 +7,15 @@ use nanocl_stubs::{config::DaemonConfig, system::HostInfo};
 use ntex::web;
 use serde_json::json;
 
-use crate::{version, error::HttpResponseError, event::EventEmitter};
+use crate::version;
+use crate::event::EventEmitter;
+use crate::error::HttpResponseError;
 
 #[web::get("/version")]
 async fn get_version() -> web::HttpResponse {
   web::HttpResponse::Ok().json(&json!({
     "Arch": version::ARCH,
+    "Channel": version::CHANNEL,
     "Version": version::VERSION,
     "CommitId": version::COMMIT_ID,
   }))

@@ -355,9 +355,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.1.4"
+version = "4.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f13b9c79b5d1dd500d20ef541215a6423c75829ef43117e1b4d17fd8af0b5d76"
+checksum = "ec0b0588d44d4d63a87dbd75c136c166bbfd9a86a31cb89e09906521c7d3f5e3"
 dependencies = [
  "bitflags",
  "clap_derive",
@@ -370,9 +370,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.1.1"
+version = "4.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d6540eedc41f8a5a76cf3d8d458057dcdf817be4158a55b5f861f7a5483de75"
+checksum = "bd125be87bf4c255ebc50de0b7f4d2a6201e8ac3dc86e39c0ad081dc5e7236fe"
 dependencies = [
  "clap",
 ]
@@ -401,9 +401,9 @@ dependencies = [
 
 [[package]]
 name = "clap_mangen"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb258c6232b4d728d13d6072656627924c16707aae6267cd5a1ea05abff9a25c"
+checksum = "48283ce8d5cd9513633949a674a0442bcb507ab61ed6533863437052ddbb494b"
 dependencies = [
  "clap",
  "roff",
@@ -554,9 +554,9 @@ dependencies = [
 
 [[package]]
 name = "cxx"
-version = "1.0.90"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90d59d9acd2a682b4e40605a242f6670eaa58c5957471cbf85e8aa6a0b97a5e8"
+checksum = "86d3488e7665a7a483b57e25bdd90d0aeb2bc7608c8d0346acf2ad3f1caf1d62"
 dependencies = [
  "cc",
  "cxxbridge-flags",
@@ -566,9 +566,9 @@ dependencies = [
 
 [[package]]
 name = "cxx-build"
-version = "1.0.90"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebfa40bda659dd5c864e65f4c9a2b0aff19bea56b017b9b77c73d3766a453a38"
+checksum = "48fcaf066a053a41a81dfb14d57d99738b767febb8b735c3016e469fac5da690"
 dependencies = [
  "cc",
  "codespan-reporting",
@@ -581,15 +581,15 @@ dependencies = [
 
 [[package]]
 name = "cxxbridge-flags"
-version = "1.0.90"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "457ce6757c5c70dc6ecdbda6925b958aae7f959bda7d8fb9bde889e34a09dc03"
+checksum = "a2ef98b8b717a829ca5603af80e1f9e2e48013ab227b68ef37872ef84ee479bf"
 
 [[package]]
 name = "cxxbridge-macro"
-version = "1.0.90"
+version = "1.0.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebf883b7aacd7b2aeb2a7b338648ee19f57c140d4ee8e52c68979c6b2f7f2263"
+checksum = "086c685979a698443656e5cf7856c95c642295a38599f12fb1ff76fb28d19892"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1383,7 +1383,7 @@ dependencies = [
  "hyper",
  "indicatif",
  "nanocld_client 0.0.7",
- "nanocld_client 0.0.8",
+ "nanocld_client 0.0.9",
  "ntex",
  "serde",
  "serde_json",
@@ -1411,7 +1411,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "bollard-next",
  "serde",
@@ -1435,11 +1435,9 @@ dependencies = [
  "hyper",
  "libc",
  "log",
- "nanocl_stubs 0.0.8",
+ "nanocl_stubs 0.0.9",
  "ntex",
  "r2d2",
- "rustls",
- "rustls-pemfile",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1469,11 +1467,11 @@ dependencies = [
 
 [[package]]
 name = "nanocld_client"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "bollard-next",
  "futures",
- "nanocl_stubs 0.0.8",
+ "nanocl_stubs 0.0.9",
  "ntex",
  "serde",
  "serde_json",
@@ -2080,15 +2078,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustls-pemfile"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d194b56d58803a43635bdc398cd17e383d6f71f9182b9a192c127ca42494a59b"
-dependencies = [
- "base64 0.21.0",
-]
-
-[[package]]
 name = "ryu"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2197,7 +2186,7 @@ dependencies = [
  "indexmap",
  "serde",
  "serde_json",
- "time 0.3.17",
+ "time 0.3.18",
 ]
 
 [[package]]
@@ -2383,9 +2372,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.17"
+version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a561bf4617eebd33bca6434b988f39ed798e527f51a1e797d0ee4f61c0a38376"
+checksum = "af0097eaf301d576d0b2aead7a59facab6d53cc636340f0291fab8446a2e8613"
 dependencies = [
  "itoa",
  "serde",

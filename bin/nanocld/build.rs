@@ -30,6 +30,12 @@ fn set_env_target_arch() -> Result<()> {
   Ok(())
 }
 
+fn set_channel() -> Result<()> {
+  let channel = std::env::var("NANOCL_CHANNEL").unwrap_or("stable".into());
+  println!("cargo:rustc-env=CHANNEL={channel}");
+  Ok(())
+}
+
 /// Generate nanocld man page
 pub fn generate_man_command(
   name: &str,
@@ -46,6 +52,7 @@ pub fn generate_man_command(
 }
 
 fn main() -> std::io::Result<()> {
+  set_channel()?;
   set_env_target_arch()?;
   set_env_git_commit_hash()?;
   fs::create_dir_all(MAN_PATH)?;
