@@ -31,7 +31,7 @@ jobs:
     - name: Print branch name
       run: echo $BRANCH_NAME
     - name: Get bin name
-      run: echo "BINARY_NAME=$(echo $BRANCH_NAME | awk -F- 'print $2')" >> $GITHUB_ENV
+      run: echo "BINARY_NAME=$(echo $BRANCH_NAME | awk -F- '{print $2}')" >> $GITHUB_ENV
     - name: Set version
       run: echo "VERSION=$(echo $BRANCH_NAME | awk -F- '{print $3}')" >> $GITHUB_ENV
     - name: Print BINARY_NAME and VERSION
