@@ -39,7 +39,7 @@ jobs:
         echo $BINARY_NAME
         echo $VERSION
     - name: Build image
-      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache -t $BINARY_NAME:nightly-$VERSION .
+      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache -t $BINARY_NAME:nightly-$VERSION -f ./bin/nanocld/Dockerfile .
     - name: Export image
       run: docker save $BINARY_NAME:nightly-$IMAGE_VERSION | gzip > /tmp/$BINARY_NAME-nightly-$IMAGE_VERSION.tar.gz
     - name: Test if release already exists
