@@ -12,8 +12,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Print info
-        run: echo "Name: ${{ github.event.release.name }} Description: ${{ github.event.release.body }}"
       - name: Get bin name
         run: echo "CHANNEL=$(echo ${{ github.event.release.name }} | awk -F- '{print $1}')" >> $GITHUB_ENV
       - name: Get bin name
