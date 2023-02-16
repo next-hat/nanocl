@@ -20,10 +20,10 @@ impl NanoclClient {
           .connector(ntex::service::fn_service(|_| async {
             Ok::<_, _>(rt::unix_connect("/run/nanocl/nanocl.sock").await?)
           }))
-          .timeout(ntex::time::Millis::from_secs(10))
+          .timeout(ntex::time::Millis::from_secs(20))
           .finish(),
       )
-      .timeout(ntex::time::Millis::from_secs(10))
+      .timeout(ntex::time::Millis::from_secs(20))
       .finish();
 
     NanoclClient {
