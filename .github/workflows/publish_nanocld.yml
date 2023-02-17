@@ -36,3 +36,5 @@ jobs:
           docker tag nanocld:nightly-$VERSION nexthat/nanocld:nightly-$VERSION
           docker push nexthat/nanocld:nightly
           docker push nexthat/nanocld:nightly-$VERSION
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
