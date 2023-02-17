@@ -19,13 +19,6 @@
 
   <p>
 
-  [![Crate.io](https://img.shields.io/crates/v/nanocl?style=flat)](https://crates.io/crates/nanocl)
-  [![Github](https://img.shields.io/github/v/release/nxthat/nanocl?style=flat)](https://github.com/nxthat/nanocl/releases/latest)
-
-  </p>
-
-  <p>
-
   [![codecov](https://codecov.io/gh/nxthat/nanocl/branch/nightly/graph/badge.svg?token=4I60HOW6HM)](https://codecov.io/gh/nxthat/nanocl)
 
   </p>
@@ -78,17 +71,7 @@ It uses the best ideas and practices from the community to provide high performa
 Built-in TLS and VPN, Nanocl ensures that your infrastructure is always secure, using the best security practices.</br>
 With logs, auto fail-over, automatic backups, and zero downtime, you can sleep while Nanocl takes care of your infrastructure.
 
-## Unleash Your Infrastructure
-
-Nanocl is the perfect solution for organizations that want to unleash their infrastructure. With its powerful features and ease of use, Nanocl is the future of container and virtual machine orchestration.
-
-## Free and Open Source with Commercial Support
-
-Nanocl is free and open source, making it accessible to everyone, whether you are in a home lab setup or a large enterprise.
-  If you need commercial support, you can purchase it through Next Hat company.
-
 ## Getting Started
 
 To get started with Nanocl, please refer to the [installation guide](https://docs.next-hat.com/docs/setups/nanocl) and [documentation](https://docs.next-hat.com/docs/references/nanocl/cli). If you need any assistance or have any questions, feel free to reach out to our community for support.
 You may also wanna take a look at our [tutorial](https://docs.next-hat.com/docs/guides/nanocl/get-started)
-
