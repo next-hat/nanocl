@@ -23,5 +23,5 @@ jobs:
           echo $CHANNEL
           echo $BINARY_NAME
           echo $VERSION
-      - name: Publish nightly
-        if: env.CHANNEL == 'nightly'
+      # - name: Publish nightly
+      #   if: env.CHANNEL == 'nightly'
