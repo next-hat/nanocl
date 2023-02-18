@@ -51,7 +51,7 @@ fn gen_store_cargo_conf(
     dns_entry: None,
     replication: None,
     container: ContainerConfig {
-      image: Some("cockroachdb/cockroach:v21.2.17".into()),
+      image: Some("cockroachdb/cockroach:v22.2.5".into()),
       labels: Some(labels.to_owned()),
       host_config,
       cmd: Some(vec!["start-single-node".into(), "--insecure".into()]),

@@ -11,7 +11,7 @@ use ntex::util::Bytes;
 use ntex::time::interval;
 use futures::Stream;
 use futures::{stream, StreamExt};
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_stubs::system::Event;
 
@@ -43,7 +43,6 @@ pub type EventEmitterPtr = Arc<Mutex<EventEmitter>>;
 impl EventEmitter {
   /// Convert an event to a string and send it to all clients
   async fn handle_event(&mut self, e: Event) {
-    log::debug!("Sending events {e}");
     let mut data = serde_json::to_vec(&e).unwrap();
     data.push(b'\n');
     let bytes = Bytes::from(data);

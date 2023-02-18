@@ -1,15 +1,5 @@
 // @generated automatically by Diesel CLI.
 
-pub mod sql_types {
-  #[derive(diesel::sql_types::SqlType)]
-  #[diesel(postgres_type(name = "node_modes"))]
-  pub struct NodeModes;
-
-  #[derive(diesel::sql_types::SqlType)]
-  #[diesel(postgres_type(name = "ssh_auth_modes"))]
-  pub struct SshAuthModes;
-}
-
 diesel::table! {
     cargo_configs (key) {
         key -> Uuid,
@@ -31,13 +21,24 @@ diesel::table! {
     metrics (key) {
         key -> Uuid,
         kind -> Text,
-        value -> Jsonb,
+        data -> Jsonb,
+        created_at -> Timestamptz,
+        expire_at -> Timestamptz,
     }
 }
 
 diesel::table! {
     namespaces (name) {
         name -> Varchar,
+    }
+}
+
+diesel::table! {
+    nodes (name) {
+        name -> Varchar,
+        mode -> Text,
+        labels -> Jsonb,
+        ip_address -> Varchar,
     }
 }
 
@@ -57,14 +58,16 @@ diesel::table! {
     }
 }
 
-joinable!(cargoes -> cargo_configs (config_key));
-joinable!(resources -> resource_configs (config_key));
+diesel::joinable!(cargoes -> cargo_configs (config_key));
+diesel::joinable!(cargoes -> namespaces (namespace_name));
+diesel::joinable!(resources -> resource_configs (config_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
-  cargo_configs,
-  cargoes,
-  metrics,
-  namespaces,
-  resource_configs,
-  resources,
+    cargo_configs,
+    cargoes,
+    metrics,
+    namespaces,
+    nodes,
+    resource_configs,
+    resources,
 );

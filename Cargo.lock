@@ -1333,9 +1333,9 @@ dependencies = [
 
 [[package]]
 name = "metrsd_client"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c90f01a1eeb008e27f47960f6736bf7a73443e8a41bd3dd6eaf416107014740f"
+checksum = "89c048fc7dc4c0e927b641562b34fb37d61f923eb94850ce67e495e0e6932f38"
 dependencies = [
  "futures",
  "metrs_stubs",
@@ -1447,6 +1447,7 @@ name = "nanocld"
 version = "0.2.0"
 dependencies = [
  "bollard-next",
+ "chrono",
  "clap",
  "clap_mangen",
  "diesel",
