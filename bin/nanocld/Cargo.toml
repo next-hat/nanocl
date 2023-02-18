@@ -52,3 +52,4 @@ libc = "0.2.139"
 
 # Dependency required with dev feature
 utoipa = { version = "3.0.2", features = ["uuid", "chrono"], optional = true }
+metrsd_client = "0.1.0"

@@ -6,6 +6,7 @@ mod events;
 mod resource;
 mod state;
 mod info;
+mod setup;
 
 pub use namespace::exec_namespace;
 pub use cargo::exec_cargo;

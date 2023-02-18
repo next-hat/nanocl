@@ -1323,6 +1323,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrs_stubs"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90d4d59e5f96c1e8a464bf9c1f4dc73162069da0e6c5e4a2bb82d2c5ff2a959f"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "metrsd_client"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c90f01a1eeb008e27f47960f6736bf7a73443e8a41bd3dd6eaf416107014740f"
+dependencies = [
+ "futures",
+ "metrs_stubs",
+ "ntex",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "migrations_internals"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1435,6 +1458,7 @@ dependencies = [
  "hyper",
  "libc",
  "log",
+ "metrsd_client",
  "nanocl_stubs 0.0.9",
  "ntex",
  "r2d2",
