@@ -48,7 +48,7 @@ mod tests {
       hosts: None,
       docker_host: None,
       state_dir: None,
-      config_dir: String::from("/etc/nanocl"),
+      conf_dir: String::from("/etc/nanocl"),
       gateway: None,
     };
 

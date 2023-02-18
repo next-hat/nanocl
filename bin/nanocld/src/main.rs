@@ -42,7 +42,7 @@ async fn main() -> std::io::Result<()> {
 
   let config = match config::init(&args) {
     Err(err) => {
-      log::error!("Error while parsing config {} : {}", &args.config_dir, &err);
+      log::error!("Error while parsing config {} : {}", &args.conf_dir, &err);
       std::process::exit(1);
     }
     Ok(config) => config,

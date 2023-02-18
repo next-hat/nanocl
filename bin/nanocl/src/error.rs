@@ -18,7 +18,7 @@ pub enum CliError {
   ParseJson(#[from] serde_json::Error),
   #[error(transparent)]
   Api(#[from] ApiError),
-  #[error("{msg:?}")]
+  #[error("{msg}")]
   Custom { msg: String },
 }
 

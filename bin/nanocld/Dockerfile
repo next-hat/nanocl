@@ -52,5 +52,7 @@ RUN apk add libgcc libpq util-linux
 COPY --from=builder /app/target/release/nanocld /usr/local/bin/nanocld
 COPY ./bin/nanocld/entrypoint.sh /entrypoint.sh
 
+RUN chmod +x /entrypoint.sh
+
 ## Set entrypoint
 ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]

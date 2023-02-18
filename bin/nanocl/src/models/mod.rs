@@ -4,6 +4,7 @@ mod cargo_image;
 mod resource;
 mod version;
 mod state;
+mod setup;
 
 pub use namespace::*;
 pub use cargo::*;
@@ -11,6 +12,7 @@ pub use cargo_image::*;
 pub use resource::*;
 pub use version::*;
 pub use state::*;
+pub use setup::*;
 
 use clap::{Parser, Subcommand};
 
@@ -42,6 +44,8 @@ pub enum Commands {
   Info,
   /// Show nanocl version information
   Version(VersionArgs),
+  /// Setup nanocl daemon
+  Setup(SetupOpts),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for
