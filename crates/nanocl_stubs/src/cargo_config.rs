@@ -3,6 +3,7 @@ use serde::{Serialize, Deserialize};
 
 pub type ContainerConfig<T> = bollard_next::container::Config<T>;
 pub type ContainerHostConfig = bollard_next::models::HostConfig;
+pub type ContainerHealthConfig = bollard_next::models::HealthConfig;
 
 /// Auto is used to automatically define that the number of replicas in the cluster
 /// Number is used to manually set the number of replicas
