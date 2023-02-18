@@ -21,6 +21,7 @@ pub async fn init(
     .await?;
   super::system::register_namespace("global", true, &docker_api, &pool).await?;
   super::system::sync_containers(&docker_api, &pool).await?;
+  super::metrics::start_metrics_cargo(&docker_api, &pool).await?;
   Ok(BootState {
     pool,
     docker_api,

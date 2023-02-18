@@ -5,6 +5,9 @@ use diesel::r2d2::ConnectionManager;
 mod boot;
 pub use boot::*;
 
+mod metrics;
+pub use metrics::*;
+
 mod namespace;
 pub use namespace::*;
 
