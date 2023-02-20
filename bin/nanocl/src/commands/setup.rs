@@ -163,19 +163,27 @@ fn gen_daemon_binds(args: &NanocldArgs) -> Vec<String> {
       format!("{host}:{host}", host = path.display())
     });
 
-  let mut binds = vec![
+  let mut base_bind = vec![
     format!("{state_dir}:{state_dir}", state_dir = args.state_dir),
     format!("{conf_dir}:{conf_dir}", conf_dir = args.conf_dir),
   ];
 
-  binds.extend(host_binds);
+  base_bind.extend(host_binds);
 
   if args.docker_host.starts_with("unix://") {
-    binds.push(format!(
+    base_bind.push(format!(
       "{docker_host}:{docker_host}",
       docker_host = args.docker_host.trim_start_matches("unix://")
     ));
   }
+
+  let mut binds = Vec::new();
+  for b in base_bind {
+    if !binds.contains(&b) {
+      binds.push(b);
+    }
+  }
+
   binds
 }
 
