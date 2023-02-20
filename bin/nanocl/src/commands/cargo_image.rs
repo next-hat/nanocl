@@ -71,7 +71,7 @@ fn update_progress(
   }
 }
 
-async fn exec_create_cargo_image(
+pub(crate) async fn exec_create_cargo_image(
   client: &NanoclClient,
   name: &str,
 ) -> Result<(), CliError> {

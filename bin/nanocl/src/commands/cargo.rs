@@ -9,10 +9,10 @@ use crate::error::CliError;
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
-  CargoExecOpts, CargoHistoryOpts, CargoResetOpts, CargoLogsOpts,
+  CargoExecOpts, CargoHistoryOpts, CargoResetOpts, CargoLogsOpts, CargoRunOpts,
 };
 
-use super::cargo_image;
+use super::cargo_image::{self, exec_create_cargo_image};
 
 /// Execute cargo command
 ///
@@ -194,6 +194,27 @@ async fn exec_cargo_reset(
   Ok(())
 }
 
+async fn exec_cargo_run(
+  client: &NanoclClient,
+  args: &CargoArgs,
+  opts: &CargoRunOpts,
+) -> Result<(), CliError> {
+  // Image is not existing so we donwload it
+  if client.inspect_cargo_image(&opts.image).await.is_err() {
+    exec_create_cargo_image(client, &opts.image).await?;
+  }
+
+  let cargo = client
+    .create_cargo(&opts.clone().into(), args.namespace.clone())
+    .await?;
+
+  client
+    .start_cargo(&cargo.name, Some(cargo.namespace_name))
+    .await?;
+
+  Ok(())
+}
+
 pub async fn exec_cargo(
   client: &NanoclClient,
   args: &CargoArgs,
@@ -233,5 +254,6 @@ pub async fn exec_cargo(
     CargoCommands::Logs(options) => {
       exec_cargo_logs(client, args, options).await
     }
+    CargoCommands::Run(options) => exec_cargo_run(client, args, options).await,
   }
 }
