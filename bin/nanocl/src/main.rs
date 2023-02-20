@@ -295,4 +295,25 @@ mod tests {
     let args = Cli::parse_from(["nanocl", "info"]);
     assert!(execute_args(&args).await.is_ok());
   }
+
+  #[ntex::test]
+  async fn run_setup() {
+    let args = Cli::parse_from([
+      "nanocl",
+      "setup",
+      "--deamon-hosts",
+      "unix:///run/nanocl/nanocl2.sock",
+      "--state-dir",
+      "/tmp/nanocl2",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args =
+      Cli::parse_from(["nanocl", "cargo", "-n", "system", "stop", "daemon"]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args =
+      Cli::parse_from(["nanocl", "cargo", "-n", "system", "rm", "daemon"]);
+    assert!(execute_args(&args).await.is_ok());
+  }
 }

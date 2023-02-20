@@ -55,7 +55,7 @@ mod tests {
       "/run/docker.sock",
       "--state-dir",
       "/var/lib/nanocl",
-      "--config-dir",
+      "--conf-dir",
       "/etc/nanocl",
     ]);
     assert_eq!(

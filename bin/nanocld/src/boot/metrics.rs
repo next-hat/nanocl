@@ -30,7 +30,7 @@ pub async fn start_metrics_cargo(
   pool: &Pool,
 ) -> Result<(), DaemonError> {
   let cargo = &gen_metrics_cargo("metrics");
-  if utils::cargo::inspect("system-metrics", &docker_api, &pool)
+  if utils::cargo::inspect("system-metrics", docker_api, pool)
     .await
     .is_err()
   {
