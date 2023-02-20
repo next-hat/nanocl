@@ -6,4 +6,4 @@ Namespace: example-namespace
 Cargoes:
   - Name: example-cargo
     Container:
-      Image: nexthat/nanocl-get-started
+      Image: nexthat/nanocl-get-started:latest

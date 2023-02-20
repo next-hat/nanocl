@@ -21,7 +21,7 @@ Resources:
 Cargoes:
   - Name: get-started
     Container:
-      Image: nexthat/nanocl-get-started
+      Image: nexthat/nanocl-get-started:latest
       Env :
         - NODE_ENV=production
         - APP=LANDING
