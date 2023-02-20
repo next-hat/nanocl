@@ -10,8 +10,13 @@ members = [
 opt-level = 0
 
 [profile.release]
-opt-level = 3
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'
+strip = "debuginfo"
 
 [patch.crates-io]
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocld_client = { path = "crates/nanocld_client" }
+
