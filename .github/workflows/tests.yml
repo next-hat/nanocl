@@ -51,7 +51,7 @@ jobs:
         sudo chmod 777 -R /run/nanocl
     # Run coverage
     - name: Run tests
-      run: cargo make covgen
+      run: sudo cargo make covgen
     # Upload it to codecov
     - name: Codecov
       uses: codecov/codecov-action@v3.1.1

@@ -306,11 +306,15 @@ mod tests {
       "unix:///tmp/nanocl_tmp.sock",
       "--state-dir",
       "/tmp/nanocl2",
+      "--conf-dir",
+      "/tmp",
     ]);
-    assert!(execute_args(&args).await.is_ok());
+    let res = execute_args(&args).await;
+    println!("{res:#?}");
+    assert!(res.is_ok());
 
     // Wait before trying to stop the cargo
-    interval(Seconds(4)).tick().await;
+    interval(Seconds(8)).tick().await;
 
     let args =
       Cli::parse_from(["nanocl", "cargo", "-n", "system", "stop", "daemon"]);

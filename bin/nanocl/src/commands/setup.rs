@@ -139,7 +139,6 @@ fn gen_daemon_args(args: &NanocldArgs) -> Vec<String> {
     &args.docker_host,
     "--gateway",
     &args.gateway,
-    // ..,
   ]
   .iter()
   .map(|arg| arg.to_string())
@@ -149,11 +148,23 @@ fn gen_daemon_args(args: &NanocldArgs) -> Vec<String> {
 }
 
 fn gen_daemon_binds(args: &NanocldArgs) -> Vec<String> {
+  let host_binds = args
+    .hosts
+    .iter()
+    .filter(|host| host.starts_with("unix://"))
+    .map(|host| {
+      format!(
+        "{host}:{host}",
+        host = host.trim_start_matches("unix://").trim_end_matches('/')
+      )
+    });
+
   let mut binds = vec![
     format!("{state_dir}:{state_dir}", state_dir = args.state_dir),
     format!("{conf_dir}:{conf_dir}", conf_dir = args.conf_dir),
-    format!("/run/nanocl:/run/nanocl"),
   ];
+
+  binds.extend(host_binds);
 
   if args.docker_host.starts_with("unix://") {
     binds.push(format!(
