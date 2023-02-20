@@ -303,7 +303,7 @@ mod tests {
       "nanocl",
       "setup",
       "--deamon-hosts",
-      "unix:///nanocl_tmp.sock",
+      "unix:///tmp/nanocl_tmp.sock",
       "--state-dir",
       "/tmp/nanocl2",
     ]);
