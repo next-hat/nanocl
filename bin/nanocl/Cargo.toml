@@ -24,7 +24,7 @@ serde = { version = "1.0", features = ["derive"] }
 clap_complete = "4.1.1"
 clap_mangen = { version = "0.2" }
 tabled = "0.10.0"
-nanocld_client = { version = "0.0.7" }
+nanocld_client = { version = "0.0.9" }
 bollard-next = { version = "0.14.1" }
 chrono = "0.4.23"
 

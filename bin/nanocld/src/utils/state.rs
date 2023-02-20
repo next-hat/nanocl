@@ -72,8 +72,7 @@ pub async fn apply_deployment(
 
   if let Some(cargoes) = data.cargoes {
     for cargo in cargoes {
-      utils::cargo::create_or_patch(&namespace, &cargo, docker_api, pool)
-        .await?;
+      utils::cargo::create_or_put(&namespace, &cargo, docker_api, pool).await?;
       let key = utils::key::gen_key(&namespace, &cargo.name);
       let p = pool.to_owned();
       let ev = event_emitter.to_owned();
@@ -137,7 +136,7 @@ pub async fn apply_cargo(
   };
 
   for cargo in data.cargoes {
-    utils::cargo::create_or_patch(&namespace, &cargo, docker_api, pool).await?;
+    utils::cargo::create_or_put(&namespace, &cargo, docker_api, pool).await?;
     let key = utils::key::gen_key(&namespace, &cargo.name);
     let p = pool.to_owned();
     let ev = event_emitter.to_owned();

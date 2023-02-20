@@ -1,4 +1,4 @@
-use nanocld_client::NanoclClient;
+use nanocld_client::NanocldClient;
 
 use crate::utils::print::*;
 use crate::error::CliError;
@@ -14,7 +14,7 @@ use crate::models::{
 // which will apply a state file
 //
 // async fn exec_create
-//   client: &NanoclClient,
+//   client: &NanocldClient,
 //   opts: &ResourceCreateOpts,
 // ) -> Result<(), CliError> {
 //   let mut file_path = std::env::current_dir()?;
@@ -38,7 +38,7 @@ use crate::models::{
 //   Ok(())
 // }
 
-async fn exec_list(client: &NanoclClient) -> Result<(), CliError> {
+async fn exec_list(client: &NanocldClient) -> Result<(), CliError> {
   let resources = client.list_resource(None).await?;
 
   let row = resources
@@ -51,7 +51,7 @@ async fn exec_list(client: &NanoclClient) -> Result<(), CliError> {
 }
 
 async fn exec_remove(
-  client: &NanoclClient,
+  client: &NanocldClient,
   opts: &ResourceRemoveOpts,
 ) -> Result<(), CliError> {
   for name in &opts.names {
@@ -62,7 +62,7 @@ async fn exec_remove(
 }
 
 async fn exec_inspect(
-  client: &NanoclClient,
+  client: &NanocldClient,
   opts: &ResourceInspectOpts,
 ) -> Result<(), CliError> {
   let resource = client.inspect_resource(&opts.name).await?;
@@ -72,7 +72,7 @@ async fn exec_inspect(
 }
 
 async fn exec_history(
-  client: &NanoclClient,
+  client: &NanocldClient,
   opts: &ResourceHistoryOpts,
 ) -> Result<(), CliError> {
   let history = client.list_history_resource(&opts.name).await?;
@@ -82,7 +82,7 @@ async fn exec_history(
 }
 
 async fn exec_reset(
-  client: &NanoclClient,
+  client: &NanocldClient,
   opts: &ResourceResetOpts,
 ) -> Result<(), CliError> {
   let resource = client.reset_resource(&opts.name, &opts.key).await?;
@@ -92,7 +92,7 @@ async fn exec_reset(
 }
 
 pub async fn exec_resource(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &ResourceArgs,
 ) -> Result<(), CliError> {
   match &args.commands {

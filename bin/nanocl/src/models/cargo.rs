@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use nanocld_client::stubs::{
   cargo::CargoSummary,
   cargo_config::{
-    CargoConfigPatch, ContainerConfig, CargoConfigPartial, ContainerHostConfig,
+    CargoConfigUpdate, ContainerConfig, CargoConfigPartial, ContainerHostConfig,
   },
 };
 
@@ -124,11 +124,13 @@ pub struct CargoPatchOpts {
   pub(crate) image: Option<String>,
   #[clap(short, long = "env")]
   pub(crate) env: Option<Vec<String>>,
+  #[clap(short, long = "volume")]
+  pub(crate) volumes: Option<Vec<String>>,
 }
 
-impl From<CargoPatchOpts> for CargoConfigPatch {
+impl From<CargoPatchOpts> for CargoConfigUpdate {
   fn from(val: CargoPatchOpts) -> Self {
-    CargoConfigPatch {
+    CargoConfigUpdate {
       name: val.new_name,
       container: Some(ContainerConfig {
         image: val.image,

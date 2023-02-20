@@ -7,12 +7,12 @@ use futures::{StreamExt, TryStreamExt};
 use crate::error::ApiError;
 
 #[derive(Clone)]
-pub struct NanoclClient {
+pub struct NanocldClient {
   client: Client,
   url: String,
 }
 
-impl NanoclClient {
+impl NanocldClient {
   pub fn connect_with_unix_default() -> Self {
     let client = Client::build()
       .connector(
@@ -26,7 +26,7 @@ impl NanoclClient {
       .timeout(ntex::time::Millis::from_secs(50))
       .finish();
 
-    NanoclClient {
+    NanocldClient {
       client,
       url: String::from("http://localhost"),
     }

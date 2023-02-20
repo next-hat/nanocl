@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use nanocl_stubs::cargo_config::ContainerConfig;
+use nanocl_stubs::cargo_config::ContainerHostConfig;
 use ntex::web;
 use ntex::util::Bytes;
 use ntex::http::StatusCode;
@@ -11,7 +13,7 @@ use bollard_next::service::{ContainerSummary, HostConfig};
 use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
 use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 
-use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
+use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, CargoOutput, CargoExecConfig,
 };
@@ -326,9 +328,9 @@ pub async fn delete(
 ///   - [Ok](Cargo) - The cargo has been patched
 ///   - [Err](HttpResponseError) - The cargo has not been patched
 ///
-pub async fn patch(
+pub async fn put(
   cargo_key: &str,
-  config: &CargoConfigPatch,
+  config: &CargoConfigUpdate,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
@@ -646,7 +648,7 @@ pub async fn exec_command(
 ///   - [Ok](()) - The cargo has been created or patched
 ///   - [Err](HttpResponseError) - The cargo has not been created or patched
 ///
-pub async fn create_or_patch(
+pub async fn create_or_put(
   namespace: &str,
   cargo: &CargoConfigPartial,
   docker_api: &bollard_next::Docker,
@@ -657,13 +659,100 @@ pub async fn create_or_patch(
     .await
     .is_ok()
   {
-    utils::cargo::patch(&key, &cargo.to_owned().into(), docker_api, pool)
-      .await?;
+    utils::cargo::put(&key, &cargo.to_owned().into(), docker_api, pool).await?;
   } else {
     utils::cargo::create(namespace, cargo, docker_api, pool).await?;
     utils::cargo::start(&key, docker_api).await?;
   }
   Ok(())
+}
+
+pub async fn patch(
+  key: &str,
+  payload: &CargoConfigUpdate,
+  docker_api: &bollard_next::Docker,
+  pool: &Pool,
+) -> Result<Cargo, HttpResponseError> {
+  let cargo = repositories::cargo::inspect_by_key(key.to_owned(), pool).await?;
+
+  let container = if let Some(container) = payload.container.clone() {
+    // merge env and ensure no duplicate key
+    let new_env = container.env.unwrap_or_default();
+    let mut env_vars: Vec<String> =
+      cargo.config.container.env.unwrap_or_default();
+
+    // Merge environment variables from new_env into the merged array
+    for env_var in new_env {
+      let parts: Vec<&str> = env_var.split('=').collect();
+      let name = parts[0].to_string();
+      let value = parts[1].to_string();
+
+      if let Some(pos) = env_vars.iter().position(|x| x.starts_with(&name)) {
+        let old_value = env_vars[pos].split('=').nth(1).unwrap().to_string();
+        if old_value != value {
+          // Update the value if it has changed
+          env_vars[pos] = format!("{}={}", name, value);
+        }
+      } else {
+        // Add new environment variables
+        env_vars.push(env_var.to_string());
+      }
+    }
+
+    // merge volumes and ensure no duplication
+    let new_volumes = container
+      .host_config
+      .clone()
+      .unwrap_or_default()
+      .binds
+      .unwrap_or_default();
+    let mut volumes: Vec<String> = cargo
+      .config
+      .container
+      .host_config
+      .clone()
+      .unwrap_or_default()
+      .binds
+      .unwrap_or_default();
+
+    for volume in new_volumes {
+      if !volumes.contains(&volume) {
+        volumes.push(volume);
+      }
+    }
+
+    let cmd = if let Some(cmd) = container.cmd.clone() {
+      Some(cmd)
+    } else {
+      cargo.config.container.cmd
+    };
+
+    ContainerConfig {
+      cmd,
+      image: container.image,
+      env: Some(env_vars),
+      host_config: Some(ContainerHostConfig {
+        binds: Some(volumes),
+        ..cargo.config.container.host_config.unwrap_or_default()
+      }),
+      ..cargo.config.container
+    }
+  } else {
+    cargo.config.container
+  };
+
+  let dns_entry = if let Some(dns) = payload.dns_entry.clone() {
+    Some(dns)
+  } else {
+    cargo.config.dns_entry
+  };
+
+  let config = CargoConfigUpdate {
+    container: Some(container),
+    dns_entry,
+    ..payload.to_owned()
+  };
+  utils::cargo::put(key, &config, docker_api, pool).await
 }
 
 pub fn get_logs(

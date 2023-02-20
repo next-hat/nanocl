@@ -1,12 +1,12 @@
-use crate::http_client::NanoclClient;
+use crate::http_client::NanocldClient;
 
-use crate::error::{NanoclClientError, is_api_error};
+use crate::error::{NanocldClientError, is_api_error};
 
-impl NanoclClient {
+impl NanocldClient {
   pub async fn apply_state(
     &self,
     data: &serde_json::Value,
-  ) -> Result<(), NanoclClientError> {
+  ) -> Result<(), NanocldClientError> {
     let mut res = self.put("/state/apply".into()).send_json(data).await?;
 
     let status = res.status();
@@ -18,7 +18,7 @@ impl NanoclClient {
   pub async fn revert_state(
     &self,
     data: &serde_json::Value,
-  ) -> Result<(), NanoclClientError> {
+  ) -> Result<(), NanocldClientError> {
     let mut res = self.put("/state/revert".into()).send_json(data).await?;
 
     let status = res.status();

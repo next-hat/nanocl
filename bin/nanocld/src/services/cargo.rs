@@ -9,7 +9,7 @@ use ntex::http::StatusCode;
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::CargoExecConfig;
-use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigPatch};
+use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
 use crate::{utils, repositories};
 use crate::event::EventEmitterPtr;
@@ -169,13 +169,13 @@ pub async fn stop_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Endpoint to patch a cargo
+/// Endpoint to put a cargo
 #[cfg_attr(feature = "dev", utoipa::path(
-    patch,
+    put,
     path = "/cargoes/{name}",
     request_body = CargoPartial,
     params(
-      ("name" = String, Path, description = "Name of the cargo to patch"),
+      ("name" = String, Path, description = "Name of the cargo to put"),
       ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
     ),
     responses(
@@ -184,13 +184,53 @@ pub async fn stop_cargo(
       (status = 404, description = "Cargo not found", body = ApiError),
     ),
   ))]
+#[web::put("/cargoes/{name}")]
+pub async fn put_cargo(
+  pool: web::types::State<Pool>,
+  docker_api: web::types::State<bollard_next::Docker>,
+  event_emitter: web::types::State<EventEmitterPtr>,
+  id: web::types::Path<String>,
+  payload: web::types::Json<CargoConfigUpdate>,
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &id);
+  log::debug!("Patching cargo: {}", &key);
+  let cargo = utils::cargo::put(&key, &payload, &docker_api, &pool).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
+      .await
+      .unwrap();
+    event_emitter
+      .lock()
+      .unwrap()
+      .send(Event::CargoPatched(Box::new(cargo)));
+  });
+  Ok(web::HttpResponse::Ok().json(&cargo))
+}
+
+/// Endpoint to patch a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  put,
+  path = "/cargoes/{name}",
+  request_body = CargoPartial,
+  params(
+    ("name" = String, Path, description = "Name of the cargo to put"),
+    ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
+  ),
+  responses(
+    (status = 200, description = "Cargo patched", body = Cargo),
+    (status = 400, description = "Generic database error", body = ApiError),
+    (status = 404, description = "Cargo not found", body = ApiError),
+  ),
+))]
 #[web::patch("/cargoes/{name}")]
 pub async fn patch_cargo(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard_next::Docker>,
   event_emitter: web::types::State<EventEmitterPtr>,
   id: web::types::Path<String>,
-  payload: web::types::Json<CargoConfigPatch>,
+  payload: web::types::Json<CargoConfigUpdate>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
@@ -317,7 +357,7 @@ async fn reset_cargo(
   let config =
     repositories::cargo_config::find_by_key(config_id.to_owned(), &pool)
       .await?;
-  let cargo = utils::cargo::patch(
+  let cargo = utils::cargo::put(
     &cargo_key,
     &config.to_owned().into(),
     &docker_api,
@@ -357,6 +397,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(start_cargo);
   config.service(stop_cargo);
   config.service(patch_cargo);
+  config.service(put_cargo);
   config.service(list_cargo);
   config.service(inspect_cargo);
   config.service(list_cargo_history);
@@ -373,7 +414,7 @@ mod tests {
   use futures::{TryStreamExt, StreamExt};
   use nanocl_stubs::cargo::{Cargo, CargoSummary, CargoInspect, CargoOutput};
   use nanocl_stubs::cargo_config::{
-    CargoConfigPartial, CargoConfigPatch, CargoConfig,
+    CargoConfigPartial, CargoConfigUpdate, CargoConfig,
   };
 
   use crate::utils::tests::*;
@@ -430,8 +471,8 @@ mod tests {
     assert_eq!(res.status(), 202);
 
     let mut res = srv
-      .patch(format!("/cargoes/{}", response.name))
-      .send_json(&CargoConfigPatch {
+      .put(format!("/cargoes/{}", response.name))
+      .send_json(&CargoConfigUpdate {
         container: Some(bollard_next::container::Config {
           image: Some("nexthat/nanocl-get-started:latest".to_string()),
           env: Some(vec!["TEST=1".to_string()]),

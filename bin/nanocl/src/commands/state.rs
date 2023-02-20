@@ -1,13 +1,13 @@
 use std::fs;
 
-use nanocld_client::NanoclClient;
+use nanocld_client::NanocldClient;
 
 use crate::utils;
 use crate::error::CliError;
 use crate::models::{StateArgs, StateCommands, StateOpts};
 
 async fn exec_apply(
-  client: &NanoclClient,
+  client: &NanocldClient,
   opts: &StateOpts,
 ) -> Result<(), CliError> {
   match url::Url::parse(&opts.file_path) {
@@ -55,7 +55,7 @@ async fn exec_apply(
 }
 
 async fn exec_revert(
-  client: &NanoclClient,
+  client: &NanocldClient,
   opts: &StateOpts,
 ) -> Result<(), CliError> {
   let data = match url::Url::parse(&opts.file_path) {
@@ -93,7 +93,7 @@ async fn exec_revert(
 }
 
 pub async fn exec_state(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &StateArgs,
 ) -> Result<(), CliError> {
   match &args.commands {

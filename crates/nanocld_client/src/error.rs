@@ -27,7 +27,7 @@ impl std::fmt::Display for ApiError {
 }
 
 #[derive(Debug, Error)]
-pub enum NanoclClientError {
+pub enum NanocldClientError {
   #[error(transparent)]
   Api(#[from] ApiError),
   #[error(transparent)]
@@ -45,10 +45,10 @@ pub enum NanoclClientError {
 pub(crate) async fn is_api_error(
   res: &mut ClientResponse,
   status: &StatusCode,
-) -> Result<(), NanoclClientError> {
+) -> Result<(), NanocldClientError> {
   if status.is_server_error() || status.is_client_error() {
     let err = res.json::<ApiResponseError>().await?;
-    return Err(NanoclClientError::Api(ApiError {
+    return Err(NanocldClientError::Api(ApiError {
       status: *status,
       msg: err.msg,
     }));

@@ -1,5 +1,5 @@
 use clap::Parser;
-use nanocld_client::NanoclClient;
+use nanocld_client::NanocldClient;
 
 mod utils;
 mod error;
@@ -11,7 +11,7 @@ use error::CliError;
 use models::{Cli, Commands};
 
 async fn execute_args(args: &Cli) -> Result<(), CliError> {
-  let client = NanoclClient::connect_with_unix_default();
+  let client = NanocldClient::connect_with_unix_default();
   match &args.command {
     Commands::Namespace(args) => commands::exec_namespace(&client, args).await,
     Commands::Resource(args) => commands::exec_resource(&client, args).await,
@@ -37,7 +37,7 @@ async fn main() -> std::io::Result<()> {
 mod tests {
   use super::*;
 
-  use nanocld_client::NanoclClient;
+  use nanocld_client::NanocldClient;
   use ntex::time::{interval, Seconds};
 
   /// Test version command
@@ -133,7 +133,7 @@ mod tests {
 
     let args = Cli::parse_from(["nanocl", "cargo", "history", CARGO_NAME]);
     assert!(execute_args(&args).await.is_ok());
-    let client = NanoclClient::connect_with_unix_default();
+    let client = NanocldClient::connect_with_unix_default();
     let history = client
       .list_history_cargo(CARGO_NAME, None)
       .await
@@ -184,7 +184,7 @@ mod tests {
       Cli::parse_from(["nanocl", "resource", "history", "resource-example"]);
     assert!(execute_args(&args).await.is_ok());
 
-    let client = NanoclClient::connect_with_unix_default();
+    let client = NanocldClient::connect_with_unix_default();
     let history = client
       .list_history_resource("resource-example")
       .await

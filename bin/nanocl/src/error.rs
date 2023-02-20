@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use nanocld_client::error::{NanoclClientError, ApiError};
+use nanocld_client::error::{NanocldClientError, ApiError};
 
 use crate::models::Cli;
 
@@ -11,7 +11,7 @@ pub enum CliError {
   #[error(transparent)]
   ParseYml(#[from] serde_yaml::Error),
   #[error(transparent)]
-  Client(#[from] NanoclClientError),
+  Client(#[from] NanocldClientError),
   #[error(transparent)]
   Docker(#[from] bollard_next::errors::Error),
   #[error(transparent)]
@@ -26,17 +26,18 @@ impl CliError {
   pub fn exit(&self, args: &Cli) {
     match self {
       CliError::Client(err) => match err {
-        nanocld_client::error::NanoclClientError::SendRequest(err) => match err
-        {
-          ntex::http::client::error::SendRequestError::Connect(_) => {
-            eprintln!(
+        nanocld_client::error::NanocldClientError::SendRequest(err) => {
+          match err {
+            ntex::http::client::error::SendRequestError::Connect(_) => {
+              eprintln!(
               "Cannot connect to the nanocl daemon at {host}. Is the nanocl daemon running?",
               host = args.host
             )
+            }
+            _ => eprintln!("{err}"),
           }
-          _ => eprintln!("{err}"),
-        },
-        nanocld_client::error::NanoclClientError::Api(err) => {
+        }
+        nanocld_client::error::NanocldClientError::Api(err) => {
           eprintln!("Daemon [{}]: {}", err.status, err.msg);
         }
         _ => eprintln!("{err}"),
