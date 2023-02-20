@@ -1,6 +1,6 @@
 name: Tests
 
-on: [push, pull_request]
+on: [push]
 
 env:
   CARGO_TERM_COLOR: always
@@ -48,9 +48,10 @@ jobs:
         docker network ls
         cargo make run-daemon &
         sleep 5
+        chmod 777 -R /run/nanocl
     # Run coverage
     - name: Run tests
-      run: cargo make covgen
+      run: cargo make test-debug
     # Upload it to codecov
     - name: Codecov
       uses: codecov/codecov-action@v3.1.1

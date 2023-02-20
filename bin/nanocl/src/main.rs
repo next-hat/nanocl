@@ -314,11 +314,15 @@ mod tests {
 
     let args =
       Cli::parse_from(["nanocl", "cargo", "-n", "system", "stop", "daemon"]);
-    let _ = execute_args(&args).await;
+    let res = execute_args(&args).await;
+    println!("{res:?}");
+    assert!(res.is_ok());
 
     let args =
       Cli::parse_from(["nanocl", "cargo", "-n", "system", "rm", "daemon"]);
-    let _ = execute_args(&args).await.is_ok();
+    let res = execute_args(&args).await;
+    println!("{res:#?}");
+    assert!(res.is_ok());
   }
 
   #[ntex::test]

@@ -39,7 +39,7 @@ args = ["nextest", "run", "-j", "1"]
 # Test all with debug output
 [tasks.test-debug]
 command = "cargo"
-args = ["test", "--", "--nocapture"]
+args = ["test", "--", "--nocapture", "-j", "1"]
 
 # Test coverage
 [tasks.cov]
