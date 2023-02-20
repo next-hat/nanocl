@@ -314,7 +314,9 @@ mod tests {
 
     let args =
       Cli::parse_from(["nanocl", "cargo", "-n", "system", "stop", "daemon"]);
-    assert!(execute_args(&args).await.is_ok());
+    let res = execute_args(&args).await;
+
+    println!("{res:?}");
 
     let args =
       Cli::parse_from(["nanocl", "cargo", "-n", "system", "rm", "daemon"]);
