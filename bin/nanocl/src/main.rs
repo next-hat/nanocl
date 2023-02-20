@@ -302,6 +302,8 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "setup",
+      "--version",
+      "nightly",
       "--deamon-hosts",
       "unix:///tmp/nanocl_tmp.sock",
       "--state-dir",

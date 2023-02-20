@@ -14,6 +14,8 @@ pub struct SetupOpts {
   pub(crate) deamon_hosts: Option<Vec<String>>,
   #[clap(long)]
   pub(crate) group: Option<String>,
+  #[clap(long, default_value = "0.2.0")]
+  pub(crate) version: String,
 }
 
 /// This is the struct that will be passed to nanocl daemon
