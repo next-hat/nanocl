@@ -1,5 +1,5 @@
 use clap::Parser;
-use nanocld_client::NanoclClient;
+use nanocld_client::NanocldClient;
 
 mod utils;
 mod error;
@@ -11,7 +11,7 @@ use error::CliError;
 use models::{Cli, Commands};
 
 async fn execute_args(args: &Cli) -> Result<(), CliError> {
-  let client = NanoclClient::connect_with_unix_default();
+  let client = NanocldClient::connect_with_unix_default();
   match &args.command {
     Commands::Namespace(args) => commands::exec_namespace(&client, args).await,
     Commands::Resource(args) => commands::exec_resource(&client, args).await,
@@ -20,6 +20,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::State(args) => commands::exec_state(&client, args).await,
     Commands::Version(args) => commands::exec_version(&client, args).await,
     Commands::Info => commands::exec_info(&client).await,
+    Commands::Setup(opts) => commands::exec_setup(opts).await,
   }
 }
 
@@ -36,7 +37,8 @@ async fn main() -> std::io::Result<()> {
 mod tests {
   use super::*;
 
-  use nanocld_client::NanoclClient;
+  use nanocld_client::NanocldClient;
+  use ntex::time::{interval, Seconds};
 
   /// Test version command
   #[ntex::test]
@@ -131,7 +133,7 @@ mod tests {
 
     let args = Cli::parse_from(["nanocl", "cargo", "history", CARGO_NAME]);
     assert!(execute_args(&args).await.is_ok());
-    let client = NanoclClient::connect_with_unix_default();
+    let client = NanocldClient::connect_with_unix_default();
     let history = client
       .list_history_cargo(CARGO_NAME, None)
       .await
@@ -182,7 +184,7 @@ mod tests {
       Cli::parse_from(["nanocl", "resource", "history", "resource-example"]);
     assert!(execute_args(&args).await.is_ok());
 
-    let client = NanoclClient::connect_with_unix_default();
+    let client = NanocldClient::connect_with_unix_default();
     let history = client
       .list_history_resource("resource-example")
       .await
@@ -292,6 +294,58 @@ mod tests {
   #[ntex::test]
   async fn test_info() {
     let args = Cli::parse_from(["nanocl", "info"]);
+    assert!(execute_args(&args).await.is_ok());
+  }
+
+  #[ntex::test]
+  async fn test_setup() {
+    let args = Cli::parse_from([
+      "nanocl",
+      "setup",
+      "--deamon-hosts",
+      "unix:///tmp/nanocl_tmp.sock",
+      "--state-dir",
+      "/tmp/nanocl2",
+      "--conf-dir",
+      "/tmp",
+    ]);
+    let res = execute_args(&args).await;
+    println!("{res:#?}");
+    assert!(res.is_ok());
+
+    // Wait before trying to stop the cargo
+    interval(Seconds(8)).tick().await;
+
+    let args =
+      Cli::parse_from(["nanocl", "cargo", "-n", "system", "stop", "daemon"]);
+    let res = execute_args(&args).await;
+    println!("{res:?}");
+    assert!(res.is_ok());
+
+    let args =
+      Cli::parse_from(["nanocl", "cargo", "-n", "system", "rm", "daemon"]);
+    let res = execute_args(&args).await;
+    println!("{res:#?}");
+    assert!(res.is_ok());
+  }
+
+  #[ntex::test]
+  async fn test_cargo_run() {
+    let args = Cli::parse_from([
+      "nanocl",
+      "cargo",
+      "run",
+      "cli-test-run",
+      "nexthat/nanocl-get-started",
+      "-e",
+      "MESSAGE=GREETING",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from(["nanocl", "cargo", "stop", "cli-test-run"]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from(["nanocl", "cargo", "rm", "cli-test-run"]);
     assert!(execute_args(&args).await.is_ok());
   }
 }

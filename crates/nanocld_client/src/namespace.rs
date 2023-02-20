@@ -1,30 +1,30 @@
 use nanocl_stubs::namespace::{Namespace, NamespaceSummary, NamespaceInspect};
 
-use super::http_client::NanoclClient;
+use super::http_client::NanocldClient;
 
-use super::error::{NanoclClientError, is_api_error};
+use super::error::{NanocldClientError, is_api_error};
 
-impl NanoclClient {
+impl NanocldClient {
   /// ## List all namespaces
   ///
   /// ## Returns
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - A [Vec](Vec) of [namespaces](NamespaceSummary)
-  ///   * [Err](NanoclClientError) - The namespaces could not be listed
+  ///   * [Err](NanocldClientError) - The namespaces could not be listed
   ///
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocld_client::NanoclClient;
+  /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_with_unix_default();
   /// let namespaces = client.list_namespace().await;
   /// ```
   ///
   pub async fn list_namespace(
     &self,
-  ) -> Result<Vec<NamespaceSummary>, NanoclClientError> {
+  ) -> Result<Vec<NamespaceSummary>, NanocldClientError> {
     let mut res = self.get(String::from("/namespaces")).send().await?;
 
     let status = res.status();
@@ -43,12 +43,12 @@ impl NanoclClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The created [namespace](Namespace)
-  ///   * [Err](NanoclClientError) - The namespace could not be created
+  ///   * [Err](NanocldClientError) - The namespace could not be created
   ///
   pub async fn create_namespace(
     &self,
     name: &str,
-  ) -> Result<Namespace, NanoclClientError> {
+  ) -> Result<Namespace, NanocldClientError> {
     let new_item = Namespace { name: name.into() };
     let mut res = self
       .post(String::from("/namespaces"))
@@ -73,21 +73,21 @@ impl NanoclClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The desired [namespace](NamespaceInspect)
-  ///   * [Err](NanoclClientError) - The namespace could not be inspected
+  ///   * [Err](NanocldClientError) - The namespace could not be inspected
   ///
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocld_client::NanoclClient;
+  /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_with_unix_default();
   /// let namespace = client.inspect_namespace("my-namespace").await?;
   /// ```
   ///
   pub async fn inspect_namespace(
     &self,
     name: &str,
-  ) -> Result<NamespaceInspect, NanoclClientError> {
+  ) -> Result<NamespaceInspect, NanocldClientError> {
     let mut res = self
       .get(format!("/namespaces/{name}/inspect"))
       .send()
@@ -112,21 +112,21 @@ impl NanoclClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The namespace was deleted
-  ///   * [Err](NanoclClientError) - The namespace could not be deleted
+  ///   * [Err](NanocldClientError) - The namespace could not be deleted
   ///
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocld_client::NanoclClient;
+  /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_with_unix_default();
   /// client.delete_namespace("my-namespace").await?;
   /// ```
   ///
   pub async fn delete_namespace(
     &self,
     name: &str,
-  ) -> Result<(), NanoclClientError> {
+  ) -> Result<(), NanocldClientError> {
     let mut res = self.delete(format!("/namespaces/{name}")).send().await?;
 
     let status = res.status();
@@ -142,7 +142,7 @@ mod tests {
   #[ntex::test]
   async fn test_basic() {
     const NAMESPACE: &str = "clientnt";
-    let client = NanoclClient::connect_with_unix_default();
+    let client = NanocldClient::connect_with_unix_default();
 
     client.list_namespace().await.unwrap();
 

@@ -22,7 +22,7 @@ pub struct Cli {
   pub(crate) state_dir: Option<String>,
   /// Config directory
   #[clap(long, default_value = "/etc/nanocl")]
-  pub(crate) config_dir: String,
+  pub(crate) conf_dir: String,
   /// Gateway automatically detected to host default source ip gateway if not set
   #[clap(long)]
   pub(crate) gateway: Option<String>,
@@ -41,7 +41,7 @@ mod tests {
     assert!(!args.init);
     assert_eq!(args.docker_host, None);
     assert_eq!(args.state_dir, None);
-    assert_eq!(args.config_dir, String::from("/etc/nanocl"));
+    assert_eq!(args.conf_dir, String::from("/etc/nanocl"));
   }
 
   /// Test cli arguments with custom values
@@ -55,7 +55,7 @@ mod tests {
       "/run/docker.sock",
       "--state-dir",
       "/var/lib/nanocl",
-      "--config-dir",
+      "--conf-dir",
       "/etc/nanocl",
     ]);
     assert_eq!(
@@ -65,6 +65,6 @@ mod tests {
     assert!(!args.init);
     assert_eq!(args.docker_host, Some(String::from("/run/docker.sock")));
     assert_eq!(args.state_dir, Some(String::from("/var/lib/nanocl")));
-    assert_eq!(args.config_dir, String::from("/etc/nanocl"));
+    assert_eq!(args.conf_dir, String::from("/etc/nanocl"));
   }
 }

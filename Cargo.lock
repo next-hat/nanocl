@@ -1405,8 +1405,8 @@ dependencies = [
  "futures",
  "hyper",
  "indicatif",
- "nanocld_client 0.0.7",
- "nanocld_client 0.0.9",
+ "libc",
+ "nanocld_client",
  "ntex",
  "serde",
  "serde_json",
@@ -1418,18 +1418,6 @@ dependencies = [
  "tokio-util",
  "url",
  "users",
-]
-
-[[package]]
-name = "nanocl_stubs"
-version = "0.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e234f6586f2056d7cb4d7485277b2d27253a3759e6dd765bd4b39bcdcb41398"
-dependencies = [
- "bollard-next",
- "serde",
- "serde_json",
- "uuid",
 ]
 
 [[package]]
@@ -1460,7 +1448,7 @@ dependencies = [
  "libc",
  "log",
  "metrsd_client",
- "nanocl_stubs 0.0.9",
+ "nanocl_stubs",
  "ntex",
  "r2d2",
  "serde",
@@ -1476,27 +1464,11 @@ dependencies = [
 
 [[package]]
 name = "nanocld_client"
-version = "0.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fd7a6fa6ea084583646db420d9da1be975b9c33c52432fca1d852b368470012"
-dependencies = [
- "bollard-next",
- "futures",
- "nanocl_stubs 0.0.7",
- "ntex",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "thiserror",
-]
-
-[[package]]
-name = "nanocld_client"
 version = "0.0.9"
 dependencies = [
  "bollard-next",
  "futures",
- "nanocl_stubs 0.0.9",
+ "nanocl_stubs",
  "ntex",
  "serde",
  "serde_json",
@@ -2265,9 +2237,9 @@ checksum = "04d2ecae5fcf33b122e2e6bd520a57ccf152d2dde3b38c71039df1a6867264ee"
 
 [[package]]
 name = "slab"
-version = "0.4.7"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4614a76b2a8be0058caa9dbbaf66d988527d86d003c11a94fbd335d7661edcef"
+checksum = "6528351c9bc8ab22353f9d776db39a20288e8d6c37ef8cfe3317cf875eecfc2d"
 dependencies = [
  "autocfg",
 ]
@@ -2591,9 +2563,9 @@ dependencies = [
 
 [[package]]
 name = "utoipa"
-version = "3.0.2"
+version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bdd08005ac3ff3aa380060bc30b2ff4a840c4405ea072deba2bad4891e404c0"
+checksum = "a15f6da6a2b471134ca44b7d18e8a76d73035cf8b3ed24c4dd5ca6a63aa439c5"
 dependencies = [
  "indexmap",
  "serde",
@@ -2603,9 +2575,9 @@ dependencies = [
 
 [[package]]
 name = "utoipa-gen"
-version = "3.0.2"
+version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c6e78c81140a4b93470645091775e4048a57a29b6cc78add875ae60ffced17c"
+checksum = "6f2e33027986a4707b3f5c37ed01b33d0e5a53da30204b52ff18f80600f1d0ec"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",

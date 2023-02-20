@@ -1,10 +1,10 @@
-use nanocld_client::NanoclClient;
+use nanocld_client::NanocldClient;
 
 use crate::utils::print::*;
 use crate::error::CliError;
 use crate::models::{NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow};
 
-async fn exec_namespace_list(client: &NanoclClient) -> Result<(), CliError> {
+async fn exec_namespace_list(client: &NanocldClient) -> Result<(), CliError> {
   let items = client.list_namespace().await?;
   let namespaces = items
     .into_iter()
@@ -15,7 +15,7 @@ async fn exec_namespace_list(client: &NanoclClient) -> Result<(), CliError> {
 }
 
 async fn exec_namespace_create(
-  client: &NanoclClient,
+  client: &NanocldClient,
   options: &NamespaceOpts,
 ) -> Result<(), CliError> {
   let item = client.create_namespace(&options.name).await?;
@@ -24,7 +24,7 @@ async fn exec_namespace_create(
 }
 
 async fn exec_namespace_inspect(
-  client: &NanoclClient,
+  client: &NanocldClient,
   options: &NamespaceOpts,
 ) -> Result<(), CliError> {
   let namespace = client.inspect_namespace(&options.name).await?;
@@ -33,7 +33,7 @@ async fn exec_namespace_inspect(
 }
 
 async fn exec_namespace_delete(
-  client: &NanoclClient,
+  client: &NanocldClient,
   options: &NamespaceOpts,
 ) -> Result<(), CliError> {
   client.delete_namespace(&options.name).await?;
@@ -41,7 +41,7 @@ async fn exec_namespace_delete(
 }
 
 pub async fn exec_namespace(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &NamespaceArgs,
 ) -> Result<(), CliError> {
   match &args.commands {

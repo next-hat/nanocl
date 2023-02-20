@@ -6,10 +6,11 @@ use ntex::http::StatusCode;
 use bollard_next::service::ProgressDetail;
 use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
 
-use nanocld_client::NanoclClient;
+use nanocld_client::NanocldClient;
 use nanocld_client::error::ApiError;
 
 use crate::utils::print::*;
+use crate::utils::math::calculate_percentage;
 use crate::error::CliError;
 use crate::models::{
   CargoImageOpts, CargoImageCommands, CargoImageRemoveOpts,
@@ -17,7 +18,7 @@ use crate::models::{
 };
 
 async fn exec_cargo_instance_list(
-  client: &NanoclClient,
+  client: &NanocldClient,
 ) -> Result<(), CliError> {
   let items = client.list_cargo_image(None).await?;
   let rows = items
@@ -29,15 +30,11 @@ async fn exec_cargo_instance_list(
 }
 
 async fn exec_remove_cargo_image(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoImageRemoveOpts,
 ) -> Result<(), CliError> {
   client.delete_cargo_image(&args.name).await?;
   Ok(())
-}
-
-fn calculate_percentage(current: u64, total: u64) -> u64 {
-  ((current as f64 / total as f64) * 100_f64).round() as u64
 }
 
 fn update_progress(
@@ -74,8 +71,8 @@ fn update_progress(
   }
 }
 
-async fn exec_create_cargo_image(
-  client: &NanoclClient,
+pub(crate) async fn exec_create_cargo_image(
+  client: &NanocldClient,
   name: &str,
 ) -> Result<(), CliError> {
   let mut stream = client.create_cargo_image(name).await?;
@@ -126,7 +123,7 @@ async fn exec_create_cargo_image(
 }
 
 async fn exec_inspect_cargo_image(
-  client: &NanoclClient,
+  client: &NanocldClient,
   opts: &CargoImageInspectOpts,
 ) -> Result<(), CliError> {
   let image = client.inspect_cargo_image(&opts.name).await?;
@@ -135,7 +132,7 @@ async fn exec_inspect_cargo_image(
 }
 
 async fn exec_import_cargo_image(
-  client: &NanoclClient,
+  client: &NanocldClient,
   opts: &CargoImageImportOpts,
 ) -> Result<(), CliError> {
   let file = tokio::fs::File::open(&opts.file_path).await.unwrap();
@@ -154,7 +151,7 @@ async fn exec_import_cargo_image(
 }
 
 pub async fn exec_cargo_image(
-  client: &NanoclClient,
+  client: &NanocldClient,
   cmd: &CargoImageOpts,
 ) -> Result<(), CliError> {
   match &cmd.commands {

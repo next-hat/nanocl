@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use bollard_next::exec::CreateExecOptions;
 
-use nanocld_client::NanoclClient;
+use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::CargoOutputKind;
 
 use crate::utils::print::*;
@@ -9,15 +9,15 @@ use crate::error::CliError;
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
-  CargoExecOpts, CargoHistoryOpts, CargoResetOpts, CargoLogsOpts,
+  CargoExecOpts, CargoHistoryOpts, CargoResetOpts, CargoLogsOpts, CargoRunOpts,
 };
 
-use super::cargo_image;
+use super::cargo_image::{self, exec_create_cargo_image};
 
 /// Execute cargo command
 ///
 /// ## Arguments
-/// * [client](NanoclClient) - Nanocl client
+/// * [client](NanocldClient) - Nanocl client
 /// * [args](CargoArgs) - Cargo arguments
 /// * [options](CargoCommands) - Cargo command
 ///
@@ -27,7 +27,7 @@ use super::cargo_image;
 ///   * [Err](CliError) - Operation failed
 ///
 async fn exec_cargo_create(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoCreateOpts,
 ) -> Result<(), CliError> {
@@ -40,7 +40,7 @@ async fn exec_cargo_create(
 }
 
 async fn exec_cargo_delete(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoDeleteOpts,
 ) -> Result<(), CliError> {
@@ -51,7 +51,7 @@ async fn exec_cargo_delete(
 }
 
 async fn exec_cargo_list(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
 ) -> Result<(), CliError> {
   let items = client.list_cargo(args.namespace.to_owned()).await?;
@@ -65,7 +65,7 @@ async fn exec_cargo_list(
 }
 
 async fn exec_cargo_start(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoStartOpts,
 ) -> Result<(), CliError> {
@@ -76,7 +76,7 @@ async fn exec_cargo_start(
 }
 
 async fn exec_cargo_stop(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoStopOpts,
 ) -> Result<(), CliError> {
@@ -87,7 +87,7 @@ async fn exec_cargo_stop(
 }
 
 async fn exec_cargo_patch(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoPatchOpts,
 ) -> Result<(), CliError> {
@@ -99,7 +99,7 @@ async fn exec_cargo_patch(
 }
 
 async fn exec_cargo_inspect(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoInspectOpts,
 ) -> Result<(), CliError> {
@@ -111,7 +111,7 @@ async fn exec_cargo_inspect(
 }
 
 async fn exec_cargo_exec(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoExecOpts,
 ) -> Result<(), CliError> {
@@ -138,7 +138,7 @@ async fn exec_cargo_exec(
 }
 
 async fn exec_cargo_history(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
   opts: &CargoHistoryOpts,
 ) -> Result<(), CliError> {
@@ -152,7 +152,7 @@ async fn exec_cargo_history(
 }
 
 async fn exec_cargo_logs(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoLogsOpts,
 ) -> Result<(), CliError> {
@@ -182,7 +182,7 @@ async fn exec_cargo_logs(
 }
 
 async fn exec_cargo_reset(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
   opts: &CargoResetOpts,
 ) -> Result<(), CliError> {
@@ -194,8 +194,29 @@ async fn exec_cargo_reset(
   Ok(())
 }
 
+async fn exec_cargo_run(
+  client: &NanocldClient,
+  args: &CargoArgs,
+  opts: &CargoRunOpts,
+) -> Result<(), CliError> {
+  // Image is not existing so we donwload it
+  if client.inspect_cargo_image(&opts.image).await.is_err() {
+    exec_create_cargo_image(client, &opts.image).await?;
+  }
+
+  let cargo = client
+    .create_cargo(&opts.clone().into(), args.namespace.clone())
+    .await?;
+
+  client
+    .start_cargo(&cargo.name, Some(cargo.namespace_name))
+    .await?;
+
+  Ok(())
+}
+
 pub async fn exec_cargo(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &CargoArgs,
 ) -> Result<(), CliError> {
   match &args.commands {
@@ -233,5 +254,6 @@ pub async fn exec_cargo(
     CargoCommands::Logs(options) => {
       exec_cargo_logs(client, args, options).await
     }
+    CargoCommands::Run(options) => exec_cargo_run(client, args, options).await,
   }
 }

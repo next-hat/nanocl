@@ -52,7 +52,7 @@ pub struct CargoConfigPartial {
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoConfigPatch {
+pub struct CargoConfigUpdate {
   /// New name of the cargo
   pub name: Option<String>,
   /// New DNS entry of the cargo
@@ -63,7 +63,7 @@ pub struct CargoConfigPatch {
   pub replication: Option<CargoReplication>,
 }
 
-impl From<CargoConfigPartial> for CargoConfigPatch {
+impl From<CargoConfigPartial> for CargoConfigUpdate {
   fn from(cargo_config: CargoConfigPartial) -> Self {
     Self {
       name: Some(cargo_config.name),
@@ -95,7 +95,7 @@ pub struct CargoConfig {
   pub container: ContainerConfig<String>,
 }
 
-impl From<CargoConfig> for CargoConfigPatch {
+impl From<CargoConfig> for CargoConfigUpdate {
   fn from(cargo_config: CargoConfig) -> Self {
     Self {
       name: Some(cargo_config.name),

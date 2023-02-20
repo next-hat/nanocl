@@ -1,4 +1,4 @@
-use nanocld_client::NanoclClient;
+use nanocld_client::NanocldClient;
 use ntex::http::Client;
 use ntex::http::client::error::SendRequestError;
 use ntex::time::Millis;
@@ -10,7 +10,7 @@ use crate::version;
 use crate::error::CliError;
 
 pub async fn exec_version(
-  client: &NanoclClient,
+  client: &NanocldClient,
   args: &VersionArgs,
 ) -> Result<(), CliError> {
   match args.command.is_some() {
@@ -19,7 +19,7 @@ pub async fn exec_version(
   }
 }
 
-async fn print_version(client: &NanoclClient) -> Result<(), CliError> {
+async fn print_version(client: &NanocldClient) -> Result<(), CliError> {
   println!("=== [nanocli] ===");
   version::print_version();
 

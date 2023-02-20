@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use nanocld_client::stubs::{
   cargo::CargoSummary,
   cargo_config::{
-    CargoConfigPatch, ContainerConfig, CargoConfigPartial, ContainerHostConfig,
+    CargoConfigUpdate, ContainerConfig, CargoConfigPartial, ContainerHostConfig,
   },
 };
 
@@ -25,9 +25,6 @@ pub struct CargoCreateOpts {
   pub name: String,
   /// Image of the cargo
   pub image: String,
-  /// Network of the cargo this is automatically set to the namespace network
-  #[clap(long = "net")]
-  pub network: Option<String>,
   /// Volumes of the cargo
   #[clap(short, long = "volume")]
   pub volumes: Option<Vec<String>>,
@@ -46,8 +43,47 @@ impl From<CargoCreateOpts> for CargoConfigPartial {
         // volumes: val.volumes,
         env: val.env,
         host_config: Some(ContainerHostConfig {
-          network_mode: val.network,
           binds: val.volumes,
+          ..Default::default()
+        }),
+        ..Default::default()
+      },
+      ..Default::default()
+    }
+  }
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct CargoRunOpts {
+  /// Name of the cargo
+  pub name: String,
+  /// Image of the cargo
+  pub image: String,
+  /// Volumes of the cargo
+  #[clap(short, long = "volume")]
+  pub volumes: Option<Vec<String>>,
+  /// Environment variables of the cargo
+  #[clap(short, long = "env")]
+  pub env: Option<Vec<String>>,
+  /// Command to execute
+  pub command: Vec<String>,
+  #[clap(long = "rm", default_value = "false")]
+  pub auto_remove: bool,
+}
+
+impl From<CargoRunOpts> for CargoConfigPartial {
+  fn from(val: CargoRunOpts) -> Self {
+    Self {
+      name: val.name,
+      container: ContainerConfig {
+        image: Some(val.image),
+        // network: val.network,
+        // volumes: val.volumes,
+        env: val.env,
+        cmd: Some(val.command),
+        host_config: Some(ContainerHostConfig {
+          binds: val.volumes,
+          auto_remove: Some(val.auto_remove),
           ..Default::default()
         }),
         ..Default::default()
@@ -88,11 +124,13 @@ pub struct CargoPatchOpts {
   pub(crate) image: Option<String>,
   #[clap(short, long = "env")]
   pub(crate) env: Option<Vec<String>>,
+  #[clap(short, long = "volume")]
+  pub(crate) volumes: Option<Vec<String>>,
 }
 
-impl From<CargoPatchOpts> for CargoConfigPatch {
+impl From<CargoPatchOpts> for CargoConfigUpdate {
   fn from(val: CargoPatchOpts) -> Self {
-    CargoConfigPatch {
+    CargoConfigUpdate {
       name: val.new_name,
       container: Some(ContainerConfig {
         image: val.image,
@@ -173,6 +211,8 @@ pub enum CargoCommands {
   Reset(CargoResetOpts),
   /// Show logs
   Logs(CargoLogsOpts),
+  /// Run a cargo
+  Run(CargoRunOpts),
 }
 
 /// Manage cargoes

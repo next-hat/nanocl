@@ -95,7 +95,7 @@ fn read_config_file(
 /// ```
 ///
 pub fn init(args: &Cli) -> Result<DaemonConfig, DaemonError> {
-  let file_config = read_config_file(&args.config_dir)?;
+  let file_config = read_config_file(&args.conf_dir)?;
   // Merge cli args and config file with priority to args
   Ok(gen_daemon_conf(args, &file_config)?)
 }
@@ -114,7 +114,7 @@ mod tests {
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/run/docker.sock")),
-      config_dir: String::from("/etc/nanocl"),
+      conf_dir: String::from("/etc/nanocl"),
       init: false,
       gateway: None,
     };
@@ -196,7 +196,7 @@ mod tests {
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/run/docker.sock")),
-      config_dir: String::from("/etc/nanocl"),
+      conf_dir: String::from("/etc/nanocl"),
       init: false,
       gateway: None,
     };

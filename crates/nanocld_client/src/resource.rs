@@ -2,10 +2,10 @@ use nanocl_stubs::resource::{
   Resource, ResourcePartial, ResourceConfig, ResourceQuery,
 };
 
-use super::http_client::NanoclClient;
-use super::error::{NanoclClientError, is_api_error};
+use super::http_client::NanocldClient;
+use super::error::{NanocldClientError, is_api_error};
 
-impl NanoclClient {
+impl NanocldClient {
   /// ## List resources
   ///
   /// List all existing resources
@@ -14,21 +14,21 @@ impl NanoclClient {
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Vec<Resource>) - The resources
-  ///   * [Err](NanoclClientError) - An error if the operation failed
+  ///   * [Err](NanocldClientError) - An error if the operation failed
   ///
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocld_client::NanoclClient;
+  /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_with_unix_default();
   /// let namespaces = client.list_resource().await;
   /// ```
   ///
   pub async fn list_resource(
     &self,
     query: Option<ResourceQuery>,
-  ) -> Result<Vec<Resource>, NanoclClientError> {
+  ) -> Result<Vec<Resource>, NanocldClientError> {
     let mut req = self.get("/resources".into());
     if let Some(query) = query {
       req = req.query(&query)?;
@@ -52,15 +52,15 @@ impl NanoclClient {
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Resource) - The created resource
-  ///   * [Err](NanoclClientError) - An error if the operation failed
+  ///   * [Err](NanocldClientError) - An error if the operation failed
   ///
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocld_client::NanoclClient;
+  /// use nanocld_client::NanocldClient;
   /// use nanocl_stubs::resource::ResourceKind;
   ///
-  /// let client = NanoclClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_with_unix_default();
   /// let resource = client.create_resource(&ResourcePartial {
   ///   name: "my-resource".into(),
   ///   kind: ResourceKind::ProxyRules,
@@ -72,7 +72,7 @@ impl NanoclClient {
   pub async fn create_resource(
     &self,
     data: &ResourcePartial,
-  ) -> Result<Resource, NanoclClientError> {
+  ) -> Result<Resource, NanocldClientError> {
     let mut res = self.post("/resources".into()).send_json(data).await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
@@ -92,21 +92,21 @@ impl NanoclClient {
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Resource) - The inspected resource
-  ///   * [Err](NanoclClientError) - An error if the operation failed
+  ///   * [Err](NanocldClientError) - An error if the operation failed
   ///
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocld_client::NanoclClient;
+  /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_with_unix_default();
   /// let resource = client.inspect_resource("my-resource").await;
   /// ```
   ///
   pub async fn inspect_resource(
     &self,
     key: &str,
-  ) -> Result<Resource, NanoclClientError> {
+  ) -> Result<Resource, NanocldClientError> {
     let mut res = self.get(format!("/resources/{key}")).send().await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
@@ -127,14 +127,14 @@ impl NanoclClient {
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Resource) - The patched resource
-  ///   * [Err](NanoclClientError) - An error if the operation failed
+  ///   * [Err](NanocldClientError) - An error if the operation failed
   ///
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocld_client::NanoclClient;
+  /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_with_unix_default();
   /// let resource = client.patch_resource("my-resource", serde_json::json!({})).await;
   /// ```
   ///
@@ -142,7 +142,7 @@ impl NanoclClient {
     &self,
     key: &str,
     config: &serde_json::Value,
-  ) -> Result<Resource, NanoclClientError> {
+  ) -> Result<Resource, NanocldClientError> {
     let mut res = self
       .patch(format!("/resources/{key}"))
       .send_json(config)
@@ -165,21 +165,21 @@ impl NanoclClient {
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok(())) - The operation succeeded
-  ///   * [Err](NanoclClientError) - An error if the operation failed
+  ///   * [Err](NanocldClientError) - An error if the operation failed
   ///
   /// ## Example
   ///
   /// ```no_run,ignore
-  /// use nanocld_client::NanoclClient;
+  /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanoclClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_with_unix_default();
   /// let resource = client.delete_resource("my-resource").await;
   /// ```
   ///
   pub async fn delete_resource(
     &self,
     key: &str,
-  ) -> Result<(), NanoclClientError> {
+  ) -> Result<(), NanocldClientError> {
     let mut res = self.delete(format!("/resources/{key}")).send().await?;
     let status = res.status();
     is_api_error(&mut res, &status).await?;
@@ -189,7 +189,7 @@ impl NanoclClient {
   pub async fn list_history_resource(
     &self,
     key: &str,
-  ) -> Result<Vec<ResourceConfig>, NanoclClientError> {
+  ) -> Result<Vec<ResourceConfig>, NanocldClientError> {
     let mut res = self
       .get(format!("/resources/{key}/histories"))
       .send()
@@ -204,7 +204,7 @@ impl NanoclClient {
     &self,
     name: &str,
     key: &str,
-  ) -> Result<Resource, NanoclClientError> {
+  ) -> Result<Resource, NanocldClientError> {
     let mut res = self
       .patch(format!("/resources/{name}/histories/{key}/reset"))
       .send()
@@ -224,7 +224,7 @@ mod tests {
 
   #[ntex::test]
   async fn test_basic() {
-    let client = NanoclClient::connect_with_unix_default();
+    let client = NanocldClient::connect_with_unix_default();
 
     // list
     client.list_resource(None).await.unwrap();

@@ -16,3 +16,4 @@ pub use events::exec_events;
 pub use resource::exec_resource;
 pub use state::exec_state;
 pub use info::exec_info;
+pub use setup::exec_setup;

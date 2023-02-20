@@ -1,10 +1,10 @@
 use futures::StreamExt;
 
-use nanocld_client::NanoclClient;
+use nanocld_client::NanocldClient;
 
 use crate::error::CliError;
 
-pub async fn exec_events(client: &NanoclClient) -> Result<(), CliError> {
+pub async fn exec_events(client: &NanocldClient) -> Result<(), CliError> {
   let mut stream = client.watch_events().await?;
 
   while let Some(event) = stream.next().await {
