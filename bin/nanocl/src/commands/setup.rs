@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 
 use bollard_next::container::StartContainerOptions;
 use bollard_next::service::HostConfig;
@@ -153,10 +154,13 @@ fn gen_daemon_binds(args: &NanocldArgs) -> Vec<String> {
     .iter()
     .filter(|host| host.starts_with("unix://"))
     .map(|host| {
-      format!(
-        "{host}:{host}",
-        host = host.trim_start_matches("unix://").trim_end_matches('/')
-      )
+      let path = host.trim_start_matches("unix://");
+
+      let path = Path::new(path)
+        .parent()
+        .expect("Unix socket path is invalid");
+
+      format!("{host}:{host}", host = path.display())
     });
 
   let mut binds = vec![
