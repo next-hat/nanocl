@@ -60,6 +60,10 @@ nanocl-version(1)
 
 :   Show nanocl version information
 
+nanocl-setup(1)
+
+:   Setup nanocl daemon
+
 nanocl-help(1)
 
 :   Print this message or the help of the given subcommand(s)
@@ -67,4 +71,4 @@ nanocl-help(1)
 VERSION
 =======
 
-v0.1.8
+v0.2.0

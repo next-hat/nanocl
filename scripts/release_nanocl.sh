@@ -15,11 +15,7 @@ mkdir -p ${release_path}/DEBIAN
 mkdir -p ${release_path}/usr/local/bin
 mkdir -p ${release_path}/usr/local/man/man1
 
-echo "[DOC] Generating man pages"
-mkdir -p ./bin/nanocl/target/man
-cargo make man > /dev/null
-
-for file in ./target/man/*; do
+for file in ./bin/nanocl/target/man/*; do
   file_name=`basename ${file}`
   gzip < $file > ${release_path}/usr/local/man/man1/$file_name.gz
   pandoc --from man --to markdown < $file > ./doc/man/${file_name%.1}.md
