@@ -60,6 +60,6 @@ jobs:
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: |
         gh release delete-asset -y $BINARY_NAME-nightly-$VERSION ${BINARY_NAME}_${VERSION}_amd64.deb
-        gh release upload ${BINARY_NAME}_${VERSION}_amd64.deb target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+        gh release upload $BINARY_NAME-nightly-$VERSION target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
