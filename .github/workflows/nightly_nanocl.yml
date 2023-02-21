@@ -21,7 +21,6 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
-        components: cargo-strip
     # Extract branch info
     - name: Set info
       run: |
