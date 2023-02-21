@@ -684,14 +684,20 @@ pub async fn patch(
     // Merge environment variables from new_env into the merged array
     for env_var in new_env {
       let parts: Vec<&str> = env_var.split('=').collect();
+      if parts.len() != 2 {
+        continue;
+      }
       let name = parts[0].to_string();
       let value = parts[1].to_string();
 
       if let Some(pos) = env_vars.iter().position(|x| x.starts_with(&name)) {
         let old_value = env_vars[pos].split('=').nth(1).unwrap().to_string();
-        if old_value != value {
+        if old_value != value && !value.is_empty() {
           // Update the value if it has changed
           env_vars[pos] = format!("{}={}", name, value);
+        } else {
+          // Remove the variable if the value is empty
+          env_vars.remove(pos);
         }
       } else {
         // Add new environment variables
@@ -721,6 +727,12 @@ pub async fn patch(
       }
     }
 
+    let image = if let Some(image) = container.image.clone() {
+      Some(image)
+    } else {
+      cargo.config.container.image
+    };
+
     let cmd = if let Some(cmd) = container.cmd.clone() {
       Some(cmd)
     } else {
@@ -729,7 +741,7 @@ pub async fn patch(
 
     ContainerConfig {
       cmd,
-      image: container.image,
+      image,
       env: Some(env_vars),
       host_config: Some(ContainerHostConfig {
         binds: Some(volumes),

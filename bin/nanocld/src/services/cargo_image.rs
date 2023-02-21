@@ -1,13 +1,13 @@
 /*
 * Endpoints to manipulate cargo images
 */
-use std::io::Write;
-
 use ntex::{rt, web};
 use ntex::http::StatusCode;
 use futures::StreamExt;
 use tokio_util::codec;
 use bollard_next::image::ImportImageOptions;
+use tokio::io::AsyncWriteExt;
+use tokio::fs::File;
 
 use nanocl_stubs::cargo_image::{
   CargoImagePartial, ListCargoImagesOptions, CargoImageImportOptions,
@@ -123,8 +123,8 @@ async fn delete_cargo_image_by_name(
 #[web::post("/cargoes/images/import")]
 async fn import_images(
   docker_api: web::types::State<bollard_next::Docker>,
-  mut payload: web::types::Payload,
   web::types::Query(query): web::types::Query<CargoImageImportOptions>,
+  mut payload: web::types::Payload,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   // generate a random filename
   let filename = uuid::Uuid::new_v4().to_string();
@@ -134,42 +134,56 @@ async fn import_images(
   rt::spawn(async move {
     // File::create is blocking operation, use threadpool
     let file_path_ptr = filepath.clone();
-    let mut f = web::block(|| std::fs::File::create(file_path_ptr))
-      .await
-      .map_err(|err| HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while creating the file {err}"),
-      })?;
-    let mut total_size = 0;
-    while let Some(bytes) = payload.next().await {
+    let mut f =
+      File::create(&file_path_ptr)
+        .await
+        .map_err(|err| HttpResponseError {
+          status: StatusCode::INTERNAL_SERVER_ERROR,
+          msg: format!("Error while creating the file {err}"),
+        })?;
+    while let Some(bytes) = ntex::util::stream_recv(&mut payload).await {
       let bytes = bytes.map_err(|err| HttpResponseError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Error while reading the multipart field {err}"),
       })?;
-      // Field in turn is stream of *Bytes* object
-      // filesystem operations are blocking, we have to use threadpool
-      total_size += f.write(&bytes).map_err(|err| HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while writing the file {err}"),
-      })?;
       let _ = tx.send(Ok(ntex::util::Bytes::from(
         serde_json::to_string(&CargoImageImportInfo::Context(Box::new(
-          CargoImageImportContext { writed: total_size },
+          CargoImageImportContext {
+            writed: bytes.len(),
+          },
         )))
         .map_err(|err| HttpResponseError {
           status: StatusCode::INTERNAL_SERVER_ERROR,
           msg: format!("Error while serializing the context {err}"),
         })?,
       )));
+      println!("writing: {}", bytes.len());
+      // Field in turn is stream of *Bytes* object
+      // filesystem operations are blocking, we have to use threadpool
+      f.write_all(&bytes).await.map_err(|err| HttpResponseError {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        msg: format!("Error while writing the file {err}"),
+      })?;
     }
 
-    let file = tokio::fs::File::open(&filepath).await.map_err(|err| {
-      HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while opening the file {err}"),
-      }
+    println!("before shutdown");
+    f.shutdown().await.map_err(|err| HttpResponseError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      msg: format!("Error while closing the file {err}"),
     })?;
 
+    drop(f);
+
+    println!("shutdown");
+    let file =
+      File::open(&file_path_ptr)
+        .await
+        .map_err(|err| HttpResponseError {
+          status: StatusCode::INTERNAL_SERVER_ERROR,
+          msg: format!("Error while opening the file {err}"),
+        })?;
+
+    // sending the file to the docker api
     let byte_stream = codec::FramedRead::new(file, codec::BytesCodec::new())
       .map(|r| {
         let bytes = r?.freeze();
@@ -193,12 +207,12 @@ async fn import_images(
           })?,
       )));
     }
-    web::block(move || std::fs::remove_file(filepath))
-      .await
-      .map_err(|err| HttpResponseError {
+    tokio::fs::remove_file(filepath).await.map_err(|err| {
+      HttpResponseError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Error while removing the file {err}"),
-      })?;
+      }
+    })?;
     tx.close();
     Ok::<_, HttpResponseError>(())
   });
