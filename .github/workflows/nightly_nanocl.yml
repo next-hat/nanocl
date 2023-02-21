@@ -1,12 +1,12 @@
-name: Draft nanocld nightly release
+name: Draft nanocl nightly release
 
 on:
   push:
     branches:
-      - 'release-nightly-nanocld-*'
+      - 'release-nightly-nanocl-*'
   pull_request:
     branches:
-      - 'release-nightly-nanocld-*'
+      - 'release-nightly-nanocl-*'
     types: [opened, synchronize, closed]
 
 env:
@@ -38,8 +38,8 @@ jobs:
       run: |
         echo $BINARY_NAME
         echo $VERSION
-    - name: Build image
-      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/.buildx-cache -t $BINARY_NAME:nightly-$VERSION -f ./bin/nanocld/Dockerfile .
+    - name: Build binary
+      run: ./scripts/release_nanocl.sh
     # - name: Tag image
     #   run: |
     #     docker tag $BINARY_NAME:nightly-$VERSION nexthat/$BINARY_NAME:nightly
@@ -53,8 +53,6 @@ jobs:
     #   run: |
     #     docker push nexthat/$BINARY_NAME:nightly
     #     docker push nexthat/$BINARY_NAME:nightly-$VERSION
-    - name: Export image
-      run: docker save $BINARY_NAME:nightly-$VERSION | gzip > /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz
     - name: Test if release already exists
       id: release-exists
       continue-on-error: true

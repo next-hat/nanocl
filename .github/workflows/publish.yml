@@ -1,4 +1,4 @@
-name: Publish nanocld release
+name: Publish release
 
 on:
   release:

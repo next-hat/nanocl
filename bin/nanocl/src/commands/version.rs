@@ -1,5 +1,5 @@
-use nanocld_client::NanocldClient;
 use ntex::http::Client;
+use nanocld_client::NanocldClient;
 use ntex::http::client::error::SendRequestError;
 use ntex::time::Millis;
 use serde::Deserialize;
@@ -26,8 +26,11 @@ async fn print_version(client: &NanocldClient) -> Result<(), CliError> {
   let daemon_version = client.get_version().await?;
   println!("=== [nanocld] ===");
   println!(
-    "Arch: {}\nVersion: {}\nCommit ID: {}",
-    daemon_version.arch, daemon_version.version, daemon_version.commit_id
+    "Arch: {}\nChannel: {}\nVersion: {}\nCommit ID: {}",
+    daemon_version.arch,
+    daemon_version.channel,
+    daemon_version.version,
+    daemon_version.commit_id
   );
 
   Ok(())
