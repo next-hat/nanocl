@@ -52,13 +52,13 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Create new draft release
       if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-      run: gh release create -d $BINARY_NAME-nightly-$VERSION --generate-notes $(pwd)/target/debian/$BINARY_NAME-$VERSION.deb#deb
+      run: gh release create -d $BINARY_NAME-nightly-$VERSION --generate-notes $(pwd)/target/debian/$BINARY_NAME_$VERSION_amd64.deb#nanocl_amd64.deb
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Update draft release
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: >-
         gh release delete-asset -y $BINARY_NAME-$VERSION.deb
-        gh release upload $BINARY_NAME-$VERSION.deb ./target/debian/$BINARY_NAME-$VERSION.deb#deb;
+        gh release upload $BINARY_NAME_$VERSION_amd64.deb ./target/debian/$BINARY_NAME_$VERSION_amd64.deb#nanocl_amd64.deb;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
