@@ -1,6 +1,8 @@
 # stage 1 - Setup cargo-chef
 FROM rust:1.67.0-alpine3.17 as planner
 
+ARG channel=stable
+
 WORKDIR /app
 RUN apk add gcc g++ make
 RUN cargo install cargo-chef --locked
@@ -18,7 +20,7 @@ FROM rust:1.67.0-alpine3.17 as cacher
 WORKDIR /app
 COPY --from=planner /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/cargo-chef
 COPY --from=planner /app .
-RUN apk add musl-dev libpq-dev openssl-dev
+RUN apk add musl-dev libpq-dev openssl
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN cargo chef cook --release --recipe-path recipe.json --bin nanocld
 
@@ -34,8 +36,9 @@ COPY ./bin/nanocld/src ./bin/nanocld/src
 COPY ./bin/nanocld/build.rs ./bin/nanocld/build.rs
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
 COPY .git ./.git
-RUN apk add musl-dev libpq-dev openssl-dev git upx
+RUN apk add musl-dev libpq-dev openssl git upx
 ENV RUSTFLAGS="-C target-feature=-crt-static"
+ENV CHANNEL=${channel}
 RUN cargo build --release --bin nanocld
 
 ## Strip and compress the binary
