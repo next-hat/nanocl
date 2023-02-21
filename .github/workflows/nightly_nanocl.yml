@@ -39,7 +39,7 @@ jobs:
     # Install required dependencies
     - name: Install dependencies
       run: |
-        sudo apt install gcc make musl-dev
+        sudo apt install gcc make musl-dev openssl
     # Package nanocl into a .deb
     - name: Package
       run: ./scripts/release_nanocl.sh
