@@ -58,7 +58,7 @@ jobs:
     - name: Update draft release
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: >-
-        gh release delete-asset -y $BINARY_NAME-$VERSION.deb
+        gh release delete-asset -y $BINARY_NAME_$VERSION_amd64.deb.deb
         gh release upload $BINARY_NAME_$VERSION_amd64.deb target/debian/$BINARY_NAME_$VERSION_amd64.deb#nanocl_amd64.deb;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
