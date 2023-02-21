@@ -1,8 +1,6 @@
 name: Publish release
 
-on:
-  release:
-    types: [published, prereleased]
+on: release
 
 env:
   CARGO_TERM_COLOR: always
