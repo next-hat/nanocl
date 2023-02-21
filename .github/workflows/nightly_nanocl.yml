@@ -21,8 +21,7 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
-        target: x86_64-unknown-linux-musl
-        components: cargo-strip
+        components: strip
     # Extract branch info
     - name: Set info
       run: |
@@ -41,6 +40,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt install gcc make musl-dev openssl git
+        rustup target add x86_64-unknown-linux-musl
     # Package nanocl into a .deb
     - name: Package
       run: ./scripts/release_nanocl.sh
