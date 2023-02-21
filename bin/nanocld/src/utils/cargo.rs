@@ -691,7 +691,7 @@ pub async fn patch(
         if old_value != value && !value.is_empty() {
           // Update the value if it has changed
           env_vars[pos] = format!("{}={}", name, value);
-        } else {
+        } else if value.is_empty() {
           // Remove the variable if the value is empty
           env_vars.remove(pos);
         }
