@@ -31,7 +31,7 @@ fn set_env_target_arch() -> Result<()> {
 }
 
 fn set_channel() -> Result<()> {
-  let channel = std::env::var("CHANNEL").unwrap_or("stable".into());
+  let channel = std::env::var("NANOCL_CHANNEL").unwrap_or("stable".into());
   println!("cargo:rustc-env=CHANNEL={channel}");
   Ok(())
 }

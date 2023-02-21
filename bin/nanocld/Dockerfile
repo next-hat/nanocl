@@ -1,44 +1,33 @@
 # stage 1 - Setup cargo-chef
 FROM rust:1.67.0-alpine3.17 as planner
 
-ARG channel=stable
-
 WORKDIR /app
-RUN apk add gcc g++ make
-RUN cargo install cargo-chef --locked
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./crates/nanocl_stubs/Cargo.toml ./crates/nanocl_stubs/Cargo.toml
 COPY ./crates/nanocld_client/Cargo.toml ./crates/nanocld_client/Cargo.toml
 COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
 COPY ./bin/nanocld/Cargo.toml ./bin/nanocld/Cargo.toml
-RUN cargo chef prepare --recipe-path recipe.json --bin ./bin/nanocld
-
-# state 2 - Cook our dependencies
-FROM rust:1.67.0-alpine3.17 as cacher
-
-WORKDIR /app
-COPY --from=planner /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/cargo-chef
-COPY --from=planner /app .
-RUN apk add musl-dev libpq-dev openssl
-ENV RUSTFLAGS="-C target-feature=-crt-static"
-RUN cargo chef cook --release --recipe-path recipe.json --bin ./bin/nanocld
 
 # stage 3 - Build our project
 FROM rust:1.67.0-alpine3.17 as builder
 
+ARG channel=stable
+
 ## Build our nanocl daemon binary
+COPY --from=planner /app /app
 WORKDIR /app
-COPY --from=cacher /usr/local/cargo /usr/local/cargo
-COPY --from=cacher /app .
 COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
 COPY ./bin/nanocld/src ./bin/nanocld/src
 COPY ./bin/nanocld/build.rs ./bin/nanocld/build.rs
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
+COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
+COPY ./bin/nanocl/src ./bin/nanocl/src
+COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
 COPY .git ./.git
 RUN apk add musl-dev libpq-dev openssl git upx
 ENV RUSTFLAGS="-C target-feature=-crt-static"
-ENV CHANNEL=${channel}
+ENV NANOCL_CHANNEL=$channel
 RUN cargo build --release --bin nanocld
 
 ## Strip and compress the binary
