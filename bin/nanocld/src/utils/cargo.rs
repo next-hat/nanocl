@@ -733,7 +733,7 @@ pub async fn patch(
       cargo.config.container.image
     };
 
-    let cmd = if let Some(cmd) = container.cmd.clone() {
+    let cmd = if let Some(cmd) = container.cmd {
       Some(cmd)
     } else {
       cargo.config.container.cmd
