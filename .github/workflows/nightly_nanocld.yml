@@ -59,8 +59,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Update draft release
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
-      run: >-
-        gh release delete-asset -y $BINARY_NAME-nightly-$VERSION nanocl.$VERSION.tar.gz;
+      run: |
+        gh release delete-asset -y $BINARY_NAME-nightly-$VERSION $BINARY_NAME-nightly-$VERSION.tar.gz
         gh release upload $BINARY_NAME-nightly-$VERSION /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#nanocld-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}

@@ -22,7 +22,7 @@ COPY --from=planner /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/cargo-c
 COPY --from=planner /app .
 RUN apk add musl-dev libpq-dev openssl
 ENV RUSTFLAGS="-C target-feature=-crt-static"
-RUN cargo chef cook --release --recipe-path recipe.json --bin nanocld
+RUN cargo chef cook --release --recipe-path recipe.json --bin ./bin/nanocld
 
 # stage 3 - Build our project
 FROM rust:1.67.0-alpine3.17 as builder
