@@ -31,6 +31,7 @@ jobs:
         echo "VERSION=$(echo ${GITHUB_REF##*/}) | awk -F- '{print $3}')" >> $GITHUB_ENV
     # Print info for debug
     - name: Print Info
+      run: |
         echo $BRANCH_NAME
         echo $BINARY_NAME
         echo $CHANNEL
