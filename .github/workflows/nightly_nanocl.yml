@@ -40,13 +40,13 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Create new draft release
       if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-      run: gh release create -d $BINARY_NAME-nightly-$VERSION --generate-notes .//$BINARY_NAME-nightly-$VERSION.tar.gz#nanocld-image
+      run: gh release create -d $BINARY_NAME-nightly-$VERSION --generate-notes ./target/debian/$BINARY_NAME-$VERSION.tar.gz#deb
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Update draft release
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: >-
-        gh release delete-asset -y $BINARY_NAME-nightly-$VERSION nanocl.$VERSION.tar.gz;
-        gh release upload $BINARY_NAME-nightly-$VERSION /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#nanocld-image;
+        gh release delete-asset -y $BINARY_NAME-$VERSION.tar.gz
+        gh release upload $BINARY_NAME-$VERSION.tar.gz ./target/debian/$BINARY_NAME-$VERSION.tar.gz#deb;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
