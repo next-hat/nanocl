@@ -240,14 +240,7 @@ impl From<CargoSummary> for CargoRow {
       name: cargo.name,
       namespace: cargo.namespace_name,
       image: cargo.config.container.image.unwrap_or_default(),
-      instances: match cargo.config.replication {
-        None => format!("{}/{}", cargo.running_instances, 1),
-        Some(replication) => format!(
-          "{}/{}",
-          cargo.running_instances,
-          replication.min_replicas.unwrap_or(1)
-        ),
-      },
+      instances: format!("{}/{}", cargo.running_instances, cargo.instances),
     }
   }
 }

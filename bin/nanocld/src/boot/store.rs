@@ -48,7 +48,6 @@ fn gen_store_cargo_conf(
   let host_config = Some(gen_store_host_conf(config));
   CargoConfigPartial {
     name: name.into(),
-    dns_entry: None,
     replication: None,
     container: ContainerConfig {
       image: Some("cockroachdb/cockroach:v22.2.5".into()),

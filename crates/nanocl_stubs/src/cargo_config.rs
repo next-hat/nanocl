@@ -8,27 +8,31 @@ pub type ContainerHealthConfig = bollard_next::models::HealthConfig;
 /// Auto is used to automatically define that the number of replicas in the cluster
 /// Number is used to manually set the number of replicas
 /// Note: auto will ensure at least 1 replica exists in the cluster
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-#[cfg_attr(feature = "dev", derive(ToSchema))]
-pub enum ReplicaValue {
-  /// Number of replicas wanted
-  #[cfg_attr(feature = "serde", serde(rename = "number"))]
-  Number(i64),
-  /// Automatically scale the number of replicas
-  #[cfg_attr(feature = "serde", serde(rename = "auto"))]
-  Auto,
-}
-
-/// Cargo replication is used to define the minimum and maximum number of replicas in the cluster
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoReplication {
-  /// Minimum number of replicas
-  pub min_replicas: Option<i64>,
-  /// Maximum number of replicas
-  pub max_replicas: Option<i64>,
+#[cfg_attr(feature = "dev", derive(ToSchema))]
+pub enum ReplicationMode {
+  /// Auto is used to automatically define that the number of replicas in the cluster
+  /// This will ensure at least 1 replica exists in the cluster
+  /// And automatically add more replicas in the cluster if needed for redundancy
+  Auto,
+  /// Unique is used to ensure that only one replica exists in the cluster
+  Unique,
+  /// UniqueByNode is used to ensure one replica is running on each node
+  UniqueByNode,
+  /// UniqueByNodeGroups is used to ensure one replica is running on each node group
+  UniqueByNodeGroups { groups: Vec<String> },
+  /// UniqueByNodeNames is used to ensure one replica is running on each node name
+  UniqueByNodeNames { names: Vec<String> },
+  /// Number is used to manually set the number of replicas in one node
+  Number(i64),
+  /// NumberByNodes is used to manually set the number of replicas in each node
+  NumberByNodes(i64),
+  /// NumberByNodeGroups is used to manually set the number of replicas in each node group
+  NumberByNodeGroups { groups: Vec<String>, number: i64 },
+  /// NumberByNodeNames is used to manually set the number of replicas in each node name
+  NumberByNodeNames { names: Vec<String>, number: i64 },
 }
 
 /// A cargo config partial is used to create a Cargo
@@ -38,10 +42,8 @@ pub struct CargoReplication {
 pub struct CargoConfigPartial {
   /// Name of the cargo
   pub name: String,
-  /// DNS entry of the cargo
-  pub dns_entry: Option<String>,
   /// Replication configuration of the cargo
-  pub replication: Option<CargoReplication>,
+  pub replication: Option<ReplicationMode>,
   /// Container configuration of the cargo
   pub container: ContainerConfig<String>,
 }
@@ -55,19 +57,16 @@ pub struct CargoConfigPartial {
 pub struct CargoConfigUpdate {
   /// New name of the cargo
   pub name: Option<String>,
-  /// New DNS entry of the cargo
-  pub dns_entry: Option<String>,
   /// New replication configuration of the cargo
   pub container: Option<bollard_next::container::Config<String>>,
   /// New container configuration of the cargo
-  pub replication: Option<CargoReplication>,
+  pub replication: Option<ReplicationMode>,
 }
 
 impl From<CargoConfigPartial> for CargoConfigUpdate {
   fn from(cargo_config: CargoConfigPartial) -> Self {
     Self {
       name: Some(cargo_config.name),
-      dns_entry: cargo_config.dns_entry,
       container: Some(cargo_config.container),
       replication: cargo_config.replication,
     }
@@ -87,10 +86,8 @@ pub struct CargoConfig {
   pub name: String,
   /// The key of the cargo
   pub cargo_key: String,
-  /// DNS entry of the cargo
-  pub dns_entry: Option<String>,
   /// Replication configuration of the cargo
-  pub replication: Option<CargoReplication>,
+  pub replication: Option<ReplicationMode>,
   /// Container configuration of the cargo
   pub container: ContainerConfig<String>,
 }
@@ -99,7 +96,6 @@ impl From<CargoConfig> for CargoConfigUpdate {
   fn from(cargo_config: CargoConfig) -> Self {
     Self {
       name: Some(cargo_config.name),
-      dns_entry: cargo_config.dns_entry,
       container: Some(cargo_config.container),
       replication: cargo_config.replication,
     }

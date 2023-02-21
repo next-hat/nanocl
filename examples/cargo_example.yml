@@ -5,5 +5,7 @@ Namespace: example-namespace
 
 Cargoes:
   - Name: example-cargo
+    # See all options:
+    # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
     Container:
       Image: nexthat/nanocl-get-started:latest

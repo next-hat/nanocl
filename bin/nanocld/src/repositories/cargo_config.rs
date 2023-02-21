@@ -70,7 +70,6 @@ pub async fn create(
     key: dbmodel.key,
     name: item.name,
     cargo_key: dbmodel.cargo_key,
-    dns_entry: item.dns_entry,
     replication: item.replication,
     container: item.container,
   };
@@ -127,7 +126,6 @@ pub async fn find_by_key(
     key: dbmodel.key,
     name: config.name,
     cargo_key: dbmodel.cargo_key,
-    dns_entry: config.dns_entry,
     replication: config.replication,
     container: config.container,
   })
@@ -206,7 +204,6 @@ pub async fn list_by_cargo(
         key: dbmodel.key,
         name: config.name,
         cargo_key: dbmodel.cargo_key,
-        dns_entry: config.dns_entry,
         replication: config.replication,
         container: config.container,
       })

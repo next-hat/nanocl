@@ -47,8 +47,10 @@ pub struct CargoSummary {
   pub namespace_name: String,
   /// Configuration of the cargo
   pub config: CargoConfig,
+  /// Number of instances
+  pub instances: usize,
   /// Number of running instances
-  pub running_instances: i64,
+  pub running_instances: usize,
 }
 
 /// A Cargo Inspect is a detailed view of a cargo

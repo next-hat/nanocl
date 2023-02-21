@@ -19,4 +19,3 @@ strip = "debuginfo"
 [patch.crates-io]
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocld_client = { path = "crates/nanocld_client" }
-

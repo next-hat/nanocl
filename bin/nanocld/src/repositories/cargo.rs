@@ -361,7 +361,6 @@ pub async fn inspect_by_key(
     key: item.1.key,
     name: config.name,
     cargo_key: item.1.cargo_key,
-    dns_entry: config.dns_entry,
     replication: config.replication,
     container: config.container,
   };

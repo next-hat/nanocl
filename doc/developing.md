@@ -68,7 +68,7 @@ I make sure the folder `/run/nanocl` exists
 
 ```sh
 sudo mkdir /run/nanocl
-sudo chmod 770 -R /run/nanocl
+sudo chmod 777 -R /run/nanocl
 ```
 
 Before running nanocl we will need some docker images:

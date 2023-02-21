@@ -8,7 +8,6 @@ use crate::utils;
 fn gen_metrics_cargo(name: &str) -> CargoConfigPartial {
   CargoConfigPartial {
     name: name.into(),
-    dns_entry: None,
     replication: None,
     container: ContainerConfig {
       image: Some("nexthat/metrsd:v0.1.0".into()),

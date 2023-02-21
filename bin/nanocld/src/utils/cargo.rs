@@ -343,11 +343,6 @@ pub async fn put(
 
   let cargo_partial = CargoConfigPartial {
     name: config.name.to_owned().unwrap_or(cargo.name),
-    dns_entry: if config.dns_entry.is_some() {
-      config.dns_entry.to_owned()
-    } else {
-      cargo_config.dns_entry.to_owned()
-    },
     container: config
       .container
       .to_owned()
@@ -501,7 +496,7 @@ pub async fn list(
     let containers = list_instance(&cargo.key, docker_api).await?;
 
     let mut running_instances = 0;
-    for container in containers {
+    for container in containers.clone() {
       if container.state == Some("running".into()) {
         running_instances += 1;
       }
@@ -512,6 +507,7 @@ pub async fn list(
       name: cargo.name,
       namespace_name: cargo.namespace_name,
       config: config.to_owned(),
+      instances: containers.len(),
       running_instances,
       config_key: config.key,
     });
@@ -753,15 +749,8 @@ pub async fn patch(
     cargo.config.container
   };
 
-  let dns_entry = if let Some(dns) = payload.dns_entry.clone() {
-    Some(dns)
-  } else {
-    cargo.config.dns_entry
-  };
-
   let config = CargoConfigUpdate {
     container: Some(container),
-    dns_entry,
     ..payload.to_owned()
   };
   utils::cargo::put(key, &config, docker_api, pool).await
