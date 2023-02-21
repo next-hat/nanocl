@@ -22,6 +22,7 @@ jobs:
       with:
         toolchain: stable
         target: x86_64-unknown-linux-musl
+        components: cargo-strip
     # Extract branch info
     - name: Set info
       run: |
@@ -39,7 +40,7 @@ jobs:
     # Install required dependencies
     - name: Install dependencies
       run: |
-        sudo apt install gcc make musl-dev openssl
+        sudo apt install gcc make musl-dev openssl git
     # Package nanocl into a .deb
     - name: Package
       run: ./scripts/release_nanocl.sh
