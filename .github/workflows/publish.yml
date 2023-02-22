@@ -2,6 +2,7 @@ name: Publish release
 
 on:
   release:
+    types: [published, prereleased, released]
 
 env:
   CARGO_TERM_COLOR: always
@@ -37,3 +38,12 @@ jobs:
           docker push nexthat/nanocld:nightly-$VERSION
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+      - name: Publish nanocl stable
+        if: env.CHANNEL != 'nightly' && env.CHANNEL == 'nanocld'
+        run: |
+          gh release download ${{ github.event.release.tagName }} -p nanocld-$BINARY_NAME.tar.gz
+          cat nanocld-$BINARY_NAME.tar.gz | docker load
+          docker tag nanocld:$BINARY_NAME nexthat/nanocld:latest
+          docker tag nanocld:$BINARY_NAME nexthat/nanocld:$BINARY_NAME
+          docker push nexthat/nanocld:latest
+          docker push nexthat/nanocld:$BINARY_NAME

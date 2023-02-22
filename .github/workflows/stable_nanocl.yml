@@ -1,0 +1,65 @@
+name: Draft nanocl stable release
+
+on:
+  push:
+    branches:
+      - 'release-stable-nanocl-*'
+  pull_request:
+    branches:
+      - 'release-stable-nanocl-*'
+    types: [opened, synchronize, closed]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release_image:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.67.1
+        target: x86_64-unknown-linux-musl
+    # Extract branch info
+    - name: Set info
+      run: |
+        echo "BRANCH_NAME=$(echo ${GITHUB_REF##*/})" >> $GITHUB_ENV
+        echo "CHANNEL=$(echo ${GITHUB_REF##*/} | awk -F- '{print $2}')" >> $GITHUB_ENV
+        echo "NANOCL_CHANNEL=$(echo ${GITHUB_REF##*/} | awk -F- '{print $2}')" >> $GITHUB_ENV
+        echo "BINARY_NAME=$(echo ${GITHUB_REF##*/} | awk -F- '{print $3}')" >> $GITHUB_ENV
+        echo "VERSION=$(echo ${GITHUB_REF##*/} | awk -F- '{print $4}')" >> $GITHUB_ENV
+    # Print info for debug
+    - name: Print Info
+      run: |
+        echo $BRANCH_NAME
+        echo $BINARY_NAME
+        echo $CHANNEL
+        echo $VERSION
+    # Install required dependencies
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -y gcc make musl musl-dev musl-tools openssl git pandoc
+        rustup target add x86_64-unknown-linux-musl
+    # Package nanocl into a .deb
+    - name: Package
+      run: ./scripts/release_nanocl.sh
+    - name: Test if release already exists
+      id: release-exists
+      continue-on-error: true
+      run: gh release view $BINARY_NAME-$VERSION
+      env:
+        GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+    - name: Create new draft release
+      if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
+      run: gh release create -d $BINARY_NAME-$VERSION --generate-notes target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+      env:
+        GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+    - name: Update draft release
+      if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
+      run: |
+        gh release delete-asset -y $BINARY_NAME-$VERSION ${BINARY_NAME}_${VERSION}_amd64.deb
+        gh release upload $BINARY_NAME-$VERSION target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+      env:
+        GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
