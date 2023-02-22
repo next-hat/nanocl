@@ -1,8 +1,7 @@
-name: Publish nanocld release
+name: Publish release
 
 on:
   release:
-    types: [published, prereleased]
 
 env:
   CARGO_TERM_COLOR: always

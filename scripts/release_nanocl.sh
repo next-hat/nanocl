@@ -15,17 +15,22 @@ mkdir -p ${release_path}/DEBIAN
 mkdir -p ${release_path}/usr/local/bin
 mkdir -p ${release_path}/usr/local/man/man1
 
+# Build binary
+cargo build --bin nanocl --release --target=x86_64-unknown-linux-musl
+
+# Generate man pages
 for file in ./bin/nanocl/target/man/*; do
   file_name=`basename ${file}`
   gzip < $file > ${release_path}/usr/local/man/man1/$file_name.gz
   pandoc --from man --to markdown < $file > ./doc/man/${file_name%.1}.md
 done
-
-env OPENSSL_LIB_DIR=/usr/local/lib/ OPENSSL_INCLUDE_DIR=/usr/local/include OPENSSL_STATIC=yes cargo build --bin nanocl --release --target=x86_64-unknown-linux-musl
+# Stip binary
 strip ./target/x86_64-unknown-linux-musl/release/${pkg_name}
+# Compress binary
 upx ./target/x86_64-unknown-linux-musl/release/${pkg_name}
+# Copy binary
 cp ./target/x86_64-unknown-linux-musl/release/${pkg_name} ${release_path}/usr/local/bin
-# generate DEBIAN controll
+# Generate DEBIAN controll
 cat > ${release_path}/DEBIAN/control <<- EOM
 Package: ${pkg_name}
 Version: ${version}
