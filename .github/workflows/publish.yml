@@ -38,8 +38,8 @@ jobs:
           docker push nexthat/nanocld:nightly-$VERSION
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
-      - name: Publish nanocl stable
-        if: env.CHANNEL != 'nightly' && env.CHANNEL == 'nanocld'
+      - name: Publish nanocld stable
+        if: env.CHANNEL != 'nightly' && env.BINARY_NAME == 'nanocld'
         run: |
           gh release download ${{ github.event.release.tagName }} -p nanocld-$BINARY_NAME.tar.gz
           cat nanocld-$BINARY_NAME.tar.gz | docker load
