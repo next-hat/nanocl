@@ -15,7 +15,7 @@ pub async fn create(
 ) -> Result<MetricDbModel, HttpResponseError> {
   use crate::schema::metrics::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
 
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;

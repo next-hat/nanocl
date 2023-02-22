@@ -5,8 +5,11 @@ use diesel::r2d2::ConnectionManager;
 mod boot;
 pub use boot::*;
 
-mod metrics;
-pub use metrics::*;
+mod node;
+pub use node::*;
+
+mod metric;
+pub use metric::*;
 
 mod namespace;
 pub use namespace::*;

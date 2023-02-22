@@ -44,7 +44,7 @@ pub async fn create(
 ) -> Result<CargoConfig, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let dbmodel = CargoConfigDbModel {
     key: uuid::Uuid::new_v4(),
     cargo_key,
@@ -104,7 +104,7 @@ pub async fn find_by_key(
 ) -> Result<CargoConfig, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let dbmodel = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let config = dsl::cargo_configs
@@ -158,7 +158,7 @@ pub async fn delete_by_cargo_key(
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::delete(dsl::cargo_configs)
@@ -179,7 +179,7 @@ pub async fn list_by_cargo(
 ) -> Result<Vec<CargoConfig>, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let dbmodels = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let configs = dsl::cargo_configs

@@ -1,7 +1,14 @@
 -- Your SQL goes here
-create table "cargoes" (
+-- Your SQL goes here
+CREATE TABLE IF NOT EXISTS "cargo_configs" (
+  "key" UUID NOT NULL UNIQUE PRIMARY KEY,
+  "cargo_key" VARCHAR NOT NULL,
+  "config" JSON NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "cargoes" (
   "key" VARCHAR NOT NULL UNIQUE PRIMARY KEY,
   "name" VARCHAR NOT NULL,
-  "config_key" UUID NOT NULL references cargo_configs("key"),
-  "namespace_name" VARCHAR NOT NULL references namespaces("name")
+  "config_key" UUID NOT NULL REFERENCES cargo_configs("key"),
+  "namespace_name" VARCHAR NOT NULL REFERENCES namespaces("name")
 );

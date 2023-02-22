@@ -50,7 +50,7 @@ pub async fn create(
 ) -> Result<Resource, HttpResponseError> {
   use crate::schema::resources::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     resource_key: item.name.to_owned(),
@@ -115,7 +115,7 @@ pub async fn delete_by_key(
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::resources::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let count = diesel::delete(dsl::resources)
@@ -159,7 +159,7 @@ pub async fn find(
   use crate::schema::resources;
   use crate::schema::resource_configs;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let res: Vec<(ResourceDbModel, ResourceConfigDbModel)> =
     web::block(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -240,7 +240,7 @@ pub async fn inspect_by_key(
   use crate::schema::resources;
   use crate::schema::resource_configs;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let res: (ResourceDbModel, ResourceConfigDbModel) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = resources::table
@@ -294,7 +294,7 @@ pub async fn update_by_key(
 ) -> Result<Resource, HttpResponseError> {
   use crate::schema::resources;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let resource =
     repositories::resource::inspect_by_key(key.to_owned(), &pool).await?;
 

@@ -1,6 +1,7 @@
 -- Your SQL goes here
 CREATE TABLE IF NOT EXISTS metrics (
   "key" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  "node_name" VARCHAR NOT NULL,
   "kind" TEXT NOT NULL,
   "data" JSON NOT NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),

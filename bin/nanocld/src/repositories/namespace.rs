@@ -47,7 +47,7 @@ pub async fn create(
 ) -> Result<NamespaceDbModel, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = NamespaceDbModel { name: item.name };
@@ -90,7 +90,7 @@ pub async fn list(
 ) -> Result<Vec<NamespaceDbModel>, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = dsl::namespaces
@@ -133,7 +133,7 @@ pub async fn delete_by_name(
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let count = diesel::delete(dsl::namespaces.filter(dsl::name.eq(name)))
@@ -176,7 +176,7 @@ pub async fn find_by_name(
 ) -> Result<NamespaceDbModel, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = dsl::namespaces
@@ -220,7 +220,7 @@ pub async fn exist_by_name(
 ) -> Result<bool, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let exist = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let exist = Arc::new(dsl::namespaces)

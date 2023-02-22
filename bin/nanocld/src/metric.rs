@@ -5,43 +5,48 @@ use futures::StreamExt;
 use ntex::time::interval;
 use metrsd_client::{MetrsdClient, MetrsdEvent};
 
-use crate::repositories::metrics;
+use crate::repositories::metric;
 use crate::models::{Pool, MetricInsertDbModel};
 
-async fn save_metric(pool: &Pool, ev: MetrsdEvent) {
+async fn save_metric(node: &str, ev: &MetrsdEvent, pool: &Pool) {
   match ev {
     MetrsdEvent::Cpu(cpus) => {
       let item = MetricInsertDbModel {
         kind: "CPU".into(),
-        data: serde_json::to_value(&cpus).unwrap(),
+        node_name: node.to_owned(),
+        data: serde_json::to_value(cpus).unwrap(),
       };
-      let _ = metrics::create(item, pool).await;
+      let _ = metric::create(item, pool).await;
     }
     MetrsdEvent::Memory(mem) => {
       let item = MetricInsertDbModel {
         kind: "MEMORY".into(),
-        data: serde_json::to_value(&mem).unwrap(),
+        node_name: node.to_owned(),
+        data: serde_json::to_value(mem).unwrap(),
       };
-      let _ = metrics::create(item, pool).await;
+      let _ = metric::create(item, pool).await;
     }
     MetrsdEvent::Disk(disk) => {
       let item = MetricInsertDbModel {
         kind: "DISK".into(),
-        data: serde_json::to_value(&disk).unwrap(),
+        node_name: node.to_owned(),
+        data: serde_json::to_value(disk).unwrap(),
       };
-      let _ = metrics::create(item, pool).await;
+      let _ = metric::create(item, pool).await;
     }
     MetrsdEvent::Network(net) => {
       let item = MetricInsertDbModel {
         kind: "NETWORK".into(),
-        data: serde_json::to_value(&net).unwrap(),
+        node_name: node.to_owned(),
+        data: serde_json::to_value(net).unwrap(),
       };
-      let _ = metrics::create(item, pool).await;
+      let _ = metric::create(item, pool).await;
     }
   }
 }
 
-pub fn spawn_metrics(pool: &Pool) {
+pub fn spawn_metrics(node: &str, pool: &Pool) {
+  let node = node.to_owned();
   let pool = pool.clone();
   rt::Arbiter::new().exec_fn(move || {
     let client = MetrsdClient::connect("unix:///run/nanocl/metrics.sock");
@@ -52,7 +57,7 @@ pub fn spawn_metrics(pool: &Pool) {
             while let Some(res) = stream.next().await {
               match res {
                 Ok(ev) => {
-                  save_metric(&pool, ev).await;
+                  save_metric(&node, &ev, &pool).await;
                 }
                 Err(err) => {
                   log::error!("Error while receiving metric : {}", err);

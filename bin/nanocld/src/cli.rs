@@ -26,6 +26,9 @@ pub struct Cli {
   /// Gateway automatically detected to host default source ip gateway if not set
   #[clap(long)]
   pub(crate) gateway: Option<String>,
+  /// Hostname to use for the node automatically detected if not set
+  #[clap(long)]
+  pub(crate) hostname: Option<String>,
 }
 
 /// Cli arguments unit test

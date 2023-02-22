@@ -2,7 +2,7 @@ use std::io::Error;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::net::{IpAddr, Ipv4Addr};
-use libc::sockaddr_in;
+use libc::{sockaddr_in, gethostname, c_char};
 
 /// Get the default IP address of the system.
 /// This is used to determine the IP address of the host.
@@ -59,4 +59,17 @@ pub(crate) fn get_default_ip() -> std::io::Result<IpAddr> {
   ))?;
 
   Ok(ip)
+}
+
+pub fn get_hostname() -> std::io::Result<String> {
+  let mut name = [0 as c_char; 256];
+  let result = unsafe { gethostname(name.as_mut_ptr(), name.len()) };
+  if result != 0 {
+    return Err(Error::last_os_error());
+  }
+  let c_str = unsafe { CStr::from_ptr(name.as_ptr()) };
+  let hostname = c_str
+    .to_str()
+    .map_err(|err| Error::new(std::io::ErrorKind::Other, err))?;
+  Ok(hostname.to_owned())
 }

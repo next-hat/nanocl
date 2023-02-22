@@ -61,13 +61,9 @@ pub async fn create(
     .await
     .is_ok()
   {
-    return Err(HttpResponseError {
-      msg: format!(
-        "namespace {} error: network exist with same name",
-        &namespace.name
-      ),
-      status: StatusCode::CONFLICT,
-    });
+    let res =
+      repositories::namespace::create(namespace.to_owned(), pool).await?;
+    return Ok(Namespace { name: res.name });
   }
   let config = CreateNetworkOptions {
     name: namespace.name.to_owned(),

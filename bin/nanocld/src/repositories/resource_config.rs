@@ -42,7 +42,7 @@ pub async fn create(
 ) -> Result<ResourceConfigDbModel, HttpResponseError> {
   use crate::schema::resource_configs::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let dbmodel = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::insert_into(dsl::resource_configs)
@@ -86,7 +86,7 @@ pub async fn delete_by_resource_key(
 ) -> Result<(), HttpResponseError> {
   use crate::schema::resource_configs::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::delete(dsl::resource_configs.filter(dsl::resource_key.eq(key)))
@@ -106,7 +106,7 @@ pub async fn list_by_resource(
 ) -> Result<Vec<ResourceConfig>, HttpResponseError> {
   use crate::schema::resource_configs::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let models = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = dsl::resource_configs
@@ -132,7 +132,7 @@ pub async fn find_by_key(
 ) -> Result<ResourceConfig, HttpResponseError> {
   use crate::schema::resource_configs::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let model = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = dsl::resource_configs

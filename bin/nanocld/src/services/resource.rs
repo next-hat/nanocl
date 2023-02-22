@@ -33,12 +33,12 @@ pub async fn create_resource(
   log::debug!("Creating resource: {:?}", &payload);
   let resource = repositories::resource::create(payload, &pool).await?;
   log::debug!("Resource created: {:?}", &resource);
-  let resource_copy = resource.to_owned();
+  let resource_ptr = resource.clone();
   rt::spawn(async move {
     event_emitter
       .lock()
       .unwrap()
-      .send(Event::ResourceCreated(Box::new(resource_copy)));
+      .send(Event::ResourceCreated(Box::new(resource_ptr)));
   });
   Ok(web::HttpResponse::Created().json(&resource))
 }
@@ -152,12 +152,12 @@ pub async fn patch_resource(
   let resource =
     repositories::resource::update_by_key(key, payload, &pool).await?;
   log::debug!("Resource patched: {:?}", &resource);
-  let resource_copy = resource.to_owned();
+  let resource_ptr = resource.clone();
   rt::spawn(async move {
     event_emitter
       .lock()
       .unwrap()
-      .send(Event::ResourcePatched(Box::new(resource_copy)));
+      .send(Event::ResourcePatched(Box::new(resource_ptr)));
   });
   Ok(web::HttpResponse::Ok().json(&resource))
 }
@@ -196,12 +196,12 @@ pub async fn reset_resource(
     &pool,
   )
   .await?;
-  let resource_cpy = resource.to_owned();
+  let resource_ptr = resource.clone();
   rt::spawn(async move {
     event_emitter
       .lock()
       .unwrap()
-      .send(Event::ResourcePatched(Box::new(resource_cpy)));
+      .send(Event::ResourcePatched(Box::new(resource_ptr)));
   });
   Ok(web::HttpResponse::Ok().json(&resource))
 }

@@ -1,2 +1,3 @@
 -- This file should undo anything in `up.sql`
-DROP TABLE "cargoes"
+DROP TABLE IF EXISTS "cargoes";
+DROP TABLE IF EXISTS "cargo_configs";

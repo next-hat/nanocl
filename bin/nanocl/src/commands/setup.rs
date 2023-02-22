@@ -23,6 +23,7 @@ use crate::error::CliError;
 use crate::models::{SetupOpts, NanocldArgs};
 use crate::utils::math::calculate_percentage;
 use crate::utils::network::get_default_ip;
+use crate::utils::network::get_hostname;
 
 fn update_progress(
   multiprogress: &MultiProgress,
@@ -395,6 +396,14 @@ pub async fn exec_setup(options: &SetupOpts) -> Result<(), CliError> {
     ),
   })?;
 
+  let hostname = if let Some(hostname) = &options.hostname {
+    hostname.to_owned()
+  } else {
+    get_hostname().map_err(|err| CliError::Custom {
+      msg: format!("Cannot find hostname: {err}"),
+    })?
+  };
+
   let args = NanocldArgs {
     docker_host,
     state_dir,
@@ -402,6 +411,7 @@ pub async fn exec_setup(options: &SetupOpts) -> Result<(), CliError> {
     gateway,
     hosts,
     gid: gid.gid(),
+    hostname,
   };
 
   let docker_api = connect_docker(&args.docker_host)?;

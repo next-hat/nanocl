@@ -117,7 +117,7 @@ pub async fn download(
 > {
   let from_image = from_image.to_owned();
   let tag = tag.to_owned();
-  let docker_api = docker_api.to_owned();
+  let docker_api = docker_api.clone();
 
   let stream = docker_api.create_image(
     Some(bollard_next::image::CreateImageOptions {
