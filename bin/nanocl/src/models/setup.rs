@@ -30,4 +30,5 @@ pub struct NanocldArgs {
   pub(crate) hosts: Vec<String>,
   pub(crate) hostname: String,
   pub(crate) gid: u32,
+  pub(crate) version: String,
 }

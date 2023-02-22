@@ -144,6 +144,8 @@ fn gen_daemon_args(args: &NanocldArgs) -> Vec<String> {
     &args.docker_host,
     "--gateway",
     &args.gateway,
+    "--hostname",
+    &args.hostname,
   ]
   .iter()
   .map(|arg| arg.to_string())
@@ -209,7 +211,7 @@ async fn init_dependencies(
     .create_container(
       None::<CreateContainerOptions<String>>,
       ContainerConfig {
-        image: Some("nexthat/nanocld:nightly".into()),
+        image: Some(format!("nexthat/nanocld:{}", args.version)),
         cmd: Some(daemon_args),
         env: Some(vec![format!("NANOCL_GID={}", args.gid)]),
         host_config: Some(HostConfig {
@@ -287,7 +289,7 @@ async fn spawn_daemon(
         ..Default::default()
       }),
       ContainerConfig {
-        image: Some("nexthat/nanocld:nightly".into()),
+        image: Some(format!("nexthat/nanocld:{}", args.version)),
         entrypoint: Some(vec!["/entrypoint.sh".into()]),
         cmd: Some(daemon_args),
         labels: Some(labels),
@@ -399,9 +401,11 @@ pub async fn exec_setup(options: &SetupOpts) -> Result<(), CliError> {
   let hostname = if let Some(hostname) = &options.hostname {
     hostname.to_owned()
   } else {
-    get_hostname().map_err(|err| CliError::Custom {
+    let hostname = get_hostname().map_err(|err| CliError::Custom {
       msg: format!("Cannot find hostname: {err}"),
-    })?
+    })?;
+    println!("Using default hostname: {hostname}");
+    hostname
   };
 
   let args = NanocldArgs {
@@ -412,6 +416,7 @@ pub async fn exec_setup(options: &SetupOpts) -> Result<(), CliError> {
     hosts,
     gid: gid.gid(),
     hostname,
+    version: options.version.clone(),
   };
 
   let docker_api = connect_docker(&args.docker_host)?;
