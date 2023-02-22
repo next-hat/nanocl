@@ -1,12 +1,12 @@
-name: Draft nanocl nightly release
+name: Draft nanocl stable release
 
 on:
   push:
     branches:
-      - 'release-nightly-nanocl-*'
+      - 'release-stable-nanocl-*'
   pull_request:
     branches:
-      - 'release-nightly-nanocl-*'
+      - 'release-stable-nanocl-*'
     types: [opened, synchronize, closed]
 
 env:
