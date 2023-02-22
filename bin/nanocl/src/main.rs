@@ -140,7 +140,7 @@ mod tests {
       .unwrap()
       .first()
       .unwrap()
-      .to_owned();
+      .clone();
 
     let args = Cli::parse_from([
       "nanocl",
@@ -191,7 +191,7 @@ mod tests {
       .unwrap()
       .first()
       .unwrap()
-      .to_owned();
+      .clone();
 
     let args = Cli::parse_from([
       "nanocl",

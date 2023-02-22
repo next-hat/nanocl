@@ -7,7 +7,7 @@ pub async fn generate(
   daemon_state: BootState,
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("Preparing server");
-  let hosts = daemon_state.config.hosts.to_owned();
+  let hosts = daemon_state.config.hosts.clone();
   let mut server = web::HttpServer::new(move || {
     web::App::new()
       // bind config state

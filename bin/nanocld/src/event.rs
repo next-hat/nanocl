@@ -91,7 +91,7 @@ impl EventEmitter {
 
   /// Send an event to all clients
   pub fn send(&mut self, e: Event) {
-    let mut this = self.to_owned();
+    let mut this = self.clone();
     rt::spawn(async move {
       this.handle_event(e).await;
     });
