@@ -20,6 +20,7 @@ diesel::table! {
 diesel::table! {
     metrics (key) {
         key -> Uuid,
+        node_name -> Varchar,
         kind -> Text,
         data -> Jsonb,
         created_at -> Timestamptz,
@@ -34,10 +35,22 @@ diesel::table! {
 }
 
 diesel::table! {
+    node_group_links (rowid) {
+        node_name -> Varchar,
+        node_group_name -> Varchar,
+        rowid -> Int8,
+    }
+}
+
+diesel::table! {
+    node_groups (name) {
+        name -> Varchar,
+    }
+}
+
+diesel::table! {
     nodes (name) {
         name -> Varchar,
-        mode -> Text,
-        labels -> Jsonb,
         ip_address -> Varchar,
     }
 }
@@ -60,6 +73,8 @@ diesel::table! {
 
 diesel::joinable!(cargoes -> cargo_configs (config_key));
 diesel::joinable!(cargoes -> namespaces (namespace_name));
+diesel::joinable!(node_group_links -> node_groups (node_group_name));
+diesel::joinable!(node_group_links -> nodes (node_name));
 diesel::joinable!(resources -> resource_configs (config_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
@@ -67,6 +82,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     cargoes,
     metrics,
     namespaces,
+    node_group_links,
+    node_groups,
     nodes,
     resource_configs,
     resources,

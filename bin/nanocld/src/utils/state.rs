@@ -74,7 +74,7 @@ pub async fn apply_deployment(
     for cargo in cargoes {
       utils::cargo::create_or_put(&namespace, &cargo, docker_api, pool).await?;
       let key = utils::key::gen_key(&namespace, &cargo.name);
-      let p = pool.to_owned();
+      let p = pool.clone();
       let ev = event_emitter.to_owned();
       let docker = docker_api.to_owned();
       rt::spawn(async move {
@@ -89,7 +89,7 @@ pub async fn apply_deployment(
       )
       .await?;
       let key = utils::key::gen_key(&namespace, &cargo.name);
-      let p = pool.to_owned();
+      let p = pool.clone();
       let ev = event_emitter.to_owned();
       let docker = docker_api.to_owned();
       rt::spawn(async move {
@@ -105,7 +105,7 @@ pub async fn apply_deployment(
     for resource in resources {
       let key = resource.name.to_owned();
       repositories::resource::create_or_patch(&resource, pool).await?;
-      let p = pool.to_owned();
+      let p = pool.clone();
       let ev = event_emitter.to_owned();
       rt::spawn(async move {
         let item = resource::inspect_by_key(key, &p).await.unwrap();
@@ -138,7 +138,7 @@ pub async fn apply_cargo(
   for cargo in data.cargoes {
     utils::cargo::create_or_put(&namespace, &cargo, docker_api, pool).await?;
     let key = utils::key::gen_key(&namespace, &cargo.name);
-    let p = pool.to_owned();
+    let p = pool.clone();
     let ev = event_emitter.to_owned();
     let docker = docker_api.to_owned();
     rt::spawn(async move {
@@ -153,7 +153,7 @@ pub async fn apply_cargo(
     )
     .await?;
     let key = utils::key::gen_key(&namespace, &cargo.name);
-    let p = pool.to_owned();
+    let p = pool.clone();
     let ev = event_emitter.to_owned();
     let docker = docker_api.to_owned();
     rt::spawn(async move {
@@ -175,7 +175,7 @@ pub async fn apply_resource(
   for resource in data.resources {
     let key = resource.name.to_owned();
     repositories::resource::create_or_patch(&resource, pool).await?;
-    let pool = pool.to_owned();
+    let pool = pool.clone();
     let event_emitter = event_emitter.to_owned();
     rt::spawn(async move {
       let resource = repositories::resource::inspect_by_key(key, &pool)

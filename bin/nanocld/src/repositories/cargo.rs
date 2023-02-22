@@ -42,7 +42,7 @@ pub async fn find_by_namespace(
   nsp: NamespaceDbModel,
   pool: &Pool,
 ) -> Result<Vec<CargoDbModel>, HttpResponseError> {
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = CargoDbModel::belonging_to(&nsp)
@@ -95,7 +95,7 @@ pub async fn create(
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let key = utils::key::gen_key(&nsp, &item.name);
 
   let config =
@@ -157,7 +157,7 @@ pub async fn delete_by_key(
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::delete(dsl::cargoes)
@@ -199,7 +199,7 @@ pub async fn find_by_key(
 ) -> Result<CargoDbModel, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = dsl::cargoes
@@ -253,7 +253,7 @@ pub async fn update_by_key(
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
 
   let cargodb = find_by_key(key.to_owned(), &pool).await?;
   let config =
@@ -315,7 +315,7 @@ pub async fn count_by_namespace(
 ) -> Result<i64, HttpResponseError> {
   use crate::schema::cargoes;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let count = cargoes::table
@@ -338,7 +338,7 @@ pub async fn inspect_by_key(
   use crate::schema::cargoes;
   use crate::schema::cargo_configs;
 
-  let pool = pool.to_owned();
+  let pool = pool.clone();
   let item: (CargoDbModel, CargoConfigDbModel) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = cargoes::table

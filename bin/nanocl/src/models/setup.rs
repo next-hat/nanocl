@@ -16,6 +16,8 @@ pub struct SetupOpts {
   pub(crate) group: Option<String>,
   #[clap(long, default_value = "0.2.0")]
   pub(crate) version: String,
+  #[clap(long)]
+  pub(crate) hostname: Option<String>,
 }
 
 /// This is the struct that will be passed to nanocl daemon
@@ -26,5 +28,6 @@ pub struct NanocldArgs {
   pub(crate) conf_dir: String,
   pub(crate) gateway: String,
   pub(crate) hosts: Vec<String>,
+  pub(crate) hostname: String,
   pub(crate) gid: u32,
 }

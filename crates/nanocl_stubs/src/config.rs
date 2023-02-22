@@ -15,6 +15,8 @@ pub struct DaemonConfig {
   pub docker_host: String,
   /// Host gateway automatically detected to host default gateway if not set
   pub gateway: String,
+  /// Hostname to use for the node automatically detected if not set
+  pub hostname: String,
 }
 
 /// Configuration File of the daemon
@@ -30,12 +32,15 @@ pub struct DaemonConfigFile {
   pub docker_host: Option<String>,
   /// Host gateway automatically detected to host default gateway if not set
   pub gateway: Option<String>,
+  /// Hostname to use for the node automatically detected if not set
+  pub hostname: Option<String>,
 }
 
 impl Default for DaemonConfig {
   fn default() -> Self {
     Self {
       docker_host: default_host(),
+      hostname: String::default(),
       hosts: vec!["/run/nanocl.sock".into()],
       state_dir: "/var/lib/nanocl".into(),
       gateway: String::default(),

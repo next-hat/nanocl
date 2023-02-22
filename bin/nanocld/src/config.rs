@@ -40,11 +40,20 @@ fn gen_daemon_conf(
     utils::network::get_default_ip()?.to_string()
   };
 
+  let hostname = if let Some(ref hostname) = args.hostname {
+    hostname.to_owned()
+  } else if let Some(ref hostname) = config.hostname {
+    hostname.to_owned()
+  } else {
+    utils::network::get_hostname()?
+  };
+
   Ok(DaemonConfig {
     hosts,
     state_dir,
     docker_host,
     gateway,
+    hostname,
   })
 }
 
@@ -117,6 +126,7 @@ mod tests {
       conf_dir: String::from("/etc/nanocl"),
       init: false,
       gateway: None,
+      hostname: None,
     };
 
     let config = DaemonConfigFile {
@@ -124,6 +134,7 @@ mod tests {
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/run/docker.sock")),
       gateway: None,
+      hostname: None,
     };
 
     let merged = gen_daemon_conf(&args, &config).unwrap();
@@ -199,6 +210,7 @@ mod tests {
       conf_dir: String::from("/etc/nanocl"),
       init: false,
       gateway: None,
+      hostname: None,
     };
 
     let config = init(&args).unwrap();

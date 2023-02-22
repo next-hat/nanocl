@@ -1,4 +1,5 @@
 mod init;
+mod node;
 mod store;
 mod system;
 mod metrics;

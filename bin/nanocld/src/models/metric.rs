@@ -5,6 +5,7 @@ use crate::schema::metrics;
 #[diesel(table_name = metrics)]
 pub struct MetricDbModel {
   pub(crate) key: uuid::Uuid,
+  pub(crate) node_name: String,
   pub(crate) kind: String,
   pub(crate) data: serde_json::Value,
   pub(crate) created_at: chrono::NaiveDateTime,
@@ -16,5 +17,6 @@ pub struct MetricDbModel {
 #[diesel(table_name = metrics)]
 pub struct MetricInsertDbModel {
   pub(crate) kind: String,
+  pub(crate) node_name: String,
   pub(crate) data: serde_json::Value,
 }

@@ -14,7 +14,7 @@ mod schema;
 mod models;
 mod config;
 mod server;
-mod metrics;
+mod metric;
 mod services;
 mod repositories;
 
@@ -62,7 +62,7 @@ async fn main() -> std::io::Result<()> {
     return Ok(());
   }
 
-  metrics::spawn_metrics(&daemon_state.pool);
+  metric::spawn_metrics(&daemon_state.config.hostname, &daemon_state.pool);
 
   match server::generate(daemon_state).await {
     Err(err) => {

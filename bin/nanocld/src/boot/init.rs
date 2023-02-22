@@ -20,6 +20,12 @@ pub async fn init(
   super::system::register_namespace("system", false, &docker_api, &pool)
     .await?;
   super::system::register_namespace("global", true, &docker_api, &pool).await?;
+  super::node::register_node(
+    &daemon_conf.hostname,
+    &daemon_conf.gateway,
+    &pool,
+  )
+  .await?;
   super::system::sync_containers(&docker_api, &pool).await?;
   super::metrics::start_metrics_cargo(&docker_api, &pool).await?;
   Ok(BootState {
@@ -50,6 +56,7 @@ mod tests {
       state_dir: None,
       conf_dir: String::from("/etc/nanocl"),
       gateway: None,
+      hostname: None,
     };
 
     let config = config::init(&args)?;

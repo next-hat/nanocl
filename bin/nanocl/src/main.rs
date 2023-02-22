@@ -310,6 +310,10 @@ mod tests {
       "/tmp/nanocl2",
       "--conf-dir",
       "/tmp",
+      "--hostname",
+      "daemon-test",
+      "--gateway",
+      "127.0.0.1",
     ]);
     let res = execute_args(&args).await;
     println!("{res:#?}");
