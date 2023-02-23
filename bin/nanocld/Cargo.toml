@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Self-Sufficient Hybrid-Cloud Orchestrator Daemon"
-readme = "README.md"
+readme = "../../readme.md"
 license = "MIT OR Apache-2.0"
 homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
 repository = "https://github.com/nxthat/nanocld"
@@ -27,7 +27,7 @@ clap_mangen = { version = "0.2" }
 serde_yaml = "0.9"
 
 [dependencies]
-nanocl_stubs = { version = "0.0.8", features = ["serde"] }
+nanocl_stubs = { version = "0.0.9", features = ["serde"] }
 bollard-next = { version = "0.14.1" }
 r2d2 = "0.8"
 log = "0.4.17"

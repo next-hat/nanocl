@@ -8,14 +8,17 @@ Resources:
     Kind: ProxyRule
     Config:
       Watch:
-        - Name: get-started
+        - get-started@global
       Http:
         Domain: get-started.com
-        Type: Public
+        Network: Public
+        SslCertificate: /random/path/to/cert
+        SslCertificateKey: /random/path/to/key
+        SslDhParam: /random/path/to/param
         Locations:
           - Path: /
             Target:
-              Name: get-started
+              Key: get-started@global
               Port: 9000
 
 Cargoes:

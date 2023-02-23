@@ -68,38 +68,56 @@ pub struct Resource {
 }
 
 /// Proxy rules modes
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum ProxyRule {
   /// Redirect http trafic
   Http(ProxyRuleHttp),
-  /// Redirect https trafic
-  Https(ProxyRuleHttps),
-  /// Redirect tcp trafic
-  Tcp,
-  /// Redirect udp trafic
-  Udp,
+  /// Redirect tcp and udp trafic
+  Stream(ProxyRuleStream),
 }
 
 /// Defines a proxy rule target
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxyTarget {
-  /// The cargo namespace
-  pub namespace: Option<String>,
-  /// The cargo name
-  pub name: String,
+  /// The cargo key
+  pub key: String,
   /// The cargo port
   pub port: u16,
 }
 
-/// Defines a proxy rule location
-#[derive(Debug)]
+/// Proxy rules modes
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct ProxyRuleLocation {
+pub enum ProxyStreamProtocol {
+  Tcp,
+  Udp,
+}
+
+/// Proxy rules modes
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProxyRuleStream {
+  /// Type of the network binding private | public | internal | namespace:$namespace_name
+  pub network: String,
+  /// Protocol to use Tcp | Udp
+  pub protocol: ProxyStreamProtocol,
+  /// The port to open on nodes
+  pub port: u16,
+  /// The target cargo
+  pub target: ProxyTarget,
+}
+
+/// Defines a proxy rule location
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProxyHttpLocation {
   /// The path
   pub path: String,
   /// The target cargo
@@ -107,56 +125,33 @@ pub struct ProxyRuleLocation {
 }
 
 /// Defines a proxy rule http config
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxyRuleHttp {
   /// The domain
   pub domain: Option<String>,
-  /// Type of private | public | internal
-  pub r#type: String,
+  /// Type of private | public | internal | namespace:$namespace_name
+  pub r#network: String,
   /// The locations to handle multiple paths
-  pub locations: Vec<ProxyRuleLocation>,
-}
-
-#[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct ProxyRuleHttps {
-  /// The domain
-  pub domain: Option<String>,
-  /// Type of private | public | internal
-  pub r#type: String,
-  /// The locations to handle multiple paths
-  pub locations: Vec<ProxyRuleLocation>,
+  pub locations: Vec<ProxyHttpLocation>,
   /// Path to the ssl certificate
-  pub ssl_certificate: String,
+  pub ssl_certificate: Option<String>,
   /// Path to the ssl certificate key
-  pub ssl_certificate_key: String,
+  pub ssl_certificate_key: Option<String>,
   /// Path to the ssl dhparam
   pub ssl_dh_param: Option<String>,
-  /// Path to conf file to include
+  /// Path to extra config file to include
   pub includes: Option<Vec<String>>,
 }
 
-/// Define cargo to watch for changes
-#[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct ProxyWatch {
-  /// The cargo namespace
-  pub namespace: Option<String>,
-  /// The cargo name
-  pub name: String,
-}
-
 /// Define proxy rules to apply
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceProxyRule {
   /// Cargo to watch for changes
-  pub watch: Vec<ProxyWatch>,
+  pub watch: Vec<String>,
   /// The rule
   #[cfg_attr(feature = "serde", serde(flatten))]
   pub rule: ProxyRule,

@@ -6,12 +6,12 @@ Resources:
     Kind: ProxyRule
     Config:
       Watch:
-        - Name: getting-started
+        - get-started@global
       Http:
         Domain: get-started.com
-        Type: Public
+        Network: Public
         Locations:
           - Path: /
             Target:
-              Name: getting-started
+              Key: getting-started@global
               Port: 9000

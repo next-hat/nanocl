@@ -43,24 +43,11 @@ Its cutting-edge technology crafted with precision using Rust, provides the best
 * Isolate your services using namespaces and networks for improved security
 * Build an entire CI/CD pipeline, from tests to high-availability production
 * Significantly reduce the delay between writing code and shipping it to production
+* Easy deployment and management
 * Get peace of mind with logs, zero downtime with automatic fail-over and automatic backups
 * Enjoy history tracking of your container and virtual machine configuration
 * Revert configuration as quickly as pressing a button
 * Best ideas and practices from the community
-
-## Features
-
-* Manage your hosts and services with ease
-* Deploy and scale containers and virtual machines across multiple hosts
-* Built-in TLS and VPN for the best network security practices
-* Leverage the power of CockroachDB for unlimited scalability
-* Get real-time visibility into your infrastructure with logs and history tracking
-
-## Easy Deployment and Management
-
-You can manage your infrastructure and scale it depending on your need, ensuring that your services are always running smoothly.
-Nanocl makes it easy to deploy your applications, services, or databases, with its intuitive user interface and streamlined deployment process. Whether you need to deploy publicly, privately, or under a VPN, Nanocl has you covered.
-
 
 ## High Performance, Scallability and Security
 
@@ -75,8 +62,3 @@ With logs, auto fail-over, automatic backups, and zero downtime, you can sleep w
 
 To get started with Nanocl, please refer to the [installation guide](https://docs.next-hat.com/docs/setups/nanocl) and [documentation](https://docs.next-hat.com/docs/references/nanocl/cli). If you need any assistance or have any questions, feel free to reach out to our community for support.
 You may also wanna take a look at our [tutorial](https://docs.next-hat.com/docs/guides/nanocl/get-started)
-
-
-
-
-

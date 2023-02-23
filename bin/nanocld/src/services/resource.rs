@@ -1,8 +1,9 @@
 /*
 * Endpoints to manipulate resources
 */
-use ntex::{rt, web};
 
+use ntex::rt;
+use ntex::web;
 use nanocl_stubs::system::Event;
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
@@ -224,17 +225,34 @@ mod tests {
   use ntex::http::StatusCode;
 
   use crate::utils::tests::*;
-  use nanocl_stubs::resource::{ResourceKind, Resource, ResourceConfig};
+  use nanocl_stubs::resource::{
+    ResourceKind, Resource, ResourceConfig, ResourceProxyRule, ProxyRule,
+    ProxyStreamProtocol, ProxyTarget, ProxyRuleStream,
+  };
 
   #[ntex::test]
   async fn basic() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
+    let config = serde_json::to_value(ResourceProxyRule {
+      watch: vec!["random-cargo".into()],
+      rule: ProxyRule::Stream(ProxyRuleStream {
+        network: "Public".into(),
+        protocol: ProxyStreamProtocol::Tcp,
+        port: 1234,
+        target: ProxyTarget {
+          key: "random-cargo".into(),
+          port: 1234,
+        },
+      }),
+    })
+    .unwrap();
+
     // Create
     let payload = ResourcePartial {
       name: "test_resource".to_owned(),
       kind: ResourceKind::ProxyRule,
-      config: json!({"test":"value"}),
+      config: config.clone(),
     };
     let mut resp = srv.post("/resources").send_json(&payload).await.unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
@@ -253,7 +271,7 @@ mod tests {
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, ResourceKind::ProxyRule);
-    assert_eq!(resource.config, json!({"test":"value"}));
+    assert_eq!(&resource.config, &config);
 
     // History
     let mut resp = srv
@@ -281,11 +299,9 @@ mod tests {
       .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    // Patch
-    let patch_payload = json!({"test":"new_value"});
     let mut resp = srv
       .patch("/resources/test_resource")
-      .send_json(&patch_payload)
+      .send_json(&config)
       .await
       .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);

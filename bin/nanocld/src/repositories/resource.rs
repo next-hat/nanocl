@@ -3,7 +3,9 @@ use ntex::http::StatusCode;
 use diesel::prelude::*;
 
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceQuery};
+use nanocl_stubs::resource::{
+  Resource, ResourcePartial, ResourceQuery, ResourceKind, ResourceProxyRule,
+};
 
 use crate::repositories::error::db_error;
 use crate::{utils, repositories};
@@ -48,6 +50,20 @@ pub async fn create(
   item: ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
+  match &item.kind {
+    ResourceKind::ProxyRule => {
+      let _ = serde_json::from_value::<ResourceProxyRule>(item.config.clone())
+        .map_err(|err| HttpResponseError {
+          status: StatusCode::BAD_REQUEST,
+          msg: format!("Invalid proxy rule: {}", err),
+        })?;
+    }
+    _ => Err(HttpResponseError {
+      status: StatusCode::BAD_REQUEST,
+      msg: format!("Invalid resource kind: {}", item.kind),
+    })?,
+  }
+
   use crate::schema::resources::dsl;
 
   let pool = pool.clone();
