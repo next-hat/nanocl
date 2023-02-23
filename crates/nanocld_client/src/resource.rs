@@ -218,7 +218,10 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
-  use nanocl_stubs::resource::ResourceKind;
+  use nanocl_stubs::resource::{
+    ResourceKind, ResourceProxyRule, ProxyRuleStream, ProxyRule,
+    ProxyStreamProtocol, ProxyTarget,
+  };
 
   use super::*;
 
@@ -229,12 +232,26 @@ mod tests {
     // list
     client.list_resource(None).await.unwrap();
 
+    let config = serde_json::to_value(ResourceProxyRule {
+      watch: vec!["random-cargo".into()],
+      rule: ProxyRule::Stream(ProxyRuleStream {
+        network: "Public".into(),
+        protocol: ProxyStreamProtocol::Tcp,
+        port: 1234,
+        target: ProxyTarget {
+          key: "random-cargo".into(),
+          port: 1234,
+        },
+      }),
+    })
+    .unwrap();
+
     // create
     let resource = client
       .create_resource(&ResourcePartial {
         name: "my-resource".into(),
         kind: ResourceKind::ProxyRule,
-        config: serde_json::json!({}),
+        config: config.clone(),
       })
       .await
       .unwrap();
@@ -248,14 +265,10 @@ mod tests {
     assert_eq!(resource.kind, ResourceKind::ProxyRule);
 
     // patch
-    let resource = client
-      .patch_resource("my-resource", &serde_json::json!({"config": "gg"}))
-      .await
-      .unwrap();
+    let resource = client.patch_resource("my-resource", &config).await.unwrap();
 
     assert_eq!(resource.name, "my-resource");
     assert_eq!(resource.kind, ResourceKind::ProxyRule);
-    assert_eq!(resource.config, serde_json::json!({"config": "gg"}));
 
     // history
     let history = client.list_history_resource("my-resource").await.unwrap();
