@@ -17,6 +17,7 @@ ARG channel=stable
 ## Build our nanocl daemon binary
 COPY --from=planner /app /app
 WORKDIR /app
+RUN apk add musl-dev libpq-dev openssl git upx
 COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
 COPY ./bin/nanocld/src ./bin/nanocld/src
 COPY ./bin/nanocld/build.rs ./bin/nanocld/build.rs
@@ -25,13 +26,11 @@ COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
 COPY ./bin/nanocl/src ./bin/nanocl/src
 COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
 COPY .git ./.git
-RUN apk add musl-dev libpq-dev openssl git upx
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 ENV NANOCL_CHANNEL=$channel
 RUN cargo build --release --bin nanocld
 
-## Strip and compress the binary
-RUN strip target/release/nanocld
+## Compress the binary
 RUN upx /app/target/release/nanocld
 
 # stage 4 - Create runtime image

@@ -24,8 +24,6 @@ for file in ./bin/nanocl/target/man/*; do
   gzip < $file > ${release_path}/usr/local/man/man1/$file_name.gz
   pandoc --from man --to markdown < $file > ./doc/man/${file_name%.1}.md
 done
-# Stip binary
-strip ./target/x86_64-unknown-linux-musl/release/${pkg_name}
 # Compress binary
 upx ./target/x86_64-unknown-linux-musl/release/${pkg_name}
 # Copy binary
