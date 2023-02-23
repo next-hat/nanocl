@@ -10,8 +10,11 @@ Resources:
       Http:
         Domain: get-started.com
         Network: Public
+        SslCertificate: /random/path/to/cert
+        SslCertificateKey: /random/path/to/key
+        SslDhParam: /random/path/to/param
         Locations:
           - Path: /
             Target:
-              Key: getting-started@global
+              Key: get-started@global
               Port: 9000
