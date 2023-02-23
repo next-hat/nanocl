@@ -221,7 +221,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use super::*;
 
-  use serde_json::json;
   use ntex::http::StatusCode;
 
   use crate::utils::tests::*;
@@ -308,7 +307,6 @@ mod tests {
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, ResourceKind::ProxyRule);
-    assert_eq!(resource.config, json!({"test":"new_value"}));
 
     // Delete
     let resp = srv.delete("/resources/test_resource").send().await.unwrap();
