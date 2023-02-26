@@ -1,3 +1,4 @@
+use nanocl_stubs::cargo::CargoDeleteQuery;
 use ntex::rt;
 use ntex::http::StatusCode;
 
@@ -206,8 +207,17 @@ pub async fn revert_deployment(
     for cargo in cargoes {
       let key = utils::key::gen_key(&namespace, &cargo.name);
       let cargo = utils::cargo::inspect(&key, docker_api, pool).await?;
-      utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
-      let event_emitter = event_emitter.clone();
+      utils::cargo::delete(
+        &key,
+        docker_api,
+        pool,
+        Some(CargoDeleteQuery {
+          force: true,
+          ..Default::default()
+        }),
+      )
+      .await?;
+      let event_emitter = event_emitter.to_owned();
       rt::spawn(async move {
         event_emitter
           .lock()
@@ -251,8 +261,17 @@ pub async fn revert_cargo(
   for cargo in data.cargoes {
     let key = utils::key::gen_key(&namespace, &cargo.name);
     let cargo = utils::cargo::inspect(&key, docker_api, pool).await?;
-    utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
-    let event_emitter = event_emitter.clone();
+    utils::cargo::delete(
+      &key,
+      docker_api,
+      pool,
+      Some(CargoDeleteQuery {
+        force: true,
+        ..Default::default()
+      }),
+    )
+    .await?;
+    let event_emitter = event_emitter.to_owned();
     rt::spawn(async move {
       event_emitter
         .lock()

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use nanocl_stubs::cargo::CargoDeleteQuery;
 use nanocl_stubs::cargo_config::ContainerConfig;
 use nanocl_stubs::cargo_config::ContainerHostConfig;
 use ntex::web;
@@ -284,19 +285,15 @@ pub async fn delete(
   cargo_key: &str,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
-  force: Option<bool>,
+  // force: Option<bool>,
+  option: Option<CargoDeleteQuery>,
 ) -> Result<(), HttpResponseError> {
+  let option = option.unwrap_or_default();
   let containers = list_instance(cargo_key, docker_api).await?;
 
   for container in containers {
     docker_api
-      .remove_container(
-        &container.id.unwrap_or_default(),
-        Some(RemoveContainerOptions {
-          force: force.unwrap_or(false),
-          ..Default::default()
-        }),
-      )
+      .remove_container(&container.id.unwrap_or_default(), Some(option.clone().into()))
       .await
       .map_err(|e| HttpResponseError {
         msg: format!("Unable to remove container got error : {e}"),

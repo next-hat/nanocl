@@ -2,6 +2,7 @@
 * Endpoints to manipulate cargoes
 */
 
+use nanocl_stubs::cargo::CargoDeleteQuery;
 use ntex::rt;
 use ntex::web;
 use ntex::http::StatusCode;
@@ -76,7 +77,7 @@ pub async fn delete_cargo(
   docker_api: web::types::State<bollard_next::Docker>,
   event_emitter: web::types::State<EventEmitterPtr>,
   id: web::types::Path<String>,
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Query(qs): web::types::Query<CargoDeleteQuery>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &id);

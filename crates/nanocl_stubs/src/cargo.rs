@@ -3,6 +3,8 @@ use serde::{Serialize, Deserialize};
 
 use bollard_next::{models::ContainerSummary, container::LogOutput};
 
+use bollard_next::container::RemoveContainerOptions;
+
 pub use bollard_next::exec::CreateExecOptions as CargoExecConfig;
 
 use super::cargo_config::CargoConfig;
@@ -123,6 +125,31 @@ impl From<LogOutput> for CargoOutput {
         kind: CargoOutputKind::StdIn,
         data: String::from_utf8_lossy(&message).to_string(),
       },
+    }
+  }
+}
+
+/// Cargo delete query
+#[derive(Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct CargoDeleteQuery {
+  /// Name of the namespace
+  pub namespace: Option<String>,
+  #[cfg_attr(feature = "serde", serde(default = "bool::default"))]
+  pub force: bool,
+  #[cfg_attr(feature = "serde", serde(default = "bool::default"))]
+  pub v: bool,
+  #[cfg_attr(feature = "serde", serde(default = "bool::default"))]
+  pub link: bool,
+}
+
+impl From<CargoDeleteQuery> for RemoveContainerOptions {
+  fn from(query: CargoDeleteQuery) -> Self {
+    Self {
+      force: query.force,
+      v: query.v,
+      link: query.link,
     }
   }
 }
