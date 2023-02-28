@@ -78,6 +78,18 @@ pub enum ProxyRule {
   Stream(ProxyRuleStream),
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProxySslConfig {
+  /// Path to the certificate
+  pub certificate: String,
+  /// Path to the certificate key
+  pub certificate_key: String,
+  /// Path to the dhparam file
+  pub dh_param: Option<String>,
+}
+
 /// Defines a proxy rule target
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -109,6 +121,8 @@ pub struct ProxyRuleStream {
   pub protocol: ProxyStreamProtocol,
   /// The port to open on nodes
   pub port: u16,
+  /// The ssl configuration
+  pub ssl: Option<ProxySslConfig>,
   /// The target cargo
   pub target: ProxyTarget,
 }
@@ -135,12 +149,8 @@ pub struct ProxyRuleHttp {
   pub r#network: String,
   /// The locations to handle multiple paths
   pub locations: Vec<ProxyHttpLocation>,
-  /// Path to the ssl certificate
-  pub ssl_certificate: Option<String>,
-  /// Path to the ssl certificate key
-  pub ssl_certificate_key: Option<String>,
-  /// Path to the ssl dhparam
-  pub ssl_dh_param: Option<String>,
+  /// The ssl configuration
+  pub ssl: Option<ProxySslConfig>,
   /// Path to extra config file to include
   pub includes: Option<Vec<String>>,
 }
