@@ -10,6 +10,8 @@ fi
 
 exec runuser -u root -g nanocl -- /usr/local/bin/nanocld $@ &
 
-sleep 4 && chmod -R 770 /run/nanocl
+inotifywait -e create /run/nanocl > /dev/null
+chown root:nanocl -R /run/nanocl
+chmod -R 770 /run/nanocl
 
 wait

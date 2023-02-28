@@ -37,7 +37,7 @@ RUN upx /app/target/release/nanocld
 FROM alpine:3.17
 
 ## Install dependencies
-RUN apk add libgcc libpq util-linux
+RUN apk add libgcc libpq util-linux inotify-tools
 
 ## Copy the binary
 COPY --from=builder /app/target/release/nanocld /usr/local/bin/nanocld
