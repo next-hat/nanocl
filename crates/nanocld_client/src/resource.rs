@@ -238,6 +238,7 @@ mod tests {
         network: "Public".into(),
         protocol: ProxyStreamProtocol::Tcp,
         port: 1234,
+        ssl: None,
         target: ProxyTarget {
           key: "random-cargo".into(),
           port: 1234,
