@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 getent group nanocl > /dev/null 2&>1
 
@@ -8,23 +8,20 @@ if [ $? -ne 0 ]; then
   chmod -R 770 /run/nanocl
 fi
 
-init=false
 
-for arg in "$@"; do
-  if ["$arg" = "--init"]; then
-    init=true
+INIT=false
+
+for ARG in "$@"
+do
+  if [[ $ARG == "--init" ]]; then
+    INIT=true
     break
   fi
 done
 
-exec runuser -u root -g nanocl -- /usr/local/bin/nanocld $@ &
-
-if [ "$init" = true ]; then
-  exit 0
+if [[ $INIT == false ]]; then
+  sh -c "inotifywait -e create /run/nanocl > /dev/null &&
+    chown root:nanocl -R /run/nanocl && chmod -R 770 /run/nanocl" &
 fi
 
-inotifywait -e create /run/nanocl > /dev/null
-chown root:nanocl -R /run/nanocl
-chmod -R 770 /run/nanocl
-
-wait
+exec runuser -u root -g nanocl -- /usr/local/bin/nanocld $@

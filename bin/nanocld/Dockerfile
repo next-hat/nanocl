@@ -34,10 +34,11 @@ RUN cargo build --release --bin nanocld
 RUN upx /app/target/release/nanocld
 
 # stage 4 - Create runtime image
-FROM alpine:3.17
+FROM alpine:3.17.2
 
 ## Install dependencies
-RUN apk add libgcc libpq util-linux inotify-tools
+RUN apk update && apk upgrade
+RUN apk add libgcc libpq util-linux inotify-tools bash
 
 ## Copy the binary
 COPY --from=builder /app/target/release/nanocld /usr/local/bin/nanocld
@@ -46,4 +47,4 @@ COPY ./bin/nanocld/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ## Set entrypoint
-ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
