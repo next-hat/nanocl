@@ -24,12 +24,12 @@ serde = { version = "1.0", features = ["derive"] }
 clap_complete = "4.1.4"
 clap_mangen = { version = "0.2" }
 tabled = "0.10.0"
-nanocld_client = { version = "0.0.10" }
+nanocld_client = { version = "0.0.11" }
 bollard-next = { version = "0.14.1" }
 chrono = "0.4.23"
 
 [dependencies]
-nanocld_client = { version = "0.0.10", features = ["tokio"] }
+nanocld_client = { version = "0.0.11", features = ["tokio"] }
 bollard-next = { version = "0.14.1" }
 futures = "0.3"
 serde_yaml = "0.9"

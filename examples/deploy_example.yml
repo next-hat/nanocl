@@ -24,6 +24,10 @@ Cargoes:
     # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
     Container:
       Image: nexthat/nanocl-get-started:latest
+      HostConfig:
+        Binds: [
+          "./test:/test"
+        ]
       Env:
         - TEST=GG
         - APP=GET_STARTED
