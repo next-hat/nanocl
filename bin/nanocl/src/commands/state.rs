@@ -111,6 +111,28 @@ fn hook_binds(
   Ok(new_cargo)
 }
 
+async fn hook_cargoes(
+  client: &NanocldClient,
+  cargoes: Vec<CargoConfigPartial>,
+) -> Result<Vec<CargoConfigPartial>, CliError> {
+  let mut new_cargoes = Vec::new();
+  for cargo in cargoes {
+    download_cargo_image(client, &cargo).await?;
+    let new_cargo = hook_binds(&cargo)?;
+    new_cargoes.push(new_cargo);
+  }
+  Ok(new_cargoes)
+}
+
+fn inject_meta(
+  meta: StateConfig,
+  mut yml: serde_yaml::Value,
+) -> serde_yaml::Value {
+  yml["ApiVersion"] = serde_yaml::Value::String(meta.api_version);
+  yml["Type"] = serde_yaml::Value::String(meta.r#type);
+  yml
+}
+
 async fn exec_apply(
   client: &NanocldClient,
   opts: &StateOpts,
@@ -122,33 +144,16 @@ async fn exec_apply(
   let yml = match meta.r#type.as_str() {
     "Cargo" => {
       let mut data = serde_yaml::from_value::<StateCargo>(yaml)?;
-      let mut cargoes = Vec::new();
-      for cargo in data.cargoes {
-        println!("downloading cargo image: {cargo}", cargo = cargo.name);
-        download_cargo_image(client, &cargo).await?;
-        let new_cargo = hook_binds(&cargo)?;
-        cargoes.push(new_cargo);
-      }
-      data.cargoes = cargoes;
-      let mut yml = serde_yaml::to_value(data)?;
-      yml["ApiVersion"] = serde_yaml::Value::String(meta.api_version);
-      yml["Type"] = serde_yaml::Value::String(meta.r#type);
-      yml
+      data.cargoes = hook_cargoes(client, data.cargoes).await?;
+      let yml = serde_yaml::to_value(data)?;
+      inject_meta(meta, yml)
     }
     "Deployment" => {
       let mut data = serde_yaml::from_value::<StateDeployment>(yaml)?;
-      let mut cargoes = Vec::new();
-      for cargo in data.cargoes.unwrap_or_default() {
-        println!("downloading cargo image: {cargo}", cargo = cargo.name);
-        download_cargo_image(client, &cargo).await?;
-        let new_cargo = hook_binds(&cargo)?;
-        cargoes.push(new_cargo);
-      }
-      data.cargoes = Some(cargoes);
-      let mut yml = serde_yaml::to_value(data)?;
-      yml["ApiVersion"] = serde_yaml::Value::String(meta.api_version);
-      yml["Type"] = serde_yaml::Value::String(meta.r#type);
-      yml
+      data.cargoes =
+        Some(hook_cargoes(client, data.cargoes.unwrap_or_default()).await?);
+      let yml = serde_yaml::to_value(data)?;
+      inject_meta(meta, yml)
     }
     _ => yaml,
   };
