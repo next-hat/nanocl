@@ -284,6 +284,15 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "state",
+      "apply",
+      "-f",
+      "https://raw.githubusercontent.com/nxthat/nanocl/nightly/examples/deploy_example.yml"
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
       "revert",
       "-f",
       "../../examples/cargo_example.yml",
