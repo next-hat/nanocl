@@ -80,12 +80,11 @@ fn hook_binds(
           let bind_split = bind.split(":").collect::<Vec<&str>>();
           let new_bind = if bind_split.len() == 2 {
             let host_path = bind_split[0];
-            if host_path.starts_with(".") {
+            if host_path.starts_with("./") {
               let curr_path = std::env::current_dir()?;
-              let path = std::path::Path::new(&curr_path).join(host_path);
-              let path = path.to_str().ok_or(CliError::Custom {
-                msg: format!("Cannot convert path to string"),
-              })?;
+              let path = std::path::Path::new(&curr_path)
+                .join(std::path::PathBuf::from(host_path.replace("./", "")));
+              let path = path.display().to_string();
               println!("hooking: {path}", path = path);
               format!("{}:{}", path, bind_split[1])
             } else {
@@ -120,26 +119,40 @@ async fn exec_apply(
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
   };
-  match meta.r#type.as_str() {
+  let yml = match meta.r#type.as_str() {
     "Cargo" => {
-      let data = serde_yaml::from_value::<StateCargo>(yaml.clone())?;
+      let mut data = serde_yaml::from_value::<StateCargo>(yaml)?;
+      let mut cargoes = Vec::new();
       for cargo in data.cargoes {
         println!("downloading cargo image: {cargo}", cargo = cargo.name);
         download_cargo_image(client, &cargo).await?;
-        hook_binds(&cargo)?;
+        let new_cargo = hook_binds(&cargo)?;
+        cargoes.push(new_cargo);
       }
+      data.cargoes = cargoes;
+      let mut yml = serde_yaml::to_value(data)?;
+      yml["ApiVersion"] = serde_yaml::Value::String(meta.api_version);
+      yml["Type"] = serde_yaml::Value::String(meta.r#type);
+      yml
     }
     "Deployment" => {
-      let data = serde_yaml::from_value::<StateDeployment>(yaml.clone())?;
+      let mut data = serde_yaml::from_value::<StateDeployment>(yaml)?;
+      let mut cargoes = Vec::new();
       for cargo in data.cargoes.unwrap_or_default() {
         println!("downloading cargo image: {cargo}", cargo = cargo.name);
         download_cargo_image(client, &cargo).await?;
-        hook_binds(&cargo)?;
+        let new_cargo = hook_binds(&cargo)?;
+        cargoes.push(new_cargo);
       }
+      data.cargoes = Some(cargoes);
+      let mut yml = serde_yaml::to_value(data)?;
+      yml["ApiVersion"] = serde_yaml::Value::String(meta.api_version);
+      yml["Type"] = serde_yaml::Value::String(meta.r#type);
+      yml
     }
-    _ => {}
-  }
-  let data = serde_json::to_value(yaml)?;
+    _ => yaml,
+  };
+  let data = serde_json::to_value(yml)?;
   client.apply_state(&data).await?;
   Ok(())
 }
