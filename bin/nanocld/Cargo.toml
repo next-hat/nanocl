@@ -27,7 +27,7 @@ clap_mangen = { version = "0.2" }
 serde_yaml = "0.9"
 
 [dependencies]
-nanocl_stubs = { version = "0.0.10", features = ["serde"] }
+nanocl_stubs = { version = "0.0.11", features = ["serde"] }
 bollard-next = { version = "0.14.1" }
 r2d2 = "0.8"
 log = "0.4.17"
