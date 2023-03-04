@@ -85,7 +85,6 @@ fn hook_binds(
               let path = std::path::Path::new(&curr_path)
                 .join(std::path::PathBuf::from(host_path.replace("./", "")));
               let path = path.display().to_string();
-              println!("hooking: {path}", path = path);
               format!("{}:{}", path, bind_split[1])
             } else {
               bind.clone()
