@@ -77,7 +77,7 @@ fn hook_binds(
       Some(binds) => {
         let mut new_binds = Vec::new();
         for bind in binds {
-          let bind_split = bind.split(":").collect::<Vec<&str>>();
+          let bind_split = bind.split(':').collect::<Vec<&str>>();
           let new_bind = if bind_split.len() == 2 {
             let host_path = bind_split[0];
             if host_path.starts_with("./") {
