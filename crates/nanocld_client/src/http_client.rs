@@ -6,10 +6,13 @@ use futures::{StreamExt, TryStreamExt};
 
 use crate::error::ApiError;
 
+const NANOCLD_VERSION: &str = "v0.2";
+
 #[derive(Clone)]
 pub struct NanocldClient {
   client: Client,
   url: String,
+  pub(crate) version: String,
 }
 
 impl NanocldClient {
@@ -28,6 +31,7 @@ impl NanocldClient {
 
     NanocldClient {
       client,
+      version: String::from(NANOCLD_VERSION),
       url: String::from("http://localhost"),
     }
   }

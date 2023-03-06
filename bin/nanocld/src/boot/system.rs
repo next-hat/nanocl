@@ -139,6 +139,7 @@ pub(crate) async fn sync_containers(
           repositories::cargo::update_by_key(
             cargo_key.to_owned(),
             new_cargo,
+            format!("v{}", crate::version::VERSION),
             pool,
           )
           .await?;
@@ -152,8 +153,13 @@ pub(crate) async fn sync_containers(
           metadata[1],
           metadata[0]
         );
-        repositories::cargo::create(metadata[0].to_owned(), new_cargo, pool)
-          .await?;
+        repositories::cargo::create(
+          metadata[0].to_owned(),
+          new_cargo,
+          format!("v{}", crate::version::VERSION),
+          pool,
+        )
+        .await?;
       }
     }
   }

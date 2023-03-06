@@ -10,5 +10,6 @@ use super::cargo::CargoDbModel;
 pub struct CargoConfigDbModel {
   pub(crate) key: uuid::Uuid,
   pub(crate) cargo_key: String,
+  pub(crate) version: String,
   pub(crate) config: serde_json::Value,
 }

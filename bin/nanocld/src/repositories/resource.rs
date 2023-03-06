@@ -48,6 +48,7 @@ use super::error::db_blocking_error;
 ///
 pub async fn create(
   item: ResourcePartial,
+  version: String,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
   match &item.kind {
@@ -70,6 +71,7 @@ pub async fn create(
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     resource_key: item.name.to_owned(),
+    version,
     data: item.config,
   };
 
@@ -306,6 +308,7 @@ pub async fn inspect_by_key(
 pub async fn update_by_key(
   key: String,
   item: serde_json::Value,
+  version: String,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
   use crate::schema::resources;
@@ -317,6 +320,7 @@ pub async fn update_by_key(
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     resource_key: key.to_owned(),
+    version,
     data: item,
   };
 
@@ -350,15 +354,17 @@ pub async fn update_by_key(
 
 pub async fn create_or_patch(
   resource: &ResourcePartial,
+  version: String,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
   if inspect_by_key(resource.name.to_owned(), pool).await.is_ok() {
     return update_by_key(
       resource.name.to_owned(),
       resource.config.to_owned(),
+      version,
       pool,
     )
     .await;
   }
-  create(resource.to_owned(), pool).await
+  create(resource.to_owned(), version, pool).await
 }

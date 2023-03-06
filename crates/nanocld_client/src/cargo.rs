@@ -48,7 +48,7 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<Cargo, NanocldClientError> {
     let mut res = self
-      .post(String::from("/cargoes"))
+      .post(format!("/{}/cargoes", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send_json(item)
       .await?;
@@ -85,7 +85,7 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<(), NanocldClientError> {
     let mut res = self
-      .delete(format!("/cargoes/{name}"))
+      .delete(format!("/{}/cargoes/{name}", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -121,7 +121,7 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<CargoInspect, NanocldClientError> {
     let mut res = self
-      .get(format!("/cargoes/{name}/inspect"))
+      .get(format!("/{}/cargoes/{name}/inspect", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -158,7 +158,7 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<(), NanocldClientError> {
     let mut res = self
-      .post(format!("/cargoes/{name}/start"))
+      .post(format!("/{}/cargoes/{name}/start", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -194,7 +194,7 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<(), NanocldClientError> {
     let mut res = self
-      .post(format!("/cargoes/{name}/stop"))
+      .post(format!("/{}/cargoes/{name}/stop", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -228,7 +228,7 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<Vec<CargoSummary>, NanocldClientError> {
     let mut res = self
-      .get("/cargoes".into())
+      .get(format!("/{}/cargoes", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -271,7 +271,7 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<(), NanocldClientError> {
     let mut res = self
-      .patch(format!("/cargoes/{name}"))
+      .patch(format!("/{}/cargoes/{name}", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send_json(&config)
       .await?;
@@ -313,7 +313,7 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<(), NanocldClientError> {
     let mut res = self
-      .put(format!("/cargoes/{name}"))
+      .put(format!("/{}/cargoes/{name}", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send_json(&config)
       .await?;
@@ -363,7 +363,7 @@ impl NanocldClient {
   ) -> Result<mpsc::Receiver<Result<CargoOutput, ApiError>>, NanocldClientError>
   {
     let mut res = self
-      .post(format!("/cargoes/{name}/exec"))
+      .post(format!("/{}/cargoes/{name}/exec", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send_json(&exec)
       .await?;
@@ -403,7 +403,7 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<Vec<CargoConfig>, NanocldClientError> {
     let histories = self
-      .get(format!("/cargoes/{name}/histories"))
+      .get(format!("/{}/cargoes/{name}/histories", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?
@@ -442,7 +442,10 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<Cargo, NanocldClientError> {
     let mut res = self
-      .patch(format!("/cargoes/{name}/histories/{id}/reset"))
+      .patch(format!(
+        "/{}/cargoes/{name}/histories/{id}/reset",
+        &self.version
+      ))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;
@@ -466,7 +469,7 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<Receiver<Result<CargoOutput, ApiError>>, NanocldClientError> {
     let mut res = self
-      .get(format!("/cargoes/{name}/logs"))
+      .get(format!("/{}/cargoes/{name}/logs", &self.version))
       .query(&GenericNspQuery { namespace })?
       .send()
       .await?;

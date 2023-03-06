@@ -4,6 +4,7 @@ diesel::table! {
     cargo_configs (key) {
         key -> Uuid,
         cargo_key -> Varchar,
+        version -> Varchar,
         config -> Jsonb,
     }
 }
@@ -59,6 +60,7 @@ diesel::table! {
     resource_configs (key) {
         key -> Uuid,
         resource_key -> Varchar,
+        version -> Varchar,
         data -> Jsonb,
     }
 }
@@ -78,13 +80,13 @@ diesel::joinable!(node_group_links -> nodes (node_name));
 diesel::joinable!(resources -> resource_configs (config_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    cargo_configs,
-    cargoes,
-    metrics,
-    namespaces,
-    node_group_links,
-    node_groups,
-    nodes,
-    resource_configs,
-    resources,
+  cargo_configs,
+  cargoes,
+  metrics,
+  namespaces,
+  node_group_links,
+  node_groups,
+  nodes,
+  resource_configs,
+  resources,
 );

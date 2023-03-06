@@ -184,12 +184,17 @@ pub async fn list_instance(
 pub async fn create(
   namespace: &str,
   config: &CargoConfigPartial,
+  version: String,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
-  let cargo =
-    repositories::cargo::create(namespace.to_owned(), config.to_owned(), pool)
-      .await?;
+  let cargo = repositories::cargo::create(
+    namespace.to_owned(),
+    config.clone(),
+    version,
+    pool,
+  )
+  .await?;
 
   if let Err(err) = create_instance(&cargo, 1, docker_api).await {
     repositories::cargo::delete_by_key(cargo.key.to_owned(), pool).await?;
@@ -331,6 +336,7 @@ pub async fn delete(
 pub async fn put(
   cargo_key: &str,
   config: &CargoConfigUpdate,
+  version: String,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
@@ -357,6 +363,7 @@ pub async fn put(
   let cargo = repositories::cargo::update_by_key(
     cargo_key.to_owned(),
     cargo_partial,
+    version,
     pool,
   )
   .await?;
@@ -647,6 +654,7 @@ pub async fn exec_command(
 pub async fn create_or_put(
   namespace: &str,
   cargo: &CargoConfigPartial,
+  version: String,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<(), HttpResponseError> {
@@ -655,9 +663,16 @@ pub async fn create_or_put(
     .await
     .is_ok()
   {
-    utils::cargo::put(&key, &cargo.to_owned().into(), docker_api, pool).await?;
+    utils::cargo::put(
+      &key,
+      &cargo.to_owned().into(),
+      version,
+      docker_api,
+      pool,
+    )
+    .await?;
   } else {
-    utils::cargo::create(namespace, cargo, docker_api, pool).await?;
+    utils::cargo::create(namespace, cargo, version, docker_api, pool).await?;
     utils::cargo::start(&key, docker_api).await?;
   }
   Ok(())
@@ -666,6 +681,7 @@ pub async fn create_or_put(
 pub async fn patch(
   key: &str,
   payload: &CargoConfigUpdate,
+  version: String,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
@@ -753,7 +769,7 @@ pub async fn patch(
     container: Some(container),
     ..payload.to_owned()
   };
-  utils::cargo::put(key, &config, docker_api, pool).await
+  utils::cargo::put(key, &config, version, docker_api, pool).await
 }
 
 pub fn get_logs(

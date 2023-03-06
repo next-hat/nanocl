@@ -11,6 +11,7 @@ use super::resource::ResourceDbModel;
 pub struct ResourceConfigDbModel {
   pub(crate) key: uuid::Uuid,
   pub(crate) resource_key: String,
+  pub(crate) version: String,
   pub(crate) data: serde_json::Value,
 }
 

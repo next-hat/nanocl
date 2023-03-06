@@ -33,7 +33,14 @@ pub async fn start_metrics_cargo(
     .await
     .is_err()
   {
-    utils::cargo::create("system", cargo, docker_api, pool).await?;
+    utils::cargo::create(
+      "system",
+      cargo,
+      format!("v{}", crate::version::VERSION),
+      docker_api,
+      pool,
+    )
+    .await?;
     utils::cargo::start("system-metrics", docker_api).await?;
   }
   Ok(())

@@ -35,7 +35,7 @@ impl NanocldClient {
     &self,
     opts: Option<ListCargoImagesOptions>,
   ) -> Result<Vec<bollard_next::models::ImageSummary>, NanocldClientError> {
-    let mut req = self.get(String::from("/cargoes/images"));
+    let mut req = self.get(format!("/{}/cargoes/images", &self.version));
     if let Some(opts) = opts {
       req = req.query(&opts)?;
     }
@@ -46,6 +46,7 @@ impl NanocldClient {
 
     let body = res
       .json::<Vec<bollard_next::models::ImageSummary>>()
+      .limit(20_000_000)
       .await?;
 
     Ok(body)
@@ -87,7 +88,7 @@ impl NanocldClient {
     NanocldClientError,
   > {
     let mut res = self
-      .post(String::from("/cargoes/images"))
+      .post(format!("/{}/cargoes/images", self.version))
       .send_json(&CargoImagePartial {
         name: name.to_owned(),
       })
@@ -128,7 +129,7 @@ impl NanocldClient {
     name: &str,
   ) -> Result<(), NanocldClientError> {
     let mut res = self
-      .delete(format!("/cargoes/images/{name}"))
+      .delete(format!("/{}/cargoes/images/{name}", self.version))
       .send()
       .await?;
     let status = res.status();
@@ -164,7 +165,10 @@ impl NanocldClient {
     &self,
     name: &str,
   ) -> Result<bollard_next::models::ImageInspect, NanocldClientError> {
-    let mut res = self.get(format!("/cargoes/images/{name}")).send().await?;
+    let mut res = self
+      .get(format!("/{}/cargoes/images/{name}", self.version))
+      .send()
+      .await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
@@ -183,7 +187,7 @@ impl NanocldClient {
     E: Error + 'static,
   {
     let mut res = self
-      .post("/cargoes/images/import".into())
+      .post(format!("/{}/cargoes/images/import", self.version))
       .send_stream(stream)
       .await?;
     let status = res.status();

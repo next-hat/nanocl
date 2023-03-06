@@ -87,7 +87,7 @@ pub mod tests {
         .state(docker_api.clone())
         .state(event_emitter.clone())
         .configure(config)
-        .default_service(web::route().to(services::system::unhandled))
+        .default_service(web::route().to(services::unhandled))
     })
   }
 }

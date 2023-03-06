@@ -63,14 +63,14 @@ async fn create_namespace(
 ))]
 #[web::delete("/namespaces/{name}")]
 async fn delete_namespace_by_name(
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
   docker_api: web::types::State<bollard_next::Docker>,
   pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let name = name.into_inner();
-  log::debug!("Deleting namespace {}", &name);
-  let res = utils::namespace::delete_by_name(&name, &docker_api, &pool).await?;
-  log::debug!("Namespace {} deleted: {:?}", &name, &res);
+  log::debug!("Deleting namespace {}", &path.1);
+  let res =
+    utils::namespace::delete_by_name(&path.1, &docker_api, &pool).await?;
+  log::debug!("Namespace {} deleted: {:?}", &path.1, &res);
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
@@ -88,13 +88,13 @@ async fn delete_namespace_by_name(
 ))]
 #[web::get("/namespaces/{id}/inspect")]
 async fn inspect_namespace_by_name(
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
   docker_api: web::types::State<bollard_next::Docker>,
   pool: web::types::State<Pool>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let name = name.into_inner();
-  log::debug!("Inspecting namespace {}", name);
-  let namespace = utils::namespace::inspect(&name, &docker_api, &pool).await?;
+  log::debug!("Inspecting namespace {}", path.1);
+  let namespace =
+    utils::namespace::inspect(&path.1, &docker_api, &pool).await?;
   log::debug!("Namespace found: {:?}", &namespace);
   Ok(web::HttpResponse::Ok().json(&namespace))
 }
@@ -108,7 +108,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod test_namespace {
-  use super::*;
+  use crate::services::ntex_config;
 
   use serde_json::json;
 
@@ -118,7 +118,7 @@ mod test_namespace {
   use crate::utils::tests::*;
 
   async fn test_list(srv: &TestServer) -> TestRet {
-    let resp = srv.get("/namespaces").send().await?;
+    let resp = srv.get("/v0.2/namespaces").send().await?;
 
     assert!(resp.status().is_success());
     Ok(())
@@ -129,7 +129,10 @@ mod test_namespace {
       name: String::from("controller-default"),
     };
 
-    let resp = srv.post("/namespaces").send_json(&new_namespace).await?;
+    let resp = srv
+      .post("/v0.2/namespaces")
+      .send_json(&new_namespace)
+      .await?;
 
     assert!(resp.status().is_success());
     Ok(())
@@ -137,7 +140,7 @@ mod test_namespace {
 
   async fn test_fail_create(srv: &TestServer) -> TestRet {
     let resp = srv
-      .post("/namespaces")
+      .post("/v0.2/namespaces")
       .send_json(&json!({
           "name": 1,
       }))
@@ -145,7 +148,7 @@ mod test_namespace {
 
     assert!(resp.status().is_client_error());
 
-    let resp = srv.post("/namespaces").send().await?;
+    let resp = srv.post("/v0.2/namespaces").send().await?;
 
     assert!(resp.status().is_client_error());
     Ok(())
@@ -154,7 +157,7 @@ mod test_namespace {
   async fn test_inspect_by_id(srv: &TestServer) -> TestRet {
     let resp = srv
       .get(format!(
-        "/namespaces/{name}/inspect",
+        "/v0.2/namespaces/{name}/inspect",
         name = "controller-default"
       ))
       .send()
@@ -166,7 +169,10 @@ mod test_namespace {
 
   async fn test_delete(srv: &TestServer) -> TestRet {
     let mut resp = srv
-      .delete(format!("/namespaces/{name}", name = "controller-default"))
+      .delete(format!(
+        "/v0.2/namespaces/{name}",
+        name = "controller-default"
+      ))
       .send()
       .await?;
 

@@ -40,6 +40,7 @@ use super::error::{db_error, db_blocking_error};
 pub async fn create(
   cargo_key: String,
   item: CargoConfigPartial,
+  version: String,
   pool: &Pool,
 ) -> Result<CargoConfig, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
@@ -48,6 +49,7 @@ pub async fn create(
   let dbmodel = CargoConfigDbModel {
     key: uuid::Uuid::new_v4(),
     cargo_key,
+    version,
     config: serde_json::to_value(item.to_owned()).map_err(|e| {
       HttpResponseError {
         status: StatusCode::INTERNAL_SERVER_ERROR,

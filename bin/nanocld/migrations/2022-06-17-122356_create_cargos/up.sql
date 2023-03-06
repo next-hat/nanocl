@@ -3,6 +3,7 @@
 CREATE TABLE IF NOT EXISTS "cargo_configs" (
   "key" UUID NOT NULL UNIQUE PRIMARY KEY,
   "cargo_key" VARCHAR NOT NULL,
+  "version" VARCHAR NOT NULL,
   "config" JSON NOT NULL
 );
 

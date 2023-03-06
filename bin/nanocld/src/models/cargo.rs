@@ -27,6 +27,7 @@ pub struct CargoUpdateDbModel {
 /// Structure used to serialize cargo reset path
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CargoResetPath {
+  pub version: String,
   pub name: String,
   pub id: String,
 }
