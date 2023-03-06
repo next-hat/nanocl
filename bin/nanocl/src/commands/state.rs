@@ -1,5 +1,7 @@
 use std::fs;
 
+use clap::{Command, Arg};
+use dialoguer::Confirm;
 use futures::StreamExt;
 
 use bollard_next::service::HostConfig;
@@ -12,7 +14,8 @@ use ntex::rt::{self, JoinHandle};
 
 use crate::utils;
 use crate::error::CliError;
-use crate::models::{StateArgs, StateCommands, StateOpts};
+use crate::models::{StateArgs, StateCommands, StateOpts, StateBuildArgs};
+use crate::utils::print::print_yml;
 
 use super::cargo_image::exec_create_cargo_image;
 
@@ -225,6 +228,82 @@ async fn attach_to_cargoes(
   Ok(())
 }
 
+fn inject_build_args(
+  yaml: serde_yaml::Value,
+  args: Vec<String>,
+) -> Result<serde_yaml::Value, CliError> {
+  let build_args: StateBuildArgs = serde_yaml::from_value(yaml.clone())?;
+
+  let mut cmd = Command::new("nanocl state args")
+    .about("Validate state args")
+    .bin_name("nanocl state args");
+  for build_arg in build_args.args.clone().unwrap_or_default() {
+    let name = build_arg.name.to_owned();
+    let arg: &'static str = Box::leak(name.into_boxed_str());
+    let mut cmd_arg = Arg::new(arg).long(arg);
+    match build_arg.default {
+      Some(default) => {
+        let default_value: &'static str = Box::leak(default.into_boxed_str());
+        cmd_arg = cmd_arg.default_value(default_value);
+      }
+      None => {
+        cmd_arg = cmd_arg.required(true);
+      }
+    }
+    cmd = cmd.arg(cmd_arg);
+  }
+  let matches = cmd.get_matches_from(args);
+
+  let mut args = std::collections::HashMap::new();
+
+  for build_arg in build_args.args.unwrap_or_default() {
+    let name = build_arg.name.to_owned();
+    let arg: &'static str = Box::leak(name.to_owned().into_boxed_str());
+    match build_arg.r#type.as_str() {
+      "String" => {
+        let value = matches.get_one::<String>(arg).ok_or(CliError::Custom {
+          msg: format!("Missing argument {arg}"),
+        })?;
+        args.insert(name, value.to_owned());
+      }
+      "Number" => {
+        let value = matches.get_one::<i64>(arg).ok_or(CliError::Custom {
+          msg: format!("Missing argument {arg}"),
+        })?;
+        args.insert(name, format!("{value}"));
+      }
+      _ => {
+        return Err(CliError::Custom {
+          msg: format!("Unknown type {type}", type = build_arg.r#type),
+        })
+      }
+    }
+  }
+
+  let mut envs = std::collections::HashMap::new();
+  for (key, value) in std::env::vars_os() {
+    let key = key.to_string_lossy().to_string();
+    let value = value.to_string_lossy().to_string();
+    envs.insert(key, value);
+  }
+
+  let str = serde_yaml::to_string(&yaml)?;
+  let template =
+    mustache::compile_str(&str).map_err(|err| CliError::Custom {
+      msg: format!("Cannot compile mustache template: {err}"),
+    })?;
+  let str = template
+    .render_to_string(&serde_json::json!({
+      "Args": args,
+      "Envs": envs,
+    }))
+    .map_err(|err| CliError::Custom {
+      msg: format!("Cannot render mustache template: {err}"),
+    })?;
+  let yaml: serde_yaml::Value = serde_yaml::from_str(&str)?;
+  Ok(yaml)
+}
+
 async fn exec_apply(
   client: &NanocldClient,
   opts: &StateOpts,
@@ -233,9 +312,12 @@ async fn exec_apply(
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
   };
+
+  let yaml = inject_build_args(yaml.clone(), opts.args.clone())?;
+
   let mut namespace = String::from("default");
   let mut cargoes = Vec::new();
-  let yml = match meta.r#type.as_str() {
+  let yaml = match meta.r#type.as_str() {
     "Cargo" => {
       let mut data = serde_yaml::from_value::<StateCargo>(yaml)?;
       namespace = data.namespace.clone().unwrap_or(namespace);
@@ -254,7 +336,22 @@ async fn exec_apply(
     }
     _ => yaml,
   };
-  let data = serde_json::to_value(yml)?;
+  let data = serde_json::to_value(&yaml)?;
+  let _ = print_yml(&yaml);
+  if !opts.skip_confim {
+    let result = Confirm::new()
+      .with_prompt("Are you sure to apply this new state ?")
+      .default(false)
+      .interact();
+    match result {
+      Ok(true) => {}
+      _ => {
+        return Err(CliError::Custom {
+          msg: "Aborted".into(),
+        })
+      }
+    }
+  }
   client.apply_state(&data).await?;
   if opts.attach {
     attach_to_cargoes(client, cargoes, &namespace).await?;
@@ -270,7 +367,23 @@ async fn exec_revert(
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
   };
-  let data = serde_json::to_value(yaml)?;
+  let yaml = inject_build_args(yaml.clone(), opts.args.clone())?;
+  let data = serde_json::to_value(&yaml)?;
+  let _ = print_yml(&yaml);
+  if !opts.skip_confim {
+    let result = Confirm::new()
+      .with_prompt("Are you sure to revert this state ?")
+      .default(false)
+      .interact();
+    match result {
+      Ok(true) => {}
+      _ => {
+        return Err(CliError::Custom {
+          msg: "Aborted".into(),
+        })
+      }
+    }
+  }
   client.revert_state(&data).await?;
   Ok(())
 }

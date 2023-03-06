@@ -9,13 +9,13 @@ Args:
     Default: deploy-args-example.com
 
 Resources:
-  - Name: "{Args.domain}"
+  - Name: "{{Args.domain}}"
     Kind: ProxyRule
     Config:
       Watch:
         - get-started@global
       Http:
-        Domain: "{Args.domain}"
+        Domain: "{{Args.domain}}"
         Network: Public
         Locations:
           - Path: /

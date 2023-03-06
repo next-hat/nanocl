@@ -26,6 +26,6 @@ where
   T: serde::Serialize,
 {
   let yml = serde_yaml::to_string(&data)?;
-  println!("{yml}");
+  print!("{yml}");
   Ok(())
 }
