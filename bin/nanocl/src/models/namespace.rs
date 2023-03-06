@@ -20,14 +20,13 @@ pub enum NamespaceCommands {
 
 /// Manage namespaces
 #[derive(Debug, Parser)]
-#[clap(name = "nanocl-namespace")]
+#[clap(name = "nanocl namespace")]
 pub struct NamespaceArgs {
   #[clap(subcommand)]
   pub commands: NamespaceCommands,
 }
 
 #[derive(Debug, Parser)]
-#[clap(name = "nanocl-namespace-create")]
 pub struct NamespaceOpts {
   /// name of the namespace to create
   pub name: String,

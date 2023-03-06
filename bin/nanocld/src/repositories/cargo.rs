@@ -96,6 +96,14 @@ pub async fn create(
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
+  // test if the name of the cargo include a . in the name and throw error if true
+  if item.name.contains('.') {
+    return Err(HttpResponseError {
+      status: StatusCode::BAD_REQUEST,
+      msg: "The cargo name cannot contain a dot".into(),
+    });
+  }
+
   let pool = pool.clone();
   let key = utils::key::gen_key(&nsp, &item.name);
 

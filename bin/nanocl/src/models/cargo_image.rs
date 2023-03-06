@@ -44,6 +44,7 @@ pub struct CargoImageImportOpts {
 
 /// Manage container images
 #[derive(Debug, Parser)]
+#[clap(name = "nanocl cargo image")]
 pub struct CargoImageOpts {
   #[clap(subcommand)]
   pub(crate) commands: CargoImageCommands,

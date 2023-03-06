@@ -3,14 +3,19 @@ ApiVersion: v0.2
 
 Namespace: global
 
+Args:
+  - Name: domain
+    Type: String
+    Default: deploy-args-example.com
+
 Resources:
-  - Name: deploy-example.com
+  - Name: "{Args.domain}"
     Kind: ProxyRule
     Config:
       Watch:
         - get-started@global
       Http:
-        Domain: deploy-example.com
+        Domain: "{Args.domain}"
         Network: Public
         Locations:
           - Path: /
@@ -19,7 +24,7 @@ Resources:
               Port: 9000
 
 Cargoes:
-  - Name: deploy-example
+  - Name: deploy-args-example
     # See all options:
     # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
     Container:

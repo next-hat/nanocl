@@ -1,10 +1,10 @@
 Type: Cargo
 ApiVersion: v0.2
 
-Namespace: example-namespace
+Namespace: cargo-example
 
 Cargoes:
-  - Name: example-cargo
+  - Name: cargo-example
     # See all options:
     # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
     Container:
