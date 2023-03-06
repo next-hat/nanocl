@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
+use bollard_next::container::WaitContainerOptions;
+use futures::TryStreamExt;
 use nanocl_stubs::cargo_config::ContainerConfig;
 use nanocl_stubs::cargo_config::ContainerHostConfig;
+use ntex::rt;
 use ntex::web;
 use ntex::util::Bytes;
 use ntex::http::StatusCode;
@@ -76,6 +79,33 @@ async fn create_instance(
       cargo.namespace_name.to_owned(),
     );
 
+    let auto_remove = cargo
+      .config
+      .to_owned()
+      .container
+      .host_config
+      .unwrap_or_default()
+      .auto_remove
+      .unwrap_or(false);
+
+    let restart_policy = if auto_remove {
+      None
+    } else {
+      Some(
+        cargo
+          .config
+          .to_owned()
+          .container
+          .host_config
+          .unwrap_or_default()
+          .restart_policy
+          .unwrap_or(RestartPolicy {
+            name: Some(RestartPolicyNameEnum::ALWAYS),
+            maximum_retry_count: None,
+          }),
+      )
+    };
+
     // Merge the cargo config with the container config
     // And set his network mode to the cargo namespace
     let config = bollard_next::container::Config {
@@ -84,19 +114,7 @@ async fn create_instance(
       tty: Some(true),
       labels: Some(labels),
       host_config: Some(HostConfig {
-        restart_policy: Some(
-          cargo
-            .config
-            .to_owned()
-            .container
-            .host_config
-            .unwrap_or_default()
-            .restart_policy
-            .unwrap_or(RestartPolicy {
-              name: Some(RestartPolicyNameEnum::ALWAYS),
-              maximum_retry_count: None,
-            }),
-        ),
+        restart_policy,
         network_mode: Some(
           cargo
             .config
@@ -223,17 +241,60 @@ pub async fn create(
 pub async fn start(
   cargo_key: &str,
   docker_api: &bollard_next::Docker,
+  pool: &Pool,
 ) -> Result<(), HttpResponseError> {
-  let containers = list_instance(cargo_key, docker_api).await?;
+  let cargo_key = cargo_key.to_owned();
+  let docker_api = docker_api.clone();
+  let cargo =
+    repositories::cargo::inspect_by_key(cargo_key.to_owned(), pool).await?;
+
+  let auto_remove = cargo
+    .config
+    .container
+    .host_config
+    .unwrap_or_default()
+    .auto_remove
+    .unwrap_or(false);
+
+  let containers = list_instance(&cargo_key, &docker_api).await?;
+
+  let mut futures = Vec::new();
 
   for container in containers {
+    let id = container.id.unwrap_or_default();
+
+    if auto_remove {
+      let id = id.clone();
+      let docker_api = docker_api.clone();
+      futures.push(async move {
+        let options = Some(WaitContainerOptions {
+          condition: "removed",
+        });
+        let stream = docker_api.wait_container(&id, options);
+        if let Err(err) = stream.try_for_each(|_| async { Ok(()) }).await {
+          log::warn!("Error while waiting for container {id} {err}");
+        }
+      });
+    }
     docker_api
-      .start_container::<String>(&container.id.unwrap_or_default(), None)
+      .start_container::<String>(&id, None)
       .await
       .map_err(|e| HttpResponseError {
         msg: format!("Unable to start container got error : {e}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?;
+  }
+
+  if auto_remove {
+    let pool = pool.clone();
+    rt::spawn(async move {
+      futures::future::join_all(futures).await;
+      if let Err(err) =
+        repositories::cargo::delete_by_key(cargo_key.to_owned(), &pool).await
+      {
+        log::warn!("Error while deleting cargo {cargo_key} {err}");
+      }
+    });
   }
 
   Ok(())
@@ -413,7 +474,7 @@ pub async fn put(
   };
 
   // start created containers
-  if let Err(err) = start(cargo_key, docker_api).await {
+  if let Err(err) = start(cargo_key, docker_api, pool).await {
     log::error!("Unable to start cargo instance {} : {err}", cargo.key);
     // If the start of the new instance failed, we remove the new containers
     for instance in new_instances {
@@ -675,7 +736,7 @@ pub async fn create_or_put(
     .await?;
   } else {
     utils::cargo::create(namespace, cargo, version, docker_api, pool).await?;
-    utils::cargo::start(&key, docker_api).await?;
+    utils::cargo::start(&key, docker_api, pool).await?;
   }
   Ok(())
 }

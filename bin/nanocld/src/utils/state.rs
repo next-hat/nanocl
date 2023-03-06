@@ -94,6 +94,7 @@ pub async fn apply_deployment(
       utils::cargo::start(
         &utils::key::gen_key(&namespace, &cargo.name),
         docker_api,
+        pool,
       )
       .await?;
       let key = utils::key::gen_key(&namespace, &cargo.name);
@@ -167,6 +168,7 @@ pub async fn apply_cargo(
     utils::cargo::start(
       &utils::key::gen_key(&namespace, &cargo.name),
       docker_api,
+      pool,
     )
     .await?;
     let key = utils::key::gen_key(&namespace, &cargo.name);

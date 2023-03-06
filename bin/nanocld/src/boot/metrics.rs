@@ -41,7 +41,7 @@ pub async fn start_metrics_cargo(
       pool,
     )
     .await?;
-    utils::cargo::start("metrics.system", docker_api).await?;
+    utils::cargo::start("metrics.system", docker_api, pool).await?;
   }
   Ok(())
 }

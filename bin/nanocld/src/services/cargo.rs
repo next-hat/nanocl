@@ -124,8 +124,7 @@ pub async fn start_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("Starting cargo: {}", &key);
-  utils::cargo::inspect(&key, &docker_api, &pool).await?;
-  utils::cargo::start(&key, &docker_api).await?;
+  utils::cargo::start(&key, &docker_api, &pool).await?;
   rt::spawn(async move {
     let cargo = utils::cargo::inspect(&key, &docker_api, &pool)
       .await
