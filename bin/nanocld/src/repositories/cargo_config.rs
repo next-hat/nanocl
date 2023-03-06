@@ -71,6 +71,7 @@ pub async fn create(
   let config = CargoConfig {
     key: dbmodel.key,
     name: item.name,
+    version: dbmodel.version,
     cargo_key: dbmodel.cargo_key,
     replication: item.replication,
     container: item.container,
@@ -127,6 +128,7 @@ pub async fn find_by_key(
   Ok(CargoConfig {
     key: dbmodel.key,
     name: config.name,
+    version: dbmodel.version,
     cargo_key: dbmodel.cargo_key,
     replication: config.replication,
     container: config.container,
@@ -205,6 +207,7 @@ pub async fn list_by_cargo(
       Ok(CargoConfig {
         key: dbmodel.key,
         name: config.name,
+        version: dbmodel.version,
         cargo_key: dbmodel.cargo_key,
         replication: config.replication,
         container: config.container,

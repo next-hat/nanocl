@@ -48,5 +48,5 @@ pub fn resolve_nsp(nsp: &Option<String>) -> String {
 /// ```
 ///
 pub fn gen_key(nsp: &str, name: &str) -> String {
-  nsp.to_owned() + "-" + name
+  name.to_owned() + "." + nsp
 }

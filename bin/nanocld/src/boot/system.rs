@@ -86,13 +86,13 @@ pub(crate) async fn sync_containers(
       // We don't have cargo label, we skip it
       continue;
     };
-    let metadata = cargo_key.split('-').collect::<Vec<&str>>();
+    let metadata = cargo_key.split('.').collect::<Vec<&str>>();
     if metadata.len() < 2 {
       // We don't have cargo label well formated, we skip it
       continue;
     }
     // If we already inspected this cargo we skip it
-    if cargo_inspected.contains_key(metadata[1]) {
+    if cargo_inspected.contains_key(metadata[0]) {
       continue;
     }
 
@@ -120,12 +120,12 @@ pub(crate) async fn sync_containers(
     // }
 
     let new_cargo = CargoConfigPartial {
-      name: metadata[1..].join("-"),
+      name: metadata[0].to_owned(),
       container: config.to_owned(),
       ..Default::default()
     };
 
-    cargo_inspected.insert(metadata[1].to_owned(), true);
+    cargo_inspected.insert(metadata[0].to_owned(), true);
     match repositories::cargo::inspect_by_key(cargo_key.to_owned(), pool).await
     {
       // If the cargo is already in our store and the config is different we update it
@@ -133,8 +133,8 @@ pub(crate) async fn sync_containers(
         if cargo.config.container != config {
           log::debug!(
             "updating cargo {} in namespace {}",
-            metadata[1],
-            metadata[0]
+            metadata[0],
+            metadata[1]
           );
           repositories::cargo::update_by_key(
             cargo_key.to_owned(),
@@ -150,11 +150,11 @@ pub(crate) async fn sync_containers(
       Err(_err) => {
         log::debug!(
           "creating cargo {} in namespace {}",
-          metadata[1],
-          metadata[0]
+          metadata[0],
+          metadata[1]
         );
         repositories::cargo::create(
-          metadata[0].to_owned(),
+          metadata[1].to_owned(),
           new_cargo,
           format!("v{}", crate::version::VERSION),
           pool,

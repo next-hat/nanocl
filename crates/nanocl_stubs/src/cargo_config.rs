@@ -84,6 +84,8 @@ pub struct CargoConfig {
   pub key: uuid::Uuid,
   /// Name of the cargo
   pub name: String,
+  /// Version of the config
+  pub version: String,
   /// The key of the cargo
   pub cargo_key: String,
   /// Replication configuration of the cargo

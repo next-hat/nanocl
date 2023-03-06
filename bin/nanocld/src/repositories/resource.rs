@@ -97,6 +97,7 @@ pub async fn create(
   let item = Resource {
     name: item.key,
     kind: item.kind.into(),
+    version: config.version,
     config_key: config.key,
     config: config.data,
   };
@@ -220,6 +221,7 @@ pub async fn find(
       Ok::<_, HttpResponseError>(Resource {
         name: resource.key,
         kind: resource.kind.into(),
+        version: config.version,
         config_key: resource.config_key,
         config: config.data,
       })
@@ -274,6 +276,7 @@ pub async fn inspect_by_key(
   let item = Resource {
     name: res.0.key,
     kind: res.0.kind.into(),
+    version: res.1.version,
     config_key: res.0.config_key,
     config: res.1.data,
   };
@@ -346,6 +349,7 @@ pub async fn update_by_key(
   let item = Resource {
     name: resource.name,
     kind: resource.kind,
+    version: config.version,
     config_key: config.key,
     config: config.data,
   };

@@ -103,6 +103,7 @@ pub async fn create(
     cargo_config::create(key.to_owned(), item.to_owned(), version, &pool)
       .await?;
 
+  println!("name: {}", &item.name);
   let new_item = CargoDbModel {
     key,
     name: item.name,
@@ -364,6 +365,7 @@ pub async fn inspect_by_key(
   let config = CargoConfig {
     key: item.1.key,
     name: config.name,
+    version: item.1.version,
     cargo_key: item.1.cargo_key,
     replication: config.replication,
     container: config.container,

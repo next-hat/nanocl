@@ -59,6 +59,8 @@ pub struct ResourcePartial {
 pub struct Resource {
   /// The name of the resource
   pub name: String,
+  /// Version of the resource
+  pub version: String,
   /// The kind of the resource
   pub kind: ResourceKind,
   /// The config of the resource

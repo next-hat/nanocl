@@ -99,7 +99,7 @@ pub fn get_pool_conn(pool: &Pool) -> Result<DBConn, HttpResponseError> {
 pub async fn get_store_ip_addr(
   docker_api: &bollard_next::Docker,
 ) -> Result<String, HttpResponseError> {
-  let container = docker_api.inspect_container("system-store", None).await?;
+  let container = docker_api.inspect_container("store.system", None).await?;
   let networks = container
     .network_settings
     .ok_or(HttpResponseError {

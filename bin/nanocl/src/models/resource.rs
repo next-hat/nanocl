@@ -30,6 +30,7 @@ pub struct ResourceArgs {
 #[derive(Debug, Tabled)]
 pub struct ResourceRow {
   pub name: String,
+  pub version: String,
   pub kind: ResourceKind,
 }
 
@@ -37,6 +38,7 @@ impl From<Resource> for ResourceRow {
   fn from(resource: Resource) -> Self {
     Self {
       name: resource.name,
+      version: resource.version,
       kind: resource.kind,
     }
   }

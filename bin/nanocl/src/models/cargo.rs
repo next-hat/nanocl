@@ -229,6 +229,7 @@ pub struct CargoArgs {
 #[derive(Tabled)]
 pub struct CargoRow {
   pub(crate) namespace: String,
+  pub(crate) version: String,
   pub(crate) name: String,
   pub(crate) image: String,
   pub(crate) instances: String,
@@ -237,8 +238,9 @@ pub struct CargoRow {
 impl From<CargoSummary> for CargoRow {
   fn from(cargo: CargoSummary) -> Self {
     Self {
-      name: cargo.name,
       namespace: cargo.namespace_name,
+      name: cargo.name,
+      version: cargo.config.version,
       image: cargo.config.container.image.unwrap_or_default(),
       instances: format!("{}/{}", cargo.running_instances, cargo.instances),
     }

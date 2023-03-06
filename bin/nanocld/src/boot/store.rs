@@ -65,7 +65,7 @@ async fn boot(
   config: &DaemonConfig,
   docker_api: &bollard_next::Docker,
 ) -> Result<(), bollard_next::errors::Error> {
-  let container_name = "system-store";
+  let container_name = "store.system";
 
   if docker_api
     .inspect_container(container_name, None)
