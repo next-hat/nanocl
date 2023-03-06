@@ -511,6 +511,8 @@ pub async fn list(
 
     cargo_summaries.push(CargoSummary {
       key: cargo.key,
+      created_at: cargo.created_at,
+      updated_at: config.created_at,
       name: cargo.name,
       namespace_name: cargo.namespace_name,
       config: config.to_owned(),

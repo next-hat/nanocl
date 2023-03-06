@@ -70,6 +70,7 @@ pub async fn create(
   let pool = pool.clone();
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
+    created_at: chrono::Utc::now().naive_utc(),
     resource_key: item.name.to_owned(),
     version,
     data: item.config,
@@ -79,6 +80,7 @@ pub async fn create(
 
   let new_item = ResourceDbModel {
     key: item.name.to_owned(),
+    created_at: chrono::Utc::now().naive_utc(),
     kind: item.kind.into(),
     config_key: config.key.to_owned(),
   };
@@ -96,6 +98,8 @@ pub async fn create(
 
   let item = Resource {
     name: item.key,
+    created_at: item.created_at,
+    updated_at: config.created_at,
     kind: item.kind.into(),
     version: config.version,
     config_key: config.key,
@@ -220,6 +224,8 @@ pub async fn find(
       let config = e.1;
       Ok::<_, HttpResponseError>(Resource {
         name: resource.key,
+        created_at: resource.created_at,
+        updated_at: config.created_at,
         kind: resource.kind.into(),
         version: config.version,
         config_key: resource.config_key,
@@ -275,6 +281,8 @@ pub async fn inspect_by_key(
 
   let item = Resource {
     name: res.0.key,
+    created_at: res.0.created_at,
+    updated_at: res.1.created_at,
     kind: res.0.kind.into(),
     version: res.1.version,
     config_key: res.0.config_key,
@@ -322,6 +330,7 @@ pub async fn update_by_key(
 
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
+    created_at: chrono::Utc::now().naive_utc(),
     resource_key: key.to_owned(),
     version,
     data: item,
@@ -348,6 +357,8 @@ pub async fn update_by_key(
 
   let item = Resource {
     name: resource.name,
+    created_at: resource.created_at,
+    updated_at: config.created_at,
     kind: resource.kind,
     version: config.version,
     config_key: config.key,

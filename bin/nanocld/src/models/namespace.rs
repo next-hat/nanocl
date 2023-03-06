@@ -15,4 +15,5 @@ use crate::schema::namespaces;
 #[cfg_attr(feature = "dev", derive(ToSchema))]
 pub struct NamespaceDbModel {
   pub(crate) name: String,
+  pub(crate) created_at: chrono::NaiveDateTime,
 }

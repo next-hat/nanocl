@@ -107,6 +107,7 @@ pub async fn create(
   let new_item = CargoDbModel {
     key,
     name: item.name,
+    created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
     config_key: config.key,
   };
@@ -364,6 +365,7 @@ pub async fn inspect_by_key(
 
   let config = CargoConfig {
     key: item.1.key,
+    created_at: item.0.created_at,
     name: config.name,
     version: item.1.version,
     cargo_key: item.1.cargo_key,

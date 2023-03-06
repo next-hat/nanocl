@@ -10,6 +10,7 @@ use super::resource::ResourceDbModel;
 #[diesel(belongs_to(ResourceDbModel, foreign_key = resource_key))]
 pub struct ResourceConfigDbModel {
   pub(crate) key: uuid::Uuid,
+  pub(crate) created_at: chrono::NaiveDateTime,
   pub(crate) resource_key: String,
   pub(crate) version: String,
   pub(crate) data: serde_json::Value,

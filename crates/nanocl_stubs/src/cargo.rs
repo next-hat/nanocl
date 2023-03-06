@@ -39,6 +39,10 @@ pub struct Cargo {
 pub struct CargoSummary {
   /// Key of the cargo
   pub key: String,
+  /// Creation date of the cargo
+  pub created_at: chrono::NaiveDateTime,
+  /// Update date of the cargo
+  pub updated_at: chrono::NaiveDateTime,
   /// Name of the cargo
   pub name: String,
   /// Unique identifier of the cargo config

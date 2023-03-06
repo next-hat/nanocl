@@ -1415,6 +1415,7 @@ name = "nanocl_stubs"
 version = "0.0.11"
 dependencies = [
  "bollard-next",
+ "chrono",
  "serde",
  "serde_json",
  "uuid",
