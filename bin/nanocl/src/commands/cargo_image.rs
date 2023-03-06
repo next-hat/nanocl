@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use dialoguer::Confirm;
+use dialoguer::theme::ColorfulTheme;
 use tokio_util::codec;
 use futures::StreamExt;
 use ntex::http::StatusCode;
@@ -31,9 +33,25 @@ async fn exec_cargo_instance_list(
 
 async fn exec_remove_cargo_image(
   client: &NanocldClient,
-  args: &CargoImageRemoveOpts,
+  options: &CargoImageRemoveOpts,
 ) -> Result<(), CliError> {
-  client.delete_cargo_image(&args.name).await?;
+  if !options.skip_confirm {
+    let result = Confirm::with_theme(&ColorfulTheme::default())
+      .with_prompt(format!("Delete cargo images {}?", options.names.join(",")))
+      .default(false)
+      .interact();
+    match result {
+      Ok(true) => {}
+      _ => {
+        return Err(CliError::Custom {
+          msg: "Aborted".into(),
+        })
+      }
+    }
+  }
+  for name in &options.names {
+    client.delete_cargo_image(name).await?;
+  }
   Ok(())
 }
 

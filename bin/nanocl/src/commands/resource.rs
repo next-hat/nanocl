@@ -1,3 +1,5 @@
+use dialoguer::Confirm;
+use dialoguer::theme::ColorfulTheme;
 use nanocld_client::NanocldClient;
 
 use crate::utils::print::*;
@@ -6,37 +8,6 @@ use crate::models::{
   ResourceArgs, ResourceCommands, ResourceRow, ResourceRemoveOpts,
   ResourceInspectOpts, ResourceResetOpts, ResourceHistoryOpts,
 };
-
-// Since Resource are random json config
-// we can't really validate them using the cli
-// so we cannot create them using a create command
-// but we can create them using a apply command
-// which will apply a state file
-//
-// async fn exec_create
-//   client: &NanocldClient,
-//   opts: &ResourceCreateOpts,
-// ) -> Result<(), CliError> {
-//   let mut file_path = std::env::current_dir()?;
-//   file_path.push(&opts.file_path);
-//   let data = fs::read_to_string(file_path)?;
-
-//   let meta = utils::state::get_file_meta(&data)?;
-
-//   if meta.r#type != "Resource" {
-//     return Err(CliError::Custom {
-//       msg: format!("Invalid file type expected resource got: {}", &meta.r#type),
-//     });
-//   }
-
-//   let resources = utils::state::get_resources(&data)?;
-
-//   for resource in resources.resources {
-//     client.create_resource(&resource).await?;
-//   }
-
-//   Ok(())
-// }
 
 async fn exec_list(client: &NanocldClient) -> Result<(), CliError> {
   let resources = client.list_resource(None).await?;
@@ -52,9 +23,23 @@ async fn exec_list(client: &NanocldClient) -> Result<(), CliError> {
 
 async fn exec_remove(
   client: &NanocldClient,
-  opts: &ResourceRemoveOpts,
+  options: &ResourceRemoveOpts,
 ) -> Result<(), CliError> {
-  for name in &opts.names {
+  if !options.skip_confirm {
+    let result = Confirm::with_theme(&ColorfulTheme::default())
+      .with_prompt(format!("Delete resources {}?", options.names.join(",")))
+      .default(false)
+      .interact();
+    match result {
+      Ok(true) => {}
+      _ => {
+        return Err(CliError::Custom {
+          msg: "Aborted".into(),
+        })
+      }
+    }
+  }
+  for name in &options.names {
     client.delete_resource(name).await?;
   }
 

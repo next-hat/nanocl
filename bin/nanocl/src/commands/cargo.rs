@@ -1,3 +1,5 @@
+use dialoguer::Confirm;
+use dialoguer::theme::ColorfulTheme;
 use futures::StreamExt;
 use bollard_next::exec::CreateExecOptions;
 
@@ -7,7 +9,7 @@ use nanocld_client::stubs::cargo::CargoOutputKind;
 use crate::utils::print::*;
 use crate::error::CliError;
 use crate::models::{
-  CargoArgs, CargoCreateOpts, CargoCommands, CargoDeleteOpts, CargoRow,
+  CargoArgs, CargoCreateOpts, CargoCommands, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
   CargoExecOpts, CargoHistoryOpts, CargoResetOpts, CargoLogsOpts, CargoRunOpts,
 };
@@ -42,8 +44,22 @@ async fn exec_cargo_create(
 async fn exec_cargo_delete(
   client: &NanocldClient,
   args: &CargoArgs,
-  options: &CargoDeleteOpts,
+  options: &CargoRemoveOpts,
 ) -> Result<(), CliError> {
+  if !options.skip_confirm {
+    let result = Confirm::with_theme(&ColorfulTheme::default())
+      .with_prompt(format!("Delete cargoes {}?", options.names.join(",")))
+      .default(false)
+      .interact();
+    match result {
+      Ok(true) => {}
+      _ => {
+        return Err(CliError::Custom {
+          msg: "Aborted".into(),
+        })
+      }
+    }
+  }
   for name in &options.names {
     client.delete_cargo(name, args.namespace.to_owned()).await?;
   }

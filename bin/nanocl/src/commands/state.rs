@@ -2,6 +2,7 @@ use std::fs;
 
 use clap::{Command, Arg};
 use dialoguer::Confirm;
+use dialoguer::theme::ColorfulTheme;
 use futures::StreamExt;
 
 use bollard_next::service::HostConfig;
@@ -339,7 +340,7 @@ async fn exec_apply(
   let data = serde_json::to_value(&yaml)?;
   let _ = print_yml(&yaml);
   if !opts.skip_confirm {
-    let result = Confirm::new()
+    let result = Confirm::with_theme(&ColorfulTheme::default())
       .with_prompt("Are you sure to apply this new state ?")
       .default(false)
       .interact();
@@ -371,7 +372,7 @@ async fn exec_revert(
   let data = serde_json::to_value(&yaml)?;
   let _ = print_yml(&yaml);
   if !opts.skip_confirm {
-    let result = Confirm::new()
+    let result = Confirm::with_theme(&ColorfulTheme::default())
       .with_prompt("Are you sure to revert this state ?")
       .default(false)
       .interact();

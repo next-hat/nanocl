@@ -20,11 +20,11 @@ pub enum NamespaceCommands {
 
 #[derive(Debug, Parser)]
 pub struct NamespaceDeleteOpts {
-  /// name of the namespace to delete
-  pub name: String,
   /// skip confirmation
   #[clap(short = 'y')]
   pub skip_confirm: bool,
+  /// list of namespace names to delete
+  pub names: Vec<String>,
 }
 
 /// Manage namespaces

@@ -65,6 +65,9 @@ impl From<Resource> for ResourceRow {
 
 #[derive(Debug, Parser)]
 pub struct ResourceRemoveOpts {
+  /// Skip confirmation
+  #[clap(short = 'y')]
+  pub skip_confirm: bool,
   /// The names of the resources to delete
   pub names: Vec<String>,
 }

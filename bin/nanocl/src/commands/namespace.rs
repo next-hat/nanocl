@@ -1,4 +1,5 @@
 use dialoguer::Confirm;
+use dialoguer::theme::ColorfulTheme;
 use nanocld_client::NanocldClient;
 
 use crate::utils::print::*;
@@ -41,8 +42,8 @@ async fn exec_namespace_delete(
   options: &NamespaceDeleteOpts,
 ) -> Result<(), CliError> {
   if !options.skip_confirm {
-    let result = Confirm::new()
-      .with_prompt(format!("Delete namespace {}?", options.name))
+    let result = Confirm::with_theme(&ColorfulTheme::default())
+      .with_prompt(format!("Delete namespaces {}?", options.names.join(",")))
       .default(false)
       .interact();
     match result {
@@ -55,7 +56,10 @@ async fn exec_namespace_delete(
     }
   }
 
-  client.delete_namespace(&options.name).await?;
+  for name in &options.names {
+    client.delete_namespace(name).await?;
+  }
+
   Ok(())
 }
 

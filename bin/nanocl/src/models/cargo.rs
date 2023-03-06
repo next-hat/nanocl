@@ -14,7 +14,10 @@ use super::cargo_image::CargoImageOpts;
 
 /// Cargo delete options
 #[derive(Debug, Parser)]
-pub struct CargoDeleteOpts {
+pub struct CargoRemoveOpts {
+  /// Skip confirmation
+  #[clap(short = 'y')]
+  pub skip_confirm: bool,
   /// List of cargo names to delete
   pub names: Vec<String>,
 }
@@ -197,7 +200,7 @@ pub enum CargoCommands {
   Stop(CargoStopOpts),
   /// Remove cargo by its name
   #[clap(alias("rm"))]
-  Remove(CargoDeleteOpts),
+  Remove(CargoRemoveOpts),
   /// Inspect a cargo by its name
   Inspect(CargoInspectOpts),
   /// Update a cargo by its name
