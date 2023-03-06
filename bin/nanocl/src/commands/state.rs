@@ -1,9 +1,14 @@
 use std::fs;
 
+use futures::StreamExt;
+
 use bollard_next::service::HostConfig;
+
 use nanocld_client::NanocldClient;
+use nanocld_client::stubs::cargo::CargoOutputKind;
 use nanocld_client::stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
 use nanocld_client::stubs::state::{StateConfig, StateDeployment, StateCargo};
+use ntex::rt::{self, JoinHandle};
 
 use crate::utils;
 use crate::error::CliError;
@@ -116,7 +121,14 @@ async fn hook_cargoes(
 ) -> Result<Vec<CargoConfigPartial>, CliError> {
   let mut new_cargoes = Vec::new();
   for cargo in cargoes {
-    download_cargo_image(client, &cargo).await?;
+    if client
+      .inspect_cargo_image(&cargo.container.image.clone().unwrap_or_default())
+      .await
+      .is_err()
+    {
+      download_cargo_image(client, &cargo).await?;
+    }
+
     let new_cargo = hook_binds(&cargo)?;
     new_cargoes.push(new_cargo);
   }
@@ -132,6 +144,87 @@ fn inject_meta(
   yml
 }
 
+async fn attach_to_cargo(
+  client: &NanocldClient,
+  cargo: CargoConfigPartial,
+  namespace: &str,
+) -> Result<Vec<JoinHandle<()>>, CliError> {
+  let cargo = match client
+    .inspect_cargo(&cargo.name, Some(namespace.to_owned()))
+    .await
+  {
+    Err(err) => {
+      eprintln!(
+        "Error while inspecting cargo {cargo}: {err}",
+        cargo = cargo.name
+      );
+      return Ok(Vec::default());
+    }
+    Ok(cargo) => cargo,
+  };
+  let mut futures = Vec::new();
+  for (index, _) in cargo.containers.iter().enumerate() {
+    let namespace = namespace.to_owned();
+    let name = if index == 0 {
+      cargo.name.clone()
+    } else {
+      format!("{}-{}", cargo.name, index)
+    };
+    let client = client.clone();
+    let name = name.clone();
+    let fut = rt::spawn(async move {
+      match client.logs_cargo(&name, Some(namespace.to_owned())).await {
+        Err(err) => {
+          eprintln!(
+            "Cannot attach to cargo {cargo}: {err}",
+            cargo = name,
+            err = err
+          );
+        }
+        Ok(mut stream) => {
+          while let Some(output) = stream.next().await {
+            let output = match output {
+              Ok(output) => output,
+              Err(e) => {
+                eprintln!("Error: {e}");
+                break;
+              }
+            };
+            match output.kind {
+              CargoOutputKind::StdOut => {
+                print!("[{name}]: {}", &output.data);
+              }
+              CargoOutputKind::StdErr => {
+                eprint!("[{name}]: {}", &output.data);
+              }
+              CargoOutputKind::Console => {
+                print!("[{name}]: {}", &output.data);
+              }
+              _ => {}
+            }
+          }
+        }
+      }
+    });
+    futures.push(fut);
+  }
+  Ok(futures)
+}
+
+async fn attach_to_cargoes(
+  client: &NanocldClient,
+  cargoes: Vec<CargoConfigPartial>,
+  namespace: &str,
+) -> Result<(), CliError> {
+  let mut futures = Vec::new();
+  for cargo in cargoes {
+    let more_futures = attach_to_cargo(client, cargo, namespace).await?;
+    futures.extend(more_futures);
+  }
+  futures::future::join_all(futures).await;
+  Ok(())
+}
+
 async fn exec_apply(
   client: &NanocldClient,
   opts: &StateOpts,
@@ -140,17 +233,22 @@ async fn exec_apply(
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
   };
+  let mut namespace = String::from("default");
+  let mut cargoes = Vec::new();
   let yml = match meta.r#type.as_str() {
     "Cargo" => {
       let mut data = serde_yaml::from_value::<StateCargo>(yaml)?;
-      data.cargoes = hook_cargoes(client, data.cargoes).await?;
+      namespace = data.namespace.clone().unwrap_or(namespace);
+      cargoes = hook_cargoes(client, data.cargoes).await?;
+      data.cargoes = cargoes.clone();
       let yml = serde_yaml::to_value(data)?;
       inject_meta(meta, yml)
     }
     "Deployment" => {
       let mut data = serde_yaml::from_value::<StateDeployment>(yaml)?;
-      data.cargoes =
-        Some(hook_cargoes(client, data.cargoes.unwrap_or_default()).await?);
+      namespace = data.namespace.clone().unwrap_or(namespace);
+      cargoes = hook_cargoes(client, data.cargoes.unwrap_or_default()).await?;
+      data.cargoes = Some(cargoes.clone());
       let yml = serde_yaml::to_value(data)?;
       inject_meta(meta, yml)
     }
@@ -158,6 +256,9 @@ async fn exec_apply(
   };
   let data = serde_json::to_value(yml)?;
   client.apply_state(&data).await?;
+  if opts.attach {
+    attach_to_cargoes(client, cargoes, &namespace).await?;
+  }
   Ok(())
 }
 

@@ -5,6 +5,8 @@ pub struct StateOpts {
   /// Path or url to the state file
   #[clap(long, short = 'f')]
   pub file_path: String,
+  #[clap(long, short = 'a')]
+  pub attach: bool,
 }
 
 #[derive(Debug, Subcommand)]
