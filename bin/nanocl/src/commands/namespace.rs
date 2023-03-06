@@ -1,8 +1,12 @@
+use dialoguer::Confirm;
 use nanocld_client::NanocldClient;
 
 use crate::utils::print::*;
 use crate::error::CliError;
-use crate::models::{NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow};
+use crate::models::{
+  NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow,
+  NamespaceDeleteOpts,
+};
 
 async fn exec_namespace_list(client: &NanocldClient) -> Result<(), CliError> {
   let items = client.list_namespace().await?;
@@ -34,8 +38,23 @@ async fn exec_namespace_inspect(
 
 async fn exec_namespace_delete(
   client: &NanocldClient,
-  options: &NamespaceOpts,
+  options: &NamespaceDeleteOpts,
 ) -> Result<(), CliError> {
+  if !options.skip_confirm {
+    let result = Confirm::new()
+      .with_prompt(format!("Delete namespace {}?", options.name))
+      .default(false)
+      .interact();
+    match result {
+      Ok(true) => {}
+      _ => {
+        return Err(CliError::Custom {
+          msg: "Aborted".into(),
+        })
+      }
+    }
+  }
+
   client.delete_namespace(&options.name).await?;
   Ok(())
 }

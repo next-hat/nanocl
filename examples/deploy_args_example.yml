@@ -6,7 +6,6 @@ Namespace: global
 Args:
   - Name: domain
     Type: String
-    Default: deploy-args-example.com
 
 Resources:
   - Name: "{{Args.domain}}"

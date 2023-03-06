@@ -3,14 +3,21 @@ ApiVersion: v0.2
 
 Namespace: global
 
+Args:
+  - Name: domain
+    Type: String
+  - Name: email
+    Type: String
+
 Cargoes:
   - Name: cargo-autoremove
     # See all options:
     # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
     Container:
-      Image: busybox:latest
+      Image: busybox:uclibc
       Cmd:
-        - sleep
-        - "20"
+        - sh
+        - -c
+        - echo "email {{Args.email}}" && echo "domain {{Args.domain}}" && sleep 20
       HostConfig:
         AutoRemove: true

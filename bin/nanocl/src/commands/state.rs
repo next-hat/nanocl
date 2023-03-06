@@ -338,7 +338,7 @@ async fn exec_apply(
   };
   let data = serde_json::to_value(&yaml)?;
   let _ = print_yml(&yaml);
-  if !opts.skip_confim {
+  if !opts.skip_confirm {
     let result = Confirm::new()
       .with_prompt("Are you sure to apply this new state ?")
       .default(false)
@@ -370,7 +370,7 @@ async fn exec_revert(
   let yaml = inject_build_args(yaml.clone(), opts.args.clone())?;
   let data = serde_json::to_value(&yaml)?;
   let _ = print_yml(&yaml);
-  if !opts.skip_confim {
+  if !opts.skip_confirm {
     let result = Confirm::new()
       .with_prompt("Are you sure to revert this state ?")
       .default(false)

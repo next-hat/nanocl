@@ -25,7 +25,7 @@ pub struct StateOpts {
   pub attach: bool,
   /// Skip the confirmation prompt
   #[clap(short = 'y')]
-  pub skip_confim: bool,
+  pub skip_confirm: bool,
   /// Additional arguments to pass to the file
   #[clap(last = true)]
   pub args: Vec<String>,

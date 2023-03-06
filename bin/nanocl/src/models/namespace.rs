@@ -12,10 +12,19 @@ pub enum NamespaceCommands {
   Inspect(NamespaceOpts),
   /// Remove a namespace
   #[clap(alias("rm"))]
-  Remove(NamespaceOpts),
+  Remove(NamespaceDeleteOpts),
   /// List existing namespaces
   #[clap(alias("ls"))]
   List,
+}
+
+#[derive(Debug, Parser)]
+pub struct NamespaceDeleteOpts {
+  /// name of the namespace to delete
+  pub name: String,
+  /// skip confirmation
+  #[clap(short = 'y')]
+  pub skip_confirm: bool,
 }
 
 /// Manage namespaces
