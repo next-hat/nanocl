@@ -20,7 +20,7 @@ async-std = ["ntex/async-std"]
 
 [dev-dependencies]
 tokio-util = "0.7.7"
-tokio = { version = "1.25.0", features = ["fs"] }
+tokio = { version = "1.26.0", features = ["fs"] }
 
 [dependencies]
 bollard-next = { version = "0.14.1" }
