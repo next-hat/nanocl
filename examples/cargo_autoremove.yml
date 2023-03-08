@@ -3,12 +3,6 @@ ApiVersion: v0.2
 
 Namespace: global
 
-Args:
-  - Name: domain
-    Type: String
-  - Name: email
-    Type: String
-
 Cargoes:
   - Name: cargo-autoremove
     # See all options:
@@ -16,8 +10,7 @@ Cargoes:
     Container:
       Image: busybox:uclibc
       Cmd:
-        - sh
-        - -c
-        - echo "email {{Args.email}}" && echo "domain {{Args.domain}}" && sleep 20
+        - sleep
+        - "20"
       HostConfig:
         AutoRemove: true
