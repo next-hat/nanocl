@@ -28,7 +28,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
 async fn main() -> std::io::Result<()> {
   let args = Cli::parse();
   if let Err(err) = execute_args(&args).await {
-    err.exit(&args);
+    err.exit();
   }
   Ok(())
 }

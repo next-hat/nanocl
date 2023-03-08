@@ -3,10 +3,8 @@ use serde::{Serialize, Deserialize};
 use ntex::http::{
   StatusCode,
   error::PayloadError,
-  client::{
-    ClientResponse,
-    error::{SendRequestError, JsonPayloadError},
-  },
+  client::ClientResponse,
+  client::error::{SendRequestError as NtexSendRequestError, JsonPayloadError},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,13 +25,32 @@ impl std::fmt::Display for ApiError {
 }
 
 #[derive(Debug, Error)]
+pub struct SendRequestError {
+  pub msg: String,
+}
+
+impl From<NtexSendRequestError> for NanocldClientError {
+  fn from(err: NtexSendRequestError) -> Self {
+    NanocldClientError::SendRequestError(SendRequestError {
+      msg: err.to_string(),
+    })
+  }
+}
+
+impl std::fmt::Display for SendRequestError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", &self.msg)
+  }
+}
+
+#[derive(Debug, Error)]
 pub enum NanocldClientError {
   #[error(transparent)]
   Api(#[from] ApiError),
   #[error(transparent)]
   Payload(#[from] PayloadError),
   #[error(transparent)]
-  SendRequest(#[from] SendRequestError),
+  SendRequestError(#[from] SendRequestError),
   #[error(transparent)]
   JsonPayload(#[from] JsonPayloadError),
   #[error(transparent)]

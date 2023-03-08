@@ -1,12 +1,11 @@
-use ntex::rt;
 use ntex::channel::mpsc;
-use ntex::util::BytesMut;
-use futures::TryStreamExt;
 
 use nanocl_stubs::system::{Event, Version, HostInfo};
 
+use crate::error::ApiError;
+
+use super::error::NanocldClientError;
 use super::http_client::NanocldClient;
-use super::error::{NanocldClientError, is_api_error};
 
 impl NanocldClient {
   /// ## Get the version of the daemon
@@ -27,13 +26,9 @@ impl NanocldClient {
   /// ```
   ///
   pub async fn get_version(&self) -> Result<Version, NanocldClientError> {
-    let mut res = self.get(String::from("/version")).send().await?;
-    let status = res.status();
+    let res = self.send_get("/version".into(), None::<String>).await?;
 
-    is_api_error(&mut res, &status).await?;
-    let v = res.json::<Version>().await?;
-
-    Ok(v)
+    Self::res_json(res).await
   }
 
   /// ## Watch events
@@ -61,31 +56,12 @@ impl NanocldClient {
   ///
   pub async fn watch_events(
     &self,
-  ) -> Result<mpsc::Receiver<Event>, NanocldClientError> {
-    let mut res = self
-      .get(format!("/{}/events", &self.version))
-      .send()
+  ) -> Result<mpsc::Receiver<Result<Event, ApiError>>, NanocldClientError> {
+    let res = self
+      .send_get(format!("/{}/events", &self.version), None::<String>)
       .await?;
-    let status = res.status();
-    let (sx, rx) = mpsc::channel::<Event>();
-    is_api_error(&mut res, &status).await?;
-    rt::spawn(async move {
-      let mut buffer = BytesMut::new();
-      let mut stream = res.into_stream();
-      while let Some(item) = stream.try_next().await.unwrap() {
-        buffer.extend_from_slice(&item);
-        if item.last() == Some(&b'\n') {
-          let event = serde_json::from_slice::<Event>(&buffer).unwrap();
-          if sx.send(event).is_err() {
-            break;
-          }
-          buffer.clear();
-        }
-      }
-      sx.close();
-    });
 
-    Ok(rx)
+    Ok(Self::res_stream(res).await)
   }
 
   /// ## Ping the daemon
@@ -108,10 +84,8 @@ impl NanocldClient {
   /// ```
   ///
   pub async fn ping(&self) -> Result<(), NanocldClientError> {
-    let mut res = self.get(String::from("/_ping")).send().await?;
-    let status = res.status();
+    self.send_get("/_ping".into(), None::<String>).await?;
 
-    is_api_error(&mut res, &status).await?;
     Ok(())
   }
 
@@ -135,13 +109,11 @@ impl NanocldClient {
   /// ```
   ///
   pub async fn info(&self) -> Result<HostInfo, NanocldClientError> {
-    let mut res = self.get(format!("/{}/info", &self.version)).send().await?;
-    let status = res.status();
+    let res = self
+      .send_get(format!("/{}/info", &self.version), None::<String>)
+      .await?;
 
-    is_api_error(&mut res, &status).await?;
-    let info = res.json::<HostInfo>().await?;
-
-    Ok(info)
+    Self::res_json(res).await
   }
 }
 

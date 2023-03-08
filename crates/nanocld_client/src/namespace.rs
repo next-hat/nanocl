@@ -2,7 +2,7 @@ use nanocl_stubs::namespace::{Namespace, NamespaceSummary, NamespaceInspect};
 
 use super::http_client::NanocldClient;
 
-use super::error::{NanocldClientError, is_api_error};
+use super::error::NanocldClientError;
 
 impl NanocldClient {
   /// ## List all namespaces
@@ -25,15 +25,11 @@ impl NanocldClient {
   pub async fn list_namespace(
     &self,
   ) -> Result<Vec<NamespaceSummary>, NanocldClientError> {
-    let mut res = self
-      .get(format!("/{}/namespaces", &self.version))
-      .send()
+    let res = self
+      .send_get(format!("/{}/namespaces", &self.version), None::<String>)
       .await?;
 
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let items = res.json::<Vec<NamespaceSummary>>().await?;
-    Ok(items)
+    Self::res_json(res).await
   }
 
   /// ## Create a new namespace
@@ -53,15 +49,15 @@ impl NanocldClient {
     name: &str,
   ) -> Result<Namespace, NanocldClientError> {
     let new_item = Namespace { name: name.into() };
-    let mut res = self
-      .post(format!("/{}/namespaces", &self.version))
-      .send_json(&new_item)
+    let res = self
+      .send_post(
+        format!("/{}/namespaces", &self.version),
+        Some(new_item),
+        None::<String>,
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let item = res.json::<Namespace>().await?;
 
-    Ok(item)
+    Self::res_json(res).await
   }
 
   /// ## Inspect a namespace
@@ -91,16 +87,14 @@ impl NanocldClient {
     &self,
     name: &str,
   ) -> Result<NamespaceInspect, NanocldClientError> {
-    let mut res = self
-      .get(format!("/{}/namespaces/{name}/inspect", &self.version))
-      .send()
+    let res = self
+      .send_get(
+        format!("/{}/namespaces/{name}/inspect", &self.version),
+        None::<String>,
+      )
       .await?;
 
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let item = res.json::<NamespaceInspect>().await?;
-
-    Ok(item)
+    Self::res_json(res).await
   }
 
   /// ## Delete a namespace
@@ -130,13 +124,13 @@ impl NanocldClient {
     &self,
     name: &str,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self
-      .delete(format!("/{}/namespaces/{name}", &self.version))
-      .send()
+    self
+      .send_delete(
+        format!("/{}/namespaces/{name}", &self.version),
+        None::<String>,
+      )
       .await?;
 
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
     Ok(())
   }
 }
