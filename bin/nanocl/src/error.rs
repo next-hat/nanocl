@@ -1,8 +1,6 @@
 use thiserror::Error;
 
-use nanocld_client::error::{NanocldClientError, ApiError};
-
-use crate::models::Cli;
+use nanocld_client::error::{ApiError, NanocldClientError};
 
 #[derive(Debug, Error)]
 pub enum CliError {
@@ -23,21 +21,10 @@ pub enum CliError {
 }
 
 impl CliError {
-  pub fn exit(&self, args: &Cli) {
+  pub fn exit(&self) {
     match self {
       CliError::Client(err) => match err {
-        nanocld_client::error::NanocldClientError::SendRequest(err) => {
-          match err {
-            ntex::http::client::error::SendRequestError::Connect(_) => {
-              eprintln!(
-                "Cannot connect to the nanocl daemon at {host}. Is the nanocl daemon running?",
-                host = args.host
-              )
-            }
-            _ => eprintln!("{err}"),
-          }
-        }
-        nanocld_client::error::NanocldClientError::Api(err) => {
+        NanocldClientError::Api(err) => {
           eprintln!("Daemon [{}]: {}", err.status, err.msg);
         }
         _ => eprintln!("{err}"),

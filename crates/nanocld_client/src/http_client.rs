@@ -1,10 +1,14 @@
+use std::error::Error;
+
+use ntex::http::client::error::SendRequestError as NtexSendRequestError;
 use ntex::rt;
+use ntex::util::{Bytes, Stream};
 use ntex::channel::mpsc::Receiver;
 use ntex::http::{Client, StatusCode};
 use ntex::http::client::{Connector, ClientRequest, ClientResponse};
 use futures::{StreamExt, TryStreamExt};
 
-use crate::error::ApiError;
+use crate::error::{ApiError, NanocldClientError, is_api_error, SendRequestError};
 
 const NANOCLD_DEFAULT_VERSION: &str = "0.2";
 
@@ -13,6 +17,7 @@ pub struct NanocldClient {
   pub client: Client,
   pub url: String,
   pub version: String,
+  pub unix_socket: Option<String>,
 }
 
 impl NanocldClient {
@@ -31,6 +36,7 @@ impl NanocldClient {
 
     NanocldClient {
       client,
+      unix_socket: Some(String::from("/run/nanocl/nanocl.sock")),
       version: format!("v{NANOCLD_DEFAULT_VERSION}"),
       url: String::from("http://localhost"),
     }
@@ -43,8 +49,22 @@ impl NanocldClient {
 
     NanocldClient {
       client,
+      unix_socket: None,
       url: url.to_owned(),
       version: version.to_owned(),
+    }
+  }
+
+  fn send_error(&self, err: NtexSendRequestError) -> SendRequestError {
+    SendRequestError {
+      msg: format!(
+        "Cannot send request to {}: {err}",
+        if let Some(url) = &self.unix_socket {
+          url
+        } else {
+          &self.url
+        }
+      ),
     }
   }
 
@@ -63,6 +83,7 @@ impl NanocldClient {
 
     NanocldClient {
       client,
+      unix_socket: Some(String::from("/run/nanocl/nanocl.sock")),
       version: version.to_owned(),
       url: String::from("http://localhost"),
     }
@@ -72,32 +93,189 @@ impl NanocldClient {
     self.url.to_owned() + &url
   }
 
-  pub(crate) fn get(&self, url: String) -> ClientRequest {
+  fn get(&self, url: String) -> ClientRequest {
     self.client.get(self.gen_url(url))
   }
 
-  pub(crate) fn delete(&self, url: String) -> ClientRequest {
+  fn delete(&self, url: String) -> ClientRequest {
     self.client.delete(self.gen_url(url))
   }
 
-  pub(crate) fn post(&self, url: String) -> ClientRequest {
+  fn post(&self, url: String) -> ClientRequest {
     self.client.post(self.gen_url(url))
   }
 
-  pub(crate) fn patch(&self, url: String) -> ClientRequest {
+  fn patch(&self, url: String) -> ClientRequest {
     self.client.patch(self.gen_url(url))
   }
 
-  pub(crate) fn put(&self, url: String) -> ClientRequest {
+  fn put(&self, url: String) -> ClientRequest {
     self.client.put(self.gen_url(url))
   }
 
-  pub(crate) async fn stream<T>(
+  pub(crate) async fn send_get<Q>(
     &self,
-    res: ClientResponse,
-  ) -> Receiver<Result<T, ApiError>>
+    url: String,
+    query: Option<Q>,
+  ) -> Result<ClientResponse, NanocldClientError>
   where
-    T: serde::de::DeserializeOwned + Send + 'static,
+    Q: serde::Serialize,
+  {
+    let mut req = self.get(url);
+    if let Some(query) = query {
+      req = req.query(&query)?;
+    }
+    let mut res = req.send().await.map_err(|err| self.send_error(err))?;
+
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+    Ok(res)
+  }
+
+  pub(crate) async fn send_post<Q, B>(
+    &self,
+    url: String,
+    body: Option<B>,
+    query: Option<Q>,
+  ) -> Result<ClientResponse, NanocldClientError>
+  where
+    B: serde::Serialize,
+    Q: serde::Serialize,
+  {
+    let mut req = self.post(url);
+    if let Some(query) = query {
+      req = req.query(&query)?;
+    }
+    let mut res = match body {
+      None => req.send().await.map_err(|err| self.send_error(err))?,
+      Some(body) => req
+        .send_json(&body)
+        .await
+        .map_err(|err| self.send_error(err))?,
+    };
+
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+    Ok(res)
+  }
+
+  pub(crate) async fn send_post_stream<S, Q, E>(
+    &self,
+    url: String,
+    stream: S,
+    query: Option<Q>,
+  ) -> Result<ClientResponse, NanocldClientError>
+  where
+    S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
+    Q: serde::Serialize,
+    E: Error + 'static,
+  {
+    let mut req = self.post(url);
+    if let Some(query) = query {
+      req = req.query(&query)?;
+    }
+    let mut res = req
+      .send_stream(stream)
+      .await
+      .map_err(|err| self.send_error(err))?;
+
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+
+    Ok(res)
+  }
+
+  pub(crate) async fn send_delete<Q>(
+    &self,
+    url: String,
+    query: Option<Q>,
+  ) -> Result<ClientResponse, NanocldClientError>
+  where
+    Q: serde::Serialize,
+  {
+    let mut req = self.delete(url);
+    if let Some(query) = query {
+      req = req.query(&query)?;
+    }
+    let mut res = req.send().await.map_err(|err| self.send_error(err))?;
+
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+
+    Ok(res)
+  }
+
+  pub(crate) async fn send_patch<B, Q>(
+    &self,
+    url: String,
+    body: Option<B>,
+    query: Option<Q>,
+  ) -> Result<ClientResponse, NanocldClientError>
+  where
+    B: serde::Serialize,
+    Q: serde::Serialize,
+  {
+    let mut req = self.patch(url);
+    if let Some(query) = query {
+      req = req.query(&query)?;
+    }
+    let mut res = match body {
+      None => req.send().await.map_err(|err| self.send_error(err))?,
+      Some(body) => req
+        .send_json(&body)
+        .await
+        .map_err(|err| self.send_error(err))?,
+    };
+
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+
+    Ok(res)
+  }
+
+  pub(crate) async fn send_put<B, Q>(
+    &self,
+    url: String,
+    body: Option<B>,
+    query: Option<Q>,
+  ) -> Result<ClientResponse, NanocldClientError>
+  where
+    B: serde::Serialize,
+    Q: serde::Serialize,
+  {
+    let mut req = self.put(url);
+    if let Some(query) = query {
+      req = req.query(&query)?;
+    }
+    let mut res = match body {
+      None => req.send().await.map_err(|err| self.send_error(err))?,
+      Some(body) => req
+        .send_json(&body)
+        .await
+        .map_err(|err| self.send_error(err))?,
+    };
+
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+
+    Ok(res)
+  }
+
+  pub(crate) async fn res_json<R>(
+    mut res: ClientResponse,
+  ) -> Result<R, NanocldClientError>
+  where
+    R: serde::de::DeserializeOwned + Send + 'static,
+  {
+    let body = res.json::<R>().limit(20_000_000).await?;
+    Ok(body)
+  }
+
+  pub(crate) async fn res_stream<R>(
+    res: ClientResponse,
+  ) -> Receiver<Result<R, ApiError>>
+  where
+    R: serde::de::DeserializeOwned + Send + 'static,
   {
     let mut stream = res.into_stream();
     let (tx, rx) = ntex::channel::mpsc::channel();
@@ -118,7 +296,7 @@ impl NanocldClient {
         if bytes.last() != Some(&b'\n') {
           continue;
         }
-        let t = match serde_json::from_slice::<T>(&payload) {
+        let t = match serde_json::from_slice::<R>(&payload) {
           Ok(t) => t,
           Err(e) => {
             let _ = tx.send(Err(ApiError {

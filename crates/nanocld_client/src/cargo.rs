@@ -12,7 +12,7 @@ use nanocl_stubs::cargo_config::{
 use crate::error::ApiError;
 
 use super::http_client::NanocldClient;
-use super::error::{NanocldClientError, is_api_error};
+use super::error::NanocldClientError;
 
 impl NanocldClient {
   /// ## Create a new cargo
@@ -47,16 +47,14 @@ impl NanocldClient {
     item: &CargoConfigPartial,
     namespace: Option<String>,
   ) -> Result<Cargo, NanocldClientError> {
-    let mut res = self
-      .post(format!("/{}/cargoes", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send_json(item)
+    let res = self
+      .send_post(
+        format!("/{}/cargoes", &self.version),
+        Some(item),
+        Some(&GenericNspQuery { namespace }),
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let item = res.json::<Cargo>().await?;
-
-    Ok(item)
+    Self::res_json(res).await
   }
 
   /// ## Delete a cargo
@@ -84,13 +82,12 @@ impl NanocldClient {
     name: &str,
     namespace: Option<String>,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self
-      .delete(format!("/{}/cargoes/{name}", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send()
+    self
+      .send_delete(
+        format!("/{}/cargoes/{name}", &self.version),
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
 
     Ok(())
   }
@@ -120,16 +117,14 @@ impl NanocldClient {
     name: &str,
     namespace: Option<String>,
   ) -> Result<CargoInspect, NanocldClientError> {
-    let mut res = self
-      .get(format!("/{}/cargoes/{name}/inspect", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send()
+    let res = self
+      .send_get(
+        format!("/{}/cargoes/{name}/inspect", &self.version),
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let item = res.json::<CargoInspect>().await?;
 
-    Ok(item)
+    Self::res_json(res).await
   }
 
   /// ## Start a cargo
@@ -157,13 +152,13 @@ impl NanocldClient {
     name: &str,
     namespace: Option<String>,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self
-      .post(format!("/{}/cargoes/{name}/start", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send()
+    self
+      .send_post(
+        format!("/{}/cargoes/{name}/start", &self.version),
+        None::<String>,
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
 
     Ok(())
   }
@@ -193,13 +188,13 @@ impl NanocldClient {
     name: &str,
     namespace: Option<String>,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self
-      .post(format!("/{}/cargoes/{name}/stop", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send()
+    self
+      .send_post(
+        format!("/{}/cargoes/{name}/stop", &self.version),
+        None::<String>,
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
 
     Ok(())
   }
@@ -227,16 +222,14 @@ impl NanocldClient {
     &self,
     namespace: Option<String>,
   ) -> Result<Vec<CargoSummary>, NanocldClientError> {
-    let mut res = self
-      .get(format!("/{}/cargoes", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send()
+    let res = self
+      .send_get(
+        format!("/{}/cargoes", &self.version),
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let items = res.json::<Vec<CargoSummary>>().await?;
 
-    Ok(items)
+    Self::res_json(res).await
   }
 
   /// ## Patch a cargo
@@ -270,13 +263,13 @@ impl NanocldClient {
     config: CargoConfigUpdate,
     namespace: Option<String>,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self
-      .patch(format!("/{}/cargoes/{name}", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send_json(&config)
+    self
+      .send_patch(
+        format!("/{}/cargoes/{name}", &self.version),
+        Some(config),
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
 
     Ok(())
   }
@@ -312,14 +305,13 @@ impl NanocldClient {
     config: CargoConfigUpdate,
     namespace: Option<String>,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self
-      .put(format!("/{}/cargoes/{name}", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send_json(&config)
+    self
+      .send_put(
+        format!("/{}/cargoes/{name}", &self.version),
+        Some(config),
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-
     Ok(())
   }
 
@@ -362,17 +354,15 @@ impl NanocldClient {
     namespace: Option<String>,
   ) -> Result<mpsc::Receiver<Result<CargoOutput, ApiError>>, NanocldClientError>
   {
-    let mut res = self
-      .post(format!("/{}/cargoes/{name}/exec", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send_json(&exec)
+    let res = self
+      .send_post(
+        format!("/{}/cargoes/{name}/exec", &self.version),
+        Some(exec),
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
 
-    let rx = self.stream(res).await;
-
-    Ok(rx)
+    Ok(Self::res_stream(res).await)
   }
 
   /// ## List all the cargo histories
@@ -402,14 +392,14 @@ impl NanocldClient {
     name: &str,
     namespace: Option<String>,
   ) -> Result<Vec<CargoConfig>, NanocldClientError> {
-    let histories = self
-      .get(format!("/{}/cargoes/{name}/histories", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send()
-      .await?
-      .json::<Vec<CargoConfig>>()
+    let res = self
+      .send_get(
+        format!("/{}/cargoes/{name}/histories", &self.version),
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
-    Ok(histories)
+
+    Self::res_json(res).await
   }
 
   /// ## Reset a cargo to a specific history
@@ -441,18 +431,15 @@ impl NanocldClient {
     id: &str,
     namespace: Option<String>,
   ) -> Result<Cargo, NanocldClientError> {
-    let mut res = self
-      .patch(format!(
-        "/{}/cargoes/{name}/histories/{id}/reset",
-        &self.version
-      ))
-      .query(&GenericNspQuery { namespace })?
-      .send()
+    let res = self
+      .send_patch(
+        format!("/{}/cargoes/{name}/histories/{id}/reset", &self.version),
+        None::<String>,
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let cargo = res.json::<Cargo>().await?;
-    Ok(cargo)
+
+    Self::res_json(res).await
   }
 
   /// ## Get the logs of a cargo
@@ -468,17 +455,14 @@ impl NanocldClient {
     name: &str,
     namespace: Option<String>,
   ) -> Result<Receiver<Result<CargoOutput, ApiError>>, NanocldClientError> {
-    let mut res = self
-      .get(format!("/{}/cargoes/{name}/logs", &self.version))
-      .query(&GenericNspQuery { namespace })?
-      .send()
+    let res = self
+      .send_get(
+        format!("/{}/cargoes/{name}/logs", &self.version),
+        Some(GenericNspQuery { namespace }),
+      )
       .await?;
 
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let rx = self.stream(res).await;
-
-    Ok(rx)
+    Ok(Self::res_stream(res).await)
   }
 }
 

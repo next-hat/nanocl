@@ -11,7 +11,7 @@ use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
 use crate::error::ApiError;
 
 use super::http_client::NanocldClient;
-use super::error::{NanocldClientError, is_api_error};
+use super::error::NanocldClientError;
 
 impl NanocldClient {
   /// ## List all cargo images
@@ -35,21 +35,10 @@ impl NanocldClient {
     &self,
     opts: Option<ListCargoImagesOptions>,
   ) -> Result<Vec<bollard_next::models::ImageSummary>, NanocldClientError> {
-    let mut req = self.get(format!("/{}/cargoes/images", &self.version));
-    if let Some(opts) = opts {
-      req = req.query(&opts)?;
-    }
-    let mut res = req.send().await?;
-
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-
-    let body = res
-      .json::<Vec<bollard_next::models::ImageSummary>>()
-      .limit(20_000_000)
+    let res = self
+      .send_get(format!("/{}/cargoes/images", &self.version), opts)
       .await?;
-
-    Ok(body)
+    Self::res_json(res).await
   }
 
   /// ## Create a cargo image
@@ -87,18 +76,16 @@ impl NanocldClient {
     mpsc::Receiver<Result<bollard_next::models::CreateImageInfo, ApiError>>,
     NanocldClientError,
   > {
-    let mut res = self
-      .post(format!("/{}/cargoes/images", self.version))
-      .send_json(&CargoImagePartial {
-        name: name.to_owned(),
-      })
+    let res = self
+      .send_post(
+        format!("/{}/cargoes/images", self.version),
+        Some(CargoImagePartial {
+          name: name.to_owned(),
+        }),
+        None::<String>,
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-
-    let rx = self.stream(res).await;
-
-    Ok(rx)
+    Ok(Self::res_stream(res).await)
   }
 
   /// ## Delete a cargo image
@@ -128,13 +115,12 @@ impl NanocldClient {
     &self,
     name: &str,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self
-      .delete(format!("/{}/cargoes/images/{name}", self.version))
-      .send()
+    self
+      .send_delete(
+        format!("/{}/cargoes/images/{name}", self.version),
+        None::<String>,
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-
     Ok(())
   }
 
@@ -165,17 +151,13 @@ impl NanocldClient {
     &self,
     name: &str,
   ) -> Result<bollard_next::models::ImageInspect, NanocldClientError> {
-    let mut res = self
-      .get(format!("/{}/cargoes/images/{name}", self.version))
-      .send()
+    let res = self
+      .send_get(
+        format!("/{}/cargoes/images/{name}", self.version),
+        None::<String>,
+      )
       .await?;
-
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-
-    let ct_image = res.json::<bollard_next::models::ImageInspect>().await?;
-
-    Ok(ct_image)
+    Self::res_json(res).await
   }
 
   pub async fn import_from_tarball<S, E>(
@@ -186,12 +168,13 @@ impl NanocldClient {
     S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
     E: Error + 'static,
   {
-    let mut res = self
-      .post(format!("/{}/cargoes/images/import", self.version))
-      .send_stream(stream)
+    let res = self
+      .send_post_stream(
+        format!("/{}/cargoes/images/import", self.version),
+        stream,
+        None::<String>,
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
     let stream = res.into_stream();
     Ok(stream)
   }

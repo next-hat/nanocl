@@ -3,7 +3,7 @@ use nanocl_stubs::resource::{
 };
 
 use super::http_client::NanocldClient;
-use super::error::{NanocldClientError, is_api_error};
+use super::error::NanocldClientError;
 
 impl NanocldClient {
   /// ## List resources
@@ -29,15 +29,11 @@ impl NanocldClient {
     &self,
     query: Option<ResourceQuery>,
   ) -> Result<Vec<Resource>, NanocldClientError> {
-    let mut req = self.get(format!("/{}/resources", &self.version));
-    if let Some(query) = query {
-      req = req.query(&query)?;
-    }
-    let mut res = req.send().await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let resources = res.json::<Vec<Resource>>().await?;
-    Ok(resources)
+    let res = self
+      .send_get(format!("/{}/resources", &self.version), query)
+      .await?;
+
+    Self::res_json(res).await
   }
 
   /// ## Create resource
@@ -73,14 +69,15 @@ impl NanocldClient {
     &self,
     data: &ResourcePartial,
   ) -> Result<Resource, NanocldClientError> {
-    let mut res = self
-      .post(format!("/{}/resources", &self.version))
-      .send_json(data)
+    let res = self
+      .send_post(
+        format!("/{}/resources", &self.version),
+        Some(data),
+        None::<String>,
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let resource = res.json::<Resource>().await?;
-    Ok(resource)
+
+    Self::res_json(res).await
   }
 
   /// ## Inspect resource
@@ -110,14 +107,14 @@ impl NanocldClient {
     &self,
     key: &str,
   ) -> Result<Resource, NanocldClientError> {
-    let mut res = self
-      .get(format!("/{}/resources/{key}", &self.version))
-      .send()
+    let res = self
+      .send_get(
+        format!("/{}/resources/{key}", &self.version),
+        None::<String>,
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let resource = res.json::<Resource>().await?;
-    Ok(resource)
+
+    Self::res_json(res).await
   }
 
   /// ## Patch resource
@@ -149,14 +146,15 @@ impl NanocldClient {
     key: &str,
     config: &serde_json::Value,
   ) -> Result<Resource, NanocldClientError> {
-    let mut res = self
-      .patch(format!("/{}/resources/{key}", &self.version))
-      .send_json(config)
+    let res = self
+      .send_patch(
+        format!("/{}/resources/{key}", &self.version),
+        Some(config),
+        None::<String>,
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let resource = res.json::<Resource>().await?;
-    Ok(resource)
+
+    Self::res_json(res).await
   }
 
   /// ## Delete resource
@@ -186,12 +184,13 @@ impl NanocldClient {
     &self,
     key: &str,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self
-      .delete(format!("/{}/resources/{key}", &self.version))
-      .send()
+    self
+      .send_delete(
+        format!("/{}/resources/{key}", &self.version),
+        None::<String>,
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
+
     Ok(())
   }
 
@@ -199,14 +198,14 @@ impl NanocldClient {
     &self,
     key: &str,
   ) -> Result<Vec<ResourceConfig>, NanocldClientError> {
-    let mut res = self
-      .get(format!("/{}/resources/{key}/histories", &self.version))
-      .send()
+    let res = self
+      .send_get(
+        format!("/{}/resources/{key}/histories", &self.version),
+        None::<String>,
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let history = res.json::<Vec<ResourceConfig>>().await?;
-    Ok(history)
+
+    Self::res_json(res).await
   }
 
   pub async fn reset_resource(
@@ -214,17 +213,15 @@ impl NanocldClient {
     name: &str,
     key: &str,
   ) -> Result<Resource, NanocldClientError> {
-    let mut res = self
-      .patch(format!(
-        "/{}/resources/{name}/histories/{key}/reset",
-        &self.version
-      ))
-      .send()
+    let res = self
+      .send_patch(
+        format!("/{}/resources/{name}/histories/{key}/reset", &self.version),
+        None::<String>,
+        None::<String>,
+      )
       .await?;
-    let status = res.status();
-    is_api_error(&mut res, &status).await?;
-    let resource = res.json::<Resource>().await?;
-    Ok(resource)
+
+    Self::res_json(res).await
   }
 }
 

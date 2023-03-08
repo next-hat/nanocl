@@ -1,20 +1,20 @@
 use crate::http_client::NanocldClient;
 
-use crate::error::{NanocldClientError, is_api_error};
+use crate::error::NanocldClientError;
 
 impl NanocldClient {
   pub async fn apply_state(
     &self,
     data: &serde_json::Value,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self
-      .put(format!("/{}/state/apply", &self.version))
-      .send_json(data)
+    self
+      .send_put(
+        format!("/{}/state/apply", &self.version),
+        Some(data),
+        None::<String>,
+      )
       .await?;
 
-    let status = res.status();
-
-    is_api_error(&mut res, &status).await?;
     Ok(())
   }
 
@@ -22,14 +22,14 @@ impl NanocldClient {
     &self,
     data: &serde_json::Value,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self
-      .put(format!("/{}/state/revert", &self.version))
-      .send_json(data)
+    self
+      .send_put(
+        format!("/{}/state/revert", &self.version),
+        Some(data),
+        None::<String>,
+      )
       .await?;
 
-    let status = res.status();
-
-    is_api_error(&mut res, &status).await?;
     Ok(())
   }
 }

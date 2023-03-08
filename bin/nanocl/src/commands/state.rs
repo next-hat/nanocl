@@ -1,6 +1,5 @@
 use std::fs;
 
-use ntex::http::StatusCode;
 use clap::{Command, Arg};
 use dialoguer::Confirm;
 use dialoguer::theme::ColorfulTheme;
@@ -9,7 +8,6 @@ use futures::StreamExt;
 use bollard_next::service::HostConfig;
 
 use nanocld_client::NanocldClient;
-use nanocld_client::error::{NanocldClientError, ApiError};
 use nanocld_client::stubs::cargo::CargoOutputKind;
 use nanocld_client::stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
 use nanocld_client::stubs::state::{StateConfig, StateDeployment, StateCargo};
@@ -61,23 +59,15 @@ async fn get_from_file(
 async fn download_cargo_image(
   client: &NanocldClient,
   cargo: &CargoConfigPartial,
-) -> Result<(), NanocldClientError> {
+) -> Result<(), CliError> {
   match &cargo.container.image {
     Some(image) => {
-      exec_create_cargo_image(client, image)
-        .await
-        .map_err(|err| {
-          NanocldClientError::Api(ApiError {
-            status: StatusCode::BAD_REQUEST,
-            msg: format!("Unable to download image {err}"),
-          })
-        })?;
+      exec_create_cargo_image(client, image).await?;
     }
     None => {
-      return Err(NanocldClientError::Api(ApiError {
-        status: StatusCode::BAD_REQUEST,
-        msg: "cargo image is empty".into(),
-      }))
+      return Err(CliError::Custom {
+        msg: format!("Cargo image is not specified for {}", cargo.name),
+      });
     }
   }
   Ok(())
@@ -397,29 +387,7 @@ async fn exec_apply(opts: &StateOpts) -> Result<(), CliError> {
       }
     }
   }
-  client.apply_state(&data).await.map_err(| err | {
-    match err {
-        nanocld_client::error::NanocldClientError::SendRequest(serr) => {
-          match serr {
-            ntex::http::client::error::SendRequestError::Connect(_) => {
-              CliError::Custom {
-                msg: format!(
-                  "Cannot connect to the nanocl daemon at {}{}. Is the nanocl daemon running?",
-                  client.url, client.version
-                )
-              }
-            }
-            _ => CliError::Custom {
-              msg: format!(
-                "Send request error on host {}{} : {serr}",
-                client.url, client.version,
-              )
-            },
-          }
-        }
-        _ => CliError::Client(err),
-    }
-  })?;
+  client.apply_state(&data).await?;
   if opts.attach {
     attach_to_cargoes(&client, cargoes, &namespace).await?;
   }
@@ -451,29 +419,7 @@ async fn exec_revert(opts: &StateOpts) -> Result<(), CliError> {
       }
     }
   }
-  client.revert_state(&data).await.map_err(| err | {
-    match err {
-        nanocld_client::error::NanocldClientError::SendRequest(serr) => {
-          match serr {
-            ntex::http::client::error::SendRequestError::Connect(_) => {
-              CliError::Custom {
-                msg: format!(
-                  "Cannot connect to the nanocl daemon at {}{}. Is the nanocl daemon running?",
-                  client.url, client.version
-                )
-              }
-            }
-            _ => CliError::Custom {
-              msg: format!(
-                "Send request error on host {}{} : {serr}",
-                client.url, client.version,
-              )
-            },
-          }
-        }
-        _ => CliError::Client(err),
-    }
-  })?;
+  client.revert_state(&data).await?;
   Ok(())
 }
 

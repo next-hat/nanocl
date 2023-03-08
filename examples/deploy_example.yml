@@ -24,22 +24,12 @@ Cargoes:
     # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
     Container:
       Image: nexthat/nanocl-get-started:latest
-      HostConfig:
-        Binds: [
-          "./test_local:/test"
-        ]
       Env:
-        - TEST=GG
-        - APP=GET_STARTED
+        - APP=GET_STARTED1
   - Name: deploy-example2
     # See all options:
     # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
     Container:
       Image: nexthat/nanocl-get-started:latest
-      HostConfig:
-        Binds: [
-          "./test_local:/test"
-        ]
       Env:
-        - TEST=GG
-        - APP=GET_STARTED
+        - APP=GET_STARTED2
