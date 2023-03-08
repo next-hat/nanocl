@@ -42,8 +42,8 @@ async fn main() -> std::io::Result<()> {
 
   let config = match config::init(&args) {
     Err(err) => {
-      log::error!("Error while parsing config {} : {}", &args.conf_dir, &err);
-      std::process::exit(1);
+      log::error!("Error while initing config: {}", err.msg);
+      std::process::exit(err.code);
     }
     Ok(config) => config,
   };
@@ -51,8 +51,8 @@ async fn main() -> std::io::Result<()> {
   // Boot and init internal dependencies
   let daemon_state = match boot::init(&config).await {
     Err(err) => {
-      let exit_code = error::parse_daemon_error(&config, &err);
-      std::process::exit(exit_code);
+      log::error!("Error while booting daemon {}", err.msg);
+      std::process::exit(err.code);
     }
     Ok(state) => state,
   };

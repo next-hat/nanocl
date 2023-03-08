@@ -5,10 +5,24 @@ use thiserror::Error;
 use serde_json::json;
 use bollard_next::errors::Error as DockerError;
 
-use nanocl_stubs::config::DaemonConfig;
+/// Cli Error
+#[derive(Debug)]
+pub struct CliError {
+  pub(crate) code: i32,
+  pub(crate) msg: String,
+}
 
-#[cfg(feature = "dev")]
-use utoipa::ToSchema;
+impl CliError {
+  pub fn new<T>(code: i32, msg: T) -> Self
+  where
+    T: Into<String>,
+  {
+    Self {
+      code,
+      msg: msg.into(),
+    }
+  }
+}
 
 /// Http response error
 #[derive(Debug, Error)]
@@ -42,10 +56,6 @@ impl std::fmt::Display for HttpResponseError {
   }
 }
 
-pub trait IntoHttpResponseError {
-  fn to_http_error(&self) -> HttpResponseError;
-}
-
 impl web::WebResponseError for HttpResponseError {
   // builds the actual response to send back when an error occurs
   fn error_response(&self, _: &web::HttpRequest) -> web::HttpResponse {
@@ -55,44 +65,20 @@ impl web::WebResponseError for HttpResponseError {
   }
 }
 
-/// Api Error Structure that server send to client
-/// Used to generate open api specification
-#[cfg(feature = "dev")]
-#[cfg_attr(feature = "dev", derive(ToSchema))]
-#[allow(dead_code)]
-pub struct ApiError {
-  pub(crate) msg: String,
-}
-
-/// Generic Daemon error
-#[derive(Debug, Error)]
-pub enum DaemonError {
-  /// Generic system io error
-  #[error(transparent)]
-  Io(#[from] std::io::Error),
-  /// Yaml parsing error
-  #[error(transparent)]
-  Yaml(#[from] serde_yaml::Error),
-  /// Docker api error
-  #[error(transparent)]
-  Docker(#[from] DockerError),
-  /// Diesel migration error
-  #[error(transparent)]
-  DieselMigration(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
-  /// HttpResponseError
-  #[error(transparent)]
-  HttpResponse(#[from] HttpResponseError),
-}
-
-pub fn parse_daemon_error(config: &DaemonConfig, err: &DaemonError) -> i32 {
-  match err {
-    DaemonError::Docker(err) => {
-      log::error!("[DOCKER] {}: {}", &config.docker_host, &err);
-      1
+impl From<HttpResponseError> for CliError {
+  fn from(err: HttpResponseError) -> Self {
+    Self {
+      code: 1,
+      msg: err.msg,
     }
-    _ => {
-      log::error!("{}", err);
-      1
+  }
+}
+
+impl From<DockerError> for CliError {
+  fn from(err: DockerError) -> Self {
+    Self {
+      code: 1,
+      msg: format!("{err}"),
     }
   }
 }

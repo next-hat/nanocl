@@ -2,12 +2,12 @@ use nanocl_stubs::config::{DaemonConfig, DaemonConfigFile};
 
 use crate::utils;
 use crate::cli::Cli;
-use crate::error::DaemonError;
+use crate::error::CliError;
 
 fn gen_daemon_conf(
   args: &Cli,
   config: &DaemonConfigFile,
-) -> std::io::Result<DaemonConfig> {
+) -> Result<DaemonConfig, CliError> {
   let hosts = if let Some(ref hosts) = args.hosts {
     hosts.to_owned()
   } else if let Some(ref hosts) = config.hosts {
@@ -37,7 +37,11 @@ fn gen_daemon_conf(
   } else if let Some(ref gateway) = config.gateway {
     gateway.to_owned()
   } else {
-    utils::network::get_default_ip()?.to_string()
+    utils::network::get_default_ip()
+      .map_err(|err| {
+        CliError::new(1, format!("Error while getting default ip: {err}"))
+      })?
+      .to_string()
   };
 
   let hostname = if let Some(ref hostname) = args.hostname {
@@ -45,7 +49,9 @@ fn gen_daemon_conf(
   } else if let Some(ref hostname) = config.hostname {
     hostname.to_owned()
   } else {
-    utils::network::get_hostname()?
+    utils::network::get_hostname().map_err(|err| {
+      CliError::new(1, format!("Error while getting hostname: {err}"))
+    })?
   };
 
   Ok(DaemonConfig {
@@ -57,17 +63,32 @@ fn gen_daemon_conf(
   })
 }
 
-fn read_config_file(
-  config_dir: &String,
-) -> Result<DaemonConfigFile, DaemonError> {
+fn read_config_file(config_dir: &String) -> Result<DaemonConfigFile, CliError> {
   let config_path = std::path::Path::new(&config_dir).join("nanocl.conf");
 
   if !config_path.exists() {
     return Ok(DaemonConfigFile::default());
   }
 
-  let content = std::fs::read_to_string(&config_path)?;
-  let config = serde_yaml::from_str::<DaemonConfigFile>(&content)?;
+  let content = std::fs::read_to_string(&config_path).map_err(|err| {
+    CliError::new(
+      1,
+      format!(
+        "Error while reading config file at {}: {err}",
+        config_path.display()
+      ),
+    )
+  })?;
+  let config =
+    serde_yaml::from_str::<DaemonConfigFile>(&content).map_err(|err| {
+      CliError::new(
+        1,
+        format!(
+          "Error while parsing config file at {}: {err}",
+          config_path.display()
+        ),
+      )
+    })?;
 
   Ok(config)
 }
@@ -103,7 +124,7 @@ fn read_config_file(
 /// let result = config::init(args);
 /// ```
 ///
-pub fn init(args: &Cli) -> Result<DaemonConfig, DaemonError> {
+pub fn init(args: &Cli) -> Result<DaemonConfig, CliError> {
   let file_config = read_config_file(&args.conf_dir)?;
   // Merge cli args and config file with priority to args
   Ok(gen_daemon_conf(args, &file_config)?)
