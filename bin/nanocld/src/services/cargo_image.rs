@@ -320,12 +320,9 @@ pub mod tests {
     let filepath =
       std::path::Path::new(&curr_path).join("../../tests/busybox.tar.gz");
 
-    let file = tokio::fs::File::open(&filepath).await.map_err(|err| {
-      HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while opening the file {err}"),
-      }
-    })?;
+    let file = tokio::fs::File::open(&filepath)
+      .await
+      .expect("Open file for upload tarball failed");
 
     let byte_stream = codec::FramedRead::new(file, codec::BytesCodec::new())
       .map(|r| {

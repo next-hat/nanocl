@@ -7,7 +7,7 @@ use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
 
 use crate::{utils, repositories};
-use crate::error::DaemonError;
+use crate::error::CliError;
 use crate::models::Pool;
 
 /// Ensure existance of the system network that controllers will use.
@@ -17,7 +17,7 @@ use crate::models::Pool;
 pub(crate) async fn ensure_network(
   name: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<(), DaemonError> {
+) -> Result<(), CliError> {
   // Ensure network existance
   if docker_api
     .inspect_network(name, None::<InspectNetworkOptions<&str>>)
@@ -51,7 +51,7 @@ pub(crate) async fn register_namespace(
   create_network: bool,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
-) -> Result<(), DaemonError> {
+) -> Result<(), CliError> {
   if repositories::namespace::exist_by_name(name.to_owned(), pool).await? {
     return Ok(());
   }
@@ -71,7 +71,7 @@ pub(crate) async fn register_namespace(
 pub(crate) async fn sync_containers(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
-) -> Result<(), DaemonError> {
+) -> Result<(), CliError> {
   log::info!("Syncing existing container");
   let options = Some(ListContainersOptions::<&str> {
     all: true,

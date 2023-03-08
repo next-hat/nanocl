@@ -79,12 +79,14 @@ mod tests {
 
   /// Test to create a server on unix socket
   #[ntex::test]
-  async fn test_server_on_tmp_unix_socket() -> TestRet {
+  async fn server_on_tmp_unix_socket() -> TestRet {
     before();
     let args =
       Cli::parse_from(vec!["nanocl", "-H", "unix:///tmp/nanocl_test.sock"]);
-    let daemon_conf = config::init(&args)?;
-    let daemon_state = boot::init(&daemon_conf).await?;
+    let daemon_conf = config::init(&args).expect("Expect config to be valid");
+    let daemon_state = boot::init(&daemon_conf)
+      .await
+      .expect("Init daemon state to be ok");
     let server = generate(daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     Ok(())
@@ -92,11 +94,13 @@ mod tests {
 
   /// Test to create a server on tcp socket
   #[ntex::test]
-  async fn test_server_on_tcp_socket() -> TestRet {
+  async fn server_on_tcp_socket() -> TestRet {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9999"]);
-    let daemon_conf = config::init(&args)?;
-    let daemon_state = boot::init(&daemon_conf).await?;
+    let daemon_conf = config::init(&args).expect("Expect config to be valid");
+    let daemon_state = boot::init(&daemon_conf)
+      .await
+      .expect("Init daemon state to be ok");
     let server = generate(daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     Ok(())
@@ -105,15 +109,19 @@ mod tests {
   ///  Test to create 2 server on same tcp socket
   /// Expect the 2nd one to fail
   #[ntex::test]
-  async fn test_server_on_same_tcp_socket() -> TestRet {
+  async fn server_on_same_tcp_socket() -> TestRet {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9888"]);
-    let daemon_conf = config::init(&args)?;
-    let daemon_state = boot::init(&daemon_conf).await?;
+    let daemon_conf = config::init(&args).expect("Expect config to be valid");
+    let daemon_state = boot::init(&daemon_conf)
+      .await
+      .expect("Init daemon state to be ok");
     let server = generate(daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
-    let daemon_conf = config::init(&args)?;
-    let daemon_state = boot::init(&daemon_conf).await?;
+    let daemon_conf = config::init(&args).expect("Expect config to be valid");
+    let daemon_state = boot::init(&daemon_conf)
+      .await
+      .expect("Init daemon state to be ok");
     let server2 = generate(daemon_state).await;
     assert!(server2.is_err(), "Expect server to fail to run");
     Ok(())
@@ -122,11 +130,13 @@ mod tests {
   /// Test to create a server on unix socket where path is not valid
   /// Expect the server to fail
   #[ntex::test]
-  async fn test_server_on_invalid_unix_socket() -> TestRet {
+  async fn server_on_invalid_unix_socket() -> TestRet {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "unix:///root/test.sock"]);
-    let daemon_conf = config::init(&args)?;
-    let daemon_state = boot::init(&daemon_conf).await?;
+    let daemon_conf = config::init(&args).expect("Expect config to be valid");
+    let daemon_state = boot::init(&daemon_conf)
+      .await
+      .expect("Init daemon state to be ok");
     let server = generate(daemon_state).await;
     assert!(server.is_err(), "Expect server to fail to run");
     Ok(())
@@ -135,11 +145,13 @@ mod tests {
   /// Test with invalid host uri
   /// Expect the server to fail
   #[ntex::test]
-  async fn test_server_on_invalid_host() -> TestRet {
+  async fn server_on_invalid_host() -> TestRet {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "not_valid"]);
-    let daemon_conf = config::init(&args)?;
-    let daemon_state = boot::init(&daemon_conf).await?;
+    let daemon_conf = config::init(&args).expect("Expect config to be valid");
+    let daemon_state = boot::init(&daemon_conf)
+      .await
+      .expect("Init daemon state to be ok");
     let server = generate(daemon_state).await;
     assert!(server.is_err(), "Expect server to fail to run");
     Ok(())

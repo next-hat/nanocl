@@ -13,7 +13,7 @@ use nanocl_stubs::config::DaemonConfig;
 
 use crate::utils;
 use crate::models::Pool;
-use crate::error::DaemonError;
+use crate::error::CliError;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 
@@ -95,7 +95,7 @@ async fn boot(
 pub(crate) async fn ensure(
   config: &DaemonConfig,
   docker_api: &bollard_next::Docker,
-) -> Result<Pool, DaemonError> {
+) -> Result<Pool, CliError> {
   log::info!("Booting store");
   boot(config, docker_api).await?;
   // We wait 500ms to ensure store is booted
@@ -111,6 +111,8 @@ pub(crate) async fn ensure(
   // See the documentation for `MigrationHarness` for
   // all available methods.
   log::info!("Running migrations");
-  conn.run_pending_migrations(MIGRATIONS)?;
+  conn.run_pending_migrations(MIGRATIONS).map_err(|err| {
+    CliError::new(1, format!("Failed to run sql migrations: {}", err))
+  })?;
   Ok(pool)
 }

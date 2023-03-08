@@ -27,9 +27,9 @@ pub fn db_error(
 ) -> impl FnOnce(diesel::result::Error) -> HttpResponseError {
   let context = context.to_owned();
   move |err: diesel::result::Error| -> HttpResponseError {
-    log::debug!("Database error : {} {:#?}", &context, &err);
+    log::debug!("Database error : {context} {err}");
     let default_error = HttpResponseError {
-      msg: format!("Database error {} {:#}", &err, context),
+      msg: format!("Database error {context} {err}"),
       status: StatusCode::BAD_REQUEST,
     };
     match err {
@@ -37,7 +37,7 @@ pub fn db_error(
       diesel::result::Error::DatabaseError(dberr, infoerr) => match dberr {
         diesel::result::DatabaseErrorKind::UniqueViolation => {
           HttpResponseError {
-            msg: format!("Database error {} {}", &context, infoerr.message()),
+            msg: format!("Database error {context} {}", infoerr.message()),
             status: StatusCode::CONFLICT,
           }
         }

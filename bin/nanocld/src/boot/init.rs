@@ -3,18 +3,25 @@ use nanocl_stubs::config::DaemonConfig;
 use crate::event;
 use crate::models::BootState;
 
-use crate::error::DaemonError;
+use crate::error::CliError;
 
 /// Init function called before http server start
 /// to initialize our state
-pub async fn init(
-  daemon_conf: &DaemonConfig,
-) -> Result<BootState, DaemonError> {
+pub async fn init(daemon_conf: &DaemonConfig) -> Result<BootState, CliError> {
   let docker_api = bollard_next::Docker::connect_with_unix(
     &daemon_conf.docker_host,
     120,
     bollard_next::API_DEFAULT_VERSION,
-  )?;
+  )
+  .map_err(|err| {
+    CliError::new(
+      1,
+      format!(
+        "Error while connecting to docker at {}: {}",
+        err, &daemon_conf.docker_host
+      ),
+    )
+  })?;
   super::system::ensure_network("system", &docker_api).await?;
   let pool = super::store::ensure(daemon_conf, &docker_api).await?;
   super::system::register_namespace("system", false, &docker_api, &pool)
@@ -59,10 +66,10 @@ mod tests {
       hostname: None,
     };
 
-    let config = config::init(&args)?;
+    let config = config::init(&args).expect("Expect to init config");
 
     // test function init
-    let _ = init(&config).await?;
+    let _ = init(&config).await.expect("Expect to init state");
 
     Ok(())
   }
