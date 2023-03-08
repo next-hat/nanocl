@@ -127,7 +127,7 @@ fn read_config_file(config_dir: &String) -> Result<DaemonConfigFile, CliError> {
 pub fn init(args: &Cli) -> Result<DaemonConfig, CliError> {
   let file_config = read_config_file(&args.conf_dir)?;
   // Merge cli args and config file with priority to args
-  Ok(gen_daemon_conf(args, &file_config)?)
+  gen_daemon_conf(args, &file_config)
 }
 
 /// Config unit test

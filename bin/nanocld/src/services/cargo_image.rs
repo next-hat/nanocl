@@ -235,7 +235,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 pub mod tests {
 
   use crate::services::ntex_config;
-  use crate::error::HttpResponseError;
 
   use ntex::http::StatusCode;
   use bollard_next::service::ImageInspect;
