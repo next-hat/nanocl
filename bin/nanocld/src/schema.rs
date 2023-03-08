@@ -3,7 +3,9 @@
 diesel::table! {
     cargo_configs (key) {
         key -> Uuid,
+        created_at -> Timestamptz,
         cargo_key -> Varchar,
+        version -> Varchar,
         config -> Jsonb,
     }
 }
@@ -11,6 +13,7 @@ diesel::table! {
 diesel::table! {
     cargoes (key) {
         key -> Varchar,
+        created_at -> Timestamptz,
         name -> Varchar,
         config_key -> Uuid,
         namespace_name -> Varchar,
@@ -20,17 +23,18 @@ diesel::table! {
 diesel::table! {
     metrics (key) {
         key -> Uuid,
+        created_at -> Timestamptz,
+        expire_at -> Timestamptz,
         node_name -> Varchar,
         kind -> Text,
         data -> Jsonb,
-        created_at -> Timestamptz,
-        expire_at -> Timestamptz,
     }
 }
 
 diesel::table! {
     namespaces (name) {
         name -> Varchar,
+        created_at -> Timestamptz,
     }
 }
 
@@ -58,7 +62,9 @@ diesel::table! {
 diesel::table! {
     resource_configs (key) {
         key -> Uuid,
+        created_at -> Timestamptz,
         resource_key -> Varchar,
+        version -> Varchar,
         data -> Jsonb,
     }
 }
@@ -66,6 +72,7 @@ diesel::table! {
 diesel::table! {
     resources (key) {
         key -> Varchar,
+        created_at -> Timestamptz,
         kind -> Varchar,
         config_key -> Uuid,
     }

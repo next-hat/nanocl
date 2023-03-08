@@ -11,6 +11,7 @@ use crate::schema::resources;
 #[diesel(table_name = resources)]
 pub struct ResourceDbModel {
   pub(crate) key: String,
+  pub(crate) created_at: chrono::NaiveDateTime,
   pub(crate) kind: String,
   pub(crate) config_key: uuid::Uuid,
 }

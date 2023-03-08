@@ -1,8 +1,13 @@
+use dialoguer::Confirm;
+use dialoguer::theme::ColorfulTheme;
 use nanocld_client::NanocldClient;
 
 use crate::utils::print::*;
 use crate::error::CliError;
-use crate::models::{NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow};
+use crate::models::{
+  NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow,
+  NamespaceDeleteOpts,
+};
 
 async fn exec_namespace_list(client: &NanocldClient) -> Result<(), CliError> {
   let items = client.list_namespace().await?;
@@ -34,9 +39,27 @@ async fn exec_namespace_inspect(
 
 async fn exec_namespace_delete(
   client: &NanocldClient,
-  options: &NamespaceOpts,
+  options: &NamespaceDeleteOpts,
 ) -> Result<(), CliError> {
-  client.delete_namespace(&options.name).await?;
+  if !options.skip_confirm {
+    let result = Confirm::with_theme(&ColorfulTheme::default())
+      .with_prompt(format!("Delete namespaces {}?", options.names.join(",")))
+      .default(false)
+      .interact();
+    match result {
+      Ok(true) => {}
+      _ => {
+        return Err(CliError::Custom {
+          msg: "Aborted".into(),
+        })
+      }
+    }
+  }
+
+  for name in &options.names {
+    client.delete_namespace(name).await?;
+  }
+
   Ok(())
 }
 

@@ -56,6 +56,7 @@ pub fn parse_state(
 
 pub async fn apply_deployment(
   data: StateDeployment,
+  version: String,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
   event_emitter: &EventEmitterPtr,
@@ -72,7 +73,14 @@ pub async fn apply_deployment(
 
   if let Some(cargoes) = data.cargoes {
     for cargo in cargoes {
-      utils::cargo::create_or_put(&namespace, &cargo, docker_api, pool).await?;
+      utils::cargo::create_or_put(
+        &namespace,
+        &cargo,
+        version.clone(),
+        docker_api,
+        pool,
+      )
+      .await?;
       let key = utils::key::gen_key(&namespace, &cargo.name);
       let p = pool.clone();
       let ev = event_emitter.clone();
@@ -86,6 +94,7 @@ pub async fn apply_deployment(
       utils::cargo::start(
         &utils::key::gen_key(&namespace, &cargo.name),
         docker_api,
+        pool,
       )
       .await?;
       let key = utils::key::gen_key(&namespace, &cargo.name);
@@ -104,7 +113,8 @@ pub async fn apply_deployment(
   if let Some(resources) = data.resources {
     for resource in resources {
       let key = resource.name.to_owned();
-      repositories::resource::create_or_patch(&resource, pool).await?;
+      repositories::resource::create_or_patch(&resource, version.clone(), pool)
+        .await?;
       let p = pool.clone();
       let ev = event_emitter.clone();
       rt::spawn(async move {
@@ -121,6 +131,7 @@ pub async fn apply_deployment(
 
 pub async fn apply_cargo(
   data: StateCargo,
+  version: String,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
   event_emitter: &EventEmitterPtr,
@@ -136,7 +147,14 @@ pub async fn apply_cargo(
   };
 
   for cargo in data.cargoes {
-    utils::cargo::create_or_put(&namespace, &cargo, docker_api, pool).await?;
+    utils::cargo::create_or_put(
+      &namespace,
+      &cargo,
+      version.clone(),
+      docker_api,
+      pool,
+    )
+    .await?;
     let key = utils::key::gen_key(&namespace, &cargo.name);
     let p = pool.clone();
     let ev = event_emitter.clone();
@@ -150,6 +168,7 @@ pub async fn apply_cargo(
     utils::cargo::start(
       &utils::key::gen_key(&namespace, &cargo.name),
       docker_api,
+      pool,
     )
     .await?;
     let key = utils::key::gen_key(&namespace, &cargo.name);
@@ -169,12 +188,14 @@ pub async fn apply_cargo(
 
 pub async fn apply_resource(
   data: StateResources,
+  version: String,
   pool: &Pool,
   event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
   for resource in data.resources {
     let key = resource.name.to_owned();
-    repositories::resource::create_or_patch(&resource, pool).await?;
+    repositories::resource::create_or_patch(&resource, version.clone(), pool)
+      .await?;
     let pool = pool.clone();
     let event_emitter = event_emitter.clone();
     rt::spawn(async move {

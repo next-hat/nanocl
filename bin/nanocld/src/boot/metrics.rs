@@ -29,12 +29,19 @@ pub async fn start_metrics_cargo(
   pool: &Pool,
 ) -> Result<(), DaemonError> {
   let cargo = &gen_metrics_cargo("metrics");
-  if utils::cargo::inspect("system-metrics", docker_api, pool)
+  if utils::cargo::inspect("metrics.system", docker_api, pool)
     .await
     .is_err()
   {
-    utils::cargo::create("system", cargo, docker_api, pool).await?;
-    utils::cargo::start("system-metrics", docker_api).await?;
+    utils::cargo::create(
+      "system",
+      cargo,
+      format!("v{}", crate::version::VERSION),
+      docker_api,
+      pool,
+    )
+    .await?;
+    utils::cargo::start("metrics.system", docker_api, pool).await?;
   }
   Ok(())
 }

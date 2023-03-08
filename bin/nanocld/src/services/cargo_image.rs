@@ -51,11 +51,10 @@ async fn list_cargo_image(
 ))]
 #[web::get("/cargoes/images/{id_or_name}*")]
 async fn inspect_cargo_image(
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
   docker_api: web::types::State<bollard_next::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let image =
-    utils::cargo_image::inspect(&name.into_inner(), &docker_api).await?;
+  let image = utils::cargo_image::inspect(&path.1, &docker_api).await?;
 
   Ok(web::HttpResponse::Ok().json(&image))
 }
@@ -103,10 +102,9 @@ async fn create_cargo_image(
 #[web::delete("/cargoes/images/{id_or_name}*")]
 async fn delete_cargo_image_by_name(
   docker_api: web::types::State<bollard_next::Docker>,
-  id_or_name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let id_or_name = id_or_name.into_inner();
-  let res = utils::cargo_image::delete(&id_or_name, &docker_api).await?;
+  let res = utils::cargo_image::delete(&path.1, &docker_api).await?;
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
@@ -235,19 +233,22 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 /// Cargo image unit tests
 #[cfg(test)]
 pub mod tests {
-  use super::*;
+
+  use crate::services::ntex_config;
+  use crate::error::HttpResponseError;
 
   use ntex::http::StatusCode;
   use bollard_next::service::ImageInspect;
   use futures::{StreamExt, TryStreamExt};
 
-  use nanocl_stubs::generic::GenericDelete;
+  use nanocl_stubs::{generic::GenericDelete, cargo_image::CargoImagePartial};
+  use tokio_util::codec;
 
   use crate::utils::tests::*;
 
   /// Test utils to list cargo images
   pub async fn list(srv: &TestServer) -> TestReqRet {
-    srv.get("/cargoes/images").send().await
+    srv.get("/v0.2/cargoes/images").send().await
   }
 
   /// Test utils to create cargo image
@@ -255,13 +256,13 @@ pub mod tests {
     srv: &TestServer,
     payload: &CargoImagePartial,
   ) -> TestReqRet {
-    srv.post("/cargoes/images").send_json(payload).await
+    srv.post("/v0.2/cargoes/images").send_json(payload).await
   }
 
   /// Test utils to inspect cargo image
   pub async fn inspect(srv: &TestServer, id_or_name: &str) -> TestReqRet {
     srv
-      .get(format!("/cargoes/images/{id_or_name}"))
+      .get(format!("/v0.2/cargoes/images/{id_or_name}"))
       .send()
       .await
   }
@@ -269,7 +270,7 @@ pub mod tests {
   /// Test utils to delete cargo image
   pub async fn delete(srv: &TestServer, id_or_name: &str) -> TestReqRet {
     srv
-      .delete(format!("/cargoes/images/{id_or_name}"))
+      .delete(format!("/v0.2/cargoes/images/{id_or_name}"))
       .send()
       .await
   }
@@ -333,7 +334,7 @@ pub mod tests {
       });
 
     srv
-      .post("/cargoes/images/import")
+      .post("/v0.2/cargoes/images/import")
       .send_stream(byte_stream)
       .await?;
 

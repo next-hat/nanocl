@@ -9,6 +9,7 @@ use super::namespace::NamespaceDbModel;
 #[diesel(belongs_to(NamespaceDbModel, foreign_key = namespace_name))]
 pub struct CargoDbModel {
   pub(crate) key: String,
+  pub(crate) created_at: chrono::NaiveDateTime,
   pub(crate) name: String,
   pub(crate) config_key: uuid::Uuid,
   pub(crate) namespace_name: String,
@@ -27,6 +28,7 @@ pub struct CargoUpdateDbModel {
 /// Structure used to serialize cargo reset path
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct CargoResetPath {
+  pub version: String,
   pub name: String,
   pub id: String,
 }

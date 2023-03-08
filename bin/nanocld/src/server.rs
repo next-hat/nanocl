@@ -22,20 +22,8 @@ pub async fn generate(
       .wrap(web::middleware::Logger::default())
       // Set Json body max size
       .state(web::types::JsonConfig::default().limit(4096))
-      // configure system service
-      .configure(services::system::ntex_config)
-      // configure namespace service
-      .configure(services::namespace::ntex_config)
-      // configure cargo image service
-      .configure(services::cargo_image::ntex_config)
-      // configure cargo service
-      .configure(services::cargo::ntex_config)
-      // configure resource service
-      .configure(services::resource::ntex_config)
-      // configure state service
-      .configure(services::state::ntex_config)
-      // Default service that return a 404
-      .default_service(web::route().to(services::system::unhandled))
+      .configure(services::ntex_config)
+      .default_service(web::route().to(services::unhandled))
   });
   let mut count = 0;
   let len = hosts.len();

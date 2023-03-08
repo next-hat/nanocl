@@ -6,10 +6,13 @@ use futures::{StreamExt, TryStreamExt};
 
 use crate::error::ApiError;
 
+const NANOCLD_DEFAULT_VERSION: &str = "0.2";
+
 #[derive(Clone)]
 pub struct NanocldClient {
-  client: Client,
-  url: String,
+  pub client: Client,
+  pub url: String,
+  pub version: String,
 }
 
 impl NanocldClient {
@@ -28,6 +31,39 @@ impl NanocldClient {
 
     NanocldClient {
       client,
+      version: format!("v{NANOCLD_DEFAULT_VERSION}"),
+      url: String::from("http://localhost"),
+    }
+  }
+
+  pub fn connect_with_url(url: &str, version: &str) -> Self {
+    let client = Client::build()
+      .timeout(ntex::time::Millis::from_secs(50))
+      .finish();
+
+    NanocldClient {
+      client,
+      url: url.to_owned(),
+      version: version.to_owned(),
+    }
+  }
+
+  pub fn connect_with_unix_version(version: &str) -> Self {
+    let client = Client::build()
+      .connector(
+        Connector::default()
+          .connector(ntex::service::fn_service(|_| async {
+            Ok::<_, _>(rt::unix_connect("/run/nanocl/nanocl.sock").await?)
+          }))
+          .timeout(ntex::time::Millis::from_secs(50))
+          .finish(),
+      )
+      .timeout(ntex::time::Millis::from_secs(50))
+      .finish();
+
+    NanocldClient {
+      client,
+      version: version.to_owned(),
       url: String::from("http://localhost"),
     }
   }

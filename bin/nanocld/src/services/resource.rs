@@ -30,9 +30,12 @@ pub async fn create_resource(
   pool: web::types::State<Pool>,
   web::types::Json(payload): web::types::Json<ResourcePartial>,
   event_emitter: web::types::State<EventEmitterPtr>,
+  version: web::types::Path<String>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Creating resource: {:?}", &payload);
-  let resource = repositories::resource::create(payload, &pool).await?;
+  let resource =
+    repositories::resource::create(payload, version.into_inner(), &pool)
+      .await?;
   log::debug!("Resource created: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
@@ -60,15 +63,14 @@ pub async fn create_resource(
 #[web::delete("/resources/{name}")]
 pub async fn delete_resource(
   pool: web::types::State<Pool>,
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
   event_emitter: web::types::State<EventEmitterPtr>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let key = name.into_inner();
-  log::debug!("Deleting resource: {}", &key);
+  log::debug!("Deleting resource: {}", &path.1);
   let resource =
-    repositories::resource::inspect_by_key(key.to_owned(), &pool).await?;
-  repositories::resource::delete_by_key(key.to_owned(), &pool).await?;
-  repositories::resource_config::delete_by_resource_key(key.to_owned(), &pool)
+    repositories::resource::inspect_by_key(path.1.clone(), &pool).await?;
+  repositories::resource::delete_by_key(path.1.clone(), &pool).await?;
+  repositories::resource_config::delete_by_resource_key(path.1.clone(), &pool)
     .await?;
   rt::spawn(async move {
     event_emitter
@@ -117,12 +119,11 @@ pub async fn list_resource(
 #[web::get("/resources/{name}")]
 pub async fn inspect_resource(
   pool: web::types::State<Pool>,
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let key = name.into_inner();
-  log::debug!("Inspecting resource: {}", &key); // item?
+  log::debug!("Inspecting resource: {}", &path.1); // item?
   let resource =
-    repositories::resource::inspect_by_key(key.to_owned(), &pool).await?;
+    repositories::resource::inspect_by_key(path.1.clone(), &pool).await?;
   log::debug!("Resource found: {:?}", &resource);
   Ok(web::HttpResponse::Ok().json(&resource))
 }
@@ -144,14 +145,22 @@ pub async fn inspect_resource(
 #[web::patch("/resources/{name}")]
 pub async fn patch_resource(
   pool: web::types::State<Pool>,
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
   event_emitter: web::types::State<EventEmitterPtr>,
   web::types::Json(payload): web::types::Json<serde_json::Value>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let key = name.into_inner();
-  log::debug!("Patching resource: {} with payload: {:?}", &key, &payload);
-  let resource =
-    repositories::resource::update_by_key(key, payload, &pool).await?;
+  log::debug!(
+    "Patching resource: {} with payload: {:?}",
+    &path.1,
+    &payload
+  );
+  let resource = repositories::resource::update_by_key(
+    path.1.clone(),
+    payload,
+    path.0.clone(),
+    &pool,
+  )
+  .await?;
   log::debug!("Resource patched: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
@@ -166,18 +175,19 @@ pub async fn patch_resource(
 #[web::get("/resources/{name}/histories")]
 pub async fn list_resource_history(
   pool: web::types::State<Pool>,
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let key = name.into_inner();
-  log::debug!("Listing resource histories: {}", &key);
+  log::debug!("Listing resource histories: {}", &path.1);
   let items =
-    repositories::resource_config::list_by_resource(key, &pool).await?;
+    repositories::resource_config::list_by_resource(path.1.clone(), &pool)
+      .await?;
   log::debug!("Resource histories found : {:#?}", &items);
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ResourceResetPath {
+  pub version: String,
   pub name: String,
   pub id: uuid::Uuid,
 }
@@ -194,6 +204,7 @@ pub async fn reset_resource(
   let resource = repositories::resource::update_by_key(
     path.name.to_owned(),
     history.data,
+    path.version.clone(),
     &pool,
   )
   .await?;
@@ -219,14 +230,15 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+
+  use crate::services::ntex_config;
 
   use ntex::http::StatusCode;
 
   use crate::utils::tests::*;
   use nanocl_stubs::resource::{
     ResourceKind, Resource, ResourceConfig, ResourceProxyRule, ProxyRule,
-    ProxyStreamProtocol, ProxyTarget, ProxyRuleStream,
+    ProxyStreamProtocol, ProxyTarget, ProxyRuleStream, ResourcePartial,
   };
 
   #[ntex::test]
@@ -254,19 +266,31 @@ mod tests {
       kind: ResourceKind::ProxyRule,
       config: config.clone(),
     };
-    let mut resp = srv.post("/resources").send_json(&payload).await.unwrap();
+    let mut resp = srv
+      .post("/v0.2/resources")
+      .send_json(&payload)
+      .await
+      .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, ResourceKind::ProxyRule);
 
     // List
-    let mut resp = srv.get("/resources").send_json(&payload).await.unwrap();
+    let mut resp = srv
+      .get("/v0.2/resources")
+      .send_json(&payload)
+      .await
+      .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let _ = resp.json::<Vec<Resource>>().await.unwrap();
 
     // Inspect
-    let mut resp = srv.get("/resources/test_resource").send().await.unwrap();
+    let mut resp = srv
+      .get("/v0.2/resources/test_resource")
+      .send()
+      .await
+      .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
@@ -275,7 +299,7 @@ mod tests {
 
     // History
     let mut resp = srv
-      .get("/resources/test_resource/histories")
+      .get("/v0.2/resources/test_resource/histories")
       .send()
       .await
       .unwrap();
@@ -291,7 +315,7 @@ mod tests {
     // History reset
     let resp = srv
       .patch(format!(
-        "/resources/test_resource/histories/{}/reset",
+        "/v0.2/resources/test_resource/histories/{}/reset",
         history.key
       ))
       .send()
@@ -300,7 +324,7 @@ mod tests {
     assert_eq!(resp.status(), StatusCode::OK);
 
     let mut resp = srv
-      .patch("/resources/test_resource")
+      .patch("/v0.2/resources/test_resource")
       .send_json(&config)
       .await
       .unwrap();
@@ -310,7 +334,11 @@ mod tests {
     assert_eq!(resource.kind, ResourceKind::ProxyRule);
 
     // Delete
-    let resp = srv.delete("/resources/test_resource").send().await.unwrap();
+    let resp = srv
+      .delete("/v0.2/resources/test_resource")
+      .send()
+      .await
+      .unwrap();
     assert_eq!(resp.status(), StatusCode::ACCEPTED);
     Ok(())
   }

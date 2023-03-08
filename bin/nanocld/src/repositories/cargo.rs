@@ -91,19 +91,31 @@ pub async fn find_by_namespace(
 pub async fn create(
   nsp: String,
   item: CargoConfigPartial,
+  version: String,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
+
+  // test if the name of the cargo include a . in the name and throw error if true
+  if item.name.contains('.') {
+    return Err(HttpResponseError {
+      status: StatusCode::BAD_REQUEST,
+      msg: "The cargo name cannot contain a dot".into(),
+    });
+  }
 
   let pool = pool.clone();
   let key = utils::key::gen_key(&nsp, &item.name);
 
   let config =
-    cargo_config::create(key.to_owned(), item.to_owned(), &pool).await?;
+    cargo_config::create(key.to_owned(), item.to_owned(), version, &pool)
+      .await?;
 
+  println!("name: {}", &item.name);
   let new_item = CargoDbModel {
     key,
     name: item.name,
+    created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
     config_key: config.key,
   };
@@ -249,6 +261,7 @@ pub async fn find_by_key(
 pub async fn update_by_key(
   key: String,
   item: CargoConfigPartial,
+  version: String,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
@@ -257,7 +270,8 @@ pub async fn update_by_key(
 
   let cargodb = find_by_key(key.to_owned(), &pool).await?;
   let config =
-    cargo_config::create(key.to_owned(), item.to_owned(), &pool).await?;
+    cargo_config::create(key.to_owned(), item.to_owned(), version, &pool)
+      .await?;
 
   let new_item = CargoUpdateDbModel {
     name: Some(item.name),
@@ -359,7 +373,9 @@ pub async fn inspect_by_key(
 
   let config = CargoConfig {
     key: item.1.key,
+    created_at: item.0.created_at,
     name: config.name,
+    version: item.1.version,
     cargo_key: item.1.cargo_key,
     replication: config.replication,
     container: config.container,

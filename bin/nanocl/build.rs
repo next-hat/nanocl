@@ -61,8 +61,24 @@ pub fn generate_man_pages() -> Result<()> {
       command: NamespaceArgs::command(),
     },
     ManPage {
-      name: "nanocl-namespace-create",
-      command: NamespaceOpts::command(),
+      name: "nanocl-cargo",
+      command: CargoArgs::command(),
+    },
+    ManPage {
+      name: "nanocl-cargo-image",
+      command: CargoImageOpts::command(),
+    },
+    ManPage {
+      name: "nanocl-state",
+      command: StateArgs::command(),
+    },
+    ManPage {
+      name: "nanocl-resource",
+      command: ResourceArgs::command(),
+    },
+    ManPage {
+      name: "nanocl-setup",
+      command: SetupOpts::command(),
     },
   ];
 

@@ -40,6 +40,7 @@ use super::error::{db_error, db_blocking_error};
 pub async fn create(
   cargo_key: String,
   item: CargoConfigPartial,
+  version: String,
   pool: &Pool,
 ) -> Result<CargoConfig, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
@@ -48,6 +49,8 @@ pub async fn create(
   let dbmodel = CargoConfigDbModel {
     key: uuid::Uuid::new_v4(),
     cargo_key,
+    version,
+    created_at: chrono::Utc::now().naive_utc(),
     config: serde_json::to_value(item.to_owned()).map_err(|e| {
       HttpResponseError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -68,7 +71,9 @@ pub async fn create(
 
   let config = CargoConfig {
     key: dbmodel.key,
+    created_at: dbmodel.created_at,
     name: item.name,
+    version: dbmodel.version,
     cargo_key: dbmodel.cargo_key,
     replication: item.replication,
     container: item.container,
@@ -124,7 +129,9 @@ pub async fn find_by_key(
 
   Ok(CargoConfig {
     key: dbmodel.key,
+    created_at: dbmodel.created_at,
     name: config.name,
+    version: dbmodel.version,
     cargo_key: dbmodel.cargo_key,
     replication: config.replication,
     container: config.container,
@@ -202,7 +209,9 @@ pub async fn list_by_cargo(
 
       Ok(CargoConfig {
         key: dbmodel.key,
+        created_at: dbmodel.created_at,
         name: config.name,
+        version: dbmodel.version,
         cargo_key: dbmodel.cargo_key,
         replication: config.replication,
         container: config.container,

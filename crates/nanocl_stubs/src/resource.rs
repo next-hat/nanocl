@@ -59,6 +59,12 @@ pub struct ResourcePartial {
 pub struct Resource {
   /// The name of the resource
   pub name: String,
+  /// The creation date of the resource
+  pub created_at: chrono::NaiveDateTime,
+  /// The update date of the resource
+  pub updated_at: chrono::NaiveDateTime,
+  /// Version of the resource
+  pub version: String,
   /// The kind of the resource
   pub kind: ResourceKind,
   /// The config of the resource

@@ -5,8 +5,10 @@ use bollard_next::models::ImageSummary;
 
 #[derive(Debug, Parser)]
 pub struct CargoImageRemoveOpts {
-  /// id or name of image to delete
-  pub(crate) name: String,
+  #[clap(short = 'y')]
+  pub skip_confirm: bool,
+  /// List of image names to delete
+  pub(crate) names: Vec<String>,
 }
 
 #[derive(Debug, Parser)]
@@ -44,6 +46,7 @@ pub struct CargoImageImportOpts {
 
 /// Manage container images
 #[derive(Debug, Parser)]
+#[clap(name = "nanocl cargo image")]
 pub struct CargoImageOpts {
   #[clap(subcommand)]
   pub(crate) commands: CargoImageCommands,

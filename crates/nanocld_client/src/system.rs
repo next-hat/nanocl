@@ -62,7 +62,10 @@ impl NanocldClient {
   pub async fn watch_events(
     &self,
   ) -> Result<mpsc::Receiver<Event>, NanocldClientError> {
-    let mut res = self.get(String::from("/events")).send().await?;
+    let mut res = self
+      .get(format!("/{}/events", &self.version))
+      .send()
+      .await?;
     let status = res.status();
     let (sx, rx) = mpsc::channel::<Event>();
     is_api_error(&mut res, &status).await?;
@@ -132,7 +135,7 @@ impl NanocldClient {
   /// ```
   ///
   pub async fn info(&self) -> Result<HostInfo, NanocldClientError> {
-    let mut res = self.get(String::from("/info")).send().await?;
+    let mut res = self.get(format!("/{}/info", &self.version)).send().await?;
     let status = res.status();
 
     is_api_error(&mut res, &status).await?;

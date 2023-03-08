@@ -25,7 +25,10 @@ impl NanocldClient {
   pub async fn list_namespace(
     &self,
   ) -> Result<Vec<NamespaceSummary>, NanocldClientError> {
-    let mut res = self.get(String::from("/namespaces")).send().await?;
+    let mut res = self
+      .get(format!("/{}/namespaces", &self.version))
+      .send()
+      .await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;
@@ -51,7 +54,7 @@ impl NanocldClient {
   ) -> Result<Namespace, NanocldClientError> {
     let new_item = Namespace { name: name.into() };
     let mut res = self
-      .post(String::from("/namespaces"))
+      .post(format!("/{}/namespaces", &self.version))
       .send_json(&new_item)
       .await?;
     let status = res.status();
@@ -89,7 +92,7 @@ impl NanocldClient {
     name: &str,
   ) -> Result<NamespaceInspect, NanocldClientError> {
     let mut res = self
-      .get(format!("/namespaces/{name}/inspect"))
+      .get(format!("/{}/namespaces/{name}/inspect", &self.version))
       .send()
       .await?;
 
@@ -127,7 +130,10 @@ impl NanocldClient {
     &self,
     name: &str,
   ) -> Result<(), NanocldClientError> {
-    let mut res = self.delete(format!("/namespaces/{name}")).send().await?;
+    let mut res = self
+      .delete(format!("/{}/namespaces/{name}", &self.version))
+      .send()
+      .await?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;

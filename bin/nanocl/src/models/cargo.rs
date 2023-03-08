@@ -1,4 +1,5 @@
 use bollard_next::exec::CreateExecOptions;
+use chrono::TimeZone;
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
 
@@ -13,7 +14,10 @@ use super::cargo_image::CargoImageOpts;
 
 /// Cargo delete options
 #[derive(Debug, Parser)]
-pub struct CargoDeleteOpts {
+pub struct CargoRemoveOpts {
+  /// Skip confirmation
+  #[clap(short = 'y')]
+  pub skip_confirm: bool,
   /// List of cargo names to delete
   pub names: Vec<String>,
 }
@@ -103,8 +107,8 @@ pub struct CargoStartOpts {
 /// Stop Cargo options
 #[derive(Debug, Parser)]
 pub struct CargoStopOpts {
-  // Name of cargo to stop
-  pub name: String,
+  // List of cargo to stop
+  pub names: Vec<String>,
 }
 
 /// Inspect Cargo options
@@ -196,7 +200,7 @@ pub enum CargoCommands {
   Stop(CargoStopOpts),
   /// Remove cargo by its name
   #[clap(alias("rm"))]
-  Remove(CargoDeleteOpts),
+  Remove(CargoRemoveOpts),
   /// Inspect a cargo by its name
   Inspect(CargoInspectOpts),
   /// Update a cargo by its name
@@ -228,19 +232,36 @@ pub struct CargoArgs {
 
 #[derive(Tabled)]
 pub struct CargoRow {
-  pub(crate) namespace: String,
   pub(crate) name: String,
+  pub(crate) namespace: String,
   pub(crate) image: String,
   pub(crate) instances: String,
+  pub(crate) config_version: String,
+  pub(crate) created_at: String,
+  pub(crate) updated_at: String,
 }
 
 impl From<CargoSummary> for CargoRow {
   fn from(cargo: CargoSummary) -> Self {
+    let binding = chrono::Local::now();
+    let tz = binding.offset();
+    // Convert the created_at and updated_at to the current timezone
+    let created_at = tz
+      .timestamp_opt(cargo.created_at.timestamp(), 0)
+      .unwrap()
+      .format("%Y-%m-%d %H:%M:%S");
+    let updated_at = tz
+      .timestamp_opt(cargo.updated_at.timestamp(), 0)
+      .unwrap()
+      .format("%Y-%m-%d %H:%M:%S");
     Self {
       name: cargo.name,
       namespace: cargo.namespace_name,
       image: cargo.config.container.image.unwrap_or_default(),
+      config_version: cargo.config.version,
       instances: format!("{}/{}", cargo.running_instances, cargo.instances),
+      created_at: format!("{created_at}"),
+      updated_at: format!("{updated_at}"),
     }
   }
 }

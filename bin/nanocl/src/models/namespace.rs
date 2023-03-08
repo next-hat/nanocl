@@ -12,22 +12,30 @@ pub enum NamespaceCommands {
   Inspect(NamespaceOpts),
   /// Remove a namespace
   #[clap(alias("rm"))]
-  Remove(NamespaceOpts),
+  Remove(NamespaceDeleteOpts),
   /// List existing namespaces
   #[clap(alias("ls"))]
   List,
 }
 
+#[derive(Debug, Parser)]
+pub struct NamespaceDeleteOpts {
+  /// skip confirmation
+  #[clap(short = 'y')]
+  pub skip_confirm: bool,
+  /// list of namespace names to delete
+  pub names: Vec<String>,
+}
+
 /// Manage namespaces
 #[derive(Debug, Parser)]
-#[clap(name = "nanocl-namespace")]
+#[clap(name = "nanocl namespace")]
 pub struct NamespaceArgs {
   #[clap(subcommand)]
   pub commands: NamespaceCommands,
 }
 
 #[derive(Debug, Parser)]
-#[clap(name = "nanocl-namespace-create")]
 pub struct NamespaceOpts {
   /// name of the namespace to create
   pub name: String,

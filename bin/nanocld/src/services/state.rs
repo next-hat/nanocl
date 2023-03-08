@@ -12,18 +12,37 @@ async fn apply(
   docker_api: web::types::State<bollard_next::Docker>,
   pool: web::types::State<Pool>,
   event_emitter: web::types::State<EventEmitterPtr>,
+  version: web::types::Path<String>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   match utils::state::parse_state(&payload)? {
     StateData::Deployment(data) => {
-      utils::state::apply_deployment(data, &docker_api, &pool, &event_emitter)
-        .await?;
+      utils::state::apply_deployment(
+        data,
+        version.into_inner(),
+        &docker_api,
+        &pool,
+        &event_emitter,
+      )
+      .await?;
     }
     StateData::Cargo(data) => {
-      utils::state::apply_cargo(data, &docker_api, &pool, &event_emitter)
-        .await?;
+      utils::state::apply_cargo(
+        data,
+        version.into_inner(),
+        &docker_api,
+        &pool,
+        &event_emitter,
+      )
+      .await?;
     }
     StateData::Resource(data) => {
-      utils::state::apply_resource(data, &pool, &event_emitter).await?;
+      utils::state::apply_resource(
+        data,
+        version.into_inner(),
+        &pool,
+        &event_emitter,
+      )
+      .await?;
     }
   }
   Ok(web::HttpResponse::Ok().finish())
@@ -59,7 +78,7 @@ pub fn ntex_config(cfg: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use crate::services::ntex_config;
 
   use crate::utils::tests::*;
 
@@ -69,37 +88,45 @@ mod tests {
 
     let data = parse_state_file("../../examples/cargo_example.yml")?;
 
-    let req = srv.put("/state/apply").send_json(&data).await.unwrap();
+    let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
 
     assert_eq!(req.status(), 200);
 
     let data = parse_state_file("../../examples/cargo_example.yml")?;
 
-    let req = srv.put("/state/apply").send_json(&data).await.unwrap();
+    let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
 
     assert_eq!(req.status(), 200);
 
     let data = parse_state_file("../../examples/cargo_example.yml")?;
 
-    let req = srv.put("/state/revert").send_json(&data).await.unwrap();
+    let req = srv
+      .put("/v0.2/state/revert")
+      .send_json(&data)
+      .await
+      .unwrap();
 
     assert_eq!(req.status(), 200);
 
-    let data = parse_state_file("../../examples/resource_example.yml")?;
+    let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
 
-    let req = srv.put("/state/apply").send_json(&data).await.unwrap();
-
-    assert_eq!(req.status(), 200);
-
-    let data = parse_state_file("../../examples/resource_example.yml")?;
-
-    let req = srv.put("/state/apply").send_json(&data).await.unwrap();
+    let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
 
     assert_eq!(req.status(), 200);
 
-    let data = parse_state_file("../../examples/resource_example.yml")?;
+    let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
 
-    let req = srv.put("/state/revert").send_json(&data).await.unwrap();
+    let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
+
+    assert_eq!(req.status(), 200);
+
+    let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
+
+    let req = srv
+      .put("/v0.2/state/revert")
+      .send_json(&data)
+      .await
+      .unwrap();
 
     assert_eq!(req.status(), 200);
 

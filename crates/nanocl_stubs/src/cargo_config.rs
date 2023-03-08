@@ -82,8 +82,12 @@ impl From<CargoConfigPartial> for CargoConfigUpdate {
 pub struct CargoConfig {
   /// Unique identifier of the cargo config
   pub key: uuid::Uuid,
+  /// Creation date of the cargo config
+  pub created_at: chrono::NaiveDateTime,
   /// Name of the cargo
   pub name: String,
+  /// Version of the config
+  pub version: String,
   /// The key of the cargo
   pub cargo_key: String,
   /// Replication configuration of the cargo

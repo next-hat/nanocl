@@ -10,9 +10,10 @@ Resources:
       Http:
         Domain: get-started.com
         Network: Public
-        SslCertificate: /random/path/to/cert
-        SslCertificateKey: /random/path/to/key
-        SslDhParam: /random/path/to/param
+        Ssl:
+          Certificate: /random/path/to/cert
+          CertificateKey: /random/path/to/key
+          SslDhParam: /random/path/to/param
         Locations:
           - Path: /
             Target:

@@ -9,6 +9,8 @@ use super::cargo::CargoDbModel;
 #[diesel(belongs_to(CargoDbModel, foreign_key = cargo_key))]
 pub struct CargoConfigDbModel {
   pub(crate) key: uuid::Uuid,
+  pub(crate) created_at: chrono::NaiveDateTime,
   pub(crate) cargo_key: String,
+  pub(crate) version: String,
   pub(crate) config: serde_json::Value,
 }

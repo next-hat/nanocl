@@ -50,7 +50,10 @@ pub async fn create(
   let pool = pool.clone();
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = NamespaceDbModel { name: item.name };
+    let item = NamespaceDbModel {
+      name: item.name,
+      created_at: chrono::Utc::now().naive_utc(),
+    };
     diesel::insert_into(dsl::namespaces)
       .values(&item)
       .execute(&mut conn)

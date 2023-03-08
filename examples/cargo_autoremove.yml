@@ -1,11 +1,16 @@
 Type: Cargo
 ApiVersion: v0.2
 
-Namespace: cargo-example
+Namespace: global
 
 Cargoes:
-  - Name: cargo-example
+  - Name: cargo-autoremove
     # See all options:
     # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
     Container:
-      Image: nexthat/nanocl-get-started:latest
+      Image: busybox:uclibc
+      Cmd:
+        - sleep
+        - "20"
+      HostConfig:
+        AutoRemove: true
