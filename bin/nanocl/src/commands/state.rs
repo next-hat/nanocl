@@ -356,9 +356,7 @@ async fn exec_apply(opts: &StateOpts) -> Result<(), CliError> {
     "Cargo" => {
       let mut data = serde_yaml::from_value::<StateCargo>(yaml)?;
       namespace = data.namespace.clone().unwrap_or(namespace);
-      println!("Hooking cargoes...");
       cargoes = hook_cargoes(&client, data.cargoes).await?;
-      println!("Cargoes hooked");
       data.cargoes = cargoes.clone();
       let yml = serde_yaml::to_value(data)?;
       inject_meta(meta, yml)
@@ -389,7 +387,6 @@ async fn exec_apply(opts: &StateOpts) -> Result<(), CliError> {
       }
     }
   }
-  println!("Applying state...");
   client.apply_state(&data).await?;
   if opts.attach {
     attach_to_cargoes(&client, cargoes, &namespace).await?;
