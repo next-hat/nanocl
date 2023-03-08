@@ -107,8 +107,8 @@ pub struct CargoStartOpts {
 /// Stop Cargo options
 #[derive(Debug, Parser)]
 pub struct CargoStopOpts {
-  // Name of cargo to stop
-  pub name: String,
+  // List of cargo to stop
+  pub names: Vec<String>,
 }
 
 /// Inspect Cargo options

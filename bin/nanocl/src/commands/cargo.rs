@@ -96,9 +96,9 @@ async fn exec_cargo_stop(
   args: &CargoArgs,
   options: &CargoStopOpts,
 ) -> Result<(), CliError> {
-  client
-    .stop_cargo(&options.name, args.namespace.to_owned())
-    .await?;
+  for name in &options.names {
+    client.stop_cargo(name, args.namespace.to_owned()).await?;
+  }
   Ok(())
 }
 

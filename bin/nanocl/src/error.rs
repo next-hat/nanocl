@@ -30,9 +30,9 @@ impl CliError {
           match err {
             ntex::http::client::error::SendRequestError::Connect(_) => {
               eprintln!(
-              "Cannot connect to the nanocl daemon at {host}. Is the nanocl daemon running?",
-              host = args.host
-            )
+                "Cannot connect to the nanocl daemon at {host}. Is the nanocl daemon running?",
+                host = args.host
+              )
             }
             _ => eprintln!("{err}"),
           }

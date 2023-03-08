@@ -1,5 +1,6 @@
 use std::fs;
 
+use ntex::http::StatusCode;
 use clap::{Command, Arg};
 use dialoguer::Confirm;
 use dialoguer::theme::ColorfulTheme;
@@ -8,6 +9,7 @@ use futures::StreamExt;
 use bollard_next::service::HostConfig;
 
 use nanocld_client::NanocldClient;
+use nanocld_client::error::{NanocldClientError, ApiError};
 use nanocld_client::stubs::cargo::CargoOutputKind;
 use nanocld_client::stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
 use nanocld_client::stubs::state::{StateConfig, StateDeployment, StateCargo};
@@ -59,18 +61,23 @@ async fn get_from_file(
 async fn download_cargo_image(
   client: &NanocldClient,
   cargo: &CargoConfigPartial,
-) -> Result<(), CliError> {
+) -> Result<(), NanocldClientError> {
   match &cargo.container.image {
     Some(image) => {
-      exec_create_cargo_image(client, image).await?;
+      exec_create_cargo_image(client, image)
+        .await
+        .map_err(|err| {
+          NanocldClientError::Api(ApiError {
+            status: StatusCode::BAD_REQUEST,
+            msg: format!("Unable to download image {err}"),
+          })
+        })?;
     }
     None => {
-      return Err(CliError::Custom {
-        msg: format!(
-          "Image is not defined for cargo {cargo}",
-          cargo = cargo.name
-        ),
-      })
+      return Err(NanocldClientError::Api(ApiError {
+        status: StatusCode::BAD_REQUEST,
+        msg: "cargo image is empty".into(),
+      }))
     }
   }
   Ok(())
@@ -229,6 +236,44 @@ async fn attach_to_cargoes(
   Ok(())
 }
 
+fn gen_client(meta: &StateConfig) -> Result<NanocldClient, CliError> {
+  let client = match meta.api_version.clone() {
+    api_version if meta.api_version.starts_with("http") => {
+      let mut paths = api_version
+        .split('/')
+        .map(|e| e.to_owned())
+        .collect::<Vec<String>>();
+      // extract and remove last item of paths
+      let path_ptr = paths.clone();
+      let version = path_ptr.last().ok_or(CliError::Custom {
+        msg: "Please add version to the path".into(),
+      })?;
+      paths.remove(paths.len() - 1);
+      let url = paths.join("/");
+      NanocldClient::connect_with_url(&url, version)
+    }
+    api_version if meta.api_version.starts_with('v') => {
+      NanocldClient::connect_with_unix_version(&api_version)
+    }
+    _ => {
+      let mut paths = meta
+        .api_version
+        .split('/')
+        .map(|e| e.to_owned())
+        .collect::<Vec<String>>();
+      // extract and remove last item of paths
+      let path_ptr = paths.clone();
+      let version = path_ptr.last().ok_or(CliError::Custom {
+        msg: "Please add version to the path".into(),
+      })?;
+      paths.remove(paths.len() - 1);
+      let url = paths.join("/");
+      NanocldClient::connect_with_url(&format!("https://{url}"), version)
+    }
+  };
+  Ok(client)
+}
+
 fn inject_build_args(
   yaml: serde_yaml::Value,
   args: Vec<String>,
@@ -305,14 +350,13 @@ fn inject_build_args(
   Ok(yaml)
 }
 
-async fn exec_apply(
-  client: &NanocldClient,
-  opts: &StateOpts,
-) -> Result<(), CliError> {
+async fn exec_apply(opts: &StateOpts) -> Result<(), CliError> {
   let (meta, yaml) = match url::Url::parse(&opts.file_path) {
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
   };
+
+  let client = gen_client(&meta)?;
 
   let yaml = inject_build_args(yaml.clone(), opts.args.clone())?;
 
@@ -322,7 +366,7 @@ async fn exec_apply(
     "Cargo" => {
       let mut data = serde_yaml::from_value::<StateCargo>(yaml)?;
       namespace = data.namespace.clone().unwrap_or(namespace);
-      cargoes = hook_cargoes(client, data.cargoes).await?;
+      cargoes = hook_cargoes(&client, data.cargoes).await?;
       data.cargoes = cargoes.clone();
       let yml = serde_yaml::to_value(data)?;
       inject_meta(meta, yml)
@@ -330,7 +374,7 @@ async fn exec_apply(
     "Deployment" => {
       let mut data = serde_yaml::from_value::<StateDeployment>(yaml)?;
       namespace = data.namespace.clone().unwrap_or(namespace);
-      cargoes = hook_cargoes(client, data.cargoes.unwrap_or_default()).await?;
+      cargoes = hook_cargoes(&client, data.cargoes.unwrap_or_default()).await?;
       data.cargoes = Some(cargoes.clone());
       let yml = serde_yaml::to_value(data)?;
       inject_meta(meta, yml)
@@ -353,21 +397,43 @@ async fn exec_apply(
       }
     }
   }
-  client.apply_state(&data).await?;
+  client.apply_state(&data).await.map_err(| err | {
+    match err {
+        nanocld_client::error::NanocldClientError::SendRequest(serr) => {
+          match serr {
+            ntex::http::client::error::SendRequestError::Connect(_) => {
+              CliError::Custom {
+                msg: format!(
+                  "Cannot connect to the nanocl daemon at {}{}. Is the nanocl daemon running?",
+                  client.url, client.version
+                )
+              }
+            }
+            _ => CliError::Custom {
+              msg: format!(
+                "Send request error on host {}{} : {serr}",
+                client.url, client.version,
+              )
+            },
+          }
+        }
+        _ => CliError::Client(err),
+    }
+  })?;
   if opts.attach {
-    attach_to_cargoes(client, cargoes, &namespace).await?;
+    attach_to_cargoes(&client, cargoes, &namespace).await?;
   }
   Ok(())
 }
 
-async fn exec_revert(
-  client: &NanocldClient,
-  opts: &StateOpts,
-) -> Result<(), CliError> {
-  let (_meta, yaml) = match url::Url::parse(&opts.file_path) {
+async fn exec_revert(opts: &StateOpts) -> Result<(), CliError> {
+  let (meta, yaml) = match url::Url::parse(&opts.file_path) {
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
   };
+
+  let client = gen_client(&meta)?;
+
   let yaml = inject_build_args(yaml.clone(), opts.args.clone())?;
   let data = serde_json::to_value(&yaml)?;
   let _ = print_yml(&yaml);
@@ -385,16 +451,35 @@ async fn exec_revert(
       }
     }
   }
-  client.revert_state(&data).await?;
+  client.revert_state(&data).await.map_err(| err | {
+    match err {
+        nanocld_client::error::NanocldClientError::SendRequest(serr) => {
+          match serr {
+            ntex::http::client::error::SendRequestError::Connect(_) => {
+              CliError::Custom {
+                msg: format!(
+                  "Cannot connect to the nanocl daemon at {}{}. Is the nanocl daemon running?",
+                  client.url, client.version
+                )
+              }
+            }
+            _ => CliError::Custom {
+              msg: format!(
+                "Send request error on host {}{} : {serr}",
+                client.url, client.version,
+              )
+            },
+          }
+        }
+        _ => CliError::Client(err),
+    }
+  })?;
   Ok(())
 }
 
-pub async fn exec_state(
-  client: &NanocldClient,
-  args: &StateArgs,
-) -> Result<(), CliError> {
+pub async fn exec_state(args: &StateArgs) -> Result<(), CliError> {
   match &args.commands {
-    StateCommands::Apply(opts) => exec_apply(client, opts).await,
-    StateCommands::Revert(opts) => exec_revert(client, opts).await,
+    StateCommands::Apply(opts) => exec_apply(opts).await,
+    StateCommands::Revert(opts) => exec_revert(opts).await,
   }
 }
