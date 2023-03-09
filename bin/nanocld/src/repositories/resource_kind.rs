@@ -105,3 +105,44 @@ pub async fn create(
 
   Ok(item)
 }
+
+pub async fn delete_version(
+  name: &str,
+  pool: &Pool,
+) -> Result<(), HttpResponseError> {
+  use crate::schema::resource_kind_versions::dsl;
+
+  let pool = pool.clone();
+  let name = name.to_owned();
+  web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    diesel::delete(
+      dsl::resource_kind_versions.filter(dsl::resource_kind_name.eq(name)),
+    )
+    .execute(&mut conn)
+    .map_err(db_error("resource kind version"))?;
+    Ok::<_, HttpResponseError>(())
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  Ok(())
+}
+
+pub async fn delete(name: &str, pool: &Pool) -> Result<(), HttpResponseError> {
+  use crate::schema::resource_kinds::dsl;
+
+  let pool = pool.clone();
+  let name = name.to_owned();
+  web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    diesel::delete(dsl::resource_kinds.filter(dsl::name.eq(name)))
+      .execute(&mut conn)
+      .map_err(db_error("resource kind"))?;
+    Ok::<_, HttpResponseError>(())
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  Ok(())
+}
