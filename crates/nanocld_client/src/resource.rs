@@ -1,5 +1,5 @@
 use nanocl_stubs::resource::{
-  Resource, ResourcePartial, ResourceConfig, ResourceQuery,
+  Resource, ResourcePartial, ResourceConfig, ResourceQuery, ResourcePatch,
 };
 
 use super::http_client::NanocldClient;
@@ -59,7 +59,7 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_with_unix_default();
   /// let resource = client.create_resource(&ResourcePartial {
   ///   name: "my-resource".into(),
-  ///   kind: ResourceKind::ProxyRules,
+  ///   kind: String::from("Custom")s,
   ///   // Your config
   ///   config: serde_json::json!({}),
   /// }).await;
@@ -144,7 +144,7 @@ impl NanocldClient {
   pub async fn patch_resource(
     &self,
     key: &str,
-    config: &serde_json::Value,
+    config: &ResourcePatch,
   ) -> Result<Resource, NanocldClientError> {
     let res = self
       .send_patch(
@@ -227,10 +227,7 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
-  use nanocl_stubs::resource::{
-    ResourceKind, ResourceProxyRule, ProxyRuleStream, ProxyRule,
-    ProxyStreamProtocol, ProxyTarget,
-  };
+  use nanocl_stubs::resource::{ResourcePartial, ResourcePatch};
 
   use super::*;
 
@@ -241,56 +238,62 @@ mod tests {
     // list
     client.list_resource(None).await.unwrap();
 
-    let config = serde_json::to_value(ResourceProxyRule {
-      watch: vec!["random-cargo".into()],
-      rule: ProxyRule::Stream(ProxyRuleStream {
-        network: "Public".into(),
-        protocol: ProxyStreamProtocol::Tcp,
-        port: 1234,
-        ssl: None,
-        target: ProxyTarget {
-          key: "random-cargo".into(),
-          port: 1234,
-        },
-      }),
-    })
-    .unwrap();
+    let config = serde_json::json!({
+      "type": "object",
+      "required": [
+        "Watch"
+      ],
+      "properties": {
+        "Watch": {
+          "description": "Cargo to watch for changes",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    });
+
+    let resource = ResourcePartial {
+      name: "test_resource2".to_owned(),
+      version: "v0.0.1".to_owned(),
+      kind: "Custom".to_owned(),
+      config: config.clone(),
+    };
 
     // create
-    let resource = client
-      .create_resource(&ResourcePartial {
-        name: "my-resource".into(),
-        kind: ResourceKind::ProxyRule,
-        config: config.clone(),
-      })
-      .await
-      .unwrap();
+    let resource = client.create_resource(&resource).await.unwrap();
 
-    assert_eq!(resource.name, "my-resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.name, "test_resource2");
+    assert_eq!(resource.kind, String::from("Custom"));
 
     // inspect
-    let resource = client.inspect_resource("my-resource").await.unwrap();
-    assert_eq!(resource.name, "my-resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    let resource = client.inspect_resource("test_resource2").await.unwrap();
+    assert_eq!(resource.name, "test_resource2");
+    assert_eq!(resource.kind, String::from("Custom"));
+
+    let new_resource = ResourcePatch {
+      version: "v0.0.2".to_owned(),
+      config: config.clone(),
+    };
 
     // patch
-    let resource = client.patch_resource("my-resource", &config).await.unwrap();
-
-    assert_eq!(resource.name, "my-resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
-
-    // history
-    let history = client.list_history_resource("my-resource").await.unwrap();
-    assert!(history.len() > 1);
-
-    // reset
-    let _ = client
-      .reset_resource("my-resource", &history[0].key.to_string())
+    let resource = client
+      .patch_resource("test_resource2", &new_resource)
       .await
       .unwrap();
 
+    assert_eq!(resource.name, "test_resource2");
+    assert_eq!(resource.kind, String::from("Custom"));
+
+    // history
+    let history = client
+      .list_history_resource("test_resource2")
+      .await
+      .unwrap();
+    assert!(history.len() > 1);
+
     // delete
-    client.delete_resource("my-resource").await.unwrap();
+    client.delete_resource("test_resource2").await.unwrap();
   }
 }

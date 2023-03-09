@@ -113,8 +113,7 @@ pub async fn apply_deployment(
   if let Some(resources) = data.resources {
     for resource in resources {
       let key = resource.name.to_owned();
-      repositories::resource::create_or_patch(&resource, version.clone(), pool)
-        .await?;
+      utils::resource::create_or_patch(resource, pool).await?;
       let p = pool.clone();
       let ev = event_emitter.clone();
       rt::spawn(async move {
@@ -188,14 +187,12 @@ pub async fn apply_cargo(
 
 pub async fn apply_resource(
   data: StateResources,
-  version: String,
   pool: &Pool,
   event_emitter: &EventEmitterPtr,
 ) -> Result<(), HttpResponseError> {
   for resource in data.resources {
     let key = resource.name.to_owned();
-    repositories::resource::create_or_patch(&resource, version.clone(), pool)
-      .await?;
+    utils::resource::create_or_patch(resource, pool).await?;
     let pool = pool.clone();
     let event_emitter = event_emitter.clone();
     rt::spawn(async move {

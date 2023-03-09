@@ -2,6 +2,7 @@
 * Endpoints to manipulate resources
 */
 
+use nanocl_stubs::resource::ResourcePatch;
 use ntex::rt;
 use ntex::web;
 use nanocl_stubs::system::Event;
@@ -12,14 +13,13 @@ use crate::event::EventEmitterPtr;
 
 use crate::error::HttpResponseError;
 use crate::models::Pool;
+use crate::utils;
 
 // Endpoint to create a new Resource
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   request_body = ResourcePartial,
   path = "/resources",
-  params(
-  ),
   responses(
     (status = 201, description = "New resource", body = Resource),
     (status = 400, description = "Generic database error", body = ApiError),
@@ -30,12 +30,10 @@ pub async fn create_resource(
   pool: web::types::State<Pool>,
   web::types::Json(payload): web::types::Json<ResourcePartial>,
   event_emitter: web::types::State<EventEmitterPtr>,
-  version: web::types::Path<String>,
+  _version: web::types::Path<String>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Creating resource: {:?}", &payload);
-  let resource =
-    repositories::resource::create(payload, version.into_inner(), &pool)
-      .await?;
+  let resource = utils::resource::create(payload, &pool).await?;
   log::debug!("Resource created: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
@@ -69,6 +67,10 @@ pub async fn delete_resource(
   log::debug!("Deleting resource: {}", &path.1);
   let resource =
     repositories::resource::inspect_by_key(path.1.clone(), &pool).await?;
+  if resource.kind.as_str() == "Custom" {
+    repositories::resource_kind::delete_version(&resource.name, &pool).await?;
+    repositories::resource_kind::delete(&resource.name, &pool).await?;
+  }
   repositories::resource::delete_by_key(path.1.clone(), &pool).await?;
   repositories::resource_config::delete_by_resource_key(path.1.clone(), &pool)
     .await?;
@@ -147,20 +149,24 @@ pub async fn patch_resource(
   pool: web::types::State<Pool>,
   path: web::types::Path<(String, String)>,
   event_emitter: web::types::State<EventEmitterPtr>,
-  web::types::Json(payload): web::types::Json<serde_json::Value>,
+  web::types::Json(payload): web::types::Json<ResourcePatch>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!(
     "Patching resource: {} with payload: {:?}",
     &path.1,
     &payload
   );
-  let resource = repositories::resource::update_by_key(
-    path.1.clone(),
-    payload,
-    path.0.clone(),
-    &pool,
-  )
-  .await?;
+
+  let resource =
+    repositories::resource::inspect_by_key(path.1.clone(), &pool).await?;
+
+  let new_resource = ResourcePartial {
+    name: path.1.clone(),
+    version: payload.version,
+    kind: resource.kind,
+    config: payload.config,
+  };
+  let resource = utils::resource::patch(new_resource, &pool).await?;
   log::debug!("Resource patched: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
@@ -201,13 +207,16 @@ pub async fn reset_resource(
   let history =
     repositories::resource_config::find_by_key(path.id, &pool).await?;
 
-  let resource = repositories::resource::update_by_key(
-    path.name.to_owned(),
-    history.data,
-    path.version.clone(),
-    &pool,
-  )
-  .await?;
+  let resource =
+    repositories::resource::inspect_by_key(path.name.to_owned(), &pool).await?;
+
+  let new_resource = ResourcePartial {
+    name: resource.name,
+    version: history.version,
+    kind: resource.kind,
+    config: history.data,
+  };
+  let resource = utils::resource::patch(new_resource, &pool).await?;
   let resource_ptr = resource.clone();
   rt::spawn(async move {
     event_emitter
@@ -236,52 +245,47 @@ mod tests {
   use ntex::http::StatusCode;
 
   use crate::utils::tests::*;
-  use nanocl_stubs::resource::{
-    ResourceKind, Resource, ResourceConfig, ResourceProxyRule, ProxyRule,
-    ProxyStreamProtocol, ProxyTarget, ProxyRuleStream, ResourcePartial,
-  };
+  use nanocl_stubs::resource::{Resource, ResourcePartial, ResourcePatch};
 
   #[ntex::test]
   async fn basic() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
-    let config = serde_json::to_value(ResourceProxyRule {
-      watch: vec!["random-cargo".into()],
-      rule: ProxyRule::Stream(ProxyRuleStream {
-        network: "Public".into(),
-        protocol: ProxyStreamProtocol::Tcp,
-        port: 1234,
-        ssl: None,
-        target: ProxyTarget {
-          key: "random-cargo".into(),
-          port: 1234,
-        },
-      }),
-    })
-    .unwrap();
+    let config = serde_json::json!({
+      "type": "object",
+      "required": [
+        "Watch"
+      ],
+      "properties": {
+        "Watch": {
+          "description": "Cargo to watch for changes",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    });
 
-    // Create
-    let payload = ResourcePartial {
+    let resource = ResourcePartial {
       name: "test_resource".to_owned(),
-      kind: ResourceKind::ProxyRule,
+      version: "v0.0.1".to_owned(),
+      kind: "Custom".to_owned(),
       config: config.clone(),
     };
+
     let mut resp = srv
       .post("/v0.2/resources")
-      .send_json(&payload)
+      .send_json(&resource)
       .await
       .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.kind, String::from("Custom"));
 
     // List
-    let mut resp = srv
-      .get("/v0.2/resources")
-      .send_json(&payload)
-      .await
-      .unwrap();
+    let mut resp = srv.get("/v0.2/resources").send().await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let _ = resp.json::<Vec<Resource>>().await.unwrap();
 
@@ -294,44 +298,30 @@ mod tests {
     assert_eq!(resp.status(), StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.kind, String::from("Custom"));
     assert_eq!(&resource.config, &config);
 
     // History
-    let mut resp = srv
+    let _ = srv
       .get("/v0.2/resources/test_resource/histories")
       .send()
       .await
       .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let history = resp
-      .json::<Vec<ResourceConfig>>()
-      .await
-      .unwrap()
-      .first()
-      .unwrap()
-      .to_owned();
 
-    // History reset
-    let resp = srv
-      .patch(format!(
-        "/v0.2/resources/test_resource/histories/{}/reset",
-        history.key
-      ))
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-
+    let new_resource = ResourcePatch {
+      version: "v0.0.2".to_owned(),
+      config: config.clone(),
+    };
     let mut resp = srv
       .patch("/v0.2/resources/test_resource")
-      .send_json(&config)
+      .send_json(&new_resource)
       .await
       .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.kind, String::from("Custom"));
 
     // Delete
     let resp = srv

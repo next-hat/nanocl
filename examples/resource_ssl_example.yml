@@ -4,18 +4,20 @@ ApiVersion: v0.2
 Resources:
   - Name: resource-example
     Kind: ProxyRule
+    Version: v0.1
     Config:
       Watch:
         - get-started@global
-      Http:
-        Domain: get-started.com
-        Network: Public
-        Ssl:
-          Certificate: /random/path/to/cert
-          CertificateKey: /random/path/to/key
-          SslDhParam: /random/path/to/param
-        Locations:
-          - Path: /
-            Target:
-              Key: get-started@global
-              Port: 9000
+      Rule:
+        Http:
+          Domain: get-started.com
+          Network: Public
+          Ssl:
+            Certificate: /random/path/to/cert
+            CertificateKey: /random/path/to/key
+            SslDhParam: /random/path/to/param
+          Locations:
+            - Path: /
+              Target:
+                Key: get-started@global
+                Port: 9000

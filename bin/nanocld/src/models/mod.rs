@@ -23,6 +23,9 @@ pub use cargo_config::*;
 mod resource;
 pub use resource::*;
 
+mod resource_kind;
+pub use resource_kind::*;
+
 mod resource_config;
 pub use resource_config::*;
 

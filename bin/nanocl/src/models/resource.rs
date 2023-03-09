@@ -2,7 +2,7 @@ use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
-use nanocld_client::stubs::resource::{ResourceKind, Resource};
+use nanocld_client::stubs::resource::Resource;
 
 /// Resource commands
 #[derive(Debug, Subcommand)]
@@ -32,7 +32,7 @@ pub struct ResourceArgs {
 #[derive(Debug, Tabled)]
 pub struct ResourceRow {
   pub name: String,
-  pub kind: ResourceKind,
+  pub kind: String,
   pub config_version: String,
   pub created_at: String,
   pub updated_at: String,

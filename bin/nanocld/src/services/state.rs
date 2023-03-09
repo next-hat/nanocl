@@ -1,7 +1,7 @@
 use ntex::web;
 
-use crate::event::EventEmitterPtr;
 use crate::utils;
+use crate::event::EventEmitterPtr;
 use crate::models::{Pool, StateData};
 
 use crate::error::HttpResponseError;
@@ -36,13 +36,7 @@ async fn apply(
       .await?;
     }
     StateData::Resource(data) => {
-      utils::state::apply_resource(
-        data,
-        version.into_inner(),
-        &pool,
-        &event_emitter,
-      )
-      .await?;
+      utils::state::apply_resource(data, &pool, &event_emitter).await?;
     }
   }
   Ok(web::HttpResponse::Ok().finish())

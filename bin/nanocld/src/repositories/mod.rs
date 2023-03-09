@@ -12,5 +12,7 @@ pub mod cargo;
 pub mod cargo_config;
 /// Manage resource
 pub mod resource;
+/// Manage resource kind
+pub mod resource_kind;
 /// Manage resource config
 pub mod resource_config;

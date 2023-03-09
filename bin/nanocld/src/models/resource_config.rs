@@ -20,6 +20,7 @@ impl From<ResourceConfigDbModel> for ResourceConfig {
   fn from(item: ResourceConfigDbModel) -> Self {
     ResourceConfig {
       key: item.key,
+      version: item.version,
       resource_key: item.resource_key,
       data: item.data,
     }
