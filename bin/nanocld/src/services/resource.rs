@@ -2,6 +2,7 @@
 * Endpoints to manipulate resources
 */
 
+use nanocl_stubs::resource::ResourcePatch;
 use ntex::rt;
 use ntex::web;
 use nanocl_stubs::system::Event;
@@ -12,14 +13,13 @@ use crate::event::EventEmitterPtr;
 
 use crate::error::HttpResponseError;
 use crate::models::Pool;
+use crate::utils;
 
 // Endpoint to create a new Resource
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   request_body = ResourcePartial,
   path = "/resources",
-  params(
-  ),
   responses(
     (status = 201, description = "New resource", body = Resource),
     (status = 400, description = "Generic database error", body = ApiError),
@@ -30,12 +30,10 @@ pub async fn create_resource(
   pool: web::types::State<Pool>,
   web::types::Json(payload): web::types::Json<ResourcePartial>,
   event_emitter: web::types::State<EventEmitterPtr>,
-  version: web::types::Path<String>,
+  _version: web::types::Path<String>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Creating resource: {:?}", &payload);
-  let resource =
-    repositories::resource::create(payload, version.into_inner(), &pool)
-      .await?;
+  let resource = utils::resource::create(payload, &pool).await?;
   log::debug!("Resource created: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
@@ -147,20 +145,24 @@ pub async fn patch_resource(
   pool: web::types::State<Pool>,
   path: web::types::Path<(String, String)>,
   event_emitter: web::types::State<EventEmitterPtr>,
-  web::types::Json(payload): web::types::Json<serde_json::Value>,
+  web::types::Json(payload): web::types::Json<ResourcePatch>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!(
     "Patching resource: {} with payload: {:?}",
     &path.1,
     &payload
   );
-  let resource = repositories::resource::update_by_key(
-    path.1.clone(),
-    payload,
-    path.0.clone(),
-    &pool,
-  )
-  .await?;
+
+  let resource =
+    repositories::resource::inspect_by_key(path.1.clone(), &pool).await?;
+
+  let new_resource = ResourcePartial {
+    name: path.1.clone(),
+    version: payload.version,
+    kind: resource.kind,
+    config: payload.config,
+  };
+  let resource = utils::resource::patch(new_resource, &pool).await?;
   log::debug!("Resource patched: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
@@ -201,13 +203,16 @@ pub async fn reset_resource(
   let history =
     repositories::resource_config::find_by_key(path.id, &pool).await?;
 
-  let resource = repositories::resource::update_by_key(
-    path.name.to_owned(),
-    history.data,
-    path.version.clone(),
-    &pool,
-  )
-  .await?;
+  let resource =
+    repositories::resource::inspect_by_key(path.name.to_owned(), &pool).await?;
+
+  let new_resource = ResourcePartial {
+    name: resource.name,
+    version: history.version,
+    kind: resource.kind,
+    config: history.data,
+  };
+  let resource = utils::resource::patch(new_resource, &pool).await?;
   let resource_ptr = resource.clone();
   rt::spawn(async move {
     event_emitter
@@ -237,7 +242,7 @@ mod tests {
 
   use crate::utils::tests::*;
   use nanocl_stubs::resource::{
-    ResourceKind, Resource, ResourceConfig, ResourceProxyRule, ProxyRule,
+    Resource, ResourceConfig, ResourceProxyRule, ProxyRule,
     ProxyStreamProtocol, ProxyTarget, ProxyRuleStream, ResourcePartial,
   };
 
@@ -263,7 +268,8 @@ mod tests {
     // Create
     let payload = ResourcePartial {
       name: "test_resource".to_owned(),
-      kind: ResourceKind::ProxyRule,
+      kind: String::from("ProxyRule"),
+      version: String::from("v0.1"),
       config: config.clone(),
     };
     let mut resp = srv
@@ -274,7 +280,7 @@ mod tests {
     assert_eq!(resp.status(), StatusCode::CREATED);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.kind, String::from("ProxyRule"));
 
     // List
     let mut resp = srv
@@ -294,7 +300,7 @@ mod tests {
     assert_eq!(resp.status(), StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.kind, String::from("ProxyRule"));
     assert_eq!(&resource.config, &config);
 
     // History
@@ -331,7 +337,7 @@ mod tests {
     assert_eq!(resp.status(), StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.kind, String::from("ProxyRule"));
 
     // Delete
     let resp = srv

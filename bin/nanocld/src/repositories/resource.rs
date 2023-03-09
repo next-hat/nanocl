@@ -3,9 +3,7 @@ use ntex::http::StatusCode;
 use diesel::prelude::*;
 
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::resource::{
-  Resource, ResourcePartial, ResourceQuery, ResourceKind, ResourceProxyRule,
-};
+use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceQuery};
 
 use crate::repositories::error::db_error;
 use crate::{utils, repositories};
@@ -48,23 +46,8 @@ use super::error::db_blocking_error;
 ///
 pub async fn create(
   item: ResourcePartial,
-  version: String,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
-  match &item.kind {
-    ResourceKind::ProxyRule => {
-      let _ = serde_json::from_value::<ResourceProxyRule>(item.config.clone())
-        .map_err(|err| HttpResponseError {
-          status: StatusCode::BAD_REQUEST,
-          msg: format!("Invalid proxy rule: {}", err),
-        })?;
-    }
-    _ => Err(HttpResponseError {
-      status: StatusCode::BAD_REQUEST,
-      msg: format!("Invalid resource kind: {}", item.kind),
-    })?,
-  }
-
   use crate::schema::resources::dsl;
 
   let pool = pool.clone();
@@ -72,7 +55,7 @@ pub async fn create(
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: item.name.to_owned(),
-    version,
+    version: item.version.to_owned(),
     data: item.config,
   };
 
@@ -81,7 +64,7 @@ pub async fn create(
   let new_item = ResourceDbModel {
     key: item.name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
-    kind: item.kind.into(),
+    kind: item.kind,
     config_key: config.key.to_owned(),
   };
 
@@ -100,7 +83,7 @@ pub async fn create(
     name: item.key,
     created_at: item.created_at,
     updated_at: config.created_at,
-    kind: item.kind.into(),
+    kind: item.kind,
     version: config.version,
     config_key: config.key,
     config: config.data,
@@ -226,7 +209,7 @@ pub async fn find(
         name: resource.key,
         created_at: resource.created_at,
         updated_at: config.created_at,
-        kind: resource.kind.into(),
+        kind: resource.kind,
         version: config.version,
         config_key: resource.config_key,
         config: config.data,
@@ -283,7 +266,7 @@ pub async fn inspect_by_key(
     name: res.0.key,
     created_at: res.0.created_at,
     updated_at: res.1.created_at,
-    kind: res.0.kind.into(),
+    kind: res.0.kind,
     version: res.1.version,
     config_key: res.0.config_key,
     config: res.1.data,
@@ -316,24 +299,23 @@ pub async fn inspect_by_key(
 /// let item = repositories::resource::update_by_id(String::from("my-resource"), json!({"foo": "bar"}), &pool).await;
 /// ```
 ///
-pub async fn update_by_key(
-  key: String,
-  item: serde_json::Value,
-  version: String,
+pub async fn patch(
+  item: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
   use crate::schema::resources;
 
   let pool = pool.clone();
+  let key = item.name.clone();
   let resource =
-    repositories::resource::inspect_by_key(key.to_owned(), &pool).await?;
+    repositories::resource::inspect_by_key(item.name.to_owned(), &pool).await?;
 
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
-    resource_key: key.to_owned(),
-    version,
-    data: item,
+    resource_key: resource.name.to_owned(),
+    version: item.version.clone(),
+    data: item.config.clone(),
   };
 
   let config = resource_config::create(config.to_owned(), &pool).await?;
@@ -369,17 +351,10 @@ pub async fn update_by_key(
 
 pub async fn create_or_patch(
   resource: &ResourcePartial,
-  version: String,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
   if inspect_by_key(resource.name.to_owned(), pool).await.is_ok() {
-    return update_by_key(
-      resource.name.to_owned(),
-      resource.config.to_owned(),
-      version,
-      pool,
-    )
-    .await;
+    return patch(resource, pool).await;
   }
-  create(resource.to_owned(), version, pool).await
+  create(resource.to_owned(), pool).await
 }

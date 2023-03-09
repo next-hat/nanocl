@@ -7,7 +7,7 @@ use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::{Pool, ResourceConfigDbModel};
 
-use super::error::{db_blocking_error, db_error};
+use super::error::{db_error, db_blocking_error};
 
 /// ## Create resource config
 ///

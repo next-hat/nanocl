@@ -59,7 +59,7 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_with_unix_default();
   /// let resource = client.create_resource(&ResourcePartial {
   ///   name: "my-resource".into(),
-  ///   kind: ResourceKind::ProxyRules,
+  ///   kind: String::from("ProxyRule")s,
   ///   // Your config
   ///   config: serde_json::json!({}),
   /// }).await;
@@ -228,8 +228,8 @@ impl NanocldClient {
 #[cfg(test)]
 mod tests {
   use nanocl_stubs::resource::{
-    ResourceKind, ResourceProxyRule, ProxyRuleStream, ProxyRule,
-    ProxyStreamProtocol, ProxyTarget,
+    ResourceProxyRule, ProxyRuleStream, ProxyRule, ProxyStreamProtocol,
+    ProxyTarget,
   };
 
   use super::*;
@@ -260,25 +260,26 @@ mod tests {
     let resource = client
       .create_resource(&ResourcePartial {
         name: "my-resource".into(),
-        kind: ResourceKind::ProxyRule,
+        kind: String::from("ProxyRule"),
+        version: String::from("v0.1"),
         config: config.clone(),
       })
       .await
       .unwrap();
 
     assert_eq!(resource.name, "my-resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.kind, String::from("ProxyRule"));
 
     // inspect
     let resource = client.inspect_resource("my-resource").await.unwrap();
     assert_eq!(resource.name, "my-resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.kind, String::from("ProxyRule"));
 
     // patch
     let resource = client.patch_resource("my-resource", &config).await.unwrap();
 
     assert_eq!(resource.name, "my-resource");
-    assert_eq!(resource.kind, ResourceKind::ProxyRule);
+    assert_eq!(resource.kind, String::from("ProxyRule"));
 
     // history
     let history = client.list_history_resource("my-resource").await.unwrap();

@@ -13,7 +13,7 @@ use crate::models::{
 };
 
 use super::cargo_config;
-use super::error::{db_blocking_error, db_error};
+use super::error::{db_error, db_blocking_error};
 
 /// ## Find cargo items by namespace
 ///

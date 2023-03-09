@@ -6,6 +6,7 @@ pub mod cargo_image;
 pub mod namespace;
 pub mod network;
 pub mod stream;
+pub mod resource;
 
 #[cfg(test)]
 pub mod tests {

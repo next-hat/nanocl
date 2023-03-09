@@ -1,42 +1,7 @@
+use schemars::JsonSchema;
+
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
-
-/// Resource kinds
-/// It is used to define the kind of a resource
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub enum ResourceKind {
-  ProxyRule,
-  Unknown,
-}
-
-impl std::fmt::Display for ResourceKind {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      ResourceKind::ProxyRule => write!(f, "ProxyRule"),
-      ResourceKind::Unknown => write!(f, "Unknown"),
-    }
-  }
-}
-
-impl From<String> for ResourceKind {
-  fn from(kind: String) -> Self {
-    match kind.as_str() {
-      "ProxyRule" => ResourceKind::ProxyRule,
-      _ => ResourceKind::Unknown,
-    }
-  }
-}
-
-impl From<ResourceKind> for String {
-  fn from(kind: ResourceKind) -> Self {
-    match kind {
-      ResourceKind::ProxyRule => "ProxyRule".into(),
-      ResourceKind::Unknown => "Unknown".into(),
-    }
-  }
-}
 
 /// Resource partial is a payload used to create a new resource
 #[derive(Debug, Clone)]
@@ -46,7 +11,19 @@ pub struct ResourcePartial {
   /// The name of the resource
   pub name: String,
   /// The kind of the resource
-  pub kind: ResourceKind,
+  pub kind: String,
+  /// Version of the config
+  pub version: String,
+  /// The config of the resource
+  pub config: serde_json::Value,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ResourcePatch {
+  /// Version of the config
+  pub version: String,
   /// The config of the resource
   pub config: serde_json::Value,
 }
@@ -66,7 +43,7 @@ pub struct Resource {
   /// Version of the resource
   pub version: String,
   /// The kind of the resource
-  pub kind: ResourceKind,
+  pub kind: String,
   /// The config of the resource
   pub config_key: uuid::Uuid,
   /// The config of the resource
@@ -74,7 +51,7 @@ pub struct Resource {
 }
 
 /// Proxy rules modes
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum ProxyRule {
@@ -84,7 +61,7 @@ pub enum ProxyRule {
   Stream(ProxyRuleStream),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxySslConfig {
@@ -97,7 +74,7 @@ pub struct ProxySslConfig {
 }
 
 /// Defines a proxy rule target
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxyTarget {
@@ -108,7 +85,7 @@ pub struct ProxyTarget {
 }
 
 /// Proxy rules modes
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum ProxyStreamProtocol {
@@ -117,7 +94,7 @@ pub enum ProxyStreamProtocol {
 }
 
 /// Proxy rules modes
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxyRuleStream {
@@ -134,7 +111,7 @@ pub struct ProxyRuleStream {
 }
 
 /// Defines a proxy rule location
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxyHttpLocation {
@@ -145,7 +122,7 @@ pub struct ProxyHttpLocation {
 }
 
 /// Defines a proxy rule http config
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxyRuleHttp {
@@ -162,14 +139,13 @@ pub struct ProxyRuleHttp {
 }
 
 /// Define proxy rules to apply
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceProxyRule {
   /// Cargo to watch for changes
   pub watch: Vec<String>,
   /// The rule
-  #[cfg_attr(feature = "serde", serde(flatten))]
   pub rule: ProxyRule,
 }
 
@@ -178,6 +154,7 @@ pub struct ResourceProxyRule {
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceConfig {
   pub key: uuid::Uuid,
+  pub version: String,
   pub resource_key: String,
   pub data: serde_json::Value,
 }
@@ -186,6 +163,6 @@ pub struct ResourceConfig {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceQuery {
-  pub kind: Option<ResourceKind>,
+  pub kind: Option<String>,
   pub contains: Option<String>,
 }
