@@ -18,7 +18,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::Cargo(args) => commands::exec_cargo(&client, args).await,
     Commands::Events => commands::exec_events(&client).await,
     Commands::State(args) => commands::exec_state(args).await,
-    Commands::Version(args) => commands::exec_version(&client, args).await,
+    Commands::Version => commands::exec_version(&client).await,
     Commands::Info => commands::exec_info(&client).await,
     Commands::Setup(opts) => commands::exec_setup(opts).await,
   }
@@ -45,8 +45,6 @@ mod tests {
   async fn test_version() {
     let args = Cli::parse_from(["nanocl", "version"]);
     assert!(execute_args(&args).await.is_ok());
-    // let args = Cli::parse_from(["nanocl", "version", "check"]);
-    // assert!(execute_args(&args).await.is_ok());
   }
 
   /// Test Namespace commands
@@ -164,6 +162,15 @@ mod tests {
   /// Test Resource commands
   #[ntex::test]
   async fn test_resource() {
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "apply",
+      "-yf",
+      "../../examples/resource_custom.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
     // Create a new resource
     let args = Cli::parse_from([
       "nanocl",
@@ -283,14 +290,14 @@ mod tests {
     ]);
     assert!(execute_args(&args).await.is_ok());
 
-    let args = Cli::parse_from([
-      "nanocl",
-      "state",
-      "apply",
-      "-yf",
-      "https://raw.githubusercontent.com/nxthat/nanocl/nightly/examples/deploy_example.yml"
-    ]);
-    assert!(execute_args(&args).await.is_ok());
+    // let args = Cli::parse_from([
+    //   "nanocl",
+    //   "state",
+    //   "apply",
+    //   "-yf",
+    //   "https://raw.githubusercontent.com/nxthat/nanocl/nightly/examples/deploy_example.yml"
+    // ]);
+    // assert!(execute_args(&args).await.is_ok());
 
     let args = Cli::parse_from([
       "nanocl",

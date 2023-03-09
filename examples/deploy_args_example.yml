@@ -13,14 +13,15 @@ Resources:
     Config:
       Watch:
         - get-started@global
-      Http:
-        Domain: "{{Args.domain}}"
-        Network: Public
-        Locations:
-          - Path: /
-            Target:
-              Key: get-started@global
-              Port: 9000
+      Rule:
+        Http:
+          Domain: "{{Args.domain}}"
+          Network: Public
+          Locations:
+            - Path: /
+              Target:
+                Key: get-started@global
+                Port: 9000
 
 Cargoes:
   - Name: deploy-args-example

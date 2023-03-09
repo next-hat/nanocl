@@ -6,7 +6,7 @@ Namespace: global
 Resources:
   - Name: deploy-example.com
     Kind: ProxyRule
-    Version: v0.5
+    Version: v0.1
     Config:
       Watch:
         - get-started@global

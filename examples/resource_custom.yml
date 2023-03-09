@@ -4,7 +4,7 @@ ApiVersion: v0.2
 Resources:
   - Name: ProxyRule
     Kind: Custom
-    Version: v0.5
+    Version: v0.1
     Config:
       $schema: http://json-schema.org/draft-07/schema#
       title: ResourceProxyRule

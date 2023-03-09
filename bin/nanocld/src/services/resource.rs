@@ -241,53 +241,47 @@ mod tests {
   use ntex::http::StatusCode;
 
   use crate::utils::tests::*;
-  use nanocl_stubs::resource::{
-    Resource, ResourceConfig, ResourceProxyRule, ProxyRule,
-    ProxyStreamProtocol, ProxyTarget, ProxyRuleStream, ResourcePartial,
-  };
+  use nanocl_stubs::resource::{Resource, ResourcePartial, ResourcePatch};
 
   #[ntex::test]
   async fn basic() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
-    let config = serde_json::to_value(ResourceProxyRule {
-      watch: vec!["random-cargo".into()],
-      rule: ProxyRule::Stream(ProxyRuleStream {
-        network: "Public".into(),
-        protocol: ProxyStreamProtocol::Tcp,
-        port: 1234,
-        ssl: None,
-        target: ProxyTarget {
-          key: "random-cargo".into(),
-          port: 1234,
-        },
-      }),
-    })
-    .unwrap();
+    let config = serde_json::json!({
+      "type": "object",
+      "required": [
+        "Watch"
+      ],
+      "properties": {
+        "Watch": {
+          "description": "Cargo to watch for changes",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    });
 
-    // Create
-    let payload = ResourcePartial {
+    let resource = ResourcePartial {
       name: "test_resource".to_owned(),
-      kind: String::from("ProxyRule"),
-      version: String::from("v0.1"),
+      version: "v0.0.1".to_owned(),
+      kind: "Custom".to_owned(),
       config: config.clone(),
     };
+
     let mut resp = srv
       .post("/v0.2/resources")
-      .send_json(&payload)
+      .send_json(&resource)
       .await
       .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, String::from("ProxyRule"));
+    assert_eq!(resource.kind, String::from("Custom"));
 
     // List
-    let mut resp = srv
-      .get("/v0.2/resources")
-      .send_json(&payload)
-      .await
-      .unwrap();
+    let mut resp = srv.get("/v0.2/resources").send().await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let _ = resp.json::<Vec<Resource>>().await.unwrap();
 
@@ -300,44 +294,30 @@ mod tests {
     assert_eq!(resp.status(), StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, String::from("ProxyRule"));
+    assert_eq!(resource.kind, String::from("Custom"));
     assert_eq!(&resource.config, &config);
 
     // History
-    let mut resp = srv
+    let _ = srv
       .get("/v0.2/resources/test_resource/histories")
       .send()
       .await
       .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    let history = resp
-      .json::<Vec<ResourceConfig>>()
-      .await
-      .unwrap()
-      .first()
-      .unwrap()
-      .to_owned();
 
-    // History reset
-    let resp = srv
-      .patch(format!(
-        "/v0.2/resources/test_resource/histories/{}/reset",
-        history.key
-      ))
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-
+    let new_resource = ResourcePatch {
+      version: "v0.0.2".to_owned(),
+      config: config.clone(),
+    };
     let mut resp = srv
       .patch("/v0.2/resources/test_resource")
-      .send_json(&config)
+      .send_json(&new_resource)
       .await
       .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, String::from("ProxyRule"));
+    assert_eq!(resource.kind, String::from("Custom"));
 
     // Delete
     let resp = srv

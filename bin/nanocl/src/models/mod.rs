@@ -43,7 +43,7 @@ pub enum Commands {
   /// Show nanocl host information
   Info,
   /// Show nanocl version information
-  Version(VersionArgs),
+  Version,
   /// Setup nanocl daemon
   Setup(SetupOpts),
   // TODO: shell completion
