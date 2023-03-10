@@ -86,10 +86,10 @@ fn hook_binds(
           let bind_split = bind.split(':').collect::<Vec<&str>>();
           let new_bind = if bind_split.len() == 2 {
             let host_path = bind_split[0];
-            if host_path.starts_with("./") {
+            if host_path.starts_with('.') {
               let curr_path = std::env::current_dir()?;
               let path = std::path::Path::new(&curr_path)
-                .join(std::path::PathBuf::from(host_path.replace("./", "")));
+                .join(std::path::PathBuf::from(host_path));
               let path = path.display().to_string();
               format!("{}:{}", path, bind_split[1])
             } else {
@@ -269,6 +269,10 @@ fn inject_build_args(
   args: Vec<String>,
 ) -> Result<serde_yaml::Value, CliError> {
   let build_args: StateBuildArgs = serde_yaml::from_value(yaml.clone())?;
+
+  if build_args.args.is_none() {
+    return Ok(yaml);
+  }
 
   let mut cmd = Command::new("nanocl state args")
     .about("Validate state args")
