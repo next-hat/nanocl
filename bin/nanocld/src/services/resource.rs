@@ -44,13 +44,7 @@ pub async fn delete_resource(
   log::debug!("Deleting resource: {}", &path.1);
   let resource =
     repositories::resource::inspect_by_key(path.1.clone(), &pool).await?;
-  if resource.kind.as_str() == "Custom" {
-    repositories::resource_kind::delete_version(&resource.name, &pool).await?;
-    repositories::resource_kind::delete(&resource.name, &pool).await?;
-  }
-  repositories::resource::delete_by_key(path.1.clone(), &pool).await?;
-  repositories::resource_config::delete_by_resource_key(path.1.clone(), &pool)
-    .await?;
+  utils::resource::delete(resource.clone(), &pool).await?;
   rt::spawn(async move {
     event_emitter
       .lock()

@@ -38,7 +38,7 @@ mod tests {
 
   /// Test cli arguments with default values
   #[test]
-  fn test_cli_with_default() {
+  fn cli_with_default() {
     let args = Cli::parse_from(["nanocl"]);
     assert_eq!(args.hosts, None);
     assert!(!args.init);
@@ -49,7 +49,7 @@ mod tests {
 
   /// Test cli arguments with custom values
   #[test]
-  fn test_cli_with_custom() {
+  fn cli_with_custom() {
     let args = Cli::parse_from([
       "nanocl",
       "-H",

@@ -152,7 +152,7 @@ mod test_namespace {
   }
 
   #[ntex::test]
-  async fn main() -> TestRet {
+  async fn basic() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
     test_fail_create(&srv).await?;

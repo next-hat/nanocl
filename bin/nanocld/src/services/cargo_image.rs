@@ -3,7 +3,7 @@
 */
 use ntex::{rt, web};
 use ntex::http::StatusCode;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use tokio_util::codec;
 use bollard_next::image::ImportImageOptions;
 use tokio::io::AsyncWriteExt;
@@ -69,11 +69,11 @@ async fn import_images(
   mut payload: web::types::Payload,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   // generate a random filename
-  let filename = uuid::Uuid::new_v4().to_string();
-  let filepath = format!("/tmp/{filename}");
   let (tx, rx) =
     ntex::channel::mpsc::channel::<Result<ntex::util::Bytes, std::io::Error>>();
   rt::spawn(async move {
+    let filename = uuid::Uuid::new_v4().to_string();
+    let filepath = format!("/tmp/{filename}");
     // File::create is blocking operation, use threadpool
     let file_path_ptr = filepath.clone();
     let mut f =
@@ -83,11 +83,10 @@ async fn import_images(
           status: StatusCode::INTERNAL_SERVER_ERROR,
           msg: format!("Error while creating the file {err}"),
         })?;
-    while let Some(bytes) = ntex::util::stream_recv(&mut payload).await {
-      let bytes = bytes.map_err(|err| HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while reading the multipart field {err}"),
-      })?;
+    while let Ok(bytes) = payload.try_next().await {
+      let Some(bytes) = bytes else {
+        break;
+      };
       let _ = tx.send(Ok(ntex::util::Bytes::from(
         serde_json::to_string(&CargoImageImportInfo::Context(Box::new(
           CargoImageImportContext {
@@ -304,7 +303,7 @@ pub mod tests {
 
   /// Basic test to create, inspect and delete a cargo image
   #[ntex::test]
-  async fn crud() -> TestRet {
+  async fn basic() -> TestRet {
     const TEST_IMAGE: &str = "busybox:unstable-musl";
     let srv = generate_server(ntex_config).await;
 

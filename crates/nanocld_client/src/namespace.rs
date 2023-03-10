@@ -140,7 +140,7 @@ mod tests {
   use super::*;
 
   #[ntex::test]
-  async fn test_basic() {
+  async fn basic() {
     const NAMESPACE: &str = "clientnt";
     let client = NanocldClient::connect_with_unix_default();
 

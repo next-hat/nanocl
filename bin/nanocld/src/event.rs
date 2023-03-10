@@ -115,7 +115,7 @@ mod tests {
   use crate::utils::tests::*;
 
   #[ntex::test]
-  async fn basic_test() -> TestRet {
+  async fn basic() -> TestRet {
     // Create the event emitter
     let event_emitter = EventEmitter::new();
 

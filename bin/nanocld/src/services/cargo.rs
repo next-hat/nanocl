@@ -409,7 +409,7 @@ mod tests {
 
   /// Test to create start patch stop and delete a cargo with valid data
   #[ntex::test]
-  async fn test_basic() -> TestRet {
+  async fn basic() -> TestRet {
     let srv = generate_server(ntex_config).await;
     ensure_test_image().await?;
 
@@ -517,7 +517,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_exec() -> TestRet {
+  async fn exec() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
     const CARGO_NAME: &str = "store";
@@ -551,7 +551,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_logs() -> TestRet {
+  async fn logs() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
     const CARGO_NAME: &str = "store";

@@ -68,7 +68,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_system_info() -> TestRet {
+  async fn system_info() -> TestRet {
     let srv = generate_server(ntex_config).await;
     let mut resp = srv.get("/v0.2/info").send().await?;
     let status = resp.status();
