@@ -15,11 +15,11 @@ use crate::error::HttpResponseError;
   get,
   path = "/namespaces",
   responses(
-      (status = 200, description = "Array of namespace", body = [NamespaceItem]),
+      (status = 200, description = "Array of namespace", body = [NamespaceSummary]),
   ),
 ))]
 #[web::get("/namespaces")]
-async fn list_namespace(
+pub(crate) async fn list_namespace(
   pool: web::types::State<Pool>,
   docker_api: web::types::State<bollard_next::Docker>,
 ) -> Result<web::HttpResponse, HttpResponseError> {

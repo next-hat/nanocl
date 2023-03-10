@@ -11,6 +11,8 @@ mod system;
 mod resource;
 mod cargo;
 mod cargo_image;
+#[cfg(feature = "dev")]
+pub mod openapi;
 
 pub struct Versionning;
 

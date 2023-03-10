@@ -112,7 +112,7 @@ async fn delete_cargo_image_by_name(
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   path = "/cargoes/images/import",
-  descriptions(
+  responses(
     (status = 200, description = "Image import successful", body = GenericImport),
     (status = 400, description = "Invalid image data", body = ApiError),
     (status = 404, description = "Image data not found", body = ApiError),
