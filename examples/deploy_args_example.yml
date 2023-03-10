@@ -10,6 +10,7 @@ Args:
 Resources:
   - Name: "{{Args.domain}}"
     Kind: ProxyRule
+    Version: v0.1
     Config:
       Watch:
         - get-started@global

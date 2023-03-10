@@ -69,10 +69,10 @@ pub struct CargoRunOpts {
   /// Environment variables of the cargo
   #[clap(short, long = "env")]
   pub env: Option<Vec<String>>,
-  /// Command to execute
-  pub command: Vec<String>,
   #[clap(long = "rm", default_value = "false")]
   pub auto_remove: bool,
+  /// Command to execute
+  pub command: Vec<String>,
 }
 
 impl From<CargoRunOpts> for CargoConfigPartial {
@@ -152,6 +152,7 @@ pub struct CargoExecOpts {
   /// Name of cargo to execute command
   pub name: String,
   /// Command to execute
+  #[clap(last = true, raw = true)]
   pub command: Vec<String>,
 }
 

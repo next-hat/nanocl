@@ -15,11 +15,6 @@ pub struct StateBuildArgs {
   pub args: Option<Vec<StateBuildArg>>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct StateRequirements {
-  pub requires: Option<Vec<String>>,
-}
-
 #[derive(Debug, Parser)]
 pub struct StateOpts {
   /// Path or url to the state
@@ -32,7 +27,7 @@ pub struct StateOpts {
   #[clap(short = 'y')]
   pub skip_confirm: bool,
   /// Additional arguments to pass to the file
-  #[clap(last = true)]
+  #[clap(last = true, raw = true)]
   pub args: Vec<String>,
 }
 

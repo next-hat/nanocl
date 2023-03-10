@@ -277,6 +277,9 @@ fn inject_build_args(
   let mut cmd = Command::new("nanocl state args")
     .about("Validate state args")
     .bin_name("nanocl state args");
+  // Add string nanocl state args as fist element of args
+  let mut args = args;
+  args.insert(0, "nanocl state apply --".into());
   for build_arg in build_args.args.clone().unwrap_or_default() {
     let name = build_arg.name.to_owned();
     let arg: &'static str = Box::leak(name.into_boxed_str());
