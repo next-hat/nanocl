@@ -10,14 +10,6 @@ use crate::models::Pool;
 
 use crate::error::HttpResponseError;
 
-/// Endpoint to list all namespace
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  path = "/namespaces",
-  responses(
-      (status = 200, description = "Array of namespace", body = [NamespaceSummary]),
-  ),
-))]
 #[web::get("/namespaces")]
 pub(crate) async fn list_namespace(
   pool: web::types::State<Pool>,
@@ -50,17 +42,6 @@ async fn create_namespace(
   Ok(web::HttpResponse::Created().json(&item))
 }
 
-/// Endpoint to delete a namespace by it's name
-#[cfg_attr(feature = "dev", utoipa::path(
-    delete,
-    path = "/namespaces/{name}",
-    responses(
-        (status = 200, description = "database generic delete response", body = GenericDelete),
-    ),
-    params(
-        ("name" = String, Path, description = "name of the namespace"),
-    )
-))]
 #[web::delete("/namespaces/{name}")]
 async fn delete_namespace_by_name(
   path: web::types::Path<(String, String)>,
@@ -74,18 +55,6 @@ async fn delete_namespace_by_name(
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
-/// Inspect namespace by it's name
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  path = "/namespaces/{name}/inspect",
-  responses(
-      (status = 200, description = "Namespace found", body = NamespaceItem),
-      (status = 404, description = "Namespace not found", body = ApiError),
-  ),
-  params(
-    ("name" = String, Path, description = "name of the namespace"),
-  )
-))]
 #[web::get("/namespaces/{id}/inspect")]
 async fn inspect_namespace_by_name(
   path: web::types::Path<(String, String)>,

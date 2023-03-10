@@ -15,16 +15,6 @@ use crate::error::HttpResponseError;
 use crate::models::Pool;
 use crate::utils;
 
-// Endpoint to create a new Resource
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  request_body = ResourcePartial,
-  path = "/resources",
-  responses(
-    (status = 201, description = "New resource", body = Resource),
-    (status = 400, description = "Generic database error", body = ApiError),
-  ),
-))]
 #[web::post("/resources")]
 pub async fn create_resource(
   pool: web::types::State<Pool>,
@@ -45,19 +35,6 @@ pub async fn create_resource(
   Ok(web::HttpResponse::Created().json(&resource))
 }
 
-// Endpoint to delete a Resource
-#[cfg_attr(feature = "dev", utoipa::path(
-  delete,
-  path = "/resources/{name}",
-  params(
-    ("name" = String, Path, description = "Name of the resource to delete"),
-  ),
-  responses(
-    (status = 204, description = "Resource deleted"),
-    (status = 400, description = "Generic database error", body = ApiError),
-    (status = 404, description = "Resource not found", body = ApiError),
-  ),
-))]
 #[web::delete("/resources/{name}")]
 pub async fn delete_resource(
   pool: web::types::State<Pool>,
@@ -83,17 +60,6 @@ pub async fn delete_resource(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Endpoint to list resources
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  path = "/resources",
-  params(
-  ),
-  responses(
-    (status = 200, description = "Resource list", body = [Resource]),
-    (status = 400, description = "Generic database error", body = ApiError),
-  ),
-))]
 #[web::get("/resources")]
 pub async fn list_resource(
   pool: web::types::State<Pool>,
@@ -105,19 +71,6 @@ pub async fn list_resource(
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
-/// Endpoint to inspect a Resource
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  path = "/resources/{name}/inspect",
-  params(
-    ("name" = String, Path, description = "Name of the resource to inspect"),
-  ),
-  responses(
-    (status = 200, description = "Resource", body = Resource),
-    (status = 400, description = "Generic database error", body = ApiError),
-    (status = 404, description = "Resource not found", body = ApiError),
-  ),
-))]
 #[web::get("/resources/{name}")]
 pub async fn inspect_resource(
   pool: web::types::State<Pool>,
@@ -130,20 +83,6 @@ pub async fn inspect_resource(
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
-/// Endpoint to patch a Resource
-#[cfg_attr(feature = "dev", utoipa::path(
-  patch,
-  request_body = ResourcePartial,
-  path = "/resources/{name}",
-  params(
-  ("name" = String, Path, description = "Name of the resource to patch"),
-  ),
-  responses(
-    (status = 200, description = "Resource patched", body = Resource),
-    (status = 400, description = "Generic database error", body = ApiError),
-    (status = 404, description = "Resource not found", body = ApiError),
-  ),
-  ))]
 #[web::patch("/resources/{name}")]
 pub async fn patch_resource(
   pool: web::types::State<Pool>,

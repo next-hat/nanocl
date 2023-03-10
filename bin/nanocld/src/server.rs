@@ -9,7 +9,7 @@ pub async fn generate(
   log::info!("Preparing server");
   let hosts = daemon_state.config.hosts.clone();
   let mut server = web::HttpServer::new(move || {
-    let mut app = web::App::new()
+    web::App::new()
       // bind config state
       .state(daemon_state.config.clone())
       // bind postgre pool to state
@@ -23,14 +23,7 @@ pub async fn generate(
       // Set Json body max size
       .state(web::types::JsonConfig::default().limit(4096))
       .configure(services::ntex_config)
-      .default_service(web::route().to(services::unhandled));
-
-    #[cfg(feature = "dev")]
-    {
-      app = app.configure(services::openapi::ntex_config);
-    }
-
-    app
+      .default_service(web::route().to(services::unhandled))
   });
   let mut count = 0;
   let len = hosts.len();

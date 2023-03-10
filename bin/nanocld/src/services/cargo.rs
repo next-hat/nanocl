@@ -16,20 +16,6 @@ use crate::event::EventEmitterPtr;
 use crate::error::HttpResponseError;
 use crate::models::{Pool, CargoResetPath};
 
-/// Endpoint to create a new cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-    post,
-    request_body = CargoConfigPartial,
-    path = "/cargoes",
-    params(
-      ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo will be stored"),
-    ),
-    responses(
-      (status = 201, description = "New cargo", body = Cargo),
-      (status = 400, description = "Generic database error", body = ApiError),
-      (status = 404, description = "Namespace name not valid", body = ApiError),
-    ),
-  ))]
 #[web::post("/cargoes")]
 pub async fn create_cargo(
   pool: web::types::State<Pool>,
@@ -63,20 +49,6 @@ pub async fn create_cargo(
   Ok(web::HttpResponse::Created().json(&cargo))
 }
 
-/// Endpoint to delete a cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-    delete,
-    path = "/cargoes/{name}",
-    params(
-      ("name" = String, Path, description = "Name of the cargo to delete"),
-      ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
-    ),
-    responses(
-      (status = 204, description = "Cargo deleted", body = GenericDelete),
-      (status = 400, description = "Generic database error", body = ApiError),
-      (status = 404, description = "Cargo not found", body = ApiError),
-    ),
-  ))]
 #[web::delete("/cargoes/{name}")]
 pub async fn delete_cargo(
   pool: web::types::State<Pool>,

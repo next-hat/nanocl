@@ -17,15 +17,6 @@ use nanocl_stubs::cargo_image::{
 use crate::utils;
 use crate::error::HttpResponseError;
 
-/// Endpoint to list installed cargo images
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  path = "/cargoes/images",
-  responses(
-    (status = 200, description = "List of installed images", body = [ImageSummary]),
-    (status = 400, description = "Generic database error", body = ApiError),
-  ),
-))]
 #[web::get("/cargoes/images")]
 async fn list_cargo_image(
   docker_api: web::types::State<bollard_next::Docker>,
@@ -36,19 +27,6 @@ async fn list_cargo_image(
   Ok(web::HttpResponse::Ok().json(&images))
 }
 
-/// Endpoint to inspect an existing cargo image
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  path = "/cargoes/images/{id_or_name}/inspect",
-  params(
-    ("id_or_name" = String, Path, description = "id or name of the image"),
-  ),
-  responses(
-    (status = 200, description = "Advanced information about a given cargo image", body = ImageInspect),
-    (status = 400, description = "Generic database error", body = ApiError),
-    (status = 404, description = "Image id or name not valid", body = ApiError),
-  ),
-))]
 #[web::get("/cargoes/images/{id_or_name}*")]
 async fn inspect_cargo_image(
   path: web::types::Path<(String, String)>,
@@ -59,17 +37,6 @@ async fn inspect_cargo_image(
   Ok(web::HttpResponse::Ok().json(&image))
 }
 
-/// Endpoint to download a cargo image
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  path = "/cargoes/images",
-  request_body = CargoImagePartial,
-  responses(
-    (status = 200, description = "Stream to give information about the download status", content_type = "nanocl/streaming-v1", body = String),
-    (status = 400, description = "Generic database error", body = ApiError),
-    (status = 404, description = "Image name or label is not valid", body = ApiError),
-  ),
-))]
 #[web::post("/cargoes/images")]
 async fn create_cargo_image(
   docker_api: web::types::State<bollard_next::Docker>,
@@ -86,19 +53,6 @@ async fn create_cargo_image(
   )
 }
 
-/// Endpoint to delete a cargo image
-#[cfg_attr(feature = "dev", utoipa::path(
-  delete,
-  path = "/cargoes/images/{id_or_name}",
-  params(
-    ("id_or_name" = String, Path, description = "id or name of the image"),
-  ),
-  responses(
-    (status = 200, description = "Generic delete response", body = GenericDelete),
-    (status = 400, description = "Generic database error", body = ApiError),
-    (status = 404, description = "Image name or id is not valid", body = ApiError),
-  ),
-))]
 #[web::delete("/cargoes/images/{id_or_name}*")]
 async fn delete_cargo_image_by_name(
   docker_api: web::types::State<bollard_next::Docker>,
@@ -108,16 +62,6 @@ async fn delete_cargo_image_by_name(
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
-/// Endpoint to import a cargo image
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  path = "/cargoes/images/import",
-  responses(
-    (status = 200, description = "Image import successful", body = GenericImport),
-    (status = 400, description = "Invalid image data", body = ApiError),
-    (status = 404, description = "Image data not found", body = ApiError),
-  ),
-))]
 #[web::post("/cargoes/images/import")]
 async fn import_images(
   docker_api: web::types::State<bollard_next::Docker>,

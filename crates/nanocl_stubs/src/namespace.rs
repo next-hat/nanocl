@@ -1,9 +1,6 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-#[cfg(feature = "utoipa")]
-use utoipa::ToSchema;
-
 use crate::cargo::CargoInspect;
 
 /// Namespace is a identifier for a set of cargoes
@@ -30,7 +27,6 @@ pub struct NamespacePartial {
 /// It contains the number of cargoes and instances existing in the namespace
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-#[cfg_attr(feature = "utoipa", derive(ToSchema))]
 pub struct NamespaceSummary {
   /// Name of the namespace
   pub name: String,

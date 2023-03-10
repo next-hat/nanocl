@@ -1,6 +1,6 @@
-use futures::future::{ok, Either, Ready};
 use ntex::{web, Service, Middleware};
 use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
+use futures::future::{ok, Either, Ready};
 
 use crate::version;
 use crate::error::HttpResponseError;
@@ -11,8 +11,6 @@ mod system;
 mod resource;
 mod cargo;
 mod cargo_image;
-#[cfg(feature = "dev")]
-pub mod openapi;
 
 pub struct Versionning;
 
@@ -93,17 +91,23 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
         .route(web::get().to(ping))
         .route(web::head().to(ping)),
     )
-    .service(get_version)
-    .service(
-      web::scope("/{version}")
-        .wrap(Versionning)
-        .configure(state::ntex_config)
-        .configure(namespace::ntex_config)
-        .configure(system::ntex_config)
-        .configure(resource::ntex_config)
-        .configure(cargo::ntex_config)
-        .configure(cargo_image::ntex_config),
-    );
+    .service(get_version);
+
+  #[cfg(feature = "dev")]
+  {
+    config.service(web::scope("/openapi").configure(openapi::ntex_config));
+  }
+
+  config.service(
+    web::scope("/{version}")
+      .wrap(Versionning)
+      .configure(state::ntex_config)
+      .configure(namespace::ntex_config)
+      .configure(system::ntex_config)
+      .configure(resource::ntex_config)
+      .configure(cargo::ntex_config)
+      .configure(cargo_image::ntex_config),
+  );
 }
 
 #[cfg(test)]

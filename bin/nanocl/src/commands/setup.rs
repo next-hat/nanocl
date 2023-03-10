@@ -341,11 +341,9 @@ fn connect_docker(docker_host: &str) -> Result<Docker, CliError> {
         },
       )
     }
-    _ => {
-      return Err(CliError::Custom {
-        msg: format!("Invalid scheme expected [http,https] got: {docker_host}"),
-      });
-    }
+    _ => Err(CliError::Custom {
+      msg: format!("Invalid scheme expected [http,https] got: {docker_host}"),
+    }),
   }
 }
 

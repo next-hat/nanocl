@@ -17,7 +17,6 @@ path = "src/main.rs"
 
 [features]
 default = []
-dev = ["dep:utoipa", "nanocl_stubs/utoipa"]
 
 [build-dependencies]
 clap = { version = "4.1.7", features = ["derive"] }
@@ -49,9 +48,6 @@ hyper = "0.14.24"
 tokio-util = "0.7.7"
 futures-util = "0.3.26"
 libc = "0.2.139"
-
-# Dependency required with dev feature
-utoipa = { version = "3.0.2", features = ["uuid", "chrono"], optional = true }
 metrsd_client = "0.1.1"
 chrono = { version = "0.4.23", features = ["serde"] }
 jsonschema = { version = "0.16.1", default-features = false }
