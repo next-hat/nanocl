@@ -139,7 +139,7 @@ mod tests {
 
   /// Test merge config
   #[test]
-  fn test_merge_config() {
+  fn merge_config() {
     let args = Cli {
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
@@ -172,7 +172,7 @@ mod tests {
   /// It should return an error if the file is not readable
   /// It should return an error if the file is not a file
   #[test]
-  fn test_read_config_file() {
+  fn read_from_file() {
     let config_dir = String::from("/tmp");
     let config_path = std::path::Path::new(&config_dir).join("nanocl.conf");
 
@@ -223,7 +223,7 @@ mod tests {
 
   /// Test init config
   #[test]
-  fn test_init_config() {
+  fn init_config() {
     let args = Cli {
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),

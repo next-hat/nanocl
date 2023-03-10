@@ -239,8 +239,7 @@ pub async fn revert_deployment(
     for resource in resources {
       let key = resource.name.to_owned();
       let resource = repositories::resource::inspect_by_key(key, pool).await?;
-      repositories::resource::delete_by_key(resource.name.to_owned(), pool)
-        .await?;
+      utils::resource::delete(resource.clone(), pool).await?;
       let event_emitter = event_emitter.clone();
       rt::spawn(async move {
         event_emitter
@@ -290,8 +289,7 @@ pub async fn revert_resource(
   for resource in data.resources {
     let key = resource.name.to_owned();
     let resource = repositories::resource::inspect_by_key(key, pool).await?;
-    repositories::resource::delete_by_key(resource.name.to_owned(), pool)
-      .await?;
+    utils::resource::delete(resource.clone(), pool).await?;
     let event_emitter = event_emitter.clone();
     rt::spawn(async move {
       event_emitter

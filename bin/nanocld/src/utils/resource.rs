@@ -80,3 +80,20 @@ pub async fn create_or_patch(
   validate_resource(&resource, pool).await?;
   repositories::resource::create_or_patch(&resource, pool).await
 }
+
+pub async fn delete(
+  resource: Resource,
+  pool: &Pool,
+) -> Result<(), HttpResponseError> {
+  if resource.kind.as_str() == "Custom" {
+    repositories::resource_kind::delete_version(&resource.name, pool).await?;
+    repositories::resource_kind::delete(&resource.name, pool).await?;
+  }
+  repositories::resource::delete_by_key(resource.name.to_owned(), pool).await?;
+  repositories::resource_config::delete_by_resource_key(
+    resource.name.to_owned(),
+    pool,
+  )
+  .await?;
+  Ok(())
+}

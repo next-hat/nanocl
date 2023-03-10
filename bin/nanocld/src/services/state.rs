@@ -77,7 +77,7 @@ mod tests {
   use crate::utils::tests::*;
 
   #[ntex::test]
-  async fn basic_test() -> TestRet {
+  async fn basic() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
     let data = parse_state_file("../../examples/cargo_example.yml")?;
@@ -102,6 +102,10 @@ mod tests {
 
     assert_eq!(req.status(), 200);
 
+    let data = parse_state_file("../../examples/resource_custom.yml")?;
+    let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
+    assert_eq!(req.status(), 200);
+
     let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
 
     let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
@@ -122,6 +126,14 @@ mod tests {
       .await
       .unwrap();
 
+    assert_eq!(req.status(), 200);
+
+    let data = parse_state_file("../../examples/resource_custom.yml")?;
+    let req = srv
+      .put("/v0.2/state/revert")
+      .send_json(&data)
+      .await
+      .unwrap();
     assert_eq!(req.status(), 200);
 
     Ok(())

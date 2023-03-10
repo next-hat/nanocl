@@ -15,6 +15,11 @@ pub struct StateBuildArgs {
   pub args: Option<Vec<StateBuildArg>>,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct StateRequirements {
+  pub requires: Option<Vec<String>>,
+}
+
 #[derive(Debug, Parser)]
 pub struct StateOpts {
   /// Path or url to the state

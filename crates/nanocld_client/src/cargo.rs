@@ -474,7 +474,7 @@ mod tests {
   use nanocl_stubs::cargo_config::CargoConfigPartial;
 
   #[ntex::test]
-  async fn test_basic() {
+  async fn basic() {
     const CARGO_NAME: &str = "client-test-cargo";
     let client = NanocldClient::connect_with_unix_default();
 
@@ -523,7 +523,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_create_cargo_wrong_image() {
+  async fn create_cargo_wrong_image() {
     let client = NanocldClient::connect_with_unix_default();
 
     let new_cargo = CargoConfigPartial {
@@ -544,7 +544,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_create_cargo_duplicate_name() {
+  async fn create_cargo_duplicate_name() {
     let client = NanocldClient::connect_with_unix_default();
 
     let new_cargo = CargoConfigPartial {
@@ -571,7 +571,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_exec_cargo() {
+  async fn exec_cargo() {
     let client = NanocldClient::connect_with_unix_default();
 
     let exec = CargoExecConfig {
@@ -586,7 +586,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_logs_cargo() {
+  async fn logs_cargo() {
     let client = NanocldClient::connect_with_unix_default();
 
     let mut rx = client

@@ -122,7 +122,7 @@ mod tests {
   use super::*;
 
   #[ntex::test]
-  async fn test_get_version() {
+  async fn get_version() {
     let client = NanocldClient::connect_with_unix_default();
     let version = client.get_version().await;
 
@@ -130,7 +130,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_watch_events() {
+  async fn watch_events() {
     let client = NanocldClient::connect_with_unix_default();
     let _stream = client.watch_events().await.unwrap();
     // Todo : find a way to test this on CI because it's limited to 2 threads
@@ -138,7 +138,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_info() {
+  async fn info() {
     let client = NanocldClient::connect_with_unix_default();
     let info = client.info().await.unwrap();
 

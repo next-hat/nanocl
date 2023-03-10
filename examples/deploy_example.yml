@@ -9,30 +9,34 @@ Resources:
     Version: v0.1
     Config:
       Watch:
-        - get-started@global
+      -  deploy-example.global
       Rule:
         Http:
           Domain: deploy-example.com
           Network: Public
           Locations:
-            - Path: /
-              Target:
-                Key: get-started@global
-                Port: 9000
+          - Path: /
+            Target:
+              Key:  deploy-example.global
+              Port: 9000
+          - Path: /v2
+            Target:
+              Key: deploy-example2.global
+              Port: 9000
 
 Cargoes:
-  - Name: deploy-example
-    # See all options:
-    # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
-    Container:
-      Image: nexthat/nanocl-get-started:latest
-      Env:
-        - APP=GET_STARTED1
+- Name: deploy-example
+  # See all options:
+  # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
+  Container:
+    Image: nexthat/nanocl-get-started:latest
+    Env:
+      - APP=GET_STARTED1
 
-  - Name: deploy-example2
-    # See all options:
-    # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
-    Container:
-      Image: nexthat/nanocl-get-started:latest
-      Env:
-        - APP=GET_STARTED2
+- Name: deploy-example2
+  # See all options:
+  # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
+  Container:
+    Image: nexthat/nanocl-get-started:latest
+    Env:
+      - APP=GET_STARTED2

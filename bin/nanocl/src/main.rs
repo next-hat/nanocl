@@ -42,14 +42,14 @@ mod tests {
 
   /// Test version command
   #[ntex::test]
-  async fn test_version() {
+  async fn version() {
     let args = Cli::parse_from(["nanocl", "version"]);
     assert!(execute_args(&args).await.is_ok());
   }
 
   /// Test Namespace commands
   #[ntex::test]
-  async fn test_namespace() {
+  async fn namespace() {
     const NAMESPACE_NAME: &str = "cli-namespace";
     // Try to create namespace
     let args =
@@ -70,7 +70,7 @@ mod tests {
 
   /// Test Cargo image commands
   #[ntex::test]
-  async fn test_cargo_image() {
+  async fn cargo_image() {
     const IMAGE_NAME: &str = "busybox:1.26.0";
     // Try to create cargo image
     let args =
@@ -87,28 +87,22 @@ mod tests {
     let args =
       Cli::parse_from(["nanocl", "cargo", "image", "rm", "-y", IMAGE_NAME]);
     assert!(execute_args(&args).await.is_ok());
-    // Try to import a cargo image from a tarball
-    // NOTE: It's bugging out in CI, but works locally
-    // It's timeouting on the `client.import_image` call
-    // let fp = std::env::current_dir()
-    //   .unwrap()
-    //   .join("../../tests/busybox.tar.gz");
-    // let args = Cli::parse_from([
-    //   "nanocl",
-    //   "cargo",
-    //   "image",
-    //   "import",
-    //   "-f",
-    //   &fp.display().to_string(),
-    // ]);
-    // let res = execute_args(&args).await;
-    // println!("res : {res:#?}");
-    // assert!(res.is_ok());
+    let args = Cli::parse_from([
+      "nanocl",
+      "cargo",
+      "image",
+      "import",
+      "-f",
+      "../../tests/busybox.tar.gz",
+    ]);
+    let res = execute_args(&args).await;
+    println!("res : {res:#?}");
+    assert!(res.is_ok());
   }
 
   /// Test Cargo commands
   #[ntex::test]
-  async fn test_cargo() {
+  async fn cargo() {
     const CARGO_NAME: &str = "cli-test";
     const IMAGE_NAME: &str = "nexthat/nanocl-get-started:latest";
     // Try to create cargo
@@ -161,7 +155,7 @@ mod tests {
 
   /// Test Resource commands
   #[ntex::test]
-  async fn test_resource() {
+  async fn resource() {
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -219,7 +213,7 @@ mod tests {
 
   /// Test cargo exec command
   #[ntex::test]
-  async fn test_cargo_exec() {
+  async fn cargo_exec() {
     let args = Cli::parse_from([
       "nanocl",
       "cargo",
@@ -235,7 +229,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_state() {
+  async fn state() {
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -307,16 +301,25 @@ mod tests {
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "revert",
+      "-yf",
+      "../../examples/resource_custom.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
   }
 
   #[ntex::test]
-  async fn test_info() {
+  async fn info() {
     let args = Cli::parse_from(["nanocl", "info"]);
     assert!(execute_args(&args).await.is_ok());
   }
 
   // #[ntex::test]
-  async fn _test_setup() {
+  async fn _setup() {
     let args = Cli::parse_from([
       "nanocl",
       "setup",
@@ -355,7 +358,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn test_cargo_run() {
+  async fn cargo_run() {
     let args = Cli::parse_from([
       "nanocl",
       "cargo",
