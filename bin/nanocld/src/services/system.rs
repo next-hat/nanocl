@@ -38,8 +38,14 @@ async fn watch_events(
   )
 }
 
+#[web::get("/processes")]
+async fn get_processes() -> Result<web::HttpResponse, HttpResponseError> {
+  Ok(web::HttpResponse::Ok().finish())
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(watch_events);
+  config.service(get_processes);
   config.service(get_info);
 }
 

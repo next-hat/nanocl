@@ -7,12 +7,14 @@ use crate::error::HttpResponseError;
 use crate::repositories::error::{db_error, db_blocking_error};
 
 pub async fn create(
-  item: VmImageDbModel,
+  item: &VmImageDbModel,
   pool: &Pool,
 ) -> Result<VmImageDbModel, HttpResponseError> {
   use crate::schema::vm_images::dsl;
-  let pool = pool.clone();
 
+  let item = item.clone();
+
+  let pool = pool.clone();
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = diesel::insert_into(dsl::vm_images)
@@ -37,9 +39,9 @@ pub async fn find_by_name(
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = dsl::vm_images
-      .filter(dsl::name.eq(name))
+      .filter(dsl::name.eq(&name))
       .get_result(&mut conn)
-      .map_err(db_error("vm_image"))?;
+      .map_err(db_error(&format!("vm_image {name}")))?;
     Ok::<_, HttpResponseError>(item)
   })
   .await

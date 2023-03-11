@@ -164,7 +164,7 @@ async fn attach_to_cargo(
     Ok(cargo) => cargo,
   };
   let mut futures = Vec::new();
-  for (index, _) in cargo.containers.iter().enumerate() {
+  for (index, _) in cargo.instances.iter().enumerate() {
     let namespace = namespace.to_owned();
     let name = if index == 0 {
       cargo.name.clone()

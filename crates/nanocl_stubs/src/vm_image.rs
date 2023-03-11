@@ -9,5 +9,7 @@ pub struct VmImage {
   pub created_at: chrono::NaiveDateTime,
   pub path: String,
   pub kind: String,
-  pub size: i64,
+  pub format: String,
+  pub size_actual: i64,
+  pub size_virtual: i64,
 }

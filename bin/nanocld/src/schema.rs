@@ -110,7 +110,9 @@ diesel::table! {
         created_at -> Timestamptz,
         kind -> Varchar,
         path -> Varchar,
-        size -> Int8,
+        format -> Varchar,
+        size_actual -> Int8,
+        size_virtual -> Int8,
         parent -> Nullable<Varchar>,
     }
 }

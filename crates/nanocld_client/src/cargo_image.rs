@@ -2,9 +2,6 @@ use std::error::Error;
 
 use ntex::channel::mpsc;
 use ntex::util::{Bytes, Stream};
-use ntex::http::client::ClientResponse;
-use futures::TryStreamExt;
-use futures::stream::IntoStream;
 
 use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
 
@@ -168,7 +165,7 @@ impl NanocldClient {
     S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
     E: Error + 'static,
   {
-    let res = self
+    self
       .send_post_stream(
         format!("/{}/cargoes/images/import", self.version),
         stream,

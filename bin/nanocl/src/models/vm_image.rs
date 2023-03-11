@@ -1,4 +1,5 @@
 use tabled::Tabled;
+use chrono::TimeZone;
 
 use nanocld_client::stubs::vm_image::VmImage;
 
@@ -37,9 +38,9 @@ pub struct VmImageArgs {
 pub struct VmImageRow {
   pub name: String,
   pub kind: String,
+  pub format: String,
   pub size: String,
   pub created_at: String,
-  pub path: String,
 }
 
 fn convert_size(size: i64) -> String {
@@ -52,13 +53,23 @@ fn convert_size(size: i64) -> String {
 
 impl From<VmImage> for VmImageRow {
   fn from(item: VmImage) -> Self {
-    let created_at = item.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
+    // Convert the created_at and updated_at to the current timezone
+    let binding = chrono::Local::now();
+    let tz = binding.offset();
+    // Convert the created_at and updated_at to the current timezone
+    let created_at = tz
+      .timestamp_opt(item.created_at.timestamp(), 0)
+      .unwrap()
+      .format("%Y-%m-%d %H:%M:%S");
+    let size_virtual = convert_size(item.size_virtual);
+    let size_actual = convert_size(item.size_actual);
+    let size = format!("{} / {}", size_actual, size_virtual);
     Self {
       name: item.name.to_owned(),
-      kind: item.kind.to_owned(),
-      size: convert_size(item.size),
-      created_at,
-      path: item.path,
+      kind: item.kind,
+      format: item.format,
+      size,
+      created_at: format!("{created_at}"),
     }
   }
 }

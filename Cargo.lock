@@ -1632,9 +1632,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "0.6.3"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "929445547b0bd2a5ec4804ced9938d6dba33b29d1a573398374a310dbfcd852d"
+checksum = "8fa4dddc7233889d7ac3185c48bc03180de9a36d96af7f7eed1494916950f0f2"
 dependencies = [
  "async-channel",
  "async-oneshot",
@@ -1864,9 +1864,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-tokio"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74d8836dcbe30ddf1cdf81d3385950dcd93958b1eb26b420b8354d74078091f7"
+checksum = "e996405b96658c8dce71fb1006f72dd967f55856d04a62b9e0cf5099c6dbfdb5"
 dependencies = [
  "log 0.4.17",
  "ntex-bytes",

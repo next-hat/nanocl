@@ -9,7 +9,11 @@ use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};
 use crate::utils;
 use crate::error::HttpResponseError;
 use crate::models::{
-  Pool, VmDbModel, NamespaceDbModel, VmUpdateDbModel, VmConfigDbModel,
+  Pool,
+  VmDbModel,
+  NamespaceDbModel,
+  VmConfigDbModel,
+  // VmUpdateDbModel,
 };
 
 use super::vm_config;
@@ -39,9 +43,10 @@ use super::error::{db_error, db_blocking_error};
 /// ```
 ///
 pub async fn find_by_namespace(
-  nsp: NamespaceDbModel,
+  nsp: &NamespaceDbModel,
   pool: &Pool,
 ) -> Result<Vec<VmDbModel>, HttpResponseError> {
+  let nsp = nsp.clone();
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -89,12 +94,15 @@ pub async fn find_by_namespace(
 /// ```
 ///
 pub async fn create(
-  nsp: String,
+  nsp: &str,
   item: VmConfigPartial,
-  version: String,
+  version: &str,
   pool: &Pool,
 ) -> Result<Vm, HttpResponseError> {
   use crate::schema::vms::dsl;
+
+  let nsp = nsp.to_owned();
+  let version = version.to_owned();
 
   // test if the name of the vm include a . in the name and throw error if true
   if item.name.contains('.') {
@@ -163,11 +171,12 @@ pub async fn create(
 /// ```
 ///
 pub async fn delete_by_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::vms::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -205,11 +214,12 @@ pub async fn delete_by_key(
 /// ```
 ///
 pub async fn find_by_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<VmDbModel, HttpResponseError> {
   use crate::schema::vms::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -257,47 +267,47 @@ pub async fn find_by_key(
 /// let vm = update_by_key(String::from("test"), item, &pool).await;
 /// ```
 ///
-pub async fn update_by_key(
-  key: String,
-  item: VmConfigPartial,
-  version: String,
-  pool: &Pool,
-) -> Result<Vm, HttpResponseError> {
-  use crate::schema::vms::dsl;
+// pub async fn update_by_key(
+//   key: String,
+//   item: VmConfigPartial,
+//   version: String,
+//   pool: &Pool,
+// ) -> Result<Vm, HttpResponseError> {
+//   use crate::schema::vms::dsl;
 
-  let pool = pool.clone();
+//   let pool = pool.clone();
 
-  let vmdb = find_by_key(key.to_owned(), &pool).await?;
-  let config =
-    vm_config::create(key.to_owned(), item.to_owned(), version, &pool).await?;
+//   let vmdb = find_by_key(&key, &pool).await?;
+//   let config =
+//     vm_config::create(key.to_owned(), item.to_owned(), version, &pool).await?;
 
-  let new_item = VmUpdateDbModel {
-    name: Some(item.name),
-    config_key: Some(config.key),
-    ..Default::default()
-  };
+//   let new_item = VmUpdateDbModel {
+//     name: Some(item.name),
+//     config_key: Some(config.key),
+//     ..Default::default()
+//   };
 
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::update(dsl::vms.filter(dsl::key.eq(key)))
-      .set(&new_item)
-      .execute(&mut conn)
-      .map_err(db_error("vm"))?;
-    Ok::<_, HttpResponseError>(())
-  })
-  .await
-  .map_err(db_blocking_error)?;
+//   web::block(move || {
+//     let mut conn = utils::store::get_pool_conn(&pool)?;
+//     diesel::update(dsl::vms.filter(dsl::key.eq(key)))
+//       .set(&new_item)
+//       .execute(&mut conn)
+//       .map_err(db_error("vm"))?;
+//     Ok::<_, HttpResponseError>(())
+//   })
+//   .await
+//   .map_err(db_blocking_error)?;
 
-  let vm = Vm {
-    key: vmdb.key,
-    name: vmdb.name,
-    config_key: config.key,
-    namespace_name: vmdb.namespace_name,
-    config,
-  };
+//   let vm = Vm {
+//     key: vmdb.key,
+//     name: vmdb.name,
+//     config_key: config.key,
+//     namespace_name: vmdb.namespace_name,
+//     config,
+//   };
 
-  Ok(vm)
-}
+//   Ok(vm)
+// }
 
 /// ## Count vm by namespace
 ///
@@ -321,35 +331,36 @@ pub async fn update_by_key(
 /// ).await;
 /// ```
 ///
-pub async fn count_by_namespace(
-  namespace: String,
-  pool: &Pool,
-) -> Result<i64, HttpResponseError> {
-  use crate::schema::vms;
+// pub async fn count_by_namespace(
+//   namespace: String,
+//   pool: &Pool,
+// ) -> Result<i64, HttpResponseError> {
+//   use crate::schema::vms;
 
-  let pool = pool.clone();
-  let count = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let count = vms::table
-      .filter(vms::namespace_name.eq(namespace))
-      .count()
-      .get_result(&mut conn)
-      .map_err(db_error("vm"))?;
-    Ok::<_, HttpResponseError>(count)
-  })
-  .await
-  .map_err(db_blocking_error)?;
+//   let pool = pool.clone();
+//   let count = web::block(move || {
+//     let mut conn = utils::store::get_pool_conn(&pool)?;
+//     let count = vms::table
+//       .filter(vms::namespace_name.eq(namespace))
+//       .count()
+//       .get_result(&mut conn)
+//       .map_err(db_error("vm"))?;
+//     Ok::<_, HttpResponseError>(count)
+//   })
+//   .await
+//   .map_err(db_blocking_error)?;
 
-  Ok(count)
-}
+//   Ok(count)
+// }
 
 pub async fn inspect_by_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<Vm, HttpResponseError> {
   use crate::schema::vms;
   use crate::schema::vm_configs;
 
+  let key = key.to_owned();
   let pool = pool.clone();
   let item: (VmDbModel, VmConfigDbModel) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;

@@ -1,13 +1,12 @@
 use ntex::web;
 use tokio::fs;
-use tokio::fs::File;
 use ntex::http::StatusCode;
 use futures::StreamExt;
 use tokio::io::AsyncWriteExt;
 
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::repositories;
+use crate::{repositories, utils};
 use crate::error::HttpResponseError;
 use crate::models::{Pool, VmImageDbModel};
 
@@ -44,7 +43,7 @@ async fn create_base_image(
   let state_dir = daemon_config.state_dir.clone();
   let vm_images_dir = format!("{state_dir}/vms/images");
   let filepath = format!("{vm_images_dir}/{name}.img");
-  let mut f = match File::create(&filepath).await {
+  let mut f = match fs::File::create(&filepath).await {
     Err(err) => {
       return Err(HttpResponseError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -77,29 +76,27 @@ async fn create_base_image(
     });
   }
 
-  // Get the file size
-  let metadata = match tokio::fs::metadata(&filepath).await {
+  // Get image info
+  let image_info = match utils::vm_image::get_info(&filepath).await {
     Err(err) => {
-      return Err(HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!(
-          "Error while trying to get file metadata at {filepath}: {err}"
-        ),
-      });
+      let _ = fs::remove_file(&filepath).await;
+      return Err(err);
     }
-    Ok(metadata) => metadata,
+    Ok(image_info) => image_info,
   };
 
   let vm_image = VmImageDbModel {
     name: name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: "Base".into(),
-    size: metadata.len() as i64,
+    format: image_info.format,
+    size_actual: image_info.actual_size,
+    size_virtual: image_info.virtual_size,
     path: filepath,
     parent: None,
   };
 
-  repositories::vm_image::create(vm_image, &pool).await?;
+  repositories::vm_image::create(&vm_image, &pool).await?;
 
   Ok(web::HttpResponse::Ok().into())
 }
@@ -107,6 +104,7 @@ async fn create_base_image(
 #[web::get("/vms/images")]
 async fn list_images(
   pool: web::types::State<Pool>,
+  _version: web::types::Path<String>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let images = repositories::vm_image::list(&pool).await?;
 
@@ -120,15 +118,7 @@ async fn delete_vm_image(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
 
-  let vm_image = repositories::vm_image::find_by_name(&name, &pool).await?;
-
-  let filepath = vm_image.path.clone();
-
-  if let Err(err) = fs::remove_file(&filepath).await {
-    log::warn!("Error while deleting the file {filepath}: {err}");
-  }
-
-  repositories::vm_image::delete_by_name(&name, &pool).await?;
+  utils::vm_image::delete(&name, &pool).await?;
 
   Ok(web::HttpResponse::Ok().into())
 }

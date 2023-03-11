@@ -576,8 +576,8 @@ pub async fn list(
       name: cargo.name,
       namespace_name: cargo.namespace_name,
       config: config.to_owned(),
-      instances: containers.len(),
-      running_instances,
+      instance_total: containers.len(),
+      instance_running: running_instances,
       config_key: config.key,
     });
   }
@@ -622,8 +622,9 @@ pub async fn inspect(
     config_key: cargo.config_key,
     namespace_name: cargo.namespace_name,
     config: cargo.config,
-    running_instances,
-    containers,
+    instance_total: containers.len(),
+    instance_running: running_instances,
+    instances: containers,
   })
 }
 
