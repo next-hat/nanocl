@@ -7,6 +7,8 @@ pub mod namespace;
 pub mod network;
 pub mod stream;
 pub mod resource;
+pub mod vm;
+pub mod vm_image;
 
 #[cfg(test)]
 pub mod tests {

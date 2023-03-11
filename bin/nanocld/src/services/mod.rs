@@ -11,6 +11,7 @@ mod system;
 mod resource;
 mod cargo;
 mod cargo_image;
+mod vm;
 mod vm_image;
 
 pub struct Versionning;
@@ -103,6 +104,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
       .configure(resource::ntex_config)
       .configure(cargo::ntex_config)
       .configure(cargo_image::ntex_config)
+      .configure(vm::ntex_config)
       .configure(vm_image::ntex_config),
   );
 }

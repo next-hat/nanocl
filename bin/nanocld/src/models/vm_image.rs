@@ -9,11 +9,12 @@ use crate::schema::vm_images;
 )]
 #[diesel(primary_key(name))]
 #[diesel(table_name = vm_images)]
+#[serde(rename_all = "PascalCase")]
 pub struct VmImageDbModel {
   pub(crate) name: String,
   pub(crate) created_at: chrono::NaiveDateTime,
-  pub(crate) path: String,
   pub(crate) kind: String,
+  pub(crate) path: String,
   pub(crate) size: i64,
-  pub(crate) checksum: String,
+  pub(crate) parent: Option<String>,
 }

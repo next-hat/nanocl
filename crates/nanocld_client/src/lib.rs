@@ -6,6 +6,7 @@ pub(crate) mod cargo_image;
 pub(crate) mod system;
 pub(crate) mod resource;
 pub(crate) mod state;
+pub(crate) mod vm;
 pub(crate) mod vm_image;
 
 pub mod error;

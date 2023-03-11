@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS "vm_images" (
   "kind" VARCHAR NOT NULL,
   "path" VARCHAR NOT NULL,
   "size" BIGINT NOT NULL,
-  "checksum" VARCHAR NOT NULL
+  "parent" VARCHAR REFERENCES vm_images("name")
 );
 
 CREATE TABLE IF NOT EXISTS "vm_configs" (

@@ -1,20 +1,24 @@
 use std::path::Path;
 
+use indicatif::{ProgressBar, ProgressStyle};
 use tokio_util::codec;
 use futures::StreamExt;
 use nanocld_client::NanocldClient;
 
-use crate::error::CliError;
-use crate::models::{VmImageArgs, VmImageCreateBaseOpts, VmImageCommands};
+use crate::utils::math::calculate_percentage;
 
-async fn exec_vm_image_base_create(
+use crate::error::CliError;
+use crate::models::{VmImageArgs, VmImageCreateOpts, VmImageCommands, VmImageRow};
+use crate::utils::print::print_table;
+
+async fn exec_vm_image_create(
   client: &NanocldClient,
-  options: &VmImageCreateBaseOpts,
+  options: &VmImageCreateOpts,
 ) -> Result<(), CliError> {
-  let file_path = &options.file_path;
+  let file_path = options.file_path.clone();
 
   let fp =
-    Path::new(file_path)
+    Path::new(&file_path)
       .canonicalize()
       .map_err(|err| CliError::Custom {
         msg: format!("Unable to resolve path {file_path}: {err}"),
@@ -27,27 +31,58 @@ async fn exec_vm_image_base_create(
         msg: format!("Unable to open file at {file_path}: {err}"),
       })?;
 
+  // Get file size
+  let file_size = file
+    .metadata()
+    .await
+    .map_err(|err| CliError::Custom {
+      msg: format!("Unable to get file metadata for {file_path}: {err}"),
+    })?
+    .len();
+  let mut sent: u64 = 0;
+  let pg = ProgressBar::new(100);
+  let style = ProgressStyle::with_template(
+    "[{elapsed_precise}] [{bar:20.cyan/blue}] {pos:>7}% {msg}",
+  )
+  .unwrap()
+  .progress_chars("=> ");
+  pg.set_style(style);
+
   let byte_stream =
-    codec::FramedRead::new(file, codec::BytesCodec::new()).map(|r| {
-      let bytes = ntex::util::Bytes::from_iter(r?.to_vec());
+    codec::FramedRead::new(file, codec::BytesCodec::new()).map(move |r| {
+      let r = r?;
+      sent += r.len() as u64;
+      let percent = calculate_percentage(sent, file_size);
+      pg.set_position(percent);
+      let bytes = ntex::util::Bytes::from_iter(r.to_vec());
       Ok::<ntex::util::Bytes, std::io::Error>(bytes)
     });
 
-  let mut stream = client
+  client
     .create_vm_image_base_from_tar(&options.name, byte_stream)
     .await?;
 
-  while let Some(status) = stream.next().await {
-    let status = match status {
-      Err(err) => {
-        eprintln!("Error while importing image: {err}");
-        break;
-      }
-      Ok(status) => status,
-    };
-    println!("{status:#?}");
-  }
+  Ok(())
+}
 
+async fn exec_vm_image_ls(client: &NanocldClient) -> Result<(), CliError> {
+  let items = client.list_vm_image().await?;
+  let rows = items
+    .into_iter()
+    .map(VmImageRow::from)
+    .collect::<Vec<VmImageRow>>();
+
+  print_table(rows);
+  Ok(())
+}
+
+async fn exec_vm_image_rm(
+  client: &NanocldClient,
+  names: &[String],
+) -> Result<(), CliError> {
+  for name in names {
+    client.delete_vm_image(name).await?;
+  }
   Ok(())
 }
 
@@ -56,8 +91,10 @@ pub async fn exec_vm_image(
   args: &VmImageArgs,
 ) -> Result<(), CliError> {
   match &args.commands {
-    VmImageCommands::CreateBase(options) => {
-      exec_vm_image_base_create(client, options).await
+    VmImageCommands::Create(options) => {
+      exec_vm_image_create(client, options).await
     }
+    VmImageCommands::List => exec_vm_image_ls(client).await,
+    VmImageCommands::Remove { names } => exec_vm_image_rm(client, names).await,
   }
 }

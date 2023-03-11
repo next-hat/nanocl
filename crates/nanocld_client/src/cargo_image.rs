@@ -163,7 +163,7 @@ impl NanocldClient {
   pub async fn import_cargo_image_from_tar<S, E>(
     &self,
     stream: S,
-  ) -> Result<IntoStream<ClientResponse>, NanocldClientError>
+  ) -> Result<(), NanocldClientError>
   where
     S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
     E: Error + 'static,
@@ -175,8 +175,7 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-    let stream = res.into_stream();
-    Ok(stream)
+    Ok(())
   }
 }
 
@@ -209,12 +208,9 @@ mod tests {
         let bytes = ntex::util::Bytes::from_iter(r?.to_vec());
         Ok::<ntex::util::Bytes, std::io::Error>(bytes)
       });
-    let mut stream = client
+    client
       .import_cargo_image_from_tar(byte_stream)
       .await
       .unwrap();
-    while let Some(info) = stream.next().await {
-      println!("{info:?}");
-    }
   }
 }

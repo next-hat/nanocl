@@ -222,7 +222,7 @@ pub enum CargoCommands {
 
 /// Manage cargoes
 #[derive(Debug, Parser)]
-#[clap(name = "nanocl-cargo")]
+#[clap(name = "nanocl cargo")]
 pub struct CargoArgs {
   /// namespace to target by default global is used
   #[clap(long, short)]

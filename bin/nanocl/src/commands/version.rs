@@ -1,13 +1,7 @@
 use nanocld_client::NanocldClient;
 
 use crate::version;
-
 use crate::error::CliError;
-
-pub async fn exec_version(client: &NanocldClient) -> Result<(), CliError> {
-  print_version(client).await?;
-  Ok(())
-}
 
 async fn print_version(client: &NanocldClient) -> Result<(), CliError> {
   println!("=== [nanocli] ===");
@@ -23,5 +17,10 @@ async fn print_version(client: &NanocldClient) -> Result<(), CliError> {
     daemon_version.commit_id
   );
 
+  Ok(())
+}
+
+pub async fn exec_version(client: &NanocldClient) -> Result<(), CliError> {
+  print_version(client).await?;
   Ok(())
 }

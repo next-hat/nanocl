@@ -4,6 +4,10 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct VmImageImportContext {
-  pub writed: usize,
+pub struct VmImage {
+  pub name: String,
+  pub created_at: chrono::NaiveDateTime,
+  pub path: String,
+  pub kind: String,
+  pub size: i64,
 }

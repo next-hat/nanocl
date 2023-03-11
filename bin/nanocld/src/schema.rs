@@ -111,7 +111,7 @@ diesel::table! {
         kind -> Varchar,
         path -> Varchar,
         size -> Int8,
-        checksum -> Varchar,
+        parent -> Nullable<Varchar>,
     }
 }
 

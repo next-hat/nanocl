@@ -14,7 +14,7 @@ use crate::models::{
   CargoExecOpts, CargoHistoryOpts, CargoResetOpts, CargoLogsOpts, CargoRunOpts,
 };
 
-use super::cargo_image::{self, exec_create_cargo_image};
+use super::cargo_image::{self, exec_cargo_image_create};
 
 /// Execute cargo command
 ///
@@ -33,15 +33,13 @@ async fn exec_cargo_create(
   args: &CargoArgs,
   options: &CargoCreateOpts,
 ) -> Result<(), CliError> {
-  let cargo = options.to_owned().into();
-  let item = client
-    .create_cargo(&cargo, args.namespace.to_owned())
-    .await?;
+  let cargo = options.clone().into();
+  let item = client.create_cargo(&cargo, args.namespace.clone()).await?;
   println!("{}", &item.key);
   Ok(())
 }
 
-async fn exec_cargo_delete(
+async fn exec_cargo_rm(
   client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoRemoveOpts,
@@ -61,16 +59,16 @@ async fn exec_cargo_delete(
     }
   }
   for name in &options.names {
-    client.delete_cargo(name, args.namespace.to_owned()).await?;
+    client.delete_cargo(name, args.namespace.clone()).await?;
   }
   Ok(())
 }
 
-async fn exec_cargo_list(
+async fn exec_cargo_ls(
   client: &NanocldClient,
   args: &CargoArgs,
 ) -> Result<(), CliError> {
-  let items = client.list_cargo(args.namespace.to_owned()).await?;
+  let items = client.list_cargo(args.namespace.clone()).await?;
 
   let rows = items
     .into_iter()
@@ -86,7 +84,7 @@ async fn exec_cargo_start(
   options: &CargoStartOpts,
 ) -> Result<(), CliError> {
   client
-    .start_cargo(&options.name, args.namespace.to_owned())
+    .start_cargo(&options.name, args.namespace.clone())
     .await?;
   Ok(())
 }
@@ -97,7 +95,7 @@ async fn exec_cargo_stop(
   options: &CargoStopOpts,
 ) -> Result<(), CliError> {
   for name in &options.names {
-    client.stop_cargo(name, args.namespace.to_owned()).await?;
+    client.stop_cargo(name, args.namespace.clone()).await?;
   }
   Ok(())
 }
@@ -107,9 +105,9 @@ async fn exec_cargo_patch(
   args: &CargoArgs,
   options: &CargoPatchOpts,
 ) -> Result<(), CliError> {
-  let cargo = options.to_owned().into();
+  let cargo = options.clone().into();
   client
-    .patch_cargo(&options.name, cargo, args.namespace.to_owned())
+    .patch_cargo(&options.name, cargo, args.namespace.clone())
     .await?;
   Ok(())
 }
@@ -120,7 +118,7 @@ async fn exec_cargo_inspect(
   options: &CargoInspectOpts,
 ) -> Result<(), CliError> {
   let cargo = client
-    .inspect_cargo(&options.name, args.namespace.to_owned())
+    .inspect_cargo(&options.name, args.namespace.clone())
     .await?;
   print_yml(cargo)?;
   Ok(())
@@ -131,9 +129,9 @@ async fn exec_cargo_exec(
   args: &CargoArgs,
   options: &CargoExecOpts,
 ) -> Result<(), CliError> {
-  let exec: CreateExecOptions<String> = options.to_owned().into();
+  let exec: CreateExecOptions<String> = options.clone().into();
   let mut stream = client
-    .exec_cargo(&options.name, exec, args.namespace.to_owned())
+    .exec_cargo(&options.name, exec, args.namespace.clone())
     .await?;
 
   while let Some(output) = stream.next().await {
@@ -159,7 +157,7 @@ async fn exec_cargo_history(
   opts: &CargoHistoryOpts,
 ) -> Result<(), CliError> {
   let histories = client
-    .list_history_cargo(&opts.name, args.namespace.to_owned())
+    .list_history_cargo(&opts.name, args.namespace.clone())
     .await?;
 
   let histories = serde_yaml::to_string(&histories)?;
@@ -173,7 +171,7 @@ async fn exec_cargo_logs(
   options: &CargoLogsOpts,
 ) -> Result<(), CliError> {
   let mut stream = client
-    .logs_cargo(&options.name, args.namespace.to_owned())
+    .logs_cargo(&options.name, args.namespace.clone())
     .await?;
   while let Some(log) = stream.next().await {
     let log = match log {
@@ -203,7 +201,7 @@ async fn exec_cargo_reset(
   opts: &CargoResetOpts,
 ) -> Result<(), CliError> {
   let cargo = client
-    .reset_cargo(&opts.name, &opts.history_id, args.namespace.to_owned())
+    .reset_cargo(&opts.name, &opts.history_id, args.namespace.clone())
     .await?;
   let cargo = serde_yaml::to_string(&cargo)?;
   println!("{cargo}");
@@ -217,7 +215,7 @@ async fn exec_cargo_run(
 ) -> Result<(), CliError> {
   // Image is not existing so we donwload it
   if client.inspect_cargo_image(&opts.image).await.is_err() {
-    exec_create_cargo_image(client, &opts.image).await?;
+    exec_cargo_image_create(client, &opts.image).await?;
   }
 
   let cargo = client
@@ -236,12 +234,12 @@ pub async fn exec_cargo(
   args: &CargoArgs,
 ) -> Result<(), CliError> {
   match &args.commands {
-    CargoCommands::List => exec_cargo_list(client, args).await,
+    CargoCommands::List => exec_cargo_ls(client, args).await,
     CargoCommands::Create(options) => {
       exec_cargo_create(client, args, options).await
     }
     CargoCommands::Remove(options) => {
-      exec_cargo_delete(client, args, options).await
+      exec_cargo_rm(client, args, options).await
     }
     CargoCommands::Image(options) => {
       cargo_image::exec_cargo_image(client, options).await

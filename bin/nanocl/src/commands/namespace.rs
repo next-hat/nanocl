@@ -9,7 +9,7 @@ use crate::models::{
   NamespaceDeleteOpts,
 };
 
-async fn exec_namespace_list(client: &NanocldClient) -> Result<(), CliError> {
+async fn exec_namespace_ls(client: &NanocldClient) -> Result<(), CliError> {
   let items = client.list_namespace().await?;
   let namespaces = items
     .into_iter()
@@ -37,7 +37,7 @@ async fn exec_namespace_inspect(
   Ok(())
 }
 
-async fn exec_namespace_delete(
+async fn exec_namespace_rm(
   client: &NanocldClient,
   options: &NamespaceDeleteOpts,
 ) -> Result<(), CliError> {
@@ -68,7 +68,7 @@ pub async fn exec_namespace(
   args: &NamespaceArgs,
 ) -> Result<(), CliError> {
   match &args.commands {
-    NamespaceCommands::List => exec_namespace_list(client).await,
+    NamespaceCommands::List => exec_namespace_ls(client).await,
     NamespaceCommands::Create(options) => {
       exec_namespace_create(client, options).await
     }
@@ -76,7 +76,7 @@ pub async fn exec_namespace(
       exec_namespace_inspect(client, options).await
     }
     NamespaceCommands::Remove(options) => {
-      exec_namespace_delete(client, options).await
+      exec_namespace_rm(client, options).await
     }
   }
 }

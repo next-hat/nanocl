@@ -1,9 +1,86 @@
 use ntex::web;
-use ntex::http::StatusCode;
 use diesel::prelude::*;
 
-async fn create(
+use crate::utils;
+use crate::models::{Pool, VmImageDbModel};
+use crate::error::HttpResponseError;
+use crate::repositories::error::{db_error, db_blocking_error};
+
+pub async fn create(
   item: VmImageDbModel,
   pool: &Pool,
 ) -> Result<VmImageDbModel, HttpResponseError> {
+  use crate::schema::vm_images::dsl;
+  let pool = pool.clone();
+
+  let item = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let item = diesel::insert_into(dsl::vm_images)
+      .values(&item)
+      .get_result(&mut conn)
+      .map_err(db_error("vm_image"))?;
+    Ok::<_, HttpResponseError>(item)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+  Ok(item)
+}
+
+pub async fn find_by_name(
+  name: &str,
+  pool: &Pool,
+) -> Result<VmImageDbModel, HttpResponseError> {
+  use crate::schema::vm_images::dsl;
+
+  let name = name.to_owned();
+  let pool = pool.clone();
+  let item = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let item = dsl::vm_images
+      .filter(dsl::name.eq(name))
+      .get_result(&mut conn)
+      .map_err(db_error("vm_image"))?;
+    Ok::<_, HttpResponseError>(item)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+  Ok(item)
+}
+
+pub async fn delete_by_name(
+  name: &str,
+  pool: &Pool,
+) -> Result<(), HttpResponseError> {
+  use crate::schema::vm_images::dsl;
+
+  let name = name.to_owned();
+  let pool = pool.clone();
+  web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    diesel::delete(dsl::vm_images.filter(dsl::name.eq(name)))
+      .execute(&mut conn)
+      .map_err(db_error("vm_image"))?;
+    Ok::<_, HttpResponseError>(())
+  })
+  .await
+  .map_err(db_blocking_error)?;
+  Ok(())
+}
+
+pub async fn list(
+  pool: &Pool,
+) -> Result<Vec<VmImageDbModel>, HttpResponseError> {
+  use crate::schema::vm_images::dsl;
+
+  let pool = pool.clone();
+  let items = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let items = dsl::vm_images
+      .load::<VmImageDbModel>(&mut conn)
+      .map_err(db_error("vm_image"))?;
+    Ok::<_, HttpResponseError>(items)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+  Ok(items)
 }

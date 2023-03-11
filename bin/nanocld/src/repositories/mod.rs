@@ -9,6 +9,12 @@ pub mod namespace;
 pub mod cargo;
 /// Manage cargo_configs table
 pub mod cargo_config;
+/// Manage vms table
+pub mod vm;
+/// Manage vm_configs table
+pub mod vm_config;
+/// Manage vm_images table
+pub mod vm_image;
 /// Manage resources table
 pub mod resource;
 /// Manage resource_kinds table

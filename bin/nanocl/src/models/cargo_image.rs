@@ -61,11 +61,11 @@ pub struct CargoImageRow {
   pub(crate) size: String,
 }
 
-fn convert_size(size: u64) -> String {
+fn convert_size(size: i64) -> String {
   if size >= 1_000_000_000 {
-    format!("{} GB", size / 1_000_000_000)
+    format!("{} GB", size / 1024 / 1024 / 1024)
   } else {
-    format!("{} MB", size / 1_000_000)
+    format!("{} MB", size / 1024 / 1024)
   }
 }
 
@@ -81,15 +81,13 @@ impl From<ImageSummary> for CargoImageRow {
     let id = id[0..12].to_owned();
     let created = NaiveDateTime::from_timestamp_opt(value.created, 0).unwrap();
     let created = created.format("%Y-%m-%d %H:%M:%S").to_string();
-    let size = value.size;
-    let size_string = convert_size(size.try_into().unwrap());
 
     Self {
       repositories: vals.first().unwrap_or(&"<none>").to_string(),
       tag: vals.get(1).unwrap_or(&"<none>").to_string(),
       image_id: id,
       created,
-      size: size_string,
+      size: convert_size(value.size),
     }
   }
 }

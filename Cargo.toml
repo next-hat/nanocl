@@ -13,11 +13,10 @@ opt-level = 0
 opt-level = 'z'
 lto = true
 codegen-units = 1
-panic = 'abort'
 strip = "debuginfo"
 
 [patch.crates-io]
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocld_client = { path = "crates/nanocld_client" }
-ntex = { git = "https://github.com/ntex-rs/ntex" }
-ntex-tokio = { git = "https://github.com/ntex-rs/ntex" }
+#ntex = { git = "https://github.com/ntex-rs/ntex" }
+#ntex-tokio = { git = "https://github.com/ntex-rs/ntex" }
