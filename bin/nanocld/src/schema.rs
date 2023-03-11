@@ -94,12 +94,46 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    vm_configs (key) {
+        key -> Uuid,
+        created_at -> Timestamptz,
+        vm_key -> Varchar,
+        version -> Varchar,
+        config -> Jsonb,
+    }
+}
+
+diesel::table! {
+    vm_images (name) {
+        name -> Varchar,
+        created_at -> Timestamptz,
+        path -> Varchar,
+        #[sql_name = "type"]
+        type_ -> Varchar,
+        size -> Int8,
+        checksum -> Varchar,
+    }
+}
+
+diesel::table! {
+    vms (key) {
+        key -> Varchar,
+        created_at -> Timestamptz,
+        name -> Varchar,
+        config_key -> Uuid,
+        namespace_name -> Varchar,
+    }
+}
+
 diesel::joinable!(cargoes -> cargo_configs (config_key));
 diesel::joinable!(cargoes -> namespaces (namespace_name));
 diesel::joinable!(node_group_links -> node_groups (node_group_name));
 diesel::joinable!(node_group_links -> nodes (node_name));
 diesel::joinable!(resource_kind_versions -> resource_kinds (resource_kind_name));
 diesel::joinable!(resources -> resource_configs (config_key));
+diesel::joinable!(vms -> namespaces (namespace_name));
+diesel::joinable!(vms -> vm_configs (config_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
   cargo_configs,
@@ -113,4 +147,7 @@ diesel::allow_tables_to_appear_in_same_query!(
   resource_kind_versions,
   resource_kinds,
   resources,
+  vm_configs,
+  vm_images,
+  vms,
 );
