@@ -2,8 +2,8 @@
 CREATE TABLE IF NOT EXISTS "vm_images" (
   "name" VARCHAR NOT NULL PRIMARY KEY,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "kind" VARCHAR NOT NULL,
   "path" VARCHAR NOT NULL,
-  "type" VARCHAR NOT NULL,
   "size" BIGINT NOT NULL,
   "checksum" VARCHAR NOT NULL
 );

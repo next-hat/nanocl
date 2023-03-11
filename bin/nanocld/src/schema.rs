@@ -108,9 +108,8 @@ diesel::table! {
     vm_images (name) {
         name -> Varchar,
         created_at -> Timestamptz,
+        kind -> Varchar,
         path -> Varchar,
-        #[sql_name = "type"]
-        type_ -> Varchar,
         size -> Int8,
         checksum -> Varchar,
     }
@@ -136,18 +135,18 @@ diesel::joinable!(vms -> namespaces (namespace_name));
 diesel::joinable!(vms -> vm_configs (config_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
-  cargo_configs,
-  cargoes,
-  metrics,
-  namespaces,
-  node_group_links,
-  node_groups,
-  nodes,
-  resource_configs,
-  resource_kind_versions,
-  resource_kinds,
-  resources,
-  vm_configs,
-  vm_images,
-  vms,
+    cargo_configs,
+    cargoes,
+    metrics,
+    namespaces,
+    node_group_links,
+    node_groups,
+    nodes,
+    resource_configs,
+    resource_kind_versions,
+    resource_kinds,
+    resources,
+    vm_configs,
+    vm_images,
+    vms,
 );

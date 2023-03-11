@@ -160,7 +160,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  pub async fn import_from_tarball<S, E>(
+  pub async fn import_cargo_image_from_tar<S, E>(
     &self,
     stream: S,
   ) -> Result<IntoStream<ClientResponse>, NanocldClientError>
@@ -209,7 +209,10 @@ mod tests {
         let bytes = ntex::util::Bytes::from_iter(r?.to_vec());
         Ok::<ntex::util::Bytes, std::io::Error>(bytes)
       });
-    let mut stream = client.import_from_tarball(byte_stream).await.unwrap();
+    let mut stream = client
+      .import_cargo_image_from_tar(byte_stream)
+      .await
+      .unwrap();
     while let Some(info) = stream.next().await {
       println!("{info:?}");
     }

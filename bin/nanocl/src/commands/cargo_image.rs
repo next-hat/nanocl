@@ -157,11 +157,11 @@ async fn exec_import_cargo_image(
 
   let byte_stream =
     codec::FramedRead::new(file, codec::BytesCodec::new()).map(|r| {
-      let bytes = ntex::util::Bytes::from_iter(r?.to_vec());
+      let bytes = ntex::util::Bytes::from_iter(r?.freeze().to_vec());
       Ok::<ntex::util::Bytes, std::io::Error>(bytes)
     });
 
-  let mut stream = client.import_from_tarball(byte_stream).await?;
+  let mut stream = client.import_cargo_image_from_tar(byte_stream).await?;
   while let Some(info) = stream.next().await {
     println!("{info:?}");
   }

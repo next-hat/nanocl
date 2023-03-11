@@ -16,7 +16,7 @@ use tokio::sync::mpsc::{Receiver, Sender, channel};
 use nanocl_stubs::system::Event;
 
 // Wrap Receiver in our own type, with correct error type
-pub struct Client(Receiver<Bytes>);
+pub struct Client(pub Receiver<Bytes>);
 
 impl Stream for Client {
   type Item = Result<Bytes, Error>;

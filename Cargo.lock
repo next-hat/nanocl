@@ -1633,8 +1633,7 @@ dependencies = [
 [[package]]
 name = "ntex"
 version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "929445547b0bd2a5ec4804ced9938d6dba33b29d1a573398374a310dbfcd852d"
+source = "git+https://github.com/ntex-rs/ntex#a98f63b1bf70cefa817a2e26a199496b3ed09969"
 dependencies = [
  "async-channel",
  "async-oneshot",
@@ -1864,9 +1863,8 @@ dependencies = [
 
 [[package]]
 name = "ntex-tokio"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74d8836dcbe30ddf1cdf81d3385950dcd93958b1eb26b420b8354d74078091f7"
+version = "0.2.3"
+source = "git+https://github.com/ntex-rs/ntex#a98f63b1bf70cefa817a2e26a199496b3ed09969"
 dependencies = [
  "log 0.4.17",
  "ntex-bytes",
@@ -2368,9 +2366,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "2.3.0"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ea48c9627169d206b35905699f513f513c303ab9d964a59b44fdcf66c1d1ab7"
+checksum = "85456ffac572dc8826334164f2fb6fb40a7c766aebe195a2a21ee69ee2885ecf"
 dependencies = [
  "base64 0.13.1",
  "chrono",

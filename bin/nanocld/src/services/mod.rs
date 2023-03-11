@@ -11,6 +11,7 @@ mod system;
 mod resource;
 mod cargo;
 mod cargo_image;
+mod vm_image;
 
 pub struct Versionning;
 
@@ -93,11 +94,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
     )
     .service(get_version);
 
-  #[cfg(feature = "dev")]
-  {
-    config.service(web::scope("/openapi").configure(openapi::ntex_config));
-  }
-
   config.service(
     web::scope("/{version}")
       .wrap(Versionning)
@@ -106,7 +102,8 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
       .configure(system::ntex_config)
       .configure(resource::ntex_config)
       .configure(cargo::ntex_config)
-      .configure(cargo_image::ntex_config),
+      .configure(cargo_image::ntex_config)
+      .configure(vm_image::ntex_config),
   );
 }
 

@@ -1,18 +1,19 @@
 /// Functions helper to manipulate database models.
-pub mod error;
-/// Manage node
+/// Manage nodes table
 pub mod node;
-/// Manage metrics
+/// Manage metrics table
 pub mod metric;
-/// Manage namespace
+/// Manage namespaces table
 pub mod namespace;
-/// Manage cargo
+/// Manage cargoes table
 pub mod cargo;
-/// Manage cargo config
+/// Manage cargo_configs table
 pub mod cargo_config;
-/// Manage resource
+/// Manage resources table
 pub mod resource;
-/// Manage resource kind
+/// Manage resource_kinds table
 pub mod resource_kind;
-/// Manage resource config
+/// Manage resource_configs table
 pub mod resource_config;
+/// Sql error
+pub mod error;

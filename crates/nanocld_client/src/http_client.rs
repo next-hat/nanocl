@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use ntex::http::client::error::SendRequestError as NtexSendRequestError;
 use ntex::rt;
 use ntex::util::{Bytes, Stream};
 use ntex::channel::mpsc::Receiver;
@@ -8,6 +7,7 @@ use ntex::http::{Client, StatusCode};
 use ntex::http::client::{Connector, ClientRequest, ClientResponse};
 use futures::{StreamExt, TryStreamExt};
 
+use ntex::http::client::error::SendRequestError as NtexSendRequestError;
 use crate::error::{ApiError, NanocldClientError, is_api_error, SendRequestError};
 
 const NANOCLD_DEFAULT_VERSION: &str = "0.2";
@@ -277,11 +277,13 @@ impl NanocldClient {
   where
     R: serde::de::DeserializeOwned + Send + 'static,
   {
+    println!("Streaming");
     let mut stream = res.into_stream();
     let (tx, rx) = ntex::channel::mpsc::channel();
     rt::spawn(async move {
       let mut payload: Vec<u8> = Vec::new();
       while let Some(item) = stream.next().await {
+        println!("BYTES : {item:#?}");
         let bytes = match item {
           Ok(bytes) => bytes,
           Err(e) => {

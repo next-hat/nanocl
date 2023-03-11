@@ -68,10 +68,10 @@ async fn import_images(
   web::types::Query(query): web::types::Query<CargoImageImportOptions>,
   mut payload: web::types::Payload,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  // generate a random filename
   let (tx, rx) =
     ntex::channel::mpsc::channel::<Result<ntex::util::Bytes, std::io::Error>>();
   rt::spawn(async move {
+    // generate a random filename
     let filename = uuid::Uuid::new_v4().to_string();
     let filepath = format!("/tmp/{filename}");
     // File::create is blocking operation, use threadpool
@@ -98,7 +98,6 @@ async fn import_images(
           msg: format!("Error while serializing the context {err}"),
         })?,
       )));
-      println!("writing: {}", bytes.len());
       // Field in turn is stream of *Bytes* object
       // filesystem operations are blocking, we have to use threadpool
       f.write_all(&bytes).await.map_err(|err| HttpResponseError {
@@ -106,16 +105,11 @@ async fn import_images(
         msg: format!("Error while writing the file {err}"),
       })?;
     }
-
-    println!("before shutdown");
     f.shutdown().await.map_err(|err| HttpResponseError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Error while closing the file {err}"),
     })?;
-
     drop(f);
-
-    println!("shutdown");
     let file =
       File::open(&file_path_ptr)
         .await
