@@ -1,3 +1,7 @@
+use ntex::http::StatusCode;
+
+use crate::error::HttpResponseError;
+
 /// Utils to manipulate `key` property of a model
 /// The key property is based on the namespace and the name of the given model
 /// or on the key of the parent for relational purpose.
@@ -49,4 +53,18 @@ pub fn resolve_nsp(nsp: &Option<String>) -> String {
 ///
 pub fn gen_key(nsp: &str, name: &str) -> String {
   name.to_owned() + "." + nsp
+}
+
+pub fn validate_name(name: &str) -> Result<(), HttpResponseError> {
+  // Ensure name only contain a-z, A-Z, 0-9, - and _
+  if !name
+    .chars()
+    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+  {
+    return Err(HttpResponseError {
+      status: StatusCode::BAD_REQUEST,
+      msg: format!("Vm image name {name} is invalid"),
+    });
+  }
+  Ok(())
 }

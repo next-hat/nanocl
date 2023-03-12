@@ -19,16 +19,7 @@ async fn import_vm_image(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
 
-  // Ensure name only contain a-z, A-Z, 0-9, - and _
-  if !name
-    .chars()
-    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-  {
-    return Err(HttpResponseError {
-      status: StatusCode::BAD_REQUEST,
-      msg: format!("Vm image name {name} is invalid"),
-    });
-  }
+  utils::key::validate_name(&name)?;
 
   if repositories::vm_image::find_by_name(&name, &pool)
     .await
@@ -109,6 +100,23 @@ async fn list_images(
   let images = repositories::vm_image::list(&pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&images))
+}
+
+#[web::post("/vms/images/{name}/snapshot/{snapshot_name}")]
+async fn create_vm_image_snapshot(
+  pool: web::types::State<Pool>,
+  path: web::types::Path<(String, String, String)>,
+  daemon_config: web::types::State<DaemonConfig>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let name = path.1.to_owned();
+  let snapshot_name = path.2.to_owned();
+  utils::key::validate_name(&snapshot_name)?;
+  let image = repositories::vm_image::find_by_name(&name, &pool).await?;
+  let vm_image =
+    utils::vm_image::create_snap(&snapshot_name, &image, &daemon_config, &pool)
+      .await?;
+
+  Ok(web::HttpResponse::Ok().json(&vm_image))
 }
 
 #[web::delete("/vms/images/{name}")]
