@@ -1,13 +1,10 @@
 use futures::Stream;
-use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
+use ntex::util::Bytes;
+use ntex::http::client::ClientResponse;
+
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm_config::VmConfigPartial;
-use ntex::connect::Connect;
-use ntex::http::Method;
-use ntex::http::client::ClientResponse;
-use ntex::http::header::{HeaderName, HeaderValue};
-use ntex::util::Bytes;
-use ntex::{rt, ws};
+use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::NanocldClient;
 use crate::error::NanocldClientError;
@@ -115,24 +112,6 @@ impl NanocldClient {
     S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
     E: std::error::Error + 'static,
   {
-    let url = format!("/{}/vms/{}/attach", self.version, name);
-
-    // open websockets connection over http transport
-    // let con = ws::WsClient::build(url)
-    //   .connector(
-    //     Connect::default()
-    //       .connector(ntex::service::fn_service(|_| async {
-    //         Ok::<_, _>(rt::unix_connect("/run/nanocl/nanocl.sock").await?)
-    //       }))
-    //       .timeout(ntex::time::Millis::from_secs(50))
-    //       .finish(),
-    //   )
-    //   .finish()
-    //   .unwrap()
-    //   .connect()
-    //   .await
-    //   .unwrap();
-
     let res = self
       .send_post_stream(
         format!("/{}/vms/{}/attach", self.version, name),
@@ -140,8 +119,6 @@ impl NanocldClient {
         Some(&GenericNspQuery { namespace }),
       )
       .await?;
-
-    println!("res: {:?}", res);
 
     Ok(res)
   }
