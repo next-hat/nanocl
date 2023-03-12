@@ -140,8 +140,10 @@ mod tests {
   use crate::utils::tests::*;
 
   #[ntex::test]
-  async fn list_vm_image() -> TestRet {
+  async fn basic() -> TestRet {
     let srv = generate_server(ntex_config).await;
+
+    // List vm images
     let resp = srv.get("/v0.2/vms/images").send().await?;
     let status = resp.status();
     assert_eq!(
@@ -151,25 +153,18 @@ mod tests {
       StatusCode::OK,
       status
     );
-    Ok(())
-  }
 
-  #[ntex::test]
-  async fn import_vm_image() -> TestRet {
-    let srv = generate_server(ntex_config).await;
-
+    // Import a vm image
     let file =
       tokio::fs::File::open("/tmp/ubuntu-22.04-minimal-cloudimg-amd64.img")
         .await
         .expect("Expect to open /tmp/ubuntu-22.04-minimal-cloudimg-amd64.img");
-
     let byte_stream = codec::FramedRead::new(file, codec::BytesCodec::new())
       .map(move |r| {
         let r = r?;
         let bytes = ntex::util::Bytes::from_iter(r.to_vec());
         Ok::<ntex::util::Bytes, std::io::Error>(bytes)
       });
-
     let resp = srv
       .post("/v0.2/vms/images/test/import")
       .send_stream(byte_stream)
@@ -183,6 +178,7 @@ mod tests {
       status
     );
 
+    // Delete a vm image
     let resp = srv.delete("/v0.2/vms/images/test").send().await?;
     let status = resp.status();
     assert_eq!(

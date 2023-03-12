@@ -113,6 +113,18 @@ async fn create_vm(
   Ok(web::HttpResponse::Ok().json(&item))
 }
 
+#[web::get("/vms/{name}/histories")]
+async fn list_vm_history(
+  pool: web::types::State<Pool>,
+  path: web::types::Path<(String, String)>,
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  let histories = repositories::vm_config::list_by_vm(key, &pool).await?;
+  Ok(web::HttpResponse::Ok().json(&histories))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_vm);
   config.service(create_vm);
@@ -120,6 +132,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(inspect_vm);
   config.service(start_vm);
   config.service(stop_vm);
+  config.service(list_vm_history);
 }
 
 #[cfg(test)]
