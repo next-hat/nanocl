@@ -11,6 +11,16 @@ use crate::models::{Pool, VmImageDbModel, QemuImgInfo};
 pub async fn delete(name: &str, pool: &Pool) -> Result<(), HttpResponseError> {
   let vm_image = repositories::vm_image::find_by_name(name, pool).await?;
 
+  let children = repositories::vm_image::find_by_parent(name, pool).await?;
+  if !children.is_empty() {
+    return Err(HttpResponseError {
+      status: StatusCode::CONFLICT,
+      msg: format!(
+        "Vm image {name} has children images please delete them first"
+      ),
+    });
+  }
+
   let filepath = vm_image.path.clone();
 
   if let Err(err) = fs::remove_file(&filepath).await {

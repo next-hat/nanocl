@@ -49,6 +49,27 @@ pub async fn find_by_name(
   Ok(item)
 }
 
+pub async fn find_by_parent(
+  parent: &str,
+  pool: &Pool,
+) -> Result<Vec<VmImageDbModel>, HttpResponseError> {
+  use crate::schema::vm_images::dsl;
+
+  let parent = parent.to_owned();
+  let pool = pool.clone();
+  let items = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let items = dsl::vm_images
+      .filter(dsl::parent.eq(&parent))
+      .load::<VmImageDbModel>(&mut conn)
+      .map_err(db_error("vm_image"))?;
+    Ok::<_, HttpResponseError>(items)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+  Ok(items)
+}
+
 pub async fn delete_by_name(
   name: &str,
   pool: &Pool,

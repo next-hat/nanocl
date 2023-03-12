@@ -142,7 +142,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use crate::{services::ntex_config, models::VmImageDbModel};
 
-  use ntex::http::StatusCode;
+  use ntex::{http::StatusCode, time::Seconds};
   use futures::StreamExt;
   use tokio_util::codec;
 
@@ -176,6 +176,7 @@ mod tests {
       });
     let resp = srv
       .post("/v0.2/vms/images/test/import")
+      .timeout(Seconds(20))
       .send_stream(byte_stream)
       .await?;
     let status = resp.status();
@@ -214,7 +215,43 @@ mod tests {
       status
     );
 
+    // Create a snapshot
+    let resp = srv
+      .post("/v0.2/vms/images/test/snapshot/test-snapshot")
+      .send()
+      .await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::OK,
+      "Expect status to be {} got {}",
+      StatusCode::OK,
+      status
+    );
+
     // Delete a vm image
+    let resp = srv.delete("/v0.2/vms/images/test").send().await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::CONFLICT,
+      "Expect status to be {} got {}",
+      StatusCode::CONFLICT,
+      status
+    );
+
+    // Delete a vm snapshot
+    let resp = srv.delete("/v0.2/vms/images/test-snapshot").send().await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::OK,
+      "Expect status to be {} got {}",
+      StatusCode::OK,
+      status
+    );
+
+    // Delete main vm image
     let resp = srv.delete("/v0.2/vms/images/test").send().await?;
     let status = resp.status();
     assert_eq!(
@@ -224,6 +261,7 @@ mod tests {
       StatusCode::OK,
       status
     );
+
     Ok(())
   }
 }
