@@ -9,7 +9,7 @@ use crate::NanocldClient;
 use crate::error::NanocldClientError;
 
 impl NanocldClient {
-  pub async fn create_vm_image_base_from_tar<S, E>(
+  pub async fn import_vm_image<S, E>(
     &self,
     name: &str,
     stream: S,
@@ -20,7 +20,7 @@ impl NanocldClient {
   {
     self
       .send_post_stream(
-        format!("/{}/vms/images/{name}/base", self.version),
+        format!("/{}/vms/images/{name}/import", self.version),
         stream,
         None::<String>,
       )

@@ -1,8 +1,9 @@
 use std::path::Path;
 
-use indicatif::{ProgressBar, ProgressStyle};
 use tokio_util::codec;
 use futures::StreamExt;
+use indicatif::{ProgressBar, ProgressStyle};
+
 use nanocld_client::NanocldClient;
 
 use crate::utils::math::calculate_percentage;
@@ -58,9 +59,7 @@ async fn exec_vm_image_create(
       Ok::<ntex::util::Bytes, std::io::Error>(bytes)
     });
 
-  client
-    .create_vm_image_base_from_tar(&options.name, byte_stream)
-    .await?;
+  client.import_vm_image(&options.name, byte_stream).await?;
 
   Ok(())
 }

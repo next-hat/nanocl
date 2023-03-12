@@ -14,7 +14,7 @@ use nanocl_stubs::vm_config::VmConfigPartial;
 
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::Pool;
+use crate::models::{Pool, VmDbModel};
 
 pub async fn start(
   vm_key: &str,
@@ -32,11 +32,12 @@ pub async fn start(
   Ok(())
 }
 
+/// Stop a VM by his model
 pub async fn stop(
-  vm_key: &str,
+  vm: &VmDbModel,
   docker_api: &Docker,
 ) -> Result<(), HttpResponseError> {
-  let container_name = format!("{}.vm", vm_key);
+  let container_name = format!("{}.vm", vm.key);
   docker_api
     .stop_container(&container_name, None::<StopContainerOptions>)
     .await
@@ -44,8 +45,18 @@ pub async fn stop(
       msg: format!("Unable to stop container got error : {e}"),
       status: StatusCode::INTERNAL_SERVER_ERROR,
     })?;
-
   Ok(())
+}
+
+/// Stop a VM by key
+pub async fn stop_by_key(
+  vm_key: &str,
+  docker_api: &Docker,
+  pool: &Pool,
+) -> Result<(), HttpResponseError> {
+  let vm = repositories::vm::find_by_key(vm_key, pool).await?;
+
+  stop(&vm, docker_api).await
 }
 
 pub async fn inspect(
@@ -120,6 +131,7 @@ pub async fn delete(
     })?;
 
   utils::vm_image::delete(&vm.config.image, pool).await?;
+  repositories::vm_config::delete_by_vm_key(vm.key, pool).await?;
   repositories::vm::delete_by_key(vm_key, pool).await?;
 
   Ok(())
