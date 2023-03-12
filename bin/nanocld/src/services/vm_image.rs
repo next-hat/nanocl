@@ -135,11 +135,12 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(import_vm_image);
   config.service(list_images);
   config.service(delete_vm_image);
+  config.service(create_vm_image_snapshot);
 }
 
 #[cfg(test)]
 mod tests {
-  use crate::services::ntex_config;
+  use crate::{services::ntex_config, models::VmImageDbModel};
 
   use ntex::http::StatusCode;
   use futures::StreamExt;
@@ -183,6 +184,33 @@ mod tests {
       StatusCode::OK,
       "Expect status to be {} got {}",
       StatusCode::OK,
+      status
+    );
+
+    // List vm images
+    let mut resp = srv.get("/v0.2/vms/images").send().await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::OK,
+      "Expect status to be {} got {}",
+      StatusCode::OK,
+      status
+    );
+    let items = resp.json::<Vec<VmImageDbModel>>().await?;
+    assert!(!items.is_empty(), "Expect to have at least one image");
+
+    // Create a snapshot
+    let resp = srv
+      .post("/v0.2/vms/images/test/snapshot/test")
+      .send()
+      .await?;
+    let status = resp.status();
+    assert_eq!(
+      status,
+      StatusCode::CONFLICT,
+      "Expect status to be {} got {}",
+      StatusCode::CONFLICT,
       status
     );
 

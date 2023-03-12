@@ -37,9 +37,9 @@ jobs:
       run: |
         wget https://cloud-images.ubuntu.com/minimal/releases/jammy/release/ubuntu-22.04-minimal-cloudimg-amd64.img
         mv ubuntu-22.04-minimal-cloudimg-amd64.img /tmp
-        sudo ./scripts/prepare_tests.sh
-        sudo mkdir -p /tmp
+        sudo apt-get install -y qemu-utils
         sudo chmod 777 /tmp
+        sudo ./scripts/prepare_tests.sh
     # Setup daemon for the tests
     - name: Setup
       run: |

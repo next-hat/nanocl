@@ -55,6 +55,16 @@ pub async fn create_snap(
   daemon_conf: &DaemonConfig,
   pool: &Pool,
 ) -> Result<VmImageDbModel, HttpResponseError> {
+  if repositories::vm_image::find_by_name(name, pool)
+    .await
+    .is_ok()
+  {
+    return Err(HttpResponseError {
+      status: StatusCode::CONFLICT,
+      msg: format!("Vm image {name} already used"),
+    });
+  }
+
   let imagepath = image.path.clone();
   let snapshotpath =
     format!("{}/vms/images/{}.img", daemon_conf.state_dir, name);
