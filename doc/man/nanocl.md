@@ -1,21 +1,17 @@
-NAME
-====
+# NAME
 
 nanocl - The Self-Sufficient Hybrid-Cloud Orchestrator CLI
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl** \[**-H**\|**\--host**\] \[**-h**\|**\--help**\]
 \[**-V**\|**\--version**\] \<*subcommands*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 The Self-Sufficient Hybrid-Cloud Orchestrator CLI
 
-OPTIONS
-=======
+# OPTIONS
 
 **-H**, **\--host**=*HOST* \[default: unix://run/nanocl/nanocl.sock\]
 
@@ -29,8 +25,7 @@ OPTIONS
 
 :   Print version
 
-SUBCOMMANDS
-===========
+# SUBCOMMANDS
 
 nanocl-namespace(1)
 
@@ -39,6 +34,10 @@ nanocl-namespace(1)
 nanocl-cargo(1)
 
 :   Manage cargoes
+
+nanocl-vm(1)
+
+:   Manage virtual machines
 
 nanocl-resource(1)
 
@@ -68,7 +67,6 @@ nanocl-help(1)
 
 :   Print this message or the help of the given subcommand(s)
 
-VERSION
-=======
+# VERSION
 
 v0.2.2

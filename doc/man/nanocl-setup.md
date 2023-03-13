@@ -1,85 +1,49 @@
-NAME
-====
+# NAME
 
 nanocl
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl** \[**\--docker-host**\] \[**\--state-dir**\]
 \[**\--conf-dir**\] \[**\--gateway**\] \[**\--deamon-hosts**\]
 \[**\--group**\] \[**\--version**\] \[**\--hostname**\]
 \[**-h**\|**\--help**\]
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
-OPTIONS
-=======
+# OPTIONS
 
-**\--docker-host**=*DOCKER\_HOST*
+**\--docker-host**=*DOCKER_HOST*
 
 :   
 
-```{=html}
-<!-- -->
-```
-
-**\--state-dir**=*STATE\_DIR*
+**\--state-dir**=*STATE_DIR*
 
 :   
 
-```{=html}
-<!-- -->
-```
-
-**\--conf-dir**=*CONF\_DIR*
+**\--conf-dir**=*CONF_DIR*
 
 :   
-
-```{=html}
-<!-- -->
-```
 
 **\--gateway**=*GATEWAY*
 
 :   
 
-```{=html}
-<!-- -->
-```
-
-**\--deamon-hosts**=*DEAMON\_HOSTS*
+**\--deamon-hosts**=*DEAMON_HOSTS*
 
 :   
-
-```{=html}
-<!-- -->
-```
 
 **\--group**=*GROUP*
 
 :   
 
-```{=html}
-<!-- -->
-```
-
 **\--version**=*VERSION* \[default: 0.2.2\]
 
 :   
 
-```{=html}
-<!-- -->
-```
-
 **\--hostname**=*HOSTNAME*
 
 :   
-
-```{=html}
-<!-- -->
-```
 
 **-h**, **\--help**
 
