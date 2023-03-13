@@ -25,7 +25,7 @@ impl CliError {
 }
 
 /// Http response error
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub struct HttpResponseError {
   pub(crate) msg: String,
   pub(crate) status: StatusCode,

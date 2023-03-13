@@ -1,8 +1,5 @@
 use serde::{Serialize, Deserialize};
 
-#[cfg(feature = "dev")]
-use utoipa::ToSchema;
-
 use crate::schema::namespaces;
 
 /// Structure to create a namespace in database

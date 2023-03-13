@@ -1,27 +1,22 @@
-NAME
-====
+# NAME
 
 nanocl cargo image - Manage container images
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl cargo image** \[**-h**\|**\--help**\] \<*subcommands*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 Manage container images
 
-OPTIONS
-=======
+# OPTIONS
 
 **-h**, **\--help**
 
 :   Print help
 
-SUBCOMMANDS
-===========
+# SUBCOMMANDS
 
 nanocl cargo image-list(1)
 

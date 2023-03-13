@@ -1,21 +1,20 @@
 use std::collections::HashMap;
 
-use bollard_next::container::WaitContainerOptions;
-use futures::TryStreamExt;
-use nanocl_stubs::cargo_config::ContainerConfig;
-use nanocl_stubs::cargo_config::ContainerHostConfig;
 use ntex::rt;
 use ntex::web;
 use ntex::util::Bytes;
 use ntex::http::StatusCode;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use bollard_next::container::LogOutput;
 use bollard_next::container::LogsOptions;
+use bollard_next::container::WaitContainerOptions;
 use bollard_next::exec::{StartExecOptions, StartExecResults};
 use bollard_next::service::{ContainerSummary, HostConfig};
 use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
 use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 
+use nanocl_stubs::cargo_config::ContainerConfig;
+use nanocl_stubs::cargo_config::ContainerHostConfig;
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, CargoOutput, CargoExecConfig,
@@ -60,9 +59,9 @@ async fn create_instance(
   let mut instances = Vec::new();
   for current in 0..number {
     let name = if current > 0 {
-      format!("{}-{}", cargo.key, current)
+      format!("{}-{}.c", cargo.key, current)
     } else {
-      cargo.key.to_owned()
+      format!("{}.c", cargo.key)
     };
 
     let create_options = bollard_next::container::CreateContainerOptions {
@@ -73,11 +72,9 @@ async fn create_instance(
     // Add cargo label to the container to track it
     let mut labels =
       cargo.config.container.labels.to_owned().unwrap_or_default();
-    labels.insert("io.nanocl.cargo".into(), cargo.key.to_owned());
-    labels.insert(
-      "io.nanocl.namespace".into(),
-      cargo.namespace_name.to_owned(),
-    );
+    labels.insert("io.nanocl".into(), "enabled".into());
+    labels.insert("io.nanocl.c".into(), cargo.key.to_owned());
+    labels.insert("io.nanocl.cnsp".into(), cargo.namespace_name.to_owned());
 
     let auto_remove = cargo
       .config
@@ -166,7 +163,7 @@ pub async fn list_instance(
   cargo_key: &str,
   docker_api: &bollard_next::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpResponseError> {
-  let label = format!("io.nanocl.cargo={cargo_key}");
+  let label = format!("io.nanocl.c={cargo_key}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
   let options = Some(ListContainersOptions {
@@ -174,13 +171,7 @@ pub async fn list_instance(
     filters,
     ..Default::default()
   });
-  let containers = docker_api.list_containers(options).await.map_err(|e| {
-    HttpResponseError {
-      msg: format!("Unable to list containers got error : {e}"),
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-    }
-  })?;
-
+  let containers = docker_api.list_containers(options).await?;
   Ok(containers)
 }
 
@@ -577,8 +568,8 @@ pub async fn list(
       name: cargo.name,
       namespace_name: cargo.namespace_name,
       config: config.to_owned(),
-      instances: containers.len(),
-      running_instances,
+      instance_total: containers.len(),
+      instance_running: running_instances,
       config_key: config.key,
     });
   }
@@ -623,8 +614,9 @@ pub async fn inspect(
     config_key: cargo.config_key,
     namespace_name: cargo.namespace_name,
     config: cargo.config,
-    running_instances,
-    containers,
+    instance_total: containers.len(),
+    instance_running: running_instances,
+    instances: containers,
   })
 }
 
@@ -678,7 +670,8 @@ pub async fn exec_command(
   args: &CargoExecConfig<String>,
   docker_api: &bollard_next::Docker,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let result = docker_api.create_exec(name, args.to_owned()).await?;
+  let name = format!("{name}.c");
+  let result = docker_api.create_exec(&name, args.to_owned()).await?;
 
   let res = docker_api
     .start_exec(&result.id, Some(StartExecOptions::default()))

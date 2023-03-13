@@ -1,27 +1,22 @@
-NAME
-====
+# NAME
 
 nanocl - Manage configuration states
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **nanocl** \[**-h**\|**\--help**\] \<*subcommands*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 Manage configuration states
 
-OPTIONS
-=======
+# OPTIONS
 
 **-h**, **\--help**
 
 :   Print help
 
-SUBCOMMANDS
-===========
+# SUBCOMMANDS
 
 nanocl-apply(1)
 

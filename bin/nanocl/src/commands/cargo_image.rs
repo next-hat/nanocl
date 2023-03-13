@@ -19,9 +19,7 @@ use crate::models::{
   CargoImageInspectOpts, CargoImageRow, CargoImageImportOpts,
 };
 
-async fn exec_cargo_instance_list(
-  client: &NanocldClient,
-) -> Result<(), CliError> {
+async fn exec_cargo_image_ls(client: &NanocldClient) -> Result<(), CliError> {
   let items = client.list_cargo_image(None).await?;
   let rows = items
     .into_iter()
@@ -31,7 +29,7 @@ async fn exec_cargo_instance_list(
   Ok(())
 }
 
-async fn exec_remove_cargo_image(
+async fn exec_cargo_image_rm(
   client: &NanocldClient,
   options: &CargoImageRemoveOpts,
 ) -> Result<(), CliError> {
@@ -89,7 +87,7 @@ fn update_progress(
   }
 }
 
-pub(crate) async fn exec_create_cargo_image(
+pub(crate) async fn exec_cargo_image_create(
   client: &NanocldClient,
   name: &str,
 ) -> Result<(), CliError> {
@@ -140,7 +138,7 @@ pub(crate) async fn exec_create_cargo_image(
   Ok(())
 }
 
-async fn exec_inspect_cargo_image(
+async fn exec_cargo_image_inspect(
   client: &NanocldClient,
   opts: &CargoImageInspectOpts,
 ) -> Result<(), CliError> {
@@ -149,7 +147,7 @@ async fn exec_inspect_cargo_image(
   Ok(())
 }
 
-async fn exec_import_cargo_image(
+async fn exec_cargo_image_import(
   client: &NanocldClient,
   opts: &CargoImageImportOpts,
 ) -> Result<(), CliError> {
@@ -157,14 +155,11 @@ async fn exec_import_cargo_image(
 
   let byte_stream =
     codec::FramedRead::new(file, codec::BytesCodec::new()).map(|r| {
-      let bytes = ntex::util::Bytes::from_iter(r?.to_vec());
+      let bytes = ntex::util::Bytes::from_iter(r?.freeze().to_vec());
       Ok::<ntex::util::Bytes, std::io::Error>(bytes)
     });
 
-  let mut stream = client.import_from_tarball(byte_stream).await?;
-  while let Some(info) = stream.next().await {
-    println!("{info:?}");
-  }
+  client.import_cargo_image_from_tar(byte_stream).await?;
   Ok(())
 }
 
@@ -173,18 +168,16 @@ pub async fn exec_cargo_image(
   cmd: &CargoImageOpts,
 ) -> Result<(), CliError> {
   match &cmd.commands {
-    CargoImageCommands::List => exec_cargo_instance_list(client).await,
+    CargoImageCommands::List => exec_cargo_image_ls(client).await,
     CargoImageCommands::Inspect(opts) => {
-      exec_inspect_cargo_image(client, opts).await
+      exec_cargo_image_inspect(client, opts).await
     }
     CargoImageCommands::Create(opts) => {
-      exec_create_cargo_image(client, &opts.name).await
+      exec_cargo_image_create(client, &opts.name).await
     }
-    CargoImageCommands::Remove(args) => {
-      exec_remove_cargo_image(client, args).await
-    }
+    CargoImageCommands::Remove(args) => exec_cargo_image_rm(client, args).await,
     CargoImageCommands::Import(opts) => {
-      exec_import_cargo_image(client, opts).await
+      exec_cargo_image_import(client, opts).await
     }
   }
 }

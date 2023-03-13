@@ -43,8 +43,9 @@ fn gen_store_cargo_conf(
   config: &DaemonConfig,
 ) -> CargoConfigPartial {
   let mut labels = HashMap::new();
-  labels.insert("io.nanocl.cargo".into(), name.into());
-  labels.insert("io.nanocl.namespace".into(), "system".into());
+  labels.insert("io.nanocl".into(), "enabled".into());
+  labels.insert("io.nanocl.c".into(), name.into());
+  labels.insert("io.nanocl.cnsp".into(), "system".into());
   let host_config = Some(gen_store_host_conf(config));
   CargoConfigPartial {
     name: name.into(),
@@ -65,20 +66,20 @@ async fn boot(
   config: &DaemonConfig,
   docker_api: &bollard_next::Docker,
 ) -> Result<(), bollard_next::errors::Error> {
-  let container_name = "store.system";
+  let cargo_name = "store.system";
 
   if docker_api
-    .inspect_container(container_name, None)
+    .inspect_container(&format!("{cargo_name}.c"), None)
     .await
     .is_ok()
   {
     return Ok(());
   }
   let options = Some(CreateContainerOptions {
-    name: container_name,
+    name: format!("{cargo_name}.c"),
     ..Default::default()
   });
-  let config = gen_store_cargo_conf(container_name, config);
+  let config = gen_store_cargo_conf(cargo_name, config);
   let container = docker_api
     .create_container(options, config.container)
     .await?;

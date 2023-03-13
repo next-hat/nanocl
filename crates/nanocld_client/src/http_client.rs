@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use ntex::http::client::error::SendRequestError as NtexSendRequestError;
 use ntex::rt;
 use ntex::util::{Bytes, Stream};
 use ntex::channel::mpsc::Receiver;
@@ -8,6 +7,7 @@ use ntex::http::{Client, StatusCode};
 use ntex::http::client::{Connector, ClientRequest, ClientResponse};
 use futures::{StreamExt, TryStreamExt};
 
+use ntex::http::client::error::SendRequestError as NtexSendRequestError;
 use crate::error::{ApiError, NanocldClientError, is_api_error, SendRequestError};
 
 const NANOCLD_DEFAULT_VERSION: &str = "0.2";

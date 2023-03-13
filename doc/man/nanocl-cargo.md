@@ -1,21 +1,17 @@
-NAME
-====
+# NAME
 
-nanocl-cargo - Manage cargoes
+nanocl cargo - Manage cargoes
 
-SYNOPSIS
-========
+# SYNOPSIS
 
-**nanocl-cargo** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
+**nanocl cargo** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
 \[**-V**\|**\--version**\] \<*subcommands*\>
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 Manage cargoes
 
-OPTIONS
-=======
+# OPTIONS
 
 **-n**, **\--namespace**=*NAMESPACE*
 
@@ -29,66 +25,64 @@ OPTIONS
 
 :   Print version
 
-SUBCOMMANDS
-===========
+# SUBCOMMANDS
 
-nanocl-cargo-list(1)
+nanocl cargo-list(1)
 
 :   List existing cargo
 
-nanocl-cargo-create(1)
+nanocl cargo-create(1)
 
 :   Create a new cargo
 
-nanocl-cargo-start(1)
+nanocl cargo-start(1)
 
 :   Start a cargo by its name
 
-nanocl-cargo-stop(1)
+nanocl cargo-stop(1)
 
 :   Stop a cargo by its name
 
-nanocl-cargo-remove(1)
+nanocl cargo-remove(1)
 
 :   Remove cargo by its name
 
-nanocl-cargo-inspect(1)
+nanocl cargo-inspect(1)
 
 :   Inspect a cargo by its name
 
-nanocl-cargo-patch(1)
+nanocl cargo-patch(1)
 
 :   Update a cargo by its name
 
-nanocl-cargo-image(1)
+nanocl cargo-image(1)
 
 :   Manage cargo image
 
-nanocl-cargo-exec(1)
+nanocl cargo-exec(1)
 
 :   Execute a command inside a cargo
 
-nanocl-cargo-history(1)
+nanocl cargo-history(1)
 
 :   List cargo history
 
-nanocl-cargo-reset(1)
+nanocl cargo-reset(1)
 
 :   Reset cargo to a specific history
 
-nanocl-cargo-logs(1)
+nanocl cargo-logs(1)
 
 :   Show logs
 
-nanocl-cargo-run(1)
+nanocl cargo-run(1)
 
 :   Run a cargo
 
-nanocl-cargo-help(1)
+nanocl cargo-help(1)
 
 :   Print this message or the help of the given subcommand(s)
 
-VERSION
-=======
+# VERSION
 
 v0.2.2

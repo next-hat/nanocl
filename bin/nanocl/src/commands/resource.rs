@@ -9,7 +9,7 @@ use crate::models::{
   ResourceInspectOpts, ResourceResetOpts, ResourceHistoryOpts,
 };
 
-async fn exec_list(client: &NanocldClient) -> Result<(), CliError> {
+async fn exec_resource_ls(client: &NanocldClient) -> Result<(), CliError> {
   let resources = client.list_resource(None).await?;
 
   let row = resources
@@ -21,7 +21,7 @@ async fn exec_list(client: &NanocldClient) -> Result<(), CliError> {
   Ok(())
 }
 
-async fn exec_remove(
+async fn exec_resource_rm(
   client: &NanocldClient,
   options: &ResourceRemoveOpts,
 ) -> Result<(), CliError> {
@@ -46,7 +46,7 @@ async fn exec_remove(
   Ok(())
 }
 
-async fn exec_inspect(
+async fn exec_resource_inspect(
   client: &NanocldClient,
   opts: &ResourceInspectOpts,
 ) -> Result<(), CliError> {
@@ -56,7 +56,7 @@ async fn exec_inspect(
   Ok(())
 }
 
-async fn exec_history(
+async fn exec_resource_history(
   client: &NanocldClient,
   opts: &ResourceHistoryOpts,
 ) -> Result<(), CliError> {
@@ -66,7 +66,7 @@ async fn exec_history(
   Ok(())
 }
 
-async fn exec_reset(
+async fn exec_resource_reset(
   client: &NanocldClient,
   opts: &ResourceResetOpts,
 ) -> Result<(), CliError> {
@@ -82,10 +82,14 @@ pub async fn exec_resource(
 ) -> Result<(), CliError> {
   match &args.commands {
     // ResourceCommands::Create(opts) => exec_create(client, opts).await,
-    ResourceCommands::List => exec_list(client).await,
-    ResourceCommands::Remove(opts) => exec_remove(client, opts).await,
-    ResourceCommands::Inspect(opts) => exec_inspect(client, opts).await,
-    ResourceCommands::History(opts) => exec_history(client, opts).await,
-    ResourceCommands::Reset(opts) => exec_reset(client, opts).await,
+    ResourceCommands::List => exec_resource_ls(client).await,
+    ResourceCommands::Remove(opts) => exec_resource_rm(client, opts).await,
+    ResourceCommands::Inspect(opts) => {
+      exec_resource_inspect(client, opts).await
+    }
+    ResourceCommands::History(opts) => {
+      exec_resource_history(client, opts).await
+    }
+    ResourceCommands::Reset(opts) => exec_resource_reset(client, opts).await,
   }
 }

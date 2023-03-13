@@ -52,9 +52,9 @@ pub struct CargoSummary {
   /// Configuration of the cargo
   pub config: CargoConfig,
   /// Number of instances
-  pub instances: usize,
+  pub instance_total: usize,
   /// Number of running instances
-  pub running_instances: usize,
+  pub instance_running: usize,
 }
 
 /// A Cargo Inspect is a detailed view of a cargo
@@ -75,10 +75,12 @@ pub struct CargoInspect {
   pub namespace_name: String,
   /// Configuration of the cargo
   pub config: CargoConfig,
+  /// Number of instances
+  pub instance_total: usize,
   /// Number of running instances
-  pub running_instances: i64,
+  pub instance_running: usize,
   /// List of containers
-  pub containers: Vec<ContainerSummary>,
+  pub instances: Vec<ContainerSummary>,
 }
 
 /// Kind of ExecOutput

@@ -211,7 +211,8 @@ async fn init_dependencies(
     .create_container(
       None::<CreateContainerOptions<String>>,
       ContainerConfig {
-        image: Some(format!("nexthat/nanocld:{}", args.version)),
+        image: Some("nanocld:dev".into()),
+        // image: Some(format!("nexthat/nanocld:{}", args.version)),
         cmd: Some(daemon_args),
         env: Some(vec![format!("NANOCL_GID={}", args.gid)]),
         host_config: Some(HostConfig {
@@ -277,8 +278,9 @@ async fn spawn_daemon(
 
   let daemon_args = gen_daemon_args(args);
   let mut labels = HashMap::new();
-  labels.insert("io.nanocl.cargo".into(), "system-daemon".into());
-  labels.insert("io.nanocl.namespace".into(), "system".into());
+  labels.insert("io.nanocl".into(), "enabled".into());
+  labels.insert("io.nanocl.c".into(), "system-daemon".into());
+  labels.insert("io.nanocl.cnsp".into(), "system".into());
 
   let binds = gen_daemon_binds(args);
 
@@ -289,7 +291,8 @@ async fn spawn_daemon(
         ..Default::default()
       }),
       ContainerConfig {
-        image: Some(format!("nexthat/nanocld:{}", args.version)),
+        image: Some("nanocld:dev".into()),
+        // image: Some(format!("nexthat/nanocld:{}", args.version)),
         entrypoint: Some(vec!["/entrypoint.sh".into()]),
         cmd: Some(daemon_args),
         labels: Some(labels),

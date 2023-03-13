@@ -19,17 +19,6 @@ pub(crate) async fn list_namespace(
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
-/// Endpoint to create new namespace
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  path = "/namespaces",
-  request_body = NamespacePartial,
-  responses(
-    (status = 201, description = "fresh created namespace", body = NamespaceItem),
-    (status = 400, description = "generic database error", body = ApiError),
-    (status = 422, description = "the provided payload is not valid", body = ApiError),
-  ),
-))]
 #[web::post("/namespaces")]
 async fn create_namespace(
   web::types::Json(payload): web::types::Json<NamespacePartial>,

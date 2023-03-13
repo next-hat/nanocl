@@ -18,10 +18,13 @@ pub async fn generate(
       .state(daemon_state.docker_api.clone())
       // bind our event state
       .state(daemon_state.event_emitter.clone())
+      .state(
+        web::types::PayloadConfig::new(20_000_000_000), // <- limit size of the payload
+      )
       // Default logger middleware
       .wrap(web::middleware::Logger::default())
       // Set Json body max size
-      .state(web::types::JsonConfig::default().limit(4096))
+      // .state(web::types::JsonConfig::default().limit(4096))
       .configure(services::ntex_config)
       .default_service(web::route().to(services::unhandled))
   });

@@ -5,7 +5,11 @@ mod resource;
 mod version;
 mod state;
 mod setup;
+mod vm;
+mod vm_image;
 
+pub use vm::*;
+pub use vm_image::*;
 pub use namespace::*;
 pub use cargo::*;
 pub use cargo_image::*;
@@ -34,6 +38,8 @@ pub enum Commands {
   Namespace(NamespaceArgs),
   /// Manage cargoes
   Cargo(CargoArgs),
+  /// Manage virtual machines
+  Vm(VmArgs),
   /// Manage resources
   Resource(ResourceArgs),
   /// Watch daemon events

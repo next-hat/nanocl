@@ -1,9 +1,21 @@
 use nanocl_stubs::config::DaemonConfig;
+use tokio::fs;
 
 use crate::event;
 use crate::models::BootState;
 
 use crate::error::CliError;
+
+pub async fn ensure_state_dir(state_dir: &str) -> Result<(), CliError> {
+  let vm_dir = format!("{state_dir}/vms/images");
+  fs::create_dir_all(vm_dir).await.map_err(|err| {
+    CliError::new(
+      1,
+      format!("Unable to create state directory {state_dir}: {err}"),
+    )
+  })?;
+  Ok(())
+}
 
 /// Init function called before http server start
 /// to initialize our state
@@ -22,6 +34,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<BootState, CliError> {
       ),
     )
   })?;
+  ensure_state_dir(&daemon_conf.state_dir).await?;
   super::system::ensure_network("system", &docker_api).await?;
   let pool = super::store::ensure(daemon_conf, &docker_api).await?;
   super::system::register_namespace("system", false, &docker_api, &pool)

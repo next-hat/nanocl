@@ -43,7 +43,7 @@ uuid = { version = "1.2", features = ["serde", "v4"] }
 ntex = { version = "0.6.3", features = ["rustls", "tokio"] }
 diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
 diesel = { version = "2.0.1", features = ["postgres", "r2d2", "chrono", "uuid", "serde_json"] }
-tokio = { version = "1.23.1", features = ["fs"] }
+tokio = { version = "1.23.1", features = ["fs", "process", "io-std"] }
 hyper = "0.14.24"
 tokio-util = "0.7.7"
 futures-util = "0.3.26"

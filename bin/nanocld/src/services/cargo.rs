@@ -71,20 +71,6 @@ pub async fn delete_cargo(
   Ok(web::HttpResponse::NoContent().finish())
 }
 
-/// Endpoint to start a cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-    post,
-    path = "/cargoes/{name}/start",
-    params(
-      ("name" = String, Path, description = "Name of the cargo to start"),
-      ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
-    ),
-    responses(
-      (status = 202, description = "Cargo started"),
-      (status = 400, description = "Generic database error", body = ApiError),
-      (status = 404, description = "Cargo not found", body = ApiError),
-    ),
-  ))]
 #[web::post("/cargoes/{name}/start")]
 pub async fn start_cargo(
   pool: web::types::State<Pool>,
@@ -109,20 +95,6 @@ pub async fn start_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Endpoint to stop a cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-    post,
-    path = "/cargoes/{name}/stop",
-    params(
-      ("name" = String, Path, description = "Name of the cargo to stop"),
-      ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
-    ),
-    responses(
-      (status = 202, description = "Cargo stopped"),
-      (status = 400, description = "Generic database error", body = ApiError),
-      (status = 404, description = "Cargo not found", body = ApiError),
-    ),
-  ))]
 #[web::post("/cargoes/{name}/stop")]
 pub async fn stop_cargo(
   pool: web::types::State<Pool>,
@@ -148,21 +120,6 @@ pub async fn stop_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Endpoint to put a cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-    put,
-    path = "/cargoes/{name}",
-    request_body = CargoPartial,
-    params(
-      ("name" = String, Path, description = "Name of the cargo to put"),
-      ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
-    ),
-    responses(
-      (status = 200, description = "Cargo patched", body = Cargo),
-      (status = 400, description = "Generic database error", body = ApiError),
-      (status = 404, description = "Cargo not found", body = ApiError),
-    ),
-  ))]
 #[web::put("/cargoes/{name}")]
 pub async fn put_cargo(
   pool: web::types::State<Pool>,
@@ -190,21 +147,6 @@ pub async fn put_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-/// Endpoint to patch a cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-  put,
-  path = "/cargoes/{name}",
-  request_body = CargoPartial,
-  params(
-    ("name" = String, Path, description = "Name of the cargo to put"),
-    ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
-  ),
-  responses(
-    (status = 200, description = "Cargo patched", body = Cargo),
-    (status = 400, description = "Generic database error", body = ApiError),
-    (status = 404, description = "Cargo not found", body = ApiError),
-  ),
-))]
 #[web::patch("/cargoes/{name}")]
 pub async fn patch_cargo(
   pool: web::types::State<Pool>,
@@ -232,18 +174,6 @@ pub async fn patch_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-/// Endpoint to list cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-    get,
-    path = "/cargoes",
-    params(
-      ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
-    ),
-    responses(
-      (status = 200, description = "Cargo list", body = [CargoSummary]),
-      (status = 400, description = "Generic database error", body = ApiError),
-    ),
-  ))]
 #[web::get("/cargoes")]
 pub async fn list_cargo(
   pool: web::types::State<Pool>,
@@ -257,19 +187,6 @@ pub async fn list_cargo(
   Ok(web::HttpResponse::Ok().json(&cargoes))
 }
 
-/// Endpoint to inspect cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  path = "/cargoes/{name}/inspect",
-  params(
-    ("name" = String, Path, description = "Name of the cargo to inspect"),
-    ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
-  ),
-  responses(
-    (status = 200, description = "Cargo list", body = CargoInspect),
-    (status = 400, description = "Generic database error", body = ApiError),
-  ),
-))]
 #[web::get("/cargoes/{name}/inspect")]
 async fn inspect_cargo(
   pool: web::types::State<Pool>,
@@ -284,18 +201,6 @@ async fn inspect_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  path = "/cargoes/{name}/exec",
-  params(
-    ("name" = String, Path, description = "Name of the cargo to exec command into"),
-    ("namespace" = Option<String>, Query, description = "Name of the namespace where the cargo is stored"),
-  ),
-  responses(
-    (status = 200, description = "Cargo list", body = CargoInspect),
-    (status = 400, description = "Generic database error", body = ApiError),
-  ),
-))]
 #[web::post("/cargoes/{name}/exec")]
 async fn exec_command(
   path: web::types::Path<(String, String)>,

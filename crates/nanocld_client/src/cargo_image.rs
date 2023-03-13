@@ -2,9 +2,6 @@ use std::error::Error;
 
 use ntex::channel::mpsc;
 use ntex::util::{Bytes, Stream};
-use ntex::http::client::ClientResponse;
-use futures::TryStreamExt;
-use futures::stream::IntoStream;
 
 use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
 
@@ -160,23 +157,22 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  pub async fn import_from_tarball<S, E>(
+  pub async fn import_cargo_image_from_tar<S, E>(
     &self,
     stream: S,
-  ) -> Result<IntoStream<ClientResponse>, NanocldClientError>
+  ) -> Result<(), NanocldClientError>
   where
     S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
     E: Error + 'static,
   {
-    let res = self
+    self
       .send_post_stream(
         format!("/{}/cargoes/images/import", self.version),
         stream,
         None::<String>,
       )
       .await?;
-    let stream = res.into_stream();
-    Ok(stream)
+    Ok(())
   }
 }
 
@@ -209,9 +205,9 @@ mod tests {
         let bytes = ntex::util::Bytes::from_iter(r?.to_vec());
         Ok::<ntex::util::Bytes, std::io::Error>(bytes)
       });
-    let mut stream = client.import_from_tarball(byte_stream).await.unwrap();
-    while let Some(info) = stream.next().await {
-      println!("{info:?}");
-    }
+    client
+      .import_cargo_image_from_tar(byte_stream)
+      .await
+      .unwrap();
   }
 }

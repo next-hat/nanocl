@@ -18,7 +18,7 @@ use crate::error::CliError;
 use crate::models::{StateArgs, StateCommands, StateOpts, StateBuildArgs};
 use crate::utils::print::print_yml;
 
-use super::cargo_image::exec_create_cargo_image;
+use super::cargo_image::exec_cargo_image_create;
 
 async fn get_from_url(
   url: url::Url,
@@ -62,7 +62,7 @@ async fn download_cargo_image(
 ) -> Result<(), CliError> {
   match &cargo.container.image {
     Some(image) => {
-      exec_create_cargo_image(client, image).await?;
+      exec_cargo_image_create(client, image).await?;
     }
     None => {
       return Err(CliError::Custom {
@@ -164,7 +164,7 @@ async fn attach_to_cargo(
     Ok(cargo) => cargo,
   };
   let mut futures = Vec::new();
-  for (index, _) in cargo.containers.iter().enumerate() {
+  for (index, _) in cargo.instances.iter().enumerate() {
     let namespace = namespace.to_owned();
     let name = if index == 0 {
       cargo.name.clone()
@@ -347,7 +347,7 @@ fn inject_build_args(
   Ok(yaml)
 }
 
-async fn exec_apply(opts: &StateOpts) -> Result<(), CliError> {
+async fn exec_state_apply(opts: &StateOpts) -> Result<(), CliError> {
   let (meta, yaml) = match url::Url::parse(&opts.file_path) {
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
@@ -401,7 +401,7 @@ async fn exec_apply(opts: &StateOpts) -> Result<(), CliError> {
   Ok(())
 }
 
-async fn exec_revert(opts: &StateOpts) -> Result<(), CliError> {
+async fn exec_state_revert(opts: &StateOpts) -> Result<(), CliError> {
   let (meta, yaml) = match url::Url::parse(&opts.file_path) {
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
@@ -432,7 +432,7 @@ async fn exec_revert(opts: &StateOpts) -> Result<(), CliError> {
 
 pub async fn exec_state(args: &StateArgs) -> Result<(), CliError> {
   match &args.commands {
-    StateCommands::Apply(opts) => exec_apply(opts).await,
-    StateCommands::Revert(opts) => exec_revert(opts).await,
+    StateCommands::Apply(opts) => exec_state_apply(opts).await,
+    StateCommands::Revert(opts) => exec_state_revert(opts).await,
   }
 }

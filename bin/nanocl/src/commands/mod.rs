@@ -7,6 +7,8 @@ mod resource;
 mod state;
 mod info;
 mod setup;
+mod vm;
+mod vm_image;
 
 pub use namespace::exec_namespace;
 pub use cargo::exec_cargo;
@@ -17,3 +19,4 @@ pub use resource::exec_resource;
 pub use state::exec_state;
 pub use info::exec_info;
 pub use setup::exec_setup;
+pub use vm::exec_vm;

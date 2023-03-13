@@ -1,9 +1,9 @@
 /*
 * Endpoints to manipulate cargo images
 */
-use ntex::{rt, web};
+use ntex::web;
 use ntex::http::StatusCode;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use tokio_util::codec;
 use bollard_next::image::ImportImageOptions;
 use tokio::io::AsyncWriteExt;
@@ -11,7 +11,6 @@ use tokio::fs::File;
 
 use nanocl_stubs::cargo_image::{
   CargoImagePartial, ListCargoImagesOptions, CargoImageImportOptions,
-  CargoImageImportContext, CargoImageImportInfo,
 };
 
 use crate::utils;
@@ -69,100 +68,63 @@ async fn import_images(
   mut payload: web::types::Payload,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   // generate a random filename
-  let (tx, rx) =
-    ntex::channel::mpsc::channel::<Result<ntex::util::Bytes, std::io::Error>>();
-  rt::spawn(async move {
-    let filename = uuid::Uuid::new_v4().to_string();
-    let filepath = format!("/tmp/{filename}");
-    // File::create is blocking operation, use threadpool
-    let file_path_ptr = filepath.clone();
-    let mut f =
-      File::create(&file_path_ptr)
-        .await
-        .map_err(|err| HttpResponseError {
-          status: StatusCode::INTERNAL_SERVER_ERROR,
-          msg: format!("Error while creating the file {err}"),
-        })?;
-    while let Ok(bytes) = payload.try_next().await {
-      let Some(bytes) = bytes else {
-        break;
-      };
-      let _ = tx.send(Ok(ntex::util::Bytes::from(
-        serde_json::to_string(&CargoImageImportInfo::Context(Box::new(
-          CargoImageImportContext {
-            writed: bytes.len(),
-          },
-        )))
-        .map_err(|err| HttpResponseError {
-          status: StatusCode::INTERNAL_SERVER_ERROR,
-          msg: format!("Error while serializing the context {err}"),
-        })?,
-      )));
-      println!("writing: {}", bytes.len());
-      // Field in turn is stream of *Bytes* object
-      // filesystem operations are blocking, we have to use threadpool
-      f.write_all(&bytes).await.map_err(|err| HttpResponseError {
+  let filename = uuid::Uuid::new_v4().to_string();
+  let filepath = format!("/tmp/{filename}");
+  // File::create is blocking operation, use threadpool
+  let file_path_ptr = filepath.clone();
+  let mut f =
+    File::create(&file_path_ptr)
+      .await
+      .map_err(|err| HttpResponseError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while writing the file {err}"),
+        msg: format!("Error while creating the file {err}"),
       })?;
-    }
-
-    println!("before shutdown");
-    f.shutdown().await.map_err(|err| HttpResponseError {
+  while let Some(bytes) = payload.next().await {
+    let bytes = bytes.map_err(|err| HttpResponseError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Error while closing the file {err}"),
+      msg: format!("Error while payload: {err}"),
     })?;
-
-    drop(f);
-
-    println!("shutdown");
-    let file =
-      File::open(&file_path_ptr)
-        .await
-        .map_err(|err| HttpResponseError {
-          status: StatusCode::INTERNAL_SERVER_ERROR,
-          msg: format!("Error while opening the file {err}"),
-        })?;
-
-    // sending the file to the docker api
-    let byte_stream = codec::FramedRead::new(file, codec::BytesCodec::new())
-      .map(|r| {
-        let bytes = r?.freeze();
-        Ok::<_, std::io::Error>(bytes)
-      });
-
-    let quiet = query.quiet.unwrap_or(false);
-    let body = hyper::Body::wrap_stream(byte_stream);
-    let options = ImportImageOptions { quiet };
-    let mut stream = docker_api.import_image(options, body, None);
-    while let Some(res) = stream.next().await {
-      let res = res.map_err(|err| HttpResponseError {
+    f.write_all(&bytes).await.map_err(|err| HttpResponseError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      msg: format!("Error while writing the file {err}"),
+    })?;
+  }
+  f.shutdown().await.map_err(|err| HttpResponseError {
+    status: StatusCode::INTERNAL_SERVER_ERROR,
+    msg: format!("Error while closing the file {err}"),
+  })?;
+  drop(f);
+  let file =
+    File::open(&file_path_ptr)
+      .await
+      .map_err(|err| HttpResponseError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while importing the image {err}"),
+        msg: format!("Error while opening the file {err}"),
       })?;
-      let _ = tx.send(Ok(ntex::util::Bytes::from(
-        serde_json::to_string(&CargoImageImportInfo::BuildInfo(Box::new(res)))
-          .map_err(|err| HttpResponseError {
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-            msg: format!("Error while serializing the context {err}"),
-          })?,
-      )));
-    }
-    tokio::fs::remove_file(filepath).await.map_err(|err| {
-      HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while removing the file {err}"),
-      }
-    })?;
-    tx.close();
-    Ok::<_, HttpResponseError>(())
-  });
 
-  Ok(
-    web::HttpResponse::Ok()
-      .content_type("nanocl/streaming-v1")
-      .streaming(rx),
-  )
+  // sending the file to the docker api
+  let byte_stream =
+    codec::FramedRead::new(file, codec::BytesCodec::new()).map(|r| {
+      let bytes = r?.freeze();
+      Ok::<_, std::io::Error>(bytes)
+    });
+
+  let quiet = query.quiet.unwrap_or(false);
+  let body = hyper::Body::wrap_stream(byte_stream);
+  let options = ImportImageOptions { quiet };
+  let mut stream = docker_api.import_image(options, body, None);
+  while let Some(res) = stream.next().await {
+    let _ = res.map_err(|err| HttpResponseError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      msg: format!("Error while importing the image {err}"),
+    })?;
+  }
+
+  if let Err(err) = tokio::fs::remove_file(&filepath).await {
+    log::warn!("Error while deleting the file {filepath}: {err}");
+  }
+
+  Ok(web::HttpResponse::Ok().into())
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {

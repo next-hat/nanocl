@@ -222,7 +222,7 @@ pub enum CargoCommands {
 
 /// Manage cargoes
 #[derive(Debug, Parser)]
-#[clap(name = "nanocl-cargo")]
+#[clap(name = "nanocl cargo")]
 pub struct CargoArgs {
   /// namespace to target by default global is used
   #[clap(long, short)]
@@ -260,7 +260,7 @@ impl From<CargoSummary> for CargoRow {
       namespace: cargo.namespace_name,
       image: cargo.config.container.image.unwrap_or_default(),
       config_version: cargo.config.version,
-      instances: format!("{}/{}", cargo.running_instances, cargo.instances),
+      instances: format!("{}/{}", cargo.instance_running, cargo.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
     }
