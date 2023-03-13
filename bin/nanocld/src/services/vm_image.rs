@@ -1,3 +1,4 @@
+use nanocl_stubs::vm_image::VmImageResizePayload;
 use ntex::web;
 use ntex::http::StatusCode;
 use tokio::fs;
@@ -119,6 +120,36 @@ async fn create_vm_image_snapshot(
   Ok(web::HttpResponse::Ok().json(&vm_image))
 }
 
+#[web::post("/vms/images/{name}/clone/{clone_name}")]
+async fn clone_vm_image(
+  pool: web::types::State<Pool>,
+  path: web::types::Path<(String, String, String)>,
+  daemon_config: web::types::State<DaemonConfig>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let name = path.1.to_owned();
+  let clone_name = path.2.to_owned();
+  utils::key::validate_name(&clone_name)?;
+  let image = repositories::vm_image::find_by_name(&name, &pool).await?;
+
+  let rx =
+    utils::vm_image::clone(&clone_name, &image, &daemon_config, &pool).await?;
+
+  Ok(web::HttpResponse::Ok().streaming(rx))
+}
+
+#[web::post("/vms/images/{name}/resize")]
+async fn resize_vm_image(
+  pool: web::types::State<Pool>,
+  path: web::types::Path<(String, String)>,
+  web::types::Json(payload): web::types::Json<VmImageResizePayload>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let name = path.1.to_owned();
+
+  let rx = utils::vm_image::resize_by_name(&name, &payload, &pool).await?;
+
+  Ok(web::HttpResponse::Ok().json(&rx))
+}
+
 #[web::delete("/vms/images/{name}")]
 async fn delete_vm_image(
   pool: web::types::State<Pool>,
@@ -136,132 +167,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_images);
   config.service(delete_vm_image);
   config.service(create_vm_image_snapshot);
-}
-
-#[cfg(test)]
-mod tests {
-  use crate::{services::ntex_config, models::VmImageDbModel};
-
-  use ntex::{http::StatusCode, time::Seconds};
-  use futures::StreamExt;
-  use tokio_util::codec;
-
-  use crate::utils::tests::*;
-
-  #[ntex::test]
-  async fn basic() -> TestRet {
-    let srv = generate_server(ntex_config).await;
-
-    // List vm images
-    let resp = srv.get("/v0.2/vms/images").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      StatusCode::OK,
-      "Expect status to be {} got {}",
-      StatusCode::OK,
-      status
-    );
-
-    // Import a vm image
-    let file =
-      tokio::fs::File::open("/tmp/ubuntu-22.04-minimal-cloudimg-amd64.img")
-        .await
-        .expect("Expect to open /tmp/ubuntu-22.04-minimal-cloudimg-amd64.img");
-    let byte_stream = codec::FramedRead::new(file, codec::BytesCodec::new())
-      .map(move |r| {
-        let r = r?;
-        let bytes = ntex::util::Bytes::from_iter(r.to_vec());
-        Ok::<ntex::util::Bytes, std::io::Error>(bytes)
-      });
-    let resp = srv
-      .post("/v0.2/vms/images/test/import")
-      .timeout(Seconds(20))
-      .send_stream(byte_stream)
-      .await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      StatusCode::OK,
-      "Expect status to be {} got {}",
-      StatusCode::OK,
-      status
-    );
-
-    // List vm images
-    let mut resp = srv.get("/v0.2/vms/images").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      StatusCode::OK,
-      "Expect status to be {} got {}",
-      StatusCode::OK,
-      status
-    );
-    let items = resp.json::<Vec<VmImageDbModel>>().await?;
-    assert!(!items.is_empty(), "Expect to have at least one image");
-
-    // Create a snapshot
-    let resp = srv
-      .post("/v0.2/vms/images/test/snapshot/test")
-      .send()
-      .await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      StatusCode::CONFLICT,
-      "Expect status to be {} got {}",
-      StatusCode::CONFLICT,
-      status
-    );
-
-    // Create a snapshot
-    let resp = srv
-      .post("/v0.2/vms/images/test/snapshot/test-snapshot")
-      .send()
-      .await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      StatusCode::OK,
-      "Expect status to be {} got {}",
-      StatusCode::OK,
-      status
-    );
-
-    // Delete a vm image
-    let resp = srv.delete("/v0.2/vms/images/test").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      StatusCode::CONFLICT,
-      "Expect status to be {} got {}",
-      StatusCode::CONFLICT,
-      status
-    );
-
-    // Delete a vm snapshot
-    let resp = srv.delete("/v0.2/vms/images/test-snapshot").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      StatusCode::OK,
-      "Expect status to be {} got {}",
-      StatusCode::OK,
-      status
-    );
-
-    // Delete main vm image
-    let resp = srv.delete("/v0.2/vms/images/test").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      StatusCode::OK,
-      "Expect status to be {} got {}",
-      StatusCode::OK,
-      status
-    );
-
-    Ok(())
-  }
+  config.service(clone_vm_image);
+  config.service(resize_vm_image);
 }

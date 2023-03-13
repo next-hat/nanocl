@@ -12,7 +12,6 @@ use ntex::time::interval;
 use futures::Stream;
 use futures::{stream, StreamExt};
 use tokio::sync::mpsc::{Receiver, Sender, channel};
-
 use nanocl_stubs::system::Event;
 
 // Wrap Receiver in our own type, with correct error type

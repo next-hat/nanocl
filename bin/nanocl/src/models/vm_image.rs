@@ -1,7 +1,7 @@
 use tabled::Tabled;
 use chrono::TimeZone;
 
-use nanocld_client::stubs::vm_image::VmImage;
+use nanocld_client::stubs::vm_image::{VmImage, VmImageResizePayload};
 
 use clap::{Parser, Subcommand};
 
@@ -16,6 +16,15 @@ pub struct VmImageCreateOpts {
 pub enum VmImageCommands {
   /// Create a base VM image
   Create(VmImageCreateOpts),
+  /// Clone a VM image
+  Clone {
+    /// Name of the VM image
+    name: String,
+    /// Name of the cloned VM image
+    clone_name: String,
+  },
+  /// Resize a VM image
+  Resize(VmImageResizeOpts),
   /// List VM images
   #[clap(alias("ls"))]
   List,
@@ -25,6 +34,23 @@ pub enum VmImageCommands {
     /// Names of the VM image
     names: Vec<String>,
   },
+}
+
+#[derive(Clone, Debug, Parser)]
+pub struct VmImageResizeOpts {
+  #[clap(long)]
+  pub shrink: bool,
+  pub name: String,
+  pub size: u64,
+}
+
+impl From<VmImageResizeOpts> for VmImageResizePayload {
+  fn from(opts: VmImageResizeOpts) -> Self {
+    Self {
+      size: opts.size,
+      shrink: opts.shrink,
+    }
+  }
 }
 
 /// Manage configuration states

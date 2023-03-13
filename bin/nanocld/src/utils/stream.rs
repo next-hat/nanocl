@@ -23,6 +23,6 @@ where
         status: StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Failed to serialize stream item: {err}"),
       })?;
-    Ok(Bytes::from(item + "\n"))
+    Ok(Bytes::from(item + "\r\n"))
   })
 }

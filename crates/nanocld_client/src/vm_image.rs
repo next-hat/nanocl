@@ -1,12 +1,13 @@
 use std::error::Error;
 
+use ntex::channel::mpsc;
 use ntex::util::Bytes;
 use futures::Stream;
 
-use nanocl_stubs::vm_image::VmImage;
+use nanocl_stubs::vm_image::{VmImage, VmImageCloneStream, VmImageResizePayload};
 
 use crate::NanocldClient;
-use crate::error::NanocldClientError;
+use crate::error::{NanocldClientError, ApiError};
 
 impl NanocldClient {
   pub async fn import_vm_image<S, E>(
@@ -50,5 +51,40 @@ impl NanocldClient {
       .await?;
 
     Ok(())
+  }
+
+  pub async fn clone_vm_image(
+    &self,
+    name: &str,
+    clone_name: &str,
+  ) -> Result<
+    mpsc::Receiver<Result<VmImageCloneStream, ApiError>>,
+    NanocldClientError,
+  > {
+    let res = self
+      .send_post(
+        format!("/{}/vms/images/{name}/clone/{clone_name}", self.version),
+        None::<String>,
+        None::<String>,
+      )
+      .await?;
+
+    Ok(Self::res_stream(res).await)
+  }
+
+  pub async fn resize_vm_image(
+    &self,
+    name: &str,
+    payload: &VmImageResizePayload,
+  ) -> Result<VmImage, NanocldClientError> {
+    let res = self
+      .send_post(
+        format!("/{}/vms/images/{name}/resize", self.version),
+        Some(payload.clone()),
+        None::<String>,
+      )
+      .await?;
+
+    Self::res_json(res).await
   }
 }

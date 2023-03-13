@@ -140,20 +140,16 @@ pub async fn list_instance(
   namespace: &str,
   docker_api: &bollard_next::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpResponseError> {
-  let label = format!("io.nanocl.namespace={namespace}");
+  let clabel = format!("io.nanocl.cnsp={namespace}");
+  let vlabel = format!("io.nanocl.vnsp={namespace}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
-  filters.insert("label", vec![&label]);
+  filters.insert("label", vec![&clabel, &vlabel]);
   let options = Some(ListContainersOptions {
     all: true,
     filters,
     ..Default::default()
   });
-  let containers = docker_api.list_containers(options).await.map_err(|e| {
-    HttpResponseError {
-      msg: format!("Unable to list containers got error : {e}"),
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-    }
-  })?;
+  let containers = docker_api.list_containers(options).await?;
 
   Ok(containers)
 }

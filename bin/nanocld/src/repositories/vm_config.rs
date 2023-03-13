@@ -75,11 +75,13 @@ pub async fn create(
     name: item.name,
     version: dbmodel.version,
     vm_key: dbmodel.vm_key,
-    image: item.image,
+    disk: item.disk,
+    host_config: item.host_config,
     hostname: item.hostname,
-    memory: item.memory,
-    cpu: item.cpu,
-    net_iface: item.net_iface,
+    domainname: item.domainname,
+    user: item.user,
+    labels: item.labels,
+    mac_address: item.mac_address,
   };
 
   Ok(config)
@@ -136,11 +138,13 @@ pub async fn find_by_key(
     name: config.name,
     version: dbmodel.version,
     vm_key: dbmodel.vm_key,
-    image: config.image,
     hostname: config.hostname,
-    memory: config.memory,
-    cpu: config.cpu,
-    net_iface: config.net_iface,
+    domainname: config.domainname,
+    user: config.user,
+    labels: config.labels,
+    mac_address: config.mac_address,
+    disk: config.disk,
+    host_config: config.host_config,
   })
 }
 
@@ -219,11 +223,13 @@ pub async fn list_by_vm(
         name: config.name,
         version: dbmodel.version,
         vm_key: dbmodel.vm_key,
-        image: config.image,
         hostname: config.hostname,
-        memory: config.memory,
-        cpu: config.cpu,
-        net_iface: config.net_iface,
+        domainname: config.domainname,
+        user: config.user,
+        labels: config.labels,
+        mac_address: config.mac_address,
+        disk: config.disk,
+        host_config: config.host_config,
       })
     })
     .collect::<Result<Vec<VmConfig>, HttpResponseError>>()?;

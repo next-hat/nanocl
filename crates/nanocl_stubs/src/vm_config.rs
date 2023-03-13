@@ -1,5 +1,37 @@
+use std::collections::HashMap;
+
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
+
+/// Disk representation of a VM
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct VmDiskConfig {
+  /// Name of the image to use
+  pub image: String,
+  /// Virtual size allowed for the disk
+  pub size: Option<u64>,
+}
+
+/// A vm's resources (cpu, memory, network)
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct VmHostConfig {
+  /// Number of cpu of the vm
+  pub cpu: Option<u64>,
+  /// Memory of the vm
+  pub memory: Option<u64>,
+  /// default network interface of the vm
+  pub net_iface: Option<String>,
+  /// Enable KVM
+  pub kvm: Option<bool>,
+  /// A list of DNS servers for the vm to use.
+  pub dns: Option<Vec<String>>,
+  /// Runtime to use
+  pub runtime: Option<String>,
+}
 
 /// A vm config partial is used to create a Vm
 #[derive(Debug, Default, Clone)]
@@ -8,16 +40,20 @@ use serde::{Serialize, Deserialize};
 pub struct VmConfigPartial {
   /// Name of the vm
   pub name: String,
-  /// Name of the image
-  pub image: String,
-  /// hostname of the vm
+  /// Hostname of the vm
   pub hostname: Option<String>,
-  /// Number of cpu of the vm
-  pub cpu: Option<u64>,
-  /// Memory of the vm
-  pub memory: Option<u64>,
-  /// default network interface of the vm
-  pub net_iface: Option<String>,
+  /// Domain name of the vm
+  pub domainname: Option<String>,
+  /// Default user of the vm (cloud)
+  pub user: Option<String>,
+  /// Disk config of the vm
+  pub disk: VmDiskConfig,
+  /// Mac address of the vm
+  pub mac_address: Option<String>,
+  /// User-defined key/value metadata.
+  pub labels: Option<HashMap<String, String>>,
+  /// A vm's resources (cpu, memory, network)
+  pub host_config: Option<VmHostConfig>,
 }
 
 /// Payload used to patch a vm
@@ -29,27 +65,33 @@ pub struct VmConfigPartial {
 pub struct VmConfigUpdate {
   /// Name of the vm
   pub name: Option<String>,
-  /// Name of the image
-  pub image: String,
-  /// hostname of the vm
+  /// Hostname of the vm
   pub hostname: Option<String>,
-  /// Number of cpu of the vm
-  pub cpu: Option<u64>,
-  /// Memory of the vm
-  pub memory: Option<u64>,
-  /// default network interface of the vm
-  pub net_iface: Option<String>,
+  /// Domain name of the vm
+  pub domainname: Option<String>,
+  /// Default user of the vm (cloud)
+  pub user: Option<String>,
+  /// Disk config of the vm
+  pub disk: Option<VmDiskConfig>,
+  /// Mac address of the vm
+  pub mac_address: Option<String>,
+  /// User-defined key/value metadata.
+  pub labels: Option<HashMap<String, String>>,
+  /// A vm's resources (cpu, memory, network)
+  pub host_config: Option<VmHostConfig>,
 }
 
 impl From<VmConfigPartial> for VmConfigUpdate {
   fn from(vm_config: VmConfigPartial) -> Self {
     Self {
       name: Some(vm_config.name),
-      image: vm_config.image,
       hostname: vm_config.hostname,
-      cpu: vm_config.cpu,
-      memory: vm_config.memory,
-      net_iface: vm_config.net_iface,
+      domainname: vm_config.domainname,
+      user: vm_config.user,
+      disk: Some(vm_config.disk),
+      mac_address: vm_config.mac_address,
+      labels: vm_config.labels,
+      host_config: vm_config.host_config,
     }
   }
 }
@@ -71,27 +113,33 @@ pub struct VmConfig {
   pub version: String,
   /// The key of the vm
   pub vm_key: String,
-  /// Name of the image
-  pub image: String,
-  /// hostname of the vm
+  /// Hostname of the vm
   pub hostname: Option<String>,
-  /// Number of cpu of the vm
-  pub cpu: Option<u64>,
-  /// Memory of the vm
-  pub memory: Option<u64>,
-  /// default network interface of the vm
-  pub net_iface: Option<String>,
+  /// Domain name of the vm
+  pub domainname: Option<String>,
+  /// Default user of the vm (cloud)
+  pub user: Option<String>,
+  /// Disk config of the vm
+  pub disk: VmDiskConfig,
+  /// Mac address of the vm
+  pub mac_address: Option<String>,
+  /// User-defined key/value metadata.
+  pub labels: Option<HashMap<String, String>>,
+  /// A vm's resources (cpu, memory, network)
+  pub host_config: Option<VmHostConfig>,
 }
 
 impl From<VmConfig> for VmConfigUpdate {
   fn from(vm_config: VmConfig) -> Self {
     Self {
       name: Some(vm_config.name),
-      image: vm_config.image,
       hostname: vm_config.hostname,
-      cpu: vm_config.cpu,
-      memory: vm_config.memory,
-      net_iface: vm_config.net_iface,
+      domainname: vm_config.domainname,
+      user: vm_config.user,
+      disk: Some(vm_config.disk),
+      mac_address: vm_config.mac_address,
+      labels: vm_config.labels,
+      host_config: vm_config.host_config,
     }
   }
 }

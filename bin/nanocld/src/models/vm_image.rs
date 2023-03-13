@@ -1,5 +1,6 @@
 use diesel::prelude::*;
 
+use nanocl_stubs::vm_image::VmImage;
 use serde::{Serialize, Deserialize};
 
 use crate::schema::vm_images;
@@ -19,6 +20,27 @@ pub struct VmImageDbModel {
   pub(crate) size_actual: i64,
   pub(crate) size_virtual: i64,
   pub(crate) parent: Option<String>,
+}
+
+#[derive(Clone, Debug, AsChangeset)]
+#[diesel(table_name = vm_images)]
+pub struct VmImageUpdateDbModel {
+  pub(crate) size_actual: i64,
+  pub(crate) size_virtual: i64,
+}
+
+impl From<VmImageDbModel> for VmImage {
+  fn from(db_model: VmImageDbModel) -> Self {
+    Self {
+      name: db_model.name,
+      created_at: db_model.created_at,
+      path: db_model.path,
+      kind: db_model.kind,
+      format: db_model.format,
+      size_actual: db_model.size_actual,
+      size_virtual: db_model.size_virtual,
+    }
+  }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

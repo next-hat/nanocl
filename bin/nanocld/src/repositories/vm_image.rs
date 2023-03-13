@@ -2,7 +2,7 @@ use ntex::web;
 use diesel::prelude::*;
 
 use crate::utils;
-use crate::models::{Pool, VmImageDbModel};
+use crate::models::{Pool, VmImageDbModel, VmImageUpdateDbModel};
 use crate::error::HttpResponseError;
 use crate::repositories::error::{db_error, db_blocking_error};
 
@@ -106,4 +106,27 @@ pub async fn list(
   .await
   .map_err(db_blocking_error)?;
   Ok(items)
+}
+
+pub async fn update_by_name(
+  name: &str,
+  item: &VmImageUpdateDbModel,
+  pool: &Pool,
+) -> Result<VmImageDbModel, HttpResponseError> {
+  use crate::schema::vm_images::dsl;
+
+  let name = name.to_owned();
+  let item = item.clone();
+  let pool = pool.clone();
+  let item = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let item = diesel::update(dsl::vm_images.filter(dsl::name.eq(name)))
+      .set(item)
+      .get_result(&mut conn)
+      .map_err(db_error("vm_image"))?;
+    Ok::<_, HttpResponseError>(item)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+  Ok(item)
 }

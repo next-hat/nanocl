@@ -386,11 +386,13 @@ pub async fn inspect_by_key(
     name: config.name,
     version: item.1.version,
     vm_key: item.1.vm_key,
-    image: config.image,
     hostname: config.hostname,
-    memory: config.memory,
-    cpu: config.cpu,
-    net_iface: config.net_iface,
+    disk: config.disk,
+    domainname: config.domainname,
+    user: config.user,
+    mac_address: config.mac_address,
+    labels: config.labels,
+    host_config: config.host_config,
   };
 
   let item = Vm {

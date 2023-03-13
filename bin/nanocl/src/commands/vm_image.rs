@@ -5,11 +5,15 @@ use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use nanocld_client::NanocldClient;
+use nanocld_client::stubs::vm_image::VmImageCloneStream;
 
 use crate::utils::math::calculate_percentage;
 
 use crate::error::CliError;
-use crate::models::{VmImageArgs, VmImageCreateOpts, VmImageCommands, VmImageRow};
+use crate::models::{
+  VmImageArgs, VmImageCreateOpts, VmImageCommands, VmImageRow,
+  VmImageResizeOpts,
+};
 use crate::utils::print::print_table;
 
 async fn exec_vm_image_create(
@@ -85,6 +89,42 @@ async fn exec_vm_image_rm(
   Ok(())
 }
 
+async fn exec_vm_image_clone(
+  client: &NanocldClient,
+  name: &str,
+  clone_name: &str,
+) -> Result<(), CliError> {
+  let mut stream = client.clone_vm_image(name, clone_name).await?;
+  let pg = ProgressBar::new(100);
+  let style = ProgressStyle::with_template(
+    "[{elapsed_precise}] [{bar:20.cyan/blue}] {pos:>7}% {msg}",
+  )
+  .unwrap()
+  .progress_chars("=> ");
+  pg.set_style(style);
+  while let Some(item) = stream.next().await {
+    let item = item?;
+    match item {
+      VmImageCloneStream::Progress(progress) => {
+        pg.set_position((progress * 100.0) as u64 / 100);
+      }
+      VmImageCloneStream::Done(_) => {
+        pg.finish_and_clear();
+      }
+    }
+  }
+  Ok(())
+}
+
+async fn exec_vm_resize(
+  client: &NanocldClient,
+  options: &VmImageResizeOpts,
+) -> Result<(), CliError> {
+  let payload = options.clone().into();
+  client.resize_vm_image(&options.name, &payload).await?;
+  Ok(())
+}
+
 pub async fn exec_vm_image(
   client: &NanocldClient,
   args: &VmImageArgs,
@@ -95,5 +135,9 @@ pub async fn exec_vm_image(
     }
     VmImageCommands::List => exec_vm_image_ls(client).await,
     VmImageCommands::Remove { names } => exec_vm_image_rm(client, names).await,
+    VmImageCommands::Clone { name, clone_name } => {
+      exec_vm_image_clone(client, name, clone_name).await
+    }
+    VmImageCommands::Resize(opts) => exec_vm_resize(client, opts).await,
   }
 }

@@ -59,7 +59,7 @@ async fn create_instance(
   let mut instances = Vec::new();
   for current in 0..number {
     let name = if current > 0 {
-      format!("{}-{}", cargo.key, current)
+      format!("{}-{}.c", cargo.key, current)
     } else {
       cargo.key.to_owned()
     };
@@ -72,11 +72,9 @@ async fn create_instance(
     // Add cargo label to the container to track it
     let mut labels =
       cargo.config.container.labels.to_owned().unwrap_or_default();
-    labels.insert("io.nanocl.cargo".into(), cargo.key.to_owned());
-    labels.insert(
-      "io.nanocl.namespace".into(),
-      cargo.namespace_name.to_owned(),
-    );
+    labels.insert("io.nanocl".into(), "enabled".into());
+    labels.insert("io.nanocl.c".into(), cargo.key.to_owned());
+    labels.insert("io.nanocl.cnsp".into(), cargo.namespace_name.to_owned());
 
     let auto_remove = cargo
       .config
@@ -165,7 +163,7 @@ pub async fn list_instance(
   cargo_key: &str,
   docker_api: &bollard_next::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpResponseError> {
-  let label = format!("io.nanocl.cargo={cargo_key}");
+  let label = format!("io.nanocl.c={cargo_key}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
   let options = Some(ListContainersOptions {
@@ -173,13 +171,7 @@ pub async fn list_instance(
     filters,
     ..Default::default()
   });
-  let containers = docker_api.list_containers(options).await.map_err(|e| {
-    HttpResponseError {
-      msg: format!("Unable to list containers got error : {e}"),
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-    }
-  })?;
-
+  let containers = docker_api.list_containers(options).await?;
   Ok(containers)
 }
 
@@ -678,7 +670,8 @@ pub async fn exec_command(
   args: &CargoExecConfig<String>,
   docker_api: &bollard_next::Docker,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let result = docker_api.create_exec(name, args.to_owned()).await?;
+  let name = format!("{name}.c");
+  let result = docker_api.create_exec(&name, args.to_owned()).await?;
 
   let res = docker_api
     .start_exec(&result.id, Some(StartExecOptions::default()))

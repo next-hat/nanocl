@@ -2,7 +2,10 @@ use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
-use nanocld_client::stubs::{vm_config::VmConfigPartial, vm::VmSummary};
+use nanocld_client::stubs::{
+  vm_config::{VmConfigPartial, VmDiskConfig, VmHostConfig},
+  vm::VmSummary,
+};
 
 use super::VmImageArgs;
 
@@ -63,11 +66,18 @@ impl From<VmRunOpts> for VmConfigPartial {
   fn from(val: VmRunOpts) -> Self {
     Self {
       name: val.name,
-      image: val.image,
       hostname: val.hostname,
-      cpu: val.cpu,
-      memory: val.memory,
-      net_iface: val.net_iface,
+      disk: VmDiskConfig {
+        image: val.image,
+        ..Default::default()
+      },
+      host_config: Some(VmHostConfig {
+        cpu: val.cpu,
+        memory: val.memory,
+        net_iface: val.net_iface,
+        ..Default::default()
+      }),
+      ..Default::default()
     }
   }
 }
@@ -84,11 +94,11 @@ impl From<VmCreateOpts> for VmConfigPartial {
   fn from(val: VmCreateOpts) -> Self {
     Self {
       name: val.name,
-      image: val.image,
-      hostname: None,
-      cpu: None,
-      memory: None,
-      net_iface: None,
+      disk: VmDiskConfig {
+        image: val.image,
+        ..Default::default()
+      },
+      ..Default::default()
     }
   }
 }
@@ -97,7 +107,7 @@ impl From<VmCreateOpts> for VmConfigPartial {
 pub struct VmRow {
   pub(crate) name: String,
   pub(crate) namespace: String,
-  pub(crate) image: String,
+  pub(crate) disk: String,
   pub(crate) instances: String,
   pub(crate) config_version: String,
   pub(crate) created_at: String,
@@ -121,7 +131,7 @@ impl From<VmSummary> for VmRow {
     Self {
       name: vm.name,
       namespace: vm.namespace_name,
-      image: vm.config.image,
+      disk: vm.config.disk.image,
       config_version: vm.config.version,
       instances: format!("{}/{}", vm.running_instances, vm.instances),
       created_at: format!("{created_at}"),

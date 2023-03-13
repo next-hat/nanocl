@@ -90,7 +90,7 @@ pub async fn list_instance(
   vm_key: &str,
   docker_api: &Docker,
 ) -> Result<Vec<ContainerSummary>, HttpResponseError> {
-  let label = format!("io.nanocl.vm={vm_key}");
+  let label = format!("io.nanocl.v={vm_key}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
   let options = Some(ListContainersOptions {
@@ -98,13 +98,7 @@ pub async fn list_instance(
     filters,
     ..Default::default()
   });
-  let containers = docker_api.list_containers(options).await.map_err(|e| {
-    HttpResponseError {
-      msg: format!("Unable to list containers got error : {e}"),
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-    }
-  })?;
-
+  let containers = docker_api.list_containers(options).await?;
   Ok(containers)
 }
 
@@ -124,15 +118,11 @@ pub async fn delete(
   let container_name = format!("{}.vm", vm_key);
   docker_api
     .remove_container(&container_name, Some(options))
-    .await
-    .map_err(|e| HttpResponseError {
-      msg: format!("Unable to remove container got error : {e}"),
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-    })?;
+    .await?;
 
-  utils::vm_image::delete(&vm.config.image, pool).await?;
-  repositories::vm_config::delete_by_vm_key(vm.key, pool).await?;
   repositories::vm::delete_by_key(vm_key, pool).await?;
+  repositories::vm_config::delete_by_vm_key(vm.key, pool).await?;
+  utils::vm_image::delete(&vm.config.disk.image, pool).await?;
 
   Ok(())
 }
@@ -197,40 +187,61 @@ pub async fn create(
     });
   }
   let vmimagespath = format!("{}/vms/images", daemon_conf.state_dir);
-  let image = repositories::vm_image::find_by_name(&vm.image, pool).await?;
+  let image =
+    repositories::vm_image::find_by_name(&vm.disk.image, pool).await?;
+  if image.kind.as_str() != "Base" {
+    return Err(HttpResponseError {
+      msg: format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image),
+      status: StatusCode::BAD_REQUEST,
+    });
+  }
   let snapname = format!("{}.{vm_key}", &image.name);
   let image =
     utils::vm_image::create_snap(&snapname, &image, daemon_conf, pool).await?;
 
   // Use the snapshot image
-  vm.image = image.name;
+  vm.disk.image = image.name;
 
   let vm = repositories::vm::create(namespace, vm, &version, pool).await?;
 
   let mut labels = HashMap::new();
-  labels.insert("io.nanocl.vm", vm.key.as_str());
-  labels.insert("io.nanocl.vmnsp", namespace);
+  labels.insert("io.nanocl", "enabled");
+  labels.insert("io.nanocl.v", vm.key.as_str());
+  labels.insert("io.nanocl.vnsp", namespace);
+
+  let mut args = vec!["-hda", &image.path, "--nographic"];
+  let host_config = vm.config.host_config.clone().unwrap_or_default();
+  let kvm = host_config.kvm.unwrap_or(true);
+  if kvm {
+    args.push("-accel");
+    args.push("kvm");
+  }
+  let cpu = host_config.cpu.unwrap_or_default();
+  let cpu = if cpu > 0 { cpu.to_string() } else { "2".into() };
+  let cpu = cpu.clone();
+  args.push("-smp");
+  args.push(cpu.as_str());
+  let memory = host_config.memory.unwrap_or_default();
+  let memory = if memory > 0 {
+    format!("{memory}G")
+  } else {
+    "2G".into()
+  };
+  args.push("-m");
+  args.push(&memory);
 
   let config = bollard_next::container::Config {
     image: Some("nanocl-qemu:dev"),
     tty: Some(true),
     labels: Some(labels),
-    cmd: Some(vec![
-      "-accel",
-      "kvm",
-      "-m",
-      "4G",
-      "-smp 4",
-      "-hda",
-      &image.path,
-      "--nographic",
-    ]),
+    cmd: Some(args),
     attach_stderr: Some(true),
     attach_stdin: Some(true),
     attach_stdout: Some(true),
     open_stdin: Some(true),
     stdin_once: Some(true),
     host_config: Some(HostConfig {
+      network_mode: Some(vm.namespace_name.to_owned()),
       binds: Some(vec![format!("{vmimagespath}:/var/lib/nanocl/vms/images")]),
       devices: Some(vec![
         DeviceMapping {
