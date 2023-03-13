@@ -836,7 +836,7 @@ pub fn get_logs(
   HttpResponseError,
 > {
   let stream = docker_api.logs(
-    name,
+    &format!("{name}.c"),
     Some(LogsOptions::<String> {
       follow: true,
       stdout: true,
