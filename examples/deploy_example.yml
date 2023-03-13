@@ -4,23 +4,27 @@ ApiVersion: v0.2
 Namespace: global
 
 Resources:
-  - Name: deploy-example.com
-    Kind: ProxyRule
-    Version: v0.1
-    Config:
-      Watch:
-      -  deploy-example.global
-      Rule:
-        Http:
-          Domain: deploy-example.com
-          Network: Public
-          Locations:
-          - Path: /
-            Target:
-              Key:  deploy-example.global
-              Port: 9000
-          - Path: /v2
-            Target:
+- Name: deploy-example.com
+  Kind: ProxyRule
+  Version: v0.1
+  Config:
+    Watch:
+    - deploy-example.global
+    - deploy-example2.global
+    Rule:
+      Http:
+        Domain: deploy-example.com
+        Network: Public
+        Locations:
+        - Path: /
+          Target:
+            Http:
+              Url: http://deploy-example.com/v2
+              Redirect: TemporaryRedirect
+
+        - Path: /v2
+          Target:
+            Cargo:
               Key: deploy-example2.global
               Port: 9000
 

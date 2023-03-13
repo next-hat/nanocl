@@ -40,10 +40,10 @@ pub async fn validate_resource(
         .compile(&kind.schema)
         .map_err(|err| HttpResponseError {
           status: StatusCode::BAD_REQUEST,
-          msg: format!("Invalid schema: {}", err),
+          msg: format!("Invalid schema {}", err),
         })?;
       schema.validate(&resource.config).map_err(|err| {
-        let mut msg = String::from("Invalid config: ");
+        let mut msg = String::from("Invalid config ");
         for error in err {
           msg += &format!("{} ", error);
         }

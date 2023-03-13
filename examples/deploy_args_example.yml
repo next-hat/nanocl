@@ -4,36 +4,37 @@ ApiVersion: v0.2
 Namespace: global
 
 Args:
-  - Name: domain
-    Type: String
+- Name: domain
+  Type: String
 
 Resources:
-  - Name: "{{Args.domain}}"
-    Kind: ProxyRule
-    Version: v0.1
-    Config:
-      Watch:
-        - get-started@global
-      Rule:
-        Http:
-          Domain: "{{Args.domain}}"
-          Network: Public
-          Locations:
-            - Path: /
-              Target:
-                Key: get-started@global
-                Port: 9000
+- Name: "{{Args.domain}}"
+  Kind: ProxyRule
+  Version: v0.1
+  Config:
+    Watch:
+    - get-started.global
+    Rule:
+      Http:
+        Domain: "{{Args.domain}}"
+        Network: Public
+        Locations:
+        - Path: /
+          Target:
+            Cargo:
+              Key: get-started.global
+              Port: 9000
 
 Cargoes:
-  - Name: deploy-args-example
-    # See all options:
-    # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
-    Container:
-      Image: nexthat/nanocl-get-started:latest
-      HostConfig:
-        Binds: [
-          "./test_local:/test"
-        ]
-      Env:
-        - TEST=GG
-        - APP=GET_STARTED
+- Name: deploy-args-example
+  # See all options:
+  # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
+  Container:
+    Image: nexthat/nanocl-get-started:latest
+    HostConfig:
+      Binds: [
+        "./test_local:/test"
+      ]
+    Env:
+      - TEST=GG
+      - APP=GET_STARTED

@@ -4,13 +4,13 @@ ApiVersion: v0.2
 Namespace: global
 
 Cargoes:
-  - Name: cargo-autoremove
-    # See all options:
-    # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
-    Container:
-      Image: busybox:uclibc
-      Cmd:
-        - sleep
-        - "20"
-      HostConfig:
-        AutoRemove: true
+- Name: cargo-autoremove
+  # See all options:
+  # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
+  Container:
+    Image: busybox:uclibc
+    Cmd:
+      - sleep
+      - "20"
+    HostConfig:
+      AutoRemove: true

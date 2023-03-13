@@ -267,13 +267,7 @@ pub async fn start(
         }
       });
     }
-    docker_api
-      .start_container::<String>(&id, None)
-      .await
-      .map_err(|e| HttpResponseError {
-        msg: format!("Unable to start container got error : {e}"),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-      })?;
+    docker_api.start_container::<String>(&id, None).await?;
   }
 
   if auto_remove {
@@ -313,11 +307,7 @@ pub async fn stop(
   for container in containers {
     docker_api
       .stop_container(&container.id.unwrap_or_default(), None)
-      .await
-      .map_err(|e| HttpResponseError {
-        msg: format!("Unable to stop container got error : {e}"),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-      })?;
+      .await?;
   }
 
   Ok(())
@@ -477,11 +467,7 @@ pub async fn put(
             ..Default::default()
           }),
         )
-        .await
-        .map_err(|e| HttpResponseError {
-          msg: format!("Unable to remove container got error : {e}"),
-          status: StatusCode::INTERNAL_SERVER_ERROR,
-        })?;
+        .await?;
     }
     // We rename the old containers
     for container in containers.iter().cloned() {
@@ -493,11 +479,7 @@ pub async fn put(
           &container.id.unwrap_or_default(),
           bollard_next::container::RenameContainerOptions { name },
         )
-        .await
-        .map_err(|e| HttpResponseError {
-          msg: format!("Unable to rename container got error : {e}"),
-          status: StatusCode::INTERNAL_SERVER_ERROR,
-        })?;
+        .await?;
     }
   }
 
