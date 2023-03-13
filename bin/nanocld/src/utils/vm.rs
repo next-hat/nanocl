@@ -8,9 +8,9 @@ use bollard_next::container::{
   StopContainerOptions,
 };
 
-use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::vm_config::VmConfigPartial;
+use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
@@ -20,7 +20,7 @@ pub async fn start(
   vm_key: &str,
   docker_api: &Docker,
 ) -> Result<(), HttpResponseError> {
-  let container_name = format!("{}.vm", vm_key);
+  let container_name = format!("{}.v", vm_key);
   docker_api
     .start_container(&container_name, None::<StartContainerOptions<String>>)
     .await
@@ -37,7 +37,7 @@ pub async fn stop(
   vm: &VmDbModel,
   docker_api: &Docker,
 ) -> Result<(), HttpResponseError> {
-  let container_name = format!("{}.vm", vm.key);
+  let container_name = format!("{}.v", vm.key);
   docker_api
     .stop_container(&container_name, None::<StopContainerOptions>)
     .await
@@ -115,7 +115,7 @@ pub async fn delete(
     ..Default::default()
   };
 
-  let container_name = format!("{}.vm", vm_key);
+  let container_name = format!("{}.v", vm_key);
   docker_api
     .remove_container(&container_name, Some(options))
     .await?;
@@ -196,11 +196,16 @@ pub async fn create(
     });
   }
   let snapname = format!("{}.{vm_key}", &image.name);
+
+  let size = vm.disk.size.unwrap_or(20);
+
   let image =
-    utils::vm_image::create_snap(&snapname, &image, daemon_conf, pool).await?;
+    utils::vm_image::create_snap(&snapname, size, &image, daemon_conf, pool)
+      .await?;
 
   // Use the snapshot image
   vm.disk.image = image.name;
+  vm.disk.size = Some(size);
 
   let vm = repositories::vm::create(namespace, vm, &version, pool).await?;
 
@@ -210,20 +215,20 @@ pub async fn create(
   labels.insert("io.nanocl.vnsp", namespace);
 
   let mut args = vec!["-hda", &image.path, "--nographic"];
-  let host_config = vm.config.host_config.clone().unwrap_or_default();
+  let host_config = vm.config.host_config.clone();
   let kvm = host_config.kvm.unwrap_or(true);
   if kvm {
     args.push("-accel");
     args.push("kvm");
   }
-  let cpu = host_config.cpu.unwrap_or_default();
+  let cpu = host_config.cpu;
   let cpu = if cpu > 0 { cpu.to_string() } else { "2".into() };
   let cpu = cpu.clone();
   args.push("-smp");
   args.push(cpu.as_str());
-  let memory = host_config.memory.unwrap_or_default();
+  let memory = host_config.memory;
   let memory = if memory > 0 {
-    format!("{memory}G")
+    format!("{memory}M")
   } else {
     "2G".into()
   };
@@ -262,7 +267,7 @@ pub async fn create(
   };
 
   let options = Some(CreateContainerOptions {
-    name: format!("{}.vm", &vm.key),
+    name: format!("{}.v", &vm.key),
     ..Default::default()
   });
 

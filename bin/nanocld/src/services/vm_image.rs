@@ -113,9 +113,14 @@ async fn create_vm_image_snapshot(
   let snapshot_name = path.2.to_owned();
   utils::key::validate_name(&snapshot_name)?;
   let image = repositories::vm_image::find_by_name(&name, &pool).await?;
-  let vm_image =
-    utils::vm_image::create_snap(&snapshot_name, &image, &daemon_config, &pool)
-      .await?;
+  let vm_image = utils::vm_image::create_snap(
+    &snapshot_name,
+    50,
+    &image,
+    &daemon_config,
+    &pool,
+  )
+  .await?;
 
   Ok(web::HttpResponse::Ok().json(&vm_image))
 }

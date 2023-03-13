@@ -61,7 +61,7 @@ async fn create_instance(
     let name = if current > 0 {
       format!("{}-{}.c", cargo.key, current)
     } else {
-      cargo.key.to_owned()
+      format!("{}.c", cargo.key)
     };
 
     let create_options = bollard_next::container::CreateContainerOptions {

@@ -392,7 +392,7 @@ pub async fn inspect_by_key(
     user: config.user,
     mac_address: config.mac_address,
     labels: config.labels,
-    host_config: config.host_config,
+    host_config: config.host_config.unwrap_or_default(),
   };
 
   let item = Vm {

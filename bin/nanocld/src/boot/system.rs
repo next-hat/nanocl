@@ -82,7 +82,7 @@ pub(crate) async fn sync_containers(
   for container_summary in containers {
     // extract cargo name and namespace
     let labels = container_summary.labels.unwrap_or_default();
-    let Some(cargo_key) = labels.get("io.nanocl.cargo") else {
+    let Some(cargo_key) = labels.get("io.nanocl.c") else {
       // We don't have cargo label, we skip it
       continue;
     };

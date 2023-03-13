@@ -15,14 +15,14 @@ pub struct VmDiskConfig {
 }
 
 /// A vm's resources (cpu, memory, network)
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmHostConfig {
   /// Number of cpu of the vm
-  pub cpu: Option<u64>,
+  pub cpu: u64,
   /// Memory of the vm
-  pub memory: Option<u64>,
+  pub memory: u64,
   /// default network interface of the vm
   pub net_iface: Option<String>,
   /// Enable KVM
@@ -31,6 +31,19 @@ pub struct VmHostConfig {
   pub dns: Option<Vec<String>>,
   /// Runtime to use
   pub runtime: Option<String>,
+}
+
+impl Default for VmHostConfig {
+  fn default() -> Self {
+    Self {
+      cpu: 1,
+      memory: 512,
+      net_iface: Some(String::default()),
+      kvm: Some(true),
+      dns: Some(vec![]),
+      runtime: Some(String::default()),
+    }
+  }
 }
 
 /// A vm config partial is used to create a Vm
@@ -126,7 +139,7 @@ pub struct VmConfig {
   /// User-defined key/value metadata.
   pub labels: Option<HashMap<String, String>>,
   /// A vm's resources (cpu, memory, network)
-  pub host_config: Option<VmHostConfig>,
+  pub host_config: VmHostConfig,
 }
 
 impl From<VmConfig> for VmConfigUpdate {
@@ -139,7 +152,7 @@ impl From<VmConfig> for VmConfigUpdate {
       disk: Some(vm_config.disk),
       mac_address: vm_config.mac_address,
       labels: vm_config.labels,
-      host_config: vm_config.host_config,
+      host_config: Some(vm_config.host_config),
     }
   }
 }

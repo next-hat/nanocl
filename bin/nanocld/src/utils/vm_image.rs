@@ -69,6 +69,7 @@ pub async fn get_info(path: &str) -> Result<QemuImgInfo, HttpResponseError> {
 
 pub async fn create_snap(
   name: &str,
+  size: u64,
   image: &VmImageDbModel,
   daemon_conf: &DaemonConfig,
   pool: &Pool,
@@ -114,8 +115,9 @@ pub async fn create_snap(
       msg: format!("Failed to create snapshot of {imagepath}: {output:#?}"),
     })?;
 
+  let size = format!("{size}G");
   let output = Command::new("qemu-img")
-    .args(["resize", &snapshotpath, "50G"])
+    .args(["resize", &snapshotpath, &size])
     .output()
     .await
     .map_err(|err| HttpResponseError {

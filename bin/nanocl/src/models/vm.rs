@@ -47,10 +47,10 @@ pub struct VmRunOpts {
   /// hostname of the vm
   #[clap(long)]
   pub hostname: Option<String>,
-  /// cpu of the vm
+  /// Cpu of the vm default to 1
   #[clap(long)]
   pub cpu: Option<u64>,
-  /// memory of the vm
+  /// Memory of the vm in MB default to 512
   #[clap(long = "mem")]
   pub memory: Option<u64>,
   /// network interface of the vm
@@ -72,8 +72,8 @@ impl From<VmRunOpts> for VmConfigPartial {
         ..Default::default()
       },
       host_config: Some(VmHostConfig {
-        cpu: val.cpu,
-        memory: val.memory,
+        cpu: val.cpu.unwrap_or(1),
+        memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
         ..Default::default()
       }),
