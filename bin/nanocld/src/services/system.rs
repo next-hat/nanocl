@@ -89,7 +89,7 @@ mod tests {
   #[ntex::test]
   async fn wrong_version() {
     let srv = generate_server(ntex_config).await;
-    let resp = srv.get("/v0.3/info").send().await.unwrap();
+    let resp = srv.get("/v12.44/info").send().await.unwrap();
     let status = resp.status();
     assert_eq!(
       status,
