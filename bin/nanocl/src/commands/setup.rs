@@ -123,7 +123,7 @@ async fn install_dependencies(
   println!("Installing dependencies");
   install_image("cockroachdb/cockroach", "v22.2.5", docker_api).await?;
   install_image("nexthat/metrsd", "v0.1.0", docker_api).await?;
-  // install_image("nexthat/nanocld", version, docker_api).await?;
+  install_image("nexthat/nanocld", version, docker_api).await?;
   println!("Dependencies installed");
   Ok(())
 }
@@ -211,8 +211,8 @@ async fn init_dependencies(
     .create_container(
       None::<CreateContainerOptions<String>>,
       ContainerConfig {
-        image: Some("nanocld:dev".into()),
-        // image: Some(format!("nexthat/nanocld:{}", args.version)),
+        // image: Some("nanocld:nightly-0.3.0".into()),
+        image: Some(format!("nexthat/nanocld:{}", args.version)),
         cmd: Some(daemon_args),
         env: Some(vec![format!("NANOCL_GID={}", args.gid)]),
         host_config: Some(HostConfig {
@@ -291,8 +291,8 @@ async fn spawn_daemon(
         ..Default::default()
       }),
       ContainerConfig {
-        image: Some("nanocld:dev".into()),
-        // image: Some(format!("nexthat/nanocld:{}", args.version)),
+        // image: Some("nanocld:nightly-0.3.0".into()),
+        image: Some(format!("nexthat/nanocld:{}", args.version)),
         entrypoint: Some(vec!["/entrypoint.sh".into()]),
         cmd: Some(daemon_args),
         labels: Some(labels),
