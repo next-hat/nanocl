@@ -123,7 +123,7 @@ async fn install_dependencies(
   println!("Installing dependencies");
   install_image("cockroachdb/cockroach", "v22.2.5", docker_api).await?;
   install_image("nexthat/metrsd", "v0.1.0", docker_api).await?;
-  install_image("nexthat/nanocld", version, docker_api).await?;
+  // install_image("nexthat/nanocld", version, docker_api).await?;
   println!("Dependencies installed");
   Ok(())
 }
@@ -279,7 +279,7 @@ async fn spawn_daemon(
   let daemon_args = gen_daemon_args(args);
   let mut labels = HashMap::new();
   labels.insert("io.nanocl".into(), "enabled".into());
-  labels.insert("io.nanocl.c".into(), "system-daemon".into());
+  labels.insert("io.nanocl.c".into(), "daemon.system".into());
   labels.insert("io.nanocl.cnsp".into(), "system".into());
 
   let binds = gen_daemon_binds(args);
@@ -287,7 +287,7 @@ async fn spawn_daemon(
   let container = docker_api
     .create_container(
       Some(CreateContainerOptions {
-        name: "system-daemon",
+        name: "daemon.system.c",
         ..Default::default()
       }),
       ContainerConfig {
