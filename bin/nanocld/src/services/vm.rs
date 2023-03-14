@@ -2,7 +2,7 @@ use ntex::web;
 
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::vm_config::VmConfigPartial;
+use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 
 use bollard_next::Docker;
 
@@ -125,6 +125,26 @@ async fn list_vm_history(
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
+#[web::put("/vms/{name}")]
+async fn update_vm(
+  pool: web::types::State<Pool>,
+  daemon_conf: web::types::State<DaemonConfig>,
+  docker_api: web::types::State<Docker>,
+  path: web::types::Path<(String, String)>,
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Json(payload): web::types::Json<VmConfigUpdate>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  let version = path.0.clone();
+
+  let vm =
+    utils::vm::put(&key, &payload, &version, &daemon_conf, &docker_api, &pool)
+      .await?;
+
+  Ok(web::HttpResponse::Ok().json(&vm))
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_vm);
   config.service(create_vm);
@@ -133,6 +153,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(start_vm);
   config.service(stop_vm);
   config.service(list_vm_history);
+  config.service(update_vm);
 }
 
 #[cfg(test)]

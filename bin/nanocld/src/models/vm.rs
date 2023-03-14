@@ -3,7 +3,7 @@ use crate::schema::vms;
 use super::namespace::NamespaceDbModel;
 
 /// Structure to create a cargo in the database
-#[derive(Debug, Queryable, Identifiable, Insertable, Associations)]
+#[derive(Clone, Debug, Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = vms)]
 #[diesel(belongs_to(NamespaceDbModel, foreign_key = namespace_name))]

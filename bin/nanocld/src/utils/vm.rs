@@ -9,12 +9,12 @@ use bollard_next::container::{
 };
 
 use nanocl_stubs::config::DaemonConfig;
-use nanocl_stubs::vm_config::VmConfigPartial;
+use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::{Pool, VmDbModel};
+use crate::models::{Pool, VmDbModel, VmImageDbModel};
 
 pub async fn start(
   vm_key: &str,
@@ -167,52 +167,17 @@ pub async fn list(
   Ok(vm_summaries)
 }
 
-pub async fn create(
-  mut vm: VmConfigPartial,
-  namespace: &str,
-  version: String,
+pub async fn create_instance(
+  vm: &Vm,
+  image: &VmImageDbModel,
   daemon_conf: &DaemonConfig,
   docker_api: &Docker,
-  pool: &Pool,
-) -> Result<Vm, HttpResponseError> {
-  let vm_key = utils::key::gen_key(namespace, &vm.name);
-
-  if repositories::vm::find_by_key(&vm_key, pool).await.is_ok() {
-    return Err(HttpResponseError {
-      status: StatusCode::CONFLICT,
-      msg: format!(
-        "VM with name {} already exists in namespace {namespace}",
-        vm.name
-      ),
-    });
-  }
-  let vmimagespath = format!("{}/vms/images", daemon_conf.state_dir);
-  let image =
-    repositories::vm_image::find_by_name(&vm.disk.image, pool).await?;
-  if image.kind.as_str() != "Base" {
-    return Err(HttpResponseError {
-      msg: format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image),
-      status: StatusCode::BAD_REQUEST,
-    });
-  }
-  let snapname = format!("{}.{vm_key}", &image.name);
-
-  let size = vm.disk.size.unwrap_or(20);
-
-  let image =
-    utils::vm_image::create_snap(&snapname, size, &image, daemon_conf, pool)
-      .await?;
-
-  // Use the snapshot image
-  vm.disk.image = image.name;
-  vm.disk.size = Some(size);
-
-  let vm = repositories::vm::create(namespace, vm, &version, pool).await?;
-
+) -> Result<(), HttpResponseError> {
   let mut labels = HashMap::new();
+  let vmimagespath = format!("{}/vms/images", daemon_conf.state_dir);
   labels.insert("io.nanocl", "enabled");
   labels.insert("io.nanocl.v", vm.key.as_str());
-  labels.insert("io.nanocl.vnsp", namespace);
+  labels.insert("io.nanocl.vnsp", &vm.namespace_name);
 
   let mut args = vec!["-hda", &image.path, "--nographic"];
   let host_config = vm.config.host_config.clone();
@@ -272,6 +237,121 @@ pub async fn create(
   });
 
   docker_api.create_container(options, config).await?;
+
+  Ok(())
+}
+
+pub async fn create(
+  mut vm: VmConfigPartial,
+  namespace: &str,
+  version: String,
+  daemon_conf: &DaemonConfig,
+  docker_api: &Docker,
+  pool: &Pool,
+) -> Result<Vm, HttpResponseError> {
+  let vm_key = utils::key::gen_key(namespace, &vm.name);
+
+  if repositories::vm::find_by_key(&vm_key, pool).await.is_ok() {
+    return Err(HttpResponseError {
+      status: StatusCode::CONFLICT,
+      msg: format!(
+        "VM with name {} already exists in namespace {namespace}",
+        vm.name
+      ),
+    });
+  }
+  let image =
+    repositories::vm_image::find_by_name(&vm.disk.image, pool).await?;
+  if image.kind.as_str() != "Base" {
+    return Err(HttpResponseError {
+      msg: format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image),
+      status: StatusCode::BAD_REQUEST,
+    });
+  }
+  let snapname = format!("{}.{vm_key}", &image.name);
+
+  let size = vm.disk.size.unwrap_or(20);
+
+  let image =
+    utils::vm_image::create_snap(&snapname, size, &image, daemon_conf, pool)
+      .await?;
+
+  // Use the snapshot image
+  vm.disk.image = image.name.clone();
+  vm.disk.size = Some(size);
+
+  let vm = repositories::vm::create(namespace, vm, &version, pool).await?;
+
+  create_instance(&vm, &image, daemon_conf, docker_api).await?;
+
+  Ok(vm)
+}
+
+pub async fn put(
+  cargo_key: &str,
+  config: &VmConfigUpdate,
+  version: &str,
+  daemon_conf: &DaemonConfig,
+  docker_api: &bollard_next::Docker,
+  pool: &Pool,
+) -> Result<Vm, HttpResponseError> {
+  let vm = repositories::vm::find_by_key(cargo_key, pool).await?;
+
+  let old_config =
+    repositories::vm_config::find_by_key(vm.config_key, pool).await?;
+
+  let vm_partial = VmConfigPartial {
+    name: config.name.to_owned().unwrap_or(vm.name.clone()),
+    disk: config.disk.to_owned().unwrap_or(old_config.disk),
+    host_config: Some(
+      config
+        .host_config
+        .to_owned()
+        .unwrap_or(old_config.host_config),
+    ),
+    hostname: if config.hostname.is_some() {
+      config.hostname.clone()
+    } else {
+      old_config.hostname
+    },
+    domainname: if config.domainname.is_some() {
+      config.domainname.clone()
+    } else {
+      old_config.domainname
+    },
+    user: if config.user.is_some() {
+      config.user.clone()
+    } else {
+      old_config.user
+    },
+    mac_address: if config.mac_address.is_some() {
+      config.mac_address.clone()
+    } else {
+      old_config.mac_address
+    },
+    labels: if config.labels.is_some() {
+      config.labels.clone()
+    } else {
+      old_config.labels
+    },
+  };
+
+  // Stop the current vm
+  let _ = stop(&vm, docker_api).await;
+
+  let vm = repositories::vm::update_by_key(
+    vm.key,
+    vm_partial,
+    version.to_owned(),
+    pool,
+  )
+  .await?;
+
+  let image =
+    repositories::vm_image::find_by_name(&vm.config.disk.image, pool).await?;
+
+  create_instance(&vm, &image, daemon_conf, docker_api).await?;
+  // Update the vm
 
   Ok(vm)
 }

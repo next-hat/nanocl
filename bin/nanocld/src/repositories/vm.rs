@@ -13,6 +13,7 @@ use crate::models::{
   VmDbModel,
   NamespaceDbModel,
   VmConfigDbModel,
+  VmUpdateDbModel,
   // VmUpdateDbModel,
 };
 
@@ -267,47 +268,47 @@ pub async fn find_by_key(
 /// let vm = update_by_key(String::from("test"), item, &pool).await;
 /// ```
 ///
-// pub async fn update_by_key(
-//   key: String,
-//   item: VmConfigPartial,
-//   version: String,
-//   pool: &Pool,
-// ) -> Result<Vm, HttpResponseError> {
-//   use crate::schema::vms::dsl;
+pub async fn update_by_key(
+  key: String,
+  item: VmConfigPartial,
+  version: String,
+  pool: &Pool,
+) -> Result<Vm, HttpResponseError> {
+  use crate::schema::vms::dsl;
 
-//   let pool = pool.clone();
+  let pool = pool.clone();
 
-//   let vmdb = find_by_key(&key, &pool).await?;
-//   let config =
-//     vm_config::create(key.to_owned(), item.to_owned(), version, &pool).await?;
+  let vmdb = find_by_key(&key, &pool).await?;
+  let config =
+    vm_config::create(key.to_owned(), item.to_owned(), version, &pool).await?;
 
-//   let new_item = VmUpdateDbModel {
-//     name: Some(item.name),
-//     config_key: Some(config.key),
-//     ..Default::default()
-//   };
+  let new_item = VmUpdateDbModel {
+    name: Some(item.name),
+    config_key: Some(config.key),
+    ..Default::default()
+  };
 
-//   web::block(move || {
-//     let mut conn = utils::store::get_pool_conn(&pool)?;
-//     diesel::update(dsl::vms.filter(dsl::key.eq(key)))
-//       .set(&new_item)
-//       .execute(&mut conn)
-//       .map_err(db_error("vm"))?;
-//     Ok::<_, HttpResponseError>(())
-//   })
-//   .await
-//   .map_err(db_blocking_error)?;
+  web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    diesel::update(dsl::vms.filter(dsl::key.eq(key)))
+      .set(&new_item)
+      .execute(&mut conn)
+      .map_err(db_error("vm"))?;
+    Ok::<_, HttpResponseError>(())
+  })
+  .await
+  .map_err(db_blocking_error)?;
 
-//   let vm = Vm {
-//     key: vmdb.key,
-//     name: vmdb.name,
-//     config_key: config.key,
-//     namespace_name: vmdb.namespace_name,
-//     config,
-//   };
+  let vm = Vm {
+    key: vmdb.key,
+    name: vmdb.name,
+    config_key: config.key,
+    namespace_name: vmdb.namespace_name,
+    config,
+  };
 
-//   Ok(vm)
-// }
+  Ok(vm)
+}
 
 /// ## Count vm by namespace
 ///
