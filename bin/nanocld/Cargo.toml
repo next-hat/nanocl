@@ -49,5 +49,5 @@ tokio-util = "0.7.7"
 futures-util = "0.3.26"
 libc = "0.2.139"
 metrsd_client = "0.1.1"
-chrono = { version = "0.4.23", features = ["serde"] }
+chrono = { version = "0.4.24", features = ["serde"] }
 jsonschema = { version = "0.16.1", default-features = false }
