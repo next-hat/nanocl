@@ -1632,9 +1632,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "0.6.4"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fa4dddc7233889d7ac3185c48bc03180de9a36d96af7f7eed1494916950f0f2"
+checksum = "374013b45c3d47cd41532cfef6bfa094e28d3375492c98ee39aadd764b4a5aee"
 dependencies = [
  "async-channel",
  "async-oneshot",
@@ -1671,7 +1671,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "sha-1",
- "socket2 0.4.9",
+ "socket2 0.5.1",
  "thiserror",
  "webpki-roots",
 ]
@@ -2470,6 +2470,16 @@ checksum = "64a4a911eed85daf18834cfaa86a79b7d266ff93ff5ba14005426219480ed662"
 dependencies = [
  "libc",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "socket2"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc8d618c6641ae355025c449427f9e96b98abf99a772be3cef6708d15c77147a"
+dependencies = [
+ "libc",
+ "windows-sys 0.45.0",
 ]
 
 [[package]]
