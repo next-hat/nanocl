@@ -215,8 +215,6 @@ pub async fn create_instance(
     env.push(format!("SSH_KEY={ssh_key}"));
   }
 
-  println!("passing env: {:?}", env);
-
   let config = bollard_next::container::Config {
     image: Some("nexthat/nanocl-qemu:0.1.0".into()),
     tty: Some(true),
