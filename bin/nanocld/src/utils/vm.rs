@@ -5,7 +5,7 @@ use bollard_next::Docker;
 use bollard_next::service::{HostConfig, DeviceMapping, ContainerSummary};
 use bollard_next::container::{
   CreateContainerOptions, StartContainerOptions, ListContainersOptions,
-  StopContainerOptions,
+  StopContainerOptions, RemoveContainerOptions,
 };
 
 use nanocl_stubs::config::DaemonConfig;
@@ -170,39 +170,57 @@ pub async fn list(
 pub async fn create_instance(
   vm: &Vm,
   image: &VmImageDbModel,
+  disable_keygen: bool,
   daemon_conf: &DaemonConfig,
   docker_api: &Docker,
 ) -> Result<(), HttpResponseError> {
-  let mut labels = HashMap::new();
+  let mut labels: HashMap<String, String> = HashMap::new();
   let vmimagespath = format!("{}/vms/images", daemon_conf.state_dir);
-  labels.insert("io.nanocl", "enabled");
-  labels.insert("io.nanocl.v", vm.key.as_str());
-  labels.insert("io.nanocl.vnsp", &vm.namespace_name);
+  labels.insert("io.nanocl".into(), "enabled".into());
+  labels.insert("io.nanocl.v".into(), vm.key.clone());
+  labels.insert("io.nanocl.vnsp".into(), vm.namespace_name.clone());
 
-  let mut args = vec!["-hda", &image.path, "--nographic"];
+  let mut args: Vec<String> =
+    vec!["-hda".into(), image.path.clone(), "--nographic".into()];
   let host_config = vm.config.host_config.clone();
   let kvm = host_config.kvm.unwrap_or(true);
   if kvm {
-    args.push("-accel");
-    args.push("kvm");
+    args.push("-accel".into());
+    args.push("kvm".into());
   }
   let cpu = host_config.cpu;
   let cpu = if cpu > 0 { cpu.to_string() } else { "2".into() };
   let cpu = cpu.clone();
-  args.push("-smp");
-  args.push(cpu.as_str());
+  args.push("-smp".into());
+  args.push(cpu.clone());
   let memory = host_config.memory;
   let memory = if memory > 0 {
     format!("{memory}M")
   } else {
     "2G".into()
   };
-  args.push("-m");
-  args.push(&memory);
+  args.push("-m".into());
+  args.push(memory);
+
+  let mut env: Vec<String> = Vec::new();
+  env.push(format!("DELETE_SSH_KEY={disable_keygen}"));
+
+  if let Some(user) = &vm.config.user {
+    env.push(format!("USER={user}"));
+  }
+  if let Some(password) = &vm.config.password {
+    env.push(format!("PASSWORD={password}"));
+  }
+  if let Some(ssh_key) = &vm.config.ssh_key {
+    env.push(format!("SSH_KEY={ssh_key}"));
+  }
+
+  println!("passing env: {:?}", env);
 
   let config = bollard_next::container::Config {
-    image: Some("nanocl-qemu:dev"),
+    image: Some("nexthat/nanocl-qemu:0.1.0".into()),
     tty: Some(true),
+    env: Some(env),
     labels: Some(labels),
     cmd: Some(args),
     attach_stderr: Some(true),
@@ -282,12 +300,12 @@ pub async fn create(
 
   let vm = repositories::vm::create(namespace, vm, &version, pool).await?;
 
-  create_instance(&vm, &image, daemon_conf, docker_api).await?;
+  create_instance(&vm, &image, true, daemon_conf, docker_api).await?;
 
   Ok(vm)
 }
 
-pub async fn put(
+pub async fn patch(
   cargo_key: &str,
   config: &VmConfigUpdate,
   version: &str,
@@ -302,33 +320,32 @@ pub async fn put(
 
   let vm_partial = VmConfigPartial {
     name: config.name.to_owned().unwrap_or(vm.name.clone()),
-    disk: config.disk.to_owned().unwrap_or(old_config.disk),
-    host_config: Some(
-      config
-        .host_config
-        .to_owned()
-        .unwrap_or(old_config.host_config),
-    ),
+    disk: old_config.disk,
+    host_config: config
+      .host_config
+      .to_owned()
+      .unwrap_or(old_config.host_config),
     hostname: if config.hostname.is_some() {
       config.hostname.clone()
     } else {
       old_config.hostname
-    },
-    domainname: if config.domainname.is_some() {
-      config.domainname.clone()
-    } else {
-      old_config.domainname
     },
     user: if config.user.is_some() {
       config.user.clone()
     } else {
       old_config.user
     },
-    mac_address: if config.mac_address.is_some() {
-      config.mac_address.clone()
+    password: if config.password.is_some() {
+      config.password.clone()
     } else {
-      old_config.mac_address
+      old_config.password
     },
+    ssh_key: if config.ssh_key.is_some() {
+      config.ssh_key.clone()
+    } else {
+      old_config.ssh_key
+    },
+    mac_address: old_config.mac_address,
     labels: if config.labels.is_some() {
       config.labels.clone()
     } else {
@@ -336,8 +353,13 @@ pub async fn put(
     },
   };
 
-  // Stop the current vm
-  let _ = stop(&vm, docker_api).await;
+  let container_name = format!("{}.v", &vm.key);
+
+  stop(&vm, docker_api).await?;
+
+  docker_api
+    .remove_container(&container_name, None::<RemoveContainerOptions>)
+    .await?;
 
   let vm = repositories::vm::update_by_key(
     vm.key,
@@ -350,8 +372,9 @@ pub async fn put(
   let image =
     repositories::vm_image::find_by_name(&vm.config.disk.image, pool).await?;
 
-  create_instance(&vm, &image, daemon_conf, docker_api).await?;
+  create_instance(&vm, &image, false, daemon_conf, docker_api).await?;
   // Update the vm
+  start(&vm.key, docker_api).await?;
 
   Ok(vm)
 }

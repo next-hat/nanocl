@@ -29,8 +29,10 @@ pub struct VmHostConfig {
   pub kvm: Option<bool>,
   /// A list of DNS servers for the vm to use.
   pub dns: Option<Vec<String>>,
-  /// Runtime to use
+  /// Container image name to use for vm default: nexthat/nanocl-qemu
   pub runtime: Option<String>,
+  // Container network to use, default to the vm namespace
+  pub runtime_net: Option<String>,
 }
 
 impl Default for VmHostConfig {
@@ -38,10 +40,11 @@ impl Default for VmHostConfig {
     Self {
       cpu: 1,
       memory: 512,
-      net_iface: Some(String::default()),
-      kvm: Some(true),
-      dns: Some(vec![]),
-      runtime: Some(String::default()),
+      net_iface: None,
+      kvm: None,
+      dns: None,
+      runtime: None,
+      runtime_net: None,
     }
   }
 }
@@ -55,10 +58,12 @@ pub struct VmConfigPartial {
   pub name: String,
   /// Hostname of the vm
   pub hostname: Option<String>,
-  /// Domain name of the vm
-  pub domainname: Option<String>,
   /// Default user of the vm (cloud)
   pub user: Option<String>,
+  /// Default password of the vm (cloud)
+  pub password: Option<String>,
+  /// Default ssh key for the user
+  pub ssh_key: Option<String>,
   /// Disk config of the vm
   pub disk: VmDiskConfig,
   /// Mac address of the vm
@@ -66,7 +71,7 @@ pub struct VmConfigPartial {
   /// User-defined key/value metadata.
   pub labels: Option<HashMap<String, String>>,
   /// A vm's resources (cpu, memory, network)
-  pub host_config: Option<VmHostConfig>,
+  pub host_config: VmHostConfig,
 }
 
 /// Payload used to patch a vm
@@ -80,14 +85,12 @@ pub struct VmConfigUpdate {
   pub name: Option<String>,
   /// Hostname of the vm
   pub hostname: Option<String>,
-  /// Domain name of the vm
-  pub domainname: Option<String>,
   /// Default user of the vm (cloud)
   pub user: Option<String>,
-  /// Disk config of the vm
-  pub disk: Option<VmDiskConfig>,
-  /// Mac address of the vm
-  pub mac_address: Option<String>,
+  /// Default password of the vm (cloud)
+  pub password: Option<String>,
+  /// Default ssh key for the user
+  pub ssh_key: Option<String>,
   /// User-defined key/value metadata.
   pub labels: Option<HashMap<String, String>>,
   /// A vm's resources (cpu, memory, network)
@@ -99,12 +102,11 @@ impl From<VmConfigPartial> for VmConfigUpdate {
     Self {
       name: Some(vm_config.name),
       hostname: vm_config.hostname,
-      domainname: vm_config.domainname,
       user: vm_config.user,
-      disk: Some(vm_config.disk),
-      mac_address: vm_config.mac_address,
       labels: vm_config.labels,
-      host_config: vm_config.host_config,
+      host_config: Some(vm_config.host_config),
+      password: vm_config.password,
+      ssh_key: vm_config.ssh_key,
     }
   }
 }
@@ -128,8 +130,10 @@ pub struct VmConfig {
   pub vm_key: String,
   /// Hostname of the vm
   pub hostname: Option<String>,
-  /// Domain name of the vm
-  pub domainname: Option<String>,
+  /// Default password of the vm (cloud)
+  pub password: Option<String>,
+  /// Default ssh key for the user
+  pub ssh_key: Option<String>,
   /// Default user of the vm (cloud)
   pub user: Option<String>,
   /// Disk config of the vm
@@ -147,12 +151,11 @@ impl From<VmConfig> for VmConfigUpdate {
     Self {
       name: Some(vm_config.name),
       hostname: vm_config.hostname,
-      domainname: vm_config.domainname,
       user: vm_config.user,
-      disk: Some(vm_config.disk),
-      mac_address: vm_config.mac_address,
       labels: vm_config.labels,
       host_config: Some(vm_config.host_config),
+      password: vm_config.password,
+      ssh_key: vm_config.ssh_key,
     }
   }
 }

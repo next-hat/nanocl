@@ -3,7 +3,7 @@ use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::{
-  vm_config::{VmConfigPartial, VmDiskConfig, VmHostConfig},
+  vm_config::{VmConfigPartial, VmDiskConfig, VmHostConfig, VmConfigUpdate},
   vm::VmSummary,
 };
 
@@ -40,6 +40,54 @@ pub enum VmCommands {
     /// Name of the vm
     name: String,
   },
+  /// Patch a vm
+  Patch(VmPatchOpts),
+}
+
+#[derive(Clone, Debug, Parser)]
+pub struct VmPatchOpts {
+  /// Name of the vm
+  pub name: String,
+  /// Default user of the VM
+  #[clap(long)]
+  pub user: Option<String>,
+  /// Default password of the VM
+  #[clap(long)]
+  pub password: Option<String>,
+  /// Ssh key for the user
+  #[clap(long)]
+  pub ssh_key: Option<String>,
+  /// hostname of the vm
+  #[clap(long)]
+  pub hostname: Option<String>,
+  /// Cpu of the vm default to 1
+  #[clap(long)]
+  pub cpu: Option<u64>,
+  /// Memory of the vm in MB default to 512
+  #[clap(long)]
+  pub memory: Option<u64>,
+  /// network interface of the vm
+  #[clap(long)]
+  pub net_iface: Option<String>,
+}
+
+impl From<VmPatchOpts> for VmConfigUpdate {
+  fn from(val: VmPatchOpts) -> Self {
+    Self {
+      name: Some(val.name),
+      user: val.user,
+      password: val.password,
+      ssh_key: val.ssh_key,
+      hostname: val.hostname,
+      host_config: Some(VmHostConfig {
+        cpu: val.cpu.unwrap_or(1),
+        memory: val.memory.unwrap_or(512),
+        net_iface: val.net_iface,
+        ..Default::default()
+      }),
+      ..Default::default()
+    }
+  }
 }
 
 #[derive(Clone, Debug, Parser)]
@@ -56,6 +104,15 @@ pub struct VmRunOpts {
   /// network interface of the vm
   #[clap(long)]
   pub net_iface: Option<String>,
+  /// Default user of the VM
+  #[clap(long)]
+  pub user: Option<String>,
+  /// Default password of the VM
+  #[clap(long)]
+  pub password: Option<String>,
+  /// Ssh key for the user
+  #[clap(long)]
+  pub ssh_key: Option<String>,
   /// Name of the vm
   pub name: String,
   /// Name of the vm image
@@ -67,16 +124,19 @@ impl From<VmRunOpts> for VmConfigPartial {
     Self {
       name: val.name,
       hostname: val.hostname,
+      user: val.user,
+      password: val.password,
+      ssh_key: val.ssh_key,
       disk: VmDiskConfig {
         image: val.image,
         ..Default::default()
       },
-      host_config: Some(VmHostConfig {
+      host_config: VmHostConfig {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
         ..Default::default()
-      }),
+      },
       ..Default::default()
     }
   }

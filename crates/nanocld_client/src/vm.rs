@@ -3,8 +3,8 @@ use ntex::util::Bytes;
 use ntex::http::client::ClientResponse;
 
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::vm_config::VmConfigPartial;
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
+use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 
 use crate::NanocldClient;
 use crate::error::NanocldClientError;
@@ -121,5 +121,22 @@ impl NanocldClient {
       .await?;
 
     Ok(res)
+  }
+
+  pub async fn patch_vm(
+    &self,
+    name: &str,
+    vm: &VmConfigUpdate,
+    namespace: Option<String>,
+  ) -> Result<(), NanocldClientError> {
+    self
+      .send_patch(
+        format!("/{}/vms/{}", self.version, name),
+        Some(vm),
+        Some(&GenericNspQuery { namespace }),
+      )
+      .await?;
+
+    Ok(())
   }
 }

@@ -76,12 +76,13 @@ pub async fn create(
     version: dbmodel.version,
     vm_key: dbmodel.vm_key,
     disk: item.disk,
-    host_config: item.host_config.unwrap_or_default(),
+    host_config: item.host_config,
     hostname: item.hostname,
-    domainname: item.domainname,
     user: item.user,
     labels: item.labels,
     mac_address: item.mac_address,
+    password: item.password,
+    ssh_key: item.ssh_key,
   };
 
   Ok(config)
@@ -139,12 +140,13 @@ pub async fn find_by_key(
     version: dbmodel.version,
     vm_key: dbmodel.vm_key,
     hostname: config.hostname,
-    domainname: config.domainname,
     user: config.user,
     labels: config.labels,
     mac_address: config.mac_address,
     disk: config.disk,
-    host_config: config.host_config.unwrap_or_default(),
+    host_config: config.host_config,
+    password: config.password,
+    ssh_key: config.ssh_key,
   })
 }
 
@@ -224,12 +226,13 @@ pub async fn list_by_vm(
         version: dbmodel.version,
         vm_key: dbmodel.vm_key,
         hostname: config.hostname,
-        domainname: config.domainname,
         user: config.user,
         labels: config.labels,
         mac_address: config.mac_address,
         disk: config.disk,
-        host_config: config.host_config.unwrap_or_default(),
+        host_config: config.host_config,
+        ssh_key: config.ssh_key,
+        password: config.password,
       })
     })
     .collect::<Result<Vec<VmConfig>, HttpResponseError>>()?;

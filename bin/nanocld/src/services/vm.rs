@@ -125,8 +125,8 @@ async fn list_vm_history(
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
-#[web::put("/vms/{name}")]
-async fn update_vm(
+#[web::patch("/vms/{name}")]
+async fn patch_vm(
   pool: web::types::State<Pool>,
   daemon_conf: web::types::State<DaemonConfig>,
   docker_api: web::types::State<Docker>,
@@ -138,9 +138,15 @@ async fn update_vm(
   let key = utils::key::gen_key(&namespace, &path.1);
   let version = path.0.clone();
 
-  let vm =
-    utils::vm::put(&key, &payload, &version, &daemon_conf, &docker_api, &pool)
-      .await?;
+  let vm = utils::vm::patch(
+    &key,
+    &payload,
+    &version,
+    &daemon_conf,
+    &docker_api,
+    &pool,
+  )
+  .await?;
 
   Ok(web::HttpResponse::Ok().json(&vm))
 }
@@ -153,7 +159,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(start_vm);
   config.service(stop_vm);
   config.service(list_vm_history);
-  config.service(update_vm);
+  config.service(patch_vm);
 }
 
 #[cfg(test)]

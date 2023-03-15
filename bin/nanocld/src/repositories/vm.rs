@@ -389,11 +389,12 @@ pub async fn inspect_by_key(
     vm_key: item.1.vm_key,
     hostname: config.hostname,
     disk: config.disk,
-    domainname: config.domainname,
     user: config.user,
     mac_address: config.mac_address,
     labels: config.labels,
-    host_config: config.host_config.unwrap_or_default(),
+    host_config: config.host_config,
+    password: config.password,
+    ssh_key: config.ssh_key,
   };
 
   let item = Vm {

@@ -1,7 +1,9 @@
 use nanocld_client::NanocldClient;
 
 use crate::error::CliError;
-use crate::models::{VmArgs, VmCommands, VmCreateOpts, VmRow, VmRunOpts};
+use crate::models::{
+  VmArgs, VmCommands, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts,
+};
 use crate::utils::print::{print_table, print_yml};
 
 use super::vm_image::exec_vm_image;
@@ -88,6 +90,19 @@ pub async fn exec_vm_run(
   Ok(())
 }
 
+pub async fn exec_vm_patch(
+  client: &NanocldClient,
+  args: &VmArgs,
+  options: &VmPatchOpts,
+) -> Result<(), CliError> {
+  let vm = options.clone().into();
+  client
+    .patch_vm(&options.name, &vm, args.namespace.clone())
+    .await?;
+
+  Ok(())
+}
+
 pub async fn exec_vm(
   client: &NanocldClient,
   args: &VmArgs,
@@ -101,5 +116,6 @@ pub async fn exec_vm(
     VmCommands::Start { name } => exec_vm_start(client, args, name).await,
     VmCommands::Stop { name } => exec_vm_stop(client, args, name).await,
     VmCommands::Run(options) => exec_vm_run(client, args, options).await,
+    VmCommands::Patch(options) => exec_vm_patch(client, args, options).await,
   }
 }
