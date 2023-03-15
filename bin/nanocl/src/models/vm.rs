@@ -40,6 +40,11 @@ pub enum VmCommands {
     /// Name of the vm
     name: String,
   },
+  /// Attach to a vm
+  Attach {
+    /// Name of the vm
+    name: String,
+  },
   /// Patch a vm
   Patch(VmPatchOpts),
 }

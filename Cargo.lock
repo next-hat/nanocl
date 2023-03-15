@@ -285,9 +285,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next"
-version = "0.14.1"
+version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a56b827027cc6e54ec9f38cdff9ab25f88f5a820ec6663d2ecb98b064b866082"
+checksum = "d2b65a3a1caee2fc085623eb8a82ecefb357e817945e55da5a0cd1f166259f9b"
 dependencies = [
  "base64 0.21.0",
  "bollard-next-stubs",
@@ -314,9 +314,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next-stubs"
-version = "1.42.0-rc.7"
+version = "1.42.0-rc.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c38293937f7bcc9798e9a4280c391b9af756fa7ab4de1a6431480e6dd94735e"
+checksum = "02b4603827a64fa5362e9982f8875a48941ac71dfbe4b963dc124c5681920c0e"
 dependencies = [
  "serde",
  "serde_with",
@@ -1532,6 +1532,7 @@ dependencies = [
  "serde_urlencoded",
  "serde_yaml",
  "tabled",
+ "termios",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -2558,6 +2559,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be55cf8942feac5c765c2c993422806843c9a9a45d4d5c407ad6dd2ea95eb9b6"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "termios"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "411c5bf740737c7918b8b1fe232dca4dc9f8e754b8ad5e20966814001ed0ac6b"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

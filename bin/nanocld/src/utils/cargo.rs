@@ -17,7 +17,7 @@ use nanocl_stubs::cargo_config::ContainerConfig;
 use nanocl_stubs::cargo_config::ContainerHostConfig;
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, CargoOutput, CargoExecConfig,
+  Cargo, CargoSummary, CargoInspect, OutputLog, CargoExecConfig,
 };
 
 use crate::{utils, repositories};
@@ -663,7 +663,7 @@ pub async fn exec_command(
   match res {
     StartExecResults::Detached => Ok(web::HttpResponse::Ok().finish()),
     StartExecResults::Attached { output, .. } => {
-      let stream = transform_stream::<LogOutput, CargoOutput>(output);
+      let stream = transform_stream::<LogOutput, OutputLog>(output);
       Ok(
         web::HttpResponse::Ok()
           .content_type("nanocl/streaming-v1")
@@ -827,6 +827,6 @@ pub fn get_logs(
       ..Default::default()
     }),
   );
-  let stream = transform_stream::<LogOutput, CargoOutput>(stream);
+  let stream = transform_stream::<LogOutput, OutputLog>(stream);
   Ok(stream)
 }

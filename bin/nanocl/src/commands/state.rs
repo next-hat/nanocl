@@ -8,7 +8,7 @@ use futures::StreamExt;
 use bollard_next::service::HostConfig;
 
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::cargo::CargoOutputKind;
+use nanocld_client::stubs::cargo::OutputKind;
 use nanocld_client::stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
 use nanocld_client::stubs::state::{StateConfig, StateDeployment, StateCargo};
 use ntex::rt::{self, JoinHandle};
@@ -192,13 +192,13 @@ async fn attach_to_cargo(
               }
             };
             match output.kind {
-              CargoOutputKind::StdOut => {
+              OutputKind::StdOut => {
                 print!("[{name}]: {}", &output.data);
               }
-              CargoOutputKind::StdErr => {
+              OutputKind::StdErr => {
                 eprint!("[{name}]: {}", &output.data);
               }
-              CargoOutputKind::Console => {
+              OutputKind::Console => {
                 print!("[{name}]: {}", &output.data);
               }
               _ => {}

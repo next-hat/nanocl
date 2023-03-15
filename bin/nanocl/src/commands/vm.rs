@@ -1,4 +1,16 @@
+use std::thread;
+use std::io::{Read, Write};
+use std::os::fd::AsRawFd;
+use std::time::Duration;
+
+use ntex::{ws, rt, time};
+use ntex::util::Bytes;
+use futures::channel::mpsc;
+use futures::{SinkExt, StreamExt};
+
 use nanocld_client::NanocldClient;
+use nanocld_client::stubs::cargo::{OutputLog, OutputKind};
+use termios::{TCSANOW, tcsetattr, Termios, ICANON, ECHO};
 
 use crate::error::CliError;
 use crate::models::{
@@ -103,6 +115,107 @@ pub async fn exec_vm_patch(
   Ok(())
 }
 
+pub async fn exec_vm_attach(
+  client: &NanocldClient,
+  args: &VmArgs,
+  name: &str,
+) -> Result<(), CliError> {
+  /// How often heartbeat pings are sent
+  const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
+  let conn = client.attach_vm(name, args.namespace.clone()).await?;
+  let (mut tx, mut rx) = mpsc::unbounded();
+
+  // // Get the current terminal settings
+  let mut termios = Termios::from_fd(std::io::stdin().as_raw_fd())?;
+  // Save a copy of the original terminal settings
+  let original_termios = termios;
+  // Disable canonical mode and echo
+  termios.c_lflag &= !(ICANON | ECHO);
+
+  // Redirect the output of the console to the TTY device
+  let mut stderr = std::io::stderr();
+  let mut stdout = std::io::stdout();
+  // let mut tty_writer = std::io::BufWriter::new(tty_file);
+  // std::io::copy(&mut stdout, &mut tty_writer)?;
+  // Apply the new terminal settings
+  tcsetattr(std::io::stdin().as_raw_fd(), TCSANOW, &termios)?;
+  // start console read loop
+  thread::spawn(move || loop {
+    let mut input = [0; 1];
+
+    if std::io::stdin().read(&mut input).is_err() {
+      println!("Unable to read stdin");
+      return;
+    }
+    let s = std::str::from_utf8(&input).unwrap();
+    // send text to server
+    if futures::executor::block_on(tx.send(ws::Message::Text(s.into())))
+      .is_err()
+    {
+      return;
+    }
+  });
+
+  // read console commands
+  let sink = conn.sink();
+  rt::spawn(async move {
+    while let Some(msg) = rx.next().await {
+      if sink.send(msg).await.is_err() {
+        return;
+      }
+    }
+  });
+
+  // start heartbeat task
+  let sink = conn.sink();
+  rt::spawn(async move {
+    loop {
+      time::sleep(HEARTBEAT_INTERVAL).await;
+      if sink.send(ws::Message::Ping(Bytes::new())).await.is_err() {
+        return;
+      }
+    }
+  });
+
+  // run ws dispatcher
+  let sink = conn.sink();
+  let mut rx = conn.seal().receiver();
+
+  while let Some(frame) = rx.next().await {
+    match frame {
+      Ok(ws::Frame::Binary(text)) => {
+        let output = serde_json::from_slice::<OutputLog>(&text)?;
+        match &output.kind {
+          OutputKind::StdOut => {
+            stdout.write_all(output.data.as_bytes())?;
+            stdout.flush()?;
+          }
+          OutputKind::StdErr => {
+            stderr.write_all(output.data.as_bytes())?;
+            stdout.flush()?;
+          }
+          OutputKind::Console => {
+            stdout.write_all(output.data.as_bytes())?;
+            stdout.flush()?;
+          }
+          _ => {}
+        }
+      }
+      Ok(ws::Frame::Ping(msg)) => {
+        sink
+          .send(ws::Message::Pong(msg))
+          .await
+          .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+      }
+      Err(_) => break,
+      _ => (),
+    }
+  }
+  // Restore the original terminal settings
+  tcsetattr(std::io::stdin().as_raw_fd(), TCSANOW, &original_termios)?;
+  Ok(())
+}
+
 pub async fn exec_vm(
   client: &NanocldClient,
   args: &VmArgs,
@@ -117,5 +230,6 @@ pub async fn exec_vm(
     VmCommands::Stop { name } => exec_vm_stop(client, args, name).await,
     VmCommands::Run(options) => exec_vm_run(client, args, options).await,
     VmCommands::Patch(options) => exec_vm_patch(client, args, options).await,
+    VmCommands::Attach { name } => exec_vm_attach(client, args, name).await,
   }
 }

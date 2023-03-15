@@ -3,7 +3,7 @@ use ntex::channel::mpsc::Receiver;
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, CargoExecConfig, CargoOutput,
+  Cargo, CargoSummary, CargoInspect, CargoExecConfig, OutputLog,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigUpdate, CargoConfigPartial, CargoConfig,
@@ -352,7 +352,7 @@ impl NanocldClient {
     name: &str,
     exec: CargoExecConfig<String>,
     namespace: Option<String>,
-  ) -> Result<mpsc::Receiver<Result<CargoOutput, ApiError>>, NanocldClientError>
+  ) -> Result<mpsc::Receiver<Result<OutputLog, ApiError>>, NanocldClientError>
   {
     let res = self
       .send_post(
@@ -454,7 +454,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<Receiver<Result<CargoOutput, ApiError>>, NanocldClientError> {
+  ) -> Result<Receiver<Result<OutputLog, ApiError>>, NanocldClientError> {
     let res = self
       .send_get(
         format!("/{}/cargoes/{name}/logs", &self.version),

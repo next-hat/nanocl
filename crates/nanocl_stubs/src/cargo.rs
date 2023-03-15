@@ -87,7 +87,7 @@ pub struct CargoInspect {
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub enum CargoOutputKind {
+pub enum OutputKind {
   /// Data is a standard input
   StdIn,
   /// Data is a standard output
@@ -103,30 +103,30 @@ pub enum CargoOutputKind {
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoOutput {
+pub struct OutputLog {
   /// Kind of the output
-  pub kind: CargoOutputKind,
+  pub kind: OutputKind,
   /// Data of the output
   pub data: String,
 }
 
-impl From<LogOutput> for CargoOutput {
+impl From<LogOutput> for OutputLog {
   fn from(output: LogOutput) -> Self {
     match output {
       LogOutput::StdOut { message } => Self {
-        kind: CargoOutputKind::StdOut,
+        kind: OutputKind::StdOut,
         data: String::from_utf8_lossy(&message).to_string(),
       },
       LogOutput::StdErr { message } => Self {
-        kind: CargoOutputKind::StdErr,
+        kind: OutputKind::StdErr,
         data: String::from_utf8_lossy(&message).to_string(),
       },
       LogOutput::Console { message } => Self {
-        kind: CargoOutputKind::Console,
+        kind: OutputKind::Console,
         data: String::from_utf8_lossy(&message).to_string(),
       },
       LogOutput::StdIn { message } => Self {
-        kind: CargoOutputKind::StdIn,
+        kind: OutputKind::StdIn,
         data: String::from_utf8_lossy(&message).to_string(),
       },
     }

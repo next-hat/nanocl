@@ -304,7 +304,7 @@ mod tests {
   use nanocl_stubs::cargo::CargoExecConfig;
   use ntex::http::StatusCode;
   use futures::{TryStreamExt, StreamExt};
-  use nanocl_stubs::cargo::{Cargo, CargoSummary, CargoInspect, CargoOutput};
+  use nanocl_stubs::cargo::{Cargo, CargoSummary, CargoInspect, OutputLog};
   use nanocl_stubs::cargo_config::{
     CargoConfigPartial, CargoConfigUpdate, CargoConfig,
   };
@@ -448,7 +448,7 @@ mod tests {
       };
       payload.extend_from_slice(&data);
       if data.last() == Some(&b'\n') {
-        let _ = serde_json::from_slice::<CargoOutput>(&payload)?;
+        let _ = serde_json::from_slice::<OutputLog>(&payload)?;
         payload.clear();
       }
     }
@@ -476,7 +476,7 @@ mod tests {
     let data = stream.next().await.unwrap().unwrap();
     payload.extend_from_slice(&data);
     if data.last() == Some(&b'\n') {
-      let _ = serde_json::from_slice::<CargoOutput>(&payload)?;
+      let _ = serde_json::from_slice::<OutputLog>(&payload)?;
       payload.clear();
     }
     Ok(())

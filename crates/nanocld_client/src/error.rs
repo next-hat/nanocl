@@ -57,6 +57,10 @@ pub enum NanocldClientError {
   SerdeUrlEncode(#[from] serde_urlencoded::ser::Error),
   #[error(transparent)]
   Utf8Error(#[from] std::string::FromUtf8Error),
+  #[error(transparent)]
+  WsClientBuilderError(#[from] ntex::ws::error::WsClientBuilderError),
+  #[error(transparent)]
+  WsClientError(#[from] ntex::ws::error::WsClientError),
 }
 
 pub(crate) async fn is_api_error(

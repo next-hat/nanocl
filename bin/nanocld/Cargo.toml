@@ -27,7 +27,7 @@ serde_yaml = "0.9"
 
 [dependencies]
 nanocl_stubs = { version = "0.3.0", features = ["serde"] }
-bollard-next = { version = "0.14.1" }
+bollard-next = { version = "0.14.3" }
 r2d2 = "0.8"
 log = "0.4.17"
 futures = "0.3"

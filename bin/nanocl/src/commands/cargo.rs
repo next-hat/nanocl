@@ -4,7 +4,7 @@ use futures::StreamExt;
 use bollard_next::exec::CreateExecOptions;
 
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::cargo::CargoOutputKind;
+use nanocld_client::stubs::cargo::OutputKind;
 
 use crate::utils::print::*;
 use crate::error::CliError;
@@ -137,14 +137,14 @@ async fn exec_cargo_exec(
   while let Some(output) = stream.next().await {
     let output = output?;
     match output.kind {
-      CargoOutputKind::StdOut => {
+      OutputKind::StdOut => {
         print!("{}", &output.data);
       }
-      CargoOutputKind::StdErr => {
+      OutputKind::StdErr => {
         eprint!("{}", output.data);
       }
-      CargoOutputKind::StdIn => println!("TODO: StdIn {}", &output.data),
-      CargoOutputKind::Console => print!("{}", &output.data),
+      OutputKind::StdIn => println!("TODO: StdIn {}", &output.data),
+      OutputKind::Console => print!("{}", &output.data),
     }
   }
 
@@ -182,14 +182,14 @@ async fn exec_cargo_logs(
       }
     };
     match log.kind {
-      CargoOutputKind::StdOut => {
+      OutputKind::StdOut => {
         print!("{}", &log.data);
       }
-      CargoOutputKind::StdErr => {
+      OutputKind::StdErr => {
         eprint!("{}", log.data);
       }
-      CargoOutputKind::StdIn => println!("TODO: StdIn {}", &log.data),
-      CargoOutputKind::Console => print!("{}", &log.data),
+      OutputKind::StdIn => println!("TODO: StdIn {}", &log.data),
+      OutputKind::Console => print!("{}", &log.data),
     }
   }
   Ok(())
