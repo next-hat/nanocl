@@ -6,6 +6,7 @@ mod error;
 mod models;
 mod version;
 mod commands;
+mod config;
 
 use error::CliError;
 use models::{Cli, Commands};
@@ -22,6 +23,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
     Commands::Info => commands::exec_info(&client).await,
     Commands::Setup(opts) => commands::exec_setup(opts).await,
     Commands::Vm(args) => commands::exec_vm(&client, args).await,
+    Commands::Ps(opts) => commands::exec_process(&client, opts).await,
   }
 }
 

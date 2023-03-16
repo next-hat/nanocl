@@ -1,3 +1,4 @@
+use bollard_next::container::ListContainersOptions;
 use bollard_next::service::SystemInfo;
 
 #[cfg(feature = "serde")]
@@ -70,6 +71,31 @@ impl std::fmt::Display for Event {
       Event::ResourcePatched(resource) => {
         write!(f, "ResourcePatched({})", resource.name)
       }
+    }
+  }
+}
+
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProccessQuery {
+  /// Return all containers. By default, only running containers are shown
+  pub all: bool,
+  /// Return this number of most recently created containers, including non-running ones
+  pub last: Option<isize>,
+  /// Return the size of container as fields `SizeRw` and `SizeRootFs`
+  pub size: bool,
+  /// Show all containers running for the given namespace
+  pub namespace: Option<String>,
+}
+
+impl From<ProccessQuery> for ListContainersOptions<String> {
+  fn from(query: ProccessQuery) -> Self {
+    ListContainersOptions {
+      all: query.all,
+      limit: query.last,
+      size: query.size,
+      ..Default::default()
     }
   }
 }

@@ -69,7 +69,7 @@ pub struct VmPatchOpts {
   #[clap(long)]
   pub cpu: Option<u64>,
   /// Memory of the vm in MB default to 512
-  #[clap(long)]
+  #[clap(long = "mem")]
   pub memory: Option<u64>,
   /// network interface of the vm
   #[clap(long)]
@@ -118,6 +118,9 @@ pub struct VmRunOpts {
   /// Ssh key for the user
   #[clap(long)]
   pub ssh_key: Option<String>,
+  /// Size of the disk in GB
+  #[clap(long = "img-size")]
+  pub image_size: Option<u64>,
   /// Name of the vm
   pub name: String,
   /// Name of the vm image
@@ -134,7 +137,7 @@ impl From<VmRunOpts> for VmConfigPartial {
       ssh_key: val.ssh_key,
       disk: VmDiskConfig {
         image: val.image,
-        ..Default::default()
+        size: val.image_size,
       },
       host_config: VmHostConfig {
         cpu: val.cpu.unwrap_or(1),
@@ -149,6 +152,27 @@ impl From<VmRunOpts> for VmConfigPartial {
 
 #[derive(Clone, Debug, Parser)]
 pub struct VmCreateOpts {
+  /// hostname of the vm
+  #[clap(long)]
+  pub hostname: Option<String>,
+  /// Cpu of the vm default to 1
+  #[clap(long)]
+  pub cpu: Option<u64>,
+  /// Memory of the vm in MB default to 512
+  #[clap(long = "mem")]
+  pub memory: Option<u64>,
+  /// network interface of the vm
+  #[clap(long)]
+  pub net_iface: Option<String>,
+  /// Default user of the VM
+  #[clap(long)]
+  pub user: Option<String>,
+  /// Default password of the VM
+  #[clap(long)]
+  pub password: Option<String>,
+  /// Ssh key for the user
+  #[clap(long)]
+  pub ssh_key: Option<String>,
   /// Name of the vm
   pub name: String,
   /// Name of the vm image
@@ -159,6 +183,16 @@ impl From<VmCreateOpts> for VmConfigPartial {
   fn from(val: VmCreateOpts) -> Self {
     Self {
       name: val.name,
+      hostname: val.hostname,
+      user: val.user,
+      password: val.password,
+      ssh_key: val.ssh_key,
+      host_config: VmHostConfig {
+        cpu: val.cpu.unwrap_or(1),
+        memory: val.memory.unwrap_or(512),
+        net_iface: val.net_iface,
+        ..Default::default()
+      },
       disk: VmDiskConfig {
         image: val.image,
         ..Default::default()

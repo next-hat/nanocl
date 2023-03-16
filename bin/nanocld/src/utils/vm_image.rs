@@ -236,7 +236,6 @@ pub async fn clone(
               .trim_start_matches('(')
               .parse::<f32>()
               .unwrap();
-            println!("progress: {}", progress);
             let stream = VmImageCloneStream::Progress(progress);
             let stream = serde_json::to_string(&stream).unwrap();
             let _ = txpg.send(Ok(Bytes::from(format!("{stream}\r\n"))));

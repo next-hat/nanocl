@@ -2,6 +2,7 @@
 * Endpoints to manipulate cargoes
 */
 
+use nanocl_stubs::cargo::CargoKillOptions;
 use ntex::rt;
 use ntex::web;
 use ntex::http::StatusCode;
@@ -212,6 +213,20 @@ async fn exec_command(
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("Executing command on cargo : {}", &key);
   utils::cargo::exec_command(&key, &payload, &docker_api).await
+}
+
+#[web::post("/cargoes/{name}/kill")]
+async fn kill_cargo(
+  path: web::types::Path<(String, String)>,
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Json(payload): web::types::Json<CargoKillOptions>,
+  docker_api: web::types::State<bollard_next::Docker>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  log::debug!("Executing command on cargo : {}", &key);
+  utils::cargo::kill(&key, &payload, &docker_api).await?;
+  Ok(web::HttpResponse::Ok().into())
 }
 
 #[web::get("/cargoes/{name}/histories")]

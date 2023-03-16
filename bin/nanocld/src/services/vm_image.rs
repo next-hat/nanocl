@@ -1,9 +1,8 @@
-use nanocl_stubs::vm_image::VmImageResizePayload;
 use ntex::web;
 use ntex::http::StatusCode;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use futures::StreamExt;
+use nanocl_stubs::vm_image::VmImageResizePayload;
 
 use nanocl_stubs::config::DaemonConfig;
 
@@ -45,7 +44,7 @@ async fn import_vm_image(
     Ok(f) => f,
   };
 
-  while let Some(bytes) = payload.next().await {
+  while let Some(bytes) = ntex::util::stream_recv(&mut payload).await {
     let bytes = match bytes {
       Err(err) => {
         log::error!("Unable to create vm image {name}: {err}");

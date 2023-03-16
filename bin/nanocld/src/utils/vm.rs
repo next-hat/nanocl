@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use ntex::http::StatusCode;
+
 use bollard_next::Docker;
 use bollard_next::service::{HostConfig, DeviceMapping, ContainerSummary};
 use bollard_next::container::{
@@ -116,9 +117,9 @@ pub async fn delete(
   };
 
   let container_name = format!("{}.v", vm_key);
-  docker_api
+  let _ = docker_api
     .remove_container(&container_name, Some(options))
-    .await?;
+    .await;
 
   repositories::vm::delete_by_key(vm_key, pool).await?;
   repositories::vm_config::delete_by_vm_key(vm.key, pool).await?;
@@ -218,6 +219,7 @@ pub async fn create_instance(
   let config = bollard_next::container::Config {
     image: Some("nexthat/nanocl-qemu:0.1.0".into()),
     tty: Some(true),
+    hostname: vm.config.hostname.clone(),
     env: Some(env),
     labels: Some(labels),
     cmd: Some(args),

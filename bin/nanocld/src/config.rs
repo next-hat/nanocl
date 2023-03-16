@@ -60,6 +60,7 @@ fn gen_daemon_conf(
     docker_host,
     gateway,
     hostname,
+    nodes: args.nodes.clone(),
   })
 }
 
@@ -148,6 +149,7 @@ mod tests {
       init: false,
       gateway: None,
       hostname: None,
+      nodes: Vec::default(),
     };
 
     let config = DaemonConfigFile {
@@ -232,6 +234,7 @@ mod tests {
       init: false,
       gateway: None,
       hostname: None,
+      nodes: Vec::default(),
     };
 
     let config = init(&args).unwrap();

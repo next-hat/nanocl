@@ -1,6 +1,7 @@
+use bollard_next::service::ContainerSummary;
 use ntex::channel::mpsc;
 
-use nanocl_stubs::system::{Event, Version, HostInfo};
+use nanocl_stubs::system::{Event, Version, HostInfo, ProccessQuery};
 
 use crate::error::ApiError;
 
@@ -111,6 +112,17 @@ impl NanocldClient {
   pub async fn info(&self) -> Result<HostInfo, NanocldClientError> {
     let res = self
       .send_get(format!("/{}/info", &self.version), None::<String>)
+      .await?;
+
+    Self::res_json(res).await
+  }
+
+  pub async fn process(
+    &self,
+    opts: Option<ProccessQuery>,
+  ) -> Result<Vec<ContainerSummary>, NanocldClientError> {
+    let res = self
+      .send_get(format!("/{}/processes", &self.version), opts)
       .await?;
 
     Self::res_json(res).await

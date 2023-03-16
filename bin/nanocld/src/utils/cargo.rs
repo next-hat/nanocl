@@ -5,6 +5,7 @@ use ntex::web;
 use ntex::util::Bytes;
 use ntex::http::StatusCode;
 use futures::{StreamExt, TryStreamExt};
+
 use bollard_next::container::LogOutput;
 use bollard_next::container::LogsOptions;
 use bollard_next::container::WaitContainerOptions;
@@ -13,6 +14,7 @@ use bollard_next::service::{ContainerSummary, HostConfig};
 use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
 use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 
+use nanocl_stubs::cargo::CargoKillOptions;
 use nanocl_stubs::cargo_config::ContainerConfig;
 use nanocl_stubs::cargo_config::ContainerHostConfig;
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
@@ -671,6 +673,17 @@ pub async fn exec_command(
       )
     }
   }
+}
+
+pub async fn kill(
+  name: &str,
+  options: &CargoKillOptions,
+  docker_api: &bollard_next::Docker,
+) -> Result<(), HttpResponseError> {
+  let name = format!("{name}.c");
+  let options = options.clone().into();
+  docker_api.kill_container(&name, Some(options)).await?;
+  Ok(())
 }
 
 /// ## Create or patch cargo

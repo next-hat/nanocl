@@ -47,6 +47,22 @@ fn gen_store_cargo_conf(
   labels.insert("io.nanocl.c".into(), name.into());
   labels.insert("io.nanocl.cnsp".into(), "system".into());
   let host_config = Some(gen_store_host_conf(config));
+  let mut cmd = vec![
+    if config.nodes.is_empty() {
+      "start-single-node".into()
+    } else {
+      "start".into()
+    },
+    "--insecure".into(),
+    format!("--store={}", config.hostname),
+    "--accept-sql-without-tls".into(),
+    "--listen-addr=:26257".into(),
+    "--http-addr=:8080".into(),
+  ];
+  for node in &config.nodes {
+    cmd.push("--join".into());
+    cmd.push(node.clone());
+  }
   CargoConfigPartial {
     name: name.into(),
     replication: None,
@@ -54,7 +70,7 @@ fn gen_store_cargo_conf(
       image: Some("cockroachdb/cockroach:v22.2.5".into()),
       labels: Some(labels.to_owned()),
       host_config,
-      cmd: Some(vec!["start-single-node".into(), "--insecure".into()]),
+      cmd: Some(cmd),
       ..Default::default()
     },
   }

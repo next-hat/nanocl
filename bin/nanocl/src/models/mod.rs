@@ -7,7 +7,9 @@ mod state;
 mod setup;
 mod vm;
 mod vm_image;
+mod system;
 
+pub use system::*;
 pub use vm::*;
 pub use vm_image::*;
 pub use namespace::*;
@@ -52,6 +54,8 @@ pub enum Commands {
   Version,
   /// Setup nanocl daemon
   Setup(SetupOpts),
+  /// Show all processes managed by nanocl
+  Ps(ProcessOpts),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for

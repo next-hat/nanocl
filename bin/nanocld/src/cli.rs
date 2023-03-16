@@ -29,6 +29,9 @@ pub struct Cli {
   /// Hostname to use for the node automatically detected if not set
   #[clap(long)]
   pub(crate) hostname: Option<String>,
+  /// Join current node to a cluster
+  #[clap(long = "node")]
+  pub(crate) nodes: Vec<String>,
 }
 
 /// Cli arguments unit test

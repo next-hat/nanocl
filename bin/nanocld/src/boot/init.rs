@@ -76,6 +76,7 @@ mod tests {
       state_dir: None,
       conf_dir: String::from("/etc/nanocl"),
       gateway: None,
+      nodes: Vec::default(),
       hostname: None,
     };
 

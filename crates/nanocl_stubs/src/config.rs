@@ -17,6 +17,8 @@ pub struct DaemonConfig {
   pub gateway: String,
   /// Hostname to use for the node automatically detected if not set
   pub hostname: String,
+  /// List of nodes to join
+  pub nodes: Vec<String>,
 }
 
 /// Configuration File of the daemon
@@ -44,6 +46,7 @@ impl Default for DaemonConfig {
       hosts: vec!["/run/nanocl.sock".into()],
       state_dir: "/var/lib/nanocl".into(),
       gateway: String::default(),
+      nodes: Vec::default(),
     }
   }
 }

@@ -4,6 +4,7 @@ use ntex::channel::mpsc::Receiver;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, CargoExecConfig, OutputLog,
+  CargoKillOptions,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigUpdate, CargoConfigPartial, CargoConfig,
@@ -463,6 +464,23 @@ impl NanocldClient {
       .await?;
 
     Ok(Self::res_stream(res).await)
+  }
+
+  pub async fn kill_cargo(
+    &self,
+    name: &str,
+    options: &CargoKillOptions,
+    namespace: Option<String>,
+  ) -> Result<(), NanocldClientError> {
+    self
+      .send_post(
+        format!("/{}/cargoes/{name}", &self.version),
+        Some(options),
+        Some(GenericNspQuery { namespace }),
+      )
+      .await?;
+
+    Ok(())
   }
 }
 

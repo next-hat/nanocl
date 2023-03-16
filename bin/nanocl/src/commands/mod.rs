@@ -9,7 +9,9 @@ mod info;
 mod setup;
 mod vm;
 mod vm_image;
+mod system;
 
+pub use system::exec_process;
 pub use namespace::exec_namespace;
 pub use cargo::exec_cargo;
 pub use cargo_image::exec_cargo_image;

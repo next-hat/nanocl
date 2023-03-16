@@ -1,7 +1,10 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard_next::{models::ContainerSummary, container::LogOutput};
+use bollard_next::{
+  models::ContainerSummary,
+  container::{LogOutput, KillContainerOptions},
+};
 
 pub use bollard_next::exec::CreateExecOptions as CargoExecConfig;
 
@@ -129,6 +132,27 @@ impl From<LogOutput> for OutputLog {
         kind: OutputKind::StdIn,
         data: String::from_utf8_lossy(&message).to_string(),
       },
+    }
+  }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CargoKillOptions {
+  pub signal: String,
+}
+
+impl Default for CargoKillOptions {
+  fn default() -> Self {
+    Self {
+      signal: "SIGKILL".into(),
+    }
+  }
+}
+
+impl From<CargoKillOptions> for KillContainerOptions<String> {
+  fn from(options: CargoKillOptions) -> Self {
+    Self {
+      signal: options.signal,
     }
   }
 }
