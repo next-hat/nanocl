@@ -69,7 +69,6 @@ impl From<ContainerSummary> for ProcessRow {
       ipaddr = network.ip_address.clone().unwrap_or_default();
     }
 
-    println!("{:?}", networks);
     let binding = chrono::Local::now();
     let tz = binding.offset();
     // Convert the created_at and updated_at to the current timezone

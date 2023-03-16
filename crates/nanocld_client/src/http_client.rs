@@ -42,6 +42,45 @@ impl NanocldClient {
     }
   }
 
+  pub fn connect_to(url: &'static str) -> Self {
+    let (client, url) = match url {
+      url if url.starts_with("http://") || url.starts_with("https://") => {
+        let client = Client::build()
+          .connector(
+            Connector::default()
+              .timeout(ntex::time::Millis::from_secs(20))
+              .finish(),
+          )
+          .timeout(ntex::time::Millis::from_secs(20))
+          .finish();
+        (client, url.to_owned())
+      }
+      url if url.starts_with("unix://") => {
+        let client = Client::build()
+          .connector(
+            Connector::default()
+              .connector(ntex::service::fn_service(move |_| async {
+                let path = url.trim_start_matches("unix://");
+                Ok::<_, _>(rt::unix_connect(path).await?)
+              }))
+              .timeout(ntex::time::Millis::from_secs(50))
+              .finish(),
+          )
+          .timeout(ntex::time::Millis::from_secs(50))
+          .finish();
+        (client, "http://localhost".into())
+      }
+      _ => panic!("Invalid url: {}", url),
+    };
+
+    NanocldClient {
+      client,
+      unix_socket: None,
+      url,
+      version: format!("v{NANOCLD_DEFAULT_VERSION}"),
+    }
+  }
+
   pub fn connect_with_url(url: &str, version: &str) -> Self {
     let client = Client::build()
       .timeout(ntex::time::Millis::from_secs(50))

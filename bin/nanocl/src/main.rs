@@ -12,7 +12,15 @@ use error::CliError;
 use models::{Cli, Commands};
 
 async fn execute_args(args: &Cli) -> Result<(), CliError> {
-  let client = NanocldClient::connect_with_unix_default();
+  let cli_conf = config::read();
+
+  let client = match cli_conf.url {
+    Some(url) => {
+      let url = Box::leak(url.into_boxed_str());
+      NanocldClient::connect_to(url)
+    }
+    None => NanocldClient::connect_with_unix_default(),
+  };
   match &args.command {
     Commands::Namespace(args) => commands::exec_namespace(&client, args).await,
     Commands::Resource(args) => commands::exec_resource(&client, args).await,
