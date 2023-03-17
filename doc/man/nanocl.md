@@ -63,6 +63,10 @@ nanocl-setup(1)
 
 :   Setup nanocl daemon
 
+nanocl-ps(1)
+
+:   Show all processes managed by nanocl
+
 nanocl-help(1)
 
 :   Print this message or the help of the given subcommand(s)
