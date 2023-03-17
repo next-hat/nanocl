@@ -1,13 +1,11 @@
 use std::io;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::time::{Instant, Duration};
+use std::time::Instant;
 
 use ntex::rt;
 use ntex::ws;
 use ntex::web;
-use ntex::time;
-use ntex::util;
 use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use ntex::channel::oneshot;
@@ -25,6 +23,7 @@ use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 
 use tokio::io::AsyncWriteExt;
 
+use crate::models::WsConState;
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
 use crate::models::DaemonState;
@@ -161,49 +160,6 @@ async fn patch_vm(
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
-/// How often heartbeat pings are sent
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
-/// How long before lack of client response causes a timeout
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
-
-struct AttachConState {
-  hb: Instant,
-}
-
-/// helper method that sends ping to client every second.
-///
-/// also this method checks heartbeats from client
-async fn heartbeat(
-  state: Rc<RefCell<AttachConState>>,
-  sink: ws::WsSink,
-  mut rx: oneshot::Receiver<()>,
-) {
-  loop {
-    match util::select(Box::pin(time::sleep(HEARTBEAT_INTERVAL)), &mut rx).await
-    {
-      util::Either::Left(_) => {
-        // check client heartbeats
-        if Instant::now().duration_since(state.borrow().hb) > CLIENT_TIMEOUT {
-          // heartbeat timed out
-          println!("Websocket Client heartbeat failed, disconnecting!");
-          // disconnect connection
-          sink.io().close();
-          return;
-        } else {
-          // send ping
-          if sink.send(ws::Message::Ping(Bytes::new())).await.is_err() {
-            return;
-          }
-        }
-      }
-      util::Either::Right(_) => {
-        println!("Connection is dropped, stop heartbeat task");
-        return;
-      }
-    }
-  }
-}
-
 async fn ws_attach_service(
   (key, sink, state): (String, ws::WsSink, web::types::State<DaemonState>),
 ) -> Result<
@@ -212,8 +168,8 @@ async fn ws_attach_service(
 > {
   // start heartbeat task
   let (tx, rx) = oneshot::channel();
-  let con_state = Rc::new(RefCell::new(AttachConState { hb: Instant::now() }));
-  rt::spawn(heartbeat(con_state.clone(), sink.clone(), rx));
+  let con_state = Rc::new(RefCell::new(WsConState::new()));
+  rt::spawn(utils::ws::heartbeat(con_state.clone(), sink.clone(), rx));
 
   let (scmd, mut rcmd) = mpsc::channel::<Result<Bytes, web::Error>>();
 

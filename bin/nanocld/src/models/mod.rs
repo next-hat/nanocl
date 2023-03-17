@@ -2,6 +2,9 @@ use diesel::PgConnection;
 use r2d2::PooledConnection;
 use diesel::r2d2::ConnectionManager;
 
+mod ws;
+pub use ws::*;
+
 mod node;
 pub use node::*;
 

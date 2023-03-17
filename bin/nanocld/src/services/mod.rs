@@ -106,7 +106,8 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
       .configure(cargo_image::ntex_config)
       .configure(cargo::ntex_config)
       .configure(vm_image::ntex_config)
-      .configure(vm::ntex_config),
+      .configure(vm::ntex_config)
+      .configure(node::ntex_config),
   );
 }
 

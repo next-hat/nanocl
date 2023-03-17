@@ -10,10 +10,9 @@ use bollard_next::container::ListContainersOptions;
 use nanocl_stubs::system::ProccessQuery;
 use nanocl_stubs::system::HostInfo;
 
-use crate::event::EventEmitter;
-use crate::error::HttpResponseError;
-use crate::models::DaemonState;
 use crate::repositories;
+use crate::models::DaemonState;
+use crate::error::HttpResponseError;
 
 #[web::get("/info")]
 async fn get_info(

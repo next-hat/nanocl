@@ -138,25 +138,26 @@ async fn clone_vm_image(
 
 #[web::post("/vms/images/{name}/resize")]
 async fn resize_vm_image(
-  pool: web::types::State<Pool>,
-  path: web::types::Path<(String, String)>,
   web::types::Json(payload): web::types::Json<VmImageResizePayload>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
 
-  let rx = utils::vm_image::resize_by_name(&name, &payload, &pool).await?;
+  let rx =
+    utils::vm_image::resize_by_name(&name, &payload, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&rx))
 }
 
 #[web::delete("/vms/images/{name}")]
 async fn delete_vm_image(
-  pool: web::types::State<Pool>,
   path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
 
-  utils::vm_image::delete(&name, &pool).await?;
+  utils::vm_image::delete(&name, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().into())
 }

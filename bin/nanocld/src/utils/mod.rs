@@ -9,6 +9,7 @@ pub mod stream;
 pub mod resource;
 pub mod vm;
 pub mod vm_image;
+pub mod ws;
 
 #[cfg(test)]
 pub mod tests {

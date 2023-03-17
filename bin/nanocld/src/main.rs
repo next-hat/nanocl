@@ -6,6 +6,7 @@ use clap::Parser;
 mod cli;
 mod version;
 
+mod node;
 mod boot;
 mod error;
 mod utils;
