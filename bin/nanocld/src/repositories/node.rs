@@ -61,3 +61,44 @@ pub async fn create_if_not_exists(
     Ok(node) => Ok(node),
   }
 }
+
+pub async fn list(pool: &Pool) -> Result<Vec<NodeDbModel>, HttpResponseError> {
+  use crate::schema::nodes::dsl;
+
+  let pool = pool.clone();
+  let items = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let items = dsl::nodes
+      .load::<NodeDbModel>(&mut conn)
+      .map_err(db_error("nodes"))?;
+
+    Ok::<_, HttpResponseError>(items)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  Ok(items)
+}
+
+pub async fn list_unless(
+  name: &str,
+  pool: &Pool,
+) -> Result<Vec<NodeDbModel>, HttpResponseError> {
+  use crate::schema::nodes::dsl;
+
+  let name = name.to_owned();
+  let pool = pool.clone();
+  let items = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let items = dsl::nodes
+      .filter(dsl::name.ne(name))
+      .load::<NodeDbModel>(&mut conn)
+      .map_err(db_error("nodes"))?;
+
+    Ok::<_, HttpResponseError>(items)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  Ok(items)
+}

@@ -1,27 +1,24 @@
 use ntex::web;
 
 use crate::utils;
-use crate::event::EventEmitterPtr;
-use crate::models::{Pool, StateData};
+use crate::models::{StateData, DaemonState};
 
 use crate::error::HttpResponseError;
 
 #[web::put("/state/apply")]
 async fn apply(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
-  docker_api: web::types::State<bollard_next::Docker>,
-  pool: web::types::State<Pool>,
-  event_emitter: web::types::State<EventEmitterPtr>,
   version: web::types::Path<String>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   match utils::state::parse_state(&payload)? {
     StateData::Deployment(data) => {
       utils::state::apply_deployment(
         data,
         version.into_inner(),
-        &docker_api,
-        &pool,
-        &event_emitter,
+        &state.docker_api,
+        &state.pool,
+        &state.event_emitter,
       )
       .await?;
     }
@@ -29,14 +26,15 @@ async fn apply(
       utils::state::apply_cargo(
         data,
         version.into_inner(),
-        &docker_api,
-        &pool,
-        &event_emitter,
+        &state.docker_api,
+        &state.pool,
+        &state.event_emitter,
       )
       .await?;
     }
     StateData::Resource(data) => {
-      utils::state::apply_resource(data, &pool, &event_emitter).await?;
+      utils::state::apply_resource(data, &state.pool, &state.event_emitter)
+        .await?;
     }
   }
   Ok(web::HttpResponse::Ok().finish())
@@ -45,21 +43,30 @@ async fn apply(
 #[web::put("/state/revert")]
 async fn revert(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
-  docker_api: web::types::State<bollard_next::Docker>,
-  pool: web::types::State<Pool>,
-  event_emitter: web::types::State<EventEmitterPtr>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   match utils::state::parse_state(&payload)? {
     StateData::Deployment(data) => {
-      utils::state::revert_deployment(data, &docker_api, &pool, &event_emitter)
-        .await?;
+      utils::state::revert_deployment(
+        data,
+        &state.docker_api,
+        &state.pool,
+        &state.event_emitter,
+      )
+      .await?;
     }
     StateData::Cargo(data) => {
-      utils::state::revert_cargo(data, &docker_api, &pool, &event_emitter)
-        .await?;
+      utils::state::revert_cargo(
+        data,
+        &state.docker_api,
+        &state.pool,
+        &state.event_emitter,
+      )
+      .await?;
     }
     StateData::Resource(data) => {
-      utils::state::revert_resource(data, &pool, &event_emitter).await?;
+      utils::state::revert_resource(data, &state.pool, &state.event_emitter)
+        .await?;
     }
   }
   Ok(web::HttpResponse::Ok().finish())

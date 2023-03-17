@@ -2,7 +2,7 @@ use nanocl_stubs::config::DaemonConfig;
 use tokio::fs;
 
 use crate::event;
-use crate::models::BootState;
+use crate::models::DaemonState;
 
 use crate::error::CliError;
 
@@ -19,7 +19,7 @@ pub async fn ensure_state_dir(state_dir: &str) -> Result<(), CliError> {
 
 /// Init function called before http server start
 /// to initialize our state
-pub async fn init(daemon_conf: &DaemonConfig) -> Result<BootState, CliError> {
+pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
   let docker_api = bollard_next::Docker::connect_with_unix(
     &daemon_conf.docker_host,
     120,
@@ -42,13 +42,13 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<BootState, CliError> {
   super::system::register_namespace("global", true, &docker_api, &pool).await?;
   super::node::register_node(
     &daemon_conf.hostname,
-    &daemon_conf.gateway,
+    &daemon_conf.advertise_addr,
     &pool,
   )
   .await?;
   super::system::sync_containers(&docker_api, &pool).await?;
   super::metrics::start_metrics_cargo(&docker_api, &pool).await?;
-  Ok(BootState {
+  Ok(DaemonState {
     pool,
     docker_api,
     config: daemon_conf.to_owned(),

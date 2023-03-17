@@ -6,6 +6,7 @@ use crate::version;
 use crate::error::HttpResponseError;
 
 mod state;
+mod node;
 mod namespace;
 mod system;
 mod resource;

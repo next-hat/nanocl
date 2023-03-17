@@ -4,23 +4,23 @@ use std::collections::HashMap;
 */
 use std::sync::{Arc, Mutex};
 
+use ntex::web;
+
 use bollard_next::container::ListContainersOptions;
 use nanocl_stubs::system::ProccessQuery;
-use ntex::web;
-use nanocl_stubs::{config::DaemonConfig, system::HostInfo};
+use nanocl_stubs::system::HostInfo;
 
 use crate::event::EventEmitter;
 use crate::error::HttpResponseError;
-use crate::models::Pool;
+use crate::models::DaemonState;
 use crate::repositories;
 
 #[web::get("/info")]
 async fn get_info(
-  config: web::types::State<DaemonConfig>,
-  docker_api: web::types::State<bollard_next::Docker>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let docker = docker_api.info().await?;
-  let host_gateway = config.gateway.clone();
+  let docker = state.docker_api.info().await?;
+  let host_gateway = state.config.gateway.clone();
   let info = HostInfo {
     host_gateway,
     docker,
@@ -31,10 +31,10 @@ async fn get_info(
 /// Join events stream
 #[web::get("/events")]
 async fn watch_events(
-  event_emitter: web::types::State<Arc<Mutex<EventEmitter>>>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   // TODO: spawn a future to lock the event_emitter and subscribe to the stream
-  let stream = event_emitter.lock().unwrap().subscribe();
+  let stream = state.event_emitter.lock().unwrap().subscribe();
 
   Ok(
     web::HttpResponse::Ok()
@@ -46,16 +46,17 @@ async fn watch_events(
 #[web::get("/processes")]
 async fn get_processes(
   web::types::Query(qs): web::types::Query<ProccessQuery>,
-  docker_api: web::types::State<bollard_next::Docker>,
-  pool: web::types::State<Pool>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let label = "io.nanocl=enabled".into();
   let mut filters: HashMap<String, Vec<String>> = HashMap::new();
   let mut labels = vec![label];
 
   if let Some(namespace) = &qs.namespace {
-    repositories::namespace::find_by_name(namespace.to_owned(), &pool).await?;
-    labels.push(format!("io.nanocl.namespace={}", namespace));
+    repositories::namespace::find_by_name(namespace.to_owned(), &state.pool)
+      .await?;
+    labels.push(format!("io.nanocl.vnsp={}", namespace));
+    labels.push(format!("io.nanocl.cnsp={}", namespace));
   }
 
   filters.insert("label".into(), labels);
@@ -63,7 +64,7 @@ async fn get_processes(
   let opts = qs.clone().into();
 
   let options = Some(ListContainersOptions::<String> { filters, ..opts });
-  let containers = docker_api.list_containers(options).await?;
+  let containers = state.docker_api.list_containers(options).await?;
 
   Ok(web::HttpResponse::Ok().json(&containers))
 }

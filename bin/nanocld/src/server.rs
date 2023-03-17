@@ -1,23 +1,17 @@
 use ntex::web;
 
 use crate::services;
-use crate::models::BootState;
+use crate::models::DaemonState;
 
 pub async fn generate(
-  daemon_state: BootState,
+  daemon_state: DaemonState,
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("Preparing server");
   let hosts = daemon_state.config.hosts.clone();
   let mut server = web::HttpServer::new(move || {
     web::App::new()
       // bind config state
-      .state(daemon_state.config.clone())
-      // bind postgre pool to state
-      .state(daemon_state.pool.clone())
-      // bind docker api
-      .state(daemon_state.docker_api.clone())
-      // bind our event state
-      .state(daemon_state.event_emitter.clone())
+      .state(daemon_state.clone())
       .state(
         web::types::PayloadConfig::new(20_000_000_000), // <- limit size of the payload
       )
