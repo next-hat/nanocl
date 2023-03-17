@@ -121,7 +121,7 @@ async fn install_dependencies(
   version: &str,
 ) -> Result<(), CliError> {
   println!("Installing dependencies");
-  install_image("cockroachdb/cockroach", "v22.2.5", docker_api).await?;
+  install_image("cockroachdb/cockroach", "v22.2.6", docker_api).await?;
   install_image("nexthat/metrsd", "v0.1.0", docker_api).await?;
   install_image("nexthat/nanocld", version, docker_api).await?;
   println!("Dependencies installed");

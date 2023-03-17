@@ -43,7 +43,7 @@ jobs:
     # Setup daemon for the tests
     - name: Setup
       run: |
-        docker pull cockroachdb/cockroach:v22.2.5
+        docker pull cockroachdb/cockroach:v22.2.6
         docker pull nexthat/metrsd:v0.1.0
         docker pull nexthat/nanocl-get-started:latest
         cargo make run-daemon -- --init

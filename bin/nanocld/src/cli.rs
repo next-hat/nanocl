@@ -32,6 +32,9 @@ pub struct Cli {
   /// Join current node to a cluster
   #[clap(long = "node")]
   pub(crate) nodes: Vec<String>,
+  /// Address to advertise to other nodes
+  #[clap(long = "advertise-addr")]
+  pub(crate) advertise_addr: Option<String>,
 }
 
 /// Cli arguments unit test

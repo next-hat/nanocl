@@ -78,6 +78,7 @@ mod tests {
       gateway: None,
       nodes: Vec::default(),
       hostname: None,
+      advertise_addr: None,
     };
 
     let config = config::init(&args).expect("Expect to init config");

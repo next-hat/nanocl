@@ -19,6 +19,8 @@ pub struct DaemonConfig {
   pub hostname: String,
   /// List of nodes to join
   pub nodes: Vec<String>,
+  /// Address to advertise to other nodes
+  pub advertise_addr: String,
 }
 
 /// Configuration File of the daemon
@@ -47,6 +49,7 @@ impl Default for DaemonConfig {
       state_dir: "/var/lib/nanocl".into(),
       gateway: String::default(),
       nodes: Vec::default(),
+      advertise_addr: String::default(),
     }
   }
 }

@@ -54,12 +54,19 @@ fn gen_daemon_conf(
     })?
   };
 
+  let advertise_addr = if let Some(ref advertise_addr) = args.advertise_addr {
+    advertise_addr.to_owned()
+  } else {
+    gateway.clone()
+  };
+
   Ok(DaemonConfig {
     hosts,
     state_dir,
     docker_host,
     gateway,
     hostname,
+    advertise_addr,
     nodes: args.nodes.clone(),
   })
 }
@@ -149,6 +156,7 @@ mod tests {
       init: false,
       gateway: None,
       hostname: None,
+      advertise_addr: None,
       nodes: Vec::default(),
     };
 
@@ -233,6 +241,7 @@ mod tests {
       conf_dir: String::from("/etc/nanocl"),
       init: false,
       gateway: None,
+      advertise_addr: None,
       hostname: None,
       nodes: Vec::default(),
     };

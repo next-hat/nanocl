@@ -54,10 +54,14 @@ fn gen_store_cargo_conf(
       "start".into()
     },
     "--insecure".into(),
-    format!("--store={}", config.hostname),
-    "--accept-sql-without-tls".into(),
     "--listen-addr=:26257".into(),
-    "--http-addr=:8080".into(),
+    format!("--advertise-addr={}", config.advertise_addr),
+    // format!("--store={}", config.hostname),
+    // "--sql-addr=:26357".into(),
+    // "--advertise-addr=:26257".into(),
+    // "--accept-sql-without-tls".into(),
+    // "--listen-addr=:26257".into(),
+    // "--http-addr=:8080".into(),
   ];
   for node in &config.nodes {
     cmd.push("--join".into());
@@ -67,7 +71,7 @@ fn gen_store_cargo_conf(
     name: name.into(),
     replication: None,
     container: ContainerConfig {
-      image: Some("cockroachdb/cockroach:v22.2.5".into()),
+      image: Some("cockroachdb/cockroach:v22.2.6".into()),
       labels: Some(labels.to_owned()),
       host_config,
       cmd: Some(cmd),
