@@ -124,8 +124,6 @@ impl NanocldClient {
     name: &str,
     namespace: Option<String>,
   ) -> Result<WsConnection<Base>, NanocldClientError> {
-    // open websockets connection over http transport
-
     let qs = if let Some(namespace) = namespace {
       format!("?namespace={}", namespace)
     } else {

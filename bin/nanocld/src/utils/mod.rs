@@ -23,6 +23,7 @@ pub mod tests {
 
   use nanocl_stubs::config::DaemonConfig;
 
+  use crate::models::DaemonState;
   use crate::services;
   use crate::event::EventEmitter;
   use crate::models::Pool;
@@ -83,13 +84,16 @@ pub mod tests {
     let docker_api = gen_docker_client();
     // Create postgres pool
     let pool = gen_postgre_pool().await;
+    let daemon_state = DaemonState {
+      config: daemon_config.clone(),
+      docker_api: docker_api.clone(),
+      pool: pool.clone(),
+      event_emitter: event_emitter.clone(),
+    };
     // Create test server
     test::server(move || {
       App::new()
-        .state(daemon_config.clone())
-        .state(pool.clone())
-        .state(docker_api.clone())
-        .state(event_emitter.clone())
+        .state(daemon_state.clone())
         .configure(config)
         .default_service(web::route().to(services::unhandled))
     })
