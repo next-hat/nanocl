@@ -10,10 +10,9 @@ use ntex::{Service, fn_service, pipeline};
 use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
 use futures::future::ready;
 
-use crate::models::WsConState;
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::DaemonState;
+use crate::models::{DaemonState, WsConState};
 
 #[web::get("/nodes")]
 async fn list_node(

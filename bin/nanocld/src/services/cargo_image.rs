@@ -14,9 +14,9 @@ use nanocl_stubs::cargo_image::{
   CargoImagePartial, ListCargoImagesOptions, CargoImageImportOptions,
 };
 
-use crate::models::DaemonState;
 use crate::utils;
 use crate::error::HttpResponseError;
+use crate::models::DaemonState;
 
 #[web::get("/cargoes/images")]
 async fn list_cargo_image(

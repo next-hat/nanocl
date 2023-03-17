@@ -23,10 +23,9 @@ use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 
 use tokio::io::AsyncWriteExt;
 
-use crate::models::WsConState;
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::DaemonState;
+use crate::models::{DaemonState, WsConState};
 
 #[web::get("/vms")]
 async fn list_vm(

@@ -10,8 +10,8 @@ use nanocl_stubs::resource::ResourcePatch;
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
 use crate::{utils, repositories};
-use crate::models::{DaemonState, ResourceResetPath};
 use crate::error::HttpResponseError;
+use crate::models::{DaemonState, ResourceResetPath};
 
 #[web::post("/resources")]
 pub async fn create_resource(

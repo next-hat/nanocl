@@ -1,9 +1,8 @@
 use ntex::web;
 
 use crate::utils;
-use crate::models::{StateData, DaemonState};
-
 use crate::error::HttpResponseError;
+use crate::models::{StateData, DaemonState};
 
 #[web::put("/state/apply")]
 async fn apply(

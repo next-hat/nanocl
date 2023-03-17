@@ -1,8 +1,4 @@
 use std::collections::HashMap;
-/*
-* Endpoints for system information
-*/
-use std::sync::{Arc, Mutex};
 
 use ntex::web;
 
@@ -11,8 +7,8 @@ use nanocl_stubs::system::ProccessQuery;
 use nanocl_stubs::system::HostInfo;
 
 use crate::repositories;
-use crate::models::DaemonState;
 use crate::error::HttpResponseError;
+use crate::models::DaemonState;
 
 #[web::get("/info")]
 async fn get_info(

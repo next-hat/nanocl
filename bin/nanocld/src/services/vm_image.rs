@@ -4,9 +4,9 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
-use crate::{repositories, utils};
+use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::{Pool, VmImageDbModel, DaemonState};
+use crate::models::{DaemonState, VmImageDbModel};
 
 #[web::post("/vms/images/{name}/import")]
 async fn import_vm_image(
