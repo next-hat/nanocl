@@ -8,6 +8,7 @@ use futures::{StreamExt, TryStreamExt};
 
 use bollard_next::container::LogOutput;
 use bollard_next::container::LogsOptions;
+use nanocl_stubs::node::NodeContainerSummary;
 use bollard_next::container::WaitContainerOptions;
 use bollard_next::exec::{StartExecOptions, StartExecResults};
 use bollard_next::service::{ContainerSummary, HostConfig};
@@ -22,9 +23,9 @@ use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoExecConfig,
 };
 
+use crate::models::DaemonState;
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::Pool;
 
 use super::stream::transform_stream;
 
@@ -195,20 +196,15 @@ pub async fn list_instance(
 pub async fn create(
   namespace: &str,
   config: &CargoConfigPartial,
-  version: String,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  version: &str,
+  state: &DaemonState,
 ) -> Result<Cargo, HttpResponseError> {
-  let cargo = repositories::cargo::create(
-    namespace.to_owned(),
-    config.clone(),
-    version,
-    pool,
-  )
-  .await?;
+  let cargo =
+    repositories::cargo::create(namespace, config, version, &state.pool)
+      .await?;
 
-  if let Err(err) = create_instance(&cargo, 1, docker_api).await {
-    repositories::cargo::delete_by_key(cargo.key.to_owned(), pool).await?;
+  if let Err(err) = create_instance(&cargo, 1, &state.docker_api).await {
+    repositories::cargo::delete_by_key(&cargo.key, &state.pool).await?;
     return Err(err);
   }
 
@@ -233,13 +229,12 @@ pub async fn create(
 ///
 pub async fn start(
   cargo_key: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
   let cargo_key = cargo_key.to_owned();
-  let docker_api = docker_api.clone();
+  let docker_api = state.docker_api.clone();
   let cargo =
-    repositories::cargo::inspect_by_key(cargo_key.to_owned(), pool).await?;
+    repositories::cargo::inspect_by_key(&cargo_key, &state.pool).await?;
 
   let auto_remove = cargo
     .config
@@ -273,11 +268,11 @@ pub async fn start(
   }
 
   if auto_remove {
-    let pool = pool.clone();
+    let pool = state.pool.clone();
     rt::spawn(async move {
       futures::future::join_all(futures).await;
       if let Err(err) =
-        repositories::cargo::delete_by_key(cargo_key.to_owned(), &pool).await
+        repositories::cargo::delete_by_key(&cargo_key, &pool).await
       {
         log::warn!("Error while deleting cargo {cargo_key} {err}");
       }
@@ -331,14 +326,14 @@ pub async fn stop(
 ///
 pub async fn delete(
   cargo_key: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
   force: Option<bool>,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
-  let containers = list_instance(cargo_key, docker_api).await?;
+  let containers = list_instance(cargo_key, &state.docker_api).await?;
 
   for container in containers {
-    docker_api
+    state
+      .docker_api
       .remove_container(
         &container.id.unwrap_or_default(),
         Some(RemoveContainerOptions {
@@ -353,8 +348,8 @@ pub async fn delete(
       })?;
   }
 
-  repositories::cargo::delete_by_key(cargo_key.to_owned(), pool).await?;
-  repositories::cargo_config::delete_by_cargo_key(cargo_key.to_owned(), pool)
+  repositories::cargo::delete_by_key(cargo_key, &state.pool).await?;
+  repositories::cargo_config::delete_by_cargo_key(cargo_key, &state.pool)
     .await?;
 
   Ok(())
@@ -380,15 +375,13 @@ pub async fn delete(
 pub async fn put(
   cargo_key: &str,
   config: &CargoConfigUpdate,
-  version: String,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  version: &str,
+  state: &DaemonState,
 ) -> Result<Cargo, HttpResponseError> {
-  let cargo =
-    repositories::cargo::find_by_key(cargo_key.to_owned(), pool).await?;
+  let cargo = repositories::cargo::find_by_key(cargo_key, &state.pool).await?;
 
   let cargo_config =
-    repositories::cargo_config::find_by_key(cargo.config_key.to_owned(), pool)
+    repositories::cargo_config::find_by_key(&cargo.config_key, &state.pool)
       .await?;
 
   // Todo should remove this as part of a patch
@@ -406,21 +399,22 @@ pub async fn put(
   };
 
   let cargo = repositories::cargo::update_by_key(
-    cargo_key.to_owned(),
-    cargo_partial,
+    cargo_key,
+    &cargo_partial,
     version,
-    pool,
+    &state.pool,
   )
   .await?;
 
-  let containers = list_instance(cargo_key, docker_api).await?;
+  let containers = list_instance(cargo_key, &state.docker_api).await?;
 
   // Rename existing container to avoid name conflict
   for container in containers.iter().cloned() {
     let names = container.names.unwrap_or_default();
     let name = format!("{}-backup", names[0]);
 
-    docker_api
+    state
+      .docker_api
       .rename_container(
         &container.id.unwrap_or_default(),
         bollard_next::container::RenameContainerOptions { name },
@@ -433,14 +427,16 @@ pub async fn put(
   }
 
   // Create instance with the new config
-  let new_instances = match create_instance(&cargo, 1, docker_api).await {
+  let new_instances = match create_instance(&cargo, 1, &state.docker_api).await
+  {
     Err(err) => {
       // If the creation of the new instance failed, we rename the old containers
       for container in containers.iter().cloned() {
         let names = container.names.unwrap_or_default();
         let name = names[0].replace("-backup", "");
 
-        docker_api
+        state
+          .docker_api
           .rename_container(
             &container.id.unwrap_or_default(),
             bollard_next::container::RenameContainerOptions { name },
@@ -458,11 +454,12 @@ pub async fn put(
   };
 
   // start created containers
-  if let Err(err) = start(cargo_key, docker_api, pool).await {
+  if let Err(err) = start(cargo_key, state).await {
     log::error!("Unable to start cargo instance {} : {err}", cargo.key);
     // If the start of the new instance failed, we remove the new containers
     for instance in new_instances {
-      docker_api
+      state
+        .docker_api
         .remove_container(
           &instance,
           Some(RemoveContainerOptions {
@@ -477,7 +474,8 @@ pub async fn put(
       let names = container.names.unwrap_or_default();
       let name = names[0].replace("-backup", "");
 
-      docker_api
+      state
+        .docker_api
         .rename_container(
           &container.id.unwrap_or_default(),
           bollard_next::container::RenameContainerOptions { name },
@@ -488,7 +486,8 @@ pub async fn put(
 
   // Delete old cors
   for container in containers {
-    docker_api
+    state
+      .docker_api
       .remove_container(
         &container.id.unwrap_or_default(),
         Some(RemoveContainerOptions {
@@ -524,20 +523,44 @@ pub async fn put(
 ///
 pub async fn list(
   nsp: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<Vec<CargoSummary>, HttpResponseError> {
   let namespace =
-    repositories::namespace::find_by_name(nsp.to_owned(), pool).await?;
+    repositories::namespace::find_by_name(nsp, &state.pool).await?;
 
-  let cargoes = repositories::cargo::find_by_namespace(namespace, pool).await?;
+  let cargoes =
+    repositories::cargo::find_by_namespace(&namespace, &state.pool).await?;
 
   let mut cargo_summaries = Vec::new();
 
+  let nodes =
+    repositories::node::list_unless(&state.config.hostname, &state.pool)
+      .await?;
+
   for cargo in cargoes {
     let config =
-      repositories::cargo_config::find_by_key(cargo.config_key, pool).await?;
-    let containers = list_instance(&cargo.key, docker_api).await?;
+      repositories::cargo_config::find_by_key(&cargo.config_key, &state.pool)
+        .await?;
+    let mut containers = list_instance(&cargo.key, &state.docker_api).await?;
+
+    for node in &nodes {
+      let client = node.to_http_client();
+      let node_containers = match client
+        .list_cargo_instance(&cargo.name, Some(cargo.namespace_name.clone()))
+        .await
+      {
+        Ok(containers) => containers,
+        Err(err) => {
+          log::error!(
+            "Unable to list cargo instance on node {} : {}",
+            node.name,
+            err
+          );
+          continue;
+        }
+      };
+      containers.extend(node_containers);
+    }
 
     let mut running_instances = 0;
     for container in containers.clone() {
@@ -580,15 +603,54 @@ pub async fn list(
 ///
 pub async fn inspect(
   key: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<CargoInspect, HttpResponseError> {
-  let cargo = repositories::cargo::inspect_by_key(key.to_owned(), pool).await?;
-  let containers = list_instance(&cargo.key, docker_api).await?;
+  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let containers = list_instance(&cargo.key, &state.docker_api).await?;
+
+  let mut containers = containers
+    .into_iter()
+    .map(|c| {
+      NodeContainerSummary::new(
+        state.config.hostname.clone(),
+        state.config.advertise_addr.clone(),
+        c,
+      )
+    })
+    .collect::<Vec<NodeContainerSummary>>();
+
+  let nodes =
+    repositories::node::list_unless(&state.config.hostname, &state.pool)
+      .await?;
+
+  for node in &nodes {
+    let client = node.to_http_client();
+    let node_containers = match client
+      .list_cargo_instance(&cargo.name, Some(cargo.namespace_name.clone()))
+      .await
+    {
+      Ok(containers) => containers,
+      Err(err) => {
+        log::error!(
+          "Unable to list cargo instance on node {} : {}",
+          node.name,
+          err
+        );
+        continue;
+      }
+    };
+    let node_containers = node_containers
+      .into_iter()
+      .map(|c| {
+        NodeContainerSummary::new(node.name.clone(), node.ip_address.clone(), c)
+      })
+      .collect::<Vec<NodeContainerSummary>>();
+    containers.extend(node_containers);
+  }
 
   let mut running_instances = 0;
-  for container in &containers {
-    if container.state == Some("running".into()) {
+  for nc in &containers {
+    if nc.container.state == Some("running".into()) {
       running_instances += 1;
     }
   }
@@ -631,16 +693,16 @@ pub async fn inspect(
 ///
 pub async fn delete_by_namespace(
   namespace: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
   let namespace =
-    repositories::namespace::find_by_name(namespace.to_owned(), pool).await?;
+    repositories::namespace::find_by_name(namespace, &state.pool).await?;
 
-  let cargoes = repositories::cargo::find_by_namespace(namespace, pool).await?;
+  let cargoes =
+    repositories::cargo::find_by_namespace(&namespace, &state.pool).await?;
 
   for cargo in cargoes {
-    delete(&cargo.key, docker_api, pool, None).await?;
+    delete(&cargo.key, None, state).await?;
   }
 
   Ok(())
@@ -653,12 +715,13 @@ pub async fn delete_by_namespace(
 pub async fn exec_command(
   name: &str,
   args: &CargoExecConfig<String>,
-  docker_api: &bollard_next::Docker,
+  state: &DaemonState,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = format!("{name}.c");
-  let result = docker_api.create_exec(&name, args.to_owned()).await?;
+  let result = state.docker_api.create_exec(&name, args.to_owned()).await?;
 
-  let res = docker_api
+  let res = state
+    .docker_api
     .start_exec(&result.id, Some(StartExecOptions::default()))
     .await?;
 
@@ -706,26 +769,18 @@ pub async fn kill(
 pub async fn create_or_put(
   namespace: &str,
   cargo: &CargoConfigPartial,
-  version: String,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  version: &str,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
   let key = utils::key::gen_key(namespace, &cargo.name);
-  if repositories::cargo::find_by_key(key.to_owned(), pool)
+  if repositories::cargo::find_by_key(&key, &state.pool)
     .await
     .is_ok()
   {
-    utils::cargo::put(
-      &key,
-      &cargo.to_owned().into(),
-      version,
-      docker_api,
-      pool,
-    )
-    .await?;
+    utils::cargo::put(&key, &cargo.clone().into(), version, state).await?;
   } else {
-    utils::cargo::create(namespace, cargo, version, docker_api, pool).await?;
-    utils::cargo::start(&key, docker_api, pool).await?;
+    utils::cargo::create(namespace, cargo, version, state).await?;
+    utils::cargo::start(&key, state).await?;
   }
   Ok(())
 }
@@ -733,11 +788,10 @@ pub async fn create_or_put(
 pub async fn patch(
   key: &str,
   payload: &CargoConfigUpdate,
-  version: String,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  version: &str,
+  state: &DaemonState,
 ) -> Result<Cargo, HttpResponseError> {
-  let cargo = repositories::cargo::inspect_by_key(key.to_owned(), pool).await?;
+  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
 
   let container = if let Some(container) = payload.container.clone() {
     // merge env and ensure no duplicate key
@@ -821,7 +875,7 @@ pub async fn patch(
     container: Some(container),
     ..payload.to_owned()
   };
-  utils::cargo::put(key, &config, version, docker_api, pool).await
+  utils::cargo::put(key, &config, version, state).await
 }
 
 pub fn get_logs(

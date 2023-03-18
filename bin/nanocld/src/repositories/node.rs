@@ -8,12 +8,14 @@ use crate::error::HttpResponseError;
 use super::error::{db_error, db_blocking_error};
 
 pub async fn create(
-  node: NodeDbModel,
+  node: &NodeDbModel,
   pool: &Pool,
 ) -> Result<NodeDbModel, HttpResponseError> {
   use crate::schema::nodes::dsl;
 
+  let node = node.clone();
   let pool = pool.clone();
+
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = diesel::insert_into(dsl::nodes)
@@ -57,7 +59,48 @@ pub async fn create_if_not_exists(
   pool: &Pool,
 ) -> Result<NodeDbModel, HttpResponseError> {
   match find_by_name(&node.name, pool).await {
-    Err(_) => create(node.clone(), pool).await,
+    Err(_) => create(node, pool).await,
     Ok(node) => Ok(node),
   }
+}
+
+pub async fn list(pool: &Pool) -> Result<Vec<NodeDbModel>, HttpResponseError> {
+  use crate::schema::nodes::dsl;
+
+  let pool = pool.clone();
+  let items = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let items = dsl::nodes
+      .load::<NodeDbModel>(&mut conn)
+      .map_err(db_error("nodes"))?;
+
+    Ok::<_, HttpResponseError>(items)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  Ok(items)
+}
+
+pub async fn list_unless(
+  name: &str,
+  pool: &Pool,
+) -> Result<Vec<NodeDbModel>, HttpResponseError> {
+  use crate::schema::nodes::dsl;
+
+  let name = name.to_owned();
+  let pool = pool.clone();
+  let items = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let items = dsl::nodes
+      .filter(dsl::name.ne(name))
+      .load::<NodeDbModel>(&mut conn)
+      .map_err(db_error("nodes"))?;
+
+    Ok::<_, HttpResponseError>(items)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  Ok(items)
 }

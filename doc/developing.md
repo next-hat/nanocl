@@ -75,7 +75,7 @@ Before running nanocl we will need some docker images:
 
 ```sh
 docker pull nexthat/metrsd:0.1.0
-docker pull cockroachdb/cockroach:v22.2.5
+docker pull cockroachdb/cockroach:v22.2.6
 ```
 
 Finally we can start the daemon.

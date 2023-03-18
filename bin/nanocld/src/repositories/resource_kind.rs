@@ -10,7 +10,7 @@ use crate::models::{
 use super::error::{db_error, db_blocking_error};
 
 pub async fn create_version(
-  item: ResourceKindPartial,
+  item: &ResourceKindPartial,
   pool: &Pool,
 ) -> Result<ResourceKindVersionDbModel, HttpResponseError> {
   use crate::schema::resource_kind_versions::dsl;
@@ -18,7 +18,7 @@ pub async fn create_version(
   let kind_version = ResourceKindVersionDbModel {
     resource_kind_name: item.name.clone(),
     version: item.version.clone(),
-    schema: item.schema,
+    schema: item.schema.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
   let pool = pool.clone();
@@ -82,7 +82,7 @@ pub async fn find_by_name(
 }
 
 pub async fn create(
-  item: ResourceKindPartial,
+  item: &ResourceKindPartial,
   pool: &Pool,
 ) -> Result<ResourceKindDbModel, HttpResponseError> {
   use crate::schema::resource_kinds::dsl;

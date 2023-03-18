@@ -9,6 +9,7 @@ pub mod stream;
 pub mod resource;
 pub mod vm;
 pub mod vm_image;
+pub mod ws;
 
 #[cfg(test)]
 pub mod tests {
@@ -22,9 +23,11 @@ pub mod tests {
 
   use nanocl_stubs::config::DaemonConfig;
 
+  use crate::models::DaemonState;
   use crate::services;
   use crate::event::EventEmitter;
   use crate::models::Pool;
+  use crate::version::VERSION;
 
   pub use ntex::web::test::TestServer;
   pub type TestReqRet = Result<ClientResponse, SendRequestError>;
@@ -70,10 +73,10 @@ pub mod tests {
     store::create_pool(ip_addr).await
   }
 
-  pub async fn generate_server(config: Config) -> test::TestServer {
+  pub async fn generate_server(routes: Config) -> test::TestServer {
     before();
     // Build a test daemon config
-    let daemon_config = DaemonConfig {
+    let config = DaemonConfig {
       state_dir: String::from("/var/lib/nanocl"),
       ..Default::default()
     };
@@ -82,14 +85,18 @@ pub mod tests {
     let docker_api = gen_docker_client();
     // Create postgres pool
     let pool = gen_postgre_pool().await;
+    let daemon_state = DaemonState {
+      config,
+      docker_api,
+      pool,
+      event_emitter,
+      version: VERSION.to_owned(),
+    };
     // Create test server
     test::server(move || {
       App::new()
-        .state(daemon_config.clone())
-        .state(pool.clone())
-        .state(docker_api.clone())
-        .state(event_emitter.clone())
-        .configure(config)
+        .state(daemon_state.clone())
+        .configure(routes)
         .default_service(web::route().to(services::unhandled))
     })
   }

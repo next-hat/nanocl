@@ -1571,6 +1571,7 @@ dependencies = [
  "log 0.4.17",
  "metrsd_client",
  "nanocl_stubs",
+ "nanocld_client",
  "ntex",
  "r2d2",
  "serde",

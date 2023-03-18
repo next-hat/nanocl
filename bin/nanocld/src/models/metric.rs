@@ -12,7 +12,7 @@ pub struct MetricDbModel {
   pub(crate) data: serde_json::Value,
 }
 
-#[derive(Debug, Default, Insertable)]
+#[derive(Clone, Debug, Default, Insertable)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = metrics)]
 pub struct MetricInsertDbModel {

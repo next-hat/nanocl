@@ -37,12 +37,14 @@ use super::error::{db_error, db_blocking_error};
 /// ```
 ///
 pub async fn create(
-  item: ResourceConfigDbModel,
+  item: &ResourceConfigDbModel,
   pool: &Pool,
 ) -> Result<ResourceConfigDbModel, HttpResponseError> {
   use crate::schema::resource_configs::dsl;
 
+  let item = item.clone();
   let pool = pool.clone();
+
   let dbmodel = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::insert_into(dsl::resource_configs)
@@ -63,7 +65,7 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [key](String) - Resource key
+/// - [key](&str) - Resource key
 /// - [pool](Pool) - Database connection pool
 ///
 /// ## Returns
@@ -77,16 +79,18 @@ pub async fn create(
 /// ```rust,norun
 /// use crate::repositories;
 ///
-/// repositories::resource_config::delete_by_resource_key(String::from("my-resource"), &pool).await;
+/// repositories::resource_config::delete_by_resource_key(&str::from("my-resource"), &pool).await;
 /// ```
 ///
 pub async fn delete_by_resource_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<(), HttpResponseError> {
   use crate::schema::resource_configs::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
+
   web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::delete(dsl::resource_configs.filter(dsl::resource_key.eq(key)))
@@ -101,12 +105,14 @@ pub async fn delete_by_resource_key(
 }
 
 pub async fn list_by_resource(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<Vec<ResourceConfig>, HttpResponseError> {
   use crate::schema::resource_configs::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
+
   let models = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = dsl::resource_configs
@@ -127,12 +133,14 @@ pub async fn list_by_resource(
 }
 
 pub async fn find_by_key(
-  key: uuid::Uuid,
+  key: &uuid::Uuid,
   pool: &Pool,
 ) -> Result<ResourceConfig, HttpResponseError> {
   use crate::schema::resource_configs::dsl;
 
+  let key = *key;
   let pool = pool.clone();
+
   let model = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = dsl::resource_configs

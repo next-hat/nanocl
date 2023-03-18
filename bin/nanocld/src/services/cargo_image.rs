@@ -5,9 +5,10 @@ use ntex::web;
 use ntex::http::StatusCode;
 use futures::StreamExt;
 use tokio_util::codec;
-use bollard_next::image::ImportImageOptions;
 use tokio::io::AsyncWriteExt;
 use tokio::fs::File;
+
+use bollard_next::image::ImportImageOptions;
 
 use nanocl_stubs::cargo_image::{
   CargoImagePartial, ListCargoImagesOptions, CargoImageImportOptions,
@@ -15,13 +16,14 @@ use nanocl_stubs::cargo_image::{
 
 use crate::utils;
 use crate::error::HttpResponseError;
+use crate::models::DaemonState;
 
 #[web::get("/cargoes/images")]
 async fn list_cargo_image(
-  docker_api: web::types::State<bollard_next::Docker>,
   web::types::Query(query): web::types::Query<ListCargoImagesOptions>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let images = utils::cargo_image::list(&docker_api, query.into()).await?;
+  let images = utils::cargo_image::list(&query.into(), &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&images))
 }
@@ -29,21 +31,20 @@ async fn list_cargo_image(
 #[web::get("/cargoes/images/{id_or_name}*")]
 async fn inspect_cargo_image(
   path: web::types::Path<(String, String)>,
-  docker_api: web::types::State<bollard_next::Docker>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let image = utils::cargo_image::inspect(&path.1, &docker_api).await?;
+  let image = utils::cargo_image::inspect(&path.1, &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&image))
 }
 
 #[web::post("/cargoes/images")]
 async fn create_cargo_image(
-  docker_api: web::types::State<bollard_next::Docker>,
   web::types::Json(payload): web::types::Json<CargoImagePartial>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let (from_image, tag) = utils::cargo_image::parse_image_info(&payload.name)?;
-  let rx_body =
-    utils::cargo_image::download(&from_image, &tag, &docker_api).await?;
+  let rx_body = utils::cargo_image::download(&from_image, &tag, &state).await?;
   Ok(
     web::HttpResponse::Ok()
       .keep_alive()
@@ -54,18 +55,18 @@ async fn create_cargo_image(
 
 #[web::delete("/cargoes/images/{id_or_name}*")]
 async fn delete_cargo_image_by_name(
-  docker_api: web::types::State<bollard_next::Docker>,
   path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let res = utils::cargo_image::delete(&path.1, &docker_api).await?;
+  let res = utils::cargo_image::delete(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
 #[web::post("/cargoes/images/import")]
 async fn import_images(
-  docker_api: web::types::State<bollard_next::Docker>,
   web::types::Query(query): web::types::Query<CargoImageImportOptions>,
   mut payload: web::types::Payload,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   // generate a random filename
   let filename = uuid::Uuid::new_v4().to_string();
@@ -112,7 +113,7 @@ async fn import_images(
   let quiet = query.quiet.unwrap_or(false);
   let body = hyper::Body::wrap_stream(byte_stream);
   let options = ImportImageOptions { quiet };
-  let mut stream = docker_api.import_image(options, body, None);
+  let mut stream = state.docker_api.import_image(options, body, None);
   while let Some(res) = stream.next().await {
     let _ = res.map_err(|err| HttpResponseError {
       status: StatusCode::INTERNAL_SERVER_ERROR,

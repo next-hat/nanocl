@@ -2,32 +2,29 @@
 * Endpoints to manipulate resources
 */
 
-use nanocl_stubs::resource::ResourcePatch;
 use ntex::rt;
 use ntex::web;
+
 use nanocl_stubs::system::Event;
+use nanocl_stubs::resource::ResourcePatch;
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
-use crate::repositories;
-use crate::event::EventEmitterPtr;
-
+use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::Pool;
-use crate::utils;
+use crate::models::{DaemonState, ResourceResetPath};
 
 #[web::post("/resources")]
 pub async fn create_resource(
-  pool: web::types::State<Pool>,
   web::types::Json(payload): web::types::Json<ResourcePartial>,
-  event_emitter: web::types::State<EventEmitterPtr>,
-  _version: web::types::Path<String>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Creating resource: {:?}", &payload);
-  let resource = utils::resource::create(payload, &pool).await?;
+  let resource = utils::resource::create(&payload, &state.pool).await?;
   log::debug!("Resource created: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
-    event_emitter
+    state
+      .event_emitter
       .lock()
       .unwrap()
       .send(Event::ResourceCreated(Box::new(resource_ptr)));
@@ -37,16 +34,16 @@ pub async fn create_resource(
 
 #[web::delete("/resources/{name}")]
 pub async fn delete_resource(
-  pool: web::types::State<Pool>,
   path: web::types::Path<(String, String)>,
-  event_emitter: web::types::State<EventEmitterPtr>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Deleting resource: {}", &path.1);
   let resource =
-    repositories::resource::inspect_by_key(path.1.clone(), &pool).await?;
-  utils::resource::delete(resource.clone(), &pool).await?;
+    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
+  utils::resource::delete(resource.clone(), &state.pool).await?;
   rt::spawn(async move {
-    event_emitter
+    state
+      .event_emitter
       .lock()
       .unwrap()
       .send(Event::ResourceDeleted(Box::new(resource)));
@@ -56,33 +53,32 @@ pub async fn delete_resource(
 
 #[web::get("/resources")]
 pub async fn list_resource(
-  pool: web::types::State<Pool>,
   web::types::Query(query): web::types::Query<ResourceQuery>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Listing resources with query: {query:#?}");
-  let items = repositories::resource::find(&pool, Some(query)).await?;
+  let items = repositories::resource::find(&state.pool, Some(query)).await?;
   log::debug!("Found {} resources", &items.len());
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
 #[web::get("/resources/{name}")]
 pub async fn inspect_resource(
-  pool: web::types::State<Pool>,
   path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  log::debug!("Inspecting resource: {}", &path.1); // item?
+  log::debug!("Inspecting resource: {}", &path.1);
   let resource =
-    repositories::resource::inspect_by_key(path.1.clone(), &pool).await?;
+    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
   log::debug!("Resource found: {:?}", &resource);
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
 #[web::patch("/resources/{name}")]
 pub async fn patch_resource(
-  pool: web::types::State<Pool>,
-  path: web::types::Path<(String, String)>,
-  event_emitter: web::types::State<EventEmitterPtr>,
   web::types::Json(payload): web::types::Json<ResourcePatch>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!(
     "Patching resource: {} with payload: {:?}",
@@ -91,7 +87,7 @@ pub async fn patch_resource(
   );
 
   let resource =
-    repositories::resource::inspect_by_key(path.1.clone(), &pool).await?;
+    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
 
   let new_resource = ResourcePartial {
     name: path.1.clone(),
@@ -99,11 +95,12 @@ pub async fn patch_resource(
     kind: resource.kind,
     config: payload.config,
   };
-  let resource = utils::resource::patch(new_resource, &pool).await?;
+  let resource = utils::resource::patch(new_resource, &state.pool).await?;
   log::debug!("Resource patched: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
-    event_emitter
+    state
+      .event_emitter
       .lock()
       .unwrap()
       .send(Event::ResourcePatched(Box::new(resource_ptr)));
@@ -113,35 +110,27 @@ pub async fn patch_resource(
 
 #[web::get("/resources/{name}/histories")]
 pub async fn list_resource_history(
-  pool: web::types::State<Pool>,
   path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Listing resource histories: {}", &path.1);
   let items =
-    repositories::resource_config::list_by_resource(path.1.clone(), &pool)
+    repositories::resource_config::list_by_resource(&path.1, &state.pool)
       .await?;
   log::debug!("Resource histories found : {:#?}", &items);
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ResourceResetPath {
-  pub version: String,
-  pub name: String,
-  pub id: uuid::Uuid,
-}
-
 #[web::patch("/resources/{name}/histories/{id}/reset")]
 pub async fn reset_resource(
-  pool: web::types::State<Pool>,
   path: web::types::Path<ResourceResetPath>,
-  event_emitter: web::types::State<EventEmitterPtr>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let history =
-    repositories::resource_config::find_by_key(path.id, &pool).await?;
+    repositories::resource_config::find_by_key(&path.id, &state.pool).await?;
 
   let resource =
-    repositories::resource::inspect_by_key(path.name.to_owned(), &pool).await?;
+    repositories::resource::inspect_by_key(&path.name, &state.pool).await?;
 
   let new_resource = ResourcePartial {
     name: resource.name,
@@ -149,10 +138,11 @@ pub async fn reset_resource(
     kind: resource.kind,
     config: history.data,
   };
-  let resource = utils::resource::patch(new_resource, &pool).await?;
+  let resource = utils::resource::patch(new_resource, &state.pool).await?;
   let resource_ptr = resource.clone();
   rt::spawn(async move {
-    event_emitter
+    state
+      .event_emitter
       .lock()
       .unwrap()
       .send(Event::ResourcePatched(Box::new(resource_ptr)));

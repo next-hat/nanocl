@@ -1,15 +1,54 @@
-use bollard_next::service::CreateImageInfo;
 use ntex::util::Bytes;
 use ntex::http::StatusCode;
 use futures::StreamExt;
-use bollard_next::Docker;
-use bollard_next::models::{ImageInspect, ImageSummary};
 
+use bollard_next::service::CreateImageInfo;
+use bollard_next::models::{ImageInspect, ImageSummary};
 use nanocl_stubs::generic::GenericDelete;
 
 use crate::error::HttpResponseError;
+use crate::models::DaemonState;
 
 use super::stream;
+
+/// # Parse image info
+///
+/// Get the image name and tag from a string
+///
+/// ## Arguments
+///
+/// - [image_info](str) The string to parse
+///
+/// ## Return
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](String, String) - The image name and tag
+///   - [Err](HttpResponseError) - An http response error if something went wrong
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use crate::utils::cargo_image;
+///
+/// let (name, tag) = cargo_image::parse_image_info("nginx:latest").unwrap();
+/// ```
+///
+pub fn parse_image_info(
+  image_info: &str,
+) -> Result<(String, String), HttpResponseError> {
+  let image_info: Vec<&str> = image_info.split(':').collect();
+
+  if image_info.len() != 2 {
+    return Err(HttpResponseError {
+      msg: String::from("missing tag in image name"),
+      status: StatusCode::BAD_REQUEST,
+    });
+  }
+
+  let image_name = image_info[0].to_ascii_lowercase();
+  let image_tag = image_info[1].to_ascii_lowercase();
+  Ok((image_name, image_tag))
+}
 
 /// ## List cargo image
 ///
@@ -34,10 +73,10 @@ use super::stream;
 /// ```
 ///
 pub async fn list(
-  docker_api: &Docker,
-  opts: bollard_next::image::ListImagesOptions<String>,
+  opts: &bollard_next::image::ListImagesOptions<String>,
+  state: &DaemonState,
 ) -> Result<Vec<ImageSummary>, HttpResponseError> {
-  let items = docker_api.list_images(Some(opts)).await?;
+  let items = state.docker_api.list_images(Some(opts.clone())).await?;
 
   Ok(items)
 }
@@ -69,9 +108,9 @@ pub async fn list(
 ///
 pub async fn inspect(
   image_name: &str,
-  docker_api: &Docker,
+  state: &DaemonState,
 ) -> Result<ImageInspect, HttpResponseError> {
-  let image = docker_api.inspect_image(image_name).await?;
+  let image = state.docker_api.inspect_image(image_name).await?;
 
   Ok(image)
 }
@@ -110,14 +149,14 @@ pub async fn inspect(
 pub async fn download(
   from_image: &str,
   tag: &str,
-  docker_api: &Docker,
+  state: &DaemonState,
 ) -> Result<
   impl StreamExt<Item = Result<Bytes, HttpResponseError>>,
   HttpResponseError,
 > {
   let from_image = from_image.to_owned();
   let tag = tag.to_owned();
-  let docker_api = docker_api.clone();
+  let docker_api = state.docker_api.clone();
 
   let stream = docker_api.create_image(
     Some(bollard_next::image::CreateImageOptions {
@@ -160,49 +199,13 @@ pub async fn download(
 ///
 pub async fn delete(
   id_or_name: &str,
-  docker_api: &Docker,
+  state: &DaemonState,
 ) -> Result<GenericDelete, HttpResponseError> {
-  docker_api.remove_image(id_or_name, None, None).await?;
+  state
+    .docker_api
+    .remove_image(id_or_name, None, None)
+    .await?;
   let res = GenericDelete { count: 1 };
 
   Ok(res)
-}
-
-/// # Parse image info
-///
-/// Get the image name and tag from a string
-///
-/// ## Arguments
-///
-/// - [image_info](str) The string to parse
-///
-/// ## Return
-///
-/// - [Result](Result) The result of the operation
-///   - [Ok](String, String) - The image name and tag
-///   - [Err](HttpResponseError) - An http response error if something went wrong
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use crate::utils::cargo_image;
-///
-/// let (name, tag) = cargo_image::parse_image_info("nginx:latest").unwrap();
-/// ```
-///
-pub fn parse_image_info(
-  image_info: &str,
-) -> Result<(String, String), HttpResponseError> {
-  let image_info: Vec<&str> = image_info.split(':').collect();
-
-  if image_info.len() != 2 {
-    return Err(HttpResponseError {
-      msg: String::from("missing tag in image name"),
-      status: StatusCode::BAD_REQUEST,
-    });
-  }
-
-  let image_name = image_info[0].to_ascii_lowercase();
-  let image_tag = image_info[1].to_ascii_lowercase();
-  Ok((image_name, image_tag))
 }

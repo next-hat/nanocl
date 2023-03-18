@@ -1,13 +1,11 @@
 use std::io;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::time::{Instant, Duration};
+use std::time::Instant;
 
 use ntex::rt;
 use ntex::ws;
 use ntex::web;
-use ntex::time;
-use ntex::util;
 use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use ntex::channel::oneshot;
@@ -20,217 +18,149 @@ use futures::future::ready;
 use bollard_next::container::AttachContainerOptions;
 
 use nanocl_stubs::cargo::OutputLog;
-use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 
-use bollard_next::Docker;
 use tokio::io::AsyncWriteExt;
 
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::Pool;
+use crate::models::{DaemonState, WsConState};
 
 #[web::get("/vms")]
 async fn list_vm(
-  docker_api: web::types::State<Docker>,
-  pool: web::types::State<Pool>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
 
-  let vms = utils::vm::list(&namespace, &docker_api, &pool).await?;
+  let vms = utils::vm::list(&namespace, &state.docker_api, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&vms))
 }
 
 #[web::get("/vms/{name}/inspect")]
 async fn inspect_vm(
-  docker_api: web::types::State<Docker>,
-  pool: web::types::State<Pool>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
 
-  let vm = utils::vm::inspect(&key, &docker_api, &pool).await?;
+  let vm = utils::vm::inspect(&key, &state.docker_api, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
 #[web::post("/vms/{name}/start")]
 async fn start_vm(
-  docker_api: web::types::State<Docker>,
-  pool: web::types::State<Pool>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
 
-  repositories::vm::find_by_key(&key, &pool).await?;
-  utils::vm::start(&key, &docker_api).await?;
+  repositories::vm::find_by_key(&key, &state.pool).await?;
+  utils::vm::start(&key, &state.docker_api).await?;
 
   Ok(web::HttpResponse::Ok().finish())
 }
 
 #[web::post("/vms/{name}/stop")]
 async fn stop_vm(
-  docker_api: web::types::State<Docker>,
-  pool: web::types::State<Pool>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
 
-  repositories::vm::find_by_key(&key, &pool).await?;
-  utils::vm::stop_by_key(&key, &docker_api, &pool).await?;
+  repositories::vm::find_by_key(&key, &state.pool).await?;
+  utils::vm::stop_by_key(&key, &state.docker_api, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().finish())
 }
 
 #[web::delete("/vms/{name}")]
 async fn delete_vm(
-  docker_api: web::types::State<Docker>,
-  pool: web::types::State<Pool>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
 
-  utils::vm::delete(&key, true, &docker_api, &pool).await?;
+  utils::vm::delete(&key, true, &state.docker_api, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().finish())
 }
 
 #[web::post("/vms")]
 async fn create_vm(
-  docker_api: web::types::State<Docker>,
-  pool: web::types::State<Pool>,
-  daemon_conf: web::types::State<DaemonConfig>,
-  web::types::Json(payload): web::types::Json<VmConfigPartial>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Json(payload): web::types::Json<VmConfigPartial>,
   version: web::types::Path<String>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
 
-  let item = utils::vm::create(
-    payload,
-    &namespace,
-    version.to_string(),
-    &daemon_conf,
-    &docker_api,
-    &pool,
-  )
-  .await?;
+  let item = utils::vm::create(&payload, &namespace, &version, &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&item))
 }
 
 #[web::get("/vms/{name}/histories")]
 async fn list_vm_history(
-  pool: web::types::State<Pool>,
-  path: web::types::Path<(String, String)>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let histories = repositories::vm_config::list_by_vm(key, &pool).await?;
+  let histories =
+    repositories::vm_config::list_by_vm(&key, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
 #[web::patch("/vms/{name}")]
 async fn patch_vm(
-  pool: web::types::State<Pool>,
-  daemon_conf: web::types::State<DaemonConfig>,
-  docker_api: web::types::State<Docker>,
-  path: web::types::Path<(String, String)>,
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<VmConfigUpdate>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let version = path.0.clone();
 
-  let vm = utils::vm::patch(
-    &key,
-    &payload,
-    &version,
-    &daemon_conf,
-    &docker_api,
-    &pool,
-  )
-  .await?;
+  let vm = utils::vm::patch(&key, &payload, &version, &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
-/// How often heartbeat pings are sent
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
-/// How long before lack of client response causes a timeout
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
-
-struct AttachState {
-  hb: Instant,
-}
-
-/// helper method that sends ping to client every second.
-///
-/// also this method checks heartbeats from client
-async fn heartbeat(
-  state: Rc<RefCell<AttachState>>,
-  sink: ws::WsSink,
-  mut rx: oneshot::Receiver<()>,
-) {
-  loop {
-    match util::select(Box::pin(time::sleep(HEARTBEAT_INTERVAL)), &mut rx).await
-    {
-      util::Either::Left(_) => {
-        // check client heartbeats
-        if Instant::now().duration_since(state.borrow().hb) > CLIENT_TIMEOUT {
-          // heartbeat timed out
-          println!("Websocket Client heartbeat failed, disconnecting!");
-          // disconnect connection
-          sink.io().close();
-          return;
-        } else {
-          // send ping
-          if sink.send(ws::Message::Ping(Bytes::new())).await.is_err() {
-            return;
-          }
-        }
-      }
-      util::Either::Right(_) => {
-        println!("Connection is dropped, stop heartbeat task");
-        return;
-      }
-    }
-  }
-}
-
 async fn ws_attach_service(
-  (key, sink, docker_api): (String, ws::WsSink, web::types::State<Docker>),
+  (key, sink, state): (String, ws::WsSink, web::types::State<DaemonState>),
 ) -> Result<
   impl Service<ws::Frame, Response = Option<ws::Message>, Error = io::Error>,
   web::Error,
 > {
   // start heartbeat task
   let (tx, rx) = oneshot::channel();
-  let state = Rc::new(RefCell::new(AttachState { hb: Instant::now() }));
-  rt::spawn(heartbeat(state.clone(), sink.clone(), rx));
+  let con_state = Rc::new(RefCell::new(WsConState::new()));
+  rt::spawn(utils::ws::heartbeat(con_state.clone(), sink.clone(), rx));
 
   let (scmd, mut rcmd) = mpsc::channel::<Result<Bytes, web::Error>>();
 
   println!("Websocket connection established: {}", key);
 
-  let stream = docker_api
+  let stream = state
+    .docker_api
     .attach_container(
       &format!("{key}.v"),
       Some(AttachContainerOptions::<String> {
@@ -303,12 +233,12 @@ async fn ws_attach_service(
   let service = fn_service(move |frame| {
     let item = match frame {
       ws::Frame::Ping(msg) => {
-        state.borrow_mut().hb = Instant::now();
+        con_state.borrow_mut().hb = Instant::now();
         Some(ws::Message::Pong(msg))
       }
       // update heartbeat
       ws::Frame::Pong(_) => {
-        state.borrow_mut().hb = Instant::now();
+        con_state.borrow_mut().hb = Instant::now();
         None
       }
       ws::Frame::Text(text) => {
@@ -333,10 +263,10 @@ async fn ws_attach_service(
 
 /// Entry point for our route
 async fn vm_attach(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
   req: HttpRequest,
   path: web::types::Path<(String, String)>,
-  docker_api: web::types::State<Docker>,
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, Error> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -345,7 +275,7 @@ async fn vm_attach(
     req,
     // inject chat server send to a ws_service factory
     map_config(fn_factory_with_config(ws_attach_service), move |cfg| {
-      (key.clone(), cfg, docker_api.clone())
+      (key.clone(), cfg, state.clone())
     }),
   )
   .await

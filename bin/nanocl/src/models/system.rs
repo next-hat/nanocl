@@ -1,12 +1,13 @@
-use bollard_next::service::ContainerSummary;
-use chrono::TimeZone;
 use clap::Parser;
-use nanocld_client::stubs::system::ProccessQuery;
 use tabled::Tabled;
+use chrono::TimeZone;
+
+use nanocld_client::stubs::node::NodeContainerSummary;
+use nanocld_client::stubs::system::ProccessQuery;
 
 #[derive(Clone, Debug, Parser)]
 pub struct ProcessOpts {
-  /// Return all containers. By default, only running containers are shown
+  /// Return containers for all nodes by default only the current node
   #[clap(long, short)]
   pub all: bool,
   /// Return this number of most recently created containers, including non-running ones
@@ -33,6 +34,7 @@ impl From<ProcessOpts> for ProccessQuery {
 
 #[derive(Tabled)]
 pub struct ProcessRow {
+  node: String,
   name: String,
   namespace: String,
   kind: String,
@@ -42,9 +44,10 @@ pub struct ProcessRow {
   created: String,
 }
 
-impl From<ContainerSummary> for ProcessRow {
-  fn from(summary: ContainerSummary) -> Self {
-    let names = summary.names.unwrap_or_default();
+impl From<NodeContainerSummary> for ProcessRow {
+  fn from(summary: NodeContainerSummary) -> Self {
+    let container = summary.container;
+    let names = container.names.unwrap_or_default();
     let binding = String::default();
     let name = names.first().unwrap_or(&binding).replace('/', "");
     let mut names = name.split('.');
@@ -59,7 +62,7 @@ impl From<ContainerSummary> for ProcessRow {
       None => "Undefined".to_owned(),
     };
 
-    let network = summary.network_settings.unwrap_or_default();
+    let network = container.network_settings.unwrap_or_default();
 
     let networks = network.networks.unwrap_or_default();
 
@@ -73,16 +76,17 @@ impl From<ContainerSummary> for ProcessRow {
     let tz = binding.offset();
     // Convert the created_at and updated_at to the current timezone
     let created_at = tz
-      .timestamp_opt(summary.created.unwrap_or_default(), 0)
+      .timestamp_opt(container.created.unwrap_or_default(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
 
     Self {
+      node: summary.node,
       kind,
       name: name.to_owned(),
       namespace: namespace.to_owned(),
-      image: summary.image.unwrap_or_default(),
-      status: summary.status.unwrap_or_default(),
+      image: container.image.unwrap_or_default(),
+      status: container.status.unwrap_or_default(),
       ip_address: ipaddr,
       created: format!("{created_at}"),
     }

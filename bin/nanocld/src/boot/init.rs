@@ -1,10 +1,12 @@
-use nanocl_stubs::config::DaemonConfig;
 use tokio::fs;
 
+use nanocl_stubs::config::DaemonConfig;
+
 use crate::event;
-use crate::models::BootState;
+use crate::models::DaemonState;
 
 use crate::error::CliError;
+use crate::version::VERSION;
 
 pub async fn ensure_state_dir(state_dir: &str) -> Result<(), CliError> {
   let vm_dir = format!("{state_dir}/vms/images");
@@ -19,7 +21,7 @@ pub async fn ensure_state_dir(state_dir: &str) -> Result<(), CliError> {
 
 /// Init function called before http server start
 /// to initialize our state
-pub async fn init(daemon_conf: &DaemonConfig) -> Result<BootState, CliError> {
+pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
   let docker_api = bollard_next::Docker::connect_with_unix(
     &daemon_conf.docker_host,
     120,
@@ -37,23 +39,25 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<BootState, CliError> {
   ensure_state_dir(&daemon_conf.state_dir).await?;
   super::system::ensure_network("system", &docker_api).await?;
   let pool = super::store::ensure(daemon_conf, &docker_api).await?;
-  super::system::register_namespace("system", false, &docker_api, &pool)
-    .await?;
-  super::system::register_namespace("global", true, &docker_api, &pool).await?;
+  let daemon_state = DaemonState {
+    pool: pool.clone(),
+    docker_api: docker_api.clone(),
+    config: daemon_conf.to_owned(),
+    event_emitter: event::EventEmitter::new(),
+    version: VERSION.to_owned(),
+  };
+  super::system::register_namespace("system", false, &daemon_state).await?;
+  super::system::register_namespace("global", true, &daemon_state).await?;
   super::node::register_node(
     &daemon_conf.hostname,
-    &daemon_conf.gateway,
+    &daemon_conf.advertise_addr,
     &pool,
   )
   .await?;
   super::system::sync_containers(&docker_api, &pool).await?;
-  super::metrics::start_metrics_cargo(&docker_api, &pool).await?;
-  Ok(BootState {
-    pool,
-    docker_api,
-    config: daemon_conf.to_owned(),
-    event_emitter: event::EventEmitter::new(),
-  })
+  super::metrics::start_metrics_cargo(&daemon_state).await?;
+
+  Ok(daemon_state)
 }
 
 /// Init unit test
@@ -78,6 +82,7 @@ mod tests {
       gateway: None,
       nodes: Vec::default(),
       hostname: None,
+      advertise_addr: None,
     };
 
     let config = config::init(&args).expect("Expect to init config");

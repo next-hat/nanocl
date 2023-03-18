@@ -6,9 +6,10 @@ use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
 
+use crate::version::VERSION;
 use crate::{utils, repositories};
 use crate::error::CliError;
-use crate::models::Pool;
+use crate::models::{Pool, DaemonState};
 
 /// Ensure existance of the system network that controllers will use.
 /// It's ensure existance of a network in your system called `nanocl.system`
@@ -49,19 +50,18 @@ pub(crate) async fn ensure_network(
 pub(crate) async fn register_namespace(
   name: &str,
   create_network: bool,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<(), CliError> {
-  if repositories::namespace::exist_by_name(name.to_owned(), pool).await? {
+  if repositories::namespace::exist_by_name(name, &state.pool).await? {
     return Ok(());
   }
   let new_nsp = NamespacePartial {
     name: name.to_owned(),
   };
   if create_network {
-    utils::namespace::create(&new_nsp, docker_api, pool).await?;
+    utils::namespace::create(&new_nsp, state).await?;
   } else {
-    repositories::namespace::create(new_nsp, pool).await?;
+    repositories::namespace::create(&new_nsp, &state.pool).await?;
   }
   Ok(())
 }
@@ -126,8 +126,7 @@ pub(crate) async fn sync_containers(
     };
 
     cargo_inspected.insert(metadata[0].to_owned(), true);
-    match repositories::cargo::inspect_by_key(cargo_key.to_owned(), pool).await
-    {
+    match repositories::cargo::inspect_by_key(cargo_key, pool).await {
       // If the cargo is already in our store and the config is different we update it
       Ok(cargo) => {
         if cargo.config.container != config {
@@ -137,9 +136,9 @@ pub(crate) async fn sync_containers(
             metadata[1]
           );
           repositories::cargo::update_by_key(
-            cargo_key.to_owned(),
-            new_cargo,
-            format!("v{}", crate::version::VERSION),
+            cargo_key,
+            &new_cargo,
+            &format!("v{}", VERSION),
             pool,
           )
           .await?;
@@ -154,9 +153,9 @@ pub(crate) async fn sync_containers(
           metadata[1]
         );
         repositories::cargo::create(
-          metadata[1].to_owned(),
-          new_cargo,
-          format!("v{}", crate::version::VERSION),
+          metadata[1],
+          &new_cargo,
+          &format!("v{}", VERSION),
           pool,
         )
         .await?;

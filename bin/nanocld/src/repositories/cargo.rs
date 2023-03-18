@@ -39,10 +39,12 @@ use super::error::{db_error, db_blocking_error};
 /// ```
 ///
 pub async fn find_by_namespace(
-  nsp: NamespaceDbModel,
+  nsp: &NamespaceDbModel,
   pool: &Pool,
 ) -> Result<Vec<CargoDbModel>, HttpResponseError> {
+  let nsp = nsp.clone();
   let pool = pool.clone();
+
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = CargoDbModel::belonging_to(&nsp)
@@ -89,12 +91,16 @@ pub async fn find_by_namespace(
 /// ```
 ///
 pub async fn create(
-  nsp: String,
-  item: CargoConfigPartial,
-  version: String,
+  nsp: &str,
+  item: &CargoConfigPartial,
+  version: &str,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
+
+  let nsp = nsp.to_owned();
+  let item = item.to_owned();
+  let version = version.to_owned();
 
   // test if the name of the cargo include a . in the name and throw error if true
   if item.name.contains('.') {
@@ -107,9 +113,7 @@ pub async fn create(
   let pool = pool.clone();
   let key = utils::key::gen_key(&nsp, &item.name);
 
-  let config =
-    cargo_config::create(key.to_owned(), item.to_owned(), version, &pool)
-      .await?;
+  let config = cargo_config::create(&key, &item, &version, &pool).await?;
 
   println!("name: {}", &item.name);
   let new_item = CargoDbModel {
@@ -164,12 +168,14 @@ pub async fn create(
 /// ```
 ///
 pub async fn delete_by_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
+
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::delete(dsl::cargoes)
@@ -206,12 +212,14 @@ pub async fn delete_by_key(
 /// ```
 ///
 pub async fn find_by_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<CargoDbModel, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
+
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = dsl::cargoes
@@ -259,19 +267,20 @@ pub async fn find_by_key(
 /// ```
 ///
 pub async fn update_by_key(
-  key: String,
-  item: CargoConfigPartial,
-  version: String,
+  key: &str,
+  item: &CargoConfigPartial,
+  version: &str,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes::dsl;
 
+  let key = key.to_owned();
+  let item = item.clone();
+  let version = version.to_owned();
   let pool = pool.clone();
 
-  let cargodb = find_by_key(key.to_owned(), &pool).await?;
-  let config =
-    cargo_config::create(key.to_owned(), item.to_owned(), version, &pool)
-      .await?;
+  let cargodb = find_by_key(&key, &pool).await?;
+  let config = cargo_config::create(&key, &item, &version, &pool).await?;
 
   let new_item = CargoUpdateDbModel {
     name: Some(item.name),
@@ -324,16 +333,18 @@ pub async fn update_by_key(
 /// ```
 ///
 pub async fn count_by_namespace(
-  namespace: String,
+  nsp: &str,
   pool: &Pool,
 ) -> Result<i64, HttpResponseError> {
   use crate::schema::cargoes;
 
+  let nsp = nsp.to_owned();
   let pool = pool.clone();
+
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let count = cargoes::table
-      .filter(cargoes::namespace_name.eq(namespace))
+      .filter(cargoes::namespace_name.eq(nsp))
       .count()
       .get_result(&mut conn)
       .map_err(db_error("cargo"))?;
@@ -346,12 +357,13 @@ pub async fn count_by_namespace(
 }
 
 pub async fn inspect_by_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<Cargo, HttpResponseError> {
   use crate::schema::cargoes;
   use crate::schema::cargo_configs;
 
+  let key = key.to_owned();
   let pool = pool.clone();
   let item: (CargoDbModel, CargoConfigDbModel) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;

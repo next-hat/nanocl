@@ -22,3 +22,10 @@ pub struct ResourceUpdateModel {
   pub(crate) key: Option<String>,
   pub(crate) config_key: Option<uuid::Uuid>,
 }
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct ResourceResetPath {
+  pub version: String,
+  pub name: String,
+  pub id: uuid::Uuid,
+}

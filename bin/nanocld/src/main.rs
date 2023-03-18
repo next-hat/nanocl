@@ -6,6 +6,7 @@ use clap::Parser;
 mod cli;
 mod version;
 
+mod node;
 mod boot;
 mod error;
 mod utils;
@@ -60,6 +61,11 @@ async fn main() -> std::io::Result<()> {
   // If init is true we don't start the server
   if args.init {
     return Ok(());
+  }
+
+  if let Err(err) = node::join_cluster(&daemon_state).await {
+    log::error!("Error while joining cluster {}", err.msg);
+    std::process::exit(err.code);
   }
 
   metric::spawn_metrics(&daemon_state.config.hostname, &daemon_state.pool);

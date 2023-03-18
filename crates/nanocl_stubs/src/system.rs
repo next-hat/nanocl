@@ -79,7 +79,7 @@ impl std::fmt::Display for Event {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProccessQuery {
-  /// Return all containers. By default, only running containers are shown
+  /// Return container from all nodes
   pub all: bool,
   /// Return this number of most recently created containers, including non-running ones
   pub last: Option<isize>,

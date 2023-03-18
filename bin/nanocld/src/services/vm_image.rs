@@ -4,24 +4,21 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
-use nanocl_stubs::config::DaemonConfig;
-
-use crate::{repositories, utils};
+use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::{Pool, VmImageDbModel};
+use crate::models::{DaemonState, VmImageDbModel};
 
 #[web::post("/vms/images/{name}/import")]
 async fn import_vm_image(
   mut payload: web::types::Payload,
-  daemon_config: web::types::State<DaemonConfig>,
-  pool: web::types::State<Pool>,
   path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
 
   utils::key::validate_name(&name)?;
 
-  if repositories::vm_image::find_by_name(&name, &pool)
+  if repositories::vm_image::find_by_name(&name, &state.pool)
     .await
     .is_ok()
   {
@@ -31,7 +28,7 @@ async fn import_vm_image(
     });
   }
 
-  let state_dir = daemon_config.state_dir.clone();
+  let state_dir = state.config.state_dir.clone();
   let vm_images_dir = format!("{state_dir}/vms/images");
   let filepath = format!("{vm_images_dir}/{name}.img");
   let mut f = match fs::File::create(&filepath).await {
@@ -87,81 +84,72 @@ async fn import_vm_image(
     parent: None,
   };
 
-  repositories::vm_image::create(&vm_image, &pool).await?;
+  repositories::vm_image::create(&vm_image, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().into())
 }
 
 #[web::get("/vms/images")]
 async fn list_images(
-  pool: web::types::State<Pool>,
-  _version: web::types::Path<String>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let images = repositories::vm_image::list(&pool).await?;
+  let images = repositories::vm_image::list(&state.pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&images))
 }
 
 #[web::post("/vms/images/{name}/snapshot/{snapshot_name}")]
 async fn create_vm_image_snapshot(
-  pool: web::types::State<Pool>,
   path: web::types::Path<(String, String, String)>,
-  daemon_config: web::types::State<DaemonConfig>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
   let snapshot_name = path.2.to_owned();
   utils::key::validate_name(&snapshot_name)?;
-  let image = repositories::vm_image::find_by_name(&name, &pool).await?;
-  let vm_image = utils::vm_image::create_snap(
-    &snapshot_name,
-    50,
-    &image,
-    &daemon_config,
-    &pool,
-  )
-  .await?;
+  let image = repositories::vm_image::find_by_name(&name, &state.pool).await?;
+  let vm_image =
+    utils::vm_image::create_snap(&snapshot_name, 50, &image, &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&vm_image))
 }
 
 #[web::post("/vms/images/{name}/clone/{clone_name}")]
 async fn clone_vm_image(
-  pool: web::types::State<Pool>,
   path: web::types::Path<(String, String, String)>,
-  daemon_config: web::types::State<DaemonConfig>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
   let clone_name = path.2.to_owned();
   utils::key::validate_name(&clone_name)?;
-  let image = repositories::vm_image::find_by_name(&name, &pool).await?;
+  let image = repositories::vm_image::find_by_name(&name, &state.pool).await?;
 
-  let rx =
-    utils::vm_image::clone(&clone_name, &image, &daemon_config, &pool).await?;
+  let rx = utils::vm_image::clone(&clone_name, &image, &state).await?;
 
   Ok(web::HttpResponse::Ok().streaming(rx))
 }
 
 #[web::post("/vms/images/{name}/resize")]
 async fn resize_vm_image(
-  pool: web::types::State<Pool>,
-  path: web::types::Path<(String, String)>,
   web::types::Json(payload): web::types::Json<VmImageResizePayload>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
 
-  let rx = utils::vm_image::resize_by_name(&name, &payload, &pool).await?;
+  let rx =
+    utils::vm_image::resize_by_name(&name, &payload, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&rx))
 }
 
 #[web::delete("/vms/images/{name}")]
 async fn delete_vm_image(
-  pool: web::types::State<Pool>,
   path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = path.1.to_owned();
 
-  utils::vm_image::delete(&name, &pool).await?;
+  utils::vm_image::delete(&name, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().into())
 }
