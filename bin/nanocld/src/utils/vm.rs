@@ -9,7 +9,6 @@ use bollard_next::container::{
   StopContainerOptions, RemoveContainerOptions,
 };
 
-use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
