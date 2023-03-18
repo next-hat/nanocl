@@ -764,7 +764,7 @@ pub async fn kill(
 pub async fn create_or_put(
   namespace: &str,
   cargo: &CargoConfigPartial,
-  version: String,
+  version: &str,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<(), HttpResponseError> {
@@ -776,13 +776,20 @@ pub async fn create_or_put(
     utils::cargo::put(
       &key,
       &cargo.to_owned().into(),
-      version,
+      version.to_owned(),
       docker_api,
       pool,
     )
     .await?;
   } else {
-    utils::cargo::create(namespace, cargo, version, docker_api, pool).await?;
+    utils::cargo::create(
+      namespace,
+      cargo,
+      version.to_owned(),
+      docker_api,
+      pool,
+    )
+    .await?;
     utils::cargo::start(&key, docker_api, pool).await?;
   }
   Ok(())

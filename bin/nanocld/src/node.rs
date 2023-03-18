@@ -81,8 +81,8 @@ impl NodeClients {
       NodeClientsMessage::Connect { node_id, sender } => {
         self.sessions.insert(node_id, sender);
       }
-      NodeClientsMessage::SendMessage { node_id, msg } => {
-        for (id, sender) in &self.sessions {
+      NodeClientsMessage::SendMessage { node_id: _, msg } => {
+        for sender in self.sessions.values() {
           let mut sender = sender.clone();
           let msg = msg.clone();
           rt::spawn(async move {

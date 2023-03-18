@@ -63,7 +63,11 @@ async fn main() -> std::io::Result<()> {
     return Ok(());
   }
 
-  node::join_cluster(&daemon_state).await;
+  if let Err(err) = node::join_cluster(&daemon_state).await {
+    log::error!("Error while joining cluster {}", err.msg);
+    std::process::exit(err.code);
+  }
+
   metric::spawn_metrics(&daemon_state.config.hostname, &daemon_state.pool);
 
   match server::generate(daemon_state).await {

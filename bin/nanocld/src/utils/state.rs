@@ -54,14 +54,14 @@ pub fn parse_state(
 
 pub async fn apply_deployment(
   data: &StateDeployment,
-  version: &String,
+  version: &str,
   state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
   // If we have a namespace and it doesn't exist, create it
   // Unless we use `global` as default for the creation of cargoes
   let namespace = if let Some(namespace) = &data.namespace {
     utils::namespace::create_if_not_exists(
-      &namespace,
+      namespace,
       &state.docker_api,
       &state.pool,
     )
@@ -75,8 +75,8 @@ pub async fn apply_deployment(
     for cargo in cargoes {
       utils::cargo::create_or_put(
         &namespace,
-        &cargo,
-        version.clone(),
+        cargo,
+        version,
         &state.docker_api,
         &state.pool,
       )
@@ -133,14 +133,14 @@ pub async fn apply_deployment(
 
 pub async fn apply_cargo(
   data: &StateCargo,
-  version: &String,
+  version: &str,
   state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
   // If we have a namespace and it doesn't exist, create it
   // Unless we use `global` as default for the creation of cargoes
   let namespace = if let Some(namespace) = &data.namespace {
     utils::namespace::create_if_not_exists(
-      &namespace,
+      namespace,
       &state.docker_api,
       &state.pool,
     )
@@ -153,8 +153,8 @@ pub async fn apply_cargo(
   for cargo in &data.cargoes {
     utils::cargo::create_or_put(
       &namespace,
-      &cargo,
-      version.clone(),
+      cargo,
+      version,
       &state.docker_api,
       &state.pool,
     )
@@ -271,7 +271,7 @@ pub async fn revert_cargo(
 
   for cargo in &data.cargoes {
     let key = utils::key::gen_key(&namespace, &cargo.name);
-    let cargo = utils::cargo::inspect(&key, &state).await?;
+    let cargo = utils::cargo::inspect(&key, state).await?;
     utils::cargo::delete(&key, &state.docker_api, &state.pool, Some(true))
       .await?;
     let event_emitter = state.event_emitter.clone();

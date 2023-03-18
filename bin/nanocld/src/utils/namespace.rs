@@ -238,7 +238,7 @@ pub async fn inspect(
   log::debug!("Found namespace cargoes to inspect {:?}", &cargo_db_models);
   let mut cargoes = Vec::new();
   for cargo in cargo_db_models {
-    let cargo = cargo::inspect(&cargo.key, &state).await?;
+    let cargo = cargo::inspect(&cargo.key, state).await?;
     cargoes.push(cargo);
   }
   Ok(NamespaceInspect {
