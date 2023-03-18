@@ -9,7 +9,6 @@ mod state;
 mod node;
 mod namespace;
 mod system;
-mod metric;
 mod resource;
 mod cargo;
 mod cargo_image;
@@ -101,15 +100,14 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
     web::scope("/{version}")
       .wrap(Versionning)
       .configure(state::ntex_config)
+      .configure(node::ntex_config)
       .configure(namespace::ntex_config)
       .configure(system::ntex_config)
       .configure(resource::ntex_config)
       .configure(cargo_image::ntex_config)
       .configure(cargo::ntex_config)
       .configure(vm_image::ntex_config)
-      .configure(vm::ntex_config)
-      .configure(node::ntex_config)
-      .configure(metric::ntex_config),
+      .configure(vm::ntex_config),
   );
 }
 

@@ -3,9 +3,7 @@ use diesel::prelude::*;
 
 use crate::utils;
 use crate::error::HttpResponseError;
-use crate::{
-  models::{Pool, MetricInsertDbModel, MetricDbModel},
-};
+use crate::models::{Pool, MetricDbModel, MetricInsertDbModel};
 
 use super::error::{db_error, db_blocking_error};
 
@@ -30,24 +28,4 @@ pub async fn create(
   .map_err(db_blocking_error)?;
 
   Ok(item)
-}
-
-pub async fn list(
-  pool: &Pool,
-) -> Result<Vec<MetricDbModel>, HttpResponseError> {
-  use crate::schema::metrics::dsl;
-
-  let pool = pool.clone();
-
-  let items = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = dsl::metrics
-      .load::<MetricDbModel>(&mut conn)
-      .map_err(db_error("metrics"))?;
-    Ok::<_, HttpResponseError>(res)
-  })
-  .await
-  .map_err(db_blocking_error)?;
-
-  Ok(items)
 }

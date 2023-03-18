@@ -1,16 +1,16 @@
+pub mod ws;
 pub mod key;
+pub mod stream;
+pub mod network;
+
 pub mod store;
 pub mod state;
-pub mod cargo;
-pub mod cargo_image;
-pub mod namespace;
-pub mod network;
-pub mod stream;
-pub mod node;
 pub mod resource;
+pub mod namespace;
 pub mod vm;
 pub mod vm_image;
-pub mod ws;
+pub mod cargo;
+pub mod cargo_image;
 
 #[cfg(test)]
 pub mod tests {
