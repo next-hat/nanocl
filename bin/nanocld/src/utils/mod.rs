@@ -6,6 +6,7 @@ pub mod cargo_image;
 pub mod namespace;
 pub mod network;
 pub mod stream;
+pub mod node;
 pub mod resource;
 pub mod vm;
 pub mod vm_image;
