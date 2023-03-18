@@ -297,7 +297,7 @@ pub async fn create(
   vm.disk.size = Some(size);
 
   let vm =
-    repositories::vm::create(namespace, &vm, &version, &state.pool).await?;
+    repositories::vm::create(namespace, &vm, version, &state.pool).await?;
 
   create_instance(&vm, &image, true, state).await?;
 
