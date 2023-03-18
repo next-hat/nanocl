@@ -33,13 +33,11 @@ pub async fn start_metrics_cargo(state: &DaemonState) -> Result<(), CliError> {
     utils::cargo::create(
       "system",
       cargo,
-      format!("v{}", crate::version::VERSION),
-      &state.docker_api,
-      &state.pool,
+      &format!("v{}", crate::version::VERSION),
+      state,
     )
     .await?;
-    utils::cargo::start("metrics.system", &state.docker_api, &state.pool)
-      .await?;
+    utils::cargo::start("metrics.system", state).await?;
   }
   Ok(())
 }

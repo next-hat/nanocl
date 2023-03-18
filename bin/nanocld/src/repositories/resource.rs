@@ -59,7 +59,7 @@ pub async fn create(
     data: item.config,
   };
 
-  let config = resource_config::create(config.to_owned(), &pool).await?;
+  let config = resource_config::create(&config, &pool).await?;
 
   let new_item = ResourceDbModel {
     key: item.name.to_owned(),
@@ -318,7 +318,7 @@ pub async fn patch(
     data: item.config.clone(),
   };
 
-  let config = resource_config::create(config.to_owned(), &pool).await?;
+  let config = resource_config::create(&config, &pool).await?;
 
   let resource_update = ResourceUpdateModel {
     key: None,

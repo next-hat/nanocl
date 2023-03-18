@@ -49,8 +49,7 @@ async fn get_processes(
   let mut labels = vec![label];
 
   if let Some(namespace) = &qs.namespace {
-    repositories::namespace::find_by_name(namespace.to_owned(), &state.pool)
-      .await?;
+    repositories::namespace::find_by_name(namespace, &state.pool).await?;
     labels.push(format!("io.nanocl.vnsp={}", namespace));
     labels.push(format!("io.nanocl.cnsp={}", namespace));
   }
@@ -63,7 +62,13 @@ async fn get_processes(
 
   let mut process = containers
     .into_iter()
-    .map(|c| NodeContainerSummary::new(state.config.hostname.clone(), c))
+    .map(|c| {
+      NodeContainerSummary::new(
+        state.config.hostname.clone(),
+        state.config.advertise_addr.clone(),
+        c,
+      )
+    })
     .collect::<Vec<NodeContainerSummary>>();
 
   let nodes =

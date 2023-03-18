@@ -73,14 +73,7 @@ pub async fn apply_deployment(
 
   if let Some(cargoes) = &data.cargoes {
     for cargo in cargoes {
-      utils::cargo::create_or_put(
-        &namespace,
-        cargo,
-        version,
-        &state.docker_api,
-        &state.pool,
-      )
-      .await?;
+      utils::cargo::create_or_put(&namespace, cargo, version, state).await?;
       let key = utils::key::gen_key(&namespace, &cargo.name);
       let state_ptr = state.clone();
       rt::spawn(async move {
@@ -91,12 +84,8 @@ pub async fn apply_deployment(
           .unwrap()
           .send(Event::CargoPatched(Box::new(cargo)));
       });
-      utils::cargo::start(
-        &utils::key::gen_key(&namespace, &cargo.name),
-        &state.docker_api,
-        &state.pool,
-      )
-      .await?;
+      utils::cargo::start(&utils::key::gen_key(&namespace, &cargo.name), state)
+        .await?;
       let key = utils::key::gen_key(&namespace, &cargo.name);
       let state_ptr = state.clone();
       rt::spawn(async move {
@@ -151,14 +140,7 @@ pub async fn apply_cargo(
   };
 
   for cargo in &data.cargoes {
-    utils::cargo::create_or_put(
-      &namespace,
-      cargo,
-      version,
-      &state.docker_api,
-      &state.pool,
-    )
-    .await?;
+    utils::cargo::create_or_put(&namespace, cargo, version, state).await?;
     let key = utils::key::gen_key(&namespace, &cargo.name);
     let state_ptr = state.clone();
     rt::spawn(async move {
@@ -169,12 +151,8 @@ pub async fn apply_cargo(
         .unwrap()
         .send(Event::CargoPatched(Box::new(cargo)));
     });
-    utils::cargo::start(
-      &utils::key::gen_key(&namespace, &cargo.name),
-      &state.docker_api,
-      &state.pool,
-    )
-    .await?;
+    utils::cargo::start(&utils::key::gen_key(&namespace, &cargo.name), state)
+      .await?;
     let key = utils::key::gen_key(&namespace, &cargo.name);
     let state_ptr = state.clone();
     rt::spawn(async move {

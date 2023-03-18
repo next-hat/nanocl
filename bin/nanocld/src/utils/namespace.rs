@@ -49,9 +49,7 @@ pub async fn create(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Namespace, HttpResponseError> {
-  if repositories::namespace::exist_by_name(namespace.name.to_owned(), pool)
-    .await?
-  {
+  if repositories::namespace::exist_by_name(&namespace.name, pool).await? {
     return Err(HttpResponseError {
       msg: format!("namespace {} error: already exist", &namespace.name),
       status: StatusCode::CONFLICT,
@@ -62,8 +60,7 @@ pub async fn create(
     .await
     .is_ok()
   {
-    let res =
-      repositories::namespace::create(namespace.to_owned(), pool).await?;
+    let res = repositories::namespace::create(namespace, pool).await?;
     return Ok(Namespace { name: res.name });
   }
   let config = CreateNetworkOptions {
@@ -72,7 +69,7 @@ pub async fn create(
     ..Default::default()
   };
   docker_api.create_network(config).await?;
-  let res = repositories::namespace::create(namespace.to_owned(), pool).await?;
+  let res = repositories::namespace::create(namespace, pool).await?;
   Ok(Namespace { name: res.name })
 }
 
@@ -110,7 +107,7 @@ pub async fn delete_by_name(
   if let Err(err) = docker_api.remove_network(name).await {
     log::error!("Unable to remove network {} got error: {}", name, err);
   }
-  repositories::namespace::delete_by_name(name.to_owned(), pool).await
+  repositories::namespace::delete_by_name(name, pool).await
 }
 
 /// ## List existing container in a namespace
@@ -187,8 +184,7 @@ pub async fn list(
   let mut new_items = Vec::new();
   for item in items {
     let cargo_count =
-      repositories::cargo::count_by_namespace(item.name.to_owned(), pool)
-        .await?;
+      repositories::cargo::count_by_namespace(&item.name, pool).await?;
     let instance_count = list_instance(&item.name, docker_api).await?.len();
     new_items.push(NamespaceSummary {
       name: item.name.to_owned(),
@@ -229,12 +225,10 @@ pub async fn inspect(
   state: &DaemonState,
 ) -> Result<NamespaceInspect, HttpResponseError> {
   let namespace =
-    repositories::namespace::find_by_name(namespace.to_owned(), &state.pool)
-      .await?;
+    repositories::namespace::find_by_name(namespace, &state.pool).await?;
   log::debug!("Found namespace to inspect {:?}", &namespace);
   let cargo_db_models =
-    repositories::cargo::find_by_namespace(namespace.to_owned(), &state.pool)
-      .await?;
+    repositories::cargo::find_by_namespace(&namespace, &state.pool).await?;
   log::debug!("Found namespace cargoes to inspect {:?}", &cargo_db_models);
   let mut cargoes = Vec::new();
   for cargo in cargo_db_models {
@@ -276,7 +270,7 @@ pub async fn create_if_not_exists(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<(), HttpResponseError> {
-  if repositories::namespace::find_by_name(name.to_owned(), pool)
+  if repositories::namespace::find_by_name(name, pool)
     .await
     .is_err()
   {

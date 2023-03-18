@@ -16,7 +16,7 @@ async fn save_metric(node: &str, ev: &MetrsdEvent, pool: &Pool) {
         node_name: node.to_owned(),
         data: serde_json::to_value(cpus).unwrap(),
       };
-      let _ = metric::create(item, pool).await;
+      let _ = metric::create(&item, pool).await;
     }
     MetrsdEvent::Memory(mem) => {
       let item = MetricInsertDbModel {
@@ -24,7 +24,7 @@ async fn save_metric(node: &str, ev: &MetrsdEvent, pool: &Pool) {
         node_name: node.to_owned(),
         data: serde_json::to_value(mem).unwrap(),
       };
-      let _ = metric::create(item, pool).await;
+      let _ = metric::create(&item, pool).await;
     }
     MetrsdEvent::Disk(disk) => {
       let item = MetricInsertDbModel {
@@ -32,7 +32,7 @@ async fn save_metric(node: &str, ev: &MetrsdEvent, pool: &Pool) {
         node_name: node.to_owned(),
         data: serde_json::to_value(disk).unwrap(),
       };
-      let _ = metric::create(item, pool).await;
+      let _ = metric::create(&item, pool).await;
     }
     MetrsdEvent::Network(net) => {
       let item = MetricInsertDbModel {
@@ -40,7 +40,7 @@ async fn save_metric(node: &str, ev: &MetrsdEvent, pool: &Pool) {
         node_name: node.to_owned(),
         data: serde_json::to_value(net).unwrap(),
       };
-      let _ = metric::create(item, pool).await;
+      let _ = metric::create(&item, pool).await;
     }
   }
 }

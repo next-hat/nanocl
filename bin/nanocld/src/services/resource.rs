@@ -114,11 +114,9 @@ pub async fn list_resource_history(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Listing resource histories: {}", &path.1);
-  let items = repositories::resource_config::list_by_resource(
-    path.1.clone(),
-    &state.pool,
-  )
-  .await?;
+  let items =
+    repositories::resource_config::list_by_resource(&path.1, &state.pool)
+      .await?;
   log::debug!("Resource histories found : {:#?}", &items);
   Ok(web::HttpResponse::Ok().json(&items))
 }
@@ -129,7 +127,7 @@ pub async fn reset_resource(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let history =
-    repositories::resource_config::find_by_key(path.id, &state.pool).await?;
+    repositories::resource_config::find_by_key(&path.id, &state.pool).await?;
 
   let resource =
     repositories::resource::inspect_by_key(path.name.to_owned(), &state.pool)

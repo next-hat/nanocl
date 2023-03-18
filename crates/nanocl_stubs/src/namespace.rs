@@ -5,7 +5,7 @@ use crate::cargo::CargoInspect;
 
 /// Namespace is a identifier for a set of cargoes
 /// It is used to group cargoes together
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Namespace {
@@ -13,7 +13,7 @@ pub struct Namespace {
   pub name: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 /// A Namespace partial is a payload used to create a new namespace
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -40,7 +40,7 @@ pub struct NamespaceSummary {
 /// It is used to inspect a namespace
 /// It contains all the information about the namespace
 /// It also contains the list of cargoes
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct NamespaceInspect {

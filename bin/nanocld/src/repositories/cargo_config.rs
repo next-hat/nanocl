@@ -38,12 +38,15 @@ use super::error::{db_error, db_blocking_error};
 /// ```
 ///
 pub async fn create(
-  cargo_key: String,
-  item: CargoConfigPartial,
-  version: String,
+  cargo_key: &str,
+  item: &CargoConfigPartial,
+  version: &str,
   pool: &Pool,
 ) -> Result<CargoConfig, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
+
+  let cargo_key = cargo_key.to_owned();
+  let version = version.to_owned();
 
   let pool = pool.clone();
   let dbmodel = CargoConfigDbModel {
@@ -51,7 +54,7 @@ pub async fn create(
     cargo_key,
     version,
     created_at: chrono::Utc::now().naive_utc(),
-    config: serde_json::to_value(item.to_owned()).map_err(|e| {
+    config: serde_json::to_value(item.clone()).map_err(|e| {
       HttpResponseError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Failed to serialize config: {e}"),
@@ -72,11 +75,11 @@ pub async fn create(
   let config = CargoConfig {
     key: dbmodel.key,
     created_at: dbmodel.created_at,
-    name: item.name,
+    name: item.name.clone(),
     version: dbmodel.version,
     cargo_key: dbmodel.cargo_key,
-    replication: item.replication,
-    container: item.container,
+    replication: item.replication.clone(),
+    container: item.container.clone(),
   };
 
   Ok(config)
@@ -104,12 +107,14 @@ pub async fn create(
 /// ```
 ///
 pub async fn find_by_key(
-  key: uuid::Uuid,
+  key: &uuid::Uuid,
   pool: &Pool,
 ) -> Result<CargoConfig, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
 
+  let key = *key;
   let pool = pool.clone();
+
   let dbmodel = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let config = dsl::cargo_configs
@@ -160,12 +165,14 @@ pub async fn find_by_key(
 /// ```
 ///
 pub async fn delete_by_cargo_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
+
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::delete(dsl::cargo_configs)
@@ -181,12 +188,14 @@ pub async fn delete_by_cargo_key(
 }
 
 pub async fn list_by_cargo(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<Vec<CargoConfig>, HttpResponseError> {
   use crate::schema::cargo_configs::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
+
   let dbmodels = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let configs = dsl::cargo_configs

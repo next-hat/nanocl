@@ -24,14 +24,8 @@ pub async fn create_cargo(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   log::debug!("Creating cargo: {:?}", &payload);
-  let cargo = utils::cargo::create(
-    &namespace,
-    &payload,
-    version.into_inner(),
-    &state.docker_api,
-    &state.pool,
-  )
-  .await?;
+  let cargo =
+    utils::cargo::create(&namespace, &payload, &version, &state).await?;
   log::debug!("Cargo created: {:?}", &cargo);
   let key = cargo.key.to_owned();
   rt::spawn(async move {
@@ -75,7 +69,7 @@ pub async fn start_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("Starting cargo: {}", &key);
-  utils::cargo::start(&key, &state.docker_api, &state.pool).await?;
+  utils::cargo::start(&key, &state).await?;
   rt::spawn(async move {
     let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
     state
@@ -119,14 +113,7 @@ pub async fn put_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("Patching cargo: {}", &key);
-  let cargo = utils::cargo::put(
-    &key,
-    &payload,
-    path.0.clone(),
-    &state.docker_api,
-    &state.pool,
-  )
-  .await?;
+  let cargo = utils::cargo::put(&key, &payload, &path.0, &state).await?;
   rt::spawn(async move {
     let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
     state
@@ -148,14 +135,7 @@ pub async fn patch_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("Patching cargo: {}", &key);
-  let cargo = utils::cargo::patch(
-    &key,
-    &payload,
-    path.0.clone(),
-    &state.docker_api,
-    &state.pool,
-  )
-  .await?;
+  let cargo = utils::cargo::patch(&key, &payload, &path.0, &state).await?;
   rt::spawn(async move {
     let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
     state
@@ -246,7 +226,7 @@ async fn list_cargo_history(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let histories =
-    repositories::cargo_config::list_by_cargo(key, &state.pool).await?;
+    repositories::cargo_config::list_by_cargo(&key, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
@@ -265,17 +245,15 @@ async fn reset_cargo(
       msg: format!("Invalid config id : {err}"),
     })?;
   let config =
-    repositories::cargo_config::find_by_key(config_id.to_owned(), &state.pool)
-      .await?;
+    repositories::cargo_config::find_by_key(&config_id, &state.pool).await?;
   let cargo = utils::cargo::put(
     &cargo_key,
-    &config.to_owned().into(),
-    path.version.clone(),
-    &state.docker_api,
-    &state.pool,
+    &config.clone().into(),
+    &path.version,
+    &state,
   )
   .await?;
-  let key = cargo_key.to_owned();
+  let key = cargo_key.clone();
   rt::spawn(async move {
     let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
     state

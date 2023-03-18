@@ -38,9 +38,9 @@ use super::error::{db_error, db_blocking_error};
 /// ```
 ///
 pub async fn create(
-  vm_key: String,
-  item: VmConfigPartial,
-  version: String,
+  vm_key: &str,
+  item: &VmConfigPartial,
+  version: &str,
   pool: &Pool,
 ) -> Result<VmConfig, HttpResponseError> {
   use crate::schema::vm_configs::dsl;
@@ -48,8 +48,8 @@ pub async fn create(
   let pool = pool.clone();
   let dbmodel = VmConfigDbModel {
     key: uuid::Uuid::new_v4(),
-    vm_key,
-    version,
+    vm_key: vm_key.to_owned(),
+    version: version.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
     config: serde_json::to_value(item.to_owned()).map_err(|e| {
       HttpResponseError {
@@ -72,17 +72,17 @@ pub async fn create(
   let config = VmConfig {
     key: dbmodel.key,
     created_at: dbmodel.created_at,
-    name: item.name,
+    name: item.name.clone(),
     version: dbmodel.version,
     vm_key: dbmodel.vm_key,
-    disk: item.disk,
-    host_config: item.host_config,
-    hostname: item.hostname,
-    user: item.user,
-    labels: item.labels,
-    mac_address: item.mac_address,
-    password: item.password,
-    ssh_key: item.ssh_key,
+    disk: item.disk.clone(),
+    host_config: item.host_config.clone(),
+    hostname: item.hostname.clone(),
+    user: item.user.clone(),
+    labels: item.labels.clone(),
+    mac_address: item.mac_address.clone(),
+    password: item.password.clone(),
+    ssh_key: item.ssh_key.clone(),
   };
 
   Ok(config)
@@ -110,12 +110,14 @@ pub async fn create(
 /// ```
 ///
 pub async fn find_by_key(
-  key: uuid::Uuid,
+  key: &uuid::Uuid,
   pool: &Pool,
 ) -> Result<VmConfig, HttpResponseError> {
   use crate::schema::vm_configs::dsl;
 
+  let key = *key;
   let pool = pool.clone();
+
   let dbmodel = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let config = dsl::vm_configs
@@ -172,12 +174,14 @@ pub async fn find_by_key(
 /// ```
 ///
 pub async fn delete_by_vm_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::vm_configs::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
+
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::delete(dsl::vm_configs)
@@ -193,12 +197,14 @@ pub async fn delete_by_vm_key(
 }
 
 pub async fn list_by_vm(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<Vec<VmConfig>, HttpResponseError> {
   use crate::schema::vm_configs::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
+
   let dbmodels = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let configs = dsl::vm_configs

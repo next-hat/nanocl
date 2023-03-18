@@ -6,6 +6,7 @@ use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
 
+use crate::version::VERSION;
 use crate::{utils, repositories};
 use crate::error::CliError;
 use crate::models::Pool;
@@ -52,7 +53,7 @@ pub(crate) async fn register_namespace(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<(), CliError> {
-  if repositories::namespace::exist_by_name(name.to_owned(), pool).await? {
+  if repositories::namespace::exist_by_name(name, pool).await? {
     return Ok(());
   }
   let new_nsp = NamespacePartial {
@@ -61,7 +62,7 @@ pub(crate) async fn register_namespace(
   if create_network {
     utils::namespace::create(&new_nsp, docker_api, pool).await?;
   } else {
-    repositories::namespace::create(new_nsp, pool).await?;
+    repositories::namespace::create(&new_nsp, pool).await?;
   }
   Ok(())
 }
@@ -126,8 +127,7 @@ pub(crate) async fn sync_containers(
     };
 
     cargo_inspected.insert(metadata[0].to_owned(), true);
-    match repositories::cargo::inspect_by_key(cargo_key.to_owned(), pool).await
-    {
+    match repositories::cargo::inspect_by_key(cargo_key, pool).await {
       // If the cargo is already in our store and the config is different we update it
       Ok(cargo) => {
         if cargo.config.container != config {
@@ -137,9 +137,9 @@ pub(crate) async fn sync_containers(
             metadata[1]
           );
           repositories::cargo::update_by_key(
-            cargo_key.to_owned(),
-            new_cargo,
-            format!("v{}", crate::version::VERSION),
+            cargo_key,
+            &new_cargo,
+            &format!("v{}", VERSION),
             pool,
           )
           .await?;
@@ -154,9 +154,9 @@ pub(crate) async fn sync_containers(
           metadata[1]
         );
         repositories::cargo::create(
-          metadata[1].to_owned(),
-          new_cargo,
-          format!("v{}", crate::version::VERSION),
+          metadata[1],
+          &new_cargo,
+          &format!("v{}", VERSION),
           pool,
         )
         .await?;

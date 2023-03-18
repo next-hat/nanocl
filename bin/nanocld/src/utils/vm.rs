@@ -122,7 +122,7 @@ pub async fn delete(
     .await;
 
   repositories::vm::delete_by_key(vm_key, pool).await?;
-  repositories::vm_config::delete_by_vm_key(vm.key, pool).await?;
+  repositories::vm_config::delete_by_vm_key(&vm.key, pool).await?;
   utils::vm_image::delete(&vm.config.disk.image, pool).await?;
 
   Ok(())
@@ -133,8 +133,7 @@ pub async fn list(
   docker_api: &Docker,
   pool: &Pool,
 ) -> Result<Vec<VmSummary>, HttpResponseError> {
-  let namespace =
-    repositories::namespace::find_by_name(nsp.to_owned(), pool).await?;
+  let namespace = repositories::namespace::find_by_name(nsp, pool).await?;
 
   let vmes = repositories::vm::find_by_namespace(&namespace, pool).await?;
 
@@ -142,7 +141,7 @@ pub async fn list(
 
   for vm in vmes {
     let config =
-      repositories::vm_config::find_by_key(vm.config_key, pool).await?;
+      repositories::vm_config::find_by_key(&vm.config_key, pool).await?;
     let containers = list_instance(&vm.key, docker_api).await?;
 
     let mut running_instances = 0;
@@ -298,7 +297,7 @@ pub async fn create(
   vm.disk.image = image.name.clone();
   vm.disk.size = Some(size);
 
-  let vm = repositories::vm::create(namespace, vm, &version, pool).await?;
+  let vm = repositories::vm::create(namespace, &vm, &version, pool).await?;
 
   create_instance(&vm, &image, true, daemon_conf, docker_api).await?;
 
@@ -316,7 +315,7 @@ pub async fn patch(
   let vm = repositories::vm::find_by_key(cargo_key, pool).await?;
 
   let old_config =
-    repositories::vm_config::find_by_key(vm.config_key, pool).await?;
+    repositories::vm_config::find_by_key(&vm.config_key, pool).await?;
 
   let vm_partial = VmConfigPartial {
     name: config.name.to_owned().unwrap_or(vm.name.clone()),
@@ -361,13 +360,8 @@ pub async fn patch(
     .remove_container(&container_name, None::<RemoveContainerOptions>)
     .await?;
 
-  let vm = repositories::vm::update_by_key(
-    vm.key,
-    vm_partial,
-    version.to_owned(),
-    pool,
-  )
-  .await?;
+  let vm = repositories::vm::update_by_key(&vm.key, &vm_partial, version, pool)
+    .await?;
 
   let image =
     repositories::vm_image::find_by_name(&vm.config.disk.image, pool).await?;

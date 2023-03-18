@@ -42,12 +42,14 @@ use super::error::{db_error, db_blocking_error};
 /// ```
 ///
 pub async fn create(
-  item: NamespacePartial,
+  item: &NamespacePartial,
   pool: &Pool,
 ) -> Result<NamespaceDbModel, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
+  let item = item.clone();
   let pool = pool.clone();
+
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = NamespaceDbModel {
@@ -131,12 +133,14 @@ pub async fn list(
 /// ```
 ///
 pub async fn delete_by_name(
-  name: String,
+  name: &str,
   pool: &Pool,
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
+  let name = name.to_owned();
   let pool = pool.clone();
+
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let count = diesel::delete(dsl::namespaces.filter(dsl::name.eq(name)))
@@ -174,12 +178,14 @@ pub async fn delete_by_name(
 /// ```
 ///
 pub async fn find_by_name(
-  name: String,
+  name: &str,
   pool: &Pool,
 ) -> Result<NamespaceDbModel, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
+  let name = name.to_owned();
   let pool = pool.clone();
+
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = dsl::namespaces
@@ -218,12 +224,14 @@ pub async fn find_by_name(
 /// ```
 ///
 pub async fn exist_by_name(
-  name: String,
+  name: &str,
   pool: &Pool,
 ) -> Result<bool, HttpResponseError> {
   use crate::schema::namespaces::dsl;
 
+  let name = name.to_owned();
   let pool = pool.clone();
+
   let exist = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let exist = Arc::new(dsl::namespaces)

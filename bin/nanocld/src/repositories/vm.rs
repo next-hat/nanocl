@@ -96,14 +96,13 @@ pub async fn find_by_namespace(
 ///
 pub async fn create(
   nsp: &str,
-  item: VmConfigPartial,
+  item: &VmConfigPartial,
   version: &str,
   pool: &Pool,
 ) -> Result<Vm, HttpResponseError> {
   use crate::schema::vms::dsl;
 
   let nsp = nsp.to_owned();
-  let version = version.to_owned();
 
   // test if the name of the vm include a . in the name and throw error if true
   if item.name.contains('.') {
@@ -116,13 +115,12 @@ pub async fn create(
   let pool = pool.clone();
   let key = utils::key::gen_key(&nsp, &item.name);
 
-  let config =
-    vm_config::create(key.to_owned(), item.to_owned(), version, &pool).await?;
+  let config = vm_config::create(&key, item, version, &pool).await?;
 
   println!("name: {}", &item.name);
   let new_item = VmDbModel {
     key,
-    name: item.name,
+    name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
     config_key: config.key,
@@ -269,21 +267,21 @@ pub async fn find_by_key(
 /// ```
 ///
 pub async fn update_by_key(
-  key: String,
-  item: VmConfigPartial,
-  version: String,
+  key: &str,
+  item: &VmConfigPartial,
+  version: &str,
   pool: &Pool,
 ) -> Result<Vm, HttpResponseError> {
   use crate::schema::vms::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
 
   let vmdb = find_by_key(&key, &pool).await?;
-  let config =
-    vm_config::create(key.to_owned(), item.to_owned(), version, &pool).await?;
+  let config = vm_config::create(&key, item, version, &pool).await?;
 
   let new_item = VmUpdateDbModel {
-    name: Some(item.name),
+    name: Some(item.name.clone()),
     config_key: Some(config.key),
     ..Default::default()
   };

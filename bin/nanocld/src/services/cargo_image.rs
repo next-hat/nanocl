@@ -23,8 +23,7 @@ async fn list_cargo_image(
   web::types::Query(query): web::types::Query<ListCargoImagesOptions>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let images =
-    utils::cargo_image::list(&state.docker_api, query.into()).await?;
+  let images = utils::cargo_image::list(&query.into(), &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&images))
 }
@@ -34,7 +33,7 @@ async fn inspect_cargo_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let image = utils::cargo_image::inspect(&path.1, &state.docker_api).await?;
+  let image = utils::cargo_image::inspect(&path.1, &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&image))
 }
@@ -45,8 +44,7 @@ async fn create_cargo_image(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let (from_image, tag) = utils::cargo_image::parse_image_info(&payload.name)?;
-  let rx_body =
-    utils::cargo_image::download(&from_image, &tag, &state.docker_api).await?;
+  let rx_body = utils::cargo_image::download(&from_image, &tag, &state).await?;
   Ok(
     web::HttpResponse::Ok()
       .keep_alive()
@@ -60,7 +58,7 @@ async fn delete_cargo_image_by_name(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  let res = utils::cargo_image::delete(&path.1, &state.docker_api).await?;
+  let res = utils::cargo_image::delete(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&res))
 }
 

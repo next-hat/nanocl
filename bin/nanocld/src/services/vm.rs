@@ -131,7 +131,8 @@ async fn list_vm_history(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let histories = repositories::vm_config::list_by_vm(key, &state.pool).await?;
+  let histories =
+    repositories::vm_config::list_by_vm(&key, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 

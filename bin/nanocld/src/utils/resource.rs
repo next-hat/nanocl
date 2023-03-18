@@ -23,10 +23,9 @@ pub async fn validate_resource(
         .await
         .is_err()
       {
-        repositories::resource_kind::create(resource_kind.clone(), pool)
-          .await?;
+        repositories::resource_kind::create(&resource_kind, pool).await?;
       }
-      repositories::resource_kind::create_version(resource_kind, pool).await?;
+      repositories::resource_kind::create_version(&resource_kind, pool).await?;
     }
     _ => {
       let kind = repositories::resource_kind::get_version(
@@ -90,10 +89,7 @@ pub async fn delete(
     repositories::resource_kind::delete(&resource.name, pool).await?;
   }
   repositories::resource::delete_by_key(resource.name.to_owned(), pool).await?;
-  repositories::resource_config::delete_by_resource_key(
-    resource.name.to_owned(),
-    pool,
-  )
-  .await?;
+  repositories::resource_config::delete_by_resource_key(&resource.name, pool)
+    .await?;
   Ok(())
 }
