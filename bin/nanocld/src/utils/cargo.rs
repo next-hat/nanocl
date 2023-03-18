@@ -6,9 +6,9 @@ use ntex::util::Bytes;
 use ntex::http::StatusCode;
 use futures::{StreamExt, TryStreamExt};
 
-use nanocld_client::NanocldClient;
 use bollard_next::container::LogOutput;
 use bollard_next::container::LogsOptions;
+use nanocl_stubs::node::NodeContainerSummary;
 use bollard_next::container::WaitContainerOptions;
 use bollard_next::exec::{StartExecOptions, StartExecResults};
 use bollard_next::service::{ContainerSummary, HostConfig};
@@ -547,9 +547,7 @@ pub async fn list(
     let mut containers = list_instance(&cargo.key, &state.docker_api).await?;
 
     for node in &nodes {
-      let url =
-        Box::leak(format!("http://{}:8081", node.ip_address).into_boxed_str());
-      let client = NanocldClient::connect_to(url);
+      let client = node.to_http_client();
       let node_containers = match client
         .list_cargo_instance(&cargo.name, Some(cargo.namespace_name.clone()))
         .await
@@ -612,16 +610,19 @@ pub async fn inspect(
 ) -> Result<CargoInspect, HttpResponseError> {
   let cargo =
     repositories::cargo::inspect_by_key(key.to_owned(), &state.pool).await?;
-  let mut containers = list_instance(&cargo.key, &state.docker_api).await?;
+  let containers = list_instance(&cargo.key, &state.docker_api).await?;
+
+  let mut containers = containers
+    .into_iter()
+    .map(|c| NodeContainerSummary::new(state.config.hostname.clone(), c))
+    .collect::<Vec<NodeContainerSummary>>();
 
   let nodes =
     repositories::node::list_unless(&state.config.hostname, &state.pool)
       .await?;
 
   for node in &nodes {
-    let url =
-      Box::leak(format!("http://{}:8081", node.ip_address).into_boxed_str());
-    let client = NanocldClient::connect_to(url);
+    let client = node.to_http_client();
     let node_containers = match client
       .list_cargo_instance(&cargo.name, Some(cargo.namespace_name.clone()))
       .await
@@ -636,12 +637,16 @@ pub async fn inspect(
         continue;
       }
     };
+    let node_containers = node_containers
+      .into_iter()
+      .map(|c| NodeContainerSummary::new(state.config.hostname.clone(), c))
+      .collect::<Vec<NodeContainerSummary>>();
     containers.extend(node_containers);
   }
 
   let mut running_instances = 0;
-  for container in &containers {
-    if container.state == Some("running".into()) {
+  for nc in &containers {
+    if nc.container.state == Some("running".into()) {
       running_instances += 1;
     }
   }

@@ -1,14 +1,11 @@
 use std::collections::HashMap;
 
-use nanocl_stubs::system::ProcessSummary;
 use ntex::web;
 
 use bollard_next::container::ListContainersOptions;
 
-use nanocld_client::NanocldClient;
-
-use nanocl_stubs::system::ProccessQuery;
-use nanocl_stubs::system::HostInfo;
+use nanocl_stubs::node::NodeContainerSummary;
+use nanocl_stubs::system::{HostInfo, ProccessQuery};
 
 use crate::repositories;
 use crate::error::HttpResponseError;
@@ -66,8 +63,8 @@ async fn get_processes(
 
   let mut process = containers
     .into_iter()
-    .map(|c| ProcessSummary::new(state.config.hostname.clone(), c))
-    .collect::<Vec<ProcessSummary>>();
+    .map(|c| NodeContainerSummary::new(state.config.hostname.clone(), c))
+    .collect::<Vec<NodeContainerSummary>>();
 
   let nodes =
     repositories::node::list_unless(&state.config.hostname, &state.pool)
@@ -75,9 +72,7 @@ async fn get_processes(
 
   if opts.all {
     for node in nodes {
-      let url =
-        Box::leak(format!("http://{}:8081", node.ip_address).into_boxed_str());
-      let client = NanocldClient::connect_to(url);
+      let client = node.to_http_client();
       let node_containers = match client
         .process(Some(ProccessQuery {
           all: false,

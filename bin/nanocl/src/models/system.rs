@@ -1,7 +1,9 @@
 use clap::Parser;
 use tabled::Tabled;
 use chrono::TimeZone;
-use nanocld_client::stubs::system::{ProccessQuery, ProcessSummary};
+
+use nanocld_client::stubs::node::NodeContainerSummary;
+use nanocld_client::stubs::system::ProccessQuery;
 
 #[derive(Clone, Debug, Parser)]
 pub struct ProcessOpts {
@@ -42,8 +44,8 @@ pub struct ProcessRow {
   created: String,
 }
 
-impl From<ProcessSummary> for ProcessRow {
-  fn from(summary: ProcessSummary) -> Self {
+impl From<NodeContainerSummary> for ProcessRow {
+  fn from(summary: NodeContainerSummary) -> Self {
     let container = summary.container;
     let names = container.names.unwrap_or_default();
     let binding = String::default();

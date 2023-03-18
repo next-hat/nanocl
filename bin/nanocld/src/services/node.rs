@@ -2,12 +2,11 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::time::Instant;
 
-use ntex::util::ByteString;
-use ntex::util::Bytes;
 use ntex::ws;
 use ntex::rt;
 use ntex::web;
 use ntex::channel::oneshot;
+use ntex::util::ByteString;
 use ntex::{Service, fn_service, pipeline};
 use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
 use futures::future::ready;

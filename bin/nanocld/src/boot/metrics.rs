@@ -2,7 +2,7 @@ use bollard_next::service::HostConfig;
 use nanocl_stubs::cargo_config::{ContainerConfig, CargoConfigPartial};
 
 use crate::utils;
-use crate::models::{Pool, DaemonState};
+use crate::models::DaemonState;
 use crate::error::CliError;
 
 fn gen_metrics_cargo(name: &str) -> CargoConfigPartial {
@@ -26,7 +26,7 @@ fn gen_metrics_cargo(name: &str) -> CargoConfigPartial {
 
 pub async fn start_metrics_cargo(state: &DaemonState) -> Result<(), CliError> {
   let cargo = &gen_metrics_cargo("metrics");
-  if utils::cargo::inspect("metrics.system", &state)
+  if utils::cargo::inspect("metrics.system", state)
     .await
     .is_err()
   {

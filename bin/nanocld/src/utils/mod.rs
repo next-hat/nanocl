@@ -72,10 +72,10 @@ pub mod tests {
     store::create_pool(ip_addr).await
   }
 
-  pub async fn generate_server(config: Config) -> test::TestServer {
+  pub async fn generate_server(routes: Config) -> test::TestServer {
     before();
     // Build a test daemon config
-    let daemon_config = DaemonConfig {
+    let config = DaemonConfig {
       state_dir: String::from("/var/lib/nanocl"),
       ..Default::default()
     };
@@ -85,16 +85,16 @@ pub mod tests {
     // Create postgres pool
     let pool = gen_postgre_pool().await;
     let daemon_state = DaemonState {
-      config: daemon_config.clone(),
-      docker_api: docker_api.clone(),
-      pool: pool.clone(),
-      event_emitter: event_emitter.clone(),
+      config,
+      docker_api,
+      pool,
+      event_emitter,
     };
     // Create test server
     test::server(move || {
       App::new()
         .state(daemon_state.clone())
-        .configure(config)
+        .configure(routes)
         .default_service(web::route().to(services::unhandled))
     })
   }

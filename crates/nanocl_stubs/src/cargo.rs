@@ -1,12 +1,11 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard_next::{
-  models::ContainerSummary,
-  container::{LogOutput, KillContainerOptions},
-};
+use bollard_next::container::{LogOutput, KillContainerOptions};
 
 pub use bollard_next::exec::CreateExecOptions as CargoExecConfig;
+
+use crate::node::NodeContainerSummary;
 
 use super::cargo_config::CargoConfig;
 
@@ -83,7 +82,7 @@ pub struct CargoInspect {
   /// Number of running instances
   pub instance_running: usize,
   /// List of containers
-  pub instances: Vec<ContainerSummary>,
+  pub instances: Vec<NodeContainerSummary>,
 }
 
 /// Kind of ExecOutput
@@ -136,8 +135,10 @@ impl From<LogOutput> for OutputLog {
   }
 }
 
+/// Options for the kill command
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CargoKillOptions {
+  /// Signal to send to the container default: SIGKILL
   pub signal: String,
 }
 

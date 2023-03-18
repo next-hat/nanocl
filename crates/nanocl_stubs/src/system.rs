@@ -99,17 +99,3 @@ impl From<ProccessQuery> for ListContainersOptions<String> {
     }
   }
 }
-
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct ProcessSummary {
-  pub node: String,
-  pub container: ContainerSummary,
-}
-
-impl ProcessSummary {
-  pub fn new(node: String, container: ContainerSummary) -> Self {
-    Self { node, container }
-  }
-}
