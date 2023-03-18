@@ -91,5 +91,6 @@ async fn node_ws(
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
+  config.service(list_node);
   config.service(web::resource("/nodes/ws").route(web::get().to(node_ws)));
 }

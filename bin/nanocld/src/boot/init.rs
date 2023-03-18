@@ -6,6 +6,7 @@ use crate::event;
 use crate::models::DaemonState;
 
 use crate::error::CliError;
+use crate::version::VERSION;
 
 pub async fn ensure_state_dir(state_dir: &str) -> Result<(), CliError> {
   let vm_dir = format!("{state_dir}/vms/images");
@@ -43,6 +44,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
     docker_api: docker_api.clone(),
     config: daemon_conf.to_owned(),
     event_emitter: event::EventEmitter::new(),
+    version: VERSION.to_owned(),
   };
   super::system::register_namespace("system", false, &daemon_state).await?;
   super::system::register_namespace("global", true, &daemon_state).await?;

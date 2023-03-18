@@ -17,6 +17,9 @@ pub struct DaemonState {
   pub(crate) config: DaemonConfig,
   /// The event emitter
   pub(crate) event_emitter: EventEmitterPtr,
+  /// Latest version of the daemon or version of current request
+  #[allow(dead_code)]
+  pub(crate) version: String,
 }
 
 #[derive(Debug)]

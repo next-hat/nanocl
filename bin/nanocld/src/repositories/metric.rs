@@ -31,3 +31,23 @@ pub async fn create(
 
   Ok(item)
 }
+
+pub async fn list(
+  pool: &Pool,
+) -> Result<Vec<MetricDbModel>, HttpResponseError> {
+  use crate::schema::metrics::dsl;
+
+  let pool = pool.clone();
+
+  let items = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let res = dsl::metrics
+      .load::<MetricDbModel>(&mut conn)
+      .map_err(db_error("metrics"))?;
+    Ok::<_, HttpResponseError>(res)
+  })
+  .await
+  .map_err(db_blocking_error)?;
+
+  Ok(items)
+}

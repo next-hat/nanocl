@@ -27,6 +27,7 @@ pub mod tests {
   use crate::services;
   use crate::event::EventEmitter;
   use crate::models::Pool;
+  use crate::version::VERSION;
 
   pub use ntex::web::test::TestServer;
   pub type TestReqRet = Result<ClientResponse, SendRequestError>;
@@ -89,6 +90,7 @@ pub mod tests {
       docker_api,
       pool,
       event_emitter,
+      version: VERSION.to_owned(),
     };
     // Create test server
     test::server(move || {
