@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use bollard_next::network::CreateNetworkOptions;
-use bollard_next::network::InspectNetworkOptions;
-use nanocl_stubs::generic::GenericDelete;
 use ntex::http::StatusCode;
+
 use bollard_next::models::ContainerSummary;
 use bollard_next::container::ListContainersOptions;
+use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
+use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
 };
@@ -46,21 +46,23 @@ use super::cargo;
 ///
 pub async fn create(
   namespace: &NamespacePartial,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<Namespace, HttpResponseError> {
-  if repositories::namespace::exist_by_name(&namespace.name, pool).await? {
+  if repositories::namespace::exist_by_name(&namespace.name, &state.pool)
+    .await?
+  {
     return Err(HttpResponseError {
       msg: format!("namespace {} error: already exist", &namespace.name),
       status: StatusCode::CONFLICT,
     });
   }
-  if docker_api
+  if state
+    .docker_api
     .inspect_network(&namespace.name, None::<InspectNetworkOptions<String>>)
     .await
     .is_ok()
   {
-    let res = repositories::namespace::create(namespace, pool).await?;
+    let res = repositories::namespace::create(namespace, &state.pool).await?;
     return Ok(Namespace { name: res.name });
   }
   let config = CreateNetworkOptions {
@@ -68,8 +70,8 @@ pub async fn create(
     driver: String::from("bridge"),
     ..Default::default()
   };
-  docker_api.create_network(config).await?;
-  let res = repositories::namespace::create(namespace, pool).await?;
+  state.docker_api.create_network(config).await?;
+  let res = repositories::namespace::create(namespace, &state.pool).await?;
   Ok(Namespace { name: res.name })
 }
 
@@ -100,14 +102,13 @@ pub async fn create(
 ///
 pub async fn delete_by_name(
   name: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<GenericDelete, HttpResponseError> {
-  utils::cargo::delete_by_namespace(name, docker_api, pool).await?;
-  if let Err(err) = docker_api.remove_network(name).await {
+  utils::cargo::delete_by_namespace(name, state).await?;
+  if let Err(err) = state.docker_api.remove_network(name).await {
     log::error!("Unable to remove network {} got error: {}", name, err);
   }
-  repositories::namespace::delete_by_name(name, pool).await
+  repositories::namespace::delete_by_name(name, &state.pool).await
 }
 
 /// ## List existing container in a namespace
@@ -267,10 +268,9 @@ pub async fn inspect(
 ///
 pub async fn create_if_not_exists(
   name: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
-  if repositories::namespace::find_by_name(name, pool)
+  if repositories::namespace::find_by_name(name, &state.pool)
     .await
     .is_err()
   {
@@ -278,8 +278,7 @@ pub async fn create_if_not_exists(
       &NamespacePartial {
         name: name.to_owned(),
       },
-      docker_api,
-      pool,
+      state,
     )
     .await?;
   }

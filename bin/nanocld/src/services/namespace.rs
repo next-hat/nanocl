@@ -24,8 +24,7 @@ async fn create_namespace(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Creating namespace: {:?}", &payload);
-  let item =
-    utils::namespace::create(&payload, &state.docker_api, &state.pool).await?;
+  let item = utils::namespace::create(&payload, &state).await?;
   log::debug!("Namespace created: {:?}", &item);
   Ok(web::HttpResponse::Created().json(&item))
 }
@@ -36,9 +35,7 @@ async fn delete_namespace_by_name(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Deleting namespace {}", &path.1);
-  let res =
-    utils::namespace::delete_by_name(&path.1, &state.docker_api, &state.pool)
-      .await?;
+  let res = utils::namespace::delete_by_name(&path.1, &state).await?;
   log::debug!("Namespace {} deleted: {:?}", &path.1, &res);
   Ok(web::HttpResponse::Ok().json(&res))
 }

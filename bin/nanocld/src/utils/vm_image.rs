@@ -14,7 +14,9 @@ use nanocl_stubs::config::DaemonConfig;
 
 use crate::repositories;
 use crate::error::HttpResponseError;
-use crate::models::{Pool, VmImageDbModel, QemuImgInfo, VmImageUpdateDbModel};
+use crate::models::{
+  Pool, VmImageDbModel, QemuImgInfo, VmImageUpdateDbModel, DaemonState,
+};
 
 pub async fn delete(name: &str, pool: &Pool) -> Result<(), HttpResponseError> {
   let vm_image = repositories::vm_image::find_by_name(name, pool).await?;
@@ -71,10 +73,9 @@ pub async fn create_snap(
   name: &str,
   size: u64,
   image: &VmImageDbModel,
-  daemon_conf: &DaemonConfig,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<VmImageDbModel, HttpResponseError> {
-  if repositories::vm_image::find_by_name(name, pool)
+  if repositories::vm_image::find_by_name(name, &state.pool)
     .await
     .is_ok()
   {
@@ -86,7 +87,7 @@ pub async fn create_snap(
 
   let imagepath = image.path.clone();
   let snapshotpath =
-    format!("{}/vms/images/{}.img", daemon_conf.state_dir, name);
+    format!("{}/vms/images/{}.img", state.config.state_dir, name);
 
   let output = Command::new("qemu-img")
     .args([
@@ -147,7 +148,8 @@ pub async fn create_snap(
     parent: Some(image.name.clone()),
   };
 
-  let snap_image = repositories::vm_image::create(&snap_image, pool).await?;
+  let snap_image =
+    repositories::vm_image::create(&snap_image, &state.pool).await?;
 
   Ok(snap_image)
 }
@@ -155,8 +157,7 @@ pub async fn create_snap(
 pub async fn clone(
   name: &str,
   image: &VmImageDbModel,
-  daemon_conf: &DaemonConfig,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<Receiver<Result<Bytes, HttpResponseError>>, HttpResponseError> {
   if image.kind != "Snapshot" {
     return Err(HttpResponseError {
@@ -164,7 +165,7 @@ pub async fn clone(
       msg: format!("Vm image {name} is not a snapshot"),
     });
   }
-  if repositories::vm_image::find_by_name(name, pool)
+  if repositories::vm_image::find_by_name(name, &state.pool)
     .await
     .is_ok()
   {
@@ -179,8 +180,8 @@ pub async fn clone(
 
   let name = name.to_owned();
   let image = image.clone();
-  let daemon_conf = daemon_conf.clone();
-  let pool = pool.clone();
+  let daemon_conf = state.config.clone();
+  let pool = state.pool.clone();
   rt::spawn(async move {
     let imagepath = image.path.clone();
     let newbasepath =

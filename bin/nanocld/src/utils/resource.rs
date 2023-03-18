@@ -57,11 +57,11 @@ pub async fn validate_resource(
 }
 
 pub async fn create(
-  resource: ResourcePartial,
+  resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
-  validate_resource(&resource, pool).await?;
-  repositories::resource::create(resource.clone(), pool).await
+  validate_resource(resource, pool).await?;
+  repositories::resource::create(resource, pool).await
 }
 
 pub async fn patch(
@@ -88,7 +88,7 @@ pub async fn delete(
     repositories::resource_kind::delete_version(&resource.name, pool).await?;
     repositories::resource_kind::delete(&resource.name, pool).await?;
   }
-  repositories::resource::delete_by_key(resource.name.to_owned(), pool).await?;
+  repositories::resource::delete_by_key(&resource.name, pool).await?;
   repositories::resource_config::delete_by_resource_key(&resource.name, pool)
     .await?;
   Ok(())

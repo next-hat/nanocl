@@ -49,7 +49,7 @@ pub async fn delete_cargo(
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("Deleting cargo: {}", &key);
   let cargo = utils::cargo::inspect(&key, &state).await?;
-  utils::cargo::delete(&key, &state.docker_api, &state.pool, None).await?;
+  utils::cargo::delete(&key, None, &state).await?;
   rt::spawn(async move {
     state
       .event_emitter
@@ -200,7 +200,7 @@ async fn exec_command(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("Executing command on cargo : {}", &key);
-  utils::cargo::exec_command(&key, &payload, &state.docker_api).await
+  utils::cargo::exec_command(&key, &payload, &state).await
 }
 
 #[web::post("/cargoes/{name}/kill")]

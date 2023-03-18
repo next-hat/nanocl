@@ -45,7 +45,7 @@ use super::error::db_blocking_error;
 /// ```
 ///
 pub async fn create(
-  item: ResourcePartial,
+  item: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
   use crate::schema::resources::dsl;
@@ -56,7 +56,7 @@ pub async fn create(
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: item.name.to_owned(),
     version: item.version.to_owned(),
-    data: item.config,
+    data: item.config.clone(),
   };
 
   let config = resource_config::create(&config, &pool).await?;
@@ -64,7 +64,7 @@ pub async fn create(
   let new_item = ResourceDbModel {
     key: item.name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
-    kind: item.kind,
+    kind: item.kind.clone(),
     config_key: config.key.to_owned(),
   };
 
@@ -116,12 +116,14 @@ pub async fn create(
 /// ```
 ///
 pub async fn delete_by_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<GenericDelete, HttpResponseError> {
   use crate::schema::resources::dsl;
 
+  let key = key.to_owned();
   let pool = pool.clone();
+
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let count = diesel::delete(dsl::resources)
@@ -243,13 +245,15 @@ pub async fn find(
 /// ```
 ///
 pub async fn inspect_by_key(
-  key: String,
+  key: &str,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
   use crate::schema::resources;
   use crate::schema::resource_configs;
 
+  let key = key.to_owned();
   let pool = pool.clone();
+
   let res: (ResourceDbModel, ResourceConfigDbModel) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = resources::table
@@ -308,7 +312,7 @@ pub async fn patch(
   let pool = pool.clone();
   let key = item.name.clone();
   let resource =
-    repositories::resource::inspect_by_key(item.name.to_owned(), &pool).await?;
+    repositories::resource::inspect_by_key(&item.name, &pool).await?;
 
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
@@ -353,8 +357,8 @@ pub async fn create_or_patch(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
-  if inspect_by_key(resource.name.to_owned(), pool).await.is_ok() {
+  if inspect_by_key(&resource.name, pool).await.is_ok() {
     return patch(resource, pool).await;
   }
-  create(resource.to_owned(), pool).await
+  create(resource, pool).await
 }

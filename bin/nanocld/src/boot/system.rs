@@ -9,7 +9,7 @@ use nanocl_stubs::cargo_config::CargoConfigPartial;
 use crate::version::VERSION;
 use crate::{utils, repositories};
 use crate::error::CliError;
-use crate::models::Pool;
+use crate::models::{Pool, DaemonState};
 
 /// Ensure existance of the system network that controllers will use.
 /// It's ensure existance of a network in your system called `nanocl.system`
@@ -50,19 +50,18 @@ pub(crate) async fn ensure_network(
 pub(crate) async fn register_namespace(
   name: &str,
   create_network: bool,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<(), CliError> {
-  if repositories::namespace::exist_by_name(name, pool).await? {
+  if repositories::namespace::exist_by_name(name, &state.pool).await? {
     return Ok(());
   }
   let new_nsp = NamespacePartial {
     name: name.to_owned(),
   };
   if create_network {
-    utils::namespace::create(&new_nsp, docker_api, pool).await?;
+    utils::namespace::create(&new_nsp, state).await?;
   } else {
-    repositories::namespace::create(&new_nsp, pool).await?;
+    repositories::namespace::create(&new_nsp, &state.pool).await?;
   }
   Ok(())
 }

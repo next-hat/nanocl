@@ -60,12 +60,7 @@ pub async fn apply_deployment(
   // If we have a namespace and it doesn't exist, create it
   // Unless we use `global` as default for the creation of cargoes
   let namespace = if let Some(namespace) = &data.namespace {
-    utils::namespace::create_if_not_exists(
-      namespace,
-      &state.docker_api,
-      &state.pool,
-    )
-    .await?;
+    utils::namespace::create_if_not_exists(namespace, state).await?;
     namespace.to_owned()
   } else {
     "global".into()
@@ -105,9 +100,10 @@ pub async fn apply_deployment(
       utils::resource::create_or_patch(resource.clone(), &state.pool).await?;
       let state_ptr = state.clone();
       rt::spawn(async move {
-        let item = repositories::resource::inspect_by_key(key, &state_ptr.pool)
-          .await
-          .unwrap();
+        let item =
+          repositories::resource::inspect_by_key(&key, &state_ptr.pool)
+            .await
+            .unwrap();
         state_ptr
           .event_emitter
           .lock()
@@ -128,12 +124,7 @@ pub async fn apply_cargo(
   // If we have a namespace and it doesn't exist, create it
   // Unless we use `global` as default for the creation of cargoes
   let namespace = if let Some(namespace) = &data.namespace {
-    utils::namespace::create_if_not_exists(
-      namespace,
-      &state.docker_api,
-      &state.pool,
-    )
-    .await?;
+    utils::namespace::create_if_not_exists(namespace, state).await?;
     namespace.to_owned()
   } else {
     "global".into()
@@ -178,7 +169,7 @@ pub async fn apply_resource(
     let pool = state.pool.clone();
     let event_emitter = state.event_emitter.clone();
     rt::spawn(async move {
-      let resource = repositories::resource::inspect_by_key(key, &pool)
+      let resource = repositories::resource::inspect_by_key(&key, &pool)
         .await
         .unwrap();
       event_emitter
@@ -204,8 +195,7 @@ pub async fn revert_deployment(
     for cargo in cargoes {
       let key = utils::key::gen_key(&namespace, &cargo.name);
       let cargo = utils::cargo::inspect(&key, state).await?;
-      utils::cargo::delete(&key, &state.docker_api, &state.pool, Some(true))
-        .await?;
+      utils::cargo::delete(&key, Some(true), state).await?;
       let state_ptr = state.clone();
       rt::spawn(async move {
         state_ptr
@@ -221,7 +211,7 @@ pub async fn revert_deployment(
     for resource in resources {
       let key = resource.name.to_owned();
       let resource =
-        repositories::resource::inspect_by_key(key, &state.pool).await?;
+        repositories::resource::inspect_by_key(&key, &state.pool).await?;
       utils::resource::delete(resource.clone(), &state.pool).await?;
       let state_ptr = state.clone();
       rt::spawn(async move {
@@ -250,8 +240,7 @@ pub async fn revert_cargo(
   for cargo in &data.cargoes {
     let key = utils::key::gen_key(&namespace, &cargo.name);
     let cargo = utils::cargo::inspect(&key, state).await?;
-    utils::cargo::delete(&key, &state.docker_api, &state.pool, Some(true))
-      .await?;
+    utils::cargo::delete(&key, Some(true), state).await?;
     let event_emitter = state.event_emitter.clone();
     rt::spawn(async move {
       event_emitter
@@ -271,7 +260,7 @@ pub async fn revert_resource(
   for resource in &data.resources {
     let key = resource.name.to_owned();
     let resource =
-      repositories::resource::inspect_by_key(key, &state.pool).await?;
+      repositories::resource::inspect_by_key(&key, &state.pool).await?;
     utils::resource::delete(resource.clone(), &state.pool).await?;
     let event_emitter = state.event_emitter.clone();
     rt::spawn(async move {

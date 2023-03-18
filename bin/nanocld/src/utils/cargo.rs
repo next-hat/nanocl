@@ -26,7 +26,6 @@ use nanocl_stubs::cargo::{
 use crate::models::DaemonState;
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::Pool;
 
 use super::stream::transform_stream;
 
@@ -327,14 +326,14 @@ pub async fn stop(
 ///
 pub async fn delete(
   cargo_key: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
   force: Option<bool>,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
-  let containers = list_instance(cargo_key, docker_api).await?;
+  let containers = list_instance(cargo_key, &state.docker_api).await?;
 
   for container in containers {
-    docker_api
+    state
+      .docker_api
       .remove_container(
         &container.id.unwrap_or_default(),
         Some(RemoveContainerOptions {
@@ -349,8 +348,9 @@ pub async fn delete(
       })?;
   }
 
-  repositories::cargo::delete_by_key(cargo_key, pool).await?;
-  repositories::cargo_config::delete_by_cargo_key(cargo_key, pool).await?;
+  repositories::cargo::delete_by_key(cargo_key, &state.pool).await?;
+  repositories::cargo_config::delete_by_cargo_key(cargo_key, &state.pool)
+    .await?;
 
   Ok(())
 }
@@ -693,17 +693,16 @@ pub async fn inspect(
 ///
 pub async fn delete_by_namespace(
   namespace: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
   let namespace =
-    repositories::namespace::find_by_name(namespace, pool).await?;
+    repositories::namespace::find_by_name(namespace, &state.pool).await?;
 
   let cargoes =
-    repositories::cargo::find_by_namespace(&namespace, pool).await?;
+    repositories::cargo::find_by_namespace(&namespace, &state.pool).await?;
 
   for cargo in cargoes {
-    delete(&cargo.key, docker_api, pool, None).await?;
+    delete(&cargo.key, None, state).await?;
   }
 
   Ok(())
@@ -716,12 +715,13 @@ pub async fn delete_by_namespace(
 pub async fn exec_command(
   name: &str,
   args: &CargoExecConfig<String>,
-  docker_api: &bollard_next::Docker,
+  state: &DaemonState,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let name = format!("{name}.c");
-  let result = docker_api.create_exec(&name, args.to_owned()).await?;
+  let result = state.docker_api.create_exec(&name, args.to_owned()).await?;
 
-  let res = docker_api
+  let res = state
+    .docker_api
     .start_exec(&result.id, Some(StartExecOptions::default()))
     .await?;
 

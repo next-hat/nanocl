@@ -15,7 +15,7 @@ use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::{Pool, VmDbModel, VmImageDbModel};
+use crate::models::{Pool, VmDbModel, VmImageDbModel, DaemonState};
 
 pub async fn start(
   vm_key: &str,
@@ -171,11 +171,10 @@ pub async fn create_instance(
   vm: &Vm,
   image: &VmImageDbModel,
   disable_keygen: bool,
-  daemon_conf: &DaemonConfig,
-  docker_api: &Docker,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
   let mut labels: HashMap<String, String> = HashMap::new();
-  let vmimagespath = format!("{}/vms/images", daemon_conf.state_dir);
+  let vmimagespath = format!("{}/vms/images", state.config.state_dir);
   labels.insert("io.nanocl".into(), "enabled".into());
   labels.insert("io.nanocl.v".into(), vm.key.clone());
   labels.insert("io.nanocl.vnsp".into(), vm.namespace_name.clone());
@@ -253,22 +252,24 @@ pub async fn create_instance(
     ..Default::default()
   });
 
-  docker_api.create_container(options, config).await?;
+  state.docker_api.create_container(options, config).await?;
 
   Ok(())
 }
 
 pub async fn create(
-  mut vm: VmConfigPartial,
+  vm: &VmConfigPartial,
   namespace: &str,
-  version: String,
-  daemon_conf: &DaemonConfig,
-  docker_api: &Docker,
-  pool: &Pool,
+  version: &str,
+  state: &DaemonState,
 ) -> Result<Vm, HttpResponseError> {
   let vm_key = utils::key::gen_key(namespace, &vm.name);
 
-  if repositories::vm::find_by_key(&vm_key, pool).await.is_ok() {
+  let mut vm = vm.clone();
+  if repositories::vm::find_by_key(&vm_key, &state.pool)
+    .await
+    .is_ok()
+  {
     return Err(HttpResponseError {
       status: StatusCode::CONFLICT,
       msg: format!(
@@ -278,7 +279,7 @@ pub async fn create(
     });
   }
   let image =
-    repositories::vm_image::find_by_name(&vm.disk.image, pool).await?;
+    repositories::vm_image::find_by_name(&vm.disk.image, &state.pool).await?;
   if image.kind.as_str() != "Base" {
     return Err(HttpResponseError {
       msg: format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image),
@@ -290,16 +291,16 @@ pub async fn create(
   let size = vm.disk.size.unwrap_or(20);
 
   let image =
-    utils::vm_image::create_snap(&snapname, size, &image, daemon_conf, pool)
-      .await?;
+    utils::vm_image::create_snap(&snapname, size, &image, state).await?;
 
   // Use the snapshot image
   vm.disk.image = image.name.clone();
   vm.disk.size = Some(size);
 
-  let vm = repositories::vm::create(namespace, &vm, &version, pool).await?;
+  let vm =
+    repositories::vm::create(namespace, &vm, &version, &state.pool).await?;
 
-  create_instance(&vm, &image, true, daemon_conf, docker_api).await?;
+  create_instance(&vm, &image, true, state).await?;
 
   Ok(vm)
 }
@@ -308,14 +309,12 @@ pub async fn patch(
   cargo_key: &str,
   config: &VmConfigUpdate,
   version: &str,
-  daemon_conf: &DaemonConfig,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<Vm, HttpResponseError> {
-  let vm = repositories::vm::find_by_key(cargo_key, pool).await?;
+  let vm = repositories::vm::find_by_key(cargo_key, &state.pool).await?;
 
   let old_config =
-    repositories::vm_config::find_by_key(&vm.config_key, pool).await?;
+    repositories::vm_config::find_by_key(&vm.config_key, &state.pool).await?;
 
   let vm_partial = VmConfigPartial {
     name: config.name.to_owned().unwrap_or(vm.name.clone()),
@@ -354,21 +353,24 @@ pub async fn patch(
 
   let container_name = format!("{}.v", &vm.key);
 
-  stop(&vm, docker_api).await?;
+  stop(&vm, &state.docker_api).await?;
 
-  docker_api
+  state
+    .docker_api
     .remove_container(&container_name, None::<RemoveContainerOptions>)
     .await?;
 
-  let vm = repositories::vm::update_by_key(&vm.key, &vm_partial, version, pool)
-    .await?;
+  let vm =
+    repositories::vm::update_by_key(&vm.key, &vm_partial, version, &state.pool)
+      .await?;
 
   let image =
-    repositories::vm_image::find_by_name(&vm.config.disk.image, pool).await?;
+    repositories::vm_image::find_by_name(&vm.config.disk.image, &state.pool)
+      .await?;
 
-  create_instance(&vm, &image, false, daemon_conf, docker_api).await?;
+  create_instance(&vm, &image, false, state).await?;
   // Update the vm
-  start(&vm.key, docker_api).await?;
+  start(&vm.key, &state.docker_api).await?;
 
   Ok(vm)
 }

@@ -1,5 +1,6 @@
-use nanocl_stubs::config::DaemonConfig;
 use tokio::fs;
+
+use nanocl_stubs::config::DaemonConfig;
 
 use crate::event;
 use crate::models::DaemonState;
@@ -43,9 +44,8 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
     config: daemon_conf.to_owned(),
     event_emitter: event::EventEmitter::new(),
   };
-  super::system::register_namespace("system", false, &docker_api, &pool)
-    .await?;
-  super::system::register_namespace("global", true, &docker_api, &pool).await?;
+  super::system::register_namespace("system", false, &daemon_state).await?;
+  super::system::register_namespace("global", true, &daemon_state).await?;
   super::node::register_node(
     &daemon_conf.hostname,
     &daemon_conf.advertise_addr,
@@ -54,6 +54,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
   .await?;
   super::system::sync_containers(&docker_api, &pool).await?;
   super::metrics::start_metrics_cargo(&daemon_state).await?;
+
   Ok(daemon_state)
 }
 

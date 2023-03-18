@@ -110,15 +110,7 @@ async fn create_vm(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
 
-  let item = utils::vm::create(
-    payload,
-    &namespace,
-    version.to_string(),
-    &state.config,
-    &state.docker_api,
-    &state.pool,
-  )
-  .await?;
+  let item = utils::vm::create(&payload, &namespace, &version, &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&item))
 }
@@ -147,15 +139,7 @@ async fn patch_vm(
   let key = utils::key::gen_key(&namespace, &path.1);
   let version = path.0.clone();
 
-  let vm = utils::vm::patch(
-    &key,
-    &payload,
-    &version,
-    &state.config,
-    &state.docker_api,
-    &state.pool,
-  )
-  .await?;
+  let vm = utils::vm::patch(&key, &payload, &version, &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&vm))
 }

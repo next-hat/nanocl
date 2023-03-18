@@ -19,7 +19,7 @@ pub async fn create_resource(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Creating resource: {:?}", &payload);
-  let resource = utils::resource::create(payload, &state.pool).await?;
+  let resource = utils::resource::create(&payload, &state.pool).await?;
   log::debug!("Resource created: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
@@ -39,7 +39,7 @@ pub async fn delete_resource(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Deleting resource: {}", &path.1);
   let resource =
-    repositories::resource::inspect_by_key(path.1.clone(), &state.pool).await?;
+    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
   utils::resource::delete(resource.clone(), &state.pool).await?;
   rt::spawn(async move {
     state
@@ -67,9 +67,9 @@ pub async fn inspect_resource(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
-  log::debug!("Inspecting resource: {}", &path.1); // item?
+  log::debug!("Inspecting resource: {}", &path.1);
   let resource =
-    repositories::resource::inspect_by_key(path.1.clone(), &state.pool).await?;
+    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
   log::debug!("Resource found: {:?}", &resource);
   Ok(web::HttpResponse::Ok().json(&resource))
 }
@@ -87,7 +87,7 @@ pub async fn patch_resource(
   );
 
   let resource =
-    repositories::resource::inspect_by_key(path.1.clone(), &state.pool).await?;
+    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
 
   let new_resource = ResourcePartial {
     name: path.1.clone(),
@@ -130,8 +130,7 @@ pub async fn reset_resource(
     repositories::resource_config::find_by_key(&path.id, &state.pool).await?;
 
   let resource =
-    repositories::resource::inspect_by_key(path.name.to_owned(), &state.pool)
-      .await?;
+    repositories::resource::inspect_by_key(&path.name, &state.pool).await?;
 
   let new_resource = ResourcePartial {
     name: resource.name,
