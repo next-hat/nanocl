@@ -1,5 +1,5 @@
 use bollard_next::container::ListContainersOptions;
-use bollard_next::service::{SystemInfo, ContainerSummary};
+use bollard_next::service::SystemInfo;
 
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};

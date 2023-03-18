@@ -1,17 +1,19 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use futures::SinkExt;
-use futures::channel::mpsc;
-use nanocl_stubs::config::DaemonConfig;
-use ntex::io::Base;
 use ntex::rt;
-use ntex::time;
 use ntex::ws;
+use ntex::time;
+use ntex::io::Base;
 use ntex::util::Bytes;
 use ntex::http::StatusCode;
-use futures::StreamExt;
 use ntex::ws::WsConnection;
+
+use futures::SinkExt;
+use futures::channel::mpsc;
+use futures::StreamExt;
+
+use nanocl_stubs::config::DaemonConfig;
 
 use crate::error::CliError;
 use crate::models::DaemonState;
