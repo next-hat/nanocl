@@ -63,6 +63,7 @@ async fn main() -> std::io::Result<()> {
     return Ok(());
   }
 
+  node::join_cluster(&daemon_state).await;
   metric::spawn_metrics(&daemon_state.config.hostname, &daemon_state.pool);
 
   match server::generate(daemon_state).await {

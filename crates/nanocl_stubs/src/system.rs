@@ -1,5 +1,5 @@
 use bollard_next::container::ListContainersOptions;
-use bollard_next::service::SystemInfo;
+use bollard_next::service::{SystemInfo, ContainerSummary};
 
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
@@ -79,7 +79,7 @@ impl std::fmt::Display for Event {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProccessQuery {
-  /// Return all containers. By default, only running containers are shown
+  /// Return container from all nodes
   pub all: bool,
   /// Return this number of most recently created containers, including non-running ones
   pub last: Option<isize>,
@@ -97,5 +97,19 @@ impl From<ProccessQuery> for ListContainersOptions<String> {
       size: query.size,
       ..Default::default()
     }
+  }
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProcessSummary {
+  pub node: String,
+  pub container: ContainerSummary,
+}
+
+impl ProcessSummary {
+  pub fn new(node: String, container: ContainerSummary) -> Self {
+    Self { node, container }
   }
 }

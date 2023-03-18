@@ -2,6 +2,8 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::time::Instant;
 
+use ntex::util::ByteString;
+use ntex::util::Bytes;
 use ntex::ws;
 use ntex::rt;
 use ntex::web;
@@ -34,6 +36,11 @@ async fn node_ws_service(
   let con_state = Rc::new(RefCell::new(WsConState::new()));
   rt::spawn(utils::ws::heartbeat(con_state.clone(), sink.clone(), rx));
 
+  let message = format!("[SERVER] hello i'm {}", state.config.hostname);
+  let _ = sink
+    .send(ws::Message::Text(ByteString::from(message)))
+    .await;
+
   // handler service for incoming websockets frames
   let service = fn_service(move |frame| {
     let item = match frame {
@@ -47,12 +54,15 @@ async fn node_ws_service(
         None
       }
       ws::Frame::Text(text) => {
-        println!("Received text: {:#?}", text);
+        println!("[SERVER] received text: {:#?}", text);
         None
       }
-      ws::Frame::Binary(_) => None,
+      ws::Frame::Binary(bytes) => {
+        println!("[SERVER] received bytes: {:#?}", bytes);
+        None
+      }
       ws::Frame::Close(reason) => Some(ws::Message::Close(reason)),
-      _ => Some(ws::Message::Close(None)),
+      _ => None, // _ => Some(ws::Message::Close(None)),
     };
     ready(Ok(item))
   });

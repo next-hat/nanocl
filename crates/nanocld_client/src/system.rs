@@ -1,7 +1,9 @@
 use bollard_next::service::ContainerSummary;
 use ntex::channel::mpsc;
 
-use nanocl_stubs::system::{Event, Version, HostInfo, ProccessQuery};
+use nanocl_stubs::system::{
+  Event, Version, HostInfo, ProccessQuery, ProcessSummary,
+};
 
 use crate::error::ApiError;
 
@@ -120,7 +122,7 @@ impl NanocldClient {
   pub async fn process(
     &self,
     opts: Option<ProccessQuery>,
-  ) -> Result<Vec<ContainerSummary>, NanocldClientError> {
+  ) -> Result<Vec<ProcessSummary>, NanocldClientError> {
     let res = self
       .send_get(format!("/{}/processes", &self.version), opts)
       .await?;

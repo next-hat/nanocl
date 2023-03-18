@@ -1,8 +1,12 @@
 use std::collections::HashMap;
 
+use nanocl_stubs::system::ProcessSummary;
 use ntex::web;
 
 use bollard_next::container::ListContainersOptions;
+
+use nanocld_client::NanocldClient;
+
 use nanocl_stubs::system::ProccessQuery;
 use nanocl_stubs::system::HostInfo;
 
@@ -57,11 +61,39 @@ async fn get_processes(
   filters.insert("label".into(), labels);
 
   let opts = qs.clone().into();
-
   let options = Some(ListContainersOptions::<String> { filters, ..opts });
   let containers = state.docker_api.list_containers(options).await?;
 
-  Ok(web::HttpResponse::Ok().json(&containers))
+  let mut process = containers
+    .into_iter()
+    .map(|c| ProcessSummary::new(state.config.hostname.clone(), c))
+    .collect::<Vec<ProcessSummary>>();
+
+  let nodes =
+    repositories::node::list_unless(&state.config.hostname, &state.pool)
+      .await?;
+
+  if opts.all {
+    for node in nodes {
+      let url =
+        Box::leak(format!("http://{}:8081", node.ip_address).into_boxed_str());
+      let client = NanocldClient::connect_to(url);
+      let node_containers = match client
+        .process(Some(ProccessQuery {
+          all: false,
+          namespace: qs.namespace.clone(),
+          ..Default::default()
+        }))
+        .await
+      {
+        Ok(containers) => containers,
+        Err(_) => continue,
+      };
+      process.extend(node_containers);
+    }
+  }
+
+  Ok(web::HttpResponse::Ok().json(&process))
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
