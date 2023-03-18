@@ -12,28 +12,13 @@ async fn apply(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   match utils::state::parse_state(&payload)? {
     StateData::Deployment(data) => {
-      utils::state::apply_deployment(
-        data,
-        version.into_inner(),
-        &state.docker_api,
-        &state.pool,
-        &state.event_emitter,
-      )
-      .await?;
+      utils::state::apply_deployment(&data, &version, &state).await?;
     }
     StateData::Cargo(data) => {
-      utils::state::apply_cargo(
-        data,
-        version.into_inner(),
-        &state.docker_api,
-        &state.pool,
-        &state.event_emitter,
-      )
-      .await?;
+      utils::state::apply_cargo(&data, &version, &state).await?;
     }
     StateData::Resource(data) => {
-      utils::state::apply_resource(data, &state.pool, &state.event_emitter)
-        .await?;
+      utils::state::apply_resource(&data, &state).await?;
     }
   }
   Ok(web::HttpResponse::Ok().finish())
@@ -46,26 +31,13 @@ async fn revert(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   match utils::state::parse_state(&payload)? {
     StateData::Deployment(data) => {
-      utils::state::revert_deployment(
-        data,
-        &state.docker_api,
-        &state.pool,
-        &state.event_emitter,
-      )
-      .await?;
+      utils::state::revert_deployment(&data, &state).await?;
     }
     StateData::Cargo(data) => {
-      utils::state::revert_cargo(
-        data,
-        &state.docker_api,
-        &state.pool,
-        &state.event_emitter,
-      )
-      .await?;
+      utils::state::revert_cargo(&data, &state).await?;
     }
     StateData::Resource(data) => {
-      utils::state::revert_resource(data, &state.pool, &state.event_emitter)
-        .await?;
+      utils::state::revert_resource(&data, &state).await?;
     }
   }
   Ok(web::HttpResponse::Ok().finish())

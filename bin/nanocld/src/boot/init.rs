@@ -37,6 +37,12 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
   ensure_state_dir(&daemon_conf.state_dir).await?;
   super::system::ensure_network("system", &docker_api).await?;
   let pool = super::store::ensure(daemon_conf, &docker_api).await?;
+  let daemon_state = DaemonState {
+    pool: pool.clone(),
+    docker_api: docker_api.clone(),
+    config: daemon_conf.to_owned(),
+    event_emitter: event::EventEmitter::new(),
+  };
   super::system::register_namespace("system", false, &docker_api, &pool)
     .await?;
   super::system::register_namespace("global", true, &docker_api, &pool).await?;
@@ -47,13 +53,8 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
   )
   .await?;
   super::system::sync_containers(&docker_api, &pool).await?;
-  super::metrics::start_metrics_cargo(&docker_api, &pool).await?;
-  Ok(DaemonState {
-    pool,
-    docker_api,
-    config: daemon_conf.to_owned(),
-    event_emitter: event::EventEmitter::new(),
-  })
+  super::metrics::start_metrics_cargo(&daemon_state).await?;
+  Ok(daemon_state)
 }
 
 /// Init unit test

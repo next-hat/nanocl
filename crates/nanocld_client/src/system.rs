@@ -1,4 +1,3 @@
-use bollard_next::service::ContainerSummary;
 use ntex::channel::mpsc;
 
 use nanocl_stubs::system::{

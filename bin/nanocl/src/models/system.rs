@@ -1,13 +1,12 @@
-use bollard_next::service::ContainerSummary;
-use chrono::TimeZone;
 use clap::Parser;
-use nanocld_client::stubs::system::{ProccessQuery, ProcessSummary};
 use tabled::Tabled;
+use chrono::TimeZone;
+use nanocld_client::stubs::system::{ProccessQuery, ProcessSummary};
 
 #[derive(Clone, Debug, Parser)]
 pub struct ProcessOpts {
-  /// Return all containers. By default, only running containers are shown
-  #[clap(long, short, default_value = "true")]
+  /// Return containers for all nodes by default only the current node
+  #[clap(long, short)]
   pub all: bool,
   /// Return this number of most recently created containers, including non-running ones
   #[clap(long)]

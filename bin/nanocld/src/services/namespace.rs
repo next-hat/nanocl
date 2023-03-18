@@ -49,8 +49,7 @@ async fn inspect_namespace_by_name(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpResponseError> {
   log::debug!("Inspecting namespace {}", path.1);
-  let namespace =
-    utils::namespace::inspect(&path.1, &state.docker_api, &state.pool).await?;
+  let namespace = utils::namespace::inspect(&path.1, &state).await?;
   log::debug!("Namespace found: {:?}", &namespace);
   Ok(web::HttpResponse::Ok().json(&namespace))
 }

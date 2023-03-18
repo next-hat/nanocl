@@ -11,6 +11,7 @@ use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
 };
 
+use crate::models::DaemonState;
 use crate::utils;
 use crate::repositories;
 use crate::models::Pool;
@@ -225,18 +226,19 @@ pub async fn list(
 ///
 pub async fn inspect(
   namespace: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<NamespaceInspect, HttpResponseError> {
   let namespace =
-    repositories::namespace::find_by_name(namespace.to_owned(), pool).await?;
+    repositories::namespace::find_by_name(namespace.to_owned(), &state.pool)
+      .await?;
   log::debug!("Found namespace to inspect {:?}", &namespace);
   let cargo_db_models =
-    repositories::cargo::find_by_namespace(namespace.to_owned(), pool).await?;
+    repositories::cargo::find_by_namespace(namespace.to_owned(), &state.pool)
+      .await?;
   log::debug!("Found namespace cargoes to inspect {:?}", &cargo_db_models);
   let mut cargoes = Vec::new();
   for cargo in cargo_db_models {
-    let cargo = cargo::inspect(&cargo.key, docker_api, pool).await?;
+    let cargo = cargo::inspect(&cargo.key, &state).await?;
     cargoes.push(cargo);
   }
   Ok(NamespaceInspect {

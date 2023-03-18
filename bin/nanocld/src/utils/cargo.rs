@@ -6,6 +6,7 @@ use ntex::util::Bytes;
 use ntex::http::StatusCode;
 use futures::{StreamExt, TryStreamExt};
 
+use nanocld_client::NanocldClient;
 use bollard_next::container::LogOutput;
 use bollard_next::container::LogsOptions;
 use bollard_next::container::WaitContainerOptions;
@@ -22,6 +23,7 @@ use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoExecConfig,
 };
 
+use crate::models::DaemonState;
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
 use crate::models::Pool;
@@ -524,20 +526,46 @@ pub async fn put(
 ///
 pub async fn list(
   nsp: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<Vec<CargoSummary>, HttpResponseError> {
   let namespace =
-    repositories::namespace::find_by_name(nsp.to_owned(), pool).await?;
+    repositories::namespace::find_by_name(nsp.to_owned(), &state.pool).await?;
 
-  let cargoes = repositories::cargo::find_by_namespace(namespace, pool).await?;
+  let cargoes =
+    repositories::cargo::find_by_namespace(namespace, &state.pool).await?;
 
   let mut cargo_summaries = Vec::new();
 
+  let nodes =
+    repositories::node::list_unless(&state.config.hostname, &state.pool)
+      .await?;
+
   for cargo in cargoes {
     let config =
-      repositories::cargo_config::find_by_key(cargo.config_key, pool).await?;
-    let containers = list_instance(&cargo.key, docker_api).await?;
+      repositories::cargo_config::find_by_key(cargo.config_key, &state.pool)
+        .await?;
+    let mut containers = list_instance(&cargo.key, &state.docker_api).await?;
+
+    for node in &nodes {
+      let url =
+        Box::leak(format!("http://{}:8081", node.ip_address).into_boxed_str());
+      let client = NanocldClient::connect_to(url);
+      let node_containers = match client
+        .list_cargo_instance(&cargo.name, Some(cargo.namespace_name.clone()))
+        .await
+      {
+        Ok(containers) => containers,
+        Err(err) => {
+          log::error!(
+            "Unable to list cargo instance on node {} : {}",
+            node.name,
+            err
+          );
+          continue;
+        }
+      };
+      containers.extend(node_containers);
+    }
 
     let mut running_instances = 0;
     for container in containers.clone() {
@@ -580,11 +608,36 @@ pub async fn list(
 ///
 pub async fn inspect(
   key: &str,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<CargoInspect, HttpResponseError> {
-  let cargo = repositories::cargo::inspect_by_key(key.to_owned(), pool).await?;
-  let containers = list_instance(&cargo.key, docker_api).await?;
+  let cargo =
+    repositories::cargo::inspect_by_key(key.to_owned(), &state.pool).await?;
+  let mut containers = list_instance(&cargo.key, &state.docker_api).await?;
+
+  let nodes =
+    repositories::node::list_unless(&state.config.hostname, &state.pool)
+      .await?;
+
+  for node in &nodes {
+    let url =
+      Box::leak(format!("http://{}:8081", node.ip_address).into_boxed_str());
+    let client = NanocldClient::connect_to(url);
+    let node_containers = match client
+      .list_cargo_instance(&cargo.name, Some(cargo.namespace_name.clone()))
+      .await
+    {
+      Ok(containers) => containers,
+      Err(err) => {
+        log::error!(
+          "Unable to list cargo instance on node {} : {}",
+          node.name,
+          err
+        );
+        continue;
+      }
+    };
+    containers.extend(node_containers);
+  }
 
   let mut running_instances = 0;
   for container in &containers {

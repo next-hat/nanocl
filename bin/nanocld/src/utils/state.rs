@@ -6,11 +6,9 @@ use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateConfig,
 };
 
-use crate::event::EventEmitterPtr;
-use crate::repositories::resource;
 use crate::{utils, repositories};
 use crate::error::HttpResponseError;
-use crate::models::{Pool, StateData};
+use crate::models::{StateData, DaemonState};
 
 pub fn parse_state(
   data: &serde_json::Value,
@@ -55,70 +53,75 @@ pub fn parse_state(
 }
 
 pub async fn apply_deployment(
-  data: StateDeployment,
-  version: String,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
-  event_emitter: &EventEmitterPtr,
+  data: &StateDeployment,
+  version: &String,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
   // If we have a namespace and it doesn't exist, create it
   // Unless we use `global` as default for the creation of cargoes
-  let namespace = if let Some(namespace) = data.namespace {
-    utils::namespace::create_if_not_exists(&namespace, docker_api, pool)
-      .await?;
-    namespace
+  let namespace = if let Some(namespace) = &data.namespace {
+    utils::namespace::create_if_not_exists(
+      &namespace,
+      &state.docker_api,
+      &state.pool,
+    )
+    .await?;
+    namespace.to_owned()
   } else {
     "global".into()
   };
 
-  if let Some(cargoes) = data.cargoes {
+  if let Some(cargoes) = &data.cargoes {
     for cargo in cargoes {
       utils::cargo::create_or_put(
         &namespace,
         &cargo,
         version.clone(),
-        docker_api,
-        pool,
+        &state.docker_api,
+        &state.pool,
       )
       .await?;
       let key = utils::key::gen_key(&namespace, &cargo.name);
-      let p = pool.clone();
-      let ev = event_emitter.clone();
-      let docker = docker_api.clone();
+      let state_ptr = state.clone();
       rt::spawn(async move {
-        let cargo = utils::cargo::inspect(&key, &docker, &p).await.unwrap();
-        ev.lock()
+        let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
+        state_ptr
+          .event_emitter
+          .lock()
           .unwrap()
           .send(Event::CargoPatched(Box::new(cargo)));
       });
       utils::cargo::start(
         &utils::key::gen_key(&namespace, &cargo.name),
-        docker_api,
-        pool,
+        &state.docker_api,
+        &state.pool,
       )
       .await?;
       let key = utils::key::gen_key(&namespace, &cargo.name);
-      let p = pool.clone();
-      let ev = event_emitter.clone();
-      let docker = docker_api.clone();
+      let state_ptr = state.clone();
       rt::spawn(async move {
-        let cargo = utils::cargo::inspect(&key, &docker, &p).await.unwrap();
-        ev.lock()
+        let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
+        state_ptr
+          .event_emitter
+          .lock()
           .unwrap()
           .send(Event::CargoStarted(Box::new(cargo)));
       });
     }
   }
 
-  if let Some(resources) = data.resources {
+  if let Some(resources) = &data.resources {
     for resource in resources {
       let key = resource.name.to_owned();
-      utils::resource::create_or_patch(resource, pool).await?;
-      let p = pool.clone();
-      let ev = event_emitter.clone();
+      utils::resource::create_or_patch(resource.clone(), &state.pool).await?;
+      let state_ptr = state.clone();
       rt::spawn(async move {
-        let item = resource::inspect_by_key(key, &p).await.unwrap();
-        ev.lock()
+        let item = repositories::resource::inspect_by_key(key, &state_ptr.pool)
+          .await
+          .unwrap();
+        state_ptr
+          .event_emitter
+          .lock()
           .unwrap()
           .send(Event::ResourcePatched(Box::new(item)));
       });
@@ -129,54 +132,56 @@ pub async fn apply_deployment(
 }
 
 pub async fn apply_cargo(
-  data: StateCargo,
-  version: String,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
-  event_emitter: &EventEmitterPtr,
+  data: &StateCargo,
+  version: &String,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
   // If we have a namespace and it doesn't exist, create it
   // Unless we use `global` as default for the creation of cargoes
-  let namespace = if let Some(namespace) = data.namespace {
-    utils::namespace::create_if_not_exists(&namespace, docker_api, pool)
-      .await?;
-    namespace
+  let namespace = if let Some(namespace) = &data.namespace {
+    utils::namespace::create_if_not_exists(
+      &namespace,
+      &state.docker_api,
+      &state.pool,
+    )
+    .await?;
+    namespace.to_owned()
   } else {
     "global".into()
   };
 
-  for cargo in data.cargoes {
+  for cargo in &data.cargoes {
     utils::cargo::create_or_put(
       &namespace,
       &cargo,
       version.clone(),
-      docker_api,
-      pool,
+      &state.docker_api,
+      &state.pool,
     )
     .await?;
     let key = utils::key::gen_key(&namespace, &cargo.name);
-    let p = pool.clone();
-    let ev = event_emitter.clone();
-    let docker = docker_api.clone();
+    let state_ptr = state.clone();
     rt::spawn(async move {
-      let cargo = utils::cargo::inspect(&key, &docker, &p).await.unwrap();
-      ev.lock()
+      let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
+      state_ptr
+        .event_emitter
+        .lock()
         .unwrap()
         .send(Event::CargoPatched(Box::new(cargo)));
     });
     utils::cargo::start(
       &utils::key::gen_key(&namespace, &cargo.name),
-      docker_api,
-      pool,
+      &state.docker_api,
+      &state.pool,
     )
     .await?;
     let key = utils::key::gen_key(&namespace, &cargo.name);
-    let p = pool.clone();
-    let ev = event_emitter.clone();
-    let docker = docker_api.clone();
+    let state_ptr = state.clone();
     rt::spawn(async move {
-      let cargo = utils::cargo::inspect(&key, &docker, &p).await.unwrap();
-      ev.lock()
+      let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
+      state_ptr
+        .event_emitter
+        .lock()
         .unwrap()
         .send(Event::CargoStarted(Box::new(cargo)));
     });
@@ -186,15 +191,14 @@ pub async fn apply_cargo(
 }
 
 pub async fn apply_resource(
-  data: StateResources,
-  pool: &Pool,
-  event_emitter: &EventEmitterPtr,
+  data: &StateResources,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
-  for resource in data.resources {
+  for resource in &data.resources {
     let key = resource.name.to_owned();
-    utils::resource::create_or_patch(resource, pool).await?;
-    let pool = pool.clone();
-    let event_emitter = event_emitter.clone();
+    utils::resource::create_or_patch(resource.clone(), &state.pool).await?;
+    let pool = state.pool.clone();
+    let event_emitter = state.event_emitter.clone();
     rt::spawn(async move {
       let resource = repositories::resource::inspect_by_key(key, &pool)
         .await
@@ -209,25 +213,25 @@ pub async fn apply_resource(
 }
 
 pub async fn revert_deployment(
-  data: StateDeployment,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
-  event_emitter: &EventEmitterPtr,
+  data: &StateDeployment,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
-  let namespace = if let Some(namespace) = data.namespace {
-    namespace
+  let namespace = if let Some(namespace) = &data.namespace {
+    namespace.to_owned()
   } else {
     "global".into()
   };
 
-  if let Some(cargoes) = data.cargoes {
+  if let Some(cargoes) = &data.cargoes {
     for cargo in cargoes {
       let key = utils::key::gen_key(&namespace, &cargo.name);
-      let cargo = utils::cargo::inspect(&key, docker_api, pool).await?;
-      utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
-      let event_emitter = event_emitter.clone();
+      let cargo = utils::cargo::inspect(&key, state).await?;
+      utils::cargo::delete(&key, &state.docker_api, &state.pool, Some(true))
+        .await?;
+      let state_ptr = state.clone();
       rt::spawn(async move {
-        event_emitter
+        state_ptr
+          .event_emitter
           .lock()
           .unwrap()
           .send(Event::CargoDeleted(Box::new(cargo)));
@@ -235,14 +239,16 @@ pub async fn revert_deployment(
     }
   }
 
-  if let Some(resources) = data.resources {
+  if let Some(resources) = &data.resources {
     for resource in resources {
       let key = resource.name.to_owned();
-      let resource = repositories::resource::inspect_by_key(key, pool).await?;
-      utils::resource::delete(resource.clone(), pool).await?;
-      let event_emitter = event_emitter.clone();
+      let resource =
+        repositories::resource::inspect_by_key(key, &state.pool).await?;
+      utils::resource::delete(resource.clone(), &state.pool).await?;
+      let state_ptr = state.clone();
       rt::spawn(async move {
-        event_emitter
+        state_ptr
+          .event_emitter
           .lock()
           .unwrap()
           .send(Event::ResourceDeleted(Box::new(resource)));
@@ -254,22 +260,21 @@ pub async fn revert_deployment(
 }
 
 pub async fn revert_cargo(
-  data: StateCargo,
-  docker_api: &bollard_next::Docker,
-  pool: &Pool,
-  event_emitter: &EventEmitterPtr,
+  data: &StateCargo,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
-  let namespace = if let Some(namespace) = data.namespace {
-    namespace
+  let namespace = if let Some(namespace) = &data.namespace {
+    namespace.to_owned()
   } else {
     "global".into()
   };
 
-  for cargo in data.cargoes {
+  for cargo in &data.cargoes {
     let key = utils::key::gen_key(&namespace, &cargo.name);
-    let cargo = utils::cargo::inspect(&key, docker_api, pool).await?;
-    utils::cargo::delete(&key, docker_api, pool, Some(true)).await?;
-    let event_emitter = event_emitter.clone();
+    let cargo = utils::cargo::inspect(&key, &state).await?;
+    utils::cargo::delete(&key, &state.docker_api, &state.pool, Some(true))
+      .await?;
+    let event_emitter = state.event_emitter.clone();
     rt::spawn(async move {
       event_emitter
         .lock()
@@ -282,15 +287,15 @@ pub async fn revert_cargo(
 }
 
 pub async fn revert_resource(
-  data: StateResources,
-  pool: &Pool,
-  event_emitter: &EventEmitterPtr,
+  data: &StateResources,
+  state: &DaemonState,
 ) -> Result<(), HttpResponseError> {
-  for resource in data.resources {
+  for resource in &data.resources {
     let key = resource.name.to_owned();
-    let resource = repositories::resource::inspect_by_key(key, pool).await?;
-    utils::resource::delete(resource.clone(), pool).await?;
-    let event_emitter = event_emitter.clone();
+    let resource =
+      repositories::resource::inspect_by_key(key, &state.pool).await?;
+    utils::resource::delete(resource.clone(), &state.pool).await?;
+    let event_emitter = state.event_emitter.clone();
     rt::spawn(async move {
       event_emitter
         .lock()

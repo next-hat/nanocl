@@ -35,9 +35,7 @@ pub async fn create_cargo(
   log::debug!("Cargo created: {:?}", &cargo);
   let key = cargo.key.to_owned();
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state.docker_api, &state.pool)
-      .await
-      .unwrap();
+    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
     state
       .event_emitter
       .lock()
@@ -56,8 +54,7 @@ pub async fn delete_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("Deleting cargo: {}", &key);
-  let cargo =
-    utils::cargo::inspect(&key, &state.docker_api, &state.pool).await?;
+  let cargo = utils::cargo::inspect(&key, &state).await?;
   utils::cargo::delete(&key, &state.docker_api, &state.pool, None).await?;
   rt::spawn(async move {
     state
@@ -80,9 +77,7 @@ pub async fn start_cargo(
   log::debug!("Starting cargo: {}", &key);
   utils::cargo::start(&key, &state.docker_api, &state.pool).await?;
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state.docker_api, &state.pool)
-      .await
-      .unwrap();
+    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
     state
       .event_emitter
       .lock()
@@ -101,12 +96,10 @@ pub async fn stop_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("Stopping cargo: {}", &key);
-  utils::cargo::inspect(&key, &state.docker_api, &state.pool).await?;
+  utils::cargo::inspect(&key, &state).await?;
   utils::cargo::stop(&key, &state.docker_api).await?;
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state.docker_api, &state.pool)
-      .await
-      .unwrap();
+    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
     state
       .event_emitter
       .lock()
@@ -135,9 +128,7 @@ pub async fn put_cargo(
   )
   .await?;
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state.docker_api, &state.pool)
-      .await
-      .unwrap();
+    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
     state
       .event_emitter
       .lock()
@@ -166,9 +157,7 @@ pub async fn patch_cargo(
   )
   .await?;
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state.docker_api, &state.pool)
-      .await
-      .unwrap();
+    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
     state
       .event_emitter
       .lock()
@@ -185,10 +174,27 @@ pub async fn list_cargo(
 ) -> Result<web::HttpResponse, HttpResponseError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   log::debug!("Listing cargoes in namespace: {}", &namespace);
-  let cargoes =
-    utils::cargo::list(&namespace, &state.docker_api, &state.pool).await?;
+  let cargoes = utils::cargo::list(&namespace, &state).await?;
   log::debug!("Found {} cargoes: {:#?}", &cargoes.len(), &cargoes);
   Ok(web::HttpResponse::Ok().json(&cargoes))
+}
+
+#[web::get("/cargoes/{name}/instances")]
+pub async fn list_cargo_instances(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpResponseError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  log::debug!("Listing instances of cargo: {}", &key);
+  let instances = utils::cargo::list_instance(&key, &state.docker_api).await?;
+  log::debug!(
+    "Found {} instances of cargo: {:#?}",
+    &instances.len(),
+    &instances
+  );
+  Ok(web::HttpResponse::Ok().json(&instances))
 }
 
 #[web::get("/cargoes/{name}/inspect")]
@@ -200,8 +206,7 @@ async fn inspect_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("Inspecting cargo : {}", &key);
-  let cargo =
-    utils::cargo::inspect(&key, &state.docker_api, &state.pool).await?;
+  let cargo = utils::cargo::inspect(&key, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -272,9 +277,7 @@ async fn reset_cargo(
   .await?;
   let key = cargo_key.to_owned();
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state.docker_api, &state.pool)
-      .await
-      .unwrap();
+    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
     state
       .event_emitter
       .lock()
@@ -311,6 +314,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(reset_cargo);
   config.service(exec_command);
   config.service(logs_cargo);
+  config.service(list_cargo_instances);
 }
 
 #[cfg(test)]

@@ -1,3 +1,4 @@
+use bollard_next::service::ContainerSummary;
 use ntex::channel::mpsc;
 use ntex::channel::mpsc::Receiver;
 
@@ -481,6 +482,21 @@ impl NanocldClient {
       .await?;
 
     Ok(())
+  }
+
+  pub async fn list_cargo_instance(
+    &self,
+    name: &str,
+    namespace: Option<String>,
+  ) -> Result<Vec<ContainerSummary>, NanocldClientError> {
+    let res = self
+      .send_get(
+        format!("/{}/cargoes/{name}/instances", &self.version),
+        Some(GenericNspQuery { namespace }),
+      )
+      .await?;
+
+    Self::res_json(res).await
   }
 }
 
