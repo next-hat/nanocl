@@ -1542,7 +1542,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -1586,7 +1586,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld_client"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bollard-next",
  "futures",

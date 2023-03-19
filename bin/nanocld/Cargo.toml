@@ -26,7 +26,7 @@ clap_mangen = { version = "0.2" }
 serde_yaml = "0.9"
 
 [dependencies]
-nanocl_stubs = { version = "0.3.0", features = ["serde"] }
+nanocl_stubs = { version = "0.4.0", features = ["serde"] }
 bollard-next = { version = "0.14.3" }
 r2d2 = "0.8"
 log = "0.4.17"
@@ -51,4 +51,4 @@ libc = "0.2.139"
 metrsd_client = "0.1.1"
 chrono = { version = "0.4.24", features = ["serde"] }
 jsonschema = { version = "0.16.1", default-features = false }
-nanocld_client = { version = "0.3.0", features = ["tokio"] }
+nanocld_client = { version = "0.4.0", features = ["tokio"] }
