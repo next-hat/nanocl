@@ -1,0 +1,11 @@
+Type: Cargo
+ApiVersion: v0.3
+
+Namespace: global
+
+Cargoes:
+- Name: get-started
+  # See all options:
+  # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
+  Container:
+    Image: nexthat/nanocl-get-started:latest

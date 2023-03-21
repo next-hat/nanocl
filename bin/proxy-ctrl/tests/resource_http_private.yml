@@ -1,0 +1,20 @@
+Type: Resource
+ApiVersion: v0.3
+
+Resources:
+- Name: proxy-get-started
+  Kind: ProxyRule
+  Version: v0.1
+  Config:
+    Watch:
+    - get-started.global
+    Rule:
+      Http:
+        Domain: get-started.com
+        Network: Internal
+        Locations:
+        - Path: /
+          Target:
+            Cargo:
+              Key: get-started.global
+              Port: 9000

@@ -1,0 +1,8 @@
+indent_style = "Block"
+max_width = 80
+tab_spaces = 2
+reorder_imports = false
+reorder_modules = false
+force_multiline_blocks = true
+brace_style = "PreferSameLine"
+control_brace_style = "AlwaysSameLine"
