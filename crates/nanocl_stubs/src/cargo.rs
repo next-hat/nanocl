@@ -136,7 +136,9 @@ impl From<LogOutput> for OutputLog {
 }
 
 /// Options for the kill command
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoKillOptions {
   /// Signal to send to the container default: SIGKILL
   pub signal: String,
