@@ -2,6 +2,7 @@
 members = [
   "crates/nanocl_stubs",
   "crates/nanocld_client",
+  "bin/proxy-ctrl",
   "bin/nanocld",
   "bin/nanocl"
 ]

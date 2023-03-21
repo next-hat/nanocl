@@ -7,9 +7,9 @@ use bollard_next::container::CreateContainerOptions;
 use bollard_next::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
-use nanocl_stubs::cargo_config::CargoConfigPartial;
-use nanocl_stubs::cargo_config::ContainerConfig;
 use nanocl_stubs::config::DaemonConfig;
+use nanocl_stubs::cargo_config::ContainerConfig;
+use nanocl_stubs::cargo_config::CargoConfigPartial;
 
 use crate::utils;
 use crate::models::Pool;
@@ -115,7 +115,7 @@ pub(crate) async fn ensure(
   boot(config, docker_api).await?;
   // We wait 500ms to ensure store is booted
   // It's a tricky hack to avoid some error printed by postgresql connector for now.
-  thread::sleep(time::Duration::from_millis(500));
+  thread::sleep(time::Duration::from_millis(1000));
   let postgres_ip = utils::store::get_store_ip_addr(docker_api).await?;
   log::info!("Connecting to store");
   // Connect to postgresql
