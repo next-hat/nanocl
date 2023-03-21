@@ -59,7 +59,7 @@ async fn exec_vm_image_create(
       sent += r.len() as u64;
       let percent = calculate_percentage(sent, file_size);
       pg.set_position(percent);
-      let bytes = ntex::util::Bytes::from_iter(r.to_vec());
+      let bytes = ntex::util::Bytes::from_iter(r.freeze().to_vec());
       Ok::<ntex::util::Bytes, std::io::Error>(bytes)
     });
 

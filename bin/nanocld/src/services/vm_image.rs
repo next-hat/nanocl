@@ -1,7 +1,9 @@
+use std::io::Write;
+
 use ntex::web;
 use ntex::http::StatusCode;
-use tokio::fs;
-use tokio::io::AsyncWriteExt;
+use futures::StreamExt;
+
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
 use crate::{utils, repositories};
@@ -31,43 +33,31 @@ async fn import_vm_image(
   let state_dir = state.config.state_dir.clone();
   let vm_images_dir = format!("{state_dir}/vms/images");
   let filepath = format!("{vm_images_dir}/{name}.img");
-  let mut f = match fs::File::create(&filepath).await {
-    Err(err) => {
-      return Err(HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while trying to create file at {filepath}: {err}"),
-      });
-    }
-    Ok(f) => f,
-  };
-
-  while let Some(bytes) = ntex::util::stream_recv(&mut payload).await {
-    let bytes = match bytes {
-      Err(err) => {
-        log::error!("Unable to create vm image {name}: {err}");
-        break;
-      }
-      Ok(bytes) => bytes,
-    };
-    if let Err(err) = f.write_all(&bytes).await {
-      return Err(HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while trying to white file at {filepath}: {err}"),
-      });
-    }
-  }
-
-  if let Err(err) = f.shutdown().await {
-    return Err(HttpResponseError {
+  let fp = filepath.clone();
+  let fp2 = filepath.clone();
+  let mut f = web::block(move || std::fs::File::create(fp))
+    .await
+    .map_err(|err| HttpResponseError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Error while closing file {filepath}: {err}"),
-    });
+      msg: format!("Unable to create vm image {name}: {err}"),
+    })?;
+  while let Some(bytes) = payload.next().await {
+    let bytes = bytes.map_err(|err| HttpResponseError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      msg: format!("Unable to create vm image {name}: {err}"),
+    })?;
+    f = web::block(move || f.write_all(&bytes).map(|_| f))
+      .await
+      .map_err(|err| HttpResponseError {
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+        msg: format!("Unable to create vm image {name}: {err}"),
+      })?;
   }
 
   // Get image info
   let image_info = match utils::vm_image::get_info(&filepath).await {
     Err(err) => {
-      let _ = fs::remove_file(&filepath).await;
+      let _ = web::block(move || std::fs::remove_file(fp2)).await;
       return Err(err);
     }
     Ok(image_info) => image_info,

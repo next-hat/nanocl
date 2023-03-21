@@ -56,12 +56,6 @@ fn gen_store_cargo_conf(
     "--insecure".into(),
     "--listen-addr=:26257".into(),
     format!("--advertise-addr={}", config.advertise_addr),
-    // format!("--store={}", config.hostname),
-    // "--sql-addr=:26357".into(),
-    // "--advertise-addr=:26257".into(),
-    // "--accept-sql-without-tls".into(),
-    // "--listen-addr=:26257".into(),
-    // "--http-addr=:8080".into(),
   ];
   for node in &config.nodes {
     cmd.push("--join".into());
