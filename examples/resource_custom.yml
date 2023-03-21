@@ -1,5 +1,5 @@
 Type: Resource
-ApiVersion: v0.2
+ApiVersion: v0.4
 
 Resources:
 - Name: ProxyRule

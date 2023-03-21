@@ -7,8 +7,11 @@ use nanocl_stubs::state::StateDeployment;
 use crate::error::CliError;
 use crate::utils;
 
+#[cfg(feature = "dev")]
 pub const PROXY_CONF: &str =
   include_str!("../../specs/controllers/dev.proxy.yml");
+#[cfg(not(feature = "dev"))]
+pub const PROXY_CONF: &str = include_str!("../../specs/controllers/proxy.yml");
 
 pub async fn init(docker: &Docker) -> Result<(), CliError> {
   let proxy_conf = serde_yaml::from_str::<StateDeployment>(PROXY_CONF)

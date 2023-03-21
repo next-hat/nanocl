@@ -46,6 +46,8 @@ jobs:
         docker pull cockroachdb/cockroach:v22.2.6
         docker pull nexthat/metrsd:v0.1.0
         docker pull nexthat/nanocl-get-started:latest
+        docker pull nexthat/nanocl-proxy:0.2.3
+        docker pull nexthat/nanocl-ctrl-proxy:0.2.3
         cargo make run-daemon -- --init
         docker network ls
         cargo make run-daemon &
