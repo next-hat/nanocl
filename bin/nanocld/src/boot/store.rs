@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use std::time;
 use std::thread;
 use std::path::Path;
+use std::collections::HashMap;
 
 use bollard_next::container::CreateContainerOptions;
 use bollard_next::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};

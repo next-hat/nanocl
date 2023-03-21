@@ -48,6 +48,7 @@ jobs:
         docker pull nexthat/nanocl-get-started:latest
         docker pull nexthat/nanocl-proxy:0.2.3
         docker pull nexthat/nanocl-ctrl-proxy:0.2.3
+        cargo build --bin nanocl
         cargo make run-daemon -- --init
         docker network ls
         cargo make run-daemon &
