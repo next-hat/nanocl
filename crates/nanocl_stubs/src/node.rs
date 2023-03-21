@@ -7,8 +7,8 @@ use serde::{Serialize, Deserialize};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Node {
-  pub(crate) name: String,
-  pub(crate) ip_address: String,
+  pub name: String,
+  pub ip_address: String,
 }
 
 #[derive(Clone, Debug)]
