@@ -429,8 +429,8 @@ pub(crate) mod tests {
   pub(crate) async fn exec_nanocl(arg: &str) -> std::io::Result<Output> {
     let arg = arg.to_owned();
     web::block(move || {
-      let mut cmd = std::process::Command::new("cargo");
-      let mut args = vec!["run", "--bin", "nanocl", "--"];
+      let mut cmd = std::process::Command::new("nanocl");
+      let mut args = vec![];
       args.extend(arg.split(' ').collect::<Vec<&str>>());
       cmd.args(&args);
       let output = cmd.output()?;
