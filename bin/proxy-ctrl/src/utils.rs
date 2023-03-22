@@ -422,7 +422,9 @@ pub(crate) async fn sync_resources(
 
 #[cfg(test)]
 pub(crate) mod tests {
-  use ntex::web::ServiceConfig;
+  use std::process::Output;
+
+  use ntex::web::{ServiceConfig, error::BlockingError};
 
   use crate::nginx::Nginx;
 
@@ -438,6 +440,25 @@ pub(crate) mod tests {
       .parse_env("LOG_LEVEL")
       .is_test(true)
       .try_init();
+  }
+
+  pub(crate) async fn exec_nanocl(arg: &str) -> std::io::Result<Output> {
+    let arg = arg.to_owned();
+    ntex::web::block(move || {
+      let mut cmd = std::process::Command::new("nanocl");
+      let mut args = vec![];
+      args.extend(arg.split(' ').collect::<Vec<&str>>());
+      cmd.args(&args);
+      let output = cmd.output()?;
+      Ok::<_, std::io::Error>(output)
+    })
+    .await
+    .map_err(|err| match err {
+      BlockingError::Error(err) => err,
+      BlockingError::Canceled => {
+        std::io::Error::new(std::io::ErrorKind::Other, "Canceled")
+      }
+    })
   }
 
   pub fn generate_server(routes: Config) -> ntex::web::test::TestServer {

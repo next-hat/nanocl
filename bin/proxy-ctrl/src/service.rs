@@ -19,7 +19,7 @@ async fn apply_rule(
   utils::create_resource_conf(&client, &nginx, &payload).await?;
   utils::reload_config(&client).await?;
 
-  Ok(web::HttpResponse::Ok().finish())
+  Ok(web::HttpResponse::Ok().json(&payload))
 }
 
 #[web::delete("/rules/{kind}/{name}")]
@@ -28,6 +28,8 @@ async fn remove_rule(
   nginx: web::types::State<Nginx>,
 ) -> Result<web::HttpResponse, HttpError> {
   let (kind, name) = path.into_inner();
+
+  println!("Deleting rule: {kind} {name}");
 
   let kind: NginxConfKind = kind.parse()?;
 
@@ -51,7 +53,7 @@ mod tests {
   use crate::utils::tests;
 
   #[ntex::test]
-  async fn rule() {
+  async fn rules() {
     let test_srv = tests::generate_server(ntex_config);
 
     let resource: &str = include_str!("../tests/resource_redirect.yml");

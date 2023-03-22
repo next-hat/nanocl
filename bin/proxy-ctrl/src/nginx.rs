@@ -88,6 +88,16 @@ impl Nginx {
         ),
       )
     })?;
+    // Ensure conf.d directory exists
+    let conf_d = format!("{}/conf.d", self.conf_dir);
+    fs::create_dir_all(conf_d).map_err(|err| {
+      ErrorHint::error(
+        2,
+        format!(
+          "Cannot create directory {streams_enabled_dir} got error : {err}",
+        ),
+      )
+    })?;
     Ok(())
   }
 

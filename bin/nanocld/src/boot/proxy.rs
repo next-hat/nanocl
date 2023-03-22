@@ -10,8 +10,11 @@ use crate::utils;
 #[cfg(feature = "dev")]
 pub const PROXY_CONF: &str =
   include_str!("../../specs/controllers/dev.proxy.yml");
-#[cfg(not(feature = "dev"))]
+#[cfg(feature = "release")]
 pub const PROXY_CONF: &str = include_str!("../../specs/controllers/proxy.yml");
+#[cfg(feature = "test")]
+pub const PROXY_CONF: &str =
+  include_str!("../../specs/controllers/test.proxy.yml");
 
 pub async fn init(docker: &Docker) -> Result<(), CliError> {
   let proxy_conf = serde_yaml::from_str::<StateDeployment>(PROXY_CONF)

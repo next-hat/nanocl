@@ -39,7 +39,7 @@ args = ["nextest", "run", "-j", "1"]
 # Test all with debug output
 [tasks.test-debug]
 command = "cargo"
-args = ["nextest", "run", "-j", "1", "--nocapture"]
+args = ["nextest", "run", "--features", "test", "-j", "1", "--nocapture"]
 
 [tasks.dev]
 command = "cargo"
@@ -52,12 +52,12 @@ args = ["run", "--features", "dev", "--bin", "proxy-ctrl", "${@}"]
 # Test coverage
 [tasks.cov]
 command = "cargo"
-args = ["llvm-cov", "nextest", "-j", "1"]
+args = ["llvm-cov", "nextest", "--features", "test", "-j", "1"]
 
 # Test all with coverage for codecov
 [tasks.covgen]
 command = "cargo"
-args = ["llvm-cov", "nextest", "-j", "1", "--output-path", "./lcov.info", "--lcov"]
+args = ["llvm-cov", "nextest", "--features", "test", "-j", "1", "--output-path", "./lcov.info", "--lcov"]
 
 # Release
 [tasks.release]

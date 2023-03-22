@@ -16,8 +16,10 @@ bench = false
 path = "src/main.rs"
 
 [features]
-default = []
+default = ["release"]
 dev = []
+test = []
+release = []
 
 [build-dependencies]
 clap = { version = "4.1.7", features = ["derive"] }

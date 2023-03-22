@@ -80,7 +80,7 @@ mod tests {
 
     assert_eq!(req.status(), 200);
 
-    let data = parse_state_file("../../examples/resource_custom.yml")?;
+    let data = parse_state_file("../../examples/deploy_example.yml")?;
     let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
     assert_eq!(req.status(), 200);
 
@@ -106,7 +106,7 @@ mod tests {
 
     assert_eq!(req.status(), 200);
 
-    let data = parse_state_file("../../examples/resource_custom.yml")?;
+    let data = parse_state_file("../../examples/deploy_example.yml")?;
     let req = srv
       .put("/v0.2/state/revert")
       .send_json(&data)
