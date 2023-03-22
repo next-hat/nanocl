@@ -1,10 +1,10 @@
 Type: Cargo
 ApiVersion: v0.4
 
-Namespace: cargo-example
+Namespace: global
 
 Cargoes:
-- Name: cargo-example
+- Name: get-started
   # See all options:
   # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
   Container:

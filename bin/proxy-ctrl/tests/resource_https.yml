@@ -2,12 +2,12 @@ Type: Resource
 ApiVersion: v0.4
 
 Resources:
-- Name: resource-example
+- Name: proxy-get-started
   Kind: ProxyRule
   Version: v0.1
   Config:
     Watch:
-      - get-started.global
+    - get-started.global
     Rule:
       Http:
         Domain: get-started.com
@@ -15,10 +15,10 @@ Resources:
         Ssl:
           Certificate: /random/path/to/cert
           CertificateKey: /random/path/to/key
-          SslDhParam: /random/path/to/param
+          DhParam: /random/path/to/param
         Locations:
-          - Path: /
-            Target:
-              Cargo:
-                Key: get-started.global
-                Port: 9000
+        - Path: /
+          Target:
+            Cargo:
+              Key: get-started.global
+              Port: 9000

@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use bollard_next::service::HostConfig;
+use nanocl_stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
 use ntex::rt;
 use ntex::http::StatusCode;
 
@@ -7,7 +11,7 @@ use nanocl_stubs::state::{
 };
 
 use crate::{utils, repositories};
-use crate::error::HttpResponseError;
+use crate::error::{HttpResponseError, CliError};
 use crate::models::{StateData, DaemonState};
 
 pub fn parse_state(
@@ -271,4 +275,75 @@ pub async fn revert_resource(
     });
   }
   Ok(())
+}
+
+pub fn hook_cargo_binds(
+  cargo: &CargoConfigPartial,
+) -> Result<CargoConfigPartial, CliError> {
+  if let Some(host_config) = &cargo.container.host_config {
+    if let Some(binds) = &host_config.binds {
+      let mut new_bind = Vec::new();
+      for bind in binds {
+        let split = bind.split(':').collect::<Vec<&str>>();
+        let source = split.first();
+        let dest = split.get(1);
+        let dest = dest.unwrap_or(&"");
+        let source = source.unwrap_or(&"");
+        if source.starts_with('.') {
+          let cwd = std::env::current_dir().map_err(|err| CliError {
+            msg: format!("Failed to get current directory: {}", err),
+            code: 5,
+          })?;
+          let source = cwd
+            .join(source)
+            .canonicalize()
+            .map_err(|err| CliError {
+              msg: format!("Failed to get canonical path: {}", err),
+              code: 5,
+            })?
+            .display()
+            .to_string();
+          new_bind.push(format!("{}:{}", source, dest));
+          continue;
+        }
+        new_bind.push(bind.to_owned());
+      }
+      return Ok(CargoConfigPartial {
+        container: ContainerConfig::<String> {
+          host_config: Some(HostConfig {
+            binds: Some(new_bind),
+            ..host_config.clone()
+          }),
+          ..cargo.container.clone()
+        },
+        ..cargo.clone()
+      });
+    }
+  }
+
+  Ok(cargo.clone())
+}
+
+pub fn hook_labels(
+  namespace: &str,
+  cargo: &CargoConfigPartial,
+) -> CargoConfigPartial {
+  let key = utils::key::gen_key(namespace, &cargo.name);
+
+  let mut labels = HashMap::new();
+  labels.insert("io.nanocl".into(), "enabled".into());
+  labels.insert("io.nanocl.c".into(), key);
+  labels.insert("io.nanocl.cnsp".into(), namespace.into());
+
+  let mut curr_label = cargo.container.labels.clone().unwrap_or_default();
+
+  curr_label.extend(labels);
+
+  CargoConfigPartial {
+    container: ContainerConfig::<String> {
+      labels: Some(curr_label),
+      ..cargo.container.clone()
+    },
+    ..cargo.clone()
+  }
 }

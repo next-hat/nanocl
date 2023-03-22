@@ -1,5 +1,7 @@
-Type: Resource
+Type: Deployment
 ApiVersion: v0.4
+
+Namespace: system
 
 Resources:
 - Name: ProxyRule
@@ -190,3 +192,28 @@ Resources:
         - MovedPermanently
         - PermanentRedirect
         - TemporaryRedirect
+
+Cargoes:
+- Name: proxy
+  Container:
+    Image: nexthat/nanocl-proxy:0.2.3
+    HostConfig:
+      NetworkMode: host
+      Binds: [
+        "/var/lib/nanocl/proxy/letsencrypt:/etc/letsencrypt",
+        "/var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d",
+        "/var/lib/nanocl/proxy/html:/usr/share/nginx/html",
+        "/var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled",
+        "/var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled",
+      ]
+
+- Name: ctrl-proxy
+  Container:
+    Image: nexthat/nanocl-ctrl-proxy:0.2.3
+    HostConfig:
+      Binds: [
+        "/var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d",
+        "/var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled",
+        "/var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled",
+        "/run/nanocl:/run/nanocl"
+      ]

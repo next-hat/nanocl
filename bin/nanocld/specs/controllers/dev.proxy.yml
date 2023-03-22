@@ -1,0 +1,32 @@
+Type: Deployment
+ApiVersion: v0.4
+
+Namespace: system
+
+Cargoes:
+  - Name: proxy
+    Container:
+      Image: nanocl-nginx:dev
+      HostConfig:
+        NetworkMode: host
+        Binds: [
+          "/var/lib/nanocl/proxy/html:/usr/share/nginx/html",
+          "/var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d",
+          "/var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled",
+          "/var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled"
+        ]
+
+  - Name: ctrl-proxy
+    Container:
+      Image: nanocl-ctrl-proxy:dev
+      Cmd: ["-x", "run"]
+      Tty: true
+      HostConfig:
+        Binds: [
+          "./:/project",
+          "/usr/local/cargo/registry/cache:/usr/local/cargo/registry/cache",
+          "/var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d",
+          "/var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled",
+          "/var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled",
+          "/run/nanocl:/run/nanocl"
+        ]
