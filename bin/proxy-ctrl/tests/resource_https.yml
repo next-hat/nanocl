@@ -1,5 +1,5 @@
 Type: Resource
-ApiVersion: v0.3
+ApiVersion: v0.4
 
 Resources:
 - Name: proxy-get-started

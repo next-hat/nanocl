@@ -196,6 +196,10 @@ mod tests {
       run(args).await;
     });
 
+    exec_nanocl("state apply -y -f ../../examples/resource_custom.yml")
+      .await
+      .unwrap();
+
     // Deploy a cargo
     let output = exec_nanocl("state apply -y -f ./tests/test-deploy.yml")
       .await
@@ -208,6 +212,7 @@ mod tests {
     let output = exec_nanocl("state apply -y -f ./tests/resource_http.yml")
       .await
       .expect("Expect to deploy a resource");
+    println!("{output:#?}");
     assert!(output.status.success());
     ntex::time::sleep(std::time::Duration::from_secs(1)).await;
 
@@ -277,6 +282,10 @@ mod tests {
       .await
       .expect("Expect delete a tcp resource");
     assert!(output.status.success());
+
+    exec_nanocl("state revert -y -f ../../examples/resource_custom.yml")
+      .await
+      .unwrap();
   }
 
   #[allow(dead_code)]
