@@ -1,24 +1,23 @@
 use nanocld_client::{
   NanocldClient,
   stubs::{
-    resource::{Resource, ResourceQuery},
+    resource::{Resource, ResourceQuery, ResourcePartial},
     cargo::{CargoInspect, CargoExecConfig},
+    proxy::StreamTarget,
   },
 };
 
-use crate::{
-  error::ErrorHint,
-  models::{
-    ProxyRuleHttp, CargoTarget, ProxyHttpLocation, ProxyRuleStream,
-    LocationTarget,
-  },
+use nanocld_client::stubs::proxy::{
+  ProxyRuleHttp, CargoTarget, ProxyHttpLocation, ProxyRuleStream,
+  LocationTarget, ResourceProxyRule, ProxyRule,
 };
+
+use crate::error::ErrorHint;
 use crate::nginx::{Nginx, NginxConfKind};
-use crate::models::{ResourceProxyRule, ProxyRule};
 
 /// Serialize a ProxyRule
 pub(crate) fn serialize_proxy_rule(
-  resource: &Resource,
+  resource: &ResourcePartial,
 ) -> Result<ResourceProxyRule, ErrorHint> {
   let proxy_rule =
     serde_json::from_value::<ResourceProxyRule>(resource.config.to_owned())
@@ -254,9 +253,15 @@ async fn gen_stream_server_block(
   let port = rule.port;
   let listen_addr = get_listen_addr(resource_name, &rule.network)?;
 
-  let upstream_key =
-    gen_cargo_upstream(&NginxConfKind::Stream, &rule.target, client, nginx)
-      .await?;
+  let upstream_key = match &rule.target {
+    StreamTarget::Cargo(cargo_target) => {
+      gen_cargo_upstream(&NginxConfKind::Stream, cargo_target, client, nginx)
+        .await?
+    }
+    StreamTarget::Uri(_) => {
+      return Err(ErrorHint::error("Not implemented".into()))
+    }
+  };
 
   let ssl = if let Some(ssl) = &rule.ssl {
     let certificate = &ssl.certificate;
@@ -341,7 +346,7 @@ pub(crate) async fn reload_config(
 pub(crate) async fn create_resource_conf(
   client: &NanocldClient,
   nginx: &Nginx,
-  resource: &nanocld_client::stubs::resource::Resource,
+  resource: &nanocld_client::stubs::resource::ResourcePartial,
 ) -> Result<(), ErrorHint> {
   let proxy_rule = serialize_proxy_rule(resource)?;
   let (kind, conf) =
@@ -399,7 +404,9 @@ pub(crate) async fn sync_resources(
   let _ = nginx.clear_conf();
 
   for resource in resources {
-    if let Err(err) = create_resource_conf(client, nginx, &resource).await {
+    if let Err(err) =
+      create_resource_conf(client, nginx, &resource.into()).await
+    {
       err.print();
     }
   }
@@ -412,7 +419,12 @@ pub(crate) mod tests {
   use std::process::Output;
 
   use ntex::web;
+  use ntex::web::ServiceConfig;
   use ntex::web::error::BlockingError;
+
+  use crate::nginx::Nginx;
+
+  type Config = fn(&mut ServiceConfig);
 
   pub fn before() {
     // Build a test env logger
@@ -426,22 +438,31 @@ pub(crate) mod tests {
       .try_init();
   }
 
-  pub(crate) async fn exec_nanocl(arg: &str) -> std::io::Result<Output> {
-    let arg = arg.to_owned();
-    web::block(move || {
-      let mut cmd = std::process::Command::new("nanocl");
-      let mut args = vec![];
-      args.extend(arg.split(' ').collect::<Vec<&str>>());
-      cmd.args(&args);
-      let output = cmd.output()?;
-      Ok::<_, std::io::Error>(output)
-    })
-    .await
-    .map_err(|err| match err {
-      BlockingError::Error(err) => err,
-      BlockingError::Canceled => {
-        std::io::Error::new(std::io::ErrorKind::Other, "Canceled")
-      }
+  // pub(crate) async fn exec_nanocl(arg: &str) -> std::io::Result<Output> {
+  //   let arg = arg.to_owned();
+  //   web::block(move || {
+  //     let mut cmd = std::process::Command::new("nanocl");
+  //     let mut args = vec![];
+  //     args.extend(arg.split(' ').collect::<Vec<&str>>());
+  //     cmd.args(&args);
+  //     let output = cmd.output()?;
+  //     Ok::<_, std::io::Error>(output)
+  //   })
+  //   .await
+  //   .map_err(|err| match err {
+  //     BlockingError::Error(err) => err,
+  //     BlockingError::Canceled => {
+  //       std::io::Error::new(std::io::ErrorKind::Other, "Canceled")
+  //     }
+  //   })
+  // }
+
+  pub fn generate_server(routes: Config) -> ntex::web::test::TestServer {
+    before();
+    let nginx = Nginx::new("/tmp/nginx");
+    // Create test server
+    ntex::web::test::server(move || {
+      ntex::web::App::new().state(nginx.clone()).configure(routes)
     })
   }
 }

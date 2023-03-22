@@ -1,12 +1,14 @@
+#[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
 #[cfg(feature = "bschemars")]
 use schemars::JsonSchema;
 
 /// Proxy rules modes
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum ProxyRule {
   /// Redirect http trafic
   Http(ProxyRuleHttp),
@@ -14,9 +16,10 @@ pub enum ProxyRule {
   Stream(ProxyRuleStream),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxySslConfig {
   /// Path to the certificate
   pub certificate: String,
@@ -27,9 +30,10 @@ pub struct ProxySslConfig {
 }
 
 /// Defines a proxy rule target
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoTarget {
   /// The cargo key
   pub key: String,
@@ -37,9 +41,10 @@ pub struct CargoTarget {
   pub port: u16,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum UrlRedirect {
   MovedPermanently,
   PermanentRedirect,
@@ -59,35 +64,63 @@ impl std::fmt::Display for UrlRedirect {
   }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct HttpTarget {
+  /// Url to target
   pub url: String,
+  /// Redirect type if it's a redirect
   pub redirect: Option<UrlRedirect>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum LocationTarget {
+  /// Target an existing cargo
   Cargo(CargoTarget),
+  /// Target a specific http url
   Http(HttpTarget),
 }
 
-/// Proxy rules modes
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct UriTarget {
+  /// Uri to target
+  pub uri: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "bschemars", derive(JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum StreamTarget {
+  /// Target an existing cargo
+  Cargo(CargoTarget),
+  /// Target a specific uri
+  Uri(UriTarget),
+}
+
+/// Proxy rules modes
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "bschemars", derive(JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum ProxyStreamProtocol {
   Tcp,
   Udp,
 }
 
 /// Proxy rules modes
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxyRuleStream {
   /// Type of the network binding private | public | internal | namespace:$namespace_name
   pub network: String,
@@ -97,14 +130,15 @@ pub struct ProxyRuleStream {
   pub port: u16,
   /// The ssl configuration
   pub ssl: Option<ProxySslConfig>,
-  /// The target cargo
-  pub target: CargoTarget,
+  /// The target
+  pub target: StreamTarget,
 }
 
 /// Defines a proxy rule location
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxyHttpLocation {
   /// The path
   pub path: String,
@@ -113,9 +147,10 @@ pub struct ProxyHttpLocation {
 }
 
 /// Defines a proxy rule http config
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxyRuleHttp {
   /// The domain
   pub domain: Option<String>,
@@ -130,9 +165,10 @@ pub struct ProxyRuleHttp {
 }
 
 /// Define proxy rules to apply
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "bschemars", derive(JsonSchema))]
-#[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceProxyRule {
   /// Cargo to watch for changes
   pub watch: Vec<String>,

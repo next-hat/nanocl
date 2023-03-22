@@ -2,7 +2,7 @@ use std::fs;
 
 use crate::error::ErrorHint;
 
-use crate::models::ProxyRule;
+use nanocld_client::stubs::proxy::ProxyRule;
 
 #[derive(Debug)]
 pub(crate) enum NginxConfKind {
@@ -28,25 +28,15 @@ impl From<ProxyRule> for NginxConfKind {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct Nginx {
-  pub(crate) default_gateway: Option<String>,
   pub(crate) conf_dir: String,
 }
 
 impl Nginx {
   pub(crate) fn new(conf_dir: &str) -> Self {
     Self {
-      default_gateway: None,
       conf_dir: conf_dir.to_owned(),
-    }
-  }
-
-  pub(crate) fn set_default_gateway(&mut self, gateway: &str) -> Self {
-    self.default_gateway = Some(gateway.to_owned());
-    Self {
-      default_gateway: Some(gateway.to_owned()),
-      conf_dir: self.conf_dir.clone(),
     }
   }
 

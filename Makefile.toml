@@ -45,6 +45,10 @@ args = ["nextest", "run", "-j", "1", "--nocapture"]
 command = "cargo"
 args = ["run", "--features", "dev", "--bin", "nanocld", "${@}"]
 
+[tasks.dev-proxy]
+command = "cargo"
+args = ["run", "--features", "dev", "--bin", "proxy-ctrl", "${@}"]
+
 # Test coverage
 [tasks.cov]
 command = "cargo"

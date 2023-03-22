@@ -1,5 +1,3 @@
-include!("src/models.rs");
-
 #[cfg(feature = "bschemars")]
 fn build_models() {
   use std::fs;

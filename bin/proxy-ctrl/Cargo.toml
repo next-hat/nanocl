@@ -27,6 +27,8 @@ serde_json = "1.0.91"
 
 [dev-dependencies]
 bollard-next = "0.14.3"
+serde_yaml = "0.9.19"
+
 
 [dependencies]
 clap = { version = "4.1.7", features = ["derive"] }
