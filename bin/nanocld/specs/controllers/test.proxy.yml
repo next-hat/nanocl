@@ -6,7 +6,7 @@ Namespace: system
 Cargoes:
 - Name: proxy
   Container:
-    Image: nanocl-proxy:test
+    Image: nexthat/nanocl-proxy:0.2.3
     HostConfig:
       NetworkMode: host
       Binds: [
@@ -19,7 +19,7 @@ Cargoes:
 
 - Name: ctrl-proxy
   Container:
-    Image: nexthat/nanocl-ctrl-proxy:0.2.3
+    Image: nanocl-proxy:test
     HostConfig:
       Binds: [
         "/var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d",
