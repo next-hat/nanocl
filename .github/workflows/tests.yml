@@ -55,6 +55,7 @@ jobs:
         cargo make run-daemon &
         sleep 5
         sudo chmod 777 -R /run/nanocl
+        sudo chmod 777 -R /var/lib/nanocl
     # Run coverage
     - name: Run tests
       run: cargo make covgen
