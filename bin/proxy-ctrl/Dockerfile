@@ -2,8 +2,6 @@
 FROM rust:1.68.0-alpine3.17 as planner
 
 WORKDIR /app
-RUN apk add gcc g++ make
-RUN cargo install cargo-chef --locked
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./crates/nanocl_stubs/Cargo.toml ./crates/nanocl_stubs/Cargo.toml
