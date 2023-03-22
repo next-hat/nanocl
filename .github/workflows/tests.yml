@@ -54,10 +54,11 @@ jobs:
         cargo make run-daemon -- --init
         docker network ls
         cargo make run-daemon &
-        sleep 5
+        sleep 8
         sudo chmod 777 -R /run/nanocl
         sudo chmod 777 -R /var/lib/nanocl
         mkdir -p /tmp/nginx/sites-enabled
+        docker ps -a
     # Run coverage
     - name: Run tests
       run: cargo make covgen
