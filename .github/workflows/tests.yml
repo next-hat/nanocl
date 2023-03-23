@@ -48,17 +48,19 @@ jobs:
         docker pull nexthat/nanocl-get-started:latest
         docker pull nexthat/nanocl-proxy:0.2.3
         docker pull nexthat/nanocl-ctrl-proxy:0.2.3
-        docker build -t nanocl-proxy:test -f ./bin/proxy-ctrl/Dockerfile .
         cargo build --bin nanocl
         cargo build --bin proxy-ctrl
         cp ./target/debug/nanocl /usr/local/bin
         cargo make run-daemon -- --init
         docker network ls
         cargo make run-daemon &
+        sleep 8
+        sudo mkdir -p /var/lib/nanocl/proxy
+        sudo chmod 777 -R /run/nanocl
+        sudo chmod 777 -R /var/lib/nanocl
         cargo run --bin proxy-ctrl --conf-dir /var/lib/nanocl/proxy &
         sleep 8
         sudo chmod 777 -R /run/nanocl
-        sudo chmod 777 -R /var/lib/nanocl
         mkdir -p /tmp/nginx/sites-enabled
         docker ps -a
     # Run coverage
