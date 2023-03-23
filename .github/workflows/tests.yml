@@ -58,7 +58,7 @@ jobs:
         sudo mkdir -p /var/lib/nanocl/proxy
         sudo chmod 777 -R /run/nanocl
         sudo chmod 777 -R /var/lib/nanocl
-        cargo run --bin proxy-ctrl --conf-dir /var/lib/nanocl/proxy &
+        cargo run --bin proxy-ctrl -- --conf-dir /var/lib/nanocl/proxy &
         sleep 8
         sudo chmod 777 -R /run/nanocl
         mkdir -p /tmp/nginx/sites-enabled
