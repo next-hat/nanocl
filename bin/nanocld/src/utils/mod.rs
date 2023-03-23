@@ -5,6 +5,7 @@ pub mod network;
 
 pub mod store;
 pub mod state;
+pub mod proxy;
 pub mod resource;
 pub mod namespace;
 pub mod vm;

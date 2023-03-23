@@ -1,6 +1,6 @@
 use ntex::{web, Service, Middleware};
-use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
 use futures::future::{ok, Either, Ready};
+use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
 
 use crate::version;
 use crate::error::HttpResponseError;

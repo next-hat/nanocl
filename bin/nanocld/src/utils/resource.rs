@@ -1,3 +1,4 @@
+use nanocl_stubs::proxy::{ProxyRule, ResourceProxyRule};
 use ntex::http::StatusCode;
 use jsonschema::{JSONSchema, Draft};
 
@@ -6,6 +7,8 @@ use nanocl_stubs::resource::{Resource, ResourcePartial};
 use crate::repositories;
 use crate::error::HttpResponseError;
 use crate::models::{Pool, ResourceKindPartial};
+
+use super::proxy::ProxyClient;
 
 pub async fn validate_resource(
   resource: &ResourcePartial,
@@ -56,11 +59,61 @@ pub async fn validate_resource(
   Ok(())
 }
 
+async fn hook_apply_proxy_rule(
+  resource: &ResourcePartial,
+  pool: &Pool,
+) -> Result<ResourcePartial, HttpResponseError> {
+  if resource.kind != "ProxyRule" {
+    validate_resource(resource, pool).await?;
+    return Ok(resource.to_owned());
+  }
+  let proxy = ProxyClient::unix_default();
+  let hooked_resource =
+    proxy
+      .apply_rule(resource)
+      .await
+      .map_err(|err| HttpResponseError {
+        status: StatusCode::BAD_REQUEST,
+        msg: format!("Invalid proxy rule {}", err),
+      })?;
+  Ok(hooked_resource)
+}
+
+async fn hook_remove_proxy_rule(
+  resource: &Resource,
+) -> Result<(), HttpResponseError> {
+  if resource.kind != "ProxyRule" {
+    return Ok(());
+  }
+
+  let proxy_rule =
+    serde_json::from_value::<ResourceProxyRule>(resource.config.clone())
+      .map_err(|err| HttpResponseError {
+        status: StatusCode::BAD_REQUEST,
+        msg: format!("Invalid proxy rule {}", err),
+      })?;
+
+  let kind = match proxy_rule.rule {
+    ProxyRule::Http(_) => "site",
+    ProxyRule::Stream(_) => "stream",
+  };
+
+  let proxy = ProxyClient::unix_default();
+  proxy
+    .delete_rule(&resource.name, kind)
+    .await
+    .map_err(|err| HttpResponseError {
+      status: StatusCode::BAD_REQUEST,
+      msg: format!("Invalid proxy rule {}", err),
+    })?;
+  Ok(())
+}
+
 pub async fn create(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
-  validate_resource(resource, pool).await?;
+  hook_apply_proxy_rule(resource, pool).await?;
   repositories::resource::create(resource, pool).await
 }
 
@@ -68,7 +121,7 @@ pub async fn patch(
   resource: ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
-  validate_resource(&resource, pool).await?;
+  hook_apply_proxy_rule(&resource, pool).await?;
   repositories::resource::patch(&resource, pool).await
 }
 
@@ -76,7 +129,7 @@ pub async fn create_or_patch(
   resource: ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpResponseError> {
-  validate_resource(&resource, pool).await?;
+  hook_apply_proxy_rule(&resource, pool).await?;
   repositories::resource::create_or_patch(&resource, pool).await
 }
 
@@ -84,6 +137,9 @@ pub async fn delete(
   resource: Resource,
   pool: &Pool,
 ) -> Result<(), HttpResponseError> {
+  if let Err(err) = hook_remove_proxy_rule(&resource).await {
+    log::warn!("{err}");
+  }
   if resource.kind.as_str() == "Custom" {
     repositories::resource_kind::delete_version(&resource.name, pool).await?;
     repositories::resource_kind::delete(&resource.name, pool).await?;

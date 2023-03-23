@@ -172,10 +172,9 @@ mod tests {
       "state",
       "apply",
       "-yf",
-      "../../examples/resource_custom.yml",
+      "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
-
     // Create a new resource
     let args = Cli::parse_from([
       "nanocl",
@@ -220,6 +219,14 @@ mod tests {
     let args =
       Cli::parse_from(["nanocl", "resource", "rm", "-y", "resource-example"]);
     assert!(execute_args(&args).await.is_ok());
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "revert",
+      "-yf",
+      "../../examples/deploy_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
   }
 
   /// Test cargo exec command
@@ -248,78 +255,41 @@ mod tests {
       "-yf",
       "../../examples/deploy_example.yml",
     ]);
-
     assert!(execute_args(&args).await.is_ok());
 
     let args = Cli::parse_from([
       "nanocl",
       "state",
       "apply",
+      "-yf",
+      "../../examples/cargo_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "apply",
+      "-yf",
+      "../../examples/cargo_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "revert",
+      "-yf",
+      "../../examples/cargo_example.yml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "revert",
       "-yf",
       "../../examples/deploy_example.yml",
-    ]);
-    assert!(execute_args(&args).await.is_ok());
-
-    let args = Cli::parse_from([
-      "nanocl",
-      "state",
-      "revert",
-      "-yf",
-      "../../examples/deploy_example.yml",
-    ]);
-    assert!(execute_args(&args).await.is_ok());
-
-    let args = Cli::parse_from([
-      "nanocl",
-      "state",
-      "apply",
-      "-yf",
-      "../../examples/cargo_example.yml",
-    ]);
-    assert!(execute_args(&args).await.is_ok());
-
-    let args = Cli::parse_from([
-      "nanocl",
-      "state",
-      "apply",
-      "-yf",
-      "../../examples/cargo_example.yml",
-    ]);
-    assert!(execute_args(&args).await.is_ok());
-
-    let args = Cli::parse_from([
-      "nanocl",
-      "state",
-      "apply",
-      "-yf",
-      "../../examples/cargo_example.yml",
-    ]);
-    assert!(execute_args(&args).await.is_ok());
-
-    // let args = Cli::parse_from([
-    //   "nanocl",
-    //   "state",
-    //   "apply",
-    //   "-yf",
-    //   "https://raw.githubusercontent.com/nxthat/nanocl/nightly/examples/deploy_example.yml"
-    // ]);
-    // assert!(execute_args(&args).await.is_ok());
-
-    let args = Cli::parse_from([
-      "nanocl",
-      "state",
-      "revert",
-      "-yf",
-      "../../examples/cargo_example.yml",
-    ]);
-    assert!(execute_args(&args).await.is_ok());
-
-    let args = Cli::parse_from([
-      "nanocl",
-      "state",
-      "revert",
-      "-yf",
-      "../../examples/resource_custom.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
   }

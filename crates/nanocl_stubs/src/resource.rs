@@ -48,6 +48,17 @@ pub struct Resource {
   pub config: serde_json::Value,
 }
 
+impl From<Resource> for ResourcePartial {
+  fn from(resource: Resource) -> Self {
+    Self {
+      name: resource.name,
+      kind: resource.kind,
+      version: resource.version,
+      config: resource.config,
+    }
+  }
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]

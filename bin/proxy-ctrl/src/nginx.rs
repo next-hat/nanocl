@@ -1,8 +1,8 @@
-use std::fs;
+use std::{fs, str::FromStr};
 
 use crate::error::ErrorHint;
 
-use crate::models::ProxyRule;
+use nanocld_client::stubs::proxy::ProxyRule;
 
 #[derive(Debug)]
 pub(crate) enum NginxConfKind {
@@ -28,25 +28,29 @@ impl From<ProxyRule> for NginxConfKind {
   }
 }
 
-#[derive(Clone)]
+impl FromStr for NginxConfKind {
+  type Err = ErrorHint;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "Site" => Ok(Self::Site),
+      "Stream" => Ok(Self::Stream),
+      "site" => Ok(Self::Site),
+      "stream" => Ok(Self::Stream),
+      _ => Err(ErrorHint::error(1, format!("Invalid NginxConfKind: {}", s))),
+    }
+  }
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct Nginx {
-  pub(crate) default_gateway: Option<String>,
   pub(crate) conf_dir: String,
 }
 
 impl Nginx {
   pub(crate) fn new(conf_dir: &str) -> Self {
     Self {
-      default_gateway: None,
       conf_dir: conf_dir.to_owned(),
-    }
-  }
-
-  pub(crate) fn set_default_gateway(&mut self, gateway: &str) -> Self {
-    self.default_gateway = Some(gateway.to_owned());
-    Self {
-      default_gateway: Some(gateway.to_owned()),
-      conf_dir: self.conf_dir.clone(),
     }
   }
 
@@ -67,16 +71,32 @@ impl Nginx {
     // Ensure sites-enabled directory exists
     let sites_enabled_dir = format!("{}/sites-enabled", self.conf_dir);
     fs::create_dir_all(&sites_enabled_dir).map_err(|err| {
-      ErrorHint::error(format!(
-        "Cannot create directory {sites_enabled_dir} got error : {err}",
-      ))
+      ErrorHint::error(
+        2,
+        format!(
+          "Cannot create directory {sites_enabled_dir} got error : {err}",
+        ),
+      )
     })?;
     // Ensure streams-enabled directory exists
     let streams_enabled_dir = format!("{}/streams-enabled", self.conf_dir);
     fs::create_dir_all(&streams_enabled_dir).map_err(|err| {
-      ErrorHint::error(format!(
-        "Cannot create directory {streams_enabled_dir} got error : {err}",
-      ))
+      ErrorHint::error(
+        2,
+        format!(
+          "Cannot create directory {streams_enabled_dir} got error : {err}",
+        ),
+      )
+    })?;
+    // Ensure conf.d directory exists
+    let conf_d = format!("{}/conf.d", self.conf_dir);
+    fs::create_dir_all(conf_d).map_err(|err| {
+      ErrorHint::error(
+        2,
+        format!(
+          "Cannot create directory {streams_enabled_dir} got error : {err}",
+        ),
+      )
     })?;
     Ok(())
   }
@@ -97,7 +117,10 @@ impl Nginx {
     let path = format!("{}/conf.d/default.conf", self.conf_dir);
 
     fs::write(&path, &default_conf).map_err(|err| {
-      ErrorHint::error(format!("Unable to create {path} file got error: {err}"))
+      ErrorHint::error(
+        1,
+        format!("Unable to create {path} file got error: {err}"),
+      )
     })?;
 
     log::debug!("Writing default file conf:\n {default_conf}");
@@ -114,24 +137,35 @@ impl Nginx {
   ) -> Result<(), ErrorHint> {
     let path = self.gen_conf_path(name, kind);
     fs::write(&path, data).map_err(|err| {
-      ErrorHint::error(format!(
-        "Unable to create new site file {path} got error: {err}"
-      ))
+      ErrorHint::error(
+        1,
+        format!("Unable to create new site file {path} got error: {err}"),
+      )
     })?;
     Ok(())
   }
 
   #[inline]
-  pub(crate) fn delete_conf_file(
+  pub(crate) async fn delete_conf_file(
     &self,
     name: &str,
     kind: &NginxConfKind,
   ) -> Result<(), ErrorHint> {
     let path = self.gen_conf_path(name, kind);
-    fs::remove_file(&path).map_err(|err| {
-      ErrorHint::warning(format!(
-        "Unable to delete site file {path} got error: {err}"
-      ))
+    ntex::web::block(move || {
+      fs::remove_file(&path).map_err(|err| {
+        ErrorHint::warning(
+          3,
+          format!("Unable to delete site file {path} got error: {err}"),
+        )
+      })
+    })
+    .await
+    .map_err(|err| match err {
+      ntex::web::error::BlockingError::Error(err) => err,
+      ntex::web::error::BlockingError::Canceled => {
+        ErrorHint::warning(3, "Blocking task canceled".into())
+      }
     })?;
     Ok(())
   }
@@ -140,25 +174,37 @@ impl Nginx {
   pub(crate) fn clear_conf(&self) -> Result<(), ErrorHint> {
     let sites_enabled_dir = format!("{}/sites-enabled", self.conf_dir);
     fs::remove_dir_all(&sites_enabled_dir).map_err(|err| {
-      ErrorHint::error(format!(
-        "Cannot remove directory {sites_enabled_dir} got error : {err}",
-      ))
+      ErrorHint::error(
+        3,
+        format!(
+          "Cannot remove directory {sites_enabled_dir} got error : {err}",
+        ),
+      )
     })?;
     let streams_enabled_dir = format!("{}/streams-enabled", self.conf_dir);
     fs::remove_dir_all(&streams_enabled_dir).map_err(|err| {
-      ErrorHint::error(format!(
-        "Cannot remove directory {streams_enabled_dir} got error : {err}",
-      ))
+      ErrorHint::error(
+        3,
+        format!(
+          "Cannot remove directory {streams_enabled_dir} got error : {err}",
+        ),
+      )
     })?;
     fs::create_dir_all(&sites_enabled_dir).map_err(|err| {
-      ErrorHint::error(format!(
-        "Cannot create directory {sites_enabled_dir} got error : {err}",
-      ))
+      ErrorHint::error(
+        3,
+        format!(
+          "Cannot create directory {sites_enabled_dir} got error : {err}",
+        ),
+      )
     })?;
     fs::create_dir_all(&streams_enabled_dir).map_err(|err| {
-      ErrorHint::error(format!(
-        "Cannot create directory {streams_enabled_dir} got error : {err}",
-      ))
+      ErrorHint::error(
+        3,
+        format!(
+          "Cannot create directory {streams_enabled_dir} got error : {err}",
+        ),
+      )
     })?;
     Ok(())
   }

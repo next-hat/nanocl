@@ -16,14 +16,3 @@ Cargoes:
         "/var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled",
         "/var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled",
       ]
-
-- Name: ctrl-proxy
-  Container:
-    Image: nexthat/nanocl-ctrl-proxy:0.2.3
-    HostConfig:
-      Binds: [
-        "/var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d",
-        "/var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled",
-        "/var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled",
-        "/run/nanocl:/run/nanocl"
-      ]
