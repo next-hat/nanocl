@@ -1,0 +1,20 @@
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package]
+name = "ctrl-dns"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ctrl-dns"
+test = true
+bench = false
+path = "src/main.rs"
+
+[profile.dev]
+opt-level = 0
+
+[dependencies]
+clap = { version = "4.1.4", features = ["derive"] }
+ntex = { version = "0.6.3", features = ["tokio"] }
+nanocld_client = "0.0.2"
+futures = "0.3.26"

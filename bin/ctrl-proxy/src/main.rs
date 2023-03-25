@@ -70,7 +70,7 @@ mod tests {
   #[ntex::test]
   async fn boot() {
     let cli =
-      super::cli::Cli::parse_from(["proxy-ctrl", "--conf-dir", "/tmp/nginx"]);
+      super::cli::Cli::parse_from(["ctrl-proxy", "--conf-dir", "/tmp/nginx"]);
 
     super::boot(&cli).await;
   }

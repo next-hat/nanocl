@@ -18,4 +18,4 @@ WORKDIR /project
 
 ENV TZ=${tz}
 
-ENTRYPOINT ["cargo", "watch", "-x", "run --bin proxy-ctrl"]
+ENTRYPOINT ["cargo", "watch", "-x", "run --bin ctrl-proxy"]

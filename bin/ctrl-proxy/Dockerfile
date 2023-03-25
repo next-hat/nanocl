@@ -8,7 +8,7 @@ COPY ./crates/nanocl_stubs/Cargo.toml ./crates/nanocl_stubs/Cargo.toml
 COPY ./crates/nanocld_client/Cargo.toml ./crates/nanocld_client/Cargo.toml
 COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
 COPY ./bin/nanocld/Cargo.toml ./bin/nanocld/Cargo.toml
-COPY ./bin/proxy-ctrl/Cargo.toml ./bin/proxy-ctrl/Cargo.toml
+COPY ./bin/ctrl-proxy/Cargo.toml ./bin/ctrl-proxy/Cargo.toml
 
 # stage 2 - Build our project
 FROM rust:1.68.0-alpine3.17 as builder
@@ -27,16 +27,16 @@ COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
 COPY ./bin/nanocl/src ./bin/nanocl/src
 COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
 COPY .git ./.git
-COPY ./bin/proxy-ctrl/src ./bin/proxy-ctrl/src
-COPY ./bin/proxy-ctrl/build.rs ./bin/proxy-ctrl/build.rs
-COPY ./bin/proxy-ctrl/specs ./bin/proxy-ctrl/specs
+COPY ./bin/ctrl-proxy/src ./bin/ctrl-proxy/src
+COPY ./bin/ctrl-proxy/build.rs ./bin/ctrl-proxy/build.rs
+COPY ./bin/ctrl-proxy/specs ./bin/ctrl-proxy/specs
 ENV RUSTFLAGS="-C target-feature=+crt-static"
-RUN cargo build --release --target=x86_64-unknown-linux-musl --bin proxy-ctrl
-RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/proxy-ctrl
+RUN cargo build --release --target=x86_64-unknown-linux-musl --bin ctrl-proxy
+RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ctrl-proxy
 
 # stage 4 - create runtime image
 FROM scratch
 
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/proxy-ctrl /bin/proxy-ctrl
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/ctrl-proxy /bin/ctrl-proxy
 
-ENTRYPOINT ["proxy-ctrl"]
+ENTRYPOINT ["ctrl-proxy"]

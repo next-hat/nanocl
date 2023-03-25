@@ -20,9 +20,13 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 /// Generate store host config
 /// Generate a host config struct for the store container
 fn gen_store_host_conf(config: &DaemonConfig) -> HostConfig {
-  let path = Path::new(&config.state_dir).join("store/data");
+  let data_path = Path::new(&config.state_dir).join("store/data");
+  let certs_path = Path::new(&config.state_dir).join("store/certs");
 
-  let binds = vec![format!("{}:/cockroach/cockroach-data", path.display())];
+  let binds = vec![
+    format!("{}:/cockroach/cockroach-data", data_path.display()),
+    format!("{}:/certs", certs_path.display()),
+  ];
 
   HostConfig {
     binds: Some(binds),
@@ -53,7 +57,8 @@ fn gen_store_cargo_conf(
     } else {
       "start".into()
     },
-    "--insecure".into(),
+    "--certs-dir".into(),
+    "/certs".into(),
     "--listen-addr=:26257".into(),
     format!("--advertise-addr={}", config.advertise_addr),
   ];

@@ -1,0 +1,22 @@
+Type: Deployment
+ApiVersion: v0.4
+
+Namespace: system
+
+Cargoes:
+  - Name: proxy
+    Container:
+      Image: nanocl-dnsmasq:0.0.1
+      HostConfig:
+        NetworkMode: host
+        Binds: [
+        ]
+
+  - Name: ctrl-proxy
+    Container:
+      Image: nanocl-ctrl-dns:0.0.1
+      Tty: true
+      HostConfig:
+        Binds: [
+          "/run/nanocl:/run/nanocl"
+        ]

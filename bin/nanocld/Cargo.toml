@@ -43,7 +43,7 @@ clap = { version = "4.1.7", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
 serde = { version = "1.0.148", features = ["derive"] }
 uuid = { version = "1.2", features = ["serde", "v4"] }
-ntex = { version = "0.6.3", features = ["rustls", "tokio"] }
+ntex = { version = "0.6.3", features = ["openssl", "tokio"] }
 diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
 diesel = { version = "2.0.1", features = ["postgres", "r2d2", "chrono", "uuid", "serde_json"] }
 tokio = { version = "1.23.1", features = ["fs", "process", "io-std"] }
@@ -55,3 +55,5 @@ metrsd_client = "0.1.1"
 chrono = { version = "0.4.24", features = ["serde"] }
 jsonschema = { version = "0.17.0", default-features = false }
 nanocld_client = { version = "0.4.0", features = ["tokio"] }
+openssl = { version = "0.10.47", features = ["vendored"] }
+r2d2_postgres = "0.18.1"
