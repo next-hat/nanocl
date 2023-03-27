@@ -8,8 +8,10 @@ pub(crate) fn gen_cargo_domains(
   cargo: &CargoInspect,
 ) -> Result<Vec<(String, String)>, ErrorHint> {
   let mut domains = Vec::new();
-  for container in &cargo.containers {
-    let networks = container
+  for instance in &cargo.instances {
+    let id = instance.container.id.clone().unwrap_or_default();
+    let networks = instance
+      .container
       .network_settings
       .to_owned()
       .unwrap_or_default()
@@ -19,19 +21,18 @@ pub(crate) fn gen_cargo_domains(
       networks
         .get(&cargo.namespace_name)
         .ok_or(ErrorHint::Warning(format!(
-        "Unable to find network for container {} for cargo {} in namespace {}",
-        container.id.to_owned().unwrap_or_default(),
-        cargo.key,
-        cargo.namespace_name,
-      )))?;
-    let name = container
+          "Unable to find network for container {id} of cargo {}",
+          cargo.key,
+        )))?;
+    let name = instance
+      .container
       .names
       .to_owned()
       .unwrap_or_default()
       .get(0)
       .ok_or(ErrorHint::Warning(format!(
         "Unable to find name for container {} for cargo {} in namespace {}",
-        container.id.to_owned().unwrap_or_default(),
+        instance.container.id.to_owned().unwrap_or_default(),
         cargo.key,
         cargo.namespace_name,
       )))?
@@ -44,7 +45,7 @@ pub(crate) fn gen_cargo_domains(
         .to_owned()
         .ok_or(ErrorHint::Warning(format!(
       "Unable to find ip address for container {} for cargo {} in namespace {}",
-      container.id.to_owned().unwrap_or_default(),
+      instance.container.id.to_owned().unwrap_or_default(),
       cargo.key,
       cargo.namespace_name,
     )))?;
@@ -57,7 +58,7 @@ pub(crate) fn gen_cargo_domains(
 
 /// Restart dnsmask to apply the new configuration
 pub(crate) async fn restart_dns_service(
-  client: &nanocld_client::NanoclClient,
+  client: &nanocld_client::NanocldClient,
 ) -> Result<(), ErrorHint> {
   let cargo = "dns";
   let namespace = Some(String::from("system"));
@@ -77,7 +78,7 @@ pub(crate) async fn restart_dns_service(
 /// This function is called at startup
 /// To ensure that no data is lost
 pub(crate) async fn sync_daemon_state(
-  client: &nanocld_client::NanoclClient,
+  client: &nanocld_client::NanocldClient,
   dnsmasq: &Dnsmasq,
 ) -> Result<(), ErrorHint> {
   println!("[INFO] Syncing daemon state");
