@@ -41,7 +41,7 @@ ntex = { version = "0.6.3", features = ["rustls", "tokio"] }
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "4.1.7", features = ["derive", "cargo"] }
 url = { version = "2.3.1", features = ["serde"] }
-tokio = { version = "1.23.1", features = ["fs"] }
+tokio = { version = "1.27.0", features = ["fs"] }
 hyper = "0.14.20"
 serde_urlencoded = "0.7.1"
 users = "0.11.0"
