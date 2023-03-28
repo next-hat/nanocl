@@ -23,7 +23,7 @@ bschemars = ["dep:schemars"]
 serde = { version = "1.0", features = ["derive"] }
 schemars = { version = "0.8.12", default-features = false, features = ["derive"] }
 serde_yaml = "0.9.19"
-serde_json = "1.0.91"
+serde_json = "1.0.95"
 
 [dev-dependencies]
 bollard-next = "0.14.3"
@@ -34,7 +34,7 @@ serde_yaml = "0.9.19"
 clap = { version = "4.1.7", features = ["derive"] }
 ntex = { version = "0.6.0", features = ["tokio"] }
 nanocld_client = { version = "0.4.0" }
-serde_json = "1.0.91"
+serde_json = "1.0.95"
 futures = "0.3.25"
 log = "0.4.17"
 env_logger = "0.10.0"

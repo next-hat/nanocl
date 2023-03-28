@@ -35,7 +35,7 @@ futures = "0.3"
 serde_yaml = "0.9"
 tabled = "0.10.0"
 indicatif = "0.17.3"
-serde_json = "1.0.89"
+serde_json = "1.0.95"
 thiserror = "1.0.37"
 ntex = { version = "0.6.3", features = ["rustls", "tokio"] }
 serde = { version = "1.0", features = ["derive"] }
