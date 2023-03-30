@@ -33,9 +33,17 @@
 
 ## Overview
 
-Nanocl is a distributed orchestrator that simplifies the management of containers and virtual machines across multiple hosts.<br />
-With Nanocl, you can efficiently share resources and deploy applications, services, and databases publicly, privately, or under a VPN.<br />
+Nanocl is a distributed orchestrator that simplifies the management of containers and virtual machines across multiple hosts.
+With Nanocl, you can efficiently share resources and deploy applications, services, and databases publicly, privately, or under a VPN.
 Whether you're running a home lab setup or a large enterprise, Nanocl's cutting-edge technology, crafted with precision using Rust, provides unparalleled performance and a small footprint.
+
+
+## Architecture
+
+<div align="center">
+  <img src="./doc/architecture.png" />
+</div>
+
 
 ## Key Benefits
 
@@ -48,10 +56,6 @@ Whether you're running a home lab setup or a large enterprise, Nanocl's cutting-
 * Enjoy history tracking of your container and virtual machine configuration
 * Revert configuration as quickly as pressing a button
 * Best ideas and practices from the community
-
-## Architecture
-
-<img src="./doc/architecture.png" />
 
 
 ## Getting Started
