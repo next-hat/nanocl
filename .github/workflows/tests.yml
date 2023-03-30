@@ -45,9 +45,9 @@ jobs:
       run: |
         docker pull cockroachdb/cockroach:v22.2.6
         docker pull nexthat/metrsd:v0.1.0
+        docker build -t nanocl-proxy:test -f ./bin/ctrl-proxy/nginx/Dockerfile ./bin/ctrl-proxy
+        docker build -t nanocl-dns:test -f ./bin/ctrl-dns/dnsmasq/Dockerfile ./bin/ctrl-dns/dnsmasq
         docker pull nexthat/nanocl-get-started:latest
-        docker pull nexthat/nanocl-proxy:0.2.3
-        docker pull nexthat/nanocl-ctrl-proxy:0.2.3
         cargo build --bin nanocl
         cargo build --bin ctrl-proxy
         cp ./target/debug/nanocl /usr/local/bin

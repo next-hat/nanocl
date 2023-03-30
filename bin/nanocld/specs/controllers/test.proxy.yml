@@ -6,7 +6,7 @@ Namespace: system
 Cargoes:
 - Name: proxy
   Container:
-    Image: nexthat/nanocl-proxy:0.2.3
+    Image: nanocl-proxy:test
     HostConfig:
       NetworkMode: host
       Binds: [
