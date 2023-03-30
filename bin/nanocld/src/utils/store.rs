@@ -27,10 +27,10 @@ use crate::models::{Pool, DBConn};
 /// ```
 ///
 pub async fn create_pool(host: String) -> Pool {
+  // ?sslmode=verify-full
   web::block(move || {
-    let db_url = "postgres://root:root@".to_owned()
-      + &host
-      + ":26257/defaultdb?sslmode=verify-full";
+    let db_url =
+      "postgres://root:root@".to_owned() + &host + ":26257/defaultdb";
     let manager = ConnectionManager::<PgConnection>::new(db_url);
     r2d2::Pool::builder().build(manager)
   })
