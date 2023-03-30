@@ -27,6 +27,7 @@ use crate::models::{Pool, DBConn};
 /// ```
 ///
 pub async fn create_pool(host: String) -> Pool {
+  // ?sslmode=verify-full
   web::block(move || {
     let db_url =
       "postgres://root:root@".to_owned() + &host + ":26257/defaultdb";
@@ -34,7 +35,7 @@ pub async fn create_pool(host: String) -> Pool {
     r2d2::Pool::builder().build(manager)
   })
   .await
-  .expect("cannot connect to postgresql.")
+  .expect("Cannot connect to the store")
 }
 
 /// ## Get connection from the pool

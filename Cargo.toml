@@ -2,7 +2,8 @@
 members = [
   "crates/nanocl_stubs",
   "crates/nanocld_client",
-  "bin/proxy-ctrl",
+  "bin/ctrl-proxy",
+  "bin/ctrl-dns",
   "bin/nanocld",
   "bin/nanocl"
 ]
@@ -12,7 +13,6 @@ opt-level = 0
 
 [profile.release]
 opt-level = 'z'
-lto = true
 codegen-units = 1
 strip = "debuginfo"
 

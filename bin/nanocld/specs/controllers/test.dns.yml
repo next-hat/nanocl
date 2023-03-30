@@ -1,0 +1,11 @@
+Type: Deployment
+ApiVersion: v0.4
+
+Namespace: system
+
+Cargoes:
+- Name: dns
+  Container:
+    Image: nanocl-dns:test
+    HostConfig:
+      NetworkMode: host

@@ -39,6 +39,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
   ensure_state_dir(&daemon_conf.state_dir).await?;
   super::system::ensure_network("system", &docker_api).await?;
 
+  super::dns::init(&docker_api).await?;
   super::proxy::init(&docker_api).await?;
 
   let pool = super::store::ensure(daemon_conf, &docker_api).await?;
