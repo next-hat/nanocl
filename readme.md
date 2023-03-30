@@ -27,7 +27,7 @@
 
 <blockquote>
  <span>
-   Test, Deploy, Monitor, Scale, Orchestrate
+   Test, Deploy, Scale, Monitor, Orchestrate
  </span>
 </blockquote>
 

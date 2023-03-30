@@ -49,18 +49,18 @@ jobs:
         docker build -t nanocl-proxy:test -f ./bin/ctrl-proxy/nginx/Dockerfile ./bin/ctrl-proxy
         docker build -t nanocl-dns:test -f ./bin/ctrl-dns/dnsmasq/Dockerfile ./bin/ctrl-dns/dnsmasq
         docker pull nexthat/nanocl-get-started:latest
-        cargo build --features test --bin nanocl
-        cargo build --features test --bin ctrl-proxy
+        cargo build --no-default-features --features test --bin nanocl
+        cargo build --no-default-features --features test --bin ctrl-proxy
         cp ./target/debug/nanocl /usr/local/bin
-        cargo build --features test --bin nanocld
-        cargo run --features test --bin nanocld -- --init
+        cargo build --no-default-features --features test --bin nanocld
+        cargo run --no-default-features --features test --bin nanocld -- --init
         docker network ls
-        cargo run --features test --bin nanocld &
+        cargo run --no-default-features --features test --bin nanocld &
         sleep 8
         sudo mkdir -p /var/lib/nanocl/proxy
         sudo chmod 777 -R /run/nanocl
         sudo chmod 777 -R /var/lib/nanocl
-        cargo run --features test --bin ctrl-proxy -- --conf-dir /var/lib/nanocl/proxy &
+        cargo run --no-default-features --features test --bin ctrl-proxy -- --conf-dir /var/lib/nanocl/proxy &
         sleep 8
         sudo chmod 777 -R /run/nanocl
         mkdir -p /tmp/nginx/sites-enabled
