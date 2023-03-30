@@ -57,8 +57,8 @@ fn gen_store_cargo_conf(
     } else {
       "start".into()
     },
-    "--certs-dir".into(),
-    "/certs".into(),
+    // "--certs-dir".into(),
+    // "/certs".into(),
     "--listen-addr=:26257".into(),
     format!("--advertise-addr={}", config.advertise_addr),
   ];
