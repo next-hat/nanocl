@@ -1,5 +1,6 @@
 use ntex::web;
 use ntex::http::StatusCode;
+use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 
 use crate::error::HttpResponseError;
@@ -30,10 +31,8 @@ pub async fn create_pool(host: String) -> Pool {
     let db_url = "postgres://root:root@".to_owned()
       + &host
       + ":26257/defaultdb?sslmode=verify-full";
-    let manager = ConnectionManager::new(db_url);
-    let builder = r2d2::Builder::new();
-
-    builder.build(manager)
+    let manager = ConnectionManager::<PgConnection>::new(db_url);
+    r2d2::Pool::builder().build(manager)
   })
   .await
   .expect("Cannot connect to the store")

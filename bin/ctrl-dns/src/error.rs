@@ -40,3 +40,18 @@ impl web::WebResponseError for HttpError {
     web::HttpResponse::build(self.status).json(&err_json)
   }
 }
+
+impl From<ErrorHint> for HttpError {
+  fn from(err: ErrorHint) -> Self {
+    match err {
+      ErrorHint::Error(msg) => HttpError {
+        msg,
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+      },
+      ErrorHint::Warning(msg) => HttpError {
+        msg,
+        status: StatusCode::BAD_REQUEST,
+      },
+    }
+  }
+}

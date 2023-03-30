@@ -11,6 +11,8 @@
  *
 */
 
+use ntex::web;
+use ntex::server::Server;
 use nanocld_client::stubs::system::Event;
 
 mod cli;
@@ -45,7 +47,11 @@ async fn on_event(
   }
 }
 
-fn setup_server() {}
+fn setup_server() -> Server {
+  let server = web::HttpServer::new(|| web::App::new());
+
+  server.run()
+}
 
 /// Main function
 /// Is parsing the command line arguments,
@@ -58,10 +64,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   println!("nanocl-ctrl-dns v{}", env!("CARGO_PKG_VERSION"));
   let cli = cli::parse();
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
-  let dnsmasq = dnsmasq::new(&conf_dir).with_dns(cli.dns.to_owned());
+  let dnsmasq = dnsmasq::new(&conf_dir).with_dns(cli.dns);
   if let Err(err) = dnsmasq.ensure() {
     eprintln!("{err}");
     std::process::exit(1);
   }
+
+  let server = setup_server();
+
+  server.await?;
+
   Ok(())
 }

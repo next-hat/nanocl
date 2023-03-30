@@ -1,38 +1,51 @@
 # stage 1 - generate recipe file for dependencies
-FROM rust:1.67.0-alpine3.17 as planner
+FROM rust:1.68.0-alpine3.17 as planner
 
 WORKDIR /app
-RUN apk add gcc g++ make
+RUN apk add gcc make
 RUN cargo install cargo-chef --locked
-COPY ./Cargo.toml ./Cargo.lock ./
-RUN cargo chef prepare --recipe-path recipe.json
+COPY ./Cargo.toml ./Cargo.toml
+COPY ./Cargo.lock ./Cargo.lock
+COPY ./crates/nanocl_stubs/Cargo.toml ./crates/nanocl_stubs/Cargo.toml
+COPY ./crates/nanocld_client/Cargo.toml ./crates/nanocld_client/Cargo.toml
+COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
+COPY ./bin/nanocld/Cargo.toml ./bin/nanocld/Cargo.toml
+COPY ./bin/ctrl-proxy/Cargo.toml ./bin/ctrl-proxy/Cargo.toml
+COPY ./bin/ctrl-dns/Cargo.toml ./bin/ctrl-dns/Cargo.toml
 
-# state 2 - build our dependencies
-FROM rust:1.67.0-alpine3.17 as cacher
+# stage 2 - Build our project
+FROM rust:1.68.0-alpine3.17 as builder
 
+ARG channel=stable
+
+## Build our nanocl daemon binary
+COPY --from=planner /app /app
 WORKDIR /app
-COPY --from=planner /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/cargo-chef
-COPY --from=planner /app .
+RUN rustup target add x86_64-unknown-linux-musl
 RUN apk update && apk upgrade
-RUN apk add gcc g++ make
-RUN cargo chef cook --release --target=x86_64-unknown-linux-musl --recipe-path recipe.json
-
-# stage 3 - build our project
-FROM rust:1.67.0-alpine3.17 as builder
-
-WORKDIR /app
-COPY --from=cacher /usr/local/cargo /usr/local/cargo
-COPY --from=cacher /app .
-COPY ./src ./src
-RUN apk update && apk upgrade
-RUN apk add gcc g++ make upx
-RUN cargo build --release --target=x86_64-unknown-linux-musl
-RUN strip /app/target/x86_64-unknown-linux-musl/release/nanocl-ctrl-dns
-RUN upx /app/target/x86_64-unknown-linux-musl/release/nanocl-ctrl-dns
+RUN apk add clang-dev gcc gcompat make musl-dev libpq-dev openssl openssl-dev git upx
+COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
+COPY ./bin/nanocld/src ./bin/nanocld/src
+COPY ./bin/nanocld/specs ./bin/nanocld/specs
+COPY ./bin/nanocld/build.rs ./bin/nanocld/build.rs
+COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
+COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
+COPY ./bin/nanocl/src ./bin/nanocl/src
+COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
+COPY .git ./.git
+COPY ./bin/ctrl-proxy/src ./bin/ctrl-proxy/src
+COPY ./bin/ctrl-proxy/build.rs ./bin/ctrl-proxy/build.rs
+COPY ./bin/ctrl-proxy/specs ./bin/ctrl-proxy/specs
+COPY ./bin/ctrl-dns/src ./bin/ctrl-dns/src
+RUN cargo build --release --target=x86_64-unknown-linux-musl --features release --bin ctrl-dns
+RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ctrl-dns
 
 # stage 4 - create runtime image
-from scratch
+FROM scratch
 
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/nanocl-ctrl-dns /bin/nanocl-ctrl-dns
+LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
+LABEL org.opencontainers.image.description The nanocl DNS controller
 
-ENTRYPOINT ["nanocl-ctrl-dns"]
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/ctrl-dns /bin/ctrl-dns
+
+ENTRYPOINT ["ctrl-dns"]

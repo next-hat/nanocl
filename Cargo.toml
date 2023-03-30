@@ -13,7 +13,6 @@ opt-level = 0
 
 [profile.release]
 opt-level = 'z'
-lto = true
 codegen-units = 1
 strip = "debuginfo"
 

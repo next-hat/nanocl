@@ -11,6 +11,7 @@ RUN apk add g++
 RUN apk add make
 RUN apk add tzdata
 RUN apk add util-linux
+RUN apk add bash
 RUN cargo install cargo-watch
 
 RUN mkdir -p /project
@@ -18,4 +19,4 @@ WORKDIR /project
 
 ENV TZ=${tz}
 
-ENTRYPOINT ["cargo", "watch", "-x", "run --bin ctrl-proxy"]
+ENTRYPOINT ["/bin/bash"]
