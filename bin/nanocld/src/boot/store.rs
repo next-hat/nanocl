@@ -57,6 +57,7 @@ fn gen_store_cargo_conf(
     } else {
       "start".into()
     },
+    "--insecure".into(),
     // "--certs-dir".into(),
     // "/certs".into(),
     "--listen-addr=:26257".into(),
