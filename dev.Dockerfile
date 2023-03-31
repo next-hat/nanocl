@@ -19,4 +19,4 @@ WORKDIR /project
 
 ENV TZ=${tz}
 
-ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT ["/bin/bash", "-c"]

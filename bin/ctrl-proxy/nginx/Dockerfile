@@ -9,11 +9,11 @@ RUN apt-get install -y certbot python3-certbot-nginx
 EXPOSE 80/tcp 443/tcp
 
 # Copy default nginx config
-COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
+COPY ./nginx.conf /etc/nginx/nginx.conf
 # Copy default error pages
-COPY ./nginx/html /html
+COPY ./html /html
 
-COPY ./nginx/entrypoint.sh /entrypoint.sh
+COPY ./entrypoint.sh /entrypoint.sh
 RUN mkdir -p /var/lib/nginx/cache/public
 RUN mkdir -p /var/lib/nginx/cache/private
 RUN mkdir -p /tmp/nginx/body

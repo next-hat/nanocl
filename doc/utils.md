@@ -6,7 +6,7 @@
 lsns
 ```
 
-##  nsenter - run program in different namespaces
+## nsenter - run program in different namespaces
 
 ```sh
 sudo nsenter -t 12267 -n ss -ltu

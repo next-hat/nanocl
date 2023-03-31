@@ -2,7 +2,6 @@
 
 This guide will help you to setup nanocl in development.
 
-
 ## Installation
 
 Clone the repository:
@@ -47,7 +46,6 @@ Then you can install rust devtools required to run nanocl
 ./scripts/rust.deps.sh
 ```
 
-
 ## Running and Watching
 
 You can run nanocl in multiple way
@@ -58,7 +56,7 @@ I personnally run the project that way:
 
 I make sure my user is in docker group if it's not you can add it like this
 
-```
+```sh
 sudo usermod -aG docker $USER
 newgrp docker
 ```
@@ -82,18 +80,25 @@ Finally we can start the daemon.
 You can do it in multiple way :
 
 - Using cargo make
+
   ```sh
   cargo make run-daemon
   ```
+
 - Using cargo
+
   ```sh
   cargo run --bin nanocld
   ```
+
 - Using cargo watch
-  ```
+
+  ```sh
   cargo watch -x "run --bin nanocld"
   ```
+
 - Using the docker compose
+
   ```sh
   docker compose up
   ```
@@ -103,10 +108,13 @@ I personally use the first way.
 Now you can run the CLI:
 
 - Using cargo make
+
   ```sh
   cargo make run-cli version
   ```
+
 - Using cargo
+
   ```sh
   cargo run --bin nanocl version
   ```

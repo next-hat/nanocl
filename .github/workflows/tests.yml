@@ -46,12 +46,10 @@ jobs:
       run: |
         docker pull cockroachdb/cockroach:v22.2.6
         docker pull nexthat/metrsd:v0.1.0
-        docker build -t nanocl-proxy:test -f ./bin/ctrl-proxy/nginx/Dockerfile ./bin/ctrl-proxy
-        docker build -t nanocl-dns:test -f ./bin/ctrl-dns/dnsmasq/Dockerfile ./bin/ctrl-dns/dnsmasq
         docker pull nexthat/nanocl-get-started:latest
+        ./scripts/build_dev_image.sh
         cargo build --no-default-features --features test --bin nanocl
         cargo build --no-default-features --features test --bin ctrl-proxy
-        cp ./target/debug/nanocl /usr/local/bin
         cargo build --no-default-features --features test --bin nanocld
         cargo run --no-default-features --features test --bin nanocld -- --init
         docker network ls
@@ -64,6 +62,7 @@ jobs:
         sleep 8
         sudo chmod 777 -R /run/nanocl
         mkdir -p /tmp/nginx/sites-enabled
+        cp ./target/debug/nanocl /usr/local/bin
         docker ps -a
     # Run coverage
     - name: Run tests
