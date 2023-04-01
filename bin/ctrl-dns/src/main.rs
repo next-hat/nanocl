@@ -48,7 +48,7 @@ async fn on_event(
 }
 
 fn setup_server() -> Server {
-  let server = web::HttpServer::new(|| web::App::new());
+  let server = web::HttpServer::new(web::App::new);
 
   server.run()
 }

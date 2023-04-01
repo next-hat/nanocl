@@ -7,7 +7,7 @@ mod cli;
 mod version;
 
 mod node;
-mod boot;
+mod subsystem;
 mod error;
 mod utils;
 mod event;
@@ -50,7 +50,7 @@ async fn main() -> std::io::Result<()> {
   };
 
   // Boot and init internal dependencies
-  let daemon_state = match boot::init(&config).await {
+  let daemon_state = match subsystem::init(&config).await {
     Err(err) => {
       log::error!("Error while booting daemon {}", err.msg);
       std::process::exit(err.code);

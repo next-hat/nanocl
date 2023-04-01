@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use bollard_next::service::HostConfig;
 use nanocl_stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
+use nanocl_stubs::config::DaemonConfig;
 use ntex::rt;
 use ntex::http::StatusCode;
 
@@ -279,6 +280,7 @@ pub async fn revert_resource(
 
 pub fn hook_cargo_binds(
   cargo: &CargoConfigPartial,
+  daemon_conf: &DaemonConfig,
 ) -> Result<CargoConfigPartial, CliError> {
   if let Some(host_config) = &cargo.container.host_config {
     if let Some(binds) = &host_config.binds {
@@ -289,6 +291,7 @@ pub fn hook_cargo_binds(
         let dest = split.get(1);
         let dest = dest.unwrap_or(&"");
         let source = source.unwrap_or(&"");
+        let source = source.replace("{state_dir}", &daemon_conf.state_dir);
         if source.starts_with('.') {
           let cwd = std::env::current_dir().map_err(|err| CliError {
             msg: format!("Failed to get current directory: {}", err),

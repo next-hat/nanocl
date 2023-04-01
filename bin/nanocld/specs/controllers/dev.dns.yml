@@ -4,20 +4,21 @@ ApiVersion: v0.4
 Namespace: system
 
 Cargoes:
-  - Name: dns
-    Container:
-      Image: nanocl-dns:dev
-      HostConfig:
-        NetworkMode: host
+- Name: dns
+  Container:
+    Image: nanocl-dns:dev
+    HostConfig:
+      NetworkMode: host
 
-  - Name: ctrl-dns
-    Container:
-      Image: nanocl-ctrl-dns:dev
-      Cmd: ["-x", "run"]
-      Tty: true
-      HostConfig:
-        Binds: [
-          "./:/project",
-          "/usr/local/cargo/registry/cache:/usr/local/cargo/registry/cache",
-          "/run/nanocl:/run/nanocl"
-        ]
+- Name: ctrl-dns
+  Container:
+    Image: nanocl-dev:dev
+    Cmd:
+    - watch
+    - -x
+    - run --no-default-features --features dev --bin ctrl-dns
+    Tty: true
+    HostConfig:
+      Binds:
+      - ./:/project
+      - /run/nanocl:/run/nanocl

@@ -2,13 +2,13 @@ use tokio::fs;
 
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::event;
-use crate::models::DaemonState;
+use crate::{event, repositories};
+use crate::models::{Pool, DaemonState, NodeDbModel};
 
 use crate::error::CliError;
 use crate::version::VERSION;
 
-pub async fn ensure_state_dir(state_dir: &str) -> Result<(), CliError> {
+async fn ensure_state_dir(state_dir: &str) -> Result<(), CliError> {
   let vm_dir = format!("{state_dir}/vms/images");
   fs::create_dir_all(vm_dir).await.map_err(|err| {
     CliError::new(
@@ -19,10 +19,42 @@ pub async fn ensure_state_dir(state_dir: &str) -> Result<(), CliError> {
   Ok(())
 }
 
+async fn register_node(
+  name: &str,
+  gateway: &str,
+  pool: &Pool,
+) -> Result<(), CliError> {
+  let node = NodeDbModel {
+    name: name.to_owned(),
+    ip_address: gateway.to_owned(),
+  };
+
+  repositories::node::create_if_not_exists(&node, pool).await?;
+
+  Ok(())
+}
+
 /// Init function called before http server start
 /// to initialize our state
 pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
-  let docker_api = bollard_next::Docker::connect_with_unix(
+  #[cfg(feature = "dev")]
+  const PROXY_CONF: &str =
+    include_str!("../../specs/controllers/dev.proxy.yml");
+  #[cfg(feature = "release")]
+  const PROXY_CONF: &str = include_str!("../../specs/controllers/proxy.yml");
+  #[cfg(feature = "test")]
+  const PROXY_CONF: &str =
+    include_str!("../../specs/controllers/test.proxy.yml");
+  #[cfg(feature = "dev")]
+  const DNS_CONF: &str = include_str!("../../specs/controllers/dev.dns.yml");
+  #[cfg(feature = "release")]
+  const DNS_CONF: &str = include_str!("../../specs/controllers/dns.yml");
+  #[cfg(feature = "test")]
+  const DNS_CONF: &str = include_str!("../../specs/controllers/test.dns.yml");
+
+  const METRICS_CONF: &str = include_str!("../../specs/metrics.yml");
+
+  let docker = bollard_next::Docker::connect_with_unix(
     &daemon_conf.docker_host,
     120,
     bollard_next::API_DEFAULT_VERSION,
@@ -37,29 +69,24 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
     )
   })?;
   ensure_state_dir(&daemon_conf.state_dir).await?;
-  super::system::ensure_network("system", &docker_api).await?;
+  super::system::ensure_network("system", &docker).await?;
+  super::system::boot_controller(&docker, DNS_CONF, daemon_conf).await?;
+  super::system::boot_controller(&docker, PROXY_CONF, daemon_conf).await?;
+  super::system::start_subsystem(&docker, METRICS_CONF, daemon_conf).await?;
 
-  super::dns::init(&docker_api).await?;
-  super::proxy::init(&docker_api).await?;
-
-  let pool = super::store::ensure(daemon_conf, &docker_api).await?;
+  let pool = super::store::init(&docker, daemon_conf).await?;
   let daemon_state = DaemonState {
     pool: pool.clone(),
-    docker_api: docker_api.clone(),
+    docker_api: docker.clone(),
     config: daemon_conf.to_owned(),
     event_emitter: event::EventEmitter::new(),
     version: VERSION.to_owned(),
   };
   super::system::register_namespace("system", false, &daemon_state).await?;
   super::system::register_namespace("global", true, &daemon_state).await?;
-  super::node::register_node(
-    &daemon_conf.hostname,
-    &daemon_conf.advertise_addr,
-    &pool,
-  )
-  .await?;
-  super::system::sync_containers(&docker_api, &pool).await?;
-  super::metrics::start_metrics_cargo(&daemon_state).await?;
+  register_node(&daemon_conf.hostname, &daemon_conf.advertise_addr, &pool)
+    .await?;
+  super::system::sync_containers(&docker, &pool).await?;
 
   Ok(daemon_state)
 }

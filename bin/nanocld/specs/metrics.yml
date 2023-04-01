@@ -1,0 +1,9 @@
+Name: metrics
+Container:
+  Image: nexthat/metrsd:v0.1.0
+  HostConfig:
+    Cmd:
+    - --hosts
+    - unix:///run/nanocl/metrics.sock
+    Binds:
+    - /run/nanocl:/run/nanocl
