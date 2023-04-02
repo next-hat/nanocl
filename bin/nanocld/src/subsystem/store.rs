@@ -19,19 +19,18 @@ pub(crate) async fn init(
 ) -> Result<Pool, CliError> {
   let mut store_conf = include_str!("../../specs/store.yml").to_owned();
   store_conf = store_conf.replace("{state_dir}", &daemon_conf.state_dir);
-
+  store_conf =
+    store_conf.replace("{advertise_addr}", &daemon_conf.advertise_addr);
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
   log::info!("Booting store");
-
   super::system::start_subsystem(docker_api, &store_conf, daemon_conf).await?;
-
-  // We wait 500ms to ensure store is booted
+  // We wait 1000ms to ensure store is booted
   // It's a tricky hack to avoid some error printed by postgresql connector for now.
   thread::sleep(time::Duration::from_millis(1000));
-  let postgres_ip = utils::store::get_store_ip_addr(docker_api).await?;
   log::info!("Connecting to store");
   // Connect to postgresql
-  let pool = utils::store::create_pool(postgres_ip).await;
+  let pool =
+    utils::store::create_pool(daemon_conf.advertise_addr.to_owned()).await;
   let mut conn = utils::store::get_pool_conn(&pool)?;
   log::info!("Store connected");
   // This will run the necessary migrations.

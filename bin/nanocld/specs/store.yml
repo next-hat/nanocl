@@ -4,7 +4,14 @@ Container:
   Tty: true
   Cmd:
   - start-single-node
-  - --insecure
-  Binds:
-  - {state_dir}/store/data:/cockroach/cockroach-data
-  - {state_dir}/store/certs:/certs
+  - --certs-dir
+  - /certs
+  - --listen-addr=:26257
+  - --advertise-addr={advertise_addr}:26257
+  HostConfig:
+    PortBindings:
+      26257/tcp:
+      - HostPort: 26257
+    Binds:
+    - {state_dir}/store/data:/cockroach/cockroach-data
+    - {state_dir}/store/certs:/certs
