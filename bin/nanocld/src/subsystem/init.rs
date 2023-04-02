@@ -38,21 +38,27 @@ async fn register_node(
 /// to initialize our state
 pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
   #[cfg(feature = "dev")]
-  const PROXY_CONF: &str =
-    include_str!("../../specs/controllers/dev.proxy.yml");
+  let mut proxy_conf =
+    include_str!("../../specs/controllers/dev.proxy.yml").to_owned();
   #[cfg(feature = "release")]
-  const PROXY_CONF: &str = include_str!("../../specs/controllers/proxy.yml");
+  let mut proxy_conf =
+    include_str!("../../specs/controllers/proxy.yml").to_owned();
   #[cfg(feature = "test")]
-  const PROXY_CONF: &str =
-    include_str!("../../specs/controllers/test.proxy.yml");
+  let mut proxy_conf =
+    include_str!("../../specs/controllers/test.proxy.yml").to_owned();
   #[cfg(feature = "dev")]
-  const DNS_CONF: &str = include_str!("../../specs/controllers/dev.dns.yml");
+  let mut dns_conf =
+    include_str!("../../specs/controllers/dev.dns.yml").to_owned();
   #[cfg(feature = "release")]
-  const DNS_CONF: &str = include_str!("../../specs/controllers/dns.yml");
+  let mut dns_conf = include_str!("../../specs/controllers/dns.yml").to_owned();
   #[cfg(feature = "test")]
-  const DNS_CONF: &str = include_str!("../../specs/controllers/test.dns.yml");
+  let mut dns_conf =
+    include_str!("../../specs/controllers/test.dns.yml").to_owned();
+  let mut metrics_conf = include_str!("../../specs/metrics.yml").to_owned();
 
-  const METRICS_CONF: &str = include_str!("../../specs/metrics.yml");
+  dns_conf = dns_conf.replace("{state_dir}", &daemon_conf.state_dir);
+  proxy_conf = proxy_conf.replace("{state_dir}", &daemon_conf.state_dir);
+  metrics_conf = metrics_conf.replace("{state_dir}", &daemon_conf.state_dir);
 
   let docker = bollard_next::Docker::connect_with_unix(
     &daemon_conf.docker_host,
@@ -70,9 +76,9 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
   })?;
   ensure_state_dir(&daemon_conf.state_dir).await?;
   super::system::ensure_network("system", &docker).await?;
-  super::system::boot_controller(&docker, DNS_CONF, daemon_conf).await?;
-  super::system::boot_controller(&docker, PROXY_CONF, daemon_conf).await?;
-  super::system::start_subsystem(&docker, METRICS_CONF, daemon_conf).await?;
+  super::system::boot_controller(&docker, &dns_conf, daemon_conf).await?;
+  super::system::boot_controller(&docker, &proxy_conf, daemon_conf).await?;
+  super::system::start_subsystem(&docker, &metrics_conf, daemon_conf).await?;
 
   let pool = super::store::init(&docker, daemon_conf).await?;
   let daemon_state = DaemonState {

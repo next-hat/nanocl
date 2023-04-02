@@ -36,6 +36,9 @@ pub(crate) async fn boot_controller(
     let name = format!("{key}.c");
     let mut cargo = utils::state::hook_cargo_binds(&cargo, daemon_conf)?;
     cargo = utils::state::hook_labels(&namespace, &cargo);
+    let mut host_config = cargo.container.host_config.unwrap_or_default();
+    host_config.network_mode = Some(namespace.clone());
+    cargo.container.host_config = Some(host_config);
     if docker
       .inspect_container(&name, None::<InspectContainerOptions>)
       .await
@@ -78,6 +81,18 @@ pub(crate) async fn start_subsystem(
   let name = format!("{key}.c");
   cargo = utils::state::hook_cargo_binds(&cargo, daemon_conf)?;
   cargo = utils::state::hook_labels(namespace, &cargo);
+  let mut host_config = cargo.container.host_config.unwrap_or_default();
+  host_config.network_mode = Some(namespace.to_owned());
+  cargo.container.host_config = Some(host_config);
+
+  if docker
+    .inspect_container(&name, None::<InspectContainerOptions>)
+    .await
+    .is_ok()
+  {
+    return Ok(());
+  }
+
   let cnt = docker
     .create_container(
       Some(CreateContainerOptions {

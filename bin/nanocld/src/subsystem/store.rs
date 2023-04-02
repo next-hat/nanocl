@@ -1,7 +1,6 @@
 use std::time;
 use std::thread;
 
-use bollard_next::container::CreateContainerOptions;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
 use nanocl_stubs::config::DaemonConfig;
@@ -18,11 +17,13 @@ pub(crate) async fn init(
   docker_api: &bollard_next::Docker,
   daemon_conf: &DaemonConfig,
 ) -> Result<Pool, CliError> {
-  const STORE_CONF: &str = include!("../../specs/store.yml");
+  let mut store_conf = include_str!("../../specs/store.yml").to_owned();
+  store_conf = store_conf.replace("{state_dir}", &daemon_conf.state_dir);
+
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
   log::info!("Booting store");
 
-  super::system::start_subsystem(docker_api, STORE_CONF, daemon_conf).await?;
+  super::system::start_subsystem(docker_api, &store_conf, daemon_conf).await?;
 
   // We wait 500ms to ensure store is booted
   // It's a tricky hack to avoid some error printed by postgresql connector for now.
