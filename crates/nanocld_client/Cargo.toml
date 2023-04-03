@@ -17,6 +17,7 @@ default = ["tokio"]
 tokio = ["ntex/tokio"]
 glommio = ["ntex/glommio"]
 async-std = ["ntex/async-std"]
+utoipa = ["nanocl_stubs/utoipa"]
 
 [dev-dependencies]
 tokio-util = "0.7.7"

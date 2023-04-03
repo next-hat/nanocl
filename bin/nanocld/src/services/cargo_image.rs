@@ -18,8 +18,17 @@ use crate::utils;
 use crate::error::HttpError;
 use crate::models::DaemonState;
 
+/// List existing cargo/container images
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Cargo Images",
+  path = "/cargoes/images",
+  responses(
+    (status = 200, description = "List of container image", body = [ImageSummary]),
+  ),
+))]
 #[web::get("/cargoes/images")]
-async fn list_cargo_image(
+pub(crate) async fn list_cargo_image(
   web::types::Query(query): web::types::Query<ListCargoImagesOptions>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -28,8 +37,21 @@ async fn list_cargo_image(
   Ok(web::HttpResponse::Ok().json(&images))
 }
 
+/// Get detailed information about an image
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  path = "/cargoes/images/{id_or_name}",
+  tag = "Cargo Images",
+  params(
+    ("id_or_name" = String, Path, description = "Image ID or name")
+  ),
+  responses(
+    (status = 200, description = "Detailed information about an image", body = ImageInspect),
+    (status = 404, description = "Image not found", body = ApiError),
+  ),
+))]
 #[web::get("/cargoes/images/{id_or_name}*")]
-async fn inspect_cargo_image(
+pub(crate) async fn inspect_cargo_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -38,8 +60,19 @@ async fn inspect_cargo_image(
   Ok(web::HttpResponse::Ok().json(&image))
 }
 
+/// Download a cargo image
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  request_body = CargoImagePartial,
+  tag = "Cargo Images",
+  path = "/cargoes/images",
+  responses(
+    (status = 200, description = "Download stream"),
+    (status = 404, description = "Image not found", body = ApiError),
+  ),
+))]
 #[web::post("/cargoes/images")]
-async fn create_cargo_image(
+pub(crate) async fn create_cargo_image(
   web::types::Json(payload): web::types::Json<CargoImagePartial>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -48,13 +81,26 @@ async fn create_cargo_image(
   Ok(
     web::HttpResponse::Ok()
       .keep_alive()
-      .content_type("nanocl/streaming-v1")
+      .content_type("text/event-stream")
       .streaming(rx_body),
   )
 }
 
+/// Delete a cargo image
+#[cfg_attr(feature = "dev", utoipa::path(
+  delete,
+  path = "/cargoes/images/{id_or_name}",
+  tag = "Cargo Images",
+  params(
+    ("id_or_name" = String, Path, description = "Image ID or name")
+  ),
+  responses(
+    (status = 200, description = "Delete response", body = GenericDelete),
+    (status = 404, description = "Image not found", body = ApiError),
+  ),
+))]
 #[web::delete("/cargoes/images/{id_or_name}*")]
-async fn delete_cargo_image_by_name(
+pub(crate) async fn delete_cargo_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -62,8 +108,19 @@ async fn delete_cargo_image_by_name(
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
+/// Import image from tarball
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  request_body = String,
+  tag = "Cargo Images",
+  path = "/cargoes/images/import",
+  responses(
+    (status = 200, description = "Image imported"),
+    (status = 404, description = "Image not found", body = ApiError),
+  ),
+))]
 #[web::post("/cargoes/images/import")]
-async fn import_images(
+pub(crate) async fn import_cargo_image(
   web::types::Query(query): web::types::Query<CargoImageImportOptions>,
   mut payload: web::types::Payload,
   state: web::types::State<DaemonState>,
@@ -127,9 +184,9 @@ async fn import_images(
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_cargo_image);
   config.service(create_cargo_image);
-  config.service(delete_cargo_image_by_name);
+  config.service(delete_cargo_image);
   config.service(inspect_cargo_image);
-  config.service(import_images);
+  config.service(import_cargo_image);
 }
 
 /// Cargo image unit tests

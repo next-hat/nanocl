@@ -5,6 +5,9 @@ use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
 use crate::version;
 use crate::error::HttpError;
 
+#[cfg(feature = "dev")]
+mod openapi;
+
 mod state;
 mod node;
 mod namespace;
@@ -88,6 +91,11 @@ pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
+  #[cfg(feature = "dev")]
+  {
+    config.service(web::scope("/explorer").configure(openapi::ntex_config));
+  }
+
   config
     .service(
       web::resource("/_ping")

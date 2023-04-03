@@ -17,11 +17,12 @@ use crate::utils;
 use crate::error::CliError;
 use crate::models::{StateArgs, StateCommands, StateOpts, StateBuildArgs};
 use crate::utils::print::print_yml;
+use crate::utils::url::parse_url;
 
 use super::cargo_image::exec_cargo_image_create;
 
 async fn get_from_url(
-  url: url::Url,
+  url: String,
 ) -> Result<(StateConfig, serde_yaml::Value), CliError> {
   let reqwest = ntex::http::Client::default();
   let data = reqwest
@@ -348,7 +349,7 @@ fn inject_build_args(
 }
 
 async fn exec_state_apply(opts: &StateOpts) -> Result<(), CliError> {
-  let (meta, yaml) = match url::Url::parse(&opts.file_path) {
+  let (meta, yaml) = match parse_url(&opts.file_path) {
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
   };
@@ -402,7 +403,7 @@ async fn exec_state_apply(opts: &StateOpts) -> Result<(), CliError> {
 }
 
 async fn exec_state_revert(opts: &StateOpts) -> Result<(), CliError> {
-  let (meta, yaml) = match url::Url::parse(&opts.file_path) {
+  let (meta, yaml) = match parse_url(&opts.file_path) {
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
   };
