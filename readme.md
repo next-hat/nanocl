@@ -62,4 +62,4 @@ Whether you're running a home lab setup or a large enterprise, Nanocl's cutting-
 
 To get started with Nanocl, please refer to the [installation guide](https://docs.next-hat.com/setups/nanocl) and [documentation](https://docs.next-hat.com/references/nanocl/cli). If you need any assistance or have any questions, feel free to reach out to our community for support.
 You may also want to take a look at our [tutorial](https://docs.next-hat.com/guides/nanocl/get-started)
-
+If you want to contribute see our [developer documentation](./doc/developing.md)
