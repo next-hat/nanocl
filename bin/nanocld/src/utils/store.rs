@@ -39,6 +39,59 @@ pub async fn create_pool(host: String) -> Pool {
   .expect("Cannot connect to the store")
 }
 
+/// ## Get store ip address
+///
+/// Get the ip address of the store container
+///
+/// ## Arguments
+///
+/// [docker_api](Docker) Reference to docker api
+///
+/// ## Returns
+///
+/// - [Result](Result) Result of the operation
+///   - [Ok](String) - The ip address of the store
+///   - [Err](HttpResponseError) - The ip address of the store has not been retrieved
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use crate::utils;
+///
+/// let docker_api = Docker::connect_with_local_defaults().unwrap();
+/// let ip_address = utils::store::get_store_ip_addr(&docker_api).await;
+/// ```
+///
+pub async fn get_store_ip_addr(
+  docker_api: &bollard_next::Docker,
+) -> Result<String, HttpResponseError> {
+  let container = docker_api.inspect_container("store.system.c", None).await?;
+  let networks = container
+    .network_settings
+    .ok_or(HttpResponseError {
+      msg: String::from("unable to get store network nettings"),
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+    })?
+    .networks
+    .ok_or(HttpResponseError {
+      msg: String::from("unable to get store networks"),
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+    })?;
+  let ip_address = networks
+    .get("system")
+    .ok_or(HttpResponseError {
+      msg: String::from("unable to get store network nanocl"),
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+    })?
+    .ip_address
+    .as_ref()
+    .ok_or(HttpResponseError {
+      msg: String::from("unable to get store network nanocl"),
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+    })?;
+  Ok(ip_address.to_owned())
+}
+
 /// ## Get connection from the pool
 ///
 /// Get connection from the connection pool

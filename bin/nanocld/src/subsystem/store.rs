@@ -24,13 +24,13 @@ pub(crate) async fn init(
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
   log::info!("Booting store");
   super::system::start_subsystem(docker_api, &store_conf, daemon_conf).await?;
+  let postgresql_id = utils::store::get_store_ip_addr(docker_api).await?;
   // We wait 1000ms to ensure store is booted
   // It's a tricky hack to avoid some error printed by postgresql connector for now.
   thread::sleep(time::Duration::from_millis(1000));
   log::info!("Connecting to store");
   // Connect to postgresql
-  let pool =
-    utils::store::create_pool(daemon_conf.advertise_addr.to_owned()).await;
+  let pool = utils::store::create_pool(postgresql_id).await;
   let mut conn = utils::store::get_pool_conn(&pool)?;
   log::info!("Store connected");
   // This will run the necessary migrations.
