@@ -77,6 +77,7 @@ async fn create_instance(
       cargo.config.container.labels.to_owned().unwrap_or_default();
     labels.insert("io.nanocl".into(), "enabled".into());
     labels.insert("io.nanocl.c".into(), cargo.key.to_owned());
+    labels.insert("io.nanocl.n".into(), cargo.namespace_name.to_owned());
     labels.insert("io.nanocl.cnsp".into(), cargo.namespace_name.to_owned());
 
     let auto_remove = cargo

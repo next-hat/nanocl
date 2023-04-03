@@ -9,6 +9,7 @@ pub type ContainerHealthConfig = bollard_next::models::HealthConfig;
 /// Number is used to manually set the number of replicas
 /// Note: auto will ensure at least 1 replica exists in the cluster
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 #[cfg_attr(feature = "dev", derive(ToSchema))]
@@ -36,6 +37,7 @@ pub enum ReplicationMode {
 }
 
 /// A cargo config partial is used to create a Cargo
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -51,6 +53,7 @@ pub struct CargoConfigPartial {
 /// Payload used to patch a cargo
 /// It will create a new [CargoConfig](CargoConfig) with the new values
 /// It will keep the old values in the history
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -76,6 +79,7 @@ impl From<CargoConfigPartial> for CargoConfigUpdate {
 /// A cargo config is the configuration of a cargo
 /// It used to know the state of the cargo
 /// It keep tracking of an history when you patch an existing cargo
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]

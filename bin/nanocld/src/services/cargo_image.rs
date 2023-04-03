@@ -18,7 +18,7 @@ use crate::utils;
 use crate::error::HttpError;
 use crate::models::DaemonState;
 
-/// List existing cargo/container images
+/// List container images
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Cargo Images",
@@ -33,11 +33,10 @@ pub(crate) async fn list_cargo_image(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let images = utils::cargo_image::list(&query.into(), &state).await?;
-
   Ok(web::HttpResponse::Ok().json(&images))
 }
 
-/// Get detailed information about an image
+/// Get detailed information about a container image
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   path = "/cargoes/images/{id_or_name}",
@@ -56,11 +55,10 @@ pub(crate) async fn inspect_cargo_image(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let image = utils::cargo_image::inspect(&path.1, &state).await?;
-
   Ok(web::HttpResponse::Ok().json(&image))
 }
 
-/// Download a cargo image
+/// Download a container image
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   request_body = CargoImagePartial,
@@ -86,7 +84,7 @@ pub(crate) async fn create_cargo_image(
   )
 }
 
-/// Delete a cargo image
+/// Delete a container image
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   path = "/cargoes/images/{id_or_name}",
@@ -108,7 +106,7 @@ pub(crate) async fn delete_cargo_image(
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
-/// Import image from tarball
+/// Import a container image from a tarball
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   request_body = String,
@@ -342,7 +340,7 @@ pub mod tests {
       .to_str()
       .unwrap();
     assert_eq!(
-      content_type, "nanocl/streaming-v1",
+      content_type, "text/event-stream",
       "Expect content type header to be nanocl/streaming-v1 got {content_type}"
     );
     let mut stream = res.into_stream();

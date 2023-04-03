@@ -1,4 +1,3 @@
-use nanocl_stubs::generic::GenericDelete;
 use ntex::web;
 use ntex::http;
 use ntex_files as fs;
@@ -6,16 +5,25 @@ use utoipa::Modify;
 use utoipa::{OpenApi, ToSchema};
 use bollard_next::models::{ImageInspect, ImageSummary};
 use bollard_next::service::{
-  HealthConfig, ContainerConfig, GraphDriverData, ImageInspectMetadata,
-  ImageInspectRootFs,
+  EndpointIpamConfig, EndpointSettings, MountPointTypeEnum, PortTypeEnum,
+  ContainerSummaryHostConfig, ContainerSummaryNetworkSettings, MountPoint,
+  Port, ContainerSummary, HealthConfig, ContainerConfig, GraphDriverData,
+  ImageInspectMetadata, ImageInspectRootFs,
 };
+use nanocl_stubs::generic::GenericDelete;
+use nanocl_stubs::node::NodeContainerSummary;
+use nanocl_stubs::namespace::{
+  Namespace, NamespaceSummary, NamespacePartial, NamespaceInspect,
+};
+use nanocl_stubs::cargo::CargoInspect;
+use nanocl_stubs::cargo_config::{CargoConfig, ReplicationMode};
 use nanocl_stubs::cargo_image::CargoImagePartial;
 
 use crate::error::HttpError;
 
-use super::cargo_image;
+use super::{namespace, cargo_image};
 
-/// This is the
+/// Api error response
 #[allow(dead_code)]
 #[derive(ToSchema)]
 struct ApiError {
@@ -54,9 +62,21 @@ impl Modify for VersionModifier {
     cargo_image::create_cargo_image,
     cargo_image::delete_cargo_image,
     cargo_image::import_cargo_image,
+    // Namespace
+    namespace::list_namespace,
+    namespace::create_namespace,
+    namespace::delete_namespace,
+    namespace::inspect_namespace,
   ),
   components(schemas(
-    // Cargo Image
+    // Namespace
+    Namespace,
+    NamespacePartial,
+    NamespaceInspect,
+    NamespaceSummary,
+    // Node
+    NodeContainerSummary,
+    // Container Image
     ImageSummary,
     ImageInspect,
     ImageInspectMetadata,
@@ -66,13 +86,27 @@ impl Modify for VersionModifier {
     // Container
     ContainerConfig,
     HealthConfig,
+    ContainerSummary,
+    ContainerSummaryHostConfig,
+    ContainerSummaryNetworkSettings,
+    Port,
+    MountPoint,
+    MountPointTypeEnum,
+    EndpointSettings,
+    PortTypeEnum,
+    EndpointIpamConfig,
+    // Cargo
+    CargoInspect,
+    CargoConfig,
+    ReplicationMode,
     // Error
     ApiError,
     // Generic Response
     GenericDelete,
   )),
   tags(
-    (name = "Cargo Images", description = "Cargo images management endpoints.")
+    (name = "Cargo Images", description = "Cargo images management endpoints."),
+    (name = "Namespaces", description = "Namespaces management endpoints."),
   ),
   modifiers(&VersionModifier),
 )]

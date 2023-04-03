@@ -5,11 +5,20 @@ use ntex::web;
 
 use nanocl_stubs::namespace::NamespacePartial;
 
-use crate::utils;
+use crate::{utils, repositories};
 use crate::models::DaemonState;
 
 use crate::error::HttpError;
 
+/// List namespaces
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Namespaces",
+  path = "/namespaces",
+  responses(
+    (status = 200, description = "List of namespace", body = [NamespaceSummary]),
+  ),
+))]
 #[web::get("/namespaces")]
 pub(crate) async fn list_namespace(
   state: web::types::State<DaemonState>,
@@ -18,44 +27,76 @@ pub(crate) async fn list_namespace(
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
+/// Create a namespace
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  request_body = NamespacePartial,
+  tag = "Namespaces",
+  path = "/namespaces",
+  responses(
+    (status = 200, description = "List of namespace", body = Namespace),
+    (status = 409, description = "Namespace already exist", body = ApiError),
+  ),
+))]
 #[web::post("/namespaces")]
-async fn create_namespace(
+pub(crate) async fn create_namespace(
   web::types::Json(payload): web::types::Json<NamespacePartial>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("Creating namespace: {:?}", &payload);
   let item = utils::namespace::create(&payload, &state).await?;
-  log::debug!("Namespace created: {:?}", &item);
   Ok(web::HttpResponse::Created().json(&item))
 }
 
+/// Delete a namespace
+#[cfg_attr(feature = "dev", utoipa::path(
+  delete,
+  tag = "Namespaces",
+  path = "/namespaces/{name}",
+  params(
+    ("name" = String, Path, description = "The namespace name to delete")
+  ),
+  responses(
+    (status = 200, description = "Delete response", body = GenericDelete),
+    (status = 404, description = "Namespace is not existing", body = ApiError),
+  ),
+))]
 #[web::delete("/namespaces/{name}")]
-async fn delete_namespace_by_name(
+pub(crate) async fn delete_namespace(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("Deleting namespace {}", &path.1);
+  repositories::namespace::find_by_name(&path.1, &state.pool).await?;
   let res = utils::namespace::delete_by_name(&path.1, &state).await?;
-  log::debug!("Namespace {} deleted: {:?}", &path.1, &res);
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
+/// Get detailed information about a namespace
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Namespaces",
+  path = "/namespaces/{name}/inspect",
+  params(
+    ("name" = String, Path, description = "The namespace name to inspect")
+  ),
+  responses(
+    (status = 200, description = "Detailed information about a namespace", body = [NamespaceInspect]),
+    (status = 404, description = "Namespace is not existing", body = ApiError),
+  ),
+))]
 #[web::get("/namespaces/{id}/inspect")]
-async fn inspect_namespace_by_name(
+pub(crate) async fn inspect_namespace(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("Inspecting namespace {}", path.1);
   let namespace = utils::namespace::inspect(&path.1, &state).await?;
-  log::debug!("Namespace found: {:?}", &namespace);
   Ok(web::HttpResponse::Ok().json(&namespace))
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_namespace);
   config.service(create_namespace);
-  config.service(inspect_namespace_by_name);
-  config.service(delete_namespace_by_name);
+  config.service(inspect_namespace);
+  config.service(delete_namespace);
 }
 
 #[cfg(test)]

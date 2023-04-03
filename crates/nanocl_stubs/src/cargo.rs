@@ -18,6 +18,7 @@ use super::cargo_config::CargoConfig;
 /// The configuration can be updated and the old configuration will be kept in the history
 /// That way you can rollback to a previous configuration quickly
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Cargo {
@@ -36,6 +37,7 @@ pub struct Cargo {
 /// A Cargo Summary is a summary of a cargo
 /// It is used to list all the cargos
 #[derive(Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoSummary {
@@ -64,6 +66,7 @@ pub struct CargoSummary {
 /// It contains all the information about the cargo
 /// It also contains the list of containers
 #[derive(Default, Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoInspect {
@@ -87,6 +90,7 @@ pub struct CargoInspect {
 
 /// Kind of ExecOutput
 #[derive(Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum OutputKind {
@@ -103,6 +107,7 @@ pub enum OutputKind {
 /// ExecOutput is the output of an exec command
 /// It contains the kind of the output and the data
 #[derive(Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct OutputLog {
@@ -137,6 +142,7 @@ impl From<LogOutput> for OutputLog {
 
 /// Options for the kill command
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoKillOptions {
