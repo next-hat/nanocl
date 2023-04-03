@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
-use bollard_next::service::HostConfig;
-use nanocl_stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
 use ntex::rt;
 use ntex::http::StatusCode;
+
+use bollard_next::service::HostConfig;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateConfig,
 };
+use nanocl_stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
 
 use crate::{utils, repositories};
 use crate::error::{HttpResponseError, CliError};

@@ -9,14 +9,11 @@ Cargoes:
       Image: nanocl-dnsmasq:0.0.1
       HostConfig:
         NetworkMode: host
-        Binds: [
-        ]
 
   - Name: ctrl-proxy
     Container:
       Image: nanocl-ctrl-dns:0.0.1
       Tty: true
       HostConfig:
-        Binds: [
-          "/run/nanocl:/run/nanocl"
-        ]
+        Binds:
+        - /run/nanocl:/run/nanocl

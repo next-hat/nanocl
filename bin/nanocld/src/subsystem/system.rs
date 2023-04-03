@@ -1,8 +1,14 @@
 use std::collections::HashMap;
 
+use bollard_next::Docker;
+use bollard_next::container::{
+  ListContainersOptions, InspectContainerOptions, CreateContainerOptions,
+  StartContainerOptions,
+};
+use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
 use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
-use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 
+use nanocl_stubs::state::StateDeployment;
 use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
 
@@ -10,6 +16,104 @@ use crate::version::VERSION;
 use crate::{utils, repositories};
 use crate::error::CliError;
 use crate::models::{Pool, DaemonState};
+
+pub(crate) async fn boot_controller(
+  docker: &Docker,
+  ctrl_conf: &str,
+) -> Result<(), CliError> {
+  let conf =
+    serde_yaml::from_str::<StateDeployment>(ctrl_conf).map_err(|err| {
+      CliError {
+        msg: format!("Failed to parse controller config: {}", err),
+        code: 4,
+      }
+    })?;
+
+  let namespace = conf.namespace.unwrap_or("default".into());
+  for cargo in conf.cargoes.unwrap_or_default() {
+    let key = utils::key::gen_key(&namespace, &cargo.name);
+    let name = format!("{key}.c");
+    let mut cargo = utils::state::hook_cargo_binds(&cargo)?;
+    cargo = utils::state::hook_labels(&namespace, &cargo);
+    let mut host_config = cargo.container.host_config.unwrap_or_default();
+    host_config.network_mode = Some(namespace.clone());
+    host_config.restart_policy = Some(RestartPolicy {
+      name: Some(RestartPolicyNameEnum::ON_FAILURE),
+      maximum_retry_count: Some(5),
+    });
+    cargo.container.host_config = Some(host_config);
+    if docker
+      .inspect_container(&name, None::<InspectContainerOptions>)
+      .await
+      .is_ok()
+    {
+      continue;
+    }
+
+    let cnt = docker
+      .create_container(
+        Some(CreateContainerOptions {
+          name,
+          platform: None,
+        }),
+        cargo.container,
+      )
+      .await?;
+    docker
+      .start_container(&cnt.id, None::<StartContainerOptions<String>>)
+      .await?;
+  }
+
+  Ok(())
+}
+
+pub(crate) async fn start_subsystem(
+  docker: &Docker,
+  system_conf: &str,
+) -> Result<(), CliError> {
+  let mut cargo = serde_yaml::from_str::<CargoConfigPartial>(system_conf)
+    .map_err(|err| CliError {
+      msg: format!(
+        "Failed to parse subsystem config:\n{system_conf}\nGot error: {err}"
+      ),
+      code: 4,
+    })?;
+
+  let namespace = "system";
+  let key = utils::key::gen_key(namespace, &cargo.name);
+  let name = format!("{key}.c");
+  cargo = utils::state::hook_cargo_binds(&cargo)?;
+  cargo = utils::state::hook_labels(namespace, &cargo);
+  let mut host_config = cargo.container.host_config.unwrap_or_default();
+  host_config.network_mode = Some(namespace.to_owned());
+  host_config.restart_policy = Some(RestartPolicy {
+    name: Some(RestartPolicyNameEnum::ON_FAILURE),
+    maximum_retry_count: Some(5),
+  });
+  cargo.container.host_config = Some(host_config);
+
+  if docker
+    .inspect_container(&name, None::<InspectContainerOptions>)
+    .await
+    .is_ok()
+  {
+    return Ok(());
+  }
+
+  let cnt = docker
+    .create_container(
+      Some(CreateContainerOptions {
+        name,
+        platform: None,
+      }),
+      cargo.container,
+    )
+    .await?;
+  docker
+    .start_container(&cnt.id, None::<StartContainerOptions<String>>)
+    .await?;
+  Ok(())
+}
 
 /// Ensure existance of the system network that controllers will use.
 /// It's ensure existance of a network in your system called `nanocl.system`

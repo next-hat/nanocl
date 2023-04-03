@@ -38,42 +38,6 @@ pub async fn create_pool(host: String) -> Pool {
   .expect("Cannot connect to the store")
 }
 
-/// ## Get connection from the pool
-///
-/// Get connection from the connection pool
-///
-/// ## Arguments
-///
-/// [pool](Pool) a pool wrapped in ntex State
-///
-/// ## Returns
-///
-/// - [Result](Result) Result of the operation
-///   - [Ok](DBConn) - The connection has been retrieved
-///   - [Err](HttpResponseError) - The connection has not been retrieved
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use crate::utils;
-///
-/// let pool = utils::store::create_pool("localhost".to_string()).await;
-/// let conn = utils::store::get_pool_conn(&pool);
-/// ```
-///
-pub fn get_pool_conn(pool: &Pool) -> Result<DBConn, HttpResponseError> {
-  let conn = match pool.get() {
-    Ok(conn) => conn,
-    Err(err) => {
-      return Err(HttpResponseError {
-        msg: format!("Cannot get connection from pool got error: {}", &err),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-      });
-    }
-  };
-  Ok(conn)
-}
-
 /// ## Get store ip address
 ///
 /// Get the ip address of the store container
@@ -125,4 +89,40 @@ pub async fn get_store_ip_addr(
       status: StatusCode::INTERNAL_SERVER_ERROR,
     })?;
   Ok(ip_address.to_owned())
+}
+
+/// ## Get connection from the pool
+///
+/// Get connection from the connection pool
+///
+/// ## Arguments
+///
+/// [pool](Pool) a pool wrapped in ntex State
+///
+/// ## Returns
+///
+/// - [Result](Result) Result of the operation
+///   - [Ok](DBConn) - The connection has been retrieved
+///   - [Err](HttpResponseError) - The connection has not been retrieved
+///
+/// ## Example
+///
+/// ```rust,norun
+/// use crate::utils;
+///
+/// let pool = utils::store::create_pool("localhost".to_string()).await;
+/// let conn = utils::store::get_pool_conn(&pool);
+/// ```
+///
+pub fn get_pool_conn(pool: &Pool) -> Result<DBConn, HttpResponseError> {
+  let conn = match pool.get() {
+    Ok(conn) => conn,
+    Err(err) => {
+      return Err(HttpResponseError {
+        msg: format!("Cannot get connection from pool got error: {}", &err),
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+      });
+    }
+  };
+  Ok(conn)
 }

@@ -1,0 +1,13 @@
+Name: store
+Container:
+  Image: cockroachdb/cockroach:v22.2.6
+  Tty: true
+  Cmd:
+  - start-single-node
+  - --insecure
+  - --listen-addr=:26257
+  - --advertise-addr={advertise_addr}:26257
+  HostConfig:
+    Binds:
+    - {state_dir}/store/data:/cockroach/cockroach-data
+    - {state_dir}/store/certs:/certs
