@@ -6,7 +6,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};
 
 use crate::utils;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{Pool, VmConfigDbModel};
 use super::error::{db_error, db_blocking_error};
 
@@ -42,7 +42,7 @@ pub async fn create(
   item: &VmConfigPartial,
   version: &str,
   pool: &Pool,
-) -> Result<VmConfig, HttpResponseError> {
+) -> Result<VmConfig, HttpError> {
   use crate::schema::vm_configs::dsl;
 
   let pool = pool.clone();
@@ -51,11 +51,9 @@ pub async fn create(
     vm_key: vm_key.to_owned(),
     version: version.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
-    config: serde_json::to_value(item.to_owned()).map_err(|e| {
-      HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Failed to serialize config: {e}"),
-      }
+    config: serde_json::to_value(item.to_owned()).map_err(|e| HttpError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      msg: format!("Failed to serialize config: {e}"),
     })?,
   };
   let dbmodel = web::block(move || {
@@ -64,7 +62,7 @@ pub async fn create(
       .values(&dbmodel)
       .execute(&mut conn)
       .map_err(db_error("vm config"))?;
-    Ok::<_, HttpResponseError>(dbmodel)
+    Ok::<_, HttpError>(dbmodel)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -112,7 +110,7 @@ pub async fn create(
 pub async fn find_by_key(
   key: &uuid::Uuid,
   pool: &Pool,
-) -> Result<VmConfig, HttpResponseError> {
+) -> Result<VmConfig, HttpError> {
   use crate::schema::vm_configs::dsl;
 
   let key = *key;
@@ -124,13 +122,13 @@ pub async fn find_by_key(
       .filter(dsl::key.eq(key))
       .get_result::<VmConfigDbModel>(&mut conn)
       .map_err(db_error("vm config"))?;
-    Ok::<_, HttpResponseError>(config)
+    Ok::<_, HttpError>(config)
   })
   .await
   .map_err(db_blocking_error)?;
 
   let config = serde_json::from_value::<VmConfigPartial>(dbmodel.config)
-    .map_err(|e| HttpResponseError {
+    .map_err(|e| HttpError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Failed to deserialize config: {e}"),
     })?;
@@ -176,7 +174,7 @@ pub async fn find_by_key(
 pub async fn delete_by_vm_key(
   key: &str,
   pool: &Pool,
-) -> Result<GenericDelete, HttpResponseError> {
+) -> Result<GenericDelete, HttpError> {
   use crate::schema::vm_configs::dsl;
 
   let key = key.to_owned();
@@ -188,7 +186,7 @@ pub async fn delete_by_vm_key(
       .filter(dsl::vm_key.eq(key))
       .execute(&mut conn)
       .map_err(db_error("vm config"))?;
-    Ok::<_, HttpResponseError>(res)
+    Ok::<_, HttpError>(res)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -199,7 +197,7 @@ pub async fn delete_by_vm_key(
 pub async fn list_by_vm(
   key: &str,
   pool: &Pool,
-) -> Result<Vec<VmConfig>, HttpResponseError> {
+) -> Result<Vec<VmConfig>, HttpError> {
   use crate::schema::vm_configs::dsl;
 
   let key = key.to_owned();
@@ -211,7 +209,7 @@ pub async fn list_by_vm(
       .filter(dsl::vm_key.eq(key))
       .get_results::<VmConfigDbModel>(&mut conn)
       .map_err(db_error("vm config"))?;
-    Ok::<_, HttpResponseError>(configs)
+    Ok::<_, HttpError>(configs)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -220,7 +218,7 @@ pub async fn list_by_vm(
     .into_iter()
     .map(|dbmodel| {
       let config = serde_json::from_value::<VmConfigPartial>(dbmodel.config)
-        .map_err(|e| HttpResponseError {
+        .map_err(|e| HttpError {
           status: StatusCode::INTERNAL_SERVER_ERROR,
           msg: format!("Failed to deserialize config: {e}"),
         })?;
@@ -241,7 +239,7 @@ pub async fn list_by_vm(
         password: config.password,
       })
     })
-    .collect::<Result<Vec<VmConfig>, HttpResponseError>>()?;
+    .collect::<Result<Vec<VmConfig>, HttpError>>()?;
 
   Ok(configs)
 }

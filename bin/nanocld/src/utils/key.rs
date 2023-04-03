@@ -1,6 +1,6 @@
 use ntex::http::StatusCode;
 
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 
 /// Utils to manipulate `key` property of a model
 /// The key property is based on the namespace and the name of the given model
@@ -55,13 +55,13 @@ pub fn gen_key(nsp: &str, name: &str) -> String {
   name.to_owned() + "." + nsp
 }
 
-pub fn validate_name(name: &str) -> Result<(), HttpResponseError> {
+pub fn validate_name(name: &str) -> Result<(), HttpError> {
   // Ensure name only contain a-z, A-Z, 0-9, - and _
   if !name
     .chars()
     .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
   {
-    return Err(HttpResponseError {
+    return Err(HttpError {
       status: StatusCode::BAD_REQUEST,
       msg: format!("Vm image name {name} is invalid"),
     });

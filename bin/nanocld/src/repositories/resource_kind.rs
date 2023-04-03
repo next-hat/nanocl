@@ -2,7 +2,7 @@ use ntex::web;
 use diesel::prelude::*;
 
 use crate::utils;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{
   Pool, ResourceKindPartial, ResourceKindDbModel, ResourceKindVersionDbModel,
 };
@@ -12,7 +12,7 @@ use super::error::{db_error, db_blocking_error};
 pub async fn create_version(
   item: &ResourceKindPartial,
   pool: &Pool,
-) -> Result<ResourceKindVersionDbModel, HttpResponseError> {
+) -> Result<ResourceKindVersionDbModel, HttpError> {
   use crate::schema::resource_kind_versions::dsl;
 
   let kind_version = ResourceKindVersionDbModel {
@@ -28,7 +28,7 @@ pub async fn create_version(
       .values(&kind_version)
       .execute(&mut conn)
       .map_err(db_error("resource kind version"))?;
-    Ok::<_, HttpResponseError>(kind_version)
+    Ok::<_, HttpError>(kind_version)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -40,7 +40,7 @@ pub async fn get_version(
   name: &str,
   version: &str,
   pool: &Pool,
-) -> Result<ResourceKindVersionDbModel, HttpResponseError> {
+) -> Result<ResourceKindVersionDbModel, HttpError> {
   use crate::schema::resource_kind_versions::dsl;
 
   let pool = pool.clone();
@@ -63,7 +63,7 @@ pub async fn get_version(
 pub async fn find_by_name(
   name: &str,
   pool: &Pool,
-) -> Result<ResourceKindDbModel, HttpResponseError> {
+) -> Result<ResourceKindDbModel, HttpError> {
   use crate::schema::resource_kinds;
 
   let pool = pool.clone();
@@ -84,7 +84,7 @@ pub async fn find_by_name(
 pub async fn create(
   item: &ResourceKindPartial,
   pool: &Pool,
-) -> Result<ResourceKindDbModel, HttpResponseError> {
+) -> Result<ResourceKindDbModel, HttpError> {
   use crate::schema::resource_kinds::dsl;
 
   let kind = ResourceKindDbModel {
@@ -98,7 +98,7 @@ pub async fn create(
       .values(&kind)
       .execute(&mut conn)
       .map_err(db_error("resource kind"))?;
-    Ok::<_, HttpResponseError>(kind)
+    Ok::<_, HttpError>(kind)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -106,10 +106,7 @@ pub async fn create(
   Ok(item)
 }
 
-pub async fn delete_version(
-  name: &str,
-  pool: &Pool,
-) -> Result<(), HttpResponseError> {
+pub async fn delete_version(name: &str, pool: &Pool) -> Result<(), HttpError> {
   use crate::schema::resource_kind_versions::dsl;
 
   let pool = pool.clone();
@@ -121,7 +118,7 @@ pub async fn delete_version(
     )
     .execute(&mut conn)
     .map_err(db_error("resource kind version"))?;
-    Ok::<_, HttpResponseError>(())
+    Ok::<_, HttpError>(())
   })
   .await
   .map_err(db_blocking_error)?;
@@ -129,7 +126,7 @@ pub async fn delete_version(
   Ok(())
 }
 
-pub async fn delete(name: &str, pool: &Pool) -> Result<(), HttpResponseError> {
+pub async fn delete(name: &str, pool: &Pool) -> Result<(), HttpError> {
   use crate::schema::resource_kinds::dsl;
 
   let pool = pool.clone();
@@ -139,7 +136,7 @@ pub async fn delete(name: &str, pool: &Pool) -> Result<(), HttpResponseError> {
     diesel::delete(dsl::resource_kinds.filter(dsl::name.eq(name)))
       .execute(&mut conn)
       .map_err(db_error("resource kind"))?;
-    Ok::<_, HttpResponseError>(())
+    Ok::<_, HttpError>(())
   })
   .await
   .map_err(db_blocking_error)?;

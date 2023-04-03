@@ -12,13 +12,13 @@ use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
 use futures::future::ready;
 
 use crate::{utils, repositories};
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{DaemonState, WsConState};
 
 #[web::get("/nodes")]
 async fn list_node(
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let items = repositories::node::list(&state.pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&items))

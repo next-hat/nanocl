@@ -3,14 +3,14 @@ use diesel::prelude::*;
 
 use crate::utils;
 use crate::models::{NodeDbModel, Pool};
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 
 use super::error::{db_error, db_blocking_error};
 
 pub async fn create(
   node: &NodeDbModel,
   pool: &Pool,
-) -> Result<NodeDbModel, HttpResponseError> {
+) -> Result<NodeDbModel, HttpError> {
   use crate::schema::nodes::dsl;
 
   let node = node.clone();
@@ -23,7 +23,7 @@ pub async fn create(
       .get_result(&mut conn)
       .map_err(db_error("nodes"))?;
 
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -34,7 +34,7 @@ pub async fn create(
 pub async fn find_by_name(
   name: &str,
   pool: &Pool,
-) -> Result<NodeDbModel, HttpResponseError> {
+) -> Result<NodeDbModel, HttpError> {
   use crate::schema::nodes::dsl;
 
   let name = name.to_owned();
@@ -46,7 +46,7 @@ pub async fn find_by_name(
       .get_result(&mut conn)
       .map_err(db_error("nodes"))?;
 
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -57,14 +57,14 @@ pub async fn find_by_name(
 pub async fn create_if_not_exists(
   node: &NodeDbModel,
   pool: &Pool,
-) -> Result<NodeDbModel, HttpResponseError> {
+) -> Result<NodeDbModel, HttpError> {
   match find_by_name(&node.name, pool).await {
     Err(_) => create(node, pool).await,
     Ok(node) => Ok(node),
   }
 }
 
-pub async fn list(pool: &Pool) -> Result<Vec<NodeDbModel>, HttpResponseError> {
+pub async fn list(pool: &Pool) -> Result<Vec<NodeDbModel>, HttpError> {
   use crate::schema::nodes::dsl;
 
   let pool = pool.clone();
@@ -74,7 +74,7 @@ pub async fn list(pool: &Pool) -> Result<Vec<NodeDbModel>, HttpResponseError> {
       .load::<NodeDbModel>(&mut conn)
       .map_err(db_error("nodes"))?;
 
-    Ok::<_, HttpResponseError>(items)
+    Ok::<_, HttpError>(items)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -85,7 +85,7 @@ pub async fn list(pool: &Pool) -> Result<Vec<NodeDbModel>, HttpResponseError> {
 pub async fn list_unless(
   name: &str,
   pool: &Pool,
-) -> Result<Vec<NodeDbModel>, HttpResponseError> {
+) -> Result<Vec<NodeDbModel>, HttpError> {
   use crate::schema::nodes::dsl;
 
   let name = name.to_owned();
@@ -97,7 +97,7 @@ pub async fn list_unless(
       .load::<NodeDbModel>(&mut conn)
       .map_err(db_error("nodes"))?;
 
-    Ok::<_, HttpResponseError>(items)
+    Ok::<_, HttpError>(items)
   })
   .await
   .map_err(db_blocking_error)?;

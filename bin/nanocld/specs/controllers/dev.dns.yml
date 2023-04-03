@@ -12,7 +12,7 @@ Cargoes:
 
 - Name: ctrl-dns
   Container:
-    Image: nanocl-dev:dev
+    Image: ghcr.io/nxthat/nanocl-dev:dev
     Cmd:
     - watch
     - -x

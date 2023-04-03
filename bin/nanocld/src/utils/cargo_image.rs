@@ -6,7 +6,7 @@ use bollard_next::service::CreateImageInfo;
 use bollard_next::models::{ImageInspect, ImageSummary};
 use nanocl_stubs::generic::GenericDelete;
 
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::DaemonState;
 
 use super::stream;
@@ -35,11 +35,11 @@ use super::stream;
 ///
 pub fn parse_image_info(
   image_info: &str,
-) -> Result<(String, String), HttpResponseError> {
+) -> Result<(String, String), HttpError> {
   let image_info: Vec<&str> = image_info.split(':').collect();
 
   if image_info.len() != 2 {
-    return Err(HttpResponseError {
+    return Err(HttpError {
       msg: String::from("missing tag in image name"),
       status: StatusCode::BAD_REQUEST,
     });
@@ -75,7 +75,7 @@ pub fn parse_image_info(
 pub async fn list(
   opts: &bollard_next::image::ListImagesOptions<String>,
   state: &DaemonState,
-) -> Result<Vec<ImageSummary>, HttpResponseError> {
+) -> Result<Vec<ImageSummary>, HttpError> {
   let items = state.docker_api.list_images(Some(opts.clone())).await?;
 
   Ok(items)
@@ -109,7 +109,7 @@ pub async fn list(
 pub async fn inspect(
   image_name: &str,
   state: &DaemonState,
-) -> Result<ImageInspect, HttpResponseError> {
+) -> Result<ImageInspect, HttpError> {
   let image = state.docker_api.inspect_image(image_name).await?;
 
   Ok(image)
@@ -150,10 +150,7 @@ pub async fn download(
   from_image: &str,
   tag: &str,
   state: &DaemonState,
-) -> Result<
-  impl StreamExt<Item = Result<Bytes, HttpResponseError>>,
-  HttpResponseError,
-> {
+) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
   let from_image = from_image.to_owned();
   let tag = tag.to_owned();
   let docker_api = state.docker_api.clone();
@@ -200,7 +197,7 @@ pub async fn download(
 pub async fn delete(
   id_or_name: &str,
   state: &DaemonState,
-) -> Result<GenericDelete, HttpResponseError> {
+) -> Result<GenericDelete, HttpError> {
   state
     .docker_api
     .remove_image(id_or_name, None, None)

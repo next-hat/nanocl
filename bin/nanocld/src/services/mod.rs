@@ -3,7 +3,7 @@ use futures::future::{ok, Either, Ready};
 use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
 
 use crate::version;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 
 mod state;
 mod node;
@@ -64,7 +64,7 @@ where
 }
 
 // This is a dummy endpoint you can use to test if the server is accessible.
-async fn ping() -> Result<web::HttpResponse, HttpResponseError> {
+async fn ping() -> Result<web::HttpResponse, HttpError> {
   Ok(web::HttpResponse::Ok().json(&serde_json::json!({
     "msg": "pong",
   })))
@@ -80,8 +80,8 @@ async fn get_version() -> web::HttpResponse {
   }))
 }
 
-pub async fn unhandled() -> Result<web::HttpResponse, HttpResponseError> {
-  Err(HttpResponseError {
+pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
+  Err(HttpError {
     status: ntex::http::StatusCode::NOT_FOUND,
     msg: "Route or method unhandled".into(),
   })

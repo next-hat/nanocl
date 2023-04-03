@@ -3,7 +3,7 @@ use ntex::http::StatusCode;
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{Pool, DBConn};
 
 /// ## Create pool
@@ -63,28 +63,28 @@ pub async fn create_pool(host: String) -> Pool {
 ///
 pub async fn get_store_ip_addr(
   docker_api: &bollard_next::Docker,
-) -> Result<String, HttpResponseError> {
+) -> Result<String, HttpError> {
   let container = docker_api.inspect_container("store.system.c", None).await?;
   let networks = container
     .network_settings
-    .ok_or(HttpResponseError {
+    .ok_or(HttpError {
       msg: String::from("unable to get store network nettings"),
       status: StatusCode::INTERNAL_SERVER_ERROR,
     })?
     .networks
-    .ok_or(HttpResponseError {
+    .ok_or(HttpError {
       msg: String::from("unable to get store networks"),
       status: StatusCode::INTERNAL_SERVER_ERROR,
     })?;
   let ip_address = networks
     .get("system")
-    .ok_or(HttpResponseError {
+    .ok_or(HttpError {
       msg: String::from("unable to get store network nanocl"),
       status: StatusCode::INTERNAL_SERVER_ERROR,
     })?
     .ip_address
     .as_ref()
-    .ok_or(HttpResponseError {
+    .ok_or(HttpError {
       msg: String::from("unable to get store network nanocl"),
       status: StatusCode::INTERNAL_SERVER_ERROR,
     })?;
@@ -114,11 +114,11 @@ pub async fn get_store_ip_addr(
 /// let conn = utils::store::get_pool_conn(&pool);
 /// ```
 ///
-pub fn get_pool_conn(pool: &Pool) -> Result<DBConn, HttpResponseError> {
+pub fn get_pool_conn(pool: &Pool) -> Result<DBConn, HttpError> {
   let conn = match pool.get() {
     Ok(conn) => conn,
     Err(err) => {
-      return Err(HttpResponseError {
+      return Err(HttpError {
         msg: format!("Cannot get connection from pool got error: {}", &err),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       });

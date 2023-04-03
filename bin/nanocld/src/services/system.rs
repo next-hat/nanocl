@@ -8,13 +8,13 @@ use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{HostInfo, ProccessQuery};
 
 use crate::repositories;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::DaemonState;
 
 #[web::get("/info")]
 async fn get_info(
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let docker = state.docker_api.info().await?;
   let host_gateway = state.config.gateway.clone();
   let info = HostInfo {
@@ -28,9 +28,9 @@ async fn get_info(
 #[web::get("/events")]
 async fn watch_events(
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   // TODO: spawn a future to lock the event_emitter and subscribe to the stream
-  let stream = state.event_emitter.lock().unwrap().subscribe();
+  let stream = state.event_emitter.subscribe().await?;
 
   Ok(
     web::HttpResponse::Ok()
@@ -43,7 +43,7 @@ async fn watch_events(
 async fn get_processes(
   web::types::Query(qs): web::types::Query<ProccessQuery>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let label = "io.nanocl=enabled".into();
   let mut filters: HashMap<String, Vec<String>> = HashMap::new();
   let mut labels = vec![label];
