@@ -76,9 +76,9 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
   })?;
   ensure_state_dir(&daemon_conf.state_dir).await?;
   super::system::ensure_network("system", &docker).await?;
-  super::system::boot_controller(&docker, &dns_conf, daemon_conf).await?;
-  super::system::boot_controller(&docker, &proxy_conf, daemon_conf).await?;
-  super::system::start_subsystem(&docker, &metrics_conf, daemon_conf).await?;
+  super::system::boot_controller(&docker, &dns_conf).await?;
+  super::system::boot_controller(&docker, &proxy_conf).await?;
+  super::system::start_subsystem(&docker, &metrics_conf).await?;
 
   let pool = super::store::init(&docker, daemon_conf).await?;
   let daemon_state = DaemonState {

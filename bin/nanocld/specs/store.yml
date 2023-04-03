@@ -4,7 +4,7 @@ Container:
   Tty: true
   Cmd:
   - start-single-node
-  -- insecure
+  - --insecure
   - --listen-addr=:26257
   - --advertise-addr={advertise_addr}:26257
   HostConfig:

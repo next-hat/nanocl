@@ -23,7 +23,7 @@ pub(crate) async fn init(
     store_conf.replace("{advertise_addr}", &daemon_conf.advertise_addr);
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
   log::info!("Booting store");
-  super::system::start_subsystem(docker_api, &store_conf, daemon_conf).await?;
+  super::system::start_subsystem(docker_api, &store_conf).await?;
   let postgresql_id = utils::store::get_store_ip_addr(docker_api).await?;
   // We wait 1000ms to ensure store is booted
   // It's a tricky hack to avoid some error printed by postgresql connector for now.
