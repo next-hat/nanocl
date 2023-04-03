@@ -25,7 +25,7 @@ use nanocl_stubs::cargo::{
 
 use crate::models::DaemonState;
 use crate::{utils, repositories};
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 
 use super::stream::transform_stream;
 
@@ -58,7 +58,7 @@ async fn create_instance(
   cargo: &Cargo,
   number: i64,
   docker_api: &bollard_next::Docker,
-) -> Result<Vec<String>, HttpResponseError> {
+) -> Result<Vec<String>, HttpError> {
   let mut instances = Vec::new();
   for current in 0..number {
     let name = if current > 0 {
@@ -139,7 +139,7 @@ async fn create_instance(
     let res = docker_api
       .create_container::<String, String>(Some(create_options), config)
       .await
-      .map_err(|e| HttpResponseError {
+      .map_err(|e| HttpError {
         msg: format!("Unable to create container: {e}"),
         status: StatusCode::BAD_REQUEST,
       })?;
@@ -165,7 +165,7 @@ async fn create_instance(
 pub async fn list_instance(
   cargo_key: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<Vec<ContainerSummary>, HttpResponseError> {
+) -> Result<Vec<ContainerSummary>, HttpError> {
   let label = format!("io.nanocl.c={cargo_key}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
@@ -198,7 +198,7 @@ pub async fn create(
   config: &CargoConfigPartial,
   version: &str,
   state: &DaemonState,
-) -> Result<Cargo, HttpResponseError> {
+) -> Result<Cargo, HttpError> {
   let cargo =
     repositories::cargo::create(namespace, config, version, &state.pool)
       .await?;
@@ -230,7 +230,7 @@ pub async fn create(
 pub async fn start(
   cargo_key: &str,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let cargo_key = cargo_key.to_owned();
   let docker_api = state.docker_api.clone();
   let cargo =
@@ -298,7 +298,7 @@ pub async fn start(
 pub async fn stop(
   cargo_key: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let containers = list_instance(cargo_key, docker_api).await?;
 
   for container in containers {
@@ -328,7 +328,7 @@ pub async fn delete(
   cargo_key: &str,
   force: Option<bool>,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let containers = list_instance(cargo_key, &state.docker_api).await?;
 
   for container in containers {
@@ -342,7 +342,7 @@ pub async fn delete(
         }),
       )
       .await
-      .map_err(|e| HttpResponseError {
+      .map_err(|e| HttpError {
         msg: format!("Unable to remove container got error : {e}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?;
@@ -377,7 +377,7 @@ pub async fn put(
   config: &CargoConfigUpdate,
   version: &str,
   state: &DaemonState,
-) -> Result<Cargo, HttpResponseError> {
+) -> Result<Cargo, HttpError> {
   let cargo = repositories::cargo::find_by_key(cargo_key, &state.pool).await?;
 
   let cargo_config =
@@ -420,7 +420,7 @@ pub async fn put(
         bollard_next::container::RenameContainerOptions { name },
       )
       .await
-      .map_err(|e| HttpResponseError {
+      .map_err(|e| HttpError {
         msg: format!("Unable to rename container got error : {e}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?;
@@ -442,7 +442,7 @@ pub async fn put(
             bollard_next::container::RenameContainerOptions { name },
           )
           .await
-          .map_err(|e| HttpResponseError {
+          .map_err(|e| HttpError {
             msg: format!("Unable to rename container got error : {e}"),
             status: StatusCode::INTERNAL_SERVER_ERROR,
           })?;
@@ -496,7 +496,7 @@ pub async fn put(
         }),
       )
       .await
-      .map_err(|e| HttpResponseError {
+      .map_err(|e| HttpError {
         msg: format!("Unable to remove container got error : {e}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?;
@@ -524,7 +524,7 @@ pub async fn put(
 pub async fn list(
   nsp: &str,
   state: &DaemonState,
-) -> Result<Vec<CargoSummary>, HttpResponseError> {
+) -> Result<Vec<CargoSummary>, HttpError> {
   let namespace =
     repositories::namespace::find_by_name(nsp, &state.pool).await?;
 
@@ -604,7 +604,7 @@ pub async fn list(
 pub async fn inspect(
   key: &str,
   state: &DaemonState,
-) -> Result<CargoInspect, HttpResponseError> {
+) -> Result<CargoInspect, HttpError> {
   let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
   let containers = list_instance(&cargo.key, &state.docker_api).await?;
 
@@ -694,7 +694,7 @@ pub async fn inspect(
 pub async fn delete_by_namespace(
   namespace: &str,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let namespace =
     repositories::namespace::find_by_name(namespace, &state.pool).await?;
 
@@ -716,7 +716,7 @@ pub async fn exec_command(
   name: &str,
   args: &CargoExecConfig<String>,
   state: &DaemonState,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let name = format!("{name}.c");
   let result = state.docker_api.create_exec(&name, args.to_owned()).await?;
 
@@ -742,7 +742,7 @@ pub async fn kill(
   name: &str,
   options: &CargoKillOptions,
   docker_api: &bollard_next::Docker,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let name = format!("{name}.c");
   let options = options.clone().into();
   docker_api.kill_container(&name, Some(options)).await?;
@@ -771,7 +771,7 @@ pub async fn create_or_put(
   cargo: &CargoConfigPartial,
   version: &str,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let key = utils::key::gen_key(namespace, &cargo.name);
   if repositories::cargo::find_by_key(&key, &state.pool)
     .await
@@ -790,7 +790,7 @@ pub async fn patch(
   payload: &CargoConfigUpdate,
   version: &str,
   state: &DaemonState,
-) -> Result<Cargo, HttpResponseError> {
+) -> Result<Cargo, HttpError> {
   let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
 
   let container = if let Some(container) = payload.container.clone() {
@@ -881,10 +881,7 @@ pub async fn patch(
 pub fn get_logs(
   name: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<
-  impl StreamExt<Item = Result<Bytes, HttpResponseError>>,
-  HttpResponseError,
-> {
+) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
   let stream = docker_api.logs(
     &format!("{name}.c"),
     Some(LogsOptions::<String> {

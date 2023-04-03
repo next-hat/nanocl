@@ -7,7 +7,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
 
 use crate::utils;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{
   Pool, CargoDbModel, NamespaceDbModel, CargoUpdateDbModel, CargoConfigDbModel,
 };
@@ -41,7 +41,7 @@ use super::error::{db_error, db_blocking_error};
 pub async fn find_by_namespace(
   nsp: &NamespaceDbModel,
   pool: &Pool,
-) -> Result<Vec<CargoDbModel>, HttpResponseError> {
+) -> Result<Vec<CargoDbModel>, HttpError> {
   let nsp = nsp.clone();
   let pool = pool.clone();
 
@@ -50,7 +50,7 @@ pub async fn find_by_namespace(
     let items = CargoDbModel::belonging_to(&nsp)
       .load(&mut conn)
       .map_err(db_error("cargo"))?;
-    Ok::<_, HttpResponseError>(items)
+    Ok::<_, HttpError>(items)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -95,7 +95,7 @@ pub async fn create(
   item: &CargoConfigPartial,
   version: &str,
   pool: &Pool,
-) -> Result<Cargo, HttpResponseError> {
+) -> Result<Cargo, HttpError> {
   use crate::schema::cargoes::dsl;
 
   let nsp = nsp.to_owned();
@@ -104,7 +104,7 @@ pub async fn create(
 
   // test if the name of the cargo include a . in the name and throw error if true
   if item.name.contains('.') {
-    return Err(HttpResponseError {
+    return Err(HttpError {
       status: StatusCode::BAD_REQUEST,
       msg: "The cargo name cannot contain a dot".into(),
     });
@@ -130,7 +130,7 @@ pub async fn create(
       .values(&new_item)
       .execute(&mut conn)
       .map_err(db_error("cargo"))?;
-    Ok::<_, HttpResponseError>(new_item)
+    Ok::<_, HttpError>(new_item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -170,7 +170,7 @@ pub async fn create(
 pub async fn delete_by_key(
   key: &str,
   pool: &Pool,
-) -> Result<GenericDelete, HttpResponseError> {
+) -> Result<GenericDelete, HttpError> {
   use crate::schema::cargoes::dsl;
 
   let key = key.to_owned();
@@ -182,7 +182,7 @@ pub async fn delete_by_key(
       .filter(dsl::key.eq(key))
       .execute(&mut conn)
       .map_err(db_error("cargo"))?;
-    Ok::<_, HttpResponseError>(res)
+    Ok::<_, HttpError>(res)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -214,7 +214,7 @@ pub async fn delete_by_key(
 pub async fn find_by_key(
   key: &str,
   pool: &Pool,
-) -> Result<CargoDbModel, HttpResponseError> {
+) -> Result<CargoDbModel, HttpError> {
   use crate::schema::cargoes::dsl;
 
   let key = key.to_owned();
@@ -226,7 +226,7 @@ pub async fn find_by_key(
       .filter(dsl::key.eq(key))
       .get_result(&mut conn)
       .map_err(db_error("cargo"))?;
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -271,7 +271,7 @@ pub async fn update_by_key(
   item: &CargoConfigPartial,
   version: &str,
   pool: &Pool,
-) -> Result<Cargo, HttpResponseError> {
+) -> Result<Cargo, HttpError> {
   use crate::schema::cargoes::dsl;
 
   let key = key.to_owned();
@@ -294,7 +294,7 @@ pub async fn update_by_key(
       .set(&new_item)
       .execute(&mut conn)
       .map_err(db_error("cargo"))?;
-    Ok::<_, HttpResponseError>(())
+    Ok::<_, HttpError>(())
   })
   .await
   .map_err(db_blocking_error)?;
@@ -335,7 +335,7 @@ pub async fn update_by_key(
 pub async fn count_by_namespace(
   nsp: &str,
   pool: &Pool,
-) -> Result<i64, HttpResponseError> {
+) -> Result<i64, HttpError> {
   use crate::schema::cargoes;
 
   let nsp = nsp.to_owned();
@@ -348,7 +348,7 @@ pub async fn count_by_namespace(
       .count()
       .get_result(&mut conn)
       .map_err(db_error("cargo"))?;
-    Ok::<_, HttpResponseError>(count)
+    Ok::<_, HttpError>(count)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -359,7 +359,7 @@ pub async fn count_by_namespace(
 pub async fn inspect_by_key(
   key: &str,
   pool: &Pool,
-) -> Result<Cargo, HttpResponseError> {
+) -> Result<Cargo, HttpError> {
   use crate::schema::cargoes;
   use crate::schema::cargo_configs;
 
@@ -372,13 +372,13 @@ pub async fn inspect_by_key(
       .filter(cargoes::key.eq(key))
       .get_result(&mut conn)
       .map_err(db_error("cargo"))?;
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;
 
   let config = serde_json::from_value::<CargoConfigPartial>(item.1.config)
-    .map_err(|err| HttpResponseError {
+    .map_err(|err| HttpError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Error parsing cargo config: {err}"),
     })?;

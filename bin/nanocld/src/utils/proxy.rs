@@ -13,7 +13,7 @@ use ntex::{
 
 use nanocl_stubs::resource::ResourcePartial;
 
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 
 pub struct ProxyClient {
   pub(crate) client: Client,
@@ -27,7 +27,7 @@ pub enum ProxyClientError {
   #[error("Failed to parse json: {0}")]
   JsonPayload(#[from] JsonPayloadError),
   #[error(transparent)]
-  HttpResponse(#[from] HttpResponseError),
+  HttpResponse(#[from] HttpError),
 }
 
 impl ProxyClient {
@@ -75,11 +75,11 @@ impl ProxyClient {
   ) -> Result<(), ProxyClientError> {
     if status.is_server_error() || status.is_client_error() {
       let body = res.json::<serde_json::Value>().await?;
-      let msg = body["msg"].as_str().ok_or(HttpResponseError {
+      let msg = body["msg"].as_str().ok_or(HttpError {
         status: *status,
         msg: String::default(),
       })?;
-      return Err(ProxyClientError::HttpResponse(HttpResponseError {
+      return Err(ProxyClientError::HttpResponse(HttpError {
         status: *status,
         msg: msg.to_owned(),
       }));

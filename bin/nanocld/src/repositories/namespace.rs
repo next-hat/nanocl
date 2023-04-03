@@ -9,7 +9,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::namespace::NamespacePartial;
 
 use crate::utils;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{Pool, NamespaceDbModel};
 
 use super::error::{db_error, db_blocking_error};
@@ -44,7 +44,7 @@ use super::error::{db_error, db_blocking_error};
 pub async fn create(
   item: &NamespacePartial,
   pool: &Pool,
-) -> Result<NamespaceDbModel, HttpResponseError> {
+) -> Result<NamespaceDbModel, HttpError> {
   use crate::schema::namespaces::dsl;
 
   let item = item.clone();
@@ -60,7 +60,7 @@ pub async fn create(
       .values(&item)
       .execute(&mut conn)
       .map_err(db_error("namespace"))?;
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -90,9 +90,7 @@ pub async fn create(
 /// let namespaces = repositories::namespace::list(&pool).await;
 /// ```
 ///
-pub async fn list(
-  pool: &Pool,
-) -> Result<Vec<NamespaceDbModel>, HttpResponseError> {
+pub async fn list(pool: &Pool) -> Result<Vec<NamespaceDbModel>, HttpError> {
   use crate::schema::namespaces::dsl;
 
   let pool = pool.clone();
@@ -101,7 +99,7 @@ pub async fn list(
     let items = dsl::namespaces
       .load(&mut conn)
       .map_err(db_error("namespace"))?;
-    Ok::<_, HttpResponseError>(items)
+    Ok::<_, HttpError>(items)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -135,7 +133,7 @@ pub async fn list(
 pub async fn delete_by_name(
   name: &str,
   pool: &Pool,
-) -> Result<GenericDelete, HttpResponseError> {
+) -> Result<GenericDelete, HttpError> {
   use crate::schema::namespaces::dsl;
 
   let name = name.to_owned();
@@ -146,7 +144,7 @@ pub async fn delete_by_name(
     let count = diesel::delete(dsl::namespaces.filter(dsl::name.eq(name)))
       .execute(&mut conn)
       .map_err(db_error("namespace"))?;
-    Ok::<_, HttpResponseError>(count)
+    Ok::<_, HttpError>(count)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -180,7 +178,7 @@ pub async fn delete_by_name(
 pub async fn find_by_name(
   name: &str,
   pool: &Pool,
-) -> Result<NamespaceDbModel, HttpResponseError> {
+) -> Result<NamespaceDbModel, HttpError> {
   use crate::schema::namespaces::dsl;
 
   let name = name.to_owned();
@@ -192,7 +190,7 @@ pub async fn find_by_name(
       .filter(dsl::name.eq(name))
       .get_result(&mut conn)
       .map_err(db_error("namespace"))?;
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -223,10 +221,7 @@ pub async fn find_by_name(
 /// let exist = repositories::namespace::exist_by_name("my-namespace".into(), &pool).await.unwrap();
 /// ```
 ///
-pub async fn exist_by_name(
-  name: &str,
-  pool: &Pool,
-) -> Result<bool, HttpResponseError> {
+pub async fn exist_by_name(name: &str, pool: &Pool) -> Result<bool, HttpError> {
   use crate::schema::namespaces::dsl;
 
   let name = name.to_owned();
@@ -239,7 +234,7 @@ pub async fn exist_by_name(
       .get_result::<NamespaceDbModel>(&mut conn)
       .optional()
       .map_err(db_error("namespace"))?;
-    Ok::<_, HttpResponseError>(exist)
+    Ok::<_, HttpError>(exist)
   })
   .await
   .map_err(db_blocking_error)?;

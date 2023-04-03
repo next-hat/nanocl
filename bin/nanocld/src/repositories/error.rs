@@ -1,7 +1,7 @@
 use ntex::web;
 use ntex::{http::StatusCode, web::error::BlockingError};
 
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 
 /// ## Db Error
 ///
@@ -24,29 +24,27 @@ use crate::error::HttpResponseError;
 ///
 pub fn db_error(
   context: &str,
-) -> impl FnOnce(diesel::result::Error) -> HttpResponseError {
+) -> impl FnOnce(diesel::result::Error) -> HttpError {
   let context = context.to_owned();
-  move |err: diesel::result::Error| -> HttpResponseError {
+  move |err: diesel::result::Error| -> HttpError {
     log::debug!("StoreError {context} {err}");
-    let default_error = HttpResponseError {
+    let default_error = HttpError {
       msg: format!("StoreError {context} {err}"),
       status: StatusCode::BAD_REQUEST,
     };
     match err {
       diesel::result::Error::InvalidCString(_) => default_error,
       diesel::result::Error::DatabaseError(dberr, infoerr) => match dberr {
-        diesel::result::DatabaseErrorKind::UniqueViolation => {
-          HttpResponseError {
-            msg: format!(
-              "StoreError {context} {}",
-              infoerr.details().unwrap_or_default()
-            ),
-            status: StatusCode::CONFLICT,
-          }
-        }
+        diesel::result::DatabaseErrorKind::UniqueViolation => HttpError {
+          msg: format!(
+            "StoreError {context} {}",
+            infoerr.details().unwrap_or_default()
+          ),
+          status: StatusCode::CONFLICT,
+        },
         _ => default_error,
       },
-      diesel::result::Error::NotFound => HttpResponseError {
+      diesel::result::Error::NotFound => HttpError {
         msg: format!("StoreError {context} not found"),
         status: StatusCode::NOT_FOUND,
       },
@@ -55,7 +53,7 @@ pub fn db_error(
       diesel::result::Error::SerializationError(_) => default_error,
       diesel::result::Error::RollbackTransaction => default_error,
       diesel::result::Error::AlreadyInTransaction => default_error,
-      _ => HttpResponseError {
+      _ => HttpError {
         msg: format!("Unhandled error {context} {err:#}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       },
@@ -77,12 +75,10 @@ pub fn db_error(
 /// use crate::repositories::errors::db_blocking_error;
 /// Err(db_blocking_error(err))
 /// ```
-pub fn db_blocking_error(
-  err: BlockingError<HttpResponseError>,
-) -> HttpResponseError {
+pub fn db_blocking_error(err: BlockingError<HttpError>) -> HttpError {
   match err {
     web::error::BlockingError::Error(err) => err,
-    web::error::BlockingError::Canceled => HttpResponseError {
+    web::error::BlockingError::Canceled => HttpError {
       msg: String::from("Blocking error: Canceled"),
       status: StatusCode::INTERNAL_SERVER_ERROR,
     },

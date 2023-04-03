@@ -3,7 +3,7 @@ use nanocl_stubs::{
   state::{StateDeployment, StateCargo, StateResources},
 };
 
-use crate::event::EventEmitterPtr;
+use crate::event::EventEmitter;
 
 use super::Pool;
 
@@ -16,7 +16,7 @@ pub struct DaemonState {
   /// The config of the daemon
   pub(crate) config: DaemonConfig,
   /// The event emitter
-  pub(crate) event_emitter: EventEmitterPtr,
+  pub(crate) event_emitter: EventEmitter,
   /// Latest version of the daemon or version of current request
   #[allow(dead_code)]
   pub(crate) version: String,

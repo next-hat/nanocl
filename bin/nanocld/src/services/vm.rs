@@ -24,14 +24,14 @@ use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 use tokio::io::AsyncWriteExt;
 
 use crate::{utils, repositories};
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{DaemonState, WsConState};
 
 #[web::get("/vms")]
 async fn list_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
 
   let vms = utils::vm::list(&namespace, &state.docker_api, &state.pool).await?;
@@ -44,7 +44,7 @@ async fn inspect_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
@@ -59,7 +59,7 @@ async fn start_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
@@ -75,7 +75,7 @@ async fn stop_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
@@ -91,7 +91,7 @@ async fn delete_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
@@ -107,7 +107,7 @@ async fn create_vm(
   web::types::Json(payload): web::types::Json<VmConfigPartial>,
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
 
   let item = utils::vm::create(&payload, &namespace, &version, &state).await?;
@@ -120,7 +120,7 @@ async fn list_vm_history(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let histories =
@@ -134,7 +134,7 @@ async fn patch_vm(
   web::types::Json(payload): web::types::Json<VmConfigUpdate>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let version = path.0.clone();
@@ -173,7 +173,7 @@ async fn ws_attach_service(
       }),
     )
     .await
-    .map_err(|err| HttpResponseError {
+    .map_err(|err| HttpError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       msg: err.to_string(),
     })?;

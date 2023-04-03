@@ -1,7 +1,7 @@
 use ntex::web;
 
 use crate::utils;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{StateData, DaemonState};
 
 #[web::put("/state/apply")]
@@ -9,7 +9,7 @@ async fn apply(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   match utils::state::parse_state(&payload)? {
     StateData::Deployment(data) => {
       utils::state::apply_deployment(&data, &version, &state).await?;
@@ -28,7 +28,7 @@ async fn apply(
 async fn revert(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   match utils::state::parse_state(&payload)? {
     StateData::Deployment(data) => {
       utils::state::revert_deployment(&data, &state).await?;

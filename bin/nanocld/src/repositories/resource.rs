@@ -7,7 +7,7 @@ use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceQuery};
 
 use crate::repositories::error::db_error;
 use crate::{utils, repositories};
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{
   Pool, ResourceDbModel, ResourceConfigDbModel, ResourceUpdateModel,
 };
@@ -47,7 +47,7 @@ use super::error::db_blocking_error;
 pub async fn create(
   item: &ResourcePartial,
   pool: &Pool,
-) -> Result<Resource, HttpResponseError> {
+) -> Result<Resource, HttpError> {
   use crate::schema::resources::dsl;
 
   let pool = pool.clone();
@@ -74,7 +74,7 @@ pub async fn create(
       .values(&new_item)
       .execute(&mut conn)
       .map_err(db_error("resource"))?;
-    Ok::<_, HttpResponseError>(new_item)
+    Ok::<_, HttpError>(new_item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -118,7 +118,7 @@ pub async fn create(
 pub async fn delete_by_key(
   key: &str,
   pool: &Pool,
-) -> Result<GenericDelete, HttpResponseError> {
+) -> Result<GenericDelete, HttpError> {
   use crate::schema::resources::dsl;
 
   let key = key.to_owned();
@@ -130,7 +130,7 @@ pub async fn delete_by_key(
       .filter(dsl::key.eq(key))
       .execute(&mut conn)
       .map_err(db_error("resource"))?;
-    Ok::<_, HttpResponseError>(count)
+    Ok::<_, HttpError>(count)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -163,7 +163,7 @@ pub async fn delete_by_key(
 pub async fn find(
   pool: &Pool,
   query: Option<ResourceQuery>,
-) -> Result<Vec<Resource>, HttpResponseError> {
+) -> Result<Vec<Resource>, HttpError> {
   use crate::schema::resources;
   use crate::schema::resource_configs;
 
@@ -181,7 +181,7 @@ pub async fn find(
           }
           if let Some(contains) = &qs.contains {
             let contains = serde_json::from_str::<serde_json::Value>(contains)
-              .map_err(|err| HttpResponseError {
+              .map_err(|err| HttpError {
                 status: StatusCode::BAD_REQUEST,
                 msg: format!("Invalid contains query: {err}"),
               })?;
@@ -197,7 +197,7 @@ pub async fn find(
 
       let res = req.map_err(db_error("resource"))?;
 
-      Ok::<_, HttpResponseError>(res)
+      Ok::<_, HttpError>(res)
     })
     .await
     .map_err(db_blocking_error)?;
@@ -207,7 +207,7 @@ pub async fn find(
     .map(|e| {
       let resource = e.0;
       let config = e.1;
-      Ok::<_, HttpResponseError>(Resource {
+      Ok::<_, HttpError>(Resource {
         name: resource.key,
         created_at: resource.created_at,
         updated_at: config.created_at,
@@ -217,7 +217,7 @@ pub async fn find(
         config: config.data,
       })
     })
-    .collect::<Result<Vec<Resource>, HttpResponseError>>()?;
+    .collect::<Result<Vec<Resource>, HttpError>>()?;
   Ok(items)
 }
 
@@ -247,7 +247,7 @@ pub async fn find(
 pub async fn inspect_by_key(
   key: &str,
   pool: &Pool,
-) -> Result<Resource, HttpResponseError> {
+) -> Result<Resource, HttpError> {
   use crate::schema::resources;
   use crate::schema::resource_configs;
 
@@ -261,7 +261,7 @@ pub async fn inspect_by_key(
       .filter(resources::key.eq(key))
       .get_result(&mut conn)
       .map_err(db_error("resource"))?;
-    Ok::<_, HttpResponseError>(res)
+    Ok::<_, HttpError>(res)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -306,7 +306,7 @@ pub async fn inspect_by_key(
 pub async fn patch(
   item: &ResourcePartial,
   pool: &Pool,
-) -> Result<Resource, HttpResponseError> {
+) -> Result<Resource, HttpError> {
   use crate::schema::resources;
 
   let pool = pool.clone();
@@ -336,7 +336,7 @@ pub async fn patch(
       .set(&resource_update)
       .execute(&mut conn)
       .map_err(db_error("resource"))?;
-    Ok::<_, HttpResponseError>(())
+    Ok::<_, HttpError>(())
   })
   .await
   .map_err(db_blocking_error)?;
@@ -356,7 +356,7 @@ pub async fn patch(
 pub async fn create_or_patch(
   resource: &ResourcePartial,
   pool: &Pool,
-) -> Result<Resource, HttpResponseError> {
+) -> Result<Resource, HttpError> {
   if inspect_by_key(&resource.name, pool).await.is_ok() {
     return patch(resource, pool).await;
   }

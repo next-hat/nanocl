@@ -3,13 +3,13 @@ use diesel::prelude::*;
 
 use crate::utils;
 use crate::models::{Pool, VmImageDbModel, VmImageUpdateDbModel};
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::repositories::error::{db_error, db_blocking_error};
 
 pub async fn create(
   item: &VmImageDbModel,
   pool: &Pool,
-) -> Result<VmImageDbModel, HttpResponseError> {
+) -> Result<VmImageDbModel, HttpError> {
   use crate::schema::vm_images::dsl;
 
   let item = item.clone();
@@ -21,7 +21,7 @@ pub async fn create(
       .values(&item)
       .get_result(&mut conn)
       .map_err(db_error("vm_image"))?;
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -31,7 +31,7 @@ pub async fn create(
 pub async fn find_by_name(
   name: &str,
   pool: &Pool,
-) -> Result<VmImageDbModel, HttpResponseError> {
+) -> Result<VmImageDbModel, HttpError> {
   use crate::schema::vm_images::dsl;
 
   let name = name.to_owned();
@@ -42,7 +42,7 @@ pub async fn find_by_name(
       .filter(dsl::name.eq(&name))
       .get_result(&mut conn)
       .map_err(db_error(&format!("vm_image {name}")))?;
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -52,7 +52,7 @@ pub async fn find_by_name(
 pub async fn find_by_parent(
   parent: &str,
   pool: &Pool,
-) -> Result<Vec<VmImageDbModel>, HttpResponseError> {
+) -> Result<Vec<VmImageDbModel>, HttpError> {
   use crate::schema::vm_images::dsl;
 
   let parent = parent.to_owned();
@@ -63,17 +63,14 @@ pub async fn find_by_parent(
       .filter(dsl::parent.eq(&parent))
       .load::<VmImageDbModel>(&mut conn)
       .map_err(db_error("vm_image"))?;
-    Ok::<_, HttpResponseError>(items)
+    Ok::<_, HttpError>(items)
   })
   .await
   .map_err(db_blocking_error)?;
   Ok(items)
 }
 
-pub async fn delete_by_name(
-  name: &str,
-  pool: &Pool,
-) -> Result<(), HttpResponseError> {
+pub async fn delete_by_name(name: &str, pool: &Pool) -> Result<(), HttpError> {
   use crate::schema::vm_images::dsl;
 
   let name = name.to_owned();
@@ -83,16 +80,14 @@ pub async fn delete_by_name(
     diesel::delete(dsl::vm_images.filter(dsl::name.eq(name)))
       .execute(&mut conn)
       .map_err(db_error("vm_image"))?;
-    Ok::<_, HttpResponseError>(())
+    Ok::<_, HttpError>(())
   })
   .await
   .map_err(db_blocking_error)?;
   Ok(())
 }
 
-pub async fn list(
-  pool: &Pool,
-) -> Result<Vec<VmImageDbModel>, HttpResponseError> {
+pub async fn list(pool: &Pool) -> Result<Vec<VmImageDbModel>, HttpError> {
   use crate::schema::vm_images::dsl;
 
   let pool = pool.clone();
@@ -101,7 +96,7 @@ pub async fn list(
     let items = dsl::vm_images
       .load::<VmImageDbModel>(&mut conn)
       .map_err(db_error("vm_image"))?;
-    Ok::<_, HttpResponseError>(items)
+    Ok::<_, HttpError>(items)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -112,7 +107,7 @@ pub async fn update_by_name(
   name: &str,
   item: &VmImageUpdateDbModel,
   pool: &Pool,
-) -> Result<VmImageDbModel, HttpResponseError> {
+) -> Result<VmImageDbModel, HttpError> {
   use crate::schema::vm_images::dsl;
 
   let name = name.to_owned();
@@ -124,7 +119,7 @@ pub async fn update_by_name(
       .set(item)
       .get_result(&mut conn)
       .map_err(db_error("vm_image"))?;
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;

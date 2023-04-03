@@ -12,15 +12,13 @@ use nanocl_stubs::state::{
 use nanocl_stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
 
 use crate::{utils, repositories};
-use crate::error::{HttpResponseError, CliError};
+use crate::error::{HttpError, CliError};
 use crate::models::{StateData, DaemonState};
 
-pub fn parse_state(
-  data: &serde_json::Value,
-) -> Result<StateData, HttpResponseError> {
+pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
   let meta =
     serde_json::from_value::<StateConfig>(data.to_owned()).map_err(|err| {
-      HttpResponseError {
+      HttpError {
         status: StatusCode::BAD_REQUEST,
         msg: format!("unable to serialize payload {err}"),
       }
@@ -28,7 +26,7 @@ pub fn parse_state(
   match meta.r#type.as_str() {
     "Deployment" => {
       let data = serde_json::from_value::<StateDeployment>(data.to_owned())
-        .map_err(|err| HttpResponseError {
+        .map_err(|err| HttpError {
           status: StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
@@ -36,7 +34,7 @@ pub fn parse_state(
     }
     "Cargo" => {
       let data = serde_json::from_value::<StateCargo>(data.to_owned())
-        .map_err(|err| HttpResponseError {
+        .map_err(|err| HttpError {
           status: StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
@@ -44,13 +42,13 @@ pub fn parse_state(
     }
     "Resource" => {
       let data = serde_json::from_value::<StateResources>(data.to_owned())
-        .map_err(|err| HttpResponseError {
+        .map_err(|err| HttpError {
           status: StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
       Ok(StateData::Resource(data))
     }
-    _ => Err(HttpResponseError {
+    _ => Err(HttpError {
       status: StatusCode::BAD_REQUEST,
       msg: "unknown type".into(),
     }),
@@ -61,7 +59,7 @@ pub async fn apply_deployment(
   data: &StateDeployment,
   version: &str,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   // If we have a namespace and it doesn't exist, create it
   // Unless we use `global` as default for the creation of cargoes
   let namespace = if let Some(namespace) = &data.namespace {
@@ -78,11 +76,10 @@ pub async fn apply_deployment(
       let state_ptr = state.clone();
       rt::spawn(async move {
         let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
-        state_ptr
+        let _ = state_ptr
           .event_emitter
-          .lock()
-          .unwrap()
-          .send(Event::CargoPatched(Box::new(cargo)));
+          .emit(Event::CargoPatched(Box::new(cargo)))
+          .await;
       });
       utils::cargo::start(&utils::key::gen_key(&namespace, &cargo.name), state)
         .await?;
@@ -90,11 +87,10 @@ pub async fn apply_deployment(
       let state_ptr = state.clone();
       rt::spawn(async move {
         let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
-        state_ptr
+        let _ = state_ptr
           .event_emitter
-          .lock()
-          .unwrap()
-          .send(Event::CargoStarted(Box::new(cargo)));
+          .emit(Event::CargoStarted(Box::new(cargo)))
+          .await;
       });
     }
   }
@@ -109,11 +105,10 @@ pub async fn apply_deployment(
           repositories::resource::inspect_by_key(&key, &state_ptr.pool)
             .await
             .unwrap();
-        state_ptr
+        let _ = state_ptr
           .event_emitter
-          .lock()
-          .unwrap()
-          .send(Event::ResourcePatched(Box::new(item)));
+          .emit(Event::ResourcePatched(Box::new(item)))
+          .await;
       });
     }
   }
@@ -125,7 +120,7 @@ pub async fn apply_cargo(
   data: &StateCargo,
   version: &str,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   // If we have a namespace and it doesn't exist, create it
   // Unless we use `global` as default for the creation of cargoes
   let namespace = if let Some(namespace) = &data.namespace {
@@ -141,11 +136,10 @@ pub async fn apply_cargo(
     let state_ptr = state.clone();
     rt::spawn(async move {
       let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
-      state_ptr
+      let _ = state_ptr
         .event_emitter
-        .lock()
-        .unwrap()
-        .send(Event::CargoPatched(Box::new(cargo)));
+        .emit(Event::CargoPatched(Box::new(cargo)))
+        .await;
     });
     utils::cargo::start(&utils::key::gen_key(&namespace, &cargo.name), state)
       .await?;
@@ -153,11 +147,10 @@ pub async fn apply_cargo(
     let state_ptr = state.clone();
     rt::spawn(async move {
       let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
-      state_ptr
+      let _ = state_ptr
         .event_emitter
-        .lock()
-        .unwrap()
-        .send(Event::CargoStarted(Box::new(cargo)));
+        .emit(Event::CargoStarted(Box::new(cargo)))
+        .await;
     });
   }
 
@@ -167,7 +160,7 @@ pub async fn apply_cargo(
 pub async fn apply_resource(
   data: &StateResources,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   for resource in &data.resources {
     let key = resource.name.to_owned();
     utils::resource::create_or_patch(resource.clone(), &state.pool).await?;
@@ -177,10 +170,9 @@ pub async fn apply_resource(
       let resource = repositories::resource::inspect_by_key(&key, &pool)
         .await
         .unwrap();
-      event_emitter
-        .lock()
-        .unwrap()
-        .send(Event::ResourcePatched(Box::new(resource)));
+      let _ = event_emitter
+        .emit(Event::ResourcePatched(Box::new(resource)))
+        .await;
     });
   }
   Ok(())
@@ -189,7 +181,7 @@ pub async fn apply_resource(
 pub async fn revert_deployment(
   data: &StateDeployment,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let namespace = if let Some(namespace) = &data.namespace {
     namespace.to_owned()
   } else {
@@ -203,11 +195,10 @@ pub async fn revert_deployment(
       utils::cargo::delete(&key, Some(true), state).await?;
       let state_ptr = state.clone();
       rt::spawn(async move {
-        state_ptr
+        let _ = state_ptr
           .event_emitter
-          .lock()
-          .unwrap()
-          .send(Event::CargoDeleted(Box::new(cargo)));
+          .emit(Event::CargoDeleted(Box::new(cargo)))
+          .await;
       });
     }
   }
@@ -220,11 +211,10 @@ pub async fn revert_deployment(
       utils::resource::delete(resource.clone(), &state.pool).await?;
       let state_ptr = state.clone();
       rt::spawn(async move {
-        state_ptr
+        let _ = state_ptr
           .event_emitter
-          .lock()
-          .unwrap()
-          .send(Event::ResourceDeleted(Box::new(resource)));
+          .emit(Event::ResourceDeleted(Box::new(resource)))
+          .await;
       });
     }
   }
@@ -235,7 +225,7 @@ pub async fn revert_deployment(
 pub async fn revert_cargo(
   data: &StateCargo,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let namespace = if let Some(namespace) = &data.namespace {
     namespace.to_owned()
   } else {
@@ -248,10 +238,9 @@ pub async fn revert_cargo(
     utils::cargo::delete(&key, Some(true), state).await?;
     let event_emitter = state.event_emitter.clone();
     rt::spawn(async move {
-      event_emitter
-        .lock()
-        .unwrap()
-        .send(Event::CargoDeleted(Box::new(cargo)));
+      let _ = event_emitter
+        .emit(Event::CargoDeleted(Box::new(cargo)))
+        .await;
     });
   }
 
@@ -261,7 +250,7 @@ pub async fn revert_cargo(
 pub async fn revert_resource(
   data: &StateResources,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   for resource in &data.resources {
     let key = resource.name.to_owned();
     let resource =
@@ -269,10 +258,9 @@ pub async fn revert_resource(
     utils::resource::delete(resource.clone(), &state.pool).await?;
     let event_emitter = state.event_emitter.clone();
     rt::spawn(async move {
-      event_emitter
-        .lock()
-        .unwrap()
-        .send(Event::ResourceDeleted(Box::new(resource)));
+      let _ = event_emitter
+        .emit(Event::ResourceDeleted(Box::new(resource)))
+        .await;
     });
   }
   Ok(())

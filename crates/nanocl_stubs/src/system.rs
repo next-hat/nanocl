@@ -29,7 +29,7 @@ pub struct Version {
 }
 
 /// Event is a message sent by nanocld to connected clients
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum Event {

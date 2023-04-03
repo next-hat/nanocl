@@ -7,7 +7,7 @@ use futures::StreamExt;
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
 use crate::{utils, repositories};
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{DaemonState, VmImageDbModel};
 
 #[web::post("/vms/images/{name}/import")]
@@ -15,7 +15,7 @@ async fn import_vm_image(
   mut payload: web::types::Payload,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
 
   utils::key::validate_name(&name)?;
@@ -24,7 +24,7 @@ async fn import_vm_image(
     .await
     .is_ok()
   {
-    return Err(HttpResponseError {
+    return Err(HttpError {
       status: StatusCode::BAD_REQUEST,
       msg: format!("Vm image {name} already used"),
     });
@@ -37,18 +37,18 @@ async fn import_vm_image(
   let fp2 = filepath.clone();
   let mut f = web::block(move || std::fs::File::create(fp))
     .await
-    .map_err(|err| HttpResponseError {
+    .map_err(|err| HttpError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Unable to create vm image {name}: {err}"),
     })?;
   while let Some(bytes) = payload.next().await {
-    let bytes = bytes.map_err(|err| HttpResponseError {
+    let bytes = bytes.map_err(|err| HttpError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Unable to create vm image {name}: {err}"),
     })?;
     f = web::block(move || f.write_all(&bytes).map(|_| f))
       .await
-      .map_err(|err| HttpResponseError {
+      .map_err(|err| HttpError {
         status: StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Unable to create vm image {name}: {err}"),
       })?;
@@ -82,7 +82,7 @@ async fn import_vm_image(
 #[web::get("/vms/images")]
 async fn list_images(
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let images = repositories::vm_image::list(&state.pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&images))
@@ -92,7 +92,7 @@ async fn list_images(
 async fn create_vm_image_snapshot(
   path: web::types::Path<(String, String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
   let snapshot_name = path.2.to_owned();
   utils::key::validate_name(&snapshot_name)?;
@@ -107,7 +107,7 @@ async fn create_vm_image_snapshot(
 async fn clone_vm_image(
   path: web::types::Path<(String, String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
   let clone_name = path.2.to_owned();
   utils::key::validate_name(&clone_name)?;
@@ -123,7 +123,7 @@ async fn resize_vm_image(
   web::types::Json(payload): web::types::Json<VmImageResizePayload>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
 
   let rx =
@@ -136,7 +136,7 @@ async fn resize_vm_image(
 async fn delete_vm_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
 
   utils::vm_image::delete(&name, &state.pool).await?;

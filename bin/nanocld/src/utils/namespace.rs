@@ -15,7 +15,7 @@ use crate::models::DaemonState;
 use crate::utils;
 use crate::repositories;
 use crate::models::Pool;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 
 use super::cargo;
 
@@ -47,11 +47,11 @@ use super::cargo;
 pub async fn create(
   namespace: &NamespacePartial,
   state: &DaemonState,
-) -> Result<Namespace, HttpResponseError> {
+) -> Result<Namespace, HttpError> {
   if repositories::namespace::exist_by_name(&namespace.name, &state.pool)
     .await?
   {
-    return Err(HttpResponseError {
+    return Err(HttpError {
       msg: format!("namespace {} error: already exist", &namespace.name),
       status: StatusCode::CONFLICT,
     });
@@ -103,7 +103,7 @@ pub async fn create(
 pub async fn delete_by_name(
   name: &str,
   state: &DaemonState,
-) -> Result<GenericDelete, HttpResponseError> {
+) -> Result<GenericDelete, HttpError> {
   utils::cargo::delete_by_namespace(name, state).await?;
   if let Err(err) = state.docker_api.remove_network(name).await {
     log::error!("Unable to remove network {} got error: {}", name, err);
@@ -138,7 +138,7 @@ pub async fn delete_by_name(
 pub async fn list_instance(
   namespace: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<Vec<ContainerSummary>, HttpResponseError> {
+) -> Result<Vec<ContainerSummary>, HttpError> {
   let clabel = format!("io.nanocl.cnsp={namespace}");
   let vlabel = format!("io.nanocl.vnsp={namespace}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
@@ -180,7 +180,7 @@ pub async fn list_instance(
 pub async fn list(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
-) -> Result<Vec<NamespaceSummary>, HttpResponseError> {
+) -> Result<Vec<NamespaceSummary>, HttpError> {
   let items = repositories::namespace::list(pool).await?;
   let mut new_items = Vec::new();
   for item in items {
@@ -224,7 +224,7 @@ pub async fn list(
 pub async fn inspect(
   namespace: &str,
   state: &DaemonState,
-) -> Result<NamespaceInspect, HttpResponseError> {
+) -> Result<NamespaceInspect, HttpError> {
   let namespace =
     repositories::namespace::find_by_name(namespace, &state.pool).await?;
   log::debug!("Found namespace to inspect {:?}", &namespace);
@@ -269,7 +269,7 @@ pub async fn inspect(
 pub async fn create_if_not_exists(
   name: &str,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   if repositories::namespace::find_by_name(name, &state.pool)
     .await
     .is_err()

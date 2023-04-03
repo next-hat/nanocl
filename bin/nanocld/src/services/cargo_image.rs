@@ -15,14 +15,14 @@ use nanocl_stubs::cargo_image::{
 };
 
 use crate::utils;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::DaemonState;
 
 #[web::get("/cargoes/images")]
 async fn list_cargo_image(
   web::types::Query(query): web::types::Query<ListCargoImagesOptions>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let images = utils::cargo_image::list(&query.into(), &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&images))
@@ -32,7 +32,7 @@ async fn list_cargo_image(
 async fn inspect_cargo_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let image = utils::cargo_image::inspect(&path.1, &state).await?;
 
   Ok(web::HttpResponse::Ok().json(&image))
@@ -42,7 +42,7 @@ async fn inspect_cargo_image(
 async fn create_cargo_image(
   web::types::Json(payload): web::types::Json<CargoImagePartial>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let (from_image, tag) = utils::cargo_image::parse_image_info(&payload.name)?;
   let rx_body = utils::cargo_image::download(&from_image, &tag, &state).await?;
   Ok(
@@ -57,7 +57,7 @@ async fn create_cargo_image(
 async fn delete_cargo_image_by_name(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let res = utils::cargo_image::delete(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&res))
 }
@@ -67,41 +67,37 @@ async fn import_images(
   web::types::Query(query): web::types::Query<CargoImageImportOptions>,
   mut payload: web::types::Payload,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   // generate a random filename
   let filename = uuid::Uuid::new_v4().to_string();
   let filepath = format!("/tmp/{filename}");
   // File::create is blocking operation, use threadpool
   let file_path_ptr = filepath.clone();
-  let mut f =
-    File::create(&file_path_ptr)
-      .await
-      .map_err(|err| HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while creating the file {err}"),
-      })?;
+  let mut f = File::create(&file_path_ptr)
+    .await
+    .map_err(|err| HttpError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      msg: format!("Error while creating the file {err}"),
+    })?;
   while let Some(bytes) = payload.next().await {
-    let bytes = bytes.map_err(|err| HttpResponseError {
+    let bytes = bytes.map_err(|err| HttpError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Error while payload: {err}"),
     })?;
-    f.write_all(&bytes).await.map_err(|err| HttpResponseError {
+    f.write_all(&bytes).await.map_err(|err| HttpError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Error while writing the file {err}"),
     })?;
   }
-  f.shutdown().await.map_err(|err| HttpResponseError {
+  f.shutdown().await.map_err(|err| HttpError {
     status: StatusCode::INTERNAL_SERVER_ERROR,
     msg: format!("Error while closing the file {err}"),
   })?;
   drop(f);
-  let file =
-    File::open(&file_path_ptr)
-      .await
-      .map_err(|err| HttpResponseError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Error while opening the file {err}"),
-      })?;
+  let file = File::open(&file_path_ptr).await.map_err(|err| HttpError {
+    status: StatusCode::INTERNAL_SERVER_ERROR,
+    msg: format!("Error while opening the file {err}"),
+  })?;
 
   // sending the file to the docker api
   let byte_stream =
@@ -115,7 +111,7 @@ async fn import_images(
   let options = ImportImageOptions { quiet };
   let mut stream = state.docker_api.import_image(options, body, None);
   while let Some(res) = stream.next().await {
-    let _ = res.map_err(|err| HttpResponseError {
+    let _ = res.map_err(|err| HttpError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Error while importing the image {err}"),
     })?;

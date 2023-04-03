@@ -13,18 +13,15 @@ use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{Pool, VmDbModel, VmImageDbModel, DaemonState};
 
-pub async fn start(
-  vm_key: &str,
-  docker_api: &Docker,
-) -> Result<(), HttpResponseError> {
+pub async fn start(vm_key: &str, docker_api: &Docker) -> Result<(), HttpError> {
   let container_name = format!("{}.v", vm_key);
   docker_api
     .start_container(&container_name, None::<StartContainerOptions<String>>)
     .await
-    .map_err(|e| HttpResponseError {
+    .map_err(|e| HttpError {
       msg: format!("Unable to start container got error : {e}"),
       status: StatusCode::INTERNAL_SERVER_ERROR,
     })?;
@@ -36,12 +33,12 @@ pub async fn start(
 pub async fn stop(
   vm: &VmDbModel,
   docker_api: &Docker,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let container_name = format!("{}.v", vm.key);
   docker_api
     .stop_container(&container_name, None::<StopContainerOptions>)
     .await
-    .map_err(|e| HttpResponseError {
+    .map_err(|e| HttpError {
       msg: format!("Unable to stop container got error : {e}"),
       status: StatusCode::INTERNAL_SERVER_ERROR,
     })?;
@@ -53,7 +50,7 @@ pub async fn stop_by_key(
   vm_key: &str,
   docker_api: &Docker,
   pool: &Pool,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let vm = repositories::vm::find_by_key(vm_key, pool).await?;
 
   stop(&vm, docker_api).await
@@ -63,7 +60,7 @@ pub async fn inspect(
   vm_key: &str,
   docker_api: &Docker,
   pool: &Pool,
-) -> Result<VmInspect, HttpResponseError> {
+) -> Result<VmInspect, HttpError> {
   let vm = repositories::vm::inspect_by_key(vm_key, pool).await?;
   let containers = list_instance(&vm.key, docker_api).await?;
 
@@ -89,7 +86,7 @@ pub async fn inspect(
 pub async fn list_instance(
   vm_key: &str,
   docker_api: &Docker,
-) -> Result<Vec<ContainerSummary>, HttpResponseError> {
+) -> Result<Vec<ContainerSummary>, HttpError> {
   let label = format!("io.nanocl.v={vm_key}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
@@ -107,7 +104,7 @@ pub async fn delete(
   force: bool,
   docker_api: &Docker,
   pool: &Pool,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let vm = repositories::vm::inspect_by_key(vm_key, pool).await?;
 
   let options = bollard_next::container::RemoveContainerOptions {
@@ -131,7 +128,7 @@ pub async fn list(
   nsp: &str,
   docker_api: &Docker,
   pool: &Pool,
-) -> Result<Vec<VmSummary>, HttpResponseError> {
+) -> Result<Vec<VmSummary>, HttpError> {
   let namespace = repositories::namespace::find_by_name(nsp, pool).await?;
 
   let vmes = repositories::vm::find_by_namespace(&namespace, pool).await?;
@@ -171,7 +168,7 @@ pub async fn create_instance(
   image: &VmImageDbModel,
   disable_keygen: bool,
   state: &DaemonState,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   let mut labels: HashMap<String, String> = HashMap::new();
   let vmimagespath = format!("{}/vms/images", state.config.state_dir);
   labels.insert("io.nanocl".into(), "enabled".into());
@@ -261,7 +258,7 @@ pub async fn create(
   namespace: &str,
   version: &str,
   state: &DaemonState,
-) -> Result<Vm, HttpResponseError> {
+) -> Result<Vm, HttpError> {
   let vm_key = utils::key::gen_key(namespace, &vm.name);
 
   let mut vm = vm.clone();
@@ -269,7 +266,7 @@ pub async fn create(
     .await
     .is_ok()
   {
-    return Err(HttpResponseError {
+    return Err(HttpError {
       status: StatusCode::CONFLICT,
       msg: format!(
         "VM with name {} already exists in namespace {namespace}",
@@ -280,7 +277,7 @@ pub async fn create(
   let image =
     repositories::vm_image::find_by_name(&vm.disk.image, &state.pool).await?;
   if image.kind.as_str() != "Base" {
-    return Err(HttpResponseError {
+    return Err(HttpError {
       msg: format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image),
       status: StatusCode::BAD_REQUEST,
     });
@@ -309,7 +306,7 @@ pub async fn patch(
   config: &VmConfigUpdate,
   version: &str,
   state: &DaemonState,
-) -> Result<Vm, HttpResponseError> {
+) -> Result<Vm, HttpError> {
   let vm = repositories::vm::find_by_key(cargo_key, &state.pool).await?;
 
   let old_config =

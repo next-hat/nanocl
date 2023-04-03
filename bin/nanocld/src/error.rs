@@ -26,23 +26,23 @@ impl CliError {
 
 /// Http response error
 #[derive(Clone, Debug, Error)]
-pub struct HttpResponseError {
+pub struct HttpError {
   pub(crate) msg: String,
   pub(crate) status: StatusCode,
 }
 
-impl From<DockerError> for HttpResponseError {
+impl From<DockerError> for HttpError {
   fn from(err: DockerError) -> Self {
     match err {
       DockerError::DockerResponseServerError {
         status_code,
         message,
-      } => HttpResponseError {
+      } => HttpError {
         msg: message,
         status: StatusCode::from_u16(status_code)
           .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
       },
-      _ => HttpResponseError {
+      _ => HttpError {
         msg: format!("{err}"),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       },
@@ -50,13 +50,13 @@ impl From<DockerError> for HttpResponseError {
   }
 }
 
-impl std::fmt::Display for HttpResponseError {
+impl std::fmt::Display for HttpError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "[{}] {}", self.status, self.msg)
   }
 }
 
-impl web::WebResponseError for HttpResponseError {
+impl web::WebResponseError for HttpError {
   // builds the actual response to send back when an error occurs
   fn error_response(&self, _: &web::HttpRequest) -> web::HttpResponse {
     log::error!("[{}] error: {}", self.status, self.msg);
@@ -65,8 +65,8 @@ impl web::WebResponseError for HttpResponseError {
   }
 }
 
-impl From<HttpResponseError> for CliError {
-  fn from(err: HttpResponseError) -> Self {
+impl From<HttpError> for CliError {
+  fn from(err: HttpError) -> Self {
     Self {
       code: 1,
       msg: err.msg,

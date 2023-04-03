@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use nanocl_stubs::resource::ResourceConfig;
 
 use crate::utils;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 use crate::models::{Pool, ResourceConfigDbModel};
 
 use super::error::{db_error, db_blocking_error};
@@ -39,7 +39,7 @@ use super::error::{db_error, db_blocking_error};
 pub async fn create(
   item: &ResourceConfigDbModel,
   pool: &Pool,
-) -> Result<ResourceConfigDbModel, HttpResponseError> {
+) -> Result<ResourceConfigDbModel, HttpError> {
   use crate::schema::resource_configs::dsl;
 
   let item = item.clone();
@@ -51,7 +51,7 @@ pub async fn create(
       .values(&item)
       .execute(&mut conn)
       .map_err(db_error("resource config"))?;
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -85,7 +85,7 @@ pub async fn create(
 pub async fn delete_by_resource_key(
   key: &str,
   pool: &Pool,
-) -> Result<(), HttpResponseError> {
+) -> Result<(), HttpError> {
   use crate::schema::resource_configs::dsl;
 
   let key = key.to_owned();
@@ -96,7 +96,7 @@ pub async fn delete_by_resource_key(
     diesel::delete(dsl::resource_configs.filter(dsl::resource_key.eq(key)))
       .execute(&mut conn)
       .map_err(db_error("resource config"))?;
-    Ok::<_, HttpResponseError>(())
+    Ok::<_, HttpError>(())
   })
   .await
   .map_err(db_blocking_error)?;
@@ -107,7 +107,7 @@ pub async fn delete_by_resource_key(
 pub async fn list_by_resource(
   key: &str,
   pool: &Pool,
-) -> Result<Vec<ResourceConfig>, HttpResponseError> {
+) -> Result<Vec<ResourceConfig>, HttpError> {
   use crate::schema::resource_configs::dsl;
 
   let key = key.to_owned();
@@ -119,7 +119,7 @@ pub async fn list_by_resource(
       .filter(dsl::resource_key.eq(key))
       .load::<ResourceConfigDbModel>(&mut conn)
       .map_err(db_error("resource config"))?;
-    Ok::<_, HttpResponseError>(items)
+    Ok::<_, HttpError>(items)
   })
   .await
   .map_err(db_blocking_error)?;
@@ -135,7 +135,7 @@ pub async fn list_by_resource(
 pub async fn find_by_key(
   key: &uuid::Uuid,
   pool: &Pool,
-) -> Result<ResourceConfig, HttpResponseError> {
+) -> Result<ResourceConfig, HttpError> {
   use crate::schema::resource_configs::dsl;
 
   let key = *key;
@@ -147,7 +147,7 @@ pub async fn find_by_key(
       .filter(dsl::key.eq(key))
       .first::<ResourceConfigDbModel>(&mut conn)
       .map_err(db_error("resource config"))?;
-    Ok::<_, HttpResponseError>(item)
+    Ok::<_, HttpError>(item)
   })
   .await
   .map_err(db_blocking_error)?;

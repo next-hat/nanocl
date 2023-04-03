@@ -8,12 +8,12 @@ use nanocl_stubs::namespace::NamespacePartial;
 use crate::utils;
 use crate::models::DaemonState;
 
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 
 #[web::get("/namespaces")]
 pub(crate) async fn list_namespace(
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   let items = utils::namespace::list(&state.docker_api, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
@@ -22,7 +22,7 @@ pub(crate) async fn list_namespace(
 async fn create_namespace(
   web::types::Json(payload): web::types::Json<NamespacePartial>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   log::debug!("Creating namespace: {:?}", &payload);
   let item = utils::namespace::create(&payload, &state).await?;
   log::debug!("Namespace created: {:?}", &item);
@@ -33,7 +33,7 @@ async fn create_namespace(
 async fn delete_namespace_by_name(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   log::debug!("Deleting namespace {}", &path.1);
   let res = utils::namespace::delete_by_name(&path.1, &state).await?;
   log::debug!("Namespace {} deleted: {:?}", &path.1, &res);
@@ -44,7 +44,7 @@ async fn delete_namespace_by_name(
 async fn inspect_namespace_by_name(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpResponseError> {
+) -> Result<web::HttpResponse, HttpError> {
   log::debug!("Inspecting namespace {}", path.1);
   let namespace = utils::namespace::inspect(&path.1, &state).await?;
   log::debug!("Namespace found: {:?}", &namespace);

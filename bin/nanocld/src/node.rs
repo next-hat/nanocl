@@ -20,7 +20,7 @@ use crate::models::DaemonState;
 use crate::models::NodeDbModel;
 use crate::repositories;
 use crate::version::VERSION;
-use crate::error::HttpResponseError;
+use crate::error::HttpError;
 
 #[derive(Clone)]
 pub struct NodeMessage {
@@ -39,17 +39,17 @@ impl NodeClient {
     }
   }
 
-  pub async fn connect(&self) -> Result<WsConnection<Base>, HttpResponseError> {
+  pub async fn connect(&self) -> Result<WsConnection<Base>, HttpError> {
     let url = format!("http://{}:8081/{VERSION}/nodes/ws", self.ip_addr);
     let con = ws::WsClient::build(url)
       .finish()
-      .map_err(|err| HttpResponseError {
+      .map_err(|err| HttpError {
         msg: format!("Failed to build websocket connection: {}", err),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?
       .connect()
       .await
-      .map_err(|err| HttpResponseError {
+      .map_err(|err| HttpError {
         msg: format!("Failed to connect to websocket: {}", err),
         status: StatusCode::INTERNAL_SERVER_ERROR,
       })?;
