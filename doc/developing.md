@@ -69,11 +69,10 @@ sudo mkdir /run/nanocl
 sudo chmod 777 -R /run/nanocl
 ```
 
-Before running nanocl we will need some docker images:
+Before running nanocl we will need to download and build some docker images:
 
 ```sh
-docker pull nexthat/metrsd:0.1.0
-docker pull cockroachdb/cockroach:v22.2.6
+./scripts/install_dev_image.sh
 ```
 
 Finally we can start the daemon.
@@ -82,25 +81,19 @@ You can do it in multiple way :
 - Using cargo make
 
   ```sh
-  cargo make run-daemon
+  cargo make dev # Run the daemon (the daemon will start required services)
   ```
 
 - Using cargo
 
   ```sh
-  cargo run --bin nanocld
+  cargo run --no-default-features --features dev --bin nanocld
   ```
 
 - Using cargo watch
 
   ```sh
-  cargo watch -x "run --bin nanocld"
-  ```
-
-- Using the docker compose
-
-  ```sh
-  docker compose up
+  cargo watch -x "run --no-default-features --features dev --bin nanocld"
   ```
 
 I personally use the first way.
@@ -125,6 +118,8 @@ The project is separated into multiple crates and binaries.
 We have:
 
 - `crates/nanocl_stubs` Is shared data models between daemon client and cli.
-- `crates/nanocld_client` Is a client for nanocl daemon
+- `crates/nanocld_client` Is a rust client for nanocl daemon
+- `bin/ctrl-dns` The dns controller is the microservice responsable of the dns entries
+- `bin/ctrl-proxy` The proxy controller is the microservice responsable of proxy entries
 - `bin/nanocld` Is the nanocl daemon
 - `bin/nanocl` Is the nanocl CLI
