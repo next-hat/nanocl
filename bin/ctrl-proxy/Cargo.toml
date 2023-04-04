@@ -21,7 +21,9 @@ bschemars = ["dep:schemars"]
 
 [build-dependencies]
 serde = { version = "1.0", features = ["derive"] }
-schemars = { version = "0.8.12", default-features = false, features = ["derive"] }
+schemars = { version = "0.8.12", default-features = false, features = [
+  "derive",
+] }
 serde_yaml = "0.9.19"
 serde_json = "1.0.91"
 
@@ -38,8 +40,6 @@ futures = "0.3.25"
 log = "0.4.17"
 env_logger = "0.10.0"
 serde = "1.0.154"
-schemars = { version = "0.8.12", default-features = false, features = ["derive"], optional = true }
-
-# [patch.crates-io]
-# nanocl_stubs = { path = "../nanocl/crates/nanocl_stubs" }
-# nanocld_client = { path = "../nanocl/crates/nanocld_client" }
+schemars = { version = "0.8.12", default-features = false, features = [
+  "derive",
+], optional = true }
