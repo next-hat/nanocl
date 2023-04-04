@@ -14,7 +14,7 @@ pub struct ResourcePartial {
   /// Version of the config
   pub version: String,
   /// The config of the resource (json object)
-  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub config: serde_json::Value,
 }
 
@@ -26,7 +26,7 @@ pub struct ResourcePatch {
   /// Version of the config
   pub version: String,
   /// The config of the resource as a json object
-  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub config: serde_json::Value,
 }
 
@@ -50,7 +50,7 @@ pub struct Resource {
   /// The config of the resource
   pub config_key: uuid::Uuid,
   /// The config of the resource as a json object
-  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub config: serde_json::Value,
 }
 
@@ -77,7 +77,7 @@ pub struct ResourceConfig {
   /// Resource key associated with the config
   pub resource_key: String,
   /// The config of the resource as a json object
-  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub data: serde_json::Value,
 }
 

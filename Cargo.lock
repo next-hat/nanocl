@@ -326,8 +326,6 @@ dependencies = [
 [[package]]
 name = "bollard-next"
 version = "0.14.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bba9e4db6c45268349085211e2417f51be47825a4065cd60eaf49b11b946ecf1"
 dependencies = [
  "base64 0.21.0",
  "bollard-next-stubs",
@@ -356,8 +354,6 @@ dependencies = [
 [[package]]
 name = "bollard-next-stubs"
 version = "1.42.0-rc.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cd019d6ab0ec7e634290d54ab32d6c2b08a81b7dae6bfac1724925db5460813"
 dependencies = [
  "serde",
  "serde_with",
@@ -1484,9 +1480,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.140"
+version = "0.2.141"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99227334921fae1a979cf0bfdfcc6b3e5ce376ef57e16fb6fb3ea2ed6095f80c"
+checksum = "3304a64d199bb964be99741b7a14d26972741915b3649639149b2479bb46f4b5"
 
 [[package]]
 name = "link-cplusplus"

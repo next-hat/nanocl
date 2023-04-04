@@ -1,10 +1,17 @@
+use ntex::util::HashMap;
 use ntex::web;
 use ntex::http;
 use ntex_files as fs;
-use utoipa::Modify;
-use utoipa::{OpenApi, ToSchema};
+use serde::{Serialize, Deserialize};
+use utoipa::{OpenApi, Modify, ToSchema};
+use bollard_next::container::Config;
 use bollard_next::service::{
-  Driver, ConfigSpec, Config, HostConfig, NetworkingConfig,
+  PortBinding, MountBindOptionsPropagationEnum, MountVolumeOptionsDriverConfig,
+  MountBindOptions, MountTmpfsOptions, MountTypeEnum, MountVolumeOptions,
+  RestartPolicyNameEnum, ThrottleDevice, ResourcesBlkioWeightDevice,
+  HostConfigCgroupnsModeEnum, DeviceRequest, DeviceMapping,
+  HostConfigIsolationEnum, HostConfigLogConfig, Mount, RestartPolicy,
+  ResourcesUlimits, Driver, ConfigSpec, HostConfig, NetworkingConfig,
   SwarmSpecCaConfigExternalCasProtocolEnum, ImageInspect, ImageSummary,
   TlsInfo, SwarmSpecCaConfig, SwarmSpecDispatcher, SwarmSpecEncryptionConfig,
   SwarmSpecOrchestration, SwarmSpecRaft, SwarmSpecTaskDefaults, ObjectVersion,
@@ -40,13 +47,66 @@ use crate::error::HttpError;
 
 use super::{node, cargo, system, namespace, cargo_image, resource};
 
-/// Api error response
+/// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
 #[allow(dead_code)]
 #[derive(ToSchema)]
 struct ApiError {
   msg: String,
 }
 
+/// Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceConfig](ResourceConfig)
+#[allow(dead_code)]
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(untagged)]
+enum Any {
+  String(String),
+  Number(f64),
+  Bool(bool),
+  Array(Vec<Any>),
+  Object(HashMap<String, Any>),
+}
+
+struct PortMap;
+
+impl<'__s> utoipa::ToSchema<'__s> for PortMap {
+  fn schema() -> (
+    &'__s str,
+    utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+  ) {
+    (
+      "PortMap",
+      utoipa::openapi::ObjectBuilder::new()
+        .nullable(true)
+        .title(Some("PortMap"))
+        .description(Some("PortMap"))
+        .schema_type(utoipa::openapi::schema::SchemaType::Object)
+        .property(
+          "<port/tcp|udp>",
+          utoipa::openapi::ArrayBuilder::new()
+            .items(
+              utoipa::openapi::ObjectBuilder::new()
+                .property(
+                  "HostPort",
+                  utoipa::openapi::ObjectBuilder::new()
+                    .schema_type(utoipa::openapi::schema::SchemaType::String)
+                    .build(),
+                )
+                .property(
+                  "HostIp",
+                  utoipa::openapi::ObjectBuilder::new()
+                    .schema_type(utoipa::openapi::schema::SchemaType::String)
+                    .build(),
+                )
+                .build(),
+            )
+            .build(),
+        )
+        .into(),
+    )
+  }
+}
+
+/// Helper to generate the versioned OpenAPI documentation
 struct VersionModifier;
 
 impl Modify for VersionModifier {
@@ -59,11 +119,11 @@ impl Modify for VersionModifier {
 
     let server = utoipa::openapi::ServerBuilder::default()
       .url("/{version}")
-      .description(Some("Local development server"))
+      .description(Some("localhost"))
       .parameter("version", variable)
       .build();
 
-    openapi.info.title = "Nanocl Daemon Endpoints".to_string();
+    openapi.info.title = "Nanocl Daemon".to_string();
     openapi.info.version = format!("v{}", env!("CARGO_PKG_VERSION"));
     openapi.servers = Some(vec![server]);
   }
@@ -184,11 +244,29 @@ impl Modify for VersionModifier {
     ContainerSummaryHostConfig,
     ContainerSummaryNetworkSettings,
     Port,
+    PortMap,
+    PortBinding,
     MountPoint,
     MountPointTypeEnum,
     EndpointSettings,
     PortTypeEnum,
     EndpointIpamConfig,
+    ThrottleDevice,
+    ResourcesBlkioWeightDevice, HostConfigCgroupnsModeEnum,
+    DeviceRequest,
+    DeviceMapping,
+    HostConfigIsolationEnum,
+    HostConfigLogConfig,
+    Mount,
+    RestartPolicy,
+    ResourcesUlimits,
+    MountBindOptions,
+    MountTmpfsOptions,
+    MountTypeEnum,
+    MountVolumeOptions,
+    RestartPolicyNameEnum,
+    MountBindOptionsPropagationEnum,
+    MountVolumeOptionsDriverConfig,
     // Resource
     Resource,
     ResourcePatch,
@@ -197,6 +275,7 @@ impl Modify for VersionModifier {
     // Error
     ApiError,
     // Generic Response
+    Any,
     GenericDelete,
   )),
   tags(
