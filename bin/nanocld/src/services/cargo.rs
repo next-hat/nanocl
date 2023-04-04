@@ -590,7 +590,7 @@ mod tests {
       .delete(format!("/v0.2/cargoes/{}", response.name))
       .send()
       .await?;
-    assert_eq!(res.status(), 204);
+    assert_eq!(res.status(), 202);
 
     Ok(())
   }
