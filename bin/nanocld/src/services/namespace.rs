@@ -27,6 +27,28 @@ pub(crate) async fn list_namespace(
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
+/// Get detailed information about a namespace
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Namespaces",
+  path = "/namespaces/{name}/inspect",
+  params(
+    ("name" = String, Path, description = "The namespace name to inspect")
+  ),
+  responses(
+    (status = 200, description = "Detailed information about a namespace", body = [NamespaceInspect]),
+    (status = 404, description = "Namespace is not existing", body = ApiError),
+  ),
+))]
+#[web::get("/namespaces/{id}/inspect")]
+pub(crate) async fn inspect_namespace(
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::namespace::inspect(&path.1, &state).await?;
+  Ok(web::HttpResponse::Ok().json(&namespace))
+}
+
 /// Create a namespace
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
@@ -68,28 +90,6 @@ pub(crate) async fn delete_namespace(
   repositories::namespace::find_by_name(&path.1, &state.pool).await?;
   let res = utils::namespace::delete_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&res))
-}
-
-/// Get detailed information about a namespace
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  tag = "Namespaces",
-  path = "/namespaces/{name}/inspect",
-  params(
-    ("name" = String, Path, description = "The namespace name to inspect")
-  ),
-  responses(
-    (status = 200, description = "Detailed information about a namespace", body = [NamespaceInspect]),
-    (status = 404, description = "Namespace is not existing", body = ApiError),
-  ),
-))]
-#[web::get("/namespaces/{id}/inspect")]
-pub(crate) async fn inspect_namespace(
-  path: web::types::Path<(String, String)>,
-  state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
-  let namespace = utils::namespace::inspect(&path.1, &state).await?;
-  Ok(web::HttpResponse::Ok().json(&namespace))
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {

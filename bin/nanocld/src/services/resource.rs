@@ -13,8 +13,67 @@ use crate::{utils, repositories};
 use crate::error::HttpError;
 use crate::models::{DaemonState, ResourceResetPath};
 
+/// List resources
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Resources",
+  path = "/resources",
+  params(
+    ("kind" = Option<String>, Query, description = "Filter by resource kind"),
+    ("contains" = Option<String>, Query, description = "Filter by resource content"),
+  ),
+  responses(
+    (status = 200, description = "List of resources", body = [Resource]),
+  ),
+))]
+#[web::get("/resources")]
+pub(crate) async fn list_resource(
+  web::types::Query(query): web::types::Query<ResourceQuery>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  log::debug!("Listing resources with query: {query:#?}");
+  let items = repositories::resource::find(&state.pool, Some(query)).await?;
+  log::debug!("Found {} resources", &items.len());
+  Ok(web::HttpResponse::Ok().json(&items))
+}
+
+/// Get detailed information about a resource
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Resources",
+  path = "/resources/{name}",
+  params(
+    ("name" = String, Path, description = "The resource name to inspect")
+  ),
+  responses(
+    (status = 200, description = "Detailed information about a resource", body = Resource),
+    (status = 404, description = "Resource is not existing", body = ApiError),
+  ),
+))]
+#[web::get("/resources/{name}")]
+pub(crate) async fn inspect_resource(
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  log::debug!("Inspecting resource: {}", &path.1);
+  let resource =
+    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
+  log::debug!("Resource found: {:?}", &resource);
+  Ok(web::HttpResponse::Ok().json(&resource))
+}
+
+/// Create a resource
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  request_body = ResourcePartial,
+  tag = "Resources",
+  path = "/resources",
+  responses(
+    (status = 200, description = "The created resource", body = Resource),
+  ),
+))]
 #[web::post("/resources")]
-pub async fn create_resource(
+pub(crate) async fn create_resource(
   web::types::Json(payload): web::types::Json<ResourcePartial>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -31,8 +90,21 @@ pub async fn create_resource(
   Ok(web::HttpResponse::Created().json(&resource))
 }
 
+/// Delete a resource
+#[cfg_attr(feature = "dev", utoipa::path(
+  delete,
+  tag = "Resources",
+  path = "/resources/{name}",
+  params(
+    ("name" = String, Path, description = "The resource name to delete")
+  ),
+  responses(
+    (status = 202, description = "The resource and his history has been deleted"),
+    (status = 404, description = "Resource is not existing", body = ApiError),
+  ),
+))]
 #[web::delete("/resources/{name}")]
-pub async fn delete_resource(
+pub(crate) async fn delete_resource(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -49,31 +121,22 @@ pub async fn delete_resource(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-#[web::get("/resources")]
-pub async fn list_resource(
-  web::types::Query(query): web::types::Query<ResourceQuery>,
-  state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("Listing resources with query: {query:#?}");
-  let items = repositories::resource::find(&state.pool, Some(query)).await?;
-  log::debug!("Found {} resources", &items.len());
-  Ok(web::HttpResponse::Ok().json(&items))
-}
-
-#[web::get("/resources/{name}")]
-pub async fn inspect_resource(
-  path: web::types::Path<(String, String)>,
-  state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("Inspecting resource: {}", &path.1);
-  let resource =
-    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
-  log::debug!("Resource found: {:?}", &resource);
-  Ok(web::HttpResponse::Ok().json(&resource))
-}
-
+/// Patch a resource (update its version and/or config) and create a new history
+#[cfg_attr(feature = "dev", utoipa::path(
+  patch,
+  request_body = ResourcePatch,
+  tag = "Resources",
+  path = "/resources/{name}",
+  params(
+    ("name" = String, Path, description = "The resource name to patch")
+  ),
+  responses(
+    (status = 200, description = "The patched resource", body = Resource),
+    (status = 404, description = "Resource is not existing", body = ApiError),
+  ),
+))]
 #[web::patch("/resources/{name}")]
-pub async fn patch_resource(
+pub(crate) async fn patch_resource(
   web::types::Json(payload): web::types::Json<ResourcePatch>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -105,8 +168,21 @@ pub async fn patch_resource(
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
+/// List resource history
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Resources",
+  path = "/resources/{name}/histories",
+  params(
+    ("name" = String, Path, description = "The resource name to list history")
+  ),
+  responses(
+    (status = 200, description = "The resource history", body = [ResourceConfig]),
+    (status = 404, description = "Resource is not existing", body = ApiError),
+  ),
+))]
 #[web::get("/resources/{name}/histories")]
-pub async fn list_resource_history(
+pub(crate) async fn list_resource_history(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -118,8 +194,22 @@ pub async fn list_resource_history(
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
+/// Reset a resource to a specific history
+#[cfg_attr(feature = "dev", utoipa::path(
+  patch,
+  tag = "Resources",
+  path = "/resources/{name}/histories/{id}/reset",
+  params(
+    ("name" = String, Path, description = "The resource name to reset"),
+    ("id" = String, Path, description = "The resource history id to reset to")
+  ),
+  responses(
+    (status = 200, description = "The resource has been reset", body = Resource),
+    (status = 404, description = "Resource is not existing", body = ApiError),
+  ),
+))]
 #[web::patch("/resources/{name}/histories/{id}/reset")]
-pub async fn reset_resource(
+pub(crate) async fn reset_resource(
   path: web::types::Path<ResourceResetPath>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {

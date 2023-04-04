@@ -8,6 +8,7 @@ use crate::schema::nodes;
 )]
 #[diesel(primary_key(name))]
 #[diesel(table_name = nodes)]
+#[serde(rename_all = "PascalCase")]
 pub struct NodeDbModel {
   pub(crate) name: String,
   pub(crate) ip_address: String,

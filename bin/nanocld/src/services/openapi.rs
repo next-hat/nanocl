@@ -11,7 +11,10 @@ use bollard_next::service::{
   ImageInspectMetadata, ImageInspectRootFs,
 };
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::node::NodeContainerSummary;
+use nanocl_stubs::resource::{
+  Resource, ResourcePatch, ResourceConfig, ResourcePartial,
+};
+use nanocl_stubs::node::{Node, NodeContainerSummary};
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespacePartial, NamespaceInspect,
 };
@@ -21,7 +24,7 @@ use nanocl_stubs::cargo_image::CargoImagePartial;
 
 use crate::error::HttpError;
 
-use super::{node, namespace, cargo_image};
+use super::{node, namespace, cargo_image, resource};
 
 /// Api error response
 #[allow(dead_code)]
@@ -46,8 +49,8 @@ impl Modify for VersionModifier {
       .parameter("version", variable)
       .build();
 
-    openapi.info.title = "Nanocld API".to_string();
-    openapi.info.version = "v0.4".to_string();
+    openapi.info.title = "Nanocl Daemon Endpoints".to_string();
+    openapi.info.version = format!("v{}", env!("CARGO_PKG_VERSION"));
     openapi.servers = Some(vec![server]);
   }
 }
@@ -56,20 +59,28 @@ impl Modify for VersionModifier {
 #[derive(OpenApi)]
 #[openapi(
   paths(
+    // Namespace
+    namespace::list_namespace,
+    namespace::inspect_namespace,
+    namespace::create_namespace,
+    namespace::delete_namespace,
+    // Node
+    node::list_node,
+    node::node_ws,
     // Cargo Image
     cargo_image::list_cargo_image,
     cargo_image::inspect_cargo_image,
     cargo_image::create_cargo_image,
     cargo_image::delete_cargo_image,
     cargo_image::import_cargo_image,
-    // Namespace
-    namespace::list_namespace,
-    namespace::create_namespace,
-    namespace::delete_namespace,
-    namespace::inspect_namespace,
-    // Node
-    node::list_node,
-    node::node_ws,
+    // Resource
+    resource::list_resource,
+    resource::inspect_resource,
+    resource::create_resource,
+    resource::delete_resource,
+    resource::patch_resource,
+    resource::list_resource_history,
+    resource::reset_resource,
   ),
   components(schemas(
     // Namespace
@@ -78,6 +89,7 @@ impl Modify for VersionModifier {
     NamespaceInspect,
     NamespaceSummary,
     // Node
+    Node,
     NodeContainerSummary,
     // Container Image
     ImageSummary,
@@ -102,6 +114,11 @@ impl Modify for VersionModifier {
     CargoInspect,
     CargoConfig,
     ReplicationMode,
+    // Resource
+    Resource,
+    ResourcePatch,
+    ResourceConfig,
+    ResourcePartial,
     // Error
     ApiError,
     // Generic Response
@@ -110,6 +127,8 @@ impl Modify for VersionModifier {
   tags(
     (name = "Cargo Images", description = "Cargo images management endpoints."),
     (name = "Namespaces", description = "Namespaces management endpoints."),
+    (name = "Nodes", description = "Nodes management endpoints."),
+    (name = "Resources", description = "Resources management endpoints."),
   ),
   modifiers(&VersionModifier),
 )]

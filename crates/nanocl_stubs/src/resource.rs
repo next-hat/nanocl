@@ -3,6 +3,7 @@ use serde::{Serialize, Deserialize};
 
 /// Resource partial is a payload used to create a new resource
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourcePartial {
@@ -12,23 +13,27 @@ pub struct ResourcePartial {
   pub kind: String,
   /// Version of the config
   pub version: String,
-  /// The config of the resource
+  /// The config of the resource (json object)
+  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
   pub config: serde_json::Value,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourcePatch {
   /// Version of the config
   pub version: String,
-  /// The config of the resource
+  /// The config of the resource as a json object
+  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
   pub config: serde_json::Value,
 }
 
 /// Resource is a configuration with a name and a kind
 /// It is used to define [proxy rules](ProxyRule) and other kind of config
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Resource {
@@ -44,7 +49,8 @@ pub struct Resource {
   pub kind: String,
   /// The config of the resource
   pub config_key: uuid::Uuid,
-  /// The config of the resource
+  /// The config of the resource as a json object
+  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
   pub config: serde_json::Value,
 }
 
@@ -60,12 +66,18 @@ impl From<Resource> for ResourcePartial {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceConfig {
+  /// Key of the resource
   pub key: uuid::Uuid,
+  /// Version of the config
   pub version: String,
+  /// Resource key associated with the config
   pub resource_key: String,
+  /// The config of the resource as a json object
+  #[cfg_attr(feature = "utoipa", schema(value_type = String))]
   pub data: serde_json::Value,
 }
 
