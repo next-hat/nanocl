@@ -21,7 +21,7 @@ use nanocl_stubs::cargo_image::CargoImagePartial;
 
 use crate::error::HttpError;
 
-use super::{namespace, cargo_image};
+use super::{node, namespace, cargo_image};
 
 /// Api error response
 #[allow(dead_code)]
@@ -67,6 +67,9 @@ impl Modify for VersionModifier {
     namespace::create_namespace,
     namespace::delete_namespace,
     namespace::inspect_namespace,
+    // Node
+    node::list_node,
+    node::node_ws,
   ),
   components(schemas(
     // Namespace

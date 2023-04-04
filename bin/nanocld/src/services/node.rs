@@ -15,8 +15,17 @@ use crate::{utils, repositories};
 use crate::error::HttpError;
 use crate::models::{DaemonState, WsConState};
 
+/// List nodes
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Nodes",
+  path = "/nodes",
+  responses(
+    (status = 200, description = "List of nodes", body = [Node]),
+  ),
+))]
 #[web::get("/nodes")]
-async fn list_node(
+pub(crate) async fn list_node(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let items = repositories::node::list(&state.pool).await?;
@@ -75,7 +84,15 @@ async fn node_ws_service(
   Ok(pipeline(service).and_then(on_shutdown))
 }
 
-/// Entry point for our route
+/// Websocket endpoint for communication between nodes used internally
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Nodes",
+  path = "/nodes/ws",
+  responses(
+    (status = 101, description = "Websocket connection"),
+  ),
+))]
 async fn node_ws(
   req: web::HttpRequest,
   state: web::types::State<DaemonState>,
