@@ -8,6 +8,7 @@ use super::cargo::CargoInspect;
 use super::resource::Resource;
 
 /// HostInfo contains information about the host and the docker daemon
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct HostInfo {
@@ -81,7 +82,7 @@ impl std::fmt::Display for Event {
 pub struct ProccessQuery {
   /// Return container from all nodes
   pub all: bool,
-  /// Return this number of most recently created containers, including non-running ones
+  /// Return this number of most recently created containers
   pub last: Option<isize>,
   /// Return the size of container as fields `SizeRw` and `SizeRootFs`
   pub size: bool,

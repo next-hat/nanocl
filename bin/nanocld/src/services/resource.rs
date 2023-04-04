@@ -19,8 +19,8 @@ use crate::models::{DaemonState, ResourceResetPath};
   tag = "Resources",
   path = "/resources",
   params(
-    ("kind" = Option<String>, Query, description = "Filter by resource kind"),
-    ("contains" = Option<String>, Query, description = "Filter by resource content"),
+    ("Kind" = Option<String>, Query, description = "Filter by resource kind"),
+    ("Contains" = Option<String>, Query, description = "Filter by resource content"),
   ),
   responses(
     (status = 200, description = "List of resources", body = [Resource]),

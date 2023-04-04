@@ -3,13 +3,22 @@ use ntex::http;
 use ntex_files as fs;
 use utoipa::Modify;
 use utoipa::{OpenApi, ToSchema};
-use bollard_next::models::{ImageInspect, ImageSummary};
 use bollard_next::service::{
-  EndpointIpamConfig, EndpointSettings, MountPointTypeEnum, PortTypeEnum,
+  SwarmSpecCaConfigExternalCasProtocolEnum, ImageInspect, ImageSummary,
+  TlsInfo, SwarmSpecCaConfig, SwarmSpecDispatcher, SwarmSpecEncryptionConfig,
+  SwarmSpecOrchestration, SwarmSpecRaft, SwarmSpecTaskDefaults, ObjectVersion,
+  SwarmSpec, SystemInfoCgroupDriverEnum, SystemInfoCgroupVersionEnum, Commit,
+  IndexInfo, ClusterInfo, LocalNodeState, PeerNode,
+  SystemInfoDefaultAddressPools, SystemInfoIsolationEnum, PluginsInfo,
+  RegistryServiceConfig, Runtime, SwarmInfo, SystemInfo, EndpointIpamConfig,
+  EndpointSettings, MountPointTypeEnum, PortTypeEnum,
   ContainerSummaryHostConfig, ContainerSummaryNetworkSettings, MountPoint,
   Port, ContainerSummary, HealthConfig, ContainerConfig, GraphDriverData,
-  ImageInspectMetadata, ImageInspectRootFs,
+  ImageInspectMetadata, ImageInspectRootFs, SwarmSpecCaConfigExternalCas,
+  SwarmSpecTaskDefaultsLogDriver, GenericResources,
+  GenericResourcesDiscreteResourceSpec, GenericResourcesNamedResourceSpec,
 };
+use nanocl_stubs::system::HostInfo;
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::resource::{
   Resource, ResourcePatch, ResourceConfig, ResourcePartial,
@@ -24,7 +33,7 @@ use nanocl_stubs::cargo_image::CargoImagePartial;
 
 use crate::error::HttpError;
 
-use super::{node, namespace, cargo_image, resource};
+use super::{node, system, namespace, cargo_image, resource};
 
 /// Api error response
 #[allow(dead_code)]
@@ -59,14 +68,18 @@ impl Modify for VersionModifier {
 #[derive(OpenApi)]
 #[openapi(
   paths(
+    // Node
+    node::list_node,
+    node::node_ws,
+    // System
+    system::get_info,
+    system::watch_event,
+    system::get_processes,
     // Namespace
     namespace::list_namespace,
     namespace::inspect_namespace,
     namespace::create_namespace,
     namespace::delete_namespace,
-    // Node
-    node::list_node,
-    node::node_ws,
     // Cargo Image
     cargo_image::list_cargo_image,
     cargo_image::inspect_cargo_image,
@@ -83,14 +96,45 @@ impl Modify for VersionModifier {
     resource::reset_resource,
   ),
   components(schemas(
+    // Node
+    Node,
+    NodeContainerSummary,
+    // System
+    HostInfo,
+    SystemInfo,
+    Commit,
+    Runtime,
+    SwarmInfo,
+    PluginsInfo,
+    GenericResources,
+    RegistryServiceConfig,
+    SystemInfoCgroupDriverEnum,
+    SystemInfoDefaultAddressPools,
+    SystemInfoCgroupVersionEnum,
+    SystemInfoIsolationEnum,
+    IndexInfo,
+    ClusterInfo,
+    LocalNodeState,
+    PeerNode,
+    SwarmSpec,
+    ObjectVersion,
+    TlsInfo,
+    SwarmSpecCaConfig,
+    SwarmSpecDispatcher,
+    SwarmSpecEncryptionConfig,
+    SwarmSpecOrchestration,
+    SwarmSpecRaft,
+    SwarmSpecTaskDefaults,
+    SwarmSpecCaConfigExternalCas,
+    SwarmSpecTaskDefaultsLogDriver,
+    SwarmSpecCaConfigExternalCasProtocolEnum,
+    GenericResourcesDiscreteResourceSpec,
+    GenericResourcesNamedResourceSpec,
     // Namespace
     Namespace,
     NamespacePartial,
     NamespaceInspect,
     NamespaceSummary,
-    // Node
-    Node,
-    NodeContainerSummary,
     // Container Image
     ImageSummary,
     ImageInspect,
@@ -129,6 +173,7 @@ impl Modify for VersionModifier {
     (name = "Namespaces", description = "Namespaces management endpoints."),
     (name = "Nodes", description = "Nodes management endpoints."),
     (name = "Resources", description = "Resources management endpoints."),
+    (name = "System", description = "General system endpoints."),
   ),
   modifiers(&VersionModifier),
 )]

@@ -11,8 +11,17 @@ use crate::repositories;
 use crate::error::HttpError;
 use crate::models::DaemonState;
 
+/// Get host/node system information
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "System",
+  path = "/info",
+  responses(
+    (status = 200, description = "Host/Node information", body = HostInfo),
+  ),
+))]
 #[web::get("/info")]
-async fn get_info(
+pub(crate) async fn get_info(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let docker = state.docker_api.info().await?;
@@ -24,12 +33,19 @@ async fn get_info(
   Ok(web::HttpResponse::Ok().json(&info))
 }
 
-/// Join events stream
+/// Listen on events using Server-Sent Events / EventSource
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "System",
+  path = "/events",
+  responses(
+    (status = 200, description = "Event stream", body = String),
+  ),
+))]
 #[web::get("/events")]
-async fn watch_events(
+pub(crate) async fn watch_event(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  // TODO: spawn a future to lock the event_emitter and subscribe to the stream
   let stream = state.event_emitter.subscribe().await?;
 
   Ok(
@@ -39,8 +55,22 @@ async fn watch_events(
   )
 }
 
+/// List instances (cargo/vm) including non running ones
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "System",
+  path = "/processes",
+  params(
+    ("All" = bool, Query, description = "Return instances from all nodes"),
+    ("Last" = Option<isize>, Query, description = "Return this number of most recently created containers"),
+    ("Namespace" = Option<String>, Query, description = "Return instances from this namespace only"),
+  ),
+  responses(
+    (status = 200, description = "List of instances", body = [NodeContainerSummary]),
+  ),
+))]
 #[web::get("/processes")]
-async fn get_processes(
+pub(crate) async fn get_processes(
   web::types::Query(qs): web::types::Query<ProccessQuery>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -97,7 +127,7 @@ async fn get_processes(
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(watch_events);
+  config.service(watch_event);
   config.service(get_info);
   config.service(get_processes);
 }
