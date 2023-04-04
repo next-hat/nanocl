@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
+use bollard_next::container::Config;
+use bollard_next::service::HostConfig;
 use ntex::rt;
 use ntex::http::StatusCode;
-
-use bollard_next::service::HostConfig;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateConfig,
 };
-use nanocl_stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
+use nanocl_stubs::cargo_config::CargoConfigPartial;
 
 use crate::{utils, repositories};
 use crate::error::{HttpError, CliError};
@@ -298,7 +298,7 @@ pub fn hook_cargo_binds(
         new_bind.push(bind.to_owned());
       }
       return Ok(CargoConfigPartial {
-        container: ContainerConfig::<String> {
+        container: Config {
           host_config: Some(HostConfig {
             binds: Some(new_bind),
             ..host_config.clone()
@@ -330,7 +330,7 @@ pub fn hook_labels(
   curr_label.extend(labels);
 
   CargoConfigPartial {
-    container: ContainerConfig::<String> {
+    container: Config {
       labels: Some(curr_label),
       ..cargo.container.clone()
     },

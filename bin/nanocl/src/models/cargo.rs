@@ -6,7 +6,8 @@ use clap::{Parser, Subcommand};
 use nanocld_client::stubs::{
   cargo::CargoSummary,
   cargo_config::{
-    CargoConfigUpdate, ContainerConfig, CargoConfigPartial, ContainerHostConfig,
+    CargoConfigUpdate, Config as ContainerConfig, CargoConfigPartial,
+    HostConfig,
   },
 };
 
@@ -46,7 +47,7 @@ impl From<CargoCreateOpts> for CargoConfigPartial {
         // network: val.network,
         // volumes: val.volumes,
         env: val.env,
-        host_config: Some(ContainerHostConfig {
+        host_config: Some(HostConfig {
           binds: val.volumes,
           ..Default::default()
         }),
@@ -85,7 +86,7 @@ impl From<CargoRunOpts> for CargoConfigPartial {
         // volumes: val.volumes,
         env: val.env,
         cmd: Some(val.command),
-        host_config: Some(ContainerHostConfig {
+        host_config: Some(HostConfig {
           binds: val.volumes,
           auto_remove: Some(val.auto_remove),
           ..Default::default()
@@ -156,7 +157,7 @@ pub struct CargoExecOpts {
   pub command: Vec<String>,
 }
 
-impl From<CargoExecOpts> for CreateExecOptions<String> {
+impl From<CargoExecOpts> for CreateExecOptions {
   fn from(val: CargoExecOpts) -> Self {
     CreateExecOptions {
       cmd: Some(val.command),

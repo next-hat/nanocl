@@ -39,10 +39,10 @@ pub(crate) async fn list_cargo_image(
 /// Get detailed information about a container image
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
-  path = "/cargoes/images/{id_or_name}",
+  path = "/cargoes/images/{IdOrName}",
   tag = "Cargo Images",
   params(
-    ("id_or_name" = String, Path, description = "Image ID or name")
+    ("IdOrName" = String, Path, description = "Image ID or name")
   ),
   responses(
     (status = 200, description = "Detailed information about an image", body = ImageInspect),
@@ -87,10 +87,10 @@ pub(crate) async fn create_cargo_image(
 /// Delete a container image
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
-  path = "/cargoes/images/{id_or_name}",
+  path = "/cargoes/images/{IdOrName}",
   tag = "Cargo Images",
   params(
-    ("id_or_name" = String, Path, description = "Image ID or name")
+    ("IdOrName" = String, Path, description = "Image ID or name")
   ),
   responses(
     (status = 200, description = "Delete response", body = GenericDelete),

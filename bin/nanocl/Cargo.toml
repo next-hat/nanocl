@@ -25,12 +25,12 @@ clap_complete = "4.1.4"
 clap_mangen = { version = "0.2" }
 tabled = "0.10.0"
 nanocld_client = { version = "0.4.1" }
-bollard-next = { version = "0.14.5" }
+bollard-next = { version = "0.14.6" }
 chrono = "0.4.24"
 
 [dependencies]
 nanocld_client = { version = "0.4.1", features = ["tokio"] }
-bollard-next = { version = "0.14.5" }
+bollard-next = { version = "0.14.6" }
 futures = "0.3"
 serde_yaml = "0.9"
 tabled = "0.10.0"

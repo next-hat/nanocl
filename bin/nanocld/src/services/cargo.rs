@@ -6,27 +6,112 @@ use ntex::rt;
 use ntex::web;
 use ntex::http::StatusCode;
 
+use bollard_next::exec::CreateExecOptions;
+
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::cargo::{CargoExecConfig, CargoKillOptions};
+use nanocl_stubs::cargo::CargoKillOptions;
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
 use crate::{utils, repositories};
 use crate::error::HttpError;
 use crate::models::{DaemonState, CargoResetPath};
 
+/// List cargoes
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Cargoes",
+  path = "/cargoes",
+  params(
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "List of cargoes", body = [CargoSummary]),
+  ),
+))]
+#[web::get("/cargoes")]
+pub(crate) async fn list_cargo(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let cargoes = utils::cargo::list(&namespace, &state).await?;
+  Ok(web::HttpResponse::Ok().json(&cargoes))
+}
+
+/// List cargo instances
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/instances",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "List of cargo instances", body = [ContainerSummary]),
+  ),
+))]
+#[web::get("/cargoes/{name}/instances")]
+pub(crate) async fn list_cargo_instance(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  let instances = utils::cargo::list_instance(&key, &state.docker_api).await?;
+  Ok(web::HttpResponse::Ok().json(&instances))
+}
+
+/// Inspect a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/inspect",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "Cargo details", body = CargoInspect),
+  ),
+))]
+#[web::get("/cargoes/{name}/inspect")]
+async fn inspect_cargo(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  let cargo = utils::cargo::inspect(&key, &state).await?;
+  Ok(web::HttpResponse::Ok().json(&cargo))
+}
+
+/// Create a new cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Cargoes",
+  path = "/cargoes",
+  request_body = CargoConfigPartial,
+  params(
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 201, description = "Cargo created", body = CargoInspect),
+  ),
+))]
 #[web::post("/cargoes")]
-pub async fn create_cargo(
+pub(crate) async fn create_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<CargoConfigPartial>,
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  log::debug!("Creating cargo: {:?}", &payload);
   let cargo =
     utils::cargo::create(&namespace, &payload, &version, &state).await?;
-  log::debug!("Cargo created: {:?}", &cargo);
   let key = cargo.key.to_owned();
   rt::spawn(async move {
     let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
@@ -38,15 +123,28 @@ pub async fn create_cargo(
   Ok(web::HttpResponse::Created().json(&cargo))
 }
 
+/// Delete a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  delete,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 202, description = "Cargo deleted"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
 #[web::delete("/cargoes/{name}")]
-pub async fn delete_cargo(
+pub(crate) async fn delete_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("Deleting cargo: {}", &key);
   let cargo = utils::cargo::inspect(&key, &state).await?;
   utils::cargo::delete(&key, None, &state).await?;
   rt::spawn(async move {
@@ -55,18 +153,31 @@ pub async fn delete_cargo(
       .emit(Event::CargoDeleted(Box::new(cargo)))
       .await;
   });
-  Ok(web::HttpResponse::NoContent().finish())
+  Ok(web::HttpResponse::Accepted().finish())
 }
 
+/// Start a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/start",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 202, description = "Cargo started"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
 #[web::post("/cargoes/{name}/start")]
-pub async fn start_cargo(
+pub(crate) async fn start_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("Starting cargo: {}", &key);
   utils::cargo::start(&key, &state).await?;
   rt::spawn(async move {
     let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
@@ -78,15 +189,28 @@ pub async fn start_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
+/// Stop a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/stop",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 202, description = "Cargo stopped"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
 #[web::post("/cargoes/{name}/stop")]
-pub async fn stop_cargo(
+pub(crate) async fn stop_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("Stopping cargo: {}", &key);
   utils::cargo::inspect(&key, &state).await?;
   utils::cargo::stop(&key, &state.docker_api).await?;
   rt::spawn(async move {
@@ -99,8 +223,23 @@ pub async fn stop_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
+/// Create a new cargo config from scratch and add history entry
+#[cfg_attr(feature = "dev", utoipa::path(
+  put,
+  tag = "Cargoes",
+  request_body = CargoConfigUpdate,
+  path = "/cargoes/{Name}",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "Cargo updated", body = Cargo),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
 #[web::put("/cargoes/{name}")]
-pub async fn put_cargo(
+pub(crate) async fn put_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   payload: web::types::Json<CargoConfigUpdate>,
   path: web::types::Path<(String, String)>,
@@ -108,7 +247,6 @@ pub async fn put_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("Patching cargo: {}", &key);
   let cargo = utils::cargo::put(&key, &payload, &path.0, &state).await?;
   rt::spawn(async move {
     let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
@@ -120,8 +258,23 @@ pub async fn put_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
+/// Patch a cargo config meaning merging current config with the new one and add history entry
+#[cfg_attr(feature = "dev", utoipa::path(
+  patch,
+  tag = "Cargoes",
+  request_body = CargoConfigUpdate,
+  path = "/cargoes/{Name}",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "Cargo updated", body = Cargo),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
 #[web::patch("/cargoes/{name}")]
-pub async fn patch_cargo(
+pub(crate) async fn patch_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   payload: web::types::Json<CargoConfigUpdate>,
   path: web::types::Path<(String, String)>,
@@ -129,7 +282,6 @@ pub async fn patch_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("Patching cargo: {}", &key);
   let cargo = utils::cargo::patch(&key, &payload, &path.0, &state).await?;
   rt::spawn(async move {
     let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
@@ -141,62 +293,48 @@ pub async fn patch_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-#[web::get("/cargoes")]
-pub async fn list_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  log::debug!("Listing cargoes in namespace: {}", &namespace);
-  let cargoes = utils::cargo::list(&namespace, &state).await?;
-  log::debug!("Found {} cargoes: {:#?}", &cargoes.len(), &cargoes);
-  Ok(web::HttpResponse::Ok().json(&cargoes))
-}
-
-#[web::get("/cargoes/{name}/instances")]
-pub async fn list_cargo_instances(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
-  state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("Listing instances of cargo: {}", &key);
-  let instances = utils::cargo::list_instance(&key, &state.docker_api).await?;
-  log::debug!(
-    "Found {} instances of cargo: {:#?}",
-    &instances.len(),
-    &instances
-  );
-  Ok(web::HttpResponse::Ok().json(&instances))
-}
-
-#[web::get("/cargoes/{name}/inspect")]
-async fn inspect_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
-  state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("Inspecting cargo : {}", &key);
-  let cargo = utils::cargo::inspect(&key, &state).await?;
-  Ok(web::HttpResponse::Ok().json(&cargo))
-}
-
+/// Execute a command in a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Cargoes",
+  request_body = CreateExecOptions,
+  path = "/cargoes/{Name}/exec",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "Event Stream of the command output", content_type = "text/event-stream"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
 #[web::post("/cargoes/{name}/exec")]
 async fn exec_command(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<CargoExecConfig<String>>,
+  web::types::Json(payload): web::types::Json<CreateExecOptions>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("Executing command on cargo : {}", &key);
   utils::cargo::exec_command(&key, &payload, &state).await
 }
 
+/// Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Cargoes",
+  request_body = CargoKillOptions,
+  path = "/cargoes/{Name}/kill",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "Cargo killed"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
 #[web::post("/cargoes/{name}/kill")]
 async fn kill_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -206,11 +344,24 @@ async fn kill_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("Executing command on cargo : {}", &key);
   utils::cargo::kill(&key, &payload, &state.docker_api).await?;
   Ok(web::HttpResponse::Ok().into())
 }
 
+/// List cargo histories
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/histories",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "List of cargo histories", body = Vec<CargoConfig>),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
 #[web::get("/cargoes/{name}/histories")]
 async fn list_cargo_history(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -224,6 +375,21 @@ async fn list_cargo_history(
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
+/// Reset a cargo to a specific history
+#[cfg_attr(feature = "dev", utoipa::path(
+  patch,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/histories/{Id}/reset",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Id" = String, Path, description = "Id of the cargo history"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "Cargo reset", body = Cargo),
+    (status = 404, description = "Cargo does not exist", body = ApiError),
+  ),
+))]
 #[web::patch("/cargoes/{name}/histories/{id}/reset")]
 async fn reset_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -232,7 +398,6 @@ async fn reset_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo_key = utils::key::gen_key(&namespace, &path.name);
-  log::debug!("Resetting cargo : {}", &cargo_key);
   let config_id = uuid::Uuid::parse_str(&path.id).map_err(|err| HttpError {
     status: StatusCode::BAD_REQUEST,
     msg: format!("Invalid config id : {err}"),
@@ -254,10 +419,23 @@ async fn reset_cargo(
       .emit(Event::CargoPatched(Box::new(cargo)))
       .await;
   });
-  log::debug!("Resetting cargo : {} done", &cargo_key);
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
+/// Get logs of a cargo instance from a EventStream (SSE)
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/logs",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "Cargo logs", content_type = "text/event-stream"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
 #[web::get("/cargoes/{name}/logs")]
 async fn logs_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -266,9 +444,12 @@ async fn logs_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("Getting cargo logs : {}", &key);
   let steam = utils::cargo::get_logs(&key, &state.docker_api)?;
-  Ok(web::HttpResponse::Ok().streaming(steam))
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("text/event-stream")
+      .streaming(steam),
+  )
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
@@ -284,19 +465,20 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(reset_cargo);
   config.service(exec_command);
   config.service(logs_cargo);
-  config.service(list_cargo_instances);
+  config.service(list_cargo_instance);
 }
 
 #[cfg(test)]
 mod tests {
 
-  use crate::services::ntex_config;
-
-  use nanocl_stubs::generic::GenericNspQuery;
-  use nanocl_stubs::cargo::CargoExecConfig;
   use ntex::http::StatusCode;
+
+  use crate::services::ntex_config;
+  use nanocl_stubs::generic::GenericNspQuery;
   use futures::{TryStreamExt, StreamExt};
-  use nanocl_stubs::cargo::{Cargo, CargoSummary, CargoInspect, OutputLog};
+  use nanocl_stubs::cargo::{
+    Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
+  };
   use nanocl_stubs::cargo_config::{
     CargoConfigPartial, CargoConfigUpdate, CargoConfig,
   };
@@ -425,8 +607,8 @@ mod tests {
         namespace: Some("system".into()),
       })
       .unwrap()
-      .send_json(&CargoExecConfig {
-        cmd: Some(vec!["ls", "/", "-lra"]),
+      .send_json(&CreateExecOptions {
+        cmd: Some(vec!["ls".into(), "/".into(), "-lra".into()]),
         ..Default::default()
       })
       .await?;

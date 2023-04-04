@@ -208,7 +208,7 @@ pub(crate) async fn sync_containers(
       )
       .await?;
     let config = container.config.unwrap_or_default();
-    let mut config: bollard_next::container::Config<String> = config.into();
+    let mut config: bollard_next::container::Config = config.into();
     config.host_config = container.host_config;
 
     // TODO: handle network config

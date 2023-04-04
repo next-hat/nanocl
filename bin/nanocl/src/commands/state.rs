@@ -9,7 +9,9 @@ use bollard_next::service::HostConfig;
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::OutputKind;
-use nanocld_client::stubs::cargo_config::{CargoConfigPartial, ContainerConfig};
+use nanocld_client::stubs::cargo_config::{
+  CargoConfigPartial, Config as ContainerConfig,
+};
 use nanocld_client::stubs::state::{StateConfig, StateDeployment, StateCargo};
 use ntex::rt::{self, JoinHandle};
 
@@ -102,7 +104,7 @@ fn hook_binds(
           new_binds.push(new_bind);
         }
         CargoConfigPartial {
-          container: ContainerConfig::<String> {
+          container: ContainerConfig {
             host_config: Some(HostConfig {
               binds: Some(new_binds),
               ..host_config.clone()

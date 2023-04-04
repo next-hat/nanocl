@@ -1,9 +1,9 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-pub type ContainerConfig<T> = bollard_next::container::Config<T>;
-pub type ContainerHostConfig = bollard_next::models::HostConfig;
-pub type ContainerHealthConfig = bollard_next::models::HealthConfig;
+pub use bollard_next::container::Config;
+pub use bollard_next::models::HostConfig;
+pub use bollard_next::models::HealthConfig;
 
 /// Auto is used to automatically define that the number of replicas in the cluster
 /// Number is used to manually set the number of replicas
@@ -37,8 +37,8 @@ pub enum ReplicationMode {
 }
 
 /// A cargo config partial is used to create a Cargo
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoConfigPartial {
@@ -47,7 +47,7 @@ pub struct CargoConfigPartial {
   /// Replication configuration of the cargo
   pub replication: Option<ReplicationMode>,
   /// Container configuration of the cargo
-  pub container: ContainerConfig<String>,
+  pub container: Config,
 }
 
 /// Payload used to patch a cargo
@@ -61,7 +61,7 @@ pub struct CargoConfigUpdate {
   /// New name of the cargo
   pub name: Option<String>,
   /// New replication configuration of the cargo
-  pub container: Option<bollard_next::container::Config<String>>,
+  pub container: Option<Config>,
   /// New container configuration of the cargo
   pub replication: Option<ReplicationMode>,
 }
@@ -97,7 +97,7 @@ pub struct CargoConfig {
   /// Replication configuration of the cargo
   pub replication: Option<ReplicationMode>,
   /// Container configuration of the cargo
-  pub container: ContainerConfig<String>,
+  pub container: Config,
 }
 
 impl From<CargoConfig> for CargoConfigUpdate {

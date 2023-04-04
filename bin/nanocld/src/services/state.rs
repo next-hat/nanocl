@@ -5,7 +5,7 @@ use crate::error::HttpError;
 use crate::models::{StateData, DaemonState};
 
 #[web::put("/state/apply")]
-async fn apply(
+pub(crate) async fn apply(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
@@ -25,7 +25,7 @@ async fn apply(
 }
 
 #[web::put("/state/revert")]
-async fn revert(
+pub(crate) async fn revert(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -55,7 +55,7 @@ mod tests {
   use crate::utils::tests::*;
 
   #[ntex::test]
-  async fn basic() -> TestRet {
+  pub(crate) async fn basic() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
     let data = parse_state_file("../../examples/cargo_example.yml")?;

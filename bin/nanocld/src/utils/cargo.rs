@@ -16,11 +16,10 @@ use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
 use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 
 use nanocl_stubs::cargo::CargoKillOptions;
-use nanocl_stubs::cargo_config::ContainerConfig;
-use nanocl_stubs::cargo_config::ContainerHostConfig;
+use nanocl_stubs::cargo_config::Config as ContainerConfig;
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, OutputLog, CargoExecConfig,
+  Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
 };
 
 use crate::models::DaemonState;
@@ -138,7 +137,7 @@ async fn create_instance(
     };
 
     let res = docker_api
-      .create_container::<String, String>(Some(create_options), config)
+      .create_container::<String>(Some(create_options), config)
       .await
       .map_err(|e| HttpError {
         msg: format!("Unable to create container: {e}"),
@@ -715,7 +714,7 @@ pub async fn delete_by_namespace(
 ///
 pub async fn exec_command(
   name: &str,
-  args: &CargoExecConfig<String>,
+  args: &CreateExecOptions,
   state: &DaemonState,
 ) -> Result<web::HttpResponse, HttpError> {
   let name = format!("{name}.c");
@@ -862,7 +861,7 @@ pub async fn patch(
       cmd,
       image,
       env: Some(env_vars),
-      host_config: Some(ContainerHostConfig {
+      host_config: Some(HostConfig {
         binds: Some(volumes),
         ..cargo.config.container.host_config.unwrap_or_default()
       }),

@@ -4,7 +4,7 @@ use ntex::channel::mpsc::Receiver;
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, CargoExecConfig, OutputLog,
+  Cargo, CargoSummary, CargoInspect, CreateExecOptions, OutputLog,
   CargoKillOptions,
 };
 use nanocl_stubs::cargo_config::{
@@ -322,7 +322,7 @@ impl NanocldClient {
   /// ## Arguments
   ///
   /// - [name](str) - The name of the cargo to exec the command in
-  /// - [exec](CargoExecConfig) - The config for the exec command
+  /// - [exec](CreateExecOptions) - The config for the exec command
   /// - [namespace](Option<String>) - The namespace where belong the cargo
   ///
   /// ## Returns
@@ -336,10 +336,10 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use futures::StreamExt;
   /// use nanocld_client::NanocldClient;
-  /// use nanocld_client::models::cargo_config::CargoExecConfig;
+  /// use nanocld_client::models::cargo_config::CreateExecOptions;
   ///
   /// let client = NanocldClient::connect_with_unix_default();
-  /// let exec = CargoExecConfig {
+  /// let exec = CreateExecOptions {
   ///  cmd: vec!["echo".into(), "hello".into()],
   /// ..Default::default()
   /// };
@@ -352,7 +352,7 @@ impl NanocldClient {
   pub async fn exec_cargo(
     &self,
     name: &str,
-    exec: CargoExecConfig<String>,
+    exec: CreateExecOptions,
     namespace: Option<String>,
   ) -> Result<mpsc::Receiver<Result<OutputLog, ApiError>>, NanocldClientError>
   {
@@ -608,7 +608,7 @@ mod tests {
   async fn exec_cargo() {
     let client = NanocldClient::connect_with_unix_default();
 
-    let exec = CargoExecConfig {
+    let exec = CreateExecOptions {
       cmd: Some(vec!["echo".into(), "hello".into()]),
       ..Default::default()
     };

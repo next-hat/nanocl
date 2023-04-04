@@ -11,7 +11,7 @@ use crate::error::HttpError;
 use crate::models::{DaemonState, VmImageDbModel};
 
 #[web::post("/vms/images/{name}/import")]
-async fn import_vm_image(
+pub(crate) async fn import_vm_image(
   mut payload: web::types::Payload,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -80,7 +80,7 @@ async fn import_vm_image(
 }
 
 #[web::get("/vms/images")]
-async fn list_images(
+pub(crate) async fn list_images(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let images = repositories::vm_image::list(&state.pool).await?;
@@ -89,7 +89,7 @@ async fn list_images(
 }
 
 #[web::post("/vms/images/{name}/snapshot/{snapshot_name}")]
-async fn create_vm_image_snapshot(
+pub(crate) async fn create_vm_image_snapshot(
   path: web::types::Path<(String, String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -104,7 +104,7 @@ async fn create_vm_image_snapshot(
 }
 
 #[web::post("/vms/images/{name}/clone/{clone_name}")]
-async fn clone_vm_image(
+pub(crate) async fn clone_vm_image(
   path: web::types::Path<(String, String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -119,7 +119,7 @@ async fn clone_vm_image(
 }
 
 #[web::post("/vms/images/{name}/resize")]
-async fn resize_vm_image(
+pub(crate) async fn resize_vm_image(
   web::types::Json(payload): web::types::Json<VmImageResizePayload>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -133,7 +133,7 @@ async fn resize_vm_image(
 }
 
 #[web::delete("/vms/images/{name}")]
-async fn delete_vm_image(
+pub(crate) async fn delete_vm_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {

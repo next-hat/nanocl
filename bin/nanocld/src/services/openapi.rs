@@ -4,6 +4,7 @@ use ntex_files as fs;
 use utoipa::Modify;
 use utoipa::{OpenApi, ToSchema};
 use bollard_next::service::{
+  Driver, ConfigSpec, Config, HostConfig, NetworkingConfig,
   SwarmSpecCaConfigExternalCasProtocolEnum, ImageInspect, ImageSummary,
   TlsInfo, SwarmSpecCaConfig, SwarmSpecDispatcher, SwarmSpecEncryptionConfig,
   SwarmSpecOrchestration, SwarmSpecRaft, SwarmSpecTaskDefaults, ObjectVersion,
@@ -20,20 +21,24 @@ use bollard_next::service::{
 };
 use nanocl_stubs::system::HostInfo;
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::resource::{
-  Resource, ResourcePatch, ResourceConfig, ResourcePartial,
-};
 use nanocl_stubs::node::{Node, NodeContainerSummary};
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespacePartial, NamespaceInspect,
 };
-use nanocl_stubs::cargo::CargoInspect;
-use nanocl_stubs::cargo_config::{CargoConfig, ReplicationMode};
+use nanocl_stubs::cargo::{
+  Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
+};
+use nanocl_stubs::cargo_config::{
+  CargoConfig, CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
+};
 use nanocl_stubs::cargo_image::CargoImagePartial;
+use nanocl_stubs::resource::{
+  Resource, ResourcePatch, ResourceConfig, ResourcePartial,
+};
 
 use crate::error::HttpError;
 
-use super::{node, system, namespace, cargo_image, resource};
+use super::{node, cargo, system, namespace, cargo_image, resource};
 
 /// Api error response
 #[allow(dead_code)]
@@ -80,6 +85,21 @@ impl Modify for VersionModifier {
     namespace::inspect_namespace,
     namespace::create_namespace,
     namespace::delete_namespace,
+    // Cargo
+    cargo::list_cargo,
+    cargo::list_cargo_instance,
+    cargo::inspect_cargo,
+    cargo::create_cargo,
+    cargo::delete_cargo,
+    cargo::start_cargo,
+    cargo::stop_cargo,
+    cargo::put_cargo,
+    cargo::patch_cargo,
+    cargo::exec_command,
+    cargo::kill_cargo,
+    cargo::list_cargo_history,
+    cargo::reset_cargo,
+    cargo::logs_cargo,
     // Cargo Image
     cargo_image::list_cargo_image,
     cargo_image::inspect_cargo_image,
@@ -135,6 +155,16 @@ impl Modify for VersionModifier {
     NamespacePartial,
     NamespaceInspect,
     NamespaceSummary,
+    // Cargo
+    Cargo,
+    CreateExecOptions,
+    CargoKillOptions,
+    CargoInspect,
+    CargoConfig,
+    ReplicationMode,
+    CargoSummary,
+    CargoConfigPartial,
+    CargoConfigUpdate,
     // Container Image
     ImageSummary,
     ImageInspect,
@@ -143,6 +173,11 @@ impl Modify for VersionModifier {
     GraphDriverData,
     CargoImagePartial,
     // Container
+    Config,
+    Driver,
+    NetworkingConfig,
+    ConfigSpec,
+    HostConfig,
     ContainerConfig,
     HealthConfig,
     ContainerSummary,
@@ -154,10 +189,6 @@ impl Modify for VersionModifier {
     EndpointSettings,
     PortTypeEnum,
     EndpointIpamConfig,
-    // Cargo
-    CargoInspect,
-    CargoConfig,
-    ReplicationMode,
     // Resource
     Resource,
     ResourcePatch,

@@ -2,7 +2,7 @@ use nanocld_client::{
   NanocldClient,
   stubs::{
     proxy::StreamTarget,
-    cargo::{CargoInspect, CargoExecConfig},
+    cargo::{CargoInspect, CreateExecOptions},
     resource::{ResourceQuery, ResourcePartial},
   },
 };
@@ -335,7 +335,7 @@ pub(crate) async fn reload_config(
   client: &NanocldClient,
 ) -> Result<(), ErrorHint> {
   log::info!("Reloading proxy configuration");
-  let exec = CargoExecConfig::<String> {
+  let exec = CreateExecOptions {
     cmd: Some(vec!["nginx".into(), "-s".into(), "reload".into()]),
     ..Default::default()
   };

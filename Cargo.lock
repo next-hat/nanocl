@@ -325,9 +325,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next"
-version = "0.14.5"
+version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1c16f0157e5b5fea80c7877dab5017b3b59f361cdd18ec69b3004b37a4ac9f4"
+checksum = "bba9e4db6c45268349085211e2417f51be47825a4065cd60eaf49b11b946ecf1"
 dependencies = [
  "base64 0.21.0",
  "bollard-next-stubs",
@@ -349,6 +349,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
+ "utoipa",
  "winapi",
 ]
 

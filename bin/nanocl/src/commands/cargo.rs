@@ -129,7 +129,7 @@ async fn exec_cargo_exec(
   args: &CargoArgs,
   options: &CargoExecOpts,
 ) -> Result<(), CliError> {
-  let exec: CreateExecOptions<String> = options.clone().into();
+  let exec: CreateExecOptions = options.clone().into();
   let mut stream = client
     .exec_cargo(&options.name, exec, args.namespace.clone())
     .await?;

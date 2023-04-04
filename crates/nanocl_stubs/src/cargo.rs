@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 
 use bollard_next::container::{LogOutput, KillContainerOptions};
 
-pub use bollard_next::exec::CreateExecOptions as CargoExecConfig;
+pub use bollard_next::exec::CreateExecOptions;
 
 use crate::node::NodeContainerSummary;
 

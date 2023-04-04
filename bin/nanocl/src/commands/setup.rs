@@ -15,7 +15,7 @@ use bollard_next::container::WaitContainerOptions;
 use bollard_next::service::ProgressDetail;
 use bollard_next::image::CreateImageOptions;
 
-use nanocld_client::stubs::cargo_config::ContainerConfig;
+use nanocld_client::stubs::cargo_config::Config as ContainerConfig;
 use users::get_group_by_name;
 
 use crate::error::CliError;

@@ -28,7 +28,7 @@ use crate::error::HttpError;
 use crate::models::{DaemonState, WsConState};
 
 #[web::get("/vms")]
-async fn list_vm(
+pub(crate) async fn list_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -40,7 +40,7 @@ async fn list_vm(
 }
 
 #[web::get("/vms/{name}/inspect")]
-async fn inspect_vm(
+pub(crate) async fn inspect_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -55,7 +55,7 @@ async fn inspect_vm(
 }
 
 #[web::post("/vms/{name}/start")]
-async fn start_vm(
+pub(crate) async fn start_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -71,7 +71,7 @@ async fn start_vm(
 }
 
 #[web::post("/vms/{name}/stop")]
-async fn stop_vm(
+pub(crate) async fn stop_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -87,7 +87,7 @@ async fn stop_vm(
 }
 
 #[web::delete("/vms/{name}")]
-async fn delete_vm(
+pub(crate) async fn delete_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -102,7 +102,7 @@ async fn delete_vm(
 }
 
 #[web::post("/vms")]
-async fn create_vm(
+pub(crate) async fn create_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<VmConfigPartial>,
   version: web::types::Path<String>,
@@ -116,7 +116,7 @@ async fn create_vm(
 }
 
 #[web::get("/vms/{name}/histories")]
-async fn list_vm_history(
+pub(crate) async fn list_vm_history(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -129,7 +129,7 @@ async fn list_vm_history(
 }
 
 #[web::patch("/vms/{name}")]
-async fn patch_vm(
+pub(crate) async fn patch_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<VmConfigUpdate>,
   path: web::types::Path<(String, String)>,
@@ -144,7 +144,7 @@ async fn patch_vm(
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
-async fn ws_attach_service(
+pub(crate) async fn ws_attach_service(
   (key, sink, state): (String, ws::WsSink, web::types::State<DaemonState>),
 ) -> Result<
   impl Service<ws::Frame, Response = Option<ws::Message>, Error = io::Error>,
@@ -262,7 +262,7 @@ async fn ws_attach_service(
 }
 
 /// Entry point for our route
-async fn vm_attach(
+pub(crate) async fn vm_attach(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   req: HttpRequest,
   path: web::types::Path<(String, String)>,
@@ -304,7 +304,7 @@ mod tests {
   use crate::utils::tests::*;
 
   #[ntex::test]
-  async fn list_vm() -> TestRet {
+  pub(crate) async fn list_vm() -> TestRet {
     let srv = generate_server(ntex_config).await;
     let resp = srv.get("/v0.2/vms").send().await?;
     let status = resp.status();

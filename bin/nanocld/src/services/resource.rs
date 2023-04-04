@@ -41,9 +41,9 @@ pub(crate) async fn list_resource(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Resources",
-  path = "/resources/{name}",
+  path = "/resources/{Name}",
   params(
-    ("name" = String, Path, description = "The resource name to inspect")
+    ("Name" = String, Path, description = "The resource name to inspect")
   ),
   responses(
     (status = 200, description = "Detailed information about a resource", body = Resource),
@@ -94,9 +94,9 @@ pub(crate) async fn create_resource(
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Resources",
-  path = "/resources/{name}",
+  path = "/resources/{Name}",
   params(
-    ("name" = String, Path, description = "The resource name to delete")
+    ("Name" = String, Path, description = "The resource name to delete")
   ),
   responses(
     (status = 202, description = "The resource and his history has been deleted"),
@@ -126,9 +126,9 @@ pub(crate) async fn delete_resource(
   patch,
   request_body = ResourcePatch,
   tag = "Resources",
-  path = "/resources/{name}",
+  path = "/resources/{Name}",
   params(
-    ("name" = String, Path, description = "The resource name to patch")
+    ("Name" = String, Path, description = "The resource name to patch")
   ),
   responses(
     (status = 200, description = "The patched resource", body = Resource),
@@ -172,9 +172,9 @@ pub(crate) async fn patch_resource(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Resources",
-  path = "/resources/{name}/histories",
+  path = "/resources/{Name}/histories",
   params(
-    ("name" = String, Path, description = "The resource name to list history")
+    ("Name" = String, Path, description = "The resource name to list history")
   ),
   responses(
     (status = 200, description = "The resource history", body = [ResourceConfig]),
@@ -198,10 +198,10 @@ pub(crate) async fn list_resource_history(
 #[cfg_attr(feature = "dev", utoipa::path(
   patch,
   tag = "Resources",
-  path = "/resources/{name}/histories/{id}/reset",
+  path = "/resources/{Name}/histories/{Id}/reset",
   params(
-    ("name" = String, Path, description = "The resource name to reset"),
-    ("id" = String, Path, description = "The resource history id to reset to")
+    ("Name" = String, Path, description = "The resource name to reset"),
+    ("Id" = String, Path, description = "The resource history id to reset to")
   ),
   responses(
     (status = 200, description = "The resource has been reset", body = Resource),

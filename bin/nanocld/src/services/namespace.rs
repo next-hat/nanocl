@@ -31,16 +31,16 @@ pub(crate) async fn list_namespace(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Namespaces",
-  path = "/namespaces/{name}/inspect",
+  path = "/namespaces/{Name}/inspect",
   params(
-    ("name" = String, Path, description = "The namespace name to inspect")
+    ("Name" = String, Path, description = "The namespace name to inspect")
   ),
   responses(
     (status = 200, description = "Detailed information about a namespace", body = [NamespaceInspect]),
     (status = 404, description = "Namespace is not existing", body = ApiError),
   ),
 ))]
-#[web::get("/namespaces/{id}/inspect")]
+#[web::get("/namespaces/{name}/inspect")]
 pub(crate) async fn inspect_namespace(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -73,9 +73,9 @@ pub(crate) async fn create_namespace(
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Namespaces",
-  path = "/namespaces/{name}",
+  path = "/namespaces/{Name}",
   params(
-    ("name" = String, Path, description = "The namespace name to delete")
+    ("Name" = String, Path, description = "The namespace name to delete")
   ),
   responses(
     (status = 200, description = "Delete response", body = GenericDelete),
