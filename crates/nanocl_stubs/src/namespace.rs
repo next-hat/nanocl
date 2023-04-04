@@ -6,6 +6,7 @@ use crate::cargo::CargoInspect;
 /// Namespace is a identifier for a set of cargoes
 /// It is used to group cargoes together
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Namespace {
@@ -13,8 +14,9 @@ pub struct Namespace {
   pub name: String,
 }
 
-#[derive(Clone, Debug)]
 /// A Namespace partial is a payload used to create a new namespace
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct NamespacePartial {
@@ -25,6 +27,7 @@ pub struct NamespacePartial {
 /// A Namespace Summary is a summary of a namespace
 /// It is used to list all the namespaces
 /// It contains the number of cargoes and instances existing in the namespace
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct NamespaceSummary {
@@ -41,6 +44,7 @@ pub struct NamespaceSummary {
 /// It contains all the information about the namespace
 /// It also contains the list of cargoes
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct NamespaceInspect {

@@ -77,7 +77,6 @@ impl EventEmitter {
 
   /// Check if clients are still connected
   fn check_connection(&mut self) -> Result<(), HttpError> {
-    log::debug!("Checking alive connection...");
     let mut alive_clients = Vec::new();
     let clients = self
       .inner
@@ -94,7 +93,6 @@ impl EventEmitter {
         alive_clients.push(client.clone());
       }
     }
-    log::debug!("Alive clients: {}", alive_clients.len());
     self
       .inner
       .lock()

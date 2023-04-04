@@ -139,10 +139,9 @@ pub async fn list_instance(
   namespace: &str,
   docker_api: &bollard_next::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpError> {
-  let clabel = format!("io.nanocl.cnsp={namespace}");
-  let vlabel = format!("io.nanocl.vnsp={namespace}");
+  let label = format!("io.nanocl.n={namespace}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
-  filters.insert("label", vec![&clabel, &vlabel]);
+  filters.insert("label", vec![&label]);
   let options = Some(ListContainersOptions {
     all: true,
     filters,

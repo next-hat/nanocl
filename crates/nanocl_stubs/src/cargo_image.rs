@@ -4,10 +4,12 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
 /// Cargo Image Partial is used to pull a new container image
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoImagePartial {
   /// Name of the image
+  #[cfg_attr(feature = "utoipa", schema(example = "nginx:latest"))]
   pub name: String,
 }
 
@@ -41,6 +43,7 @@ impl From<ListCargoImagesOptions>
 }
 
 /// Cargo Image is used to pull a new container image from a tar archive
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoImageImportOptions {

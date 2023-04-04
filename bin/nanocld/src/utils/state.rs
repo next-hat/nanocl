@@ -322,6 +322,7 @@ pub fn hook_labels(
   let mut labels = HashMap::new();
   labels.insert("io.nanocl".into(), "enabled".into());
   labels.insert("io.nanocl.c".into(), key);
+  labels.insert("io.nanocl.n".into(), namespace.into());
   labels.insert("io.nanocl.cnsp".into(), namespace.into());
 
   let mut curr_label = cargo.container.labels.clone().unwrap_or_default();

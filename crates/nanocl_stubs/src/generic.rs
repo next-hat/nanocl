@@ -12,6 +12,7 @@ pub struct GenericNspQuery {
 
 #[derive(Debug)]
 /// Generic delete response
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 #[cfg_attr(feature = "dev", derive(ToSchema))]

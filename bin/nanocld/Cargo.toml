@@ -17,7 +17,7 @@ path = "src/main.rs"
 
 [features]
 default = ["release"]
-dev = []
+dev = ["dep:utoipa", "dep:ntex-files", "bollard-next/utoipa", "nanocl_stubs/utoipa"]
 test = []
 release = []
 
@@ -30,7 +30,7 @@ serde_yaml = "0.9"
 
 [dependencies]
 nanocl_stubs = { version = "0.4.1", features = ["serde"] }
-bollard-next = { version = "0.14.3" }
+bollard-next = { version = "0.14.4" }
 r2d2 = "0.8"
 log = "0.4.17"
 futures = "0.3"
@@ -56,3 +56,5 @@ chrono = { version = "0.4.24", features = ["serde"] }
 jsonschema = { version = "0.17.0", default-features = false }
 nanocld_client = { version = "0.4.1", features = ["tokio"] }
 openssl = { version = "0.10.47", features = ["vendored"] }
+utoipa = { version = "3", features = ["yaml"], optional = true }
+ntex-files = { version = "0.2.0", optional = true }
