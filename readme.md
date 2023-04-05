@@ -1,7 +1,6 @@
 <div align="center">
   <img src="https://download.next-hat.com/ressources/images/logo.png" >
-  <h1>Unleash Your Infrastructure</h1>
-  <h3>The Distributed Orchestrator</h3>
+  <h1>Nanocl</h1>
   <p>
 
   [![Stars](https://img.shields.io/github/stars/nxthat/nanocl?label=%E2%AD%90%20stars%20%E2%AD%90)](https://github.com/nxthat/nanocl)
@@ -31,35 +30,124 @@
  </span>
 </blockquote>
 
-## Overview
+## ❓ What is Nanocl ?
 
-Nanocl is a distributed orchestrator that simplifies the management of containers and virtual machines across multiple hosts.
-With Nanocl, you can efficiently share resources and deploy applications, services, and databases publicly, privately, or under a VPN.
-Whether you're running a home lab setup or a large enterprise, Nanocl's cutting-edge technology, crafted with precision using Rust, provides unparalleled performance and a small footprint.
+`Nanocl` is a *distributed system* that simplifies the management of `containers` and `virtual machines` across multiple `hosts` also called `nodes`.
+With `Nanocl`, you can **efficiently share resources** and **deploy applications**, **services**, and **databases** `publicly`, `privately`, or under a `VPN`.
+Whether you're running a **home lab** setup or a **large enterprise**, *Nanocl's cutting-edge technology*, crafted with precision using `Rust`, provides **unparalleled performance** and a **small footprint**.
 
+## 📙 Table of Contents
+* [❓ What is Nanocl ?](#❓-what-is-nanocl)
+* [📙 Table of Contents](#📙-table-of-contents)
+* [🚀 Key Benefits](#🚀-key-benefits)
+* [🧿 Architecture](#🧿-architecture)
+* [📚 Documentation](#📚-documentation)
+* [📋 Requirements](#📋-requirements)
+* [💾 Installation](#💾-installation)
+* [🔧 Usage](#🔧-usage)
+* [👨‍💻 Contributing](#👨‍💻-contributing)
 
-## Architecture
+## 🚀 Key Benefits
+
+* Easy deployment and management
+* Significantly reduce the delay between writing code and shipping it to production
+* Efficiently manage and scale your infrastructure as your needs evolve
+* Enhance security by isolating services using namespaces and networks.
+* Enjoy peace of mind with automatic backups, zero downtime fail-over, and comprehensive log monitoring
+* Enjoy history tracking of your container and virtual machine configuration
+* Revert configuration as quickly as pressing a button
+* Build an entire CI/CD pipeline, from tests to high-availability production
+* Best ideas and practices from the community
+
+## 🧿 Architecture
+
+`Nanocl` is designed in a **micro services** architecture several component are required and they are running as **container** included the `Nanocl Daemon` itself.
+The following components will be installed during `nanocl setup` and are required to ensure `Nanocl` functionnality:
+
+* `store` to save our state
+* `metrics` to monitor Cpu, Memory and Network usage
+* `proxy` to redirect traffic to our `containers` and `virtual machines`
+* `ctrl-proxy` to update proxy configuration based on the current state
+* `dns` to manage the dns entries for the `containers` and `virtual machines`
+* `ctrl-dns` to update dns entries based on the current state
+
+Simplified version of our architecture for a single node:
 
 <div align="center">
   <img src="./doc/architecture.png" />
 </div>
 
+## 📚 Documentation
 
-## Key Benefits
+To learn more about `Nanocl`, you can take a look at the following resources:
 
-* Efficiently manage and scale your infrastructure as your needs evolve
-* Enhance security by isolating services using namespaces and networks.
-* Build an entire CI/CD pipeline, from tests to high-availability production
-* Significantly reduce the delay between writing code and shipping it to production
-* Easy deployment and management
-* Enjoy peace of mind with automatic backups, zero downtime fail-over, and comprehensive log monitoring
-* Enjoy history tracking of your container and virtual machine configuration
-* Revert configuration as quickly as pressing a button
-* Best ideas and practices from the community
+- [Overview](https://docs.next-hat.com/guides/nanocl)
+- [Get Started](https://docs.next-hat.com/guides/nanocl/get-started)
+- [CLI References](https://docs.next-hat.com/references/nanocl/cli)
+- [DAEMON References](https://docs.next-hat.com/references/nanocl/daemon/overview)
 
 
-## Getting Started
+## 📋 Requirements
 
-To get started with Nanocl, please refer to the [installation guide](https://docs.next-hat.com/setups/nanocl) and [documentation](https://docs.next-hat.com/references/nanocl/cli). If you need any assistance or have any questions, feel free to reach out to our community for support.
-You may also want to take a look at our [tutorial](https://docs.next-hat.com/guides/nanocl/get-started)
-If you want to contribute see our [developer documentation](./doc/developing.md)
+To work properly `Nanocl` must have theses dependencies installed on the system:
+
+- [Docker](https://www.docker.com) minimum version 1.42
+
+
+## 💾 Installation
+
+To install `Nanocl`, please refer to our online [installation guide](https://docs.next-hat.com/setups/nanocl).
+
+## 🔧 Usage
+
+`Nanocl` is designed to be easy to operate by mostly using **state files**.<br />
+**State Files** are `yaml` files that define the state you want.
+There is an example used to deploy our [documentation](https://docs.next-hat.com):
+
+```yaml
+ApiVersion: v0.3
+Type: Deployment
+
+Namespace: nexthat
+
+Cargoes:
+- Name: doc
+  Container:
+    Image: nexthat-doc:0.3.7
+
+Resources:
+- Name: docs.next-hat.com
+  Kind: ProxyRule
+  Version: v0.1
+  Config:
+    Watch:
+    - doc.nexthat
+    Rule:
+      Http:
+        Domain: docs.next-hat.com
+        Network: Public
+        Gzip: true
+        Ssl:
+          Certificate: /etc/letsencrypt/live/docs.next-hat.com/fullchain.pem
+          CertificateKey: /etc/letsencrypt/live/docs.next-hat.com/privkey.pem
+          Dhparam: /etc/letsencrypt/ssl-dhparams.pem
+        Includes:
+        - /etc/letsencrypt/options-ssl-nginx.conf
+        Locations:
+        - Path: /
+          Target:
+            Cargo:
+              Key: doc.nexthat
+              Port: 80
+```
+
+To apply a state we can do it easily bu running `nanocl state apply -f path|url`
+We can also revert a state by calling `nanocl state revert -f path|url`
+
+## 👨‍💻 Contributing
+
+Every contribution is very welcome.
+
+But to be abble to do so you need a dev environnement right ?<br />
+You can learn more about it inside the local [documentation of the project](./doc/).<br />
+Also don't hesitate to join the discord if you have any question!
