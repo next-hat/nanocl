@@ -1,4 +1,3 @@
-use std::fs;
 use std::io::{Result, Error, ErrorKind};
 
 use clap::*;
@@ -55,7 +54,7 @@ fn main() -> std::io::Result<()> {
   set_channel()?;
   set_env_target_arch()?;
   set_env_git_commit_hash()?;
-  fs::create_dir_all(MAN_PATH)?;
+  std::fs::create_dir_all(MAN_PATH)?;
   generate_man_command("nanocld", Cli::command())?;
   Ok(())
 }

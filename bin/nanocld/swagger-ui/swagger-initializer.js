@@ -6,6 +6,9 @@ window.onload = function() {
     url: "/explorer/swagger.json",
     dom_id: '#swagger-ui',
     deepLinking: true,
+    operationsSorter: 'alpha',
+    apisSorter: 'alpha',
+    tagsSorter: 'alpha',
     presets: [
       SwaggerUIBundle.presets.apis,
       SwaggerUIStandalonePreset

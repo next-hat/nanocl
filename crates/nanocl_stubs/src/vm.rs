@@ -6,6 +6,7 @@ use crate::vm_config::VmConfig;
 
 /// A virtual machine instance
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Vm {
@@ -24,6 +25,7 @@ pub struct Vm {
 /// A Vm Summary is a summary of a vm
 /// It is used to list all the vms
 #[derive(Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmSummary {
@@ -52,6 +54,7 @@ pub struct VmSummary {
 /// It contains all the information about the cargo
 /// It also contains the list of containers
 #[derive(Default, Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmInspect {

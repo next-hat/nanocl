@@ -21,7 +21,7 @@ use crate::models::DaemonState;
 /// List container images
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
-  tag = "Cargo Images",
+  tag = "CargoImages",
   path = "/cargoes/images",
   responses(
     (status = 200, description = "List of container image", body = [ImageSummary]),
@@ -40,7 +40,7 @@ pub(crate) async fn list_cargo_image(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   path = "/cargoes/images/{IdOrName}",
-  tag = "Cargo Images",
+  tag = "CargoImages",
   params(
     ("IdOrName" = String, Path, description = "Image ID or name")
   ),
@@ -62,7 +62,7 @@ pub(crate) async fn inspect_cargo_image(
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   request_body = CargoImagePartial,
-  tag = "Cargo Images",
+  tag = "CargoImages",
   path = "/cargoes/images",
   responses(
     (status = 200, description = "Download stream"),
@@ -88,7 +88,7 @@ pub(crate) async fn create_cargo_image(
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   path = "/cargoes/images/{IdOrName}",
-  tag = "Cargo Images",
+  tag = "CargoImages",
   params(
     ("IdOrName" = String, Path, description = "Image ID or name")
   ),
@@ -110,7 +110,7 @@ pub(crate) async fn delete_cargo_image(
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   request_body = String,
-  tag = "Cargo Images",
+  tag = "CargoImages",
   path = "/cargoes/images/import",
   responses(
     (status = 200, description = "Image imported"),

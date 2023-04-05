@@ -1,3 +1,36 @@
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-global-radius: 0.4rem;
+  --ifm-code-padding-vertical: 0px;
+  --ifm-code-padding-horizontal: 0.1rem;
+  --ifm-color-emphasis-600: white;
+  --ifm-menu-color-background-active: #262628;
+  --ifm-menu-link-sublist-icon-filter: invert(100%) sepia(94%) saturate(17%)
+    hue-rotate(223deg) brightness(104%) contrast(98%);
+  /* NavBar */
+  --ifm-navbar-background-color: #1B1B1D !important;
+  --ifm-navbar-link-color: white;
+  --ifm-menu-color: white;
+  /* Footer */
+  --ifm-footer-title-color: white;
+  --ifm-footer-link-color: white;
+  --ifm-footer-background-color: #1B1B1D;
+  --ifm-toc-border-color: #444950;
+  --ifm-blockquote-border-color: #1B1B1D;
+  --ifm-footer-color: white;
+  /* Text */
+  --ifm-color-emphasis-300: white;
+  --ifm-color-primary: #ff9800;
+  --ifm-color-primary-dark: #df8013;
+  --ifm-color-primary-darker: #c46f0f;
+  --ifm-color-primary-darkest: #7e4e17;
+  --ifm-color-primary-light: #ffb340;
+  --ifm-color-primary-lighter: #ffc165;
+  --ifm-color-primary-lightest: #ffc46b;
+  --ifm-code-font-size: 90%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
 html {
     box-sizing: border-box;
     overflow: -moz-scrollbars-vertical;
@@ -12,5 +45,28 @@ html {
 
 body {
     margin: 0;
-    background: #fafafa;
+}
+
+* {
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu,
+    Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+}
+
+code, span {
+  font-family: monospace;
+  white-space: pre;
+}
+
+code {
+  padding: var(--ifm-code-padding-vertical) var(--ifm-code-padding-horizontal) !important;
+  color: #ff9800 !important;
+  font-size: var(--ifm-code-font-size) !important;
+  border: .1rem solid #0000001a !important;
+  box-sizing: border-box !important;
+  border-radius: var(--ifm-global-radius) !important;
+  font-weight: unset !important;
+}
+
+p {
+  line-height: 1.5;
 }

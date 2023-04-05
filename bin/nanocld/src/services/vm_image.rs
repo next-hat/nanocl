@@ -10,6 +10,37 @@ use crate::{utils, repositories};
 use crate::error::HttpError;
 use crate::models::{DaemonState, VmImageDbModel};
 
+/// List virtual machine images
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "VmImages",
+  path = "/vms/images",
+  responses(
+    (status = 200, description = "List of vm images", body = [VmImage]),
+  ),
+))]
+#[web::get("/vms/images")]
+pub(crate) async fn list_vm_images(
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let images = repositories::vm_image::list(&state.pool).await?;
+
+  Ok(web::HttpResponse::Ok().json(&images))
+}
+
+/// Import a virtual machine image from a file
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "VmImages",
+  request_body = String,
+  path = "/vms/images/{Name}/import",
+  params(
+    ("Name" = String, Path, description = "The name of the vm image"),
+  ),
+  responses(
+    (status = 200, description = "Image have been imported"),
+  ),
+))]
 #[web::post("/vms/images/{name}/import")]
 pub(crate) async fn import_vm_image(
   mut payload: web::types::Payload,
@@ -79,17 +110,22 @@ pub(crate) async fn import_vm_image(
   Ok(web::HttpResponse::Ok().into())
 }
 
-#[web::get("/vms/images")]
-pub(crate) async fn list_images(
-  state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
-  let images = repositories::vm_image::list(&state.pool).await?;
-
-  Ok(web::HttpResponse::Ok().json(&images))
-}
-
+/// Create a snapshot of a virtual machine image
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "VmImages",
+  request_body = String,
+  path = "/vms/images/{Name}/snapshot/{SnapshotName}",
+  params(
+    ("Name" = String, Path, description = "The name of the vm image"),
+    ("SnapshotName" = String, Path, description = "The name of the snapshot"),
+  ),
+  responses(
+    (status = 200, description = "The snapshot have been created", body = VmImage),
+  ),
+))]
 #[web::post("/vms/images/{name}/snapshot/{snapshot_name}")]
-pub(crate) async fn create_vm_image_snapshot(
+pub(crate) async fn snapshot_vm_image(
   path: web::types::Path<(String, String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -103,6 +139,20 @@ pub(crate) async fn create_vm_image_snapshot(
   Ok(web::HttpResponse::Ok().json(&vm_image))
 }
 
+/// Clone a virtual machine image
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "VmImages",
+  request_body = String,
+  path = "/vms/images/{Name}/clone/{CloneName}",
+  params(
+    ("Name" = String, Path, description = "The name of the vm image"),
+    ("CloneName" = String, Path, description = "The name of the clone"),
+  ),
+  responses(
+    (status = 200, description = "The snapshot have been created", body = VmImage),
+  ),
+))]
 #[web::post("/vms/images/{name}/clone/{clone_name}")]
 pub(crate) async fn clone_vm_image(
   path: web::types::Path<(String, String, String)>,
@@ -118,6 +168,20 @@ pub(crate) async fn clone_vm_image(
   Ok(web::HttpResponse::Ok().streaming(rx))
 }
 
+/// Resize a virtual machine image
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "VmImages",
+  request_body = VmImageResizePayload,
+  path = "/vms/images/{Name}/resize",
+  params(
+    ("Name" = String, Path, description = "The name of the vm image"),
+    ("CloneName" = String, Path, description = "The name of the clone"),
+  ),
+  responses(
+    (status = 200, description = "The snapshot have been created", body = VmImage),
+  ),
+))]
 #[web::post("/vms/images/{name}/resize")]
 pub(crate) async fn resize_vm_image(
   web::types::Json(payload): web::types::Json<VmImageResizePayload>,
@@ -132,6 +196,18 @@ pub(crate) async fn resize_vm_image(
   Ok(web::HttpResponse::Ok().json(&rx))
 }
 
+/// Delete a virtual machine image
+#[cfg_attr(feature = "dev", utoipa::path(
+  delete,
+  tag = "VmImages",
+  path = "/vms/images/{Name}",
+  params(
+    ("Name" = String, Path, description = "The name of the vm image"),
+  ),
+  responses(
+    (status = 200, description = "Image have been deleted"),
+  ),
+))]
 #[web::delete("/vms/images/{name}")]
 pub(crate) async fn delete_vm_image(
   path: web::types::Path<(String, String)>,
@@ -146,9 +222,9 @@ pub(crate) async fn delete_vm_image(
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(import_vm_image);
-  config.service(list_images);
+  config.service(list_vm_images);
   config.service(delete_vm_image);
-  config.service(create_vm_image_snapshot);
+  config.service(snapshot_vm_image);
   config.service(clone_vm_image);
   config.service(resize_vm_image);
 }

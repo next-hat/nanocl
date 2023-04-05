@@ -1,0 +1,4457 @@
+openapi: 3.0.3
+info:
+  title: Nanocl Daemon
+  description: |
+    The `Nanocl Daemon` is an `HTTP REST API`.<br />
+    It is the `API` the `Nanocl Client` uses, so everything the `Nanocl Client` can do can be done with the `API`.
+
+    Most of the client's commands map directly to API endpoints e.g: `nanocl ps` is `GET /processes`.<br />
+    The notable exception is running `Cargo`, which consists of several `API` calls.
+
+
+    ## OpenAPI Specification
+    This API is documented in **OpenAPI format** using [Utoipa](https://github.com/juhaku/utoipa)<br />
+    The specification is generated automatically when running in development only.<br />
+    When releasing a version, the generated file is transfered to our [Documentation](https://github.com/nxthat/documentation).
+
+
+    ## Cross-Origin Resource Sharing
+    This API features Cross-Origin Resource Sharing (CORS) implemented in compliance with  [W3C spec](https://www.w3.org/TR/cors/).<br />
+    And that allows cross-domain communication from the browser.<br />
+    All responses have a wildcard same-origin which makes them completely public and accessible to everyone, including any code on any site.
+  contact:
+    name: nanocl contributors
+    email: team@next-hat.com
+  license:
+    name: MIT OR Apache-2.0
+  version: v0.4.0
+servers:
+- url: /{version}
+  variables:
+    version:
+      default: v0.4
+      description: API version
+      enum:
+      - v0.4
+      - v0.3
+      - v0.2
+      - v0.1
+paths:
+  /cargoes:
+    get:
+      tags:
+      - Cargoes
+      summary: List cargoes
+      description: List cargoes
+      operationId: list_cargo
+      parameters:
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: List of cargoes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CargoSummary'
+    post:
+      tags:
+      - Cargoes
+      summary: Create a new cargo
+      description: Create a new cargo
+      operationId: create_cargo
+      parameters:
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CargoConfigPartial'
+        required: true
+      responses:
+        '201':
+          description: Cargo created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CargoInspect'
+  /cargoes/images:
+    get:
+      tags:
+      - CargoImages
+      summary: List container images
+      description: List container images
+      operationId: list_cargo_image
+      responses:
+        '200':
+          description: List of container image
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ImageSummary'
+    post:
+      tags:
+      - CargoImages
+      summary: Download a container image
+      description: Download a container image
+      operationId: create_cargo_image
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CargoImagePartial'
+        required: true
+      responses:
+        '200':
+          description: Download stream
+        '404':
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /cargoes/images/import:
+    post:
+      tags:
+      - CargoImages
+      summary: Import a container image from a tarball
+      description: Import a container image from a tarball
+      operationId: import_cargo_image
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: Image imported
+        '404':
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /cargoes/images/{IdOrName}:
+    get:
+      tags:
+      - CargoImages
+      summary: Get detailed information about a container image
+      description: Get detailed information about a container image
+      operationId: inspect_cargo_image
+      parameters:
+      - name: IdOrName
+        in: path
+        description: Image ID or name
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Detailed information about an image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageInspect'
+        '404':
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    delete:
+      tags:
+      - CargoImages
+      summary: Delete a container image
+      description: Delete a container image
+      operationId: delete_cargo_image
+      parameters:
+      - name: IdOrName
+        in: path
+        description: Image ID or name
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Delete response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericDelete'
+        '404':
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /cargoes/{Name}:
+    put:
+      tags:
+      - Cargoes
+      summary: Create a new cargo config from scratch and add history entry
+      description: Create a new cargo config from scratch and add history entry
+      operationId: put_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CargoConfigUpdate'
+        required: true
+      responses:
+        '200':
+          description: Cargo updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cargo'
+        '404':
+          description: Cargo does not exist
+    delete:
+      tags:
+      - Cargoes
+      summary: Delete a cargo
+      description: Delete a cargo
+      operationId: delete_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '202':
+          description: Cargo deleted
+        '404':
+          description: Cargo does not exist
+    patch:
+      tags:
+      - Cargoes
+      summary: Patch a cargo config meaning merging current config with the new one and add history entry
+      description: Patch a cargo config meaning merging current config with the new one and add history entry
+      operationId: patch_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CargoConfigUpdate'
+        required: true
+      responses:
+        '200':
+          description: Cargo updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cargo'
+        '404':
+          description: Cargo does not exist
+  /cargoes/{Name}/exec:
+    post:
+      tags:
+      - Cargoes
+      summary: Execute a command in a cargo
+      description: Execute a command in a cargo
+      operationId: exec_command
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExecOptions'
+        required: true
+      responses:
+        '200':
+          description: Event Stream of the command output
+        '404':
+          description: Cargo does not exist
+  /cargoes/{Name}/histories:
+    get:
+      tags:
+      - Cargoes
+      summary: List cargo histories
+      description: List cargo histories
+      operationId: list_cargo_history
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: List of cargo histories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CargoConfig'
+        '404':
+          description: Cargo does not exist
+  /cargoes/{Name}/histories/{Id}/reset:
+    patch:
+      tags:
+      - Cargoes
+      summary: Reset a cargo to a specific history
+      description: Reset a cargo to a specific history
+      operationId: reset_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Id
+        in: path
+        description: Id of the cargo history
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: Cargo reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cargo'
+        '404':
+          description: Cargo does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /cargoes/{Name}/inspect:
+    get:
+      tags:
+      - Cargoes
+      summary: Inspect a cargo
+      description: Inspect a cargo
+      operationId: inspect_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: Cargo details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CargoInspect'
+  /cargoes/{Name}/instances:
+    get:
+      tags:
+      - Cargoes
+      summary: List cargo instances
+      description: List cargo instances
+      operationId: list_cargo_instance
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: List of cargo instances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ContainerSummary'
+  /cargoes/{Name}/kill:
+    post:
+      tags:
+      - Cargoes
+      summary: Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
+      description: Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
+      operationId: kill_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CargoKillOptions'
+        required: true
+      responses:
+        '200':
+          description: Cargo killed
+        '404':
+          description: Cargo does not exist
+  /cargoes/{Name}/logs:
+    get:
+      tags:
+      - Cargoes
+      summary: Get logs of a cargo instance from a EventStream (SSE)
+      description: Get logs of a cargo instance from a EventStream (SSE)
+      operationId: logs_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo instance usually `name` or `name-number`
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: Cargo logs
+        '404':
+          description: Cargo does not exist
+  /cargoes/{Name}/start:
+    post:
+      tags:
+      - Cargoes
+      summary: Start a cargo
+      description: Start a cargo
+      operationId: start_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '202':
+          description: Cargo started
+        '404':
+          description: Cargo does not exist
+  /cargoes/{Name}/stop:
+    post:
+      tags:
+      - Cargoes
+      summary: Stop a cargo
+      description: Stop a cargo
+      operationId: stop_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '202':
+          description: Cargo stopped
+        '404':
+          description: Cargo does not exist
+  /events:
+    get:
+      tags:
+      - System
+      summary: Listen on events using Server-Sent Events / EventSource
+      description: Listen on events using Server-Sent Events / EventSource
+      operationId: watch_event
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/plain:
+              schema:
+                type: string
+  /info:
+    get:
+      tags:
+      - System
+      summary: Get host/node system information
+      description: Get host/node system information
+      operationId: get_info
+      responses:
+        '200':
+          description: Host/Node information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostInfo'
+  /namespaces:
+    get:
+      tags:
+      - Namespaces
+      summary: List namespaces
+      description: List namespaces
+      operationId: list_namespace
+      responses:
+        '200':
+          description: List of namespace
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NamespaceSummary'
+    post:
+      tags:
+      - Namespaces
+      summary: Create a namespace
+      description: Create a namespace
+      operationId: create_namespace
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NamespacePartial'
+        required: true
+      responses:
+        '200':
+          description: List of namespace
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Namespace'
+        '409':
+          description: Namespace already exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /namespaces/{Name}:
+    delete:
+      tags:
+      - Namespaces
+      summary: Delete a namespace
+      description: Delete a namespace
+      operationId: delete_namespace
+      parameters:
+      - name: Name
+        in: path
+        description: The namespace name to delete
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Delete response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericDelete'
+        '404':
+          description: Namespace is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /namespaces/{Name}/inspect:
+    get:
+      tags:
+      - Namespaces
+      summary: Get detailed information about a namespace
+      description: Get detailed information about a namespace
+      operationId: inspect_namespace
+      parameters:
+      - name: Name
+        in: path
+        description: The namespace name to inspect
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Detailed information about a namespace
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NamespaceInspect'
+        '404':
+          description: Namespace is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /nodes:
+    get:
+      tags:
+      - Nodes
+      summary: List nodes
+      description: List nodes
+      operationId: list_node
+      responses:
+        '200':
+          description: List of nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Node'
+  /nodes/ws:
+    get:
+      tags:
+      - Nodes
+      summary: Websocket endpoint for communication between nodes used internally
+      description: Websocket endpoint for communication between nodes used internally
+      operationId: node_ws
+      responses:
+        '101':
+          description: Websocket connection
+  /processes:
+    get:
+      tags:
+      - System
+      summary: List instances (cargo/vm) including non running ones
+      description: List instances (cargo/vm) including non running ones
+      operationId: get_processes
+      parameters:
+      - name: All
+        in: query
+        description: Return instances from all nodes
+        required: true
+        schema:
+          type: boolean
+      - name: Last
+        in: query
+        description: Return this number of most recently created containers
+        required: false
+        schema:
+          type: integer
+          nullable: true
+      - name: Namespace
+        in: query
+        description: Return instances from this namespace only
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: List of instances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NodeContainerSummary'
+  /resources:
+    get:
+      tags:
+      - Resources
+      summary: List resources
+      description: List resources
+      operationId: list_resource
+      parameters:
+      - name: Kind
+        in: query
+        description: Filter by resource kind
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: Contains
+        in: query
+        description: Filter by resource content
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: List of resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Resource'
+    post:
+      tags:
+      - Resources
+      summary: Create a resource
+      description: Create a resource
+      operationId: create_resource
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourcePartial'
+        required: true
+      responses:
+        '200':
+          description: The created resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+  /resources/{Name}:
+    get:
+      tags:
+      - Resources
+      summary: Get detailed information about a resource
+      description: Get detailed information about a resource
+      operationId: inspect_resource
+      parameters:
+      - name: Name
+        in: path
+        description: The resource name to inspect
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Detailed information about a resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '404':
+          description: Resource is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    delete:
+      tags:
+      - Resources
+      summary: Delete a resource
+      description: Delete a resource
+      operationId: delete_resource
+      parameters:
+      - name: Name
+        in: path
+        description: The resource name to delete
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: The resource and his history has been deleted
+        '404':
+          description: Resource is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    patch:
+      tags:
+      - Resources
+      summary: Patch a resource (update its version and/or config) and create a new history
+      description: Patch a resource (update its version and/or config) and create a new history
+      operationId: patch_resource
+      parameters:
+      - name: Name
+        in: path
+        description: The resource name to patch
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourcePatch'
+        required: true
+      responses:
+        '200':
+          description: The patched resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '404':
+          description: Resource is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /resources/{Name}/histories:
+    get:
+      tags:
+      - Resources
+      summary: List resource history
+      description: List resource history
+      operationId: list_resource_history
+      parameters:
+      - name: Name
+        in: path
+        description: The resource name to list history
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The resource history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResourceConfig'
+        '404':
+          description: Resource is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /resources/{Name}/histories/{Id}/reset:
+    patch:
+      tags:
+      - Resources
+      summary: Reset a resource to a specific history
+      description: Reset a resource to a specific history
+      operationId: reset_resource
+      parameters:
+      - name: Name
+        in: path
+        description: The resource name to reset
+        required: true
+        schema:
+          type: string
+      - name: Id
+        in: path
+        description: The resource history id to reset to
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The resource has been reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '404':
+          description: Resource is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /vms:
+    get:
+      tags:
+      - Vms
+      summary: List virtual machines
+      description: List virtual machines
+      operationId: list_vm
+      parameters:
+      - name: Namespace
+        in: query
+        description: The namespace of the virtual machine
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: List of virtual machine
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VmSummary'
+    post:
+      tags:
+      - Vms
+      summary: Create a virtual machine
+      description: Create a virtual machine
+      operationId: create_vm
+      parameters:
+      - name: Namespace
+        in: query
+        description: The namespace of the virtual machine
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VmConfigPartial'
+        required: true
+      responses:
+        '200':
+          description: The virtual machine has been created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vm'
+  /vms/images:
+    get:
+      tags:
+      - VmImages
+      summary: List virtual machine images
+      description: List virtual machine images
+      operationId: list_vm_images
+      responses:
+        '200':
+          description: List of vm images
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VmImage'
+  /vms/images/{Name}:
+    delete:
+      tags:
+      - VmImages
+      summary: Delete a virtual machine image
+      description: Delete a virtual machine image
+      operationId: delete_vm_image
+      parameters:
+      - name: Name
+        in: path
+        description: The name of the vm image
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Image have been deleted
+  /vms/images/{Name}/clone/{CloneName}:
+    post:
+      tags:
+      - VmImages
+      summary: Clone a virtual machine image
+      description: Clone a virtual machine image
+      operationId: clone_vm_image
+      parameters:
+      - name: Name
+        in: path
+        description: The name of the vm image
+        required: true
+        schema:
+          type: string
+      - name: CloneName
+        in: path
+        description: The name of the clone
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: The snapshot have been created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmImage'
+  /vms/images/{Name}/import:
+    post:
+      tags:
+      - VmImages
+      summary: Import a virtual machine image from a file
+      description: Import a virtual machine image from a file
+      operationId: import_vm_image
+      parameters:
+      - name: Name
+        in: path
+        description: The name of the vm image
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: Image have been imported
+  /vms/images/{Name}/resize:
+    post:
+      tags:
+      - VmImages
+      summary: Resize a virtual machine image
+      description: Resize a virtual machine image
+      operationId: resize_vm_image
+      parameters:
+      - name: Name
+        in: path
+        description: The name of the vm image
+        required: true
+        schema:
+          type: string
+      - name: CloneName
+        in: path
+        description: The name of the clone
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VmImageResizePayload'
+        required: true
+      responses:
+        '200':
+          description: The snapshot have been created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmImage'
+  /vms/images/{Name}/snapshot/{SnapshotName}:
+    post:
+      tags:
+      - VmImages
+      summary: Create a snapshot of a virtual machine image
+      description: Create a snapshot of a virtual machine image
+      operationId: snapshot_vm_image
+      parameters:
+      - name: Name
+        in: path
+        description: The name of the vm image
+        required: true
+        schema:
+          type: string
+      - name: SnapshotName
+        in: path
+        description: The name of the snapshot
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: The snapshot have been created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmImage'
+  /vms/{Name}:
+    delete:
+      tags:
+      - Vms
+      summary: Delete a virtual machine
+      description: Delete a virtual machine
+      operationId: delete_vm
+      parameters:
+      - name: Name
+        in: path
+        description: The name of the virtual machine
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: The namespace of the virtual machine
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: The virtual machine has been deleted
+    patch:
+      tags:
+      - Vms
+      summary: Patch a virtual machine config meaning merging current config with the new one and add history entry
+      description: Patch a virtual machine config meaning merging current config with the new one and add history entry
+      operationId: patch_vm
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the virtual machine
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the virtual machine
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VmConfigUpdate'
+        required: true
+      responses:
+        '200':
+          description: Updated virtual machine
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vm'
+        '404':
+          description: Virtual machine not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /vms/{Name}/attach:
+    get:
+      tags:
+      - Vms
+      summary: Attach to a virtual machine via websocket
+      description: Attach to a virtual machine via websocket
+      operationId: vm_attach
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the virtual machine
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the virtual machine
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '101':
+          description: Websocket connection
+  /vms/{Name}/histories:
+    get:
+      tags:
+      - Vms
+      summary: List virtual machine histories
+      description: List virtual machine histories
+      operationId: list_vm_history
+      parameters:
+      - name: Name
+        in: path
+        description: The name of the virtual machine
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: The namespace of the virtual machine
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: The virtual machine histories have been listed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VmConfig'
+  /vms/{Name}/inspect:
+    get:
+      tags:
+      - Vms
+      summary: Inspect a virtual machine
+      description: Inspect a virtual machine
+      operationId: inspect_vm
+      parameters:
+      - name: Name
+        in: path
+        description: The name of the virtual machine
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: The namespace of the virtual machine
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: Detailed information about a virtual machine
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmInspect'
+  /vms/{Name}/start:
+    post:
+      tags:
+      - Vms
+      summary: Start a virtual machine
+      description: Start a virtual machine
+      operationId: start_vm
+      parameters:
+      - name: Name
+        in: path
+        description: The name of the virtual machine
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: The namespace of the virtual machine
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: The virtual machine has been started
+  /vms/{Name}/stop:
+    post:
+      tags:
+      - Vms
+      summary: Stop a virtual machine
+      description: Stop a virtual machine
+      operationId: stop_vm
+      parameters:
+      - name: Name
+        in: path
+        description: The name of the virtual machine
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: The namespace of the virtual machine
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: The virtual machine has been stopped
+components:
+  schemas:
+    Any:
+      oneOf:
+      - type: string
+      - type: number
+        format: double
+      - type: boolean
+      - type: array
+        items:
+          $ref: '#/components/schemas/Any'
+      - type: object
+        additionalProperties:
+          $ref: '#/components/schemas/Any'
+      description: Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceConfig](ResourceConfig)
+    ApiError:
+      type: object
+      description: When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
+      required:
+      - msg
+      properties:
+        msg:
+          type: string
+    Cargo:
+      type: object
+      description: |-
+        A Cargo is a replicable container
+        It is used to run one or multiple instances of the same container
+        You can define the number of replicas you want to run
+        You can also define the minimum and maximum number of replicas
+        The cluster will automatically scale the number of replicas to match the number of replicas you want
+        Cargo contain a configuration which is used to create the container
+        The configuration can be updated and the old configuration will be kept in the history
+        That way you can rollback to a previous configuration quickly
+      required:
+      - Key
+      - NamespaceName
+      - Name
+      - ConfigKey
+      - Config
+      properties:
+        Config:
+          $ref: '#/components/schemas/CargoConfig'
+        ConfigKey:
+          type: string
+          format: uuid
+          description: Unique identifier of the cargo config
+        Key:
+          type: string
+          description: Key of the cargo
+        Name:
+          type: string
+          description: Name of the cargo
+        NamespaceName:
+          type: string
+          description: Name of the namespace
+    CargoConfig:
+      type: object
+      description: |-
+        A cargo config is the configuration of a cargo
+        It used to know the state of the cargo
+        It keep tracking of an history when you patch an existing cargo
+      required:
+      - Key
+      - CreatedAt
+      - Name
+      - Version
+      - CargoKey
+      - Container
+      properties:
+        CargoKey:
+          type: string
+          description: The key of the cargo
+        Container:
+          $ref: '#/components/schemas/Config'
+        CreatedAt:
+          type: string
+          format: date-time
+          description: Creation date of the cargo config
+        Key:
+          type: string
+          format: uuid
+          description: Unique identifier of the cargo config
+        Name:
+          type: string
+          description: Name of the cargo
+        Replication:
+          allOf:
+          - $ref: '#/components/schemas/ReplicationMode'
+          nullable: true
+        Version:
+          type: string
+          description: Version of the config
+    CargoConfigPartial:
+      type: object
+      description: A cargo config partial is used to create a Cargo
+      required:
+      - Name
+      - Container
+      properties:
+        Container:
+          $ref: '#/components/schemas/Config'
+        Name:
+          type: string
+          description: Name of the cargo
+        Replication:
+          allOf:
+          - $ref: '#/components/schemas/ReplicationMode'
+          nullable: true
+    CargoConfigUpdate:
+      type: object
+      description: |-
+        Payload used to patch a cargo
+        It will create a new [CargoConfig](CargoConfig) with the new values
+        It will keep the old values in the history
+      properties:
+        Container:
+          allOf:
+          - $ref: '#/components/schemas/Config'
+          nullable: true
+        Name:
+          type: string
+          description: New name of the cargo
+          nullable: true
+        Replication:
+          allOf:
+          - $ref: '#/components/schemas/ReplicationMode'
+          nullable: true
+    CargoImagePartial:
+      type: object
+      description: Cargo Image Partial is used to pull a new container image
+      required:
+      - Name
+      properties:
+        Name:
+          type: string
+          description: Name of the image
+          example: nginx:latest
+    CargoInspect:
+      type: object
+      description: |-
+        A Cargo Inspect is a detailed view of a cargo
+        It is used to inspect a cargo
+        It contains all the information about the cargo
+        It also contains the list of containers
+      required:
+      - Key
+      - Name
+      - ConfigKey
+      - NamespaceName
+      - Config
+      - InstanceTotal
+      - InstanceRunning
+      - Instances
+      properties:
+        Config:
+          $ref: '#/components/schemas/CargoConfig'
+        ConfigKey:
+          type: string
+          format: uuid
+          description: Unique identifier of the cargo config
+        InstanceRunning:
+          type: integer
+          description: Number of running instances
+          minimum: 0.0
+        InstanceTotal:
+          type: integer
+          description: Number of instances
+          minimum: 0.0
+        Instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeContainerSummary'
+          description: List of containers
+        Key:
+          type: string
+          description: Key of the cargo
+        Name:
+          type: string
+          description: Name of the cargo
+        NamespaceName:
+          type: string
+          description: Name of the namespace
+    CargoKillOptions:
+      type: object
+      description: Options for the kill command
+      required:
+      - Signal
+      properties:
+        Signal:
+          type: string
+          description: 'Signal to send to the container default: SIGKILL'
+    CargoSummary:
+      type: object
+      description: |-
+        A Cargo Summary is a summary of a cargo
+        It is used to list all the cargos
+      required:
+      - Key
+      - CreatedAt
+      - UpdatedAt
+      - Name
+      - ConfigKey
+      - NamespaceName
+      - Config
+      - InstanceTotal
+      - InstanceRunning
+      properties:
+        Config:
+          $ref: '#/components/schemas/CargoConfig'
+        ConfigKey:
+          type: string
+          format: uuid
+          description: Unique identifier of the cargo config
+        CreatedAt:
+          type: string
+          format: date-time
+          description: Creation date of the cargo
+        InstanceRunning:
+          type: integer
+          description: Number of running instances
+          minimum: 0.0
+        InstanceTotal:
+          type: integer
+          description: Number of instances
+          minimum: 0.0
+        Key:
+          type: string
+          description: Key of the cargo
+        Name:
+          type: string
+          description: Name of the cargo
+        NamespaceName:
+          type: string
+          description: Name of the namespace
+        UpdatedAt:
+          type: string
+          format: date-time
+          description: Update date of the cargo
+    ClusterInfo:
+      type: object
+      description: ClusterInfo represents information about the swarm as is returned by the \"/info\" endpoint. Join-tokens are not included.
+      properties:
+        CreatedAt:
+          type: string
+          description: Date and time at which the swarm was initialised in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+        DataPathPort:
+          type: integer
+          format: int32
+          description: DataPathPort specifies the data path port number for data traffic. Acceptable port range is 1024 to 49151. If no port is set or is set to 0, the default port (4789) is used.
+          nullable: true
+          minimum: 0.0
+        DefaultAddrPool:
+          type: array
+          items:
+            type: string
+          description: Default Address Pool specifies default subnet pools for global scope networks.
+          nullable: true
+        ID:
+          type: string
+          description: The ID of the swarm.
+          nullable: true
+        RootRotationInProgress:
+          type: boolean
+          description: Whether there is currently a root CA rotation in progress for the swarm
+          nullable: true
+        Spec:
+          allOf:
+          - $ref: '#/components/schemas/SwarmSpec'
+          nullable: true
+        SubnetSize:
+          type: integer
+          format: int32
+          description: SubnetSize specifies the subnet size of the networks created from the default subnet pool.
+          nullable: true
+          minimum: 0.0
+        TLSInfo:
+          allOf:
+          - $ref: '#/components/schemas/TlsInfo'
+          nullable: true
+        UpdatedAt:
+          type: string
+          description: Date and time at which the swarm was last updated in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+        Version:
+          allOf:
+          - $ref: '#/components/schemas/ObjectVersion'
+          nullable: true
+    Commit:
+      type: object
+      description: Commit holds the Git-commit (SHA1) that a binary was built from, as reported in the version-string of external tools, such as `containerd`, or `runC`.
+      properties:
+        Expected:
+          type: string
+          description: Commit ID of external tool expected by dockerd as set at build time.
+          nullable: true
+        ID:
+          type: string
+          description: Actual commit ID of external tool.
+          nullable: true
+    Config:
+      type: object
+      description: Container to create.
+      properties:
+        ArgsEscaped:
+          type: boolean
+          description: Command is already escaped (Windows only)
+          nullable: true
+        AttachStderr:
+          type: boolean
+          description: Whether to attach to `stderr`.
+          nullable: true
+        AttachStdin:
+          type: boolean
+          description: Whether to attach to `stdin`.
+          nullable: true
+        AttachStdout:
+          type: boolean
+          description: Whether to attach to `stdout`.
+          nullable: true
+        Cmd:
+          type: array
+          items:
+            type: string
+          description: Command to run specified as a string or an array of strings.
+          nullable: true
+        Domainname:
+          type: string
+          description: The domain name to use for the container.
+          nullable: true
+        Entrypoint:
+          type: array
+          items:
+            type: string
+          description: The entry point for the container as a string or an array of strings.  If the array consists of exactly one empty string (`[\"\"]`) then the entry point is reset to system default (i.e., the entry point used by docker when there is no `ENTRYPOINT` instruction in the `Dockerfile`).
+          nullable: true
+        Env:
+          type: array
+          items:
+            type: string
+          description: A list of environment variables to set inside the container in the form `[\"VAR=value\", ...]`. A variable without `=` is removed from the environment, rather than to have an empty value.
+          nullable: true
+        ExposedPorts:
+          type: object
+          description: 'An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`'
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+          nullable: true
+        Healthcheck:
+          allOf:
+          - $ref: '#/components/schemas/HealthConfig'
+          nullable: true
+        HostConfig:
+          allOf:
+          - $ref: '#/components/schemas/HostConfig'
+          nullable: true
+        Hostname:
+          type: string
+          description: The hostname to use for the container, as a valid RFC 1123 hostname.
+          nullable: true
+        Image:
+          type: string
+          description: The name of the image to use when creating the container
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        MacAddress:
+          type: string
+          description: MAC address of the container.
+          nullable: true
+        NetworkDisabled:
+          type: boolean
+          description: Disable networking for the container.
+          nullable: true
+        NetworkingConfig:
+          allOf:
+          - $ref: '#/components/schemas/NetworkingConfig'
+          nullable: true
+        OnBuild:
+          type: array
+          items:
+            type: string
+          description: '`ONBUILD` metadata that were defined in the image''s `Dockerfile`.'
+          nullable: true
+        OpenStdin:
+          type: boolean
+          description: Open `stdin`
+          nullable: true
+        Shell:
+          type: array
+          items:
+            type: string
+          description: Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
+          nullable: true
+        StdinOnce:
+          type: boolean
+          description: Close `stdin` after one attached client disconnects
+          nullable: true
+        StopSignal:
+          type: string
+          description: Signal to stop a container as a string or unsigned integer.
+          nullable: true
+        StopTimeout:
+          type: integer
+          format: int64
+          description: Timeout to stop a container in seconds.
+          nullable: true
+        Tty:
+          type: boolean
+          description: Attach standard streams to a TTY, including `stdin` if it is not closed.
+          nullable: true
+        User:
+          type: string
+          description: The user that commands are run as inside the container.
+          nullable: true
+        Volumes:
+          type: object
+          description: An object mapping mount point paths inside the container to empty objects.
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+          nullable: true
+        WorkingDir:
+          type: string
+          description: The working directory for commands to run in.
+          nullable: true
+    ConfigSpec:
+      type: object
+      properties:
+        Data:
+          type: string
+          description: Base64-url-safe-encoded ([RFC 4648](https://tools.ietf.org/html/rfc4648#section-5)) config data.
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        Name:
+          type: string
+          description: User-defined name of the config.
+          nullable: true
+        Templating:
+          allOf:
+          - $ref: '#/components/schemas/Driver'
+          nullable: true
+    ContainerConfig:
+      type: object
+      description: Configuration for a container that is portable between hosts.  When used as `ContainerConfig` field in an image, `ContainerConfig` is an optional field containing the configuration of the container that was last committed when creating the image.  Previous versions of Docker builder used this field to store build cache, and it is not in active use anymore.
+      properties:
+        ArgsEscaped:
+          type: boolean
+          description: Command is already escaped (Windows only)
+          nullable: true
+        AttachStderr:
+          type: boolean
+          description: Whether to attach to `stderr`.
+          nullable: true
+        AttachStdin:
+          type: boolean
+          description: Whether to attach to `stdin`.
+          nullable: true
+        AttachStdout:
+          type: boolean
+          description: Whether to attach to `stdout`.
+          nullable: true
+        Cmd:
+          type: array
+          items:
+            type: string
+          description: Command to run specified as a string or an array of strings.
+          nullable: true
+        Domainname:
+          type: string
+          description: The domain name to use for the container.
+          nullable: true
+        Entrypoint:
+          type: array
+          items:
+            type: string
+          description: The entry point for the container as a string or an array of strings.  If the array consists of exactly one empty string (`[\"\"]`) then the entry point is reset to system default (i.e., the entry point used by docker when there is no `ENTRYPOINT` instruction in the `Dockerfile`).
+          nullable: true
+        Env:
+          type: array
+          items:
+            type: string
+          description: A list of environment variables to set inside the container in the form `[\"VAR=value\", ...]`. A variable without `=` is removed from the environment, rather than to have an empty value.
+          nullable: true
+        ExposedPorts:
+          type: object
+          description: 'An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`'
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+          nullable: true
+        Healthcheck:
+          allOf:
+          - $ref: '#/components/schemas/HealthConfig'
+          nullable: true
+        Hostname:
+          type: string
+          description: The hostname to use for the container, as a valid RFC 1123 hostname.
+          nullable: true
+        Image:
+          type: string
+          description: The name (or reference) of the image to use when creating the container, or which was used when the container was created.
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        MacAddress:
+          type: string
+          description: MAC address of the container.
+          nullable: true
+        NetworkDisabled:
+          type: boolean
+          description: Disable networking for the container.
+          nullable: true
+        OnBuild:
+          type: array
+          items:
+            type: string
+          description: '`ONBUILD` metadata that were defined in the image''s `Dockerfile`.'
+          nullable: true
+        OpenStdin:
+          type: boolean
+          description: Open `stdin`
+          nullable: true
+        Shell:
+          type: array
+          items:
+            type: string
+          description: Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
+          nullable: true
+        StdinOnce:
+          type: boolean
+          description: Close `stdin` after one attached client disconnects
+          nullable: true
+        StopSignal:
+          type: string
+          description: Signal to stop a container as a string or unsigned integer.
+          nullable: true
+        StopTimeout:
+          type: integer
+          format: int64
+          description: Timeout to stop a container in seconds.
+          nullable: true
+        Tty:
+          type: boolean
+          description: Attach standard streams to a TTY, including `stdin` if it is not closed.
+          nullable: true
+        User:
+          type: string
+          description: The user that commands are run as inside the container.
+          nullable: true
+        Volumes:
+          type: object
+          description: An object mapping mount point paths inside the container to empty objects.
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+          nullable: true
+        WorkingDir:
+          type: string
+          description: The working directory for commands to run in.
+          nullable: true
+    ContainerSummary:
+      type: object
+      properties:
+        Command:
+          type: string
+          description: Command to run when starting the container
+          nullable: true
+        Created:
+          type: integer
+          format: int64
+          description: When the container was created
+          nullable: true
+        HostConfig:
+          allOf:
+          - $ref: '#/components/schemas/ContainerSummaryHostConfig'
+          nullable: true
+        Id:
+          type: string
+          description: The ID of this container
+          nullable: true
+        Image:
+          type: string
+          description: The name of the image used when creating this container
+          nullable: true
+        ImageID:
+          type: string
+          description: The ID of the image that this container was created from
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        Mounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/MountPoint'
+          nullable: true
+        Names:
+          type: array
+          items:
+            type: string
+          description: The names that this container has been given
+          nullable: true
+        NetworkSettings:
+          allOf:
+          - $ref: '#/components/schemas/ContainerSummaryNetworkSettings'
+          nullable: true
+        Ports:
+          type: array
+          items:
+            $ref: '#/components/schemas/Port'
+          description: The ports exposed by this container
+          nullable: true
+        SizeRootFs:
+          type: integer
+          format: int64
+          description: The total size of all the files in this container
+          nullable: true
+        SizeRw:
+          type: integer
+          format: int64
+          description: The size of files that have been created or changed by this container
+          nullable: true
+        State:
+          type: string
+          description: The state of this container (e.g. `Exited`)
+          nullable: true
+        Status:
+          type: string
+          description: Additional human-readable status of this container (e.g. `Exit 0`)
+          nullable: true
+    ContainerSummaryHostConfig:
+      type: object
+      properties:
+        NetworkMode:
+          type: string
+          nullable: true
+    ContainerSummaryNetworkSettings:
+      type: object
+      description: A summary of the container's network settings
+      properties:
+        Networks:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/EndpointSettings'
+          nullable: true
+    CreateExecOptions:
+      type: object
+      description: Exec configuration used in the [Create Exec API](Docker::create_exec())
+      properties:
+        AttachStderr:
+          type: boolean
+          description: Attach to stderr of the exec command.
+          nullable: true
+        AttachStdin:
+          type: boolean
+          description: Attach to `stdin` of the exec command.
+          nullable: true
+        AttachStdout:
+          type: boolean
+          description: Attach to stdout of the exec command.
+          nullable: true
+        Cmd:
+          type: array
+          items:
+            type: string
+          description: Command to run, as a string or array of strings.
+          nullable: true
+        DetachKeys:
+          type: string
+          description: |-
+            Override the key sequence for detaching a container. Format is a single character `[a-Z]`
+            or `ctrl-<value>` where `<value>` is one of: `a-z`, `@`, `^`, `[`, `,` or `_`.
+          nullable: true
+        Env:
+          type: array
+          items:
+            type: string
+          description: A list of environment variables in the form `["VAR=value", ...].`
+          nullable: true
+        Privileged:
+          type: boolean
+          description: Runs the exec process with extended privileges.
+          nullable: true
+        Tty:
+          type: boolean
+          description: Allocate a pseudo-TTY.
+          nullable: true
+        User:
+          type: string
+          description: |-
+            The user, and optionally, group to run the exec process inside the container. Format is one
+            of: `user`, `user:group`, `uid`, or `uid:gid`.
+          nullable: true
+        WorkingDir:
+          type: string
+          description: The working directory for the exec process inside the container.
+          nullable: true
+    DeviceMapping:
+      type: object
+      description: A device mapping between the host and container
+      properties:
+        CgroupPermissions:
+          type: string
+          nullable: true
+        PathInContainer:
+          type: string
+          nullable: true
+        PathOnHost:
+          type: string
+          nullable: true
+    DeviceRequest:
+      type: object
+      description: A request for devices to be sent to device drivers
+      properties:
+        Capabilities:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+          description: A list of capabilities; an OR list of AND lists of capabilities.
+          nullable: true
+        Count:
+          type: integer
+          format: int64
+          nullable: true
+        DeviceIDs:
+          type: array
+          items:
+            type: string
+          nullable: true
+        Driver:
+          type: string
+          nullable: true
+        Options:
+          type: object
+          description: Driver-specific options, specified as a key/value pairs. These options are passed directly to the driver.
+          additionalProperties:
+            type: string
+          nullable: true
+    Driver:
+      type: object
+      description: Driver represents a driver (network, logging, secrets).
+      required:
+      - Name
+      properties:
+        Name:
+          type: string
+          description: Name of the driver.
+        Options:
+          type: object
+          description: Key/value map of driver-specific options.
+          additionalProperties:
+            type: string
+          nullable: true
+    EndpointIpamConfig:
+      type: object
+      description: EndpointIPAMConfig represents an endpoint's IPAM configuration.
+      properties:
+        IPv4Address:
+          type: string
+          nullable: true
+        IPv6Address:
+          type: string
+          nullable: true
+        LinkLocalIPs:
+          type: array
+          items:
+            type: string
+          nullable: true
+    EndpointSettings:
+      type: object
+      description: Configuration for a network endpoint.
+      properties:
+        Aliases:
+          type: array
+          items:
+            type: string
+          nullable: true
+        DriverOpts:
+          type: object
+          description: DriverOpts is a mapping of driver options and values. These options are passed directly to the driver and are driver specific.
+          additionalProperties:
+            type: string
+          nullable: true
+        EndpointID:
+          type: string
+          description: Unique ID for the service endpoint in a Sandbox.
+          nullable: true
+        Gateway:
+          type: string
+          description: Gateway address for this network.
+          nullable: true
+        GlobalIPv6Address:
+          type: string
+          description: Global IPv6 address.
+          nullable: true
+        GlobalIPv6PrefixLen:
+          type: integer
+          format: int64
+          description: Mask length of the global IPv6 address.
+          nullable: true
+        IPAMConfig:
+          allOf:
+          - $ref: '#/components/schemas/EndpointIpamConfig'
+          nullable: true
+        IPAddress:
+          type: string
+          description: IPv4 address.
+          nullable: true
+        IPPrefixLen:
+          type: integer
+          format: int64
+          description: Mask length of the IPv4 address.
+          nullable: true
+        IPv6Gateway:
+          type: string
+          description: IPv6 gateway address.
+          nullable: true
+        Links:
+          type: array
+          items:
+            type: string
+          nullable: true
+        MacAddress:
+          type: string
+          description: MAC address for the endpoint on this network.
+          nullable: true
+        NetworkID:
+          type: string
+          description: Unique ID of the network.
+          nullable: true
+    GenericDelete:
+      type: object
+      description: Generic delete response
+      required:
+      - Count
+      properties:
+        Count:
+          type: integer
+          description: Number of deleted items
+          minimum: 0.0
+    GenericResources:
+      type: object
+      description: User-defined resources can be either Integer resources (e.g, `SSD=3`) or String resources (e.g, `GPU=UUID1`).
+      properties:
+        DiscreteResourceSpec:
+          allOf:
+          - $ref: '#/components/schemas/GenericResourcesDiscreteResourceSpec'
+          nullable: true
+        NamedResourceSpec:
+          allOf:
+          - $ref: '#/components/schemas/GenericResourcesNamedResourceSpec'
+          nullable: true
+    GenericResourcesDiscreteResourceSpec:
+      type: object
+      properties:
+        Kind:
+          type: string
+          nullable: true
+        Value:
+          type: integer
+          format: int64
+          nullable: true
+    GenericResourcesNamedResourceSpec:
+      type: object
+      properties:
+        Kind:
+          type: string
+          nullable: true
+        Value:
+          type: string
+          nullable: true
+    GraphDriverData:
+      type: object
+      description: Information about the storage driver used to store the container's and image's filesystem.
+      required:
+      - Name
+      - Data
+      properties:
+        Data:
+          type: object
+          description: Low-level storage metadata, provided as key/value pairs.  This information is driver-specific, and depends on the storage-driver in use, and should be used for informational purposes only.
+          additionalProperties:
+            type: string
+        Name:
+          type: string
+          description: Name of the storage driver.
+    HealthConfig:
+      type: object
+      description: A test to perform to check that the container is healthy.
+      properties:
+        Interval:
+          type: integer
+          format: int64
+          description: The time to wait between checks in nanoseconds. It should be 0 or at least 1000000 (1 ms). 0 means inherit.
+          nullable: true
+        Retries:
+          type: integer
+          format: int64
+          description: The number of consecutive failures needed to consider a container as unhealthy. 0 means inherit.
+          nullable: true
+        StartPeriod:
+          type: integer
+          format: int64
+          description: Start period for the container to initialize before starting health-retries countdown in nanoseconds. It should be 0 or at least 1000000 (1 ms). 0 means inherit.
+          nullable: true
+        Test:
+          type: array
+          items:
+            type: string
+          description: 'The test to perform. Possible values are:  - `[]` inherit healthcheck from image or parent image - `[\"NONE\"]` disable healthcheck - `[\"CMD\", args...]` exec arguments directly - `[\"CMD-SHELL\", command]` run command with system''s default shell'
+          nullable: true
+        Timeout:
+          type: integer
+          format: int64
+          description: The time to wait before considering the check to have hung. It should be 0 or at least 1000000 (1 ms). 0 means inherit.
+          nullable: true
+    HostConfig:
+      type: object
+      description: Container configuration that depends on the host we are running on
+      properties:
+        AutoRemove:
+          type: boolean
+          description: Automatically remove the container when the container's process exits. This has no effect if `RestartPolicy` is set.
+          nullable: true
+        Binds:
+          type: array
+          items:
+            type: string
+          description: 'A list of volume bindings for this container. Each volume binding is a string in one of these forms:  - `host-src:container-dest[:options]` to bind-mount a host path   into the container. Both `host-src`, and `container-dest` must   be an _absolute_ path. - `volume-name:container-dest[:options]` to bind-mount a volume   managed by a volume driver into the container. `container-dest`   must be an _absolute_ path.  `options` is an optional, comma-delimited list of:  - `nocopy` disables automatic copying of data from the container   path to the volume. The `nocopy` flag only applies to named volumes. - `[ro|rw]` mounts a volume read-only or read-write, respectively.   If omitted or set to `rw`, volumes are mounted read-write. - `[z|Z]` applies SELinux labels to allow or deny multiple containers   to read and write to the same volume.     - `z`: a _shared_ content label is applied to the content. This       label indicates that multiple containers can share the volume       content, for both reading and writing.     - `Z`: a _private unshared_ label is applied to the content.       This label indicates that only the current container can use       a private volume. Labeling systems such as SELinux require       proper labels to be placed on volume content that is mounted       into a container. Without a label, the security system can       prevent a container''s processes from using the content. By       default, the labels set by the host operating system are not       modified. - `[[r]shared|[r]slave|[r]private]` specifies mount   [propagation behavior](https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt).   This only applies to bind-mounted volumes, not internal volumes   or named volumes. Mount propagation requires the source mount   point (the location where the source directory is mounted in the   host operating system) to have the correct propagation properties.   For shared volumes, the source mount point must be set to `shared`.   For slave volumes, the mount must be set to either `shared` or   `slave`.'
+          nullable: true
+        BlkioDeviceReadBps:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThrottleDevice'
+          description: 'Limit read rate (bytes per second) from a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
+          nullable: true
+        BlkioDeviceReadIOps:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThrottleDevice'
+          description: 'Limit read rate (IO per second) from a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
+          nullable: true
+        BlkioDeviceWriteBps:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThrottleDevice'
+          description: 'Limit write rate (bytes per second) to a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
+          nullable: true
+        BlkioDeviceWriteIOps:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThrottleDevice'
+          description: 'Limit write rate (IO per second) to a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
+          nullable: true
+        BlkioWeight:
+          type: integer
+          format: int32
+          description: Block IO weight (relative weight).
+          nullable: true
+          minimum: 0.0
+        BlkioWeightDevice:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourcesBlkioWeightDevice'
+          description: 'Block IO weight (relative device weight) in the form:  ``` [{\"Path\": \"device_path\", \"Weight\": weight}] ```'
+          nullable: true
+        CapAdd:
+          type: array
+          items:
+            type: string
+          description: A list of kernel capabilities to add to the container. Conflicts with option 'Capabilities'.
+          nullable: true
+        CapDrop:
+          type: array
+          items:
+            type: string
+          description: A list of kernel capabilities to drop from the container. Conflicts with option 'Capabilities'.
+          nullable: true
+        Cgroup:
+          type: string
+          description: Cgroup to use for the container.
+          nullable: true
+        CgroupParent:
+          type: string
+          description: Path to `cgroups` under which the container's `cgroup` is created. If the path is not absolute, the path is considered to be relative to the `cgroups` path of the init process. Cgroups are created if they do not already exist.
+          nullable: true
+        CgroupnsMode:
+          allOf:
+          - $ref: '#/components/schemas/HostConfigCgroupnsModeEnum'
+          nullable: true
+        ConsoleSize:
+          type: array
+          items:
+            type: integer
+            format: int32
+          description: Initial console size, as an `[height, width]` array.
+          nullable: true
+        ContainerIDFile:
+          type: string
+          description: Path to a file where the container ID is written
+          nullable: true
+        CpuCount:
+          type: integer
+          format: int64
+          description: The number of usable CPUs (Windows only).  On Windows Server containers, the processor resource controls are mutually exclusive. The order of precedence is `CPUCount` first, then `CPUShares`, and `CPUPercent` last.
+          nullable: true
+        CpuPercent:
+          type: integer
+          format: int64
+          description: The usable percentage of the available CPUs (Windows only).  On Windows Server containers, the processor resource controls are mutually exclusive. The order of precedence is `CPUCount` first, then `CPUShares`, and `CPUPercent` last.
+          nullable: true
+        CpuPeriod:
+          type: integer
+          format: int64
+          description: The length of a CPU period in microseconds.
+          nullable: true
+        CpuQuota:
+          type: integer
+          format: int64
+          description: Microseconds of CPU time that the container can get in a CPU period.
+          nullable: true
+        CpuRealtimePeriod:
+          type: integer
+          format: int64
+          description: The length of a CPU real-time period in microseconds. Set to 0 to allocate no time allocated to real-time tasks.
+          nullable: true
+        CpuRealtimeRuntime:
+          type: integer
+          format: int64
+          description: The length of a CPU real-time runtime in microseconds. Set to 0 to allocate no time allocated to real-time tasks.
+          nullable: true
+        CpuShares:
+          type: integer
+          format: int64
+          description: An integer value representing this container's relative CPU weight versus other containers.
+          nullable: true
+        CpusetCpus:
+          type: string
+          description: CPUs in which to allow execution (e.g., `0-3`, `0,1`).
+          nullable: true
+        CpusetMems:
+          type: string
+          description: Memory nodes (MEMs) in which to allow execution (0-3, 0,1). Only effective on NUMA systems.
+          nullable: true
+        DeviceCgroupRules:
+          type: array
+          items:
+            type: string
+          description: a list of cgroup rules to apply to the container
+          nullable: true
+        DeviceRequests:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceRequest'
+          description: A list of requests for devices to be sent to device drivers.
+          nullable: true
+        Devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceMapping'
+          description: A list of devices to add to the container.
+          nullable: true
+        Dns:
+          type: array
+          items:
+            type: string
+          description: A list of DNS servers for the container to use.
+          nullable: true
+        DnsOptions:
+          type: array
+          items:
+            type: string
+          description: A list of DNS options.
+          nullable: true
+        DnsSearch:
+          type: array
+          items:
+            type: string
+          description: A list of DNS search domains.
+          nullable: true
+        ExtraHosts:
+          type: array
+          items:
+            type: string
+          description: A list of hostnames/IP mappings to add to the container's `/etc/hosts` file. Specified in the form `[\"hostname:IP\"]`.
+          nullable: true
+        GroupAdd:
+          type: array
+          items:
+            type: string
+          description: A list of additional groups that the container process will run as.
+          nullable: true
+        IOMaximumBandwidth:
+          type: integer
+          format: int64
+          description: Maximum IO in bytes per second for the container system drive (Windows only).
+          nullable: true
+        IOMaximumIOps:
+          type: integer
+          format: int64
+          description: Maximum IOps for the container system drive (Windows only)
+          nullable: true
+        Init:
+          type: boolean
+          description: Run an init inside the container that forwards signals and reaps processes. This field is omitted if empty, and the default (as configured on the daemon) is used.
+          nullable: true
+        IpcMode:
+          type: string
+          description: 'IPC sharing mode for the container. Possible values are:  - `\"none\"`: own private IPC namespace, with /dev/shm not mounted - `\"private\"`: own private IPC namespace - `\"shareable\"`: own private IPC namespace, with a possibility to share it with other containers - `\"container:<name|id>\"`: join another (shareable) container''s IPC namespace - `\"host\"`: use the host system''s IPC namespace  If not specified, daemon default is used, which can either be `\"private\"` or `\"shareable\"`, depending on daemon version and configuration.'
+          nullable: true
+        Isolation:
+          allOf:
+          - $ref: '#/components/schemas/HostConfigIsolationEnum'
+          nullable: true
+        KernelMemoryTCP:
+          type: integer
+          format: int64
+          description: Hard limit for kernel TCP buffer memory (in bytes). Depending on the OCI runtime in use, this option may be ignored. It is no longer supported by the default (runc) runtime.  This field is omitted when empty.
+          nullable: true
+        Links:
+          type: array
+          items:
+            type: string
+          description: A list of links for the container in the form `container_name:alias`.
+          nullable: true
+        LogConfig:
+          allOf:
+          - $ref: '#/components/schemas/HostConfigLogConfig'
+          nullable: true
+        MaskedPaths:
+          type: array
+          items:
+            type: string
+          description: The list of paths to be masked inside the container (this overrides the default set of paths).
+          nullable: true
+        Memory:
+          type: integer
+          format: int64
+          description: Memory limit in bytes.
+          nullable: true
+        MemoryReservation:
+          type: integer
+          format: int64
+          description: Memory soft limit in bytes.
+          nullable: true
+        MemorySwap:
+          type: integer
+          format: int64
+          description: Total memory limit (memory + swap). Set as `-1` to enable unlimited swap.
+          nullable: true
+        MemorySwappiness:
+          type: integer
+          format: int64
+          description: Tune a container's memory swappiness behavior. Accepts an integer between 0 and 100.
+          nullable: true
+        Mounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Mount'
+          description: Specification for mounts to be added to the container.
+          nullable: true
+        NanoCpus:
+          type: integer
+          format: int64
+          description: CPU quota in units of 10<sup>-9</sup> CPUs.
+          nullable: true
+        NetworkMode:
+          type: string
+          description: 'Network mode to use for this container. Supported standard values are: `bridge`, `host`, `none`, and `container:<name|id>`. Any other value is taken as a custom network''s name to which this container should connect to.'
+          nullable: true
+        OomKillDisable:
+          type: boolean
+          description: Disable OOM Killer for the container.
+          nullable: true
+        OomScoreAdj:
+          type: integer
+          format: int64
+          description: An integer value containing the score given to the container in order to tune OOM killer preferences.
+          nullable: true
+        PidMode:
+          type: string
+          description: 'Set the PID (Process) Namespace mode for the container. It can be either:  - `\"container:<name|id>\"`: joins another container''s PID namespace - `\"host\"`: use the host''s PID namespace inside the container'
+          nullable: true
+        PidsLimit:
+          type: integer
+          format: int64
+          description: Tune a container's PIDs limit. Set `0` or `-1` for unlimited, or `null` to not change.
+          nullable: true
+        PortBindings:
+          allOf:
+          - $ref: '#/components/schemas/PortMap'
+          nullable: true
+        Privileged:
+          type: boolean
+          description: Gives the container full access to the host.
+          nullable: true
+        PublishAllPorts:
+          type: boolean
+          description: Allocates an ephemeral host port for all of a container's exposed ports.  Ports are de-allocated when the container stops and allocated when the container starts. The allocated port might be changed when restarting the container.  The port is selected from the ephemeral port range that depends on the kernel. For example, on Linux the range is defined by `/proc/sys/net/ipv4/ip_local_port_range`.
+          nullable: true
+        ReadonlyPaths:
+          type: array
+          items:
+            type: string
+          description: The list of paths to be set as read-only inside the container (this overrides the default set of paths).
+          nullable: true
+        ReadonlyRootfs:
+          type: boolean
+          description: Mount the container's root filesystem as read only.
+          nullable: true
+        RestartPolicy:
+          allOf:
+          - $ref: '#/components/schemas/RestartPolicy'
+          nullable: true
+        Runtime:
+          type: string
+          description: Runtime to use with this container.
+          nullable: true
+        SecurityOpt:
+          type: array
+          items:
+            type: string
+          description: A list of string values to customize labels for MLS systems, such as SELinux.
+          nullable: true
+        ShmSize:
+          type: integer
+          format: int64
+          description: Size of `/dev/shm` in bytes. If omitted, the system uses 64MB.
+          nullable: true
+        StorageOpt:
+          type: object
+          description: 'Storage driver options for this container, in the form `{\"size\": \"120G\"}`.'
+          additionalProperties:
+            type: string
+          nullable: true
+        Sysctls:
+          type: object
+          description: 'A list of kernel parameters (sysctls) to set in the container. For example:  ``` {\"net.ipv4.ip_forward\": \"1\"} ```'
+          additionalProperties:
+            type: string
+          nullable: true
+        Tmpfs:
+          type: object
+          description: 'A map of container directories which should be replaced by tmpfs mounts, and their corresponding mount options. For example:  ``` { \"/run\": \"rw,noexec,nosuid,size=65536k\" } ```'
+          additionalProperties:
+            type: string
+          nullable: true
+        UTSMode:
+          type: string
+          description: UTS namespace to use for the container.
+          nullable: true
+        Ulimits:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourcesUlimits'
+          description: 'A list of resource limits to set in the container. For example:  ``` {\"Name\": \"nofile\", \"Soft\": 1024, \"Hard\": 2048} ```'
+          nullable: true
+        UsernsMode:
+          type: string
+          description: Sets the usernamespace mode for the container when usernamespace remapping option is enabled.
+          nullable: true
+        VolumeDriver:
+          type: string
+          description: Driver that this container uses to mount volumes.
+          nullable: true
+        VolumesFrom:
+          type: array
+          items:
+            type: string
+          description: A list of volumes to inherit from another container, specified in the form `<container name>[:<ro|rw>]`.
+          nullable: true
+    HostConfigCgroupnsModeEnum:
+      type: string
+      enum:
+      - EMPTY
+      - private
+      - host
+    HostConfigIsolationEnum:
+      type: string
+      enum:
+      - EMPTY
+      - default
+      - process
+      - hyperv
+    HostConfigLogConfig:
+      type: object
+      description: The logging configuration for this container
+      properties:
+        Config:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+        Type:
+          type: string
+          nullable: true
+    HostInfo:
+      allOf:
+      - $ref: '#/components/schemas/SystemInfo'
+      - type: object
+        required:
+        - HostGateway
+        properties:
+          HostGateway:
+            type: string
+            description: HostGateway is the gateway address of the host
+      description: HostInfo contains information about the host and the docker daemon
+    ImageInspect:
+      type: object
+      description: Information about an image in the local image cache.
+      properties:
+        Architecture:
+          type: string
+          description: Hardware CPU architecture that the image runs on.
+          nullable: true
+        Author:
+          type: string
+          description: Name of the author that was specified when committing the image, or as specified through MAINTAINER (deprecated) in the Dockerfile.
+          nullable: true
+        Comment:
+          type: string
+          description: Optional message that was set when committing or importing the image.
+          nullable: true
+        Config:
+          allOf:
+          - $ref: '#/components/schemas/ContainerConfig'
+          nullable: true
+        Container:
+          type: string
+          description: The ID of the container that was used to create the image.  Depending on how the image was created, this field may be empty.
+          nullable: true
+        ContainerConfig:
+          allOf:
+          - $ref: '#/components/schemas/ContainerConfig'
+          nullable: true
+        Created:
+          type: string
+          description: Date and time at which the image was created, formatted in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+          nullable: true
+        DockerVersion:
+          type: string
+          description: The version of Docker that was used to build the image.  Depending on how the image was created, this field may be empty.
+          nullable: true
+        GraphDriver:
+          allOf:
+          - $ref: '#/components/schemas/GraphDriverData'
+          nullable: true
+        Id:
+          type: string
+          description: ID is the content-addressable ID of an image.  This identifier is a content-addressable digest calculated from the image's configuration (which includes the digests of layers used by the image).  Note that this digest differs from the `RepoDigests` below, which holds digests of image manifests that reference the image.
+          nullable: true
+        Metadata:
+          allOf:
+          - $ref: '#/components/schemas/ImageInspectMetadata'
+          nullable: true
+        Os:
+          type: string
+          description: Operating System the image is built to run on.
+          nullable: true
+        OsVersion:
+          type: string
+          description: Operating System version the image is built to run on (especially for Windows).
+          nullable: true
+        Parent:
+          type: string
+          description: ID of the parent image.  Depending on how the image was created, this field may be empty and is only set for images that were built/created locally. This field is empty if the image was pulled from an image registry.
+          nullable: true
+        RepoDigests:
+          type: array
+          items:
+            type: string
+          description: List of content-addressable digests of locally available image manifests that the image is referenced from. Multiple manifests can refer to the same image.  These digests are usually only available if the image was either pulled from a registry, or if the image was pushed to a registry, which is when the manifest is generated and its digest calculated.
+          nullable: true
+        RepoTags:
+          type: array
+          items:
+            type: string
+          description: List of image names/tags in the local image cache that reference this image.  Multiple image tags can refer to the same image, and this list may be empty if no tags reference the image, in which case the image is \"untagged\", in which case it can still be referenced by its ID.
+          nullable: true
+        RootFS:
+          allOf:
+          - $ref: '#/components/schemas/ImageInspectRootFs'
+          nullable: true
+        Size:
+          type: integer
+          format: int64
+          description: Total size of the image including all layers it is composed of.
+          nullable: true
+        Variant:
+          type: string
+          description: CPU architecture variant (presently ARM-only).
+          nullable: true
+        VirtualSize:
+          type: integer
+          format: int64
+          description: Total size of the image including all layers it is composed of.  In versions of Docker before v1.10, this field was calculated from the image itself and all of its parent images. Docker v1.10 and up store images self-contained, and no longer use a parent-chain, making this field an equivalent of the Size field.  This field is kept for backward compatibility, but may be removed in a future version of the API.
+          nullable: true
+    ImageInspectMetadata:
+      type: object
+      description: Additional metadata of the image in the local cache. This information is local to the daemon, and not part of the image itself.
+      properties:
+        LastTagTime:
+          type: string
+          description: Date and time at which the image was last tagged in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.  This information is only available if the image was tagged locally, and omitted otherwise.
+          nullable: true
+    ImageInspectRootFs:
+      type: object
+      description: Information about the image's RootFS, including the layer IDs.
+      required:
+      - Type
+      properties:
+        Layers:
+          type: array
+          items:
+            type: string
+          nullable: true
+        Type:
+          type: string
+    ImageSummary:
+      type: object
+      required:
+      - Id
+      - ParentId
+      - RepoTags
+      - RepoDigests
+      - Created
+      - Size
+      - SharedSize
+      - VirtualSize
+      - Labels
+      - Containers
+      properties:
+        Containers:
+          type: integer
+          format: int64
+          description: Number of containers using this image. Includes both stopped and running containers.  This size is not calculated by default, and depends on which API endpoint is used. `-1` indicates that the value has not been set / calculated.
+        Created:
+          type: integer
+          format: int64
+          description: Date and time at which the image was created as a Unix timestamp (number of seconds sinds EPOCH).
+        Id:
+          type: string
+          description: ID is the content-addressable ID of an image.  This identifier is a content-addressable digest calculated from the image's configuration (which includes the digests of layers used by the image).  Note that this digest differs from the `RepoDigests` below, which holds digests of image manifests that reference the image.
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+        ParentId:
+          type: string
+          description: ID of the parent image.  Depending on how the image was created, this field may be empty and is only set for images that were built/created locally. This field is empty if the image was pulled from an image registry.
+        RepoDigests:
+          type: array
+          items:
+            type: string
+          description: List of content-addressable digests of locally available image manifests that the image is referenced from. Multiple manifests can refer to the same image.  These digests are usually only available if the image was either pulled from a registry, or if the image was pushed to a registry, which is when the manifest is generated and its digest calculated.
+        RepoTags:
+          type: array
+          items:
+            type: string
+          description: List of image names/tags in the local image cache that reference this image.  Multiple image tags can refer to the same image, and this list may be empty if no tags reference the image, in which case the image is \"untagged\", in which case it can still be referenced by its ID.
+        SharedSize:
+          type: integer
+          format: int64
+          description: Total size of image layers that are shared between this image and other images.  This size is not calculated by default. `-1` indicates that the value has not been set / calculated.
+        Size:
+          type: integer
+          format: int64
+          description: Total size of the image including all layers it is composed of.
+        VirtualSize:
+          type: integer
+          format: int64
+          description: Total size of the image including all layers it is composed of.  In versions of Docker before v1.10, this field was calculated from the image itself and all of its parent images. Docker v1.10 and up store images self-contained, and no longer use a parent-chain, making this field an equivalent of the Size field.  This field is kept for backward compatibility, but may be removed in a future version of the API.
+    IndexInfo:
+      type: object
+      description: IndexInfo contains information about a registry.
+      properties:
+        Mirrors:
+          type: array
+          items:
+            type: string
+          description: List of mirrors, expressed as URIs.
+          nullable: true
+        Name:
+          type: string
+          description: Name of the registry, such as \"docker.io\".
+          nullable: true
+        Official:
+          type: boolean
+          description: Indicates whether this is an official registry (i.e., Docker Hub / docker.io)
+          nullable: true
+        Secure:
+          type: boolean
+          description: 'Indicates if the registry is part of the list of insecure registries.  If `false`, the registry is insecure. Insecure registries accept un-encrypted (HTTP) and/or untrusted (HTTPS with certificates from unknown CAs) communication.  > **Warning**: Insecure registries can be useful when running a local > registry. However, because its use creates security vulnerabilities > it should ONLY be enabled for testing purposes. For increased > security, users should add their CA to their system''s list of > trusted CAs instead of enabling this option.'
+          nullable: true
+    LocalNodeState:
+      type: string
+      description: |-
+        Current local status of this node.
+        Enumeration of values.
+        Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
+        which helps with FFI.
+      enum:
+      - EMPTY
+      - inactive
+      - pending
+      - active
+      - error
+      - locked
+    Mount:
+      type: object
+      properties:
+        BindOptions:
+          allOf:
+          - $ref: '#/components/schemas/MountBindOptions'
+          nullable: true
+        Consistency:
+          type: string
+          description: 'The consistency requirement for the mount: `default`, `consistent`, `cached`, or `delegated`.'
+          nullable: true
+        ReadOnly:
+          type: boolean
+          description: Whether the mount should be read-only.
+          nullable: true
+        Source:
+          type: string
+          description: Mount source (e.g. a volume name, a host path).
+          nullable: true
+        Target:
+          type: string
+          description: Container path.
+          nullable: true
+        TmpfsOptions:
+          allOf:
+          - $ref: '#/components/schemas/MountTmpfsOptions'
+          nullable: true
+        Type:
+          allOf:
+          - $ref: '#/components/schemas/MountTypeEnum'
+          nullable: true
+        VolumeOptions:
+          allOf:
+          - $ref: '#/components/schemas/MountVolumeOptions'
+          nullable: true
+    MountBindOptions:
+      type: object
+      description: Optional configuration for the `bind` type.
+      properties:
+        CreateMountpoint:
+          type: boolean
+          description: Create mount point on host if missing
+          nullable: true
+        NonRecursive:
+          type: boolean
+          description: Disable recursive bind mount.
+          nullable: true
+        Propagation:
+          allOf:
+          - $ref: '#/components/schemas/MountBindOptionsPropagationEnum'
+          nullable: true
+    MountBindOptionsPropagationEnum:
+      type: string
+      enum:
+      - EMPTY
+      - private
+      - rprivate
+      - shared
+      - rshared
+      - slave
+      - rslave
+    MountPoint:
+      type: object
+      description: MountPoint represents a mount point configuration inside the container. This is used for reporting the mountpoints in use by a container.
+      properties:
+        Destination:
+          type: string
+          description: Destination is the path relative to the container root (`/`) where the `Source` is mounted inside the container.
+          nullable: true
+        Driver:
+          type: string
+          description: Driver is the volume driver used to create the volume (if it is a volume).
+          nullable: true
+        Mode:
+          type: string
+          description: Mode is a comma separated list of options supplied by the user when creating the bind/volume mount.  The default is platform-specific (`\"z\"` on Linux, empty on Windows).
+          nullable: true
+        Name:
+          type: string
+          description: Name is the name reference to the underlying data defined by `Source` e.g., the volume name.
+          nullable: true
+        Propagation:
+          type: string
+          description: Propagation describes how mounts are propagated from the host into the mount point, and vice-versa. Refer to the [Linux kernel documentation](https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt) for details. This field is not used on Windows.
+          nullable: true
+        RW:
+          type: boolean
+          description: Whether the mount is mounted writable (read-write).
+          nullable: true
+        Source:
+          type: string
+          description: Source location of the mount.  For volumes, this contains the storage location of the volume (within `/var/lib/docker/volumes/`). For bind-mounts, and `npipe`, this contains the source (host) part of the bind-mount. For `tmpfs` mount points, this field is empty.
+          nullable: true
+        Type:
+          allOf:
+          - $ref: '#/components/schemas/MountPointTypeEnum'
+          nullable: true
+    MountPointTypeEnum:
+      type: string
+      enum:
+      - EMPTY
+      - bind
+      - volume
+      - tmpfs
+      - npipe
+      - cluster
+    MountTmpfsOptions:
+      type: object
+      description: Optional configuration for the `tmpfs` type.
+      properties:
+        Mode:
+          type: integer
+          format: int64
+          description: The permission mode for the tmpfs mount in an integer.
+          nullable: true
+        SizeBytes:
+          type: integer
+          format: int64
+          description: The size for the tmpfs mount in bytes.
+          nullable: true
+    MountTypeEnum:
+      type: string
+      enum:
+      - EMPTY
+      - bind
+      - volume
+      - tmpfs
+      - npipe
+      - cluster
+    MountVolumeOptions:
+      type: object
+      description: Optional configuration for the `volume` type.
+      properties:
+        DriverConfig:
+          allOf:
+          - $ref: '#/components/schemas/MountVolumeOptionsDriverConfig'
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        NoCopy:
+          type: boolean
+          description: Populate volume with data from the target.
+          nullable: true
+    MountVolumeOptionsDriverConfig:
+      type: object
+      description: Map of driver specific options
+      properties:
+        Name:
+          type: string
+          description: Name of the driver to use to create the volume.
+          nullable: true
+        Options:
+          type: object
+          description: key/value map of driver specific options.
+          additionalProperties:
+            type: string
+          nullable: true
+    Namespace:
+      type: object
+      description: |-
+        Namespace is a identifier for a set of cargoes
+        It is used to group cargoes together
+      required:
+      - Name
+      properties:
+        Name:
+          type: string
+          description: Name of the namespace
+    NamespaceInspect:
+      type: object
+      description: |-
+        A Namespace Inspect is a detailed view of a namespace
+        It is used to inspect a namespace
+        It contains all the information about the namespace
+        It also contains the list of cargoes
+      required:
+      - Name
+      - Cargoes
+      properties:
+        Cargoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/CargoInspect'
+          description: Number of cargoes
+        Name:
+          type: string
+          description: Name of the namespace
+    NamespacePartial:
+      type: object
+      description: A Namespace partial is a payload used to create a new namespace
+      required:
+      - Name
+      properties:
+        Name:
+          type: string
+          description: Name of the namespace
+    NamespaceSummary:
+      type: object
+      description: |-
+        A Namespace Summary is a summary of a namespace
+        It is used to list all the namespaces
+        It contains the number of cargoes and instances existing in the namespace
+      required:
+      - Name
+      - Cargoes
+      - Instances
+      properties:
+        Cargoes:
+          type: integer
+          format: int64
+          description: Number of cargoes
+        Instances:
+          type: integer
+          format: int64
+          description: Number of instances
+        Name:
+          type: string
+          description: Name of the namespace
+    NetworkingConfig:
+      type: object
+      description: NetworkingConfig represents the container's networking configuration for each of its interfaces. It is used for the networking configs specified in the `docker create` and `docker network connect` commands.
+      properties:
+        EndpointsConfig:
+          type: object
+          description: A mapping of network name to endpoint configuration for that network.
+          additionalProperties:
+            $ref: '#/components/schemas/EndpointSettings'
+          nullable: true
+    Node:
+      type: object
+      required:
+      - Name
+      - IpAddress
+      properties:
+        IpAddress:
+          type: string
+        Name:
+          type: string
+    NodeContainerSummary:
+      type: object
+      required:
+      - Node
+      - IpAddress
+      - Container
+      properties:
+        Container:
+          $ref: '#/components/schemas/ContainerSummary'
+        IpAddress:
+          type: string
+        Node:
+          type: string
+    ObjectVersion:
+      type: object
+      description: The version number of the object such as node, service, etc. This is needed to avoid conflicting writes. The client must send the version number along with the modified specification when updating these objects.  This approach ensures safe concurrency and determinism in that the change on the object may not be applied if the version number has changed from the last read. In other words, if two update requests specify the same base version, only one of the requests can succeed. As a result, two separate update requests that happen at the same time will not unintentionally overwrite each other.
+      properties:
+        Index:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0.0
+    PeerNode:
+      type: object
+      description: Represents a peer-node in the swarm
+      properties:
+        Addr:
+          type: string
+          description: IP address and ports at which this node can be reached.
+          nullable: true
+        NodeID:
+          type: string
+          description: Unique identifier of for this node in the swarm.
+          nullable: true
+    PluginsInfo:
+      type: object
+      description: 'Available plugins per type.  <p><br /></p>  > **Note**: Only unmanaged (V1) plugins are included in this list. > V1 plugins are \"lazily\" loaded, and are not returned in this list > if there is no resource using the plugin.'
+      properties:
+        Authorization:
+          type: array
+          items:
+            type: string
+          description: Names of available authorization plugins.
+          nullable: true
+        Log:
+          type: array
+          items:
+            type: string
+          description: Names of available logging-drivers, and logging-driver plugins.
+          nullable: true
+        Network:
+          type: array
+          items:
+            type: string
+          description: Names of available network-drivers, and network-driver plugins.
+          nullable: true
+        Volume:
+          type: array
+          items:
+            type: string
+          description: Names of available volume-drivers, and network-driver plugins.
+          nullable: true
+    Port:
+      type: object
+      description: An open port on a container
+      required:
+      - PrivatePort
+      properties:
+        IP:
+          type: string
+          description: Host IP address that the container's port is mapped to
+          nullable: true
+        PrivatePort:
+          type: integer
+          format: int64
+          description: Port on the container
+        PublicPort:
+          type: integer
+          format: int64
+          description: Port exposed on the host
+          nullable: true
+        Type:
+          allOf:
+          - $ref: '#/components/schemas/PortTypeEnum'
+          nullable: true
+    PortBinding:
+      type: object
+      description: PortBinding represents a binding between a host IP address and a host port.
+      properties:
+        HostIp:
+          type: string
+          description: Host IP address that the container's port is mapped to.
+          nullable: true
+        HostPort:
+          type: string
+          description: Host port number that the container's port is mapped to.
+          nullable: true
+    PortMap:
+      type: object
+      title: PortMap
+      description: PortMap
+      properties:
+        <port/tcp|udp>:
+          type: array
+          items:
+            type: object
+            properties:
+              HostIp:
+                type: string
+              HostPort:
+                type: string
+      nullable: true
+    PortTypeEnum:
+      type: string
+      enum:
+      - EMPTY
+      - tcp
+      - udp
+      - sctp
+    RegistryServiceConfig:
+      type: object
+      description: RegistryServiceConfig stores daemon registry services configuration.
+      properties:
+        AllowNondistributableArtifactsCIDRs:
+          type: array
+          items:
+            type: string
+          description: 'List of IP ranges to which nondistributable artifacts can be pushed, using the CIDR syntax [RFC 4632](https://tools.ietf.org/html/4632).  Some images (for example, Windows base images) contain artifacts whose distribution is restricted by license. When these images are pushed to a registry, restricted artifacts are not included.  This configuration override this behavior, and enables the daemon to push nondistributable artifacts to all registries whose resolved IP address is within the subnet described by the CIDR syntax.  This option is useful when pushing images containing nondistributable artifacts to a registry on an air-gapped network so hosts on that network can pull the images without connecting to another server.  > **Warning**: Nondistributable artifacts typically have restrictions > on how and where they can be distributed and shared. Only use this > feature to push artifacts to private registries and ensure that you > are in compliance with any terms that cover redistributing > nondistributable artifacts.'
+          nullable: true
+        AllowNondistributableArtifactsHostnames:
+          type: array
+          items:
+            type: string
+          description: 'List of registry hostnames to which nondistributable artifacts can be pushed, using the format `<hostname>[:<port>]` or `<IP address>[:<port>]`.  Some images (for example, Windows base images) contain artifacts whose distribution is restricted by license. When these images are pushed to a registry, restricted artifacts are not included.  This configuration override this behavior for the specified registries.  This option is useful when pushing images containing nondistributable artifacts to a registry on an air-gapped network so hosts on that network can pull the images without connecting to another server.  > **Warning**: Nondistributable artifacts typically have restrictions > on how and where they can be distributed and shared. Only use this > feature to push artifacts to private registries and ensure that you > are in compliance with any terms that cover redistributing > nondistributable artifacts.'
+          nullable: true
+        IndexConfigs:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/IndexInfo'
+          nullable: true
+        InsecureRegistryCIDRs:
+          type: array
+          items:
+            type: string
+          description: 'List of IP ranges of insecure registries, using the CIDR syntax ([RFC 4632](https://tools.ietf.org/html/4632)). Insecure registries accept un-encrypted (HTTP) and/or untrusted (HTTPS with certificates from unknown CAs) communication.  By default, local registries (`127.0.0.0/8`) are configured as insecure. All other registries are secure. Communicating with an insecure registry is not possible if the daemon assumes that registry is secure.  This configuration override this behavior, insecure communication with registries whose resolved IP address is within the subnet described by the CIDR syntax.  Registries can also be marked insecure by hostname. Those registries are listed under `IndexConfigs` and have their `Secure` field set to `false`.  > **Warning**: Using this option can be useful when running a local > registry, but introduces security vulnerabilities. This option > should therefore ONLY be used for testing purposes. For increased > security, users should add their CA to their system''s list of trusted > CAs instead of enabling this option.'
+          nullable: true
+        Mirrors:
+          type: array
+          items:
+            type: string
+          description: List of registry URLs that act as a mirror for the official (`docker.io`) registry.
+          nullable: true
+    ReplicationMode:
+      oneOf:
+      - type: string
+        enum:
+        - Auto
+      - type: string
+        enum:
+        - Unique
+      - type: string
+        enum:
+        - UniqueByNode
+      - type: object
+        required:
+        - UniqueByNodeGroups
+        properties:
+          UniqueByNodeGroups:
+            type: object
+            description: UniqueByNodeGroups is used to ensure one replica is running on each node group
+            required:
+            - groups
+            properties:
+              groups:
+                type: array
+                items:
+                  type: string
+      - type: object
+        required:
+        - UniqueByNodeNames
+        properties:
+          UniqueByNodeNames:
+            type: object
+            description: UniqueByNodeNames is used to ensure one replica is running on each node name
+            required:
+            - names
+            properties:
+              names:
+                type: array
+                items:
+                  type: string
+      - type: object
+        required:
+        - Number
+        properties:
+          Number:
+            type: integer
+            format: int64
+            description: Number is used to manually set the number of replicas in one node
+      - type: object
+        required:
+        - NumberByNodes
+        properties:
+          NumberByNodes:
+            type: integer
+            format: int64
+            description: NumberByNodes is used to manually set the number of replicas in each node
+      - type: object
+        required:
+        - NumberByNodeGroups
+        properties:
+          NumberByNodeGroups:
+            type: object
+            description: NumberByNodeGroups is used to manually set the number of replicas in each node group
+            required:
+            - groups
+            - number
+            properties:
+              groups:
+                type: array
+                items:
+                  type: string
+              number:
+                type: integer
+                format: int64
+      - type: object
+        required:
+        - NumberByNodeNames
+        properties:
+          NumberByNodeNames:
+            type: object
+            description: NumberByNodeNames is used to manually set the number of replicas in each node name
+            required:
+            - names
+            - number
+            properties:
+              names:
+                type: array
+                items:
+                  type: string
+              number:
+                type: integer
+                format: int64
+      description: |-
+        Auto is used to automatically define that the number of replicas in the cluster
+        Number is used to manually set the number of replicas
+        Note: auto will ensure at least 1 replica exists in the cluster
+    Resource:
+      type: object
+      description: |-
+        Resource is a configuration with a name and a kind
+        It is used to define [proxy rules](ProxyRule) and other kind of config
+      required:
+      - Name
+      - CreatedAt
+      - UpdatedAt
+      - Version
+      - Kind
+      - ConfigKey
+      - Config
+      properties:
+        Config:
+          type: object
+          description: The config of the resource as a json object
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        ConfigKey:
+          type: string
+          format: uuid
+          description: The config of the resource
+        CreatedAt:
+          type: string
+          format: date-time
+          description: The creation date of the resource
+        Kind:
+          type: string
+          description: The kind of the resource
+        Name:
+          type: string
+          description: The name of the resource
+        UpdatedAt:
+          type: string
+          format: date-time
+          description: The update date of the resource
+        Version:
+          type: string
+          description: Version of the resource
+    ResourceConfig:
+      type: object
+      required:
+      - Key
+      - Version
+      - ResourceKey
+      - Data
+      properties:
+        Data:
+          type: object
+          description: The config of the resource as a json object
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Key:
+          type: string
+          format: uuid
+          description: Key of the resource
+        ResourceKey:
+          type: string
+          description: Resource key associated with the config
+        Version:
+          type: string
+          description: Version of the config
+    ResourcePartial:
+      type: object
+      description: Resource partial is a payload used to create a new resource
+      required:
+      - Name
+      - Kind
+      - Version
+      - Config
+      properties:
+        Config:
+          type: object
+          description: The config of the resource (json object)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Kind:
+          type: string
+          description: The kind of the resource
+        Name:
+          type: string
+          description: The name of the resource
+        Version:
+          type: string
+          description: Version of the config
+    ResourcePatch:
+      type: object
+      required:
+      - Version
+      - Config
+      properties:
+        Config:
+          type: object
+          description: The config of the resource as a json object
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Version:
+          type: string
+          description: Version of the config
+    ResourcesBlkioWeightDevice:
+      type: object
+      properties:
+        Path:
+          type: string
+          nullable: true
+        Weight:
+          type: integer
+          nullable: true
+          minimum: 0.0
+    ResourcesUlimits:
+      type: object
+      properties:
+        Hard:
+          type: integer
+          format: int64
+          description: Hard limit
+          nullable: true
+        Name:
+          type: string
+          description: Name of ulimit
+          nullable: true
+        Soft:
+          type: integer
+          format: int64
+          description: Soft limit
+          nullable: true
+    RestartPolicy:
+      type: object
+      description: The behavior to apply when the container exits. The default is not to restart.  An ever increasing delay (double the previous delay, starting at 100ms) is added before each restart to prevent flooding the server.
+      properties:
+        MaximumRetryCount:
+          type: integer
+          format: int64
+          description: If `on-failure` is used, the number of times to retry before giving up.
+          nullable: true
+        Name:
+          allOf:
+          - $ref: '#/components/schemas/RestartPolicyNameEnum'
+          nullable: true
+    RestartPolicyNameEnum:
+      type: string
+      enum:
+      - EMPTY
+      - no
+      - always
+      - unless-stopped
+      - on-failure
+    Runtime:
+      type: object
+      description: Runtime describes an [OCI compliant](https://github.com/opencontainers/runtime-spec) runtime.  The runtime is invoked by the daemon via the `containerd` daemon. OCI runtimes act as an interface to the Linux kernel namespaces, cgroups, and SELinux.
+      properties:
+        path:
+          type: string
+          description: Name and, optional, path, of the OCI executable binary.  If the path is omitted, the daemon searches the host's `$PATH` for the binary and uses the first result.
+          nullable: true
+        runtimeArgs:
+          type: array
+          items:
+            type: string
+          description: List of command-line arguments to pass to the runtime when invoked.
+          nullable: true
+    SwarmInfo:
+      type: object
+      description: Represents generic information about swarm.
+      properties:
+        Cluster:
+          allOf:
+          - $ref: '#/components/schemas/ClusterInfo'
+          nullable: true
+        ControlAvailable:
+          type: boolean
+          nullable: true
+        Error:
+          type: string
+          nullable: true
+        LocalNodeState:
+          allOf:
+          - $ref: '#/components/schemas/LocalNodeState'
+          nullable: true
+        Managers:
+          type: integer
+          format: int64
+          description: Total number of managers in the swarm.
+          nullable: true
+        NodeAddr:
+          type: string
+          description: IP address at which this node can be reached by other nodes in the swarm.
+          nullable: true
+        NodeID:
+          type: string
+          description: Unique identifier of for this node in the swarm.
+          nullable: true
+        Nodes:
+          type: integer
+          format: int64
+          description: Total number of nodes in the swarm.
+          nullable: true
+        RemoteManagers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PeerNode'
+          description: List of ID's and addresses of other managers in the swarm.
+          nullable: true
+    SwarmSpec:
+      type: object
+      description: User modifiable swarm configuration.
+      properties:
+        CAConfig:
+          allOf:
+          - $ref: '#/components/schemas/SwarmSpecCaConfig'
+          nullable: true
+        Dispatcher:
+          allOf:
+          - $ref: '#/components/schemas/SwarmSpecDispatcher'
+          nullable: true
+        EncryptionConfig:
+          allOf:
+          - $ref: '#/components/schemas/SwarmSpecEncryptionConfig'
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        Name:
+          type: string
+          description: Name of the swarm.
+          nullable: true
+        Orchestration:
+          allOf:
+          - $ref: '#/components/schemas/SwarmSpecOrchestration'
+          nullable: true
+        Raft:
+          allOf:
+          - $ref: '#/components/schemas/SwarmSpecRaft'
+          nullable: true
+        TaskDefaults:
+          allOf:
+          - $ref: '#/components/schemas/SwarmSpecTaskDefaults'
+          nullable: true
+    SwarmSpecCaConfig:
+      type: object
+      description: CA configuration.
+      properties:
+        ExternalCAs:
+          type: array
+          items:
+            $ref: '#/components/schemas/SwarmSpecCaConfigExternalCas'
+          description: Configuration for forwarding signing requests to an external certificate authority.
+          nullable: true
+        ForceRotate:
+          type: integer
+          format: int64
+          description: An integer whose purpose is to force swarm to generate a new signing CA certificate and key, if none have been specified in `SigningCACert` and `SigningCAKey`
+          nullable: true
+          minimum: 0.0
+        NodeCertExpiry:
+          type: integer
+          format: int64
+          description: The duration node certificates are issued for.
+          nullable: true
+        SigningCACert:
+          type: string
+          description: The desired signing CA certificate for all swarm node TLS leaf certificates, in PEM format.
+          nullable: true
+        SigningCAKey:
+          type: string
+          description: The desired signing CA key for all swarm node TLS leaf certificates, in PEM format.
+          nullable: true
+    SwarmSpecCaConfigExternalCas:
+      type: object
+      properties:
+        CACert:
+          type: string
+          description: The root CA certificate (in PEM format) this external CA uses to issue TLS certificates (assumed to be to the current swarm root CA certificate if not provided).
+          nullable: true
+        Options:
+          type: object
+          description: An object with key/value pairs that are interpreted as protocol-specific options for the external CA driver.
+          additionalProperties:
+            type: string
+          nullable: true
+        Protocol:
+          allOf:
+          - $ref: '#/components/schemas/SwarmSpecCaConfigExternalCasProtocolEnum'
+          nullable: true
+        URL:
+          type: string
+          description: URL where certificate signing requests should be sent.
+          nullable: true
+    SwarmSpecCaConfigExternalCasProtocolEnum:
+      type: string
+      enum:
+      - EMPTY
+      - cfssl
+    SwarmSpecDispatcher:
+      type: object
+      description: Dispatcher configuration.
+      properties:
+        HeartbeatPeriod:
+          type: integer
+          format: int64
+          description: The delay for an agent to send a heartbeat to the dispatcher.
+          nullable: true
+    SwarmSpecEncryptionConfig:
+      type: object
+      description: Parameters related to encryption-at-rest.
+      properties:
+        AutoLockManagers:
+          type: boolean
+          description: If set, generate a key and use it to lock data stored on the managers.
+          nullable: true
+    SwarmSpecOrchestration:
+      type: object
+      description: Orchestration configuration.
+      properties:
+        TaskHistoryRetentionLimit:
+          type: integer
+          format: int64
+          description: The number of historic tasks to keep per instance or node. If negative, never remove completed or failed tasks.
+          nullable: true
+    SwarmSpecRaft:
+      type: object
+      description: Raft configuration.
+      properties:
+        ElectionTick:
+          type: integer
+          format: int64
+          description: The number of ticks that a follower will wait for a message from the leader before becoming a candidate and starting an election. `ElectionTick` must be greater than `HeartbeatTick`.  A tick currently defaults to one second, so these translate directly to seconds currently, but this is NOT guaranteed.
+          nullable: true
+        HeartbeatTick:
+          type: integer
+          format: int64
+          description: The number of ticks between heartbeats. Every HeartbeatTick ticks, the leader will send a heartbeat to the followers.  A tick currently defaults to one second, so these translate directly to seconds currently, but this is NOT guaranteed.
+          nullable: true
+        KeepOldSnapshots:
+          type: integer
+          format: int64
+          description: The number of snapshots to keep beyond the current snapshot.
+          nullable: true
+          minimum: 0.0
+        LogEntriesForSlowFollowers:
+          type: integer
+          format: int64
+          description: The number of log entries to keep around to sync up slow followers after a snapshot is created.
+          nullable: true
+          minimum: 0.0
+        SnapshotInterval:
+          type: integer
+          format: int64
+          description: The number of log entries between snapshots.
+          nullable: true
+          minimum: 0.0
+    SwarmSpecTaskDefaults:
+      type: object
+      description: Defaults for creating tasks in this cluster.
+      properties:
+        LogDriver:
+          allOf:
+          - $ref: '#/components/schemas/SwarmSpecTaskDefaultsLogDriver'
+          nullable: true
+    SwarmSpecTaskDefaultsLogDriver:
+      type: object
+      description: The log driver to use for tasks created in the orchestrator if unspecified by a service.  Updating this value only affects new tasks. Existing tasks continue to use their previously configured log driver until recreated.
+      properties:
+        Name:
+          type: string
+          description: The log driver to use as a default for new tasks.
+          nullable: true
+        Options:
+          type: object
+          description: Driver-specific options for the selectd log driver, specified as key/value pairs.
+          additionalProperties:
+            type: string
+          nullable: true
+    SystemInfo:
+      type: object
+      properties:
+        Architecture:
+          type: string
+          description: Hardware architecture of the host, as returned by the Go runtime (`GOARCH`).  A full list of possible values can be found in the [Go documentation](https://golang.org/doc/install/source#environment).
+          nullable: true
+        BridgeNfIp6tables:
+          type: boolean
+          description: Indicates if `bridge-nf-call-ip6tables` is available on the host.
+          nullable: true
+        BridgeNfIptables:
+          type: boolean
+          description: Indicates if `bridge-nf-call-iptables` is available on the host.
+          nullable: true
+        CPUSet:
+          type: boolean
+          description: Indicates if CPUsets (cpuset.cpus, cpuset.mems) are supported by the host.  See [cpuset(7)](https://www.kernel.org/doc/Documentation/cgroup-v1/cpusets.txt)
+          nullable: true
+        CPUShares:
+          type: boolean
+          description: Indicates if CPU Shares limiting is supported by the host.
+          nullable: true
+        CgroupDriver:
+          allOf:
+          - $ref: '#/components/schemas/SystemInfoCgroupDriverEnum'
+          nullable: true
+        CgroupVersion:
+          allOf:
+          - $ref: '#/components/schemas/SystemInfoCgroupVersionEnum'
+          nullable: true
+        ClusterAdvertise:
+          type: string
+          description: 'The network endpoint that the Engine advertises for the purpose of node discovery. ClusterAdvertise is a `host:port` combination on which the daemon is reachable by other hosts.  <p><br /></p>  > **Deprecated**: This field is only propagated when using standalone Swarm > mode, and overlay networking using an external k/v store. Overlay > networks with Swarm mode enabled use the built-in raft store, and > this field will be empty.'
+          nullable: true
+        ClusterStore:
+          type: string
+          description: 'URL of the distributed storage backend.   The storage backend is used for multihost networking (to store network and endpoint information) and by the node discovery mechanism.  <p><br /></p>  > **Deprecated**: This field is only propagated when using standalone Swarm > mode, and overlay networking using an external k/v store. Overlay > networks with Swarm mode enabled use the built-in raft store, and > this field will be empty.'
+          nullable: true
+        ContainerdCommit:
+          allOf:
+          - $ref: '#/components/schemas/Commit'
+          nullable: true
+        Containers:
+          type: integer
+          format: int64
+          description: Total number of containers on the host.
+          nullable: true
+        ContainersPaused:
+          type: integer
+          format: int64
+          description: Number of containers with status `\"paused\"`.
+          nullable: true
+        ContainersRunning:
+          type: integer
+          format: int64
+          description: Number of containers with status `\"running\"`.
+          nullable: true
+        ContainersStopped:
+          type: integer
+          format: int64
+          description: Number of containers with status `\"stopped\"`.
+          nullable: true
+        CpuCfsPeriod:
+          type: boolean
+          description: Indicates if CPU CFS(Completely Fair Scheduler) period is supported by the host.
+          nullable: true
+        CpuCfsQuota:
+          type: boolean
+          description: Indicates if CPU CFS(Completely Fair Scheduler) quota is supported by the host.
+          nullable: true
+        Debug:
+          type: boolean
+          description: Indicates if the daemon is running in debug-mode / with debug-level logging enabled.
+          nullable: true
+        DefaultAddressPools:
+          type: array
+          items:
+            $ref: '#/components/schemas/SystemInfoDefaultAddressPools'
+          description: 'List of custom default address pools for local networks, which can be specified in the daemon.json file or dockerd option.  Example: a Base \"10.10.0.0/16\" with Size 24 will define the set of 256 10.10.[0-255].0/24 address pools.'
+          nullable: true
+        DefaultRuntime:
+          type: string
+          description: Name of the default OCI runtime that is used when starting containers.  The default can be overridden per-container at create time.
+          nullable: true
+        DockerRootDir:
+          type: string
+          description: Root directory of persistent Docker state.  Defaults to `/var/lib/docker` on Linux, and `C:\\ProgramData\\docker` on Windows.
+          nullable: true
+        Driver:
+          type: string
+          description: Name of the storage driver in use.
+          nullable: true
+        DriverStatus:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+          description: 'Information specific to the storage driver, provided as \"label\" / \"value\" pairs.  This information is provided by the storage driver, and formatted in a way consistent with the output of `docker info` on the command line.  <p><br /></p>  > **Note**: The information returned in this field, including the > formatting of values and labels, should not be considered stable, > and may change without notice.'
+          nullable: true
+        ExperimentalBuild:
+          type: boolean
+          description: Indicates if experimental features are enabled on the daemon.
+          nullable: true
+        GenericResources:
+          allOf:
+          - $ref: '#/components/schemas/GenericResources'
+          nullable: true
+        HttpProxy:
+          type: string
+          description: HTTP-proxy configured for the daemon. This value is obtained from the [`HTTP_PROXY`](https://www.gnu.org/software/wget/manual/html_node/Proxies.html) environment variable. Credentials ([user info component](https://tools.ietf.org/html/rfc3986#section-3.2.1)) in the proxy URL are masked in the API response.  Containers do not automatically inherit this configuration.
+          nullable: true
+        HttpsProxy:
+          type: string
+          description: HTTPS-proxy configured for the daemon. This value is obtained from the [`HTTPS_PROXY`](https://www.gnu.org/software/wget/manual/html_node/Proxies.html) environment variable. Credentials ([user info component](https://tools.ietf.org/html/rfc3986#section-3.2.1)) in the proxy URL are masked in the API response.  Containers do not automatically inherit this configuration.
+          nullable: true
+        ID:
+          type: string
+          description: 'Unique identifier of the daemon.  <p><br /></p>  > **Note**: The format of the ID itself is not part of the API, and > should not be considered stable.'
+          nullable: true
+        IPv4Forwarding:
+          type: boolean
+          description: Indicates IPv4 forwarding is enabled.
+          nullable: true
+        Images:
+          type: integer
+          format: int64
+          description: Total number of images on the host.  Both _tagged_ and _untagged_ (dangling) images are counted.
+          nullable: true
+        IndexServerAddress:
+          type: string
+          description: Address / URL of the index server that is used for image search, and as a default for user authentication for Docker Hub and Docker Cloud.
+          nullable: true
+        InitBinary:
+          type: string
+          description: Name and, optional, path of the `docker-init` binary.  If the path is omitted, the daemon searches the host's `$PATH` for the binary and uses the first result.
+          nullable: true
+        InitCommit:
+          allOf:
+          - $ref: '#/components/schemas/Commit'
+          nullable: true
+        Isolation:
+          allOf:
+          - $ref: '#/components/schemas/SystemInfoIsolationEnum'
+          nullable: true
+        KernelMemoryTCP:
+          type: boolean
+          description: Indicates if the host has kernel memory TCP limit support enabled. This field is omitted if not supported.  Kernel memory TCP limits are not supported when using cgroups v2, which does not support the corresponding `memory.kmem.tcp.limit_in_bytes` cgroup.
+          nullable: true
+        KernelVersion:
+          type: string
+          description: Kernel version of the host.  On Linux, this information obtained from `uname`. On Windows this information is queried from the <kbd>HKEY_LOCAL_MACHINE\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\</kbd> registry value, for example _\"10.0 14393 (14393.1198.amd64fre.rs1_release_sec.170427-1353)\"_.
+          nullable: true
+        Labels:
+          type: array
+          items:
+            type: string
+          description: 'User-defined labels (key/value metadata) as set on the daemon.  <p><br /></p>  > **Note**: When part of a Swarm, nodes can both have _daemon_ labels, > set through the daemon configuration, and _node_ labels, set from a > manager node in the Swarm. Node labels are not included in this > field. Node labels can be retrieved using the `/nodes/(id)` endpoint > on a manager node in the Swarm.'
+          nullable: true
+        LiveRestoreEnabled:
+          type: boolean
+          description: Indicates if live restore is enabled.  If enabled, containers are kept running when the daemon is shutdown or upon daemon start if running containers are detected.
+          nullable: true
+        LoggingDriver:
+          type: string
+          description: The logging driver to use as a default for new containers.
+          nullable: true
+        MemTotal:
+          type: integer
+          format: int64
+          description: Total amount of physical memory available on the host, in bytes.
+          nullable: true
+        MemoryLimit:
+          type: boolean
+          description: Indicates if the host has memory limit support enabled.
+          nullable: true
+        NCPU:
+          type: integer
+          format: int64
+          description: The number of logical CPUs usable by the daemon.  The number of available CPUs is checked by querying the operating system when the daemon starts. Changes to operating system CPU allocation after the daemon is started are not reflected.
+          nullable: true
+        NEventsListener:
+          type: integer
+          format: int64
+          description: Number of event listeners subscribed.
+          nullable: true
+        NFd:
+          type: integer
+          format: int64
+          description: The total number of file Descriptors in use by the daemon process.  This information is only returned if debug-mode is enabled.
+          nullable: true
+        NGoroutines:
+          type: integer
+          format: int64
+          description: The  number of goroutines that currently exist.  This information is only returned if debug-mode is enabled.
+          nullable: true
+        Name:
+          type: string
+          description: Hostname of the host.
+          nullable: true
+        NoProxy:
+          type: string
+          description: Comma-separated list of domain extensions for which no proxy should be used. This value is obtained from the [`NO_PROXY`](https://www.gnu.org/software/wget/manual/html_node/Proxies.html) environment variable.  Containers do not automatically inherit this configuration.
+          nullable: true
+        OSType:
+          type: string
+          description: Generic type of the operating system of the host, as returned by the Go runtime (`GOOS`).  Currently returned values are \"linux\" and \"windows\". A full list of possible values can be found in the [Go documentation](https://golang.org/doc/install/source#environment).
+          nullable: true
+        OSVersion:
+          type: string
+          description: 'Version of the host''s operating system  <p><br /></p>  > **Note**: The information returned in this field, including its > very existence, and the formatting of values, should not be considered > stable, and may change without notice.'
+          nullable: true
+        OomKillDisable:
+          type: boolean
+          description: Indicates if OOM killer disable is supported on the host.
+          nullable: true
+        OperatingSystem:
+          type: string
+          description: 'Name of the host''s operating system, for example: \"Ubuntu 16.04.2 LTS\" or \"Windows Server 2016 Datacenter\"'
+          nullable: true
+        PidsLimit:
+          type: boolean
+          description: Indicates if the host kernel has PID limit support enabled.
+          nullable: true
+        Plugins:
+          allOf:
+          - $ref: '#/components/schemas/PluginsInfo'
+          nullable: true
+        ProductLicense:
+          type: string
+          description: Reports a summary of the product license on the daemon.  If a commercial license has been applied to the daemon, information such as number of nodes, and expiration are included.
+          nullable: true
+        RegistryConfig:
+          allOf:
+          - $ref: '#/components/schemas/RegistryServiceConfig'
+          nullable: true
+        RuncCommit:
+          allOf:
+          - $ref: '#/components/schemas/Commit'
+          nullable: true
+        Runtimes:
+          type: object
+          description: List of [OCI compliant](https://github.com/opencontainers/runtime-spec) runtimes configured on the daemon. Keys hold the \"name\" used to reference the runtime.  The Docker daemon relies on an OCI compliant runtime (invoked via the `containerd` daemon) as its interface to the Linux kernel namespaces, cgroups, and SELinux.  The default runtime is `runc`, and automatically configured. Additional runtimes can be configured by the user and will be listed here.
+          additionalProperties:
+            $ref: '#/components/schemas/Runtime'
+          nullable: true
+        SecurityOptions:
+          type: array
+          items:
+            type: string
+          description: List of security features that are enabled on the daemon, such as apparmor, seccomp, SELinux, user-namespaces (userns), and rootless.  Additional configuration options for each security feature may be present, and are included as a comma-separated list of key/value pairs.
+          nullable: true
+        ServerVersion:
+          type: string
+          description: 'Version string of the daemon.  > **Note**: the [standalone Swarm API](https://docs.docker.com/swarm/swarm-api/) > returns the Swarm version instead of the daemon  version, for example > `swarm/1.2.8`.'
+          nullable: true
+        SwapLimit:
+          type: boolean
+          description: Indicates if the host has memory swap limit support enabled.
+          nullable: true
+        Swarm:
+          allOf:
+          - $ref: '#/components/schemas/SwarmInfo'
+          nullable: true
+        SystemTime:
+          type: string
+          description: Current system-time in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+          nullable: true
+        Warnings:
+          type: array
+          items:
+            type: string
+          description: List of warnings / informational messages about missing features, or issues related to the daemon configuration.  These messages can be printed by the client as information to the user.
+          nullable: true
+    SystemInfoCgroupDriverEnum:
+      type: string
+      enum:
+      - EMPTY
+      - cgroupfs
+      - systemd
+      - none
+    SystemInfoCgroupVersionEnum:
+      type: string
+      enum:
+      - EMPTY
+      - '1'
+      - '2'
+    SystemInfoDefaultAddressPools:
+      type: object
+      properties:
+        Base:
+          type: string
+          description: The network address in CIDR format
+          nullable: true
+        Size:
+          type: integer
+          format: int64
+          description: The network pool size
+          nullable: true
+    SystemInfoIsolationEnum:
+      type: string
+      enum:
+      - EMPTY
+      - default
+      - hyperv
+      - process
+    ThrottleDevice:
+      type: object
+      properties:
+        Path:
+          type: string
+          description: Device path
+          nullable: true
+        Rate:
+          type: integer
+          format: int64
+          description: Rate
+          nullable: true
+    TlsInfo:
+      type: object
+      description: Information about the issuer of leaf TLS certificates and the trusted root CA certificate.
+      properties:
+        CertIssuerPublicKey:
+          type: string
+          description: The base64-url-safe-encoded raw public key bytes of the issuer.
+          nullable: true
+        CertIssuerSubject:
+          type: string
+          description: The base64-url-safe-encoded raw subject bytes of the issuer.
+          nullable: true
+        TrustRoot:
+          type: string
+          description: The root CA certificate(s) that are used to validate leaf TLS certificates.
+          nullable: true
+    Vm:
+      type: object
+      description: A virtual machine instance
+      required:
+      - Key
+      - NamespaceName
+      - Name
+      - ConfigKey
+      - Config
+      properties:
+        Config:
+          $ref: '#/components/schemas/VmConfig'
+        ConfigKey:
+          type: string
+          format: uuid
+          description: Unique identifier of the vm config
+        Key:
+          type: string
+          description: Key of the vm
+        Name:
+          type: string
+          description: Name of the vm
+        NamespaceName:
+          type: string
+          description: Name of the namespace
+    VmConfig:
+      type: object
+      description: |-
+        A vm config is the configuration of a vm
+        It used to know the state of the vm
+        It keep tracking of an history when you patch an existing vm
+      required:
+      - Key
+      - CreatedAt
+      - Name
+      - Version
+      - VmKey
+      - Disk
+      - HostConfig
+      properties:
+        CreatedAt:
+          type: string
+          format: date-time
+          description: Creation date of the vm config
+        Disk:
+          $ref: '#/components/schemas/VmDiskConfig'
+        HostConfig:
+          $ref: '#/components/schemas/VmHostConfig'
+        Hostname:
+          type: string
+          description: Hostname of the vm
+          nullable: true
+        Key:
+          type: string
+          format: uuid
+          description: Unique identifier of the vm config
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        MacAddress:
+          type: string
+          description: Mac address of the vm
+          nullable: true
+        Name:
+          type: string
+          description: Name of the vm
+        Password:
+          type: string
+          description: Default password of the vm (cloud)
+          nullable: true
+        SshKey:
+          type: string
+          description: Default ssh key for the user
+          nullable: true
+        User:
+          type: string
+          description: Default user of the vm (cloud)
+          nullable: true
+        Version:
+          type: string
+          description: Version of the config
+        VmKey:
+          type: string
+          description: The key of the vm
+    VmConfigPartial:
+      type: object
+      description: A vm config partial is used to create a Vm
+      required:
+      - Name
+      - Disk
+      - HostConfig
+      properties:
+        Disk:
+          $ref: '#/components/schemas/VmDiskConfig'
+        HostConfig:
+          $ref: '#/components/schemas/VmHostConfig'
+        Hostname:
+          type: string
+          description: Hostname of the vm
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        MacAddress:
+          type: string
+          description: Mac address of the vm
+          nullable: true
+        Name:
+          type: string
+          description: Name of the vm
+        Password:
+          type: string
+          description: Default password of the vm (cloud)
+          nullable: true
+        SshKey:
+          type: string
+          description: Default ssh key for the user
+          nullable: true
+        User:
+          type: string
+          description: Default user of the vm (cloud)
+          nullable: true
+    VmConfigUpdate:
+      type: object
+      description: |-
+        Payload used to patch a vm
+        It will create a new [VmConfig](VmConfig) with the new values
+        It will keep the old values in the history
+      properties:
+        HostConfig:
+          allOf:
+          - $ref: '#/components/schemas/VmHostConfig'
+          nullable: true
+        Hostname:
+          type: string
+          description: Hostname of the vm
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        Name:
+          type: string
+          description: Name of the vm
+          nullable: true
+        Password:
+          type: string
+          description: Default password of the vm (cloud)
+          nullable: true
+        SshKey:
+          type: string
+          description: Default ssh key for the user
+          nullable: true
+        User:
+          type: string
+          description: Default user of the vm (cloud)
+          nullable: true
+    VmDiskConfig:
+      type: object
+      description: Disk representation of a VM
+      required:
+      - Image
+      properties:
+        Image:
+          type: string
+          description: Name of the image to use
+        Size:
+          type: integer
+          format: int64
+          description: Virtual size allowed for the disk
+          nullable: true
+          minimum: 0.0
+    VmHostConfig:
+      type: object
+      description: A vm's resources (cpu, memory, network)
+      required:
+      - Cpu
+      - Memory
+      properties:
+        Cpu:
+          type: integer
+          format: int64
+          description: Number of cpu of the vm
+          minimum: 0.0
+        Dns:
+          type: array
+          items:
+            type: string
+          description: A list of DNS servers for the vm to use.
+          nullable: true
+        Kvm:
+          type: boolean
+          description: Enable KVM
+          nullable: true
+        Memory:
+          type: integer
+          format: int64
+          description: Memory of the vm
+          minimum: 0.0
+        NetIface:
+          type: string
+          description: default network interface of the vm
+          nullable: true
+        Runtime:
+          type: string
+          description: 'Container image name to use for vm default: nexthat/nanocl-qemu'
+          nullable: true
+        RuntimeNet:
+          type: string
+          nullable: true
+    VmImage:
+      type: object
+      required:
+      - Name
+      - CreatedAt
+      - Path
+      - Kind
+      - Format
+      - SizeActual
+      - SizeVirtual
+      properties:
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the image was created
+        Format:
+          type: string
+          description: The format of the image
+        Kind:
+          type: string
+          description: The type of the image
+        Name:
+          type: string
+          description: The name of the image
+        Path:
+          type: string
+          description: The path to the image
+        SizeActual:
+          type: integer
+          format: int64
+          description: The actual size of the image in bytes
+        SizeVirtual:
+          type: integer
+          format: int64
+          description: The virtual size of the image in bytes
+    VmImageResizePayload:
+      type: object
+      required:
+      - Size
+      - Shrink
+      properties:
+        Shrink:
+          type: boolean
+          description: Whether to shrink the image or not
+        Size:
+          type: integer
+          format: int64
+          description: The new size of the image in bytes
+          minimum: 0.0
+    VmInspect:
+      type: object
+      description: |-
+        A Vm Inspect is a detailed view of a cargo
+        It is used to inspect a cargo
+        It contains all the information about the cargo
+        It also contains the list of containers
+      required:
+      - Key
+      - Name
+      - ConfigKey
+      - NamespaceName
+      - Config
+      - InstanceTotal
+      - InstanceRunning
+      - Instances
+      properties:
+        Config:
+          $ref: '#/components/schemas/VmConfig'
+        ConfigKey:
+          type: string
+          format: uuid
+          description: Unique identifier of the cargo config
+        InstanceRunning:
+          type: integer
+          description: Number of running instances
+          minimum: 0.0
+        InstanceTotal:
+          type: integer
+          description: Number of instances
+          minimum: 0.0
+        Instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContainerSummary'
+          description: List of containers
+        Key:
+          type: string
+          description: Key of the cargo
+        Name:
+          type: string
+          description: Name of the cargo
+        NamespaceName:
+          type: string
+          description: Name of the namespace
+    VmSummary:
+      type: object
+      description: |-
+        A Vm Summary is a summary of a vm
+        It is used to list all the vms
+      required:
+      - Key
+      - CreatedAt
+      - UpdatedAt
+      - Name
+      - ConfigKey
+      - NamespaceName
+      - Config
+      - Instances
+      - RunningInstances
+      properties:
+        Config:
+          $ref: '#/components/schemas/VmConfig'
+        ConfigKey:
+          type: string
+          format: uuid
+          description: Unique identifier of the vm config
+        CreatedAt:
+          type: string
+          format: date-time
+          description: Creation date of the vm
+        Instances:
+          type: integer
+          description: Number of instances
+          minimum: 0.0
+        Key:
+          type: string
+          description: Key of the vm
+        Name:
+          type: string
+          description: Name of the vm
+        NamespaceName:
+          type: string
+          description: Name of the namespace
+        RunningInstances:
+          type: integer
+          description: Number of running instances
+          minimum: 0.0
+        UpdatedAt:
+          type: string
+          format: date-time
+          description: Update date of the vm
+tags:
+- name: CargoImages
+  description: Cargo images management endpoints.
+- name: Namespaces
+  description: Namespaces management endpoints.
+- name: Nodes
+  description: Nodes management endpoints.
+- name: Resources
+  description: Resources management endpoints.
+- name: System
+  description: General system endpoints.
+- name: VmImages
+  description: Virtual machine images management endpoints.
+- name: Vms
+  description: Virtual machines management endpoints.

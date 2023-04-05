@@ -27,6 +27,18 @@ use crate::{utils, repositories};
 use crate::error::HttpError;
 use crate::models::{DaemonState, WsConState};
 
+/// List virtual machines
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Vms",
+  path = "/vms",
+  params(
+    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+  ),
+  responses(
+    (status = 200, description = "List of virtual machine", body = [VmSummary]),
+  ),
+))]
 #[web::get("/vms")]
 pub(crate) async fn list_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -39,6 +51,19 @@ pub(crate) async fn list_vm(
   Ok(web::HttpResponse::Ok().json(&vms))
 }
 
+/// Inspect a virtual machine
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Vms",
+  path = "/vms/{Name}/inspect",
+  params(
+    ("Name" = String, Path, description = "The name of the virtual machine"),
+    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+  ),
+  responses(
+    (status = 200, description = "Detailed information about a virtual machine", body = VmInspect),
+  ),
+))]
 #[web::get("/vms/{name}/inspect")]
 pub(crate) async fn inspect_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -54,6 +79,19 @@ pub(crate) async fn inspect_vm(
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
+/// Start a virtual machine
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Vms",
+  path = "/vms/{Name}/start",
+  params(
+    ("Name" = String, Path, description = "The name of the virtual machine"),
+    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+  ),
+  responses(
+    (status = 200, description = "The virtual machine has been started"),
+  ),
+))]
 #[web::post("/vms/{name}/start")]
 pub(crate) async fn start_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -70,6 +108,19 @@ pub(crate) async fn start_vm(
   Ok(web::HttpResponse::Ok().finish())
 }
 
+/// Stop a virtual machine
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Vms",
+  path = "/vms/{Name}/stop",
+  params(
+    ("Name" = String, Path, description = "The name of the virtual machine"),
+    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+  ),
+  responses(
+    (status = 200, description = "The virtual machine has been stopped"),
+  ),
+))]
 #[web::post("/vms/{name}/stop")]
 pub(crate) async fn stop_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -86,6 +137,19 @@ pub(crate) async fn stop_vm(
   Ok(web::HttpResponse::Ok().finish())
 }
 
+/// Delete a virtual machine
+#[cfg_attr(feature = "dev", utoipa::path(
+  delete,
+  tag = "Vms",
+  path = "/vms/{Name}",
+  params(
+    ("Name" = String, Path, description = "The name of the virtual machine"),
+    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+  ),
+  responses(
+    (status = 200, description = "The virtual machine has been deleted"),
+  ),
+))]
 #[web::delete("/vms/{name}")]
 pub(crate) async fn delete_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -101,6 +165,19 @@ pub(crate) async fn delete_vm(
   Ok(web::HttpResponse::Ok().finish())
 }
 
+/// Create a virtual machine
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Vms",
+  path = "/vms",
+  request_body = VmConfigPartial,
+  params(
+    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+  ),
+  responses(
+    (status = 200, description = "The virtual machine has been created", body = Vm),
+  ),
+))]
 #[web::post("/vms")]
 pub(crate) async fn create_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -115,6 +192,19 @@ pub(crate) async fn create_vm(
   Ok(web::HttpResponse::Ok().json(&item))
 }
 
+/// List virtual machine histories
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Vms",
+  path = "/vms/{Name}/histories",
+  params(
+    ("Name" = String, Path, description = "The name of the virtual machine"),
+    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+  ),
+  responses(
+    (status = 200, description = "The virtual machine histories have been listed", body = [VmConfig]),
+  ),
+))]
 #[web::get("/vms/{name}/histories")]
 pub(crate) async fn list_vm_history(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -128,6 +218,21 @@ pub(crate) async fn list_vm_history(
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
+/// Patch a virtual machine config meaning merging current config with the new one and add history entry
+#[cfg_attr(feature = "dev", utoipa::path(
+  patch,
+  tag = "Vms",
+  request_body = VmConfigUpdate,
+  path = "/vms/{Name}",
+  params(
+    ("Name" = String, Path, description = "Name of the virtual machine"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the virtual machine"),
+  ),
+  responses(
+    (status = 200, description = "Updated virtual machine", body = Vm),
+    (status = 404, description = "Virtual machine not found", body = ApiError),
+  ),
+))]
 #[web::patch("/vms/{name}")]
 pub(crate) async fn patch_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
@@ -144,7 +249,7 @@ pub(crate) async fn patch_vm(
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
-pub(crate) async fn ws_attach_service(
+async fn ws_attach_service(
   (key, sink, state): (String, ws::WsSink, web::types::State<DaemonState>),
 ) -> Result<
   impl Service<ws::Frame, Response = Option<ws::Message>, Error = io::Error>,
@@ -261,7 +366,19 @@ pub(crate) async fn ws_attach_service(
   Ok(pipeline(service).and_then(on_shutdown))
 }
 
-/// Entry point for our route
+/// Attach to a virtual machine via websocket
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Vms",
+  path = "/vms/{Name}/attach",
+  params(
+    ("Name" = String, Path, description = "Name of the virtual machine"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the virtual machine"),
+  ),
+  responses(
+    (status = 101, description = "Websocket connection"),
+  ),
+))]
 pub(crate) async fn vm_attach(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   req: HttpRequest,

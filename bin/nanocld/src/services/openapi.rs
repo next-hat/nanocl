@@ -27,6 +27,7 @@ use bollard_next::service::{
   GenericResourcesDiscreteResourceSpec, GenericResourcesNamedResourceSpec,
 };
 use nanocl_stubs::system::HostInfo;
+use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::node::{Node, NodeContainerSummary};
 use nanocl_stubs::namespace::{
@@ -39,13 +40,17 @@ use nanocl_stubs::cargo_config::{
   CargoConfig, CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
 };
 use nanocl_stubs::cargo_image::CargoImagePartial;
+use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
+use nanocl_stubs::vm_config::{
+  VmConfig, VmConfigPartial, VmConfigUpdate, VmDiskConfig, VmHostConfig,
+};
 use nanocl_stubs::resource::{
   Resource, ResourcePatch, ResourceConfig, ResourcePartial,
 };
 
 use crate::error::HttpError;
 
-use super::{node, cargo, system, namespace, cargo_image, resource};
+use super::{node, system, namespace, cargo, cargo_image, vm, vm_image, resource};
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
 #[allow(dead_code)]
@@ -119,12 +124,13 @@ impl Modify for VersionModifier {
 
     let server = utoipa::openapi::ServerBuilder::default()
       .url("/{version}")
-      .description(Some("localhost"))
       .parameter("version", variable)
       .build();
 
     openapi.info.title = "Nanocl Daemon".to_string();
     openapi.info.version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    openapi.info.description =
+      Some(include_str!("../../specs/readme.md").to_string());
     openapi.servers = Some(vec![server]);
   }
 }
@@ -166,6 +172,23 @@ impl Modify for VersionModifier {
     cargo_image::create_cargo_image,
     cargo_image::delete_cargo_image,
     cargo_image::import_cargo_image,
+    // VM Image
+    vm_image::list_vm_images,
+    vm_image::import_vm_image,
+    vm_image::delete_vm_image,
+    vm_image::resize_vm_image,
+    vm_image::clone_vm_image,
+    vm_image::snapshot_vm_image,
+    // Vm
+    vm::list_vm,
+    vm::inspect_vm,
+    vm::start_vm,
+    vm::stop_vm,
+    vm::delete_vm,
+    vm::create_vm,
+    vm::list_vm_history,
+    vm::patch_vm,
+    vm::vm_attach,
     // Resource
     resource::list_resource,
     resource::inspect_resource,
@@ -267,6 +290,19 @@ impl Modify for VersionModifier {
     RestartPolicyNameEnum,
     MountBindOptionsPropagationEnum,
     MountVolumeOptionsDriverConfig,
+    // Vm Image
+    VmImage,
+    VmImageResizePayload,
+    // Vm
+    Vm,
+    VmSummary,
+    VmInspect,
+    // Vm Config
+    VmConfig,
+    VmConfigPartial,
+    VmConfigUpdate,
+    VmDiskConfig,
+    VmHostConfig,
     // Resource
     Resource,
     ResourcePatch,
@@ -279,11 +315,13 @@ impl Modify for VersionModifier {
     GenericDelete,
   )),
   tags(
-    (name = "Cargo Images", description = "Cargo images management endpoints."),
+    (name = "CargoImages", description = "Cargo images management endpoints."),
     (name = "Namespaces", description = "Namespaces management endpoints."),
     (name = "Nodes", description = "Nodes management endpoints."),
     (name = "Resources", description = "Resources management endpoints."),
     (name = "System", description = "General system endpoints."),
+    (name = "VmImages", description = "Virtual machine images management endpoints."),
+    (name = "Vms", description = "Virtual machines management endpoints."),
   ),
   modifiers(&VersionModifier),
 )]
@@ -303,6 +341,12 @@ async fn get_api_specs() -> Result<web::HttpResponse, HttpError> {
 }
 
 pub fn ntex_config(config: &mut ntex::web::ServiceConfig) {
+  let yaml = ApiDoc::openapi()
+    .to_yaml()
+    .expect("Unable to generate openapi spec");
+
+  std::fs::write("./bin/nanocld/specs/swagger.yaml", yaml).unwrap();
+
   config.service(get_api_specs);
   config.service(
     fs::Files::new("/", "./bin/nanocld/swagger-ui/").index_file("index.html"),

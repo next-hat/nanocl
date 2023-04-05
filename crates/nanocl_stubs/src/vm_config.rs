@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 
 /// Disk representation of a VM
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmDiskConfig {
@@ -16,6 +17,7 @@ pub struct VmDiskConfig {
 
 /// A vm's resources (cpu, memory, network)
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmHostConfig {
@@ -51,6 +53,7 @@ impl Default for VmHostConfig {
 
 /// A vm config partial is used to create a Vm
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmConfigPartial {
@@ -78,6 +81,7 @@ pub struct VmConfigPartial {
 /// It will create a new [VmConfig](VmConfig) with the new values
 /// It will keep the old values in the history
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmConfigUpdate {
@@ -115,6 +119,7 @@ impl From<VmConfigPartial> for VmConfigUpdate {
 /// It used to know the state of the vm
 /// It keep tracking of an history when you patch an existing vm
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmConfig {

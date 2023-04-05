@@ -1,10 +1,13 @@
 # Nanocl Daemon
 
-The nanocl daemon is used as gateway between nanocl controller and the store by emitting events
+The nanocl daemon is a Rest Api designed to be the entrypoint of a enduser.
+
 
 ## Sources Structure
 
-- `src/models` Data structure used in all project
-- `src/repositories` Method
-- `src/services`
-- `src/utils` Utils function usually to controll containers or controllers.
+- `src/models` **Data structure** used for the project
+- `src/repositories` **CRUD** functions helper for postgresql
+- `src/services` **CRUD** endpoints for the rest api
+- `src/utils` **Utils** functions.
+
+**CRUD**: Create, Read, Update, Delete
