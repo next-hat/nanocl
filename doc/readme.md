@@ -156,7 +156,7 @@ You can do it in multiple way :
   cargo watch -x "run --no-default-features --features dev --bin nanocld"
   ```
 
-Once started a swagger should be available on [http://localhost:8585/explorer].
+Once started a swagger should be available on [http://localhost:8585/explorer](http://localhost:8585/explorer).
 
 
 <div align="center">
