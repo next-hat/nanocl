@@ -98,7 +98,7 @@ To learn more about `Nanocl`, you can take a look at the following resources:
 
 To work properly `Nanocl` must have theses dependencies installed on the system:
 
-- [Docker](https://www.docker.com) minimum version 1.42
+- [Docker](https://www.docker.com) minimum version 1.41
 
 
 ## 💾 Installation
