@@ -30,22 +30,26 @@
  </span>
 </blockquote>
 
+
 ## ❓ What is Nanocl ?
 
-`Nanocl` is a *distributed system* that simplifies the management of `containers` and `virtual machines` across multiple `hosts` also called `nodes`.
+`Nanocl` is a **distributed system** that simplifies the management of `containers` and `virtual machines` across multiple `hosts` also called `nodes`.
 With `Nanocl`, you can **efficiently share resources** and **deploy applications**, **services**, and **databases** `publicly`, `privately`, or under a `VPN`.
 Whether you're running a **home lab** setup or a **large enterprise**, *Nanocl's cutting-edge technology*, crafted with precision using `Rust`, provides **unparalleled performance** and a **small footprint**.
 
+
 ## 📙 Table of Contents
-* [❓ What is Nanocl ?](#❓-what-is-nanocl)
-* [📙 Table of Contents](#📙-table-of-contents)
-* [🚀 Key Benefits](#🚀-key-benefits)
-* [🧿 Architecture](#🧿-architecture)
-* [📚 Documentation](#📚-documentation)
-* [📋 Requirements](#📋-requirements)
-* [💾 Installation](#💾-installation)
-* [🔧 Usage](#🔧-usage)
-* [👨‍💻 Contributing](#👨‍💻-contributing)
+
+* [❓ What is Nanocl ?](#-what-is-nanocl)
+* [📙 Table of Contents](#-table-of-contents)
+* [🚀 Key Benefits](#-key-benefits)
+* [🧿 Architecture](#-architecture)
+* [📚 Documentation](#-documentation)
+* [📋 Requirements](#-requirements)
+* [💾 Installation](#-installation)
+* [🔧 Usage](#-usage)
+* [👨‍💻 Contributing](#-contributing)
+
 
 ## 🚀 Key Benefits
 
@@ -59,16 +63,18 @@ Whether you're running a **home lab** setup or a **large enterprise**, *Nanocl's
 * Build an entire CI/CD pipeline, from tests to high-availability production
 * Best ideas and practices from the community
 
+
 ## 🧿 Architecture
 
 `Nanocl` is designed in a **micro services** architecture several component are required and they are running as **container** included the `Nanocl Daemon` itself.
 The following components will be installed during `nanocl setup` and are required to ensure `Nanocl` functionnality:
 
 * `store` to save our state
-* `metrics` to monitor Cpu, Memory and Network usage
-* `proxy` to redirect traffic to our `containers` and `virtual machines`
+* `daemon` as **REST API** to manage everything
+* `metrics` to monitor cpu, memory and network usage
+* `proxy` to redirect traffic to our **containers** and **virtual machines**
 * `ctrl-proxy` to update proxy configuration based on the current state
-* `dns` to manage the dns entries for the `containers` and `virtual machines`
+* `dns` to manage the dns entries for the **containers** and **virtual machines**
 * `ctrl-dns` to update dns entries based on the current state
 
 Simplified version of our architecture for a single node:
@@ -76,6 +82,7 @@ Simplified version of our architecture for a single node:
 <div align="center">
   <img src="./doc/architecture.png" />
 </div>
+
 
 ## 📚 Documentation
 
@@ -98,10 +105,11 @@ To work properly `Nanocl` must have theses dependencies installed on the system:
 
 To install `Nanocl`, please refer to our online [installation guide](https://docs.next-hat.com/setups/nanocl).
 
+
 ## 🔧 Usage
 
 `Nanocl` is designed to be easy to operate by mostly using **state files**.<br />
-**State Files** are `yaml` files that define the state you want.
+**State Files** are `yaml` files that define the state you want.<br />
 There is an example used to deploy our [documentation](https://docs.next-hat.com):
 
 ```yaml
@@ -141,7 +149,7 @@ Resources:
               Port: 80
 ```
 
-To apply a state we can do it easily bu running `nanocl state apply -f path|url`
+To apply a state we can do it easily bu running `nanocl state apply -f path|url`<br />
 We can also revert a state by calling `nanocl state revert -f path|url`
 
 ## 👨‍💻 Contributing

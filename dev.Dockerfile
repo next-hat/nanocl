@@ -6,17 +6,12 @@ ARG tz=Europe/Paris
 
 
 # Install required dependencies
-RUN apk add openssl
-RUN apk add libpq-dev
-RUN apk add gcc
-RUN apk add g++
-RUN apk add make
-RUN apk add tzdata
-RUN apk add util-linux
-RUN apk add bash
+RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base tzdata bash util-linux
 
+# Install cargo-watch
 RUN cargo install cargo-watch --locked
 
+# Create project directory
 RUN mkdir -p /project
 WORKDIR /project
 

@@ -325,9 +325,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next"
-version = "0.14.6"
+version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bba9e4db6c45268349085211e2417f51be47825a4065cd60eaf49b11b946ecf1"
+checksum = "b1fe60921ca63eba188e9837de5bd7d3506fca65ac6e40efbce9f4ddfadbcd61"
 dependencies = [
  "base64 0.21.0",
  "bollard-next-stubs",
@@ -355,9 +355,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next-stubs"
-version = "1.42.0-rc.10"
+version = "1.42.0-rc.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cd019d6ab0ec7e634290d54ab32d6c2b08a81b7dae6bfac1724925db5460813"
+checksum = "638b9e2e0b41d089b75687a8c896a8564e2babddc6693d91c19675fbdc4c364f"
 dependencies = [
  "serde",
  "serde_with",
@@ -683,7 +683,6 @@ dependencies = [
  "log 0.4.17",
  "nanocld_client",
  "ntex",
- "schemars",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -819,12 +818,6 @@ dependencies = [
  "block-buffer",
  "crypto-common",
 ]
-
-[[package]]
-name = "dyn-clone"
-version = "1.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68b0cf012f1230e43cd00ebb729c6bb58707ecfa8ad08b52ef3a4ccd2697fc30"
 
 [[package]]
 name = "enclose"
@@ -2548,30 +2541,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "schemars"
-version = "0.8.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02c613288622e5f0c3fdc5dbd4db1c5fbe752746b1d1a56a0630b78fd00de44f"
-dependencies = [
- "dyn-clone",
- "schemars_derive",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "schemars_derive"
-version = "0.8.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "109da1e6b197438deb6db99952990c7f959572794b80ff93707d55a232545e7c"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde_derive_internals",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2626,17 +2595,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_derive_internals"
-version = "0.26.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85bf8229e7920a9f636479437026331ce11aa132b4dde37d121944a44d6e5f3c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "serde_json"
 version = "1.0.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2672,9 +2630,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "2.3.1"
+version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85456ffac572dc8826334164f2fb6fb40a7c766aebe195a2a21ee69ee2885ecf"
+checksum = "331bb8c3bf9b92457ab7abecf07078c13f7d270ba490103e84e8b014490cd0b0"
 dependencies = [
  "base64 0.13.1",
  "chrono",
@@ -2687,9 +2645,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.9.19"
+version = "0.9.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f82e6c8c047aa50a7328632d067bcae6ef38772a79e28daf32f735e0e4f3dd10"
+checksum = "0feade41f4649f0549d22df8c0432b2c25128b50f5d926b22173022e25b7c69e"
 dependencies = [
  "indexmap",
  "itoa",
