@@ -22,24 +22,28 @@ Resources:
               Url: http://deploy-example.com/v2
               Redirect: TemporaryRedirect
 
+        - Path: /v1
+          Target:
+            Cargo:
+              Key: deploy-example.global
+              Port: 9000
+
         - Path: /v2
           Target:
             Cargo:
               Key: deploy-example2.global
               Port: 9000
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/daemon/v0.4#tag/Cargoes/operation/create_cargo
 Cargoes:
 - Name: deploy-example
-  # See all options:
-  # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
   Container:
     Image: nexthat/nanocl-get-started:latest
     Env:
       - APP=GET_STARTED1
 
 - Name: deploy-example2
-  # See all options:
-  # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
   Container:
     Image: nexthat/nanocl-get-started:latest
     Env:

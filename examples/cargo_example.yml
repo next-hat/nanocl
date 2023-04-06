@@ -3,9 +3,9 @@ ApiVersion: v0.4
 
 Namespace: cargo-example
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/daemon/v0.4#tag/Cargoes/operation/create_cargo
 Cargoes:
 - Name: cargo-example
-  # See all options:
-  # https://docs.docker.com/engine/api/v1.42/#tag/Container/operation/ContainerCreate
   Container:
     Image: nexthat/nanocl-get-started:latest
