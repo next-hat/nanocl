@@ -14,7 +14,7 @@ pub struct SetupOpts {
   pub(crate) deamon_hosts: Option<Vec<String>>,
   #[clap(long)]
   pub(crate) group: Option<String>,
-  #[clap(long, default_value = "0.3.0")]
+  #[clap(long, default_value = "0.4.0")]
   pub(crate) version: String,
   #[clap(long)]
   pub(crate) hostname: Option<String>,

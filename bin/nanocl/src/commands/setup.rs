@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use bollard_next::container::LogOutput;
+use bollard_next::container::LogsOptions;
+use ntex::rt;
+
 use bollard_next::container::StartContainerOptions;
 use bollard_next::service::HostConfig;
 use futures::StreamExt;
@@ -120,11 +124,14 @@ async fn install_dependencies(
   docker_api: &Docker,
   version: &str,
 ) -> Result<(), CliError> {
-  println!("Installing dependencies");
+  println!("Installing dependencies:");
   install_image("cockroachdb/cockroach", "v22.2.6", docker_api).await?;
   install_image("nexthat/metrsd", "v0.1.0", docker_api).await?;
-  install_image("nexthat/nanocld", version, docker_api).await?;
-  println!("Dependencies installed");
+  install_image("ghcr.io/nxthat/nanocld", version, docker_api).await?;
+  install_image("ghcr.io/nxthat/nanocl-proxy", "0.2.4", docker_api).await?;
+  install_image("ghcr.io/nxthat/nanocl-ctrl-proxy", "0.2.4", docker_api)
+    .await?;
+  println!("Dependencies installed.");
   Ok(())
 }
 
@@ -197,7 +204,7 @@ async fn init_dependencies(
   args: &NanocldArgs,
   docker_api: &Docker,
 ) -> Result<(), CliError> {
-  println!("Initing daemon");
+  println!("Initing daemon:");
   let base_args = gen_daemon_args(args);
   let mut daemon_args = vec!["--init"]
     .iter()
@@ -211,9 +218,9 @@ async fn init_dependencies(
     .create_container(
       None::<CreateContainerOptions<String>>,
       ContainerConfig {
-        // image: Some("nanocld:nightly-0.3.0".into()),
-        image: Some(format!("nexthat/nanocld:{}", args.version)),
+        image: Some(format!("ghcr.io/nxthat/nanocld:{}", args.version)),
         cmd: Some(daemon_args),
+        tty: Some(true),
         env: Some(vec![format!("NANOCL_GID={}", args.gid)]),
         host_config: Some(HostConfig {
           network_mode: Some("host".into()),
@@ -228,45 +235,104 @@ async fn init_dependencies(
   docker_api
     .start_container(&container.id, None::<StartContainerOptions<String>>)
     .await?;
-  let mut stream = docker_api.wait_container(
-    &container.id,
-    Some(WaitContainerOptions {
-      condition: "removed",
-    }),
-  );
-  while let Some(stream) = stream.next().await {
-    match stream {
-      Ok(data) => {
-        if data.status_code != 0 {
-          return Err(CliError::Custom {
-            msg: format!(
-              "Error while initing nanocld daemon: [{}] {}",
-              data.status_code,
-              data.error.unwrap_or_default().message.unwrap_or_default()
-            ),
-          });
+  let container_id = container.id.to_owned();
+  let docker = docker_api.clone();
+  let waiter = rt::spawn(async move {
+    let mut stream = docker.wait_container(
+      &container_id,
+      Some(WaitContainerOptions {
+        condition: "removed",
+      }),
+    );
+    while let Some(stream) = stream.next().await {
+      match stream {
+        Ok(data) => {
+          if data.status_code != 0 {
+            return Err(CliError::Custom {
+              msg: format!(
+                "Error while initing nanocld daemon: [{}] {}",
+                data.status_code,
+                data.error.unwrap_or_default().message.unwrap_or_default()
+              ),
+            });
+          }
         }
+        Err(err) => match err {
+          bollard_next::errors::Error::DockerContainerWaitError {
+            error,
+            code,
+          } => {
+            return Err(CliError::Custom {
+              msg: format!(
+                "Error while initing nanocld daemon: [{}] {}",
+                code, error
+              ),
+            });
+          }
+          _ => {
+            return Err(CliError::Custom {
+              msg: format!("Error while initing nanocld daemon: {}", err),
+            });
+          }
+        },
       }
-      Err(err) => match err {
-        bollard_next::errors::Error::DockerContainerWaitError {
-          error,
-          code,
-        } => {
-          return Err(CliError::Custom {
-            msg: format!(
-              "Error while initing nanocld daemon: [{}] {}",
-              code, error
-            ),
-          });
-        }
-        _ => {
+    }
+    Ok::<_, CliError>(())
+  });
+  let container_id = container.id.to_owned();
+  let docker = docker_api.clone();
+  rt::spawn(async move {
+    let mut logs = docker.logs(
+      &container_id,
+      Some(LogsOptions::<String> {
+        stdout: true,
+        follow: true,
+        stderr: true,
+        ..Default::default()
+      }),
+    );
+
+    while let Some(log) = logs.next().await {
+      let output = match log {
+        Ok(data) => data,
+        Err(err) => {
           return Err(CliError::Custom {
             msg: format!("Error while initing nanocld daemon: {}", err),
           });
         }
-      },
+      };
+      match output {
+        LogOutput::StdOut { message } => {
+          let v = message.to_vec();
+          let s = String::from_utf8_lossy(&v);
+          print!("{}", s);
+        }
+        LogOutput::StdErr { message } => {
+          let v = message.to_vec();
+          let s = String::from_utf8_lossy(&v);
+          eprint!("{}", s);
+        }
+        LogOutput::Console { message } => {
+          let v = message.to_vec();
+          let s = String::from_utf8_lossy(&v);
+          print!("{}", s);
+        }
+        _ => {}
+      }
     }
-  }
+    Ok::<_, CliError>(())
+  });
+  waiter.await.map_err(|err| {
+    if err.is_cancelled() {
+      CliError::Custom {
+        msg: "Error while initing nanocld daemon: cancelled".into(),
+      }
+    } else {
+      CliError::Custom {
+        msg: format!("Error while initing nanocld daemon: {}", err),
+      }
+    }
+  })??;
   Ok(())
 }
 
@@ -279,6 +345,7 @@ async fn spawn_daemon(
   let daemon_args = gen_daemon_args(args);
   let mut labels = HashMap::new();
   labels.insert("io.nanocl".into(), "enabled".into());
+  labels.insert("io.nanocl.n".into(), "system".into());
   labels.insert("io.nanocl.c".into(), "daemon.system".into());
   labels.insert("io.nanocl.cnsp".into(), "system".into());
 
@@ -292,9 +359,10 @@ async fn spawn_daemon(
       }),
       ContainerConfig {
         // image: Some("nanocld:nightly-0.3.0".into()),
-        image: Some(format!("nexthat/nanocld:{}", args.version)),
+        image: Some(format!("ghcr.io/nxthat/nanocld:{}", args.version)),
         entrypoint: Some(vec!["/entrypoint.sh".into()]),
         cmd: Some(daemon_args),
+        tty: Some(true),
         labels: Some(labels),
         env: Some(vec![format!("NANOCL_GID={}", args.gid)]),
         host_config: Some(HostConfig {

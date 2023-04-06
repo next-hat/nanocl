@@ -19,4 +19,7 @@ RUN mkdir -p /var/lib/nginx/cache/private
 RUN mkdir -p /tmp/nginx/body
 RUN chmod +x /entrypoint.sh
 
+LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
+LABEL org.opencontainers.image.description Nanocl Proxy
+
 ENTRYPOINT ["/entrypoint.sh"]

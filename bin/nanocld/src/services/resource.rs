@@ -31,9 +31,7 @@ pub(crate) async fn list_resource(
   web::types::Query(query): web::types::Query<ResourceQuery>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("Listing resources with query: {query:#?}");
   let items = repositories::resource::find(&state.pool, Some(query)).await?;
-  log::debug!("Found {} resources", &items.len());
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -55,10 +53,8 @@ pub(crate) async fn inspect_resource(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("Inspecting resource: {}", &path.1);
   let resource =
     repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
-  log::debug!("Resource found: {:?}", &resource);
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
@@ -77,9 +73,7 @@ pub(crate) async fn create_resource(
   web::types::Json(payload): web::types::Json<ResourcePartial>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("Creating resource: {:?}", &payload);
   let resource = utils::resource::create(&payload, &state.pool).await?;
-  log::debug!("Resource created: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
     let _ = state
@@ -108,7 +102,6 @@ pub(crate) async fn delete_resource(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("Deleting resource: {}", &path.1);
   let resource =
     repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
   utils::resource::delete(resource.clone(), &state.pool).await?;
@@ -141,12 +134,6 @@ pub(crate) async fn patch_resource(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  log::debug!(
-    "Patching resource: {} with payload: {:?}",
-    &path.1,
-    &payload
-  );
-
   let resource =
     repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
 
@@ -157,7 +144,6 @@ pub(crate) async fn patch_resource(
     config: payload.config,
   };
   let resource = utils::resource::patch(new_resource, &state.pool).await?;
-  log::debug!("Resource patched: {:?}", &resource);
   let resource_ptr = resource.clone();
   rt::spawn(async move {
     let _ = state
@@ -186,11 +172,9 @@ pub(crate) async fn list_resource_history(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  log::debug!("Listing resource histories: {}", &path.1);
   let items =
     repositories::resource_config::list_by_resource(&path.1, &state.pool)
       .await?;
-  log::debug!("Resource histories found : {:#?}", &items);
   Ok(web::HttpResponse::Ok().json(&items))
 }
 

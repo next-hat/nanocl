@@ -40,9 +40,21 @@ async fn boot(cli: &cli::Cli) -> nginx::Nginx {
   nginx
 }
 
+fn wait_for_daemon() {
+  loop {
+    if std::path::Path::new("/run/nanocl/nanocl.sock").exists() {
+      break;
+    }
+
+    std::thread::sleep(std::time::Duration::from_secs(5));
+  }
+}
+
 fn main() -> std::io::Result<()> {
   ntex::rt::System::new(stringify!("run")).block_on(async move {
     let cli = cli::Cli::parse();
+
+    wait_for_daemon();
 
     let nginx = boot(&cli).await;
 

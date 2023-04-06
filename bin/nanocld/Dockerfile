@@ -30,19 +30,19 @@ COPY ./bin/nanocl/src ./bin/nanocl/src
 COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
 COPY .git ./.git
 ENV NANOCL_CHANNEL=$channel
-ENV RUSTFLAGS="-C target-feature=+crt-static"
-RUN cargo build --release --target=x86_64-unknown-linux-musl --bin nanocld
-RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/nanocld
+ENV RUSTFLAGS="-C target-feature=-crt-static"
+RUN cargo build --release --bin nanocld
+RUN upx --lzma --best /app/target/release/nanocld
 
 # stage 3 - Create runtime image
 FROM alpine:3.17.3
 
 ## Install dependencies
 RUN apk update && apk upgrade
-RUN apk add util-linux inotify-tools bash cloud-utils cdrkit
+RUN apk add libgcc openssl libpq util-linux inotify-tools bash cloud-utils cdrkit
 
 ## Copy the binary
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/nanocld /usr/local/bin/nanocld
+COPY --from=builder /app/target/release/nanocld /usr/local/bin/nanocld
 COPY ./bin/nanocld/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
