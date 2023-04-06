@@ -15,5 +15,6 @@ Cargoes:
       Image: nanocl-ctrl-dns:0.0.1
       Tty: true
       HostConfig:
+        NetworkMode: system
         Binds:
         - /run/nanocl:/run/nanocl

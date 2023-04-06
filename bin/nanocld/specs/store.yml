@@ -8,6 +8,7 @@ Container:
   - --listen-addr=:26257
   - --advertise-addr={advertise_addr}:26257
   HostConfig:
+    NetworkMode: system
     Binds:
     - {state_dir}/store/data:/cockroach/cockroach-data
     - {state_dir}/store/certs:/certs

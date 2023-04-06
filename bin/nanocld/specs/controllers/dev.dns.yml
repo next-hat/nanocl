@@ -19,6 +19,7 @@ Cargoes:
     - run --no-default-features --features dev --bin ctrl-dns
     Tty: true
     HostConfig:
+      NetworkMode: system
       Binds:
       - ./:/project
       - /run/nanocl:/run/nanocl

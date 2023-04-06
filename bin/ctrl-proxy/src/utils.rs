@@ -33,10 +33,14 @@ pub(crate) fn serialize_proxy_rule(
   Ok(proxy_rule)
 }
 
-fn get_listen_addr(name: &str, network: &str) -> Result<String, ErrorHint> {
+fn get_listen(
+  name: &str,
+  network: &str,
+  port: u16,
+) -> Result<String, ErrorHint> {
   match network {
-    "Public" => Ok("0.0.0.0".into()),
-    "Internal" => Ok("127.0.0.1".into()),
+    "Public" => Ok(format!("{port}")),
+    "Internal" => Ok(format!("127.0.0.1:{port}")),
     _ => Err(ErrorHint::warning(
       4,
       format!("Unsupported network {network} for resource {name}"),
@@ -200,7 +204,7 @@ async fn gen_http_server_block(
   client: &NanocldClient,
   nginx: &Nginx,
 ) -> Result<String, ErrorHint> {
-  let listen_addr = get_listen_addr(name, &rule.network)?;
+  let listen_http = get_listen(name, &rule.network, 80)?;
   let locations = gen_locations(&rule.locations, client, nginx)
     .await?
     .join("\n");
@@ -218,9 +222,10 @@ async fn gen_http_server_block(
       }
       None => String::default(),
     };
+    let listen_https = get_listen(name, &rule.network, 443)?;
     format!(
       "
-  listen {listen_addr}:443 http2 ssl;
+  listen {listen_https} http2 ssl;
 
   if ($scheme != https) {{
     return 301 https://$host$request_uri;
@@ -246,7 +251,7 @@ async fn gen_http_server_block(
   let conf = format!(
     "
 server {{
-  listen {listen_addr}:80;
+  listen {listen_http};
 {http_host}{ssl}{includes}
 {locations}
 }}\n",
@@ -261,7 +266,7 @@ async fn gen_stream_server_block(
   nginx: &Nginx,
 ) -> Result<String, ErrorHint> {
   let port = rule.port;
-  let listen_addr = get_listen_addr(resource_name, &rule.network)?;
+  let listen_addr = get_listen(resource_name, &rule.network, port)?;
 
   let upstream_key = match &rule.target {
     StreamTarget::Cargo(cargo_target) => {

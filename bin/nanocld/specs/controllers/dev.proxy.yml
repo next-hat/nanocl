@@ -25,6 +25,7 @@ Cargoes:
     - run --no-default-features --features dev --bin ctrl-proxy
     Tty: true
     HostConfig:
+      NetworkMode: system
       Binds:
       - ./:/project
       - /usr/local/cargo/registry/cache:/usr/local/cargo/registry/cache

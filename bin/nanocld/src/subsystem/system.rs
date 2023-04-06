@@ -36,7 +36,6 @@ pub(crate) async fn boot_controller(
     let mut cargo = utils::state::hook_cargo_binds(&cargo)?;
     cargo = utils::state::hook_labels(&namespace, &cargo);
     let mut host_config = cargo.container.host_config.unwrap_or_default();
-    host_config.network_mode = Some(namespace.clone());
     host_config.restart_policy = Some(RestartPolicy {
       name: Some(RestartPolicyNameEnum::ON_FAILURE),
       maximum_retry_count: Some(5),
@@ -85,7 +84,6 @@ pub(crate) async fn start_subsystem(
   cargo = utils::state::hook_cargo_binds(&cargo)?;
   cargo = utils::state::hook_labels(namespace, &cargo);
   let mut host_config = cargo.container.host_config.unwrap_or_default();
-  host_config.network_mode = Some(namespace.to_owned());
   host_config.restart_policy = Some(RestartPolicy {
     name: Some(RestartPolicyNameEnum::ON_FAILURE),
     maximum_retry_count: Some(5),
