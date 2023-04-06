@@ -1,8 +1,8 @@
 # Developer documentation
 
-Step in a unknow project can be difficult, even when you have some experiences.<br />
+Joining an unknown project can be difficult, even if you have some experience.<br />
 This documentation will help you to setup `Nanocl` in development.<br />
-Note: `Nanocl` heavily use [ntex](https://ntex.rs) as **client** and **server**
+Note: `Nanocl` heavily utilizes [ntex](https://ntex.rs) as **client** and **server**
 
 
 ## 📙 Table of Contents
@@ -31,7 +31,7 @@ bin
 │   └── tests # Configuration to tests
 ├── nanocl # Nanocl CLI
 │   └── src # Rust source code
-│       ├── commands # Function that execute commands
+│       ├── commands # Function that executes commands
 │       ├── models # Data structure used in the project
 │       └── utils # Utils functions
 └── nanocld # Nanocl DAEMON REST API
@@ -47,8 +47,8 @@ bin
     │   └── controllers # Controller configurations the daemon will apply at runtime
     └── src # Rust source code
         ├── models # Data structure used in the project
-        ├── repositories # Functions to make SQL request
-        ├── services # Function to accepts http request
+        ├── repositories # Functions to make SQL requests
+        ├── services # Function to accept http requests
         ├── subsystem # Function every runtime to ensude the default state is setup
         └── utils # Utils functions
 crates # Libraries
@@ -79,7 +79,7 @@ To build and run `Nanocl` you will need these dependencies
 
 ### 🐧 Ubuntu
 
-If you are running on ubuntu there is some scripts to help you install dependencies:
+If you are running ubuntu, the following scripts will install dependencies the needed dependencies:
 
 ```sh
 ./scripts/ubuntu.deps.sh
@@ -100,7 +100,7 @@ To install rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Then you can install rust devtools required to run `Nanocl`
+Afterwards install rust devtools required to run `Nanocl`
 
 ```sh
 ./scripts/rust.deps.sh
@@ -109,12 +109,12 @@ Then you can install rust devtools required to run `Nanocl`
 
 ## 🏃 Running
 
-You can run `Nanocl` in multiple way
+You can run `Nanocl` in multiple ways
 
-First you need to start a daemon, the daemon need to have right to access to docker.<br />
+First you need to start the daemon, the daemon needs to have the right to access to docker.<br />
 The daemon is our principal **REST API** and will start the required components at runtime.
 
-Make sure your are in docker group if it's not you can add it like this
+Make sure your are in docker group, if not then you can add yourself:
 
 ```sh
 sudo usermod -aG docker $USER
@@ -156,7 +156,7 @@ You can do it in multiple way :
   cargo watch -x "run --no-default-features --features dev --bin nanocld"
   ```
 
-Once started a swagger should be available on [http://localhost:8585/explorer](http://localhost:8585/explorer).
+Once started, a swagger should be available on [http://localhost:8585/explorer](http://localhost:8585/explorer).
 
 
 <div align="center">
@@ -164,8 +164,8 @@ Once started a swagger should be available on [http://localhost:8585/explorer](h
 </div>
 
 
-Note that a *env variable* could be passed to change the port, it's hardcoded for now.<br />
-It's could be a nice an easy first issue and pull request if you are read till there :).
+Note that a *env variable* could be passed to change the port, it is hardcoded for now.<br />
+It could be a nice and easy first issue and pull request if you would like to help :).
 
 
 Now you can run the CLI:
