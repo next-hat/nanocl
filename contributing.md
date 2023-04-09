@@ -79,7 +79,7 @@ To build and run `Nanocl` you will need these dependencies
 
 ### 🐧 Ubuntu
 
-If you are running ubuntu, the following scripts will install dependencies the needed dependencies:
+If you are running ubuntu, the following scripts will install the required dependencies:
 
 ```sh
 ./scripts/ubuntu.deps.sh
@@ -121,14 +121,6 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-Knowing that `Nanocl Daemon` will create a unix socket at `/run/nanocl/nanocl.sock`
-I make sure the folder `/run/nanocl` exists
-
-```sh
-sudo mkdir /run/nanocl
-sudo chmod 777 -R /run/nanocl
-```
-
 Before running `Nanocl` we will need to download and build some docker images:
 
 ```sh
@@ -142,6 +134,14 @@ In development i personnaly don't really care and do it that way:
 ```sh
 sudo mkdir /var/lib/nanocl
 sudo chmod 777 /var/lib/nanocl
+```
+
+Knowing that `Nanocl Daemon` will create a unix socket at `/run/nanocl/nanocl.sock`
+I make sure the folder `/run/nanocl` exists
+
+```sh
+sudo mkdir /run/nanocl
+sudo chmod 777 -R /run/nanocl
 ```
 
 Finally we can start the daemon.
