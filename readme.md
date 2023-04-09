@@ -157,5 +157,5 @@ We can also revert a state by calling `nanocl state revert -f path|url`
 Every contribution is very welcome.
 
 But to be abble to do so you need a dev environnement right ?<br />
-You can learn more about it inside the local [documentation of the project](./doc/).<br />
+You can learn more about it on the [contribution guide](./contributing.md).<br />
 Also don't hesitate to join the discord if you have any question!
