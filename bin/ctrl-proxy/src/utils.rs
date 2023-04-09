@@ -266,7 +266,7 @@ async fn gen_stream_server_block(
   nginx: &Nginx,
 ) -> Result<String, ErrorHint> {
   let port = rule.port;
-  let listen_addr = get_listen(resource_name, &rule.network, port)?;
+  let listen = get_listen(resource_name, &rule.network, port)?;
 
   let upstream_key = match &rule.target {
     StreamTarget::Cargo(cargo_target) => {
@@ -289,7 +289,6 @@ async fn gen_stream_server_block(
     };
     format!(
       "
-    listen {listen_addr}:443 ssl;
     ssl_certificate      {certificate};
     ssl_certificate_key  {certificate_key};{ssl_dh_param}
           "
@@ -300,7 +299,7 @@ async fn gen_stream_server_block(
   let conf = format!(
     "
 server {{
-  listen {listen_addr}:{port};
+  listen {listen};
   proxy_pass {upstream_key};
 {ssl}
 }}"
