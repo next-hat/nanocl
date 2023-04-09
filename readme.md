@@ -113,16 +113,20 @@ To install `Nanocl`, please refer to our online [installation guide](https://doc
 There is an example used to deploy our [documentation](https://docs.next-hat.com):
 
 ```yaml
-ApiVersion: v0.3
+ApiVersion: v0.4
 Type: Deployment
 
 Namespace: nexthat
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
 - Name: doc
   Container:
-    Image: nexthat-doc:0.3.7
+    Image: nexthat-doc:0.4.1
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
 Resources:
 - Name: docs.next-hat.com
   Kind: ProxyRule
@@ -134,7 +138,6 @@ Resources:
       Http:
         Domain: docs.next-hat.com
         Network: Public
-        Gzip: true
         Ssl:
           Certificate: /etc/letsencrypt/live/docs.next-hat.com/fullchain.pem
           CertificateKey: /etc/letsencrypt/live/docs.next-hat.com/privkey.pem
