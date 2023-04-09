@@ -1587,6 +1587,21 @@ components:
           type: integer
           description: Number of running instances
           minimum: 0.0
+    CargoTarget:
+      type: object
+      description: Defines a proxy rule target
+      required:
+      - Key
+      - Port
+      properties:
+        Key:
+          type: string
+          description: The cargo key
+        Port:
+          type: integer
+          format: int32
+          description: The cargo port
+          minimum: 0.0
     ClusterInfo:
       type: object
       description: ClusterInfo represents information about the swarm as is returned by the \"/info\" endpoint. Join-tokens are not included.
@@ -2678,6 +2693,18 @@ components:
             type: string
             description: HostGateway is the gateway address of the host
       description: HostInfo contains information about the host and the docker daemon
+    HttpTarget:
+      type: object
+      required:
+      - Url
+      properties:
+        Url:
+          type: string
+          description: Url to target
+        Redirect:
+          allOf:
+          - $ref: '#/components/schemas/UrlRedirect'
+          nullable: true
     ImageInspect:
       type: object
       description: Information about an image in the local image cache.
@@ -2880,6 +2907,20 @@ components:
       - active
       - error
       - locked
+    LocationTarget:
+      oneOf:
+      - type: object
+        required:
+        - Cargo
+        properties:
+          Cargo:
+            $ref: '#/components/schemas/CargoTarget'
+      - type: object
+        required:
+        - Http
+        properties:
+          Http:
+            $ref: '#/components/schemas/HttpTarget'
     Mount:
       type: object
       properties:
@@ -3241,6 +3282,109 @@ components:
       - tcp
       - udp
       - sctp
+    ProxyHttpLocation:
+      type: object
+      description: Defines a proxy rule location
+      required:
+      - Path
+      - Target
+      properties:
+        Path:
+          type: string
+          description: The path
+        Target:
+          $ref: '#/components/schemas/LocationTarget'
+    ProxyRule:
+      oneOf:
+      - type: object
+        required:
+        - Http
+        properties:
+          Http:
+            $ref: '#/components/schemas/ProxyRuleHttp'
+      - type: object
+        required:
+        - Stream
+        properties:
+          Stream:
+            $ref: '#/components/schemas/ProxyRuleStream'
+      description: Proxy rules modes
+    ProxyRuleHttp:
+      type: object
+      description: Defines a proxy rule http config
+      required:
+      - Network
+      - Locations
+      properties:
+        Domain:
+          type: string
+          description: The domain
+          nullable: true
+        Network:
+          type: string
+          description: Type of private | public | internal | namespace:$namespace_name
+        Locations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProxyHttpLocation'
+          description: The locations to handle multiple paths
+        Ssl:
+          allOf:
+          - $ref: '#/components/schemas/ProxySslConfig'
+          nullable: true
+        Includes:
+          type: array
+          items:
+            type: string
+          description: Path to extra config file to include
+          nullable: true
+    ProxyRuleStream:
+      type: object
+      description: Proxy rules modes
+      required:
+      - Network
+      - Protocol
+      - Port
+      - Target
+      properties:
+        Network:
+          type: string
+          description: Type of the network binding private | public | internal | namespace:$namespace_name
+        Protocol:
+          $ref: '#/components/schemas/ProxyStreamProtocol'
+        Port:
+          type: integer
+          format: int32
+          description: The port to open on nodes
+          minimum: 0.0
+        Ssl:
+          allOf:
+          - $ref: '#/components/schemas/ProxySslConfig'
+          nullable: true
+        Target:
+          $ref: '#/components/schemas/StreamTarget'
+    ProxySslConfig:
+      type: object
+      required:
+      - Certificate
+      - CertificateKey
+      properties:
+        Certificate:
+          type: string
+          description: Path to the certificate
+        CertificateKey:
+          type: string
+          description: Path to the certificate key
+        DhParam:
+          type: string
+          description: Path to the dhparam file
+          nullable: true
+    ProxyStreamProtocol:
+      type: string
+      description: Proxy rules modes
+      enum:
+      - Tcp
+      - Udp
     RegistryServiceConfig:
       type: object
       description: RegistryServiceConfig stores daemon registry services configuration.
@@ -3469,6 +3613,20 @@ components:
           description: The config of the resource as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
+    ResourceProxyRule:
+      type: object
+      description: Define proxy rules to apply
+      required:
+      - Watch
+      - Rule
+      properties:
+        Watch:
+          type: array
+          items:
+            type: string
+          description: Cargo to watch for changes
+        Rule:
+          $ref: '#/components/schemas/ProxyRule'
     ResourcesBlkioWeightDevice:
       type: object
       properties:
@@ -3531,6 +3689,20 @@ components:
             type: string
           description: List of command-line arguments to pass to the runtime when invoked.
           nullable: true
+    StreamTarget:
+      oneOf:
+      - type: object
+        required:
+        - Cargo
+        properties:
+          Cargo:
+            $ref: '#/components/schemas/CargoTarget'
+      - type: object
+        required:
+        - Uri
+        properties:
+          Uri:
+            $ref: '#/components/schemas/UriTarget'
     SwarmInfo:
       type: object
       description: Represents generic information about swarm.
@@ -4081,6 +4253,20 @@ components:
           type: string
           description: The base64-url-safe-encoded raw public key bytes of the issuer.
           nullable: true
+    UriTarget:
+      type: object
+      required:
+      - Uri
+      properties:
+        Uri:
+          type: string
+          description: Uri to target
+    UrlRedirect:
+      type: string
+      enum:
+      - MovedPermanently
+      - PermanentRedirect
+      - TemporaryRedirect
     Vm:
       type: object
       description: A virtual machine instance

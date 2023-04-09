@@ -47,6 +47,11 @@ use nanocl_stubs::vm_config::{
 use nanocl_stubs::resource::{
   Resource, ResourcePatch, ResourceConfig, ResourcePartial,
 };
+use nanocl_stubs::proxy::{
+  ResourceProxyRule, ProxyRuleHttp, ProxyHttpLocation, ProxySslConfig,
+  ProxyRuleStream, StreamTarget, ProxyStreamProtocol, UriTarget,
+  LocationTarget, HttpTarget, UrlRedirect, CargoTarget, ProxyRule,
+};
 
 use crate::error::HttpError;
 
@@ -308,6 +313,20 @@ impl Modify for VersionModifier {
     ResourcePatch,
     ResourceConfig,
     ResourcePartial,
+    // ProxyRules
+    ResourceProxyRule,
+    ProxyRule,
+    ProxyRuleHttp,
+    ProxyHttpLocation,
+    ProxySslConfig,
+    ProxyRuleStream,
+    StreamTarget,
+    ProxyStreamProtocol,
+    UriTarget,
+    LocationTarget,
+    HttpTarget,
+    UrlRedirect,
+    CargoTarget,
     // Error
     ApiError,
     // Generic Response
