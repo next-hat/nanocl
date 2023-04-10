@@ -6,7 +6,7 @@ ARG tz=Europe/Paris
 
 
 # Install required dependencies
-RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base tzdata bash util-linux
+RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base tzdata bash util-linux libgcc openssl libpq util-linux inotify-tools bash cloud-utils cdrkit
 
 # Install cargo-watch
 RUN cargo install cargo-watch --locked
@@ -16,6 +16,7 @@ RUN mkdir -p /project
 WORKDIR /project
 
 ENV TZ=${tz}
+ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
 LABEL org.opencontainers.image.description The dev image for nanocl services

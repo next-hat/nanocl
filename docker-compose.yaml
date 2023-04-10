@@ -1,0 +1,18 @@
+version: '3.9'
+services:
+  daemon:
+    container_name: nanocld
+    image: ghcr.io/nxthat/nanocl-dev:dev
+    tty: true
+    network_mode: host
+    volumes:
+      - /run/docker.sock:/run/docker.sock
+      - ./:/project
+      - /run/nanocl:/run/nanocl
+      - /usr/local/cargo/registry/cache:/usr/local/cargo/registry/cache
+    command:
+      - watch
+      - -w
+      - /project/bin/nanocld/src
+      - -x
+      - run --no-default-features --features dev --bin nanocld
