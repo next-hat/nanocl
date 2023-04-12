@@ -63,7 +63,11 @@ tokio-util = "0.7.7"
 futures-util = "0.3.26"
 libc = "0.2.139"
 metrsd_client = "0.1.1"
-chrono = { version = "0.4.24", features = ["serde"] }
+chrono = { version = "0.4.24", default-features = false, features = [
+  "std",
+  "clock",
+  "serde",
+] }
 jsonschema = { version = "0.17.0", default-features = false }
 nanocld_client = { version = "0.4.1", features = ["tokio"] }
 openssl = { version = "0.10.50", features = ["vendored"] }
