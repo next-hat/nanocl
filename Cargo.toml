@@ -19,7 +19,7 @@ strip = "debuginfo"
 [patch.crates-io]
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocld_client = { path = "crates/nanocld_client" }
-ntex-files = { git = "https://github.com/leon3s/ntex-extras", branch = "upgrade-ntex-version" }
+# ntex-files = { git = "https://github.com/leon3s/ntex-extras", branch = "upgrade-ntex-version" }
 # ntex-multipart = { git = "https://github.com/leon3s/ntex-extras" }
 # bollard-next = { path = "../bollard" }
 #ntex = { git = "https://github.com/ntex-rs/ntex" }
