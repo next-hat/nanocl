@@ -1,4 +1,4 @@
-# Developer documentation
+# Contribution guide
 
 Joining an unknown project can be difficult, even if you have some experience.<br />
 This documentation will help you to setup `Nanocl` in development.<br />
@@ -178,7 +178,7 @@ Once started, a swagger should be available on [http://localhost:8585/explorer](
 
 
 <div align="center">
-  <img src="./swagger.png" />
+  <img src="./doc/swagger.png" />
 </div>
 
 
