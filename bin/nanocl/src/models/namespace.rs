@@ -46,6 +46,7 @@ pub struct NamespaceRow {
   pub(crate) name: String,
   pub(crate) cargoes: i64,
   pub(crate) instances: i64,
+  pub(crate) gateway: String,
 }
 
 impl From<NamespaceSummary> for NamespaceRow {
@@ -54,6 +55,7 @@ impl From<NamespaceSummary> for NamespaceRow {
       name: item.name,
       cargoes: item.cargoes,
       instances: item.instances,
+      gateway: item.gateway,
     }
   }
 }

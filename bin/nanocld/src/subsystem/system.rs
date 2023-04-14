@@ -37,8 +37,8 @@ pub(crate) async fn boot_controller(
     cargo = utils::state::hook_labels(&namespace, &cargo);
     let mut host_config = cargo.container.host_config.unwrap_or_default();
     host_config.restart_policy = Some(RestartPolicy {
-      name: Some(RestartPolicyNameEnum::ON_FAILURE),
-      maximum_retry_count: Some(5),
+      name: Some(RestartPolicyNameEnum::UNLESS_STOPPED),
+      maximum_retry_count: None,
     });
     cargo.container.host_config = Some(host_config);
     if docker
@@ -85,8 +85,8 @@ pub(crate) async fn start_subsystem(
   cargo = utils::state::hook_labels(namespace, &cargo);
   let mut host_config = cargo.container.host_config.unwrap_or_default();
   host_config.restart_policy = Some(RestartPolicy {
-    name: Some(RestartPolicyNameEnum::ON_FAILURE),
-    maximum_retry_count: Some(5),
+    name: Some(RestartPolicyNameEnum::UNLESS_STOPPED),
+    maximum_retry_count: None,
   });
   cargo.container.host_config = Some(host_config);
 

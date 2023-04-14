@@ -3103,6 +3103,7 @@ components:
       required:
       - Name
       - Cargoes
+      - Network
       properties:
         Name:
           type: string
@@ -3112,6 +3113,8 @@ components:
           items:
             $ref: '#/components/schemas/CargoInspect'
           description: Number of cargoes
+        Network:
+          $ref: '#/components/schemas/Network'
     NamespacePartial:
       type: object
       description: A Namespace partial is a payload used to create a new namespace
@@ -3131,6 +3134,7 @@ components:
       - Name
       - Cargoes
       - Instances
+      - Gateway
       properties:
         Name:
           type: string
@@ -3143,6 +3147,58 @@ components:
           type: integer
           format: int64
           description: Number of instances
+        Gateway:
+          type: string
+          description: Gateway of the namespace
+    Network:
+      type: object
+      properties:
+        Name:
+          type: string
+          nullable: true
+        Id:
+          type: string
+          nullable: true
+        Created:
+          type: string
+          nullable: true
+        Scope:
+          type: string
+          nullable: true
+        Driver:
+          type: string
+          nullable: true
+        EnableIPv6:
+          type: boolean
+          nullable: true
+        IPAM:
+          allOf:
+          - $ref: '#/components/schemas/Ipam'
+          nullable: true
+        Internal:
+          type: boolean
+          nullable: true
+        Attachable:
+          type: boolean
+          nullable: true
+        Ingress:
+          type: boolean
+          nullable: true
+        Containers:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/NetworkContainer'
+          nullable: true
+        Options:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+        Labels:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
     NetworkingConfig:
       type: object
       description: NetworkingConfig represents the container's networking configuration for each of its interfaces. It is used for the networking configs specified in the `docker create` and `docker network connect` commands.
