@@ -33,14 +33,52 @@ pub(crate) fn serialize_proxy_rule(
   Ok(proxy_rule)
 }
 
-fn get_listen(
+async fn get_namespace_addr(
+  name: &str,
+  client: &NanocldClient,
+) -> Result<String, ErrorHint> {
+  let namespace = client.inspect_namespace(name).await.map_err(|err| {
+    ErrorHint::error(
+      5,
+      format!("Unable to inspect namespace {name}: {err}", name = name),
+    )
+  })?;
+
+  let ipam = namespace.network.ipam.unwrap_or_default();
+  let ipam_config = ipam.config.unwrap_or_default();
+  let ipam_config = ipam_config.get(0).ok_or(ErrorHint::error(
+    5,
+    format!(
+      "Unable to find ipam config for namespace {name}",
+      name = name
+    ),
+  ))?;
+
+  let ip_address = ipam_config.gateway.clone().ok_or(ErrorHint::error(
+    5,
+    format!(
+      "Unable to find ip address for namespace {name}",
+      name = name
+    ),
+  ))?;
+
+  Ok(ip_address)
+}
+
+async fn get_listen(
   name: &str,
   network: &str,
   port: u16,
+  client: &NanocldClient,
 ) -> Result<String, ErrorHint> {
   match network {
     "Public" => Ok(format!("{port}")),
     "Internal" => Ok(format!("127.0.0.1:{port}")),
+    network if network.starts_with("Namespace:") => {
+      let namespace = network.trim_start_matches("Namespace:");
+      let ip_address = get_namespace_addr(namespace, client).await?;
+      Ok(format!("{ip_address}:{port}"))
+    }
     _ => Err(ErrorHint::warning(
       4,
       format!("Unsupported network {network} for resource {name}"),
@@ -204,7 +242,7 @@ async fn gen_http_server_block(
   client: &NanocldClient,
   nginx: &Nginx,
 ) -> Result<String, ErrorHint> {
-  let listen_http = get_listen(name, &rule.network, 80)?;
+  let listen_http = get_listen(name, &rule.network, 80, client).await?;
   let locations = gen_locations(&rule.locations, client, nginx)
     .await?
     .join("\n");
@@ -222,7 +260,7 @@ async fn gen_http_server_block(
       }
       None => String::default(),
     };
-    let listen_https = get_listen(name, &rule.network, 443)?;
+    let listen_https = get_listen(name, &rule.network, 443, client).await?;
     format!(
       "
   listen {listen_https} http2 ssl;
@@ -266,7 +304,7 @@ async fn gen_stream_server_block(
   nginx: &Nginx,
 ) -> Result<String, ErrorHint> {
   let port = rule.port;
-  let listen = get_listen(resource_name, &rule.network, port)?;
+  let listen = get_listen(resource_name, &rule.network, port, client).await?;
 
   let upstream_key = match &rule.target {
     StreamTarget::Cargo(cargo_target) => {
@@ -422,6 +460,31 @@ pub(crate) async fn sync_resources(
   }
   reload_config(client).await?;
   Ok(())
+}
+
+/// List resources from nanocl daemon
+/// This function will list all resources that contains the target key
+/// in the watch list
+/// The target key is the name of the cargo @ the namespace
+/// The namespace is optional, if not provided, it will be set to "global"
+pub(crate) async fn list_resource_by_cargo(
+  name: &str,
+  namespace: Option<String>,
+  client: &NanocldClient,
+) -> Result<Vec<nanocld_client::stubs::resource::Resource>, ErrorHint> {
+  let namespace = namespace.unwrap_or("global".into());
+  let target_key = format!("{name}.{namespace}");
+  let query = ResourceQuery {
+    contains: Some(serde_json::json!({ "Watch": [target_key] }).to_string()),
+    kind: Some("ProxyRule".into()),
+  };
+  let resources = client.list_resource(Some(query)).await.map_err(|err| {
+    ErrorHint::warning(
+      4,
+      format!("Unable to list resources from nanocl daemon: {err}"),
+    )
+  })?;
+  Ok(resources)
 }
 
 #[cfg(test)]

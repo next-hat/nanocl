@@ -1,3 +1,4 @@
+use bollard_next::service::Network;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
@@ -37,6 +38,8 @@ pub struct NamespaceSummary {
   pub cargoes: i64,
   /// Number of instances
   pub instances: i64,
+  /// Gateway of the namespace
+  pub gateway: String,
 }
 
 /// A Namespace Inspect is a detailed view of a namespace
@@ -53,5 +56,5 @@ pub struct NamespaceInspect {
   /// Number of cargoes
   pub cargoes: Vec<CargoInspect>,
   // Network of the namespace
-  // pub network: NetworkInspect,
+  pub network: Network,
 }

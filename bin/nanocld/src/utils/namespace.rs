@@ -186,10 +186,28 @@ pub async fn list(
     let cargo_count =
       repositories::cargo::count_by_namespace(&item.name, pool).await?;
     let instance_count = list_instance(&item.name, docker_api).await?.len();
+
+    let network = docker_api
+      .inspect_network(&item.name, None::<InspectNetworkOptions<String>>)
+      .await?;
+    let ipam = network.ipam.unwrap_or_default();
+    let ipam_config = ipam.config.unwrap_or_default();
+
+    let gateway = ipam_config
+      .get(0)
+      .ok_or(HttpError {
+        msg: format!("Unable to get gateway for network {}", &item.name),
+        status: StatusCode::INTERNAL_SERVER_ERROR,
+      })?
+      .gateway
+      .clone()
+      .unwrap_or_default();
+
     new_items.push(NamespaceSummary {
       name: item.name.to_owned(),
       cargoes: cargo_count,
       instances: instance_count.try_into().unwrap(),
+      gateway,
     })
   }
   Ok(new_items)
@@ -221,11 +239,11 @@ pub async fn list(
 /// ```
 ///
 pub async fn inspect(
-  namespace: &str,
+  name: &str,
   state: &DaemonState,
 ) -> Result<NamespaceInspect, HttpError> {
   let namespace =
-    repositories::namespace::find_by_name(namespace, &state.pool).await?;
+    repositories::namespace::find_by_name(name, &state.pool).await?;
   log::debug!("Found namespace to inspect {:?}", &namespace);
   let cargo_db_models =
     repositories::cargo::find_by_namespace(&namespace, &state.pool).await?;
@@ -235,9 +253,14 @@ pub async fn inspect(
     let cargo = cargo::inspect(&cargo.key, state).await?;
     cargoes.push(cargo);
   }
+  let network = state
+    .docker_api
+    .inspect_network(name, None::<InspectNetworkOptions<String>>)
+    .await?;
   Ok(NamespaceInspect {
     name: namespace.name,
     cargoes,
+    network,
   })
 }
 

@@ -1,10 +1,15 @@
 version: '3.9'
 services:
   daemon:
-    container_name: nanocld
+    container_name: system-daemon.c
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
     network_mode: host
+    labels:
+      - io.nanocl=enabled
+      - io.nanocl.c=system-daemon
+      - io.nanocl.n=system
+      - io.nanocl.nsp=system
     volumes:
       - /run/docker.sock:/run/docker.sock
       - ./:/project

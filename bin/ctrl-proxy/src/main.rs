@@ -6,8 +6,15 @@ mod service;
 
 use clap::Parser;
 
-use ntex::web::{App, HttpServer};
-use nanocld_client::NanocldClient;
+use futures::StreamExt;
+use ntex::{
+  web::{App, HttpServer},
+  rt,
+};
+use nanocld_client::{
+  NanocldClient,
+  stubs::{system::Event, resource::ResourcePartial},
+};
 
 async fn boot(cli: &cli::Cli) -> nginx::Nginx {
   if std::env::var("LOG_LEVEL").is_err() {
@@ -40,6 +47,135 @@ async fn boot(cli: &cli::Cli) -> nginx::Nginx {
   nginx
 }
 
+async fn on_event(
+  client: NanocldClient,
+  nginx: nginx::Nginx,
+  event: Event,
+) -> Result<(), error::ErrorHint> {
+  match event {
+    Event::CargoStarted(ev) => {
+      let resources = utils::list_resource_by_cargo(
+        &ev.name,
+        Some(ev.namespace_name),
+        &client,
+      )
+      .await?;
+      for resource in resources {
+        let resource: ResourcePartial = resource.into();
+        if let Err(err) =
+          utils::create_resource_conf(&client, &nginx, &resource).await
+        {
+          err.print();
+        }
+      }
+      utils::reload_config(&client).await?;
+    }
+    Event::CargoStopped(ev) => {
+      let resources = utils::list_resource_by_cargo(
+        &ev.name,
+        Some(ev.namespace_name),
+        &client,
+      )
+      .await?;
+      for resource in resources {
+        let resource: ResourcePartial = resource.into();
+        let proxy_rule = utils::serialize_proxy_rule(&resource)?;
+        if let Err(err) = nginx
+          .delete_conf_file(&resource.name, &proxy_rule.rule.into())
+          .await
+        {
+          err.print();
+        }
+      }
+      utils::reload_config(&client).await?;
+    }
+    Event::CargoDeleted(ev) => {
+      let resources = utils::list_resource_by_cargo(
+        &ev.name,
+        Some(ev.namespace_name),
+        &client,
+      )
+      .await?;
+      for resource in resources {
+        let resource: ResourcePartial = resource.into();
+        let proxy_rule = utils::serialize_proxy_rule(&resource)?;
+        if let Err(err) = nginx
+          .delete_conf_file(&resource.name, &proxy_rule.rule.into())
+          .await
+        {
+          err.print();
+        }
+      }
+      utils::reload_config(&client).await?;
+    }
+    Event::ResourceCreated(ev) => {
+      if ev.kind.as_str() != "ProxyRule" {
+        return Ok(());
+      }
+      let resource: ResourcePartial = ev.as_ref().clone().into();
+      if let Err(err) =
+        utils::create_resource_conf(&client, &nginx, &resource).await
+      {
+        err.print();
+      }
+      utils::reload_config(&client).await?;
+    }
+    Event::ResourcePatched(ev) => {
+      if ev.kind.as_str() != "ProxyRule" {
+        return Ok(());
+      }
+      let resource: ResourcePartial = ev.as_ref().clone().into();
+      if let Err(err) =
+        utils::create_resource_conf(&client, &nginx, &resource).await
+      {
+        err.print();
+      }
+      utils::reload_config(&client).await?;
+    }
+    Event::ResourceDeleted(ev) => {
+      if ev.kind.as_str() != "ProxyRule" {
+        return Ok(());
+      }
+      let resource: ResourcePartial = ev.as_ref().clone().into();
+      let proxy_rule = utils::serialize_proxy_rule(&resource)?;
+      let _ = nginx
+        .delete_conf_file(&ev.name, &proxy_rule.rule.into())
+        .await;
+      utils::reload_config(&client).await?;
+    }
+    // Ignore other events
+    _ => {}
+  }
+  Ok(())
+}
+
+async fn r#loop(client: &NanocldClient, nginx: &nginx::Nginx) {
+  loop {
+    log::info!("Connecting to nanocl daemon...");
+    match client.watch_events().await {
+      Err(err) => {
+        log::warn!("Unable to connect to nanocl daemon got error: {err}");
+      }
+      Ok(mut stream) => {
+        log::info!("Connected!");
+        while let Some(event) = stream.next().await {
+          let Ok(event) = event else {
+            break;
+          };
+          if let Err(err) = on_event(client.clone(), nginx.clone(), event).await
+          {
+            err.print();
+          }
+        }
+      }
+    }
+    log::warn!(
+      "Disconnected from nanocl daemon trying to reconnect in 2 seconds"
+    );
+    ntex::time::sleep(std::time::Duration::from_secs(2)).await;
+  }
+}
+
 fn wait_for_daemon() {
   loop {
     if std::path::Path::new("/run/nanocl/nanocl.sock").exists() {
@@ -54,9 +190,16 @@ fn main() -> std::io::Result<()> {
   ntex::rt::System::new(stringify!("run")).block_on(async move {
     let cli = cli::Cli::parse();
 
+    let nginx = boot(&cli).await;
+    let n = nginx.clone();
     wait_for_daemon();
 
-    let nginx = boot(&cli).await;
+    rt::Arbiter::new().exec_fn(move || {
+      let client = NanocldClient::connect_with_unix_default();
+      ntex::rt::spawn(async move {
+        r#loop(&client, &n).await;
+      });
+    });
 
     let mut server = HttpServer::new(move || {
       App::new()
