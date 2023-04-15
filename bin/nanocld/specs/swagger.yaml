@@ -2897,6 +2897,42 @@ components:
           type: boolean
           description: Indicates whether this is an official registry (i.e., Docker Hub / docker.io)
           nullable: true
+    Ipam:
+      type: object
+      properties:
+        Driver:
+          type: string
+          description: Name of the IPAM driver to use.
+          nullable: true
+        Config:
+          type: array
+          items:
+            $ref: '#/components/schemas/IpamConfig'
+          description: 'List of IPAM configuration options, specified as a map:  ``` {\"Subnet\": <CIDR>, \"IPRange\": <CIDR>, \"Gateway\": <IP address>, \"AuxAddress\": <device_name:IP address>} ```'
+          nullable: true
+        Options:
+          type: object
+          description: Driver-specific options, specified as a map.
+          additionalProperties:
+            type: string
+          nullable: true
+    IpamConfig:
+      type: object
+      properties:
+        Subnet:
+          type: string
+          nullable: true
+        IPRange:
+          type: string
+          nullable: true
+        Gateway:
+          type: string
+          nullable: true
+        AuxiliaryAddresses:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
     LocalNodeState:
       type: string
       description: |-
@@ -3203,6 +3239,24 @@ components:
           type: object
           additionalProperties:
             type: string
+          nullable: true
+    NetworkContainer:
+      type: object
+      properties:
+        Name:
+          type: string
+          nullable: true
+        EndpointID:
+          type: string
+          nullable: true
+        MacAddress:
+          type: string
+          nullable: true
+        IPv4Address:
+          type: string
+          nullable: true
+        IPv6Address:
+          type: string
           nullable: true
     NetworkingConfig:
       type: object

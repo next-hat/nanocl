@@ -25,6 +25,7 @@ use bollard_next::service::{
   ImageInspectMetadata, ImageInspectRootFs, SwarmSpecCaConfigExternalCas,
   SwarmSpecTaskDefaultsLogDriver, GenericResourcesInnerDiscreteResourceSpec,
   Network, GenericResourcesInner, GenericResourcesInnerNamedResourceSpec,
+  NetworkContainer, Ipam, IpamConfig,
 };
 use nanocl_stubs::system::HostInfo;
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
@@ -347,6 +348,9 @@ impl Modify for VersionModifier {
     RestartPolicyNameEnum,
     MountBindOptionsPropagationEnum,
     MountVolumeOptionsDriverConfig,
+    NetworkContainer,
+    Ipam,
+    IpamConfig,
     // Network
     Network,
     // Vm Image

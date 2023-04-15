@@ -37,7 +37,7 @@ nanocl
 
 :   
 
-**\--version**=*VERSION* \[default: 0.4.0\]
+**\--version**=*VERSION* \[default: 0.5.0\]
 
 :   
 
