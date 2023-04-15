@@ -12,7 +12,6 @@ jobs:
     runs-on: bigben
 
     steps:
-      - uses: actions/checkout@v3
       - name: Get info
         run: |
           echo "BINARY_NAME=$(echo ${{ github.event.release.name }} | awk -F- '{print $1}')" >> $GITHUB_ENV
@@ -32,7 +31,7 @@ jobs:
       - name: Publish Nightly
         if: env.CHANNEL == 'nightly' && env.BINARY_NAME != 'nanocl'
         run: |
-          gh release download $BINARY_NAME-nightly-$VERSION -p $BINARY_NAME-nightly-$VERSION.tar.gz
+          gh release download -R nxthat/nanocl $BINARY_NAME-nightly-$VERSION -p $BINARY_NAME-nightly-$VERSION.tar.gz
           cat $BINARY_NAME-nightly-$VERSION.tar.gz | docker load
           docker tag $BINARY_NAME:nightly-$VERSION ghcr.io/nxthat/$BINARY_NAME:nightly
           docker tag $BINARY_NAME:nightly-$VERSION ghcr.io/nxthat/$BINARY_NAME:nightly-$VERSION
@@ -44,7 +43,7 @@ jobs:
       - name: Publish Stable
         if: env.CHANNEL == 'stable' && env.BINARY_NAME != 'nanocl'
         run: |
-          gh release download $BINARY_NAME-stable-$VERSION -p $BINARY_NAME-stable-$VERSION.tar.gz
+          gh release download -R nxthat/nanocl $BINARY_NAME-stable-$VERSION -p $BINARY_NAME-stable-$VERSION.tar.gz
           cat $BINARY_NAME-stable-$VERSION.tar.gz | docker load
           docker tag $BINARY_NAME:stable-$VERSION ghcr.io/nxthat/$BINARY_NAME:latest
           docker tag $BINARY_NAME:stable-$VERSION ghcr.io/nxthat/$BINARY_NAME:$VERSION
