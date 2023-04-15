@@ -9,7 +9,7 @@ env:
 
 jobs:
   release_image:
-    runs-on: ubuntu-latest-8-cores
+    runs-on: nanocl-runner
 
     steps:
       - name: Get info

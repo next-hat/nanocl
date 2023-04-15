@@ -8,7 +8,7 @@ jobs:
   clippy:
     strategy:
       fail-fast: true
-    runs-on: ubuntu-latest-8-cores
+    runs-on: nanocl-runner
 
     steps:
       - name: Checkout repository code

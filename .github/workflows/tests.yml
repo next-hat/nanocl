@@ -9,7 +9,7 @@ jobs:
   ubuntu_test:
     strategy:
       fail-fast: true
-    runs-on: ubuntu-latest-8-cores
+    runs-on: nanocl-runner
 
     steps:
     - uses: actions/checkout@v3
