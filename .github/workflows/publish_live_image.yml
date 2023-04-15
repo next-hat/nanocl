@@ -2,7 +2,7 @@ name: Publish Live Image
 
 on:
   release:
-    types: [published, prereleased, released]
+    types: [published]
 
 env:
   CARGO_TERM_COLOR: always
