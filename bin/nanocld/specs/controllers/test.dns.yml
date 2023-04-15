@@ -6,6 +6,6 @@ Namespace: system
 Cargoes:
 - Name: dns
   Container:
-    Image: nanocl-dns:dev
+    Image: ndns:dev
     HostConfig:
       NetworkMode: host

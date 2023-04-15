@@ -6,7 +6,7 @@ Namespace: system
 Cargoes:
 - Name: proxy
   Container:
-    Image: nanocl-nginx:dev
+    Image: nproxy:dev
     Tty: true
     HostConfig:
       NetworkMode: host

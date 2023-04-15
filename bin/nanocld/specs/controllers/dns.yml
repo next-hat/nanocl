@@ -4,13 +4,13 @@ ApiVersion: v0.4
 Namespace: system
 
 Cargoes:
-  - Name: proxy
+  - Name: ndns
     Container:
       Image: nanocl-dnsmasq:0.0.1
       HostConfig:
         NetworkMode: host
 
-  - Name: ncdproxy
+  - Name: ncddns
     Container:
       Image: nanocl-ncddns:0.0.1
       Tty: true

@@ -4,9 +4,9 @@ ApiVersion: v0.4
 Namespace: system
 
 Cargoes:
-- Name: proxy
+- Name: nproxy
   Container:
-    Image: ghcr.io/nxthat/nanocl-proxy:0.2.4
+    Image: ghcr.io/nxthat/nproxy:0.2.4
     HostConfig:
       NetworkMode: host
       Binds:

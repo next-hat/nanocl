@@ -6,7 +6,7 @@ Namespace: system
 Cargoes:
 - Name: proxy
   Container:
-    Image: nanocl-proxy:dev
+    Image: nproxy:dev
     HostConfig:
       NetworkMode: host
       Binds:
