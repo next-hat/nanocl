@@ -16,7 +16,7 @@ Cargoes:
     Cmd:
     - watch
     - -x
-    - run --no-default-features --features dev --bin ctrl-dns
+    - run --no-default-features --features dev --bin ctrldns
     Tty: true
     HostConfig:
       NetworkMode: system

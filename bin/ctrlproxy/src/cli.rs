@@ -14,9 +14,9 @@ mod tests {
   #[test]
   fn parse() {
     let args =
-      Cli::parse_from(["nanocl-ctrl-proxy", "--conf-dir", "/etc/nginx"]);
+      Cli::parse_from(["nanocl-ctrlproxy", "--conf-dir", "/etc/nginx"]);
     assert_eq!(args.conf_dir, Some("/etc/nginx".into()));
-    let args = Cli::parse_from(["nanocl-ctrl-proxy"]);
+    let args = Cli::parse_from(["nanocl-ctrlproxy"]);
     assert_eq!(args.conf_dir, None);
     let _ = Cli::try_parse();
   }

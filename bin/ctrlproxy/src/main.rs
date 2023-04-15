@@ -18,7 +18,7 @@ use nanocld_client::{
 
 async fn boot(cli: &cli::Cli) -> nginx::Nginx {
   if std::env::var("LOG_LEVEL").is_err() {
-    std::env::set_var("LOG_LEVEL", "nanocl-ctrl-proxy=info,warn,error,debug");
+    std::env::set_var("LOG_LEVEL", "nanocl-ctrlproxy=info,warn,error,debug");
   }
   let is_test = std::env::var("TEST").is_ok();
   env_logger::Builder::new()
@@ -27,7 +27,7 @@ async fn boot(cli: &cli::Cli) -> nginx::Nginx {
     .is_test(is_test)
     .init();
 
-  log::info!("nanocl-ctrl-proxy v{}", env!("CARGO_PKG_VERSION"));
+  log::info!("nanocl-ctrlproxy v{}", env!("CARGO_PKG_VERSION"));
 
   let nginx = nginx::new(&cli.conf_dir.clone().unwrap_or("/etc/nginx".into()));
   let client = NanocldClient::connect_with_unix_default();
@@ -225,7 +225,7 @@ mod tests {
   #[ntex::test]
   async fn boot() {
     let cli =
-      super::cli::Cli::parse_from(["ctrl-proxy", "--conf-dir", "/tmp/nginx"]);
+      super::cli::Cli::parse_from(["ctrlproxy", "--conf-dir", "/tmp/nginx"]);
 
     super::boot(&cli).await;
   }

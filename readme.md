@@ -73,9 +73,9 @@ The following components will be installed during `nanocl setup` and are require
 * `daemon` as **REST API** to manage everything
 * `metrics` to monitor cpu, memory and network usage
 * `proxy` to redirect traffic to our **containers** and **virtual machines**
-* `ctrl-proxy` to update proxy configuration based on the current state
+* `ctrlproxy` to update proxy configuration based on the current state
 * `dns` to manage the dns entries for the **containers** and **virtual machines**
-* `ctrl-dns` to update dns entries based on the current state
+* `ctrldns` to update dns entries based on the current state
 
 Simplified version of our architecture for a single node:
 

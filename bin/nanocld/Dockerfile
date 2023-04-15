@@ -6,8 +6,8 @@ COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./crates/nanocl_stubs/Cargo.toml ./crates/nanocl_stubs/Cargo.toml
 COPY ./crates/nanocld_client/Cargo.toml ./crates/nanocld_client/Cargo.toml
-COPY ./bin/ctrl-proxy/Cargo.toml ./bin/ctrl-proxy/Cargo.toml
-COPY ./bin/ctrl-dns/Cargo.toml ./bin/ctrl-dns/Cargo.toml
+COPY ./bin/ctrlproxy/Cargo.toml ./bin/ctrlproxy/Cargo.toml
+COPY ./bin/ctrldns/Cargo.toml ./bin/ctrldns/Cargo.toml
 COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
 COPY ./bin/nanocld/Cargo.toml ./bin/nanocld/Cargo.toml
 

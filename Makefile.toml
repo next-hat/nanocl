@@ -78,7 +78,7 @@ args = [
   "--features",
   "dev",
   "--bin",
-  "ctrl-proxy",
+  "ctrlproxy",
   "${@}",
 ]
 
