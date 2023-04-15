@@ -10,7 +10,7 @@ use futures::{StreamExt, TryStreamExt};
 use ntex::http::client::error::SendRequestError as NtexSendRequestError;
 use crate::error::{ApiError, NanocldClientError, is_api_error, SendRequestError};
 
-const NANOCLD_DEFAULT_VERSION: &str = "0.3.0";
+const NANOCLD_DEFAULT_VERSION: &str = "0.5.0";
 
 #[derive(Clone)]
 pub struct NanocldClient {
@@ -28,10 +28,10 @@ impl NanocldClient {
           .connector(ntex::service::fn_service(|_| async {
             Ok::<_, _>(rt::unix_connect("/run/nanocl/nanocl.sock").await?)
           }))
-          .timeout(ntex::time::Millis::from_secs(20))
+          .timeout(ntex::time::Millis::from_secs(100))
           .finish(),
       )
-      .timeout(ntex::time::Millis::from_secs(20))
+      .timeout(ntex::time::Millis::from_secs(100))
       .finish();
 
     NanocldClient {
@@ -48,10 +48,10 @@ impl NanocldClient {
         let client = Client::build()
           .connector(
             Connector::default()
-              .timeout(ntex::time::Millis::from_secs(20))
+              .timeout(ntex::time::Millis::from_secs(100))
               .finish(),
           )
-          .timeout(ntex::time::Millis::from_secs(20))
+          .timeout(ntex::time::Millis::from_secs(100))
           .finish();
         (client, url.to_owned())
       }
@@ -63,10 +63,10 @@ impl NanocldClient {
                 let path = url.trim_start_matches("unix://");
                 Ok::<_, _>(rt::unix_connect(path).await?)
               }))
-              .timeout(ntex::time::Millis::from_secs(50))
+              .timeout(ntex::time::Millis::from_secs(100))
               .finish(),
           )
-          .timeout(ntex::time::Millis::from_secs(50))
+          .timeout(ntex::time::Millis::from_secs(100))
           .finish();
         (client, "http://localhost".into())
       }
@@ -83,7 +83,7 @@ impl NanocldClient {
 
   pub fn connect_with_url(url: &str, version: &str) -> Self {
     let client = Client::build()
-      .timeout(ntex::time::Millis::from_secs(50))
+      .timeout(ntex::time::Millis::from_secs(100))
       .finish();
 
     NanocldClient {
@@ -114,10 +114,10 @@ impl NanocldClient {
           .connector(ntex::service::fn_service(|_| async {
             Ok::<_, _>(rt::unix_connect("/run/nanocl/nanocl.sock").await?)
           }))
-          .timeout(ntex::time::Millis::from_secs(50))
+          .timeout(ntex::time::Millis::from_secs(100))
           .finish(),
       )
-      .timeout(ntex::time::Millis::from_secs(50))
+      .timeout(ntex::time::Millis::from_secs(100))
       .finish();
 
     NanocldClient {
