@@ -1,13 +1,19 @@
-name: Draft nanocld stable release
+name: Draft Image
 
 on:
   push:
     branches:
+    - 'release-nightly-ctrlproxy-*'
+    - 'release-nightly-ctrldns-*'
+    - 'release-nightly-nanocld-*'
     - 'release-stable-ctrlproxy-*'
     - 'release-stable-ctrldns-*'
     - 'release-stable-nanocld-*'
   pull_request:
     branches:
+    - 'release-nightly-ctrlproxy-*'
+    - 'release-nightly-ctrldns-*'
+    - 'release-nightly-nanocld-*'
     - 'release-stable-ctrlproxy-*'
     - 'release-stable-ctrldns-*'
     - 'release-stable-nanocld-*'
@@ -49,26 +55,26 @@ jobs:
         echo $VERSION
     # Build daemon image
     - name: Build image
-      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache --build-arg channel=$CHANNEL -t $BINARY_NAME:$VERSION -f ./bin/nanocld/Dockerfile .
+      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache --build-arg channel=$CHANNEL -t $BINARY_NAME:nightly-$VERSION -f ./bin/$BINARY_NAME/Dockerfile .
     # Export it as tar.gz
     - name: Export image
-      run: docker save $BINARY_NAME:$VERSION | gzip > /tmp/$BINARY_NAME-$VERSION.tar.gz
+      run: docker save $BINARY_NAME:$CHANNEL-$VERSION | gzip > /tmp/$BINARY_NAME-$CHANNEL-$VERSION.tar.gz
     # Upload it to release
     - name: Test if release already exists
       id: release-exists
       continue-on-error: true
-      run: gh release view $BINARY_NAME-$VERSION
+      run: gh release view $BINARY_NAME-$CHANNEL-$VERSION
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Create new draft release
       if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-      run: gh release create -d $BINARY_NAME-$VERSION --generate-notes /tmp/$BINARY_NAME-$VERSION.tar.gz#nanocld-image
+      run: gh release create -t $BINARY_NAME-$CHANNEL-$VERSION -d $BINARY_NAME-$CHANNEL-$VERSION -F ./bin/$BINARY_NAME/changelog.md /tmp/$BINARY_NAME-$CHANNEL-$VERSION.tar.gz#$BINARY_NAME-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Update draft release
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: |
-        gh release delete-asset -y $BINARY_NAME-$VERSION $BINARY_NAME-$VERSION.tar.gz
-        gh release upload $BINARY_NAME-$VERSION /tmp/$BINARY_NAME-$VERSION.tar.gz#nanocld-image;
+        gh release delete-asset -y $BINARY_NAME-$CHANNEL-$VERSION $BINARY_NAME-$CHANNEL-$VERSION.tar.gz
+        gh release upload $BINARY_NAME-$CHANNEL-$VERSION /tmp/$BINARY_NAME-$CHANNEL-$VERSION.tar.gz#$BINARY_NAME-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}

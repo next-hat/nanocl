@@ -44,7 +44,7 @@ RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ctrldns
 FROM scratch
 
 LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
-LABEL org.opencontainers.image.description The nanocl DNS controller
+LABEL org.opencontainers.image.description Nanocl Controller DNS
 
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/ctrldns /bin/ctrldns
 

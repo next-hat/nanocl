@@ -23,29 +23,31 @@ jobs:
           echo $CHANNEL
           echo $VERSION
       - name: Log in to Docker Hub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USER }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish nanocld nightly
-        if: env.CHANNEL == 'nightly' && env.BINARY_NAME == 'nanocld'
+          registry: ghcr.io
+          username: nexthatbot
+          password: ${{ secrets.BOT_TOKEN }}
+      - name: Publish Nightly
+        if: env.CHANNEL == 'nightly' && env.BINARY_NAME != 'nanocl'
         run: |
-          gh release download $BINARY_NAME-nightly-$VERSION -p nanocld-nightly-$VERSION.tar.gz
-          cat nanocld-nightly-$VERSION.tar.gz | docker load
-          docker tag nanocld:nightly-$VERSION nexthat/nanocld:nightly
-          docker tag nanocld:nightly-$VERSION nexthat/nanocld:nightly-$VERSION
-          docker push nexthat/nanocld:nightly
-          docker push nexthat/nanocld:nightly-$VERSION
+          gh release download $BINARY_NAME-nightly-$VERSION -p $BINARY_NAME-nightly-$VERSION.tar.gz
+          cat $BINARY_NAME-nightly-$VERSION.tar.gz | docker load
+          docker tag $BINARY_NAME:nightly-$VERSION ghcr.io/nxthat/$BINARY_NAME:nightly
+          docker tag $BINARY_NAME:nightly-$VERSION ghcr.io/nxthat/$BINARY_NAME:nightly-$VERSION
+          docker push ghcr.io/nxthat/$BINARY_NAME:nightly
+          docker push ghcr.io/nxthat/$BINARY_NAME:nightly-$VERSION
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
-      - name: Publish nanocld stable
-        if: env.CHANNEL != 'nightly' && env.BINARY_NAME == 'nanocld'
+
+      - name: Publish Stable
+        if: env.CHANNEL == 'stable' && env.BINARY_NAME != 'nanocl'
         run: |
-          gh release download $BINARY_NAME-$VERSION -p nanocld-$CHANNEL.tar.gz
-          cat nanocld-$CHANNEL.tar.gz | docker load
-          docker tag nanocld:$CHANNEL nexthat/nanocld:latest
-          docker tag nanocld:$CHANNEL nexthat/nanocld:$CHANNEL
-          docker push nexthat/nanocld:latest
-          docker push nexthat/nanocld:$CHANNEL
+          gh release download $BINARY_NAME-stable-$VERSION -p $BINARY_NAME-stable-$VERSION.tar.gz
+          cat $BINARY_NAME-stable-$VERSION.tar.gz | docker load
+          docker tag $BINARY_NAME:stable-$VERSION ghcr.io/nxthat/$BINARY_NAME:latest
+          docker tag $BINARY_NAME:stable-$VERSION ghcr.io/nxthat/$BINARY_NAME:$VERSION
+          docker push ghcr.io/nxthat/$BINARY_NAME:latest
+          docker push ghcr.io/nxthat/$BINARY_NAME:$VERSION
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
