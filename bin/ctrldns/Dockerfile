@@ -37,8 +37,8 @@ COPY ./bin/ctrlproxy/src ./bin/ctrlproxy/src
 COPY ./bin/ctrlproxy/build.rs ./bin/ctrlproxy/build.rs
 COPY ./bin/ctrlproxy/specs ./bin/ctrlproxy/specs
 COPY ./bin/ctrldns/src ./bin/ctrldns/src
-RUN cargo build --release --target=x86_64-unknown-linux-musl --features release --bin ctrl-dns
-RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ctrl-dns
+RUN cargo build --release --target=x86_64-unknown-linux-musl --features release --bin ctrldns
+RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ctrldns
 
 # stage 4 - create runtime image
 FROM scratch
@@ -46,6 +46,6 @@ FROM scratch
 LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
 LABEL org.opencontainers.image.description The nanocl DNS controller
 
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/ctrl-dns /bin/ctrldns
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/ctrldns /bin/ctrldns
 
-ENTRYPOINT ["ctrl-dns"]
+ENTRYPOINT ["ctrldns"]

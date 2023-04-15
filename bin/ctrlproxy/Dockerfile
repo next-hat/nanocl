@@ -8,7 +8,7 @@ COPY ./crates/nanocl_stubs/Cargo.toml ./crates/nanocl_stubs/Cargo.toml
 COPY ./crates/nanocld_client/Cargo.toml ./crates/nanocld_client/Cargo.toml
 COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
 COPY ./bin/nanocld/Cargo.toml ./bin/nanocld/Cargo.toml
-COPY ./bin/ctrl-dns/Cargo.toml ./bin/ctrl-dns/Cargo.toml
+COPY ./bin/ctrldns/Cargo.toml ./bin/ctrldns/Cargo.toml
 COPY ./bin/ctrlproxy/Cargo.toml ./bin/ctrlproxy/Cargo.toml
 
 # stage 2 - Build our project
@@ -25,7 +25,7 @@ COPY ./bin/nanocld/src ./bin/nanocld/src
 COPY ./bin/nanocld/build.rs ./bin/nanocld/build.rs
 COPY ./bin/nanocl/src ./bin/nanocl/src
 COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
-COPY ./bin/ctrl-dns/src ./bin/ctrl-dns/src
+COPY ./bin/ctrldns/src ./bin/ctrldns/src
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
 COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
 COPY .git ./.git

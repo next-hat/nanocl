@@ -1,12 +1,16 @@
-name: Draft nanocld nightly release
+name: Draft nightly image
 
 on:
   push:
     branches:
-      - 'release-nightly-nanocld-*'
+    - 'release-nightly-ctrlproxy-*'
+    - 'release-nightly-ctrldns-*'
+    - 'release-nightly-nanocld-*'
   pull_request:
     branches:
-      - 'release-nightly-nanocld-*'
+    - 'release-nightly-ctrlproxy-*'
+    - 'release-nightly-ctrldns-*'
+    - 'release-nightly-nanocld-*'
     types: [opened, synchronize, closed]
 
 env:
@@ -45,7 +49,7 @@ jobs:
         echo $VERSION
     # Build daemon image
     - name: Build image
-      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache --build-arg channel=$CHANNEL -t $BINARY_NAME:nightly-$VERSION -f ./bin/nanocld/Dockerfile .
+      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache --build-arg channel=$CHANNEL -t $BINARY_NAME:nightly-$VERSION -f ./bin/$BINARY_NAME/Dockerfile .
     # Export it as tar.gz
     - name: Export image
       run: docker save $BINARY_NAME:nightly-$VERSION | gzip > /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz
@@ -58,13 +62,13 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Create new draft release
       if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-      run: gh release create -d $BINARY_NAME-nightly-$VERSION --generate-notes /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#nanocld-image
+      run: gh release create -t $BINARY_NAME-nightly-$VERSION -d $BINARY_NAME-nightly-$VERSION -F ./bin/$BINARY_NAME/changelog.md /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#$BINARY_NAME-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Update draft release
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: |
         gh release delete-asset -y $BINARY_NAME-nightly-$VERSION $BINARY_NAME-nightly-$VERSION.tar.gz
-        gh release upload $BINARY_NAME-nightly-$VERSION /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#nanocld-image;
+        gh release upload $BINARY_NAME-nightly-$VERSION /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#$BINARY_NAME-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}

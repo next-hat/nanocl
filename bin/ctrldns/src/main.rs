@@ -1,5 +1,5 @@
 /*
- * nanocl-ctrl-dns
+ * nanocl-ctrldns
  * Is the default nanocl controller for domain name is using dnsmasq.
  * It will ensure each cargo instance will own a dns entry.
  * The dns entry will be the cargo generated from the cargo key.
@@ -61,7 +61,7 @@ fn setup_server() -> Server {
 /// and finally it will start the main loop
 #[ntex::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  println!("nanocl-ctrl-dns v{}", env!("CARGO_PKG_VERSION"));
+  println!("nanocl-ctrldns v{}", env!("CARGO_PKG_VERSION"));
   let cli = cli::parse();
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
   let dnsmasq = dnsmasq::new(&conf_dir).with_dns(cli.dns);
