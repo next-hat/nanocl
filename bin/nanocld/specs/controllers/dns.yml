@@ -12,7 +12,7 @@ Cargoes:
 
   - Name: ctrlproxy
     Container:
-      Image: nanocl-ctrl-dns:0.0.1
+      Image: nanocl-ctrldns:0.0.1
       Tty: true
       HostConfig:
         NetworkMode: system

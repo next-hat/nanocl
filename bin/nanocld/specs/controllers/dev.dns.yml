@@ -10,7 +10,7 @@ Cargoes:
     HostConfig:
       NetworkMode: host
 
-- Name: ctrl-dns
+- Name: ctrldns
   Container:
     Image: ghcr.io/nxthat/nanocl-dev:dev
     Cmd:
