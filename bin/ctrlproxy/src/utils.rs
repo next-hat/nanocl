@@ -132,7 +132,7 @@ fn create_cargo_upstream(
     "
 upstream {upstream_key} {{
   hash $remote_addr consistent;
-  {}
+{}
 }}
 ",
     ip_addresses
@@ -344,7 +344,8 @@ server {{
   listen {listen};
   proxy_pass {upstream_key};
 {ssl}
-}}"
+}}
+"
   );
   Ok(conf)
 }
@@ -364,8 +365,13 @@ async fn resource_to_nginx_conf(
       let conf = gen_http_server_block(name, rule, client, nginx).await?;
       (NginxConfKind::Site, conf)
     }
-    ProxyRule::Stream(rule) => {
-      let conf = gen_stream_server_block(name, rule, client, nginx).await?;
+    ProxyRule::Stream(rules) => {
+      let mut conf = String::new();
+
+      for rule in rules {
+        conf += &gen_stream_server_block(name, rule, client, nginx).await?;
+      }
+
       (NginxConfKind::Stream, conf)
     }
   };

@@ -10,7 +10,7 @@ pub enum ProxyRule {
   /// Redirect http trafic
   Http(ProxyRuleHttp),
   /// Redirect tcp and udp trafic
-  Stream(ProxyRuleStream),
+  Stream(Vec<ProxyRuleStream>),
 }
 
 #[derive(Debug, Clone)]
