@@ -238,7 +238,7 @@ mod tests {
       "--namespace",
       "system",
       "exec",
-      "store",
+      "nstore",
       "--",
       "echo",
       "hello",
