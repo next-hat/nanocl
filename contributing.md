@@ -21,10 +21,10 @@ Note: `Nanocl` heavily utilizes [ntex](https://ntex.rs) as **client** and **serv
 
 ```sh
 bin
-├── ctrldns # Controller DNS
+├── ncddns # Controller DNS
 │   ├── dnsmasq # Source to build dnsmasq container image
 │   └── src # Rust source code
-├── ctrlproxy # Controller PROXY
+├── ncdproxy # Controller PROXY
 │   ├── nginx # Source to build nginx container image
 │   │   └── html
 │   ├── src # Rust source code
@@ -166,7 +166,7 @@ You can do it in multiple way :
   ```
 
 
-Note: Since required services like `ctrlproxy` and `ctrldns` are running inside a container.
+Note: Since required services like `ncdproxy` and `ncddns` are running inside a container.
 You may encounter permission problem.
 After starting the daemon i recommand you to run:
 

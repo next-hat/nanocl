@@ -66,7 +66,7 @@ Then you need to download our images:
 
 ```sh
 docker pull ghcr.io/nxthat/nanocl-proxy:latest
-docker pull ghcr.io/nxthat/nanocl-ctrlproxy:latest
+docker pull ghcr.io/nxthat/ncdproxy:latest
 ```
 
 ### Development
@@ -78,7 +78,7 @@ Build dev and test image
 ```sh
 docker build -t nanocl-proxy:test -f ./nginx/Dockerfile .
 docker build -t nanocl-proxy:dev -f ./nginx/Dockerfile .
-docker build -t nanocl-ctrlproxy:dev -f dev.Dockerfile .
+docker build -t nanocl-ncdproxy:dev -f dev.Dockerfile .
 ```
 
 Apply nanocl dev state

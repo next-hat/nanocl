@@ -10,8 +10,8 @@ COPY ./crates/nanocl_stubs/Cargo.toml ./crates/nanocl_stubs/Cargo.toml
 COPY ./crates/nanocld_client/Cargo.toml ./crates/nanocld_client/Cargo.toml
 COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
 COPY ./bin/nanocld/Cargo.toml ./bin/nanocld/Cargo.toml
-COPY ./bin/ctrlproxy/Cargo.toml ./bin/ctrlproxy/Cargo.toml
-COPY ./bin/ctrldns/Cargo.toml ./bin/ctrldns/Cargo.toml
+COPY ./bin/ncdproxy/Cargo.toml ./bin/ncdproxy/Cargo.toml
+COPY ./bin/ncddns/Cargo.toml ./bin/ncddns/Cargo.toml
 
 # stage 2 - Build our project
 FROM rust:1.68.0-alpine3.17 as builder
@@ -33,12 +33,12 @@ COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
 COPY ./bin/nanocl/src ./bin/nanocl/src
 COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
 COPY .git ./.git
-COPY ./bin/ctrlproxy/src ./bin/ctrlproxy/src
-COPY ./bin/ctrlproxy/build.rs ./bin/ctrlproxy/build.rs
-COPY ./bin/ctrlproxy/specs ./bin/ctrlproxy/specs
-COPY ./bin/ctrldns/src ./bin/ctrldns/src
-RUN cargo build --release --target=x86_64-unknown-linux-musl --features release --bin ctrldns
-RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ctrldns
+COPY ./bin/ncdproxy/src ./bin/ncdproxy/src
+COPY ./bin/ncdproxy/build.rs ./bin/ncdproxy/build.rs
+COPY ./bin/ncdproxy/specs ./bin/ncdproxy/specs
+COPY ./bin/ncddns/src ./bin/ncddns/src
+RUN cargo build --release --target=x86_64-unknown-linux-musl --features release --bin ncddns
+RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ncddns
 
 # stage 4 - create runtime image
 FROM scratch
@@ -46,6 +46,6 @@ FROM scratch
 LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
 LABEL org.opencontainers.image.description Nanocl Controller DNS
 
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/ctrldns /bin/ctrldns
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/ncddns /bin/ncddns
 
-ENTRYPOINT ["ctrldns"]
+ENTRYPOINT ["ncddns"]

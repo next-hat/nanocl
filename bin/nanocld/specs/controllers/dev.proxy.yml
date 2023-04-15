@@ -16,13 +16,13 @@ Cargoes:
       - {state_dir}/proxy/sites-enabled:/etc/nginx/sites-enabled
       - {state_dir}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
-- Name: ctrlproxy
+- Name: ncdproxy
   Container:
     Image: ghcr.io/nxthat/nanocl-dev:dev
     Cmd:
     - watch
     - -x
-    - run --no-default-features --features dev --bin ctrlproxy
+    - run --no-default-features --features dev --bin ncdproxy
     Tty: true
     HostConfig:
       NetworkMode: system

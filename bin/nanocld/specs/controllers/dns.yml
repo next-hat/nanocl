@@ -10,9 +10,9 @@ Cargoes:
       HostConfig:
         NetworkMode: host
 
-  - Name: ctrlproxy
+  - Name: ncdproxy
     Container:
-      Image: nanocl-ctrldns:0.0.1
+      Image: nanocl-ncddns:0.0.1
       Tty: true
       HostConfig:
         NetworkMode: system
