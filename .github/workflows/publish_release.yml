@@ -9,7 +9,7 @@ env:
 
 jobs:
   release_image:
-    runs-on: nanocl-runner
+    runs-on: bigben
 
     steps:
       - name: Get info

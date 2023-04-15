@@ -8,7 +8,7 @@ jobs:
   clippy:
     strategy:
       fail-fast: true
-    runs-on: nanocl-runner
+    runs-on: bigben
 
     steps:
       - name: Checkout repository code
