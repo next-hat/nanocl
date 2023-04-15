@@ -10,7 +10,7 @@ Cargoes:
       HostConfig:
         NetworkMode: host
 
-  - Name: ctrl-proxy
+  - Name: ctrlproxy
     Container:
       Image: nanocl-ctrl-dns:0.0.1
       Tty: true

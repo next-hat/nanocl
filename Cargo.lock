@@ -659,7 +659,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctrl-dns"
+name = "ctrldns"
 version = "0.1.0"
 dependencies = [
  "clap",
@@ -671,8 +671,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctrl-proxy"
-version = "0.2.4"
+name = "ctrlproxy"
+version = "0.3.0"
 dependencies = [
  "bollard-next",
  "clap",

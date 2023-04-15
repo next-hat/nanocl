@@ -9,7 +9,7 @@ COPY ./crates/nanocld_client/Cargo.toml ./crates/nanocld_client/Cargo.toml
 COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
 COPY ./bin/nanocld/Cargo.toml ./bin/nanocld/Cargo.toml
 COPY ./bin/ctrl-dns/Cargo.toml ./bin/ctrl-dns/Cargo.toml
-COPY ./bin/ctrl-proxy/Cargo.toml ./bin/ctrl-proxy/Cargo.toml
+COPY ./bin/ctrlproxy/Cargo.toml ./bin/ctrlproxy/Cargo.toml
 
 # stage 2 - Build our project
 FROM rust:1.68.0-alpine3.17 as builder
@@ -29,10 +29,10 @@ COPY ./bin/ctrl-dns/src ./bin/ctrl-dns/src
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
 COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
 COPY .git ./.git
-COPY ./bin/ctrl-proxy/src ./bin/ctrl-proxy/src
+COPY ./bin/ctrlproxy/src ./bin/ctrlproxy/src
 ENV RUSTFLAGS="-C target-feature=+crt-static"
-RUN cargo build --release --target=x86_64-unknown-linux-musl --bin ctrl-proxy
-RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ctrl-proxy
+RUN cargo build --release --target=x86_64-unknown-linux-musl --bin ctrlproxy
+RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ctrlproxy
 
 # stage 4 - create runtime image
 FROM scratch
@@ -40,6 +40,6 @@ FROM scratch
 LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
 LABEL org.opencontainers.image.description Nanocl Controller Proxy
 
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/ctrl-proxy /bin/ctrl-proxy
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/ctrlproxy /bin/ctrlproxy
 
-ENTRYPOINT ["ctrl-proxy"]
+ENTRYPOINT ["ctrlproxy"]
