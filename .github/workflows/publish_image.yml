@@ -12,6 +12,7 @@ jobs:
     runs-on: bigben
 
     steps:
+      - uses: actions/checkout@v3
       - name: Get info
         run: |
           echo "BINARY_NAME=$(echo ${{ github.event.release.name }} | awk -F- '{print $1}')" >> $GITHUB_ENV
