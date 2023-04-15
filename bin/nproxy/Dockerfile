@@ -1,4 +1,4 @@
-FROM nginx:1.23.2
+FROM nginx:1.23.4
 
 ENV TZ="Europe/Paris"
 RUN apt-get update -y
