@@ -9,7 +9,7 @@ jobs:
   ubuntu_test:
     strategy:
       fail-fast: true
-    runs-on: bigben
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3

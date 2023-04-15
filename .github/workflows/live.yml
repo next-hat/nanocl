@@ -9,7 +9,7 @@ env:
 
 jobs:
   release_image:
-    runs-on: bigben
+    runs-on: ubuntu-latest
 
     steps:
       - name: Get info
