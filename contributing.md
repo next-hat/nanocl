@@ -177,7 +177,7 @@ sudo chmod 777 -R /run/nanocl
 ## Docker Desktop
 
 In case you are using Docker desktop, you need to use the `docker-compose.yaml`<br/>
-But for you need to update this line:
+But before you need to update this line:
 
 ```yaml
 volumes:
@@ -197,6 +197,7 @@ docker context ls
 docker context use default
 ```
 
+To use previous commands
 
 Once started, a swagger should be available on [http://localhost:8585/explorer](http://localhost:8585/explorer).
 
