@@ -1,7 +1,7 @@
 use nanocld_client::{
   NanocldClient,
   stubs::{
-    proxy::StreamTarget,
+    proxy::{StreamTarget, ProxyStreamProtocol},
     cargo::{CargoInspect, CreateExecOptions},
     resource::{ResourceQuery, ResourcePartial},
   },
@@ -304,7 +304,8 @@ async fn gen_stream_server_block(
   nginx: &Nginx,
 ) -> Result<String, ErrorHint> {
   let port = rule.port;
-  let listen = get_listen(resource_name, &rule.network, port, client).await?;
+  let mut listen =
+    get_listen(resource_name, &rule.network, port, client).await?;
 
   let upstream_key = match &rule.target {
     StreamTarget::Cargo(cargo_target) => {
@@ -334,6 +335,9 @@ async fn gen_stream_server_block(
   } else {
     String::default()
   };
+  if rule.protocol == ProxyStreamProtocol::Udp {
+    listen = format!("{} udp", listen);
+  }
   let conf = format!(
     "
 server {{

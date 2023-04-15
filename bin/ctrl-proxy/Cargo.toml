@@ -22,7 +22,7 @@ serde_yaml = "0.9.19"
 serde_json = "1.0.91"
 
 [dev-dependencies]
-bollard-next = "0.14.4"
+bollard-next = "0.14.9"
 serde_yaml = "0.9.19"
 
 [dependencies]

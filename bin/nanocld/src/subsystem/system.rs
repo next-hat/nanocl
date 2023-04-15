@@ -254,6 +254,20 @@ pub(crate) async fn sync_containers(
           metadata[0],
           metadata[1]
         );
+
+        if repositories::namespace::find_by_name(metadata[1], pool)
+          .await
+          .is_err()
+        {
+          repositories::namespace::create(
+            &NamespacePartial {
+              name: metadata[1].to_owned(),
+            },
+            pool,
+          )
+          .await?;
+        }
+
         repositories::cargo::create(
           metadata[1],
           &new_cargo,

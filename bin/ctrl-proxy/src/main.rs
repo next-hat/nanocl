@@ -190,9 +190,9 @@ fn main() -> std::io::Result<()> {
   ntex::rt::System::new(stringify!("run")).block_on(async move {
     let cli = cli::Cli::parse();
 
+    wait_for_daemon();
     let nginx = boot(&cli).await;
     let n = nginx.clone();
-    wait_for_daemon();
 
     rt::Arbiter::new().exec_fn(move || {
       let client = NanocldClient::connect_with_unix_default();

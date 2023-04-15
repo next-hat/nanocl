@@ -1371,6 +1371,12 @@ components:
       properties:
         msg:
           type: string
+    BollardDate:
+      type: string
+      title: BollardDate
+      description: BollardDate
+      example: 2021-01-01T00:00:00.000000000Z
+      nullable: true
     Cargo:
       type: object
       description: |-
@@ -1615,11 +1621,13 @@ components:
           - $ref: '#/components/schemas/ObjectVersion'
           nullable: true
         CreatedAt:
-          type: string
-          description: Date and time at which the swarm was initialised in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+          allOf:
+          - $ref: '#/components/schemas/BollardDate'
+          nullable: true
         UpdatedAt:
-          type: string
-          description: Date and time at which the swarm was last updated in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
+          allOf:
+          - $ref: '#/components/schemas/BollardDate'
+          nullable: true
         Spec:
           allOf:
           - $ref: '#/components/schemas/SwarmSpec'
@@ -1694,9 +1702,7 @@ components:
           type: object
           description: 'An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`'
           additionalProperties:
-            type: object
-            additionalProperties:
-              type: string
+            $ref: '#/components/schemas/EmptyObject'
           nullable: true
         Tty:
           type: boolean
@@ -1738,9 +1744,7 @@ components:
           type: object
           description: An object mapping mount point paths inside the container to empty objects.
           additionalProperties:
-            type: object
-            additionalProperties:
-              type: string
+            $ref: '#/components/schemas/EmptyObject'
           nullable: true
         WorkingDir:
           type: string
@@ -1848,9 +1852,7 @@ components:
           type: object
           description: 'An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`'
           additionalProperties:
-            type: object
-            additionalProperties:
-              type: string
+            $ref: '#/components/schemas/EmptyObject'
           nullable: true
         Tty:
           type: boolean
@@ -1892,9 +1894,7 @@ components:
           type: object
           description: An object mapping mount point paths inside the container to empty objects.
           additionalProperties:
-            type: object
-            additionalProperties:
-              type: string
+            $ref: '#/components/schemas/EmptyObject'
           nullable: true
         WorkingDir:
           type: string
@@ -2139,6 +2139,11 @@ components:
           additionalProperties:
             type: string
           nullable: true
+    EmptyObject:
+      type: object
+      title: EmptyObject
+      description: EmptyObject
+      nullable: true
     EndpointIpamConfig:
       type: object
       description: EndpointIPAMConfig represents an endpoint's IPAM configuration.
@@ -2228,17 +2233,16 @@ components:
           minimum: 0.0
     GenericResources:
       type: object
-      description: User-defined resources can be either Integer resources (e.g, `SSD=3`) or String resources (e.g, `GPU=UUID1`).
       properties:
         NamedResourceSpec:
           allOf:
-          - $ref: '#/components/schemas/GenericResourcesNamedResourceSpec'
+          - $ref: '#/components/schemas/GenericResourcesInnerNamedResourceSpec'
           nullable: true
         DiscreteResourceSpec:
           allOf:
-          - $ref: '#/components/schemas/GenericResourcesDiscreteResourceSpec'
+          - $ref: '#/components/schemas/GenericResourcesInnerDiscreteResourceSpec'
           nullable: true
-    GenericResourcesDiscreteResourceSpec:
+    GenericResourcesInnerDiscreteResourceSpec:
       type: object
       properties:
         Kind:
@@ -2248,7 +2252,7 @@ components:
           type: integer
           format: int64
           nullable: true
-    GenericResourcesNamedResourceSpec:
+    GenericResourcesInnerNamedResourceSpec:
       type: object
       properties:
         Kind:
@@ -2800,8 +2804,8 @@ components:
       description: Additional metadata of the image in the local cache. This information is local to the daemon, and not part of the image itself.
       properties:
         LastTagTime:
-          type: string
-          description: Date and time at which the image was last tagged in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.  This information is only available if the image was tagged locally, and omitted otherwise.
+          allOf:
+          - $ref: '#/components/schemas/BollardDate'
           nullable: true
     ImageInspectRootFs:
       type: object
@@ -3160,7 +3164,8 @@ components:
           type: string
           nullable: true
         Created:
-          type: string
+          allOf:
+          - $ref: '#/components/schemas/BollardDate'
           nullable: true
         Scope:
           type: string

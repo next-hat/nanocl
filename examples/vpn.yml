@@ -12,17 +12,23 @@ Args:
 Cargoes:
 - Name: srv
   Container:
-    Image: hwdsl2/ipsec-vpn-server
+    Image: hwdsl2/ipsec-vpn-server:latest
     Env:
     - VPN_PUBLIC_IP={{Args.gateway}}
-    - VPN_L2TP_NET=192.168.84.0/16
-    - VPN_L2TP_LOCAL=192.168.84.1
-    - VPN_L2TP_POOL=192.168.84.10-192.168.84.254
-    - VPN_XAUTH_NET=192.168.85.0/16
-    - VPN_XAUTH_POOL=192.168.85.10-192.168.85.254
+    - VPN_L2TP_NET=192.168.42.0/16
+    - VPN_L2TP_LOCAL=192.168.42.1
+    - VPN_L2TP_POOL=192.168.42.10-192.168.42.254
+    - VPN_XAUTH_NET=192.168.43.0/16
+    - VPN_XAUTH_POOL=192.168.43.10-192.168.83.254
     HostConfig:
+      PortBinds:
+        500/udp:
+          HostPort: 500
+        4500/udp:
+          HostPort: 4500
       Binds:
       - /opt/nanocl-vpn:/etc/ipsec.d
+      - /lib/modules:/lib/modules
       CapAdd:
       - NET_ADMIN
       Devices:
@@ -30,45 +36,12 @@ Cargoes:
         PathInContainer: /dev/ppp
         CgroupPermissions: rwm
       Sysctls:
-        net.ipv4.ip_forward: 1
-        net.ipv4.conf.all.accept_redirects: 0
-        net.ipv4.conf.all.send_redirects: 0
-        net.ipv4.conf.all.rp_filter: 0
-        net.ipv4.conf.default.accept_redirects: 0
-        net.ipv4.conf.default.send_redirects: 0
-        net.ipv4.conf.default.rp_filter: 0
-        net.ipv4.conf.eth0.send_redirects: 0
-        net.ipv4.conf.eth0.rp_filter: 0
-
-Resources:
-- Name: vpn-500
-  Kind: ProxyRule
-  Version: v0.1
-  Config:
-    Watch:
-    - srv.vpn
-    Rule:
-      Stream:
-        Network: Public
-        Protocol: Udp
-        Port: 500
-        Target:
-          Cargo:
-            Key: srv.vpn
-            Port: 500
-
-- Name: vpn-4500
-  Kind: ProxyRule
-  Version: v0.1
-  Config:
-    Watch:
-    - srv.vpn
-    Rule:
-      Stream:
-        Network: Public
-        Protocol: Udp
-        Port: 4500
-        Target:
-          Cargo:
-            Key: srv.vpn
-            Port: 4500
+        net.ipv4.ip_forward: "1"
+        net.ipv4.conf.all.accept_redirects: "0"
+        net.ipv4.conf.all.send_redirects: "0"
+        net.ipv4.conf.all.rp_filter: "0"
+        net.ipv4.conf.default.accept_redirects: "0"
+        net.ipv4.conf.default.send_redirects: "0"
+        net.ipv4.conf.default.rp_filter: "0"
+        net.ipv4.conf.eth0.send_redirects: "0"
+        net.ipv4.conf.eth0.rp_filter: "0"
