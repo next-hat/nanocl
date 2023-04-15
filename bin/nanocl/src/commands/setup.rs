@@ -128,9 +128,8 @@ async fn install_dependencies(
   install_image("cockroachdb/cockroach", "v22.2.6", docker_api).await?;
   install_image("nexthat/metrsd", "v0.1.0", docker_api).await?;
   install_image("ghcr.io/nxthat/nanocld", version, docker_api).await?;
-  install_image("ghcr.io/nxthat/nanocl-proxy", "0.2.4", docker_api).await?;
-  install_image("ghcr.io/nxthat/nanocl-ctrl-proxy", "0.2.4", docker_api)
-    .await?;
+  install_image("ghcr.io/nxthat/nproxy", "1.23.4.0", docker_api).await?;
+  install_image("ghcr.io/nxthat/ncdproxy", "0.3.0", docker_api).await?;
   println!("Dependencies installed.");
   Ok(())
 }

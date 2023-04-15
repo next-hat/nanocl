@@ -18,7 +18,7 @@ Cargoes:
 
 - Name: ncdproxy
   Container:
-    Image: ghcr.io/nxthat/ncdproxy:0.3.0
+    Image: ghcr.io/nxthat/ncdproxy:0.3.1
     HostConfig:
       NetworkMode: system
       Binds:

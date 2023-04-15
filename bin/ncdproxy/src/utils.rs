@@ -392,7 +392,7 @@ pub(crate) async fn reload_config(
     ..Default::default()
   };
   client
-    .exec_cargo("proxy", exec, Some("system".into()))
+    .exec_cargo("nproxy", exec, Some("system".into()))
     .await
     .map_err(|err| {
       ErrorHint::warning(98, format!("Unable to reload proxy: {err}"))

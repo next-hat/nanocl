@@ -4,7 +4,7 @@ ApiVersion: v0.4
 Namespace: system
 
 Cargoes:
-- Name: dns
+- Name: ndns
   Container:
     Image: ndns:dev
     HostConfig:
