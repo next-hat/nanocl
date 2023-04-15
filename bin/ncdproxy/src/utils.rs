@@ -510,7 +510,7 @@ pub(crate) mod tests {
   pub fn before() {
     // Build a test env logger
     if std::env::var("LOG_LEVEL").is_err() {
-      std::env::set_var("LOG_LEVEL", "nanocl-ctrlproxy=info,warn,error,debug");
+      std::env::set_var("LOG_LEVEL", "nanocl-ncdproxy=info,warn,error,debug");
     }
     std::env::set_var("TEST", "true");
     let _ = env_logger::Builder::new()

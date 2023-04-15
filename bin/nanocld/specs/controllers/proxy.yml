@@ -16,9 +16,9 @@ Cargoes:
       - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
       - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled
 
-- Name: ctrlproxy
+- Name: ncdproxy
   Container:
-    Image: ghcr.io/nxthat/nanocl-ctrlproxy:0.3.0
+    Image: ghcr.io/nxthat/nanocl-ncdproxy:0.3.0
     HostConfig:
       NetworkMode: system
       Binds:

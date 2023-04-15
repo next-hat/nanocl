@@ -3,19 +3,19 @@ name: Draft Image
 on:
   push:
     branches:
-    - 'release-nightly-ctrlproxy-*'
-    - 'release-nightly-ctrldns-*'
+    - 'release-nightly-ncdproxy-*'
+    - 'release-nightly-ncddns-*'
     - 'release-nightly-nanocld-*'
-    - 'release-stable-ctrlproxy-*'
-    - 'release-stable-ctrldns-*'
+    - 'release-stable-ncdproxy-*'
+    - 'release-stable-ncddns-*'
     - 'release-stable-nanocld-*'
   pull_request:
     branches:
-    - 'release-nightly-ctrlproxy-*'
-    - 'release-nightly-ctrldns-*'
+    - 'release-nightly-ncdproxy-*'
+    - 'release-nightly-ncddns-*'
     - 'release-nightly-nanocld-*'
-    - 'release-stable-ctrlproxy-*'
-    - 'release-stable-ctrldns-*'
+    - 'release-stable-ncdproxy-*'
+    - 'release-stable-ncddns-*'
     - 'release-stable-nanocld-*'
     types: [opened, synchronize, closed]
 

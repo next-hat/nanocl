@@ -1,6 +1,6 @@
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [package]
-name = "ctrlproxy"
+name = "ncdproxy"
 version = "0.3.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
@@ -11,7 +11,7 @@ homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
 repository = "https://github.com/nxthat/nanocld"
 
 [[bin]]
-name = "ctrlproxy"
+name = "ncdproxy"
 test = true
 bench = false
 path = "src/main.rs"
