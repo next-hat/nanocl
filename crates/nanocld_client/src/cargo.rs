@@ -613,7 +613,7 @@ mod tests {
       ..Default::default()
     };
     let mut rx = client
-      .exec_cargo("store", exec, Some("system".into()))
+      .exec_cargo("nstore", exec, Some("system".into()))
       .await
       .unwrap();
     while let Some(_out) = rx.next().await {}
@@ -624,7 +624,7 @@ mod tests {
     let client = NanocldClient::connect_with_unix_default();
 
     let mut rx = client
-      .logs_cargo("store", Some("system".into()))
+      .logs_cargo("nstore", Some("system".into()))
       .await
       .unwrap();
     let _out = rx.next().await.unwrap().unwrap();

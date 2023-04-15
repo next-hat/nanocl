@@ -599,7 +599,7 @@ mod tests {
   async fn exec() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
-    const CARGO_NAME: &str = "store";
+    const CARGO_NAME: &str = "nstore";
 
     let res = srv
       .post(format!("/v0.2/cargoes/{CARGO_NAME}/exec"))
@@ -633,7 +633,7 @@ mod tests {
   async fn logs() -> TestRet {
     let srv = generate_server(ntex_config).await;
 
-    const CARGO_NAME: &str = "store";
+    const CARGO_NAME: &str = "nstore";
 
     let res = srv
       .get(format!("/v0.2/cargoes/{CARGO_NAME}/logs"))
