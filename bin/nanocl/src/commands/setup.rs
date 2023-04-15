@@ -126,7 +126,7 @@ async fn install_dependencies(
 ) -> Result<(), CliError> {
   println!("Installing dependencies:");
   install_image("cockroachdb/cockroach", "v22.2.6", docker_api).await?;
-  install_image("nexthat/metrsd", "v0.1.0", docker_api).await?;
+  install_image("ghcr.io/nxthat/metrsd", "0.2.0", docker_api).await?;
   install_image("ghcr.io/nxthat/nanocld", version, docker_api).await?;
   install_image("ghcr.io/nxthat/nproxy", "1.23.4.0", docker_api).await?;
   install_image("ghcr.io/nxthat/ncdproxy", "0.3.1", docker_api).await?;
@@ -345,7 +345,7 @@ async fn spawn_daemon(
   let mut labels = HashMap::new();
   labels.insert("io.nanocl".into(), "enabled".into());
   labels.insert("io.nanocl.n".into(), "system".into());
-  labels.insert("io.nanocl.c".into(), "daemon.system".into());
+  labels.insert("io.nanocl.c".into(), "ndaemon.system".into());
   labels.insert("io.nanocl.cnsp".into(), "system".into());
 
   let binds = gen_daemon_binds(args);
@@ -353,11 +353,10 @@ async fn spawn_daemon(
   let container = docker_api
     .create_container(
       Some(CreateContainerOptions {
-        name: "daemon.system.c",
+        name: "ndaemon.system.c",
         ..Default::default()
       }),
       ContainerConfig {
-        // image: Some("nanocld:nightly-0.3.0".into()),
         image: Some(format!("ghcr.io/nxthat/nanocld:{}", args.version)),
         entrypoint: Some(vec!["/entrypoint.sh".into()]),
         cmd: Some(daemon_args),
