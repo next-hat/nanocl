@@ -64,7 +64,9 @@ pub async fn create_pool(host: String) -> Pool {
 pub async fn get_store_ip_addr(
   docker_api: &bollard_next::Docker,
 ) -> Result<String, HttpError> {
-  let container = docker_api.inspect_container("store.system.c", None).await?;
+  let container = docker_api
+    .inspect_container("nstore.system.c", None)
+    .await?;
   let networks = container
     .network_settings
     .ok_or(HttpError {
