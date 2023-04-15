@@ -65,6 +65,6 @@ jobs:
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: |
         gh release delete-asset -y $BINARY_NAME-nightly-$VERSION $BINARY_NAME-nightly-$VERSION.tar.gz
-        gh release upload $BINARY_NAME-nightly-$VERSION /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#nanocld-image;
+        gh release upload $BINARY_NAME-nightly-$VERSION /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#ctrl-proxy-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
