@@ -8,12 +8,12 @@ jobs:
   clippy:
     strategy:
       fail-fast: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
 
     steps:
       - name: Checkout repository code
         uses: actions/checkout@v3
-     
+
       # Cache Rust
       - uses: actions/cache@v3
         with:
@@ -25,11 +25,11 @@ jobs:
         with:
           path: ~/.cargo
           key: ${{ hashFiles('./Cargo.lock') }}
-     
+
       - name: Install Rust with Clippy
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
- 
+
       - name: Run Clippy
         run: cargo clippy
