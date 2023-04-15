@@ -1,12 +1,16 @@
-name: Draft nanocld nightly release
+name: Draft nanocld stable release
 
 on:
   push:
     branches:
-      - 'release-nightly-nanocld-*'
+    - 'release-stable-ctrlproxy-*'
+    - 'release-stable-ctrldns-*'
+    - 'release-stable-nanocld-*'
   pull_request:
     branches:
-      - 'release-nightly-nanocld-*'
+    - 'release-stable-ctrlproxy-*'
+    - 'release-stable-ctrldns-*'
+    - 'release-stable-nanocld-*'
     types: [opened, synchronize, closed]
 
 env:
@@ -45,26 +49,26 @@ jobs:
         echo $VERSION
     # Build daemon image
     - name: Build image
-      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache --build-arg channel=$CHANNEL -t $BINARY_NAME:nightly-$VERSION -f ./bin/nanocld/Dockerfile .
+      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache --build-arg channel=$CHANNEL -t $BINARY_NAME:$VERSION -f ./bin/nanocld/Dockerfile .
     # Export it as tar.gz
     - name: Export image
-      run: docker save $BINARY_NAME:nightly-$VERSION | gzip > /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz
+      run: docker save $BINARY_NAME:$VERSION | gzip > /tmp/$BINARY_NAME-$VERSION.tar.gz
     # Upload it to release
     - name: Test if release already exists
       id: release-exists
       continue-on-error: true
-      run: gh release view $BINARY_NAME-nightly-$VERSION
+      run: gh release view $BINARY_NAME-$VERSION
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Create new draft release
       if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-      run: gh release create -d $BINARY_NAME-nightly-$VERSION --generate-notes /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#nanocld-image
+      run: gh release create -d $BINARY_NAME-$VERSION --generate-notes /tmp/$BINARY_NAME-$VERSION.tar.gz#nanocld-image
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Update draft release
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: |
-        gh release delete-asset -y $BINARY_NAME-nightly-$VERSION $BINARY_NAME-nightly-$VERSION.tar.gz
-        gh release upload $BINARY_NAME-nightly-$VERSION /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#nanocld-image;
+        gh release delete-asset -y $BINARY_NAME-$VERSION $BINARY_NAME-$VERSION.tar.gz
+        gh release upload $BINARY_NAME-$VERSION /tmp/$BINARY_NAME-$VERSION.tar.gz#nanocld-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
