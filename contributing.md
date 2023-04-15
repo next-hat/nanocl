@@ -174,6 +174,30 @@ After starting the daemon i recommand you to run:
 sudo chmod 777 -R /run/nanocl
 ```
 
+## Docker Desktop
+
+In case you are using Docker desktop, you need to use the `docker-compose.yaml`<br/>
+But for you need to update this line:
+
+```yaml
+volumes:
+  - /run/docker.sock:/run/docker.sock # by /home/{your_user}/.docker/desktop/docker.sock:/run/docker.sock
+```
+
+Afterward you can start the daemon using:
+
+```sh
+docker compose up
+```
+
+If you can have Docker installed normally with his default socket on `/run/docker.sock` you can also change the context:
+
+```sh
+docker context ls
+docker context use default
+```
+
+
 Once started, a swagger should be available on [http://localhost:8585/explorer](http://localhost:8585/explorer).
 
 

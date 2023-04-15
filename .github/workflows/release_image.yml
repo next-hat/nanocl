@@ -55,7 +55,7 @@ jobs:
         echo $VERSION
     # Build daemon image
     - name: Build image
-      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache --build-arg channel=$CHANNEL -t $BINARY_NAME:nightly-$VERSION -f ./bin/$BINARY_NAME/Dockerfile .
+      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache --build-arg channel=$CHANNEL -t $BINARY_NAME:$CHANNEL-$VERSION -f ./bin/$BINARY_NAME/Dockerfile .
     # Export it as tar.gz
     - name: Export image
       run: docker save $BINARY_NAME:$CHANNEL-$VERSION | gzip > /tmp/$BINARY_NAME-$CHANNEL-$VERSION.tar.gz
