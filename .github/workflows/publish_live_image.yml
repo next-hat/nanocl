@@ -1,4 +1,4 @@
-name: Live Publish
+name: Publish Live Image
 
 on:
   release:
