@@ -6,7 +6,7 @@ Namespace: system
 Cargoes:
 - Name: nproxy
   Container:
-    Image: ghcr.io/nxthat/nproxy:0.2.4
+    Image: ghcr.io/nxthat/nproxy:1.23.4.0
     HostConfig:
       NetworkMode: host
       Binds:
