@@ -1,4 +1,4 @@
-name: Publish image
+name: Publish
 
 on:
   release:
