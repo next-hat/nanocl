@@ -6,17 +6,21 @@ on:
     - 'release-nightly-ncdproxy-*'
     - 'release-nightly-ncddns-*'
     - 'release-nightly-nanocld-*'
+    - 'release-nightly-nproxy-*'
     - 'release-stable-ncdproxy-*'
     - 'release-stable-ncddns-*'
     - 'release-stable-nanocld-*'
+    - 'release-stable-nproxy-*'
   pull_request:
     branches:
     - 'release-nightly-ncdproxy-*'
     - 'release-nightly-ncddns-*'
     - 'release-nightly-nanocld-*'
+    - 'release-nightly-nproxy-*'
     - 'release-stable-ncdproxy-*'
     - 'release-stable-ncddns-*'
     - 'release-stable-nanocld-*'
+    - 'release-stable-nproxy-*'
     types: [opened, synchronize, closed]
 
 env:
