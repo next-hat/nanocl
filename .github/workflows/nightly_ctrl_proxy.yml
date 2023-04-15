@@ -58,7 +58,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Create new draft release
       if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-      run: gh release create -d $BINARY_NAME-nightly-$VERSION -F ./bin/ctrl-proxy/changelog.md /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#ctrl-proxy-image;
+      run: gh release create -t $BINARY_NAME-nightly-$VERSION -d $BINARY_NAME-nightly-$VERSION -F ./bin/ctrl-proxy/changelog.md /tmp/$BINARY_NAME-nightly-$VERSION.tar.gz#ctrl-proxy-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Update draft release
