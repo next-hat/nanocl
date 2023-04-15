@@ -773,15 +773,20 @@ pub async fn create_or_put(
   state: &DaemonState,
 ) -> Result<(), HttpError> {
   let key = utils::key::gen_key(namespace, &cargo.name);
-  if repositories::cargo::find_by_key(&key, &state.pool)
-    .await
-    .is_ok()
-  {
-    utils::cargo::put(&key, &cargo.clone().into(), version, state).await?;
-  } else {
-    utils::cargo::create(namespace, cargo, version, state).await?;
-    utils::cargo::start(&key, state).await?;
+  match utils::cargo::inspect(&key, state).await {
+    Ok(existing) => {
+      let existing: CargoConfigPartial = existing.into();
+      if existing == *cargo {
+        return Ok(());
+      }
+      utils::cargo::put(&key, &cargo.clone().into(), version, state).await?;
+    }
+    Err(_err) => {
+      utils::cargo::create(namespace, cargo, version, state).await?;
+      utils::cargo::start(&key, state).await?;
+    }
   }
+  //
   Ok(())
 }
 

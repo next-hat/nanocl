@@ -23,9 +23,8 @@ use bollard_next::service::{
   ContainerSummaryHostConfig, ContainerSummaryNetworkSettings, MountPoint,
   Port, ContainerSummary, HealthConfig, ContainerConfig, GraphDriverData,
   ImageInspectMetadata, ImageInspectRootFs, SwarmSpecCaConfigExternalCas,
-  SwarmSpecTaskDefaultsLogDriver, GenericResources,
-  GenericResourcesDiscreteResourceSpec, GenericResourcesNamedResourceSpec,
-  Network,
+  SwarmSpecTaskDefaultsLogDriver, GenericResourcesInnerDiscreteResourceSpec,
+  Network, GenericResourcesInner, GenericResourcesInnerNamedResourceSpec,
 };
 use nanocl_stubs::system::HostInfo;
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
@@ -75,6 +74,58 @@ enum Any {
   Bool(bool),
   Array(Vec<Any>),
   Object(HashMap<String, Any>),
+}
+
+struct EmptyObject;
+
+impl<'__s> utoipa::ToSchema<'__s> for EmptyObject {
+  fn schema() -> (
+    &'__s str,
+    utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+  ) {
+    (
+      "EmptyObject",
+      utoipa::openapi::ObjectBuilder::new()
+        .nullable(true)
+        .title(Some("EmptyObject"))
+        .description(Some("EmptyObject"))
+        .schema_type(utoipa::openapi::schema::SchemaType::Object)
+        .build()
+        .into(),
+    )
+  }
+}
+
+struct GenericResources;
+
+impl<'__s> utoipa::ToSchema<'__s> for GenericResources {
+  fn schema() -> (
+    &'__s str,
+    utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+  ) {
+    ("GenericResources", GenericResourcesInner::schema().1)
+  }
+}
+
+struct BollardDate;
+
+impl<'__s> utoipa::ToSchema<'__s> for BollardDate {
+  fn schema() -> (
+    &'__s str,
+    utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+  ) {
+    (
+      "BollardDate",
+      utoipa::openapi::ObjectBuilder::new()
+        .nullable(true)
+        .title(Some("BollardDate"))
+        .description(Some("BollardDate"))
+        .schema_type(utoipa::openapi::schema::SchemaType::String)
+        .example(Some("2021-01-01T00:00:00.000000000Z".into()))
+        .build()
+        .into(),
+    )
+  }
 }
 
 struct PortMap;
@@ -237,8 +288,8 @@ impl Modify for VersionModifier {
     SwarmSpecCaConfigExternalCas,
     SwarmSpecTaskDefaultsLogDriver,
     SwarmSpecCaConfigExternalCasProtocolEnum,
-    GenericResourcesDiscreteResourceSpec,
-    GenericResourcesNamedResourceSpec,
+    GenericResourcesInnerDiscreteResourceSpec,
+    GenericResourcesInnerNamedResourceSpec,
     // Namespace
     Namespace,
     NamespacePartial,
@@ -332,8 +383,10 @@ impl Modify for VersionModifier {
     CargoTarget,
     // Error
     ApiError,
-    // Generic Response
+    // Generic Types
     Any,
+    BollardDate,
+    EmptyObject,
     GenericDelete,
   )),
   tags(

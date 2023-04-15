@@ -25,7 +25,7 @@ clap_complete = "4.1.4"
 clap_mangen = { version = "0.2" }
 tabled = "0.10.0"
 nanocld_client = { version = "0.4.1" }
-bollard-next = { version = "0.14.7" }
+bollard-next = { version = "0.14.9" }
 chrono = { version = "0.4.24", default-features = false, features = [
   "std",
   "clock",
@@ -33,7 +33,7 @@ chrono = { version = "0.4.24", default-features = false, features = [
 
 [dependencies]
 nanocld_client = { version = "0.4.1", features = ["tokio"] }
-bollard-next = { version = "0.14.7" }
+bollard-next = { version = "0.14.9" }
 futures = "0.3"
 serde_yaml = "0.9"
 tabled = "0.10.0"

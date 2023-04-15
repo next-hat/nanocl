@@ -5,10 +5,12 @@ pub use bollard_next::container::Config;
 pub use bollard_next::models::HostConfig;
 pub use bollard_next::models::HealthConfig;
 
+use crate::cargo::CargoInspect;
+
 /// Auto is used to automatically define that the number of replicas in the cluster
 /// Number is used to manually set the number of replicas
 /// Note: auto will ensure at least 1 replica exists in the cluster
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -37,7 +39,7 @@ pub enum ReplicationMode {
 }
 
 /// A cargo config partial is used to create a Cargo
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -106,6 +108,16 @@ impl From<CargoConfig> for CargoConfigUpdate {
       name: Some(cargo_config.name),
       container: Some(cargo_config.container),
       replication: cargo_config.replication,
+    }
+  }
+}
+
+impl From<CargoInspect> for CargoConfigPartial {
+  fn from(cargo_inspect: CargoInspect) -> Self {
+    Self {
+      name: cargo_inspect.name,
+      replication: cargo_inspect.config.replication,
+      container: cargo_inspect.config.container,
     }
   }
 }

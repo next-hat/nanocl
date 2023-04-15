@@ -24,7 +24,7 @@ tokio-util = "0.7.7"
 tokio = { version = "1.25.0", features = ["fs"] }
 
 [dependencies]
-bollard-next = { version = "0.14.7" }
+bollard-next = { version = "0.14.9" }
 futures = "0.3.25"
 nanocl_stubs = { version = "0.4.2", features = ["serde"] }
 ntex = { version = "0.6.6" }
