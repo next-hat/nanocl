@@ -12,20 +12,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    # Clone project
     - uses: actions/checkout@v3
+    # Install buildx
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v2
+    # Set buildx cache
+    - name: Cache register
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: buildx-cache
     # Install rust
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         override: true
         components: llvm-tools-preview
-    # Cache tests
+    # Cache Rust
     - uses: actions/cache@v3
       with:
-        path: ./target/llvm-cov-target
-        key: llvm-cov-key
-    # Cache rust
-    - uses: Swatinem/rust-cache@v2
+        path: ./target
+        key: ${{ hashFiles('./Cargo.lock') }}
     # Install cargo make
     - uses: davidB/rust-cargo-make@v1
     # Install llvm-cov
@@ -35,16 +44,12 @@ jobs:
     # Prepare CI
     - name: Prepare CI
       run: |
-        wget https://cloud-images.ubuntu.com/minimal/releases/jammy/release/ubuntu-22.04-minimal-cloudimg-amd64.img
-        mv ubuntu-22.04-minimal-cloudimg-amd64.img /tmp
-        sudo apt-get update -y
-        sudo apt-get install -y qemu-utils
-        sudo chmod 777 /tmp
         sudo ./scripts/prepare_tests.sh
     # Setup daemon for the tests
     - name: Setup
       run: |
-        ./scripts/install_dev_image.sh
+        docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ncddns/dnsmasq/Dockerfile ./bin/ncddns/dnsmasq
+        docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
         cargo build --no-default-features --features test --bin nanocl
         cargo build --no-default-features --features test --bin ncdproxy
         cargo build --no-default-features --features test --bin nanocld
