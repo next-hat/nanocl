@@ -48,6 +48,9 @@ jobs:
     # Setup daemon for the tests
     - name: Setup
       run: |
+        docker pull cockroachdb/cockroach:v22.2.6
+        docker pull ghcr.io/nxthat/metrsd
+        docker pull nexthat/nanocl-get-started
         docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ncddns/dnsmasq/Dockerfile ./bin/ncddns/dnsmasq
         docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
         cargo build --no-default-features --features test --bin nanocl
