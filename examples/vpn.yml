@@ -21,7 +21,7 @@ Cargoes:
     - VPN_XAUTH_NET=192.168.43.0/16
     - VPN_XAUTH_POOL=192.168.43.10-192.168.83.254
     HostConfig:
-      PortBinds:
+      PortBindings:
         500/udp:
           HostPort: 500
         4500/udp:
