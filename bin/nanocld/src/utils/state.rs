@@ -74,7 +74,7 @@ pub async fn apply_deployment(
 ) -> Result<Receiver<Result<Bytes, HttpError>>, HttpError> {
   let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
 
-  let data = data.to_owned();
+  let data = data.clone();
   let version = version.to_owned();
   let state = state.clone();
 
@@ -258,7 +258,8 @@ pub async fn apply_cargo(
 
     if sx
       .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-        "Creating cargoes in namespace: {namespace}"
+        "Creating {0} cargoes in namespace: {namespace}",
+        data.cargoes.len(),
       ))))
       .is_err()
     {
@@ -362,6 +363,17 @@ pub async fn apply_resource(
   let state = state.clone();
 
   rt::spawn(async move {
+    if sx
+      .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+        "Creating {0} resources",
+        data.resources.len(),
+      ))))
+      .is_err()
+    {
+      log::warn!("User stopped the deployment");
+      return Ok(());
+    };
+
     for resource in &data.resources {
       let key = resource.name.to_owned();
       let res =
@@ -383,7 +395,7 @@ pub async fn apply_resource(
 
       if sx
         .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Created resource {0}",
+          "Resource {0} created",
           resource.name
         ))))
         .is_err()
@@ -412,95 +424,262 @@ pub async fn apply_resource(
 pub async fn revert_deployment(
   data: &StateDeployment,
   state: &DaemonState,
-) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    namespace.to_owned()
-  } else {
-    "global".into()
-  };
+) -> Result<Receiver<Result<Bytes, HttpError>>, HttpError> {
+  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
 
-  if let Some(cargoes) = &data.cargoes {
-    for cargo in cargoes {
-      let key = utils::key::gen_key(&namespace, &cargo.name);
-      if utils::cargo::delete(&key, Some(true), state).await.is_err() {
-        continue;
-      }
-      let state_ptr = state.clone();
-      rt::spawn(async move {
-        let cargo = utils::cargo::inspect(&key, &state_ptr).await?;
-        let _ = state_ptr
-          .event_emitter
-          .emit(Event::CargoDeleted(Box::new(cargo)))
-          .await;
-        Ok::<_, HttpError>(())
-      });
-    }
-  }
+  let data = data.clone();
+  let state = state.clone();
 
-  if let Some(resources) = &data.resources {
-    for resource in resources {
-      let key = resource.name.to_owned();
-      let resource =
-        match repositories::resource::inspect_by_key(&key, &state.pool).await {
-          Ok(resource) => resource,
-          Err(_) => continue,
+  rt::spawn(async move {
+    let namespace = if let Some(namespace) = &data.namespace {
+      namespace.to_owned()
+    } else {
+      "global".into()
+    };
+
+    if let Some(cargoes) = &data.cargoes {
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Deleting {0} cargoes in namespace {namespace}",
+          cargoes.len(),
+        ))))
+        .is_err()
+      {
+        log::warn!("User stopped the deployment");
+        return Ok(());
+      };
+
+      for cargo in cargoes {
+        let key = utils::key::gen_key(&namespace, &cargo.name);
+
+        let cargo = match utils::cargo::inspect(&key, &state).await {
+          Ok(cargo) => cargo,
+          Err(_) => {
+            if sx
+              .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+                "Cargo {0} not found skipping",
+                cargo.name
+              ))))
+              .is_err()
+            {
+              log::warn!("User stopped the deployment");
+              break;
+            }
+            continue;
+          }
         };
-      utils::resource::delete(resource.clone(), &state.pool).await?;
-      let state_ptr = state.clone();
-      rt::spawn(async move {
-        let _ = state_ptr
-          .event_emitter
-          .emit(Event::ResourceDeleted(Box::new(resource)))
-          .await;
-      });
-    }
-  }
 
-  Ok(())
+        utils::cargo::delete(&key, Some(true), &state).await?;
+
+        if sx
+          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+            "Cargo {0} deleted",
+            cargo.name
+          ))))
+          .is_err()
+        {
+          log::warn!("User stopped the deployment");
+          break;
+        }
+
+        let state_ptr = state.clone();
+        rt::spawn(async move {
+          let _ = state_ptr
+            .event_emitter
+            .emit(Event::CargoDeleted(Box::new(cargo)))
+            .await;
+          Ok::<_, HttpError>(())
+        });
+      }
+    }
+
+    if let Some(resources) = &data.resources {
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Deleting {0} resources",
+          resources.len(),
+        ))))
+        .is_err()
+      {
+        log::warn!("User stopped the deployment");
+        return Ok(());
+      };
+
+      for resource in resources {
+        let key = resource.name.to_owned();
+        let resource =
+          match repositories::resource::inspect_by_key(&key, &state.pool).await
+          {
+            Ok(resource) => resource,
+            Err(_) => {
+              if sx
+                .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+                  "Resource {0} not found skipping",
+                  resource.name
+                ))))
+                .is_err()
+              {
+                log::warn!("User stopped the deployment");
+                return Ok(());
+              }
+              continue;
+            }
+          };
+        utils::resource::delete(resource.clone(), &state.pool).await?;
+        if sx
+          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+            "Resource {0} deleted",
+            resource.name
+          ))))
+          .is_err()
+        {
+          log::warn!("User stopped the deployment");
+          break;
+        }
+        let state_ptr = state.clone();
+        rt::spawn(async move {
+          let _ = state_ptr
+            .event_emitter
+            .emit(Event::ResourceDeleted(Box::new(resource)))
+            .await;
+        });
+      }
+    }
+    Ok::<_, HttpError>(())
+  });
+  Ok(rx)
 }
 
 pub async fn revert_cargo(
   data: &StateCargo,
   state: &DaemonState,
-) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    namespace.to_owned()
-  } else {
-    "global".into()
-  };
+) -> Result<Receiver<Result<Bytes, HttpError>>, HttpError> {
+  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
 
-  for cargo in &data.cargoes {
-    let key = utils::key::gen_key(&namespace, &cargo.name);
-    let cargo = utils::cargo::inspect(&key, state).await?;
-    utils::cargo::delete(&key, Some(true), state).await?;
-    let event_emitter = state.event_emitter.clone();
-    rt::spawn(async move {
-      let _ = event_emitter
-        .emit(Event::CargoDeleted(Box::new(cargo)))
-        .await;
-    });
-  }
+  let data = data.clone();
+  let state = state.clone();
 
-  Ok(())
+  rt::spawn(async move {
+    let namespace = if let Some(namespace) = &data.namespace {
+      namespace.to_owned()
+    } else {
+      "global".into()
+    };
+
+    if sx
+      .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+        "Deleting {0} cargoes in namespace {namespace}",
+        data.cargoes.len(),
+      ))))
+      .is_err()
+    {
+      log::warn!("User stopped the deployment");
+      return Ok(());
+    };
+
+    for cargo in &data.cargoes {
+      let key = utils::key::gen_key(&namespace, &cargo.name);
+      let cargo = match utils::cargo::inspect(&key, &state).await {
+        Ok(cargo) => cargo,
+        Err(_) => {
+          if sx
+            .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+              "Cargo {0} not found",
+              cargo.name
+            ))))
+            .is_err()
+          {
+            log::warn!("User stopped the deployment");
+            break;
+          }
+          continue;
+        }
+      };
+      utils::cargo::delete(&key, Some(true), &state).await?;
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Cargo {0} deleted",
+          cargo.name
+        ))))
+        .is_err()
+      {
+        log::warn!("User stopped the deployment");
+        break;
+      }
+      let event_emitter = state.event_emitter.clone();
+      rt::spawn(async move {
+        let _ = event_emitter
+          .emit(Event::CargoDeleted(Box::new(cargo)))
+          .await;
+      });
+    }
+
+    Ok::<_, HttpError>(())
+  });
+  Ok(rx)
 }
 
 pub async fn revert_resource(
   data: &StateResources,
   state: &DaemonState,
-) -> Result<(), HttpError> {
-  for resource in &data.resources {
-    let key = resource.name.to_owned();
-    let resource =
-      repositories::resource::inspect_by_key(&key, &state.pool).await?;
-    utils::resource::delete(resource.clone(), &state.pool).await?;
-    let event_emitter = state.event_emitter.clone();
-    rt::spawn(async move {
-      let _ = event_emitter
-        .emit(Event::ResourceDeleted(Box::new(resource)))
-        .await;
-    });
-  }
-  Ok(())
+) -> Result<Receiver<Result<Bytes, HttpError>>, HttpError> {
+  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
+
+  let data = data.clone();
+  let state = state.clone();
+
+  rt::spawn(async move {
+    if sx
+      .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+        "Deleting {0} resources",
+        data.resources.len(),
+      ))))
+      .is_err()
+    {
+      log::warn!("User stopped the deployment");
+      return Ok(());
+    };
+
+    for resource in &data.resources {
+      let key = resource.name.to_owned();
+      let resource =
+        match repositories::resource::inspect_by_key(&key, &state.pool).await {
+          Ok(resource) => resource,
+          Err(_) => {
+            if sx
+              .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+                "Resource {0} not found skipping",
+                resource.name
+              ))))
+              .is_err()
+            {
+              log::warn!("User stopped the deployment");
+              return Ok(());
+            }
+            continue;
+          }
+        };
+      utils::resource::delete(resource.clone(), &state.pool).await?;
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Resource {0} deleted",
+          resource.name
+        ))))
+        .is_err()
+      {
+        log::warn!("User stopped the deployment");
+        break;
+      }
+      let event_emitter = state.event_emitter.clone();
+      rt::spawn(async move {
+        let _ = event_emitter
+          .emit(Event::ResourceDeleted(Box::new(resource)))
+          .await;
+      });
+    }
+    Ok::<_, HttpError>(())
+  });
+  Ok(rx)
 }
 
 pub fn hook_cargo_binds(
