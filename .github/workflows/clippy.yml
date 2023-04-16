@@ -2,7 +2,7 @@
 
 name: Clippy
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   clippy:
