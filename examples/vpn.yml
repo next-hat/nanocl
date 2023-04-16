@@ -23,9 +23,9 @@ Cargoes:
     HostConfig:
       PortBindings:
         500/udp:
-          HostPort: 500
+        - HostPort: 500
         4500/udp:
-          HostPort: 4500
+        - HostPort: 4500
       Binds:
       - /opt/nanocl-vpn:/etc/ipsec.d
       - /lib/modules:/lib/modules
