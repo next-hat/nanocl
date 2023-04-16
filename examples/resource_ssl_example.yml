@@ -1,5 +1,5 @@
 Type: Resource
-ApiVersion: v0.4
+ApiVersion: v0.5
 
 Resources:
 - Name: resource-example

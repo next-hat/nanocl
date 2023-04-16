@@ -12,7 +12,9 @@ use nanocld_client::stubs::cargo::OutputKind;
 use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
 };
-use nanocld_client::stubs::state::{StateConfig, StateDeployment, StateCargo};
+use nanocld_client::stubs::state::{
+  StateConfig, StateDeployment, StateCargo, StateStream,
+};
 use ntex::rt::{self, JoinHandle};
 
 use crate::utils;
@@ -397,7 +399,16 @@ async fn exec_state_apply(opts: &StateOpts) -> Result<(), CliError> {
       }
     }
   }
-  client.apply_state(&data).await?;
+  let mut stream = client.apply_state(&data).await?;
+
+  while let Some(res) = stream.next().await {
+    let res = res?;
+    match res {
+      StateStream::Error(err) => eprintln!("{err}"),
+      StateStream::Msg(msg) => println!("{msg}"),
+    }
+  }
+
   if opts.attach {
     attach_to_cargoes(&client, cargoes, &namespace).await?;
   }

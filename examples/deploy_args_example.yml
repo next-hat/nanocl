@@ -1,5 +1,5 @@
 Type: Deployment
-ApiVersion: v0.4
+ApiVersion: v0.5
 
 Namespace: global
 

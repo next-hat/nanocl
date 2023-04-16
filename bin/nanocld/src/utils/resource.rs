@@ -1,8 +1,8 @@
-use nanocl_stubs::proxy::{ProxyRule, ResourceProxyRule};
 use ntex::http::StatusCode;
 use jsonschema::{JSONSchema, Draft};
 
 use nanocl_stubs::resource::{Resource, ResourcePartial};
+use nanocl_stubs::proxy::{ProxyRule, ResourceProxyRule};
 
 use crate::repositories;
 use crate::error::HttpError;

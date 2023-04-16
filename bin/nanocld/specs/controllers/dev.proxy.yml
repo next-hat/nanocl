@@ -21,6 +21,8 @@ Cargoes:
     Image: ghcr.io/nxthat/nanocl-dev:dev
     Cmd:
     - watch
+    - -w
+    - /project/bin/ncdproxy/src
     - -x
     - run --no-default-features --features dev --bin ncdproxy
     Tty: true

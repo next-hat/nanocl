@@ -5,7 +5,7 @@ use crate::cargo_config::CargoConfigPartial;
 
 use super::resource::ResourcePartial;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct StateConfig {
@@ -13,14 +13,14 @@ pub struct StateConfig {
   pub r#type: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct StateResources {
   pub resources: Vec<ResourcePartial>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct StateCargo {
@@ -28,11 +28,19 @@ pub struct StateCargo {
   pub cargoes: Vec<CargoConfigPartial>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct StateDeployment {
   pub namespace: Option<String>,
   pub resources: Option<Vec<ResourcePartial>>,
   pub cargoes: Option<Vec<CargoConfigPartial>>,
+}
+
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum StateStream {
+  Msg(String),
+  Error(String),
 }

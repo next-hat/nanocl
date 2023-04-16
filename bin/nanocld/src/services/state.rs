@@ -10,18 +10,21 @@ pub(crate) async fn apply(
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  match utils::state::parse_state(&payload)? {
+  let state_file = utils::state::parse_state(&payload)?;
+
+  let res = match state_file {
     StateData::Deployment(data) => {
-      utils::state::apply_deployment(&data, &version, &state).await?;
+      utils::state::apply_deployment(&data, &version, &state).await?
     }
     StateData::Cargo(data) => {
-      utils::state::apply_cargo(&data, &version, &state).await?;
+      utils::state::apply_cargo(&data, &version, &state).await?
     }
     StateData::Resource(data) => {
-      utils::state::apply_resource(&data, &state).await?;
+      utils::state::apply_resource(&data, &state).await?
     }
-  }
-  Ok(web::HttpResponse::Ok().finish())
+  };
+
+  Ok(web::HttpResponse::Ok().streaming(res))
 }
 
 #[web::put("/state/revert")]
@@ -50,6 +53,8 @@ pub fn ntex_config(cfg: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
+  use futures::{TryStreamExt, StreamExt};
+
   use crate::services::ntex_config;
 
   use crate::utils::tests::*;
@@ -60,20 +65,32 @@ mod tests {
 
     let data = parse_state_file("../../examples/cargo_example.yml")?;
 
-    let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
+    let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
 
     assert_eq!(req.status(), 200);
+
+    let mut stream = req.into_stream();
+
+    while let Some(item) = stream.next().await {
+      item.expect("Correct response");
+    }
 
     let data = parse_state_file("../../examples/cargo_example.yml")?;
 
-    let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
+    let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
 
     assert_eq!(req.status(), 200);
+
+    let mut stream = req.into_stream();
+
+    while let Some(item) = stream.next().await {
+      item.expect("Correct response");
+    }
 
     let data = parse_state_file("../../examples/cargo_example.yml")?;
 
     let req = srv
-      .put("/v0.2/state/revert")
+      .put("/v0.5/state/revert")
       .send_json(&data)
       .await
       .unwrap();
@@ -81,25 +98,43 @@ mod tests {
     assert_eq!(req.status(), 200);
 
     let data = parse_state_file("../../examples/deploy_example.yml")?;
-    let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
+    let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
     assert_eq!(req.status(), 200);
+
+    let mut stream = req.into_stream();
+
+    while let Some(item) = stream.next().await {
+      item.expect("Correct response");
+    }
 
     let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
 
-    let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
+    let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
 
     assert_eq!(req.status(), 200);
+
+    let mut stream = req.into_stream();
+
+    while let Some(item) = stream.next().await {
+      item.expect("Correct response");
+    }
 
     let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
 
-    let req = srv.put("/v0.2/state/apply").send_json(&data).await.unwrap();
+    let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
 
     assert_eq!(req.status(), 200);
+
+    let mut stream = req.into_stream();
+
+    while let Some(item) = stream.next().await {
+      item.expect("Correct response");
+    }
 
     let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
 
     let req = srv
-      .put("/v0.2/state/revert")
+      .put("/v0.5/state/revert")
       .send_json(&data)
       .await
       .unwrap();
@@ -108,10 +143,11 @@ mod tests {
 
     let data = parse_state_file("../../examples/deploy_example.yml")?;
     let req = srv
-      .put("/v0.2/state/revert")
+      .put("/v0.5/state/revert")
       .send_json(&data)
       .await
       .unwrap();
+
     assert_eq!(req.status(), 200);
 
     Ok(())
