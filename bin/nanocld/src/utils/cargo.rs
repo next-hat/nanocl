@@ -777,6 +777,7 @@ pub async fn create_or_put(
     Ok(existing) => {
       let existing: CargoConfigPartial = existing.into();
       if existing == *cargo {
+        log::debug!("No changes detected for cargo {} skipping", &key);
         return Ok(());
       }
       utils::cargo::put(&key, &cargo.clone().into(), version, state).await?;
@@ -786,7 +787,6 @@ pub async fn create_or_put(
       utils::cargo::start(&key, state).await?;
     }
   }
-  //
   Ok(())
 }
 

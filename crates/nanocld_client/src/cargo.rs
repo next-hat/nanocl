@@ -1,6 +1,7 @@
-use bollard_next::service::ContainerSummary;
 use ntex::channel::mpsc;
 use ntex::channel::mpsc::Receiver;
+
+use bollard_next::service::ContainerSummary;
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{

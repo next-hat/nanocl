@@ -10,7 +10,7 @@ use futures::{StreamExt, TryStreamExt};
 use ntex::http::client::error::SendRequestError as NtexSendRequestError;
 use crate::error::{ApiError, NanocldClientError, is_api_error, SendRequestError};
 
-const NANOCLD_DEFAULT_VERSION: &str = "0.5.0";
+const NANOCLD_DEFAULT_VERSION: &str = "0.5";
 
 #[derive(Clone)]
 pub struct NanocldClient {
