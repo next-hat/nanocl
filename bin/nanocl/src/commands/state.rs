@@ -440,7 +440,14 @@ async fn exec_state_revert(opts: &StateOpts) -> Result<(), CliError> {
       }
     }
   }
-  client.revert_state(&data).await?;
+  let mut stream = client.revert_state(&data).await?;
+  while let Some(res) = stream.next().await {
+    let res = res?;
+    match res {
+      StateStream::Error(err) => eprintln!("{err}"),
+      StateStream::Msg(msg) => println!("{msg}"),
+    }
+  }
   Ok(())
 }
 

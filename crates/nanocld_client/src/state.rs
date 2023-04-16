@@ -24,8 +24,8 @@ impl NanocldClient {
   pub async fn revert_state(
     &self,
     data: &serde_json::Value,
-  ) -> Result<(), NanocldClientError> {
-    self
+  ) -> Result<Receiver<Result<StateStream, ApiError>>, NanocldClientError> {
+    let res = self
       .send_put(
         format!("/{}/state/revert", &self.version),
         Some(data),
@@ -33,6 +33,6 @@ impl NanocldClient {
       )
       .await?;
 
-    Ok(())
+    Ok(Self::res_stream(res).await)
   }
 }
