@@ -3,7 +3,7 @@ use ntex::http::StatusCode;
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 
-use crate::error::HttpError;
+use crate::error::{CliError, HttpError};
 use crate::models::{Pool, DBConn};
 
 /// ## Create pool
@@ -26,7 +26,7 @@ use crate::models::{Pool, DBConn};
 /// let pool = utils::create_pool("localhost".to_string()).await;
 /// ```
 ///
-pub async fn create_pool(host: String) -> Pool {
+pub async fn create_pool(host: String) -> Result<Pool, CliError> {
   // ?sslmode=verify-full
   web::block(move || {
     let db_url =
@@ -35,7 +35,9 @@ pub async fn create_pool(host: String) -> Pool {
     r2d2::Pool::builder().build(manager)
   })
   .await
-  .expect("Cannot connect to the store")
+  .map_err(|err| {
+    CliError::new(1, format!("Failed to connect to store: {}", err))
+  })
 }
 
 /// ## Get store ip address
@@ -61,7 +63,7 @@ pub async fn create_pool(host: String) -> Pool {
 /// let ip_address = utils::store::get_store_ip_addr(&docker_api).await;
 /// ```
 ///
-pub async fn get_store_ip_addr(
+pub async fn get_store_addr(
   docker_api: &bollard_next::Docker,
 ) -> Result<String, HttpError> {
   let container = docker_api

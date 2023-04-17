@@ -70,9 +70,11 @@ pub mod tests {
 
   pub async fn gen_postgre_pool() -> Pool {
     let docker_api = gen_docker_client();
-    let ip_addr = store::get_store_ip_addr(&docker_api).await.unwrap();
+    let ip_addr = store::get_store_addr(&docker_api).await.unwrap();
 
-    store::create_pool(ip_addr).await
+    store::create_pool(ip_addr)
+      .await
+      .expect("Failed to connect to store at: {ip_addr}")
   }
 
   pub async fn generate_server(routes: Config) -> test::TestServer {
