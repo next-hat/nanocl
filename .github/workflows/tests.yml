@@ -22,7 +22,7 @@ jobs:
     - name: Cache register
       uses: actions/cache@v3
       with:
-        path: /tmp/.buildx-cache
+        path: ./buildx-cache
         key: buildx-cache
     # Install rust
     - uses: actions-rs/toolchain@v1
@@ -31,9 +31,8 @@ jobs:
         override: true
         components: llvm-tools-preview
     # Cache Rust
-    - uses: actions/cache@v3
+    - uses: Swatinem/rust-cache@v2
       with:
-        path: ./target
         key: ${{ hashFiles('./Cargo.lock') }}
     # Install cargo make
     - uses: davidB/rust-cargo-make@v1
