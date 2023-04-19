@@ -1,5 +1,4 @@
 use ntex::web;
-#[cfg(feature = "dev")]
 use ntex_cors::Cors;
 
 use crate::services;
