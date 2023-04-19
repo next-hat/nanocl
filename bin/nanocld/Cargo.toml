@@ -20,7 +20,6 @@ default = ["release"]
 dev = [
   "dep:utoipa",
   "dep:ntex-files",
-  "dep:ntex-cors",
   "bollard-next/utoipa",
   "nanocl_stubs/utoipa",
 ]
