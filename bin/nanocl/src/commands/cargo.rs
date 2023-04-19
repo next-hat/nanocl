@@ -59,7 +59,7 @@ async fn exec_cargo_rm(
     }
   }
   for name in &options.names {
-    client.delete_cargo(name, args.namespace.clone()).await?;
+    client.delete_cargo(name, args.namespace.clone(), options.force_delete).await?;
   }
   Ok(())
 }

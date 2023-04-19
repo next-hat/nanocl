@@ -4,6 +4,7 @@ use ntex::channel::mpsc::Receiver;
 use bollard_next::service::ContainerSummary;
 
 use nanocl_stubs::generic::GenericNspQuery;
+use nanocl_stubs::generic::CargoDelete;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, CreateExecOptions, OutputLog,
   CargoKillOptions,
@@ -84,11 +85,12 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
+    force_delete: bool
   ) -> Result<(), NanocldClientError> {
     self
       .send_delete(
         format!("/{}/cargoes/{name}", &self.version),
-        Some(GenericNspQuery { namespace }),
+        Some(CargoDelete { namespace, force_delete }),
       )
       .await?;
 

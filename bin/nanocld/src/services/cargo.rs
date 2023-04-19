@@ -10,6 +10,7 @@ use bollard_next::exec::CreateExecOptions;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
+use nanocl_stubs::generic::CargoDelete;
 use nanocl_stubs::cargo::CargoKillOptions;
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
@@ -139,14 +140,14 @@ pub(crate) async fn create_cargo(
 ))]
 #[web::delete("/cargoes/{name}")]
 pub(crate) async fn delete_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Query(qs): web::types::Query<CargoDelete>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::inspect(&key, &state).await?;
-  utils::cargo::delete(&key, None, &state).await?;
+  utils::cargo::delete(&key, Some(qs.force_delete), &state).await?;
   rt::spawn(async move {
     let _ = state
       .event_emitter
