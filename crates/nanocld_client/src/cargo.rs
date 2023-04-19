@@ -6,7 +6,7 @@ use bollard_next::service::ContainerSummary;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, CreateExecOptions, OutputLog,
-  CargoKillOptions,
+  CargoKillOptions, CargoDeleteQuery,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigUpdate, CargoConfigPartial, CargoConfig,
@@ -83,13 +83,10 @@ impl NanocldClient {
   pub async fn delete_cargo(
     &self,
     name: &str,
-    namespace: Option<String>,
+    query: &CargoDeleteQuery,
   ) -> Result<(), NanocldClientError> {
     self
-      .send_delete(
-        format!("/{}/cargoes/{name}", &self.version),
-        Some(GenericNspQuery { namespace }),
-      )
+      .send_delete(format!("/{}/cargoes/{name}", &self.version), Some(query))
       .await?;
 
     Ok(())
@@ -556,7 +553,10 @@ mod tests {
       .unwrap();
 
     client.stop_cargo(CARGO_NAME, None).await.unwrap();
-    client.delete_cargo(CARGO_NAME, None).await.unwrap();
+    client
+      .delete_cargo(CARGO_NAME, &CargoDeleteQuery::default())
+      .await
+      .unwrap();
   }
 
   #[ntex::test]
@@ -602,7 +602,7 @@ mod tests {
       _ => panic!("Wrong error type"),
     }
     client
-      .delete_cargo("client-test-cargodup", None)
+      .delete_cargo("client-test-cargodup", &CargoDeleteQuery::default())
       .await
       .unwrap();
   }

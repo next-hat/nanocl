@@ -165,3 +165,14 @@ impl From<CargoKillOptions> for KillContainerOptions<String> {
     }
   }
 }
+
+/// Delete cargo query
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct CargoDeleteQuery {
+  /// Name of the namespace
+  pub namespace: Option<String>,
+  /// Delete cargo even if it is running
+  pub force: Option<bool>,
+}

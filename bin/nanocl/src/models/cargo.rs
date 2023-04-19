@@ -19,6 +19,9 @@ pub struct CargoRemoveOpts {
   /// Skip confirmation
   #[clap(short = 'y')]
   pub skip_confirm: bool,
+  /// Force delete
+  #[clap(short = 'f')]
+  pub force: bool,
   /// List of cargo names to delete
   pub names: Vec<String>,
 }

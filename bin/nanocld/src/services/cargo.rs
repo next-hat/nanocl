@@ -10,7 +10,7 @@ use bollard_next::exec::CreateExecOptions;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::cargo::CargoKillOptions;
+use nanocl_stubs::cargo::{CargoDeleteQuery, CargoKillOptions};
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
 use crate::{utils, repositories};
@@ -131,6 +131,7 @@ pub(crate) async fn create_cargo(
   params(
     ("Name" = String, Path, description = "Name of the cargo"),
     ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("Force" = bool, Query, description = "If true forces the delete operation"),
   ),
   responses(
     (status = 202, description = "Cargo deleted"),
@@ -139,14 +140,14 @@ pub(crate) async fn create_cargo(
 ))]
 #[web::delete("/cargoes/{name}")]
 pub(crate) async fn delete_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Query(qs): web::types::Query<CargoDeleteQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::inspect(&key, &state).await?;
-  utils::cargo::delete(&key, None, &state).await?;
+  utils::cargo::delete(&key, qs.force, &state).await?;
   rt::spawn(async move {
     let _ = state
       .event_emitter
@@ -492,6 +493,7 @@ mod tests {
   use futures::{TryStreamExt, StreamExt};
   use nanocl_stubs::cargo::{
     Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
+    CargoDeleteQuery,
   };
   use nanocl_stubs::cargo_config::{
     CargoConfigPartial, CargoConfigUpdate, CargoConfig,
@@ -602,6 +604,41 @@ mod tests {
 
     let res = srv
       .delete(format!("/v0.2/cargoes/{}", response.name))
+      .send()
+      .await?;
+    assert_eq!(res.status(), 202);
+
+    Ok(())
+  }
+
+  #[ntex::test]
+  async fn force_delete() -> TestRet {
+    let srv = generate_server(ntex_config).await;
+    ensure_test_image().await?;
+
+    const CARGO_NAME: &str = "daemon-test-cargo2";
+
+    let mut res = srv
+      .post("/v0.2/cargoes")
+      .send_json(&CargoConfigPartial {
+        name: CARGO_NAME.to_string(),
+        container: bollard_next::container::Config {
+          image: Some("nexthat/nanocl-get-started:latest".to_string()),
+          ..Default::default()
+        },
+        ..Default::default()
+      })
+      .await?;
+    assert_eq!(res.status(), 201);
+
+    let response = res.json::<Cargo>().await?;
+
+    let res = srv
+      .delete(format!("/v0.2/cargoes/{}", response.name))
+      .query(&CargoDeleteQuery {
+        namespace: None,
+        force: Some(true),
+      })?
       .send()
       .await?;
     assert_eq!(res.status(), 202);

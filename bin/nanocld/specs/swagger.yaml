@@ -256,6 +256,12 @@ paths:
         schema:
           type: string
           nullable: true
+      - name: Force
+        in: query
+        description: If true forces the delete operation
+        required: true
+        schema:
+          type: boolean
       responses:
         '202':
           description: Cargo deleted
