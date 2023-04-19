@@ -7,6 +7,7 @@ Cargoes:
 - Name: nproxy
   Container:
     Image: nproxy:dev
+    Tty: true
     HostConfig:
       NetworkMode: host
       Binds:

@@ -1,6 +1,9 @@
+use serde::{Serialize, Deserialize};
+
 use crate::schema::metrics;
 
-#[derive(Debug, Queryable, Identifiable, Insertable)]
+#[derive(Debug, Identifiable, Queryable, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 #[diesel(primary_key(key))]
 #[diesel(table_name = metrics)]
 pub struct MetricDbModel {

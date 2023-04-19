@@ -7,5 +7,6 @@ Cargoes:
 - Name: ndns
   Container:
     Image: ndns:dev
+    Tty: true
     HostConfig:
       NetworkMode: host

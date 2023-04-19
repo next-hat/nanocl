@@ -1,4 +1,6 @@
 use ntex::web;
+#[cfg(feature = "dev")]
+use ntex_cors::Cors;
 
 use crate::services;
 use crate::models::DaemonState;
@@ -15,8 +17,14 @@ pub async fn generate(
       .state(
         web::types::PayloadConfig::new(20_000_000_000), // <- limit size of the payload
       )
+      .wrap(
+        Cors::new()
+          .disable_preflight()
+          .disable_vary_header()
+          .finish(),
+      )
       // Default logger middleware
-      .wrap(web::middleware::Logger::default())
+      // .wrap(web::middleware::Logger::default())
       // Set Json body max size
       // .state(web::types::JsonConfig::default().limit(4096))
       .configure(services::ntex_config)

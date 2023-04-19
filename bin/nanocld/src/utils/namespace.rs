@@ -9,6 +9,7 @@ use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
+  NamespaceListQuery,
 };
 
 use crate::models::DaemonState;
@@ -177,10 +178,11 @@ pub async fn list_instance(
 /// ```
 ///
 pub async fn list(
+  query: &NamespaceListQuery,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Vec<NamespaceSummary>, HttpError> {
-  let items = repositories::namespace::list(pool).await?;
+  let items = repositories::namespace::list(&query, pool).await?;
   let mut new_items = Vec::new();
   for item in items {
     let cargo_count =

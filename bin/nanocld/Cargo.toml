@@ -20,6 +20,7 @@ default = ["release"]
 dev = [
   "dep:utoipa",
   "dep:ntex-files",
+  "dep:ntex-cors",
   "bollard-next/utoipa",
   "nanocl_stubs/utoipa",
 ]
@@ -73,3 +74,4 @@ nanocld_client = { version = "0.5.0", features = ["tokio"] }
 openssl = { version = "0.10.50", features = ["vendored"] }
 utoipa = { version = "3", features = ["yaml"], optional = true }
 ntex-files = { version = "0.2.2", optional = true }
+ntex-cors = { version = "0.3.0", optional = true }

@@ -220,8 +220,37 @@ pub(crate) async fn reset_resource(
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
+/// Endpoint to allow CORS preflight
+#[web::options("/resources")]
+pub(crate) async fn options_resource() -> Result<web::HttpResponse, HttpError> {
+  Ok(
+    web::HttpResponse::Ok()
+      .header("Access-Control-Allow-Origin", "*")
+      .header("Access-Control-Allow-Headers", "*")
+      .header("Access-Control-Allow-Methods", "*")
+      .header("Access-Control-Max-Age", "600")
+      .finish(),
+  )
+}
+
+/// Endpoint to allow CORS preflight
+#[web::options("/resources/{name}")]
+pub(crate) async fn options_resource_name(
+) -> Result<web::HttpResponse, HttpError> {
+  Ok(
+    web::HttpResponse::Ok()
+      .header("Access-Control-Allow-Origin", "*")
+      .header("Access-Control-Allow-Headers", "*")
+      .header("Access-Control-Allow-Methods", "*")
+      .header("Access-Control-Max-Age", "600")
+      .finish(),
+  )
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_resource);
+  config.service(options_resource);
+  config.service(options_resource_name);
   config.service(delete_resource);
   config.service(list_resource);
   config.service(inspect_resource);

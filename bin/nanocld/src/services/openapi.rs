@@ -28,6 +28,7 @@ use bollard_next::service::{
   NetworkContainer, Ipam, IpamConfig,
 };
 use nanocl_stubs::system::HostInfo;
+use nanocl_stubs::metric::Metric;
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::node::{Node, NodeContainerSummary};
@@ -56,7 +57,9 @@ use nanocl_stubs::proxy::{
 
 use crate::error::HttpError;
 
-use super::{node, system, namespace, cargo, cargo_image, vm, vm_image, resource};
+use super::{
+  node, system, namespace, cargo, cargo_image, vm, vm_image, resource, metric,
+};
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
 #[allow(dead_code)]
@@ -255,6 +258,8 @@ impl Modify for VersionModifier {
     resource::patch_resource,
     resource::list_resource_history,
     resource::reset_resource,
+    // Metric
+    metric::list_metric,
   ),
   components(schemas(
     // Node
@@ -385,6 +390,8 @@ impl Modify for VersionModifier {
     HttpTarget,
     UrlRedirect,
     CargoTarget,
+    // Metric
+    Metric,
     // Error
     ApiError,
     // Generic Types

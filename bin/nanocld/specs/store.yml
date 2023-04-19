@@ -1,6 +1,6 @@
 Name: nstore
 Container:
-  Image: cockroachdb/cockroach:v22.2.6
+  Image: cockroachdb/cockroach:v22.2.7
   Tty: true
   Cmd:
   - start-single-node

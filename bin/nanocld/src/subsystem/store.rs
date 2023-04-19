@@ -10,18 +10,17 @@ use crate::utils;
 use crate::models::Pool;
 use crate::error::CliError;
 
+/// Wait for store to be ready
+/// We loop until a tcp connection can be established to the store
 async fn wait_store(addr: &str) -> Result<(), CliError> {
-  // open tcp connection
-
+  // Open tcp connection to check if store is ready
   let addr: SocketAddr = addr.parse().map_err(|err| {
     CliError::new(1, format!("Failed to parse store address: {}", err))
   })?;
-
   while let Err(_err) = rt::tcp_connect(addr).await {
     log::warn!("Waiting for store");
     time::sleep(Duration::from_millis(1000)).await;
   }
-
   Ok(())
 }
 

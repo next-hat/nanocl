@@ -6,7 +6,7 @@ use ntex::web;
 use diesel::prelude::*;
 
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::namespace::NamespacePartial;
+use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
 
 use crate::utils;
 use crate::error::HttpError;
@@ -90,15 +90,27 @@ pub async fn create(
 /// let namespaces = repositories::namespace::list(&pool).await;
 /// ```
 ///
-pub async fn list(pool: &Pool) -> Result<Vec<NamespaceDbModel>, HttpError> {
+pub async fn list(
+  query: &NamespaceListQuery,
+  pool: &Pool,
+) -> Result<Vec<NamespaceDbModel>, HttpError> {
   use crate::schema::namespaces::dsl;
 
+  let query = query.clone();
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = dsl::namespaces
-      .load(&mut conn)
-      .map_err(db_error("namespace"))?;
+    let mut sql = dsl::namespaces.into_boxed();
+    if let Some(name) = &query.name {
+      sql = sql.filter(dsl::name.ilike(format!("%{name}%")));
+    }
+    if let Some(limit) = query.limit {
+      sql = sql.limit(limit);
+    }
+    if let Some(offset) = query.offset {
+      sql = sql.offset(offset);
+    }
+    let items = sql.load(&mut conn).map_err(db_error("namespace"))?;
     Ok::<_, HttpError>(items)
   })
   .await
