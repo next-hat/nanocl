@@ -447,28 +447,14 @@ async fn logs_cargo(
   let steam = utils::cargo::get_logs(&key, &state.docker_api)?;
   Ok(
     web::HttpResponse::Ok()
-      .header("Content-Type", "application/vdn.nanocl.raw-stream")
+      .content_type("application/vdn.nanocl.raw-stream")
       .streaming(steam),
   )
 }
 
 /// Endpoint to allow CORS preflight
-#[web::options("/cargoes")]
+#[web::options("/cargoes{all}*")]
 pub(crate) async fn options_cargo() -> Result<web::HttpResponse, HttpError> {
-  Ok(
-    web::HttpResponse::Ok()
-      .header("Access-Control-Allow-Origin", "*")
-      .header("Access-Control-Allow-Headers", "*")
-      .header("Access-Control-Allow-Methods", "*")
-      .header("Access-Control-Max-Age", "600")
-      .finish(),
-  )
-}
-
-/// Endpoint to allow CORS preflight
-#[web::options("/cargoes/{all}*")]
-pub(crate) async fn options_cargo_name() -> Result<web::HttpResponse, HttpError>
-{
   Ok(
     web::HttpResponse::Ok()
       .header("Access-Control-Allow-Origin", "*")
@@ -482,7 +468,6 @@ pub(crate) async fn options_cargo_name() -> Result<web::HttpResponse, HttpError>
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(options_cargo);
-  config.service(options_cargo_name);
   config.service(delete_cargo);
   config.service(start_cargo);
   config.service(stop_cargo);
