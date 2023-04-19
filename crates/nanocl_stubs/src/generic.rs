@@ -14,7 +14,7 @@ pub struct GenericNspQuery {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoDelete {
+pub struct CargoDeleteQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
   /// Was force flag provided
