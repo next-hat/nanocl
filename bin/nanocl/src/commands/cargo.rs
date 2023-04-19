@@ -4,8 +4,7 @@ use futures::StreamExt;
 use bollard_next::exec::CreateExecOptions;
 
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::cargo::OutputKind;
-use nanocld_client::stubs::generic::CargoDeleteQuery;
+use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery};
 
 use crate::utils::print::*;
 use crate::error::CliError;
@@ -59,9 +58,12 @@ async fn exec_cargo_rm(
       }
     }
   }
-  let query = CargoDeleteQuery { namespace: args.namespace.clone(), force_delete: options.force_delete };
+  let query = CargoDeleteQuery {
+    namespace: args.namespace.clone(),
+    force: Some(options.force),
+  };
   for name in &options.names {
-    client.delete_cargo(name, query.clone()).await?;
+    client.delete_cargo(name, &query).await?;
   }
   Ok(())
 }

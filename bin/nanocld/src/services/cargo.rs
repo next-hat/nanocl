@@ -10,8 +10,7 @@ use bollard_next::exec::CreateExecOptions;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::generic::CargoDeleteQuery;
-use nanocl_stubs::cargo::CargoKillOptions;
+use nanocl_stubs::cargo::{CargoDeleteQuery, CargoKillOptions};
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
 use crate::{utils, repositories};
@@ -148,7 +147,7 @@ pub(crate) async fn delete_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::inspect(&key, &state).await?;
-  utils::cargo::delete(&key, Some(qs.force_delete), &state).await?;
+  utils::cargo::delete(&key, qs.force, &state).await?;
   rt::spawn(async move {
     let _ = state
       .event_emitter
@@ -480,6 +479,7 @@ mod tests {
   use futures::{TryStreamExt, StreamExt};
   use nanocl_stubs::cargo::{
     Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
+    CargoDeleteQuery,
   };
   use nanocl_stubs::cargo_config::{
     CargoConfigPartial, CargoConfigUpdate, CargoConfig,
@@ -487,8 +487,6 @@ mod tests {
 
   use crate::utils::tests::*;
   use crate::services::cargo_image::tests::ensure_test_image;
-
-  use nanocl_stubs::generic::CargoDeleteQuery;
 
   /// Test to create start patch stop and delete a cargo with valid data
   #[ntex::test]
@@ -623,7 +621,10 @@ mod tests {
 
     let res = srv
       .delete(format!("/v0.2/cargoes/{}", response.name))
-      .query(&CargoDeleteQuery{ namespace: None, force_delete: true })?
+      .query(&CargoDeleteQuery {
+        namespace: None,
+        force: Some(true),
+      })?
       .send()
       .await?;
     assert_eq!(res.status(), 202);
