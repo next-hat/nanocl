@@ -512,8 +512,8 @@ paths:
     get:
       tags:
       - Cargoes
-      summary: Get logs of a cargo instance from a EventStream (SSE)
-      description: Get logs of a cargo instance from a EventStream (SSE)
+      summary: Get logs of a cargo instance
+      description: Get logs of a cargo instance
       operationId: logs_cargo
       parameters:
       - name: Name
