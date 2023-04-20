@@ -182,7 +182,7 @@ pub async fn list(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> Result<Vec<NamespaceSummary>, HttpError> {
-  let items = repositories::namespace::list(&query, pool).await?;
+  let items = repositories::namespace::list(query, pool).await?;
   let mut new_items = Vec::new();
   for item in items {
     let cargo_count =

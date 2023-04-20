@@ -79,7 +79,7 @@ pub(crate) async fn create_cargo_image(
   Ok(
     web::HttpResponse::Ok()
       .keep_alive()
-      .content_type("text/event-stream")
+      .content_type("application/vdn.nanocl.raw-stream")
       .streaming(rx_body),
   )
 }
