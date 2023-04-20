@@ -3,7 +3,7 @@ use std::error::Error;
 use ntex::rt;
 use ntex::util::{Bytes, Stream};
 use ntex::channel::mpsc::Receiver;
-use ntex::http::{Client, StatusCode};
+use ntex::http::{Client, StatusCode, ConnectionType};
 use ntex::http::client::{Connector, ClientRequest, ClientResponse};
 use futures::{StreamExt, TryStreamExt};
 
@@ -160,7 +160,7 @@ impl NanocldClient {
   where
     Q: serde::Serialize,
   {
-    let mut req = self.get(url);
+    let mut req = self.get(url).set_connection_type(ConnectionType::KeepAlive);
     if let Some(query) = query {
       req = req.query(&query)?;
     }

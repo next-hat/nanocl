@@ -115,7 +115,6 @@ pub async fn create(
 
   let config = cargo_config::create(&key, &item, &version, &pool).await?;
 
-  println!("name: {}", &item.name);
   let new_item = CargoDbModel {
     key,
     name: item.name,

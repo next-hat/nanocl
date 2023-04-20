@@ -71,7 +71,7 @@ async fn hook_apply_proxy_rule(
   let hooked_resource =
     proxy.apply_rule(resource).await.map_err(|err| HttpError {
       status: StatusCode::BAD_REQUEST,
-      msg: format!("Invalid proxy rule {}", err),
+      msg: format!("{}", err),
     })?;
   Ok(hooked_resource)
 }
@@ -85,7 +85,7 @@ async fn hook_remove_proxy_rule(resource: &Resource) -> Result<(), HttpError> {
     serde_json::from_value::<ResourceProxyRule>(resource.config.clone())
       .map_err(|err| HttpError {
         status: StatusCode::BAD_REQUEST,
-        msg: format!("Invalid proxy rule {}", err),
+        msg: format!("{}", err),
       })?;
 
   let kind = match proxy_rule.rule {
@@ -99,7 +99,7 @@ async fn hook_remove_proxy_rule(resource: &Resource) -> Result<(), HttpError> {
     .await
     .map_err(|err| HttpError {
       status: StatusCode::BAD_REQUEST,
-      msg: format!("Invalid proxy rule {}", err),
+      msg: format!("{}", err),
     })?;
   Ok(())
 }

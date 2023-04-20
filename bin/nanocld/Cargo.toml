@@ -73,3 +73,4 @@ nanocld_client = { version = "0.5.0", features = ["tokio"] }
 openssl = { version = "0.10.50", features = ["vendored"] }
 utoipa = { version = "3", features = ["yaml"], optional = true }
 ntex-files = { version = "0.2.2", optional = true }
+ntex-cors = { version = "0.3.0" }

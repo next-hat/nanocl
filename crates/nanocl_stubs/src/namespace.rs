@@ -58,3 +58,16 @@ pub struct NamespaceInspect {
   // Network of the namespace
   pub network: Network,
 }
+
+/// Namespace List Query is a query used to list namespaces
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct NamespaceListQuery {
+  /// Filter by name
+  pub name: Option<String>,
+  /// Limit the number of items returned
+  pub limit: Option<i64>,
+  /// Offset the number of items returned
+  pub offset: Option<i64>,
+}

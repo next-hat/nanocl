@@ -3,7 +3,7 @@
 */
 use ntex::web;
 
-use nanocl_stubs::namespace::NamespacePartial;
+use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
 
 use crate::{utils, repositories};
 use crate::models::DaemonState;
@@ -15,6 +15,11 @@ use crate::error::HttpError;
   get,
   tag = "Namespaces",
   path = "/namespaces",
+  params(
+    ("Name" = Option<String>, Query, description = "Filter by name"),
+    ("Limit" = Option<i64>, Query, description = "Limit the number of items returned"),
+    ("Offset" = Option<i64>, Query, description = "Offset the number of items returned"),
+  ),
   responses(
     (status = 200, description = "List of namespace", body = [NamespaceSummary]),
   ),
@@ -22,8 +27,10 @@ use crate::error::HttpError;
 #[web::get("/namespaces")]
 pub(crate) async fn list_namespace(
   state: web::types::State<DaemonState>,
+  web::types::Query(query): web::types::Query<NamespaceListQuery>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let items = utils::namespace::list(&state.docker_api, &state.pool).await?;
+  let items =
+    utils::namespace::list(&query, &state.docker_api, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -92,8 +99,23 @@ pub(crate) async fn delete_namespace(
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
+/// Endpoint to allow CORS preflight
+#[web::options("/namespaces{all}*")]
+pub(crate) async fn options_namespace() -> Result<web::HttpResponse, HttpError>
+{
+  Ok(
+    web::HttpResponse::Ok()
+      .header("Access-Control-Allow-Origin", "*")
+      .header("Access-Control-Allow-Headers", "*")
+      .header("Access-Control-Allow-Methods", "*")
+      .header("Access-Control-Max-Age", "600")
+      .finish(),
+  )
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_namespace);
+  config.service(options_namespace);
   config.service(create_namespace);
   config.service(inspect_namespace);
   config.service(delete_namespace);

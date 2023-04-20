@@ -24,7 +24,11 @@ pub(crate) async fn apply(
     }
   };
 
-  Ok(web::HttpResponse::Ok().streaming(res))
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("application/vdn.nanocl.raw-stream")
+      .streaming(res),
+  )
 }
 
 #[web::put("/state/revert")]
@@ -41,12 +45,29 @@ pub(crate) async fn revert(
       utils::state::revert_resource(&data, &state).await?
     }
   };
-  Ok(web::HttpResponse::Ok().streaming(res))
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("application/vdn.nanocl.raw-stream")
+      .streaming(res),
+  )
+}
+
+#[web::options("/state{all}*")]
+pub(crate) async fn options_state() -> Result<web::HttpResponse, HttpError> {
+  Ok(
+    web::HttpResponse::Ok()
+      .header("Access-Control-Allow-Origin", "*")
+      .header("Access-Control-Allow-Headers", "*")
+      .header("Access-Control-Allow-Methods", "*")
+      .header("Access-Control-Max-Age", "600")
+      .finish(),
+  )
 }
 
 pub fn ntex_config(cfg: &mut web::ServiceConfig) {
   cfg.service(apply);
   cfg.service(revert);
+  cfg.service(options_state);
 }
 
 #[cfg(test)]

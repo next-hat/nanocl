@@ -14,3 +14,4 @@ pub mod vm;
 pub mod vm_config;
 pub mod vm_image;
 pub mod proxy;
+pub mod metric;

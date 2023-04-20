@@ -602,6 +602,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HostInfo'
+  /metrics:
+    get:
+      tags:
+      - Metrics
+      summary: Get logs of a cargo instance from a EventStream (SSE)
+      description: Get logs of a cargo instance from a EventStream (SSE)
+      operationId: list_metric
+      parameters:
+      - name: Kind
+        in: query
+        description: Namespace of the cargo
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Cargo reset
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Metric'
   /namespaces:
     get:
       tags:
@@ -609,6 +632,30 @@ paths:
       summary: List namespaces
       description: List namespaces
       operationId: list_namespace
+      parameters:
+      - name: Name
+        in: query
+        description: Filter by name
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: Limit
+        in: query
+        description: Limit the number of items returned
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: Offset
+        in: query
+        description: Offset the number of items returned
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
       responses:
         '200':
           description: List of namespace
@@ -2967,6 +3014,31 @@ components:
         properties:
           Http:
             $ref: '#/components/schemas/HttpTarget'
+    Metric:
+      type: object
+      description: Metric entry
+      required:
+      - Key
+      - CreatedAt
+      - ExpireAt
+      - NodeName
+      - Kind
+      - Data
+      properties:
+        Key:
+          type: string
+          format: uuid
+        CreatedAt:
+          type: string
+          format: date-time
+        ExpireAt:
+          type: string
+          format: date-time
+        NodeName:
+          type: string
+        Kind:
+          type: string
+        Data: {}
     Mount:
       type: object
       properties:

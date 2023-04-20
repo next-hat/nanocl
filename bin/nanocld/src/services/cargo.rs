@@ -448,13 +448,27 @@ async fn logs_cargo(
   let steam = utils::cargo::get_logs(&key, &state.docker_api)?;
   Ok(
     web::HttpResponse::Ok()
-      .content_type("text/event-stream")
+      .content_type("application/vdn.nanocl.raw-stream")
       .streaming(steam),
+  )
+}
+
+/// Endpoint to allow CORS preflight
+#[web::options("/cargoes{all}*")]
+pub(crate) async fn options_cargo() -> Result<web::HttpResponse, HttpError> {
+  Ok(
+    web::HttpResponse::Ok()
+      .header("Access-Control-Allow-Origin", "*")
+      .header("Access-Control-Allow-Headers", "*")
+      .header("Access-Control-Allow-Methods", "*")
+      .header("Access-Control-Max-Age", "600")
+      .finish(),
   )
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
+  config.service(options_cargo);
   config.service(delete_cargo);
   config.service(start_cargo);
   config.service(stop_cargo);
