@@ -4,8 +4,8 @@ use nanocld_client::NanocldClient;
 use nanocld_client::stubs::resource::ResourcePartial;
 
 use crate::{
-  error::HttpError,
   utils,
+  error::HttpError,
   nginx::{Nginx, NginxConfKind},
 };
 
