@@ -29,14 +29,26 @@ servers:
 - url: /{version}
   variables:
     version:
-      default: v0.4
+      default: v0.5
       description: API version
       enum:
+      - v0.6
+      - v0.5
       - v0.4
       - v0.3
       - v0.2
       - v0.1
 paths:
+  /_ping:
+    head:
+      tags:
+      - System
+      summary: Get version information
+      description: Get version information
+      operationId: get_ping
+      responses:
+        '202':
+          description: Server is up
   /cargoes:
     get:
       tags:
@@ -606,19 +618,20 @@ paths:
     get:
       tags:
       - Metrics
-      summary: Get logs of a cargo instance from a EventStream (SSE)
-      description: Get logs of a cargo instance from a EventStream (SSE)
+      summary: Get specific metric of all peer nodes
+      description: Get specific metric of all peer nodes
       operationId: list_metric
       parameters:
       - name: Kind
         in: query
-        description: Namespace of the cargo
+        description: Kind of the metrics CPU|MEMORY|NETWORK|DISK
         required: true
         schema:
           type: string
+        example: CPU
       responses:
         '200':
-          description: Cargo reset
+          description: Kind of the metrics peer node
           content:
             application/json:
               schema:
@@ -1002,6 +1015,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /version:
+    get:
+      tags:
+      - System
+      summary: Get version information
+      description: Get version information
+      operationId: get_version
+      responses:
+        '200':
+          description: Version information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
   /vms:
     get:
       tags:
@@ -4462,6 +4489,23 @@ components:
       - MovedPermanently
       - PermanentRedirect
       - TemporaryRedirect
+    Version:
+      type: object
+      description: Version contain details about the current version nanocl
+      required:
+      - Arch
+      - Channel
+      - Version
+      - CommitId
+      properties:
+        Arch:
+          type: string
+        Channel:
+          type: string
+        Version:
+          type: string
+        CommitId:
+          type: string
     Vm:
       type: object
       description: A virtual machine instance

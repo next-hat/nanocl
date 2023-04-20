@@ -340,8 +340,8 @@ pub mod tests {
       .to_str()
       .unwrap();
     assert_eq!(
-      content_type, "text/event-stream",
-      "Expect content type header to be nanocl/streaming-v1 got {content_type}"
+      content_type, "application/vdn.nanocl.raw-stream",
+      "Expect content type to be application/vdn.nanocl.raw-stream got {content_type}"
     );
     let mut stream = res.into_stream();
     while let Some(chunk) = stream.next().await {

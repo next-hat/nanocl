@@ -67,23 +67,6 @@ where
   }
 }
 
-// This is a dummy endpoint you can use to test if the server is accessible.
-async fn ping() -> Result<web::HttpResponse, HttpError> {
-  Ok(web::HttpResponse::Ok().json(&serde_json::json!({
-    "msg": "pong",
-  })))
-}
-
-#[web::get("/version")]
-async fn get_version() -> web::HttpResponse {
-  web::HttpResponse::Ok().json(&serde_json::json!({
-    "Arch": version::ARCH,
-    "Channel": version::CHANNEL,
-    "Version": version::VERSION,
-    "CommitId": version::COMMIT_ID,
-  }))
-}
-
 pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
   Err(HttpError {
     status: ntex::http::StatusCode::NOT_FOUND,
@@ -96,14 +79,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   {
     config.service(web::scope("/explorer").configure(openapi::ntex_config));
   }
-
-  config
-    .service(
-      web::resource("/_ping")
-        .route(web::get().to(ping))
-        .route(web::head().to(ping)),
-    )
-    .service(get_version);
 
   config.service(
     web::scope("/{version}")
