@@ -7,16 +7,16 @@ use crate::models::DaemonState;
 use crate::repositories;
 use crate::error::HttpError;
 
-/// Get logs of a cargo instance from a EventStream (SSE)
+/// Get specific metric of all peer nodes
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Metrics",
   path = "/metrics",
   params(
-    ("Kind" = String, Query, description = "Namespace of the cargo"),
+    ("Kind" = String, Query, description = "Kind of the metrics CPU|MEMORY|NETWORK|DISK", example = "CPU"),
   ),
   responses(
-    (status = 200, description = "Cargo reset", body = Vec<Metric>),
+    (status = 200, description = "Kind of the metrics peer node", body = Vec<Metric>),
   ),
 ))]
 #[web::get("/metrics")]

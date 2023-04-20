@@ -67,23 +67,6 @@ where
   }
 }
 
-// This is a dummy endpoint you can use to test if the server is accessible.
-async fn ping() -> Result<web::HttpResponse, HttpError> {
-  Ok(web::HttpResponse::Ok().json(&serde_json::json!({
-    "msg": "pong",
-  })))
-}
-
-#[web::get("/version")]
-async fn get_version() -> web::HttpResponse {
-  web::HttpResponse::Ok().json(&serde_json::json!({
-    "Arch": version::ARCH,
-    "Channel": version::CHANNEL,
-    "Version": version::VERSION,
-    "CommitId": version::COMMIT_ID,
-  }))
-}
-
 pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
   Err(HttpError {
     status: ntex::http::StatusCode::NOT_FOUND,
@@ -96,14 +79,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   {
     config.service(web::scope("/explorer").configure(openapi::ntex_config));
   }
-
-  config
-    .service(
-      web::resource("/_ping")
-        .route(web::get().to(ping))
-        .route(web::head().to(ping)),
-    )
-    .service(get_version);
 
   config.service(
     web::scope("/{version}")
@@ -135,7 +110,7 @@ mod tests {
   #[ntex::test]
   pub async fn get_version() -> TestRet {
     let srv = generate_server(ntex_config).await;
-    let mut resp = srv.get("/version").send().await?;
+    let mut resp = srv.get("/v0.5/version").send().await?;
     let status = resp.status();
     assert_eq!(
       status,
@@ -172,28 +147,13 @@ mod tests {
   #[ntex::test]
   async fn test_ping() -> TestRet {
     let srv = generate_server(ntex_config).await;
-    let mut resp = srv.get("/_ping").send().await?;
+    let resp = srv.head("/v0.5/_ping").send().await?;
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::OK,
+      StatusCode::ACCEPTED,
       "Expect status to be {} got {}",
-      StatusCode::OK,
-      status
-    );
-    let body: serde_json::Value = resp
-      .json()
-      .await
-      .expect("To receive a valid version json payload");
-    assert_eq!(body["msg"], "pong");
-
-    let resp = srv.head("/_ping").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      StatusCode::OK,
-      "Expect status to be {} got {}",
-      StatusCode::OK,
+      StatusCode::ACCEPTED,
       status
     );
     Ok(())

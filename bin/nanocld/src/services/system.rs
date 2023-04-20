@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use ntex::web;
 
+use crate::version;
+
 use bollard_next::container::ListContainersOptions;
 
 use nanocl_stubs::node::NodeContainerSummary;
@@ -10,6 +12,39 @@ use nanocl_stubs::system::{HostInfo, ProccessQuery};
 use crate::repositories;
 use crate::error::HttpError;
 use crate::models::DaemonState;
+
+/// Get version information
+#[cfg_attr(feature = "dev", utoipa::path(
+  head,
+  tag = "System",
+  path = "/_ping",
+  responses(
+    (status = 202, description = "Server is up"),
+  ),
+))]
+#[web::head("/_ping")]
+pub(crate) async fn get_ping() -> Result<web::HttpResponse, HttpError> {
+  Ok(web::HttpResponse::Accepted().into())
+}
+
+/// Get version information
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "System",
+  path = "/version",
+  responses(
+    (status = 200, description = "Version information", body = Version),
+  ),
+))]
+#[web::get("/version")]
+pub(crate) async fn get_version() -> web::HttpResponse {
+  web::HttpResponse::Ok().json(&serde_json::json!({
+    "Arch": version::ARCH,
+    "Channel": version::CHANNEL,
+    "Version": version::VERSION,
+    "CommitId": version::COMMIT_ID,
+  }))
+}
 
 /// Get host/node system information
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -130,6 +165,8 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(watch_event);
   config.service(get_info);
   config.service(get_processes);
+  config.service(get_ping);
+  config.service(get_version);
 }
 
 #[cfg(test)]

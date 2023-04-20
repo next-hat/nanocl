@@ -27,7 +27,9 @@ impl NanocldClient {
   /// ```
   ///
   pub async fn get_version(&self) -> Result<Version, NanocldClientError> {
-    let res = self.send_get("/version".into(), None::<String>).await?;
+    let res = self
+      .send_get(format!("/{}/version", &self.version), None::<String>)
+      .await?;
 
     Self::res_json(res).await
   }
@@ -85,7 +87,9 @@ impl NanocldClient {
   /// ```
   ///
   pub async fn ping(&self) -> Result<(), NanocldClientError> {
-    self.send_get("/_ping".into(), None::<String>).await?;
+    self
+      .send_head(format!("/{}/_ping", &self.version), None::<String>)
+      .await?;
 
     Ok(())
   }
