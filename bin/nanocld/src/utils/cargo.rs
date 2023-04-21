@@ -15,7 +15,7 @@ use bollard_next::service::{ContainerSummary, HostConfig};
 use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
 use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 
-use nanocl_stubs::cargo::CargoKillOptions;
+use nanocl_stubs::cargo::{CargoKillOptions, GenericCargoListQuery};
 use nanocl_stubs::cargo_config::Config as ContainerConfig;
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 use nanocl_stubs::cargo::{
@@ -511,7 +511,8 @@ pub async fn put(
 ///
 /// ## Arguments
 ///
-/// - [nsp](str) - The namespace name
+/// - [query](GenericCargoListQuery) - The query containing namespace, name filter and
+/// pagination info
 /// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
@@ -522,14 +523,15 @@ pub async fn put(
 ///   - [Err](HttpResponseError) - The containers of the cargo has not been listed
 ///
 pub async fn list(
-  nsp: &str,
+  query: GenericCargoListQuery<&str>,
   state: &DaemonState,
 ) -> Result<Vec<CargoSummary>, HttpError> {
   let namespace =
-    repositories::namespace::find_by_name(nsp, &state.pool).await?;
+    repositories::namespace::find_by_name(query.namespace, &state.pool).await?;
 
+  let query = query.merge(namespace);
   let cargoes =
-    repositories::cargo::find_by_namespace(&namespace, &state.pool).await?;
+    repositories::cargo::find_by_list_query(&query, &state.pool).await?;
 
   let mut cargo_summaries = Vec::new();
 

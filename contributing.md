@@ -249,3 +249,8 @@ Some usefull command to know:
   ```sh
   nanocl exec system-nano-proxy -- certbot --nginx --email email@email.com --agree-tos -d your-domain.com
   ```
+
+* Run ntex tests
+  ```sh
+  cargo nextest run -p nanocld
+  ```

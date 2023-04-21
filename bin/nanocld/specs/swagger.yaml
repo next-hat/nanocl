@@ -64,6 +64,29 @@ paths:
         schema:
           type: string
           nullable: true
+      - name: Name
+        in: query
+        description: Filter for cargoes with similar name
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: Limit
+        in: query
+        description: Max amount of cargoes in response
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: Offset
+        in: query
+        description: Offset of the first cargo in response
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
       responses:
         '200':
           description: List of cargoes

@@ -2,7 +2,7 @@ use ntex::web;
 use ntex::http::StatusCode;
 use diesel::prelude::*;
 
-use nanocl_stubs::cargo::Cargo;
+use nanocl_stubs::cargo::{Cargo, GenericCargoListQuery};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
 
@@ -42,14 +42,57 @@ pub async fn find_by_namespace(
   nsp: &NamespaceDbModel,
   pool: &Pool,
 ) -> Result<Vec<CargoDbModel>, HttpError> {
-  let nsp = nsp.clone();
+    let query = GenericCargoListQuery::of_namespace(nsp.clone());
+    find_by_list_query(&query, pool).await
+}
+
+/// ## Find cargo items by list query
+///
+/// ## Arguments
+///
+/// - [query](GenericCargoListQuery) - Query containing namespace, name filter and pagination info
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///  - [Ok](Vec<CargoDbModel>) - List a cargo found
+///  - [Err](HttpResponseError) - Error during the operation
+///
+/// ## Examples
+///
+/// ```rust,norun
+/// use nanocl_stubs::namespace::NamespaceItem;
+/// use nanocl_stubs::cargo::GenericCargoListQuery;
+/// let nsp = NamespaceItem {
+///  name: String::from("test"),
+/// };
+/// let query = GenericCargoListQuery::of_namespace(nsp);
+/// let items = find_by_list_query(&query, &pool).await;
+/// ```
+///
+pub async fn find_by_list_query(
+  query: &GenericCargoListQuery<NamespaceDbModel>,
+  pool: &Pool,
+) -> Result<Vec<CargoDbModel>, HttpError> {
+  use crate::schema::cargoes::dsl;
+
+  let query = query.clone();
   let pool = pool.clone();
 
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = CargoDbModel::belonging_to(&nsp)
-      .load(&mut conn)
-      .map_err(db_error("cargo"))?;
+    let mut sql = CargoDbModel::belonging_to(&query.namespace).into_boxed();
+    if let Some(name) = &query.name {
+      sql = sql.filter(dsl::name.ilike(format!("%{name}%")));
+    }
+    if let Some(limit) = query.limit {
+      sql = sql.limit(limit);
+    }
+    if let Some(offset) = query.offset {
+      sql = sql.offset(offset);
+    }
+    let items = sql.load(&mut conn).map_err(db_error("cargo"))?;
     Ok::<_, HttpError>(items)
   })
   .await

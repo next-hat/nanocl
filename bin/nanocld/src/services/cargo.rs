@@ -10,7 +10,7 @@ use bollard_next::exec::CreateExecOptions;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::cargo::{CargoDeleteQuery, CargoKillOptions};
+use nanocl_stubs::cargo::{CargoListQuery, CargoDeleteQuery, CargoKillOptions};
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
 use crate::{utils, repositories};
@@ -24,6 +24,9 @@ use crate::models::{DaemonState, CargoResetPath};
   path = "/cargoes",
   params(
     ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("Name" = Option<String>, Query, description = "Filter for cargoes with similar name"),
+    ("Limit" = Option<i64>, Query, description = "Max amount of cargoes in response"),
+    ("Offset" = Option<i64>, Query, description = "Offset of the first cargo in response"),
   ),
   responses(
     (status = 200, description = "List of cargoes", body = [CargoSummary]),
@@ -31,11 +34,12 @@ use crate::models::{DaemonState, CargoResetPath};
 ))]
 #[web::get("/cargoes")]
 pub(crate) async fn list_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Query(qs): web::types::Query<CargoListQuery>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let cargoes = utils::cargo::list(&namespace, &state).await?;
+  let query = qs.merge(namespace.as_str());
+  let cargoes = utils::cargo::list(query, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargoes))
 }
 
@@ -493,7 +497,7 @@ mod tests {
   use futures::{TryStreamExt, StreamExt};
   use nanocl_stubs::cargo::{
     Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
-    CargoDeleteQuery,
+    CargoDeleteQuery,CargoListQuery,
   };
   use nanocl_stubs::cargo_config::{
     CargoConfigPartial, CargoConfigUpdate, CargoConfig,
@@ -508,37 +512,69 @@ mod tests {
     let srv = generate_server(ntex_config).await;
     ensure_test_image().await?;
 
-    const CARGO_NAME: &str = "daemon-test-cargo1";
+    let test_cargoes = vec!["daemon-test-cargo1", "another-test-cargo", "daemon-test-cargo3"];
+    let main_test_cargo = test_cargoes[0];
 
-    let mut res = srv
-      .post("/v0.2/cargoes")
-      .send_json(&CargoConfigPartial {
-        name: CARGO_NAME.to_string(),
-        container: bollard_next::container::Config {
+    for test_cargo in test_cargoes.iter() {
+      let test_cargo = test_cargo.to_string();
+      let mut res = srv
+        .post("/v0.2/cargoes")
+        .send_json(&CargoConfigPartial {
+          name: test_cargo.clone(),
+          container: bollard_next::container::Config {
           image: Some("nexthat/nanocl-get-started:latest".to_string()),
+            ..Default::default()
+          },
           ..Default::default()
-        },
-        ..Default::default()
       })
       .await?;
-    assert_eq!(res.status(), 201);
+      assert_eq!(res.status(), 201);
 
-    let response = res.json::<Cargo>().await?;
-    assert_eq!(response.name, CARGO_NAME);
-    assert_eq!(response.namespace_name, "global");
-    assert_eq!(
-      response.config.container.image,
-      Some("nexthat/nanocl-get-started:latest".to_string())
-    );
+      let response = res.json::<Cargo>().await?;
+      assert_eq!(response.name, test_cargo);
+      assert_eq!(response.namespace_name, "global");
+      assert_eq!(
+        response.config.container.image,
+        Some("nexthat/nanocl-get-started:latest".to_string())
+      );
+    }
 
     let mut res = srv
-      .get(format!("/v0.2/cargoes/{CARGO_NAME}/inspect"))
+      .get("/v0.2/cargoes")
+      .query(&CargoListQuery {
+        name: Some(test_cargoes.get(1).unwrap().to_string()),
+        namespace: None,
+        limit: None,
+        offset: None
+      })?
+      .send()
+      .await?;
+    assert_eq!(res.status(), 200);
+    let cargoes = res.json::<Vec<CargoSummary>>().await?;
+    assert_eq!(cargoes[0].name, test_cargoes[1].to_string());
+
+    let mut res = srv
+      .get("/v0.2/cargoes")
+      .query(&CargoListQuery {
+        name: None,
+        namespace: None,
+        limit: Some(1),
+        offset: None
+      })?
+      .send()
+      .await?;
+    assert_eq!(res.status(), 200);
+    let cargoes = res.json::<Vec<CargoSummary>>().await?;
+    assert_eq!(cargoes.len(), 1);
+
+    let mut res = srv
+      .get(format!("/v0.2/cargoes/{main_test_cargo}/inspect"))
       .send()
       .await?;
     assert_eq!(res.status(), 200);
 
     let response = res.json::<CargoInspect>().await?;
-    assert_eq!(response.name, CARGO_NAME);
+    assert_eq!(response.name, main_test_cargo);
 
     let mut res = srv.get("/v0.2/cargoes").send().await?;
     assert_eq!(res.status(), 200);
@@ -566,7 +602,7 @@ mod tests {
     assert_eq!(res.status(), 200);
 
     let patch_response = res.json::<Cargo>().await?;
-    assert_eq!(patch_response.name, CARGO_NAME);
+    assert_eq!(patch_response.name, main_test_cargo);
     assert_eq!(patch_response.namespace_name, "global");
     assert_eq!(
       patch_response.config.container.image,
@@ -608,33 +644,8 @@ mod tests {
       .await?;
     assert_eq!(res.status(), 202);
 
-    Ok(())
-  }
-
-  #[ntex::test]
-  async fn force_delete() -> TestRet {
-    let srv = generate_server(ntex_config).await;
-    ensure_test_image().await?;
-
-    const CARGO_NAME: &str = "daemon-test-cargo2";
-
-    let mut res = srv
-      .post("/v0.2/cargoes")
-      .send_json(&CargoConfigPartial {
-        name: CARGO_NAME.to_string(),
-        container: bollard_next::container::Config {
-          image: Some("nexthat/nanocl-get-started:latest".to_string()),
-          ..Default::default()
-        },
-        ..Default::default()
-      })
-      .await?;
-    assert_eq!(res.status(), 201);
-
-    let response = res.json::<Cargo>().await?;
-
     let res = srv
-      .delete(format!("/v0.2/cargoes/{}", response.name))
+      .delete(format!("/v0.2/cargoes/{}", test_cargoes[1]))
       .query(&CargoDeleteQuery {
         namespace: None,
         force: Some(true),
@@ -642,7 +653,15 @@ mod tests {
       .send()
       .await?;
     assert_eq!(res.status(), 202);
-
+    let res = srv
+      .delete(format!("/v0.2/cargoes/{}", test_cargoes[2]))
+      .query(&CargoDeleteQuery {
+        namespace: None,
+        force: Some(true),
+      })?
+      .send()
+      .await?;
+    assert_eq!(res.status(), 202);
     Ok(())
   }
 
