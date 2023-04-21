@@ -176,3 +176,32 @@ pub struct CargoDeleteQuery {
   /// Delete cargo even if it is running
   pub force: Option<bool>,
 }
+
+/// To use this structure for database access it needs to be able to hold a NamespaceDbModel
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct GenericCargoListQuery<NS> {
+  /// Name of the namespace
+  pub namespace: NS,
+  /// Filter for cargoes with similar name
+  pub name: Option<String>,
+  /// Max amount of cargoes in response
+  pub limit: Option<i64>,
+  /// Offset of the first cargo in response
+  pub offset: Option<i64>
+}
+
+impl<NS> GenericCargoListQuery<NS> {
+  /// Create a GenericCargoListQuery with only the namespace specified
+  pub fn of_namespace(nsp: NS) -> GenericCargoListQuery<NS> {
+    GenericCargoListQuery{ namespace: nsp, name: None, limit: None, offset: None }
+  }
+  /// Move all fields except namespace to new GenericCargoListQuery
+  pub fn merge<T>(self, nsp: T) -> GenericCargoListQuery<T> {
+    GenericCargoListQuery{ namespace: nsp, name: self.name, limit: self.limit, offset: self.offset }
+  }
+}
+
+/// List cargo query
+pub type CargoListQuery = GenericCargoListQuery<Option<String>>;

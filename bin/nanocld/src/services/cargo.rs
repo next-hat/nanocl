@@ -10,7 +10,7 @@ use bollard_next::exec::CreateExecOptions;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::cargo::{CargoDeleteQuery, CargoKillOptions};
+use nanocl_stubs::cargo::{CargoListQuery, CargoDeleteQuery, CargoKillOptions};
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
 use crate::{utils, repositories};
@@ -24,6 +24,9 @@ use crate::models::{DaemonState, CargoResetPath};
   path = "/cargoes",
   params(
     ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("Name" = Option<String>, Query, description = "Filter for cargoes with similar name"),
+    ("Limit" = Option<i64>, Query, description = "Max amount of cargoes in response"),
+    ("Offset" = Option<i64>, Query, description = "Offset of the first cargo in response"),
   ),
   responses(
     (status = 200, description = "List of cargoes", body = [CargoSummary]),
@@ -31,11 +34,12 @@ use crate::models::{DaemonState, CargoResetPath};
 ))]
 #[web::get("/cargoes")]
 pub(crate) async fn list_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Query(qs): web::types::Query<CargoListQuery>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let cargoes = utils::cargo::list(&namespace, &state).await?;
+  let query = qs.merge(namespace.as_str());
+  let cargoes = utils::cargo::list(query, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargoes))
 }
 
