@@ -11,11 +11,13 @@ Cargoes:
     HostConfig:
       NetworkMode: host
       Binds:
-      - /var/lib/nanocl/proxy/letsencrypt:/etc/letsencrypt
-      - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
-      - /var/lib/nanocl/proxy/html:/usr/share/nginx/html
-      - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
-      - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled
+      - /run:/run
+      - {state_dir}/proxy/logs:/var/log/nginx/access
+      - {state_dir}/proxy/letsencrypt:/etc/letsencrypt
+      - {state_dir}/proxy/conf.d:/etc/nginx/conf.d
+      - {state_dir}/proxy/html:/usr/share/nginx/html
+      - {state_dir}/proxy/sites-enabled:/etc/nginx/sites-enabled
+      - {state_dir}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
 - Name: ncdproxy
   Container:
@@ -24,7 +26,8 @@ Cargoes:
     HostConfig:
       NetworkMode: system
       Binds:
-      - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
-      - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
-      - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled
       - /run/nanocl:/run/nanocl
+      - {state_dir}/proxy/conf.d:/etc/nginx/conf.d
+      - {state_dir}/proxy/logs:/var/log/nginx/access
+      - {state_dir}/proxy/sites-enabled:/etc/nginx/sites-enabled
+      - {state_dir}/proxy/streams-enabled:/etc/nginx/streams-enabled

@@ -180,6 +180,22 @@ fn extract_target_cargo(key: &str) -> Result<(String, String), ErrorHint> {
   Ok((name, namespace))
 }
 
+async fn gen_unix_stream(
+  path: &str,
+  nginx: &Nginx,
+) -> Result<String, ErrorHint> {
+  let upstream_key = format!("unix-{}", path.replace('/', "-"));
+  let upstream = format!(
+    "upstream {upstream_key} {{
+  server unix:{path};
+}}
+",
+    path = path
+  );
+  nginx.write_conf_file(&upstream_key, &upstream, &NginxConfKind::Site)?;
+  Ok(upstream_key)
+}
+
 async fn gen_locations(
   location_rules: &Vec<ProxyHttpLocation>,
   client: &NanocldClient,
@@ -204,6 +220,21 @@ async fn gen_locations(
     proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
     proxy_set_header X-Real-IP          $remote_addr;
   }}"
+        );
+        locations.push(location);
+      }
+      LocationTarget::Unix(unix_target) => {
+        let upstream_key = gen_unix_stream(unix_target, nginx).await?;
+        let location = format!(
+          "location {path} {{
+    proxy_pass http://{upstream_key}/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Scheme $scheme;
+    proxy_set_header X-Forwarded-Proto  $scheme;
+    proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
+    proxy_set_header X-Real-IP          $remote_addr;
+  }}
+  "
         );
         locations.push(location);
       }
@@ -311,6 +342,9 @@ async fn gen_stream_server_block(
     StreamTarget::Cargo(cargo_target) => {
       gen_cargo_upstream(&NginxConfKind::Stream, cargo_target, client, nginx)
         .await?
+    }
+    StreamTarget::Unix(unix_target) => {
+      gen_unix_stream(unix_target, nginx).await?
     }
     StreamTarget::Uri(_) => {
       return Err(ErrorHint::error(99, "Not implemented".into()))

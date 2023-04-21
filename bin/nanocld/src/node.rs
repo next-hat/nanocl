@@ -92,8 +92,9 @@ impl NodeClients {
           });
         }
       }
+      #[allow(unused_variables)]
       NodeClientsMessage::ReceiveMessage { msg } => {
-        println!("[CLIENT] received {}", msg.data);
+        // println!("[CLIENT] received {}", msg.data);
       }
     }
   }

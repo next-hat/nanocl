@@ -3,6 +3,8 @@
 pub mod node;
 /// Manage metrics table
 pub mod metric;
+/// Manage HTTP metrics table
+pub mod http_metric;
 /// Manage namespaces table
 pub mod namespace;
 /// Manage cargoes table

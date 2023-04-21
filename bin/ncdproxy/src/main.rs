@@ -3,14 +3,15 @@ mod error;
 mod nginx;
 mod utils;
 mod service;
+mod network_log;
 
 use clap::Parser;
 
-use futures::StreamExt;
 use ntex::{
-  web::{App, HttpServer},
   rt,
+  web::{App, HttpServer},
 };
+use futures::StreamExt;
 use nanocld_client::{
   NanocldClient,
   stubs::{system::Event, resource::ResourcePartial},
@@ -31,6 +32,8 @@ async fn boot(cli: &cli::Cli) -> nginx::Nginx {
 
   let nginx = nginx::new(&cli.conf_dir.clone().unwrap_or("/etc/nginx".into()));
   let client = NanocldClient::connect_with_unix_default();
+
+  network_log::run();
 
   if let Err(err) = nginx.ensure() {
     err.exit();

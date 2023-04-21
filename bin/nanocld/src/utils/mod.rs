@@ -12,6 +12,7 @@ pub mod vm;
 pub mod vm_image;
 pub mod cargo;
 pub mod cargo_image;
+pub mod metric;
 
 #[cfg(test)]
 pub mod tests {

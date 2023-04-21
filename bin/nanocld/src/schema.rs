@@ -21,11 +21,40 @@ diesel::table! {
 }
 
 diesel::table! {
+    http_metrics (key) {
+        key -> Uuid,
+        created_at -> Timestamptz,
+        expire_at -> Timestamptz,
+        date_gmt -> Timestamptz,
+        status -> Int8,
+        bytes_sent -> Int8,
+        content_length -> Int8,
+        body_bytes_sent -> Int8,
+        request_time -> Float8,
+        node_name -> Text,
+        uri -> Text,
+        host -> Text,
+        remote_addr -> Text,
+        realip_remote_addr -> Text,
+        server_protocol -> Text,
+        request_method -> Text,
+        proxy_host -> Nullable<Text>,
+        upstream_addr -> Nullable<Text>,
+        query_string -> Nullable<Text>,
+        request_body -> Nullable<Text>,
+        content_type -> Nullable<Text>,
+        http_user_agent -> Nullable<Text>,
+        http_referrer -> Nullable<Text>,
+        http_accept_language -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
     metrics (key) {
         key -> Uuid,
         created_at -> Timestamptz,
         expire_at -> Timestamptz,
-        node_name -> Varchar,
+        node_name -> Text,
         kind -> Text,
         data -> Jsonb,
     }
@@ -137,18 +166,19 @@ diesel::joinable!(vms -> namespaces (namespace_name));
 diesel::joinable!(vms -> vm_configs (config_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    cargo_configs,
-    cargoes,
-    metrics,
-    namespaces,
-    node_group_links,
-    node_groups,
-    nodes,
-    resource_configs,
-    resource_kind_versions,
-    resource_kinds,
-    resources,
-    vm_configs,
-    vm_images,
-    vms,
+  cargo_configs,
+  cargoes,
+  http_metrics,
+  metrics,
+  namespaces,
+  node_group_links,
+  node_groups,
+  nodes,
+  resource_configs,
+  resource_kind_versions,
+  resource_kinds,
+  resources,
+  vm_configs,
+  vm_images,
+  vms,
 );

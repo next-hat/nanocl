@@ -1,19 +1,17 @@
-use thiserror::Error;
-use ntex::{
-  rt,
-  http::{
-    Client, StatusCode,
-    client::{
-      Connector,
-      error::{SendRequestError, JsonPayloadError},
-      ClientResponse,
-    },
-  },
+use ntex::rt;
+use ntex::http::{Client, StatusCode};
+use ntex::http::client::{
+  Connector, ClientResponse,
+  error::{SendRequestError, JsonPayloadError},
 };
+use futures::StreamExt;
+use thiserror::Error;
+use bollard_next::container::{LogsOptions, LogOutput};
 
 use nanocl_stubs::resource::ResourcePartial;
 
 use crate::error::HttpError;
+use crate::models::{DaemonState, HttpMetricPartial};
 
 pub struct ProxyClient {
   pub(crate) client: Client,
@@ -125,4 +123,62 @@ impl ProxyClient {
 
     Ok(())
   }
+}
+
+pub(crate) fn spawn_logger(state: &DaemonState) {
+  let state = state.clone();
+  rt::Arbiter::new().exec_fn(move || {
+    rt::spawn(async move {
+      let now = chrono::Utc::now().timestamp();
+      let mut res = state.docker_api.logs(
+        "ncdproxy.system.c",
+        Some(LogsOptions::<String> {
+          follow: true,
+          stdout: true,
+          stderr: true,
+          since: now,
+          ..Default::default()
+        }),
+      );
+      while let Some(log) = res.next().await {
+        match log {
+          Err(e) => {
+            log::warn!("Failed to get log: {}", e);
+            continue;
+          }
+          Ok(log) => {
+            let log = match &log {
+              LogOutput::StdOut { message } => {
+                String::from_utf8_lossy(message).to_string()
+              }
+              LogOutput::StdErr { message } => {
+                String::from_utf8_lossy(message).to_string()
+              }
+              LogOutput::Console { message } => {
+                String::from_utf8_lossy(message).to_string()
+              }
+              _ => continue,
+            };
+            match &log {
+              log if log.starts_with("#HTTP") => {
+                let http_metric = serde_json::from_str::<HttpMetricPartial>(
+                  log.trim_start_matches("#HTTP "),
+                );
+                match http_metric {
+                  Ok(http_metric) => {
+                    println!("{:#?}", &http_metric);
+                  }
+                  Err(e) => {
+                    log::warn!("Failed to parse http metric: {}", e);
+                  }
+                }
+              }
+              log if log.starts_with("#STREAM") => {}
+              _ => {}
+            }
+          }
+        }
+      }
+    });
+  });
 }

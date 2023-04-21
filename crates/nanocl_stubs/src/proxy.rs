@@ -81,6 +81,8 @@ pub enum LocationTarget {
   Cargo(CargoTarget),
   /// Target a specific http url
   Http(HttpTarget),
+  /// Target a specific unix socket
+  Unix(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -101,6 +103,8 @@ pub enum StreamTarget {
   Cargo(CargoTarget),
   /// Target a specific uri
   Uri(UriTarget),
+  /// Target a specific unix socket
+  Unix(String),
 }
 
 /// Proxy rules modes

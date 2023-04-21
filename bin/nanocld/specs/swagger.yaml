@@ -3064,6 +3064,13 @@ components:
         properties:
           Http:
             $ref: '#/components/schemas/HttpTarget'
+      - type: object
+        required:
+        - Unix
+        properties:
+          Unix:
+            type: string
+            description: Target a specific unix socket
     Metric:
       type: object
       description: Metric entry
@@ -3948,6 +3955,13 @@ components:
         properties:
           Uri:
             $ref: '#/components/schemas/UriTarget'
+      - type: object
+        required:
+        - Unix
+        properties:
+          Unix:
+            type: string
+            description: Target a specific unix socket
     SwarmInfo:
       type: object
       description: Represents generic information about swarm.

@@ -117,7 +117,6 @@ pub async fn create(
 
   let config = vm_config::create(&key, item, version, &pool).await?;
 
-  println!("name: {}", &item.name);
   let new_item = VmDbModel {
     key,
     name: item.name.clone(),
