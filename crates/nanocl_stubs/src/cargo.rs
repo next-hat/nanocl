@@ -197,7 +197,7 @@ impl<NS> GenericCargoListQuery<NS> {
   pub fn of_namespace(nsp: NS) -> GenericCargoListQuery<NS> {
     GenericCargoListQuery{ namespace: nsp, name: None, limit: None, offset: None }
   }
-  /// Move all fields except namespace to new GenericCargoListQuery
+  /// Move fields to new query with different namespace
   pub fn merge<T>(self, nsp: T) -> GenericCargoListQuery<T> {
     GenericCargoListQuery{ namespace: nsp, name: self.name, limit: self.limit, offset: self.offset }
   }

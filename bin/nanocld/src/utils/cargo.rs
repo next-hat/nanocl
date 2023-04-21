@@ -511,7 +511,8 @@ pub async fn put(
 ///
 /// ## Arguments
 ///
-/// - [nsp](str) - The namespace name
+/// - [query](GenericCargoListQuery) - The query containing namespace, name filter and
+/// pagination info
 /// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
@@ -530,7 +531,7 @@ pub async fn list(
 
   let query = query.merge(namespace);
   let cargoes =
-    repositories::cargo::find_by_namespace_query(&query, &state.pool).await?;
+    repositories::cargo::find_by_list_query(&query, &state.pool).await?;
 
   let mut cargo_summaries = Vec::new();
 

@@ -43,10 +43,35 @@ pub async fn find_by_namespace(
   pool: &Pool,
 ) -> Result<Vec<CargoDbModel>, HttpError> {
     let query = GenericCargoListQuery::of_namespace(nsp.clone());
-    find_by_namespace_query(&query, pool).await
+    find_by_list_query(&query, pool).await
 }
 
-pub async fn find_by_namespace_query(
+/// ## Find cargo items by list query
+///
+/// ## Arguments
+///
+/// - [query](GenericCargoListQuery) - Query containing namespace, name filter and pagination info
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///  - [Ok](Vec<CargoDbModel>) - List a cargo found
+///  - [Err](HttpResponseError) - Error during the operation
+///
+/// ## Examples
+///
+/// ```rust,norun
+/// use nanocl_stubs::namespace::NamespaceItem;
+/// use nanocl_stubs::cargo::GenericCargoListQuery;
+/// let nsp = NamespaceItem {
+///  name: String::from("test"),
+/// };
+/// let query = GenericCargoListQuery::of_namespace(nsp);
+/// let items = find_by_list_query(&query, &pool).await;
+/// ```
+///
+pub async fn find_by_list_query(
   query: &GenericCargoListQuery<NamespaceDbModel>,
   pool: &Pool,
 ) -> Result<Vec<CargoDbModel>, HttpError> {
