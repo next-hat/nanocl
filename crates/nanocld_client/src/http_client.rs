@@ -152,6 +152,10 @@ impl NanocldClient {
     self.client.put(self.gen_url(url))
   }
 
+  fn head(&self, url: String) -> ClientRequest {
+    self.client.head(self.gen_url(url))
+  }
+
   pub(crate) async fn send_get<Q>(
     &self,
     url: String,
@@ -265,6 +269,27 @@ impl NanocldClient {
         .await
         .map_err(|err| self.send_error(err))?,
     };
+
+    let status = res.status();
+    is_api_error(&mut res, &status).await?;
+
+    Ok(res)
+  }
+
+  pub(crate) async fn send_head<Q>(
+    &self,
+    url: String,
+    query: Option<Q>,
+  ) -> Result<ClientResponse, NanocldClientError>
+  where
+    Q: serde::Serialize,
+  {
+    let mut req = self.head(url);
+    if let Some(query) = query {
+      req = req.query(&query)?;
+    }
+
+    let mut res = req.send().await.map_err(|err| self.send_error(err))?;
 
     let status = res.status();
     is_api_error(&mut res, &status).await?;

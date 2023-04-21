@@ -427,7 +427,7 @@ async fn reset_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-/// Get logs of a cargo instance from a EventStream (SSE)
+/// Get logs of a cargo instance
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Cargoes",
@@ -437,7 +437,7 @@ async fn reset_cargo(
     ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
   ),
   responses(
-    (status = 200, description = "Cargo logs", content_type = "text/event-stream"),
+    (status = 200, description = "Cargo logs", content_type = "application/vdn.nanocl.raw-stream"),
     (status = 404, description = "Cargo does not exist"),
   ),
 ))]
