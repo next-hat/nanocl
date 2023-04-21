@@ -1,3 +1,4 @@
+use chrono::{DateTime, FixedOffset};
 use uuid::Uuid;
 use serde::{Serialize, Deserialize, Deserializer};
 
@@ -46,12 +47,15 @@ where
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Insertable)]
+#[serde(rename_all(serialize = "PascalCase"))]
 #[diesel(table_name = http_metrics)]
 pub struct HttpMetricPartial {
-  pub date_gmt: chrono::NaiveDateTime,
+  pub date_gmt: DateTime<FixedOffset>,
   pub uri: String,
   pub host: String,
   pub remote_addr: String,
+  #[serde(skip_deserializing)]
+  pub node_name: String,
   pub realip_remote_addr: String,
   pub server_protocol: String,
   pub request_method: String,

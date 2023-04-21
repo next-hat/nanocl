@@ -161,8 +161,12 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
             };
             match &log {
               log if log.starts_with("#HTTP") => {
+                let log = log.trim_start_matches("#HTTP ");
+                let log = log.replace('\n', "");
+                log::debug!("Got http metric log: {}", log);
+
                 let http_metric = serde_json::from_str::<HttpMetricPartial>(
-                  log.trim_start_matches("#HTTP "),
+                  &log,
                 );
                 match http_metric {
                   Ok(http_metric) => {
