@@ -5,6 +5,8 @@ services:
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
     network_mode: host
+    environment:
+      - TZ=Europe/Paris
     labels:
       - io.nanocl=enabled
       - io.nanocl.c=system-daemon

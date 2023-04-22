@@ -4,17 +4,21 @@ ApiVersion: v0.4
 Namespace: system
 
 Cargoes:
-  - Name: ndns
-    Container:
-      Image: nanocl-dnsmasq:0.0.1
-      HostConfig:
-        NetworkMode: host
+- Name: ndns
+  Env:
+  - TZ=Europe/Paris
+  Container:
+    Image: nanocl-dnsmasq:0.0.1
+    HostConfig:
+      NetworkMode: host
 
-  - Name: ncddns
-    Container:
-      Image: nanocl-ncddns:0.0.1
-      Tty: true
-      HostConfig:
-        NetworkMode: system
-        Binds:
-        - /run/nanocl:/run/nanocl
+- Name: ncddns
+  Container:
+    Env:
+    - TZ=Europe/Paris
+    Image: nanocl-ncddns:0.0.1
+    Tty: true
+    HostConfig:
+      NetworkMode: system
+      Binds:
+      - /run/nanocl:/run/nanocl

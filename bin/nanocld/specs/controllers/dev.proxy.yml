@@ -8,6 +8,8 @@ Cargoes:
   Container:
     Image: nproxy:dev
     Tty: true
+    Env:
+    - TZ=Europe/Paris
     HostConfig:
       NetworkMode: host
       Binds:
@@ -28,6 +30,8 @@ Cargoes:
     - -x
     - run --no-default-features --features dev --bin ncdproxy
     Tty: true
+    Env:
+    - TZ=Europe/Paris
     HostConfig:
       NetworkMode: system
       Binds:

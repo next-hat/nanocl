@@ -8,6 +8,8 @@ Cargoes:
   Container:
     Image: ghcr.io/nxthat/nproxy:1.23.4.0
     Tty: true
+    Env:
+    - TZ=Europe/Paris
     HostConfig:
       NetworkMode: host
       Binds:
@@ -23,6 +25,8 @@ Cargoes:
   Container:
     Image: ghcr.io/nxthat/ncdproxy:0.3.1
     Tty: true
+    Env:
+    - TZ=Europe/Paris
     HostConfig:
       NetworkMode: system
       Binds:

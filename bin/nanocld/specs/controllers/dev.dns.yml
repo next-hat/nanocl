@@ -8,6 +8,8 @@ Cargoes:
   Container:
     Image: ndns:dev
     Tty: true
+    Env:
+    - TZ=Europe/Paris
     HostConfig:
       NetworkMode: host
 
@@ -19,6 +21,8 @@ Cargoes:
     - -x
     - run --no-default-features --features dev --bin ncddns
     Tty: true
+    Env:
+    - TZ=Europe/Paris
     HostConfig:
       NetworkMode: system
       Binds:
