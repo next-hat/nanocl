@@ -9,7 +9,7 @@ use crate::{
   nginx::{Nginx, NginxConfKind},
 };
 
-#[web::post("/rules")]
+#[web::put("/rules")]
 async fn apply_rule(
   web::types::Json(payload): web::types::Json<ResourcePartial>,
   nginx: web::types::State<Nginx>,
@@ -64,7 +64,7 @@ mod tests {
 
     let resource = serde_yaml::from_value::<ResourcePartial>(resource).unwrap();
 
-    let res = test_srv.post("/rules").send_json(&resource).await.unwrap();
+    let res = test_srv.put("/rules").send_json(&resource).await.unwrap();
 
     assert_eq!(res.status(), StatusCode::OK);
 

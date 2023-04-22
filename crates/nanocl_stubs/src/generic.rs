@@ -15,8 +15,16 @@ pub struct GenericNspQuery {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-#[cfg_attr(feature = "dev", derive(ToSchema))]
 pub struct GenericDelete {
   /// Number of deleted items
   pub count: usize,
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct GenericCount {
+  /// Number of items
+  pub count: i64,
 }

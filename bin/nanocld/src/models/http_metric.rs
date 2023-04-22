@@ -1,5 +1,5 @@
-use chrono::{DateTime, FixedOffset};
 use uuid::Uuid;
+use chrono::{DateTime, FixedOffset};
 use serde::{Serialize, Deserialize, Deserializer};
 
 use crate::schema::http_metrics;
@@ -54,11 +54,11 @@ pub struct HttpMetricPartial {
   pub uri: String,
   pub host: String,
   pub remote_addr: String,
-  #[serde(skip_deserializing)]
-  pub node_name: String,
   pub realip_remote_addr: String,
   pub server_protocol: String,
   pub request_method: String,
+  #[serde(deserialize_with = "deserialize_string_to_i64")]
+  pub bytes_sent: i64,
   #[serde(deserialize_with = "deserialize_string_to_i64")]
   pub content_length: i64,
   #[serde(deserialize_with = "deserialize_string_to_i64")]
@@ -85,41 +85,43 @@ pub struct HttpMetricPartial {
   pub http_accept_language: Option<String>,
 }
 
-// impl HttpMetricsPartial {
-//   fn to_db_model(&self, node_name: &str) -> HttpMetricDbModel {
-//     HttpMetricDbModel {
-//       key: Uuid::new_v4(),
-//       created_at: chrono::Utc::now().naive_utc(),
-//       expire_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30),
-//       date_gmt: self.date_gmt.naive_utc(),
-//       uri: self.uri.clone(),
-//       host: self.host.clone(),
-//       remote_addr: self.remote_addr.clone(),
-//       node_name: node_name.to_string(),
-//       realip_remote_addr: self.realip_remote_addr.clone(),
-//       server_protocol: self.server_protocol.clone(),
-//       request_method: self.request_method.clone(),
-//       content_length: self.content_length,
-//       status: self.status,
-//       request_time: self.request_time,
-//       body_bytes_sent: self.body_bytes_sent,
-//       proxy_host: self.proxy_host.clone(),
-//       upstream_addr: self.upstream_addr.clone(),
-//       query_string: self.query_string.clone(),
-//       request_body: self.request_body.clone(),
-//       content_type: self.content_type.clone(),
-//       http_user_agent: self.http_user_agent.clone(),
-//       http_referrer: self.http_referrer.clone(),
-//       http_accept_language: self.http_accept_language.clone(),
-//     }
-//   }
-// }
+impl HttpMetricPartial {
+  pub(crate) fn to_db_model(&self, node_name: &str) -> HttpMetricDbModel {
+    HttpMetricDbModel {
+      key: Uuid::new_v4(),
+      created_at: chrono::Utc::now().naive_utc(),
+      expire_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30),
+      bytes_sent: self.bytes_sent,
+      date_gmt: self.date_gmt.naive_utc(),
+      uri: self.uri.clone(),
+      host: self.host.clone(),
+      remote_addr: self.remote_addr.clone(),
+      node_name: node_name.to_string(),
+      realip_remote_addr: self.realip_remote_addr.clone(),
+      server_protocol: self.server_protocol.clone(),
+      request_method: self.request_method.clone(),
+      content_length: self.content_length,
+      status: self.status,
+      request_time: self.request_time,
+      body_bytes_sent: self.body_bytes_sent,
+      proxy_host: self.proxy_host.clone(),
+      upstream_addr: self.upstream_addr.clone(),
+      query_string: self.query_string.clone(),
+      request_body: self.request_body.clone(),
+      content_type: self.content_type.clone(),
+      http_user_agent: self.http_user_agent.clone(),
+      http_referrer: self.http_referrer.clone(),
+      http_accept_language: self.http_accept_language.clone(),
+    }
+  }
+}
 
 #[derive(
   Clone, Debug, Identifiable, Insertable, Queryable, Serialize, Deserialize,
 )]
 #[diesel(primary_key(key))]
 #[diesel(table_name = http_metrics)]
+#[serde(rename_all = "PascalCase")]
 pub struct HttpMetricDbModel {
   pub key: Uuid,
   pub created_at: chrono::NaiveDateTime,
@@ -146,3 +148,17 @@ pub struct HttpMetricDbModel {
   pub http_referrer: Option<String>,
   pub http_accept_language: Option<String>,
 }
+
+// TODO - implement Stream Metrics support for tcp/udp protocols
+// #[derive(Clone, Debug, Serialize, Deserialize)]
+// #[serde(rename_all(serialize = "PascalCase"))]
+// pub struct StreamMetricPartial {
+//   pub date_gmt: DateTime<FixedOffset>,
+//   pub remote_addr: String,
+//   pub upstream_addr: String,
+//   pub protocol: String,
+//   pub status: i64,
+//   pub session_time: String,
+//   pub bytes_sent: String,
+//   pub bytes_received: String,
+// }

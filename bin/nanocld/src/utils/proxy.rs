@@ -4,12 +4,13 @@ use ntex::http::client::{
   Connector, ClientResponse,
   error::{SendRequestError, JsonPayloadError},
 };
-use futures::StreamExt;
 use thiserror::Error;
+use futures::StreamExt;
 use bollard_next::container::{LogsOptions, LogOutput};
 
 use nanocl_stubs::resource::ResourcePartial;
 
+use crate::repositories;
 use crate::error::HttpError;
 use crate::models::{DaemonState, HttpMetricPartial};
 
@@ -99,7 +100,7 @@ impl ProxyClient {
   ) -> Result<ResourcePartial, ProxyClientError> {
     let mut res = self
       .client
-      .post(self.format_url("/rules"))
+      .put(self.format_url("/rules"))
       .send_json(resource)
       .await?;
     let status = res.status();
@@ -161,16 +162,22 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
             };
             match &log {
               log if log.starts_with("#HTTP") => {
-                let log = log.trim_start_matches("#HTTP ");
-                let log = log.replace('\n', "");
-                log::debug!("Got http metric log: {}", log);
-
-                let http_metric = serde_json::from_str::<HttpMetricPartial>(
-                  &log,
-                );
+                let log = log.trim_start_matches("#HTTP");
+                let http_metric =
+                  serde_json::from_str::<HttpMetricPartial>(log);
                 match http_metric {
                   Ok(http_metric) => {
-                    println!("{:#?}", &http_metric);
+                    let http_metric =
+                      http_metric.to_db_model(&state.config.hostname);
+                    println!("{:?}", http_metric);
+                    let res = repositories::http_metric::create(
+                      &http_metric,
+                      &state.pool,
+                    )
+                    .await;
+                    if let Err(e) = res {
+                      log::warn!("Failed to save http metric: {}", e);
+                    }
                   }
                   Err(e) => {
                     log::warn!("Failed to parse http metric: {}", e);
