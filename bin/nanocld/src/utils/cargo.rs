@@ -897,9 +897,9 @@ pub fn get_logs(
       timestamps: query.timestamps.unwrap_or(false),
       since: query.since.unwrap_or(0),
       until: query.until.unwrap_or(0),
+      tail: query.tail.to_owned().unwrap_or("all".to_string()),
       stdout: true,
       stderr: true,
-      ..Default::default()
     }),
   );
   let stream = transform_stream::<LogOutput, OutputLog>(stream);

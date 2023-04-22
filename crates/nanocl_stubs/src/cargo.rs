@@ -218,5 +218,5 @@ pub struct CargoLogQuery {
   pub until: Option<i64>,
   pub timestamps: Option<bool>,
   pub follow: Option<bool>,
-
+  pub tail: Option<String>,
 }
