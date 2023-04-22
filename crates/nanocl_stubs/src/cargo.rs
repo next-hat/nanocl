@@ -213,11 +213,15 @@ pub type CargoListQuery = GenericCargoListQuery<Option<String>>;
 pub struct CargoLogQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
-  ///
+  /// Only include logs since unix timestamp
   pub since: Option<i64>,
+  /// Only include logs until unix timestamp
   pub until: Option<i64>,
+  /// Bool, if set include timestamp to ever log line
   pub timestamps: Option<bool>,
+  /// Bool, if set open the log as stream
   pub follow: Option<bool>,
+  /// If integer only return last n logs, if "all" returns all logs
   pub tail: Option<String>,
 }
 

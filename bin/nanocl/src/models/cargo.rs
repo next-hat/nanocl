@@ -189,14 +189,19 @@ pub struct CargoResetOpts {
 pub struct CargoLogsOpts {
   /// Name of cargo to show logs
   pub name: String,
+  /// Only include logs since unix timestamp
   #[clap(short = 's')]
   pub since: Option<i64>,
+  /// Only include logs until unix timestamp
   #[clap(short = 'u')]
   pub until: Option<i64>,
+  /// If integer only return last n logs, if "all" returns all logs
   #[clap(short = 't')]
   pub tail: Option<String>,
+  /// Bool, if set include timestamp to ever log line
   #[clap(long = "timestamps")]
   pub timestamps: bool,
+  /// Bool, if set open the log as stream
   #[clap(short = 'f')]
   pub follow: bool,
 }
