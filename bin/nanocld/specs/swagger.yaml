@@ -552,6 +552,43 @@ paths:
         schema:
           type: string
           nullable: true
+      - name: Since
+        in: query
+        description: Only logs returned since timestamp
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: Until
+        in: query
+        description: Only logs returned until timestamp
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: Timestamps
+        in: query
+        description: Add timestamps to every log line
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      - name: Follow
+        in: query
+        description: Boolean to return a stream or not
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      - name: Tail
+        in: query
+        description: Only return the n last (integer) or all ("all") logs
+        required: false
+        schema:
+          type: string
+          nullable: true
       responses:
         '200':
           description: Cargo logs

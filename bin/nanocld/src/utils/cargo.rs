@@ -19,7 +19,7 @@ use nanocl_stubs::cargo::{CargoKillOptions, GenericCargoListQuery};
 use nanocl_stubs::cargo_config::Config as ContainerConfig;
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
+  Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions, CargoLogQuery
 };
 
 use crate::models::DaemonState;
@@ -887,12 +887,16 @@ pub async fn patch(
 
 pub fn get_logs(
   name: &str,
+  query: &CargoLogQuery,
   docker_api: &bollard_next::Docker,
 ) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
   let stream = docker_api.logs(
     &format!("{name}.c"),
     Some(LogsOptions::<String> {
-      follow: true,
+      follow: query.follow.unwrap_or(false),
+      timestamps: query.timestamps.unwrap_or(false),
+      since: query.since.unwrap_or(0),
+      until: query.until.unwrap_or(0),
       stdout: true,
       stderr: true,
       ..Default::default()

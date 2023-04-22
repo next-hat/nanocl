@@ -205,3 +205,18 @@ impl<NS> GenericCargoListQuery<NS> {
 
 /// List cargo query
 pub type CargoListQuery = GenericCargoListQuery<Option<String>>;
+
+/// Log cargo query
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct CargoLogQuery {
+  /// Name of the namespace
+  pub namespace: Option<String>,
+  ///
+  pub since: Option<i64>,
+  pub until: Option<i64>,
+  pub timestamps: Option<bool>,
+  pub follow: Option<bool>,
+
+}
