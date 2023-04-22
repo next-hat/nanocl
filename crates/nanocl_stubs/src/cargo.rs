@@ -220,3 +220,9 @@ pub struct CargoLogQuery {
   pub follow: Option<bool>,
   pub tail: Option<String>,
 }
+
+impl CargoLogQuery {
+  pub fn of_namespace(nsp: String) -> CargoLogQuery {
+    CargoLogQuery { namespace: Some(nsp), since: None, until: None, timestamps: None, follow: None, tail: None }
+  }
+}

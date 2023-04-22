@@ -6,7 +6,7 @@ use bollard_next::service::ContainerSummary;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, CreateExecOptions, OutputLog,
-  CargoKillOptions, CargoDeleteQuery,
+  CargoKillOptions, CargoDeleteQuery, CargoLogQuery,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigUpdate, CargoConfigPartial, CargoConfig,
@@ -453,12 +453,12 @@ impl NanocldClient {
   pub async fn logs_cargo(
     &self,
     name: &str,
-    namespace: Option<String>,
+    query: &CargoLogQuery,
   ) -> Result<Receiver<Result<OutputLog, ApiError>>, NanocldClientError> {
     let res = self
       .send_get(
         format!("/{}/cargoes/{name}/logs", &self.version),
-        Some(GenericNspQuery { namespace }),
+        Some(query),
       )
       .await?;
 
@@ -627,7 +627,7 @@ mod tests {
     let client = NanocldClient::connect_with_unix_default();
 
     let mut rx = client
-      .logs_cargo("nstore", Some("system".into()))
+      .logs_cargo("nstore", &CargoLogQuery::of_namespace("System".into()))
       .await
       .unwrap();
     let _out = rx.next().await.unwrap().unwrap();

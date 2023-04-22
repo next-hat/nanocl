@@ -189,6 +189,16 @@ pub struct CargoResetOpts {
 pub struct CargoLogsOpts {
   /// Name of cargo to show logs
   pub name: String,
+  #[clap(short = 's')]
+  pub since: Option<i64>,
+  #[clap(short = 'u')]
+  pub until: Option<i64>,
+  #[clap(short = 't')]
+  pub tail: Option<String>,
+  #[clap(long = "timestamps")]
+  pub timestamps: bool,
+  #[clap(short = 'f')]
+  pub follow: bool,
 }
 
 #[derive(Debug, Subcommand)]
