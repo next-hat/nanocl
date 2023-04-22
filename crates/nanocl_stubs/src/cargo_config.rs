@@ -14,7 +14,6 @@ use crate::cargo::CargoInspect;
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-#[cfg_attr(feature = "dev", derive(ToSchema))]
 pub enum ReplicationMode {
   /// Auto is used to automatically define that the number of replicas in the cluster
   /// This will ensure at least 1 replica exists in the cluster

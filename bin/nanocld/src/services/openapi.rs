@@ -27,8 +27,10 @@ use bollard_next::service::{
   Network, GenericResourcesInner, GenericResourcesInnerNamedResourceSpec,
   NetworkContainer, Ipam, IpamConfig,
 };
+use nanocl_stubs::generic::GenericCount;
 use nanocl_stubs::system::{Version, HostInfo};
 use nanocl_stubs::metric::Metric;
+use nanocl_stubs::http_metric::HttpMetric;
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::node::{Node, NodeContainerSummary};
@@ -59,6 +61,7 @@ use crate::error::HttpError;
 
 use super::{
   node, system, namespace, cargo, cargo_image, vm, vm_image, resource, metric,
+  http_metric,
 };
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -262,6 +265,9 @@ impl Modify for VersionModifier {
     resource::reset_resource,
     // Metric
     metric::list_metric,
+    // Http Metric
+    http_metric::list_http_metric,
+    http_metric::count_http_metric,
   ),
   components(schemas(
     // Node
@@ -395,9 +401,12 @@ impl Modify for VersionModifier {
     CargoTarget,
     // Metric
     Metric,
+    // HttpMetric
+    HttpMetric,
     // Error
     ApiError,
     // Generic Types
+    GenericCount,
     Any,
     BollardDate,
     EmptyObject,
@@ -411,6 +420,8 @@ impl Modify for VersionModifier {
     (name = "System", description = "General system endpoints."),
     (name = "VmImages", description = "Virtual machine images management endpoints."),
     (name = "Vms", description = "Virtual machines management endpoints."),
+    (name = "Metrics", description = "Metrics management endpoints."),
+    (name = "HttpMetrics", description = "HTTP Metrics management endpoints."),
   ),
   modifiers(&VersionModifier),
 )]

@@ -8,9 +8,13 @@ Cargoes:
   Container:
     Image: nproxy:dev
     Tty: true
+    Env:
+    - TZ=Europe/Paris
     HostConfig:
       NetworkMode: host
       Binds:
+      - /run:/run
+      - {state_dir}/proxy/logs:/var/log/nginx/access
       - {state_dir}/proxy/html:/usr/share/nginx/html
       - {state_dir}/proxy/conf.d:/etc/nginx/conf.d
       - {state_dir}/proxy/sites-enabled:/etc/nginx/sites-enabled
@@ -26,12 +30,15 @@ Cargoes:
     - -x
     - run --no-default-features --features dev --bin ncdproxy
     Tty: true
+    Env:
+    - TZ=Europe/Paris
     HostConfig:
       NetworkMode: system
       Binds:
       - ./:/project
+      - /run/nanocl:/run/nanocl
       - /usr/local/cargo/registry/cache:/usr/local/cargo/registry/cache
+      - {state_dir}/proxy/logs:/var/log/nginx/access
       - {state_dir}/proxy/conf.d:/etc/nginx/conf.d
       - {state_dir}/proxy/sites-enabled:/etc/nginx/sites-enabled
       - {state_dir}/proxy/streams-enabled:/etc/nginx/streams-enabled
-      - /run/nanocl:/run/nanocl

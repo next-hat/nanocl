@@ -262,8 +262,6 @@ async fn ws_attach_service(
 
   let (scmd, mut rcmd) = mpsc::channel::<Result<Bytes, web::Error>>();
 
-  println!("Websocket connection established: {}", key);
-
   let stream = state
     .docker_api
     .attach_container(
@@ -289,21 +287,18 @@ async fn ws_attach_service(
       let output = match output {
         Ok(output) => output,
         Err(e) => {
-          println!("Error reading from container: {}", e);
+          log::error!("Error reading from container: {}", e);
           break;
         }
       };
 
       let outputlog: OutputLog = output.into();
-
-      println!("{outputlog:#?}");
-
       let output = serde_json::to_vec(&outputlog);
 
       let mut output = match output {
         Ok(output) => output,
         Err(e) => {
-          println!("Error serializing output: {}", e);
+          log::error!("Error serializing output: {}", e);
           break;
         }
       };
@@ -323,7 +318,7 @@ async fn ws_attach_service(
       let cmd = match cmd {
         Ok(cmd) => cmd,
         Err(e) => {
-          println!("Error reading from container: {}", e);
+          log::error!("Error reading from container: {}", e);
           break;
         }
       };

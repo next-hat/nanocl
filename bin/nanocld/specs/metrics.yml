@@ -2,6 +2,8 @@ Name: nmetrics
 Container:
   Image: ghcr.io/nxthat/metrsd:0.2.0
   Tty: true
+  Env:
+  - TZ=Europe/Paris
   Cmd:
   - --hosts
   - unix:///run/nanocl/metrics.sock

@@ -6,7 +6,7 @@ use ntex::time::interval;
 use metrsd_client::{MetrsdClient, MetrsdEvent};
 
 use crate::repositories::metric;
-use crate::models::{Pool, MetricInsertDbModel};
+use crate::models::{Pool, MetricInsertDbModel, DaemonState};
 
 async fn save_metric(node: &str, ev: &MetrsdEvent, pool: &Pool) {
   match ev {
@@ -45,9 +45,8 @@ async fn save_metric(node: &str, ev: &MetrsdEvent, pool: &Pool) {
   }
 }
 
-pub fn spawn_metrics(node: &str, pool: &Pool) {
-  let node = node.to_owned();
-  let pool = pool.clone();
+pub(crate) fn spawn_logger(state: &DaemonState) {
+  let state = state.clone();
   rt::Arbiter::new().exec_fn(move || {
     let client = MetrsdClient::connect("unix:///run/nanocl/metrics.sock");
     rt::spawn(async move {
@@ -57,7 +56,7 @@ pub fn spawn_metrics(node: &str, pool: &Pool) {
             while let Some(res) = stream.next().await {
               match res {
                 Ok(ev) => {
-                  save_metric(&node, &ev, &pool).await;
+                  save_metric(&state.config.hostname, &ev, &state.pool).await;
                 }
                 Err(err) => {
                   log::error!("Error while receiving metric : {}", err);
