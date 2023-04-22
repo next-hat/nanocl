@@ -21,12 +21,41 @@ diesel::table! {
 }
 
 diesel::table! {
+    http_metrics (key) {
+        key -> Uuid,
+        created_at -> Timestamptz,
+        expire_at -> Timestamptz,
+        date_gmt -> Timestamptz,
+        status -> Int8,
+        bytes_sent -> Int8,
+        content_length -> Int8,
+        body_bytes_sent -> Int8,
+        request_time -> Float8,
+        node_name -> Varchar,
+        uri -> Varchar,
+        host -> Varchar,
+        remote_addr -> Varchar,
+        realip_remote_addr -> Varchar,
+        server_protocol -> Varchar,
+        request_method -> Varchar,
+        proxy_host -> Nullable<Varchar>,
+        upstream_addr -> Nullable<Varchar>,
+        query_string -> Nullable<Varchar>,
+        request_body -> Nullable<Varchar>,
+        content_type -> Nullable<Varchar>,
+        http_user_agent -> Nullable<Varchar>,
+        http_referrer -> Nullable<Varchar>,
+        http_accept_language -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
     metrics (key) {
         key -> Uuid,
         created_at -> Timestamptz,
         expire_at -> Timestamptz,
         node_name -> Varchar,
-        kind -> Text,
+        kind -> Varchar,
         data -> Jsonb,
     }
 }
@@ -139,6 +168,7 @@ diesel::joinable!(vms -> vm_configs (config_key));
 diesel::allow_tables_to_appear_in_same_query!(
     cargo_configs,
     cargoes,
+    http_metrics,
     metrics,
     namespaces,
     node_group_links,

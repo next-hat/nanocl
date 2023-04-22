@@ -1,6 +1,28 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "UPPERCASE"))]
+pub enum MetricKind {
+  Cpu,
+  Memory,
+  Network,
+  Disk,
+}
+
+impl ToString for MetricKind {
+  fn to_string(&self) -> String {
+    match self {
+      MetricKind::Cpu => "CPU".to_string(),
+      MetricKind::Memory => "MEMORY".to_string(),
+      MetricKind::Network => "NETWORK".to_string(),
+      MetricKind::Disk => "DISK".to_string(),
+    }
+  }
+}
+
 /// Metric entry
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -11,7 +33,7 @@ pub struct Metric {
   pub created_at: chrono::NaiveDateTime,
   pub expire_at: chrono::NaiveDateTime,
   pub node_name: String,
-  pub kind: String,
+  pub kind: MetricKind,
   pub data: serde_json::Value,
 }
 
@@ -21,5 +43,5 @@ pub struct Metric {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct MetricFilterQuery {
-  pub kind: String,
+  pub kind: MetricKind,
 }

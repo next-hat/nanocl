@@ -49,8 +49,6 @@ pub async fn get_info(path: &str) -> Result<QemuImgInfo, HttpError> {
       msg: format!("Failed to get info of {path}: {}", err),
     })?;
 
-  println!("{:?}", ouput);
-
   if !ouput.status.success() {
     return Err(HttpError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -298,7 +296,6 @@ pub async fn resize(
   pool: &Pool,
 ) -> Result<VmImageDbModel, HttpError> {
   let imagepath = image.path.clone();
-  println!("resizing image ! {payload:#?}");
   let size = format!("{}G", payload.size);
   let mut args = vec!["resize"];
   if payload.shrink {
@@ -306,7 +303,6 @@ pub async fn resize(
   }
   args.push(&imagepath);
   args.push(&size);
-  println!("args {args:#?}");
   let ouput =
     Command::new("qemu-img")
       .args(args)

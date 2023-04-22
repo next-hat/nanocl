@@ -32,8 +32,6 @@ jobs:
         components: llvm-tools-preview
     # Cache Rust
     - uses: Swatinem/rust-cache@v2
-      with:
-        key: ${{ hashFiles('./Cargo.lock') }}
     # Install cargo make
     - uses: davidB/rust-cargo-make@v1
     # Install llvm-cov

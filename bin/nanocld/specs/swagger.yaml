@@ -623,6 +623,62 @@ paths:
             text/plain:
               schema:
                 type: string
+  /http_metrics:
+    get:
+      tags:
+      - HttpMetrics
+      summary: Get http metrics of all peer nodes
+      description: Get http metrics of all peer nodes
+      operationId: list_http_metric
+      parameters:
+      - name: Limit
+        in: query
+        description: Limit of the list
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: Offset
+        in: query
+        description: Offset of the list
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      responses:
+        '200':
+          description: Array of HTTP metrics founds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HttpMetric'
+  /http_metrics/count:
+    get:
+      tags:
+      - HttpMetrics
+      summary: Count http metrics of all peer nodes
+      description: Count http metrics of all peer nodes
+      operationId: count_http_metric
+      parameters:
+      - name: Status
+        in: query
+        description: Filter by status
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: 200,299
+      responses:
+        '200':
+          description: Count of HTTP metrics founds
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericCount'
   /info:
     get:
       tags:
@@ -2324,6 +2380,15 @@ components:
           additionalProperties:
             type: string
           nullable: true
+    GenericCount:
+      type: object
+      required:
+      - Count
+      properties:
+        Count:
+          type: integer
+          format: int64
+          description: Number of items
     GenericDelete:
       type: object
       description: Generic delete response
@@ -2800,6 +2865,91 @@ components:
             type: string
             description: HostGateway is the gateway address of the host
       description: HostInfo contains information about the host and the docker daemon
+    HttpMetric:
+      type: object
+      required:
+      - Key
+      - CreatedAt
+      - ExpireAt
+      - DateGmt
+      - Status
+      - BytesSent
+      - ContentLength
+      - BodyBytesSent
+      - RequestTime
+      - NodeName
+      - Uri
+      - Host
+      - RemoteAddr
+      - RealipRemoteAddr
+      - ServerProtocol
+      - RequestMethod
+      properties:
+        Key:
+          type: string
+          format: uuid
+        CreatedAt:
+          type: string
+          format: date-time
+        ExpireAt:
+          type: string
+          format: date-time
+        DateGmt:
+          type: string
+          format: date-time
+        Status:
+          type: integer
+          format: int64
+        BytesSent:
+          type: integer
+          format: int64
+        ContentLength:
+          type: integer
+          format: int64
+        BodyBytesSent:
+          type: integer
+          format: int64
+        RequestTime:
+          type: number
+          format: double
+        NodeName:
+          type: string
+        Uri:
+          type: string
+        Host:
+          type: string
+        RemoteAddr:
+          type: string
+        RealipRemoteAddr:
+          type: string
+        ServerProtocol:
+          type: string
+        RequestMethod:
+          type: string
+        ProxyHost:
+          type: string
+          nullable: true
+        UpstreamAddr:
+          type: string
+          nullable: true
+        QueryString:
+          type: string
+          nullable: true
+        RequestBody:
+          type: string
+          nullable: true
+        ContentType:
+          type: string
+          nullable: true
+        HttpUserAgent:
+          type: string
+          nullable: true
+        HttpReferrer:
+          type: string
+          nullable: true
+        HttpAcceptLanguage:
+          type: string
+          nullable: true
     HttpTarget:
       type: object
       required:
@@ -3064,6 +3214,13 @@ components:
         properties:
           Http:
             $ref: '#/components/schemas/HttpTarget'
+      - type: object
+        required:
+        - Unix
+        properties:
+          Unix:
+            type: string
+            description: Target a specific unix socket
     Metric:
       type: object
       description: Metric entry
@@ -3948,6 +4105,13 @@ components:
         properties:
           Uri:
             $ref: '#/components/schemas/UriTarget'
+      - type: object
+        required:
+        - Unix
+        properties:
+          Unix:
+            type: string
+            description: Target a specific unix socket
     SwarmInfo:
       type: object
       description: Represents generic information about swarm.
@@ -4903,3 +5067,7 @@ tags:
   description: Virtual machine images management endpoints.
 - name: Vms
   description: Virtual machines management endpoints.
+- name: Metrics
+  description: Metrics management endpoints.
+- name: HttpMetrics
+  description: HTTP Metrics management endpoints.

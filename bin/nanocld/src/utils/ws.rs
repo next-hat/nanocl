@@ -23,7 +23,7 @@ pub async fn heartbeat(
         // check client heartbeats
         if Instant::now().duration_since(state.borrow().hb) > CLIENT_TIMEOUT {
           // heartbeat timed out
-          println!("Websocket Client heartbeat failed, disconnecting!");
+          log::debug!("Websocket Client heartbeat failed, disconnecting!");
           // disconnect connection
           sink.io().close();
           return;
@@ -39,7 +39,7 @@ pub async fn heartbeat(
         }
       }
       util::Either::Right(_) => {
-        println!("Connection is dropped, stop heartbeat task");
+        log::debug!("Connection is dropped, stop heartbeat task");
         return;
       }
     }

@@ -2,8 +2,6 @@
 
 set -e
 
-ls -lR /html
-
 ## Test if the 403, and 502 pages are present
 if [ ! -f /usr/share/nginx/html/403.html ]; then
   echo "Using default 403"
