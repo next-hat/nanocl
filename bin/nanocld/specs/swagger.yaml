@@ -703,10 +703,10 @@ paths:
       parameters:
       - name: Kind
         in: query
-        description: Kind of the metrics CPU|MEMORY|NETWORK|DISK
+        description: Kind of the metrics CPU | MEMORY | NETWORK | DISK
         required: true
         schema:
-          type: string
+          $ref: '#/components/schemas/MetricKind'
         example: CPU
       responses:
         '200':
@@ -3244,8 +3244,15 @@ components:
         NodeName:
           type: string
         Kind:
-          type: string
+          $ref: '#/components/schemas/MetricKind'
         Data: {}
+    MetricKind:
+      type: string
+      enum:
+      - CPU
+      - MEMORY
+      - NETWORK
+      - DISK
     Mount:
       type: object
       properties:

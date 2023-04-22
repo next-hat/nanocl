@@ -169,7 +169,6 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                   Ok(http_metric) => {
                     let http_metric =
                       http_metric.to_db_model(&state.config.hostname);
-                    println!("{:?}", http_metric);
                     let res = repositories::http_metric::create(
                       &http_metric,
                       &state.pool,

@@ -29,7 +29,7 @@ use bollard_next::service::{
 };
 use nanocl_stubs::generic::GenericCount;
 use nanocl_stubs::system::{Version, HostInfo};
-use nanocl_stubs::metric::Metric;
+use nanocl_stubs::metric::{Metric, MetricKind};
 use nanocl_stubs::http_metric::HttpMetric;
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
 use nanocl_stubs::generic::GenericDelete;
@@ -401,6 +401,7 @@ impl Modify for VersionModifier {
     CargoTarget,
     // Metric
     Metric,
+    MetricKind,
     // HttpMetric
     HttpMetric,
     // Error

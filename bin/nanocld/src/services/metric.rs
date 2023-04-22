@@ -13,7 +13,7 @@ use crate::error::HttpError;
   tag = "Metrics",
   path = "/metrics",
   params(
-    ("Kind" = String, Query, description = "Kind of the metrics CPU|MEMORY|NETWORK|DISK", example = "CPU"),
+    ("Kind" = MetricKind, Query, description = "Kind of the metrics CPU | MEMORY | NETWORK | DISK", example = "CPU"),
   ),
   responses(
     (status = 200, description = "Kind of the metrics peer node", body = Vec<Metric>),
