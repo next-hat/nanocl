@@ -7,7 +7,7 @@ use crate::utils;
 use crate::dnsmasq::Dnsmasq;
 use crate::error::HttpError;
 
-#[web::post("/dns/entry")]
+#[web::put("/rules")]
 async fn dns_entry(
   dnsmasq: web::types::State<Dnsmasq>,
   web::types::Json(payload): web::types::Json<CargoInspect>,
@@ -19,12 +19,12 @@ async fn dns_entry(
   Ok(web::HttpResponse::Ok().finish())
 }
 
-#[web::delete("/dns/entry/{key}")]
+#[web::delete("/rules/{name}")]
 async fn dns_entry_delete() -> Result<web::HttpResponse, HttpError> {
   Ok(web::HttpResponse::Ok().finish())
 }
 
-pub fn configure(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(dns_entry);
   config.service(dns_entry_delete);
 }

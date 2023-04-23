@@ -1,18 +1,6 @@
-/*
- * nanocl-ncddns
- * Is the default nanocl controller for domain name is using dnsmasq.
- * It will ensure each cargo instance will own a dns entry.
- * The dns entry will be the cargo generated from the cargo key.
- * We will replace - and _ by a . and will be generated this way:
- * `nanocl.<key>.local`
- * This process should never stop by itself or by a crash.
- * It will loop till it have a connection to nanocl daemon
- * and be able to watch for his events.
- *
-*/
-
 use ntex::web;
 use ntex::server::Server;
+use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;
 
 mod cli;
@@ -21,21 +9,23 @@ mod utils;
 mod dnsmasq;
 mod service;
 
+use dnsmasq::Dnsmasq;
+
 /// Handle events from nanocl daemon
 async fn on_event(
-  client: nanocld_client::NanocldClient,
-  dnsmasq: dnsmasq::Dnsmasq,
+  client: NanocldClient,
+  dnsmasq: Dnsmasq,
   event: Event,
 ) -> Result<(), error::ErrorHint> {
   match &event {
     Event::CargoStarted(cargo) => {
-      if cargo.name != "dns" && cargo.namespace_name != "system" {
-        println!("[INFO] Generating dns entries for cargo : {}", &cargo.key);
-        let domains = utils::gen_cargo_domains(cargo)?;
-        dnsmasq.generate_domains_file(&cargo.key, &domains)?;
-        return utils::restart_dns_service(&client).await;
+      if cargo.name == "dns" || cargo.namespace_name == "system" {
+        return Ok(());
       }
-      Ok(())
+      println!("[INFO] Generating dns entries for cargo : {}", &cargo.key);
+      let domains = utils::gen_cargo_domains(cargo)?;
+      dnsmasq.generate_domains_file(&cargo.key, &domains)?;
+      utils::restart_dns_service(&client).await
     }
     Event::CargoDeleted(cargo) => {
       println!("[INFO] Removing dns entries for cargo : {}", &cargo.key);
@@ -47,22 +37,35 @@ async fn on_event(
   }
 }
 
-fn setup_server() -> Server {
-  let server = web::HttpServer::new(web::App::new);
+fn setup_server(dnsmasq: &Dnsmasq) -> std::io::Result<Server> {
+  let dnsmasq = dnsmasq.clone();
+  let mut server = web::HttpServer::new(move || {
+    web::App::new()
+      .state(dnsmasq.clone())
+      .configure(service::ntex_config)
+  });
 
-  server.run()
+  server = server.bind_uds("/run/nanocl/proxy.sock")?;
+
+  Ok(server.run())
 }
 
-/// Main function
-/// Is parsing the command line arguments,
-/// ensure a minimal dnsmasq config is present,
-/// it will exit with code 1 if it can't create the minimal dnsmasq config
-/// then it will try to sync the cargo dns entries with the current nanocl daemon state
-/// and finally it will start the main loop
+fn wait_for_daemon() {
+  loop {
+    if std::path::Path::new("/run/nanocl/nanocl.sock").exists() {
+      break;
+    }
+
+    std::thread::sleep(std::time::Duration::from_secs(5));
+  }
+}
+
 #[ntex::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  println!("nanocl-ncddns v{}", env!("CARGO_PKG_VERSION"));
   let cli = cli::parse();
+
+  println!("nanocl-ncddns v{}", env!("CARGO_PKG_VERSION"));
+
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
   let dnsmasq = dnsmasq::new(&conf_dir).with_dns(cli.dns);
   if let Err(err) = dnsmasq.ensure() {
@@ -70,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::process::exit(1);
   }
 
-  let server = setup_server();
+  let server = setup_server(&dnsmasq)?;
 
   server.await?;
 

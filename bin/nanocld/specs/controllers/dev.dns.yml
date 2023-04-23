@@ -18,6 +18,8 @@ Cargoes:
     Image: ghcr.io/nxthat/nanocl-dev:dev
     Cmd:
     - watch
+    - -w
+    - /project/bin/ncddns/src
     - -x
     - run --no-default-features --features dev --bin ncddns
     Tty: true
