@@ -627,7 +627,7 @@ mod tests {
     let client = NanocldClient::connect_with_unix_default();
 
     let mut rx = client
-      .logs_cargo("nstore", &CargoLogQuery::of_namespace("System".into()))
+      .logs_cargo("nstore", &CargoLogQuery::of_namespace("system".into()))
       .await
       .unwrap();
     let _out = rx.next().await.unwrap().unwrap();
