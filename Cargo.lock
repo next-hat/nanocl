@@ -1786,6 +1786,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
+ "utoipa",
 ]
 
 [[package]]
@@ -1803,6 +1804,8 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "tokio",
+ "utoipa",
 ]
 
 [[package]]

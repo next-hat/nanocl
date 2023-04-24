@@ -13,10 +13,10 @@ repository = "https://github.com/nxthat/nanocl"
 bench = false
 
 [features]
+logger = ["dep:log", "dep:env_logger"]
 io_error = []
 serde_json = ["dep:serde_json"]
 http_error = ["dep:ntex", "dep:serde_json"]
-logger = ["dep:log", "dep:env_logger"]
 
 [dependencies]
 log = { version = "0.4.17", optional = true }

@@ -2,24 +2,20 @@ use ntex::web;
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::dns::ResourceDnsRule;
-use nanocld_client::stubs::resource::ResourcePartial;
-
-use nanocl_utils::io_error::FromIo;
 use nanocl_utils::http_error::HttpError;
 
 use crate::utils;
 use crate::dnsmasq::Dnsmasq;
 
-#[web::put("/rules")]
+#[web::put("/rules/{name}")]
 async fn dns_entry(
+  name: web::types::Path<String>,
   dnsmasq: web::types::State<Dnsmasq>,
-  web::types::Json(payload): web::types::Json<ResourcePartial>,
+  web::types::Json(payload): web::types::Json<ResourceDnsRule>,
 ) -> Result<web::HttpResponse, HttpError> {
   let client = NanocldClient::connect_with_unix_default();
-  let dns_rule = serde_json::from_value::<ResourceDnsRule>(payload.config)
-    .map_err(|err| err.map_err_context(|| "unable to parse config"))?;
-  utils::write_rule(&payload.name, &dns_rule, &dnsmasq, &client).await?;
-  Ok(web::HttpResponse::Ok().finish())
+  utils::write_rule(&name, &payload, &dnsmasq, &client).await?;
+  Ok(web::HttpResponse::Ok().json(&payload))
 }
 
 #[web::delete("/rules/{name}")]
@@ -42,7 +38,6 @@ mod tests {
   use super::*;
 
   use ntex::http::StatusCode;
-  use nanocld_client::stubs::resource::ResourcePartial;
 
   use crate::utils::tests;
 
@@ -55,15 +50,18 @@ mod tests {
     let yaml: serde_yaml::Value = serde_yaml::from_str(resource).unwrap();
 
     let resource = yaml["Resources"][0].clone();
+    let name = resource["Name"].as_str().unwrap();
 
-    let resource = serde_yaml::from_value::<ResourcePartial>(resource).unwrap();
-
-    let res = test_srv.put("/rules").send_json(&resource).await.unwrap();
+    let res = test_srv
+      .put(format!("/rules/{name}"))
+      .send_json(&resource["Config"])
+      .await
+      .unwrap();
 
     assert_eq!(res.status(), StatusCode::OK);
 
     let res = test_srv
-      .delete(format!("/rules/{}", resource.name))
+      .delete(format!("/rules/{name}"))
       .send()
       .await
       .unwrap();

@@ -403,14 +403,14 @@ pub(crate) async fn reload_config(client: &NanocldClient) -> IoResult<()> {
 /// and reload the nginx configuration
 /// The resource must be a ProxyRule
 pub(crate) async fn create_resource_conf(
+  name: &str,
+  proxy_rule: &ResourceProxyRule,
   client: &NanocldClient,
   nginx: &Nginx,
-  resource: &nanocld_client::stubs::resource::ResourcePartial,
 ) -> IoResult<()> {
-  let proxy_rule = serialize_proxy_rule(resource)?;
   let (kind, conf) =
-    resource_to_nginx_conf(client, nginx, &resource.name, &proxy_rule).await?;
-  nginx.write_conf_file(&resource.name, &conf, &kind)?;
+    resource_to_nginx_conf(client, nginx, &name, &proxy_rule).await?;
+  nginx.write_conf_file(&name, &conf, &kind)?;
   Ok(())
 }
 
@@ -456,8 +456,9 @@ pub(crate) async fn sync_resources(
   let _ = nginx.clear_conf();
 
   for resource in resources {
+    let proxy_rule = serialize_proxy_rule(&resource.clone().into())?;
     if let Err(err) =
-      create_resource_conf(client, nginx, &resource.into()).await
+      create_resource_conf(&resource.name, &proxy_rule, client, nginx).await
     {
       log::warn!("{err}")
     }

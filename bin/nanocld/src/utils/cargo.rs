@@ -7,7 +7,6 @@ use ntex::http::StatusCode;
 use futures::{StreamExt, TryStreamExt};
 
 use bollard_next::container::LogOutput;
-use bollard_next::container::LogsOptions;
 use nanocl_stubs::node::NodeContainerSummary;
 use bollard_next::container::WaitContainerOptions;
 use bollard_next::exec::{StartExecOptions, StartExecResults};
@@ -19,7 +18,8 @@ use nanocl_stubs::cargo::{CargoKillOptions, GenericCargoListQuery};
 use nanocl_stubs::cargo_config::Config as ContainerConfig;
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions, CargoLogQuery
+  Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
+  CargoLogQuery,
 };
 
 use crate::models::DaemonState;
@@ -890,10 +890,8 @@ pub fn get_logs(
   query: &CargoLogQuery,
   docker_api: &bollard_next::Docker,
 ) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
-  let stream = docker_api.logs(
-    &format!("{name}.c"),
-    Some(query.clone().into()),
-  );
+  let stream =
+    docker_api.logs(&format!("{name}.c"), Some(query.clone().into()));
   let stream = transform_stream::<LogOutput, OutputLog>(stream);
   Ok(stream)
 }

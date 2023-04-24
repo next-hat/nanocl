@@ -45,8 +45,14 @@ async fn on_event(
       .await?;
       for resource in resources {
         let resource: ResourcePartial = resource.into();
-        if let Err(err) =
-          utils::create_resource_conf(&client, &nginx, &resource).await
+        let proxy_rule = utils::serialize_proxy_rule(&resource)?;
+        if let Err(err) = utils::create_resource_conf(
+          &resource.name,
+          &proxy_rule,
+          &client,
+          &nginx,
+        )
+        .await
         {
           log::warn!("{err}");
         }
@@ -62,13 +68,7 @@ async fn on_event(
       .await?;
       for resource in resources {
         let resource: ResourcePartial = resource.into();
-        let proxy_rule = utils::serialize_proxy_rule(&resource)?;
-        if let Err(err) = nginx
-          .delete_conf_file(&resource.name, &proxy_rule.rule.into())
-          .await
-        {
-          log::warn!("{err}");
-        }
+        nginx.delete_conf_file(&resource.name).await;
       }
       utils::reload_config(&client).await?;
     }
@@ -80,14 +80,7 @@ async fn on_event(
       )
       .await?;
       for resource in resources {
-        let resource: ResourcePartial = resource.into();
-        let proxy_rule = utils::serialize_proxy_rule(&resource)?;
-        if let Err(err) = nginx
-          .delete_conf_file(&resource.name, &proxy_rule.rule.into())
-          .await
-        {
-          log::warn!("{err}");
-        }
+        nginx.delete_conf_file(&resource.name).await;
       }
       utils::reload_config(&client).await?;
     }
@@ -96,8 +89,14 @@ async fn on_event(
         return Ok(());
       }
       let resource: ResourcePartial = ev.as_ref().clone().into();
-      if let Err(err) =
-        utils::create_resource_conf(&client, &nginx, &resource).await
+      let proxy_rule = utils::serialize_proxy_rule(&resource)?;
+      if let Err(err) = utils::create_resource_conf(
+        &resource.name,
+        &proxy_rule,
+        &client,
+        &nginx,
+      )
+      .await
       {
         log::warn!("{err}");
       }
@@ -108,8 +107,14 @@ async fn on_event(
         return Ok(());
       }
       let resource: ResourcePartial = ev.as_ref().clone().into();
-      if let Err(err) =
-        utils::create_resource_conf(&client, &nginx, &resource).await
+      let proxy_rule = utils::serialize_proxy_rule(&resource)?;
+      if let Err(err) = utils::create_resource_conf(
+        &resource.name,
+        &proxy_rule,
+        &client,
+        &nginx,
+      )
+      .await
       {
         log::warn!("{err}");
       }
@@ -119,11 +124,7 @@ async fn on_event(
       if ev.kind.as_str() != "ProxyRule" {
         return Ok(());
       }
-      let resource: ResourcePartial = ev.as_ref().clone().into();
-      let proxy_rule = utils::serialize_proxy_rule(&resource)?;
-      let _ = nginx
-        .delete_conf_file(&ev.name, &proxy_rule.rule.into())
-        .await;
+      nginx.delete_conf_file(&ev.name).await;
       utils::reload_config(&client).await?;
     }
     // Ignore other events

@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = cli::parse();
   enable_logger("ncddns");
 
-  log::info!("nanocl-ncddns v{}", env!("CARGO_PKG_VERSION"));
+  log::info!("ncddns v{}", env!("CARGO_PKG_VERSION"));
 
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
   let dnsmasq = dnsmasq::new(&conf_dir).with_dns(cli.dns);

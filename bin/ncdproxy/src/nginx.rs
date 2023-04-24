@@ -138,27 +138,11 @@ impl Nginx {
   }
 
   #[inline]
-  pub(crate) async fn delete_conf_file(
-    &self,
-    name: &str,
-    kind: &NginxConfKind,
-  ) -> IoResult<()> {
-    let path = self.gen_conf_path(name, kind);
-    let path_cpy = path.clone();
-    ntex::web::block(move || {
-      fs::remove_file(&path_cpy).map_err(|err| {
-        err.map_err_context(|| format!("Unable to delete file {path_cpy}"))
-      })
-    })
-    .await
-    .map_err(|err| match err {
-      ntex::web::error::BlockingError::Error(err) => err,
-      ntex::web::error::BlockingError::Canceled => Box::new(IoError::new(
-        format!("Delete file {path}"),
-        std::io::Error::new(std::io::ErrorKind::Other, "Canceled"),
-      )),
-    })?;
-    Ok(())
+  pub(crate) async fn delete_conf_file(&self, name: &str) {
+    let path = self.gen_conf_path(name, &NginxConfKind::Site);
+    let _ = tokio::fs::remove_file(&path).await;
+    let path = self.gen_conf_path(name, &NginxConfKind::Stream);
+    let _ = tokio::fs::remove_file(&path).await;
   }
 
   #[inline]
