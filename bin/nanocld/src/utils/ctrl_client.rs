@@ -6,8 +6,6 @@ use ntex::http::client::{
 };
 use thiserror::Error;
 
-use nanocl_stubs::resource::ResourcePartial;
-
 use crate::error::HttpError;
 
 pub struct CtrlClient {
@@ -90,7 +88,7 @@ impl CtrlClient {
     &self,
     name: &str,
     data: &serde_json::Value,
-  ) -> Result<ResourcePartial, CtrlClientError> {
+  ) -> Result<serde_json::Value, CtrlClientError> {
     let mut res = self
       .client
       .put(self.format_url(&format!("/rules/{name}")))

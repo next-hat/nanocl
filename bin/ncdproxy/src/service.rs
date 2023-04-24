@@ -81,9 +81,13 @@ mod tests {
     let resource = yaml["Resources"][0].clone();
     let name = resource["Name"].as_str().unwrap();
 
+    let payload = resource["Config"].clone();
+
+    println!("payload: {:?}", payload);
+
     let res = test_srv
       .put(format!("/rules/{name}"))
-      .send_json(&resource["Config"])
+      .send_json(&payload)
       .await
       .unwrap();
 

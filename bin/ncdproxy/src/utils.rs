@@ -409,8 +409,8 @@ pub(crate) async fn create_resource_conf(
   nginx: &Nginx,
 ) -> IoResult<()> {
   let (kind, conf) =
-    resource_to_nginx_conf(client, nginx, &name, &proxy_rule).await?;
-  nginx.write_conf_file(&name, &conf, &kind)?;
+    resource_to_nginx_conf(client, nginx, name, proxy_rule).await?;
+  nginx.write_conf_file(name, &conf, &kind)?;
   Ok(())
 }
 
@@ -527,6 +527,7 @@ pub(crate) mod tests {
   pub fn generate_server(routes: Config) -> ntex::web::test::TestServer {
     before();
     let nginx = Nginx::new("/tmp/nginx");
+    nginx.ensure().unwrap();
     // Create test server
     ntex::web::test::server(move || {
       ntex::web::App::new().state(nginx.clone()).configure(routes)

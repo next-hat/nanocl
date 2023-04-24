@@ -73,13 +73,17 @@ async fn hook_create_resource(
     }
   };
 
-  let resource = ctrl_client
+  let config = ctrl_client
     .apply_rule(&resource.name, &resource.config)
     .await
     .map_err(|err| HttpError {
       status: StatusCode::BAD_REQUEST,
       msg: format!("{}", err),
     })?;
+
+  let mut resource = resource.clone();
+  resource.config = config;
+
   Ok(resource)
 }
 
