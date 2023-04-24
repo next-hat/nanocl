@@ -454,7 +454,7 @@ async fn logs_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let stream = utils::cargo::get_logs(&key, qs, &state.docker_api)?;
+  let stream = utils::cargo::get_logs(&key, &qs, &state.docker_api)?;
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
