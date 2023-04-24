@@ -176,11 +176,14 @@ async fn exec_cargo_logs(
 ) -> Result<(), CliError> {
   let query = CargoLogQuery { 
     namespace: args.namespace.clone(), 
-    tail: options.tail.to_owned(),
-    since: options.since.to_owned(),
-    until: options.until.to_owned(),
+    tail: options.tail.clone(),
+    since: options.since.clone(),
+    until: options.until.clone(),
     follow: Some(options.follow),
-    timestamps: Some(options.timestamps) };
+    timestamps: Some(options.timestamps),
+    stderr: None,
+    stdout: None,
+  };
   let mut stream = client
     .logs_cargo(&options.name, &query)
     .await?;

@@ -887,20 +887,12 @@ pub async fn patch(
 
 pub fn get_logs(
   name: &str,
-  query: &CargoLogQuery,
+  query: CargoLogQuery,
   docker_api: &bollard_next::Docker,
 ) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
   let stream = docker_api.logs(
     &format!("{name}.c"),
-    Some(LogsOptions::<String> {
-      follow: query.follow.unwrap_or(false),
-      timestamps: query.timestamps.unwrap_or(false),
-      since: query.since.unwrap_or(0),
-      until: query.until.unwrap_or(0),
-      tail: query.tail.to_owned().unwrap_or("all".to_string()),
-      stdout: true,
-      stderr: true,
-    }),
+    Some(query.into()),
   );
   let stream = transform_stream::<LogOutput, OutputLog>(stream);
   Ok(stream)

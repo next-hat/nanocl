@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard_next::container::{LogOutput, KillContainerOptions};
+use bollard_next::container::{LogOutput, KillContainerOptions, LogsOptions};
 
 pub use bollard_next::exec::CreateExecOptions;
 
@@ -223,10 +223,28 @@ pub struct CargoLogQuery {
   pub follow: Option<bool>,
   /// If integer only return last n logs, if "all" returns all logs
   pub tail: Option<String>,
+  /// Include stderr in response
+  pub stderr: Option<bool>,
+  /// Include stdout in response
+  pub stdout: Option<bool>,
 }
 
 impl CargoLogQuery {
   pub fn of_namespace(nsp: String) -> CargoLogQuery {
-    CargoLogQuery { namespace: Some(nsp), since: None, until: None, timestamps: None, follow: None, tail: None }
+    CargoLogQuery { namespace: Some(nsp), since: None, until: None, timestamps: None, follow: None, tail: None, stderr: None, stdout: None }
+  }
+}
+
+impl From<CargoLogQuery> for LogsOptions<String> {
+  fn from(query: CargoLogQuery) -> LogsOptions<String> {
+    LogsOptions::<String> {
+      follow: query.follow.unwrap_or_default(),
+      timestamps: query.timestamps.unwrap_or_default(),
+      since: query.since.unwrap_or_default(),
+      until: query.until.unwrap_or_default(),
+      tail: query.tail.to_owned().unwrap_or("all".to_string()),
+      stdout: query.stdout.unwrap_or(true),
+      stderr: query.stdout.unwrap_or(true),
+    }
   }
 }
