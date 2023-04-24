@@ -8,7 +8,7 @@ use futures::StreamExt;
 use bollard_next::service::HostConfig;
 
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::cargo::OutputKind;
+use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
 };
@@ -179,7 +179,8 @@ async fn attach_to_cargo(
     let client = client.clone();
     let name = name.clone();
     let fut = rt::spawn(async move {
-      match client.logs_cargo(&name, Some(namespace.to_owned())).await {
+      let query = CargoLogQuery::of_namespace(namespace.to_owned());
+      match client.logs_cargo(&name, &query).await {
         Err(err) => {
           eprintln!(
             "Cannot attach to cargo {cargo}: {err}",

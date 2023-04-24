@@ -250,7 +250,9 @@ Some usefull command to know:
   nanocl exec system-nano-proxy -- certbot --nginx --email email@email.com --agree-tos -d your-domain.com
   ```
 
-* Run ntex tests
+* Run tests
+  When running all tests, the daemon needs to be started first
+  Permissions on /run/nanocl need to be set correctly
   ```sh
-  cargo nextest run -p nanocld
+  cargo make test
   ```

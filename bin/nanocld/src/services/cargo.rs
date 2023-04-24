@@ -10,7 +10,7 @@ use bollard_next::exec::CreateExecOptions;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::cargo::{CargoListQuery, CargoDeleteQuery, CargoKillOptions};
+use nanocl_stubs::cargo::{CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery};
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
 use crate::{utils, repositories};
@@ -435,6 +435,11 @@ async fn reset_cargo(
   params(
     ("Name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
     ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("Since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
+    ("Until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
+    ("Timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
+    ("Follow" = Option<bool>, Query, description = "Boolean to return a stream or not"),
+    ("Tail" = Option<String>, Query, description = "Only return the n last (integer) or all (\"all\") logs"),
   ),
   responses(
     (status = 200, description = "Cargo logs", content_type = "application/vdn.nanocl.raw-stream"),
@@ -443,17 +448,17 @@ async fn reset_cargo(
 ))]
 #[web::get("/cargoes/{name}/logs")]
 async fn logs_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Query(qs): web::types::Query<CargoLogQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let steam = utils::cargo::get_logs(&key, &state.docker_api)?;
+  let stream = utils::cargo::get_logs(&key, &qs, &state.docker_api)?;
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(steam),
+      .streaming(stream),
   )
 }
 

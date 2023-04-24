@@ -4,7 +4,7 @@ use futures::StreamExt;
 use bollard_next::exec::CreateExecOptions;
 
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery};
+use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery, CargoLogQuery};
 
 use crate::utils::print::*;
 use crate::error::CliError;
@@ -174,8 +174,18 @@ async fn exec_cargo_logs(
   args: &CargoArgs,
   options: &CargoLogsOpts,
 ) -> Result<(), CliError> {
+  let query = CargoLogQuery { 
+    namespace: args.namespace.clone(), 
+    tail: options.tail.clone(),
+    since: options.since.clone(),
+    until: options.until.clone(),
+    follow: Some(options.follow),
+    timestamps: Some(options.timestamps),
+    stderr: None,
+    stdout: None,
+  };
   let mut stream = client
-    .logs_cargo(&options.name, args.namespace.clone())
+    .logs_cargo(&options.name, &query)
     .await?;
   while let Some(log) = stream.next().await {
     let log = match log {
