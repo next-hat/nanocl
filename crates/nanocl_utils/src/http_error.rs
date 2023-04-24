@@ -85,3 +85,10 @@ impl From<crate::io_error::IoError> for HttpError {
     }
   }
 }
+
+#[cfg(feature = "io_error")]
+impl From<Box<crate::io_error::IoError>> for HttpError {
+  fn from(err: Box<crate::io_error::IoError>) -> Self {
+    (*err).into()
+  }
+}

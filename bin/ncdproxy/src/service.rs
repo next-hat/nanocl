@@ -28,7 +28,7 @@ async fn remove_rule(
 ) -> Result<web::HttpResponse, HttpError> {
   let (kind, name) = path.into_inner();
 
-  println!("Deleting rule: {kind} {name}");
+  log::debug!("Deleting rule: {kind} {name}");
 
   let kind: NginxConfKind = kind.parse()?;
 

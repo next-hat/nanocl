@@ -88,7 +88,7 @@ pub(crate) fn run() {
           }
           _ => {}
         },
-        Err(e) => println!("watch error: {:?}", e),
+        Err(e) => log::warn!("watch error: {:?}", e),
       }
     }
   });

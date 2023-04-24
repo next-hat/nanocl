@@ -1,8 +1,10 @@
 use ntex::web;
 use ntex::server::Server;
 
+use nanocl_utils::logger::enable_logger;
+
 mod cli;
-mod error;
+mod utils;
 mod dnsmasq;
 mod service;
 
@@ -16,7 +18,7 @@ fn setup_server(dnsmasq: &Dnsmasq) -> std::io::Result<Server> {
       .configure(service::ntex_config)
   });
 
-  server = server.bind_uds("/run/nanocl/proxy.sock")?;
+  server = server.bind_uds("/run/nanocl/dns.sock")?;
 
   Ok(server.run())
 }
@@ -24,15 +26,13 @@ fn setup_server(dnsmasq: &Dnsmasq) -> std::io::Result<Server> {
 #[ntex::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = cli::parse();
+  enable_logger("ncddns");
 
-  println!("nanocl-ncddns v{}", env!("CARGO_PKG_VERSION"));
+  log::info!("nanocl-ncddns v{}", env!("CARGO_PKG_VERSION"));
 
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
   let dnsmasq = dnsmasq::new(&conf_dir).with_dns(cli.dns);
-  if let Err(err) = dnsmasq.ensure() {
-    eprintln!("{err}");
-    std::process::exit(1);
-  }
+  dnsmasq.ensure()?;
 
   let server = setup_server(&dnsmasq)?;
 

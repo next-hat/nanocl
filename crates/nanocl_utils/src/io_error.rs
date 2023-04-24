@@ -52,6 +52,16 @@ impl IoError {
       ),
     )
   }
+
+  pub fn not_fount<M>(context: M, message: M) -> Self
+  where
+    M: ToString + std::fmt::Display,
+  {
+    Self::new(
+      context.to_string(),
+      std::io::Error::new(std::io::ErrorKind::NotFound, message.to_string()),
+    )
+  }
 }
 
 impl std::fmt::Display for IoError {
