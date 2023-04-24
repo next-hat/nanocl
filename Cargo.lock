@@ -1700,6 +1700,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nanocl_utils"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "log 0.4.17",
+ "ntex",
+ "serde_json",
+]
+
+[[package]]
 name = "nanocld"
 version = "0.5.0"
 dependencies = [
@@ -1743,6 +1753,7 @@ dependencies = [
  "bollard-next",
  "futures",
  "nanocl_stubs",
+ "nanocl_utils",
  "ntex",
  "serde",
  "serde_json",
@@ -1766,7 +1777,9 @@ name = "ncddns"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "env_logger",
  "futures",
+ "log 0.4.17",
  "nanocld_client",
  "ntex",
  "serde",
@@ -1779,9 +1792,9 @@ version = "0.3.0"
 dependencies = [
  "bollard-next",
  "clap",
- "env_logger",
  "futures",
  "log 0.4.17",
+ "nanocl_utils",
  "nanocld_client",
  "notify",
  "ntex",

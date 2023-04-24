@@ -3,16 +3,15 @@ use ntex::web;
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::resource::ResourcePartial;
 
-use crate::{
-  utils,
-  error::HttpError,
-  nginx::{Nginx, NginxConfKind},
-};
+use nanocl_utils::http_error::HttpError;
+
+use crate::utils;
+use crate::nginx::{Nginx, NginxConfKind};
 
 #[web::put("/rules")]
 async fn apply_rule(
-  web::types::Json(payload): web::types::Json<ResourcePartial>,
   nginx: web::types::State<Nginx>,
+  web::types::Json(payload): web::types::Json<ResourcePartial>,
 ) -> Result<web::HttpResponse, HttpError> {
   let client = NanocldClient::connect_with_unix_default();
 
@@ -33,7 +32,9 @@ async fn remove_rule(
 
   let kind: NginxConfKind = kind.parse()?;
 
-  nginx.delete_conf_file(&name, &kind).await?;
+  if let Err(err) = nginx.delete_conf_file(&name, &kind).await {
+    log::warn!("Failed to delete file: {}", err);
+  }
 
   Ok(web::HttpResponse::Ok().finish())
 }

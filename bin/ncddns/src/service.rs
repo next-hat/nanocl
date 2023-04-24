@@ -1,21 +1,21 @@
-use nanocld_client::NanocldClient;
 use ntex::web;
 
-use nanocld_client::stubs::cargo::CargoInspect;
+use nanocld_client::NanocldClient;
+use nanocld_client::stubs::resource::ResourcePartial;
 
-use crate::utils;
 use crate::dnsmasq::Dnsmasq;
 use crate::error::HttpError;
 
 #[web::put("/rules")]
 async fn dns_entry(
   dnsmasq: web::types::State<Dnsmasq>,
-  web::types::Json(payload): web::types::Json<CargoInspect>,
+  web::types::Json(payload): web::types::Json<ResourcePartial>,
 ) -> Result<web::HttpResponse, HttpError> {
   let client = NanocldClient::connect_with_unix_default();
-  let domains = utils::gen_cargo_domains(&payload)?;
-  dnsmasq.generate_domains_file(&payload.key, &domains)?;
-  utils::restart_dns_service(&client).await?;
+
+  // let domains = utils::gen_cargo_domains(&payload)?;
+  // dnsmasq.generate_domains_file(&payload.key, &domains)?;
+  // utils::restart_dns_service(&client).await?;
   Ok(web::HttpResponse::Ok().finish())
 }
 

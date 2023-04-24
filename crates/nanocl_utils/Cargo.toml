@@ -1,0 +1,25 @@
+[package]
+name = "nanocl_utils"
+version = "0.1.0"
+edition = "2021"
+authors = ["nanocl contributors <team@next-hat.com>"]
+description = "Nanocl shared utils"
+readme = "readme.md"
+license = "MIT OR Apache-2.0"
+homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
+repository = "https://github.com/nxthat/nanocl"
+
+[lib]
+bench = false
+
+[features]
+io_error = []
+serde_json = ["dep:serde_json"]
+http_error = ["dep:ntex", "dep:serde_json"]
+logger = ["dep:log", "dep:env_logger"]
+
+[dependencies]
+log = { version = "0.4.17", optional = true }
+env_logger = { version = "0.10.0", optional = true }
+ntex = { version = "0.6.7", optional = true }
+serde_json = { version = "1.0.70", optional = true }
