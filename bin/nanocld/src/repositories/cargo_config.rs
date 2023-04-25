@@ -1,14 +1,13 @@
 use ntex::web;
-use ntex::http::StatusCode;
 use diesel::prelude::*;
 
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
 
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+
 use crate::utils;
-use crate::error::HttpError;
 use crate::models::{Pool, CargoConfigDbModel};
-use super::error::{db_error, db_blocking_error};
 
 /// ## Create cargo config
 ///
@@ -42,7 +41,7 @@ pub async fn create(
   item: &CargoConfigPartial,
   version: &str,
   pool: &Pool,
-) -> Result<CargoConfig, HttpError> {
+) -> IoResult<CargoConfig> {
   use crate::schema::cargo_configs::dsl;
 
   let cargo_key = cargo_key.to_owned();
@@ -54,21 +53,18 @@ pub async fn create(
     cargo_key,
     version,
     created_at: chrono::Utc::now().naive_utc(),
-    config: serde_json::to_value(item.clone()).map_err(|e| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to serialize config: {e}"),
-    })?,
+    config: serde_json::to_value(item.clone())
+      .map_err(|e| e.map_err_context(|| "Invalid Config"))?,
   };
   let dbmodel = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::insert_into(dsl::cargo_configs)
       .values(&dbmodel)
       .execute(&mut conn)
-      .map_err(db_error("cargo config"))?;
-    Ok::<_, HttpError>(dbmodel)
+      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
+    Ok::<_, IoError>(dbmodel)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let config = CargoConfig {
     key: dbmodel.key,
@@ -107,7 +103,7 @@ pub async fn create(
 pub async fn find_by_key(
   key: &uuid::Uuid,
   pool: &Pool,
-) -> Result<CargoConfig, HttpError> {
+) -> IoResult<CargoConfig> {
   use crate::schema::cargo_configs::dsl;
 
   let key = *key;
@@ -118,17 +114,13 @@ pub async fn find_by_key(
     let config = dsl::cargo_configs
       .filter(dsl::key.eq(key))
       .get_result::<CargoConfigDbModel>(&mut conn)
-      .map_err(db_error("cargo config"))?;
-    Ok::<_, HttpError>(config)
+      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
+    Ok::<_, IoError>(config)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let config = serde_json::from_value::<CargoConfigPartial>(dbmodel.config)
-    .map_err(|e| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to deserialize config: {e}"),
-    })?;
+    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
 
   Ok(CargoConfig {
     key: dbmodel.key,
@@ -165,7 +157,7 @@ pub async fn find_by_key(
 pub async fn delete_by_cargo_key(
   key: &str,
   pool: &Pool,
-) -> Result<GenericDelete, HttpError> {
+) -> IoResult<GenericDelete> {
   use crate::schema::cargo_configs::dsl;
 
   let key = key.to_owned();
@@ -176,11 +168,10 @@ pub async fn delete_by_cargo_key(
     let res = diesel::delete(dsl::cargo_configs)
       .filter(dsl::cargo_key.eq(key))
       .execute(&mut conn)
-      .map_err(db_error("cargo config"))?;
-    Ok::<_, HttpError>(res)
+      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
+    Ok::<_, IoError>(res)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(GenericDelete { count: res })
 }
@@ -188,7 +179,7 @@ pub async fn delete_by_cargo_key(
 pub async fn list_by_cargo(
   key: &str,
   pool: &Pool,
-) -> Result<Vec<CargoConfig>, HttpError> {
+) -> IoResult<Vec<CargoConfig>> {
   use crate::schema::cargo_configs::dsl;
 
   let key = key.to_owned();
@@ -199,20 +190,16 @@ pub async fn list_by_cargo(
     let configs = dsl::cargo_configs
       .filter(dsl::cargo_key.eq(key))
       .get_results::<CargoConfigDbModel>(&mut conn)
-      .map_err(db_error("cargo config"))?;
-    Ok::<_, HttpError>(configs)
+      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
+    Ok::<_, IoError>(configs)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let configs = dbmodels
     .into_iter()
     .map(|dbmodel| {
       let config = serde_json::from_value::<CargoConfigPartial>(dbmodel.config)
-        .map_err(|e| HttpError {
-          status: StatusCode::INTERNAL_SERVER_ERROR,
-          msg: format!("Failed to deserialize config: {e}"),
-        })?;
+        .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
 
       Ok(CargoConfig {
         key: dbmodel.key,
@@ -224,7 +211,7 @@ pub async fn list_by_cargo(
         container: config.container,
       })
     })
-    .collect::<Result<Vec<CargoConfig>, HttpError>>()?;
+    .collect::<Result<Vec<CargoConfig>, IoError>>()?;
 
   Ok(configs)
 }

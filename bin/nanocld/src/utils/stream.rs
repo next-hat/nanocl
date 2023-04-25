@@ -3,7 +3,7 @@ use ntex::http::StatusCode;
 use futures::StreamExt;
 use serde::Serialize;
 
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 
 pub(crate) fn transform_stream<I, T>(
   stream: impl StreamExt<Item = Result<I, impl std::error::Error>>,

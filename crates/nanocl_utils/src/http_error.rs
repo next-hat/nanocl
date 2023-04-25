@@ -67,6 +67,9 @@ impl std::fmt::Display for HttpError {
   }
 }
 
+/// Implement standard error for HttpError
+impl std::error::Error for HttpError {}
+
 /// Helper function to convert an HttpError into a ntex::web::HttpResponse
 impl web::WebResponseError for HttpError {
   fn error_response(&self, _: &web::HttpRequest) -> web::HttpResponse {
@@ -90,5 +93,25 @@ impl From<crate::io_error::IoError> for HttpError {
 impl From<Box<crate::io_error::IoError>> for HttpError {
   fn from(err: Box<crate::io_error::IoError>) -> Self {
     (*err).into()
+  }
+}
+
+#[cfg(feature = "bollard")]
+impl From<bollard_next::errors::Error> for HttpError {
+  fn from(err: bollard_next::errors::Error) -> Self {
+    match err {
+      bollard_next::errors::Error::DockerResponseServerError {
+        status_code,
+        message,
+      } => HttpError {
+        msg: message,
+        status: http::StatusCode::from_u16(status_code)
+          .unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR),
+      },
+      _ => HttpError {
+        msg: format!("{err}"),
+        status: http::StatusCode::INTERNAL_SERVER_ERROR,
+      },
+    }
   }
 }

@@ -24,7 +24,7 @@ use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 use tokio::io::AsyncWriteExt;
 
 use crate::{utils, repositories};
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::{DaemonState, WsConState};
 
 /// List virtual machines

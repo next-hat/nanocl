@@ -4,7 +4,7 @@ use jsonschema::{JSONSchema, Draft};
 use nanocl_stubs::resource::{Resource, ResourcePartial};
 
 use crate::repositories;
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::{Pool, ResourceKindPartial};
 
 use super::ctrl_client::CtrlClient;
@@ -111,7 +111,8 @@ pub async fn create(
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
   hook_create_resource(resource, pool).await?;
-  repositories::resource::create(resource, pool).await
+  let res = repositories::resource::create(resource, pool).await?;
+  Ok(res)
 }
 
 /// Patch a resource
@@ -120,7 +121,8 @@ pub async fn patch(
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
   hook_create_resource(&resource, pool).await?;
-  repositories::resource::patch(&resource, pool).await
+  let res = repositories::resource::patch(&resource, pool).await?;
+  Ok(res)
 }
 
 /// Create or patch a resource
@@ -129,7 +131,8 @@ pub async fn create_or_patch(
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
   hook_create_resource(&resource, pool).await?;
-  repositories::resource::create_or_patch(&resource, pool).await
+  let res = repositories::resource::create_or_patch(&resource, pool).await?;
+  Ok(res)
 }
 
 /// Delete a resource

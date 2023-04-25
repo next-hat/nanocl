@@ -3,7 +3,7 @@ use ntex::web;
 use nanocl_stubs::http_metric::{HttpMetricListQuery, HttpMetricCountQuery};
 
 use crate::repositories;
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::DaemonState;
 
 /// Get http metrics of all peer nodes

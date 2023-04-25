@@ -1,19 +1,17 @@
 use ntex::web;
-use ntex::http::StatusCode;
 use diesel::prelude::*;
 
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceQuery};
 
-use crate::repositories::error::db_error;
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+
 use crate::{utils, repositories};
-use crate::error::HttpError;
 use crate::models::{
   Pool, ResourceDbModel, ResourceConfigDbModel, ResourceUpdateModel,
 };
 
 use super::resource_config;
-use super::error::db_blocking_error;
 
 /// ## Create resource
 ///
@@ -44,10 +42,7 @@ use super::error::db_blocking_error;
 /// let item = repositories::resource::create(item, &pool).await;
 /// ```
 ///
-pub async fn create(
-  item: &ResourcePartial,
-  pool: &Pool,
-) -> Result<Resource, HttpError> {
+pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
   use crate::schema::resources::dsl;
 
   let pool = pool.clone();
@@ -73,11 +68,10 @@ pub async fn create(
     diesel::insert_into(dsl::resources)
       .values(&new_item)
       .execute(&mut conn)
-      .map_err(db_error("resource"))?;
-    Ok::<_, HttpError>(new_item)
+      .map_err(|err| err.map_err_context(|| "Resource"))?;
+    Ok::<_, IoError>(new_item)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let item = Resource {
     name: item.key,
@@ -115,10 +109,7 @@ pub async fn create(
 /// repositories::resource::delete_by_key(String::from("my-resource"), &pool).await;
 /// ```
 ///
-pub async fn delete_by_key(
-  key: &str,
-  pool: &Pool,
-) -> Result<GenericDelete, HttpError> {
+pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::resources::dsl;
 
   let key = key.to_owned();
@@ -129,11 +120,10 @@ pub async fn delete_by_key(
     let count = diesel::delete(dsl::resources)
       .filter(dsl::key.eq(key))
       .execute(&mut conn)
-      .map_err(db_error("resource"))?;
-    Ok::<_, HttpError>(count)
+      .map_err(|err| err.map_err_context(|| "Resource"))?;
+    Ok::<_, IoError>(count)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(GenericDelete { count })
 }
@@ -163,7 +153,7 @@ pub async fn delete_by_key(
 pub async fn find(
   pool: &Pool,
   query: Option<ResourceQuery>,
-) -> Result<Vec<Resource>, HttpError> {
+) -> IoResult<Vec<Resource>> {
   use crate::schema::resources;
   use crate::schema::resource_configs;
 
@@ -181,10 +171,7 @@ pub async fn find(
           }
           if let Some(contains) = &qs.contains {
             let contains = serde_json::from_str::<serde_json::Value>(contains)
-              .map_err(|err| HttpError {
-                status: StatusCode::BAD_REQUEST,
-                msg: format!("Invalid contains query: {err}"),
-              })?;
+              .map_err(|err| err.map_err_context(|| "Contains"))?;
             req = req.filter(resource_configs::data.contains(contains));
           }
 
@@ -195,19 +182,18 @@ pub async fn find(
           .load(&mut conn),
       };
 
-      let res = req.map_err(db_error("resource"))?;
+      let res = req.map_err(|err| err.map_err_context(|| "Resource"))?;
 
-      Ok::<_, HttpError>(res)
+      Ok::<_, IoError>(res)
     })
-    .await
-    .map_err(db_blocking_error)?;
+    .await?;
 
   let items = res
     .into_iter()
     .map(|e| {
       let resource = e.0;
       let config = e.1;
-      Ok::<_, HttpError>(Resource {
+      Ok::<_, IoError>(Resource {
         name: resource.key,
         created_at: resource.created_at,
         updated_at: config.created_at,
@@ -217,7 +203,7 @@ pub async fn find(
         config: config.data,
       })
     })
-    .collect::<Result<Vec<Resource>, HttpError>>()?;
+    .collect::<Result<Vec<Resource>, IoError>>()?;
   Ok(items)
 }
 
@@ -244,10 +230,7 @@ pub async fn find(
 /// let item = repositories::resource::inspect_by_key(String::from("my-resource"), &pool).await;
 /// ```
 ///
-pub async fn inspect_by_key(
-  key: &str,
-  pool: &Pool,
-) -> Result<Resource, HttpError> {
+pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Resource> {
   use crate::schema::resources;
   use crate::schema::resource_configs;
 
@@ -260,11 +243,10 @@ pub async fn inspect_by_key(
       .inner_join(resource_configs::table)
       .filter(resources::key.eq(key))
       .get_result(&mut conn)
-      .map_err(db_error("resource"))?;
-    Ok::<_, HttpError>(res)
+      .map_err(|err| err.map_err_context(|| "Resource"))?;
+    Ok::<_, IoError>(res)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let item = Resource {
     name: res.0.key,
@@ -303,10 +285,7 @@ pub async fn inspect_by_key(
 /// let item = repositories::resource::update_by_id(String::from("my-resource"), json!({"foo": "bar"}), &pool).await;
 /// ```
 ///
-pub async fn patch(
-  item: &ResourcePartial,
-  pool: &Pool,
-) -> Result<Resource, HttpError> {
+pub async fn patch(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
   use crate::schema::resources;
 
   let pool = pool.clone();
@@ -335,11 +314,10 @@ pub async fn patch(
       .filter(resources::key.eq(key))
       .set(&resource_update)
       .execute(&mut conn)
-      .map_err(db_error("resource"))?;
-    Ok::<_, HttpError>(())
+      .map_err(|err| err.map_err_context(|| "Resource"))?;
+    Ok::<_, IoError>(())
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let item = Resource {
     name: resource.name,
@@ -356,7 +334,7 @@ pub async fn patch(
 pub async fn create_or_patch(
   resource: &ResourcePartial,
   pool: &Pool,
-) -> Result<Resource, HttpError> {
+) -> IoResult<Resource> {
   if inspect_by_key(&resource.name, pool).await.is_ok() {
     return patch(resource, pool).await;
   }

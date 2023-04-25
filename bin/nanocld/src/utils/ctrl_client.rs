@@ -6,7 +6,7 @@ use ntex::http::client::{
 };
 use thiserror::Error;
 
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 
 pub struct CtrlClient {
   pub(crate) client: Client,

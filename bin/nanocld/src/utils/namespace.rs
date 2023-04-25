@@ -16,7 +16,7 @@ use crate::models::DaemonState;
 use crate::utils;
 use crate::repositories;
 use crate::models::Pool;
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 
 use super::cargo;
 
@@ -109,7 +109,8 @@ pub async fn delete_by_name(
   if let Err(err) = state.docker_api.remove_network(name).await {
     log::error!("Unable to remove network {} got error: {}", name, err);
   }
-  repositories::namespace::delete_by_name(name, &state.pool).await
+  let res = repositories::namespace::delete_by_name(name, &state.pool).await?;
+  Ok(res)
 }
 
 /// ## List existing container in a namespace

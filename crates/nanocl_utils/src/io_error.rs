@@ -4,6 +4,15 @@ pub struct IoError {
   pub inner: std::io::Error,
 }
 
+impl Clone for IoError {
+  fn clone(&self) -> Self {
+    Self {
+      context: self.context.clone(),
+      inner: std::io::Error::new(self.inner.kind(), self.inner.to_string()),
+    }
+  }
+}
+
 impl IoError {
   pub fn new<T>(context: T, inner: std::io::Error) -> Self
   where
@@ -60,6 +69,16 @@ impl IoError {
     Self::new(
       context.to_string(),
       std::io::Error::new(std::io::ErrorKind::NotFound, message.to_string()),
+    )
+  }
+
+  pub fn interupted<M>(context: M, message: M) -> Self
+  where
+    M: ToString + std::fmt::Display,
+  {
+    Self::new(
+      context.to_string(),
+      std::io::Error::new(std::io::ErrorKind::Interrupted, message.to_string()),
     )
   }
 }
@@ -191,5 +210,84 @@ impl FromIo<Box<IoError>> for serde_json::Error {
       context: Some((context)().to_string()),
       inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
     })
+  }
+}
+
+#[cfg(feature = "serde_yaml")]
+impl FromIo<Box<IoError>> for serde_yaml::Error {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
+    })
+  }
+}
+
+#[cfg(feature = "bollard")]
+impl FromIo<Box<IoError>> for bollard_next::errors::Error {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
+    })
+  }
+}
+
+#[cfg(feature = "http_error")]
+impl From<crate::http_error::HttpError> for IoError {
+  fn from(f: crate::http_error::HttpError) -> Self {
+    Self {
+      context: None,
+      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, f),
+    }
+  }
+}
+
+#[cfg(feature = "diesel")]
+impl FromIo<Box<IoError>> for diesel::result::Error {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    let inner = match self {
+      diesel::result::Error::NotFound => {
+        std::io::Error::new(std::io::ErrorKind::NotFound, self)
+      }
+      diesel::result::Error::DatabaseError(dberr, infoerr) => match dberr {
+        diesel::result::DatabaseErrorKind::UniqueViolation => {
+          std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            infoerr.details().unwrap_or_default(),
+          )
+        }
+        _ => std::io::Error::new(
+          std::io::ErrorKind::InvalidData,
+          infoerr.details().unwrap_or_default(),
+        ),
+      },
+      _ => std::io::Error::new(std::io::ErrorKind::InvalidData, self),
+    };
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner,
+    })
+  }
+}
+
+#[cfg(feature = "ntex")]
+impl From<ntex::http::error::BlockingError<IoError>> for IoError {
+  fn from(f: ntex::http::error::BlockingError<IoError>) -> Self {
+    match f {
+      ntex::http::error::BlockingError::Error(e) => e,
+      ntex::http::error::BlockingError::Canceled => {
+        IoError::interupted("Future", "Canceled")
+      }
+    }
   }
 }

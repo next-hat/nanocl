@@ -1,9 +1,9 @@
 use ntex::web;
-use ntex::http::StatusCode;
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 
-use crate::error::{CliError, HttpError};
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+
 use crate::models::{Pool, DBConn};
 
 /// ## Create pool
@@ -26,7 +26,7 @@ use crate::models::{Pool, DBConn};
 /// let pool = utils::create_pool("localhost".to_string()).await;
 /// ```
 ///
-pub async fn create_pool(host: String) -> Result<Pool, CliError> {
+pub async fn create_pool(host: String) -> IoResult<Pool> {
   // ?sslmode=verify-full
   web::block(move || {
     let db_url =
@@ -36,7 +36,7 @@ pub async fn create_pool(host: String) -> Result<Pool, CliError> {
   })
   .await
   .map_err(|err| {
-    CliError::new(1, format!("Failed to connect to store: {}", err))
+    IoError::interupted("CockroachDB", &format!("Unable to create pool {err}"))
   })
 }
 
@@ -65,33 +65,24 @@ pub async fn create_pool(host: String) -> Result<Pool, CliError> {
 ///
 pub async fn get_store_addr(
   docker_api: &bollard_next::Docker,
-) -> Result<String, HttpError> {
+) -> IoResult<String> {
   let container = docker_api
     .inspect_container("nstore.system.c", None)
-    .await?;
+    .await
+    .map_err(|err| {
+      err.map_err_context(|| "Unable to inspect nstore.system.c container")
+    })?;
   let networks = container
     .network_settings
-    .ok_or(HttpError {
-      msg: String::from("unable to get store network nettings"),
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-    })?
+    .unwrap_or_default()
     .networks
-    .ok_or(HttpError {
-      msg: String::from("unable to get store networks"),
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-    })?;
+    .unwrap_or_default();
   let ip_address = networks
     .get("system")
-    .ok_or(HttpError {
-      msg: String::from("unable to get store network nanocl"),
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-    })?
+    .ok_or(IoError::invalid_data("Network", "system not found"))?
     .ip_address
     .as_ref()
-    .ok_or(HttpError {
-      msg: String::from("unable to get store network nanocl"),
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-    })?;
+    .ok_or(IoError::invalid_data("IpAddress", "not detected"))?;
   Ok(ip_address.to_owned())
 }
 
@@ -118,14 +109,14 @@ pub async fn get_store_addr(
 /// let conn = utils::store::get_pool_conn(&pool);
 /// ```
 ///
-pub fn get_pool_conn(pool: &Pool) -> Result<DBConn, HttpError> {
+pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
   let conn = match pool.get() {
     Ok(conn) => conn,
     Err(err) => {
-      return Err(HttpError {
-        msg: format!("Cannot get connection from pool got error: {}", &err),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-      });
+      return Err(IoError::new(
+        "CockroachDB connection",
+        std::io::Error::new(std::io::ErrorKind::NotConnected, err),
+      ))
     }
   };
   Ok(conn)

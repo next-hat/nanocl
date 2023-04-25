@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
+use nanocl_utils::io_error::FromIo;
 use ntex::rt;
+use ntex::http;
+use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use ntex::channel::mpsc::Receiver;
-use ntex::http::StatusCode;
 use bollard_next::container::Config;
 use bollard_next::service::HostConfig;
 
@@ -12,16 +14,16 @@ use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateConfig, StateStream,
 };
 use nanocl_stubs::cargo_config::CargoConfigPartial;
-use ntex::util::Bytes;
+use nanocl_utils::io_error::IoResult;
+use nanocl_utils::http_error::HttpError;
 
 use crate::{utils, repositories};
-use crate::error::{HttpError, CliError};
 use crate::models::{StateData, DaemonState};
 
 pub fn stream_to_bytes(state_stream: StateStream) -> Result<Bytes, HttpError> {
   let bytes =
     serde_json::to_string(&state_stream).map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
+      status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("unable to serialize state_stream_to_bytes {err}"),
     })?;
   Ok(Bytes::from(bytes + "\r\n"))
@@ -31,7 +33,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
   let meta =
     serde_json::from_value::<StateConfig>(data.to_owned()).map_err(|err| {
       HttpError {
-        status: StatusCode::BAD_REQUEST,
+        status: http::StatusCode::BAD_REQUEST,
         msg: format!("unable to serialize payload {err}"),
       }
     })?;
@@ -39,7 +41,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
     "Deployment" => {
       let data = serde_json::from_value::<StateDeployment>(data.to_owned())
         .map_err(|err| HttpError {
-          status: StatusCode::BAD_REQUEST,
+          status: http::StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
       Ok(StateData::Deployment(data))
@@ -47,7 +49,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
     "Cargo" => {
       let data = serde_json::from_value::<StateCargo>(data.to_owned())
         .map_err(|err| HttpError {
-          status: StatusCode::BAD_REQUEST,
+          status: http::StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
       Ok(StateData::Cargo(data))
@@ -55,13 +57,13 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
     "Resource" => {
       let data = serde_json::from_value::<StateResources>(data.to_owned())
         .map_err(|err| HttpError {
-          status: StatusCode::BAD_REQUEST,
+          status: http::StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
       Ok(StateData::Resource(data))
     }
     _ => Err(HttpError {
-      status: StatusCode::BAD_REQUEST,
+      status: http::StatusCode::BAD_REQUEST,
       msg: "unknown type".into(),
     }),
   }
@@ -684,7 +686,7 @@ pub async fn revert_resource(
 
 pub fn hook_cargo_binds(
   cargo: &CargoConfigPartial,
-) -> Result<CargoConfigPartial, CliError> {
+) -> IoResult<CargoConfigPartial> {
   if let Some(host_config) = &cargo.container.host_config {
     if let Some(binds) = &host_config.binds {
       let mut new_bind = Vec::new();
@@ -695,17 +697,12 @@ pub fn hook_cargo_binds(
         let dest = dest.unwrap_or(&"");
         let source = source.unwrap_or(&"");
         if source.starts_with('.') {
-          let cwd = std::env::current_dir().map_err(|err| CliError {
-            msg: format!("Failed to get current directory: {}", err),
-            code: 5,
-          })?;
+          let cwd = std::env::current_dir()
+            .map_err(|err| err.map_err_context(|| "CurrentDir"))?;
           let source = cwd
             .join(source)
             .canonicalize()
-            .map_err(|err| CliError {
-              msg: format!("Failed to get canonical path: {}", err),
-              code: 5,
-            })?
+            .map_err(|err| err.map_err_context(|| "Canonicalize"))?
             .display()
             .to_string();
           new_bind.push(format!("{}:{}", source, dest));

@@ -57,7 +57,7 @@ use nanocl_stubs::proxy::{
   LocationTarget, HttpTarget, UrlRedirect, CargoTarget, ProxyRule,
 };
 
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 
 use super::{
   node, system, namespace, cargo, cargo_image, vm, vm_image, resource, metric,

@@ -4,16 +4,15 @@ use diesel::prelude::*;
 use nanocl_stubs::generic::GenericCount;
 use nanocl_stubs::http_metric::{HttpMetricListQuery, HttpMetricCountQuery};
 
-use crate::utils;
-use crate::error::HttpError;
-use crate::models::{Pool, HttpMetricDbModel};
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 
-use super::error::{db_error, db_blocking_error};
+use crate::utils;
+use crate::models::{Pool, HttpMetricDbModel};
 
 pub async fn create(
   item: &HttpMetricDbModel,
   pool: &Pool,
-) -> Result<HttpMetricDbModel, HttpError> {
+) -> IoResult<HttpMetricDbModel> {
   use crate::schema::http_metrics::dsl;
 
   let item = item.clone();
@@ -24,11 +23,10 @@ pub async fn create(
     let res = diesel::insert_into(dsl::http_metrics)
       .values(item)
       .get_result(&mut conn)
-      .map_err(db_error("http_metrics"))?;
-    Ok::<_, HttpError>(res)
+      .map_err(|err| err.map_err_context(|| "HttpMetric"))?;
+    Ok::<_, IoError>(res)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(item)
 }
@@ -36,7 +34,7 @@ pub async fn create(
 pub async fn list(
   filter: &HttpMetricListQuery,
   pool: &Pool,
-) -> Result<Vec<HttpMetricDbModel>, HttpError> {
+) -> IoResult<Vec<HttpMetricDbModel>> {
   use crate::schema::http_metrics::dsl;
 
   let filter = filter.clone();
@@ -57,11 +55,10 @@ pub async fn list(
 
     let res = query
       .get_results(&mut conn)
-      .map_err(db_error("http_metrics"))?;
-    Ok::<_, HttpError>(res)
+      .map_err(|err| err.map_err_context(|| "HttpMetric"))?;
+    Ok::<_, IoError>(res)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(items)
 }
@@ -69,7 +66,7 @@ pub async fn list(
 pub async fn count(
   filter: &HttpMetricCountQuery,
   pool: &Pool,
-) -> Result<GenericCount, HttpError> {
+) -> IoResult<GenericCount> {
   use crate::schema::http_metrics::dsl;
 
   let filter = filter.clone();
@@ -91,11 +88,10 @@ pub async fn count(
       .count()
       .get_result(&mut conn)
       .map(|count: i64| GenericCount { count })
-      .map_err(db_error("http_metrics"))?;
-    Ok::<_, HttpError>(res)
+      .map_err(|err| err.map_err_context(|| "HttpMetric"))?;
+    Ok::<_, IoError>(res)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(count)
 }
