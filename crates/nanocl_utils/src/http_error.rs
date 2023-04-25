@@ -58,6 +58,14 @@ impl HttpError {
   {
     Self::new(http::StatusCode::INTERNAL_SERVER_ERROR, msg)
   }
+
+  /// Create a new HttpError with status Conflict - 409
+  pub fn conflict<T>(msg: T) -> Self
+  where
+    T: ToString,
+  {
+    Self::new(http::StatusCode::CONFLICT, msg)
+  }
 }
 
 /// Helper function to display an HttpError
@@ -84,6 +92,7 @@ impl From<crate::io_error::IoError> for HttpError {
   fn from(err: crate::io_error::IoError) -> Self {
     match err.inner.kind() {
       std::io::ErrorKind::NotFound => HttpError::not_found(err.to_string()),
+      std::io::ErrorKind::AlreadyExists => HttpError::conflict(err.to_string()),
       _ => HttpError::internal_server_error(err.to_string()),
     }
   }
