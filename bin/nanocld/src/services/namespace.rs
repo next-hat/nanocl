@@ -8,7 +8,7 @@ use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
 use crate::{utils, repositories};
 use crate::models::DaemonState;
 
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 
 /// List namespaces
 #[cfg_attr(feature = "dev", utoipa::path(

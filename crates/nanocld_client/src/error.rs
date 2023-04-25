@@ -1,3 +1,4 @@
+use nanocl_utils::io_error::{FromIo, IoError};
 use thiserror::Error;
 use serde::{Serialize, Deserialize};
 use ntex::http::{
@@ -61,6 +62,27 @@ pub enum NanocldClientError {
   WsClientBuilderError(#[from] ntex::ws::error::WsClientBuilderError),
   #[error(transparent)]
   WsClientError(#[from] ntex::ws::error::WsClientError),
+}
+
+impl FromIo<Box<IoError>> for NanocldClientError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    let inner = match self {
+      NanocldClientError::Api(err) => {
+        std::io::Error::new(std::io::ErrorKind::Other, err)
+      }
+      NanocldClientError::JsonPayload(err) => {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, err)
+      }
+      _ => std::io::Error::new(std::io::ErrorKind::Other, self),
+    };
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner,
+    })
+  }
 }
 
 pub(crate) async fn is_api_error(

@@ -2,14 +2,14 @@ use ntex::http::StatusCode;
 use jsonschema::{JSONSchema, Draft};
 
 use nanocl_stubs::resource::{Resource, ResourcePartial};
-use nanocl_stubs::proxy::{ProxyRule, ResourceProxyRule};
 
 use crate::repositories;
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::{Pool, ResourceKindPartial};
 
-use super::proxy::ProxyClient;
+use super::ctrl_client::CtrlClient;
 
+/// Validate a resource from a custom config
 pub async fn validate_resource(
   resource: &ResourcePartial,
   pool: &Pool,
@@ -59,43 +59,44 @@ pub async fn validate_resource(
   Ok(())
 }
 
-async fn hook_apply_proxy_rule(
+/// Hook when creating a resource
+async fn hook_create_resource(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<ResourcePartial, HttpError> {
-  if resource.kind != "ProxyRule" {
-    validate_resource(resource, pool).await?;
-    return Ok(resource.to_owned());
-  }
-  let proxy = ProxyClient::unix_default();
-  let hooked_resource =
-    proxy.apply_rule(resource).await.map_err(|err| HttpError {
+  let ctrl_client = match resource.kind.as_ref() {
+    "ProxyRule" => CtrlClient::new("unix:///run/nanocl/proxy.sock"),
+    "DnsRule" => CtrlClient::new("unix:///run/nanocl/dns.sock"),
+    _ => {
+      validate_resource(resource, pool).await?;
+      return Ok(resource.clone());
+    }
+  };
+
+  let config = ctrl_client
+    .apply_rule(&resource.name, &resource.config)
+    .await
+    .map_err(|err| HttpError {
       status: StatusCode::BAD_REQUEST,
       msg: format!("{}", err),
     })?;
-  Ok(hooked_resource)
+
+  let mut resource = resource.clone();
+  resource.config = config;
+
+  Ok(resource)
 }
 
-async fn hook_remove_proxy_rule(resource: &Resource) -> Result<(), HttpError> {
-  if resource.kind != "ProxyRule" {
-    return Ok(());
-  }
-
-  let proxy_rule =
-    serde_json::from_value::<ResourceProxyRule>(resource.config.clone())
-      .map_err(|err| HttpError {
-        status: StatusCode::BAD_REQUEST,
-        msg: format!("{}", err),
-      })?;
-
-  let kind = match proxy_rule.rule {
-    ProxyRule::Http(_) => "site",
-    ProxyRule::Stream(_) => "stream",
+/// Hook when deleting a resource
+async fn hook_delete_resource(resource: &Resource) -> Result<(), HttpError> {
+  let ctrl_client = match resource.kind.as_ref() {
+    "ProxyRule" => CtrlClient::new("unix:///run/nanocl/proxy.sock"),
+    "DnsRule" => CtrlClient::new("unix:///run/nanocl/dns.sock"),
+    _ => return Ok(()),
   };
 
-  let proxy = ProxyClient::unix_default();
-  proxy
-    .delete_rule(&resource.name, kind)
+  ctrl_client
+    .delete_rule(&resource.name)
     .await
     .map_err(|err| HttpError {
       status: StatusCode::BAD_REQUEST,
@@ -104,32 +105,39 @@ async fn hook_remove_proxy_rule(resource: &Resource) -> Result<(), HttpError> {
   Ok(())
 }
 
+/// Create a resource
 pub async fn create(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
-  hook_apply_proxy_rule(resource, pool).await?;
-  repositories::resource::create(resource, pool).await
+  hook_create_resource(resource, pool).await?;
+  let res = repositories::resource::create(resource, pool).await?;
+  Ok(res)
 }
 
+/// Patch a resource
 pub async fn patch(
   resource: ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
-  hook_apply_proxy_rule(&resource, pool).await?;
-  repositories::resource::patch(&resource, pool).await
+  hook_create_resource(&resource, pool).await?;
+  let res = repositories::resource::patch(&resource, pool).await?;
+  Ok(res)
 }
 
+/// Create or patch a resource
 pub async fn create_or_patch(
   resource: ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
-  hook_apply_proxy_rule(&resource, pool).await?;
-  repositories::resource::create_or_patch(&resource, pool).await
+  hook_create_resource(&resource, pool).await?;
+  let res = repositories::resource::create_or_patch(&resource, pool).await?;
+  Ok(res)
 }
 
+/// Delete a resource
 pub async fn delete(resource: Resource, pool: &Pool) -> Result<(), HttpError> {
-  if let Err(err) = hook_remove_proxy_rule(&resource).await {
+  if let Err(err) = hook_delete_resource(&resource).await {
     log::warn!("{err}");
   }
   if resource.kind.as_str() == "Custom" {

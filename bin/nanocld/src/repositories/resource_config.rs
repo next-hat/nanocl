@@ -3,11 +3,10 @@ use diesel::prelude::*;
 
 use nanocl_stubs::resource::ResourceConfig;
 
-use crate::utils;
-use crate::error::HttpError;
-use crate::models::{Pool, ResourceConfigDbModel};
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 
-use super::error::{db_error, db_blocking_error};
+use crate::utils;
+use crate::models::{Pool, ResourceConfigDbModel};
 
 /// ## Create resource config
 ///
@@ -39,7 +38,7 @@ use super::error::{db_error, db_blocking_error};
 pub async fn create(
   item: &ResourceConfigDbModel,
   pool: &Pool,
-) -> Result<ResourceConfigDbModel, HttpError> {
+) -> IoResult<ResourceConfigDbModel> {
   use crate::schema::resource_configs::dsl;
 
   let item = item.clone();
@@ -50,11 +49,10 @@ pub async fn create(
     diesel::insert_into(dsl::resource_configs)
       .values(&item)
       .execute(&mut conn)
-      .map_err(db_error("resource config"))?;
-    Ok::<_, HttpError>(item)
+      .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
+    Ok::<_, IoError>(item)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(dbmodel)
 }
@@ -82,10 +80,7 @@ pub async fn create(
 /// repositories::resource_config::delete_by_resource_key(&str::from("my-resource"), &pool).await;
 /// ```
 ///
-pub async fn delete_by_resource_key(
-  key: &str,
-  pool: &Pool,
-) -> Result<(), HttpError> {
+pub async fn delete_by_resource_key(key: &str, pool: &Pool) -> IoResult<()> {
   use crate::schema::resource_configs::dsl;
 
   let key = key.to_owned();
@@ -95,11 +90,10 @@ pub async fn delete_by_resource_key(
     let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::delete(dsl::resource_configs.filter(dsl::resource_key.eq(key)))
       .execute(&mut conn)
-      .map_err(db_error("resource config"))?;
-    Ok::<_, HttpError>(())
+      .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
+    Ok::<_, IoError>(())
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(())
 }
@@ -107,7 +101,7 @@ pub async fn delete_by_resource_key(
 pub async fn list_by_resource(
   key: &str,
   pool: &Pool,
-) -> Result<Vec<ResourceConfig>, HttpError> {
+) -> IoResult<Vec<ResourceConfig>> {
   use crate::schema::resource_configs::dsl;
 
   let key = key.to_owned();
@@ -118,11 +112,10 @@ pub async fn list_by_resource(
     let items = dsl::resource_configs
       .filter(dsl::resource_key.eq(key))
       .load::<ResourceConfigDbModel>(&mut conn)
-      .map_err(db_error("resource config"))?;
-    Ok::<_, HttpError>(items)
+      .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
+    Ok::<_, IoError>(items)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let models = models
     .into_iter()
@@ -135,7 +128,7 @@ pub async fn list_by_resource(
 pub async fn find_by_key(
   key: &uuid::Uuid,
   pool: &Pool,
-) -> Result<ResourceConfig, HttpError> {
+) -> IoResult<ResourceConfig> {
   use crate::schema::resource_configs::dsl;
 
   let key = *key;
@@ -146,11 +139,10 @@ pub async fn find_by_key(
     let item = dsl::resource_configs
       .filter(dsl::key.eq(key))
       .first::<ResourceConfigDbModel>(&mut conn)
-      .map_err(db_error("resource config"))?;
-    Ok::<_, HttpError>(item)
+      .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
+    Ok::<_, IoError>(item)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(ResourceConfig::from(model))
 }

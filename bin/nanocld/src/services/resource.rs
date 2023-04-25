@@ -10,7 +10,7 @@ use nanocl_stubs::resource::ResourcePatch;
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
 use crate::{utils, repositories};
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::{DaemonState, ResourceResetPath};
 
 /// List resources

@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::error::ErrorHint;
+use nanocl_utils::io_error::{FromIo, IoResult};
 
 /// Dnsmasq configuration manager
 #[derive(Clone)]
@@ -32,24 +32,22 @@ impl Dnsmasq {
 
   /// Write the main dnsmasq config
   #[inline]
-  fn write_main_conf(&self, data: &str) -> Result<(), ErrorHint> {
+  fn write_main_conf(&self, data: &str) -> IoResult<()> {
     fs::write(&self.config_path, data).map_err(|err| {
-      ErrorHint::Error(format!(
-        "unable to create default config file {} got error: {err}",
-        &self.config_path
-      ))
+      err.map_err_context(|| {
+        format!("unable to write default config file {}", &self.config_path)
+      })
     })?;
     Ok(())
   }
 
   /// Read the main dnsmasq config
   #[inline]
-  fn read_main_conf(&self) -> Result<String, ErrorHint> {
+  fn read_main_conf(&self) -> IoResult<String> {
     let data = fs::read_to_string(&self.config_path).map_err(|err| {
-      ErrorHint::Warning(format!(
-        "unable to read default config file {} got error: {err}",
-        &self.config_path
-      ))
+      err.map_err_context(|| {
+        format!("unable to read default config file {}", &self.config_path)
+      })
     })?;
     Ok(data)
   }
@@ -57,35 +55,49 @@ impl Dnsmasq {
   /// Generate the main dnsmasq config
   /// This config is used to require all other configs from the dnsmasq.d directory
   #[inline]
-  fn gen_main_conf(&self) -> Result<(), ErrorHint> {
-    let contents = format!("conf-dir={}/dnsmasq.d,*.conf\n", &self.config_dir);
+  fn gen_main_conf(&self) -> IoResult<()> {
+    let contents = format!(
+      "bind-interfaces
+  conf-dir={}/dnsmasq.d,*.conf
+  domain-needed
+  bogus-priv
+  filterwin2k
+  localise-queries
+  expand-hosts
+  no-negcache
+",
+      &self.config_dir
+    );
     self.write_main_conf(&contents)?;
     Ok(())
   }
 
   /// Ensure that dnsmasq as a minimal config
   #[inline]
-  pub(crate) fn ensure(&self) -> Result<(), ErrorHint> {
-    println!(
-      "[INFO] Ensuring a minimal dnsmasq config inside {}",
+  pub(crate) fn ensure(&self) -> IoResult<()> {
+    log::info!(
+      "Ensuring a minimal dnsmasq config inside {}",
       &self.config_dir
     );
-    self.gen_main_conf()?;
-    self.set_dns()?;
     fs::create_dir_all(format!("{}/dnsmasq.d", &self.config_dir)).map_err(
       |err| {
-        ErrorHint::Error(format!(
-          "unable to create dnsmasq.d directory got error: {err}"
-        ))
+        err.map_err_context(|| {
+          format!(
+            "unable to create dnsmasq.d directory inside {}",
+            &self.config_dir
+          )
+        })
       },
     )?;
-    println!("[INFO] Minimal dnsmasq config is ensured");
+    self.gen_main_conf()?;
+    self.set_dns()?;
+    log::info!("[INFO] Minimal dnsmasq config is ensured");
     Ok(())
   }
 
   /// Set dns server address to resolve domain name if not existing in local
   #[inline]
-  pub(crate) fn set_dns(&self) -> Result<(), ErrorHint> {
+  pub(crate) fn set_dns(&self) -> IoResult<()> {
     let data = match self.read_main_conf() {
       Err(_err) => {
         self.gen_main_conf()?;
@@ -110,51 +122,24 @@ impl Dnsmasq {
 
   /// Generate domain records file for dnsmasq
   #[inline]
-  pub(crate) fn generate_domains_file(
+  pub(crate) async fn write_config(
     &self,
     name: &str,
-    domains: &[(String, String)],
-  ) -> Result<(), ErrorHint> {
-    let mut data = String::new();
-    for domain in domains {
-      let (name, ip) = domain;
-      data.push_str(format!("address=/{name}/{ip}\n").as_str());
-    }
+    data: &str,
+  ) -> IoResult<()> {
     let file_path = format!("{}/dnsmasq.d/{name}.conf", &self.config_dir);
-    fs::write(file_path, data).map_err(|err| {
-      ErrorHint::Warning(format!(
-        "unable to create domains file for {name} got error: {err}"
-      ))
+    tokio::fs::write(file_path, data).await.map_err(|err| {
+      err.map_err_context(|| format!("unable to write domains file for {name}"))
     })?;
     Ok(())
   }
 
   /// Remove domain records file for dnsmasq
-  pub(crate) fn remove_domains_file(
-    &self,
-    name: &str,
-  ) -> Result<(), ErrorHint> {
+  pub(crate) async fn remove_config(&self, name: &str) -> IoResult<()> {
     let file_path = format!("{}/dnsmasq.d/{name}.conf", &self.config_dir);
-    fs::remove_file(file_path).map_err(|err| {
-      ErrorHint::Warning(format!(
-        "unable to remove domains file for {name} got error: {err}"
-      ))
-    })?;
-    Ok(())
-  }
-
-  /// Clear all domain records file for dnsmasq
-  pub(crate) fn clear_domains(&self) -> Result<(), ErrorHint> {
-    let domain_dir = format!("{}/dnsmasq.d", &self.config_dir);
-    fs::remove_dir_all(&domain_dir).map_err(|err| {
-      ErrorHint::Warning(format!(
-        "unable to remove domains directory got error: {err}"
-      ))
-    })?;
-    fs::create_dir_all(&domain_dir).map_err(|err| {
-      ErrorHint::Warning(format!(
-        "unable to create domains directory got error: {err}"
-      ))
+    tokio::fs::remove_file(file_path).await.map_err(|err| {
+      err
+        .map_err_context(|| format!("unable to remove domains file for {name}"))
     })?;
     Ok(())
   }

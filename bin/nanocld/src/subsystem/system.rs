@@ -11,22 +11,19 @@ use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 use nanocl_stubs::state::StateDeployment;
 use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
+use nanocl_utils::io_error::{FromIo, IoResult};
 
 use crate::version::VERSION;
 use crate::{utils, repositories};
-use crate::error::CliError;
 use crate::models::{Pool, DaemonState};
 
 pub(crate) async fn boot_controller(
   docker: &Docker,
   ctrl_conf: &str,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let conf =
     serde_yaml::from_str::<StateDeployment>(ctrl_conf).map_err(|err| {
-      CliError {
-        msg: format!("Failed to parse controller config: {}", err),
-        code: 4,
-      }
+      err.map_err_context(|| "Failed to parse controller config")
     })?;
 
   let namespace = conf.namespace.unwrap_or("default".into());
@@ -57,10 +54,12 @@ pub(crate) async fn boot_controller(
         }),
         cargo.container,
       )
-      .await?;
+      .await
+      .map_err(|err| err.map_err_context(|| "Create container"))?;
     docker
       .start_container(&cnt.id, None::<StartContainerOptions<String>>)
-      .await?;
+      .await
+      .map_err(|err| err.map_err_context(|| "Start container"))?;
   }
 
   Ok(())
@@ -69,14 +68,9 @@ pub(crate) async fn boot_controller(
 pub(crate) async fn start_subsystem(
   docker: &Docker,
   system_conf: &str,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let mut cargo = serde_yaml::from_str::<CargoConfigPartial>(system_conf)
-    .map_err(|err| CliError {
-      msg: format!(
-        "Failed to parse subsystem config:\n{system_conf}\nGot error: {err}"
-      ),
-      code: 4,
-    })?;
+    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
 
   let namespace = "system";
   let key = utils::key::gen_key(namespace, &cargo.name);
@@ -106,10 +100,12 @@ pub(crate) async fn start_subsystem(
       }),
       cargo.container,
     )
-    .await?;
+    .await
+    .map_err(|err| err.map_err_context(|| "CreateContainer"))?;
   docker
     .start_container(&cnt.id, None::<StartContainerOptions<String>>)
-    .await?;
+    .await
+    .map_err(|err| err.map_err_context(|| "StartContainer"))?;
   Ok(())
 }
 
@@ -120,7 +116,7 @@ pub(crate) async fn start_subsystem(
 pub(crate) async fn ensure_network(
   name: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   // Ensure network existance
   if docker_api
     .inspect_network(name, None::<InspectNetworkOptions<&str>>)
@@ -140,7 +136,10 @@ pub(crate) async fn ensure_network(
     options,
     ..Default::default()
   };
-  docker_api.create_network(config).await?;
+  docker_api
+    .create_network(config)
+    .await
+    .map_err(|err| err.map_err_context(|| "CreateNetwork"))?;
   Ok(())
 }
 
@@ -153,7 +152,7 @@ pub(crate) async fn register_namespace(
   name: &str,
   create_network: bool,
   state: &DaemonState,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   if repositories::namespace::exist_by_name(name, &state.pool).await? {
     return Ok(());
   }
@@ -173,13 +172,16 @@ pub(crate) async fn register_namespace(
 pub(crate) async fn sync_containers(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   log::info!("Syncing existing container");
   let options = Some(ListContainersOptions::<&str> {
     all: true,
     ..Default::default()
   });
-  let containers = docker_api.list_containers(options).await?;
+  let containers = docker_api
+    .list_containers(options)
+    .await
+    .map_err(|err| err.map_err_context(|| "ListContainer"))?;
   let mut cargo_inspected: HashMap<String, bool> = HashMap::new();
   for container_summary in containers {
     // extract cargo name and namespace
@@ -204,7 +206,8 @@ pub(crate) async fn sync_containers(
         &container_summary.id.unwrap_or_default(),
         None::<InspectContainerOptions>,
       )
-      .await?;
+      .await
+      .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
     let config = container.config.unwrap_or_default();
     let mut config: bollard_next::container::Config = config.into();
     config.host_config = container.host_config;

@@ -48,7 +48,7 @@ jobs:
         docker pull cockroachdb/cockroach:v22.2.7
         docker pull ghcr.io/nxthat/metrsd:0.2.0
         docker pull nexthat/nanocl-get-started:latest
-        docker buildx build --load --cache-from type=local,src=./.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ncddns/dnsmasq/Dockerfile ./bin/ncddns/dnsmasq
+        docker buildx build --load --cache-from type=local,src=./.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
         docker buildx build --load --cache-from type=local,src=./.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
         cargo build --no-default-features --features test --bin nanocl
         cargo build --no-default-features --features test --bin ncdproxy

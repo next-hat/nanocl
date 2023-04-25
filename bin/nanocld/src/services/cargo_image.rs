@@ -15,7 +15,7 @@ use nanocl_stubs::cargo_image::{
 };
 
 use crate::utils;
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::DaemonState;
 
 /// List container images

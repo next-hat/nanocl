@@ -15,12 +15,13 @@ use futures::StreamExt;
 
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::error::CliError;
+use nanocl_utils::io_error::IoResult;
+use nanocl_utils::http_error::HttpError;
+
 use crate::models::DaemonState;
 use crate::models::NodeDbModel;
 use crate::repositories;
 use crate::version::VERSION;
-use crate::error::HttpError;
 
 #[derive(Clone)]
 pub struct NodeMessage {
@@ -216,7 +217,7 @@ pub fn watch_node(
   });
 }
 
-pub async fn join_cluster(state: &DaemonState) -> Result<(), CliError> {
+pub async fn join_cluster(state: &DaemonState) -> IoResult<()> {
   let state = state.clone();
   let (tx, mut rx) = mpsc::unbounded();
   let mut clients = NodeClients::default();

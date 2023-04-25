@@ -23,5 +23,3 @@ pub mod resource;
 pub mod resource_kind;
 /// Manage resource_configs table
 pub mod resource_config;
-/// Sql error
-pub mod error;

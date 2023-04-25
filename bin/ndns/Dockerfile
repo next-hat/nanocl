@@ -5,9 +5,8 @@ RUN apk add dnsmasq
 
 EXPOSE 53/tcp 53/udp
 
-COPY ./dnsmasq.conf /dnsmasq.conf
-
-COPY ./entrypoint.sh /entrypoint.sh
+COPY ./bin/ndns/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
+

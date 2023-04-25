@@ -1,6 +1,7 @@
-use std::{fs, str::FromStr};
+use std::fs;
+use std::str::FromStr;
 
-use crate::error::ErrorHint;
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 
 use nanocld_client::stubs::proxy::ProxyRule;
 
@@ -29,7 +30,7 @@ impl From<ProxyRule> for NginxConfKind {
 }
 
 impl FromStr for NginxConfKind {
-  type Err = ErrorHint;
+  type Err = IoError;
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
@@ -37,7 +38,13 @@ impl FromStr for NginxConfKind {
       "Stream" => Ok(Self::Stream),
       "site" => Ok(Self::Site),
       "stream" => Ok(Self::Stream),
-      _ => Err(ErrorHint::error(1, format!("Invalid NginxConfKind: {}", s))),
+      _ => Err(IoError::new(
+        format!("Invalid NginxConfKind: {s}"),
+        std::io::Error::new(
+          std::io::ErrorKind::InvalidData,
+          "expected | Site | site | Stream | stream",
+        ),
+      )),
     }
   }
 }
@@ -67,41 +74,32 @@ impl Nginx {
   }
 
   #[inline]
-  pub(crate) fn ensure(&self) -> Result<(), ErrorHint> {
+  pub(crate) fn ensure(&self) -> IoResult<()> {
     // Ensure sites-enabled directory exists
     let sites_enabled_dir = format!("{}/sites-enabled", self.conf_dir);
     fs::create_dir_all(&sites_enabled_dir).map_err(|err| {
-      ErrorHint::error(
-        2,
-        format!(
-          "Cannot create directory {sites_enabled_dir} got error : {err}",
-        ),
-      )
+      err.map_err_context(|| {
+        format!("Unable to create directory {sites_enabled_dir}")
+      })
     })?;
     // Ensure streams-enabled directory exists
     let streams_enabled_dir = format!("{}/streams-enabled", self.conf_dir);
     fs::create_dir_all(&streams_enabled_dir).map_err(|err| {
-      ErrorHint::error(
-        2,
-        format!(
-          "Cannot create directory {streams_enabled_dir} got error : {err}",
-        ),
-      )
+      err.map_err_context(|| {
+        format!("Cannot create directory {streams_enabled_dir}")
+      })
     })?;
     // Ensure conf.d directory exists
     let conf_d = format!("{}/conf.d", self.conf_dir);
     fs::create_dir_all(conf_d).map_err(|err| {
-      ErrorHint::error(
-        2,
-        format!(
-          "Cannot create directory {streams_enabled_dir} got error : {err}",
-        ),
-      )
+      err.map_err_context(|| {
+        format!("Cannot create directory {streams_enabled_dir}")
+      })
     })?;
     Ok(())
   }
 
-  pub(crate) fn write_default_conf(&self) -> Result<(), ErrorHint> {
+  pub(crate) fn write_default_conf(&self) -> IoResult<()> {
     let default_conf = "server {
   listen 80 default_server;
   listen [::]:80 default_server ipv6only=on;
@@ -117,10 +115,7 @@ impl Nginx {
     let path = format!("{}/conf.d/default.conf", self.conf_dir);
 
     fs::write(&path, &default_conf).map_err(|err| {
-      ErrorHint::error(
-        1,
-        format!("Unable to create {path} file got error: {err}"),
-      )
+      err.map_err_context(|| format!("Unable to create {path} file"))
     })?;
 
     log::debug!("Writing default file conf:\n {default_conf}");
@@ -134,77 +129,45 @@ impl Nginx {
     name: &str,
     data: &str,
     kind: &NginxConfKind,
-  ) -> Result<(), ErrorHint> {
+  ) -> IoResult<()> {
     let path = self.gen_conf_path(name, kind);
     fs::write(&path, data).map_err(|err| {
-      ErrorHint::error(
-        1,
-        format!("Unable to create new site file {path} got error: {err}"),
-      )
+      err.map_err_context(|| format!("Unable to create {path} file"))
     })?;
     Ok(())
   }
 
   #[inline]
-  pub(crate) async fn delete_conf_file(
-    &self,
-    name: &str,
-    kind: &NginxConfKind,
-  ) -> Result<(), ErrorHint> {
-    let path = self.gen_conf_path(name, kind);
-    ntex::web::block(move || {
-      fs::remove_file(&path).map_err(|err| {
-        ErrorHint::warning(
-          3,
-          format!("Unable to delete site file {path} got error: {err}"),
-        )
-      })
-    })
-    .await
-    .map_err(|err| match err {
-      ntex::web::error::BlockingError::Error(err) => err,
-      ntex::web::error::BlockingError::Canceled => {
-        ErrorHint::warning(3, "Blocking task canceled".into())
-      }
-    })?;
-    Ok(())
+  pub(crate) async fn delete_conf_file(&self, name: &str) {
+    let path = self.gen_conf_path(name, &NginxConfKind::Site);
+    let _ = tokio::fs::remove_file(&path).await;
+    let path = self.gen_conf_path(name, &NginxConfKind::Stream);
+    let _ = tokio::fs::remove_file(&path).await;
   }
 
   #[inline]
-  pub(crate) fn clear_conf(&self) -> Result<(), ErrorHint> {
+  pub(crate) fn clear_conf(&self) -> IoResult<()> {
     let sites_enabled_dir = format!("{}/sites-enabled", self.conf_dir);
     fs::remove_dir_all(&sites_enabled_dir).map_err(|err| {
-      ErrorHint::error(
-        3,
-        format!(
-          "Cannot remove directory {sites_enabled_dir} got error : {err}",
-        ),
-      )
+      err.map_err_context(|| {
+        format!("Cannot remove directory {sites_enabled_dir}")
+      })
     })?;
     let streams_enabled_dir = format!("{}/streams-enabled", self.conf_dir);
     fs::remove_dir_all(&streams_enabled_dir).map_err(|err| {
-      ErrorHint::error(
-        3,
-        format!(
-          "Cannot remove directory {streams_enabled_dir} got error : {err}",
-        ),
-      )
+      err.map_err_context(|| {
+        format!("Cannot remove directory {streams_enabled_dir}")
+      })
     })?;
     fs::create_dir_all(&sites_enabled_dir).map_err(|err| {
-      ErrorHint::error(
-        3,
-        format!(
-          "Cannot create directory {sites_enabled_dir} got error : {err}",
-        ),
-      )
+      err.map_err_context(|| {
+        format!("Cannot create directory {sites_enabled_dir}")
+      })
     })?;
     fs::create_dir_all(&streams_enabled_dir).map_err(|err| {
-      ErrorHint::error(
-        3,
-        format!(
-          "Cannot create directory {streams_enabled_dir} got error : {err}",
-        ),
-      )
+      err.map_err_context(|| {
+        format!("Cannot create directory {streams_enabled_dir}")
+      })
     })?;
     Ok(())
   }

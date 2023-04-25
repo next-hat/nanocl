@@ -1,34 +1,26 @@
-use nanocld_client::{
-  NanocldClient,
-  stubs::{
-    proxy::{StreamTarget, ProxyStreamProtocol},
-    cargo::{CargoInspect, CreateExecOptions},
-    resource::{ResourceQuery, ResourcePartial},
-  },
-};
+use nanocld_client::NanocldClient;
+use nanocl_utils::io_error::{IoResult, FromIo, IoError};
 
+/// Import cargo types
+use nanocld_client::stubs::cargo::{CargoInspect, CreateExecOptions};
+/// Import resource types
+use nanocld_client::stubs::resource::{ResourceQuery, ResourcePartial};
+/// Import proxy types
 use nanocld_client::stubs::proxy::{
-  ProxyRuleHttp, CargoTarget, ProxyHttpLocation, ProxyRuleStream,
-  LocationTarget, ResourceProxyRule, ProxyRule,
+  ProxyRule, StreamTarget, ProxyStreamProtocol, ProxyRuleHttp, CargoTarget,
+  ProxyHttpLocation, ProxyRuleStream, LocationTarget, ResourceProxyRule,
 };
 
-use crate::error::ErrorHint;
 use crate::nginx::{Nginx, NginxConfKind};
 
 /// Serialize a ProxyRule
 pub(crate) fn serialize_proxy_rule(
   resource: &ResourcePartial,
-) -> Result<ResourceProxyRule, ErrorHint> {
+) -> IoResult<ResourceProxyRule> {
   let proxy_rule =
     serde_json::from_value::<ResourceProxyRule>(resource.config.to_owned())
       .map_err(|err| {
-        ErrorHint::warning(
-          4,
-          format!(
-            "Unable to parse proxy rule {name}: {err}",
-            name = resource.name,
-          ),
-        )
+        err.map_err_context(|| "Unable to serialize ResourceProxyRule")
       })?;
   Ok(proxy_rule)
 }
@@ -36,52 +28,41 @@ pub(crate) fn serialize_proxy_rule(
 async fn get_namespace_addr(
   name: &str,
   client: &NanocldClient,
-) -> Result<String, ErrorHint> {
+) -> IoResult<String> {
   let namespace = client.inspect_namespace(name).await.map_err(|err| {
-    ErrorHint::error(
-      5,
-      format!("Unable to inspect namespace {name}: {err}", name = name),
-    )
+    err.map_err_context(|| format!("Unable to inspect namespace {name}"))
   })?;
 
   let ipam = namespace.network.ipam.unwrap_or_default();
   let ipam_config = ipam.config.unwrap_or_default();
-  let ipam_config = ipam_config.get(0).ok_or(ErrorHint::error(
-    5,
-    format!(
-      "Unable to find ipam config for namespace {name}",
-      name = name
-    ),
-  ))?;
+  let ipam_config = ipam_config
+    .get(0)
+    .ok_or(IoError::invalid_data("IpamConfig", "Unable to get index 0"))?;
 
-  let ip_address = ipam_config.gateway.clone().ok_or(ErrorHint::error(
-    5,
-    format!(
-      "Unable to find ip address for namespace {name}",
-      name = name
-    ),
-  ))?;
+  let ip_address = ipam_config
+    .gateway
+    .clone()
+    .ok_or(IoError::invalid_data("IpamConfig", "Unable to get gateway"))?;
 
   Ok(ip_address)
 }
 
 async fn get_listen(
-  name: &str,
   network: &str,
   port: u16,
   client: &NanocldClient,
-) -> Result<String, ErrorHint> {
+) -> IoResult<String> {
   match network {
     "Public" => Ok(format!("{port}")),
     "Internal" => Ok(format!("127.0.0.1:{port}")),
-    network if network.starts_with("Nsp.") => {
-      let namespace = network.trim_start_matches("Nsp.");
+    network if network.ends_with(".nsp") => {
+      let namespace = network.trim_end_matches("nsp.");
       let ip_address = get_namespace_addr(namespace, client).await?;
       Ok(format!("{ip_address}:{port}"))
     }
-    _ => Err(ErrorHint::warning(
-      4,
-      format!("Unsupported network {network} for resource {name}"),
+    _ => Err(IoError::invalid_data(
+      "Network",
+      &format!("network {}", network),
     )),
   }
 }
@@ -91,7 +72,7 @@ fn create_cargo_upstream(
   port: u16,
   cargo: &CargoInspect,
   nginx: &Nginx,
-) -> Result<String, ErrorHint> {
+) -> IoResult<String> {
   let ip_addresses = cargo
     .instances
     .iter()
@@ -99,34 +80,24 @@ fn create_cargo_upstream(
       let container = node_container.container.clone();
       let networks = container
         .network_settings
-        .clone()
         .unwrap_or_default()
         .networks
         .unwrap_or_default();
       let network =
         networks
           .get(&cargo.namespace_name)
-          .ok_or(ErrorHint::warning(
-            5,
-            format!(
-      "Unable to find network for container {} for cargo {} in namespace {}",
-      container.id.clone().unwrap_or_default(),
-      cargo.key,
-      cargo.namespace_name,
-    ),
+          .ok_or(IoError::invalid_data(
+            "Networks",
+            &format!("Unable to get network {}", &cargo.namespace_name),
           ))?;
-      let ip_address = network.ip_address.clone().ok_or(ErrorHint::warning(
-        5,
-        format!(
-      "Unable to find ip address for container {} for cargo {} in namespace {}",
-      container.id.unwrap_or_default(),
-      cargo.key,
-      cargo.namespace_name,
-    ),
-      ))?;
-      Ok::<_, ErrorHint>(ip_address)
+      let ip_address =
+        network.ip_address.clone().ok_or(IoError::invalid_data(
+          "IpAddress",
+          &format!("for cargo {}", &cargo.name),
+        ))?;
+      Ok::<_, IoError>(ip_address)
     })
-    .collect::<Result<Vec<String>, ErrorHint>>()?;
+    .collect::<Result<Vec<String>, IoError>>()?;
   let upstream_key = format!("{}-{}", cargo.key, port);
   let upstream = format!(
     "
@@ -150,29 +121,24 @@ async fn gen_cargo_upstream(
   target: &CargoTarget,
   client: &NanocldClient,
   nginx: &Nginx,
-) -> Result<String, ErrorHint> {
+) -> IoResult<String> {
   let port = target.port;
   let (cargo_name, namespace) = extract_target_cargo(&target.key)?;
   let cargo = client
     .inspect_cargo(&cargo_name, Some(namespace.clone()))
     .await
     .map_err(|err| {
-      ErrorHint::warning(
-        6,
-        format!(
-        "Unable to inspect cargo {cargo_name} in namespace {namespace}: {err}",
-      ),
-      )
+      err.map_err_context(|| format!("Unable to inspect cargo {cargo_name}"))
     })?;
   create_cargo_upstream(kind, port, &cargo, nginx)
 }
 
-fn extract_target_cargo(key: &str) -> Result<(String, String), ErrorHint> {
+fn extract_target_cargo(key: &str) -> IoResult<(String, String)> {
   let info = key.split('.').collect::<Vec<&str>>();
   if info.len() != 2 {
-    return Err(ErrorHint::warning(
-      6,
-      format!("Invalid cargo key expect cargo_name@namespace got: {key}"),
+    return Err(IoError::invalid_data(
+      "CargoKey",
+      "Invalid cargo key expected <name>.<namespace>",
     ));
   }
   let namespace = info[1].to_owned();
@@ -180,10 +146,7 @@ fn extract_target_cargo(key: &str) -> Result<(String, String), ErrorHint> {
   Ok((name, namespace))
 }
 
-async fn gen_unix_stream(
-  path: &str,
-  nginx: &Nginx,
-) -> Result<String, ErrorHint> {
+async fn gen_unix_stream(path: &str, nginx: &Nginx) -> IoResult<String> {
   let upstream_key = format!("unix-{}", path.replace('/', "-"));
   let upstream = format!(
     "upstream {upstream_key} {{
@@ -200,7 +163,7 @@ async fn gen_locations(
   location_rules: &Vec<ProxyHttpLocation>,
   client: &NanocldClient,
   nginx: &Nginx,
-) -> Result<Vec<String>, ErrorHint> {
+) -> IoResult<Vec<String>> {
   let mut locations = Vec::new();
   for rule in location_rules {
     let path = &rule.path;
@@ -268,12 +231,11 @@ async fn gen_locations(
 }
 
 async fn gen_http_server_block(
-  name: &str,
   rule: &ProxyRuleHttp,
   client: &NanocldClient,
   nginx: &Nginx,
-) -> Result<String, ErrorHint> {
-  let listen_http = get_listen(name, &rule.network, 80, client).await?;
+) -> IoResult<String> {
+  let listen_http = get_listen(&rule.network, 80, client).await?;
   let locations = gen_locations(&rule.locations, client, nginx)
     .await?
     .join("\n");
@@ -291,7 +253,7 @@ async fn gen_http_server_block(
       }
       None => String::default(),
     };
-    let listen_https = get_listen(name, &rule.network, 443, client).await?;
+    let listen_https = get_listen(&rule.network, 443, client).await?;
     format!(
       "
   listen {listen_https} http2 ssl;
@@ -329,14 +291,12 @@ server {{
 }
 
 async fn gen_stream_server_block(
-  resource_name: &str,
   rule: &ProxyRuleStream,
   client: &NanocldClient,
   nginx: &Nginx,
-) -> Result<String, ErrorHint> {
+) -> IoResult<String> {
   let port = rule.port;
-  let mut listen =
-    get_listen(resource_name, &rule.network, port, client).await?;
+  let mut listen = get_listen(&rule.network, port, client).await?;
 
   let upstream_key = match &rule.target {
     StreamTarget::Cargo(cargo_target) => {
@@ -347,7 +307,10 @@ async fn gen_stream_server_block(
       gen_unix_stream(unix_target, nginx).await?
     }
     StreamTarget::Uri(_) => {
-      return Err(ErrorHint::error(99, "Not implemented".into()))
+      return Err(IoError::invalid_input(
+        "StreamTarget",
+        "Uri is not supported yet sorry",
+      ))
     }
   };
 
@@ -393,17 +356,17 @@ async fn resource_to_nginx_conf(
   nginx: &Nginx,
   name: &str,
   resource_proxy: &ResourceProxyRule,
-) -> Result<(NginxConfKind, String), ErrorHint> {
+) -> IoResult<(NginxConfKind, String)> {
   let conf = match &resource_proxy.rule {
     ProxyRule::Http(rule) => {
-      let conf = gen_http_server_block(name, rule, client, nginx).await?;
+      let conf = gen_http_server_block(rule, client, nginx).await?;
       (NginxConfKind::Site, conf)
     }
     ProxyRule::Stream(rules) => {
       let mut conf = String::new();
 
       for rule in rules {
-        conf += &gen_stream_server_block(name, rule, client, nginx).await?;
+        conf += &gen_stream_server_block(rule, client, nginx).await?;
       }
 
       (NginxConfKind::Stream, conf)
@@ -417,9 +380,7 @@ async fn resource_to_nginx_conf(
 
 /// Reload the proxy configuration
 /// This function will reload the nginx configuration
-pub(crate) async fn reload_config(
-  client: &NanocldClient,
-) -> Result<(), ErrorHint> {
+pub(crate) async fn reload_config(client: &NanocldClient) -> IoResult<()> {
   log::info!("Reloading proxy configuration");
   let exec = CreateExecOptions {
     cmd: Some(vec!["nginx".into(), "-s".into(), "reload".into()]),
@@ -429,7 +390,9 @@ pub(crate) async fn reload_config(
     .exec_cargo("nproxy", exec, Some("system".into()))
     .await
     .map_err(|err| {
-      ErrorHint::warning(98, format!("Unable to reload proxy: {err}"))
+      err.map_err_context(|| {
+        "Unable to reload proxy on container nproxy.system.c"
+      })
     })?;
   log::info!("Proxy configuration reloaded");
   Ok(())
@@ -440,14 +403,14 @@ pub(crate) async fn reload_config(
 /// and reload the nginx configuration
 /// The resource must be a ProxyRule
 pub(crate) async fn create_resource_conf(
+  name: &str,
+  proxy_rule: &ResourceProxyRule,
   client: &NanocldClient,
   nginx: &Nginx,
-  resource: &nanocld_client::stubs::resource::ResourcePartial,
-) -> Result<(), ErrorHint> {
-  let proxy_rule = serialize_proxy_rule(resource)?;
+) -> IoResult<()> {
   let (kind, conf) =
-    resource_to_nginx_conf(client, nginx, &resource.name, &proxy_rule).await?;
-  nginx.write_conf_file(&resource.name, &conf, &kind)?;
+    resource_to_nginx_conf(client, nginx, name, proxy_rule).await?;
+  nginx.write_conf_file(name, &conf, &kind)?;
   Ok(())
 }
 
@@ -480,26 +443,24 @@ pub(crate) async fn create_resource_conf(
 pub(crate) async fn sync_resources(
   client: &NanocldClient,
   nginx: &Nginx,
-) -> Result<(), ErrorHint> {
+) -> IoResult<()> {
   let query = ResourceQuery {
     kind: Some("ProxyRule".into()),
     ..Default::default()
   };
   let resources = client.list_resource(Some(query)).await.map_err(|err| {
-    ErrorHint::warning(
-      8,
-      format!("Unable to list resources from nanocl: {err}"),
-    )
+    err.map_err_context(|| "Unable to list resources from nanocl")
   })?;
 
   // remove old configs
   let _ = nginx.clear_conf();
 
   for resource in resources {
+    let proxy_rule = serialize_proxy_rule(&resource.clone().into())?;
     if let Err(err) =
-      create_resource_conf(client, nginx, &resource.into()).await
+      create_resource_conf(&resource.name, &proxy_rule, client, nginx).await
     {
-      err.print();
+      log::warn!("{err}")
     }
   }
   reload_config(client).await?;
@@ -515,7 +476,7 @@ pub(crate) async fn list_resource_by_cargo(
   name: &str,
   namespace: Option<String>,
   client: &NanocldClient,
-) -> Result<Vec<nanocld_client::stubs::resource::Resource>, ErrorHint> {
+) -> IoResult<Vec<nanocld_client::stubs::resource::Resource>> {
   let namespace = namespace.unwrap_or("global".into());
   let target_key = format!("{name}.{namespace}");
   let query = ResourceQuery {
@@ -523,10 +484,7 @@ pub(crate) async fn list_resource_by_cargo(
     kind: Some("ProxyRule".into()),
   };
   let resources = client.list_resource(Some(query)).await.map_err(|err| {
-    ErrorHint::warning(
-      4,
-      format!("Unable to list resources from nanocl daemon: {err}"),
-    )
+    err.map_err_context(|| "Unable to list resources from nanocl daemon")
   })?;
   Ok(resources)
 }
@@ -534,8 +492,8 @@ pub(crate) async fn list_resource_by_cargo(
 #[cfg(test)]
 pub(crate) mod tests {
   use std::process::Output;
-
   use ntex::web::{ServiceConfig, error::BlockingError};
+  use nanocl_utils::logger::enable_logger;
 
   use crate::nginx::Nginx;
 
@@ -543,14 +501,8 @@ pub(crate) mod tests {
 
   pub fn before() {
     // Build a test env logger
-    if std::env::var("LOG_LEVEL").is_err() {
-      std::env::set_var("LOG_LEVEL", "nanocl-ncdproxy=info,warn,error,debug");
-    }
     std::env::set_var("TEST", "true");
-    let _ = env_logger::Builder::new()
-      .parse_env("LOG_LEVEL")
-      .is_test(true)
-      .try_init();
+    enable_logger("ncdproxy");
   }
 
   pub(crate) async fn exec_nanocl(arg: &str) -> std::io::Result<Output> {
@@ -575,6 +527,7 @@ pub(crate) mod tests {
   pub fn generate_server(routes: Config) -> ntex::web::test::TestServer {
     before();
     let nginx = Nginx::new("/tmp/nginx");
+    nginx.ensure().unwrap();
     // Create test server
     ntex::web::test::server(move || {
       ntex::web::App::new().state(nginx.clone()).configure(routes)

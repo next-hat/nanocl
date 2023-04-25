@@ -5,7 +5,7 @@ use nanocl_stubs::metric::MetricFilterQuery;
 use crate::models::DaemonState;
 
 use crate::repositories;
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 
 /// Get specific metric of all peer nodes
 #[cfg_attr(feature = "dev", utoipa::path(

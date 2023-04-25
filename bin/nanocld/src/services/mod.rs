@@ -3,7 +3,7 @@ use futures::future::{ok, Either, Ready};
 use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
 
 use crate::version;
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 
 #[cfg(feature = "dev")]
 mod openapi;

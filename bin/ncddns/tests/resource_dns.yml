@@ -1,0 +1,12 @@
+Type: Resource
+ApiVersion: v0.4
+
+Resources:
+- Name: dns-get-started
+  Kind: DnsRule
+  Version: v0.1
+  Config:
+    Network: Public
+    Entries:
+    - Name: test.com
+      IpAddress: 127.0.0.1

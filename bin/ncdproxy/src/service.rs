@@ -1,39 +1,58 @@
 use ntex::web;
 
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::resource::ResourcePartial;
+use nanocld_client::stubs::proxy::ResourceProxyRule;
 
-use crate::{
-  utils,
-  error::HttpError,
-  nginx::{Nginx, NginxConfKind},
-};
+use nanocl_utils::http_error::HttpError;
 
-#[web::put("/rules")]
+use crate::utils;
+use crate::nginx::Nginx;
+
+/// Create/Update a new ProxyRule
+#[cfg_attr(feature = "dev", utoipa::path(
+  put,
+  tag = "Rules",
+  path = "/rules/{Name}",
+  request_body = ResourceProxyRule,
+  params(
+    ("Name" = String, Path, description = "Name of the rule"),
+  ),
+  responses(
+    (status = 200, description = "List of namespace", body = ResourceProxyRule),
+  ),
+))]
+#[web::put("/rules/{name}")]
 async fn apply_rule(
-  web::types::Json(payload): web::types::Json<ResourcePartial>,
+  name: web::types::Path<String>,
   nginx: web::types::State<Nginx>,
+  web::types::Json(payload): web::types::Json<ResourceProxyRule>,
 ) -> Result<web::HttpResponse, HttpError> {
   let client = NanocldClient::connect_with_unix_default();
 
-  utils::create_resource_conf(&client, &nginx, &payload).await?;
+  utils::create_resource_conf(&name, &payload, &client, &nginx).await?;
   utils::reload_config(&client).await?;
 
   Ok(web::HttpResponse::Ok().json(&payload))
 }
 
-#[web::delete("/rules/{kind}/{name}")]
+/// Delete a ProxyRule
+#[cfg_attr(feature = "dev", utoipa::path(
+  delete,
+  tag = "Rules",
+  path = "/rules/{Name}",
+  params(
+    ("Name" = String, Path, description = "Name of the rule"),
+  ),
+  responses(
+    (status = 200, description = "List of namespace", body = ResourceProxyRule),
+  ),
+))]
+#[web::delete("/rules/{name}")]
 async fn remove_rule(
-  path: web::types::Path<(String, String)>,
+  name: web::types::Path<String>,
   nginx: web::types::State<Nginx>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let (kind, name) = path.into_inner();
-
-  println!("Deleting rule: {kind} {name}");
-
-  let kind: NginxConfKind = kind.parse()?;
-
-  nginx.delete_conf_file(&name, &kind).await?;
+  nginx.delete_conf_file(&name).await;
 
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -48,7 +67,6 @@ mod tests {
   use super::*;
 
   use ntex::http::StatusCode;
-  use nanocld_client::stubs::resource::ResourcePartial;
 
   use crate::utils::tests;
 
@@ -61,15 +79,22 @@ mod tests {
     let yaml: serde_yaml::Value = serde_yaml::from_str(resource).unwrap();
 
     let resource = yaml["Resources"][0].clone();
+    let name = resource["Name"].as_str().unwrap();
 
-    let resource = serde_yaml::from_value::<ResourcePartial>(resource).unwrap();
+    let payload = resource["Config"].clone();
 
-    let res = test_srv.put("/rules").send_json(&resource).await.unwrap();
+    println!("payload: {:?}", payload);
+
+    let res = test_srv
+      .put(format!("/rules/{name}"))
+      .send_json(&payload)
+      .await
+      .unwrap();
 
     assert_eq!(res.status(), StatusCode::OK);
 
     let res = test_srv
-      .delete(format!("/rules/site/{}", resource.name))
+      .delete(format!("/rules/{}", name))
       .send()
       .await
       .unwrap();

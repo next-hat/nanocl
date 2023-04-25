@@ -1,7 +1,7 @@
 use ntex::web;
 
 use crate::utils;
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::{StateData, DaemonState};
 
 #[web::put("/state/apply")]

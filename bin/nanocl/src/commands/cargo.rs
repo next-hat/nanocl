@@ -174,19 +174,17 @@ async fn exec_cargo_logs(
   args: &CargoArgs,
   options: &CargoLogsOpts,
 ) -> Result<(), CliError> {
-  let query = CargoLogQuery { 
-    namespace: args.namespace.clone(), 
+  let query = CargoLogQuery {
+    namespace: args.namespace.clone(),
     tail: options.tail.clone(),
-    since: options.since.clone(),
-    until: options.until.clone(),
+    since: options.since,
+    until: options.until,
     follow: Some(options.follow),
     timestamps: Some(options.timestamps),
     stderr: None,
     stdout: None,
   };
-  let mut stream = client
-    .logs_cargo(&options.name, &query)
-    .await?;
+  let mut stream = client.logs_cargo(&options.name, &query).await?;
   while let Some(log) = stream.next().await {
     let log = match log {
       Ok(log) => log,
