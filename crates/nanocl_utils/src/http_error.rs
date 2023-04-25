@@ -93,6 +93,9 @@ impl From<crate::io_error::IoError> for HttpError {
     match err.inner.kind() {
       std::io::ErrorKind::NotFound => HttpError::not_found(err.to_string()),
       std::io::ErrorKind::AlreadyExists => HttpError::conflict(err.to_string()),
+      std::io::ErrorKind::InvalidData => {
+        HttpError::bad_request(err.to_string())
+      }
       _ => HttpError::internal_server_error(err.to_string()),
     }
   }
