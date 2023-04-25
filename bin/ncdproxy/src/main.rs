@@ -2,13 +2,14 @@ use ntex::rt;
 use ntex::web;
 use clap::Parser;
 use futures::StreamExt;
-use nanocld_client::{
-  NanocldClient,
-  stubs::{system::Event, resource::ResourcePartial},
-};
+
 use nanocl_utils::logger;
 use nanocl_utils::ntex::middlewares;
 use nanocl_utils::io_error::IoResult;
+
+use nanocld_client::NanocldClient;
+use nanocld_client::stubs::system::Event;
+use nanocld_client::stubs::resource::ResourcePartial;
 
 mod cli;
 mod nginx;

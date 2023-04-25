@@ -5,6 +5,7 @@ use ntex::{Service, Middleware, util::BoxFuture};
 use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer};
 use futures::StreamExt;
 
+/// Middleware to convert default ntex SerializeError from text/plain to application/json
 pub struct SerializeError;
 
 impl<S> Middleware<S> for SerializeError {

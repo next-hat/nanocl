@@ -520,7 +520,6 @@ mod tests {
     let srv = generate_server(ntex_config).await;
     ensure_test_image().await?;
 
-    println!("Creating cargo");
     let test_cargoes = vec![
       "daemon-test-cargo1",
       "another-test-cargo",
