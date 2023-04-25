@@ -1828,6 +1828,7 @@ version = "0.3.0"
 dependencies = [
  "bollard-next",
  "clap",
+ "clap_mangen",
  "futures",
  "log 0.4.17",
  "nanocl_utils",

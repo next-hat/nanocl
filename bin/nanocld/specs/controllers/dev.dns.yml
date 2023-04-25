@@ -26,11 +26,7 @@ Cargoes:
     Env:
     - TZ=Europe/Paris
     HostConfig:
-      PortBindings:
-        8787/tcp:
-        - HostPort: 8787
-          HostIp: 0.0.0.0
-      NetworkMode: system
+      NetworkMode: host
       Binds:
       - ./:/project
       - /run/nanocl:/run/nanocl

@@ -23,13 +23,13 @@ use crate::nginx::Nginx;
 ))]
 #[web::put("/rules/{name}")]
 pub async fn apply_rule(
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
   nginx: web::types::State<Nginx>,
   web::types::Json(payload): web::types::Json<ResourceProxyRule>,
 ) -> Result<web::HttpResponse, HttpError> {
   let client = NanocldClient::connect_with_unix_default();
 
-  utils::create_resource_conf(&name, &payload, &client, &nginx).await?;
+  utils::create_resource_conf(&path.1, &payload, &client, &nginx).await?;
   utils::reload_config(&client).await?;
 
   Ok(web::HttpResponse::Ok().json(&payload))
@@ -49,10 +49,10 @@ pub async fn apply_rule(
 ))]
 #[web::delete("/rules/{name}")]
 pub async fn remove_rule(
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
   nginx: web::types::State<Nginx>,
 ) -> Result<web::HttpResponse, HttpError> {
-  nginx.delete_conf_file(&name).await;
+  nginx.delete_conf_file(&path.1).await;
 
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -74,7 +74,7 @@ mod tests {
   async fn rules() {
     let test_srv = tests::generate_server(ntex_config);
 
-    let resource: &str = include_str!("../tests/resource_redirect.yml");
+    let resource: &str = include_str!("../../tests/resource_redirect.yml");
 
     let yaml: serde_yaml::Value = serde_yaml::from_str(resource).unwrap();
 
