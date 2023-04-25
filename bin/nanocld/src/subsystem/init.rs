@@ -1,29 +1,22 @@
 use tokio::fs;
+use nanocl_utils::io_error::{FromIo, IoResult};
 
 use nanocl_stubs::config::DaemonConfig;
 
 use crate::{event, repositories};
 use crate::models::{Pool, DaemonState, NodeDbModel};
 
-use crate::error::CliError;
 use crate::version::VERSION;
 
-async fn ensure_state_dir(state_dir: &str) -> Result<(), CliError> {
+async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   let vm_dir = format!("{state_dir}/vms/images");
   fs::create_dir_all(vm_dir).await.map_err(|err| {
-    CliError::new(
-      1,
-      format!("Unable to create state directory {state_dir}: {err}"),
-    )
+    err.map_err_context(|| "Unable to create {state_dir}/vms/images")
   })?;
   Ok(())
 }
 
-async fn register_node(
-  name: &str,
-  gateway: &str,
-  pool: &Pool,
-) -> Result<(), CliError> {
+async fn register_node(name: &str, gateway: &str, pool: &Pool) -> IoResult<()> {
   let node = NodeDbModel {
     name: name.to_owned(),
     ip_address: gateway.to_owned(),
@@ -36,7 +29,7 @@ async fn register_node(
 
 /// Init function called before http server start
 /// to initialize our state
-pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
+pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   #[cfg(feature = "dev")]
   let mut proxy_conf =
     include_str!("../../specs/controllers/dev.proxy.yml").to_owned();
@@ -69,13 +62,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> Result<DaemonState, CliError> {
     bollard_next::API_DEFAULT_VERSION,
   )
   .map_err(|err| {
-    CliError::new(
-      1,
-      format!(
-        "Error while connecting to docker at {}: {}",
-        err, &daemon_conf.docker_host
-      ),
-    )
+    err.map_err_context(|| "Unable to connect to docker daemon")
   })?;
   ensure_state_dir(&daemon_conf.state_dir).await?;
   super::system::ensure_network("system", &docker).await?;

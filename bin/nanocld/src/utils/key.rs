@@ -1,6 +1,6 @@
 use ntex::http::StatusCode;
 
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 
 /// Utils to manipulate `key` property of a model
 /// The key property is based on the namespace and the name of the given model

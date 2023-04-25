@@ -5,7 +5,7 @@ use nanocl_stubs::resource::{Resource, ResourcePartial};
 use nanocl_stubs::proxy::{ProxyRule, ResourceProxyRule};
 
 use crate::repositories;
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::{Pool, ResourceKindPartial};
 
 use super::proxy::ProxyClient;
@@ -108,24 +108,42 @@ pub async fn create(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
+<<<<<<< Updated upstream
   hook_apply_proxy_rule(resource, pool).await?;
   repositories::resource::create(resource, pool).await
+=======
+  hook_create_resource(resource, pool).await?;
+  let res = repositories::resource::create(resource, pool).await?;
+  Ok(res)
+>>>>>>> Stashed changes
 }
 
 pub async fn patch(
   resource: ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
+<<<<<<< Updated upstream
   hook_apply_proxy_rule(&resource, pool).await?;
   repositories::resource::patch(&resource, pool).await
+=======
+  hook_create_resource(&resource, pool).await?;
+  let res = repositories::resource::patch(&resource, pool).await?;
+  Ok(res)
+>>>>>>> Stashed changes
 }
 
 pub async fn create_or_patch(
   resource: ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
+<<<<<<< Updated upstream
   hook_apply_proxy_rule(&resource, pool).await?;
   repositories::resource::create_or_patch(&resource, pool).await
+=======
+  hook_create_resource(&resource, pool).await?;
+  let res = repositories::resource::create_or_patch(&resource, pool).await?;
+  Ok(res)
+>>>>>>> Stashed changes
 }
 
 pub async fn delete(resource: Resource, pool: &Pool) -> Result<(), HttpError> {

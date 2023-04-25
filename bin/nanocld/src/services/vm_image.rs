@@ -7,7 +7,7 @@ use futures::StreamExt;
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
 use crate::{utils, repositories};
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::{DaemonState, VmImageDbModel};
 
 /// List virtual machine images

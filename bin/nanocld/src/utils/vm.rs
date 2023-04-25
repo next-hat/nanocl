@@ -13,7 +13,7 @@ use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::{Pool, VmDbModel, VmImageDbModel, DaemonState};
 
 pub async fn start(vm_key: &str, docker_api: &Docker) -> Result<(), HttpError> {

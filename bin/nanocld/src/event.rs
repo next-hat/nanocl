@@ -17,7 +17,7 @@ use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_stubs::system::Event;
 
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 
 // Wrap Receiver in our own type, with correct error type
 pub struct Client(pub Receiver<Bytes>);
@@ -189,12 +189,13 @@ mod tests {
     let event_emitter = EventEmitter::new();
 
     // Create a client
-    let mut client = event_emitter.subscribe().await?;
+    let mut client = event_emitter.subscribe().await.unwrap();
 
     // Send namespace created event
     event_emitter
       .emit(Event::NamespaceCreated("test".to_string()))
-      .await?;
+      .await
+      .unwrap();
 
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
@@ -203,14 +204,16 @@ mod tests {
     let cargo = CargoInspect::default();
     event_emitter
       .emit(Event::CargoCreated(Box::new(cargo.to_owned())))
-      .await?;
+      .await
+      .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
 
     // Send cargo deleted event
     event_emitter
       .emit(Event::CargoDeleted(Box::new(cargo)))
-      .await?;
+      .await
+      .unwrap();
 
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
@@ -219,7 +222,8 @@ mod tests {
     let cargo = CargoInspect::default();
     event_emitter
       .emit(Event::CargoStarted(Box::new(cargo)))
-      .await?;
+      .await
+      .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
 
@@ -227,7 +231,8 @@ mod tests {
     let cargo = CargoInspect::default();
     event_emitter
       .emit(Event::CargoStopped(Box::new(cargo)))
-      .await?;
+      .await
+      .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
 
@@ -235,7 +240,8 @@ mod tests {
     let cargo = CargoInspect::default();
     event_emitter
       .emit(Event::CargoPatched(Box::new(cargo)))
-      .await?;
+      .await
+      .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
 

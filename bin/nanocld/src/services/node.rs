@@ -12,7 +12,7 @@ use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
 use futures::future::ready;
 
 use crate::{utils, repositories};
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::{DaemonState, WsConState};
 
 /// List nodes

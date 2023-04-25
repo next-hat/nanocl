@@ -1,16 +1,15 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use crate::utils;
-use crate::error::HttpError;
-use crate::models::{Pool, MetricDbModel, MetricInsertDbModel};
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 
-use super::error::{db_error, db_blocking_error};
+use crate::utils;
+use crate::models::{Pool, MetricDbModel, MetricInsertDbModel};
 
 pub async fn create(
   item: &MetricInsertDbModel,
   pool: &Pool,
-) -> Result<MetricDbModel, HttpError> {
+) -> IoResult<MetricDbModel> {
   use crate::schema::metrics::dsl;
 
   let item = item.clone();
@@ -21,11 +20,10 @@ pub async fn create(
     let res = diesel::insert_into(dsl::metrics)
       .values(item)
       .get_result(&mut conn)
-      .map_err(db_error("metrics"))?;
-    Ok::<_, HttpError>(res)
+      .map_err(|err| err.map_err_context(|| "Metric"))?;
+    Ok::<_, IoError>(res)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(item)
 }
@@ -33,7 +31,7 @@ pub async fn create(
 pub async fn list_by_kind(
   kind: &str,
   pool: &Pool,
-) -> Result<Vec<MetricDbModel>, HttpError> {
+) -> IoResult<Vec<MetricDbModel>> {
   use crate::schema::metrics::dsl;
 
   let kind = kind.to_owned();
@@ -46,11 +44,10 @@ pub async fn list_by_kind(
       .distinct_on(dsl::node_name)
       .filter(dsl::kind.eq(kind))
       .load::<MetricDbModel>(&mut conn)
-      .map_err(db_error("metrics"))?;
-    Ok::<_, HttpError>(res)
+      .map_err(|err| err.map_err_context(|| "Metric"))?;
+    Ok::<_, IoError>(res)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(items)
 }

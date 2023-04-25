@@ -24,7 +24,7 @@ use nanocl_stubs::cargo::{
 
 use crate::models::DaemonState;
 use crate::{utils, repositories};
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 
 use super::stream::transform_stream;
 

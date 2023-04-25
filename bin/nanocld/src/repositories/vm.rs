@@ -1,24 +1,18 @@
 use ntex::web;
-use ntex::http::StatusCode;
 use diesel::prelude::*;
 
 use nanocl_stubs::vm::Vm;
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};
 
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+
 use crate::utils;
-use crate::error::HttpError;
 use crate::models::{
-  Pool,
-  VmDbModel,
-  NamespaceDbModel,
-  VmConfigDbModel,
-  VmUpdateDbModel,
-  // VmUpdateDbModel,
+  Pool, VmDbModel, NamespaceDbModel, VmConfigDbModel, VmUpdateDbModel,
 };
 
 use super::vm_config;
-use super::error::{db_error, db_blocking_error};
 
 /// ## Find vm items by namespace
 ///
@@ -46,18 +40,17 @@ use super::error::{db_error, db_blocking_error};
 pub async fn find_by_namespace(
   nsp: &NamespaceDbModel,
   pool: &Pool,
-) -> Result<Vec<VmDbModel>, HttpError> {
+) -> IoResult<Vec<VmDbModel>> {
   let nsp = nsp.clone();
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = VmDbModel::belonging_to(&nsp)
       .load(&mut conn)
-      .map_err(db_error("vm"))?;
-    Ok::<_, HttpError>(items)
+      .map_err(|err| err.map_err_context(|| "Vm"))?;
+    Ok::<_, IoError>(items)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
   Ok(items)
 }
 
@@ -99,17 +92,17 @@ pub async fn create(
   item: &VmConfigPartial,
   version: &str,
   pool: &Pool,
-) -> Result<Vm, HttpError> {
+) -> IoResult<Vm> {
   use crate::schema::vms::dsl;
 
   let nsp = nsp.to_owned();
 
   // test if the name of the vm include a . in the name and throw error if true
   if item.name.contains('.') {
-    return Err(HttpError {
-      status: StatusCode::BAD_REQUEST,
-      msg: "The vm name cannot contain a dot".into(),
-    });
+    return Err(IoError::invalid_data(
+      "VmConfigPartial",
+      "Name cannot contain a dot.",
+    ));
   }
 
   let pool = pool.clone();
@@ -130,11 +123,10 @@ pub async fn create(
     diesel::insert_into(dsl::vms)
       .values(&new_item)
       .execute(&mut conn)
-      .map_err(db_error("vm"))?;
-    Ok::<_, HttpError>(new_item)
+      .map_err(|err| err.map_err_context(|| "Vm"))?;
+    Ok::<_, IoError>(new_item)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let vm = Vm {
     key: item.key,
@@ -168,10 +160,7 @@ pub async fn create(
 /// let res = delete_by_key(String::from("test"), &pool).await;
 /// ```
 ///
-pub async fn delete_by_key(
-  key: &str,
-  pool: &Pool,
-) -> Result<GenericDelete, HttpError> {
+pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::vms::dsl;
 
   let key = key.to_owned();
@@ -181,11 +170,10 @@ pub async fn delete_by_key(
     let res = diesel::delete(dsl::vms)
       .filter(dsl::key.eq(key))
       .execute(&mut conn)
-      .map_err(db_error("vm"))?;
-    Ok::<_, HttpError>(res)
+      .map_err(|err| err.map_err_context(|| "Vm"))?;
+    Ok::<_, IoError>(res)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(GenericDelete { count: res })
 }
@@ -211,10 +199,7 @@ pub async fn delete_by_key(
 /// let vm = find_by_key(String::from("test"), &pool).await;
 /// ```
 ///
-pub async fn find_by_key(
-  key: &str,
-  pool: &Pool,
-) -> Result<VmDbModel, HttpError> {
+pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
   use crate::schema::vms::dsl;
 
   let key = key.to_owned();
@@ -224,11 +209,10 @@ pub async fn find_by_key(
     let item = dsl::vms
       .filter(dsl::key.eq(key))
       .get_result(&mut conn)
-      .map_err(db_error("vm"))?;
-    Ok::<_, HttpError>(item)
+      .map_err(|err| err.map_err_context(|| "Vm"))?;
+    Ok::<_, IoError>(item)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(item)
 }
@@ -270,7 +254,7 @@ pub async fn update_by_key(
   item: &VmConfigPartial,
   version: &str,
   pool: &Pool,
-) -> Result<Vm, HttpError> {
+) -> IoResult<Vm> {
   use crate::schema::vms::dsl;
 
   let key = key.to_owned();
@@ -290,11 +274,10 @@ pub async fn update_by_key(
     diesel::update(dsl::vms.filter(dsl::key.eq(key)))
       .set(&new_item)
       .execute(&mut conn)
-      .map_err(db_error("vm"))?;
-    Ok::<_, HttpError>(())
+      .map_err(|err| err.map_err_context(|| "Vm"))?;
+    Ok::<_, IoError>(())
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let vm = Vm {
     key: vmdb.key,
@@ -307,51 +290,7 @@ pub async fn update_by_key(
   Ok(vm)
 }
 
-/// ## Count vm by namespace
-///
-/// Count vm items in database for given namespace
-///
-/// ## Arguments
-///
-/// - [namespace](String) - Namespace name
-/// - [pool](Pool) - Database connection pool
-///
-/// ## Returns
-///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](i64) - The number of vm items
-///   - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// let count = count_by_namespace(String::from("test"), &pool
-/// ).await;
-/// ```
-///
-// pub async fn count_by_namespace(
-//   namespace: String,
-//   pool: &Pool,
-// ) -> Result<i64, HttpResponseError> {
-//   use crate::schema::vms;
-
-//   let pool = pool.clone();
-//   let count = web::block(move || {
-//     let mut conn = utils::store::get_pool_conn(&pool)?;
-//     let count = vms::table
-//       .filter(vms::namespace_name.eq(namespace))
-//       .count()
-//       .get_result(&mut conn)
-//       .map_err(db_error("vm"))?;
-//     Ok::<_, HttpResponseError>(count)
-//   })
-//   .await
-//   .map_err(db_blocking_error)?;
-
-//   Ok(count)
-// }
-
-pub async fn inspect_by_key(key: &str, pool: &Pool) -> Result<Vm, HttpError> {
+pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
   use crate::schema::vms;
   use crate::schema::vm_configs;
 
@@ -363,17 +302,13 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> Result<Vm, HttpError> {
       .inner_join(vm_configs::table)
       .filter(vms::key.eq(key))
       .get_result(&mut conn)
-      .map_err(db_error("vm"))?;
-    Ok::<_, HttpError>(item)
+      .map_err(|err| err.map_err_context(|| "Vm"))?;
+    Ok::<_, IoError>(item)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let config = serde_json::from_value::<VmConfigPartial>(item.1.config)
-    .map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Error parsing vm config: {err}"),
-    })?;
+    .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
 
   let config = VmConfig {
     key: item.1.key,

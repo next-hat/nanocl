@@ -1,14 +1,13 @@
 use ntex::web;
-use ntex::http::StatusCode;
 use diesel::prelude::*;
 
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};
 
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+
 use crate::utils;
-use crate::error::HttpError;
 use crate::models::{Pool, VmConfigDbModel};
-use super::error::{db_error, db_blocking_error};
 
 /// ## Create vm config
 ///
@@ -42,7 +41,7 @@ pub async fn create(
   item: &VmConfigPartial,
   version: &str,
   pool: &Pool,
-) -> Result<VmConfig, HttpError> {
+) -> IoResult<VmConfig> {
   use crate::schema::vm_configs::dsl;
 
   let pool = pool.clone();
@@ -51,21 +50,18 @@ pub async fn create(
     vm_key: vm_key.to_owned(),
     version: version.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
-    config: serde_json::to_value(item.to_owned()).map_err(|e| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to serialize config: {e}"),
-    })?,
+    config: serde_json::to_value(item.to_owned())
+      .map_err(|err| err.map_err_context(|| "VmConfig"))?,
   };
   let dbmodel = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::insert_into(dsl::vm_configs)
       .values(&dbmodel)
       .execute(&mut conn)
-      .map_err(db_error("vm config"))?;
-    Ok::<_, HttpError>(dbmodel)
+      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+    Ok::<_, IoError>(dbmodel)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let config = VmConfig {
     key: dbmodel.key,
@@ -107,10 +103,7 @@ pub async fn create(
 /// let config = find_by_key(uuid::Uuid::new_v4(), &pool).await;
 /// ```
 ///
-pub async fn find_by_key(
-  key: &uuid::Uuid,
-  pool: &Pool,
-) -> Result<VmConfig, HttpError> {
+pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
   use crate::schema::vm_configs::dsl;
 
   let key = *key;
@@ -121,17 +114,13 @@ pub async fn find_by_key(
     let config = dsl::vm_configs
       .filter(dsl::key.eq(key))
       .get_result::<VmConfigDbModel>(&mut conn)
-      .map_err(db_error("vm config"))?;
-    Ok::<_, HttpError>(config)
+      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+    Ok::<_, IoError>(config)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let config = serde_json::from_value::<VmConfigPartial>(dbmodel.config)
-    .map_err(|e| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to deserialize config: {e}"),
-    })?;
+    .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
 
   Ok(VmConfig {
     key: dbmodel.key,
@@ -174,7 +163,7 @@ pub async fn find_by_key(
 pub async fn delete_by_vm_key(
   key: &str,
   pool: &Pool,
-) -> Result<GenericDelete, HttpError> {
+) -> IoResult<GenericDelete> {
   use crate::schema::vm_configs::dsl;
 
   let key = key.to_owned();
@@ -185,19 +174,15 @@ pub async fn delete_by_vm_key(
     let res = diesel::delete(dsl::vm_configs)
       .filter(dsl::vm_key.eq(key))
       .execute(&mut conn)
-      .map_err(db_error("vm config"))?;
-    Ok::<_, HttpError>(res)
+      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+    Ok::<_, IoError>(res)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(GenericDelete { count: res })
 }
 
-pub async fn list_by_vm(
-  key: &str,
-  pool: &Pool,
-) -> Result<Vec<VmConfig>, HttpError> {
+pub async fn list_by_vm(key: &str, pool: &Pool) -> IoResult<Vec<VmConfig>> {
   use crate::schema::vm_configs::dsl;
 
   let key = key.to_owned();
@@ -208,20 +193,16 @@ pub async fn list_by_vm(
     let configs = dsl::vm_configs
       .filter(dsl::vm_key.eq(key))
       .get_results::<VmConfigDbModel>(&mut conn)
-      .map_err(db_error("vm config"))?;
-    Ok::<_, HttpError>(configs)
+      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+    Ok::<_, IoError>(configs)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   let configs = dbmodels
     .into_iter()
     .map(|dbmodel| {
       let config = serde_json::from_value::<VmConfigPartial>(dbmodel.config)
-        .map_err(|e| HttpError {
-          status: StatusCode::INTERNAL_SERVER_ERROR,
-          msg: format!("Failed to deserialize config: {e}"),
-        })?;
+        .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
 
       Ok(VmConfig {
         key: dbmodel.key,
@@ -239,7 +220,7 @@ pub async fn list_by_vm(
         password: config.password,
       })
     })
-    .collect::<Result<Vec<VmConfig>, HttpError>>()?;
+    .collect::<Result<Vec<VmConfig>, IoError>>()?;
 
   Ok(configs)
 }

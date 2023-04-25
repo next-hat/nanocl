@@ -1,16 +1,12 @@
 use ntex::web;
 use diesel::prelude::*;
 
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+
 use crate::utils;
 use crate::models::{NodeDbModel, Pool};
-use crate::error::HttpError;
 
-use super::error::{db_error, db_blocking_error};
-
-pub async fn create(
-  node: &NodeDbModel,
-  pool: &Pool,
-) -> Result<NodeDbModel, HttpError> {
+pub async fn create(node: &NodeDbModel, pool: &Pool) -> IoResult<NodeDbModel> {
   use crate::schema::nodes::dsl;
 
   let node = node.clone();
@@ -21,20 +17,16 @@ pub async fn create(
     let item = diesel::insert_into(dsl::nodes)
       .values(&node)
       .get_result(&mut conn)
-      .map_err(db_error("nodes"))?;
+      .map_err(|err| err.map_err_context(|| "nodes"))?;
 
-    Ok::<_, HttpError>(item)
+    Ok::<_, IoError>(item)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(item)
 }
 
-pub async fn find_by_name(
-  name: &str,
-  pool: &Pool,
-) -> Result<NodeDbModel, HttpError> {
+pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<NodeDbModel> {
   use crate::schema::nodes::dsl;
 
   let name = name.to_owned();
@@ -44,12 +36,11 @@ pub async fn find_by_name(
     let item = dsl::nodes
       .filter(dsl::name.eq(name))
       .get_result(&mut conn)
-      .map_err(db_error("nodes"))?;
+      .map_err(|err| err.map_err_context(|| "nodes"))?;
 
-    Ok::<_, HttpError>(item)
+    Ok::<_, IoError>(item)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(exists)
 }
@@ -57,14 +48,14 @@ pub async fn find_by_name(
 pub async fn create_if_not_exists(
   node: &NodeDbModel,
   pool: &Pool,
-) -> Result<NodeDbModel, HttpError> {
+) -> IoResult<NodeDbModel> {
   match find_by_name(&node.name, pool).await {
     Err(_) => create(node, pool).await,
     Ok(node) => Ok(node),
   }
 }
 
-pub async fn list(pool: &Pool) -> Result<Vec<NodeDbModel>, HttpError> {
+pub async fn list(pool: &Pool) -> IoResult<Vec<NodeDbModel>> {
   use crate::schema::nodes::dsl;
 
   let pool = pool.clone();
@@ -72,12 +63,11 @@ pub async fn list(pool: &Pool) -> Result<Vec<NodeDbModel>, HttpError> {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = dsl::nodes
       .load::<NodeDbModel>(&mut conn)
-      .map_err(db_error("nodes"))?;
+      .map_err(|err| err.map_err_context(|| "nodes"))?;
 
-    Ok::<_, HttpError>(items)
+    Ok::<_, IoError>(items)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(items)
 }
@@ -85,7 +75,7 @@ pub async fn list(pool: &Pool) -> Result<Vec<NodeDbModel>, HttpError> {
 pub async fn list_unless(
   name: &str,
   pool: &Pool,
-) -> Result<Vec<NodeDbModel>, HttpError> {
+) -> IoResult<Vec<NodeDbModel>> {
   use crate::schema::nodes::dsl;
 
   let name = name.to_owned();
@@ -95,12 +85,11 @@ pub async fn list_unless(
     let items = dsl::nodes
       .filter(dsl::name.ne(name))
       .load::<NodeDbModel>(&mut conn)
-      .map_err(db_error("nodes"))?;
+      .map_err(|err| err.map_err_context(|| "nodes"))?;
 
-    Ok::<_, HttpError>(items)
+    Ok::<_, IoError>(items)
   })
-  .await
-  .map_err(db_blocking_error)?;
+  .await?;
 
   Ok(items)
 }

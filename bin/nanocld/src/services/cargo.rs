@@ -10,11 +10,14 @@ use bollard_next::exec::CreateExecOptions;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::cargo::{CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery};
+use nanocl_stubs::cargo::{
+  CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery,
+};
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
+use nanocl_utils::http_error::HttpError;
+
 use crate::{utils, repositories};
-use crate::error::HttpError;
 use crate::models::{DaemonState, CargoResetPath};
 
 /// List cargoes
@@ -502,7 +505,7 @@ mod tests {
   use futures::{TryStreamExt, StreamExt};
   use nanocl_stubs::cargo::{
     Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
-    CargoDeleteQuery,CargoListQuery,
+    CargoDeleteQuery, CargoListQuery,
   };
   use nanocl_stubs::cargo_config::{
     CargoConfigPartial, CargoConfigUpdate, CargoConfig,
@@ -517,7 +520,11 @@ mod tests {
     let srv = generate_server(ntex_config).await;
     ensure_test_image().await?;
 
-    let test_cargoes = vec!["daemon-test-cargo1", "another-test-cargo", "daemon-test-cargo3"];
+    let test_cargoes = vec![
+      "daemon-test-cargo1",
+      "another-test-cargo",
+      "daemon-test-cargo3",
+    ];
     let main_test_cargo = test_cargoes[0];
 
     for test_cargo in test_cargoes.iter() {
@@ -527,12 +534,12 @@ mod tests {
         .send_json(&CargoConfigPartial {
           name: test_cargo.clone(),
           container: bollard_next::container::Config {
-          image: Some("nexthat/nanocl-get-started:latest".to_string()),
+            image: Some("nexthat/nanocl-get-started:latest".to_string()),
             ..Default::default()
           },
           ..Default::default()
-      })
-      .await?;
+        })
+        .await?;
       assert_eq!(res.status(), 201);
 
       let response = res.json::<Cargo>().await?;
@@ -550,7 +557,7 @@ mod tests {
         name: Some(test_cargoes.get(1).unwrap().to_string()),
         namespace: None,
         limit: None,
-        offset: None
+        offset: None,
       })?
       .send()
       .await?;
@@ -564,7 +571,7 @@ mod tests {
         name: None,
         namespace: None,
         limit: Some(1),
-        offset: None
+        offset: None,
       })?
       .send()
       .await?;

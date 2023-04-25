@@ -11,7 +11,7 @@ use tokio::process::Command;
 use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 
 use crate::repositories;
-use crate::error::HttpError;
+use nanocl_utils::http_error::HttpError;
 use crate::models::{
   Pool, VmImageDbModel, QemuImgInfo, VmImageUpdateDbModel, DaemonState,
 };
@@ -275,8 +275,8 @@ pub async fn clone(
     let vm = match repositories::vm_image::create(&new_base_image, &pool).await
     {
       Err(err) => {
-        let _ = tx.send(Err(err.clone()));
-        return Err(err);
+        let _ = tx.send(Err(err.clone().into()));
+        return Err(err.into());
       }
       Ok(vm) => vm,
     };
@@ -322,7 +322,7 @@ pub async fn resize(
   }
 
   let image_info = get_info(&imagepath).await?;
-  repositories::vm_image::update_by_name(
+  let res = repositories::vm_image::update_by_name(
     &image.name,
     &VmImageUpdateDbModel {
       size_actual: image_info.actual_size,
@@ -330,7 +330,9 @@ pub async fn resize(
     },
     pool,
   )
-  .await
+  .await?;
+
+  Ok(res)
 }
 
 pub async fn resize_by_name(

@@ -8,7 +8,6 @@ mod version;
 
 mod node;
 mod subsystem;
-mod error;
 mod utils;
 mod event;
 mod schema;
@@ -42,20 +41,14 @@ async fn main() -> std::io::Result<()> {
 
   let config = match config::init(&args) {
     Err(err) => {
-      log::error!("Error while initing config: {}", err.msg);
-      std::process::exit(err.code);
+      log::error!("{err}");
+      std::process::exit(1);
     }
     Ok(config) => config,
   };
 
   // Boot and init internal dependencies
-  let daemon_state = match subsystem::init(&config).await {
-    Err(err) => {
-      log::error!("Error while booting daemon {}", err.msg);
-      std::process::exit(err.code);
-    }
-    Ok(state) => state,
-  };
+  let daemon_state = subsystem::init(&config).await?;
 
   // If init is true we don't start the server
   if args.init {
@@ -63,8 +56,8 @@ async fn main() -> std::io::Result<()> {
   }
 
   if let Err(err) = node::join_cluster(&daemon_state).await {
-    log::error!("Error while joining cluster {}", err.msg);
-    std::process::exit(err.code);
+    log::error!("{err}");
+    std::process::exit(1);
   }
 
   utils::proxy::spawn_logger(&daemon_state);

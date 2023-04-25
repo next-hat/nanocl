@@ -1700,6 +1700,22 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< Updated upstream
+=======
+name = "nanocl_utils"
+version = "0.1.0"
+dependencies = [
+ "bollard-next",
+ "diesel",
+ "env_logger",
+ "log 0.4.17",
+ "ntex",
+ "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
+>>>>>>> Stashed changes
 name = "nanocld"
 version = "0.5.0"
 dependencies = [
@@ -1719,6 +1735,7 @@ dependencies = [
  "log 0.4.17",
  "metrsd_client",
  "nanocl_stubs",
+ "nanocl_utils",
  "nanocld_client",
  "ntex",
  "ntex-cors",

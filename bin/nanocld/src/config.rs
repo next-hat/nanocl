@@ -1,13 +1,14 @@
 use nanocl_stubs::config::{DaemonConfig, DaemonConfigFile};
 
+use nanocl_utils::io_error::{IoResult, FromIo};
+
 use crate::utils;
 use crate::cli::Cli;
-use crate::error::CliError;
 
 fn gen_daemon_conf(
   args: &Cli,
   config: &DaemonConfigFile,
-) -> Result<DaemonConfig, CliError> {
+) -> IoResult<DaemonConfig> {
   let hosts = if let Some(ref hosts) = args.hosts {
     hosts.to_owned()
   } else if let Some(ref hosts) = config.hosts {
@@ -38,9 +39,7 @@ fn gen_daemon_conf(
     gateway.to_owned()
   } else {
     utils::network::get_default_ip()
-      .map_err(|err| {
-        CliError::new(1, format!("Error while getting default ip: {err}"))
-      })?
+      .map_err(|err| err.map_err_context(|| "Gateway"))?
       .to_string()
   };
 
@@ -49,9 +48,8 @@ fn gen_daemon_conf(
   } else if let Some(ref hostname) = config.hostname {
     hostname.to_owned()
   } else {
-    utils::network::get_hostname().map_err(|err| {
-      CliError::new(1, format!("Error while getting hostname: {err}"))
-    })?
+    utils::network::get_hostname()
+      .map_err(|err| err.map_err_context(|| "Hostname"))?
   };
 
   let advertise_addr = if let Some(ref advertise_addr) = args.advertise_addr {
@@ -71,7 +69,7 @@ fn gen_daemon_conf(
   })
 }
 
-fn read_config_file(config_dir: &String) -> Result<DaemonConfigFile, CliError> {
+fn read_config_file(config_dir: &String) -> IoResult<DaemonConfigFile> {
   let config_path = std::path::Path::new(&config_dir).join("nanocl.conf");
 
   if !config_path.exists() {
@@ -79,24 +77,15 @@ fn read_config_file(config_dir: &String) -> Result<DaemonConfigFile, CliError> {
   }
 
   let content = std::fs::read_to_string(&config_path).map_err(|err| {
-    CliError::new(
-      1,
+    err.map_err_context(|| {
       format!(
-        "Error while reading config file at {}: {err}",
+        "Error while reading config file at {}",
         config_path.display()
-      ),
-    )
-  })?;
-  let config =
-    serde_yaml::from_str::<DaemonConfigFile>(&content).map_err(|err| {
-      CliError::new(
-        1,
-        format!(
-          "Error while parsing config file at {}: {err}",
-          config_path.display()
-        ),
       )
-    })?;
+    })
+  })?;
+  let config = serde_yaml::from_str::<DaemonConfigFile>(&content)
+    .map_err(|err| err.map_err_context(|| "DaemonConfigFile"))?;
 
   Ok(config)
 }
@@ -113,7 +102,7 @@ fn read_config_file(config_dir: &String) -> Result<DaemonConfigFile, CliError> {
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
+/// - [IoResult](IoResult) - The result of the operation
 ///   - [Ok](DaemonConfig) - The created cargo config
 ///   - [Err](DaemonError) - Error during the operation
 ///
@@ -132,7 +121,7 @@ fn read_config_file(config_dir: &String) -> Result<DaemonConfigFile, CliError> {
 /// let result = config::init(args);
 /// ```
 ///
-pub fn init(args: &Cli) -> Result<DaemonConfig, CliError> {
+pub fn init(args: &Cli) -> IoResult<DaemonConfig> {
   let file_config = read_config_file(&args.conf_dir)?;
   // Merge cli args and config file with priority to args
   gen_daemon_conf(args, &file_config)
