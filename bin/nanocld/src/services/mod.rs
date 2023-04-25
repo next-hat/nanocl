@@ -42,11 +42,11 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
     );
   }
 
-  let versionning = middlewares::Versioning::new(version::VERSION).finish();
+  let versioning = middlewares::Versioning::new(version::VERSION).finish();
 
   config.service(
     web::scope("/{version}")
-      .wrap(versionning)
+      .wrap(versioning)
       .configure(state::ntex_config)
       .configure(node::ntex_config)
       .configure(namespace::ntex_config)
