@@ -70,7 +70,7 @@ chrono = { version = "0.4.24", default-features = false, features = [
 ] }
 jsonschema = { version = "0.17.0", default-features = false }
 nanocld_client = { version = "0.5.0", features = ["tokio"] }
-openssl = { version = "0.10.50", features = ["vendored"] }
+openssl = { version = "0.10.52", features = ["vendored"] }
 utoipa = { version = "3", features = ["yaml"], optional = true }
 ntex-files = { version = "0.2.2", optional = true }
 ntex-cors = { version = "0.3.0" }
