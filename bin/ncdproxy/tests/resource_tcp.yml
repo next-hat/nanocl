@@ -8,11 +8,10 @@ Resources:
   Config:
     Watch:
     - get-started@global
-    Rule:
-      Stream:
-        Protocol: Tcp
-        Port: 9999
-        Network: Public
-        Target:
-          Key: get-started@global
-          Port: 9000
+    Rules:
+    - Protocol: Tcp
+      Port: 9999
+      Network: Public
+      Target:
+        Key: get-started@global
+        Port: 9000

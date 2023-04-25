@@ -8,12 +8,11 @@ Resources:
   Config:
     Watch:
     - get-started.global
-    Rule:
-      Http:
-        Domain: get-started.com
-        Network: Public
-        Locations:
-        - Path: /
-          Target:
-            Http:
-              Url: https://google.com
+    Rules:
+    - Domain: get-started.com
+      Network: Public
+      Locations:
+      - Path: /
+        Target:
+          Http:
+            Url: https://google.com

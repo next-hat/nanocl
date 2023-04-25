@@ -1,9 +1,8 @@
-use ntex::{web, Service, Middleware};
-use futures::future::{ok, Either, Ready};
-use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
+use ntex::web;
+use nanocl_utils::ntex::middlewares;
+use nanocl_utils::http_error::HttpError;
 
 use crate::version;
-use nanocl_utils::http_error::HttpError;
 
 #[cfg(feature = "dev")]
 mod openapi;
@@ -20,54 +19,6 @@ mod http_metric;
 mod vm;
 mod vm_image;
 
-pub struct Versionning;
-
-impl<S> Middleware<S> for Versionning {
-  type Service = VersionningMiddleware<S>;
-
-  fn create(&self, service: S) -> Self::Service {
-    VersionningMiddleware { service }
-  }
-}
-
-pub struct VersionningMiddleware<S> {
-  service: S,
-}
-
-impl<S, Err> Service<WebRequest<Err>> for VersionningMiddleware<S>
-where
-  S: Service<WebRequest<Err>, Response = WebResponse, Error = Error>,
-  Err: ErrorRenderer,
-{
-  type Response = WebResponse;
-  type Error = Error;
-  type Future<'f> = Either<S::Future<'f>, Ready<Result<Self::Response, Self::Error>>> where Self: 'f;
-
-  ntex::forward_poll_ready!(service);
-
-  fn call(&self, mut req: WebRequest<Err>) -> Self::Future<'_> {
-    let version = req.match_info_mut().get("version");
-    match version {
-      None => {}
-      Some(version) => {
-        if version.replace('v', "").as_str() > version::VERSION {
-          let msg = format!("{version} is not supported");
-          return Either::Right(ok(
-            req.into_response(
-              HttpResponse::NotFound()
-                .json(&serde_json::json!({
-                  "msg": msg,
-                }))
-                .into_body(),
-            ),
-          ));
-        }
-      }
-    }
-    Either::Left(self.service.call(req))
-  }
-}
-
 pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
   Err(HttpError {
     status: ntex::http::StatusCode::NOT_FOUND,
@@ -78,12 +29,24 @@ pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   #[cfg(feature = "dev")]
   {
-    config.service(web::scope("/explorer").configure(openapi::ntex_config));
+    use utoipa::OpenApi;
+    use nanocl_utils::ntex::swagger;
+    use openapi::ApiDoc;
+
+    let swagger_conf =
+      swagger::SwaggerConfig::new(ApiDoc::openapi(), "/explorer/swagger.json");
+    config.service(
+      web::scope("/explorer/")
+        .state(swagger_conf)
+        .configure(swagger::register),
+    );
   }
+
+  let versioning = middlewares::Versioning::new(version::VERSION).finish();
 
   config.service(
     web::scope("/{version}")
-      .wrap(Versionning)
+      .wrap(versioning)
       .configure(state::ntex_config)
       .configure(node::ntex_config)
       .configure(namespace::ntex_config)

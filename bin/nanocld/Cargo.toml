@@ -19,9 +19,9 @@ path = "src/main.rs"
 default = ["release"]
 dev = [
   "dep:utoipa",
-  "dep:ntex-files",
   "bollard-next/utoipa",
   "nanocl_stubs/utoipa",
+  "nanocl_utils/ntex_swagger",
 ]
 test = []
 release = []
@@ -49,7 +49,6 @@ serde = { version = "1.0.148", features = ["derive"] }
 uuid = { version = "1.2", features = ["serde", "v4"] }
 ntex = { version = "0.6.6", features = ["openssl", "tokio"] }
 ntex-cors = { version = "0.3.0" }
-ntex-files = { version = "0.2.2", optional = true }
 diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
 diesel = { version = "2.0.1", features = [
   "postgres",
@@ -74,6 +73,7 @@ openssl = { version = "0.10.50", features = ["vendored"] }
 metrsd_client = "0.1.1"
 nanocl_stubs = { version = "0.5.0", features = ["serde"] }
 nanocl_utils = { version = "0.1.0", features = [
+  "ntex",
   "logger",
   "io_error",
   "http_error",

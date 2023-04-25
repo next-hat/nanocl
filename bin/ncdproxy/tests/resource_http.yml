@@ -8,13 +8,12 @@ Resources:
   Config:
     Watch:
     - get-started.global
-    Rule:
-      Http:
-        Domain: get-started.com
-        Network: Public
-        Locations:
-        - Path: /
-          Target:
-            Cargo:
-              Key: get-started.global
-              Port: 9000
+    Rules:
+    - Domain: get-started.com
+      Network: Public
+      Locations:
+      - Path: /
+        Target:
+          Cargo:
+            Key: get-started.global
+            Port: 9000

@@ -22,7 +22,7 @@ use crate::nginx::Nginx;
   ),
 ))]
 #[web::put("/rules/{name}")]
-async fn apply_rule(
+pub async fn apply_rule(
   name: web::types::Path<String>,
   nginx: web::types::State<Nginx>,
   web::types::Json(payload): web::types::Json<ResourceProxyRule>,
@@ -44,11 +44,11 @@ async fn apply_rule(
     ("Name" = String, Path, description = "Name of the rule"),
   ),
   responses(
-    (status = 200, description = "List of namespace", body = ResourceProxyRule),
+    (status = 200, description = "ProxyRule has been deleted"),
   ),
 ))]
 #[web::delete("/rules/{name}")]
-async fn remove_rule(
+pub async fn remove_rule(
   name: web::types::Path<String>,
   nginx: web::types::State<Nginx>,
 ) -> Result<web::HttpResponse, HttpError> {

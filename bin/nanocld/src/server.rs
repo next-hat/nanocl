@@ -1,6 +1,8 @@
 use ntex::web;
 use ntex_cors::Cors;
 
+use nanocl_utils::ntex::middlewares;
+
 use crate::services;
 use crate::models::DaemonState;
 
@@ -22,6 +24,7 @@ pub async fn generate(
           .disable_vary_header()
           .finish(),
       )
+      .wrap(middlewares::SerializeError)
       // Default logger middleware
       // .wrap(web::middleware::Logger::default())
       // Set Json body max size
@@ -70,7 +73,7 @@ pub async fn generate(
   {
     server = server.bind("0.0.0.0:8585")?;
     log::debug!("Running in dev mode, binding to: http://0.0.0.0:8585");
-    log::debug!("OpenAPI explorer available at: http://0.0.0.0:8585/explorer");
+    log::debug!("OpenAPI explorer available at: http://0.0.0.0:8585/explorer/");
   }
 
   log::info!("Server ready");

@@ -8,17 +8,16 @@ Resources:
   Config:
     Watch:
     - get-started.global
-    Rule:
-      Http:
-        Domain: get-started.com
-        Network: Public
-        Ssl:
-          Certificate: /random/path/to/cert
-          CertificateKey: /random/path/to/key
-          DhParam: /random/path/to/param
-        Locations:
-        - Path: /
-          Target:
-            Cargo:
-              Key: get-started.global
-              Port: 9000
+    Rules:
+    - Domain: get-started.com
+      Network: Public
+      Ssl:
+        Certificate: /random/path/to/cert
+        CertificateKey: /random/path/to/key
+        DhParam: /random/path/to/param
+      Locations:
+      - Path: /
+        Target:
+          Cargo:
+            Key: get-started.global
+            Port: 9000

@@ -33,6 +33,10 @@ Cargoes:
     Env:
     - TZ=Europe/Paris
     HostConfig:
+      PortBindings:
+        8686/tcp:
+        - HostPort: 8686
+          HostIp: 0.0.0.0
       NetworkMode: system
       Binds:
       - ./:/project

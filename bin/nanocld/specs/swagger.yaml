@@ -3740,20 +3740,12 @@ components:
           $ref: '#/components/schemas/LocationTarget'
     ProxyRule:
       oneOf:
-      - type: object
-        required:
-        - Http
-        properties:
-          Http:
-            $ref: '#/components/schemas/ProxyRuleHttp'
-      - type: object
-        required:
-        - Stream
-        properties:
-          Stream:
-            type: array
-            items:
-              $ref: '#/components/schemas/ProxyRuleStream'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ProxyRuleHttp'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ProxyRuleStream'
       description: Proxy rules modes
     ProxyRuleHttp:
       type: object
@@ -4064,14 +4056,14 @@ components:
       description: Define proxy rules to apply
       required:
       - Watch
-      - Rule
+      - Rules
       properties:
         Watch:
           type: array
           items:
             type: string
           description: Cargo to watch for changes
-        Rule:
+        Rules:
           $ref: '#/components/schemas/ProxyRule'
     ResourcesBlkioWeightDevice:
       type: object

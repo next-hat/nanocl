@@ -14,16 +14,15 @@ Resources:
   Config:
     Watch:
     - get-started.global
-    Rule:
-      Http:
-        Domain: "{{Args.domain}}"
-        Network: Public
-        Locations:
-        - Path: /
-          Target:
-            Cargo:
-              Key: get-started.global
-              Port: 9000
+    Rules:
+    - Domain: "{{Args.domain}}"
+      Network: Public
+      Locations:
+      - Path: /
+        Target:
+          Cargo:
+            Key: get-started.global
+            Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/daemon/v0.4#tag/Cargoes/operation/create_cargo
@@ -32,9 +31,8 @@ Cargoes:
   Container:
     Image: nexthat/nanocl-get-started:latest
     HostConfig:
-      Binds: [
-        "./test_local:/test"
-      ]
+      Binds:
+      - ./test_local:/test
     Env:
       - TEST=GG
       - APP=GET_STARTED

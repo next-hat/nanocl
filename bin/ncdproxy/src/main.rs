@@ -1,19 +1,24 @@
+use nanocl_utils::http_error::HttpError;
 use ntex::rt;
 use ntex::web;
 use clap::Parser;
 use futures::StreamExt;
-use nanocld_client::{
-  NanocldClient,
-  stubs::{system::Event, resource::ResourcePartial},
-};
+
 use nanocl_utils::logger;
+use nanocl_utils::ntex::middlewares;
 use nanocl_utils::io_error::IoResult;
+
+use nanocld_client::NanocldClient;
+use nanocld_client::stubs::system::Event;
+use nanocld_client::stubs::resource::ResourcePartial;
 
 mod cli;
 mod nginx;
 mod utils;
 mod service;
 mod network_log;
+#[cfg(feature = "dev")]
+mod openapi;
 
 async fn boot(cli: &cli::Cli) -> IoResult<nginx::Nginx> {
   let nginx = nginx::new(&cli.conf_dir.clone().unwrap_or("/etc/nginx".into()));
@@ -170,6 +175,13 @@ fn wait_for_daemon() {
   }
 }
 
+pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
+  Err(HttpError {
+    status: ntex::http::StatusCode::NOT_FOUND,
+    msg: "Route or method unhandled".into(),
+  })
+}
+
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
   logger::enable_logger("ncdproxy");
@@ -179,7 +191,13 @@ async fn main() -> std::io::Result<()> {
   let cli = cli::Cli::parse();
 
   wait_for_daemon();
-  let nginx = boot(&cli).await?;
+  let nginx = match boot(&cli).await {
+    Err(err) => {
+      log::error!("{err}");
+      std::process::exit(err.inner.raw_os_error().unwrap_or(1));
+    }
+    Ok(nginx) => nginx,
+  };
   let n = nginx.clone();
 
   rt::Arbiter::new().exec_fn(move || {
@@ -190,12 +208,41 @@ async fn main() -> std::io::Result<()> {
   });
 
   let mut server = web::HttpServer::new(move || {
-    web::App::new()
+    // Ignore unused mut warning for dev feature
+    #[allow(unused_mut)]
+    let mut app = web::App::new()
       .state(nginx.clone())
+      .wrap(middlewares::SerializeError)
       .configure(service::ntex_config)
+      .default_service(web::route().to(unhandled));
+
+    #[cfg(feature = "dev")]
+    {
+      use utoipa::OpenApi;
+      use nanocl_utils::ntex::swagger;
+      use crate::openapi::ApiDoc;
+
+      let swagger_conf = swagger::SwaggerConfig::new(
+        ApiDoc::openapi(),
+        "/explorer/swagger.json",
+      );
+      app = app.service(
+        web::scope("/explorer/")
+          .state(swagger_conf)
+          .configure(swagger::register),
+      );
+    }
+    app
   });
 
   server = server.bind_uds("/run/nanocl/proxy.sock")?;
+
+  #[cfg(feature = "dev")]
+  {
+    server = server.bind("0.0.0.0:8686")?;
+    log::debug!("Running in dev mode, binding to: http://0.0.0.0:8686");
+    log::debug!("OpenAPI explorer available at: http://0.0.0.0:8686/explorer/");
+  }
 
   server.run().await?;
 
