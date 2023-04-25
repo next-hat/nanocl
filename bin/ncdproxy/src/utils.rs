@@ -357,9 +357,12 @@ async fn resource_to_nginx_conf(
   name: &str,
   resource_proxy: &ResourceProxyRule,
 ) -> IoResult<(NginxConfKind, String)> {
-  let conf = match &resource_proxy.rule {
-    ProxyRule::Http(rule) => {
-      let conf = gen_http_server_block(rule, client, nginx).await?;
+  let conf = match &resource_proxy.rules {
+    ProxyRule::Http(rules) => {
+      let mut conf = String::new();
+      for rule in rules {
+        conf += &gen_http_server_block(rule, client, nginx).await?;
+      }
       (NginxConfKind::Site, conf)
     }
     ProxyRule::Stream(rules) => {

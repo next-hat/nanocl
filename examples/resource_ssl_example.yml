@@ -7,18 +7,17 @@ Resources:
   Version: v0.1
   Config:
     Watch:
-      - deploy-example.global
-    Rule:
-      Http:
-        Domain: deploy-example.com
-        Network: Public
-        Ssl:
-          Certificate: /random/path/to/cert
-          CertificateKey: /random/path/to/key
-          SslDhParam: /random/path/to/param
-        Locations:
-          - Path: /
-            Target:
-              Cargo:
-                Key: deploy-example.global
-                Port: 9000
+    - deploy-example.global
+    Rules:
+    - Domain: deploy-example.com
+      Network: Public
+      Ssl:
+        Certificate: /random/path/to/cert
+        CertificateKey: /random/path/to/key
+        SslDhParam: /random/path/to/param
+      Locations:
+      - Path: /
+        Target:
+          Cargo:
+            Key: deploy-example.global
+            Port: 9000

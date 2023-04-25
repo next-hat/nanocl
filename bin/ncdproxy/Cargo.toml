@@ -4,7 +4,7 @@ name = "ncdproxy"
 version = "0.3.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
-description = "The Self-Sufficient Hybrid-Cloud Orchestrator Daemon"
+description = "Official nanocl controller daemon proxy"
 readme = "readme.md"
 license = "MIT OR Apache-2.0"
 homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
@@ -17,7 +17,7 @@ bench = false
 path = "src/main.rs"
 
 [features]
-dev = ["dep:utoipa", "nanocld_client/utoipa"]
+dev = ["dep:utoipa", "dep:utoipa-swagger-ui", "nanocld_client/utoipa"]
 
 [build-dependencies]
 serde_yaml = "0.9.19"
@@ -46,4 +46,5 @@ nanocl_utils = { version = "0.1.0", features = [
   "http_error",
   "serde_json",
 ] }
-utoipa = { version = "3", features = ["yaml"], optional = true }
+utoipa = { version = "3.2", features = ["yaml"], optional = true }
+utoipa-swagger-ui = { version = "3.1", optional = true }

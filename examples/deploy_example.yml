@@ -11,28 +11,27 @@ Resources:
     Watch:
     - deploy-example.global
     - deploy-example2.global
-    Rule:
-      Http:
-        Domain: deploy-example.com
-        Network: Public
-        Locations:
-        - Path: /
-          Target:
-            Http:
-              Url: http://deploy-example.com/v2
-              Redirect: TemporaryRedirect
+    Rules:
+    - Domain: deploy-example.com
+      Network: Public
+      Locations:
+      - Path: /
+        Target:
+          Http:
+            Url: http://deploy-example.com/v2
+            Redirect: TemporaryRedirect
 
-        - Path: /v1
-          Target:
-            Cargo:
-              Key: deploy-example.global
-              Port: 9000
+      - Path: /v1
+        Target:
+          Cargo:
+            Key: deploy-example.global
+            Port: 9000
 
-        - Path: /v2
-          Target:
-            Cargo:
-              Key: deploy-example2.global
-              Port: 9000
+      - Path: /v2
+        Target:
+          Cargo:
+            Key: deploy-example2.global
+            Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/daemon/v0.4#tag/Cargoes/operation/create_cargo

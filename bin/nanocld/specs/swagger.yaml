@@ -3239,25 +3239,10 @@ components:
       - locked
     LocationTarget:
       oneOf:
-      - type: object
-        required:
-        - Cargo
-        properties:
-          Cargo:
-            $ref: '#/components/schemas/CargoTarget'
-      - type: object
-        required:
-        - Http
-        properties:
-          Http:
-            $ref: '#/components/schemas/HttpTarget'
-      - type: object
-        required:
-        - Unix
-        properties:
-          Unix:
-            type: string
-            description: Target a specific unix socket
+      - $ref: '#/components/schemas/CargoTarget'
+      - $ref: '#/components/schemas/HttpTarget'
+      - type: string
+        description: Target a specific unix socket
     Metric:
       type: object
       description: Metric entry
@@ -3740,20 +3725,12 @@ components:
           $ref: '#/components/schemas/LocationTarget'
     ProxyRule:
       oneOf:
-      - type: object
-        required:
-        - Http
-        properties:
-          Http:
-            $ref: '#/components/schemas/ProxyRuleHttp'
-      - type: object
-        required:
-        - Stream
-        properties:
-          Stream:
-            type: array
-            items:
-              $ref: '#/components/schemas/ProxyRuleStream'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ProxyRuleHttp'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ProxyRuleStream'
       description: Proxy rules modes
     ProxyRuleHttp:
       type: object
@@ -4064,14 +4041,14 @@ components:
       description: Define proxy rules to apply
       required:
       - Watch
-      - Rule
+      - Rules
       properties:
         Watch:
           type: array
           items:
             type: string
           description: Cargo to watch for changes
-        Rule:
+        Rules:
           $ref: '#/components/schemas/ProxyRule'
     ResourcesBlkioWeightDevice:
       type: object
@@ -4137,25 +4114,10 @@ components:
           nullable: true
     StreamTarget:
       oneOf:
-      - type: object
-        required:
-        - Cargo
-        properties:
-          Cargo:
-            $ref: '#/components/schemas/CargoTarget'
-      - type: object
-        required:
-        - Uri
-        properties:
-          Uri:
-            $ref: '#/components/schemas/UriTarget'
-      - type: object
-        required:
-        - Unix
-        properties:
-          Unix:
-            type: string
-            description: Target a specific unix socket
+      - $ref: '#/components/schemas/CargoTarget'
+      - $ref: '#/components/schemas/UriTarget'
+      - type: string
+        description: Target a specific unix socket
     SwarmInfo:
       type: object
       description: Represents generic information about swarm.

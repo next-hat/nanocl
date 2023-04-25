@@ -13,7 +13,10 @@ mod cli;
 mod nginx;
 mod utils;
 mod service;
+mod middleware;
 mod network_log;
+#[cfg(feature = "dev")]
+mod openapi;
 
 async fn boot(cli: &cli::Cli) -> IoResult<nginx::Nginx> {
   let nginx = nginx::new(&cli.conf_dir.clone().unwrap_or("/etc/nginx".into()));
@@ -190,12 +193,28 @@ async fn main() -> std::io::Result<()> {
   });
 
   let mut server = web::HttpServer::new(move || {
-    web::App::new()
+    // Ignore unused mut warning for dev feature
+    #[allow(unused_mut)]
+    let mut app = web::App::new()
       .state(nginx.clone())
-      .configure(service::ntex_config)
+      .wrap(middleware::SerializeError)
+      .configure(service::ntex_config);
+
+    #[cfg(feature = "dev")]
+    {
+      app = app.configure(openapi::ntex_config);
+    }
+    app
   });
 
   server = server.bind_uds("/run/nanocl/proxy.sock")?;
+
+  #[cfg(feature = "dev")]
+  {
+    server = server.bind("0.0.0.0:8686")?;
+    log::debug!("Running in dev mode, binding to: http://0.0.0.0:8686");
+    log::debug!("OpenAPI explorer available at: http://0.0.0.0:8686/explorer");
+  }
 
   server.run().await?;
 

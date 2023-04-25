@@ -6,7 +6,7 @@ use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocld_client::stubs::proxy::ProxyRule;
 
 #[derive(Debug)]
-pub(crate) enum NginxConfKind {
+pub enum NginxConfKind {
   Site,
   Stream,
 }
@@ -50,12 +50,12 @@ impl FromStr for NginxConfKind {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Nginx {
-  pub(crate) conf_dir: String,
+pub struct Nginx {
+  pub conf_dir: String,
 }
 
 impl Nginx {
-  pub(crate) fn new(conf_dir: &str) -> Self {
+  pub fn new(conf_dir: &str) -> Self {
     Self {
       conf_dir: conf_dir.to_owned(),
     }
@@ -74,7 +74,7 @@ impl Nginx {
   }
 
   #[inline]
-  pub(crate) fn ensure(&self) -> IoResult<()> {
+  pub fn ensure(&self) -> IoResult<()> {
     // Ensure sites-enabled directory exists
     let sites_enabled_dir = format!("{}/sites-enabled", self.conf_dir);
     fs::create_dir_all(&sites_enabled_dir).map_err(|err| {
@@ -99,7 +99,7 @@ impl Nginx {
     Ok(())
   }
 
-  pub(crate) fn write_default_conf(&self) -> IoResult<()> {
+  pub fn write_default_conf(&self) -> IoResult<()> {
     let default_conf = "server {
   listen 80 default_server;
   listen [::]:80 default_server ipv6only=on;
@@ -124,7 +124,7 @@ impl Nginx {
   }
 
   #[inline]
-  pub(crate) fn write_conf_file(
+  pub fn write_conf_file(
     &self,
     name: &str,
     data: &str,
@@ -138,7 +138,7 @@ impl Nginx {
   }
 
   #[inline]
-  pub(crate) async fn delete_conf_file(&self, name: &str) {
+  pub async fn delete_conf_file(&self, name: &str) {
     let path = self.gen_conf_path(name, &NginxConfKind::Site);
     let _ = tokio::fs::remove_file(&path).await;
     let path = self.gen_conf_path(name, &NginxConfKind::Stream);
@@ -146,7 +146,7 @@ impl Nginx {
   }
 
   #[inline]
-  pub(crate) fn clear_conf(&self) -> IoResult<()> {
+  pub fn clear_conf(&self) -> IoResult<()> {
     let sites_enabled_dir = format!("{}/sites-enabled", self.conf_dir);
     fs::remove_dir_all(&sites_enabled_dir).map_err(|err| {
       err.map_err_context(|| {
@@ -174,6 +174,6 @@ impl Nginx {
 }
 
 /// Create a new nginx instance
-pub(crate) fn new(config_path: &str) -> Nginx {
+pub fn new(config_path: &str) -> Nginx {
   Nginx::new(config_path)
 }

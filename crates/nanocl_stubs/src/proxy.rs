@@ -5,10 +5,10 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum ProxyRule {
   /// Redirect http trafic
-  Http(ProxyRuleHttp),
+  Http(Vec<ProxyRuleHttp>),
   /// Redirect tcp and udp trafic
   Stream(Vec<ProxyRuleStream>),
 }
@@ -174,5 +174,5 @@ pub struct ResourceProxyRule {
   /// Cargo to watch for changes
   pub watch: Vec<String>,
   /// The rule
-  pub rule: ProxyRule,
+  pub rules: ProxyRule,
 }
