@@ -73,7 +73,7 @@ pub async fn generate(
   {
     server = server.bind("0.0.0.0:8585")?;
     log::debug!("Running in dev mode, binding to: http://0.0.0.0:8585");
-    log::debug!("OpenAPI explorer available at: http://0.0.0.0:8585/explorer");
+    log::debug!("OpenAPI explorer available at: http://0.0.0.0:8585/explorer/");
   }
 
   log::info!("Server ready");

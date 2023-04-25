@@ -1,7 +1,4 @@
 use ntex::util::HashMap;
-use ntex::web;
-use ntex::http;
-use ntex_files as fs;
 use serde::{Serialize, Deserialize};
 use utoipa::{OpenApi, Modify, ToSchema};
 use bollard_next::container::Config;
@@ -56,8 +53,6 @@ use nanocl_stubs::proxy::{
   ProxyRuleStream, StreamTarget, ProxyStreamProtocol, UriTarget,
   LocationTarget, HttpTarget, UrlRedirect, CargoTarget, ProxyRule,
 };
-
-use nanocl_utils::http_error::HttpError;
 
 use super::{
   node, system, namespace, cargo, cargo_image, vm, vm_image, resource, metric,
@@ -426,30 +421,4 @@ impl Modify for VersionModifier {
   ),
   modifiers(&VersionModifier),
 )]
-struct ApiDoc;
-
-#[web::get("/swagger.json")]
-async fn get_api_specs() -> Result<web::HttpResponse, HttpError> {
-  let spec = ApiDoc::openapi().to_json().map_err(|err| HttpError {
-    status: http::StatusCode::INTERNAL_SERVER_ERROR,
-    msg: format!("Error generating OpenAPI spec: {}", err),
-  })?;
-  return Ok(
-    web::HttpResponse::Ok()
-      .content_type("application/json")
-      .body(spec),
-  );
-}
-
-pub fn ntex_config(config: &mut ntex::web::ServiceConfig) {
-  let yaml = ApiDoc::openapi()
-    .to_yaml()
-    .expect("Unable to generate openapi spec");
-
-  std::fs::write("./bin/nanocld/specs/swagger.yaml", yaml).unwrap();
-
-  config.service(get_api_specs);
-  config.service(
-    fs::Files::new("/", "./bin/nanocld/swagger-ui/").index_file("index.html"),
-  );
-}
+pub(crate) struct ApiDoc;

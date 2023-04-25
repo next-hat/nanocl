@@ -29,7 +29,17 @@ pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   #[cfg(feature = "dev")]
   {
-    config.service(web::scope("/explorer").configure(openapi::ntex_config));
+    use utoipa::OpenApi;
+    use nanocl_utils::ntex::swagger;
+    use openapi::ApiDoc;
+
+    let swagger_conf =
+      swagger::SwaggerConfig::new(ApiDoc::openapi(), "/explorer/swagger.json");
+    config.service(
+      web::scope("/explorer/")
+        .state(swagger_conf)
+        .configure(swagger::register),
+    );
   }
 
   let versionning = middlewares::Versioning::new(version::VERSION).finish();
