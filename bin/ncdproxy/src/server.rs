@@ -5,7 +5,7 @@ use nanocl_utils::ntex::middlewares;
 use crate::services;
 use crate::nginx::Nginx;
 
-async fn generate(nginx: &Nginx) -> std::io::Result<ntex::server::Server> {
+pub fn generate(nginx: &Nginx) -> std::io::Result<ntex::server::Server> {
   let nginx = nginx.clone();
   let mut server = web::HttpServer::new(move || {
     web::App::new()

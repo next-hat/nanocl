@@ -46,7 +46,10 @@ pub fn print_last_line(path: &Path) {
   }
 }
 
-pub(crate) fn run() {
+/// Spawn new thread and watch for change inside the access log directory
+/// to print them to the console that way we can see what is happening in real time with docker logs
+/// and the nanocl daemon will be able to save them to the database
+pub(crate) fn spawn() {
   rt::Arbiter::new().exec_fn(|| {
     let path = Path::new("/var/log/nginx/access");
     if !path.exists() {

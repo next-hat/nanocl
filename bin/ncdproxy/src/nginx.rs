@@ -172,8 +172,3 @@ impl Nginx {
     Ok(())
   }
 }
-
-/// Create a new nginx instance
-pub fn new(config_path: &str) -> Nginx {
-  Nginx::new(config_path)
-}
