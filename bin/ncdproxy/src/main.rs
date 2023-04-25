@@ -7,13 +7,13 @@ use nanocld_client::{
   stubs::{system::Event, resource::ResourcePartial},
 };
 use nanocl_utils::logger;
+use nanocl_utils::ntex::middlewares;
 use nanocl_utils::io_error::IoResult;
 
 mod cli;
 mod nginx;
 mod utils;
 mod service;
-mod middleware;
 mod network_log;
 #[cfg(feature = "dev")]
 mod openapi;
@@ -197,7 +197,7 @@ async fn main() -> std::io::Result<()> {
     #[allow(unused_mut)]
     let mut app = web::App::new()
       .state(nginx.clone())
-      .wrap(middleware::SerializeError)
+      .wrap(middlewares::SerializeError)
       .configure(service::ntex_config);
 
     #[cfg(feature = "dev")]

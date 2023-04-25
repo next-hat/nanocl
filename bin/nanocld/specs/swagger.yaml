@@ -3239,10 +3239,25 @@ components:
       - locked
     LocationTarget:
       oneOf:
-      - $ref: '#/components/schemas/CargoTarget'
-      - $ref: '#/components/schemas/HttpTarget'
-      - type: string
-        description: Target a specific unix socket
+      - type: object
+        required:
+        - Cargo
+        properties:
+          Cargo:
+            $ref: '#/components/schemas/CargoTarget'
+      - type: object
+        required:
+        - Http
+        properties:
+          Http:
+            $ref: '#/components/schemas/HttpTarget'
+      - type: object
+        required:
+        - Unix
+        properties:
+          Unix:
+            type: string
+            description: Target a specific unix socket
     Metric:
       type: object
       description: Metric entry
@@ -4114,10 +4129,25 @@ components:
           nullable: true
     StreamTarget:
       oneOf:
-      - $ref: '#/components/schemas/CargoTarget'
-      - $ref: '#/components/schemas/UriTarget'
-      - type: string
-        description: Target a specific unix socket
+      - type: object
+        required:
+        - Cargo
+        properties:
+          Cargo:
+            $ref: '#/components/schemas/CargoTarget'
+      - type: object
+        required:
+        - Uri
+        properties:
+          Uri:
+            $ref: '#/components/schemas/UriTarget'
+      - type: object
+        required:
+        - Unix
+        properties:
+          Unix:
+            type: string
+            description: Target a specific unix socket
     SwarmInfo:
       type: object
       description: Represents generic information about swarm.

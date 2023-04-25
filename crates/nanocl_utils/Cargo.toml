@@ -15,7 +15,7 @@ bench = false
 [features]
 logger = ["dep:log", "dep:env_logger"]
 io_error = []
-ntex = ["dep:ntex"]
+ntex = ["dep:ntex", "dep:futures"]
 diesel = ["dep:diesel"]
 bollard = ["dep:bollard-next"]
 serde_json = ["dep:serde_json"]
@@ -30,3 +30,4 @@ serde_yaml = { version = "0.9", optional = true }
 serde_json = { version = "1.0.70", optional = true }
 bollard-next = { version = "0.14.9", optional = true }
 diesel = { version = "2.0.1", default-features = false, optional = true }
+futures = { version = "0.3.25", optional = true }

@@ -1,6 +1,8 @@
 use ntex::web;
 use ntex_cors::Cors;
 
+use nanocl_utils::ntex::middlewares;
+
 use crate::services;
 use crate::models::DaemonState;
 
@@ -22,6 +24,7 @@ pub async fn generate(
           .disable_vary_header()
           .finish(),
       )
+      .wrap(middlewares::SerializeError)
       // Default logger middleware
       // .wrap(web::middleware::Logger::default())
       // Set Json body max size
