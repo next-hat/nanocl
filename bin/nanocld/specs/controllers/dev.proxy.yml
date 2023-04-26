@@ -37,7 +37,7 @@ Cargoes:
       Binds:
       - ./:/project
       - /run/nanocl:/run/nanocl
-      - /usr/local/cargo/registry/cache:/usr/local/cargo/registry/cache
+      - ~/.cargo/registry:/usr/local/cargo/registry
       - {state_dir}/proxy/logs:/var/log/nginx/access
       - {state_dir}/proxy/conf.d:/etc/nginx/conf.d
       - {state_dir}/proxy/sites-enabled:/etc/nginx/sites-enabled
