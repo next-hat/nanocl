@@ -1,0 +1,82 @@
+Cargoes:
+- Name: nstore
+  Container:
+    Image: cockroachdb/cockroach:v22.2.7
+    Tty: true
+    Env:
+    - TZ=Europe/Paris
+    Cmd:
+    - start-single-node
+    - --insecure
+    - --listen-addr=:26257
+    - --advertise-addr=${{ advertise_addr }}:26257
+    HostConfig:
+      NetworkMode: system
+      Binds:
+      - ${{ state_dir }}/store/certs:/certs
+      - ${{ state_dir }}/store/data:/cockroach/cockroach-data
+
+- Name: nmetrics
+  Container:
+    Image: ghcr.io/nxthat/metrsd:0.2.0
+    Tty: true
+    Env:
+    - TZ=Europe/Paris
+    Cmd:
+    - --hosts
+    - unix:///run/nanocl/metrics.sock
+    HostConfig:
+      NetworkMode: system
+      Binds:
+      - /run/nanocl:/run/nanocl
+
+- Name: nproxy
+  Container:
+    Image: ghcr.io/nxthat/nproxy:1.23.4.0
+    Tty: true
+    Env:
+    - TZ=Europe/Paris
+    HostConfig:
+      NetworkMode: host
+      Binds:
+      - /run:/run
+      - ${{state_dir}}/proxy/logs:/var/log/nginx/access
+      - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
+      - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
+      - ${{ state_dir }}/proxy/html:/usr/share/nginx/html
+      - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
+      - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
+
+- Name: ncdproxy
+  Container:
+    Image: ghcr.io/nxthat/ncdproxy:0.3.1
+    Tty: true
+    Env:
+    - TZ=Europe/Paris
+    HostConfig:
+      NetworkMode: system
+      Binds:
+      - /run/nanocl:/run/nanocl
+      - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
+      - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
+      - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
+      - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
+
+- Name: ndns
+  Env:
+  - TZ=Europe/Paris
+  Container:
+    Image: nanocl-dnsmasq:0.0.1
+    HostConfig:
+      NetworkMode: host
+
+- Name: ncddns
+  Container:
+    Env:
+    - TZ=Europe/Paris
+    Image: nanocl-ncddns:0.0.1
+    Tty: true
+    HostConfig:
+      NetworkMode: system
+      Binds:
+      - /run/nanocl:/run/nanocl

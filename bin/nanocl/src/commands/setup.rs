@@ -3,6 +3,7 @@ use std::path::Path;
 
 use bollard_next::container::LogOutput;
 use bollard_next::container::LogsOptions;
+use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 use ntex::rt;
 
 use bollard_next::container::StartContainerOptions;
@@ -25,6 +26,7 @@ use users::get_group_by_name;
 use crate::error::CliError;
 
 use crate::models::{SetupOpts, NanocldArgs};
+use crate::utils;
 use crate::utils::math::calculate_percentage;
 use crate::utils::network::get_default_ip;
 use crate::utils::network::get_hostname;
@@ -217,7 +219,7 @@ async fn init_dependencies(
     .create_container(
       None::<CreateContainerOptions<String>>,
       ContainerConfig {
-        image: Some(format!("ghcr.io/nxthat/nanocld:{}", args.version)),
+        image: Some("ghcr.io/nxthat/nanocld:latest".into()),
         cmd: Some(daemon_args),
         tty: Some(true),
         env: Some(vec![format!("NANOCL_GID={}", args.gid)]),
@@ -357,7 +359,7 @@ async fn spawn_daemon(
         ..Default::default()
       }),
       ContainerConfig {
-        image: Some(format!("ghcr.io/nxthat/nanocld:{}", args.version)),
+        image: Some("ghcr.io/nxthat/nanocld:latest".into()),
         entrypoint: Some(vec!["/entrypoint.sh".into()]),
         cmd: Some(daemon_args),
         tty: Some(true),
@@ -448,6 +450,11 @@ pub async fn exec_setup(options: &SetupOpts) -> Result<(), CliError> {
     Some(gateway) => gateway.clone(),
   };
 
+  let advertise_addr = match &options.advertise_addr {
+    None => gateway.clone(),
+    Some(advertise_addr) => advertise_addr.clone(),
+  };
+
   let group = options.group.as_deref().unwrap_or("nanocl");
 
   let hosts = options
@@ -483,16 +490,40 @@ pub async fn exec_setup(options: &SetupOpts) -> Result<(), CliError> {
     hosts,
     gid: gid.gid(),
     hostname,
-    version: options.version.clone(),
+    advertise_addr,
+    // version: options.version.clone(),
   };
+
+  let installer = utils::state::compile(
+    include_str!("../../installer.yml"),
+    &args.clone().into(),
+  )?;
+
+  println!("{installer}");
+
+  let value =
+    serde_yaml::from_str::<serde_yaml::Value>(&installer).map_err(|err| {
+      CliError::Custom {
+        msg: format!("Cannot parse installer: {err}"),
+      }
+    })?;
+
+  let config = serde_yaml::from_value::<Vec<CargoConfigPartial>>(
+    value.get("Cargoes").unwrap().clone(),
+  )
+  .map_err(|err| CliError::Custom {
+    msg: format!("Cannot parse installer: {err}"),
+  })?;
+
+  // println!("{config:#?}");
 
   let docker_api = connect_docker(&args.docker_host)?;
 
-  install_dependencies(&docker_api, &options.version).await?;
+  // install_dependencies(&docker_api, &options.version).await?;
 
-  init_dependencies(&args, &docker_api).await?;
+  // init_dependencies(&args, &docker_api).await?;
 
-  spawn_daemon(&args, &docker_api).await?;
+  // spawn_daemon(&args, &docker_api).await?;
 
   println!("Congratz! Nanocl is now ready to use!");
   Ok(())

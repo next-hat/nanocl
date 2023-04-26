@@ -8,7 +8,7 @@ use ntex::http::client::{Connector, ClientRequest, ClientResponse};
 use futures::{StreamExt, TryStreamExt};
 
 use ntex::http::client::error::SendRequestError as NtexSendRequestError;
-use crate::error::{ApiError, NanocldClientError, is_api_error, SendRequestError};
+use crate::error::{ApiError, NanocldClientError, SendRequestError, is_api_error};
 
 const NANOCLD_DEFAULT_VERSION: &str = "0.5";
 
@@ -74,9 +74,9 @@ impl NanocldClient {
     };
 
     NanocldClient {
+      url,
       client,
       unix_socket: None,
-      url,
       version: format!("v{NANOCLD_DEFAULT_VERSION}"),
     }
   }
