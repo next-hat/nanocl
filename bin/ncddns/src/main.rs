@@ -1,40 +1,34 @@
-use ntex::web;
-use ntex::server::Server;
+use clap::Parser;
 
-use nanocl_utils::logger::enable_logger;
+use nanocl_utils::logger;
 
 mod cli;
 mod utils;
+mod server;
+mod version;
 mod dnsmasq;
-mod service;
+mod services;
 
+use cli::Cli;
 use dnsmasq::Dnsmasq;
-
-fn setup_server(dnsmasq: &Dnsmasq) -> std::io::Result<Server> {
-  let dnsmasq = dnsmasq.clone();
-  let mut server = web::HttpServer::new(move || {
-    web::App::new()
-      .state(dnsmasq.clone())
-      .configure(service::ntex_config)
-  });
-
-  server = server.bind_uds("/run/nanocl/dns.sock")?;
-
-  Ok(server.run())
-}
 
 #[ntex::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let cli = cli::parse();
-  enable_logger("ncddns");
+  let cli = Cli::parse();
 
+  logger::enable_logger("ncddns");
   log::info!("ncddns v{}", env!("CARGO_PKG_VERSION"));
 
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
-  let dnsmasq = dnsmasq::new(&conf_dir).with_dns(cli.dns);
-  dnsmasq.ensure()?;
+  let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns);
+  if let Err(err) = dnsmasq.ensure() {
+    err.exit();
+  }
 
-  let server = setup_server(&dnsmasq)?;
+  let server = match server::generate(&dnsmasq) {
+    Err(err) => err.exit(),
+    Ok(server) => server,
+  };
 
   server.await?;
 

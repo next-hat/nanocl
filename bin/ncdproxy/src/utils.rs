@@ -417,58 +417,35 @@ pub(crate) async fn create_resource_conf(
   Ok(())
 }
 
-/// List resources from nanocl daemon
-/// This function will list all resources that contains the target key
-/// in the watch list
-/// The target key is the name of the cargo @ the namespace
-/// The namespace is optional, if not provided, it will be set to "global"
-// pub(crate) async fn list_resource_by_cargo(
-//   name: &str,
-//   namespace: Option<String>,
-//   client: &NanocldClient,
-// ) -> Result<Vec<nanocld_client::stubs::resource::Resource>, ErrorHint> {
-//   let namespace = namespace.unwrap_or("global".into());
-//   let target_key = format!("{name}.{namespace}");
-//   let query = ResourceQuery {
-//     contains: Some(serde_json::json!({ "Watch": [target_key] }).to_string()),
-//     kind: Some("ProxyRule".into()),
-//   };
-//   let resources = client.list_resource(Some(query)).await.map_err(|err| {
-//     ErrorHint::warning(format!(
-//       "Unable to list resources from nanocl daemon: {err}"
-//     ))
-//   })?;
-//   Ok(resources)
-// }
-
 /// Sync resources from nanocl daemon
 /// This function will remove all old configs and generate new ones
-pub(crate) async fn sync_resources(
-  client: &NanocldClient,
-  nginx: &Nginx,
-) -> IoResult<()> {
-  let query = ResourceQuery {
-    kind: Some("ProxyRule".into()),
-    ..Default::default()
-  };
-  let resources = client.list_resource(Some(query)).await.map_err(|err| {
-    err.map_err_context(|| "Unable to list resources from nanocl")
-  })?;
+/// TODO Make call this function from api endpoint
+// pub(crate) async fn sync_resources(
+//   client: &NanocldClient,
+//   nginx: &Nginx,
+// ) -> IoResult<()> {
+//   let query = ResourceQuery {
+//     kind: Some("ProxyRule".into()),
+//     ..Default::default()
+//   };
+//   let resources = client.list_resource(Some(query)).await.map_err(|err| {
+//     err.map_err_context(|| "Unable to list resources from nanocl")
+//   })?;
 
-  // remove old configs
-  let _ = nginx.clear_conf();
+//   // remove old configs
+//   let _ = nginx.clear_conf();
 
-  for resource in resources {
-    let proxy_rule = serialize_proxy_rule(&resource.clone().into())?;
-    if let Err(err) =
-      create_resource_conf(&resource.name, &proxy_rule, client, nginx).await
-    {
-      log::warn!("{err}")
-    }
-  }
-  reload_config(client).await?;
-  Ok(())
-}
+//   for resource in resources {
+//     let proxy_rule = serialize_proxy_rule(&resource.clone().into())?;
+//     if let Err(err) =
+//       create_resource_conf(&resource.name, &proxy_rule, client, nginx).await
+//     {
+//       log::warn!("{err}")
+//     }
+//   }
+//   reload_config(client).await?;
+//   Ok(())
+// }
 
 /// List resources from nanocl daemon
 /// This function will list all resources that contains the target key
@@ -495,20 +472,21 @@ pub(crate) async fn list_resource_by_cargo(
 #[cfg(test)]
 pub(crate) mod tests {
   use std::process::Output;
-  use ntex::web::{ServiceConfig, error::BlockingError};
-  use nanocl_utils::logger::enable_logger;
+  use ntex::web::error::BlockingError;
 
+  use nanocl_utils::logger;
+
+  use crate::services;
   use crate::nginx::Nginx;
 
-  type Config = fn(&mut ServiceConfig);
-
+  // Before a test
   pub fn before() {
     // Build a test env logger
     std::env::set_var("TEST", "true");
-    enable_logger("ncdproxy");
+    logger::enable_logger("ncdproxy");
   }
 
-  pub(crate) async fn exec_nanocl(arg: &str) -> std::io::Result<Output> {
+  pub async fn exec_nanocl(arg: &str) -> std::io::Result<Output> {
     let arg = arg.to_owned();
     ntex::web::block(move || {
       let mut cmd = std::process::Command::new("nanocl");
@@ -527,13 +505,15 @@ pub(crate) mod tests {
     })
   }
 
-  pub fn generate_server(routes: Config) -> ntex::web::test::TestServer {
+  pub fn generate_server() -> ntex::web::test::TestServer {
     before();
     let nginx = Nginx::new("/tmp/nginx");
     nginx.ensure().unwrap();
     // Create test server
     ntex::web::test::server(move || {
-      ntex::web::App::new().state(nginx.clone()).configure(routes)
+      ntex::web::App::new()
+        .state(nginx.clone())
+        .configure(services::ntex_config)
     })
   }
 }

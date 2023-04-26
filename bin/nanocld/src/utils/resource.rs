@@ -74,7 +74,7 @@ async fn hook_create_resource(
   };
 
   let config = ctrl_client
-    .apply_rule(&resource.name, &resource.config)
+    .apply_rule(&resource.version, &resource.name, &resource.config)
     .await
     .map_err(|err| HttpError {
       status: StatusCode::BAD_REQUEST,
@@ -96,7 +96,7 @@ async fn hook_delete_resource(resource: &Resource) -> Result<(), HttpError> {
   };
 
   ctrl_client
-    .delete_rule(&resource.name)
+    .delete_rule(&resource.version, &resource.name)
     .await
     .map_err(|err| HttpError {
       status: StatusCode::BAD_REQUEST,

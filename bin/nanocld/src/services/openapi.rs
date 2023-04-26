@@ -182,8 +182,8 @@ impl Modify for VersionModifier {
       .build();
 
     let server = utoipa::openapi::ServerBuilder::default()
-      .url("/{version}")
-      .parameter("version", variable)
+      .url("/{Version}")
+      .parameter("Version", variable)
       .build();
 
     openapi.info.title = "Nanocl Daemon".to_string();

@@ -82,4 +82,4 @@ nanocl_utils = { version = "0.1.0", features = [
   "diesel",
   "bollard",
 ] }
-utoipa = { version = "3", features = ["yaml"], optional = true }
+utoipa = { version = "3.2", features = ["yaml"], optional = true }

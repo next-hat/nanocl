@@ -18,18 +18,18 @@ use crate::nginx::Nginx;
     ("Name" = String, Path, description = "Name of the rule"),
   ),
   responses(
-    (status = 200, description = "List of namespace", body = ResourceProxyRule),
+    (status = 200, description = "The created rule", body = ResourceProxyRule),
   ),
 ))]
 #[web::put("/rules/{name}")]
 pub async fn apply_rule(
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
   nginx: web::types::State<Nginx>,
   web::types::Json(payload): web::types::Json<ResourceProxyRule>,
 ) -> Result<web::HttpResponse, HttpError> {
   let client = NanocldClient::connect_with_unix_default();
 
-  utils::create_resource_conf(&name, &payload, &client, &nginx).await?;
+  utils::create_resource_conf(&path.1, &payload, &client, &nginx).await?;
   utils::reload_config(&client).await?;
 
   Ok(web::HttpResponse::Ok().json(&payload))
@@ -44,15 +44,15 @@ pub async fn apply_rule(
     ("Name" = String, Path, description = "Name of the rule"),
   ),
   responses(
-    (status = 200, description = "ProxyRule has been deleted"),
+    (status = 200, description = "Rule has been deleted"),
   ),
 ))]
 #[web::delete("/rules/{name}")]
 pub async fn remove_rule(
-  name: web::types::Path<String>,
+  path: web::types::Path<(String, String)>,
   nginx: web::types::State<Nginx>,
 ) -> Result<web::HttpResponse, HttpError> {
-  nginx.delete_conf_file(&name).await;
+  nginx.delete_conf_file(&path.1).await;
 
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -64,17 +64,16 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
 
-  use ntex::http::StatusCode;
+  use ntex::http;
 
   use crate::utils::tests;
 
   #[ntex::test]
   async fn rules() {
-    let test_srv = tests::generate_server(ntex_config);
+    let test_srv = tests::generate_server();
 
-    let resource: &str = include_str!("../tests/resource_redirect.yml");
+    let resource: &str = include_str!("../../tests/resource_redirect.yml");
 
     let yaml: serde_yaml::Value = serde_yaml::from_str(resource).unwrap();
 
@@ -86,19 +85,19 @@ mod tests {
     println!("payload: {:?}", payload);
 
     let res = test_srv
-      .put(format!("/rules/{name}"))
+      .put(format!("/v0.3/rules/{name}"))
       .send_json(&payload)
       .await
       .unwrap();
 
-    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.status(), http::StatusCode::OK);
 
     let res = test_srv
-      .delete(format!("/rules/{}", name))
+      .delete(format!("/v0.3/rules/{}", name))
       .send()
       .await
       .unwrap();
 
-    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.status(), http::StatusCode::OK);
   }
 }

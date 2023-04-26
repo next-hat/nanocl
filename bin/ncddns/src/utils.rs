@@ -80,21 +80,21 @@ pub(crate) async fn write_rule(
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
-  use ntex::web::ServiceConfig;
-  use nanocl_utils::logger::enable_logger;
+pub mod tests {
+  use nanocl_utils::logger;
 
+  use crate::services;
   use crate::dnsmasq::Dnsmasq;
 
-  type Config = fn(&mut ServiceConfig);
-
+  // Before a test
   pub fn before() {
     // Build a test env logger
     std::env::set_var("TEST", "true");
-    enable_logger("ncddns");
+    logger::enable_logger("ncddns");
   }
 
-  pub fn generate_server(routes: Config) -> ntex::web::test::TestServer {
+  // Generate a test server
+  pub fn generate_server() -> ntex::web::test::TestServer {
     before();
     let dnsmasq = Dnsmasq::new("/tmp/dnsmasq");
     dnsmasq.ensure().unwrap();
@@ -102,7 +102,7 @@ pub(crate) mod tests {
     ntex::web::test::server(move || {
       ntex::web::App::new()
         .state(dnsmasq.clone())
-        .configure(routes)
+        .configure(services::ntex_config)
     })
   }
 }

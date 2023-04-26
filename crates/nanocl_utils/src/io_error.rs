@@ -31,14 +31,6 @@ impl IoError {
     }
   }
 
-  pub fn context(&self) -> Option<&str> {
-    self.context.as_deref()
-  }
-
-  pub fn into_inner(self) -> std::io::Error {
-    self.inner
-  }
-
   pub fn invalid_data<M>(context: M, message: M) -> Self
   where
     M: ToString + std::fmt::Display,
@@ -80,6 +72,22 @@ impl IoError {
       context.to_string(),
       std::io::Error::new(std::io::ErrorKind::Interrupted, message.to_string()),
     )
+  }
+
+  pub fn context(&self) -> Option<&str> {
+    self.context.as_deref()
+  }
+
+  pub fn into_inner(self) -> std::io::Error {
+    self.inner
+  }
+
+  pub fn exit(&self) -> ! {
+    #[cfg(feature = "logger")]
+    {
+      log::error!("{self}");
+    }
+    std::process::exit(self.inner.raw_os_error().unwrap_or(1));
   }
 }
 

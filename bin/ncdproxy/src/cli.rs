@@ -1,10 +1,10 @@
 use clap::Parser;
 
 #[derive(Parser)]
-pub(crate) struct Cli {
+pub struct Cli {
   /// Path to nginx config directory
   #[clap(long)]
-  pub(crate) conf_dir: Option<String>,
+  pub conf_dir: Option<String>,
 }
 
 #[cfg(test)]

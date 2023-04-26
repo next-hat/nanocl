@@ -86,12 +86,13 @@ impl CtrlClient {
 
   pub(crate) async fn apply_rule(
     &self,
+    version: &str,
     name: &str,
     data: &serde_json::Value,
   ) -> Result<serde_json::Value, CtrlClientError> {
     let mut res = self
       .client
-      .put(self.format_url(&format!("/rules/{name}")))
+      .put(self.format_url(&format!("/{version}/rules/{name}")))
       .send_json(data)
       .await?;
     let status = res.status();
@@ -102,11 +103,12 @@ impl CtrlClient {
 
   pub(crate) async fn delete_rule(
     &self,
+    version: &str,
     name: &str,
   ) -> Result<(), CtrlClientError> {
     let mut res = self
       .client
-      .delete(self.format_url(&format!("/rules/{name}")))
+      .delete(self.format_url(&format!("/{version}/rules/{name}")))
       .send()
       .await?;
     let status = res.status();

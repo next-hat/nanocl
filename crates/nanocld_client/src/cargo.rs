@@ -462,8 +462,6 @@ impl NanocldClient {
       )
       .await?;
 
-    println!("res: {:?}", res);
-
     Ok(Self::res_stream(res).await)
   }
 
