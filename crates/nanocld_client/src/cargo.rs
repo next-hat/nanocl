@@ -504,6 +504,7 @@ mod tests {
 
   use futures::StreamExt;
   use nanocl_stubs::cargo_config::CargoConfigPartial;
+  use ntex::http;
 
   #[ntex::test]
   async fn basic() {
@@ -572,7 +573,7 @@ mod tests {
     let err = client.create_cargo(&new_cargo, None).await.unwrap_err();
     match err {
       NanocldClientError::Api(err) => {
-        assert_eq!(err.status, 400);
+        assert_eq!(err.status, http::StatusCode::NOT_FOUND);
       }
       _ => panic!("Wrong error type"),
     }

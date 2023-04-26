@@ -73,7 +73,7 @@ pub fn get_hostname() -> std::io::Result<String> {
   let c_str = unsafe { CStr::from_ptr(name.as_ptr()) };
   let hostname = c_str
     .to_str()
-    .map_err(|err| Error::new(std::io::ErrorKind::Other, err))?;
+    .map_err(|err| Error::new(std::io::ErrorKind::InvalidData, err))?;
   log::info!("Default hostname: {hostname}");
   log::info!("You can override it with the --hostname option.");
   Ok(hostname.to_owned())

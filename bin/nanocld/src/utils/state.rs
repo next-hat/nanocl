@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use nanocl_utils::io_error::FromIo;
 use ntex::rt;
 use ntex::http;
 use ntex::util::Bytes;
@@ -9,13 +8,14 @@ use ntex::channel::mpsc::Receiver;
 use bollard_next::container::Config;
 use bollard_next::service::HostConfig;
 
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_utils::http_error::HttpError;
+
 use nanocl_stubs::system::Event;
+use nanocl_stubs::cargo_config::CargoConfigPartial;
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateConfig, StateStream,
 };
-use nanocl_stubs::cargo_config::CargoConfigPartial;
-use nanocl_utils::io_error::IoResult;
-use nanocl_utils::http_error::HttpError;
 
 use crate::{utils, repositories};
 use crate::models::{StateData, DaemonState};
@@ -705,6 +705,13 @@ pub fn hook_cargo_binds(
             .map_err(|err| err.map_err_context(|| "Canonicalize"))?
             .display()
             .to_string();
+          new_bind.push(format!("{}:{}", source, dest));
+          continue;
+        }
+        if source.starts_with('~') {
+          let home = std::env::var("HOME")
+            .map_err(|err| IoError::not_fount("HOME", &err.to_string()))?;
+          let source = source.replace('~', &home);
           new_bind.push(format!("{}:{}", source, dest));
           continue;
         }

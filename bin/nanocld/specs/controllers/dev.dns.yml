@@ -30,3 +30,4 @@ Cargoes:
       Binds:
       - ./:/project
       - /run/nanocl:/run/nanocl
+      - ~/.cargo/registry:/usr/local/cargo/registry
