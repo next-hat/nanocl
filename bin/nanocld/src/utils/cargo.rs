@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use ntex::rt;
 use ntex::web;
 use ntex::util::Bytes;
-use ntex::http::StatusCode;
 use futures::{StreamExt, TryStreamExt};
 
 use bollard_next::container::LogOutput;
@@ -138,11 +137,7 @@ async fn create_instance(
 
     let res = docker_api
       .create_container::<String>(Some(create_options), config)
-      .await
-      .map_err(|e| HttpError {
-        msg: format!("Unable to create container: {e}"),
-        status: StatusCode::BAD_REQUEST,
-      })?;
+      .await?;
     instances.push(res.id);
   }
 
@@ -341,11 +336,7 @@ pub async fn delete(
           ..Default::default()
         }),
       )
-      .await
-      .map_err(|e| HttpError {
-        msg: format!("Unable to remove container got error : {e}"),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-      })?;
+      .await?;
   }
 
   repositories::cargo::delete_by_key(cargo_key, &state.pool).await?;
@@ -419,11 +410,7 @@ pub async fn put(
         &container.id.unwrap_or_default(),
         bollard_next::container::RenameContainerOptions { name },
       )
-      .await
-      .map_err(|e| HttpError {
-        msg: format!("Unable to rename container got error : {e}"),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-      })?;
+      .await?;
   }
 
   // Create instance with the new config
@@ -441,11 +428,7 @@ pub async fn put(
             &container.id.unwrap_or_default(),
             bollard_next::container::RenameContainerOptions { name },
           )
-          .await
-          .map_err(|e| HttpError {
-            msg: format!("Unable to rename container got error : {e}"),
-            status: StatusCode::INTERNAL_SERVER_ERROR,
-          })?;
+          .await?;
         log::error!("Unable to create cargo instance {} : {err}", cargo.key);
       }
       Vec::new()
@@ -495,11 +478,7 @@ pub async fn put(
           ..Default::default()
         }),
       )
-      .await
-      .map_err(|e| HttpError {
-        msg: format!("Unable to remove container got error : {e}"),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-      })?;
+      .await?;
   }
 
   Ok(cargo)
