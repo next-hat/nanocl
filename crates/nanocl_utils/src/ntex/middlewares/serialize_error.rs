@@ -46,7 +46,7 @@ where
             }
             res = res.into_response(web::HttpResponse::BadRequest().json(
               &serde_json::json!({
-                "msg": &String::from_utf8_lossy(&payload),
+                "msg": &String::from_utf8_lossy(&payload).replace("Json deserialize error:", "payload"),
               }),
             ));
           }
