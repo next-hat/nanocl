@@ -30,8 +30,8 @@ services:
     - io.nanocl.n=system
     - io.nanocl.cnsp=system
 
-  nmetric:
-    container_name: nmetric.system.c
+  nmetrics:
+    container_name: nmetrics.system.c
     image: ghcr.io/nxthat/metrsd:0.2.0
     tty: true
     networks:
@@ -44,7 +44,7 @@ services:
     - unix:///run/nanocl/metrics.sock
     labels:
     - io.nanocl=enabled
-    - io.nanocl.c=nmetric.system
+    - io.nanocl.c=nmetrics.system
     - io.nanocl.n=system
     - io.nanocl.cnsp=system
     volumes:
