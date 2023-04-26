@@ -1,147 +1,15 @@
 use std::collections::HashMap;
 
-use bollard_next::Docker;
-use bollard_next::container::{
-  ListContainersOptions, InspectContainerOptions, CreateContainerOptions,
-  StartContainerOptions,
-};
-use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
-use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
+use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 
-use nanocl_stubs::state::StateDeployment;
+use nanocl_utils::io_error::{FromIo, IoResult};
+
 use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
-use nanocl_utils::io_error::{FromIo, IoResult};
 
 use crate::version::VERSION;
 use crate::{utils, repositories};
 use crate::models::{Pool, DaemonState};
-
-pub(crate) async fn boot_controller(
-  docker: &Docker,
-  ctrl_conf: &str,
-) -> IoResult<()> {
-  let conf =
-    serde_yaml::from_str::<StateDeployment>(ctrl_conf).map_err(|err| {
-      err.map_err_context(|| "Failed to parse controller config")
-    })?;
-
-  let namespace = conf.namespace.unwrap_or("default".into());
-  for cargo in conf.cargoes.unwrap_or_default() {
-    let key = utils::key::gen_key(&namespace, &cargo.name);
-    let name = format!("{key}.c");
-    let mut cargo = utils::state::hook_cargo_binds(&cargo)?;
-    cargo = utils::state::hook_labels(&namespace, &cargo);
-    let mut host_config = cargo.container.host_config.unwrap_or_default();
-    host_config.restart_policy = Some(RestartPolicy {
-      name: Some(RestartPolicyNameEnum::UNLESS_STOPPED),
-      maximum_retry_count: None,
-    });
-    cargo.container.host_config = Some(host_config);
-    if docker
-      .inspect_container(&name, None::<InspectContainerOptions>)
-      .await
-      .is_ok()
-    {
-      continue;
-    }
-
-    let cnt = docker
-      .create_container(
-        Some(CreateContainerOptions {
-          name,
-          platform: None,
-        }),
-        cargo.container,
-      )
-      .await
-      .map_err(|err| err.map_err_context(|| "Create container"))?;
-    docker
-      .start_container(&cnt.id, None::<StartContainerOptions<String>>)
-      .await
-      .map_err(|err| err.map_err_context(|| "Start container"))?;
-  }
-
-  Ok(())
-}
-
-pub(crate) async fn start_subsystem(
-  docker: &Docker,
-  system_conf: &str,
-) -> IoResult<()> {
-  let mut cargo = serde_yaml::from_str::<CargoConfigPartial>(system_conf)
-    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
-
-  let namespace = "system";
-  let key = utils::key::gen_key(namespace, &cargo.name);
-  let name = format!("{key}.c");
-  cargo = utils::state::hook_cargo_binds(&cargo)?;
-  cargo = utils::state::hook_labels(namespace, &cargo);
-  let mut host_config = cargo.container.host_config.unwrap_or_default();
-  host_config.restart_policy = Some(RestartPolicy {
-    name: Some(RestartPolicyNameEnum::UNLESS_STOPPED),
-    maximum_retry_count: None,
-  });
-  cargo.container.host_config = Some(host_config);
-
-  if docker
-    .inspect_container(&name, None::<InspectContainerOptions>)
-    .await
-    .is_ok()
-  {
-    return Ok(());
-  }
-
-  let cnt = docker
-    .create_container(
-      Some(CreateContainerOptions {
-        name,
-        platform: None,
-      }),
-      cargo.container,
-    )
-    .await
-    .map_err(|err| err.map_err_context(|| "CreateContainer"))?;
-  docker
-    .start_container(&cnt.id, None::<StartContainerOptions<String>>)
-    .await
-    .map_err(|err| err.map_err_context(|| "StartContainer"))?;
-  Ok(())
-}
-
-/// Ensure existance of the system network that controllers will use.
-/// It's ensure existance of a network in your system called `nanocl.system`
-/// Also registered inside docker as `system` since it's the name of the namespace.
-/// This network is created to be sure a store is running inside.
-pub(crate) async fn ensure_network(
-  name: &str,
-  docker_api: &bollard_next::Docker,
-) -> IoResult<()> {
-  // Ensure network existance
-  if docker_api
-    .inspect_network(name, None::<InspectNetworkOptions<&str>>)
-    .await
-    .is_ok()
-  {
-    return Ok(());
-  }
-  let mut options: HashMap<String, String> = HashMap::new();
-  options.insert(
-    String::from("com.docker.network.bridge.name"),
-    format!("nanocl.{name}"),
-  );
-  let config = CreateNetworkOptions {
-    name: name.to_owned(),
-    driver: String::from("bridge"),
-    options,
-    ..Default::default()
-  };
-  docker_api
-    .create_network(config)
-    .await
-    .map_err(|err| err.map_err_context(|| "CreateNetwork"))?;
-  Ok(())
-}
 
 /// Ensure existance of specific namespace in our store.
 /// We use it to be sure `system` and `global` namespace exists.

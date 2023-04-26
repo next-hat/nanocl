@@ -53,6 +53,7 @@ jobs:
         cargo build --no-default-features --features test --bin nanocl
         cargo build --no-default-features --features test --bin ncdproxy
         cargo build --no-default-features --features test --bin nanocld
+        docker compose -f ./test.docker-compose.yaml up -d
         cargo run --no-default-features --features test --bin nanocld -- --init
         cargo run --no-default-features --features test --bin nanocld &
         sleep 8
