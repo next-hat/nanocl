@@ -4,7 +4,7 @@ use nanocl_utils::io_error::{FromIo, IoResult};
 
 /// Dnsmasq configuration manager
 #[derive(Clone)]
-pub(crate) struct Dnsmasq {
+pub struct Dnsmasq {
   pub(crate) config_dir: String,
   pub(crate) config_path: String,
   pub(crate) dns: Vec<String>,
@@ -91,7 +91,7 @@ impl Dnsmasq {
     )?;
     self.gen_main_conf()?;
     self.set_dns()?;
-    log::info!("[INFO] Minimal dnsmasq config is ensured");
+    log::info!("Minimal dnsmasq config is ensured");
     Ok(())
   }
 
@@ -143,9 +143,4 @@ impl Dnsmasq {
     })?;
     Ok(())
   }
-}
-
-/// Create a new dnsmasq instance
-pub(crate) fn new(config_path: &str) -> Dnsmasq {
-  Dnsmasq::new(config_path)
 }

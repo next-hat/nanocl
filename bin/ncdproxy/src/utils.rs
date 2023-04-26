@@ -417,58 +417,35 @@ pub(crate) async fn create_resource_conf(
   Ok(())
 }
 
-/// List resources from nanocl daemon
-/// This function will list all resources that contains the target key
-/// in the watch list
-/// The target key is the name of the cargo @ the namespace
-/// The namespace is optional, if not provided, it will be set to "global"
-// pub(crate) async fn list_resource_by_cargo(
-//   name: &str,
-//   namespace: Option<String>,
-//   client: &NanocldClient,
-// ) -> Result<Vec<nanocld_client::stubs::resource::Resource>, ErrorHint> {
-//   let namespace = namespace.unwrap_or("global".into());
-//   let target_key = format!("{name}.{namespace}");
-//   let query = ResourceQuery {
-//     contains: Some(serde_json::json!({ "Watch": [target_key] }).to_string()),
-//     kind: Some("ProxyRule".into()),
-//   };
-//   let resources = client.list_resource(Some(query)).await.map_err(|err| {
-//     ErrorHint::warning(format!(
-//       "Unable to list resources from nanocl daemon: {err}"
-//     ))
-//   })?;
-//   Ok(resources)
-// }
-
 /// Sync resources from nanocl daemon
 /// This function will remove all old configs and generate new ones
-pub(crate) async fn sync_resources(
-  client: &NanocldClient,
-  nginx: &Nginx,
-) -> IoResult<()> {
-  let query = ResourceQuery {
-    kind: Some("ProxyRule".into()),
-    ..Default::default()
-  };
-  let resources = client.list_resource(Some(query)).await.map_err(|err| {
-    err.map_err_context(|| "Unable to list resources from nanocl")
-  })?;
+/// TODO Make call this function from api endpoint
+// pub(crate) async fn sync_resources(
+//   client: &NanocldClient,
+//   nginx: &Nginx,
+// ) -> IoResult<()> {
+//   let query = ResourceQuery {
+//     kind: Some("ProxyRule".into()),
+//     ..Default::default()
+//   };
+//   let resources = client.list_resource(Some(query)).await.map_err(|err| {
+//     err.map_err_context(|| "Unable to list resources from nanocl")
+//   })?;
 
-  // remove old configs
-  let _ = nginx.clear_conf();
+//   // remove old configs
+//   let _ = nginx.clear_conf();
 
-  for resource in resources {
-    let proxy_rule = serialize_proxy_rule(&resource.clone().into())?;
-    if let Err(err) =
-      create_resource_conf(&resource.name, &proxy_rule, client, nginx).await
-    {
-      log::warn!("{err}")
-    }
-  }
-  reload_config(client).await?;
-  Ok(())
-}
+//   for resource in resources {
+//     let proxy_rule = serialize_proxy_rule(&resource.clone().into())?;
+//     if let Err(err) =
+//       create_resource_conf(&resource.name, &proxy_rule, client, nginx).await
+//     {
+//       log::warn!("{err}")
+//     }
+//   }
+//   reload_config(client).await?;
+//   Ok(())
+// }
 
 /// List resources from nanocl daemon
 /// This function will list all resources that contains the target key

@@ -10,8 +10,3 @@ pub(crate) struct Cli {
   #[clap(long)]
   pub(crate) dns: Vec<String>,
 }
-
-/// Parse the cli arguments
-pub(crate) fn parse() -> Cli {
-  Cli::parse()
-}

@@ -33,8 +33,15 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
     use nanocl_utils::ntex::swagger;
     use openapi::ApiDoc;
 
+    let api_doc = ApiDoc::openapi();
+    std::fs::write(
+      "./bin/nanocld/specs/swagger.yaml",
+      api_doc.to_yaml().expect("Unable to convert ApiDoc to yaml"),
+    )
+    .expect("Unable to write swagger.yaml");
     let swagger_conf =
-      swagger::SwaggerConfig::new(ApiDoc::openapi(), "/explorer/swagger.json");
+      swagger::SwaggerConfig::new(api_doc, "/explorer/swagger.json");
+
     config.service(
       web::scope("/explorer/")
         .state(swagger_conf)

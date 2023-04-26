@@ -115,15 +115,13 @@ async fn on_event(
 
 async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
   loop {
-    log::info!("Connecting to nanocl daemon...");
+    log::info!("Subscribing to nanocl daemon events..");
     match client.watch_events().await {
       Err(err) => {
-        log::warn!("Unable to connect to nanocl daemon got error: {err}");
+        log::warn!("Unable to Subscribe to nanocl daemon events: {err}");
       }
       Ok(mut stream) => {
-        if let Err(err) = utils::sync_resources(client, nginx).await {
-          log::warn!("{err}");
-        }
+        log::info!("Subscribed to nanocl daemon events");
         while let Some(event) = stream.next().await {
           let Ok(event) = event else {
             break;
@@ -136,7 +134,7 @@ async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
       }
     }
     log::warn!(
-      "Disconnected from nanocl daemon trying to reconnect in 2 seconds"
+      "Unsubscribed from nanocl daemon events, retrying to subscribe in 2 seconds"
     );
     ntex::time::sleep(std::time::Duration::from_secs(2)).await;
   }

@@ -145,30 +145,31 @@ impl Nginx {
     let _ = tokio::fs::remove_file(&path).await;
   }
 
-  #[inline]
-  pub fn clear_conf(&self) -> IoResult<()> {
-    let sites_enabled_dir = format!("{}/sites-enabled", self.conf_dir);
-    fs::remove_dir_all(&sites_enabled_dir).map_err(|err| {
-      err.map_err_context(|| {
-        format!("Cannot remove directory {sites_enabled_dir}")
-      })
-    })?;
-    let streams_enabled_dir = format!("{}/streams-enabled", self.conf_dir);
-    fs::remove_dir_all(&streams_enabled_dir).map_err(|err| {
-      err.map_err_context(|| {
-        format!("Cannot remove directory {streams_enabled_dir}")
-      })
-    })?;
-    fs::create_dir_all(&sites_enabled_dir).map_err(|err| {
-      err.map_err_context(|| {
-        format!("Cannot create directory {sites_enabled_dir}")
-      })
-    })?;
-    fs::create_dir_all(&streams_enabled_dir).map_err(|err| {
-      err.map_err_context(|| {
-        format!("Cannot create directory {streams_enabled_dir}")
-      })
-    })?;
-    Ok(())
-  }
+  // TODO: Uncommand to enable sync resources
+  // #[inline]
+  // pub fn clear_conf(&self) -> IoResult<()> {
+  //   let sites_enabled_dir = format!("{}/sites-enabled", self.conf_dir);
+  //   fs::remove_dir_all(&sites_enabled_dir).map_err(|err| {
+  //     err.map_err_context(|| {
+  //       format!("Cannot remove directory {sites_enabled_dir}")
+  //     })
+  //   })?;
+  //   let streams_enabled_dir = format!("{}/streams-enabled", self.conf_dir);
+  //   fs::remove_dir_all(&streams_enabled_dir).map_err(|err| {
+  //     err.map_err_context(|| {
+  //       format!("Cannot remove directory {streams_enabled_dir}")
+  //     })
+  //   })?;
+  //   fs::create_dir_all(&sites_enabled_dir).map_err(|err| {
+  //     err.map_err_context(|| {
+  //       format!("Cannot create directory {sites_enabled_dir}")
+  //     })
+  //   })?;
+  //   fs::create_dir_all(&streams_enabled_dir).map_err(|err| {
+  //     err.map_err_context(|| {
+  //       format!("Cannot create directory {streams_enabled_dir}")
+  //     })
+  //   })?;
+  //   Ok(())
+  // }
 }

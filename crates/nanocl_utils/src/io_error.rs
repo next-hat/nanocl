@@ -85,7 +85,7 @@ impl IoError {
   pub fn exit(&self) -> ! {
     #[cfg(feature = "logger")]
     {
-      log::error!("{}", self);
+      log::error!("{self}");
     }
     std::process::exit(self.inner.raw_os_error().unwrap_or(1));
   }

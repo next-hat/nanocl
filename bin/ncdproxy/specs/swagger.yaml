@@ -1,14 +1,48 @@
 openapi: 3.0.3
 info:
-  title: ncdproxy
-  description: Official nanocl controller daemon proxy
+  title: Nanocl Controller Daemon Proxy
+  description: |
+    The `Nanocl Controller Daemon Proxy` is an `HTTP REST API`.<br />
+    It is the `API` the `Nanocl Daemon` uses, to create / update and delete `ProxyRule`
+
+    ## OpenAPI Specification
+    This API is documented in **OpenAPI format** using [Utoipa](https://github.com/juhaku/utoipa)<br />
+    The specification is generated automatically when running in development only.<br />
+    When releasing a version, the generated file is transfered to our [Documentation](https://github.com/nxthat/documentation).
+
+
+    ## Cross-Origin Resource Sharing
+    This API features Cross-Origin Resource Sharing (CORS) implemented in compliance with  [W3C spec](https://www.w3.org/TR/cors/).<br />
+    And that allows cross-domain communication from the browser.<br />
+    All responses have a wildcard same-origin which makes them completely public and accessible to everyone, including any code on any site.
   contact:
     name: nanocl contributors
     email: team@next-hat.com
   license:
     name: MIT OR Apache-2.0
-  version: 0.3.0
+  version: v0.3.0
+servers:
+- url: /{Version}
+  variables:
+    Version:
+      default: v0.3
+      description: API version
+      enum:
+      - v0.4
+      - v0.3
+      - v0.2
+      - v0.1
 paths:
+  /_ping:
+    head:
+      tags:
+      - System
+      summary: Get version information
+      description: Get version information
+      operationId: head_ping
+      responses:
+        '202':
+          description: Server is up
   /rules/{Name}:
     put:
       tags:
@@ -31,7 +65,7 @@ paths:
         required: true
       responses:
         '200':
-          description: List of namespace
+          description: The created rule
           content:
             application/json:
               schema:
@@ -51,7 +85,21 @@ paths:
           type: string
       responses:
         '200':
-          description: ProxyRule has been deleted
+          description: Rule has been deleted
+  /version:
+    get:
+      tags:
+      - System
+      summary: Get version information
+      description: Get version information
+      operationId: get_version
+      responses:
+        '200':
+          description: Version information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
 components:
   schemas:
     CargoTarget:
@@ -248,6 +296,25 @@ components:
       - MovedPermanently
       - PermanentRedirect
       - TemporaryRedirect
+    Version:
+      type: object
+      description: Version contain details about the current version nanocl
+      required:
+      - Arch
+      - Channel
+      - Version
+      - CommitId
+      properties:
+        Arch:
+          type: string
+        Channel:
+          type: string
+        Version:
+          type: string
+        CommitId:
+          type: string
 tags:
 - name: Rules
   description: Rules management endpoints.
+- name: System
+  description: System management endpoints.
