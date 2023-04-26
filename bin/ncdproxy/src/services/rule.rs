@@ -65,15 +65,13 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
 
-  use crate::services;
-
-  use ntex::http::StatusCode;
+  use ntex::http;
 
   use crate::utils::tests;
 
   #[ntex::test]
   async fn rules() {
-    let test_srv = tests::generate_server(services::ntex_config);
+    let test_srv = tests::generate_server();
 
     let resource: &str = include_str!("../../tests/resource_redirect.yml");
 
@@ -92,7 +90,7 @@ mod tests {
       .await
       .unwrap();
 
-    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.status(), http::StatusCode::OK);
 
     let res = test_srv
       .delete(format!("/v0.3/rules/{}", name))
@@ -100,6 +98,6 @@ mod tests {
       .await
       .unwrap();
 
-    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.status(), http::StatusCode::OK);
   }
 }
