@@ -66,6 +66,13 @@ impl HttpError {
   {
     Self::new(http::StatusCode::CONFLICT, msg)
   }
+
+  pub fn bad_gateway<T>(msg: T) -> Self
+  where
+    T: ToString,
+  {
+    Self::new(http::StatusCode::BAD_GATEWAY, msg)
+  }
 }
 
 /// Helper function to display an HttpError
@@ -93,6 +100,12 @@ impl From<crate::io_error::IoError> for HttpError {
     match err.inner.kind() {
       std::io::ErrorKind::NotFound => HttpError::not_found(err.to_string()),
       std::io::ErrorKind::AlreadyExists => HttpError::conflict(err.to_string()),
+      std::io::ErrorKind::ConnectionAborted => {
+        HttpError::bad_gateway(err.to_string())
+      }
+      std::io::ErrorKind::ConnectionRefused => {
+        HttpError::bad_gateway(err.to_string())
+      }
       std::io::ErrorKind::InvalidData => {
         HttpError::bad_request(err.to_string())
       }
@@ -125,5 +138,15 @@ impl From<bollard_next::errors::Error> for HttpError {
         status: http::StatusCode::INTERNAL_SERVER_ERROR,
       },
     }
+  }
+}
+
+#[cfg(feature = "io_error")]
+impl crate::io_error::FromIo<HttpError> for HttpError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> HttpError
+  where
+    C: ToString + std::fmt::Display,
+  {
+    HttpError::new(self.status, format!("{}: {}", context(), self.msg))
   }
 }

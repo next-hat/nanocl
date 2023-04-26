@@ -65,8 +65,8 @@ async fn hook_create_resource(
   pool: &Pool,
 ) -> Result<ResourcePartial, HttpError> {
   let ctrl_client = match resource.kind.as_ref() {
-    "ProxyRule" => CtrlClient::new("unix:///run/nanocl/proxy.sock"),
-    "DnsRule" => CtrlClient::new("unix:///run/nanocl/dns.sock"),
+    "ProxyRule" => CtrlClient::new("ncdproxy", "unix:///run/nanocl/proxy.sock"),
+    "DnsRule" => CtrlClient::new("ncddns", "unix:///run/nanocl/dns.sock"),
     _ => {
       validate_resource(resource, pool).await?;
       return Ok(resource.clone());
@@ -75,11 +75,7 @@ async fn hook_create_resource(
 
   let config = ctrl_client
     .apply_rule(&resource.version, &resource.name, &resource.config)
-    .await
-    .map_err(|err| HttpError {
-      status: StatusCode::BAD_REQUEST,
-      msg: format!("{}", err),
-    })?;
+    .await?;
 
   let mut resource = resource.clone();
   resource.config = config;
@@ -90,18 +86,14 @@ async fn hook_create_resource(
 /// Hook when deleting a resource
 async fn hook_delete_resource(resource: &Resource) -> Result<(), HttpError> {
   let ctrl_client = match resource.kind.as_ref() {
-    "ProxyRule" => CtrlClient::new("unix:///run/nanocl/proxy.sock"),
-    "DnsRule" => CtrlClient::new("unix:///run/nanocl/dns.sock"),
+    "ProxyRule" => CtrlClient::new("ncdproxy", "unix:///run/nanocl/proxy.sock"),
+    "DnsRule" => CtrlClient::new("ncddns", "unix:///run/nanocl/dns.sock"),
     _ => return Ok(()),
   };
 
   ctrl_client
     .delete_rule(&resource.version, &resource.name)
-    .await
-    .map_err(|err| HttpError {
-      status: StatusCode::BAD_REQUEST,
-      msg: format!("{}", err),
-    })?;
+    .await?;
   Ok(())
 }
 

@@ -1,30 +1,56 @@
 use ntex::rt;
 use ntex::http::{Client, StatusCode};
-use ntex::http::client::{
-  Connector, ClientResponse,
-  error::{SendRequestError, JsonPayloadError},
-};
-use thiserror::Error;
+use ntex::http::client::{Connector, ClientResponse};
 
+use nanocl_utils::io_error::{IoError, FromIo};
 use nanocl_utils::http_error::HttpError;
 
 pub struct CtrlClient {
+  pub(crate) name: String,
   pub(crate) client: Client,
-  pub(crate) url: String,
+  pub(crate) base_url: String,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub enum CtrlClientError {
-  #[error("Failed to send request: {0}")]
-  SendRequest(#[from] SendRequestError),
-  #[error("Failed to parse json: {0}")]
-  JsonPayload(#[from] JsonPayloadError),
-  #[error(transparent)]
-  HttpResponse(#[from] HttpError),
+  IoError(IoError),
+  HttpResponse(HttpError),
+}
+
+impl std::fmt::Display for CtrlClientError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      CtrlClientError::IoError(err) => write!(f, "{}", err),
+      CtrlClientError::HttpResponse(err) => write!(f, "{}", err),
+    }
+  }
+}
+
+impl std::error::Error for CtrlClientError {}
+
+impl From<Box<IoError>> for CtrlClientError {
+  fn from(f: Box<IoError>) -> Self {
+    Self::IoError(*f)
+  }
+}
+
+impl From<HttpError> for CtrlClientError {
+  fn from(f: HttpError) -> Self {
+    Self::HttpResponse(f)
+  }
+}
+
+impl From<CtrlClientError> for HttpError {
+  fn from(f: CtrlClientError) -> Self {
+    match f {
+      CtrlClientError::IoError(err) => err.into(),
+      CtrlClientError::HttpResponse(err) => err,
+    }
+  }
 }
 
 impl CtrlClient {
-  pub(crate) fn new(url: &'static str) -> Self {
+  pub(crate) fn new(name: &str, url: &'static str) -> Self {
     let (client, url) = match url {
       url if url.starts_with("unix://") => {
         let client = Client::build()
@@ -50,37 +76,48 @@ impl CtrlClient {
 
     Self {
       client,
-      url: url.to_owned(),
+      name: name.to_owned(),
+      base_url: url.to_owned(),
     }
   }
 
   fn format_url(&self, path: &str) -> String {
-    format!("{}{}", self.url, path)
+    format!("{}{}", self.base_url, path)
   }
 
   async fn is_api_error(
+    &self,
     res: &mut ClientResponse,
     status: &StatusCode,
   ) -> Result<(), CtrlClientError> {
     if status.is_server_error() || status.is_client_error() {
-      let body = res.json::<serde_json::Value>().await?;
+      let body = res
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|err| err.map_err_context(|| self.name.to_string()))?;
       let msg = body["msg"].as_str().ok_or(HttpError {
         status: *status,
         msg: String::default(),
       })?;
       return Err(CtrlClientError::HttpResponse(HttpError {
         status: *status,
-        msg: msg.to_owned(),
+        msg: format!("{}: {msg}", self.name),
       }));
     }
     Ok(())
   }
 
-  async fn res_json<T>(res: &mut ClientResponse) -> Result<T, CtrlClientError>
+  async fn res_json<T>(
+    &self,
+    res: &mut ClientResponse,
+  ) -> Result<T, CtrlClientError>
   where
     T: serde::de::DeserializeOwned,
   {
-    let body = res.json::<T>().await?;
+    let body = res
+      .json::<T>()
+      .await
+      .map_err(|err| err.map_err_context(|| self.name.to_string()))?;
     Ok(body)
   }
 
@@ -94,11 +131,12 @@ impl CtrlClient {
       .client
       .put(self.format_url(&format!("/{version}/rules/{name}")))
       .send_json(data)
-      .await?;
+      .await
+      .map_err(|err| err.map_err_context(|| self.name.to_string()))?;
     let status = res.status();
-    Self::is_api_error(&mut res, &status).await?;
+    self.is_api_error(&mut res, &status).await?;
 
-    Self::res_json(&mut res).await
+    self.res_json(&mut res).await
   }
 
   pub(crate) async fn delete_rule(
@@ -110,9 +148,10 @@ impl CtrlClient {
       .client
       .delete(self.format_url(&format!("/{version}/rules/{name}")))
       .send()
-      .await?;
+      .await
+      .map_err(|err| err.map_err_context(|| self.name.to_string()))?;
     let status = res.status();
-    Self::is_api_error(&mut res, &status).await?;
+    self.is_api_error(&mut res, &status).await?;
 
     Ok(())
   }

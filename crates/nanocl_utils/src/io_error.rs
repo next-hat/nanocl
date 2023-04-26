@@ -299,3 +299,51 @@ impl From<ntex::http::error::BlockingError<IoError>> for IoError {
     }
   }
 }
+
+#[cfg(feature = "ntex")]
+impl FromIo<Box<IoError>> for ntex::http::client::error::SendRequestError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    let inner = match self {
+      ntex::http::client::error::SendRequestError::Timeout => {
+        std::io::Error::new(std::io::ErrorKind::TimedOut, format!("{self}"))
+      }
+      ntex::http::client::error::SendRequestError::Connect(err) => match err {
+        ntex::http::client::error::ConnectError::Disconnected(_) => {
+          std::io::Error::new(
+            std::io::ErrorKind::ConnectionAborted,
+            format!("{err}"),
+          )
+        }
+        _ => std::io::Error::new(
+          std::io::ErrorKind::ConnectionRefused,
+          format!("{err}"),
+        ),
+      },
+      _ => {
+        std::io::Error::new(std::io::ErrorKind::Interrupted, format!("{self}"))
+      }
+    };
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner,
+    })
+  }
+}
+
+impl FromIo<Box<IoError>> for ntex::http::client::error::JsonPayloadError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("{self}"),
+      ),
+    })
+  }
+}

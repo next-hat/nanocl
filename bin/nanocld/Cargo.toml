@@ -40,7 +40,6 @@ log = "0.4.17"
 futures = "0.3"
 serde_yaml = "0.9"
 env_logger = { version = "0.10" }
-thiserror = "1.0.37"
 serde_json = "1.0.88"
 diesel_migrations = "2.0.0"
 clap = { version = "4.1.7", features = ["derive"] }
