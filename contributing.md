@@ -12,6 +12,8 @@ Note: `Nanocl` heavily utilizes [ntex](https://ntex.rs) as **client** and **serv
   * [🐧 Ubuntu](#-ubuntu)
   * [🦀 Rust](#-rust)
 * [🏃 Running](#-running)
+  * [🐋 Docker Desktop](#-docker-desktop)
+* [🧪 Testing](#-testing)
 * [👌 Usefull Command](#-usefull-command)
 
 
@@ -124,9 +126,16 @@ Then spin up `Nanocl` services using `docker compose`:
 docker compose up
 ```
 
-## Docker Desktop
+### 🐋 Docker Desktop
 
-In case you are using Docker desktop, you need to update this line:
+If you can have Docker installed normally with his default socket on `/run/docker.sock` you can also change the context:
+
+```sh
+docker context ls
+docker context use default
+```
+
+In case you want to be using Docker desktop, you need to update this line:
 
 ```yaml
 volumes:
@@ -138,15 +147,6 @@ On the `nanocld` service, afterward you can start the daemon using:
 ```sh
 docker compose up
 ```
-
-If you can have Docker installed normally with his default socket on `/run/docker.sock` you can also change the context:
-
-```sh
-docker context ls
-docker context use default
-```
-
-To use previous commands
 
 Once started, a swagger should be available on [http://localhost:8585/explorer](http://localhost:8585/explorer).
 
@@ -179,7 +179,7 @@ Now you can run the CLI:
   cargo run --bin nanocl version
   ```
 
-## Testing
+## 🧪 Testing
 
 To run tests, make sure all `Nanocl` services are running with `docker compose up`.<br/>
 Then be sure to have correct permission set on `/run/nanocl`
@@ -227,5 +227,5 @@ Some usefull command to know:
 
 * Generate ssl cert from certbot
   ```sh
-  nanocl exec system-nano-proxy -- certbot --nginx --email email@email.com --agree-tos -d your-domain.com
+  nanocl cargo -n system exec nproxy -- certbot --nginx --email email@email.com --agree-tos -d your-domain.com
   ```
