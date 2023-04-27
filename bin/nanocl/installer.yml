@@ -1,3 +1,13 @@
+Type: Deployment
+ApiVersion: v0.5
+
+# This is the required component for nanocl ecosystem.
+# It is a deployment that will be parsed and used to spin up nanocl
+# The settings may be dynamically updated when joining a cluster
+# or when a new node is added to the cluster.
+
+Namespace: system
+
 Cargoes:
 - Name: nstore
   Container:
@@ -62,21 +72,49 @@ Cargoes:
       - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
       - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
-- Name: ndns
-  Env:
-  - TZ=Europe/Paris
+- Name: ndaemon
   Container:
-    Image: nanocl-dnsmasq:0.0.1
-    HostConfig:
-      NetworkMode: host
-
-- Name: ncddns
-  Container:
+    Image: ghcr.io/nxthat/nanocld:0.5.0
+    Tty: true
+    Arg:
+    - --state-dir
+    - ${{ state_dir }}
+    - --conf-dir
+    - ${{ conf_dir }}
+    - --docker-host
+    - ${{ docker_host }}
+    - --gateway
+    - ${{ gateway }}
+    - --hostname
+    - ${{ hostname }}
+    - --advertise-addr
+    - ${{ advertise_addr }}
     Env:
     - TZ=Europe/Paris
-    Image: nanocl-ncddns:0.0.1
-    Tty: true
+    - NANOCL_GID=${{ gid }}
     HostConfig:
       NetworkMode: system
       Binds:
       - /run/nanocl:/run/nanocl
+      - /run/docker.sock:/run/docker.sock
+      - ${{ state_dir }}:${{ state_dir }}
+      - ${{ conf_dir }}:${{ conf_dir }}
+
+# - Name: ndns
+#   Container:
+#     Env:
+#     - TZ=Europe/Paris
+#     Image: nanocl-dnsmasq:0.0.1
+#     HostConfig:
+#       NetworkMode: host
+
+# - Name: ncddns
+#   Container:
+#     Env:
+#     - TZ=Europe/Paris
+#     Image: nanocl-ncddns:0.0.1
+#     Tty: true
+#     HostConfig:
+#       NetworkMode: system
+#       Binds:
+#       - /run/nanocl:/run/nanocl
