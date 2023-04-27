@@ -33,9 +33,9 @@ pub struct ProxySslConfig {
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoTarget {
   /// The cargo key
-  pub key: String,
+  pub cargo_key: String,
   /// The cargo port
-  pub port: u16,
+  pub cargo_port: u16,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -44,8 +44,8 @@ pub struct CargoTarget {
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum UrlRedirect {
   MovedPermanently,
-  PermanentRedirect,
-  TemporaryRedirect,
+  Permanent,
+  Temporary,
   // TODO ?
   // Found,
   // SeeOther,
@@ -55,8 +55,8 @@ impl std::fmt::Display for UrlRedirect {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       UrlRedirect::MovedPermanently => write!(f, "301"),
-      UrlRedirect::PermanentRedirect => write!(f, "308"),
-      UrlRedirect::TemporaryRedirect => write!(f, "307"),
+      UrlRedirect::Permanent => write!(f, "308"),
+      UrlRedirect::Temporary => write!(f, "307"),
     }
   }
 }
@@ -75,14 +75,14 @@ pub struct HttpTarget {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum LocationTarget {
   /// Target an existing cargo
   Cargo(CargoTarget),
   /// Target a specific http url
   Http(HttpTarget),
   /// Target a specific unix socket
-  Unix(String),
+  Unix(UnixTarget),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -98,13 +98,21 @@ pub struct UriTarget {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct UnixTarget {
+  pub unix_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum StreamTarget {
   /// Target an existing cargo
   Cargo(CargoTarget),
   /// Target a specific uri
   Uri(UriTarget),
   /// Target a specific unix socket
-  Unix(String),
+  Unix(UnixTarget),
 }
 
 /// Proxy rules modes

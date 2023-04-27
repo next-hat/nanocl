@@ -18,6 +18,5 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Cargo:
-            Key: deploy-example.global
-            Port: 9000
+          CargoKey: deploy-example.global
+          CargoPort: 9000

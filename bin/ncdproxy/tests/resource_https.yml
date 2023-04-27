@@ -18,6 +18,5 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Cargo:
-            Key: get-started.global
-            Port: 9000
+          CargoKey: get-started.global
+          CargoPort: 9000
