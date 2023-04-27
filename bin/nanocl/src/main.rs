@@ -1,17 +1,17 @@
 use clap::Parser;
+
 use nanocld_client::NanocldClient;
+use nanocl_utils::io_error::IoError;
 
 mod utils;
-mod error;
+mod config;
 mod models;
 mod version;
 mod commands;
-mod config;
 
-use error::CliError;
 use models::{Cli, Commands};
 
-async fn execute_args(args: &Cli) -> Result<(), CliError> {
+async fn execute_args(args: &Cli) -> Result<(), IoError> {
   let cli_conf = config::read();
 
   let client = match cli_conf.url {
@@ -39,6 +39,7 @@ async fn execute_args(args: &Cli) -> Result<(), CliError> {
 async fn main() -> std::io::Result<()> {
   let args = Cli::parse();
   if let Err(err) = execute_args(&args).await {
+    eprintln!("{err}");
     err.exit();
   }
   Ok(())

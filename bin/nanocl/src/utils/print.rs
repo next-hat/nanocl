@@ -3,7 +3,7 @@ use tabled::{
   Padding, Alignment, Table, Style, Modify,
 };
 
-use crate::error::CliError;
+use nanocl_utils::io_error::{IoResult, FromIo};
 
 pub fn print_table<T>(iter: impl IntoIterator<Item = T>)
 where
@@ -21,11 +21,12 @@ where
   println!("{table}");
 }
 
-pub fn print_yml<T>(data: T) -> Result<(), CliError>
+pub fn print_yml<T>(data: T) -> IoResult<()>
 where
   T: serde::Serialize,
 {
-  let yml = serde_yaml::to_string(&data)?;
+  let yml = serde_yaml::to_string(&data)
+    .map_err(|err| err.map_err_context(|| "Print yaml"))?;
   print!("{yml}");
   Ok(())
 }

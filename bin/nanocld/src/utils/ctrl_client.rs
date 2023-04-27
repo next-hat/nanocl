@@ -2,51 +2,14 @@ use ntex::rt;
 use ntex::http::{Client, StatusCode};
 use ntex::http::client::{Connector, ClientResponse};
 
-use nanocl_utils::io_error::{IoError, FromIo};
+use nanocl_utils::io_error::FromIo;
 use nanocl_utils::http_error::HttpError;
+use nanocl_utils::http_client_error::HttpClientError;
 
 pub struct CtrlClient {
   pub(crate) name: String,
   pub(crate) client: Client,
   pub(crate) base_url: String,
-}
-
-#[derive(Debug)]
-pub enum CtrlClientError {
-  IoError(IoError),
-  HttpResponse(HttpError),
-}
-
-impl std::fmt::Display for CtrlClientError {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      CtrlClientError::IoError(err) => write!(f, "{}", err),
-      CtrlClientError::HttpResponse(err) => write!(f, "{}", err),
-    }
-  }
-}
-
-impl std::error::Error for CtrlClientError {}
-
-impl From<Box<IoError>> for CtrlClientError {
-  fn from(f: Box<IoError>) -> Self {
-    Self::IoError(*f)
-  }
-}
-
-impl From<HttpError> for CtrlClientError {
-  fn from(f: HttpError) -> Self {
-    Self::HttpResponse(f)
-  }
-}
-
-impl From<CtrlClientError> for HttpError {
-  fn from(f: CtrlClientError) -> Self {
-    match f {
-      CtrlClientError::IoError(err) => err.into(),
-      CtrlClientError::HttpResponse(err) => err,
-    }
-  }
 }
 
 impl CtrlClient {
@@ -89,7 +52,7 @@ impl CtrlClient {
     &self,
     res: &mut ClientResponse,
     status: &StatusCode,
-  ) -> Result<(), CtrlClientError> {
+  ) -> Result<(), HttpClientError> {
     if status.is_server_error() || status.is_client_error() {
       let body = res
         .json::<serde_json::Value>()
@@ -99,7 +62,7 @@ impl CtrlClient {
         status: *status,
         msg: String::default(),
       })?;
-      return Err(CtrlClientError::HttpResponse(HttpError {
+      return Err(HttpClientError::HttpError(HttpError {
         status: *status,
         msg: format!("{}: {msg}", self.name),
       }));
@@ -110,7 +73,7 @@ impl CtrlClient {
   async fn res_json<T>(
     &self,
     res: &mut ClientResponse,
-  ) -> Result<T, CtrlClientError>
+  ) -> Result<T, HttpClientError>
   where
     T: serde::de::DeserializeOwned,
   {
@@ -126,7 +89,7 @@ impl CtrlClient {
     version: &str,
     name: &str,
     data: &serde_json::Value,
-  ) -> Result<serde_json::Value, CtrlClientError> {
+  ) -> Result<serde_json::Value, HttpClientError> {
     let mut res = self
       .client
       .put(self.format_url(&format!("/{version}/rules/{name}")))
@@ -143,7 +106,7 @@ impl CtrlClient {
     &self,
     version: &str,
     name: &str,
-  ) -> Result<(), CtrlClientError> {
+  ) -> Result<(), HttpClientError> {
     let mut res = self
       .client
       .delete(self.format_url(&format!("/{version}/rules/{name}")))

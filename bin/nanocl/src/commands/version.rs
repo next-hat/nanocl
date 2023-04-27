@@ -1,9 +1,10 @@
+use nanocl_utils::io_error::IoResult;
+
 use nanocld_client::NanocldClient;
 
 use crate::version;
-use crate::error::CliError;
 
-async fn print_version(client: &NanocldClient) -> Result<(), CliError> {
+async fn print_version(client: &NanocldClient) -> IoResult<()> {
   println!("=== [nanocli] ===");
   version::print_version();
 
@@ -20,7 +21,7 @@ async fn print_version(client: &NanocldClient) -> Result<(), CliError> {
   Ok(())
 }
 
-pub async fn exec_version(client: &NanocldClient) -> Result<(), CliError> {
+pub async fn exec_version(client: &NanocldClient) -> IoResult<()> {
   print_version(client).await?;
   Ok(())
 }

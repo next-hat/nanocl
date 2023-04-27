@@ -3,12 +3,12 @@ use std::error::Error;
 use ntex::channel::mpsc;
 use ntex::util::{Bytes, Stream};
 
+use nanocl_utils::http_error::HttpError;
+use nanocl_utils::http_client_error::HttpClientError;
+
 use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
 
-use crate::error::ApiError;
-
 use super::http_client::NanocldClient;
-use super::error::NanocldClientError;
 
 impl NanocldClient {
   /// ## List all cargo images
@@ -17,7 +17,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [Vec](Vec) of [ImageSummary](bollard_next::models::ImageSummary)
-  ///   * [Err](Err) - [NanocldClientError](NanocldClientError) if the request failed
+  ///   * [Err](Err) - [HttpClientError](HttpClientError) if the request failed
   ///
   /// ## Example
   ///
@@ -31,7 +31,7 @@ impl NanocldClient {
   pub async fn list_cargo_image(
     &self,
     opts: Option<ListCargoImagesOptions>,
-  ) -> Result<Vec<bollard_next::models::ImageSummary>, NanocldClientError> {
+  ) -> Result<Vec<bollard_next::models::ImageSummary>, HttpClientError> {
     let res = self
       .send_get(format!("/{}/cargoes/images", &self.version), opts)
       .await?;
@@ -52,7 +52,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [mpsc::Receiver](mpsc::Receiver) of [CreateImageInfo](bollard_next::models::CreateImageInfo) as Stream
-  ///   * [Err](Err) - [NanocldClientError](NanocldClientError) if the request failed
+  ///   * [Err](Err) - [HttpClientError](HttpClientError) if the request failed
   ///
   /// ## Example
   ///
@@ -70,8 +70,8 @@ impl NanocldClient {
     &self,
     name: &str,
   ) -> Result<
-    mpsc::Receiver<Result<bollard_next::models::CreateImageInfo, ApiError>>,
-    NanocldClientError,
+    mpsc::Receiver<Result<bollard_next::models::CreateImageInfo, HttpError>>,
+    HttpClientError,
   > {
     let res = self
       .send_post(
@@ -97,7 +97,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The image was successfully deleted
-  ///   * [Err](Err) - [NanocldClientError](NanocldClientError) if the request failed
+  ///   * [Err](Err) - [HttpClientError](HttpClientError) if the request failed
   ///
   /// ## Example
   ///
@@ -111,7 +111,7 @@ impl NanocldClient {
   pub async fn delete_cargo_image(
     &self,
     name: &str,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_delete(
         format!("/{}/cargoes/images/{name}", self.version),
@@ -133,7 +133,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [ImageInspect](bollard_next::models::ImageInspect) of the image
-  ///   * [Err](Err) - [NanocldClientError](NanocldClientError) if the request failed
+  ///   * [Err](Err) - [HttpClientError](HttpClientError) if the request failed
   ///
   /// ## Example
   ///
@@ -147,7 +147,7 @@ impl NanocldClient {
   pub async fn inspect_cargo_image(
     &self,
     name: &str,
-  ) -> Result<bollard_next::models::ImageInspect, NanocldClientError> {
+  ) -> Result<bollard_next::models::ImageInspect, HttpClientError> {
     let res = self
       .send_get(
         format!("/{}/cargoes/images/{name}", self.version),
@@ -160,7 +160,7 @@ impl NanocldClient {
   pub async fn import_cargo_image_from_tar<S, E>(
     &self,
     stream: S,
-  ) -> Result<(), NanocldClientError>
+  ) -> Result<(), HttpClientError>
   where
     S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
     E: Error + 'static,

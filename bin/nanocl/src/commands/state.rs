@@ -8,6 +8,8 @@ use futures::StreamExt;
 
 use bollard_next::service::HostConfig;
 
+use nanocl_utils::io_error::{IoResult, FromIo, IoError};
+
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
@@ -18,67 +20,61 @@ use nanocld_client::stubs::state::{
 };
 
 use crate::utils;
-use crate::error::CliError;
 use crate::models::{StateArgs, StateCommands, StateOpts, StateBuildArgs};
 
 use super::cargo_image::exec_cargo_image_create;
 
 async fn get_from_url(
   url: String,
-) -> Result<(StateConfig, serde_yaml::Value), CliError> {
+) -> IoResult<(StateConfig, serde_yaml::Value)> {
   let reqwest = ntex::http::Client::default();
   let data = reqwest
     .get(url.to_string())
     .send()
     .await
-    .map_err(|err| CliError::Custom {
-      msg: format!("Cannot fetch state file from url: {err}"),
-    })?
+    .map_err(|err| err.map_err_context(|| "Unable to get StateFile from url"))?
     .body()
     .await
-    .map_err(|err| CliError::Custom {
-      msg: format!("Cannot fetch state file from url: {err}"),
-    })?
+    .map_err(|err| err.map_err_context(|| "Cannot read response from url"))?
     .to_vec();
-  let data = std::str::from_utf8(&data).map_err(|err| CliError::Custom {
-    msg: format!("Cannot fetch state file from url: {err}"),
+  let data = std::str::from_utf8(&data).map_err(|err| {
+    IoError::invalid_data("From utf8".into(), format!("{err}"))
   })?;
   let meta = utils::state::get_file_meta(&String::from(data))?;
-  let yaml: serde_yaml::Value = serde_yaml::from_str(data)?;
+  let yaml: serde_yaml::Value = serde_yaml::from_str(data).map_err(|err| {
+    err.map_err_context(|| "Unable to convert response into yaml")
+  })?;
   Ok((meta, yaml))
 }
 
 async fn get_from_file(
   path: &str,
-) -> Result<(StateConfig, serde_yaml::Value), CliError> {
+) -> IoResult<(StateConfig, serde_yaml::Value)> {
   let mut file_path = std::env::current_dir()?;
   file_path.push(path);
   let data = fs::read_to_string(file_path)?;
   let meta = utils::state::get_file_meta(&String::from(&data))?;
-  let yaml: serde_yaml::Value = serde_yaml::from_str(&data)?;
+  let yaml: serde_yaml::Value = serde_yaml::from_str(&data)
+    .map_err(|err| err.map_err_context(|| "Unable to parse yaml"))?;
   Ok((meta, yaml))
 }
 
 async fn download_cargo_image(
   client: &NanocldClient,
   cargo: &CargoConfigPartial,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   match &cargo.container.image {
     Some(image) => {
       exec_cargo_image_create(client, image).await?;
     }
     None => {
-      return Err(CliError::Custom {
-        msg: format!("Cargo image is not specified for {}", cargo.name),
-      });
+      return Err(IoError::invalid_data("Cargo image", "is not specified"))
     }
   }
   Ok(())
 }
 
-fn hook_binds(
-  cargo: &CargoConfigPartial,
-) -> Result<CargoConfigPartial, CliError> {
+fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
   let new_cargo = match &cargo.container.host_config {
     None => cargo.clone(),
     Some(host_config) => match &host_config.binds {
@@ -122,7 +118,7 @@ fn hook_binds(
 async fn hook_cargoes(
   client: &NanocldClient,
   cargoes: Vec<CargoConfigPartial>,
-) -> Result<Vec<CargoConfigPartial>, CliError> {
+) -> IoResult<Vec<CargoConfigPartial>> {
   let mut new_cargoes = Vec::new();
   for cargo in cargoes {
     if client
@@ -152,7 +148,7 @@ async fn attach_to_cargo(
   client: &NanocldClient,
   cargo: CargoConfigPartial,
   namespace: &str,
-) -> Result<Vec<rt::JoinHandle<()>>, CliError> {
+) -> IoResult<Vec<rt::JoinHandle<()>>> {
   let cargo = match client
     .inspect_cargo(&cargo.name, Some(namespace.to_owned()))
     .await
@@ -220,7 +216,7 @@ async fn attach_to_cargoes(
   client: &NanocldClient,
   cargoes: Vec<CargoConfigPartial>,
   namespace: &str,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let mut futures = Vec::new();
   for cargo in cargoes {
     let more_futures = attach_to_cargo(client, cargo, namespace).await?;
@@ -230,7 +226,7 @@ async fn attach_to_cargoes(
   Ok(())
 }
 
-fn gen_client(meta: &StateConfig) -> Result<NanocldClient, CliError> {
+fn gen_client(meta: &StateConfig) -> IoResult<NanocldClient> {
   let client = match meta.api_version.clone() {
     api_version if meta.api_version.starts_with("http") => {
       let mut paths = api_version
@@ -239,9 +235,9 @@ fn gen_client(meta: &StateConfig) -> Result<NanocldClient, CliError> {
         .collect::<Vec<String>>();
       // extract and remove last item of paths
       let path_ptr = paths.clone();
-      let version = path_ptr.last().ok_or(CliError::Custom {
-        msg: "Please add version to the path".into(),
-      })?;
+      let version = path_ptr
+        .last()
+        .ok_or(IoError::not_fount("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
       NanocldClient::connect_with_url(&url, version)
@@ -257,9 +253,9 @@ fn gen_client(meta: &StateConfig) -> Result<NanocldClient, CliError> {
         .collect::<Vec<String>>();
       // extract and remove last item of paths
       let path_ptr = paths.clone();
-      let version = path_ptr.last().ok_or(CliError::Custom {
-        msg: "Please add version to the path".into(),
-      })?;
+      let version = path_ptr
+        .last()
+        .ok_or(IoError::not_fount("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
       NanocldClient::connect_with_url(&format!("https://{url}"), version)
@@ -271,8 +267,9 @@ fn gen_client(meta: &StateConfig) -> Result<NanocldClient, CliError> {
 fn inject_build_args(
   yaml: serde_yaml::Value,
   args: Vec<String>,
-) -> Result<serde_yaml::Value, CliError> {
-  let build_args: StateBuildArgs = serde_yaml::from_value(yaml.clone())?;
+) -> IoResult<serde_yaml::Value> {
+  let build_args: StateBuildArgs = serde_yaml::from_value(yaml.clone())
+    .map_err(|err| err.map_err_context(|| "Unable to extract BuildArgs"))?;
 
   if build_args.args.is_none() {
     return Ok(yaml);
@@ -308,21 +305,26 @@ fn inject_build_args(
     let arg: &'static str = Box::leak(name.to_owned().into_boxed_str());
     match build_arg.r#type.as_str() {
       "String" => {
-        let value = matches.get_one::<String>(arg).ok_or(CliError::Custom {
-          msg: format!("Missing argument {arg}"),
-        })?;
+        let value =
+          matches.get_one::<String>(arg).ok_or(IoError::invalid_data(
+            "BuildArgs".into(),
+            format!("argument {arg} is missing"),
+          ))?;
         args.insert(name, value.to_owned());
       }
       "Number" => {
-        let value = matches.get_one::<i64>(arg).ok_or(CliError::Custom {
-          msg: format!("Missing argument {arg}"),
-        })?;
+        let value =
+          matches.get_one::<i64>(arg).ok_or(IoError::invalid_data(
+            "BuildArgs".into(),
+            format!("argument {arg} is missing"),
+          ))?;
         args.insert(name, format!("{value}"));
       }
       _ => {
-        return Err(CliError::Custom {
-          msg: format!("Unknown type {type}", type = build_arg.r#type),
-        })
+        return Err(IoError::invalid_data(
+          "StateFile".into(),
+          format!("unknown type {}", build_arg.r#type),
+        ))
       }
     }
   }
@@ -334,24 +336,25 @@ fn inject_build_args(
     envs.insert(key, value);
   }
 
-  let str = serde_yaml::to_string(&yaml)?;
-  let template =
-    mustache::compile_str(&str).map_err(|err| CliError::Custom {
-      msg: format!("Cannot compile mustache template: {err}"),
-    })?;
+  let str = serde_yaml::to_string(&yaml)
+    .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
+  let template = mustache::compile_str(&str).map_err(|err| {
+    IoError::invalid_data("Template".into(), format!("{err}"))
+  })?;
   let str = template
     .render_to_string(&serde_json::json!({
       "Args": args,
       "Envs": envs,
     }))
-    .map_err(|err| CliError::Custom {
-      msg: format!("Cannot render mustache template: {err}"),
+    .map_err(|err| {
+      IoError::invalid_data("Template".into(), format!("{err}"))
     })?;
-  let yaml: serde_yaml::Value = serde_yaml::from_str(&str)?;
+  let yaml: serde_yaml::Value = serde_yaml::from_str(&str)
+    .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
   Ok(yaml)
 }
 
-async fn exec_state_apply(opts: &StateOpts) -> Result<(), CliError> {
+async fn exec_state_apply(opts: &StateOpts) -> IoResult<()> {
   let (meta, yaml) = match utils::url::parse_url(&opts.file_path) {
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
@@ -365,24 +368,33 @@ async fn exec_state_apply(opts: &StateOpts) -> Result<(), CliError> {
   let mut cargoes = Vec::new();
   let yaml = match meta.r#type.as_str() {
     "Cargo" => {
-      let mut data = serde_yaml::from_value::<StateCargo>(yaml)?;
+      let mut data = serde_yaml::from_value::<StateCargo>(yaml)
+        .map_err(|err| err.map_err_context(|| "Unable to parse StateCargo"))?;
       namespace = data.namespace.clone().unwrap_or(namespace);
       cargoes = hook_cargoes(&client, data.cargoes).await?;
       data.cargoes = cargoes.clone();
-      let yml = serde_yaml::to_value(data)?;
+      let yml = serde_yaml::to_value(data).map_err(|err| {
+        err.map_err_context(|| "Unable to convert to yaml value")
+      })?;
       inject_meta(meta, yml)
     }
     "Deployment" => {
-      let mut data = serde_yaml::from_value::<StateDeployment>(yaml)?;
+      let mut data =
+        serde_yaml::from_value::<StateDeployment>(yaml).map_err(|err| {
+          err.map_err_context(|| "Unable to parse StateDeployment")
+        })?;
       namespace = data.namespace.clone().unwrap_or(namespace);
       cargoes = hook_cargoes(&client, data.cargoes.unwrap_or_default()).await?;
       data.cargoes = Some(cargoes.clone());
-      let yml = serde_yaml::to_value(data)?;
+      let yml = serde_yaml::to_value(data).map_err(|err| {
+        err.map_err_context(|| "Unable to convert to yaml value")
+      })?;
       inject_meta(meta, yml)
     }
     _ => yaml,
   };
-  let data = serde_json::to_value(&yaml)?;
+  let data = serde_json::to_value(&yaml)
+    .map_err(|err| err.map_err_context(|| "Unable to convert to yaml value"))?;
   let _ = utils::print::print_yml(&yaml);
   if !opts.skip_confirm {
     let result = Confirm::with_theme(&ColorfulTheme::default())
@@ -392,9 +404,7 @@ async fn exec_state_apply(opts: &StateOpts) -> Result<(), CliError> {
     match result {
       Ok(true) => {}
       _ => {
-        return Err(CliError::Custom {
-          msg: "Aborted".into(),
-        })
+        return Err(IoError::interupted("State apply", "interupted by user"))
       }
     }
   }
@@ -414,7 +424,7 @@ async fn exec_state_apply(opts: &StateOpts) -> Result<(), CliError> {
   Ok(())
 }
 
-async fn exec_state_revert(opts: &StateOpts) -> Result<(), CliError> {
+async fn exec_state_revert(opts: &StateOpts) -> IoResult<()> {
   let (meta, yaml) = match utils::url::parse_url(&opts.file_path) {
     Ok(url) => get_from_url(url).await?,
     Err(_) => get_from_file(&opts.file_path).await?,
@@ -423,7 +433,8 @@ async fn exec_state_revert(opts: &StateOpts) -> Result<(), CliError> {
   let client = gen_client(&meta)?;
 
   let yaml = inject_build_args(yaml.clone(), opts.args.clone())?;
-  let data = serde_json::to_value(&yaml)?;
+  let data = serde_json::to_value(&yaml)
+    .map_err(|err| err.map_err_context(|| "Unable to parse yaml"))?;
   let _ = utils::print::print_yml(&yaml);
   if !opts.skip_confirm {
     let result = Confirm::with_theme(&ColorfulTheme::default())
@@ -433,9 +444,7 @@ async fn exec_state_revert(opts: &StateOpts) -> Result<(), CliError> {
     match result {
       Ok(true) => {}
       _ => {
-        return Err(CliError::Custom {
-          msg: "Aborted".into(),
-        })
+        return Err(IoError::interupted("StateRevert", "interupted by user"))
       }
     }
   }
@@ -450,7 +459,7 @@ async fn exec_state_revert(opts: &StateOpts) -> Result<(), CliError> {
   Ok(())
 }
 
-pub async fn exec_state(args: &StateArgs) -> Result<(), CliError> {
+pub async fn exec_state(args: &StateArgs) -> IoResult<()> {
   match &args.commands {
     StateCommands::Apply(opts) => exec_state_apply(opts).await,
     StateCommands::Revert(opts) => exec_state_revert(opts).await,

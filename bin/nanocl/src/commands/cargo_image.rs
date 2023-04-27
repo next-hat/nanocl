@@ -4,22 +4,21 @@ use dialoguer::Confirm;
 use dialoguer::theme::ColorfulTheme;
 use tokio_util::codec;
 use futures::StreamExt;
-use ntex::http::StatusCode;
 use bollard_next::service::ProgressDetail;
 use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
 
 use nanocld_client::NanocldClient;
-use nanocld_client::error::ApiError;
+
+use nanocl_utils::io_error::{IoResult, IoError};
 
 use crate::utils::print::*;
 use crate::utils::math::calculate_percentage;
-use crate::error::CliError;
 use crate::models::{
   CargoImageOpts, CargoImageCommands, CargoImageRemoveOpts,
   CargoImageInspectOpts, CargoImageRow, CargoImageImportOpts,
 };
 
-async fn exec_cargo_image_ls(client: &NanocldClient) -> Result<(), CliError> {
+async fn exec_cargo_image_ls(client: &NanocldClient) -> IoResult<()> {
   let items = client.list_cargo_image(None).await?;
   let rows = items
     .into_iter()
@@ -32,7 +31,7 @@ async fn exec_cargo_image_ls(client: &NanocldClient) -> Result<(), CliError> {
 async fn exec_cargo_image_rm(
   client: &NanocldClient,
   options: &CargoImageRemoveOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   if !options.skip_confirm {
     let result = Confirm::with_theme(&ColorfulTheme::default())
       .with_prompt(format!("Delete cargo images {}?", options.names.join(",")))
@@ -41,9 +40,10 @@ async fn exec_cargo_image_rm(
     match result {
       Ok(true) => {}
       _ => {
-        return Err(CliError::Custom {
-          msg: "Aborted".into(),
-        })
+        return Err(IoError::interupted(
+          "Cargo image remove",
+          "interupted by user",
+        ))
       }
     }
   }
@@ -90,7 +90,7 @@ fn update_progress(
 pub(crate) async fn exec_cargo_image_create(
   client: &NanocldClient,
   name: &str,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let mut stream = client.create_cargo_image(name).await?;
   let mut layers: HashMap<String, ProgressBar> = HashMap::new();
   let multiprogress = MultiProgress::new();
@@ -99,13 +99,7 @@ pub(crate) async fn exec_cargo_image_create(
     let info = info?;
     // If there is any error we stop the stream
     if let Some(error) = info.error {
-      return Err(CliError::Api(ApiError {
-        msg: format!(
-          "Error while downloading image {} got error {}",
-          &name, &error
-        ),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-      }));
+      return Err(IoError::interupted("Cargo image create", &error));
     }
     let status = info.status.unwrap_or_default();
     let id = info.id.unwrap_or_default();
@@ -141,7 +135,7 @@ pub(crate) async fn exec_cargo_image_create(
 async fn exec_cargo_image_inspect(
   client: &NanocldClient,
   opts: &CargoImageInspectOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let image = client.inspect_cargo_image(&opts.name).await?;
   print_yml(image)?;
   Ok(())
@@ -150,7 +144,7 @@ async fn exec_cargo_image_inspect(
 async fn exec_cargo_image_import(
   client: &NanocldClient,
   opts: &CargoImageImportOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let file = tokio::fs::File::open(&opts.file_path).await.unwrap();
 
   let byte_stream =
@@ -166,7 +160,7 @@ async fn exec_cargo_image_import(
 pub async fn exec_cargo_image(
   client: &NanocldClient,
   cmd: &CargoImageOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   match &cmd.commands {
     CargoImageCommands::List => exec_cargo_image_ls(client).await,
     CargoImageCommands::Inspect(opts) => {

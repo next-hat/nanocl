@@ -1,20 +1,23 @@
-use ntex::{ws, rt};
+use nanocl_utils::io_error::FromIo;
+use ntex::rt;
+use ntex::ws;
 use ntex::io::Base;
 use ntex::ws::WsConnection;
+
+use nanocl_utils::http_client_error::HttpClientError;
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 
 use crate::NanocldClient;
-use crate::error::NanocldClientError;
 
 impl NanocldClient {
   pub async fn create_vm(
     &self,
     vm: &VmConfigPartial,
     namespace: Option<String>,
-  ) -> Result<Vm, NanocldClientError> {
+  ) -> Result<Vm, HttpClientError> {
     let res = self
       .send_post(
         format!("/{}/vms", self.version),
@@ -29,7 +32,7 @@ impl NanocldClient {
   pub async fn list_vm(
     &self,
     namespace: Option<String>,
-  ) -> Result<Vec<VmSummary>, NanocldClientError> {
+  ) -> Result<Vec<VmSummary>, HttpClientError> {
     let res = self
       .send_get(
         format!("/{}/vms", self.version),
@@ -44,7 +47,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_delete(
         format!("/{}/vms/{}", self.version, name),
@@ -59,7 +62,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<VmInspect, NanocldClientError> {
+  ) -> Result<VmInspect, HttpClientError> {
     let res = self
       .send_get(
         format!("/{}/vms/{}/inspect", self.version, name),
@@ -74,7 +77,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_post(
         format!("/{}/vms/{}/start", self.version, name),
@@ -90,7 +93,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_post(
         format!("/{}/vms/{}/stop", self.version, name),
@@ -107,7 +110,7 @@ impl NanocldClient {
     name: &str,
     vm: &VmConfigUpdate,
     namespace: Option<String>,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_patch(
         format!("/{}/vms/{}", self.version, name),
@@ -123,7 +126,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<WsConnection<Base>, NanocldClientError> {
+  ) -> Result<WsConnection<Base>, HttpClientError> {
     let qs = if let Some(namespace) = namespace {
       format!("?namespace={}", namespace)
     } else {
@@ -138,9 +141,11 @@ impl NanocldClient {
     .connector(ntex::service::fn_service(|_| async {
       Ok::<_, _>(rt::unix_connect("/run/nanocl/nanocl.sock").await?)
     }))
-    .finish()?
+    .finish()
+    .map_err(|err| err.map_err_context(|| "/run/nanocl/nanocl.sock"))?
     .connect()
-    .await?;
+    .await
+    .map_err(|err| err.map_err_context(|| "/run/nanocl/nanocl.sock"))?;
 
     Ok(con)
   }

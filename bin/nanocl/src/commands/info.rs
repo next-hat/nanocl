@@ -1,11 +1,12 @@
 use nanocld_client::NanocldClient;
 
-use crate::error::CliError;
+use nanocl_utils::io_error::IoResult;
 
-pub async fn exec_info(client: &NanocldClient) -> Result<(), CliError> {
+use crate::utils::print::print_yml;
+
+pub async fn exec_info(client: &NanocldClient) -> IoResult<()> {
   let info = client.info().await?;
-  let info = serde_yaml::to_string(&info)?;
 
-  println!("{info}");
+  print_yml(info)?;
   Ok(())
 }

@@ -21,7 +21,9 @@ ntex_swagger = ["ntex", "http_error", "dep:utoipa", "dep:utoipa-swagger-ui"]
 bollard = ["dep:bollard-next"]
 serde_json = ["dep:serde_json"]
 serde_yaml = ["dep:serde_yaml"]
+serde_urlencoded = ["dep:serde_urlencoded"]
 http_error = ["ntex", "dep:serde_json"]
+http_client_error = ["ntex", "io_error", "http_error", "serde_urlencoded"]
 
 [dependencies]
 ntex = { version = "0.6.7", optional = true }
@@ -34,3 +36,4 @@ diesel = { version = "2.0.1", default-features = false, optional = true }
 futures = { version = "0.3.25", optional = true }
 utoipa = { version = "3.2", features = ["yaml"], optional = true }
 utoipa-swagger-ui = { version = "3.1", optional = true }
+serde_urlencoded = { version = "0.7.1", optional = true }

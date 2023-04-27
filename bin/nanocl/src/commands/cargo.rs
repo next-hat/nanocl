@@ -6,8 +6,9 @@ use bollard_next::exec::CreateExecOptions;
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery, CargoLogQuery};
 
-use crate::utils::print::*;
-use crate::error::CliError;
+use nanocl_utils::io_error::{IoResult, IoError};
+
+use crate::utils::print::{print_yml, print_table};
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
@@ -26,13 +27,13 @@ use super::cargo_image::{self, exec_cargo_image_create};
 /// ## Returns
 /// * [Result](Result) - Result of the operation
 ///   * [Ok](Ok) - Operation was successful
-///   * [Err](CliError) - Operation failed
+///   * [Err](IoError) - Operation failed
 ///
 async fn exec_cargo_create(
   client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoCreateOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let cargo = options.clone().into();
   let item = client.create_cargo(&cargo, args.namespace.clone()).await?;
   println!("{}", &item.key);
@@ -43,7 +44,7 @@ async fn exec_cargo_rm(
   client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoRemoveOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   if !options.skip_confirm {
     let result = Confirm::with_theme(&ColorfulTheme::default())
       .with_prompt(format!("Delete cargoes {}?", options.names.join(",")))
@@ -52,9 +53,7 @@ async fn exec_cargo_rm(
     match result {
       Ok(true) => {}
       _ => {
-        return Err(CliError::Custom {
-          msg: "Aborted".into(),
-        })
+        return Err(IoError::interupted("Cargo remove", "interupted by user"))
       }
     }
   }
@@ -71,7 +70,7 @@ async fn exec_cargo_rm(
 async fn exec_cargo_ls(
   client: &NanocldClient,
   args: &CargoArgs,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let items = client.list_cargo(args.namespace.clone()).await?;
 
   let rows = items
@@ -86,7 +85,7 @@ async fn exec_cargo_start(
   client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoStartOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   client
     .start_cargo(&options.name, args.namespace.clone())
     .await?;
@@ -97,7 +96,7 @@ async fn exec_cargo_stop(
   client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoStopOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   for name in &options.names {
     client.stop_cargo(name, args.namespace.clone()).await?;
   }
@@ -108,7 +107,7 @@ async fn exec_cargo_patch(
   client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoPatchOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let cargo = options.clone().into();
   client
     .patch_cargo(&options.name, cargo, args.namespace.clone())
@@ -120,7 +119,7 @@ async fn exec_cargo_inspect(
   client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoInspectOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let cargo = client
     .inspect_cargo(&options.name, args.namespace.clone())
     .await?;
@@ -132,7 +131,7 @@ async fn exec_cargo_exec(
   client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoExecOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let exec: CreateExecOptions = options.clone().into();
   let mut stream = client
     .exec_cargo(&options.name, exec, args.namespace.clone())
@@ -159,13 +158,12 @@ async fn exec_cargo_history(
   client: &NanocldClient,
   args: &CargoArgs,
   opts: &CargoHistoryOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let histories = client
     .list_history_cargo(&opts.name, args.namespace.clone())
     .await?;
 
-  let histories = serde_yaml::to_string(&histories)?;
-  println!("{histories}");
+  print_yml(histories)?;
   Ok(())
 }
 
@@ -173,7 +171,7 @@ async fn exec_cargo_logs(
   client: &NanocldClient,
   args: &CargoArgs,
   options: &CargoLogsOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let query = CargoLogQuery {
     namespace: args.namespace.clone(),
     tail: options.tail.clone(),
@@ -211,12 +209,11 @@ async fn exec_cargo_reset(
   client: &NanocldClient,
   args: &CargoArgs,
   opts: &CargoResetOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let cargo = client
     .reset_cargo(&opts.name, &opts.history_id, args.namespace.clone())
     .await?;
-  let cargo = serde_yaml::to_string(&cargo)?;
-  println!("{cargo}");
+  print_yml(cargo)?;
   Ok(())
 }
 
@@ -224,7 +221,7 @@ async fn exec_cargo_run(
   client: &NanocldClient,
   args: &CargoArgs,
   opts: &CargoRunOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   // Image is not existing so we donwload it
   if client.inspect_cargo_image(&opts.image).await.is_err() {
     exec_cargo_image_create(client, &opts.image).await?;
@@ -244,7 +241,7 @@ async fn exec_cargo_run(
 pub async fn exec_cargo(
   client: &NanocldClient,
   args: &CargoArgs,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   match &args.commands {
     CargoCommands::List => exec_cargo_ls(client, args).await,
     CargoCommands::Create(options) => {

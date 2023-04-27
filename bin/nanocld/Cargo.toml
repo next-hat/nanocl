@@ -76,6 +76,7 @@ nanocl_utils = { version = "0.1.0", features = [
   "logger",
   "io_error",
   "http_error",
+  "http_client_error",
   "serde_json",
   "serde_yaml",
   "diesel",
