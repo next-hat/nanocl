@@ -8,7 +8,7 @@ use super::resource::ResourcePartial;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct StateConfig {
+pub struct StateMeta {
   pub api_version: String,
   pub r#type: String,
 }
