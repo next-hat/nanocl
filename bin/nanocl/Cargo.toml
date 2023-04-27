@@ -37,7 +37,7 @@ nanocld_client = { version = "0.5.0", features = ["tokio"] }
 bollard-next = { version = "0.14.9" }
 futures = "0.3"
 serde_yaml = "0.9"
-tabled = "0.10.0"
+tabled = "0.12.0"
 indicatif = "0.17.3"
 serde_json = "1.0.89"
 ntex = { version = "0.6.6", features = ["rustls", "tokio"] }
