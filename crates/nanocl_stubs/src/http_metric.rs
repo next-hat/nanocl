@@ -1,5 +1,7 @@
-use serde::Deserializer;
 use uuid::Uuid;
+
+#[cfg(feature = "serde")]
+use serde::Deserializer;
 
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};

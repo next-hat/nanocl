@@ -32,11 +32,12 @@ COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
 COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
 COPY ./bin/nanocl/src ./bin/nanocl/src
 COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
-COPY .git ./.git
 COPY ./bin/ncdproxy/src ./bin/ncdproxy/src
 COPY ./bin/ncdproxy/build.rs ./bin/ncdproxy/build.rs
 COPY ./bin/ncdproxy/specs ./bin/ncdproxy/specs
+COPY ./bin/ncddns/build.rs ./bin/ncddns/build.rs
 COPY ./bin/ncddns/src ./bin/ncddns/src
+COPY .git ./.git
 RUN cargo build --release --target=x86_64-unknown-linux-musl --features release --bin ncddns
 RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ncddns
 

@@ -82,10 +82,8 @@ mod tests {
 
     let payload = resource["Config"].clone();
 
-    println!("payload: {:?}", payload);
-
     let res = test_srv
-      .put(format!("/v0.3/rules/{name}"))
+      .put(format!("/v0.4/rules/{name}"))
       .send_json(&payload)
       .await
       .unwrap();
@@ -93,7 +91,7 @@ mod tests {
     assert_eq!(res.status(), http::StatusCode::OK);
 
     let res = test_srv
-      .delete(format!("/v0.3/rules/{}", name))
+      .delete(format!("/v0.4/rules/{}", name))
       .send()
       .await
       .unwrap();
