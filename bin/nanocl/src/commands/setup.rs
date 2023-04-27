@@ -1,10 +1,9 @@
 use std::time::Duration;
 
 use users::get_group_by_name;
+use bollard_next::container::StartContainerOptions;
 
 use nanocl_utils::io_error::{IoError, IoResult, FromIo};
-
-use bollard_next::container::StartContainerOptions;
 use nanocld_client::stubs::state::StateDeployment;
 
 use crate::utils;

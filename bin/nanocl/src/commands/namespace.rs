@@ -1,8 +1,8 @@
 use dialoguer::Confirm;
 use dialoguer::theme::ColorfulTheme;
-use nanocld_client::NanocldClient;
 
 use nanocl_utils::io_error::{IoError, IoResult};
+use nanocld_client::NanocldClient;
 
 use crate::utils::print::{print_yml, print_table};
 use crate::models::{

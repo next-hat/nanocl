@@ -5,7 +5,6 @@ use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 
 use nanocl_utils::io_error::{IoResult, FromIo};
-
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::vm_image::VmImageCloneStream;
 

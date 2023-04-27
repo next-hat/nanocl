@@ -3,10 +3,9 @@ use dialoguer::theme::ColorfulTheme;
 use futures::StreamExt;
 use bollard_next::exec::CreateExecOptions;
 
+use nanocl_utils::io_error::{IoError, IoResult};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery, CargoLogQuery};
-
-use nanocl_utils::io_error::{IoResult, IoError};
 
 use crate::utils::print::{print_yml, print_table};
 use crate::models::{

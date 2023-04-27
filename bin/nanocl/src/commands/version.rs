@@ -1,5 +1,4 @@
 use nanocl_utils::io_error::IoResult;
-
 use nanocld_client::NanocldClient;
 
 use crate::version;

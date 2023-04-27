@@ -1,8 +1,7 @@
 use futures::StreamExt;
 
-use nanocld_client::NanocldClient;
-
 use nanocl_utils::io_error::IoResult;
+use nanocld_client::NanocldClient;
 
 use crate::utils::print::print_yml;
 

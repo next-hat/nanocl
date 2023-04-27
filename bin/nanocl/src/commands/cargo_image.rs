@@ -7,11 +7,10 @@ use futures::StreamExt;
 use bollard_next::service::ProgressDetail;
 use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
 
+use nanocl_utils::io_error::{IoError, IoResult};
 use nanocld_client::NanocldClient;
 
-use nanocl_utils::io_error::{IoResult, IoError};
-
-use crate::utils::print::*;
+use crate::utils::print::{print_yml, print_table};
 use crate::utils::math::calculate_percentage;
 use crate::models::{
   CargoImageOpts, CargoImageCommands, CargoImageRemoveOpts,

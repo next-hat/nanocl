@@ -5,11 +5,9 @@ use clap::{Command, Arg};
 use dialoguer::Confirm;
 use dialoguer::theme::ColorfulTheme;
 use futures::StreamExt;
-
 use bollard_next::service::HostConfig;
 
-use nanocl_utils::io_error::{IoResult, FromIo, IoError};
-
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
