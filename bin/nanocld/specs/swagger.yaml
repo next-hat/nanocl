@@ -24,12 +24,12 @@ info:
     email: team@next-hat.com
   license:
     name: MIT OR Apache-2.0
-  version: v0.5.0
+  version: v0.6.0
 servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.5
+      default: v0.6
       description: API version
       enum:
       - v0.6
@@ -1793,13 +1793,13 @@ components:
       type: object
       description: Defines a proxy rule target
       required:
-      - Key
-      - Port
+      - CargoKey
+      - CargoPort
       properties:
-        Key:
+        CargoKey:
           type: string
           description: The cargo key
-        Port:
+        CargoPort:
           type: integer
           format: int32
           description: The cargo port
@@ -3239,25 +3239,9 @@ components:
       - locked
     LocationTarget:
       oneOf:
-      - type: object
-        required:
-        - Cargo
-        properties:
-          Cargo:
-            $ref: '#/components/schemas/CargoTarget'
-      - type: object
-        required:
-        - Http
-        properties:
-          Http:
-            $ref: '#/components/schemas/HttpTarget'
-      - type: object
-        required:
-        - Unix
-        properties:
-          Unix:
-            type: string
-            description: Target a specific unix socket
+      - $ref: '#/components/schemas/CargoTarget'
+      - $ref: '#/components/schemas/HttpTarget'
+      - $ref: '#/components/schemas/UnixTarget'
     Metric:
       type: object
       description: Metric entry
@@ -4129,25 +4113,9 @@ components:
           nullable: true
     StreamTarget:
       oneOf:
-      - type: object
-        required:
-        - Cargo
-        properties:
-          Cargo:
-            $ref: '#/components/schemas/CargoTarget'
-      - type: object
-        required:
-        - Uri
-        properties:
-          Uri:
-            $ref: '#/components/schemas/UriTarget'
-      - type: object
-        required:
-        - Unix
-        properties:
-          Unix:
-            type: string
-            description: Target a specific unix socket
+      - $ref: '#/components/schemas/CargoTarget'
+      - $ref: '#/components/schemas/UriTarget'
+      - $ref: '#/components/schemas/UnixTarget'
     SwarmInfo:
       type: object
       description: Represents generic information about swarm.
@@ -4710,8 +4678,8 @@ components:
       type: string
       enum:
       - MovedPermanently
-      - PermanentRedirect
-      - TemporaryRedirect
+      - Permanent
+      - Temporary
     Version:
       type: object
       description: Version contain details about the current version nanocl

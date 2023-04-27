@@ -20,12 +20,12 @@ info:
     email: team@next-hat.com
   license:
     name: MIT OR Apache-2.0
-  version: v0.3.0
+  version: v0.4.0
 servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.3
+      default: v0.4
       description: API version
       enum:
       - v0.4

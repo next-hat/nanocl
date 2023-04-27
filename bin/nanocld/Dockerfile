@@ -1,5 +1,5 @@
 # stage 1 - Setup dependencies
-FROM rust:1.68.2-alpine3.17 as planner
+FROM rust:1.69.0-alpine3.17 as planner
 
 WORKDIR /app
 COPY ./Cargo.toml ./Cargo.toml
@@ -12,7 +12,7 @@ COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
 COPY ./bin/nanocld/Cargo.toml ./bin/nanocld/Cargo.toml
 
 # stage 2 - Build binary
-FROM rust:1.68.2-alpine3.17 as builder
+FROM rust:1.69.0-alpine3.17 as builder
 
 ARG channel=stable
 

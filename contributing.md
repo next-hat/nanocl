@@ -204,7 +204,6 @@ Then be sure to have correct permission set on `/run/nanocl`
   cargo make test-cli
   ```
 
-
 ## 👌 Usefull Command
 
 Some usefull command to know:
