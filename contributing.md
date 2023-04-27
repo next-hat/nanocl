@@ -20,39 +20,35 @@ Note: `Nanocl` heavily utilizes [ntex](https://ntex.rs) as **client** and **serv
 `Nanocl` is using a **mono repository structure**.<br />
 
 ```sh
-bin
-├── ncddns # Controller DNS
-│   ├── dnsmasq # Source to build dnsmasq container image
-│   └── src # Rust source code
-├── ncdproxy # Controller PROXY
-│   ├── nginx # Source to build nginx container image
-│   │   └── html
-│   ├── src # Rust source code
-│   └── tests # Configuration to tests
+bin # Binaries (executable)
 ├── nanocl # Nanocl CLI
 │   └── src # Rust source code
 │       ├── commands # Function that executes commands
-│       ├── models # Data structure used in the project
-│       └── utils # Utils functions
-└── nanocld # Nanocl DAEMON REST API
-    ├── migrations # Container SQL migration generated with diesel
-    │   ├── 00000000000000_diesel_initial_setup
-    │   ├── 2022-05-20-134629_create_namespaces
-    │   ├── 2022-06-17-122356_create_cargos
-    │   ├── 2022-08-04-214925_create_nodes
-    │   ├── 2023-01-15-121652_resources
-    │   ├── 2023-02-17-193350_metrics
-    │   └── 2023-03-10-234850_vms
-    ├── specs # Configuration the daemon will apply at runtime
-    │   └── controllers # Controller configurations the daemon will apply at runtime
-    └── src # Rust source code
-        ├── models # Data structure used in the project
-        ├── repositories # Functions to make SQL requests
-        ├── services # Function to accept http requests
-        ├── subsystem # Function every runtime to ensude the default state is setup
-        └── utils # Utils functions
-crates # Libraries
+│       ├── models # Data structure used for the project
+│       └── utils # Utils functions for the project
+├── nanocld # Nanocl DAEMON REST API
+│   ├── migrations # SQL table definition to generate schema.rs with diesel
+│   ├── specs # OpenApi specification
+│   └── src # Rust source code
+│       ├── models # Data structure used for the project
+│       ├── repositories # Functions to make SQL requests
+│       ├── services # Function to accept http requests
+│       ├── subsystem # Function executed before starting the server
+│       └── utils # Utils functions for the project
+├── ncddns # Nanocl Controller Daemon DNS REST API
+│   ├── specs # OpenApi specification
+│   ├── tests # Test configurations
+│   └── src # Rust source code
+├── ncdproxy # Nanocl Controller Daemon PROXY REST API
+│   ├── specs # OpenApi specification
+│   ├── tests # Test configuration
+│   └── src # Rust source code
+├── ndns # Source to build custom dnsmasq container image
+└── nproxy # Source to build custom nginx container image
+crates # Shared Libraries
 ├── nanocld_client # A nanocld client
+│   └── src # The rust source code
+├── nanocl_utils # A collection of utils used in the project
 │   └── src # The rust source code
 └── nanocl_stubs # Shared data structure mostly used as input and output of out DAEMON
     └── src # The rust source code
@@ -109,11 +105,6 @@ Afterwards install rust devtools required to run `Nanocl`
 
 ## 🏃 Running
 
-You can run `Nanocl` in multiple ways
-
-First you need to start the daemon, the daemon needs to have the right to access to docker.<br />
-The daemon is our principal **REST API** and will start the required components at runtime.
-
 Make sure your are in docker group, if not then you can add yourself:
 
 ```sh
@@ -127,64 +118,22 @@ Before running `Nanocl` we will need to download and build some docker images:
 ./scripts/install_dev_image.sh
 ```
 
-We need to create the state directory of `Nanocl`
-It's located at `/var/lib/nanocl` and be sure we have correct read/write permission.
-In development i personnaly don't really care and do it that way:
+Then spin up `Nanocl` services using `docker compose`:
 
 ```sh
-sudo mkdir /var/lib/nanocl
-sudo chmod 777 /var/lib/nanocl
-```
-
-Knowing that `Nanocl Daemon` will create a unix socket at `/run/nanocl/nanocl.sock`
-I make sure the folder `/run/nanocl` exists
-
-```sh
-sudo mkdir /run/nanocl
-sudo chmod 777 -R /run/nanocl
-```
-
-Finally we can start the daemon.
-You can do it in multiple way :
-
-* Using cargo make
-
-  ```sh
-  cargo make dev # Run the daemon (the daemon will start required services)
-  ```
-
-* Using cargo
-
-  ```sh
-  cargo run --no-default-features --features dev --bin nanocld
-  ```
-
-* Using cargo watch
-
-  ```sh
-  cargo watch -x "run --no-default-features --features dev --bin nanocld"
-  ```
-
-
-Note: Since required services like `ncdproxy` and `ncddns` are running inside a container.
-You may encounter permission problem.
-After starting the daemon i recommand you to run:
-
-```
-sudo chmod 777 -R /run/nanocl
+docker compose up
 ```
 
 ## Docker Desktop
 
-In case you are using Docker desktop, you need to use the `docker-compose.yaml`<br/>
-But before you need to update this line:
+In case you are using Docker desktop, you need to update this line:
 
 ```yaml
 volumes:
   - /run/docker.sock:/run/docker.sock # by /home/{your_user}/.docker/desktop/docker.sock:/run/docker.sock
 ```
 
-Afterward you can start the daemon using:
+On the `nanocld` service, afterward you can start the daemon using:
 
 ```sh
 docker compose up
@@ -210,6 +159,11 @@ Once started, a swagger should be available on [http://localhost:8585/explorer](
 Note that a *env variable* could be passed to change the port, it is hardcoded for now.<br />
 It could be a nice and easy first issue and pull request if you would like to help :).
 
+To use the CLI you need correct permission on `/run/nanocl`
+
+```sh
+sudo chmod -R /run/nanocl
+```
 
 Now you can run the CLI:
 
@@ -224,6 +178,32 @@ Now you can run the CLI:
   ```sh
   cargo run --bin nanocl version
   ```
+
+## Testing
+
+To run tests, make sure all `Nanocl` services are running with `docker compose up`.<br/>
+Then be sure to have correct permission set on `/run/nanocl`
+
+* Run all tests
+  ```sh
+  cargo make test
+  ```
+
+* Run all tests with print output
+  ```sh
+  cargo make test-debug
+  ```
+
+* Run only daemon tests
+  ```sh
+  cargo make test-daemon
+  ```
+
+* Run only cli tests
+  ```sh
+  cargo make test-cli
+  ```
+
 
 ## 👌 Usefull Command
 
@@ -248,11 +228,4 @@ Some usefull command to know:
 * Generate ssl cert from certbot
   ```sh
   nanocl exec system-nano-proxy -- certbot --nginx --email email@email.com --agree-tos -d your-domain.com
-  ```
-
-* Run tests
-  When running all tests, the daemon needs to be started first
-  Permissions on /run/nanocl need to be set correctly
-  ```sh
-  cargo make test
   ```
