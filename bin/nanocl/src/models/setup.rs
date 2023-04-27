@@ -2,26 +2,34 @@ use clap::Parser;
 
 #[derive(Debug, Clone, Parser)]
 pub struct SetupOpts {
+  /// The docker host to connect to default is unix:///var/run/docker.sock
   #[clap(long)]
   pub(crate) docker_host: Option<String>,
+  /// The state directory to store the state of the nanocl daemon default is /var/lib/nanocl
   #[clap(long)]
   pub(crate) state_dir: Option<String>,
+  /// The configuration directory to store the configuration of the nanocl daemon default is /etc/nanocl
   #[clap(long)]
   pub(crate) conf_dir: Option<String>,
+  /// The gateway address to use for the nanocl daemon default is detected
   #[clap(long)]
   pub(crate) gateway: Option<String>,
+  /// The hosts to use for the nanocl daemon default is detected
+  #[clap(long)]
+  pub(crate) advertise_addr: Option<String>,
+  /// The hosts to use for the nanocl daemon default is detected
   #[clap(long)]
   pub(crate) deamon_hosts: Option<Vec<String>>,
+  /// The group to use for the nanocl daemon default is nanocl
   #[clap(long)]
   pub(crate) group: Option<String>,
-  #[clap(long, default_value = "0.5.0")]
-  pub(crate) version: String,
+  /// The hostname to use for the nanocl daemon default is detected
   #[clap(long)]
   pub(crate) hostname: Option<String>,
 }
 
 /// This is the struct that will be passed to nanocl daemon
-#[allow(unused)]
+#[derive(Debug, Clone)]
 pub struct NanocldArgs {
   pub(crate) docker_host: String,
   pub(crate) state_dir: String,
@@ -30,5 +38,20 @@ pub struct NanocldArgs {
   pub(crate) hosts: Vec<String>,
   pub(crate) hostname: String,
   pub(crate) gid: u32,
-  pub(crate) version: String,
+  pub(crate) advertise_addr: String,
+}
+
+impl From<NanocldArgs> for liquid::Object {
+  fn from(args: NanocldArgs) -> Self {
+    liquid::object!({
+      "docker_host": args.docker_host,
+      "state_dir": args.state_dir,
+      "conf_dir": args.conf_dir,
+      "gateway": args.gateway,
+      "hosts": args.hosts,
+      "hostname": args.hostname,
+      "gid": args.gid,
+      "advertise_addr": args.advertise_addr,
+    })
+  }
 }

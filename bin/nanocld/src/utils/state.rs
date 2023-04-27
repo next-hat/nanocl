@@ -1,18 +1,12 @@
-use std::collections::HashMap;
-
 use ntex::rt;
 use ntex::http;
 use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use ntex::channel::mpsc::Receiver;
-use bollard_next::container::Config;
-use bollard_next::service::HostConfig;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocl_utils::http_error::HttpError;
 
 use nanocl_stubs::system::Event;
-use nanocl_stubs::cargo_config::CargoConfigPartial;
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateConfig, StateStream,
 };
@@ -682,78 +676,4 @@ pub async fn revert_resource(
     Ok::<_, HttpError>(())
   });
   Ok(rx)
-}
-
-pub fn hook_cargo_binds(
-  cargo: &CargoConfigPartial,
-) -> IoResult<CargoConfigPartial> {
-  if let Some(host_config) = &cargo.container.host_config {
-    if let Some(binds) = &host_config.binds {
-      let mut new_bind = Vec::new();
-      for bind in binds {
-        let split = bind.split(':').collect::<Vec<&str>>();
-        let source = split.first();
-        let dest = split.get(1);
-        let dest = dest.unwrap_or(&"");
-        let source = source.unwrap_or(&"");
-        if source.starts_with('.') {
-          let cwd = std::env::current_dir()
-            .map_err(|err| err.map_err_context(|| "CurrentDir"))?;
-          let source = cwd
-            .join(source)
-            .canonicalize()
-            .map_err(|err| err.map_err_context(|| "Canonicalize"))?
-            .display()
-            .to_string();
-          new_bind.push(format!("{}:{}", source, dest));
-          continue;
-        }
-        if source.starts_with('~') {
-          let home = std::env::var("HOME")
-            .map_err(|err| IoError::not_fount("HOME", &err.to_string()))?;
-          let source = source.replace('~', &home);
-          new_bind.push(format!("{}:{}", source, dest));
-          continue;
-        }
-        new_bind.push(bind.to_owned());
-      }
-      return Ok(CargoConfigPartial {
-        container: Config {
-          host_config: Some(HostConfig {
-            binds: Some(new_bind),
-            ..host_config.clone()
-          }),
-          ..cargo.container.clone()
-        },
-        ..cargo.clone()
-      });
-    }
-  }
-
-  Ok(cargo.clone())
-}
-
-pub fn hook_labels(
-  namespace: &str,
-  cargo: &CargoConfigPartial,
-) -> CargoConfigPartial {
-  let key = utils::key::gen_key(namespace, &cargo.name);
-
-  let mut labels = HashMap::new();
-  labels.insert("io.nanocl".into(), "enabled".into());
-  labels.insert("io.nanocl.c".into(), key);
-  labels.insert("io.nanocl.n".into(), namespace.into());
-  labels.insert("io.nanocl.cnsp".into(), namespace.into());
-
-  let mut curr_label = cargo.container.labels.clone().unwrap_or_default();
-
-  curr_label.extend(labels);
-
-  CargoConfigPartial {
-    container: Config {
-      labels: Some(curr_label),
-      ..cargo.container.clone()
-    },
-    ..cargo.clone()
-  }
 }

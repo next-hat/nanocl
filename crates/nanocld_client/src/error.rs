@@ -1,4 +1,3 @@
-use nanocl_utils::io_error::{FromIo, IoError};
 use thiserror::Error;
 use serde::{Serialize, Deserialize};
 use ntex::http::{
@@ -7,6 +6,8 @@ use ntex::http::{
   client::ClientResponse,
   client::error::{SendRequestError as NtexSendRequestError, JsonPayloadError},
 };
+
+use nanocl_utils::io_error::{FromIo, IoError};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponseError {

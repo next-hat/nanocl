@@ -22,8 +22,9 @@ async fn wait_store(addr: &str) -> IoResult<()> {
   })?;
   while let Err(_err) = rt::tcp_connect(addr).await {
     log::warn!("Waiting for store");
-    time::sleep(Duration::from_millis(1000)).await;
+    time::sleep(Duration::from_secs(2)).await;
   }
+  time::sleep(Duration::from_secs(4)).await;
   Ok(())
 }
 

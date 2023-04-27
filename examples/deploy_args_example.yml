@@ -8,14 +8,14 @@ Args:
   Type: String
 
 Resources:
-- Name: "{{Args.domain}}"
+- Name: ${{ Args.domain }}
   Kind: ProxyRule
   Version: v0.1
   Config:
     Watch:
     - get-started.global
     Rules:
-    - Domain: "{{Args.domain}}"
+    - Domain: ${{ Args.domain }}
       Network: Public
       Locations:
       - Path: /

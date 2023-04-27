@@ -1,420 +1,13 @@
-use std::collections::HashMap;
-use std::path::Path;
+use std::time::Duration;
 
-use bollard_next::container::LogOutput;
-use bollard_next::container::LogsOptions;
-use ntex::rt;
-
-use bollard_next::container::StartContainerOptions;
-use bollard_next::service::HostConfig;
-use futures::StreamExt;
-use indicatif::MultiProgress;
-use indicatif::ProgressBar;
-use indicatif::ProgressStyle;
-
-use bollard_next::Docker;
-use bollard_next::API_DEFAULT_VERSION;
-use bollard_next::container::CreateContainerOptions;
-use bollard_next::container::WaitContainerOptions;
-use bollard_next::service::ProgressDetail;
-use bollard_next::image::CreateImageOptions;
-
-use nanocld_client::stubs::cargo_config::Config as ContainerConfig;
 use users::get_group_by_name;
 
+use bollard_next::container::StartContainerOptions;
+use nanocld_client::stubs::state::StateDeployment;
+
+use crate::utils;
 use crate::error::CliError;
-
 use crate::models::{SetupOpts, NanocldArgs};
-use crate::utils::math::calculate_percentage;
-use crate::utils::network::get_default_ip;
-use crate::utils::network::get_hostname;
-
-fn update_progress(
-  multiprogress: &MultiProgress,
-  layers: &mut HashMap<String, ProgressBar>,
-  id: &str,
-  progress: &ProgressDetail,
-) {
-  let total: u64 = progress
-    .total
-    .unwrap_or_default()
-    .try_into()
-    .unwrap_or_default();
-  let current: u64 = progress
-    .current
-    .unwrap_or_default()
-    .try_into()
-    .unwrap_or_default();
-  if let Some(pg) = layers.get(id) {
-    let percent = calculate_percentage(current, total);
-    pg.set_position(percent);
-  } else {
-    let pg = ProgressBar::new(100);
-    let style = ProgressStyle::with_template(
-      "[{elapsed_precise}] [{bar:20.cyan/blue}] {pos:>7}% {msg}",
-    )
-    .unwrap()
-    .progress_chars("=> ");
-    pg.set_style(style);
-    multiprogress.add(pg.to_owned());
-    let percent = calculate_percentage(current, total);
-    pg.set_position(percent);
-    layers.insert(id.to_owned(), pg);
-  }
-}
-
-async fn install_image(
-  from_image: &str,
-  tag: &str,
-  docker_api: &Docker,
-) -> Result<(), CliError> {
-  let options = Some(CreateImageOptions {
-    from_image,
-    tag,
-    ..Default::default()
-  });
-
-  let mut stream = docker_api.create_image(options, None, None);
-  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
-  let multiprogress = MultiProgress::new();
-  multiprogress.set_move_cursor(false);
-  while let Some(res) = stream.next().await {
-    match res {
-      Err(err) => {
-        return Err(CliError::Custom {
-          msg: format!("Error while pulling image: {err}"),
-        });
-      }
-      Ok(data) => {
-        let status = data.status.unwrap_or_default();
-        let id = data.id.unwrap_or_default();
-        let progress = data.progress_detail.unwrap_or_default();
-        match status.as_str() {
-          "Pulling fs layer" => {
-            update_progress(&multiprogress, &mut layers, &id, &progress);
-          }
-          "Downloading" => {
-            update_progress(&multiprogress, &mut layers, &id, &progress);
-          }
-          "Download complete" => {
-            if let Some(pg) = layers.get(&id) {
-              pg.set_position(100);
-            }
-          }
-          "Extracting" => {
-            update_progress(&multiprogress, &mut layers, &id, &progress);
-          }
-          _ => {
-            if layers.get(&id).is_none() {
-              let _ = multiprogress.println(&status);
-            }
-          }
-        };
-        if let Some(pg) = layers.get(&id) {
-          pg.set_message(format!("[{}] {}", &id, &status));
-        }
-      }
-    }
-  }
-
-  Ok(())
-}
-
-async fn install_dependencies(
-  docker_api: &Docker,
-  version: &str,
-) -> Result<(), CliError> {
-  println!("Installing dependencies:");
-  install_image("cockroachdb/cockroach", "v22.2.6", docker_api).await?;
-  install_image("ghcr.io/nxthat/metrsd", "0.2.0", docker_api).await?;
-  install_image("ghcr.io/nxthat/nanocld", version, docker_api).await?;
-  install_image("ghcr.io/nxthat/nproxy", "1.23.4.0", docker_api).await?;
-  install_image("ghcr.io/nxthat/ncdproxy", "0.3.1", docker_api).await?;
-  println!("Dependencies installed.");
-  Ok(())
-}
-
-fn gen_daemon_args(args: &NanocldArgs) -> Vec<String> {
-  let hosts = args
-    .hosts
-    .clone()
-    .iter()
-    .map(|host| format!("--hosts {}", host))
-    .collect::<Vec<String>>();
-  let mut args = vec![
-    "--state-dir",
-    &args.state_dir,
-    "--conf-dir",
-    &args.conf_dir,
-    "--docker-host",
-    &args.docker_host,
-    "--gateway",
-    &args.gateway,
-    "--hostname",
-    &args.hostname,
-  ]
-  .iter()
-  .map(|arg| arg.to_string())
-  .collect::<Vec<String>>();
-  args.extend(hosts);
-  args
-}
-
-fn gen_daemon_binds(args: &NanocldArgs) -> Vec<String> {
-  let host_binds = args
-    .hosts
-    .iter()
-    .filter(|host| host.starts_with("unix://"))
-    .map(|host| {
-      let path = host.trim_start_matches("unix://");
-
-      let path = Path::new(path)
-        .parent()
-        .expect("Unix socket path is invalid");
-
-      format!("{host}:{host}", host = path.display())
-    });
-
-  let mut base_bind = vec![
-    format!("{state_dir}:{state_dir}", state_dir = args.state_dir),
-    format!("{conf_dir}:{conf_dir}", conf_dir = args.conf_dir),
-  ];
-
-  base_bind.extend(host_binds);
-
-  if args.docker_host.starts_with("unix://") {
-    base_bind.push(format!(
-      "{docker_host}:{docker_host}",
-      docker_host = args.docker_host.trim_start_matches("unix://")
-    ));
-  }
-
-  let mut binds = Vec::new();
-  for b in base_bind {
-    if !binds.contains(&b) {
-      binds.push(b);
-    }
-  }
-
-  binds
-}
-
-async fn init_dependencies(
-  args: &NanocldArgs,
-  docker_api: &Docker,
-) -> Result<(), CliError> {
-  println!("Initing daemon:");
-  let base_args = gen_daemon_args(args);
-  let mut daemon_args = vec!["--init"]
-    .iter()
-    .map(|arg| arg.to_string())
-    .collect::<Vec<String>>();
-  daemon_args.extend(base_args);
-
-  let binds = gen_daemon_binds(args);
-
-  let container = docker_api
-    .create_container(
-      None::<CreateContainerOptions<String>>,
-      ContainerConfig {
-        image: Some(format!("ghcr.io/nxthat/nanocld:{}", args.version)),
-        cmd: Some(daemon_args),
-        tty: Some(true),
-        env: Some(vec![format!("NANOCL_GID={}", args.gid)]),
-        host_config: Some(HostConfig {
-          network_mode: Some("host".into()),
-          binds: Some(binds),
-          auto_remove: Some(true),
-          ..Default::default()
-        }),
-        ..Default::default()
-      },
-    )
-    .await?;
-  docker_api
-    .start_container(&container.id, None::<StartContainerOptions<String>>)
-    .await?;
-  let container_id = container.id.to_owned();
-  let docker = docker_api.clone();
-  let waiter = rt::spawn(async move {
-    let mut stream = docker.wait_container(
-      &container_id,
-      Some(WaitContainerOptions {
-        condition: "removed",
-      }),
-    );
-    while let Some(stream) = stream.next().await {
-      match stream {
-        Ok(data) => {
-          if data.status_code != 0 {
-            return Err(CliError::Custom {
-              msg: format!(
-                "Error while initing nanocld daemon: [{}] {}",
-                data.status_code,
-                data.error.unwrap_or_default().message.unwrap_or_default()
-              ),
-            });
-          }
-        }
-        Err(err) => match err {
-          bollard_next::errors::Error::DockerContainerWaitError {
-            error,
-            code,
-          } => {
-            return Err(CliError::Custom {
-              msg: format!(
-                "Error while initing nanocld daemon: [{}] {}",
-                code, error
-              ),
-            });
-          }
-          _ => {
-            return Err(CliError::Custom {
-              msg: format!("Error while initing nanocld daemon: {}", err),
-            });
-          }
-        },
-      }
-    }
-    Ok::<_, CliError>(())
-  });
-  let container_id = container.id.to_owned();
-  let docker = docker_api.clone();
-  rt::spawn(async move {
-    let mut logs = docker.logs(
-      &container_id,
-      Some(LogsOptions::<String> {
-        stdout: true,
-        follow: true,
-        stderr: true,
-        ..Default::default()
-      }),
-    );
-
-    while let Some(log) = logs.next().await {
-      let output = match log {
-        Ok(data) => data,
-        Err(err) => {
-          return Err(CliError::Custom {
-            msg: format!("Error while initing nanocld daemon: {}", err),
-          });
-        }
-      };
-      match output {
-        LogOutput::StdOut { message } => {
-          let v = message.to_vec();
-          let s = String::from_utf8_lossy(&v);
-          print!("{}", s);
-        }
-        LogOutput::StdErr { message } => {
-          let v = message.to_vec();
-          let s = String::from_utf8_lossy(&v);
-          eprint!("{}", s);
-        }
-        LogOutput::Console { message } => {
-          let v = message.to_vec();
-          let s = String::from_utf8_lossy(&v);
-          print!("{}", s);
-        }
-        _ => {}
-      }
-    }
-    Ok::<_, CliError>(())
-  });
-  waiter.await.map_err(|err| {
-    if err.is_cancelled() {
-      CliError::Custom {
-        msg: "Error while initing nanocld daemon: cancelled".into(),
-      }
-    } else {
-      CliError::Custom {
-        msg: format!("Error while initing nanocld daemon: {}", err),
-      }
-    }
-  })??;
-  Ok(())
-}
-
-async fn spawn_daemon(
-  args: &NanocldArgs,
-  docker_api: &Docker,
-) -> Result<(), CliError> {
-  println!("Spawning daemon");
-
-  let daemon_args = gen_daemon_args(args);
-  let mut labels = HashMap::new();
-  labels.insert("io.nanocl".into(), "enabled".into());
-  labels.insert("io.nanocl.n".into(), "system".into());
-  labels.insert("io.nanocl.c".into(), "ndaemon.system".into());
-  labels.insert("io.nanocl.cnsp".into(), "system".into());
-
-  let binds = gen_daemon_binds(args);
-
-  let container = docker_api
-    .create_container(
-      Some(CreateContainerOptions {
-        name: "ndaemon.system.c",
-        ..Default::default()
-      }),
-      ContainerConfig {
-        image: Some(format!("ghcr.io/nxthat/nanocld:{}", args.version)),
-        entrypoint: Some(vec!["/entrypoint.sh".into()]),
-        cmd: Some(daemon_args),
-        tty: Some(true),
-        labels: Some(labels),
-        env: Some(vec![format!("NANOCL_GID={}", args.gid)]),
-        host_config: Some(HostConfig {
-          network_mode: Some("system".into()),
-          binds: Some(binds),
-          ..Default::default()
-        }),
-        ..Default::default()
-      },
-    )
-    .await?;
-
-  docker_api
-    .start_container(&container.id, None::<StartContainerOptions<String>>)
-    .await?;
-
-  println!("Daemon spawned");
-  Ok(())
-}
-
-fn connect_docker(docker_host: &str) -> Result<Docker, CliError> {
-  match &docker_host {
-    docker_host if docker_host.starts_with("unix://") => {
-      let path = docker_host.trim_start_matches("unix://");
-      if !std::path::Path::new(&path).exists() {
-        return Err(CliError::Custom {
-          msg: format!("Error {docker_host} does not exist"),
-        });
-      }
-      Docker::connect_with_unix(path, 120, API_DEFAULT_VERSION).map_err(|err| {
-        CliError::Custom {
-          msg: format!("Cannot connect to docker got error: {err}"),
-        }
-      })
-    }
-    docker_host if docker_host.starts_with("http://") => {
-      Docker::connect_with_http(docker_host, 120, API_DEFAULT_VERSION).map_err(
-        |err| CliError::Custom {
-          msg: format!("Cannot connect to docker got error: {err}"),
-        },
-      )
-    }
-    docker_host if docker_host.starts_with("https://") => {
-      Docker::connect_with_http(docker_host, 120, API_DEFAULT_VERSION).map_err(
-        |err| CliError::Custom {
-          msg: format!("Cannot connect to docker got error: {err}"),
-        },
-      )
-    }
-    _ => Err(CliError::Custom {
-      msg: format!("Invalid scheme expected [http,https] got: {docker_host}"),
-    }),
-  }
-}
 
 pub async fn exec_setup(options: &SetupOpts) -> Result<(), CliError> {
   println!("Installing nanocl daemon on your system");
@@ -439,13 +32,19 @@ pub async fn exec_setup(options: &SetupOpts) -> Result<(), CliError> {
 
   let gateway = match &options.gateway {
     None => {
-      let gateway = get_default_ip().map_err(|err| CliError::Custom {
-        msg: format!("Cannot find default gateway: {err}"),
-      })?;
+      let gateway =
+        utils::network::get_default_ip().map_err(|err| CliError::Custom {
+          msg: format!("Cannot find default gateway: {err}"),
+        })?;
       println!("Using default gateway: {}", gateway);
       gateway.to_string()
     }
     Some(gateway) => gateway.clone(),
+  };
+
+  let advertise_addr = match &options.advertise_addr {
+    None => gateway.clone(),
+    Some(advertise_addr) => advertise_addr.clone(),
   };
 
   let group = options.group.as_deref().unwrap_or("nanocl");
@@ -468,9 +67,10 @@ pub async fn exec_setup(options: &SetupOpts) -> Result<(), CliError> {
   let hostname = if let Some(hostname) = &options.hostname {
     hostname.to_owned()
   } else {
-    let hostname = get_hostname().map_err(|err| CliError::Custom {
-      msg: format!("Cannot find hostname: {err}"),
-    })?;
+    let hostname =
+      utils::network::get_hostname().map_err(|err| CliError::Custom {
+        msg: format!("Cannot find hostname: {err}"),
+      })?;
     println!("Using default hostname: {hostname}");
     hostname
   };
@@ -483,16 +83,59 @@ pub async fn exec_setup(options: &SetupOpts) -> Result<(), CliError> {
     hosts,
     gid: gid.gid(),
     hostname,
-    version: options.version.clone(),
+    advertise_addr,
   };
 
-  let docker_api = connect_docker(&args.docker_host)?;
+  let installer = utils::state::compile(
+    include_str!("../../installer.yml"),
+    &args.clone().into(),
+  )?;
 
-  install_dependencies(&docker_api, &options.version).await?;
+  println!("{installer}");
 
-  init_dependencies(&args, &docker_api).await?;
+  let value =
+    serde_yaml::from_str::<serde_yaml::Value>(&installer).map_err(|err| {
+      CliError::Custom {
+        msg: format!("Cannot parse installer: {err}"),
+      }
+    })?;
 
-  spawn_daemon(&args, &docker_api).await?;
+  let deployment =
+    serde_yaml::from_value::<StateDeployment>(value).map_err(|err| {
+      CliError::Custom {
+        msg: format!("Cannot parse installer: {err}"),
+      }
+    })?;
+
+  let cargoes = deployment.cargoes.ok_or(CliError::Custom {
+    msg: "Cannot find cargoes in installer".into(),
+  })?;
+
+  let docker = utils::docker::connect(&args.docker_host)?;
+
+  for cargo in cargoes {
+    let image = cargo.container.image.clone().ok_or(CliError::Custom {
+      msg: format!("Cannot find image in cargo {}", cargo.name),
+    })?;
+    let mut image_detail = image.split(':');
+    let from_image = image_detail.next().ok_or(CliError::Custom {
+      msg: format!("Cannot find image in cargo {}", cargo.name),
+    })?;
+    let tag = image_detail.next().ok_or(CliError::Custom {
+      msg: format!("Cannot find image tag in cargo {}", cargo.name),
+    })?;
+    utils::docker::install_image(from_image, tag, &docker).await?;
+    let container = utils::docker::create_cargo_container(
+      &cargo,
+      &deployment.namespace.clone().unwrap_or("system".into()),
+      &docker,
+    )
+    .await?;
+    docker
+      .start_container(&container.id, None::<StartContainerOptions<String>>)
+      .await?;
+    ntex::time::sleep(Duration::from_secs(2)).await;
+  }
 
   println!("Congratz! Nanocl is now ready to use!");
   Ok(())

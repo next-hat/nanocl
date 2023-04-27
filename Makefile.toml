@@ -59,28 +59,8 @@ args = [
 ]
 
 [tasks.dev]
-command = "cargo"
-args = [
-  "run",
-  "--no-default-features",
-  "--features",
-  "dev",
-  "--bin",
-  "nanocld",
-  "${@}",
-]
-
-[tasks.dev-proxy]
-command = "cargo"
-args = [
-  "run",
-  "--no-default-features",
-  "--features",
-  "dev",
-  "--bin",
-  "ncdproxy",
-  "${@}",
-]
+command = "docker"
+args = ["compose", "up"]
 
 # Test coverage
 [tasks.cov]
