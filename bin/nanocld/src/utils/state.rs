@@ -8,7 +8,7 @@ use nanocl_utils::http_error::HttpError;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::state::{
-  StateDeployment, StateCargo, StateResources, StateConfig, StateStream,
+  StateDeployment, StateCargo, StateResources, StateMeta, StateStream,
 };
 
 use crate::{utils, repositories};
@@ -25,7 +25,7 @@ pub fn stream_to_bytes(state_stream: StateStream) -> Result<Bytes, HttpError> {
 
 pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
   let meta =
-    serde_json::from_value::<StateConfig>(data.to_owned()).map_err(|err| {
+    serde_json::from_value::<StateMeta>(data.to_owned()).map_err(|err| {
       HttpError {
         status: http::StatusCode::BAD_REQUEST,
         msg: format!("unable to serialize payload {err}"),

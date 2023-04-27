@@ -14,7 +14,7 @@ use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
 };
 use nanocld_client::stubs::state::{
-  StateConfig, StateDeployment, StateCargo, StateStream,
+  StateMeta, StateDeployment, StateCargo, StateStream,
 };
 
 use crate::utils;
@@ -22,9 +22,7 @@ use crate::models::{StateArgs, StateCommands, StateOpts, StateBuildArgs};
 
 use super::cargo_image::exec_cargo_image_create;
 
-async fn get_from_url(
-  url: String,
-) -> IoResult<(StateConfig, serde_yaml::Value)> {
+async fn get_from_url(url: String) -> IoResult<(StateMeta, serde_yaml::Value)> {
   let reqwest = ntex::http::Client::default();
   let data = reqwest
     .get(url.to_string())
@@ -45,12 +43,10 @@ async fn get_from_url(
   Ok((meta, yaml))
 }
 
-async fn get_from_file(
-  path: &str,
-) -> IoResult<(StateConfig, serde_yaml::Value)> {
-  let mut file_path = std::env::current_dir()?;
-  file_path.push(path);
-  let data = fs::read_to_string(file_path)?;
+fn read_from_file(
+  path: &std::path::Path,
+) -> IoResult<(StateMeta, serde_yaml::Value)> {
+  let data = fs::read_to_string(path)?;
   let meta = utils::state::get_file_meta(&String::from(&data))?;
   let yaml: serde_yaml::Value = serde_yaml::from_str(&data)
     .map_err(|err| err.map_err_context(|| "Unable to parse yaml"))?;
@@ -134,7 +130,7 @@ async fn hook_cargoes(
 }
 
 fn inject_meta(
-  meta: StateConfig,
+  meta: StateMeta,
   mut yml: serde_yaml::Value,
 ) -> serde_yaml::Value {
   yml["ApiVersion"] = serde_yaml::Value::String(meta.api_version);
@@ -224,7 +220,7 @@ async fn attach_to_cargoes(
   Ok(())
 }
 
-fn gen_client(meta: &StateConfig) -> IoResult<NanocldClient> {
+fn gen_client(meta: &StateMeta) -> IoResult<NanocldClient> {
   let client = match meta.api_version.clone() {
     api_version if meta.api_version.starts_with("http") => {
       let mut paths = api_version
@@ -262,7 +258,8 @@ fn gen_client(meta: &StateConfig) -> IoResult<NanocldClient> {
   Ok(client)
 }
 
-fn inject_build_args(
+/// Inject build arguments and environement variable to the StateFile
+fn inject_data(
   yaml: serde_yaml::Value,
   args: Vec<String>,
 ) -> IoResult<serde_yaml::Value> {
@@ -336,31 +333,43 @@ fn inject_build_args(
 
   let str = serde_yaml::to_string(&yaml)
     .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
-  let template = mustache::compile_str(&str).map_err(|err| {
-    IoError::invalid_data("Template".into(), format!("{err}"))
-  })?;
-  let str = template
-    .render_to_string(&serde_json::json!({
-      "Args": args,
-      "Envs": envs,
-    }))
-    .map_err(|err| {
-      IoError::invalid_data("Template".into(), format!("{err}"))
-    })?;
+  let data = liquid::object!({
+    "Args": args,
+    "Envs": envs,
+  });
+  let str = utils::state::compile(&str, &data)?;
   let yaml: serde_yaml::Value = serde_yaml::from_str(&str)
     .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
   Ok(yaml)
 }
 
+async fn parse_state_file(
+  path: &Option<String>,
+) -> IoResult<(StateMeta, serde_yaml::Value)> {
+  if let Some(path) = path {
+    if let Ok(url) = utils::url::parse_url(path) {
+      return get_from_url(url).await;
+    }
+    let path = std::path::Path::new(&path)
+      .canonicalize()
+      .map_err(|err| err.map_err_context(|| format!("StateFile {path}")))?;
+    return read_from_file(&path);
+  }
+  if let Ok(path) = std::path::Path::new("StateFile.yaml").canonicalize() {
+    return read_from_file(&path);
+  }
+  let path = std::path::Path::new("StateFile.yml")
+    .canonicalize()
+    .map_err(|err| err.map_err_context(|| "StateFile StateFile.yml"))?;
+  read_from_file(&path)
+}
+
 async fn exec_state_apply(opts: &StateOpts) -> IoResult<()> {
-  let (meta, yaml) = match utils::url::parse_url(&opts.file_path) {
-    Ok(url) => get_from_url(url).await?,
-    Err(_) => get_from_file(&opts.file_path).await?,
-  };
+  let (meta, yaml) = parse_state_file(&opts.file_path).await?;
 
   let client = gen_client(&meta)?;
 
-  let yaml = inject_build_args(yaml.clone(), opts.args.clone())?;
+  let yaml = inject_data(yaml.clone(), opts.args.clone())?;
 
   let mut namespace = String::from("default");
   let mut cargoes = Vec::new();
@@ -423,14 +432,9 @@ async fn exec_state_apply(opts: &StateOpts) -> IoResult<()> {
 }
 
 async fn exec_state_revert(opts: &StateOpts) -> IoResult<()> {
-  let (meta, yaml) = match utils::url::parse_url(&opts.file_path) {
-    Ok(url) => get_from_url(url).await?,
-    Err(_) => get_from_file(&opts.file_path).await?,
-  };
-
+  let (meta, yaml) = parse_state_file(&opts.file_path).await?;
   let client = gen_client(&meta)?;
-
-  let yaml = inject_build_args(yaml.clone(), opts.args.clone())?;
+  let yaml = inject_data(yaml.clone(), opts.args.clone())?;
   let data = serde_json::to_value(&yaml)
     .map_err(|err| err.map_err_context(|| "Unable to parse yaml"))?;
   let _ = utils::print::print_yml(&yaml);

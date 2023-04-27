@@ -19,7 +19,7 @@ pub struct StateBuildArgs {
 pub struct StateOpts {
   /// Path or url to the state
   #[clap(long, short = 'f')]
-  pub file_path: String,
+  pub file_path: Option<String>,
   /// Attach to the logs of the deployed cargo when applying a state
   #[clap(long, short = 'a')]
   pub attach: bool,

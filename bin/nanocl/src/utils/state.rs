@@ -1,17 +1,19 @@
 use regex::Regex;
 
-use nanocld_client::stubs::state::StateConfig;
+use nanocld_client::stubs::state::StateMeta;
 
 use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 
-pub fn get_file_meta(data: &str) -> IoResult<StateConfig> {
-  let meta = serde_yaml::from_str::<StateConfig>(data).map_err(|err| {
+/// Extract metadata eg: ApiVersion, Type from a StateFile
+pub fn get_file_meta(data: &str) -> IoResult<StateMeta> {
+  let meta = serde_yaml::from_str::<StateMeta>(data).map_err(|err| {
     err.map_err_context(|| "Unable to extract meta from state file")
   })?;
 
   Ok(meta)
 }
 
+/// Compile a StateFile with given data
 pub fn compile(data: &str, obj: &liquid::Object) -> IoResult<String> {
   // replace "${{ }}" with "{{ }}" syntax for liquid
   let reg = Regex::new(r"\$\{\{(.+?)\}\}")
