@@ -1,5 +1,5 @@
 use tabled::Table;
-use tabled::settings::object::{Rows, Segment};
+use tabled::settings::object::Segment;
 use tabled::settings::{Style, Modify, Padding, Alignment};
 
 use nanocl_utils::io_error::{IoResult, FromIo};
