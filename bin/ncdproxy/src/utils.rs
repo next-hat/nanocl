@@ -122,8 +122,8 @@ async fn gen_cargo_upstream(
   client: &NanocldClient,
   nginx: &Nginx,
 ) -> IoResult<String> {
-  let port = target.port;
-  let (cargo_name, namespace) = extract_target_cargo(&target.key)?;
+  let port = target.cargo_port;
+  let (cargo_name, namespace) = extract_target_cargo(&target.cargo_key)?;
   let cargo = client
     .inspect_cargo(&cargo_name, Some(namespace.clone()))
     .await
@@ -186,8 +186,8 @@ async fn gen_locations(
         );
         locations.push(location);
       }
-      LocationTarget::Unix(unix_target) => {
-        let upstream_key = gen_unix_stream(unix_target, nginx).await?;
+      LocationTarget::Unix(unix) => {
+        let upstream_key = gen_unix_stream(&unix.unix_path, nginx).await?;
         let location = format!(
           "location {path} {{
     proxy_pass http://{upstream_key}/;
@@ -303,9 +303,7 @@ async fn gen_stream_server_block(
       gen_cargo_upstream(&NginxConfKind::Stream, cargo_target, client, nginx)
         .await?
     }
-    StreamTarget::Unix(unix_target) => {
-      gen_unix_stream(unix_target, nginx).await?
-    }
+    StreamTarget::Unix(unix) => gen_unix_stream(&unix.unix_path, nginx).await?,
     StreamTarget::Uri(_) => {
       return Err(IoError::invalid_input(
         "StreamTarget",

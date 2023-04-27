@@ -14,5 +14,4 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Http:
-            Url: https://google.com
+          Url: https://google.com

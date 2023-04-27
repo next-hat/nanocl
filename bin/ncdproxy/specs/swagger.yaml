@@ -106,13 +106,13 @@ components:
       type: object
       description: Defines a proxy rule target
       required:
-      - Key
-      - Port
+      - CargoKey
+      - CargoPort
       properties:
-        Key:
+        CargoKey:
           type: string
           description: The cargo key
-        Port:
+        CargoPort:
           type: integer
           format: int32
           description: The cargo port
@@ -131,25 +131,9 @@ components:
           nullable: true
     LocationTarget:
       oneOf:
-      - type: object
-        required:
-        - Cargo
-        properties:
-          Cargo:
-            $ref: '#/components/schemas/CargoTarget'
-      - type: object
-        required:
-        - Http
-        properties:
-          Http:
-            $ref: '#/components/schemas/HttpTarget'
-      - type: object
-        required:
-        - Unix
-        properties:
-          Unix:
-            type: string
-            description: Target a specific unix socket
+      - $ref: '#/components/schemas/CargoTarget'
+      - $ref: '#/components/schemas/HttpTarget'
+      - $ref: '#/components/schemas/UnixTarget'
     ProxyHttpLocation:
       type: object
       description: Defines a proxy rule location
@@ -263,25 +247,16 @@ components:
           $ref: '#/components/schemas/ProxyRule'
     StreamTarget:
       oneOf:
-      - type: object
-        required:
-        - Cargo
-        properties:
-          Cargo:
-            $ref: '#/components/schemas/CargoTarget'
-      - type: object
-        required:
-        - Uri
-        properties:
-          Uri:
-            $ref: '#/components/schemas/UriTarget'
-      - type: object
-        required:
-        - Unix
-        properties:
-          Unix:
-            type: string
-            description: Target a specific unix socket
+      - $ref: '#/components/schemas/CargoTarget'
+      - $ref: '#/components/schemas/UriTarget'
+      - $ref: '#/components/schemas/UnixTarget'
+    UnixTarget:
+      type: object
+      required:
+      - UnixPath
+      properties:
+        UnixPath:
+          type: string
     UriTarget:
       type: object
       required:
@@ -294,8 +269,8 @@ components:
       type: string
       enum:
       - MovedPermanently
-      - PermanentRedirect
-      - TemporaryRedirect
+      - Permanent
+      - Temporary
     Version:
       type: object
       description: Version contain details about the current version nanocl

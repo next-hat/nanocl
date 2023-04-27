@@ -13,5 +13,5 @@ Resources:
       Port: 9999
       Network: Public
       Target:
-        Key: get-started@global
-        Port: 9000
+        CargoKey: get-started@global
+        CargoPort: 9000
