@@ -175,6 +175,18 @@ pub trait FromIo<T> {
     C: ToString + std::fmt::Display;
 }
 
+impl FromIo<IoError> for IoError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> IoError
+  where
+    C: ToString + std::fmt::Display,
+  {
+    IoError {
+      context: Some((context)().to_string()),
+      inner: self.into_inner(),
+    }
+  }
+}
+
 impl FromIo<Box<IoError>> for std::io::Error {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
   where
@@ -183,6 +195,18 @@ impl FromIo<Box<IoError>> for std::io::Error {
     Box::new(IoError {
       context: Some((context)().to_string()),
       inner: self,
+    })
+  }
+}
+
+impl FromIo<Box<IoError>> for std::string::FromUtf8Error {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
     })
   }
 }
@@ -230,6 +254,22 @@ impl FromIo<Box<IoError>> for serde_yaml::Error {
     Box::new(IoError {
       context: Some((context)().to_string()),
       inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
+    })
+  }
+}
+
+#[cfg(feature = "serde_urlencoded")]
+impl FromIo<Box<IoError>> for serde_urlencoded::ser::Error {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("{self}"),
+      ),
     })
   }
 }
@@ -333,7 +373,56 @@ impl FromIo<Box<IoError>> for ntex::http::client::error::SendRequestError {
   }
 }
 
+#[cfg(feature = "ntex")]
 impl FromIo<Box<IoError>> for ntex::http::client::error::JsonPayloadError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("{self}"),
+      ),
+    })
+  }
+}
+
+#[cfg(feature = "ntex")]
+impl FromIo<Box<IoError>> for ntex::http::error::PayloadError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("{self}"),
+      ),
+    })
+  }
+}
+
+#[cfg(feature = "ntex")]
+impl FromIo<Box<IoError>> for ntex::ws::error::WsClientBuilderError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("{self}"),
+      ),
+    })
+  }
+}
+
+#[cfg(feature = "ntex")]
+impl FromIo<Box<IoError>> for ntex::ws::error::WsClientError {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
   where
     C: ToString + std::fmt::Display,

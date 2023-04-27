@@ -4,12 +4,12 @@ use tokio_util::codec;
 use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 
+use nanocl_utils::io_error::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::vm_image::VmImageCloneStream;
 
 use crate::utils::math::calculate_percentage;
 
-use crate::error::CliError;
 use crate::models::{
   VmImageArgs, VmImageCreateOpts, VmImageCommands, VmImageRow,
   VmImageResizeOpts,
@@ -19,30 +19,22 @@ use crate::utils::print::print_table;
 async fn exec_vm_image_create(
   client: &NanocldClient,
   options: &VmImageCreateOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let file_path = options.file_path.clone();
 
-  let fp =
-    Path::new(&file_path)
-      .canonicalize()
-      .map_err(|err| CliError::Custom {
-        msg: format!("Unable to resolve path {file_path}: {err}"),
-      })?;
+  let fp = Path::new(&file_path)
+    .canonicalize()
+    .map_err(|err| err.map_err_context(|| file_path.to_string()))?;
 
-  let file =
-    tokio::fs::File::open(&fp)
-      .await
-      .map_err(|err| CliError::Custom {
-        msg: format!("Unable to open file at {file_path}: {err}"),
-      })?;
+  let file = tokio::fs::File::open(&fp)
+    .await
+    .map_err(|err| err.map_err_context(|| file_path.to_string()))?;
 
   // Get file size
   let file_size = file
     .metadata()
     .await
-    .map_err(|err| CliError::Custom {
-      msg: format!("Unable to get file metadata for {file_path}: {err}"),
-    })?
+    .map_err(|err| err.map_err_context(|| file_path.to_string()))?
     .len();
   let mut sent: u64 = 0;
   let pg = ProgressBar::new(100);
@@ -68,7 +60,7 @@ async fn exec_vm_image_create(
   Ok(())
 }
 
-async fn exec_vm_image_ls(client: &NanocldClient) -> Result<(), CliError> {
+async fn exec_vm_image_ls(client: &NanocldClient) -> IoResult<()> {
   let items = client.list_vm_image().await?;
   let rows = items
     .into_iter()
@@ -82,7 +74,7 @@ async fn exec_vm_image_ls(client: &NanocldClient) -> Result<(), CliError> {
 async fn exec_vm_image_rm(
   client: &NanocldClient,
   names: &[String],
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   for name in names {
     client.delete_vm_image(name).await?;
   }
@@ -93,7 +85,7 @@ async fn exec_vm_image_clone(
   client: &NanocldClient,
   name: &str,
   clone_name: &str,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let mut stream = client.clone_vm_image(name, clone_name).await?;
   let pg = ProgressBar::new(100);
   let style = ProgressStyle::with_template(
@@ -119,7 +111,7 @@ async fn exec_vm_image_clone(
 async fn exec_vm_resize(
   client: &NanocldClient,
   options: &VmImageResizeOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let payload = options.clone().into();
   client.resize_vm_image(&options.name, &payload).await?;
   Ok(())
@@ -128,7 +120,7 @@ async fn exec_vm_resize(
 pub async fn exec_vm_image(
   client: &NanocldClient,
   args: &VmImageArgs,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   match &args.commands {
     VmImageCommands::Create(options) => {
       exec_vm_image_create(client, options).await

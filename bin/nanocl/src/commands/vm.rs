@@ -7,12 +7,12 @@ use ntex::{ws, rt, time};
 use ntex::util::Bytes;
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
-
-use nanocld_client::NanocldClient;
-use nanocld_client::stubs::cargo::{OutputLog, OutputKind};
 use termios::{TCSANOW, tcsetattr, Termios, ICANON, ECHO};
 
-use crate::error::CliError;
+use nanocl_utils::io_error::{IoResult, FromIo};
+use nanocld_client::NanocldClient;
+use nanocld_client::stubs::cargo::{OutputLog, OutputKind};
+
 use crate::models::{
   VmArgs, VmCommands, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts,
 };
@@ -24,7 +24,7 @@ pub async fn exec_vm_create(
   client: &NanocldClient,
   args: &VmArgs,
   options: &VmCreateOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.clone()).await?;
 
@@ -33,10 +33,7 @@ pub async fn exec_vm_create(
   Ok(())
 }
 
-pub async fn exec_vm_ls(
-  client: &NanocldClient,
-  args: &VmArgs,
-) -> Result<(), CliError> {
+pub async fn exec_vm_ls(client: &NanocldClient, args: &VmArgs) -> IoResult<()> {
   let items = client.list_vm(args.namespace.clone()).await?;
 
   let rows = items.into_iter().map(VmRow::from).collect::<Vec<VmRow>>();
@@ -50,7 +47,7 @@ pub async fn exec_vm_rm(
   client: &NanocldClient,
   args: &VmArgs,
   names: &[String],
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   for name in names {
     client.delete_vm(name, args.namespace.clone()).await?;
   }
@@ -62,10 +59,10 @@ pub async fn exec_vm_inspect(
   client: &NanocldClient,
   args: &VmArgs,
   name: &str,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let vm = client.inspect_vm(name, args.namespace.clone()).await?;
 
-  let _ = print_yml(vm);
+  print_yml(vm)?;
 
   Ok(())
 }
@@ -74,7 +71,7 @@ pub async fn exec_vm_start(
   client: &NanocldClient,
   args: &VmArgs,
   name: &str,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   client.start_vm(name, args.namespace.clone()).await?;
 
   Ok(())
@@ -84,7 +81,7 @@ pub async fn exec_vm_stop(
   client: &NanocldClient,
   args: &VmArgs,
   name: &str,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   client.stop_vm(name, args.namespace.clone()).await?;
 
   Ok(())
@@ -94,7 +91,7 @@ pub async fn exec_vm_run(
   client: &NanocldClient,
   args: &VmArgs,
   options: &VmRunOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.clone()).await?;
   client.start_vm(&vm.name, args.namespace.clone()).await?;
@@ -106,7 +103,7 @@ pub async fn exec_vm_patch(
   client: &NanocldClient,
   args: &VmArgs,
   options: &VmPatchOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let vm = options.clone().into();
   client
     .patch_vm(&options.name, &vm, args.namespace.clone())
@@ -119,7 +116,7 @@ pub async fn exec_vm_attach(
   client: &NanocldClient,
   args: &VmArgs,
   name: &str,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   /// How often heartbeat pings are sent
   const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
   let conn = client.attach_vm(name, args.namespace.clone()).await?;
@@ -184,7 +181,10 @@ pub async fn exec_vm_attach(
   while let Some(frame) = rx.next().await {
     match frame {
       Ok(ws::Frame::Binary(text)) => {
-        let output = serde_json::from_slice::<OutputLog>(&text)?;
+        let output =
+          serde_json::from_slice::<OutputLog>(&text).map_err(|err| {
+            err.map_err_context(|| "Unable to serialize output")
+          })?;
         match &output.kind {
           OutputKind::StdOut => {
             stdout.write_all(output.data.as_bytes())?;
@@ -216,10 +216,7 @@ pub async fn exec_vm_attach(
   Ok(())
 }
 
-pub async fn exec_vm(
-  client: &NanocldClient,
-  args: &VmArgs,
-) -> Result<(), CliError> {
+pub async fn exec_vm(client: &NanocldClient, args: &VmArgs) -> IoResult<()> {
   match &args.commands {
     VmCommands::Image(args) => exec_vm_image(client, args).await,
     VmCommands::Create(options) => exec_vm_create(client, args, options).await,

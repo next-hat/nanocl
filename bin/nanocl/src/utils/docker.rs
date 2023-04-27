@@ -14,10 +14,10 @@ use bollard_next::service::{
   ContainerCreateResponse,
 };
 
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+
 use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 use nanocld_client::stubs::cargo_config::Config as ContainerConfig;
-
-use crate::error::CliError;
 
 use crate::utils::math::calculate_percentage;
 
@@ -61,7 +61,7 @@ pub async fn install_image(
   from_image: &str,
   tag: &str,
   docker_api: &Docker,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let options = Some(CreateImageOptions {
     from_image,
     tag,
@@ -73,41 +73,34 @@ pub async fn install_image(
   let multiprogress = MultiProgress::new();
   multiprogress.set_move_cursor(false);
   while let Some(res) = stream.next().await {
-    match res {
-      Err(err) => {
-        return Err(CliError::Custom {
-          msg: format!("Error while pulling image: {err}"),
-        });
+    let data = res
+      .map_err(|err| err.map_err_context(|| "Install image stream failed"))?;
+    let status = data.status.unwrap_or_default();
+    let id = data.id.unwrap_or_default();
+    let progress = data.progress_detail.unwrap_or_default();
+    match status.as_str() {
+      "Pulling fs layer" => {
+        update_image_progress(&multiprogress, &mut layers, &id, &progress);
       }
-      Ok(data) => {
-        let status = data.status.unwrap_or_default();
-        let id = data.id.unwrap_or_default();
-        let progress = data.progress_detail.unwrap_or_default();
-        match status.as_str() {
-          "Pulling fs layer" => {
-            update_image_progress(&multiprogress, &mut layers, &id, &progress);
-          }
-          "Downloading" => {
-            update_image_progress(&multiprogress, &mut layers, &id, &progress);
-          }
-          "Download complete" => {
-            if let Some(pg) = layers.get(&id) {
-              pg.set_position(100);
-            }
-          }
-          "Extracting" => {
-            update_image_progress(&multiprogress, &mut layers, &id, &progress);
-          }
-          _ => {
-            if layers.get(&id).is_none() {
-              let _ = multiprogress.println(&status);
-            }
-          }
-        };
+      "Downloading" => {
+        update_image_progress(&multiprogress, &mut layers, &id, &progress);
+      }
+      "Download complete" => {
         if let Some(pg) = layers.get(&id) {
-          pg.set_message(format!("[{}] {}", &id, &status));
+          pg.set_position(100);
         }
       }
+      "Extracting" => {
+        update_image_progress(&multiprogress, &mut layers, &id, &progress);
+      }
+      _ => {
+        if layers.get(&id).is_none() {
+          let _ = multiprogress.println(&status);
+        }
+      }
+    };
+    if let Some(pg) = layers.get(&id) {
+      pg.set_message(format!("[{}] {}", &id, &status));
     }
   }
 
@@ -115,39 +108,47 @@ pub async fn install_image(
 }
 
 /// Generate a docker client from the docker host
-pub fn connect(docker_host: &str) -> Result<Docker, CliError> {
-  match &docker_host {
-    docker_host if docker_host.starts_with("unix://") => {
-      let path = docker_host.trim_start_matches("unix://");
-      if !std::path::Path::new(&path).exists() {
-        return Err(CliError::Custom {
-          msg: format!("Error {docker_host} does not exist"),
-        });
-      }
-      Docker::connect_with_unix(path, 120, API_DEFAULT_VERSION).map_err(|err| {
-        CliError::Custom {
-          msg: format!("Cannot connect to docker got error: {err}"),
+pub fn connect(docker_host: &str) -> IoResult<Docker> {
+  let docker =
+    match &docker_host {
+      docker_host if docker_host.starts_with("unix://") => {
+        let path = docker_host.trim_start_matches("unix://");
+        if !std::path::Path::new(&path).exists() {
+          return Err(IoError::not_fount("Docker connect", path));
         }
-      })
-    }
-    docker_host if docker_host.starts_with("http://") => {
-      Docker::connect_with_http(docker_host, 120, API_DEFAULT_VERSION).map_err(
-        |err| CliError::Custom {
-          msg: format!("Cannot connect to docker got error: {err}"),
-        },
-      )
-    }
-    docker_host if docker_host.starts_with("https://") => {
-      Docker::connect_with_http(docker_host, 120, API_DEFAULT_VERSION).map_err(
-        |err| CliError::Custom {
-          msg: format!("Cannot connect to docker got error: {err}"),
-        },
-      )
-    }
-    _ => Err(CliError::Custom {
-      msg: format!("Invalid scheme expected [http,https] got: {docker_host}"),
-    }),
-  }
+        Docker::connect_with_unix(path, 120, API_DEFAULT_VERSION).map_err(
+          |err| {
+            err.map_err_context(|| {
+              format!("Unable to connect to docker at {path}")
+            })
+          },
+        )?
+      }
+      docker_host if docker_host.starts_with("http://") => {
+        Docker::connect_with_http(docker_host, 120, API_DEFAULT_VERSION)
+          .map_err(|err| {
+            err.map_err_context(|| {
+              format!("Unable to connect to docker at {docker_host}")
+            })
+          })?
+      }
+      docker_host if docker_host.starts_with("https://") => {
+        Docker::connect_with_http(docker_host, 120, API_DEFAULT_VERSION)
+          .map_err(|err| {
+            err.map_err_context(|| {
+              format!("Unable to connect to docker at {docker_host}")
+            })
+          })?
+      }
+      _ => {
+        return Err(IoError::invalid_data(
+          "Url",
+          &format!("{docker_host} have invalid schema"),
+        ))
+      }
+    };
+
+  Ok(docker)
 }
 
 pub fn hook_labels(
@@ -168,7 +169,7 @@ pub async fn create_cargo_container(
   cargo: &CargoConfigPartial,
   namespace: &str,
   docker: &Docker,
-) -> Result<ContainerCreateResponse, CliError> {
+) -> IoResult<ContainerCreateResponse> {
   let name = &cargo.name;
   let config = &cargo.container;
   let key = format!("{name}.{namespace}");
@@ -197,7 +198,8 @@ pub async fn create_cargo_container(
       }),
       hooked_config,
     )
-    .await?;
+    .await
+    .map_err(|err| err.map_err_context(|| format!("Cargo {name}")))?;
 
   Ok(container)
 }

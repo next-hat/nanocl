@@ -1,20 +1,22 @@
 use std::error::Error;
 
-use ntex::channel::mpsc;
 use ntex::util::Bytes;
+use ntex::channel::mpsc;
 use futures::Stream;
+
+use nanocl_utils::http_error::HttpError;
+use nanocl_utils::http_client_error::HttpClientError;
 
 use nanocl_stubs::vm_image::{VmImage, VmImageCloneStream, VmImageResizePayload};
 
 use crate::NanocldClient;
-use crate::error::{NanocldClientError, ApiError};
 
 impl NanocldClient {
   pub async fn import_vm_image<S, E>(
     &self,
     name: &str,
     stream: S,
-  ) -> Result<(), NanocldClientError>
+  ) -> Result<(), HttpClientError>
   where
     S: Stream<Item = Result<Bytes, E>> + Unpin + 'static,
     E: Error + 'static,
@@ -29,9 +31,7 @@ impl NanocldClient {
     Ok(())
   }
 
-  pub async fn list_vm_image(
-    &self,
-  ) -> Result<Vec<VmImage>, NanocldClientError> {
+  pub async fn list_vm_image(&self) -> Result<Vec<VmImage>, HttpClientError> {
     let res = self
       .send_get(format!("/{}/vms/images", self.version), None::<String>)
       .await?;
@@ -42,7 +42,7 @@ impl NanocldClient {
   pub async fn delete_vm_image(
     &self,
     name: &str,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_delete(
         format!("/{}/vms/images/{name}", self.version),
@@ -58,8 +58,8 @@ impl NanocldClient {
     name: &str,
     clone_name: &str,
   ) -> Result<
-    mpsc::Receiver<Result<VmImageCloneStream, ApiError>>,
-    NanocldClientError,
+    mpsc::Receiver<Result<VmImageCloneStream, HttpError>>,
+    HttpClientError,
   > {
     let res = self
       .send_post(
@@ -76,7 +76,7 @@ impl NanocldClient {
     &self,
     name: &str,
     payload: &VmImageResizePayload,
-  ) -> Result<VmImage, NanocldClientError> {
+  ) -> Result<VmImage, HttpClientError> {
     let res = self
       .send_post(
         format!("/{}/vms/images/{name}/resize", self.version),

@@ -1,8 +1,10 @@
 use ntex::channel::mpsc;
 use ntex::channel::mpsc::Receiver;
 
-use bollard_next::service::ContainerSummary;
+use nanocl_utils::http_error::HttpError;
+use nanocl_utils::http_client_error::HttpClientError;
 
+use bollard_next::service::ContainerSummary;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, CreateExecOptions, OutputLog,
@@ -12,10 +14,7 @@ use nanocl_stubs::cargo_config::{
   CargoConfigUpdate, CargoConfigPartial, CargoConfig,
 };
 
-use crate::error::ApiError;
-
 use super::http_client::NanocldClient;
-use super::error::NanocldClientError;
 
 impl NanocldClient {
   /// ## Create a new cargo
@@ -27,7 +26,7 @@ impl NanocldClient {
   /// ## Returns
   /// * [Result](Result)
   ///   * [Ok](Ok) - The created [cargo](Cargo)
-  ///   * [Err](NanocldClientError) - The cargo could not be created
+  ///   * [Err](HttpClientError) - The cargo could not be created
   ///
   /// ## Example
   ///
@@ -49,7 +48,7 @@ impl NanocldClient {
     &self,
     item: &CargoConfigPartial,
     namespace: Option<String>,
-  ) -> Result<Cargo, NanocldClientError> {
+  ) -> Result<Cargo, HttpClientError> {
     let res = self
       .send_post(
         format!("/{}/cargoes", &self.version),
@@ -70,7 +69,7 @@ impl NanocldClient {
   /// ## Returns
   /// * [Result](Result)
   ///   * [Ok](Ok) - The cargo was deleted
-  ///   * [Err](NanocldClientError) - The cargo could not be deleted
+  ///   * [Err](HttpClientError) - The cargo could not be deleted
   ///
   /// ## Example
   /// ```no_run,ignore
@@ -84,7 +83,7 @@ impl NanocldClient {
     &self,
     name: &str,
     query: &CargoDeleteQuery,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_delete(format!("/{}/cargoes/{name}", &self.version), Some(query))
       .await?;
@@ -102,7 +101,7 @@ impl NanocldClient {
   /// ## Returns
   /// * [Result](Result)
   ///   * [Ok](Ok) - The desired [cargo](Cargo)
-  ///   * [Err](NanocldClientError) - The cargo could not be inspected
+  ///   * [Err](HttpClientError) - The cargo could not be inspected
   ///
   /// ## Example
   /// ```no_run,ignore
@@ -116,7 +115,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<CargoInspect, NanocldClientError> {
+  ) -> Result<CargoInspect, HttpClientError> {
     let res = self
       .send_get(
         format!("/{}/cargoes/{name}/inspect", &self.version),
@@ -137,7 +136,7 @@ impl NanocldClient {
   /// ## Returns
   /// * [Result](Result)
   ///   * [Ok](Ok) - The cargo was started
-  ///   * [Err](NanocldClientError) - The cargo could not be started
+  ///   * [Err](HttpClientError) - The cargo could not be started
   ///
   /// ## Example
   /// ```no_run,ignore
@@ -151,7 +150,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_post(
         format!("/{}/cargoes/{name}/start", &self.version),
@@ -173,7 +172,7 @@ impl NanocldClient {
   /// ## Returns
   /// * [Result](Result)
   ///   * [Ok](Ok) - The cargo was stopped
-  ///   * [Err](NanocldClientError) - The cargo could not be stopped
+  ///   * [Err](HttpClientError) - The cargo could not be stopped
   ///
   /// ## Example
   /// ```no_run,ignore
@@ -187,7 +186,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_post(
         format!("/{}/cargoes/{name}/stop", &self.version),
@@ -208,7 +207,7 @@ impl NanocldClient {
   /// ## Returns
   /// * [Result](Result)
   ///   * [Ok](Ok) - A [Vec](Vec) of [cargoes](CargoSummary)
-  ///   * [Err](NanocldClientError) - The cargoes could not be listed
+  ///   * [Err](HttpClientError) - The cargoes could not be listed
   ///
   /// ## Example
   /// ```no_run,ignore
@@ -221,7 +220,7 @@ impl NanocldClient {
   pub async fn list_cargo(
     &self,
     namespace: Option<String>,
-  ) -> Result<Vec<CargoSummary>, NanocldClientError> {
+  ) -> Result<Vec<CargoSummary>, HttpClientError> {
     let res = self
       .send_get(
         format!("/{}/cargoes", &self.version),
@@ -244,7 +243,7 @@ impl NanocldClient {
   /// ## Returns
   /// * [Result](Result)
   ///   * [Ok](Ok) - The cargo was patched
-  ///   * [Err](NanocldClientError) - The cargo could not be patched
+  ///   * [Err](HttpClientError) - The cargo could not be patched
   ///
   /// ## Example
   /// ```no_run,ignore
@@ -262,7 +261,7 @@ impl NanocldClient {
     name: &str,
     config: CargoConfigUpdate,
     namespace: Option<String>,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_patch(
         format!("/{}/cargoes/{name}", &self.version),
@@ -286,7 +285,7 @@ impl NanocldClient {
   /// ## Returns
   /// * [Result](Result)
   ///   * [Ok](Ok) - The cargo was put
-  ///   * [Err](NanocldClientError) - The cargo could not be put
+  ///   * [Err](HttpClientError) - The cargo could not be put
   ///
   /// ## Example
   /// ```no_run,ignore
@@ -304,7 +303,7 @@ impl NanocldClient {
     name: &str,
     config: CargoConfigUpdate,
     namespace: Option<String>,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_put(
         format!("/{}/cargoes/{name}", &self.version),
@@ -327,7 +326,7 @@ impl NanocldClient {
   ///
   /// - [Result](Result)
   ///  - [Ok](Ok) - A [mpsc::Receiver](mpsc::Receiver) of [ExecOutput](ExecOutput)
-  /// - [Err](NanocldClientError) - The command could not be executed
+  /// - [Err](HttpClientError) - The command could not be executed
   ///
   /// ## Example
   ///
@@ -352,8 +351,7 @@ impl NanocldClient {
     name: &str,
     exec: CreateExecOptions,
     namespace: Option<String>,
-  ) -> Result<mpsc::Receiver<Result<OutputLog, ApiError>>, NanocldClientError>
-  {
+  ) -> Result<mpsc::Receiver<Result<OutputLog, HttpError>>, HttpClientError> {
     let res = self
       .send_post(
         format!("/{}/cargoes/{name}/exec", &self.version),
@@ -376,7 +374,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - A [Vec](Vec) of [CargoConfig](CargoConfig)
-  ///   * [Err](NanocldClientError) - The cargo could not be listed
+  ///   * [Err](HttpClientError) - The cargo could not be listed
   ///
   /// ## Example
   ///
@@ -391,7 +389,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<Vec<CargoConfig>, NanocldClientError> {
+  ) -> Result<Vec<CargoConfig>, HttpClientError> {
     let res = self
       .send_get(
         format!("/{}/cargoes/{name}/histories", &self.version),
@@ -414,7 +412,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The [Cargo](Cargo) reseted
-  ///   * [Err](NanocldClientError) - The cargo could not be reseted
+  ///   * [Err](HttpClientError) - The cargo could not be reseted
   ///
   /// ## Example
   ///
@@ -430,7 +428,7 @@ impl NanocldClient {
     name: &str,
     id: &str,
     namespace: Option<String>,
-  ) -> Result<Cargo, NanocldClientError> {
+  ) -> Result<Cargo, HttpClientError> {
     let res = self
       .send_patch(
         format!("/{}/cargoes/{name}/histories/{id}/reset", &self.version),
@@ -454,7 +452,7 @@ impl NanocldClient {
     &self,
     name: &str,
     query: &CargoLogQuery,
-  ) -> Result<Receiver<Result<OutputLog, ApiError>>, NanocldClientError> {
+  ) -> Result<Receiver<Result<OutputLog, HttpError>>, HttpClientError> {
     let res = self
       .send_get(
         format!("/{}/cargoes/{name}/logs", &self.version),
@@ -470,7 +468,7 @@ impl NanocldClient {
     name: &str,
     options: &CargoKillOptions,
     namespace: Option<String>,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_post(
         format!("/{}/cargoes/{name}", &self.version),
@@ -486,7 +484,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<String>,
-  ) -> Result<Vec<ContainerSummary>, NanocldClientError> {
+  ) -> Result<Vec<ContainerSummary>, HttpClientError> {
     let res = self
       .send_get(
         format!("/{}/cargoes/{name}/instances", &self.version),
@@ -572,7 +570,7 @@ mod tests {
     };
     let err = client.create_cargo(&new_cargo, None).await.unwrap_err();
     match err {
-      NanocldClientError::Api(err) => {
+      HttpClientError::HttpError(err) => {
         assert_eq!(err.status, http::StatusCode::NOT_FOUND);
       }
       _ => panic!("Wrong error type"),
@@ -595,7 +593,7 @@ mod tests {
 
     let err = client.create_cargo(&new_cargo, None).await.unwrap_err();
     match err {
-      NanocldClientError::Api(err) => {
+      HttpClientError::HttpError(err) => {
         assert_eq!(err.status, 409);
       }
       _ => panic!("Wrong error type"),

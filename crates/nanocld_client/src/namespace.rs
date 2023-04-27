@@ -1,8 +1,7 @@
+use nanocl_utils::http_client_error::HttpClientError;
 use nanocl_stubs::namespace::{Namespace, NamespaceSummary, NamespaceInspect};
 
 use super::http_client::NanocldClient;
-
-use super::error::NanocldClientError;
 
 impl NanocldClient {
   /// ## List all namespaces
@@ -11,7 +10,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - A [Vec](Vec) of [namespaces](NamespaceSummary)
-  ///   * [Err](NanocldClientError) - The namespaces could not be listed
+  ///   * [Err](HttpClientError) - The namespaces could not be listed
   ///
   /// ## Example
   ///
@@ -24,7 +23,7 @@ impl NanocldClient {
   ///
   pub async fn list_namespace(
     &self,
-  ) -> Result<Vec<NamespaceSummary>, NanocldClientError> {
+  ) -> Result<Vec<NamespaceSummary>, HttpClientError> {
     let res = self
       .send_get(format!("/{}/namespaces", &self.version), None::<String>)
       .await?;
@@ -42,12 +41,12 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The created [namespace](Namespace)
-  ///   * [Err](NanocldClientError) - The namespace could not be created
+  ///   * [Err](HttpClientError) - The namespace could not be created
   ///
   pub async fn create_namespace(
     &self,
     name: &str,
-  ) -> Result<Namespace, NanocldClientError> {
+  ) -> Result<Namespace, HttpClientError> {
     let new_item = Namespace { name: name.into() };
     let res = self
       .send_post(
@@ -72,7 +71,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The desired [namespace](NamespaceInspect)
-  ///   * [Err](NanocldClientError) - The namespace could not be inspected
+  ///   * [Err](HttpClientError) - The namespace could not be inspected
   ///
   /// ## Example
   ///
@@ -86,7 +85,7 @@ impl NanocldClient {
   pub async fn inspect_namespace(
     &self,
     name: &str,
-  ) -> Result<NamespaceInspect, NanocldClientError> {
+  ) -> Result<NamespaceInspect, HttpClientError> {
     let res = self
       .send_get(
         format!("/{}/namespaces/{name}/inspect", &self.version),
@@ -109,7 +108,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The namespace was deleted
-  ///   * [Err](NanocldClientError) - The namespace could not be deleted
+  ///   * [Err](HttpClientError) - The namespace could not be deleted
   ///
   /// ## Example
   ///
@@ -123,7 +122,7 @@ impl NanocldClient {
   pub async fn delete_namespace(
     &self,
     name: &str,
-  ) -> Result<(), NanocldClientError> {
+  ) -> Result<(), HttpClientError> {
     self
       .send_delete(
         format!("/{}/namespaces/{name}", &self.version),

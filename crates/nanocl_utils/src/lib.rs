@@ -9,3 +9,6 @@ pub mod io_error;
 
 #[cfg(feature = "http_error")]
 pub mod http_error;
+
+#[cfg(feature = "http_client_error")]
+pub mod http_client_error;

@@ -1,15 +1,16 @@
 use dialoguer::Confirm;
 use dialoguer::theme::ColorfulTheme;
+
+use nanocl_utils::io_error::{IoError, IoResult};
 use nanocld_client::NanocldClient;
 
-use crate::utils::print::*;
-use crate::error::CliError;
+use crate::utils::print::{print_yml, print_table};
 use crate::models::{
   ResourceArgs, ResourceCommands, ResourceRow, ResourceRemoveOpts,
   ResourceInspectOpts, ResourceResetOpts, ResourceHistoryOpts,
 };
 
-async fn exec_resource_ls(client: &NanocldClient) -> Result<(), CliError> {
+async fn exec_resource_ls(client: &NanocldClient) -> IoResult<()> {
   let resources = client.list_resource(None).await?;
 
   let row = resources
@@ -24,7 +25,7 @@ async fn exec_resource_ls(client: &NanocldClient) -> Result<(), CliError> {
 async fn exec_resource_rm(
   client: &NanocldClient,
   options: &ResourceRemoveOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   if !options.skip_confirm {
     let result = Confirm::with_theme(&ColorfulTheme::default())
       .with_prompt(format!("Delete resources {}?", options.names.join(",")))
@@ -33,9 +34,10 @@ async fn exec_resource_rm(
     match result {
       Ok(true) => {}
       _ => {
-        return Err(CliError::Custom {
-          msg: "Aborted".into(),
-        })
+        return Err(IoError::interupted(
+          "Resource remove",
+          "interupted by user",
+        ))
       }
     }
   }
@@ -49,7 +51,7 @@ async fn exec_resource_rm(
 async fn exec_resource_inspect(
   client: &NanocldClient,
   opts: &ResourceInspectOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let resource = client.inspect_resource(&opts.name).await?;
 
   print_yml(resource)?;
@@ -59,7 +61,7 @@ async fn exec_resource_inspect(
 async fn exec_resource_history(
   client: &NanocldClient,
   opts: &ResourceHistoryOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let history = client.list_history_resource(&opts.name).await?;
 
   print_yml(history)?;
@@ -69,7 +71,7 @@ async fn exec_resource_history(
 async fn exec_resource_reset(
   client: &NanocldClient,
   opts: &ResourceResetOpts,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   let resource = client.reset_resource(&opts.name, &opts.key).await?;
 
   print_yml(resource)?;
@@ -79,7 +81,7 @@ async fn exec_resource_reset(
 pub async fn exec_resource(
   client: &NanocldClient,
   args: &ResourceArgs,
-) -> Result<(), CliError> {
+) -> IoResult<()> {
   match &args.commands {
     // ResourceCommands::Create(opts) => exec_create(client, opts).await,
     ResourceCommands::List => exec_resource_ls(client).await,

@@ -1,11 +1,11 @@
 use ntex::channel::mpsc;
 
+use nanocl_utils::http_error::HttpError;
+use nanocl_utils::http_client_error::HttpClientError;
+
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{Event, Version, HostInfo, ProccessQuery};
 
-use crate::error::ApiError;
-
-use super::error::NanocldClientError;
 use super::http_client::NanocldClient;
 
 impl NanocldClient {
@@ -15,7 +15,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The [version](Version) of the daemon
-  ///   * [Err](NanocldClientError) - The version could not be retrieved
+  ///   * [Err](HttpClientError) - The version could not be retrieved
   ///
   /// ## Example
   ///
@@ -26,7 +26,7 @@ impl NanocldClient {
   /// let version = client.get_version().await;
   /// ```
   ///
-  pub async fn get_version(&self) -> Result<Version, NanocldClientError> {
+  pub async fn get_version(&self) -> Result<Version, HttpClientError> {
     let res = self
       .send_get(format!("/{}/version", &self.version), None::<String>)
       .await?;
@@ -43,7 +43,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - A [Receiver](mpsc::Receiver) of [Event](Event)s
-  ///   * [Err](NanocldClientError) - The events could not be retrieved
+  ///   * [Err](HttpClientError) - The events could not be retrieved
   ///
   /// ## Example
   ///
@@ -59,7 +59,7 @@ impl NanocldClient {
   ///
   pub async fn watch_events(
     &self,
-  ) -> Result<mpsc::Receiver<Result<Event, ApiError>>, NanocldClientError> {
+  ) -> Result<mpsc::Receiver<Result<Event, HttpError>>, HttpClientError> {
     let res = self
       .send_get(format!("/{}/events", &self.version), None::<String>)
       .await?;
@@ -75,7 +75,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The daemon is running
-  ///   * [Err](NanocldClientError) - The daemon is not running
+  ///   * [Err](HttpClientError) - The daemon is not running
   ///
   /// ## Example
   ///
@@ -86,7 +86,7 @@ impl NanocldClient {
   /// let version = client.ping().await.unwrap();
   /// ```
   ///
-  pub async fn ping(&self) -> Result<(), NanocldClientError> {
+  pub async fn ping(&self) -> Result<(), HttpClientError> {
     self
       .send_head(format!("/{}/_ping", &self.version), None::<String>)
       .await?;
@@ -102,7 +102,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The [HostInfo](HostInfo)
-  ///   * [Err](NanocldClientError) - The host info could not be retrieved
+  ///   * [Err](HttpClientError) - The host info could not be retrieved
   ///
   /// ## Example
   ///
@@ -113,7 +113,7 @@ impl NanocldClient {
   /// let info = client.info().await.unwrap();
   /// ```
   ///
-  pub async fn info(&self) -> Result<HostInfo, NanocldClientError> {
+  pub async fn info(&self) -> Result<HostInfo, HttpClientError> {
     let res = self
       .send_get(format!("/{}/info", &self.version), None::<String>)
       .await?;
@@ -124,7 +124,7 @@ impl NanocldClient {
   pub async fn process(
     &self,
     opts: Option<ProccessQuery>,
-  ) -> Result<Vec<NodeContainerSummary>, NanocldClientError> {
+  ) -> Result<Vec<NodeContainerSummary>, HttpClientError> {
     let res = self
       .send_get(format!("/{}/processes", &self.version), opts)
       .await?;
