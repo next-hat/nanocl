@@ -22,8 +22,7 @@ ARG channel=stable
 COPY --from=planner /app /app
 WORKDIR /app
 RUN rustup target add x86_64-unknown-linux-musl
-RUN apk update && apk upgrade
-RUN apk add clang-dev gcc gcompat make musl-dev libpq-dev openssl openssl-dev git upx
+RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base
 COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
 COPY ./crates/nanocl_utils/src ./crates/nanocl_utils/src
