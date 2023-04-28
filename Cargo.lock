@@ -171,7 +171,7 @@ dependencies = [
  "cfg-if",
  "concurrent-queue 2.2.0",
  "futures-lite",
- "log 0.4.17",
+ "log",
  "parking",
  "polling",
  "rustix",
@@ -234,7 +234,7 @@ dependencies = [
  "futures-lite",
  "gloo-timers",
  "kv-log-macro",
- "log 0.4.17",
+ "log",
  "memchr",
  "once_cell",
  "pin-project-lite",
@@ -271,7 +271,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "libc",
- "miniz_oxide",
+ "miniz_oxide 0.6.2",
  "object",
  "rustc-demangle",
 ]
@@ -336,7 +336,7 @@ dependencies = [
  "atomic-waker",
  "fastrand",
  "futures-lite",
- "log 0.4.17",
+ "log",
 ]
 
 [[package]]
@@ -354,7 +354,7 @@ dependencies = [
  "http",
  "hyper",
  "hyperlocal",
- "log 0.4.17",
+ "log",
  "pin-project-lite",
  "serde",
  "serde_derive",
@@ -859,7 +859,7 @@ checksum = "85cdab6a89accf66733ad5a1693a4dcced6aeff64602b634530dd73c1f3ee9f0"
 dependencies = [
  "humantime",
  "is-terminal",
- "log 0.4.17",
+ "log",
  "regex",
  "termcolor",
 ]
@@ -924,12 +924,12 @@ dependencies = [
 
 [[package]]
 name = "flate2"
-version = "1.0.25"
+version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8a2db397cb1c8772f31494cb8917e48cd1e64f0fa7efac59fbd741a0a8ce841"
+checksum = "3b9429470923de8e8cbd4d2dc513535400b4b3fef0319fb5c4e1f520a7bef743"
 dependencies = [
  "crc32fast",
- "miniz_oxide",
+ "miniz_oxide 0.7.1",
 ]
 
 [[package]]
@@ -1163,7 +1163,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "lockfree",
- "log 0.4.17",
+ "log",
  "nix",
  "pin-project-lite",
  "rlimit",
@@ -1533,7 +1533,7 @@ version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0de8b303297635ad57c9f5059fd9cee7a47f8e8daa09df0fcd07dd39fb22977f"
 dependencies = [
- "log 0.4.17",
+ "log",
 ]
 
 [[package]]
@@ -1637,15 +1637,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74ee94b5ad113c7cb98c5a040f783d0952ee4fe100993881d1673c2cb002dd23"
 dependencies = [
  "owned-alloc",
-]
-
-[[package]]
-name = "log"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"
-dependencies = [
- "log 0.4.17",
 ]
 
 [[package]]
@@ -1758,25 +1749,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "miniz_oxide"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7810e0be55b428ada41041c41f32c9f1a42817901b4ccf45fa3d4b6561e74c7"
+dependencies = [
+ "adler",
+]
+
+[[package]]
 name = "mio"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b9d9a46eff5b4ff64b45a9e316a6d1e0bc719ef429cbec4dc630684212bfdf9"
 dependencies = [
  "libc",
- "log 0.4.17",
+ "log",
  "wasi",
  "windows-sys 0.45.0",
-]
-
-[[package]]
-name = "mustache"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51956ef1c5d20a1384524d91e616fb44dfc7d8f249bf696d49c97dd3289ecab5"
-dependencies = [
- "log 0.3.9",
- "serde",
 ]
 
 [[package]]
@@ -1794,14 +1784,12 @@ dependencies = [
  "indicatif",
  "libc",
  "liquid",
- "mustache",
  "nanocl_utils",
  "nanocld_client",
  "ntex",
  "regex",
  "serde",
  "serde_json",
- "serde_urlencoded",
  "serde_yaml",
  "tabled",
  "termios",
@@ -1830,7 +1818,7 @@ dependencies = [
  "diesel",
  "env_logger",
  "futures",
- "log 0.4.17",
+ "log",
  "ntex",
  "serde_json",
  "serde_urlencoded",
@@ -1856,7 +1844,7 @@ dependencies = [
  "hyper",
  "jsonschema",
  "libc",
- "log 0.4.17",
+ "log",
  "metrsd_client",
  "nanocl_stubs",
  "nanocl_utils",
@@ -1886,7 +1874,6 @@ dependencies = [
  "ntex",
  "serde",
  "serde_json",
- "serde_urlencoded",
  "tokio",
  "tokio-util",
 ]
@@ -1907,7 +1894,7 @@ dependencies = [
  "clap",
  "clap_mangen",
  "futures",
- "log 0.4.17",
+ "log",
  "nanocl_utils",
  "nanocld_client",
  "ntex",
@@ -1926,7 +1913,7 @@ dependencies = [
  "clap",
  "clap_mangen",
  "futures",
- "log 0.4.17",
+ "log",
  "nanocl_utils",
  "nanocld_client",
  "notify",
@@ -1990,7 +1977,7 @@ dependencies = [
  "encoding_rs",
  "httparse",
  "httpdate",
- "log 0.4.17",
+ "log",
  "mime",
  "nanorand",
  "ntex-async-std",
@@ -2032,7 +2019,7 @@ checksum = "e984625782348a5bc423eb9bc72923a70b95cf5e849079e09a785c9f411f87d1"
 dependencies = [
  "async-oneshot",
  "async-std",
- "log 0.4.17",
+ "log",
  "ntex-bytes",
  "ntex-io",
  "ntex-util",
@@ -2066,7 +2053,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ebeb43837a991a064a929e5bc3616abe6ceac1e336d6ced721f0ca94afee5fc"
 dependencies = [
- "log 0.4.17",
+ "log",
  "ntex-async-std",
  "ntex-bytes",
  "ntex-glommio",
@@ -2102,7 +2089,7 @@ dependencies = [
  "async-oneshot",
  "futures-lite",
  "glommio",
- "log 0.4.17",
+ "log",
  "ntex-bytes",
  "ntex-io",
  "ntex-util",
@@ -2116,7 +2103,7 @@ checksum = "d202cd98a354e782d0c5cced29e6357da44c40ca778b63e4b2b85138dd679e97"
 dependencies = [
  "bitflags",
  "fxhash",
- "log 0.4.17",
+ "log",
  "ntex-bytes",
  "ntex-codec",
  "ntex-connect",
@@ -2138,7 +2125,7 @@ dependencies = [
  "fxhash",
  "http",
  "itoa",
- "log 0.4.17",
+ "log",
  "ntex-bytes",
 ]
 
@@ -2149,7 +2136,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9014f420c7f0969e3c34724aca8e1919df77cbc868c3a8fecabfa0c84fd3ed93"
 dependencies = [
  "bitflags",
- "log 0.4.17",
+ "log",
  "ntex-bytes",
  "ntex-codec",
  "ntex-service",
@@ -2175,7 +2162,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67631bca69fc552ba9615b36637eee827fbf4752eec4c7bc10f7135695cc1b9e"
 dependencies = [
  "http",
- "log 0.4.17",
+ "log",
  "ntex-bytes",
  "regex",
  "serde",
@@ -2193,7 +2180,7 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "glommio",
- "log 0.4.17",
+ "log",
  "tokio",
 ]
 
@@ -2212,7 +2199,7 @@ version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdaa45e310ecc5110d0c5f1f4fcc181ed78c9b0db110f0f75eabc003ff9c2aeb"
 dependencies = [
- "log 0.4.17",
+ "log",
  "ntex-bytes",
  "ntex-io",
  "ntex-service",
@@ -2228,7 +2215,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e996405b96658c8dce71fb1006f72dd967f55856d04a62b9e0cf5099c6dbfdb5"
 dependencies = [
- "log 0.4.17",
+ "log",
  "ntex-bytes",
  "ntex-io",
  "ntex-util",
@@ -2247,7 +2234,7 @@ dependencies = [
  "futures-sink",
  "futures-timer",
  "fxhash",
- "log 0.4.17",
+ "log",
  "ntex-rt",
  "ntex-service",
  "pin-project-lite",
@@ -2560,7 +2547,7 @@ dependencies = [
  "cfg-if",
  "concurrent-queue 2.2.0",
  "libc",
- "log 0.4.17",
+ "log",
  "pin-project-lite",
  "windows-sys 0.48.0",
 ]
@@ -2658,7 +2645,7 @@ version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51de85fb3fb6524929c8a2eb85e6b6d363de4e8c48f9e2c2eac4944abc181c93"
 dependencies = [
- "log 0.4.17",
+ "log",
  "parking_lot",
  "scheduled-thread-pool",
 ]
@@ -2809,7 +2796,7 @@ version = "0.20.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fff78fc74d175294f4e83b28343315ffcfb114b156f0185e9741cb5570f50e2f"
 dependencies = [
- "log 0.4.17",
+ "log",
  "ring",
  "sct",
  "webpki",
@@ -3386,7 +3373,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24cc0f6d6f267b73e5a2cadf007ba8f9bc39c6a6f9666f8cf25ea809a153b032"
 dependencies = [
  "libc",
- "log 0.4.17",
+ "log",
 ]
 
 [[package]]
@@ -3490,7 +3477,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ce8a968cb1cd110d136ff8b819a556d6fb6d919363c61534f6860c7eb172ba0"
 dependencies = [
- "log 0.4.17",
+ "log",
  "try-lock",
 ]
 
@@ -3517,7 +3504,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95ce90fd5bcc06af55a641a86428ee4229e44e07033963a2290a8e241607ccb9"
 dependencies = [
  "bumpalo",
- "log 0.4.17",
+ "log",
  "once_cell",
  "proc-macro2",
  "quote",
