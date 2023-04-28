@@ -1,9 +1,8 @@
 # stage 1 - generate recipe file for dependencies
-FROM rust:1.68.0-alpine3.17 as planner
+FROM rust:1.69.0-alpine3.17 as planner
 
 WORKDIR /app
 RUN apk add gcc make
-RUN cargo install cargo-chef --locked
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./crates/nanocl_stubs/Cargo.toml ./crates/nanocl_stubs/Cargo.toml
@@ -14,7 +13,7 @@ COPY ./bin/ncdproxy/Cargo.toml ./bin/ncdproxy/Cargo.toml
 COPY ./bin/ncddns/Cargo.toml ./bin/ncddns/Cargo.toml
 
 # stage 2 - Build our project
-FROM rust:1.68.0-alpine3.17 as builder
+FROM rust:1.69.0-alpine3.17 as builder
 
 ARG channel=stable
 
