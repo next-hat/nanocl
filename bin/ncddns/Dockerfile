@@ -6,6 +6,7 @@ RUN apk add gcc make
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./crates/nanocl_stubs/Cargo.toml ./crates/nanocl_stubs/Cargo.toml
+COPY ./crates/nanocl_utils/Cargo.toml ./crates/nanocl_utils/Cargo.toml
 COPY ./crates/nanocld_client/Cargo.toml ./crates/nanocld_client/Cargo.toml
 COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
 COPY ./bin/nanocld/Cargo.toml ./bin/nanocld/Cargo.toml
@@ -24,13 +25,14 @@ RUN rustup target add x86_64-unknown-linux-musl
 RUN apk update && apk upgrade
 RUN apk add clang-dev gcc gcompat make musl-dev libpq-dev openssl openssl-dev git upx
 COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
-COPY ./bin/nanocld/src ./bin/nanocld/src
-COPY ./bin/nanocld/specs ./bin/nanocld/specs
-COPY ./bin/nanocld/build.rs ./bin/nanocld/build.rs
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
+COPY ./crates/nanocl_utils/src ./crates/nanocl_utils/src
 COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
 COPY ./bin/nanocl/src ./bin/nanocl/src
 COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
+COPY ./bin/nanocld/src ./bin/nanocld/src
+COPY ./bin/nanocld/specs ./bin/nanocld/specs
+COPY ./bin/nanocld/build.rs ./bin/nanocld/build.rs
 COPY ./bin/ncdproxy/src ./bin/ncdproxy/src
 COPY ./bin/ncdproxy/build.rs ./bin/ncdproxy/build.rs
 COPY ./bin/ncdproxy/specs ./bin/ncdproxy/specs
