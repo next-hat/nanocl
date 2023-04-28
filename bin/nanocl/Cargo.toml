@@ -20,32 +20,30 @@ default = []
 
 [build-dependencies]
 liquid = "0.26.1"
-clap = { version = "4.1.7", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"] }
+tabled = "0.12.0"
 clap_complete = "4.1.4"
 clap_mangen = { version = "0.2" }
-tabled = "0.12.0"
-nanocld_client = { version = "0.6.0" }
-bollard-next = { version = "0.14.9" }
+clap = { version = "4.1.7", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4.24", default-features = false, features = [
   "std",
   "clock",
 ] }
+bollard-next = { version = "0.14.9" }
+nanocld_client = { version = "0.6.0" }
 
 [dependencies]
-nanocld_client = { version = "0.6.0", features = ["tokio"] }
 bollard-next = { version = "0.14.9" }
 futures = "0.3"
 serde_yaml = "0.9"
 tabled = "0.12.0"
 indicatif = "0.17.3"
 serde_json = "1.0.89"
-ntex = { version = "0.6.6", features = ["rustls", "tokio"] }
+ntex = { version = "0.6.7", features = ["tokio"] }
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "4.1.7", features = ["derive", "cargo"] }
 tokio = { version = "1.23.1", features = ["fs"] }
 hyper = "0.14.20"
-serde_urlencoded = "0.7.1"
 users = "0.11.0"
 tokio-util = "0.7.7"
 chrono = { version = "0.4.24", default-features = false, features = [
@@ -53,11 +51,11 @@ chrono = { version = "0.4.24", default-features = false, features = [
   "clock",
 ] }
 libc = "0.2.139"
-mustache = "0.9.0"
 dialoguer = "0.10.3"
 termios = "0.3.3"
-liquid = "0.26.1"
+liquid = { version = "0.26.1", default-features = false }
 regex = "1.8.1"
+nanocld_client = { version = "0.6.0", features = ["tokio"] }
 nanocl_utils = { version = "0.1.0", features = [
   "io_error",
   "http_client_error",

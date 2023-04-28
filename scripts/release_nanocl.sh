@@ -16,7 +16,8 @@ mkdir -p "${release_path}"/usr/local/bin
 mkdir -p "${release_path}"/usr/local/man/man1
 
 # Build binary
-cargo build --bin nanocl --release --target=x86_64-unknown-linux-musl
+
+RUSTFLAG="-C target-feature=+crt-static" cargo build --bin nanocl --release --target=x86_64-unknown-linux-musl
 
 # Generate man pages
 for file in ./bin/nanocl/target/man/*; do

@@ -4,43 +4,43 @@ ApiVersion: v0.5
 Namespace: global
 
 Resources:
-- Name: deploy-example.com
-  Kind: ProxyRule
-  Version: v0.1
-  Config:
-    Watch:
-    - deploy-example.global
-    - deploy-example2.global
-    Rules:
-    - Domain: deploy-example.com
-      Network: Public
-      Locations:
-      - Path: /
-        Target:
-          Url: http://deploy-example.com/v2
-          Redirect: Temporary
+  - Name: deploy-example.com
+    Kind: ProxyRule
+    Version: v0.1
+    Config:
+      Watch:
+        - deploy-example.global
+        - deploy-example2.global
+      Rules:
+        - Domain: deploy-example.com
+          Network: Public
+          Locations:
+            - Path: /
+              Target:
+                Url: http://deploy-example.com/v2
+                Redirect: Temporary
 
-      - Path: /v1
-        Target:
-          CargoKey: deploy-example.global
-          CargoPort: 9000
+            - Path: /v1
+              Target:
+                CargoKey: deploy-example.global
+                CargoPort: 9000
 
-      - Path: /v2
-        Target:
-          CargoKey: deploy-example2.global
-          CargoPort: 9000
+            - Path: /v2
+              Target:
+                CargoKey: deploy-example2.global
+                CargoPort: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/daemon/v0.4#tag/Cargoes/operation/create_cargo
 Cargoes:
-- Name: deploy-example
-  Container:
-    Image: nexthat/nanocl-get-started:latest
-    Env:
-      - APP=GET_STARTED1
+  - Name: deploy-example
+    Container:
+      Image: nexthat/nanocl-get-started:latest
+      Env:
+        - APP=GET_STARTED1
 
-- Name: deploy-example2
-  Container:
-    Image: nexthat/nanocl-get-started:latest
-    Env:
-      - APP=GET_STARTED2
+  - Name: deploy-example2
+    Container:
+      Image: nexthat/nanocl-get-started:latest
+      Env:
+        - APP=GET_STARTED2

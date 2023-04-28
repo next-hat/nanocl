@@ -9,6 +9,10 @@
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,
   "rust-analyzer.showUnlinkedFileNotification": false,
+  "rust-analyzer.checkOnSave": true,
+  "rust-analyzer.check.command": "clippy",
   "rust-analyzer.cargo.noDefaultFeatures": true,
-  "rust-analyzer.cargo.features": ["dev"],
+  "rust-analyzer.cargo.features": [
+    "dev"
+  ],
 }

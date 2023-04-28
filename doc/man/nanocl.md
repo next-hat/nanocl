@@ -73,4 +73,4 @@ nanocl-help(1)
 
 # VERSION
 
-v0.5.1
+v0.6.0

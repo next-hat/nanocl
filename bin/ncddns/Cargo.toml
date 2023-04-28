@@ -23,7 +23,7 @@ serde_yaml = "0.9.19"
 [dependencies]
 log = "0.4.17"
 clap = { version = "4.1.4", features = ["derive"] }
-ntex = { version = "0.6.5", features = ["tokio"] }
+ntex = { version = "0.6.7", features = ["tokio"] }
 tokio = { version = "1.23.1", features = ["fs"] }
 futures = "0.3.26"
 serde = { version = "1.0.158", features = ["derive"] }
