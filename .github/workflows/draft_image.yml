@@ -3,24 +3,28 @@ name: Draft Image
 on:
   push:
     branches:
-    - 'release-nightly-ncdproxy-*'
-    - 'release-nightly-ncddns-*'
     - 'release-nightly-nanocld-*'
+    - 'release-nightly-ncdproxy-*'
     - 'release-nightly-nproxy-*'
-    - 'release-stable-ncdproxy-*'
-    - 'release-stable-ncddns-*'
+    - 'release-nightly-ncddns-*'
+    - 'release-nightly-ndns-*'
     - 'release-stable-nanocld-*'
+    - 'release-stable-ncdproxy-*'
     - 'release-stable-nproxy-*'
+    - 'release-stable-ncddns-*'
+    - 'release-stable-ndns-*'
   pull_request:
     branches:
-    - 'release-nightly-ncdproxy-*'
-    - 'release-nightly-ncddns-*'
     - 'release-nightly-nanocld-*'
+    - 'release-nightly-ncdproxy-*'
     - 'release-nightly-nproxy-*'
-    - 'release-stable-ncdproxy-*'
-    - 'release-stable-ncddns-*'
+    - 'release-nightly-ncddns-*'
+    - 'release-nightly-ndns-*'
     - 'release-stable-nanocld-*'
+    - 'release-stable-ncdproxy-*'
     - 'release-stable-nproxy-*'
+    - 'release-stable-ncddns-*'
+    - 'release-stable-ndns-*'
     types: [opened, synchronize, closed]
 
 env:
