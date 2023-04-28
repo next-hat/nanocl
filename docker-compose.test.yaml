@@ -14,21 +14,21 @@ services:
     image: cockroachdb/cockroach:v22.2.7
     tty: true
     networks:
-    - system
+      - system
     volumes:
-    - /var/lib/nanocl/store/data:/cockroach/cockroach-data
-    - /var/lib/nanocl/store/certs:/certs
+      - /var/lib/nanocl/store/data:/cockroach/cockroach-data
+      - /var/lib/nanocl/store/certs:/certs
     environment:
       - TZ=Europe/Paris
     command:
-    - start-single-node
-    - --insecure
-    - --listen-addr=:26257
+      - start-single-node
+      - --insecure
+      - --listen-addr=:26257
     labels:
-    - io.nanocl=enabled
-    - io.nanocl.c=nstore.system
-    - io.nanocl.n=system
-    - io.nanocl.cnsp=system
+      - io.nanocl=enabled
+      - io.nanocl.c=nstore.system
+      - io.nanocl.n=system
+      - io.nanocl.cnsp=system
 
   ndns:
     container_name: ndns.system.c
@@ -36,32 +36,32 @@ services:
     tty: true
     network_mode: host
     environment:
-    - TZ=Europe/Paris
+      - TZ=Europe/Paris
     labels:
-    - io.nanocl=enabled
-    - io.nanocl.c=ndns.system
-    - io.nanocl.n=system
-    - io.nanocl.cnsp=system
+      - io.nanocl=enabled
+      - io.nanocl.c=ndns.system
+      - io.nanocl.n=system
+      - io.nanocl.cnsp=system
 
   nmetrics:
     container_name: nmetrics.system.c
     image: ghcr.io/nxthat/metrsd:0.2.0
     tty: true
     networks:
-    - system
+      - system
     environment:
-    - TZ=Europe/Paris
-    - LOG_LEVEL=metrsd=info
+      - TZ=Europe/Paris
+      - LOG_LEVEL=metrsd=info
     command:
-    - --hosts
-    - unix:///run/nanocl/metrics.sock
+      - --hosts
+      - unix:///run/nanocl/metrics.sock
     labels:
-    - io.nanocl=enabled
-    - io.nanocl.c=nmetrics.system
-    - io.nanocl.n=system
-    - io.nanocl.cnsp=system
+      - io.nanocl=enabled
+      - io.nanocl.c=nmetrics.system
+      - io.nanocl.n=system
+      - io.nanocl.cnsp=system
     volumes:
-    - /run/nanocl:/run/nanocl
+      - /run/nanocl:/run/nanocl
 
   nproxy:
     container_name: nproxy.system.c
@@ -69,16 +69,16 @@ services:
     tty: true
     network_mode: host
     environment:
-    - TZ=Europe/Paris
+      - TZ=Europe/Paris
     labels:
-    - io.nanocl=enabled
-    - io.nanocl.c=nproxy.system
-    - io.nanocl.n=system
-    - io.nanocl.cnsp=system
+      - io.nanocl=enabled
+      - io.nanocl.c=nproxy.system
+      - io.nanocl.n=system
+      - io.nanocl.cnsp=system
     volumes:
-    - /run:/run
-    - /var/lib/nanocl/proxy/logs:/var/log/nginx/access
-    - /var/lib/nanocl/proxy/html:/usr/share/nginx/html
-    - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
-    - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
-    - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled
+      - /run:/run
+      - /var/lib/nanocl/proxy/logs:/var/log/nginx/access
+      - /var/lib/nanocl/proxy/html:/usr/share/nginx/html
+      - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
+      - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
+      - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled

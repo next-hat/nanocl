@@ -6,11 +6,11 @@ Namespace: global
 # See all options:
 # https://docs.next-hat.com/references/nanocl/daemon/v0.4#tag/Cargoes/operation/create_cargo
 Cargoes:
-- Name: cargo-autoremove
-  Container:
-    Image: busybox:uclibc
-    Cmd:
-      - sleep
-      - "20"
-    HostConfig:
-      AutoRemove: true
+  - Name: cargo-autoremove
+    Container:
+      Image: busybox:uclibc
+      Cmd:
+        - sleep
+        - "20"
+      HostConfig:
+        AutoRemove: true
