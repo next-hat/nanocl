@@ -34,6 +34,7 @@ COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
 COPY ./bin/ncdproxy/src ./bin/ncdproxy/src
 COPY ./bin/ncdproxy/build.rs ./bin/ncdproxy/build.rs
 COPY .git ./.git
+ENV NANOCL_CHANNEL=$channel
 ENV RUSTFLAGS="-C target-feature=+crt-static"
 RUN cargo build --release --target=x86_64-unknown-linux-musl --bin ncdproxy
 RUN upx --lzma --best /app/target/x86_64-unknown-linux-musl/release/ncdproxy

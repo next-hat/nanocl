@@ -38,6 +38,7 @@ COPY ./bin/ncdproxy/specs ./bin/ncdproxy/specs
 COPY ./bin/ncddns/build.rs ./bin/ncddns/build.rs
 COPY ./bin/ncddns/src ./bin/ncddns/src
 COPY .git ./.git
+ENV NANOCL_CHANNEL=$channel
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN cargo build --release --features release --bin nanocld
 RUN upx --lzma --best /app/target/release/nanocld

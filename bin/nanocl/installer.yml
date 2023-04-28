@@ -42,7 +42,7 @@ Cargoes:
 
 - Name: nproxy
   Container:
-    Image: ghcr.io/nxthat/nproxy:1.23.4.0
+    Image: ghcr.io/nxthat/nproxy:nightly-1.24.0.0
     Tty: true
     Env:
     - TZ=Europe/Paris
@@ -59,7 +59,7 @@ Cargoes:
 
 - Name: ncdproxy
   Container:
-    Image: ghcr.io/nxthat/ncdproxy:0.3.1
+    Image: ghcr.io/nxthat/ncdproxy:nightly-0.4.0
     Tty: true
     Env:
     - TZ=Europe/Paris
@@ -72,9 +72,31 @@ Cargoes:
       - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
       - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
+- Name: ndns
+  Container:
+    Env:
+    - TZ=Europe/Paris
+    Image: ghcr.io/nxthat/ndns:nightly-2.87.0
+    HostConfig:
+      NetworkMode: host
+      Binds:
+      - ${{ state_dir }}/dns:/etc
+
+- Name: ncddns
+  Container:
+    Env:
+    - TZ=Europe/Paris
+    Image: ghcr.io/nxthat/ncddns:nightly-0.1.0
+    Tty: true
+    HostConfig:
+      NetworkMode: system
+      Binds:
+      - /run/nanocl:/run/nanocl
+      - ${{ state_dir }}/dns:/etc
+
 - Name: ndaemon
   Container:
-    Image: ghcr.io/nxthat/nanocld:0.5.0
+    Image: ghcr.io/nxthat/nanocld:nightly-0.6.0
     Tty: true
     Arg:
     - --state-dir
@@ -99,22 +121,3 @@ Cargoes:
       - /run/docker.sock:/run/docker.sock
       - ${{ state_dir }}:${{ state_dir }}
       - ${{ conf_dir }}:${{ conf_dir }}
-
-# - Name: ndns
-#   Container:
-#     Env:
-#     - TZ=Europe/Paris
-#     Image: nanocl-dnsmasq:0.0.1
-#     HostConfig:
-#       NetworkMode: host
-
-# - Name: ncddns
-#   Container:
-#     Env:
-#     - TZ=Europe/Paris
-#     Image: nanocl-ncddns:0.0.1
-#     Tty: true
-#     HostConfig:
-#       NetworkMode: system
-#       Binds:
-#       - /run/nanocl:/run/nanocl

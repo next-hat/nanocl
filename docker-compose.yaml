@@ -109,6 +109,8 @@ services:
     - io.nanocl.c=ndns.system
     - io.nanocl.n=system
     - io.nanocl.cnsp=system
+    volumes:
+    - /var/lib/nanocl/dns:/etc
 
   ncddns:
     container_name: ncddns.system.c
@@ -130,6 +132,7 @@ services:
     - io.nanocl.cnsp=system
     volumes:
     - ./:/project
+    - /var/lib/nanocl/dns:/etc
     - /run/nanocl:/run/nanocl
     - ~/.cargo/registry:/usr/local/cargo/registry
 
