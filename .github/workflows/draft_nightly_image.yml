@@ -1,12 +1,12 @@
-name: Draft nanocl stable release
+name: Draft Nightly Image
 
 on:
   push:
     branches:
-      - 'release-stable-nanocl-*'
+    - 'release-nightly-*'
   pull_request:
     branches:
-      - 'release-stable-nanocl-*'
+    - 'release-nightly-*'
     types: [opened, synchronize, closed]
 
 env:
@@ -18,10 +18,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - uses: actions-rs/toolchain@v1
+    # Install buildx
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: docker/setup-buildx-action@v2
+    # Set buildx cache
+    - name: Cache register
+      uses: actions/cache@v3
       with:
-        toolchain: 1.67.1
-        target: x86_64-unknown-linux-musl
+        path: /tmp/.buildx-cache
+        key: buildx-cache
     # Extract branch info
     - name: Set info
       run: |
@@ -37,29 +43,28 @@ jobs:
         echo $BINARY_NAME
         echo $CHANNEL
         echo $VERSION
-    # Install required dependencies
-    - name: Install dependencies
-      run: |
-        sudo apt-get install -y gcc make musl musl-dev musl-tools openssl git pandoc
-        rustup target add x86_64-unknown-linux-musl
-    # Package nanocl into a .deb
-    - name: Package
-      run: ./scripts/release_nanocl.sh
+    # Build daemon image
+    - name: Build image
+      run: docker buildx build --load --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache --build-arg channel=$CHANNEL -t $BINARY_NAME:$VERSION-$CHANNEL -f ./bin/$BINARY_NAME/Dockerfile .
+    # Export it as tar.gz
+    - name: Export image
+      run: docker save $BINARY_NAME:$VERSION-$CHANNEL | gzip > /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz
+    # Upload it to release
     - name: Test if release already exists
       id: release-exists
       continue-on-error: true
-      run: gh release view $BINARY_NAME-$VERSION
+      run: gh release view $BINARY_NAME-$VERSION-$CHANNEL
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Create new draft release
       if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-      run: gh release create -d $BINARY_NAME-$VERSION --generate-notes target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+      run: gh release create -t $BINARY_NAME-$VERSION-$CHANNEL -d $BINARY_NAME-$VERSION-$CHANNEL -F ./bin/$BINARY_NAME/changelog.md /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz#$BINARY_NAME-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
     - name: Update draft release
       if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
       run: |
-        gh release delete-asset -y $BINARY_NAME-$VERSION ${BINARY_NAME}_${VERSION}_amd64.deb
-        gh release upload $BINARY_NAME-$VERSION target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+        gh release delete-asset -y $BINARY_NAME-$VERSION-$CHANNEL $BINARY_NAME-$VERSION-$CHANNEL.tar.gz
+        gh release upload $BINARY_NAME-$VERSION-$CHANNEL /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz#$BINARY_NAME-image;
       env:
         GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
