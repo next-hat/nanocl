@@ -12,68 +12,68 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # Clone project
-    - uses: actions/checkout@v3
-    # Install buildx
-    - name: Set up Docker Buildx
-      id: buildx
-      uses: docker/setup-buildx-action@v2
-    # Set buildx cache
-    - name: Cache register
-      uses: actions/cache@v3
-      with:
-        path: ./.buildx-cache
-        key: buildx-cache
-    # Install rust
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        components: llvm-tools-preview
-    # Cache Rust
-    - uses: Swatinem/rust-cache@v2
-    # Install cargo make
-    - uses: davidB/rust-cargo-make@v1
-    # Install llvm-cov
-    - uses: taiki-e/install-action@cargo-llvm-cov
-    # Install nextest
-    - uses: taiki-e/install-action@nextest
-    # Prepare CI
-    - name: Prepare CI
-      run: |
-        sudo ./scripts/prepare_tests.sh
-    # Setup daemon for the tests
-    - name: Setup
-      run: |
-        docker pull cockroachdb/cockroach:v22.2.7
-        docker pull ghcr.io/nxthat/metrsd:0.2.0
-        docker pull nexthat/nanocl-get-started:latest
-        docker buildx build --load --cache-from type=local,src=./.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
-        docker buildx build --load --cache-from type=local,src=./.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
-        cargo build --no-default-features --features test --bin nanocl
-        cargo build --no-default-features --features test --bin ncdproxy
-        cargo build --no-default-features --features test --bin nanocld
-        docker compose -f ./docker-compose.test.yaml up -d
-        cargo run --no-default-features --features test --bin nanocld -- --init
-        cargo run --no-default-features --features test --bin nanocld &
-        sleep 8
-        sudo mkdir -p /var/lib/nanocl/proxy
-        sudo chmod 777 -R /run/nanocl
-        sudo chmod 777 -R /var/lib/nanocl
-        cargo run --no-default-features --features test --bin ncdproxy -- --conf-dir /var/lib/nanocl/proxy &
-        sleep 8
-        sudo chmod 777 -R /run/nanocl
-        mkdir -p /tmp/nginx/sites-enabled
-        cp ./target/debug/nanocl /usr/local/bin
-        docker ps -a
-    # Run coverage
-    - name: Run tests
-      run: cargo make covgen
-    # Upload it to codecov
-    - name: Codecov
-      uses: codecov/codecov-action@v3.1.1
-      with:
-        token: ${{ secrets.CODECOV }}
-        files: ./lcov.info
-        flags: unittests # optional
-        verbose: true # optional (default = false)
+      # Clone project
+      - uses: actions/checkout@v3
+      # Install buildx
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+      # Set buildx cache
+      - name: Cache register
+        uses: actions/cache@v3
+        with:
+          path: ./.buildx-cache
+          key: buildx-cache
+      # Install rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: llvm-tools-preview
+      # Cache Rust
+      - uses: Swatinem/rust-cache@v2
+      # Install cargo make
+      - uses: davidB/rust-cargo-make@v1
+      # Install llvm-cov
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      # Install nextest
+      - uses: taiki-e/install-action@nextest
+      # Prepare CI
+      - name: Prepare CI
+        run: |
+          sudo ./scripts/prepare_tests.sh
+      # Setup daemon for the tests
+      - name: Setup
+        run: |
+          docker pull cockroachdb/cockroach:v22.2.7
+          docker pull ghcr.io/nxthat/metrsd:0.2.0
+          docker pull nexthat/nanocl-get-started:latest
+          docker buildx build --load --cache-from type=local,src=./.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
+          docker buildx build --load --cache-from type=local,src=./.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
+          cargo build --no-default-features --features test --bin nanocl
+          cargo build --no-default-features --features test --bin ncdproxy
+          cargo build --no-default-features --features test --bin nanocld
+          docker compose -f ./docker-compose.test.yaml up -d
+          cargo run --no-default-features --features test --bin nanocld -- --init
+          cargo run --no-default-features --features test --bin nanocld &
+          sleep 8
+          sudo mkdir -p /var/lib/nanocl/proxy
+          sudo chmod 777 -R /run/nanocl
+          sudo chmod 777 -R /var/lib/nanocl
+          cargo run --no-default-features --features test --bin ncdproxy -- --conf-dir /var/lib/nanocl/proxy &
+          sleep 8
+          sudo chmod 777 -R /run/nanocl
+          mkdir -p /tmp/nginx/sites-enabled
+          cp ./target/debug/nanocl /usr/local/bin
+          docker ps -a
+      # Run coverage
+      - name: Run tests
+        run: cargo make covgen
+      # Upload it to codecov
+      - name: Codecov
+        uses: codecov/codecov-action@v3.1.1
+        with:
+          token: ${{ secrets.CODECOV }}
+          files: ./lcov.info
+          flags: unittests # optional
+          verbose: true # optional (default = false)
