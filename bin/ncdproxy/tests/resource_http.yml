@@ -2,17 +2,17 @@ Type: Resource
 ApiVersion: v0.4
 
 Resources:
-- Name: proxy-get-started
-  Kind: ProxyRule
-  Version: v0.1
-  Config:
-    Watch:
-    - get-started.global
-    Rules:
-    - Domain: get-started.com
-      Network: Public
-      Locations:
-      - Path: /
-        Target:
-          CargoKey: get-started.global
-          CargoPort: 9000
+  - Name: proxy-get-started
+    Kind: ProxyRule
+    Version: v0.1
+    Config:
+      Watch:
+        - get-started.global
+      Rules:
+        - Domain: get-started.com
+          Network: Public
+          Locations:
+            - Path: /
+              Target:
+                CargoKey: get-started.global
+                CargoPort: 9000

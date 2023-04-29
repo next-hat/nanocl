@@ -4,18 +4,16 @@ Joining an unknown project can be difficult, even if you have some experience.<b
 This documentation will help you to setup `Nanocl` in development.<br />
 Note: `Nanocl` heavily utilizes [ntex](https://ntex.rs) as **client** and **server**
 
-
 ## 📙 Table of Contents
 
-* [📁 Project Structure](#-project-structure)
-* [💾 Installation](#-installation)
-  * [🐧 Ubuntu](#-ubuntu)
-  * [🦀 Rust](#-rust)
-* [🏃 Running](#-running)
-  * [🐋 Docker Desktop](#-docker-desktop)
-* [🧪 Testing](#-testing)
-* [👌 Usefull Command](#-usefull-command)
-
+- [📁 Project Structure](#-project-structure)
+- [💾 Installation](#-installation)
+  - [🐧 Ubuntu](#-ubuntu)
+  - [🦀 Rust](#-rust)
+- [🏃 Running](#-running)
+  - [🐋 Docker Desktop](#-docker-desktop)
+- [🧪 Testing](#-testing)
+- [👌 Usefull Command](#-usefull-command)
 
 ## 📁 Project Structure
 
@@ -56,7 +54,6 @@ crates # Shared Libraries
     └── src # The rust source code
 ```
 
-
 ## 💾 Installation
 
 Clone the repository:
@@ -67,13 +64,12 @@ git clone https://github.com/nxthat/nanocl
 
 To build and run `Nanocl` you will need these dependencies
 
-* [rust](https://www.rust-lang.org) >= 1.67
-* [docker](https://www.docker.com) >= 1.41
-* gcc
-* make
-* libpq-dev
-* openssl-dev
-
+- [rust](https://www.rust-lang.org) >= 1.67
+- [docker](https://www.docker.com) >= 1.41
+- gcc
+- make
+- libpq-dev
+- openssl-dev
 
 ### 🐧 Ubuntu
 
@@ -89,7 +85,6 @@ If you need docker:
 ./scripts/install_docker.ubuntu.sh
 ```
 
-
 ### 🦀 Rust
 
 To install rust
@@ -103,7 +98,6 @@ Afterwards install rust devtools required to run `Nanocl`
 ```sh
 ./scripts/rust.deps.sh
 ```
-
 
 ## 🏃 Running
 
@@ -150,13 +144,11 @@ docker compose up
 
 Once started, a swagger should be available on [http://localhost:8585/explorer](http://localhost:8585/explorer).
 
-
 <div align="center">
   <img src="./doc/swagger.png" />
 </div>
 
-
-Note that a *env variable* could be passed to change the port, it is hardcoded for now.<br />
+Note that a _env variable_ could be passed to change the port, it is hardcoded for now.<br />
 It could be a nice and easy first issue and pull request if you would like to help :).
 
 To use the CLI you need correct permission on `/run/nanocl`
@@ -167,13 +159,13 @@ sudo chmod -R /run/nanocl
 
 Now you can run the CLI:
 
-* Using cargo make
+- Using cargo make
 
   ```sh
   cargo make run-cli version
   ```
 
-* Using cargo
+- Using cargo
 
   ```sh
   cargo run --bin nanocl version
@@ -184,22 +176,25 @@ Now you can run the CLI:
 To run tests, make sure all `Nanocl` services are running with `docker compose up`.<br/>
 Then be sure to have correct permission set on `/run/nanocl`
 
-* Run all tests
+- Run all tests
+
   ```sh
   cargo make test
   ```
 
-* Run all tests with print output
+- Run all tests with print output
+
   ```sh
   cargo make test-debug
   ```
 
-* Run only daemon tests
+- Run only daemon tests
+
   ```sh
   cargo make test-daemon
   ```
 
-* Run only cli tests
+- Run only cli tests
   ```sh
   cargo make test-cli
   ```
@@ -208,23 +203,25 @@ Then be sure to have correct permission set on `/run/nanocl`
 
 Some usefull command to know:
 
+- lsns - list namespaces
 
-* lsns - list namespaces
   ```sh
   lsns
   ```
 
-* nsenter - run program in different namespaces
+- nsenter - run program in different namespaces
+
   ```sh
   sudo nsenter -t 12267 -n ss -ltu
   ```
 
-* Generate a nanocld client
+- Generate a nanocld client
+
   ```sh
   docker run --rm -v $(pwd):/local openapitools/openapi-generator-cli generate -g rust -i /local/specs/v1/swagger.json -o /local/client
   ```
 
-* Generate ssl cert from certbot
+- Generate ssl cert from certbot
   ```sh
   nanocl cargo -n system exec nproxy -- certbot --nginx --email email@email.com --agree-tos -d your-domain.com
   ```

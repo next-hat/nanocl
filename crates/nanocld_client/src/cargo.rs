@@ -471,7 +471,7 @@ impl NanocldClient {
   ) -> Result<(), HttpClientError> {
     self
       .send_post(
-        format!("/{}/cargoes/{name}", &self.version),
+        format!("/{}/cargoes/{name}/kill", &self.version),
         Some(options),
         Some(GenericNspQuery { namespace }),
       )

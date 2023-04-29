@@ -110,7 +110,7 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - /var/lib/nanocl/dns:/etc
+      - /var/lib/nanocl/dns:/opt/dns
 
   ncddns:
     container_name: ncddns.system.c
@@ -124,7 +124,7 @@ services:
       - -w
       - /project/bin/ncddns/src
       - -x
-      - run --no-default-features --features dev --bin ncddns
+      - run --no-default-features --features dev --bin ncddns -- --conf-dir /opt/dns
     labels:
       - io.nanocl=enabled
       - io.nanocl.c=ncddns.system
@@ -132,7 +132,7 @@ services:
       - io.nanocl.cnsp=system
     volumes:
       - ./:/project
-      - /var/lib/nanocl/dns:/etc
+      - /var/lib/nanocl/dns:/opt/dns
       - /run/nanocl:/run/nanocl
       - ~/.cargo/registry:/usr/local/cargo/registry
 

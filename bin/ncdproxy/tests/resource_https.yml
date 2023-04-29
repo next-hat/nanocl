@@ -2,21 +2,21 @@ Type: Resource
 ApiVersion: v0.4
 
 Resources:
-- Name: proxy-get-started
-  Kind: ProxyRule
-  Version: v0.1
-  Config:
-    Watch:
-    - get-started.global
-    Rules:
-    - Domain: get-started.com
-      Network: Public
-      Ssl:
-        Certificate: /random/path/to/cert
-        CertificateKey: /random/path/to/key
-        DhParam: /random/path/to/param
-      Locations:
-      - Path: /
-        Target:
-          CargoKey: get-started.global
-          CargoPort: 9000
+  - Name: proxy-get-started
+    Kind: ProxyRule
+    Version: v0.1
+    Config:
+      Watch:
+        - get-started.global
+      Rules:
+        - Domain: get-started.com
+          Network: Public
+          Ssl:
+            Certificate: /random/path/to/cert
+            CertificateKey: /random/path/to/key
+            DhParam: /random/path/to/param
+          Locations:
+            - Path: /
+              Target:
+                CargoKey: get-started.global
+                CargoPort: 9000

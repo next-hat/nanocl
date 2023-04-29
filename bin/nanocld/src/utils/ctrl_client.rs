@@ -26,6 +26,7 @@ impl CtrlClient {
               .timeout(ntex::time::Millis::from_secs(20))
               .finish(),
           )
+          .timeout(ntex::time::Millis::from_secs(20))
           .finish();
 
         (client, "http://localhost")

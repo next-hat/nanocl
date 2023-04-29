@@ -15,9 +15,9 @@ If you discover a security vulnerability in the Nanocl GitHub repository, we enc
 
 To report a vulnerability, please create a new issue in the GitHub repository with the following information:
 
-* A description of the vulnerability and its potential impact
-* Steps to reproduce the vulnerability
-* Any additional details that may be helpful for our investigation
+- A description of the vulnerability and its potential impact
+- Steps to reproduce the vulnerability
+- Any additional details that may be helpful for our investigation
 
 We will acknowledge receipt of your report within 24 hours and will provide regular updates on our progress as we investigate the issue. Once the vulnerability has been fully mitigated, we will notify you and provide any necessary information for disclosure.
 
