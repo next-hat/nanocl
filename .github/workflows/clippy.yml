@@ -20,7 +20,7 @@ jobs:
           path: ./target
           key: ${{ hashFiles('./Cargo.lock') }}
 
-     # Cache Rust
+      # Cache Rust
       - uses: actions/cache@v3
         with:
           path: ~/.cargo
