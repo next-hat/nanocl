@@ -1,4 +1,4 @@
-name: Push Image
+name: Publish Image
 
 on:
   release:
@@ -29,7 +29,7 @@ jobs:
           username: nexthatbot
           password: ${{ secrets.BOT_TOKEN }}
       - name: Publish Nightly
-        if: env.CHANNEL == 'nightly' && env.BINARY_NAME != 'nanocl'
+        if: env.CHANNEL == 'nightly'
         run: |
           gh release download -R nxthat/nanocl $BINARY_NAME-$VERSION-nightly -p $BINARY_NAME-$VERSION-nightly.tar.gz
           cat $BINARY_NAME-$VERSION-nightly.tar.gz | docker load
@@ -41,7 +41,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
 
       - name: Publish Stable
-        if: env.CHANNEL != 'nightly' && env.BINARY_NAME != 'nanocl'
+        if: env.CHANNEL != 'nightly'
         run: |
           gh release download -R nxthat/nanocl $BINARY_NAME-$VERSION -p $BINARY_NAME-$VERSION.tar.gz
           cat $BINARY_NAME-$VERSION.tar.gz | docker load
