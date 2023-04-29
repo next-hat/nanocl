@@ -1,4 +1,4 @@
-name: Publish Live Image
+name: Push Image
 
 on:
   release:
@@ -45,8 +45,8 @@ jobs:
         run: |
           gh release download -R nxthat/nanocl $BINARY_NAME-$VERSION -p $BINARY_NAME-$VERSION.tar.gz
           cat $BINARY_NAME-$VERSION.tar.gz | docker load
-          docker tag ghcr.io/nxthat/$BINARY_NAME:stable-$VERSION ghcr.io/nxthat/$BINARY_NAME:latest
-          docker tag ghcr.io/nxthat/$BINARY_NAME:stable-$VERSION ghcr.io/nxthat/$BINARY_NAME:$VERSION
+          docker tag ghcr.io/nxthat/$BINARY_NAME:$VERSION ghcr.io/nxthat/$BINARY_NAME:latest
+          docker tag ghcr.io/nxthat/$BINARY_NAME:$VERSION ghcr.io/nxthat/$BINARY_NAME:$VERSION
           docker push ghcr.io/nxthat/$BINARY_NAME:latest
           docker push ghcr.io/nxthat/$BINARY_NAME:$VERSION
         env:
