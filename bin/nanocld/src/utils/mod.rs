@@ -120,7 +120,7 @@ pub mod tests {
     let docker_api = gen_docker_client();
     let ip_addr = get_store_addr(&docker_api).await.unwrap();
 
-    store::create_pool(&ip_addr)
+    store::create_pool(&format!("{ip_addr}:26257"))
       .await
       .expect("Failed to connect to store at: {ip_addr}")
   }
