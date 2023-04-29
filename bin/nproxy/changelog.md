@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Image name
+- Image name with channel
 
 ## [1.23.4.0] - 2023-04-15
 
