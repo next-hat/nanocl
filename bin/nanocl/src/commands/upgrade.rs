@@ -1,0 +1,63 @@
+use futures::StreamExt;
+
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocld_client::NanocldClient;
+use nanocld_client::stubs::cargo_config::CargoConfigPartial;
+use nanocld_client::stubs::state::StateStream;
+
+use crate::utils;
+use crate::models::DEFAULT_INSTALLER;
+
+use super::cargo_image::exec_cargo_image_create;
+
+pub async fn exec_upgrade(client: &NanocldClient) -> IoResult<()> {
+  let config = client.info().await?.config;
+
+  let data = liquid::object!({
+    "advertise_addr": config.advertise_addr,
+    "state_dir": config.state_dir,
+    "docker_host": config.docker_host,
+    "gateway": config.gateway,
+    "conf_dir": config.conf_dir,
+    "hostname": config.hostname,
+    "gid": config.gid,
+  });
+
+  let installer = utils::state::compile(DEFAULT_INSTALLER, &data)?;
+
+  let data =
+    serde_yaml::from_str::<serde_json::Value>(&installer).map_err(|err| {
+      err.map_err_context(|| "Unable to convert upgrade to yaml")
+    })?;
+
+  let cargoes = serde_json::from_value::<Vec<CargoConfigPartial>>(
+    data
+      .get("Cargoes")
+      .cloned()
+      .ok_or(IoError::invalid_data("Cargoes", "arent specified"))?,
+  )
+  .map_err(|err| err.map_err_context(|| "Unable to convert upgrade to json"))?;
+
+  for cargo in cargoes {
+    let image = cargo.container.image.clone().ok_or(IoError::invalid_data(
+      format!("Cargo {} image", cargo.name),
+      "is not specified".into(),
+    ))?;
+    exec_cargo_image_create(client, &image).await?;
+  }
+
+  let data =
+    serde_json::from_value::<serde_json::Value>(data).map_err(|err| {
+      err.map_err_context(|| "Unable to convert upgrade to json")
+    })?;
+  let mut stream = client.apply_state(&data).await?;
+
+  while let Some(res) = stream.next().await {
+    let res = res?;
+    match res {
+      StateStream::Error(err) => eprintln!("{err}"),
+      StateStream::Msg(msg) => println!("{msg}"),
+    }
+  }
+  Ok(())
+}

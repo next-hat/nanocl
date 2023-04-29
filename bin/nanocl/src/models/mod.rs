@@ -4,10 +4,12 @@ mod cargo_image;
 mod resource;
 mod version;
 mod state;
-mod setup;
 mod vm;
 mod vm_image;
 mod system;
+mod install;
+mod uninstall;
+// mod upgrade;
 
 pub use system::*;
 pub use vm::*;
@@ -18,7 +20,9 @@ pub use cargo_image::*;
 pub use resource::*;
 pub use version::*;
 pub use state::*;
-pub use setup::*;
+pub use install::*;
+pub use uninstall::*;
+// pub use upgrade::*;
 
 use clap::{Parser, Subcommand};
 
@@ -52,8 +56,12 @@ pub enum Commands {
   Info,
   /// Show nanocl version information
   Version,
-  /// Setup nanocl daemon
-  Setup(SetupOpts),
+  /// Install nanocl components
+  Install(InstallOpts),
+  /// Uninstall nanocl components
+  Uninstall(UninstallOpts),
+  /// Upgrade nanocl components
+  Upgrade,
   /// Show all processes managed by nanocl
   Ps(ProcessOpts),
   // TODO: shell completion

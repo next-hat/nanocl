@@ -60,12 +60,14 @@ fn gen_daemon_conf(
 
   Ok(DaemonConfig {
     hosts,
-    state_dir,
-    docker_host,
     gateway,
     hostname,
+    state_dir,
+    docker_host,
+    gid: args.gid,
     advertise_addr,
     nodes: args.nodes.clone(),
+    conf_dir: args.conf_dir.clone(),
   })
 }
 
@@ -138,6 +140,7 @@ mod tests {
   #[test]
   fn merge_config() {
     let args = Cli {
+      gid: 0,
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/run/docker.sock")),
@@ -224,6 +227,7 @@ mod tests {
   #[test]
   fn init_config() {
     let args = Cli {
+      gid: 0,
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/run/docker.sock")),

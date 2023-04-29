@@ -62,8 +62,9 @@ pub(crate) async fn get_info(
   let docker = state.docker_api.info().await?;
   let host_gateway = state.config.gateway.clone();
   let info = HostInfo {
-    host_gateway,
     docker,
+    host_gateway,
+    config: state.config.clone(),
   };
   Ok(web::HttpResponse::Ok().json(&info))
 }
@@ -219,18 +220,18 @@ mod tests {
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::NOT_FOUND,
+      StatusCode::HTTP_VERSION_NOT_SUPPORTED,
       "Expect status to be {} got {}",
-      StatusCode::NOT_FOUND,
+      StatusCode::HTTP_VERSION_NOT_SUPPORTED,
       status
     );
     let resp = srv.get("/v5.2/info").send().await.unwrap();
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::NOT_FOUND,
+      StatusCode::HTTP_VERSION_NOT_SUPPORTED,
       "Expect status to be {} got {}",
-      StatusCode::NOT_FOUND,
+      StatusCode::HTTP_VERSION_NOT_SUPPORTED,
       status
     );
   }

@@ -35,6 +35,9 @@ pub struct Cli {
   /// Address to advertise to other nodes
   #[clap(long = "advertise-addr")]
   pub(crate) advertise_addr: Option<String>,
+  /// Group id
+  #[clap(long, default_value = "0")]
+  pub(crate) gid: u32,
 }
 
 /// Cli arguments unit test

@@ -25,19 +25,65 @@ pub mod tests {
   use ntex::http::client::ClientResponse;
   use ntex::http::client::error::SendRequestError;
 
+  use nanocl_utils::io_error::{IoError, FromIo, IoResult};
   use nanocl_stubs::config::DaemonConfig;
 
-  use crate::models::DaemonState;
+  use crate::version::VERSION;
   use crate::services;
   use crate::event::EventEmitter;
-  use crate::models::Pool;
-  use crate::version::VERSION;
+  use crate::models::{Pool, DaemonState};
 
   pub use ntex::web::test::TestServer;
   pub type TestReqRet = Result<ClientResponse, SendRequestError>;
   pub type TestRet = Result<(), Box<dyn std::error::Error + 'static>>;
 
   type Config = fn(&mut ServiceConfig);
+
+  /// ## Get store ip address
+  ///
+  /// Get the ip address of the store container
+  ///
+  /// ## Arguments
+  ///
+  /// [docker_api](Docker) Reference to docker api
+  ///
+  /// ## Returns
+  ///
+  /// - [Result](Result) Result of the operation
+  ///   - [Ok](String) - The ip address of the store
+  ///   - [Err](HttpResponseError) - The ip address of the store has not been retrieved
+  ///
+  /// ## Example
+  ///
+  /// ```rust,norun
+  /// use crate::utils;
+  ///
+  /// let docker_api = Docker::connect_with_local_defaults().unwrap();
+  /// let ip_address = utils::store::get_store_ip_addr(&docker_api).await;
+  /// ```
+  ///
+  pub async fn get_store_addr(
+    docker_api: &bollard_next::Docker,
+  ) -> IoResult<String> {
+    let container = docker_api
+      .inspect_container("nstore.system.c", None)
+      .await
+      .map_err(|err| {
+        err.map_err_context(|| "Unable to inspect nstore.system.c container")
+      })?;
+    let networks = container
+      .network_settings
+      .unwrap_or_default()
+      .networks
+      .unwrap_or_default();
+    let ip_address = networks
+      .get("system")
+      .ok_or(IoError::invalid_data("Network", "system not found"))?
+      .ip_address
+      .as_ref()
+      .ok_or(IoError::invalid_data("IpAddress", "not detected"))?;
+    Ok(ip_address.to_owned())
+  }
 
   pub fn before() {
     // Build a test env logger
@@ -72,9 +118,9 @@ pub mod tests {
 
   pub async fn gen_postgre_pool() -> Pool {
     let docker_api = gen_docker_client();
-    let ip_addr = store::get_store_addr(&docker_api).await.unwrap();
+    let ip_addr = get_store_addr(&docker_api).await.unwrap();
 
-    store::create_pool(ip_addr)
+    store::create_pool(&format!("{ip_addr}:26257"))
       .await
       .expect("Failed to connect to store at: {ip_addr}")
   }

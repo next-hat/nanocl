@@ -1,8 +1,10 @@
 use clap::Parser;
 
+pub const DEFAULT_INSTALLER: &str = include_str!("../../installer.yml");
+
 #[derive(Debug, Clone, Parser)]
-pub struct SetupOpts {
-  /// The docker host to connect to default is unix:///var/run/docker.sock
+pub struct InstallOpts {
+  /// The docker host to install nanocl default is unix:///var/run/docker.sock
   #[clap(long)]
   pub(crate) docker_host: Option<String>,
   /// The state directory to store the state of the nanocl daemon default is /var/lib/nanocl

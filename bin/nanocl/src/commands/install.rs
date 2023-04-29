@@ -7,9 +7,9 @@ use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 use nanocld_client::stubs::state::StateDeployment;
 
 use crate::utils;
-use crate::models::{SetupOpts, NanocldArgs};
+use crate::models::{DEFAULT_INSTALLER, InstallOpts, NanocldArgs};
 
-pub async fn exec_setup(options: &SetupOpts) -> IoResult<()> {
+pub async fn exec_install(options: &InstallOpts) -> IoResult<()> {
   println!("Installing nanocl daemon on your system");
 
   let docker_host = options
@@ -81,18 +81,11 @@ pub async fn exec_setup(options: &SetupOpts) -> IoResult<()> {
     advertise_addr,
   };
 
-  let installer = utils::state::compile(
-    include_str!("../../installer.yml"),
-    &args.clone().into(),
-  )?;
+  let installer =
+    utils::state::compile(DEFAULT_INSTALLER, &args.clone().into())?;
 
-  println!("{installer}");
-
-  let value = serde_yaml::from_str::<serde_yaml::Value>(&installer)
-    .map_err(|err| err.map_err_context(|| "Unable to parse installer"))?;
-
-  let deployment =
-    serde_yaml::from_value::<StateDeployment>(value).map_err(|err| {
+  let deployment = serde_yaml::from_str::<StateDeployment>(&installer)
+    .map_err(|err| {
       err.map_err_context(|| "Unable to extract deployment from installer")
     })?;
 
@@ -132,6 +125,6 @@ pub async fn exec_setup(options: &SetupOpts) -> IoResult<()> {
     ntex::time::sleep(Duration::from_secs(2)).await;
   }
 
-  println!("Congratz! Nanocl is now ready to use!");
+  println!("Nanocl have been installed successfully!");
   Ok(())
 }
