@@ -4,11 +4,12 @@ mod cargo_image;
 mod resource;
 mod version;
 mod state;
-mod install;
-mod uninstall;
 mod vm;
 mod vm_image;
 mod system;
+mod install;
+mod uninstall;
+mod upgrade;
 
 pub use system::*;
 pub use vm::*;
@@ -21,6 +22,7 @@ pub use version::*;
 pub use state::*;
 pub use install::*;
 pub use uninstall::*;
+pub use upgrade::*;
 
 use clap::{Parser, Subcommand};
 
@@ -58,6 +60,8 @@ pub enum Commands {
   Install(InstallOpts),
   /// Uninstall nanocl components
   Uninstall(UninstallOpts),
+  /// Upgrade nanocl components
+  Upgrade(UpgradeOpts),
   /// Show all processes managed by nanocl
   Ps(ProcessOpts),
   // TODO: shell completion

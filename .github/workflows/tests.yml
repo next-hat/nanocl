@@ -45,6 +45,7 @@ jobs:
       # Setup daemon for the tests
       - name: Setup
         run: |
+          sudo sh -c "echo '\n127.0.0.1 nstore.nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v22.2.7
           docker pull ghcr.io/nxthat/metrsd:0.2.0
           docker pull nexthat/nanocl-get-started:latest

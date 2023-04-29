@@ -6,24 +6,9 @@ ApiVersion: v0.6
 # The settings may be dynamically updated when joining a cluster
 # or when a new node is added to the cluster.
 
-Cargoes:
-  - Name: nstore
-    Container:
-      Image: cockroachdb/cockroach:v22.2.7
-      Tty: true
-      Env:
-        - TZ=Europe/Paris
-      Cmd:
-        - start-single-node
-        - --insecure
-        - --listen-addr=:26257
-        - --advertise-addr=${{ advertise_addr }}:26257
-      HostConfig:
-        NetworkMode: system
-        Binds:
-          - ${{ state_dir }}/store/certs:/certs
-          - ${{ state_dir }}/store/data:/cockroach/cockroach-data
+Namespace: system
 
+Cargoes:
   - Name: nmetrics
     Container:
       Image: ghcr.io/nxthat/metrsd:0.2.0
@@ -48,7 +33,7 @@ Cargoes:
         NetworkMode: host
         Binds:
           - /run:/run
-          - ${{state_dir}}/proxy/logs:/var/log/nginx/access
+          - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
           - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
           - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
           - ${{ state_dir }}/proxy/html:/usr/share/nginx/html
@@ -96,6 +81,7 @@ Cargoes:
     Container:
       Image: ghcr.io/nxthat/nanocld:0.6.0-nightly
       Tty: true
+      Hostname: ndaemon.nanocl.internal
       Arg:
         - --state-dir
         - ${{ state_dir }}
@@ -109,6 +95,7 @@ Cargoes:
         - ${{ hostname }}
         - --advertise-addr
         - ${{ advertise_addr }}
+        - --gid ${{ gid }}
       Env:
         - TZ=Europe/Paris
         - NANOCL_GID=${{ gid }}
@@ -119,3 +106,21 @@ Cargoes:
           - /run/docker.sock:/run/docker.sock
           - ${{ state_dir }}:${{ state_dir }}
           - ${{ conf_dir }}:${{ conf_dir }}
+
+  - Name: nstore
+    Container:
+      Image: cockroachdb/cockroach:v22.2.7
+      Tty: true
+      Hostname: nstore.nanocl.internal
+      Env:
+        - TZ=Europe/Paris
+      Cmd:
+        - start-single-node
+        - --insecure
+        - --listen-addr=:26257
+        - --advertise-addr=${{ advertise_addr }}:26257
+      HostConfig:
+        NetworkMode: system
+        Binds:
+          - ${{ state_dir }}/store/certs:/certs
+          - ${{ state_dir }}/store/data:/cockroach/cockroach-data

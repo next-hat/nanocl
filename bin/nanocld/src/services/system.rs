@@ -62,8 +62,9 @@ pub(crate) async fn get_info(
   let docker = state.docker_api.info().await?;
   let host_gateway = state.config.gateway.clone();
   let info = HostInfo {
-    host_gateway,
     docker,
+    host_gateway,
+    config: state.config.clone(),
   };
   Ok(web::HttpResponse::Ok().json(&info))
 }

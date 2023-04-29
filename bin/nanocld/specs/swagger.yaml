@@ -2897,10 +2897,13 @@ components:
       - type: object
         required:
         - HostGateway
+        - Config
         properties:
           HostGateway:
             type: string
             description: HostGateway is the gateway address of the host
+          Config:
+            $ref: '#/components/schemas/DaemonConfig'
       description: HostInfo contains information about the host and the docker daemon
     HttpMetric:
       type: object

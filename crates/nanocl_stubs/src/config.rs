@@ -21,6 +21,10 @@ pub struct DaemonConfig {
   pub nodes: Vec<String>,
   /// Address to advertise to other nodes
   pub advertise_addr: String,
+  /// Config directory
+  pub conf_dir: String,
+  /// Group id
+  pub gid: u32,
 }
 
 /// Configuration File of the daemon
@@ -44,6 +48,8 @@ impl Default for DaemonConfig {
   fn default() -> Self {
     Self {
       docker_host: default_host(),
+      conf_dir: "/etc/nanocl".into(),
+      gid: 0,
       hostname: String::default(),
       hosts: vec!["/run/nanocl.sock".into()],
       state_dir: "/var/lib/nanocl".into(),

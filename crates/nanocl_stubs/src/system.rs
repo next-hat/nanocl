@@ -1,13 +1,16 @@
-use bollard_next::container::ListContainersOptions;
 use bollard_next::service::SystemInfo;
+use bollard_next::container::ListContainersOptions;
 
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
+
+use crate::config::DaemonConfig;
 
 use super::cargo::CargoInspect;
 use super::resource::Resource;
 
 /// HostInfo contains information about the host and the docker daemon
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -17,6 +20,8 @@ pub struct HostInfo {
   pub docker: SystemInfo,
   /// HostGateway is the gateway address of the host
   pub host_gateway: String,
+  /// Daemon configuration
+  pub config: DaemonConfig,
 }
 
 /// Version contain details about the current version nanocl

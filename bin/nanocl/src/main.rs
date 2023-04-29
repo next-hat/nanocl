@@ -29,10 +29,11 @@ async fn execute_args(args: &Cli) -> Result<(), IoError> {
     Commands::State(args) => commands::exec_state(args).await,
     Commands::Version => commands::exec_version(&client).await,
     Commands::Info => commands::exec_info(&client).await,
-    Commands::Install(opts) => commands::exec_install(opts).await,
-    Commands::Uninstall(opts) => commands::exec_uninstall(opts).await,
     Commands::Vm(args) => commands::exec_vm(&client, args).await,
     Commands::Ps(opts) => commands::exec_process(&client, opts).await,
+    Commands::Install(opts) => commands::exec_install(opts).await,
+    Commands::Uninstall(opts) => commands::exec_uninstall(opts).await,
+    Commands::Upgrade(opts) => commands::exec_upgrade(&client).await,
   }
 }
 

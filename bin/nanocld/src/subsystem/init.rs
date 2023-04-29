@@ -40,7 +40,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   })?;
   ensure_state_dir(&daemon_conf.state_dir).await?;
 
-  let pool = super::store::init(&docker).await?;
+  let pool = super::store::init().await?;
 
   let daemon_state = DaemonState {
     pool: pool.clone(),
@@ -72,6 +72,7 @@ mod tests {
   async fn basic_init() -> TestRet {
     // Init cli args
     let args = Cli {
+      gid: 0,
       init: false,
       hosts: None,
       docker_host: None,

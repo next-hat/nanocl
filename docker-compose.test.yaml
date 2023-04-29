@@ -13,6 +13,8 @@ services:
     container_name: nstore.system.c
     image: cockroachdb/cockroach:v22.2.7
     tty: true
+    ports:
+      - 26257:26257
     networks:
       - system
     volumes:
