@@ -33,7 +33,7 @@ async fn execute_args(args: &Cli) -> Result<(), IoError> {
     Commands::Ps(opts) => commands::exec_process(&client, opts).await,
     Commands::Install(opts) => commands::exec_install(opts).await,
     Commands::Uninstall(opts) => commands::exec_uninstall(opts).await,
-    Commands::Upgrade(opts) => commands::exec_upgrade(&client).await,
+    Commands::Upgrade => commands::exec_upgrade(&client).await,
   }
 }
 
