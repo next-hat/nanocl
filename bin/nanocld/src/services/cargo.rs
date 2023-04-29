@@ -484,6 +484,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(delete_cargo);
   config.service(start_cargo);
   config.service(stop_cargo);
+  config.service(kill_cargo);
   config.service(patch_cargo);
   config.service(put_cargo);
   config.service(list_cargo);

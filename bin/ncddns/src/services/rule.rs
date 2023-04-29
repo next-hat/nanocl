@@ -29,6 +29,7 @@ pub(crate) async fn apply_rule(
 ) -> Result<web::HttpResponse, HttpError> {
   let client = NanocldClient::connect_with_unix_default();
   utils::write_rule(&path.1, &payload, &dnsmasq, &client).await?;
+  utils::reload_service(&client).await?;
   Ok(web::HttpResponse::Ok().json(&payload))
 }
 
@@ -49,8 +50,9 @@ pub(crate) async fn remove_rule(
   path: web::types::Path<(String, String)>,
   dnsmasq: web::types::State<Dnsmasq>,
 ) -> Result<web::HttpResponse, HttpError> {
+  let client = NanocldClient::connect_with_unix_default();
   dnsmasq.remove_config(&path.1).await?;
-
+  utils::reload_service(&client).await?;
   Ok(web::HttpResponse::Ok().finish())
 }
 

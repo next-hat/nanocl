@@ -11,5 +11,6 @@ RUN chmod +x /entrypoint.sh
 LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
 LABEL org.opencontainers.image.description Nanocl Dns
 
-ENTRYPOINT ["/entrypoint.sh"]
+COPY ./bin/ndns/dnsmasq.conf /dnsmasq.conf
 
+ENTRYPOINT ["/entrypoint.sh"]

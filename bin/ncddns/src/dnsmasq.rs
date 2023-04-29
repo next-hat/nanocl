@@ -33,6 +33,7 @@ impl Dnsmasq {
   /// Write the main dnsmasq config
   #[inline]
   fn write_main_conf(&self, data: &str) -> IoResult<()> {
+    println!("writing data:\n{data}");
     fs::write(&self.config_path, data).map_err(|err| {
       err.map_err_context(|| {
         format!("unable to write default config file {}", &self.config_path)
@@ -58,13 +59,13 @@ impl Dnsmasq {
   fn gen_main_conf(&self) -> IoResult<()> {
     let contents = format!(
       "bind-interfaces
-  conf-dir={}/dnsmasq.d,*.conf
-  domain-needed
-  bogus-priv
-  filterwin2k
-  localise-queries
-  expand-hosts
-  no-negcache
+conf-dir={}/dnsmasq.d,*.conf
+domain-needed
+bogus-priv
+filterwin2k
+localise-queries
+expand-hosts
+no-negcache
 ",
       &self.config_dir
     );
@@ -111,7 +112,7 @@ impl Dnsmasq {
       if line.starts_with("server=") {
         continue;
       }
-      new_data.push_str(line);
+      new_data.push_str(&format!("{line}\n"));
     }
     for dns in &self.dns {
       new_data.push_str(format!("server={dns}\n").as_str());

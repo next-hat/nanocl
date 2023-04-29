@@ -56,6 +56,12 @@ async fn get_network_addr(
   Ok(addr)
 }
 
+pub(crate) async fn reload_service(client: &NanocldClient) -> IoResult<()> {
+  client.stop_cargo("ndns", Some("system".into())).await?;
+  client.start_cargo("ndns", Some("system".into())).await?;
+  Ok(())
+}
+
 /// Convert a ResourceDnsRule into a dnsmasq config and write it to a file
 pub(crate) async fn write_rule(
   name: &str,

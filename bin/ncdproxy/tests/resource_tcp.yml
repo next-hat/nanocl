@@ -2,16 +2,16 @@ Type: Resource
 ApiVersion: v0.4
 
 Resources:
-- Name: proxy-get-started
-  Kind: ProxyRule
-  Version: v0.1
-  Config:
-    Watch:
-    - get-started@global
-    Rules:
-    - Protocol: Tcp
-      Port: 9999
-      Network: Public
-      Target:
-        CargoKey: get-started@global
-        CargoPort: 9000
+  - Name: proxy-get-started
+    Kind: ProxyRule
+    Version: v0.1
+    Config:
+      Watch:
+        - get-started@global
+      Rules:
+        - Protocol: Tcp
+          Port: 9999
+          Network: Public
+          Target:
+            CargoKey: get-started@global
+            CargoPort: 9000
