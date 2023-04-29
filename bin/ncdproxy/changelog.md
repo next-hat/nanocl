@@ -8,8 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.0] - 2023-04-28
 
 ### Added
+
 - http and tcp/udp json output norm for metrics
 - Untagged rules and target for cleaner rule definition
+
+### Fixed
+
+- Image name
 
 ## [0.3.1] - 2023-04-14
 
@@ -23,4 +28,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Event Watching from nanocl daemon
 - Proxy Rule accept namespace as network
-
