@@ -33,7 +33,6 @@ impl Dnsmasq {
   /// Write the main dnsmasq config
   #[inline]
   fn write_main_conf(&self, data: &str) -> IoResult<()> {
-    println!("writing data:\n{data}");
     fs::write(&self.config_path, data).map_err(|err| {
       err.map_err_context(|| {
         format!("unable to write default config file {}", &self.config_path)
