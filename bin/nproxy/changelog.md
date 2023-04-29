@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Better http logs
 - Tcp/Udp logs
 
+### Fixed
+
+- Image name
+
 ## [1.23.4.0] - 2023-04-15
 
 ### Added
