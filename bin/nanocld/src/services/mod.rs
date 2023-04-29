@@ -134,7 +134,7 @@ mod tests {
   #[ntex::test]
   async fn test_unhandled_route() -> TestRet {
     let srv = generate_server(ntex_config).await;
-    let resp = srv.get("/unhandled").send().await?;
+    let resp = srv.get("/v0.1/unhandled").send().await?;
     let status = resp.status();
     assert_eq!(
       status,
