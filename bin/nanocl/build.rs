@@ -78,7 +78,7 @@ pub fn generate_man_pages() -> Result<()> {
     },
     ManPage {
       name: "nanocl-setup",
-      command: SetupOpts::command(),
+      command: InstallOpts::command(),
     },
   ];
 

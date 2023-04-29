@@ -78,19 +78,19 @@ Cargoes:
       HostConfig:
         NetworkMode: host
         Binds:
-          - ${{ state_dir }}/dns:/etc
+          - ${{ state_dir }}/dns:/opt/dns
 
   - Name: ncddns
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ncddns:0.1.0-nightly
+      Image: ghcr.io/nxthat/ncddns:0.1.1-nightly
       Tty: true
       HostConfig:
         NetworkMode: system
         Binds:
           - /run/nanocl:/run/nanocl
-          - ${{ state_dir }}/dns:/etc
+          - ${{ state_dir }}/dns:/opt/dns
 
   - Name: ndaemon
     Container:
