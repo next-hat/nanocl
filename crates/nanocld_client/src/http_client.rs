@@ -83,6 +83,10 @@ impl NanocldClient {
     }
   }
 
+  pub fn set_version(&mut self, version: &str) {
+    self.version = format!("v{version}")
+  }
+
   pub fn connect_with_url(url: &str, version: &str) -> Self {
     let client = http::client::Client::build()
       .timeout(ntex::time::Millis::from_secs(100))

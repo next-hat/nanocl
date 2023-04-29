@@ -1,7 +1,9 @@
 use clap::Parser;
 
+use nanocl_utils::io_error::IoResult;
+use nanocl_utils::http_client_error::HttpClientError;
+
 use nanocld_client::NanocldClient;
-use nanocl_utils::io_error::IoError;
 
 mod utils;
 mod config;
@@ -11,16 +13,32 @@ mod commands;
 
 use models::{Cli, Commands};
 
-async fn execute_args(args: &Cli) -> Result<(), IoError> {
+async fn detect_version(client: &mut NanocldClient) -> IoResult<()> {
+  client.set_version("0.1.0");
+  let version = client.get_version().await?;
+  client.set_version(&version.version);
+
+  Ok(())
+}
+
+async fn execute_args(args: &Cli) -> IoResult<()> {
   let cli_conf = config::read();
 
-  let client = match cli_conf.url {
+  let mut client = match cli_conf.url {
     Some(url) => {
       let url = Box::leak(url.into_boxed_str());
       NanocldClient::connect_to(url)
     }
     None => NanocldClient::connect_with_unix_default(),
   };
+
+  if let Err(HttpClientError::HttpError(err)) = client.get_version().await {
+    if err.status == 505 {
+      eprintln!("You're daemon is outdated, please run `nanocl upgrade`");
+      detect_version(&mut client).await?;
+    }
+  }
+
   match &args.command {
     Commands::Namespace(args) => commands::exec_namespace(&client, args).await,
     Commands::Resource(args) => commands::exec_resource(&client, args).await,
@@ -52,7 +70,6 @@ mod tests {
   use super::*;
 
   use nanocld_client::NanocldClient;
-  use ntex::time::{interval, Seconds};
 
   /// Test version command
   #[ntex::test]
@@ -301,45 +318,6 @@ mod tests {
   async fn info() {
     let args = Cli::parse_from(["nanocl", "info"]);
     assert!(execute_args(&args).await.is_ok());
-  }
-
-  // #[ntex::test]
-  async fn _setup() {
-    let args = Cli::parse_from([
-      "nanocl",
-      "setup",
-      "--version",
-      "nightly",
-      "--deamon-hosts",
-      "unix:///tmp/nanocl_tmp.sock",
-      "--state-dir",
-      "/tmp/nanocl2",
-      "--conf-dir",
-      "/tmp",
-      "--hostname",
-      "daemon-test",
-      "--gateway",
-      "127.0.0.1",
-    ]);
-    let res = execute_args(&args).await;
-    println!("{res:#?}");
-    assert!(res.is_ok());
-
-    // Wait before trying to stop the cargo
-    interval(Seconds(8)).tick().await;
-
-    let args =
-      Cli::parse_from(["nanocl", "cargo", "-n", "system", "stop", "daemon"]);
-    let res = execute_args(&args).await;
-    println!("{res:?}");
-    assert!(res.is_ok());
-
-    let args = Cli::parse_from([
-      "nanocl", "cargo", "-n", "system", "rm", "-y", "daemon",
-    ]);
-    let res = execute_args(&args).await;
-    println!("{res:#?}");
-    assert!(res.is_ok());
   }
 
   #[ntex::test]

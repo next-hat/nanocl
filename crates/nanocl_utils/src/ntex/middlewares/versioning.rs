@@ -81,7 +81,7 @@ where
           let msg = format!("{version} is not supported");
           return Either::Right(ok(
             req.into_response(
-              HttpResponse::NotFound()
+              HttpResponse::VersionNotSupported()
                 .json(&serde_json::json!({
                   "msg": msg,
                 }))
