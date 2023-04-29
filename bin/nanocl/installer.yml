@@ -1,12 +1,10 @@
 Type: Deployment
-ApiVersion: v0.5
+ApiVersion: v0.6
 
 # This is the required component for nanocl ecosystem.
 # It is a deployment that will be parsed and used to spin up nanocl
 # The settings may be dynamically updated when joining a cluster
 # or when a new node is added to the cluster.
-
-Namespace: system
 
 Cargoes:
   - Name: nstore
@@ -42,7 +40,7 @@ Cargoes:
 
   - Name: nproxy
     Container:
-      Image: ghcr.io/nxthat/nproxy:nightly-1.24.0.0
+      Image: ghcr.io/nxthat/nproxy:1.24.0.0-nightly
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -59,7 +57,7 @@ Cargoes:
 
   - Name: ncdproxy
     Container:
-      Image: ghcr.io/nxthat/ncdproxy:nightly-0.4.0
+      Image: ghcr.io/nxthat/ncdproxy:0.4.0-nightly
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -76,7 +74,7 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ndns:nightly-2.87.0
+      Image: ghcr.io/nxthat/ndns:2.87.1-nightly
       HostConfig:
         NetworkMode: host
         Binds:
@@ -86,7 +84,7 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ncddns:nightly-0.1.0
+      Image: ghcr.io/nxthat/ncddns:0.1.0-nightly
       Tty: true
       HostConfig:
         NetworkMode: system
@@ -96,7 +94,7 @@ Cargoes:
 
   - Name: ndaemon
     Container:
-      Image: ghcr.io/nxthat/nanocld:nightly-0.6.0
+      Image: ghcr.io/nxthat/nanocld:0.6.0-nightly
       Tty: true
       Arg:
         - --state-dir
