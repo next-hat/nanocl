@@ -56,7 +56,7 @@ async fn get_listen(
     "Public" => Ok(format!("{port}")),
     "Internal" => Ok(format!("127.0.0.1:{port}")),
     network if network.ends_with(".nsp") => {
-      let namespace = network.trim_end_matches("nsp.");
+      let namespace = network.trim_end_matches(".nsp");
       let ip_address = get_namespace_addr(namespace, client).await?;
       Ok(format!("{ip_address}:{port}"))
     }
