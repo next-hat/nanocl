@@ -42,7 +42,7 @@ jobs:
           echo $VERSION
       # Install dependencies
       - name: Install dependencies
-        run: apt update && apt install pandoc dpkg
+        run: sudo apt-get update && sudo apt-get install -y pandoc dpkg build-essential
       # Create binary
       - name: Create Binary
         run: ./scripts/release_nanocl.sh
