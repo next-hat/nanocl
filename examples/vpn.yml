@@ -6,6 +6,8 @@ Namespace: vpn
 Args:
   - Name: gateway
     Type: String
+  - Name: dns
+    Type: String
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/daemon/v0.4#tag/Cargoes/operation/create_cargo
@@ -14,7 +16,9 @@ Cargoes:
     Container:
       Image: hwdsl2/ipsec-vpn-server:latest
       Env:
-        - VPN_PUBLIC_IP={{Args.gateway}}
+        - VPN_PUBLIC_IP=${{ Args.gateway }}
+        - VPN_DNS_SRV1=${{ Args.dns }}
+        - VPN_DNS_SRV2=1.1.1.1
         - VPN_L2TP_NET=192.168.42.0/16
         - VPN_L2TP_LOCAL=192.168.42.1
         - VPN_L2TP_POOL=192.168.42.10-192.168.42.254
@@ -23,9 +27,9 @@ Cargoes:
       HostConfig:
         PortBindings:
           500/udp:
-            - HostPort: 500
+            - HostPort: "500"
           4500/udp:
-            - HostPort: 4500
+            - HostPort: "4500"
         Binds:
           - /opt/nanocl-vpn:/etc/ipsec.d
           - /lib/modules:/lib/modules
