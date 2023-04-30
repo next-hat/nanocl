@@ -48,18 +48,18 @@ jobs:
       - name: Test if release already exists
         id: release-exists
         continue-on-error: true
-        run: gh release view $BINARY_NAME-nightly-$VERSION
+        run: gh release view $BINARY_NAME-$VERSION-nightly
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
       - name: Create new draft release
         if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-        run: gh release create -d $BINARY_NAME-nightly-$VERSION -F ./bin/$BINARY_NAME/changelog.md target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+        run: gh release create -d $BINARY_NAME-$VERSION-nightly -F ./bin/$BINARY_NAME/changelog.md target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
       - name: Update draft release
         if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
         run: |
-          gh release delete-asset -y $BINARY_NAME-nightly-$VERSION ${BINARY_NAME}_${VERSION}_amd64.deb
-          gh release upload $BINARY_NAME-nightly-$VERSION target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+          gh release delete-asset -y $BINARY_NAME-$VERSION-nightly ${BINARY_NAME}_${VERSION}_amd64.deb
+          gh release upload $BINARY_NAME-$VERSION-nightly target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
