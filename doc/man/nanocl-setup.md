@@ -15,7 +15,8 @@ nanocl
 
 **\--docker-host**=*DOCKER_HOST*
 
-:   The docker host to connect to default is unix:///var/run/docker.sock
+:   The docker host to install nanocl default is
+    unix:///var/run/docker.sock
 
 **\--state-dir**=*STATE_DIR*
 

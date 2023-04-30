@@ -59,9 +59,17 @@ nanocl-version(1)
 
 :   Show nanocl version information
 
-nanocl-setup(1)
+nanocl-install(1)
 
-:   Setup nanocl daemon
+:   Install nanocl components
+
+nanocl-uninstall(1)
+
+:   Uninstall nanocl components
+
+nanocl-upgrade(1)
+
+:   Upgrade nanocl components
 
 nanocl-ps(1)
 
