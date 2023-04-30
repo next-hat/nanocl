@@ -2,8 +2,8 @@
 ## name: release_nanocl.sh
 
 # variables
+arch=amd64
 pkg_name="nanocl"
-arch=$(dpkg --print-architecture)
 version=$(cat ./bin/nanocl/Cargo.toml | grep -m 1 "version = \"" | sed 's/[^0-9.]*\([0-9.]*\).*/\1/')
 release_path="./target/${pkg_name}_${version}_${arch}"
 
@@ -17,7 +17,8 @@ mkdir -p "${release_path}"/usr/local/man/man1
 
 # Build binary
 
-RUSTFLAG="-C target-feature=+crt-static" cargo build --bin nanocl --release --target=x86_64-unknown-linux-musl
+export RUSTFLAGS="-C target-feature=+crt-static"
+cargo build --release --target=x86_64-unknown-linux-musl --features release --bin nanocl
 
 # Generate man pages
 for file in ./bin/nanocl/target/man/*; do
