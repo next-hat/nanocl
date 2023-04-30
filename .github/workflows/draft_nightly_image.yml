@@ -64,7 +64,7 @@ jobs:
       - name: Update draft release
         if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
         run: |
-          gh release delete-asset -y $BINARY_NAME-$VERSION-$CHANNEL $BINARY_NAME-$VERSION-$CHANNEL.tar.gz
-          gh release upload $BINARY_NAME-$VERSION-$CHANNEL /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz#$BINARY_NAME-image;
+          gh release delete-asset -y $BINARY_NAME-$VERSION-$CHANNEL $BINARY_NAME-$VERSION-$CHANNEL.tar.gz || true
+          gh release upload $BINARY_NAME-$VERSION-$CHANNEL /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz#$BINARY_NAME-image
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
