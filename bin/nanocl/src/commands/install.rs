@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
+use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 use users::get_group_by_name;
 use bollard_next::container::StartContainerOptions;
 
@@ -94,6 +96,25 @@ pub async fn exec_install(options: &InstallOpts) -> IoResult<()> {
     .ok_or(IoError::invalid_data("Cargoes", "Not founds"))?;
 
   let docker = utils::docker::connect(&args.docker_host)?;
+
+  if docker
+    .inspect_network("system", None::<InspectNetworkOptions<String>>)
+    .await
+    .is_err()
+  {
+    println!("Creating system network");
+    let mut options = HashMap::new();
+    options.insert("com.docker.network.bridge.name", "nanocl.system");
+    docker
+      .create_network(CreateNetworkOptions {
+        name: "system",
+        driver: "bridge",
+        options,
+        ..Default::default()
+      })
+      .await
+      .map_err(|err| err.map_err_context(|| "Nanocl system network"))?;
+  }
 
   for cargo in cargoes {
     let image = cargo.container.image.clone().ok_or(IoError::invalid_data(

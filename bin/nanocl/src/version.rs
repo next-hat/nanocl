@@ -7,5 +7,5 @@ pub fn print_version() {
   println!("Arch: {ARCH}");
   println!("Channel: {CHANNEL}");
   println!("Version: {VERSION}");
-  println!("Commit Id: {COMMIT_ID}");
+  println!("Commit ID: {COMMIT_ID}");
 }
