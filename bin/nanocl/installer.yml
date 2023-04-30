@@ -71,6 +71,9 @@ Cargoes:
         - TZ=Europe/Paris
       Image: ghcr.io/nxthat/ncddns:0.1.1-nightly
       Tty: true
+      Cmd:
+        - --conf-dir
+        - /opt/dns
       HostConfig:
         NetworkMode: system
         Binds:
