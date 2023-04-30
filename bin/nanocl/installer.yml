@@ -113,7 +113,8 @@ Cargoes:
         - ${{ hostname }}
         - --advertise-addr
         - ${{ advertise_addr }}
-        - --gid ${{ gid }}
+        - --gid
+        - ${{ gid }}
       Env:
         - TZ=Europe/Paris
         - NANOCL_GID=${{ gid }}
