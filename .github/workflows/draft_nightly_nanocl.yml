@@ -15,6 +15,7 @@ env:
 jobs:
   release_image:
     runs-on: ubuntu-latest
+    container: rust:1.69.0-alpine3.17
 
     steps:
       - uses: actions/checkout@v3
@@ -40,8 +41,7 @@ jobs:
       # Install required dependencies
       - name: Install dependencies
         run: |
-          sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get dist-upgrade -y
-          sudo apt-get install -y gcc make musl musl-dev musl-tools openssl git pandoc build-essential
+          apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base
           rustup target add x86_64-unknown-linux-musl
       # Package nanocl into a .deb
       - name: Package
