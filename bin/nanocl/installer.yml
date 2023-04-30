@@ -100,7 +100,7 @@ Cargoes:
       Image: ghcr.io/nxthat/nanocld:0.6.1-nightly
       Tty: true
       Hostname: ndaemon.nanocl.internal
-      Arg:
+      Cmd:
         - --state-dir
         - ${{ state_dir }}
         - --conf-dir
@@ -114,7 +114,7 @@ Cargoes:
         - --advertise-addr
         - ${{ advertise_addr }}
         - --gid
-        - ${{ gid }}
+        - "${{ gid }}"
       Env:
         - TZ=Europe/Paris
         - NANOCL_GID=${{ gid }}
