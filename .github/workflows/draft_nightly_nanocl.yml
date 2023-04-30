@@ -1,4 +1,4 @@
-name: Draft nanocl nightly release
+name: Draft nightly nanocl release
 
 on:
   push:
@@ -53,7 +53,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
       - name: Create new draft release
         if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-        run: gh release create -d $BINARY_NAME-nightly-$VERSION --generate-notes target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+        run: gh release create -d $BINARY_NAME-nightly-$VERSION -F ./bin/$BINARY_NAME/changelog.md target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
       - name: Update draft release
