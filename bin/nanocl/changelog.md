@@ -10,3 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Option to force remove a cargo by [@CreepyPvP](https://github.com/CreepyPvP)
+- Option `follow`, `tail`, `timestamp` by [@CreepyPvP](https://github.com/CreepyPvP)
+- Install command
+- Uninstall command
+- Upgrade command
