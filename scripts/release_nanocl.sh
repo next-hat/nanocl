@@ -2,8 +2,8 @@
 ## name: release_nanocl.sh
 
 # variables
+arch=x86_64
 pkg_name="nanocl"
-arch=$(dpkg --print-architecture)
 version=$(cat ./bin/nanocl/Cargo.toml | grep -m 1 "version = \"" | sed 's/[^0-9.]*\([0-9.]*\).*/\1/')
 release_path="./target/${pkg_name}_${version}_${arch}"
 
