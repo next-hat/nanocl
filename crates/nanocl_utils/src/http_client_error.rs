@@ -36,6 +36,15 @@ impl From<Box<HttpClientError>> for IoError {
   }
 }
 
+impl From<HttpClientError> for Box<IoError> {
+  fn from(f: HttpClientError) -> Self {
+    match f {
+      HttpClientError::IoError(err) => Box::new(err),
+      HttpClientError::HttpError(err) => Box::new(err.into()),
+    }
+  }
+}
+
 impl From<Box<IoError>> for HttpClientError {
   fn from(f: Box<IoError>) -> Self {
     Self::IoError(*f)

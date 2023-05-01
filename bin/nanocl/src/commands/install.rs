@@ -1,38 +1,35 @@
-use std::collections::HashMap;
 use std::time::Duration;
+use std::collections::HashMap;
 
-use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 use users::get_group_by_name;
 use bollard_next::container::StartContainerOptions;
+use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
 use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 use nanocld_client::stubs::state::StateDeployment;
 
 use crate::utils;
-use crate::models::{DEFAULT_INSTALLER, InstallOpts, NanocldArgs};
+use crate::models::{InstallOpts, NanocldArgs};
 
-pub async fn exec_install(options: &InstallOpts) -> IoResult<()> {
-  println!("Installing nanocl daemon on your system");
+/// Execute install command
+pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
+  println!("Installing Nanocl components on your system");
 
-  let docker_host = options
+  let docker_host = opts
     .docker_host
     .as_deref()
     .unwrap_or("unix:///var/run/docker.sock")
     .to_owned();
 
-  let state_dir = options
+  let state_dir = opts
     .state_dir
     .as_deref()
     .unwrap_or("/var/lib/nanocl")
     .to_owned();
 
-  let conf_dir = options
-    .conf_dir
-    .as_deref()
-    .unwrap_or("/etc/nanocl")
-    .to_owned();
+  let conf_dir = opts.conf_dir.as_deref().unwrap_or("/etc/nanocl").to_owned();
 
-  let gateway = match &options.gateway {
+  let gateway = match &opts.gateway {
     None => {
       let gateway = utils::network::get_default_ip()?;
       println!("Using default gateway: {}", gateway);
@@ -41,14 +38,14 @@ pub async fn exec_install(options: &InstallOpts) -> IoResult<()> {
     Some(gateway) => gateway.clone(),
   };
 
-  let advertise_addr = match &options.advertise_addr {
+  let advertise_addr = match &opts.advertise_addr {
     None => gateway.clone(),
     Some(advertise_addr) => advertise_addr.clone(),
   };
 
-  let group = options.group.as_deref().unwrap_or("nanocl");
+  let group = opts.group.as_deref().unwrap_or("nanocl");
 
-  let hosts = options
+  let hosts = opts
     .deamon_hosts
     .clone()
     .unwrap_or(vec!["unix:///run/nanocl/nanocl.sock".into()]);
@@ -64,7 +61,7 @@ pub async fn exec_install(options: &InstallOpts) -> IoResult<()> {
     ),
   ))?;
 
-  let hostname = if let Some(hostname) = &options.hostname {
+  let hostname = if let Some(hostname) = &opts.hostname {
     hostname.to_owned()
   } else {
     let hostname = utils::network::get_hostname()?;
@@ -83,8 +80,9 @@ pub async fn exec_install(options: &InstallOpts) -> IoResult<()> {
     advertise_addr,
   };
 
-  let installer =
-    utils::state::compile(DEFAULT_INSTALLER, &args.clone().into())?;
+  let installer = utils::installer::get_template(opts.template.clone()).await?;
+
+  let installer = utils::state::compile(&installer, &args.clone().into())?;
 
   let deployment = serde_yaml::from_str::<StateDeployment>(&installer)
     .map_err(|err| {

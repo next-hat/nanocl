@@ -166,7 +166,7 @@ fn strip_errno(err: &std::io::Error) -> String {
   msg
 }
 
-pub type IoResult<T> = Result<T, IoError>;
+pub type IoResult<T, E = IoError> = Result<T, E>;
 
 /// Enables the conversion from [`std::io::Error`] to [`IoError`] and from [`std::io::Result`] to [`IoResult`].
 pub trait FromIo<T> {
