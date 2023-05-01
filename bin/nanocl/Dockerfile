@@ -29,7 +29,6 @@ COPY ./crates/nanocl_utils/src ./crates/nanocl_utils/src
 COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
 COPY ./bin/nanocl/src ./bin/nanocl/src
 COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
-COPY ./bin/nanocl/installer.yml ./bin/nanocl/installer.yml
 COPY ./bin/nanocld/src ./bin/nanocld/src
 COPY ./bin/nanocld/specs ./bin/nanocld/specs
 COPY ./bin/nanocld/build.rs ./bin/nanocld/build.rs
