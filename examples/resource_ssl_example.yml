@@ -1,10 +1,10 @@
 Type: Resource
-ApiVersion: v0.5
+ApiVersion: v0.6
 
 Resources:
   - Name: resource-example
     Kind: ProxyRule
-    Version: v0.1
+    Version: v0.4
     Config:
       Watch:
         - deploy-example.global

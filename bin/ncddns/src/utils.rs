@@ -56,6 +56,8 @@ async fn get_network_addr(
   Ok(addr)
 }
 
+/// Reload the dns service
+/// TODO: use a better way to reload the service, we may have to move from dnsmasq to something else
 pub(crate) async fn reload_service(client: &NanocldClient) -> IoResult<()> {
   client.stop_cargo("ndns", Some("system".into())).await?;
   client.start_cargo("ndns", Some("system".into())).await?;
@@ -70,18 +72,21 @@ pub(crate) async fn write_rule(
   client: &NanocldClient,
 ) -> IoResult<()> {
   let listen_address = get_network_addr(&dns_rule.network, client).await?;
-  let address =
-    dns_rule
-      .entries
-      .iter()
-      .fold(String::default(), |mut acc, entry| {
-        acc += &format!("address=/{}/{}\n", entry.name, entry.ip_address);
-        acc
-      });
+  let mut entries = String::new();
 
-  let file_content = format!("listen-address={listen_address}\n{address}");
+  for entry in &dns_rule.entries {
+    let ip_address = match entry.ip_address.as_str() {
+      namespace if namespace.ends_with(".nsp") => {
+        let namespace = namespace.trim_end_matches(".nsp");
+        get_namespace_addr(namespace, client).await?
+      }
+      _ => entry.ip_address.clone(),
+    };
+    entries += &format!("address=/{}/{}\n", entry.name, ip_address);
+  }
+
+  let file_content = format!("listen-address={listen_address}\n{entries}");
   dnsmasq.write_config(name, &file_content).await?;
-
   Ok(())
 }
 
