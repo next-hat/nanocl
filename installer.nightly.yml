@@ -1,0 +1,130 @@
+Type: Deployment
+ApiVersion: v0.6
+
+# This is the required component for nanocl ecosystem.
+# It is a deployment that will be parsed and used to spin up nanocl
+# The settings may be dynamically updated when joining a cluster
+# or when a new node is added to the cluster.
+
+Namespace: system
+
+Cargoes:
+  - Name: nmetrics
+    Container:
+      Image: ghcr.io/nxthat/metrsd:0.2.0
+      Tty: true
+      Env:
+        - TZ=Europe/Paris
+      Cmd:
+        - --hosts
+        - unix:///run/nanocl/metrics.sock
+      HostConfig:
+        NetworkMode: system
+        Binds:
+          - /run/nanocl:/run/nanocl
+
+  - Name: nproxy
+    Container:
+      Image: ghcr.io/nxthat/nproxy:1.24.0.0-nightly
+      Tty: true
+      Env:
+        - TZ=Europe/Paris
+      HostConfig:
+        NetworkMode: host
+        Binds:
+          - /run:/run
+          - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
+          - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
+          - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
+          - ${{ state_dir }}/proxy/html:/usr/share/nginx/html
+          - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
+          - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
+
+  - Name: ncdproxy
+    Container:
+      Image: ghcr.io/nxthat/ncdproxy:0.4.1-nightly
+      Tty: true
+      Env:
+        - TZ=Europe/Paris
+      HostConfig:
+        NetworkMode: system
+        Binds:
+          - /run/nanocl:/run/nanocl
+          - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
+          - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
+          - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
+          - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
+
+  - Name: ndns
+    Container:
+      Env:
+        - TZ=Europe/Paris
+      Image: ghcr.io/nxthat/ndns:2.87.1-nightly
+      HostConfig:
+        NetworkMode: host
+        Binds:
+          - ${{ state_dir }}/dns:/opt/dns
+
+  - Name: ncddns
+    Container:
+      Env:
+        - TZ=Europe/Paris
+      Image: ghcr.io/nxthat/ncddns:0.1.2-nightly
+      Tty: true
+      Cmd:
+        - --conf-dir
+        - /opt/dns
+      HostConfig:
+        NetworkMode: system
+        Binds:
+          - /run/nanocl:/run/nanocl
+          - ${{ state_dir }}/dns:/opt/dns
+
+  - Name: nstore
+    Container:
+      Image: cockroachdb/cockroach:v22.2.7
+      Tty: true
+      Hostname: nstore.nanocl.internal
+      Env:
+        - TZ=Europe/Paris
+      Cmd:
+        - start-single-node
+        - --insecure
+        - --listen-addr=:26257
+        - --advertise-addr=${{ advertise_addr }}:26257
+      HostConfig:
+        NetworkMode: system
+        Binds:
+          - ${{ state_dir }}/store/certs:/certs
+          - ${{ state_dir }}/store/data:/cockroach/cockroach-data
+
+  - Name: ndaemon
+    Container:
+      Image: ghcr.io/nxthat/nanocld:0.6.1-nightly
+      Tty: true
+      Hostname: ndaemon.nanocl.internal
+      Cmd:
+        - --state-dir
+        - ${{ state_dir }}
+        - --conf-dir
+        - ${{ conf_dir }}
+        - --docker-host
+        - ${{ docker_host }}
+        - --gateway
+        - ${{ gateway }}
+        - --hostname
+        - ${{ hostname }}
+        - --advertise-addr
+        - ${{ advertise_addr }}
+        - --gid
+        - "${{ gid }}"
+      Env:
+        - TZ=Europe/Paris
+        - NANOCL_GID=${{ gid }}
+      HostConfig:
+        NetworkMode: system
+        Binds:
+          - /run/nanocl:/run/nanocl
+          - /run/docker.sock:/run/docker.sock
+          - ${{ state_dir }}:${{ state_dir }}
+          - ${{ conf_dir }}:${{ conf_dir }}

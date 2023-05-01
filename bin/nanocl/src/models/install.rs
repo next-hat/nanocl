@@ -1,6 +1,7 @@
 use clap::Parser;
 
-pub const DEFAULT_INSTALLER: &str = include_str!("../../installer.yml");
+pub const DEFAULT_INSTALLER: &str =
+  include_str!("../../../../installer.nightly.yml");
 
 #[derive(Debug, Clone, Parser)]
 pub struct InstallOpts {
