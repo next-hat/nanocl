@@ -1,7 +1,5 @@
 use clap::Parser;
 
-pub const DEFAULT_INSTALLER: &str = include_str!("../../installer.yml");
-
 #[derive(Debug, Clone, Parser)]
 pub struct InstallOpts {
   /// The docker host to install nanocl default is unix:///var/run/docker.sock
@@ -28,6 +26,9 @@ pub struct InstallOpts {
   /// The hostname to use for the nanocl daemon default is detected
   #[clap(long)]
   pub(crate) hostname: Option<String>,
+  /// Installation template to use for nanocl by default it's detected
+  #[clap(short, long)]
+  pub(crate) template: Option<String>,
 }
 
 /// This is the struct that will be passed to nanocl daemon

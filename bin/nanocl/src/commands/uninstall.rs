@@ -4,7 +4,7 @@ use nanocld_client::stubs::state::StateDeployment;
 use bollard_next::container::{InspectContainerOptions, RemoveContainerOptions};
 
 use crate::utils;
-use crate::models::{DEFAULT_INSTALLER, UninstallOpts};
+use crate::models::UninstallOpts;
 
 pub async fn exec_uninstall(opts: &UninstallOpts) -> IoResult<()> {
   let docker_host = opts
@@ -14,7 +14,9 @@ pub async fn exec_uninstall(opts: &UninstallOpts) -> IoResult<()> {
 
   let docker = utils::docker::connect(&docker_host)?;
 
-  let installer = serde_yaml::from_str::<StateDeployment>(DEFAULT_INSTALLER)
+  let installer = utils::installer::get_template(opts.template.clone()).await?;
+
+  let installer = serde_yaml::from_str::<StateDeployment>(&installer)
     .map_err(|err| err.map_err_context(|| "Unable to parse installer"))?;
 
   let cargoes = installer.cargoes.unwrap_or_default();

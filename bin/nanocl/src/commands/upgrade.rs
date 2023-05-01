@@ -6,11 +6,13 @@ use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 use nanocld_client::stubs::state::StateStream;
 
 use crate::utils;
-use crate::models::DEFAULT_INSTALLER;
-
+use crate::models::UpgradeOpts;
 use super::cargo_image::exec_cargo_image_create;
 
-pub async fn exec_upgrade(client: &NanocldClient) -> IoResult<()> {
+pub async fn exec_upgrade(
+  client: &NanocldClient,
+  opts: &UpgradeOpts,
+) -> IoResult<()> {
   let config = client.info().await?.config;
 
   let data = liquid::object!({
@@ -23,7 +25,9 @@ pub async fn exec_upgrade(client: &NanocldClient) -> IoResult<()> {
     "gid": config.gid,
   });
 
-  let installer = utils::state::compile(DEFAULT_INSTALLER, &data)?;
+  let installer = utils::installer::get_template(opts.template.clone()).await?;
+
+  let installer = utils::state::compile(&installer, &data)?;
 
   let data =
     serde_yaml::from_str::<serde_json::Value>(&installer).map_err(|err| {
