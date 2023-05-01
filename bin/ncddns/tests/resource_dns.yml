@@ -1,5 +1,5 @@
 Type: Resource
-ApiVersion: v0.4
+ApiVersion: v0.6
 
 Resources:
   - Name: dns-get-started
@@ -10,3 +10,5 @@ Resources:
       Entries:
         - Name: test2.com
           IpAddress: 127.0.0.1
+        - Name: test3.com
+          IpAddress: global.nsp
