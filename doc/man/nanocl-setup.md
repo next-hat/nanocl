@@ -7,7 +7,7 @@ nanocl
 **nanocl** \[**\--docker-host**\] \[**\--state-dir**\]
 \[**\--conf-dir**\] \[**\--gateway**\] \[**\--advertise-addr**\]
 \[**\--deamon-hosts**\] \[**\--group**\] \[**\--hostname**\]
-\[**-h**\|**\--help**\]
+\[**-t**\|**\--template**\] \[**-h**\|**\--help**\]
 
 # DESCRIPTION
 
@@ -47,6 +47,10 @@ nanocl
 **\--hostname**=*HOSTNAME*
 
 :   The hostname to use for the nanocl daemon default is detected
+
+**-t**, **\--template**=*TEMPLATE*
+
+:   Installation template to use for nanocl by default its detected
 
 **-h**, **\--help**
 
