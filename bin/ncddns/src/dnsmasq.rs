@@ -58,13 +58,12 @@ impl Dnsmasq {
   fn gen_main_conf(&self) -> IoResult<()> {
     let contents = format!(
       "bind-interfaces
+no-resolv
+no-poll
+no-hosts
+proxy-dnssec
+except-interface=lo
 conf-dir={}/dnsmasq.d,*.conf
-domain-needed
-bogus-priv
-filterwin2k
-localise-queries
-expand-hosts
-no-negcache
 ",
       &self.config_dir
     );
