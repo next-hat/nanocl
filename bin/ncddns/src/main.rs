@@ -18,10 +18,7 @@ async fn run(cli: &Cli) -> IoResult<()> {
   log::info!("ncddns v{}", env!("CARGO_PKG_VERSION"));
 
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
-  let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns.clone());
-  if let Err(err) = dnsmasq.ensure() {
-    err.exit();
-  }
+  let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns.clone()).ensure()?;
 
   let server = server::generate(&cli.host, &dnsmasq)?;
   server.await?;
@@ -43,7 +40,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  // use ntex::rt;
   use nanocl_utils::io_error::IoResult;
 
   #[ntex::test]
@@ -54,6 +50,8 @@ mod tests {
       "wrong://dsadsa",
       "--conf-dir",
       "/tmp/ncddns",
+      "--dns",
+      "1.1.1.1",
     ]);
     let server = run(&cli).await;
     assert!(server.is_err());
