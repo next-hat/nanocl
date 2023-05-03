@@ -59,7 +59,7 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ndns:2.87.1-nightly
+      Image: ghcr.io/nxthat/ndns:2.87.2-nightly
       HostConfig:
         NetworkMode: host
         Binds:
@@ -69,7 +69,7 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ncddns:0.1.2-nightly
+      Image: ghcr.io/nxthat/ncddns:0.1.3-nightly
       Tty: true
       Cmd:
         - --conf-dir
