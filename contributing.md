@@ -179,24 +179,24 @@ Then be sure to have correct permission set on `/run/nanocl`
 - Run all tests
 
   ```sh
-  cargo make test
+  cargo make tests
   ```
 
 - Run all tests with print output
 
   ```sh
-  cargo make test-debug
+  cargo make tests-debug
   ```
 
 - Run only daemon tests
 
   ```sh
-  cargo make test-daemon
+  cargo make tests-daemon
   ```
 
 - Run only cli tests
   ```sh
-  cargo make test-cli
+  cargo make tests-cli
   ```
 
 ## 👌 Usefull Command

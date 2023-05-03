@@ -1,6 +1,6 @@
 use clap::Parser;
 
-/// Nanocl controller dns
+/// Nanocl Controller Daemon DNS
 #[derive(Debug, Parser)]
 pub(crate) struct Cli {
   /// Path to the config directory
@@ -9,4 +9,7 @@ pub(crate) struct Cli {
   /// Dns server address to resolve domain name if not existing in local
   #[clap(long)]
   pub(crate) dns: Vec<String>,
+  /// Server address to listen on (default: unix:///run/nanocl/dns.sock)
+  #[clap(long, default_value = "unix:///run/nanocl/dns.sock")]
+  pub(crate) host: String,
 }

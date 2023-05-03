@@ -22,17 +22,17 @@ command = "cargo"
 args = ["run", "--bin", "nanocl", "${@}"]
 
 # Test daemon
-[tasks.test-daemon]
+[tasks.tests-daemon]
 command = "cargo"
 args = ["nextest", "run", "-p", "nanocld"]
 
 # Test Cli
-[tasks.test-cli]
+[tasks.tests-cli]
 command = "cargo"
 args = ["nextest", "run", "-p", "nanocl"]
 
 # Test all
-[tasks.test]
+[tasks.tests]
 command = "cargo"
 args = [
   "nextest",
@@ -42,10 +42,11 @@ args = [
   "test",
   "-j",
   "1",
+  "${@}",
 ]
 
 # Test all with debug output
-[tasks.test-debug]
+[tasks.tests-debug]
 command = "cargo"
 args = [
   "nextest",
