@@ -73,7 +73,7 @@ conf-dir={}/dnsmasq.d,*.conf
 
   /// Ensure that dnsmasq as a minimal config
   #[inline]
-  pub(crate) fn ensure(&self) -> IoResult<()> {
+  pub(crate) fn ensure(&self) -> IoResult<Self> {
     log::info!(
       "Ensuring a minimal dnsmasq config inside {}",
       &self.config_dir
@@ -91,7 +91,7 @@ conf-dir={}/dnsmasq.d,*.conf
     self.gen_main_conf()?;
     self.set_dns()?;
     log::info!("Minimal dnsmasq config is ensured");
-    Ok(())
+    Ok(self.clone())
   }
 
   /// Set dns server address to resolve domain name if not existing in local

@@ -77,4 +77,4 @@ jobs:
           token: ${{ secrets.CODECOV }}
           files: ./lcov.info
           flags: unittests # optional
-          verbose: true # optional (default = false)
+
