@@ -85,4 +85,4 @@ nanocl cargo-help(1)
 
 # VERSION
 
-v0.6.1
+v0.6.0
