@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 /// It is used to configure the daemon
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct DaemonConfig {
   /// List of hosts to listen on
   pub hosts: Vec<String>,

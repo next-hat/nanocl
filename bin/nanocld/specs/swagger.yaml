@@ -24,7 +24,7 @@ info:
     email: team@next-hat.com
   license:
     name: MIT OR Apache-2.0
-  version: v0.6.1
+  version: v0.6.0
 servers:
 - url: /{Version}
   variables:
@@ -2277,6 +2277,54 @@ components:
           type: string
           description: The working directory for the exec process inside the container.
           nullable: true
+    DaemonConfig:
+      type: object
+      description: |-
+        Configuration of the daemon
+        It is used to configure the daemon
+      required:
+      - hosts
+      - state_dir
+      - gateway
+      - hostname
+      - nodes
+      - advertise_addr
+      - conf_dir
+      - gid
+      properties:
+        hosts:
+          type: array
+          items:
+            type: string
+          description: List of hosts to listen on
+        state_dir:
+          type: string
+          description: Path to the state directory
+        docker_host:
+          type: string
+          description: Docker host to use
+        gateway:
+          type: string
+          description: Host gateway automatically detected to host default gateway if not set
+        hostname:
+          type: string
+          description: Hostname to use for the node automatically detected if not set
+        nodes:
+          type: array
+          items:
+            type: string
+          description: List of nodes to join
+        advertise_addr:
+          type: string
+          description: Address to advertise to other nodes
+        conf_dir:
+          type: string
+          description: Config directory
+        gid:
+          type: integer
+          format: int32
+          description: Group id
+          minimum: 0.0
     DeviceMapping:
       type: object
       description: A device mapping between the host and container

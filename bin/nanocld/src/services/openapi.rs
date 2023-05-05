@@ -24,6 +24,7 @@ use bollard_next::service::{
   Network, GenericResourcesInner, GenericResourcesInnerNamedResourceSpec,
   NetworkContainer, Ipam, IpamConfig,
 };
+use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::generic::GenericCount;
 use nanocl_stubs::system::{Version, HostInfo};
 use nanocl_stubs::metric::{Metric, MetricKind};
@@ -399,6 +400,8 @@ impl Modify for VersionModifier {
     MetricKind,
     // HttpMetric
     HttpMetric,
+    // Daemon
+    DaemonConfig,
     // Error
     ApiError,
     // Generic Types
