@@ -60,4 +60,5 @@ nanocl_utils = { version = "0.1.1", features = [
   "io_error",
   "http_client_error",
   "bollard",
+  "serde_yaml",
 ] }
