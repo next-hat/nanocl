@@ -126,7 +126,7 @@ Resources:
     Config:
       Watch:
         - doc.nexthat
-      Rule:
+      Rules:
         - Domain: docs.next-hat.com
           Network: Public
           Ssl:
