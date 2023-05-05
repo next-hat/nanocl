@@ -105,7 +105,7 @@ To install `Nanocl`, please refer to our online [installation guide](https://doc
 There is an example used to deploy our [documentation](https://docs.next-hat.com):
 
 ```yaml
-ApiVersion: v0.5
+ApiVersion: v0.6
 Type: Deployment
 
 Namespace: nexthat
@@ -127,8 +127,7 @@ Resources:
       Watch:
         - doc.nexthat
       Rule:
-        Http:
-          Domain: docs.next-hat.com
+        - Domain: docs.next-hat.com
           Network: Public
           Ssl:
             Certificate: /etc/letsencrypt/live/docs.next-hat.com/fullchain.pem
@@ -139,9 +138,8 @@ Resources:
           Locations:
             - Path: /
               Target:
-                Cargo:
-                  Key: doc.nexthat
-                  Port: 80
+                CargoKey: doc.nexthat
+                CargoPort: 80
 ```
 
 To apply a state we can do it easily bu running `nanocl state apply -f path|url`<br />
