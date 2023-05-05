@@ -2368,6 +2368,16 @@ components:
           additionalProperties:
             type: string
           nullable: true
+    DnsEntry:
+      type: object
+      required:
+      - Name
+      - IpAddress
+      properties:
+        Name:
+          type: string
+        IpAddress:
+          type: string
     Driver:
       type: object
       description: Driver represents a driver (network, logging, secrets).
@@ -4049,6 +4059,18 @@ components:
           description: The config of the resource as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
+    ResourceDnsRule:
+      type: object
+      required:
+      - Network
+      - Entries
+      properties:
+        Network:
+          type: string
+        Entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/DnsEntry'
     ResourcePartial:
       type: object
       description: Resource partial is a payload used to create a new resource
@@ -4717,6 +4739,13 @@ components:
           type: string
           description: The base64-url-safe-encoded raw public key bytes of the issuer.
           nullable: true
+    UnixTarget:
+      type: object
+      required:
+      - UnixPath
+      properties:
+        UnixPath:
+          type: string
     UriTarget:
       type: object
       required:
