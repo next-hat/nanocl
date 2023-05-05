@@ -88,7 +88,6 @@ impl std::error::Error for HttpError {}
 /// Helper function to convert an HttpError into a ntex::web::HttpResponse
 impl web::WebResponseError for HttpError {
   fn error_response(&self, _: &web::HttpRequest) -> web::HttpResponse {
-    log::debug!("Replying error: [{}] {}", self.status, self.msg);
     let err_json = serde_json::json!({ "msg": self.msg });
     web::HttpResponse::build(self.status).json(&err_json)
   }
