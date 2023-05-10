@@ -1800,7 +1800,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "bollard-next",
  "chrono",
