@@ -146,6 +146,17 @@ components:
           description: The path
         Target:
           $ref: '#/components/schemas/LocationTarget'
+        Headers:
+          type: array
+          items:
+            type: string
+          description: Extras header to add
+          nullable: true
+        Version:
+          type: number
+          format: double
+          description: Http version to use
+          nullable: true
     ProxyRule:
       oneOf:
       - type: array

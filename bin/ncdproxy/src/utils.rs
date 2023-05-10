@@ -168,6 +168,19 @@ async fn gen_locations(
   for rule in location_rules {
     let path = &rule.path;
 
+    let headers = rule.headers.clone().unwrap_or_default().into_iter().fold(
+      String::new(),
+      |mut acc, elem| {
+        acc += &format!("proxy_set_header {elem};\n");
+        acc
+      },
+    );
+
+    let version = match &rule.version {
+      None => String::default(),
+      Some(version) => format!("proxy_http_version {};", version),
+    };
+
     match &rule.target {
       LocationTarget::Cargo(cargo_target) => {
         let upstream_key =
@@ -182,6 +195,8 @@ async fn gen_locations(
     proxy_set_header X-Forwarded-Proto  $scheme;
     proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
     proxy_set_header X-Real-IP          $remote_addr;
+    {headers}
+    {version}
   }}"
         );
         locations.push(location);
@@ -196,6 +211,8 @@ async fn gen_locations(
     proxy_set_header X-Forwarded-Proto  $scheme;
     proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
     proxy_set_header X-Real-IP          $remote_addr;
+    {headers}
+    {version}
   }}
   "
         );
@@ -208,6 +225,8 @@ async fn gen_locations(
             format!(
               "
   location {path} {{
+    {headers}
+    {version}
     return {redirect} {url};
   }}
 "
@@ -217,6 +236,8 @@ async fn gen_locations(
             format!(
               "
   location {path} {{
+    {headers}
+    {version}
     proxy_pass {url};
   }}
 "

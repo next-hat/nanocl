@@ -153,6 +153,10 @@ pub struct ProxyHttpLocation {
   pub path: String,
   /// The target cargo
   pub target: LocationTarget,
+  /// Extras header to add
+  pub headers: Option<Vec<String>>,
+  /// Http version to use
+  pub version: Option<f64>,
 }
 
 /// Defines a proxy rule http config
