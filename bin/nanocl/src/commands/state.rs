@@ -167,14 +167,14 @@ async fn attach_to_cargo(
     let client = client.clone();
     let name = name.clone();
     let fut = rt::spawn(async move {
-      let query = CargoLogQuery::of_namespace(namespace.to_owned());
+      let query = CargoLogQuery {
+        namespace: Some(namespace),
+        follow: Some(true),
+        ..Default::default()
+      };
       match client.logs_cargo(&name, &query).await {
         Err(err) => {
-          eprintln!(
-            "Cannot attach to cargo {cargo}: {err}",
-            cargo = name,
-            err = err
-          );
+          eprintln!("Cannot attach to cargo {name}: {err}");
         }
         Ok(mut stream) => {
           while let Some(output) = stream.next().await {
@@ -265,10 +265,6 @@ fn inject_data(
 ) -> IoResult<serde_yaml::Value> {
   let build_args: StateBuildArgs = serde_yaml::from_value(yaml.clone())
     .map_err(|err| err.map_err_context(|| "Unable to extract BuildArgs"))?;
-
-  if build_args.args.is_none() {
-    return Ok(yaml);
-  }
 
   let mut cmd = Command::new("nanocl state args")
     .about("Validate state args")
