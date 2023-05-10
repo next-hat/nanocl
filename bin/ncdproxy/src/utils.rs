@@ -168,18 +168,18 @@ async fn gen_locations(
   for rule in location_rules {
     let path = &rule.path;
 
+    let version = match &rule.version {
+      None => String::default(),
+      Some(version) => format!("\n    proxy_http_version {};", version),
+    };
+
     let headers = rule.headers.clone().unwrap_or_default().into_iter().fold(
       String::new(),
       |mut acc, elem| {
-        acc += &format!("proxy_set_header {elem};\n");
+        acc += &format!("\n    proxy_set_header {elem};");
         acc
       },
     );
-
-    let version = match &rule.version {
-      None => String::default(),
-      Some(version) => format!("proxy_http_version {};", version),
-    };
 
     match &rule.target {
       LocationTarget::Cargo(cargo_target) => {
@@ -188,15 +188,13 @@ async fn gen_locations(
             .await?;
         let location = format!(
           "
-  location {path} {{
-    proxy_pass http://{upstream_key};
+  location {path} {{{version}{headers}
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Scheme $scheme;
     proxy_set_header X-Forwarded-Proto  $scheme;
     proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
     proxy_set_header X-Real-IP          $remote_addr;
-    {headers}
-    {version}
+    proxy_pass http://{upstream_key};
   }}"
         );
         locations.push(location);
@@ -204,15 +202,13 @@ async fn gen_locations(
       LocationTarget::Unix(unix) => {
         let upstream_key = gen_unix_stream(&unix.unix_path, nginx).await?;
         let location = format!(
-          "location {path} {{
+          "location {path} {{{version}{headers}
     proxy_pass http://{upstream_key}/;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Scheme $scheme;
     proxy_set_header X-Forwarded-Proto  $scheme;
     proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
     proxy_set_header X-Real-IP          $remote_addr;
-    {headers}
-    {version}
   }}
   "
         );
@@ -224,9 +220,7 @@ async fn gen_locations(
           Some(redirect) => {
             format!(
               "
-  location {path} {{
-    {headers}
-    {version}
+  location {path} {{{version}{headers}
     return {redirect} {url};
   }}
 "
@@ -235,9 +229,7 @@ async fn gen_locations(
           None => {
             format!(
               "
-  location {path} {{
-    {headers}
-    {version}
+  location {path} {{{version}{headers}
     proxy_pass {url};
   }}
 "
