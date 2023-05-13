@@ -26,122 +26,122 @@ info:
     name: MIT OR Apache-2.0
   version: v0.6.0
 servers:
-- url: /{Version}
-  variables:
-    Version:
-      default: v0.6
-      description: API version
-      enum:
-      - v0.6
-      - v0.5
-      - v0.4
-      - v0.3
-      - v0.2
-      - v0.1
+  - url: /{Version}
+    variables:
+      Version:
+        default: v0.6
+        description: API version
+        enum:
+          - v0.6
+          - v0.5
+          - v0.4
+          - v0.3
+          - v0.2
+          - v0.1
 paths:
   /_ping:
     head:
       tags:
-      - System
+        - System
       summary: Get version information
       description: Get version information
       operationId: get_ping
       responses:
-        '202':
+        "202":
           description: Server is up
   /cargoes:
     get:
       tags:
-      - Cargoes
+        - Cargoes
       summary: List cargoes
       description: List cargoes
       operationId: list_cargo
       parameters:
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: Name
-        in: query
-        description: Filter for cargoes with similar name
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: Limit
-        in: query
-        description: Max amount of cargoes in response
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: Offset
-        in: query
-        description: Offset of the first cargo in response
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
+        - name: Name
+          in: query
+          description: Filter for cargoes with similar name
+          required: false
+          schema:
+            type: string
+            nullable: true
+        - name: Limit
+          in: query
+          description: Max amount of cargoes in response
+          required: false
+          schema:
+            type: integer
+            format: int64
+            nullable: true
+        - name: Offset
+          in: query
+          description: Offset of the first cargo in response
+          required: false
+          schema:
+            type: integer
+            format: int64
+            nullable: true
       responses:
-        '200':
+        "200":
           description: List of cargoes
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/CargoSummary'
+                  $ref: "#/components/schemas/CargoSummary"
     post:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Create a new cargo
       description: Create a new cargo
       operationId: create_cargo
       parameters:
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoConfigPartial'
+              $ref: "#/components/schemas/CargoConfigPartial"
         required: true
       responses:
-        '201':
+        "201":
           description: Cargo created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CargoInspect'
+                $ref: "#/components/schemas/CargoInspect"
   /cargoes/images:
     get:
       tags:
-      - CargoImages
+        - CargoImages
       summary: List container images
       description: List container images
       operationId: list_cargo_image
       responses:
-        '200':
+        "200":
           description: List of container image
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ImageSummary'
+                  $ref: "#/components/schemas/ImageSummary"
     post:
       tags:
-      - CargoImages
+        - CargoImages
       summary: Download a container image
       description: Download a container image
       operationId: create_cargo_image
@@ -149,21 +149,21 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoImagePartial'
+              $ref: "#/components/schemas/CargoImagePartial"
         required: true
       responses:
-        '200':
+        "200":
           description: Download stream
-        '404':
+        "404":
           description: Image not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /cargoes/images/import:
     post:
       tags:
-      - CargoImages
+        - CargoImages
       summary: Import a container image from a tarball
       description: Import a container image from a tarball
       operationId: import_cargo_image
@@ -174,487 +174,487 @@ paths:
               type: string
         required: true
       responses:
-        '200':
+        "200":
           description: Image imported
-        '404':
+        "404":
           description: Image not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /cargoes/images/{IdOrName}:
     get:
       tags:
-      - CargoImages
+        - CargoImages
       summary: Get detailed information about a container image
       description: Get detailed information about a container image
       operationId: inspect_cargo_image
       parameters:
-      - name: IdOrName
-        in: path
-        description: Image ID or name
-        required: true
-        schema:
-          type: string
+        - name: IdOrName
+          in: path
+          description: Image ID or name
+          required: true
+          schema:
+            type: string
       responses:
-        '200':
+        "200":
           description: Detailed information about an image
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ImageInspect'
-        '404':
+                $ref: "#/components/schemas/ImageInspect"
+        "404":
           description: Image not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
     delete:
       tags:
-      - CargoImages
+        - CargoImages
       summary: Delete a container image
       description: Delete a container image
       operationId: delete_cargo_image
       parameters:
-      - name: IdOrName
-        in: path
-        description: Image ID or name
-        required: true
-        schema:
-          type: string
+        - name: IdOrName
+          in: path
+          description: Image ID or name
+          required: true
+          schema:
+            type: string
       responses:
-        '200':
+        "200":
           description: Delete response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GenericDelete'
-        '404':
+                $ref: "#/components/schemas/GenericDelete"
+        "404":
           description: Image not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /cargoes/{Name}:
     put:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Create a new cargo config from scratch and add history entry
       description: Create a new cargo config from scratch and add history entry
       operationId: put_cargo
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoConfigUpdate'
+              $ref: "#/components/schemas/CargoConfigUpdate"
         required: true
       responses:
-        '200':
+        "200":
           description: Cargo updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Cargo'
-        '404':
+                $ref: "#/components/schemas/Cargo"
+        "404":
           description: Cargo does not exist
     delete:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Delete a cargo
       description: Delete a cargo
       operationId: delete_cargo
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: Force
-        in: query
-        description: If true forces the delete operation
-        required: true
-        schema:
-          type: boolean
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
+        - name: Force
+          in: query
+          description: If true forces the delete operation
+          required: true
+          schema:
+            type: boolean
       responses:
-        '202':
+        "202":
           description: Cargo deleted
-        '404':
+        "404":
           description: Cargo does not exist
     patch:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Patch a cargo config meaning merging current config with the new one and add history entry
       description: Patch a cargo config meaning merging current config with the new one and add history entry
       operationId: patch_cargo
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoConfigUpdate'
+              $ref: "#/components/schemas/CargoConfigUpdate"
         required: true
       responses:
-        '200':
+        "200":
           description: Cargo updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Cargo'
-        '404':
+                $ref: "#/components/schemas/Cargo"
+        "404":
           description: Cargo does not exist
   /cargoes/{Name}/exec:
     post:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Execute a command in a cargo
       description: Execute a command in a cargo
       operationId: exec_command
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateExecOptions'
+              $ref: "#/components/schemas/CreateExecOptions"
         required: true
       responses:
-        '200':
+        "200":
           description: Event Stream of the command output
-        '404':
+        "404":
           description: Cargo does not exist
   /cargoes/{Name}/histories:
     get:
       tags:
-      - Cargoes
+        - Cargoes
       summary: List cargo histories
       description: List cargo histories
       operationId: list_cargo_history
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: List of cargo histories
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/CargoConfig'
-        '404':
+                  $ref: "#/components/schemas/CargoConfig"
+        "404":
           description: Cargo does not exist
   /cargoes/{Name}/histories/{Id}/reset:
     patch:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Reset a cargo to a specific history
       description: Reset a cargo to a specific history
       operationId: reset_cargo
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Id
-        in: path
-        description: Id of the cargo history
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Id
+          in: path
+          description: Id of the cargo history
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: Cargo reset
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Cargo'
-        '404':
+                $ref: "#/components/schemas/Cargo"
+        "404":
           description: Cargo does not exist
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /cargoes/{Name}/inspect:
     get:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Inspect a cargo
       description: Inspect a cargo
       operationId: inspect_cargo
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: Cargo details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CargoInspect'
+                $ref: "#/components/schemas/CargoInspect"
   /cargoes/{Name}/instances:
     get:
       tags:
-      - Cargoes
+        - Cargoes
       summary: List cargo instances
       description: List cargo instances
       operationId: list_cargo_instance
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: List of cargo instances
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ContainerSummary'
+                  $ref: "#/components/schemas/ContainerSummary"
   /cargoes/{Name}/kill:
     post:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
       description: Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
       operationId: kill_cargo
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoKillOptions'
+              $ref: "#/components/schemas/CargoKillOptions"
         required: true
       responses:
-        '200':
+        "200":
           description: Cargo killed
-        '404':
+        "404":
           description: Cargo does not exist
   /cargoes/{Name}/logs:
     get:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Get logs of a cargo instance
       description: Get logs of a cargo instance
       operationId: logs_cargo
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo instance usually `name` or `name-number`
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: Since
-        in: query
-        description: Only logs returned since timestamp
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: Until
-        in: query
-        description: Only logs returned until timestamp
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: Timestamps
-        in: query
-        description: Add timestamps to every log line
-        required: false
-        schema:
-          type: boolean
-          nullable: true
-      - name: Follow
-        in: query
-        description: Boolean to return a stream or not
-        required: false
-        schema:
-          type: boolean
-          nullable: true
-      - name: Tail
-        in: query
-        description: Only return the n last (integer) or all ("all") logs
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo instance usually `name` or `name-number`
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
+        - name: Since
+          in: query
+          description: Only logs returned since timestamp
+          required: false
+          schema:
+            type: integer
+            format: int64
+            nullable: true
+        - name: Until
+          in: query
+          description: Only logs returned until timestamp
+          required: false
+          schema:
+            type: integer
+            format: int64
+            nullable: true
+        - name: Timestamps
+          in: query
+          description: Add timestamps to every log line
+          required: false
+          schema:
+            type: boolean
+            nullable: true
+        - name: Follow
+          in: query
+          description: Boolean to return a stream or not
+          required: false
+          schema:
+            type: boolean
+            nullable: true
+        - name: Tail
+          in: query
+          description: Only return the n last (integer) or all ("all") logs
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: Cargo logs
-        '404':
+        "404":
           description: Cargo does not exist
   /cargoes/{Name}/start:
     post:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Start a cargo
       description: Start a cargo
       operationId: start_cargo
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '202':
+        "202":
           description: Cargo started
-        '404':
+        "404":
           description: Cargo does not exist
   /cargoes/{Name}/stop:
     post:
       tags:
-      - Cargoes
+        - Cargoes
       summary: Stop a cargo
       description: Stop a cargo
       operationId: stop_cargo
       parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the cargo
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the cargo
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '202':
+        "202":
           description: Cargo stopped
-        '404':
+        "404":
           description: Cargo does not exist
   /events:
     get:
       tags:
-      - System
+        - System
       summary: Listen on events using Server-Sent Events / EventSource
       description: Listen on events using Server-Sent Events / EventSource
       operationId: watch_event
       responses:
-        '200':
+        "200":
           description: Event stream
           content:
             text/plain:
@@ -663,140 +663,140 @@ paths:
   /http_metrics:
     get:
       tags:
-      - HttpMetrics
+        - HttpMetrics
       summary: Get http metrics of all peer nodes
       description: Get http metrics of all peer nodes
       operationId: list_http_metric
       parameters:
-      - name: Limit
-        in: query
-        description: Limit of the list
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: Offset
-        in: query
-        description: Offset of the list
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
+        - name: Limit
+          in: query
+          description: Limit of the list
+          required: false
+          schema:
+            type: integer
+            format: int64
+            nullable: true
+        - name: Offset
+          in: query
+          description: Offset of the list
+          required: false
+          schema:
+            type: integer
+            format: int64
+            nullable: true
       responses:
-        '200':
+        "200":
           description: Array of HTTP metrics founds
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/HttpMetric'
+                  $ref: "#/components/schemas/HttpMetric"
   /http_metrics/count:
     get:
       tags:
-      - HttpMetrics
+        - HttpMetrics
       summary: Count http metrics of all peer nodes
       description: Count http metrics of all peer nodes
       operationId: count_http_metric
       parameters:
-      - name: Status
-        in: query
-        description: Filter by status
-        required: false
-        schema:
-          type: string
-          nullable: true
-        example: 200,299
+        - name: Status
+          in: query
+          description: Filter by status
+          required: false
+          schema:
+            type: string
+            nullable: true
+          example: 200,299
       responses:
-        '200':
+        "200":
           description: Count of HTTP metrics founds
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GenericCount'
+                $ref: "#/components/schemas/GenericCount"
   /info:
     get:
       tags:
-      - System
+        - System
       summary: Get host/node system information
       description: Get host/node system information
       operationId: get_info
       responses:
-        '200':
+        "200":
           description: Host/Node information
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HostInfo'
+                $ref: "#/components/schemas/HostInfo"
   /metrics:
     get:
       tags:
-      - Metrics
+        - Metrics
       summary: Get specific metric of all peer nodes
       description: Get specific metric of all peer nodes
       operationId: list_metric
       parameters:
-      - name: Kind
-        in: query
-        description: Kind of the metrics CPU | MEMORY | NETWORK | DISK
-        required: true
-        schema:
-          $ref: '#/components/schemas/MetricKind'
-        example: CPU
+        - name: Kind
+          in: query
+          description: Kind of the metrics CPU | MEMORY | NETWORK | DISK
+          required: true
+          schema:
+            $ref: "#/components/schemas/MetricKind"
+          example: CPU
       responses:
-        '200':
+        "200":
           description: Kind of the metrics peer node
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Metric'
+                  $ref: "#/components/schemas/Metric"
   /namespaces:
     get:
       tags:
-      - Namespaces
+        - Namespaces
       summary: List namespaces
       description: List namespaces
       operationId: list_namespace
       parameters:
-      - name: Name
-        in: query
-        description: Filter by name
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: Limit
-        in: query
-        description: Limit the number of items returned
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: Offset
-        in: query
-        description: Offset the number of items returned
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
+        - name: Name
+          in: query
+          description: Filter by name
+          required: false
+          schema:
+            type: string
+            nullable: true
+        - name: Limit
+          in: query
+          description: Limit the number of items returned
+          required: false
+          schema:
+            type: integer
+            format: int64
+            nullable: true
+        - name: Offset
+          in: query
+          description: Offset the number of items returned
+          required: false
+          schema:
+            type: integer
+            format: int64
+            nullable: true
       responses:
-        '200':
+        "200":
           description: List of namespace
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/NamespaceSummary'
+                  $ref: "#/components/schemas/NamespaceSummary"
     post:
       tags:
-      - Namespaces
+        - Namespaces
       summary: Create a namespace
       description: Create a namespace
       operationId: create_namespace
@@ -804,174 +804,174 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NamespacePartial'
+              $ref: "#/components/schemas/NamespacePartial"
         required: true
       responses:
-        '200':
+        "200":
           description: List of namespace
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Namespace'
-        '409':
+                $ref: "#/components/schemas/Namespace"
+        "409":
           description: Namespace already exist
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /namespaces/{Name}:
     delete:
       tags:
-      - Namespaces
+        - Namespaces
       summary: Delete a namespace
       description: Delete a namespace
       operationId: delete_namespace
       parameters:
-      - name: Name
-        in: path
-        description: The namespace name to delete
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The namespace name to delete
+          required: true
+          schema:
+            type: string
       responses:
-        '200':
+        "200":
           description: Delete response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GenericDelete'
-        '404':
+                $ref: "#/components/schemas/GenericDelete"
+        "404":
           description: Namespace is not existing
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /namespaces/{Name}/inspect:
     get:
       tags:
-      - Namespaces
+        - Namespaces
       summary: Get detailed information about a namespace
       description: Get detailed information about a namespace
       operationId: inspect_namespace
       parameters:
-      - name: Name
-        in: path
-        description: The namespace name to inspect
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The namespace name to inspect
+          required: true
+          schema:
+            type: string
       responses:
-        '200':
+        "200":
           description: Detailed information about a namespace
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/NamespaceInspect'
-        '404':
+                  $ref: "#/components/schemas/NamespaceInspect"
+        "404":
           description: Namespace is not existing
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /nodes:
     get:
       tags:
-      - Nodes
+        - Nodes
       summary: List nodes
       description: List nodes
       operationId: list_node
       responses:
-        '200':
+        "200":
           description: List of nodes
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Node'
+                  $ref: "#/components/schemas/Node"
   /nodes/ws:
     get:
       tags:
-      - Nodes
+        - Nodes
       summary: Websocket endpoint for communication between nodes used internally
       description: Websocket endpoint for communication between nodes used internally
       operationId: node_ws
       responses:
-        '101':
+        "101":
           description: Websocket connection
   /processes:
     get:
       tags:
-      - System
+        - System
       summary: List instances (cargo/vm) including non running ones
       description: List instances (cargo/vm) including non running ones
       operationId: get_processes
       parameters:
-      - name: All
-        in: query
-        description: Return instances from all nodes
-        required: true
-        schema:
-          type: boolean
-      - name: Last
-        in: query
-        description: Return this number of most recently created containers
-        required: false
-        schema:
-          type: integer
-          nullable: true
-      - name: Namespace
-        in: query
-        description: Return instances from this namespace only
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: All
+          in: query
+          description: Return instances from all nodes
+          required: true
+          schema:
+            type: boolean
+        - name: Last
+          in: query
+          description: Return this number of most recently created containers
+          required: false
+          schema:
+            type: integer
+            nullable: true
+        - name: Namespace
+          in: query
+          description: Return instances from this namespace only
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: List of instances
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/NodeContainerSummary'
+                  $ref: "#/components/schemas/NodeContainerSummary"
   /resources:
     get:
       tags:
-      - Resources
+        - Resources
       summary: List resources
       description: List resources
       operationId: list_resource
       parameters:
-      - name: Kind
-        in: query
-        description: Filter by resource kind
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: Contains
-        in: query
-        description: Filter by resource content
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Kind
+          in: query
+          description: Filter by resource kind
+          required: false
+          schema:
+            type: string
+            nullable: true
+        - name: Contains
+          in: query
+          description: Filter by resource content
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: List of resources
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Resource'
+                  $ref: "#/components/schemas/Resource"
     post:
       tags:
-      - Resources
+        - Resources
       summary: Create a resource
       description: Create a resource
       operationId: create_resource
@@ -979,276 +979,276 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResourcePartial'
+              $ref: "#/components/schemas/ResourcePartial"
         required: true
       responses:
-        '200':
+        "200":
           description: The created resource
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Resource'
+                $ref: "#/components/schemas/Resource"
   /resources/{Name}:
     get:
       tags:
-      - Resources
+        - Resources
       summary: Get detailed information about a resource
       description: Get detailed information about a resource
       operationId: inspect_resource
       parameters:
-      - name: Name
-        in: path
-        description: The resource name to inspect
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The resource name to inspect
+          required: true
+          schema:
+            type: string
       responses:
-        '200':
+        "200":
           description: Detailed information about a resource
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Resource'
-        '404':
+                $ref: "#/components/schemas/Resource"
+        "404":
           description: Resource is not existing
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
     delete:
       tags:
-      - Resources
+        - Resources
       summary: Delete a resource
       description: Delete a resource
       operationId: delete_resource
       parameters:
-      - name: Name
-        in: path
-        description: The resource name to delete
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The resource name to delete
+          required: true
+          schema:
+            type: string
       responses:
-        '202':
+        "202":
           description: The resource and his history has been deleted
-        '404':
+        "404":
           description: Resource is not existing
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
     patch:
       tags:
-      - Resources
+        - Resources
       summary: Patch a resource (update its version and/or config) and create a new history
       description: Patch a resource (update its version and/or config) and create a new history
       operationId: patch_resource
       parameters:
-      - name: Name
-        in: path
-        description: The resource name to patch
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The resource name to patch
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResourcePatch'
+              $ref: "#/components/schemas/ResourcePatch"
         required: true
       responses:
-        '200':
+        "200":
           description: The patched resource
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Resource'
-        '404':
+                $ref: "#/components/schemas/Resource"
+        "404":
           description: Resource is not existing
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /resources/{Name}/histories:
     get:
       tags:
-      - Resources
+        - Resources
       summary: List resource history
       description: List resource history
       operationId: list_resource_history
       parameters:
-      - name: Name
-        in: path
-        description: The resource name to list history
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The resource name to list history
+          required: true
+          schema:
+            type: string
       responses:
-        '200':
+        "200":
           description: The resource history
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ResourceConfig'
-        '404':
+                  $ref: "#/components/schemas/ResourceConfig"
+        "404":
           description: Resource is not existing
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /resources/{Name}/histories/{Id}/reset:
     patch:
       tags:
-      - Resources
+        - Resources
       summary: Reset a resource to a specific history
       description: Reset a resource to a specific history
       operationId: reset_resource
       parameters:
-      - name: Name
-        in: path
-        description: The resource name to reset
-        required: true
-        schema:
-          type: string
-      - name: Id
-        in: path
-        description: The resource history id to reset to
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The resource name to reset
+          required: true
+          schema:
+            type: string
+        - name: Id
+          in: path
+          description: The resource history id to reset to
+          required: true
+          schema:
+            type: string
       responses:
-        '200':
+        "200":
           description: The resource has been reset
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Resource'
-        '404':
+                $ref: "#/components/schemas/Resource"
+        "404":
           description: Resource is not existing
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /version:
     get:
       tags:
-      - System
+        - System
       summary: Get version information
       description: Get version information
       operationId: get_version
       responses:
-        '200':
+        "200":
           description: Version information
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Version'
+                $ref: "#/components/schemas/Version"
   /vms:
     get:
       tags:
-      - Vms
+        - Vms
       summary: List virtual machines
       description: List virtual machines
       operationId: list_vm
       parameters:
-      - name: Namespace
-        in: query
-        description: The namespace of the virtual machine
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Namespace
+          in: query
+          description: The namespace of the virtual machine
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: List of virtual machine
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/VmSummary'
+                  $ref: "#/components/schemas/VmSummary"
     post:
       tags:
-      - Vms
+        - Vms
       summary: Create a virtual machine
       description: Create a virtual machine
       operationId: create_vm
       parameters:
-      - name: Namespace
-        in: query
-        description: The namespace of the virtual machine
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Namespace
+          in: query
+          description: The namespace of the virtual machine
+          required: false
+          schema:
+            type: string
+            nullable: true
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VmConfigPartial'
+              $ref: "#/components/schemas/VmConfigPartial"
         required: true
       responses:
-        '200':
+        "200":
           description: The virtual machine has been created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Vm'
+                $ref: "#/components/schemas/Vm"
   /vms/images:
     get:
       tags:
-      - VmImages
+        - VmImages
       summary: List virtual machine images
       description: List virtual machine images
       operationId: list_vm_images
       responses:
-        '200':
+        "200":
           description: List of vm images
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/VmImage'
+                  $ref: "#/components/schemas/VmImage"
   /vms/images/{Name}:
     delete:
       tags:
-      - VmImages
+        - VmImages
       summary: Delete a virtual machine image
       description: Delete a virtual machine image
       operationId: delete_vm_image
       parameters:
-      - name: Name
-        in: path
-        description: The name of the vm image
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The name of the vm image
+          required: true
+          schema:
+            type: string
       responses:
-        '200':
+        "200":
           description: Image have been deleted
   /vms/images/{Name}/clone/{CloneName}:
     post:
       tags:
-      - VmImages
+        - VmImages
       summary: Clone a virtual machine image
       description: Clone a virtual machine image
       operationId: clone_vm_image
       parameters:
-      - name: Name
-        in: path
-        description: The name of the vm image
-        required: true
-        schema:
-          type: string
-      - name: CloneName
-        in: path
-        description: The name of the clone
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The name of the vm image
+          required: true
+          schema:
+            type: string
+        - name: CloneName
+          in: path
+          description: The name of the clone
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           text/plain:
@@ -1256,26 +1256,26 @@ paths:
               type: string
         required: true
       responses:
-        '200':
+        "200":
           description: The snapshot have been created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VmImage'
+                $ref: "#/components/schemas/VmImage"
   /vms/images/{Name}/import:
     post:
       tags:
-      - VmImages
+        - VmImages
       summary: Import a virtual machine image from a file
       description: Import a virtual machine image from a file
       operationId: import_vm_image
       parameters:
-      - name: Name
-        in: path
-        description: The name of the vm image
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The name of the vm image
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           text/plain:
@@ -1283,61 +1283,61 @@ paths:
               type: string
         required: true
       responses:
-        '200':
+        "200":
           description: Image have been imported
   /vms/images/{Name}/resize:
     post:
       tags:
-      - VmImages
+        - VmImages
       summary: Resize a virtual machine image
       description: Resize a virtual machine image
       operationId: resize_vm_image
       parameters:
-      - name: Name
-        in: path
-        description: The name of the vm image
-        required: true
-        schema:
-          type: string
-      - name: CloneName
-        in: path
-        description: The name of the clone
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The name of the vm image
+          required: true
+          schema:
+            type: string
+        - name: CloneName
+          in: path
+          description: The name of the clone
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VmImageResizePayload'
+              $ref: "#/components/schemas/VmImageResizePayload"
         required: true
       responses:
-        '200':
+        "200":
           description: The snapshot have been created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VmImage'
+                $ref: "#/components/schemas/VmImage"
   /vms/images/{Name}/snapshot/{SnapshotName}:
     post:
       tags:
-      - VmImages
+        - VmImages
       summary: Create a snapshot of a virtual machine image
       description: Create a snapshot of a virtual machine image
       operationId: snapshot_vm_image
       parameters:
-      - name: Name
-        in: path
-        description: The name of the vm image
-        required: true
-        schema:
-          type: string
-      - name: SnapshotName
-        in: path
-        description: The name of the snapshot
-        required: true
-        schema:
-          type: string
+        - name: Name
+          in: path
+          description: The name of the vm image
+          required: true
+          schema:
+            type: string
+        - name: SnapshotName
+          in: path
+          description: The name of the snapshot
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           text/plain:
@@ -1345,225 +1345,225 @@ paths:
               type: string
         required: true
       responses:
-        '200':
+        "200":
           description: The snapshot have been created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VmImage'
+                $ref: "#/components/schemas/VmImage"
   /vms/{Name}:
     delete:
       tags:
-      - Vms
+        - Vms
       summary: Delete a virtual machine
       description: Delete a virtual machine
       operationId: delete_vm
       parameters:
-      - name: Name
-        in: path
-        description: The name of the virtual machine
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: The namespace of the virtual machine
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: The name of the virtual machine
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: The namespace of the virtual machine
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: The virtual machine has been deleted
     patch:
       tags:
-      - Vms
+        - Vms
       summary: Patch a virtual machine config meaning merging current config with the new one and add history entry
       description: Patch a virtual machine config meaning merging current config with the new one and add history entry
       operationId: patch_vm
       parameters:
-      - name: Name
-        in: path
-        description: Name of the virtual machine
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the virtual machine
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the virtual machine
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the virtual machine
+          required: false
+          schema:
+            type: string
+            nullable: true
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VmConfigUpdate'
+              $ref: "#/components/schemas/VmConfigUpdate"
         required: true
       responses:
-        '200':
+        "200":
           description: Updated virtual machine
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Vm'
-        '404':
+                $ref: "#/components/schemas/Vm"
+        "404":
           description: Virtual machine not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiError'
+                $ref: "#/components/schemas/ApiError"
   /vms/{Name}/attach:
     get:
       tags:
-      - Vms
+        - Vms
       summary: Attach to a virtual machine via websocket
       description: Attach to a virtual machine via websocket
       operationId: vm_attach
       parameters:
-      - name: Name
-        in: path
-        description: Name of the virtual machine
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the virtual machine
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: Name of the virtual machine
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: Namespace of the virtual machine
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '101':
+        "101":
           description: Websocket connection
   /vms/{Name}/histories:
     get:
       tags:
-      - Vms
+        - Vms
       summary: List virtual machine histories
       description: List virtual machine histories
       operationId: list_vm_history
       parameters:
-      - name: Name
-        in: path
-        description: The name of the virtual machine
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: The namespace of the virtual machine
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: The name of the virtual machine
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: The namespace of the virtual machine
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: The virtual machine histories have been listed
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/VmConfig'
+                  $ref: "#/components/schemas/VmConfig"
   /vms/{Name}/inspect:
     get:
       tags:
-      - Vms
+        - Vms
       summary: Inspect a virtual machine
       description: Inspect a virtual machine
       operationId: inspect_vm
       parameters:
-      - name: Name
-        in: path
-        description: The name of the virtual machine
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: The namespace of the virtual machine
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: The name of the virtual machine
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: The namespace of the virtual machine
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: Detailed information about a virtual machine
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VmInspect'
+                $ref: "#/components/schemas/VmInspect"
   /vms/{Name}/start:
     post:
       tags:
-      - Vms
+        - Vms
       summary: Start a virtual machine
       description: Start a virtual machine
       operationId: start_vm
       parameters:
-      - name: Name
-        in: path
-        description: The name of the virtual machine
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: The namespace of the virtual machine
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: The name of the virtual machine
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: The namespace of the virtual machine
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: The virtual machine has been started
   /vms/{Name}/stop:
     post:
       tags:
-      - Vms
+        - Vms
       summary: Stop a virtual machine
       description: Stop a virtual machine
       operationId: stop_vm
       parameters:
-      - name: Name
-        in: path
-        description: The name of the virtual machine
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: The namespace of the virtual machine
-        required: false
-        schema:
-          type: string
-          nullable: true
+        - name: Name
+          in: path
+          description: The name of the virtual machine
+          required: true
+          schema:
+            type: string
+        - name: Namespace
+          in: query
+          description: The namespace of the virtual machine
+          required: false
+          schema:
+            type: string
+            nullable: true
       responses:
-        '200':
+        "200":
           description: The virtual machine has been stopped
 components:
   schemas:
     Any:
       oneOf:
-      - type: string
-      - type: number
-        format: double
-      - type: boolean
-      - type: array
-        items:
-          $ref: '#/components/schemas/Any'
-      - type: object
-        additionalProperties:
-          $ref: '#/components/schemas/Any'
+        - type: string
+        - type: number
+          format: double
+        - type: boolean
+        - type: array
+          items:
+            $ref: "#/components/schemas/Any"
+        - type: object
+          additionalProperties:
+            $ref: "#/components/schemas/Any"
       description: Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceConfig](ResourceConfig)
     ApiError:
       type: object
       description: When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
       required:
-      - msg
+        - msg
       properties:
         msg:
           type: string
@@ -1585,11 +1585,11 @@ components:
         The configuration can be updated and the old configuration will be kept in the history
         That way you can rollback to a previous configuration quickly
       required:
-      - Key
-      - NamespaceName
-      - Name
-      - ConfigKey
-      - Config
+        - Key
+        - NamespaceName
+        - Name
+        - ConfigKey
+        - Config
       properties:
         Key:
           type: string
@@ -1605,7 +1605,7 @@ components:
           format: uuid
           description: Unique identifier of the cargo config
         Config:
-          $ref: '#/components/schemas/CargoConfig'
+          $ref: "#/components/schemas/CargoConfig"
     CargoConfig:
       type: object
       description: |-
@@ -1613,12 +1613,12 @@ components:
         It used to know the state of the cargo
         It keep tracking of an history when you patch an existing cargo
       required:
-      - Key
-      - CreatedAt
-      - Name
-      - Version
-      - CargoKey
-      - Container
+        - Key
+        - CreatedAt
+        - Name
+        - Version
+        - CargoKey
+        - Container
       properties:
         Key:
           type: string
@@ -1639,26 +1639,26 @@ components:
           description: The key of the cargo
         Replication:
           allOf:
-          - $ref: '#/components/schemas/ReplicationMode'
+            - $ref: "#/components/schemas/ReplicationMode"
           nullable: true
         Container:
-          $ref: '#/components/schemas/Config'
+          $ref: "#/components/schemas/Config"
     CargoConfigPartial:
       type: object
       description: A cargo config partial is used to create a Cargo
       required:
-      - Name
-      - Container
+        - Name
+        - Container
       properties:
         Name:
           type: string
           description: Name of the cargo
         Replication:
           allOf:
-          - $ref: '#/components/schemas/ReplicationMode'
+            - $ref: "#/components/schemas/ReplicationMode"
           nullable: true
         Container:
-          $ref: '#/components/schemas/Config'
+          $ref: "#/components/schemas/Config"
     CargoConfigUpdate:
       type: object
       description: |-
@@ -1672,17 +1672,17 @@ components:
           nullable: true
         Container:
           allOf:
-          - $ref: '#/components/schemas/Config'
+            - $ref: "#/components/schemas/Config"
           nullable: true
         Replication:
           allOf:
-          - $ref: '#/components/schemas/ReplicationMode'
+            - $ref: "#/components/schemas/ReplicationMode"
           nullable: true
     CargoImagePartial:
       type: object
       description: Cargo Image Partial is used to pull a new container image
       required:
-      - Name
+        - Name
       properties:
         Name:
           type: string
@@ -1696,14 +1696,14 @@ components:
         It contains all the information about the cargo
         It also contains the list of containers
       required:
-      - Key
-      - Name
-      - ConfigKey
-      - NamespaceName
-      - Config
-      - InstanceTotal
-      - InstanceRunning
-      - Instances
+        - Key
+        - Name
+        - ConfigKey
+        - NamespaceName
+        - Config
+        - InstanceTotal
+        - InstanceRunning
+        - Instances
       properties:
         Key:
           type: string
@@ -1719,7 +1719,7 @@ components:
           type: string
           description: Name of the namespace
         Config:
-          $ref: '#/components/schemas/CargoConfig'
+          $ref: "#/components/schemas/CargoConfig"
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -1731,32 +1731,32 @@ components:
         Instances:
           type: array
           items:
-            $ref: '#/components/schemas/NodeContainerSummary'
+            $ref: "#/components/schemas/NodeContainerSummary"
           description: List of containers
     CargoKillOptions:
       type: object
       description: Options for the kill command
       required:
-      - Signal
+        - Signal
       properties:
         Signal:
           type: string
-          description: 'Signal to send to the container default: SIGKILL'
+          description: "Signal to send to the container default: SIGKILL"
     CargoSummary:
       type: object
       description: |-
         A Cargo Summary is a summary of a cargo
         It is used to list all the cargos
       required:
-      - Key
-      - CreatedAt
-      - UpdatedAt
-      - Name
-      - ConfigKey
-      - NamespaceName
-      - Config
-      - InstanceTotal
-      - InstanceRunning
+        - Key
+        - CreatedAt
+        - UpdatedAt
+        - Name
+        - ConfigKey
+        - NamespaceName
+        - Config
+        - InstanceTotal
+        - InstanceRunning
       properties:
         Key:
           type: string
@@ -1780,7 +1780,7 @@ components:
           type: string
           description: Name of the namespace
         Config:
-          $ref: '#/components/schemas/CargoConfig'
+          $ref: "#/components/schemas/CargoConfig"
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -1793,8 +1793,8 @@ components:
       type: object
       description: Defines a proxy rule target
       required:
-      - CargoKey
-      - CargoPort
+        - CargoKey
+        - CargoPort
       properties:
         CargoKey:
           type: string
@@ -1814,23 +1814,23 @@ components:
           nullable: true
         Version:
           allOf:
-          - $ref: '#/components/schemas/ObjectVersion'
+            - $ref: "#/components/schemas/ObjectVersion"
           nullable: true
         CreatedAt:
           allOf:
-          - $ref: '#/components/schemas/BollardDate'
+            - $ref: "#/components/schemas/BollardDate"
           nullable: true
         UpdatedAt:
           allOf:
-          - $ref: '#/components/schemas/BollardDate'
+            - $ref: "#/components/schemas/BollardDate"
           nullable: true
         Spec:
           allOf:
-          - $ref: '#/components/schemas/SwarmSpec'
+            - $ref: "#/components/schemas/SwarmSpec"
           nullable: true
         TLSInfo:
           allOf:
-          - $ref: '#/components/schemas/TlsInfo'
+            - $ref: "#/components/schemas/TlsInfo"
           nullable: true
         RootRotationInProgress:
           type: boolean
@@ -1898,7 +1898,7 @@ components:
           type: object
           description: 'An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`'
           additionalProperties:
-            $ref: '#/components/schemas/EmptyObject'
+            $ref: "#/components/schemas/EmptyObject"
           nullable: true
         Tty:
           type: boolean
@@ -1926,7 +1926,7 @@ components:
           nullable: true
         Healthcheck:
           allOf:
-          - $ref: '#/components/schemas/HealthConfig'
+            - $ref: "#/components/schemas/HealthConfig"
           nullable: true
         ArgsEscaped:
           type: boolean
@@ -1940,7 +1940,7 @@ components:
           type: object
           description: An object mapping mount point paths inside the container to empty objects.
           additionalProperties:
-            $ref: '#/components/schemas/EmptyObject'
+            $ref: "#/components/schemas/EmptyObject"
           nullable: true
         WorkingDir:
           type: string
@@ -1964,7 +1964,7 @@ components:
           type: array
           items:
             type: string
-          description: '`ONBUILD` metadata that were defined in the image''s `Dockerfile`.'
+          description: "`ONBUILD` metadata that were defined in the image's `Dockerfile`."
           nullable: true
         Labels:
           type: object
@@ -1989,11 +1989,11 @@ components:
           nullable: true
         HostConfig:
           allOf:
-          - $ref: '#/components/schemas/HostConfig'
+            - $ref: "#/components/schemas/HostConfig"
           nullable: true
         NetworkingConfig:
           allOf:
-          - $ref: '#/components/schemas/NetworkingConfig'
+            - $ref: "#/components/schemas/NetworkingConfig"
           nullable: true
     ConfigSpec:
       type: object
@@ -2014,7 +2014,7 @@ components:
           nullable: true
         Templating:
           allOf:
-          - $ref: '#/components/schemas/Driver'
+            - $ref: "#/components/schemas/Driver"
           nullable: true
     ContainerConfig:
       type: object
@@ -2048,7 +2048,7 @@ components:
           type: object
           description: 'An object mapping ports to an empty object in the form:  `{\"<port>/<tcp|udp|sctp>\": {}}`'
           additionalProperties:
-            $ref: '#/components/schemas/EmptyObject'
+            $ref: "#/components/schemas/EmptyObject"
           nullable: true
         Tty:
           type: boolean
@@ -2076,7 +2076,7 @@ components:
           nullable: true
         Healthcheck:
           allOf:
-          - $ref: '#/components/schemas/HealthConfig'
+            - $ref: "#/components/schemas/HealthConfig"
           nullable: true
         ArgsEscaped:
           type: boolean
@@ -2090,7 +2090,7 @@ components:
           type: object
           description: An object mapping mount point paths inside the container to empty objects.
           additionalProperties:
-            $ref: '#/components/schemas/EmptyObject'
+            $ref: "#/components/schemas/EmptyObject"
           nullable: true
         WorkingDir:
           type: string
@@ -2114,7 +2114,7 @@ components:
           type: array
           items:
             type: string
-          description: '`ONBUILD` metadata that were defined in the image''s `Dockerfile`.'
+          description: "`ONBUILD` metadata that were defined in the image's `Dockerfile`."
           nullable: true
         Labels:
           type: object
@@ -2170,7 +2170,7 @@ components:
         Ports:
           type: array
           items:
-            $ref: '#/components/schemas/Port'
+            $ref: "#/components/schemas/Port"
           description: The ports exposed by this container
           nullable: true
         SizeRw:
@@ -2199,16 +2199,16 @@ components:
           nullable: true
         HostConfig:
           allOf:
-          - $ref: '#/components/schemas/ContainerSummaryHostConfig'
+            - $ref: "#/components/schemas/ContainerSummaryHostConfig"
           nullable: true
         NetworkSettings:
           allOf:
-          - $ref: '#/components/schemas/ContainerSummaryNetworkSettings'
+            - $ref: "#/components/schemas/ContainerSummaryNetworkSettings"
           nullable: true
         Mounts:
           type: array
           items:
-            $ref: '#/components/schemas/MountPoint'
+            $ref: "#/components/schemas/MountPoint"
           nullable: true
     ContainerSummaryHostConfig:
       type: object
@@ -2223,7 +2223,7 @@ components:
         Networks:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/EndpointSettings'
+            $ref: "#/components/schemas/EndpointSettings"
           nullable: true
     CreateExecOptions:
       type: object
@@ -2283,14 +2283,14 @@ components:
         Configuration of the daemon
         It is used to configure the daemon
       required:
-      - hosts
-      - state_dir
-      - gateway
-      - hostname
-      - nodes
-      - advertise_addr
-      - conf_dir
-      - gid
+        - hosts
+        - state_dir
+        - gateway
+        - hostname
+        - nodes
+        - advertise_addr
+        - conf_dir
+        - gid
       properties:
         hosts:
           type: array
@@ -2371,8 +2371,8 @@ components:
     DnsEntry:
       type: object
       required:
-      - Name
-      - IpAddress
+        - Name
+        - IpAddress
       properties:
         Name:
           type: string
@@ -2382,7 +2382,7 @@ components:
       type: object
       description: Driver represents a driver (network, logging, secrets).
       required:
-      - Name
+        - Name
       properties:
         Name:
           type: string
@@ -2419,7 +2419,7 @@ components:
       properties:
         IPAMConfig:
           allOf:
-          - $ref: '#/components/schemas/EndpointIpamConfig'
+            - $ref: "#/components/schemas/EndpointIpamConfig"
           nullable: true
         Links:
           type: array
@@ -2478,7 +2478,7 @@ components:
     GenericCount:
       type: object
       required:
-      - Count
+        - Count
       properties:
         Count:
           type: integer
@@ -2488,7 +2488,7 @@ components:
       type: object
       description: Generic delete response
       required:
-      - Count
+        - Count
       properties:
         Count:
           type: integer
@@ -2499,11 +2499,11 @@ components:
       properties:
         NamedResourceSpec:
           allOf:
-          - $ref: '#/components/schemas/GenericResourcesInnerNamedResourceSpec'
+            - $ref: "#/components/schemas/GenericResourcesInnerNamedResourceSpec"
           nullable: true
         DiscreteResourceSpec:
           allOf:
-          - $ref: '#/components/schemas/GenericResourcesInnerDiscreteResourceSpec'
+            - $ref: "#/components/schemas/GenericResourcesInnerDiscreteResourceSpec"
           nullable: true
     GenericResourcesInnerDiscreteResourceSpec:
       type: object
@@ -2528,8 +2528,8 @@ components:
       type: object
       description: Information about the storage driver used to store the container's and image's filesystem.
       required:
-      - Name
-      - Data
+        - Name
+        - Data
       properties:
         Name:
           type: string
@@ -2596,31 +2596,31 @@ components:
         BlkioWeightDevice:
           type: array
           items:
-            $ref: '#/components/schemas/ResourcesBlkioWeightDevice'
+            $ref: "#/components/schemas/ResourcesBlkioWeightDevice"
           description: 'Block IO weight (relative device weight) in the form:  ``` [{\"Path\": \"device_path\", \"Weight\": weight}] ```'
           nullable: true
         BlkioDeviceReadBps:
           type: array
           items:
-            $ref: '#/components/schemas/ThrottleDevice'
+            $ref: "#/components/schemas/ThrottleDevice"
           description: 'Limit read rate (bytes per second) from a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
           nullable: true
         BlkioDeviceWriteBps:
           type: array
           items:
-            $ref: '#/components/schemas/ThrottleDevice'
+            $ref: "#/components/schemas/ThrottleDevice"
           description: 'Limit write rate (bytes per second) to a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
           nullable: true
         BlkioDeviceReadIOps:
           type: array
           items:
-            $ref: '#/components/schemas/ThrottleDevice'
+            $ref: "#/components/schemas/ThrottleDevice"
           description: 'Limit read rate (IO per second) from a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
           nullable: true
         BlkioDeviceWriteIOps:
           type: array
           items:
-            $ref: '#/components/schemas/ThrottleDevice'
+            $ref: "#/components/schemas/ThrottleDevice"
           description: 'Limit write rate (IO per second) to a device, in the form:  ``` [{\"Path\": \"device_path\", \"Rate\": rate}] ```'
           nullable: true
         CpuPeriod:
@@ -2654,7 +2654,7 @@ components:
         Devices:
           type: array
           items:
-            $ref: '#/components/schemas/DeviceMapping'
+            $ref: "#/components/schemas/DeviceMapping"
           description: A list of devices to add to the container.
           nullable: true
         DeviceCgroupRules:
@@ -2666,7 +2666,7 @@ components:
         DeviceRequests:
           type: array
           items:
-            $ref: '#/components/schemas/DeviceRequest'
+            $ref: "#/components/schemas/DeviceRequest"
           description: A list of requests for devices to be sent to device drivers.
           nullable: true
         KernelMemoryTCP:
@@ -2710,7 +2710,7 @@ components:
         Ulimits:
           type: array
           items:
-            $ref: '#/components/schemas/ResourcesUlimits'
+            $ref: "#/components/schemas/ResourcesUlimits"
           description: 'A list of resource limits to set in the container. For example:  ``` {\"Name\": \"nofile\", \"Soft\": 1024, \"Hard\": 2048} ```'
           nullable: true
         CpuCount:
@@ -2737,7 +2737,7 @@ components:
           type: array
           items:
             type: string
-          description: 'A list of volume bindings for this container. Each volume binding is a string in one of these forms:  - `host-src:container-dest[:options]` to bind-mount a host path   into the container. Both `host-src`, and `container-dest` must   be an _absolute_ path. - `volume-name:container-dest[:options]` to bind-mount a volume   managed by a volume driver into the container. `container-dest`   must be an _absolute_ path.  `options` is an optional, comma-delimited list of:  - `nocopy` disables automatic copying of data from the container   path to the volume. The `nocopy` flag only applies to named volumes. - `[ro|rw]` mounts a volume read-only or read-write, respectively.   If omitted or set to `rw`, volumes are mounted read-write. - `[z|Z]` applies SELinux labels to allow or deny multiple containers   to read and write to the same volume.     - `z`: a _shared_ content label is applied to the content. This       label indicates that multiple containers can share the volume       content, for both reading and writing.     - `Z`: a _private unshared_ label is applied to the content.       This label indicates that only the current container can use       a private volume. Labeling systems such as SELinux require       proper labels to be placed on volume content that is mounted       into a container. Without a label, the security system can       prevent a container''s processes from using the content. By       default, the labels set by the host operating system are not       modified. - `[[r]shared|[r]slave|[r]private]` specifies mount   [propagation behavior](https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt).   This only applies to bind-mounted volumes, not internal volumes   or named volumes. Mount propagation requires the source mount   point (the location where the source directory is mounted in the   host operating system) to have the correct propagation properties.   For shared volumes, the source mount point must be set to `shared`.   For slave volumes, the mount must be set to either `shared` or   `slave`.'
+          description: "A list of volume bindings for this container. Each volume binding is a string in one of these forms:  - `host-src:container-dest[:options]` to bind-mount a host path   into the container. Both `host-src`, and `container-dest` must   be an _absolute_ path. - `volume-name:container-dest[:options]` to bind-mount a volume   managed by a volume driver into the container. `container-dest`   must be an _absolute_ path.  `options` is an optional, comma-delimited list of:  - `nocopy` disables automatic copying of data from the container   path to the volume. The `nocopy` flag only applies to named volumes. - `[ro|rw]` mounts a volume read-only or read-write, respectively.   If omitted or set to `rw`, volumes are mounted read-write. - `[z|Z]` applies SELinux labels to allow or deny multiple containers   to read and write to the same volume.     - `z`: a _shared_ content label is applied to the content. This       label indicates that multiple containers can share the volume       content, for both reading and writing.     - `Z`: a _private unshared_ label is applied to the content.       This label indicates that only the current container can use       a private volume. Labeling systems such as SELinux require       proper labels to be placed on volume content that is mounted       into a container. Without a label, the security system can       prevent a container's processes from using the content. By       default, the labels set by the host operating system are not       modified. - `[[r]shared|[r]slave|[r]private]` specifies mount   [propagation behavior](https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt).   This only applies to bind-mounted volumes, not internal volumes   or named volumes. Mount propagation requires the source mount   point (the location where the source directory is mounted in the   host operating system) to have the correct propagation properties.   For shared volumes, the source mount point must be set to `shared`.   For slave volumes, the mount must be set to either `shared` or   `slave`."
           nullable: true
         ContainerIDFile:
           type: string
@@ -2745,19 +2745,19 @@ components:
           nullable: true
         LogConfig:
           allOf:
-          - $ref: '#/components/schemas/HostConfigLogConfig'
+            - $ref: "#/components/schemas/HostConfigLogConfig"
           nullable: true
         NetworkMode:
           type: string
-          description: 'Network mode to use for this container. Supported standard values are: `bridge`, `host`, `none`, and `container:<name|id>`. Any other value is taken as a custom network''s name to which this container should connect to.'
+          description: "Network mode to use for this container. Supported standard values are: `bridge`, `host`, `none`, and `container:<name|id>`. Any other value is taken as a custom network's name to which this container should connect to."
           nullable: true
         PortBindings:
           allOf:
-          - $ref: '#/components/schemas/PortMap'
+            - $ref: "#/components/schemas/PortMap"
           nullable: true
         RestartPolicy:
           allOf:
-          - $ref: '#/components/schemas/RestartPolicy'
+            - $ref: "#/components/schemas/RestartPolicy"
           nullable: true
         AutoRemove:
           type: boolean
@@ -2776,7 +2776,7 @@ components:
         Mounts:
           type: array
           items:
-            $ref: '#/components/schemas/Mount'
+            $ref: "#/components/schemas/Mount"
           description: Specification for mounts to be added to the container.
           nullable: true
         ConsoleSize:
@@ -2800,7 +2800,7 @@ components:
           nullable: true
         CgroupnsMode:
           allOf:
-          - $ref: '#/components/schemas/HostConfigCgroupnsModeEnum'
+            - $ref: "#/components/schemas/HostConfigCgroupnsModeEnum"
           nullable: true
         Dns:
           type: array
@@ -2910,7 +2910,7 @@ components:
           nullable: true
         Isolation:
           allOf:
-          - $ref: '#/components/schemas/HostConfigIsolationEnum'
+            - $ref: "#/components/schemas/HostConfigIsolationEnum"
           nullable: true
         MaskedPaths:
           type: array
@@ -2927,16 +2927,16 @@ components:
     HostConfigCgroupnsModeEnum:
       type: string
       enum:
-      - EMPTY
-      - private
-      - host
+        - EMPTY
+        - private
+        - host
     HostConfigIsolationEnum:
       type: string
       enum:
-      - EMPTY
-      - default
-      - process
-      - hyperv
+        - EMPTY
+        - default
+        - process
+        - hyperv
     HostConfigLogConfig:
       type: object
       description: The logging configuration for this container
@@ -2951,37 +2951,37 @@ components:
           nullable: true
     HostInfo:
       allOf:
-      - $ref: '#/components/schemas/SystemInfo'
-      - type: object
-        required:
-        - HostGateway
-        - Config
-        properties:
-          HostGateway:
-            type: string
-            description: HostGateway is the gateway address of the host
-          Config:
-            $ref: '#/components/schemas/DaemonConfig'
+        - $ref: "#/components/schemas/SystemInfo"
+        - type: object
+          required:
+            - HostGateway
+            - Config
+          properties:
+            HostGateway:
+              type: string
+              description: HostGateway is the gateway address of the host
+            Config:
+              $ref: "#/components/schemas/DaemonConfig"
       description: HostInfo contains information about the host and the docker daemon
     HttpMetric:
       type: object
       required:
-      - Key
-      - CreatedAt
-      - ExpireAt
-      - DateGmt
-      - Status
-      - BytesSent
-      - ContentLength
-      - BodyBytesSent
-      - RequestTime
-      - NodeName
-      - Uri
-      - Host
-      - RemoteAddr
-      - RealipRemoteAddr
-      - ServerProtocol
-      - RequestMethod
+        - Key
+        - CreatedAt
+        - ExpireAt
+        - DateGmt
+        - Status
+        - BytesSent
+        - ContentLength
+        - BodyBytesSent
+        - RequestTime
+        - NodeName
+        - Uri
+        - Host
+        - RemoteAddr
+        - RealipRemoteAddr
+        - ServerProtocol
+        - RequestMethod
       properties:
         Key:
           type: string
@@ -3051,14 +3051,14 @@ components:
     HttpTarget:
       type: object
       required:
-      - Url
+        - Url
       properties:
         Url:
           type: string
           description: Url to target
         Redirect:
           allOf:
-          - $ref: '#/components/schemas/UrlRedirect'
+            - $ref: "#/components/schemas/UrlRedirect"
           nullable: true
     ImageInspect:
       type: object
@@ -3098,7 +3098,7 @@ components:
           nullable: true
         ContainerConfig:
           allOf:
-          - $ref: '#/components/schemas/ContainerConfig'
+            - $ref: "#/components/schemas/ContainerConfig"
           nullable: true
         DockerVersion:
           type: string
@@ -3110,7 +3110,7 @@ components:
           nullable: true
         Config:
           allOf:
-          - $ref: '#/components/schemas/ContainerConfig'
+            - $ref: "#/components/schemas/ContainerConfig"
           nullable: true
         Architecture:
           type: string
@@ -3140,15 +3140,15 @@ components:
           nullable: true
         GraphDriver:
           allOf:
-          - $ref: '#/components/schemas/GraphDriverData'
+            - $ref: "#/components/schemas/GraphDriverData"
           nullable: true
         RootFS:
           allOf:
-          - $ref: '#/components/schemas/ImageInspectRootFs'
+            - $ref: "#/components/schemas/ImageInspectRootFs"
           nullable: true
         Metadata:
           allOf:
-          - $ref: '#/components/schemas/ImageInspectMetadata'
+            - $ref: "#/components/schemas/ImageInspectMetadata"
           nullable: true
     ImageInspectMetadata:
       type: object
@@ -3156,13 +3156,13 @@ components:
       properties:
         LastTagTime:
           allOf:
-          - $ref: '#/components/schemas/BollardDate'
+            - $ref: "#/components/schemas/BollardDate"
           nullable: true
     ImageInspectRootFs:
       type: object
       description: Information about the image's RootFS, including the layer IDs.
       required:
-      - Type
+        - Type
       properties:
         Type:
           type: string
@@ -3174,16 +3174,16 @@ components:
     ImageSummary:
       type: object
       required:
-      - Id
-      - ParentId
-      - RepoTags
-      - RepoDigests
-      - Created
-      - Size
-      - SharedSize
-      - VirtualSize
-      - Labels
-      - Containers
+        - Id
+        - ParentId
+        - RepoTags
+        - RepoDigests
+        - Created
+        - Size
+        - SharedSize
+        - VirtualSize
+        - Labels
+        - Containers
       properties:
         Id:
           type: string
@@ -3242,7 +3242,7 @@ components:
           nullable: true
         Secure:
           type: boolean
-          description: 'Indicates if the registry is part of the list of insecure registries.  If `false`, the registry is insecure. Insecure registries accept un-encrypted (HTTP) and/or untrusted (HTTPS with certificates from unknown CAs) communication.  > **Warning**: Insecure registries can be useful when running a local > registry. However, because its use creates security vulnerabilities > it should ONLY be enabled for testing purposes. For increased > security, users should add their CA to their system''s list of > trusted CAs instead of enabling this option.'
+          description: "Indicates if the registry is part of the list of insecure registries.  If `false`, the registry is insecure. Insecure registries accept un-encrypted (HTTP) and/or untrusted (HTTPS with certificates from unknown CAs) communication.  > **Warning**: Insecure registries can be useful when running a local > registry. However, because its use creates security vulnerabilities > it should ONLY be enabled for testing purposes. For increased > security, users should add their CA to their system's list of > trusted CAs instead of enabling this option."
           nullable: true
         Official:
           type: boolean
@@ -3258,7 +3258,7 @@ components:
         Config:
           type: array
           items:
-            $ref: '#/components/schemas/IpamConfig'
+            $ref: "#/components/schemas/IpamConfig"
           description: 'List of IPAM configuration options, specified as a map:  ``` {\"Subnet\": <CIDR>, \"IPRange\": <CIDR>, \"Gateway\": <IP address>, \"AuxAddress\": <device_name:IP address>} ```'
           nullable: true
         Options:
@@ -3292,27 +3292,27 @@ components:
         Since this enum's variants do not hold data, we can easily define them them as `#[repr(C)]`
         which helps with FFI.
       enum:
-      - EMPTY
-      - inactive
-      - pending
-      - active
-      - error
-      - locked
+        - EMPTY
+        - inactive
+        - pending
+        - active
+        - error
+        - locked
     LocationTarget:
       oneOf:
-      - $ref: '#/components/schemas/CargoTarget'
-      - $ref: '#/components/schemas/HttpTarget'
-      - $ref: '#/components/schemas/UnixTarget'
+        - $ref: "#/components/schemas/CargoTarget"
+        - $ref: "#/components/schemas/HttpTarget"
+        - $ref: "#/components/schemas/UnixTarget"
     Metric:
       type: object
       description: Metric entry
       required:
-      - Key
-      - CreatedAt
-      - ExpireAt
-      - NodeName
-      - Kind
-      - Data
+        - Key
+        - CreatedAt
+        - ExpireAt
+        - NodeName
+        - Kind
+        - Data
       properties:
         Key:
           type: string
@@ -3326,15 +3326,15 @@ components:
         NodeName:
           type: string
         Kind:
-          $ref: '#/components/schemas/MetricKind'
+          $ref: "#/components/schemas/MetricKind"
         Data: {}
     MetricKind:
       type: string
       enum:
-      - CPU
-      - MEMORY
-      - NETWORK
-      - DISK
+        - CPU
+        - MEMORY
+        - NETWORK
+        - DISK
     Mount:
       type: object
       properties:
@@ -3348,7 +3348,7 @@ components:
           nullable: true
         Type:
           allOf:
-          - $ref: '#/components/schemas/MountTypeEnum'
+            - $ref: "#/components/schemas/MountTypeEnum"
           nullable: true
         ReadOnly:
           type: boolean
@@ -3356,19 +3356,19 @@ components:
           nullable: true
         Consistency:
           type: string
-          description: 'The consistency requirement for the mount: `default`, `consistent`, `cached`, or `delegated`.'
+          description: "The consistency requirement for the mount: `default`, `consistent`, `cached`, or `delegated`."
           nullable: true
         BindOptions:
           allOf:
-          - $ref: '#/components/schemas/MountBindOptions'
+            - $ref: "#/components/schemas/MountBindOptions"
           nullable: true
         VolumeOptions:
           allOf:
-          - $ref: '#/components/schemas/MountVolumeOptions'
+            - $ref: "#/components/schemas/MountVolumeOptions"
           nullable: true
         TmpfsOptions:
           allOf:
-          - $ref: '#/components/schemas/MountTmpfsOptions'
+            - $ref: "#/components/schemas/MountTmpfsOptions"
           nullable: true
     MountBindOptions:
       type: object
@@ -3376,7 +3376,7 @@ components:
       properties:
         Propagation:
           allOf:
-          - $ref: '#/components/schemas/MountBindOptionsPropagationEnum'
+            - $ref: "#/components/schemas/MountBindOptionsPropagationEnum"
           nullable: true
         NonRecursive:
           type: boolean
@@ -3389,20 +3389,20 @@ components:
     MountBindOptionsPropagationEnum:
       type: string
       enum:
-      - EMPTY
-      - private
-      - rprivate
-      - shared
-      - rshared
-      - slave
-      - rslave
+        - EMPTY
+        - private
+        - rprivate
+        - shared
+        - rshared
+        - slave
+        - rslave
     MountPoint:
       type: object
       description: MountPoint represents a mount point configuration inside the container. This is used for reporting the mountpoints in use by a container.
       properties:
         Type:
           allOf:
-          - $ref: '#/components/schemas/MountPointTypeEnum'
+            - $ref: "#/components/schemas/MountPointTypeEnum"
           nullable: true
         Name:
           type: string
@@ -3435,12 +3435,12 @@ components:
     MountPointTypeEnum:
       type: string
       enum:
-      - EMPTY
-      - bind
-      - volume
-      - tmpfs
-      - npipe
-      - cluster
+        - EMPTY
+        - bind
+        - volume
+        - tmpfs
+        - npipe
+        - cluster
     MountTmpfsOptions:
       type: object
       description: Optional configuration for the `tmpfs` type.
@@ -3458,12 +3458,12 @@ components:
     MountTypeEnum:
       type: string
       enum:
-      - EMPTY
-      - bind
-      - volume
-      - tmpfs
-      - npipe
-      - cluster
+        - EMPTY
+        - bind
+        - volume
+        - tmpfs
+        - npipe
+        - cluster
     MountVolumeOptions:
       type: object
       description: Optional configuration for the `volume` type.
@@ -3480,7 +3480,7 @@ components:
           nullable: true
         DriverConfig:
           allOf:
-          - $ref: '#/components/schemas/MountVolumeOptionsDriverConfig'
+            - $ref: "#/components/schemas/MountVolumeOptionsDriverConfig"
           nullable: true
     MountVolumeOptionsDriverConfig:
       type: object
@@ -3502,7 +3502,7 @@ components:
         Namespace is a identifier for a set of cargoes
         It is used to group cargoes together
       required:
-      - Name
+        - Name
       properties:
         Name:
           type: string
@@ -3515,9 +3515,9 @@ components:
         It contains all the information about the namespace
         It also contains the list of cargoes
       required:
-      - Name
-      - Cargoes
-      - Network
+        - Name
+        - Cargoes
+        - Network
       properties:
         Name:
           type: string
@@ -3525,15 +3525,15 @@ components:
         Cargoes:
           type: array
           items:
-            $ref: '#/components/schemas/CargoInspect'
+            $ref: "#/components/schemas/CargoInspect"
           description: Number of cargoes
         Network:
-          $ref: '#/components/schemas/Network'
+          $ref: "#/components/schemas/Network"
     NamespacePartial:
       type: object
       description: A Namespace partial is a payload used to create a new namespace
       required:
-      - Name
+        - Name
       properties:
         Name:
           type: string
@@ -3545,10 +3545,10 @@ components:
         It is used to list all the namespaces
         It contains the number of cargoes and instances existing in the namespace
       required:
-      - Name
-      - Cargoes
-      - Instances
-      - Gateway
+        - Name
+        - Cargoes
+        - Instances
+        - Gateway
       properties:
         Name:
           type: string
@@ -3575,7 +3575,7 @@ components:
           nullable: true
         Created:
           allOf:
-          - $ref: '#/components/schemas/BollardDate'
+            - $ref: "#/components/schemas/BollardDate"
           nullable: true
         Scope:
           type: string
@@ -3588,7 +3588,7 @@ components:
           nullable: true
         IPAM:
           allOf:
-          - $ref: '#/components/schemas/Ipam'
+            - $ref: "#/components/schemas/Ipam"
           nullable: true
         Internal:
           type: boolean
@@ -3602,7 +3602,7 @@ components:
         Containers:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/NetworkContainer'
+            $ref: "#/components/schemas/NetworkContainer"
           nullable: true
         Options:
           type: object
@@ -3640,13 +3640,13 @@ components:
           type: object
           description: A mapping of network name to endpoint configuration for that network.
           additionalProperties:
-            $ref: '#/components/schemas/EndpointSettings'
+            $ref: "#/components/schemas/EndpointSettings"
           nullable: true
     Node:
       type: object
       required:
-      - Name
-      - IpAddress
+        - Name
+        - IpAddress
       properties:
         Name:
           type: string
@@ -3655,16 +3655,16 @@ components:
     NodeContainerSummary:
       type: object
       required:
-      - Node
-      - IpAddress
-      - Container
+        - Node
+        - IpAddress
+        - Container
       properties:
         Node:
           type: string
         IpAddress:
           type: string
         Container:
-          $ref: '#/components/schemas/ContainerSummary'
+          $ref: "#/components/schemas/ContainerSummary"
     ObjectVersion:
       type: object
       description: The version number of the object such as node, service, etc. This is needed to avoid conflicting writes. The client must send the version number along with the modified specification when updating these objects.  This approach ensures safe concurrency and determinism in that the change on the object may not be applied if the version number has changed from the last read. In other words, if two update requests specify the same base version, only one of the requests can succeed. As a result, two separate update requests that happen at the same time will not unintentionally overwrite each other.
@@ -3718,7 +3718,7 @@ components:
       type: object
       description: An open port on a container
       required:
-      - PrivatePort
+        - PrivatePort
       properties:
         IP:
           type: string
@@ -3735,7 +3735,7 @@ components:
           nullable: true
         Type:
           allOf:
-          - $ref: '#/components/schemas/PortTypeEnum'
+            - $ref: "#/components/schemas/PortTypeEnum"
           nullable: true
     PortBinding:
       type: object
@@ -3767,43 +3767,48 @@ components:
     PortTypeEnum:
       type: string
       enum:
-      - EMPTY
-      - tcp
-      - udp
-      - sctp
+        - EMPTY
+        - tcp
+        - udp
+        - sctp
     ProxyHttpLocation:
       type: object
       description: Defines a proxy rule location
       required:
-      - Path
-      - Target
+        - Path
+        - Target
       properties:
         Path:
           type: string
           description: The path
         Target:
-          $ref: '#/components/schemas/LocationTarget'
+          $ref: "#/components/schemas/LocationTarget"
         Headers:
           type: array
           items:
             type: string
           description: Extras header to add
           nullable: true
+        Version:
+          type: number
+          format: double
+          description: Http version to use
+          nullable: true
     ProxyRule:
       oneOf:
-      - type: array
-        items:
-          $ref: '#/components/schemas/ProxyRuleHttp'
-      - type: array
-        items:
-          $ref: '#/components/schemas/ProxyRuleStream'
+        - type: array
+          items:
+            $ref: "#/components/schemas/ProxyRuleHttp"
+        - type: array
+          items:
+            $ref: "#/components/schemas/ProxyRuleStream"
       description: Proxy rules modes
     ProxyRuleHttp:
       type: object
       description: Defines a proxy rule http config
       required:
-      - Network
-      - Locations
+        - Network
+        - Locations
       properties:
         Domain:
           type: string
@@ -3815,11 +3820,11 @@ components:
         Locations:
           type: array
           items:
-            $ref: '#/components/schemas/ProxyHttpLocation'
+            $ref: "#/components/schemas/ProxyHttpLocation"
           description: The locations to handle multiple paths
         Ssl:
           allOf:
-          - $ref: '#/components/schemas/ProxySslConfig'
+            - $ref: "#/components/schemas/ProxySslConfig"
           nullable: true
         Includes:
           type: array
@@ -3831,16 +3836,16 @@ components:
       type: object
       description: Proxy rules modes
       required:
-      - Network
-      - Protocol
-      - Port
-      - Target
+        - Network
+        - Protocol
+        - Port
+        - Target
       properties:
         Network:
           type: string
           description: Type of the network binding private | public | internal | namespace:$namespace_name
         Protocol:
-          $ref: '#/components/schemas/ProxyStreamProtocol'
+          $ref: "#/components/schemas/ProxyStreamProtocol"
         Port:
           type: integer
           format: int32
@@ -3848,15 +3853,15 @@ components:
           minimum: 0.0
         Ssl:
           allOf:
-          - $ref: '#/components/schemas/ProxySslConfig'
+            - $ref: "#/components/schemas/ProxySslConfig"
           nullable: true
         Target:
-          $ref: '#/components/schemas/StreamTarget'
+          $ref: "#/components/schemas/StreamTarget"
     ProxySslConfig:
       type: object
       required:
-      - Certificate
-      - CertificateKey
+        - Certificate
+        - CertificateKey
       properties:
         Certificate:
           type: string
@@ -3872,8 +3877,8 @@ components:
       type: string
       description: Proxy rules modes
       enum:
-      - Tcp
-      - Udp
+        - Tcp
+        - Udp
     RegistryServiceConfig:
       type: object
       description: RegistryServiceConfig stores daemon registry services configuration.
@@ -3882,24 +3887,24 @@ components:
           type: array
           items:
             type: string
-          description: 'List of IP ranges to which nondistributable artifacts can be pushed, using the CIDR syntax [RFC 4632](https://tools.ietf.org/html/4632).  Some images (for example, Windows base images) contain artifacts whose distribution is restricted by license. When these images are pushed to a registry, restricted artifacts are not included.  This configuration override this behavior, and enables the daemon to push nondistributable artifacts to all registries whose resolved IP address is within the subnet described by the CIDR syntax.  This option is useful when pushing images containing nondistributable artifacts to a registry on an air-gapped network so hosts on that network can pull the images without connecting to another server.  > **Warning**: Nondistributable artifacts typically have restrictions > on how and where they can be distributed and shared. Only use this > feature to push artifacts to private registries and ensure that you > are in compliance with any terms that cover redistributing > nondistributable artifacts.'
+          description: "List of IP ranges to which nondistributable artifacts can be pushed, using the CIDR syntax [RFC 4632](https://tools.ietf.org/html/4632).  Some images (for example, Windows base images) contain artifacts whose distribution is restricted by license. When these images are pushed to a registry, restricted artifacts are not included.  This configuration override this behavior, and enables the daemon to push nondistributable artifacts to all registries whose resolved IP address is within the subnet described by the CIDR syntax.  This option is useful when pushing images containing nondistributable artifacts to a registry on an air-gapped network so hosts on that network can pull the images without connecting to another server.  > **Warning**: Nondistributable artifacts typically have restrictions > on how and where they can be distributed and shared. Only use this > feature to push artifacts to private registries and ensure that you > are in compliance with any terms that cover redistributing > nondistributable artifacts."
           nullable: true
         AllowNondistributableArtifactsHostnames:
           type: array
           items:
             type: string
-          description: 'List of registry hostnames to which nondistributable artifacts can be pushed, using the format `<hostname>[:<port>]` or `<IP address>[:<port>]`.  Some images (for example, Windows base images) contain artifacts whose distribution is restricted by license. When these images are pushed to a registry, restricted artifacts are not included.  This configuration override this behavior for the specified registries.  This option is useful when pushing images containing nondistributable artifacts to a registry on an air-gapped network so hosts on that network can pull the images without connecting to another server.  > **Warning**: Nondistributable artifacts typically have restrictions > on how and where they can be distributed and shared. Only use this > feature to push artifacts to private registries and ensure that you > are in compliance with any terms that cover redistributing > nondistributable artifacts.'
+          description: "List of registry hostnames to which nondistributable artifacts can be pushed, using the format `<hostname>[:<port>]` or `<IP address>[:<port>]`.  Some images (for example, Windows base images) contain artifacts whose distribution is restricted by license. When these images are pushed to a registry, restricted artifacts are not included.  This configuration override this behavior for the specified registries.  This option is useful when pushing images containing nondistributable artifacts to a registry on an air-gapped network so hosts on that network can pull the images without connecting to another server.  > **Warning**: Nondistributable artifacts typically have restrictions > on how and where they can be distributed and shared. Only use this > feature to push artifacts to private registries and ensure that you > are in compliance with any terms that cover redistributing > nondistributable artifacts."
           nullable: true
         InsecureRegistryCIDRs:
           type: array
           items:
             type: string
-          description: 'List of IP ranges of insecure registries, using the CIDR syntax ([RFC 4632](https://tools.ietf.org/html/4632)). Insecure registries accept un-encrypted (HTTP) and/or untrusted (HTTPS with certificates from unknown CAs) communication.  By default, local registries (`127.0.0.0/8`) are configured as insecure. All other registries are secure. Communicating with an insecure registry is not possible if the daemon assumes that registry is secure.  This configuration override this behavior, insecure communication with registries whose resolved IP address is within the subnet described by the CIDR syntax.  Registries can also be marked insecure by hostname. Those registries are listed under `IndexConfigs` and have their `Secure` field set to `false`.  > **Warning**: Using this option can be useful when running a local > registry, but introduces security vulnerabilities. This option > should therefore ONLY be used for testing purposes. For increased > security, users should add their CA to their system''s list of trusted > CAs instead of enabling this option.'
+          description: "List of IP ranges of insecure registries, using the CIDR syntax ([RFC 4632](https://tools.ietf.org/html/4632)). Insecure registries accept un-encrypted (HTTP) and/or untrusted (HTTPS with certificates from unknown CAs) communication.  By default, local registries (`127.0.0.0/8`) are configured as insecure. All other registries are secure. Communicating with an insecure registry is not possible if the daemon assumes that registry is secure.  This configuration override this behavior, insecure communication with registries whose resolved IP address is within the subnet described by the CIDR syntax.  Registries can also be marked insecure by hostname. Those registries are listed under `IndexConfigs` and have their `Secure` field set to `false`.  > **Warning**: Using this option can be useful when running a local > registry, but introduces security vulnerabilities. This option > should therefore ONLY be used for testing purposes. For increased > security, users should add their CA to their system's list of trusted > CAs instead of enabling this option."
           nullable: true
         IndexConfigs:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/IndexInfo'
+            $ref: "#/components/schemas/IndexInfo"
           nullable: true
         Mirrors:
           type: array
@@ -3909,95 +3914,95 @@ components:
           nullable: true
     ReplicationMode:
       oneOf:
-      - type: string
-        enum:
-        - Auto
-      - type: string
-        enum:
-        - Unique
-      - type: string
-        enum:
-        - UniqueByNode
-      - type: object
-        required:
-        - UniqueByNodeGroups
-        properties:
-          UniqueByNodeGroups:
-            type: object
-            description: UniqueByNodeGroups is used to ensure one replica is running on each node group
-            required:
-            - groups
-            properties:
-              groups:
-                type: array
-                items:
-                  type: string
-      - type: object
-        required:
-        - UniqueByNodeNames
-        properties:
-          UniqueByNodeNames:
-            type: object
-            description: UniqueByNodeNames is used to ensure one replica is running on each node name
-            required:
-            - names
-            properties:
-              names:
-                type: array
-                items:
-                  type: string
-      - type: object
-        required:
-        - Number
-        properties:
-          Number:
-            type: integer
-            format: int64
-            description: Number is used to manually set the number of replicas in one node
-      - type: object
-        required:
-        - NumberByNodes
-        properties:
-          NumberByNodes:
-            type: integer
-            format: int64
-            description: NumberByNodes is used to manually set the number of replicas in each node
-      - type: object
-        required:
-        - NumberByNodeGroups
-        properties:
-          NumberByNodeGroups:
-            type: object
-            description: NumberByNodeGroups is used to manually set the number of replicas in each node group
-            required:
-            - groups
-            - number
-            properties:
-              groups:
-                type: array
-                items:
-                  type: string
-              number:
-                type: integer
-                format: int64
-      - type: object
-        required:
-        - NumberByNodeNames
-        properties:
-          NumberByNodeNames:
-            type: object
-            description: NumberByNodeNames is used to manually set the number of replicas in each node name
-            required:
-            - names
-            - number
-            properties:
-              names:
-                type: array
-                items:
-                  type: string
-              number:
-                type: integer
-                format: int64
+        - type: string
+          enum:
+            - Auto
+        - type: string
+          enum:
+            - Unique
+        - type: string
+          enum:
+            - UniqueByNode
+        - type: object
+          required:
+            - UniqueByNodeGroups
+          properties:
+            UniqueByNodeGroups:
+              type: object
+              description: UniqueByNodeGroups is used to ensure one replica is running on each node group
+              required:
+                - groups
+              properties:
+                groups:
+                  type: array
+                  items:
+                    type: string
+        - type: object
+          required:
+            - UniqueByNodeNames
+          properties:
+            UniqueByNodeNames:
+              type: object
+              description: UniqueByNodeNames is used to ensure one replica is running on each node name
+              required:
+                - names
+              properties:
+                names:
+                  type: array
+                  items:
+                    type: string
+        - type: object
+          required:
+            - Number
+          properties:
+            Number:
+              type: integer
+              format: int64
+              description: Number is used to manually set the number of replicas in one node
+        - type: object
+          required:
+            - NumberByNodes
+          properties:
+            NumberByNodes:
+              type: integer
+              format: int64
+              description: NumberByNodes is used to manually set the number of replicas in each node
+        - type: object
+          required:
+            - NumberByNodeGroups
+          properties:
+            NumberByNodeGroups:
+              type: object
+              description: NumberByNodeGroups is used to manually set the number of replicas in each node group
+              required:
+                - groups
+                - number
+              properties:
+                groups:
+                  type: array
+                  items:
+                    type: string
+                number:
+                  type: integer
+                  format: int64
+        - type: object
+          required:
+            - NumberByNodeNames
+          properties:
+            NumberByNodeNames:
+              type: object
+              description: NumberByNodeNames is used to manually set the number of replicas in each node name
+              required:
+                - names
+                - number
+              properties:
+                names:
+                  type: array
+                  items:
+                    type: string
+                number:
+                  type: integer
+                  format: int64
       description: |-
         Auto is used to automatically define that the number of replicas in the cluster
         Number is used to manually set the number of replicas
@@ -4008,13 +4013,13 @@ components:
         Resource is a configuration with a name and a kind
         It is used to define [proxy rules](ProxyRule) and other kind of config
       required:
-      - Name
-      - CreatedAt
-      - UpdatedAt
-      - Version
-      - Kind
-      - ConfigKey
-      - Config
+        - Name
+        - CreatedAt
+        - UpdatedAt
+        - Version
+        - Kind
+        - ConfigKey
+        - Config
       properties:
         Name:
           type: string
@@ -4041,14 +4046,14 @@ components:
           type: object
           description: The config of the resource as a json object
           additionalProperties:
-            $ref: '#/components/schemas/Any'
+            $ref: "#/components/schemas/Any"
     ResourceConfig:
       type: object
       required:
-      - Key
-      - Version
-      - ResourceKey
-      - Data
+        - Key
+        - Version
+        - ResourceKey
+        - Data
       properties:
         Key:
           type: string
@@ -4064,27 +4069,27 @@ components:
           type: object
           description: The config of the resource as a json object
           additionalProperties:
-            $ref: '#/components/schemas/Any'
+            $ref: "#/components/schemas/Any"
     ResourceDnsRule:
       type: object
       required:
-      - Network
-      - Entries
+        - Network
+        - Entries
       properties:
         Network:
           type: string
         Entries:
           type: array
           items:
-            $ref: '#/components/schemas/DnsEntry'
+            $ref: "#/components/schemas/DnsEntry"
     ResourcePartial:
       type: object
       description: Resource partial is a payload used to create a new resource
       required:
-      - Name
-      - Kind
-      - Version
-      - Config
+        - Name
+        - Kind
+        - Version
+        - Config
       properties:
         Name:
           type: string
@@ -4099,12 +4104,12 @@ components:
           type: object
           description: The config of the resource (json object)
           additionalProperties:
-            $ref: '#/components/schemas/Any'
+            $ref: "#/components/schemas/Any"
     ResourcePatch:
       type: object
       required:
-      - Version
-      - Config
+        - Version
+        - Config
       properties:
         Version:
           type: string
@@ -4113,13 +4118,13 @@ components:
           type: object
           description: The config of the resource as a json object
           additionalProperties:
-            $ref: '#/components/schemas/Any'
+            $ref: "#/components/schemas/Any"
     ResourceProxyRule:
       type: object
       description: Define proxy rules to apply
       required:
-      - Watch
-      - Rules
+        - Watch
+        - Rules
       properties:
         Watch:
           type: array
@@ -4127,7 +4132,7 @@ components:
             type: string
           description: Cargo to watch for changes
         Rules:
-          $ref: '#/components/schemas/ProxyRule'
+          $ref: "#/components/schemas/ProxyRule"
     ResourcesBlkioWeightDevice:
       type: object
       properties:
@@ -4161,7 +4166,7 @@ components:
       properties:
         Name:
           allOf:
-          - $ref: '#/components/schemas/RestartPolicyNameEnum'
+            - $ref: "#/components/schemas/RestartPolicyNameEnum"
           nullable: true
         MaximumRetryCount:
           type: integer
@@ -4171,11 +4176,11 @@ components:
     RestartPolicyNameEnum:
       type: string
       enum:
-      - EMPTY
-      - no
-      - always
-      - unless-stopped
-      - on-failure
+        - EMPTY
+        - no
+        - always
+        - unless-stopped
+        - on-failure
     Runtime:
       type: object
       description: Runtime describes an [OCI compliant](https://github.com/opencontainers/runtime-spec) runtime.  The runtime is invoked by the daemon via the `containerd` daemon. OCI runtimes act as an interface to the Linux kernel namespaces, cgroups, and SELinux.
@@ -4192,9 +4197,9 @@ components:
           nullable: true
     StreamTarget:
       oneOf:
-      - $ref: '#/components/schemas/CargoTarget'
-      - $ref: '#/components/schemas/UriTarget'
-      - $ref: '#/components/schemas/UnixTarget'
+        - $ref: "#/components/schemas/CargoTarget"
+        - $ref: "#/components/schemas/UriTarget"
+        - $ref: "#/components/schemas/UnixTarget"
     SwarmInfo:
       type: object
       description: Represents generic information about swarm.
@@ -4209,7 +4214,7 @@ components:
           nullable: true
         LocalNodeState:
           allOf:
-          - $ref: '#/components/schemas/LocalNodeState'
+            - $ref: "#/components/schemas/LocalNodeState"
           nullable: true
         ControlAvailable:
           type: boolean
@@ -4220,7 +4225,7 @@ components:
         RemoteManagers:
           type: array
           items:
-            $ref: '#/components/schemas/PeerNode'
+            $ref: "#/components/schemas/PeerNode"
           description: List of ID's and addresses of other managers in the swarm.
           nullable: true
         Nodes:
@@ -4235,7 +4240,7 @@ components:
           nullable: true
         Cluster:
           allOf:
-          - $ref: '#/components/schemas/ClusterInfo'
+            - $ref: "#/components/schemas/ClusterInfo"
           nullable: true
     SwarmSpec:
       type: object
@@ -4253,27 +4258,27 @@ components:
           nullable: true
         Orchestration:
           allOf:
-          - $ref: '#/components/schemas/SwarmSpecOrchestration'
+            - $ref: "#/components/schemas/SwarmSpecOrchestration"
           nullable: true
         Raft:
           allOf:
-          - $ref: '#/components/schemas/SwarmSpecRaft'
+            - $ref: "#/components/schemas/SwarmSpecRaft"
           nullable: true
         Dispatcher:
           allOf:
-          - $ref: '#/components/schemas/SwarmSpecDispatcher'
+            - $ref: "#/components/schemas/SwarmSpecDispatcher"
           nullable: true
         CAConfig:
           allOf:
-          - $ref: '#/components/schemas/SwarmSpecCaConfig'
+            - $ref: "#/components/schemas/SwarmSpecCaConfig"
           nullable: true
         EncryptionConfig:
           allOf:
-          - $ref: '#/components/schemas/SwarmSpecEncryptionConfig'
+            - $ref: "#/components/schemas/SwarmSpecEncryptionConfig"
           nullable: true
         TaskDefaults:
           allOf:
-          - $ref: '#/components/schemas/SwarmSpecTaskDefaults'
+            - $ref: "#/components/schemas/SwarmSpecTaskDefaults"
           nullable: true
     SwarmSpecCaConfig:
       type: object
@@ -4287,7 +4292,7 @@ components:
         ExternalCAs:
           type: array
           items:
-            $ref: '#/components/schemas/SwarmSpecCaConfigExternalCas'
+            $ref: "#/components/schemas/SwarmSpecCaConfigExternalCas"
           description: Configuration for forwarding signing requests to an external certificate authority.
           nullable: true
         SigningCACert:
@@ -4309,7 +4314,7 @@ components:
       properties:
         Protocol:
           allOf:
-          - $ref: '#/components/schemas/SwarmSpecCaConfigExternalCasProtocolEnum'
+            - $ref: "#/components/schemas/SwarmSpecCaConfigExternalCasProtocolEnum"
           nullable: true
         URL:
           type: string
@@ -4328,8 +4333,8 @@ components:
     SwarmSpecCaConfigExternalCasProtocolEnum:
       type: string
       enum:
-      - EMPTY
-      - cfssl
+        - EMPTY
+        - cfssl
     SwarmSpecDispatcher:
       type: object
       description: Dispatcher configuration.
@@ -4394,7 +4399,7 @@ components:
       properties:
         LogDriver:
           allOf:
-          - $ref: '#/components/schemas/SwarmSpecTaskDefaultsLogDriver'
+            - $ref: "#/components/schemas/SwarmSpecTaskDefaultsLogDriver"
           nullable: true
     SwarmSpecTaskDefaultsLogDriver:
       type: object
@@ -4415,7 +4420,7 @@ components:
       properties:
         ID:
           type: string
-          description: 'Unique identifier of the daemon.  <p><br /></p>  > **Note**: The format of the ID itself is not part of the API, and > should not be considered stable.'
+          description: "Unique identifier of the daemon.  <p><br /></p>  > **Note**: The format of the ID itself is not part of the API, and > should not be considered stable."
           nullable: true
         Containers:
           type: integer
@@ -4460,7 +4465,7 @@ components:
           nullable: true
         Plugins:
           allOf:
-          - $ref: '#/components/schemas/PluginsInfo'
+            - $ref: "#/components/schemas/PluginsInfo"
           nullable: true
         MemoryLimit:
           type: boolean
@@ -4534,11 +4539,11 @@ components:
           nullable: true
         CgroupDriver:
           allOf:
-          - $ref: '#/components/schemas/SystemInfoCgroupDriverEnum'
+            - $ref: "#/components/schemas/SystemInfoCgroupDriverEnum"
           nullable: true
         CgroupVersion:
           allOf:
-          - $ref: '#/components/schemas/SystemInfoCgroupVersionEnum'
+            - $ref: "#/components/schemas/SystemInfoCgroupVersionEnum"
           nullable: true
         NEventsListener:
           type: integer
@@ -4555,7 +4560,7 @@ components:
           nullable: true
         OSVersion:
           type: string
-          description: 'Version of the host''s operating system  <p><br /></p>  > **Note**: The information returned in this field, including its > very existence, and the formatting of values, should not be considered > stable, and may change without notice.'
+          description: "Version of the host's operating system  <p><br /></p>  > **Note**: The information returned in this field, including its > very existence, and the formatting of values, should not be considered > stable, and may change without notice."
           nullable: true
         OSType:
           type: string
@@ -4581,11 +4586,11 @@ components:
           nullable: true
         RegistryConfig:
           allOf:
-          - $ref: '#/components/schemas/RegistryServiceConfig'
+            - $ref: "#/components/schemas/RegistryServiceConfig"
           nullable: true
         GenericResources:
           allOf:
-          - $ref: '#/components/schemas/GenericResources'
+            - $ref: "#/components/schemas/GenericResources"
           nullable: true
         HttpProxy:
           type: string
@@ -4607,7 +4612,7 @@ components:
           type: array
           items:
             type: string
-          description: 'User-defined labels (key/value metadata) as set on the daemon.  <p><br /></p>  > **Note**: When part of a Swarm, nodes can both have _daemon_ labels, > set through the daemon configuration, and _node_ labels, set from a > manager node in the Swarm. Node labels are not included in this > field. Node labels can be retrieved using the `/nodes/(id)` endpoint > on a manager node in the Swarm.'
+          description: "User-defined labels (key/value metadata) as set on the daemon.  <p><br /></p>  > **Note**: When part of a Swarm, nodes can both have _daemon_ labels, > set through the daemon configuration, and _node_ labels, set from a > manager node in the Swarm. Node labels are not included in this > field. Node labels can be retrieved using the `/nodes/(id)` endpoint > on a manager node in the Swarm."
           nullable: true
         ExperimentalBuild:
           type: boolean
@@ -4615,21 +4620,21 @@ components:
           nullable: true
         ServerVersion:
           type: string
-          description: 'Version string of the daemon.  > **Note**: the [standalone Swarm API](https://docs.docker.com/swarm/swarm-api/) > returns the Swarm version instead of the daemon  version, for example > `swarm/1.2.8`.'
+          description: "Version string of the daemon.  > **Note**: the [standalone Swarm API](https://docs.docker.com/swarm/swarm-api/) > returns the Swarm version instead of the daemon  version, for example > `swarm/1.2.8`."
           nullable: true
         ClusterStore:
           type: string
-          description: 'URL of the distributed storage backend.   The storage backend is used for multihost networking (to store network and endpoint information) and by the node discovery mechanism.  <p><br /></p>  > **Deprecated**: This field is only propagated when using standalone Swarm > mode, and overlay networking using an external k/v store. Overlay > networks with Swarm mode enabled use the built-in raft store, and > this field will be empty.'
+          description: "URL of the distributed storage backend.   The storage backend is used for multihost networking (to store network and endpoint information) and by the node discovery mechanism.  <p><br /></p>  > **Deprecated**: This field is only propagated when using standalone Swarm > mode, and overlay networking using an external k/v store. Overlay > networks with Swarm mode enabled use the built-in raft store, and > this field will be empty."
           nullable: true
         ClusterAdvertise:
           type: string
-          description: 'The network endpoint that the Engine advertises for the purpose of node discovery. ClusterAdvertise is a `host:port` combination on which the daemon is reachable by other hosts.  <p><br /></p>  > **Deprecated**: This field is only propagated when using standalone Swarm > mode, and overlay networking using an external k/v store. Overlay > networks with Swarm mode enabled use the built-in raft store, and > this field will be empty.'
+          description: "The network endpoint that the Engine advertises for the purpose of node discovery. ClusterAdvertise is a `host:port` combination on which the daemon is reachable by other hosts.  <p><br /></p>  > **Deprecated**: This field is only propagated when using standalone Swarm > mode, and overlay networking using an external k/v store. Overlay > networks with Swarm mode enabled use the built-in raft store, and > this field will be empty."
           nullable: true
         Runtimes:
           type: object
           description: List of [OCI compliant](https://github.com/opencontainers/runtime-spec) runtimes configured on the daemon. Keys hold the \"name\" used to reference the runtime.  The Docker daemon relies on an OCI compliant runtime (invoked via the `containerd` daemon) as its interface to the Linux kernel namespaces, cgroups, and SELinux.  The default runtime is `runc`, and automatically configured. Additional runtimes can be configured by the user and will be listed here.
           additionalProperties:
-            $ref: '#/components/schemas/Runtime'
+            $ref: "#/components/schemas/Runtime"
           nullable: true
         DefaultRuntime:
           type: string
@@ -4637,7 +4642,7 @@ components:
           nullable: true
         Swarm:
           allOf:
-          - $ref: '#/components/schemas/SwarmInfo'
+            - $ref: "#/components/schemas/SwarmInfo"
           nullable: true
         LiveRestoreEnabled:
           type: boolean
@@ -4645,7 +4650,7 @@ components:
           nullable: true
         Isolation:
           allOf:
-          - $ref: '#/components/schemas/SystemInfoIsolationEnum'
+            - $ref: "#/components/schemas/SystemInfoIsolationEnum"
           nullable: true
         InitBinary:
           type: string
@@ -4653,15 +4658,15 @@ components:
           nullable: true
         ContainerdCommit:
           allOf:
-          - $ref: '#/components/schemas/Commit'
+            - $ref: "#/components/schemas/Commit"
           nullable: true
         RuncCommit:
           allOf:
-          - $ref: '#/components/schemas/Commit'
+            - $ref: "#/components/schemas/Commit"
           nullable: true
         InitCommit:
           allOf:
-          - $ref: '#/components/schemas/Commit'
+            - $ref: "#/components/schemas/Commit"
           nullable: true
         SecurityOptions:
           type: array
@@ -4676,7 +4681,7 @@ components:
         DefaultAddressPools:
           type: array
           items:
-            $ref: '#/components/schemas/SystemInfoDefaultAddressPools'
+            $ref: "#/components/schemas/SystemInfoDefaultAddressPools"
           description: 'List of custom default address pools for local networks, which can be specified in the daemon.json file or dockerd option.  Example: a Base \"10.10.0.0/16\" with Size 24 will define the set of 256 10.10.[0-255].0/24 address pools.'
           nullable: true
         Warnings:
@@ -4688,16 +4693,16 @@ components:
     SystemInfoCgroupDriverEnum:
       type: string
       enum:
-      - EMPTY
-      - cgroupfs
-      - systemd
-      - none
+        - EMPTY
+        - cgroupfs
+        - systemd
+        - none
     SystemInfoCgroupVersionEnum:
       type: string
       enum:
-      - EMPTY
-      - '1'
-      - '2'
+        - EMPTY
+        - "1"
+        - "2"
     SystemInfoDefaultAddressPools:
       type: object
       properties:
@@ -4713,10 +4718,10 @@ components:
     SystemInfoIsolationEnum:
       type: string
       enum:
-      - EMPTY
-      - default
-      - hyperv
-      - process
+        - EMPTY
+        - default
+        - hyperv
+        - process
     ThrottleDevice:
       type: object
       properties:
@@ -4748,14 +4753,14 @@ components:
     UnixTarget:
       type: object
       required:
-      - UnixPath
+        - UnixPath
       properties:
         UnixPath:
           type: string
     UriTarget:
       type: object
       required:
-      - Uri
+        - Uri
       properties:
         Uri:
           type: string
@@ -4763,17 +4768,17 @@ components:
     UrlRedirect:
       type: string
       enum:
-      - MovedPermanently
-      - Permanent
-      - Temporary
+        - MovedPermanently
+        - Permanent
+        - Temporary
     Version:
       type: object
       description: Version contain details about the current version nanocl
       required:
-      - Arch
-      - Channel
-      - Version
-      - CommitId
+        - Arch
+        - Channel
+        - Version
+        - CommitId
       properties:
         Arch:
           type: string
@@ -4787,11 +4792,11 @@ components:
       type: object
       description: A virtual machine instance
       required:
-      - Key
-      - NamespaceName
-      - Name
-      - ConfigKey
-      - Config
+        - Key
+        - NamespaceName
+        - Name
+        - ConfigKey
+        - Config
       properties:
         Key:
           type: string
@@ -4807,7 +4812,7 @@ components:
           format: uuid
           description: Unique identifier of the vm config
         Config:
-          $ref: '#/components/schemas/VmConfig'
+          $ref: "#/components/schemas/VmConfig"
     VmConfig:
       type: object
       description: |-
@@ -4815,13 +4820,13 @@ components:
         It used to know the state of the vm
         It keep tracking of an history when you patch an existing vm
       required:
-      - Key
-      - CreatedAt
-      - Name
-      - Version
-      - VmKey
-      - Disk
-      - HostConfig
+        - Key
+        - CreatedAt
+        - Name
+        - Version
+        - VmKey
+        - Disk
+        - HostConfig
       properties:
         Key:
           type: string
@@ -4857,7 +4862,7 @@ components:
           description: Default user of the vm (cloud)
           nullable: true
         Disk:
-          $ref: '#/components/schemas/VmDiskConfig'
+          $ref: "#/components/schemas/VmDiskConfig"
         MacAddress:
           type: string
           description: Mac address of the vm
@@ -4869,14 +4874,14 @@ components:
             type: string
           nullable: true
         HostConfig:
-          $ref: '#/components/schemas/VmHostConfig'
+          $ref: "#/components/schemas/VmHostConfig"
     VmConfigPartial:
       type: object
       description: A vm config partial is used to create a Vm
       required:
-      - Name
-      - Disk
-      - HostConfig
+        - Name
+        - Disk
+        - HostConfig
       properties:
         Name:
           type: string
@@ -4898,7 +4903,7 @@ components:
           description: Default ssh key for the user
           nullable: true
         Disk:
-          $ref: '#/components/schemas/VmDiskConfig'
+          $ref: "#/components/schemas/VmDiskConfig"
         MacAddress:
           type: string
           description: Mac address of the vm
@@ -4910,7 +4915,7 @@ components:
             type: string
           nullable: true
         HostConfig:
-          $ref: '#/components/schemas/VmHostConfig'
+          $ref: "#/components/schemas/VmHostConfig"
     VmConfigUpdate:
       type: object
       description: |-
@@ -4946,13 +4951,13 @@ components:
           nullable: true
         HostConfig:
           allOf:
-          - $ref: '#/components/schemas/VmHostConfig'
+            - $ref: "#/components/schemas/VmHostConfig"
           nullable: true
     VmDiskConfig:
       type: object
       description: Disk representation of a VM
       required:
-      - Image
+        - Image
       properties:
         Image:
           type: string
@@ -4967,8 +4972,8 @@ components:
       type: object
       description: A vm's resources (cpu, memory, network)
       required:
-      - Cpu
-      - Memory
+        - Cpu
+        - Memory
       properties:
         Cpu:
           type: integer
@@ -4996,7 +5001,7 @@ components:
           nullable: true
         Runtime:
           type: string
-          description: 'Container image name to use for vm default: nexthat/nanocl-qemu'
+          description: "Container image name to use for vm default: nexthat/nanocl-qemu"
           nullable: true
         RuntimeNet:
           type: string
@@ -5004,13 +5009,13 @@ components:
     VmImage:
       type: object
       required:
-      - Name
-      - CreatedAt
-      - Path
-      - Kind
-      - Format
-      - SizeActual
-      - SizeVirtual
+        - Name
+        - CreatedAt
+        - Path
+        - Kind
+        - Format
+        - SizeActual
+        - SizeVirtual
       properties:
         Name:
           type: string
@@ -5039,8 +5044,8 @@ components:
     VmImageResizePayload:
       type: object
       required:
-      - Size
-      - Shrink
+        - Size
+        - Shrink
       properties:
         Size:
           type: integer
@@ -5058,14 +5063,14 @@ components:
         It contains all the information about the cargo
         It also contains the list of containers
       required:
-      - Key
-      - Name
-      - ConfigKey
-      - NamespaceName
-      - Config
-      - InstanceTotal
-      - InstanceRunning
-      - Instances
+        - Key
+        - Name
+        - ConfigKey
+        - NamespaceName
+        - Config
+        - InstanceTotal
+        - InstanceRunning
+        - Instances
       properties:
         Key:
           type: string
@@ -5081,7 +5086,7 @@ components:
           type: string
           description: Name of the namespace
         Config:
-          $ref: '#/components/schemas/VmConfig'
+          $ref: "#/components/schemas/VmConfig"
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -5093,7 +5098,7 @@ components:
         Instances:
           type: array
           items:
-            $ref: '#/components/schemas/ContainerSummary'
+            $ref: "#/components/schemas/ContainerSummary"
           description: List of containers
     VmSummary:
       type: object
@@ -5101,15 +5106,15 @@ components:
         A Vm Summary is a summary of a vm
         It is used to list all the vms
       required:
-      - Key
-      - CreatedAt
-      - UpdatedAt
-      - Name
-      - ConfigKey
-      - NamespaceName
-      - Config
-      - Instances
-      - RunningInstances
+        - Key
+        - CreatedAt
+        - UpdatedAt
+        - Name
+        - ConfigKey
+        - NamespaceName
+        - Config
+        - Instances
+        - RunningInstances
       properties:
         Key:
           type: string
@@ -5133,7 +5138,7 @@ components:
           type: string
           description: Name of the namespace
         Config:
-          $ref: '#/components/schemas/VmConfig'
+          $ref: "#/components/schemas/VmConfig"
         Instances:
           type: integer
           description: Number of instances
@@ -5143,21 +5148,21 @@ components:
           description: Number of running instances
           minimum: 0.0
 tags:
-- name: CargoImages
-  description: Cargo images management endpoints.
-- name: Namespaces
-  description: Namespaces management endpoints.
-- name: Nodes
-  description: Nodes management endpoints.
-- name: Resources
-  description: Resources management endpoints.
-- name: System
-  description: General system endpoints.
-- name: VmImages
-  description: Virtual machine images management endpoints.
-- name: Vms
-  description: Virtual machines management endpoints.
-- name: Metrics
-  description: Metrics management endpoints.
-- name: HttpMetrics
-  description: HTTP Metrics management endpoints.
+  - name: CargoImages
+    description: Cargo images management endpoints.
+  - name: Namespaces
+    description: Namespaces management endpoints.
+  - name: Nodes
+    description: Nodes management endpoints.
+  - name: Resources
+    description: Resources management endpoints.
+  - name: System
+    description: General system endpoints.
+  - name: VmImages
+    description: Virtual machine images management endpoints.
+  - name: Vms
+    description: Virtual machines management endpoints.
+  - name: Metrics
+    description: Metrics management endpoints.
+  - name: HttpMetrics
+    description: HTTP Metrics management endpoints.

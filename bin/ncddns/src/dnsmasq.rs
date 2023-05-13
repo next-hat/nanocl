@@ -106,14 +106,14 @@ conf-dir={}/dnsmasq.d,*.conf
     };
     let lines = data.lines();
     let mut new_data = String::new();
+    for dns in &self.dns {
+      new_data.push_str(format!("server={dns}\n").as_str());
+    }
     for line in lines {
       if line.starts_with("server=") {
         continue;
       }
       new_data.push_str(&format!("{line}\n"));
-    }
-    for dns in &self.dns {
-      new_data.push_str(format!("server={dns}\n").as_str());
     }
     self.write_main_conf(&new_data)?;
     Ok(())

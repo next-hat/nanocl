@@ -74,6 +74,10 @@ Cargoes:
       Cmd:
         - --conf-dir
         - /opt/dns
+        - --dns
+        - 1.1.1.1
+        - --dns
+        - 1.0.0.1
       HostConfig:
         NetworkMode: system
         Binds:

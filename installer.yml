@@ -42,7 +42,7 @@ Cargoes:
 
   - Name: ncdproxy
     Container:
-      Image: ghcr.io/nxthat/ncdproxy:0.4.0
+      Image: ghcr.io/nxthat/ncdproxy:0.4.1
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -74,6 +74,10 @@ Cargoes:
       Cmd:
         - --conf-dir
         - /opt/dns
+        - --dns
+        - 1.1.1.1
+        - --dns
+        - 1.0.0.1
       HostConfig:
         NetworkMode: system
         Binds:
