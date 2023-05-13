@@ -397,17 +397,21 @@ async fn resource_to_nginx_conf(
 pub(crate) async fn reload_config(client: &NanocldClient) -> IoResult<()> {
   log::info!("Reloading proxy configuration");
   let exec = CreateExecOptions {
+    cmd: Some(vec!["nginx".into(), "-s".into(), "reopen".into()]),
+    ..Default::default()
+  };
+  client
+    .exec_cargo("nproxy", exec, Some("system".into()))
+    .await
+    .map_err(|err| err.map_err_context(|| "Unable to reopen proxy configs"))?;
+  let exec = CreateExecOptions {
     cmd: Some(vec!["nginx".into(), "-s".into(), "reload".into()]),
     ..Default::default()
   };
   client
     .exec_cargo("nproxy", exec, Some("system".into()))
     .await
-    .map_err(|err| {
-      err.map_err_context(|| {
-        "Unable to reload proxy on container nproxy.system.c"
-      })
-    })?;
+    .map_err(|err| err.map_err_context(|| "Unable to reload proxy configs"))?;
   log::info!("Proxy configuration reloaded");
   Ok(())
 }

@@ -2,7 +2,6 @@ use ntex::web;
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::proxy::ResourceProxyRule;
-
 use nanocl_utils::http_error::HttpError;
 
 use crate::utils;
@@ -52,7 +51,10 @@ pub async fn remove_rule(
   path: web::types::Path<(String, String)>,
   nginx: web::types::State<Nginx>,
 ) -> Result<web::HttpResponse, HttpError> {
+  let client = NanocldClient::connect_with_unix_default();
+
   nginx.delete_conf_file(&path.1).await;
+  utils::reload_config(&client).await?;
 
   Ok(web::HttpResponse::Ok().finish())
 }
