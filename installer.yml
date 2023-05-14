@@ -104,7 +104,7 @@ Cargoes:
 
   - Name: ndaemon
     Container:
-      Image: ghcr.io/nxthat/nanocld:0.6.0
+      Image: ghcr.io/nxthat/nanocld:0.6.1
       Tty: true
       Hostname: ndaemon.nanocl.internal
       Cmd:
