@@ -65,12 +65,12 @@ Whether you're running a **home lab** setup or a **large enterprise**, _Nanocl's
 `Nanocl` is designed in a **micro services** architecture several component are required and they are running as **container** included the `Nanocl Daemon` itself.
 The following components will be installed during `nanocl setup` and are required to ensure `Nanocl` functionnality:
 
-- `store` to save our state
-- `daemon` as **REST API** to manage everything
-- `metrics` to monitor cpu, memory and network usage
-- `proxy` to redirect traffic to our **containers** and **virtual machines**
+- `nstore` to save our state
+- `ndaemon` as **REST API** to manage everything
+- `nmetrics` to monitor cpu, memory and network usage
+- `nproxy` proxy to redirect traffic to our **containers** and **virtual machines**
 - `ncdproxy` to update proxy configuration based on the current state
-- `dns` to manage the dns entries for the **containers** and **virtual machines**
+- `ndns` to manage the dns entries for the **containers** and **virtual machines**
 - `ncddns` to update dns entries based on the current state
 
 Simplified version of our architecture for a single node:
