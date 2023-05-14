@@ -69,7 +69,7 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ncddns:0.1.0
+      Image: ghcr.io/nxthat/ncddns:0.1.1
       Tty: true
       Cmd:
         - --conf-dir
