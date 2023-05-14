@@ -42,7 +42,7 @@ Cargoes:
 
   - Name: ncdproxy
     Container:
-      Image: ghcr.io/nxthat/ncdproxy:0.4.1
+      Image: ghcr.io/nxthat/ncdproxy:0.4.2
       Tty: true
       Env:
         - TZ=Europe/Paris
