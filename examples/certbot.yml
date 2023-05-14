@@ -1,0 +1,31 @@
+Type: Ssl
+ApiVersion: v0.6
+
+Namespace: global
+
+Args:
+  - Name: domain
+    Type: String
+  - Name: email
+    Type: String
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/daemon/v0.6#tag/Cargoes/operation/create_cargo
+Cargoes:
+  - Name: certbot
+    Container:
+      Image: certbot/certbot:v2.6.0
+      HostConfig:
+        AutoRemove: true
+        Binds:
+          - ${{ Config.state_dir }}/proxy/letsencrypt:/etc/letsencrypt
+          - ${{ Config.state_dir }}/proxy/conf.d:/etc/nginx/conf.d
+          - ${{ Config.state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
+      Cmd:
+        - certbot
+        - --nginx
+        - --domain
+        - ${{ Args.domain }}
+        - --email
+        - ${{ Args.email }}
+        - --agree-tos

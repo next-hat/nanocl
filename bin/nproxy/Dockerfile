@@ -1,12 +1,11 @@
-FROM nginx:1.24.0
+FROM nginx:1.24.0-bullseye
 
 USER root
 
 ENV TZ="Europe/Paris"
-RUN apt-get update -y
 
+RUN apt-get update -y
 RUN apt-get install -y nginx-extras
-RUN apt-get install -y certbot python3-certbot-nginx
 
 EXPOSE 80/tcp 443/tcp
 

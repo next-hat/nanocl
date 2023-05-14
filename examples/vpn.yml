@@ -4,9 +4,7 @@ ApiVersion: v0.6
 Namespace: vpn
 
 Args:
-  - Name: gateway
-    Type: String
-  - Name: dns
+  - Name: public-ip
     Type: String
 
 # See all options:
@@ -16,8 +14,8 @@ Cargoes:
     Container:
       Image: hwdsl2/ipsec-vpn-server:latest
       Env:
-        - VPN_PUBLIC_IP=${{ Args.gateway }}
-        - VPN_DNS_SRV1=${{ Args.dns }}
+        - VPN_PUBLIC_IP=${{ Args.public-ip }}
+        - VPN_DNS_SRV1=${{ Namespaces.vpn.Gateway }}
         - VPN_DNS_SRV2=1.1.1.1
         - VPN_L2TP_NET=192.168.42.0/16
         - VPN_L2TP_LOCAL=192.168.42.1

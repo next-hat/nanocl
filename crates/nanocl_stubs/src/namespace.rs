@@ -28,6 +28,7 @@ pub struct NamespacePartial {
 /// A Namespace Summary is a summary of a namespace
 /// It is used to list all the namespaces
 /// It contains the number of cargoes and instances existing in the namespace
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
