@@ -12,14 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bind Daemon config and Gateway in `StateFile.yml`
 - Bind Namespaces Summary in `StateFile.yml`
 
-## [0.6.1] 2023-05-10
+## [0.6.1] - 2023-05-10
 
 ### Fixed
 
 - `-a` option when applying a `StateFile` now.
 - `Envs` are applied to the `StateFile` even if no `BuildArgs` are set.
 
-## [0.6.0] 2023-04-30
+## [0.6.0] - 2023-04-30
 
 ### Fixed
 
