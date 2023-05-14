@@ -401,13 +401,21 @@ pub async fn put(
 
   // Rename existing container to avoid name conflict
   for container in containers.iter().cloned() {
+    let id = container.id.unwrap_or_default();
+
+    let container_state = container.state.unwrap_or_default();
+
+    if container_state == "restarting" {
+      state.docker_api.stop_container(&id, None).await?;
+    }
+
     let names = container.names.unwrap_or_default();
     let name = format!("{}-backup", names[0]);
 
     state
       .docker_api
       .rename_container(
-        &container.id.unwrap_or_default(),
+        &id,
         bollard_next::container::RenameContainerOptions { name },
       )
       .await?;

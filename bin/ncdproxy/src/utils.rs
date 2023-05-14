@@ -73,31 +73,42 @@ fn create_cargo_upstream(
   cargo: &CargoInspect,
   nginx: &Nginx,
 ) -> IoResult<String> {
-  let ip_addresses = cargo
-    .instances
-    .iter()
-    .map(|node_container| {
-      let container = node_container.container.clone();
-      let networks = container
-        .network_settings
-        .unwrap_or_default()
-        .networks
-        .unwrap_or_default();
-      let network =
-        networks
-          .get(&cargo.namespace_name)
-          .ok_or(IoError::invalid_data(
-            "Networks",
-            &format!("Unable to get network {}", &cargo.namespace_name),
-          ))?;
-      let ip_address =
-        network.ip_address.clone().ok_or(IoError::invalid_data(
-          "IpAddress",
-          &format!("for cargo {}", &cargo.name),
-        ))?;
-      Ok::<_, IoError>(ip_address)
-    })
-    .collect::<Result<Vec<String>, IoError>>()?;
+  let mut ip_addresses = Vec::new();
+
+  for node_container in cargo.instances.iter() {
+    let container = node_container.container.clone();
+    let networks = container
+      .network_settings
+      .unwrap_or_default()
+      .networks
+      .unwrap_or_default();
+
+    let network = networks.get(&cargo.namespace_name);
+
+    let Some(network) = network else {
+      log::warn!("empty ip address for cargo {}", &cargo.name);
+      log::warn!("Instance is unhealthy, skipping");
+      continue;
+    };
+    let Some(ip_address) = network.ip_address.clone() else {
+      log::warn!("empty ip address for cargo {}", &cargo.name);
+      log::warn!("Instance is unhealthy, skipping");
+      continue;
+    };
+    if ip_address.is_empty() {
+      log::warn!("empty ip address for cargo {}", &cargo.name);
+      log::warn!("Instance is unhealthy, skipping");
+      continue;
+    }
+    ip_addresses.push(ip_address);
+  }
+  if ip_addresses.is_empty() {
+    return Err(IoError::invalid_data(
+      "CargoInspect",
+      &format!("Unable to get ip addresses for cargo {}", &cargo.name),
+    ));
+  }
+  log::debug!("ip_addresses: {:?}", ip_addresses);
   let upstream_key = format!("{}-{}", cargo.key, port);
   let upstream = format!(
     "
@@ -183,9 +194,12 @@ async fn gen_locations(
 
     match &rule.target {
       LocationTarget::Cargo(cargo_target) => {
-        let upstream_key =
+        let Ok(upstream_key) =
           gen_cargo_upstream(&NginxConfKind::Site, cargo_target, client, nginx)
-            .await?;
+            .await else {
+              log::warn!("Unable to generate cargo upstream for location rule {:?} got error", rule);
+              continue;
+            };
         let location = format!(
           "
   location {path} {{{version}{headers}
@@ -253,7 +267,10 @@ async fn gen_http_server_block(
     .await?
     .join("\n");
   let http_host = match &rule.domain {
-    Some(domain) => format!("  server_name {domain};"),
+    Some(domain) => format!(
+      "  server_name {domain};\n  if ($host != {domain}) {{ return 404; }}\n",
+      domain = domain
+    ),
     None => String::default(),
   };
 

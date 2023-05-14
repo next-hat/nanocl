@@ -8,6 +8,7 @@ if [ ! -f /usr/share/nginx/html/403.html ]; then
   cp /html/403.html /usr/share/nginx/html/403.html
 fi
 
+## Test if the 502 page is present
 if [ ! -f /usr/share/nginx/html/502.html ]; then
   echo "Using default 502"
   cp /html/502.html /usr/share/nginx/html/502.html

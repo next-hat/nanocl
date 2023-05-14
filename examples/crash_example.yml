@@ -1,0 +1,34 @@
+Type: Deployment
+ApiVersion: v0.6
+
+Namespace: global
+
+Resources:
+  - Name: crash-example.com
+    Kind: ProxyRule
+    Version: v0.4
+    Config:
+      Watch:
+        - crash-example.global
+      Rules:
+        - Domain: crash-example.com
+          Network: Public
+          Locations:
+            - Path: /
+              Target:
+                CargoKey: crash-example.global
+                CargoPort: 9000
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/daemon/v0.6#tag/Cargoes/operation/create_cargo
+Cargoes:
+  - Name: crash-example
+    Container:
+      Image: ubuntu:latest
+      Cmd:
+        - bash
+        - -c
+        - |
+          echo "Going to crash 1"
+          sleep 1
+          exit 432423

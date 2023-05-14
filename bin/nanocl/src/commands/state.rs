@@ -1,4 +1,5 @@
 use std::fs;
+use std::collections::HashMap;
 
 use ntex::rt;
 use clap::{Command, Arg};
@@ -258,11 +259,10 @@ fn gen_client(meta: &StateMeta) -> IoResult<NanocldClient> {
   Ok(client)
 }
 
-/// Inject build arguments and environement variable to the StateFile
-fn inject_data(
-  yaml: serde_yaml::Value,
+fn parse_build_args(
+  yaml: &serde_yaml::Value,
   args: Vec<String>,
-) -> IoResult<serde_yaml::Value> {
+) -> IoResult<HashMap<String, String>> {
   let build_args: StateBuildArgs = serde_yaml::from_value(yaml.clone())
     .map_err(|err| err.map_err_context(|| "Unable to extract BuildArgs"))?;
 
@@ -319,7 +319,15 @@ fn inject_data(
       }
     }
   }
+  Ok(args)
+}
 
+/// Inject build arguments and environement variable to the StateFile
+async fn inject_data(
+  yaml: serde_yaml::Value,
+  args: &HashMap<String, String>,
+  client: &NanocldClient,
+) -> IoResult<serde_yaml::Value> {
   let mut envs = std::collections::HashMap::new();
   for (key, value) in std::env::vars_os() {
     let key = key.to_string_lossy().to_string();
@@ -327,11 +335,23 @@ fn inject_data(
     envs.insert(key, value);
   }
 
+  let info = client.info().await?;
+  let namespaces = client.list_namespace().await?.into_iter().fold(
+    HashMap::new(),
+    |mut acc, elem| {
+      acc.insert(elem.name.clone(), elem);
+      acc
+    },
+  );
+
   let str = serde_yaml::to_string(&yaml)
     .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
   let data = liquid::object!({
     "Args": args,
     "Envs": envs,
+    "Config": info.config,
+    "HostGateway": info.host_gateway,
+    "Namespaces": namespaces,
   });
   let str = utils::state::compile(&str, &data)?;
   let yaml: serde_yaml::Value = serde_yaml::from_str(&str)
@@ -364,9 +384,7 @@ async fn exec_state_apply(opts: &StateOpts) -> IoResult<()> {
   let (meta, yaml) = parse_state_file(&opts.file_path).await?;
 
   let client = gen_client(&meta)?;
-
-  let yaml = inject_data(yaml.clone(), opts.args.clone())?;
-
+  let args = parse_build_args(&yaml, opts.args.clone())?;
   let mut namespace = String::from("default");
   let mut cargoes = Vec::new();
   let yaml = match meta.r#type.as_str() {
@@ -374,11 +392,13 @@ async fn exec_state_apply(opts: &StateOpts) -> IoResult<()> {
       let mut data = serde_yaml::from_value::<StateCargo>(yaml)
         .map_err(|err| err.map_err_context(|| "Unable to parse StateCargo"))?;
       namespace = data.namespace.clone().unwrap_or(namespace);
+      let _ = client.create_namespace(&namespace).await;
       cargoes = hook_cargoes(&client, data.cargoes).await?;
       data.cargoes = cargoes.clone();
       let yml = serde_yaml::to_value(data).map_err(|err| {
         err.map_err_context(|| "Unable to convert to yaml value")
       })?;
+      let yml = inject_data(yml.clone(), &args, &client).await?;
       inject_meta(meta, yml)
     }
     "Deployment" => {
@@ -387,14 +407,16 @@ async fn exec_state_apply(opts: &StateOpts) -> IoResult<()> {
           err.map_err_context(|| "Unable to parse StateDeployment")
         })?;
       namespace = data.namespace.clone().unwrap_or(namespace);
+      let _ = client.create_namespace(&namespace).await;
       cargoes = hook_cargoes(&client, data.cargoes.unwrap_or_default()).await?;
       data.cargoes = Some(cargoes.clone());
       let yml = serde_yaml::to_value(data).map_err(|err| {
         err.map_err_context(|| "Unable to convert to yaml value")
       })?;
+      let yml = inject_data(yml.clone(), &args, &client).await?;
       inject_meta(meta, yml)
     }
-    _ => yaml,
+    _ => inject_data(yaml.clone(), &args, &client).await?,
   };
   let data = serde_json::to_value(&yaml)
     .map_err(|err| err.map_err_context(|| "Unable to convert to yaml value"))?;
@@ -430,7 +452,8 @@ async fn exec_state_apply(opts: &StateOpts) -> IoResult<()> {
 async fn exec_state_revert(opts: &StateOpts) -> IoResult<()> {
   let (meta, yaml) = parse_state_file(&opts.file_path).await?;
   let client = gen_client(&meta)?;
-  let yaml = inject_data(yaml.clone(), opts.args.clone())?;
+  let args = parse_build_args(&yaml, opts.args.clone())?;
+  let yaml = inject_data(yaml.clone(), &args, &client).await?;
   let data = serde_json::to_value(&yaml)
     .map_err(|err| err.map_err_context(|| "Unable to parse yaml"))?;
   let _ = utils::print::print_yml(&yaml);
