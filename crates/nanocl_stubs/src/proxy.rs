@@ -22,6 +22,10 @@ pub struct ProxySslConfig {
   pub certificate: String,
   /// Path to the certificate key
   pub certificate_key: String,
+  /// Path to the certificate client
+  pub certificate_client: Option<String>,
+  /// Enable or disable client verification
+  pub verify_client: Option<bool>,
   /// Path to the dhparam file
   pub dh_param: Option<String>,
 }

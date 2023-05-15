@@ -284,7 +284,7 @@ async fn gen_http_server_block(
       None => String::default(),
     };
     let listen_https = get_listen(&rule.network, 443, client).await?;
-    format!(
+    let mut base = format!(
       "
   listen {listen_https} http2 ssl;
 
@@ -294,8 +294,21 @@ async fn gen_http_server_block(
 
   ssl_certificate      {certificate};
   ssl_certificate_key  {certificate_key};{ssl_dh_param}
-    "
-    )
+"
+    );
+
+    if let Some(certificate_client) = &ssl.certificate_client {
+      base += &format!("  ssl_client_certificate {certificate_client};\n");
+    }
+
+    if let Some(client_verification) = &ssl.verify_client {
+      base += &format!(
+        "  ssl_verify_client {};\n",
+        if *client_verification { "on" } else { "off" }
+      );
+    }
+
+    base
   } else {
     String::default()
   };
@@ -314,6 +327,13 @@ async fn gen_http_server_block(
 server {{
   listen {listen_http};
 {http_host}{ssl}{includes}
+
+  error_page 495 496 497 /400_ssl.html;
+  location = /400_ssl.html {{
+    root /usr/share/nginx/html;
+    internal;
+  }}
+
 {locations}
 }}\n",
   );
@@ -351,12 +371,25 @@ async fn gen_stream_server_block(
       }
       None => String::default(),
     };
-    format!(
+    let mut base = format!(
       "
     ssl_certificate      {certificate};
     ssl_certificate_key  {certificate_key};{ssl_dh_param}
-          "
-    )
+"
+    );
+
+    if let Some(certificate_client) = &ssl.certificate_client {
+      base += &format!("  ssl_client_certificate {certificate_client};\n");
+    }
+
+    if let Some(client_verification) = &ssl.verify_client {
+      base += &format!(
+        "  ssl_verify_client {};\n",
+        if *client_verification { "on" } else { "off" }
+      );
+    }
+
+    base
   } else {
     String::default()
   };

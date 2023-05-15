@@ -67,6 +67,8 @@ services:
       - io.nanocl.cnsp=system
     volumes:
       - /run:/run
+      - /var/lib/nanocl/proxy/letsencrypt:/etc/letsencrypt
+      - /var/lib/nanocl/proxy/certs:/etc/nginx/certs
       - /var/lib/nanocl/proxy/logs:/var/log/nginx/access
       - /var/lib/nanocl/proxy/html:/usr/share/nginx/html
       - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
