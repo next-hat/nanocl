@@ -1,19 +1,9 @@
 Type: Resource
-ApiVersion: v0.2
+ApiVersion: v0.6
 
 Resources:
   - Name: Leone
     Kind: VpnUser
     Version: v0.1
     Config:
-      Url: https://api.example.com
-      Schema:
-        title: VpnUser
-        description: Create a new vpn user
-        type: object
-        required:
-          - Username
-        properties:
-          Username:
-            description: Cargo to watch for changes
-            type: string
+      Username: leone
