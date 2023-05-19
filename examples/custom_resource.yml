@@ -1,0 +1,19 @@
+Type: Resource
+ApiVersion: v0.6
+
+Resources:
+  - Name: VpnUser
+    Kind: Kind
+    Version: v0.1
+    Config:
+      Url: vpn.nanocl.internal
+      Schema:
+        title: VpnUser
+        description: Create a new vpn user
+        type: object
+        required:
+          - Username
+        properties:
+          Username:
+            description: Cargo to watch for changes
+            type: string

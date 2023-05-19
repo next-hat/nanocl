@@ -1,0 +1,9 @@
+Type: Resource
+ApiVersion: v0.6
+
+Resources:
+  - Name: Leone
+    Kind: VpnUser
+    Version: v0.1
+    Config:
+      Username: leone

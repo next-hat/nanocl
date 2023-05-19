@@ -34,6 +34,7 @@ Cargoes:
         Binds:
           - /run:/run
           - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
+          - ${{ state_dir }}/proxy/certs:/etc/nginx/certs
           - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
           - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
           - ${{ state_dir }}/proxy/html:/usr/share/nginx/html

@@ -18,12 +18,7 @@ pub async fn generate(
       .state(
         web::types::PayloadConfig::new(20_000_000_000), // <- limit size of the payload
       )
-      .wrap(
-        Cors::new()
-          .disable_preflight()
-          .disable_vary_header()
-          .finish(),
-      )
+      .wrap(Cors::new().finish())
       .wrap(middlewares::SerializeError)
       // Default logger middleware
       // .wrap(web::middleware::Logger::default())

@@ -4,7 +4,7 @@ ApiVersion: v0.6
 Namespace: cargo-example
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/daemon/v0.4#tag/Cargoes/operation/create_cargo
+# https://docs.next-hat.com/references/nanocl/daemon/v0.6#tag/Cargoes/operation/create_cargo
 Cargoes:
   - Name: cargo-example
     Container:

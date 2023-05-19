@@ -99,23 +99,8 @@ pub(crate) async fn delete_namespace(
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
-/// Endpoint to allow CORS preflight
-#[web::options("/namespaces{all}*")]
-pub(crate) async fn options_namespace() -> Result<web::HttpResponse, HttpError>
-{
-  Ok(
-    web::HttpResponse::Ok()
-      .header("Access-Control-Allow-Origin", "*")
-      .header("Access-Control-Allow-Headers", "*")
-      .header("Access-Control-Allow-Methods", "*")
-      .header("Access-Control-Max-Age", "600")
-      .finish(),
-  )
-}
-
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_namespace);
-  config.service(options_namespace);
   config.service(create_namespace);
   config.service(inspect_namespace);
   config.service(delete_namespace);
