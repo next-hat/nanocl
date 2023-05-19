@@ -465,22 +465,8 @@ async fn logs_cargo(
   )
 }
 
-/// Endpoint to allow CORS preflight
-#[web::options("/cargoes{all}*")]
-pub(crate) async fn options_cargo() -> Result<web::HttpResponse, HttpError> {
-  Ok(
-    web::HttpResponse::Ok()
-      .header("Access-Control-Allow-Origin", "*")
-      .header("Access-Control-Allow-Headers", "*")
-      .header("Access-Control-Allow-Methods", "*")
-      .header("Access-Control-Max-Age", "600")
-      .finish(),
-  )
-}
-
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
-  config.service(options_cargo);
   config.service(delete_cargo);
   config.service(start_cargo);
   config.service(stop_cargo);
