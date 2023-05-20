@@ -175,6 +175,8 @@ pub async fn find(
             req = req.filter(resource_configs::data.contains(contains));
           }
 
+          req = req.order(resources::created_at.desc());
+
           req.load(&mut conn)
         }
         None => resources::table

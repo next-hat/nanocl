@@ -24,7 +24,7 @@ pub struct ResourceUpdateModel {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ResourceResetPath {
+pub struct ResourceRevertPath {
   pub version: String,
   pub name: String,
   pub id: uuid::Uuid,

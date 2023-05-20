@@ -24,13 +24,10 @@ async fn detect_version(client: &mut NanocldClient) -> IoResult<()> {
 async fn execute_args(args: &Cli) -> IoResult<()> {
   let cli_conf = config::read();
 
-  let mut client = match cli_conf.url {
-    Some(url) => {
-      let url = Box::leak(url.into_boxed_str());
-      NanocldClient::connect_to(url)
-    }
-    None => NanocldClient::connect_with_unix_default(),
-  };
+  let host = args.host.clone().unwrap_or(cli_conf.host);
+
+  let url = Box::leak(host.clone().into_boxed_str());
+  let mut client = NanocldClient::connect_to(url);
 
   if let Err(HttpClientError::HttpError(err)) = client.get_version().await {
     if err.status == 505 {
@@ -44,7 +41,7 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
     Commands::Resource(args) => commands::exec_resource(&client, args).await,
     Commands::Cargo(args) => commands::exec_cargo(&client, args).await,
     Commands::Events => commands::exec_events(&client).await,
-    Commands::State(args) => commands::exec_state(args).await,
+    Commands::State(args) => commands::exec_state(&host, args).await,
     Commands::Version => commands::exec_version(&client).await,
     Commands::Info => commands::exec_info(&client).await,
     Commands::Vm(args) => commands::exec_vm(&client, args).await,
@@ -170,7 +167,7 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "cargo",
-      "reset",
+      "revert",
       CARGO_NAME,
       &history.key.to_string(),
     ]);
@@ -229,7 +226,7 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "resource",
-      "reset",
+      "revert",
       "resource-example",
       &history.key.to_string(),
     ]);

@@ -42,6 +42,7 @@ Cargoes:
       Image: nexthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED1
+        - NEW_ENV=NEW_VALUE
 
   - Name: deploy-example2
     Container:

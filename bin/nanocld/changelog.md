@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [untagged]
 
+### Feature
+
+- Replication `Static` that can allow development tests
+
 ### Fixed
 
+- Rename reset to revert
 - Missing `created_at` field for resources
 - Order by `created_at` by default for resources
 

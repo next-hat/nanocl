@@ -11,7 +11,7 @@ use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
 use crate::{utils, repositories};
 use nanocl_utils::http_error::HttpError;
-use crate::models::{DaemonState, ResourceResetPath};
+use crate::models::{DaemonState, ResourceRevertPath};
 
 /// List resources
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -178,23 +178,23 @@ pub(crate) async fn list_resource_history(
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
-/// Reset a resource to a specific history
+/// Revert a resource to a specific history
 #[cfg_attr(feature = "dev", utoipa::path(
   patch,
   tag = "Resources",
-  path = "/resources/{Name}/histories/{Id}/reset",
+  path = "/resources/{Name}/histories/{Id}/revert",
   params(
-    ("Name" = String, Path, description = "The resource name to reset"),
-    ("Id" = String, Path, description = "The resource history id to reset to")
+    ("Name" = String, Path, description = "The resource name to revert"),
+    ("Id" = String, Path, description = "The resource history id to revert to")
   ),
   responses(
-    (status = 200, description = "The resource has been reset", body = Resource),
+    (status = 200, description = "The resource has been revert", body = Resource),
     (status = 404, description = "Resource is not existing", body = ApiError),
   ),
 ))]
-#[web::patch("/resources/{name}/histories/{id}/reset")]
-pub(crate) async fn reset_resource(
-  path: web::types::Path<ResourceResetPath>,
+#[web::patch("/resources/{name}/histories/{id}/revert")]
+pub(crate) async fn revert_resource(
+  path: web::types::Path<ResourceRevertPath>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let history =
@@ -227,7 +227,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(inspect_resource);
   config.service(patch_resource);
   config.service(list_resource_history);
-  config.service(reset_resource);
+  config.service(revert_resource);
 }
 
 #[cfg(test)]

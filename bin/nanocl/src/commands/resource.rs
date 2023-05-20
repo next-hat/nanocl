@@ -7,7 +7,7 @@ use nanocld_client::NanocldClient;
 use crate::utils::print::{print_yml, print_table};
 use crate::models::{
   ResourceArgs, ResourceCommands, ResourceRow, ResourceRemoveOpts,
-  ResourceInspectOpts, ResourceResetOpts, ResourceHistoryOpts,
+  ResourceInspectOpts, ResourceRevertOpts, ResourceHistoryOpts,
 };
 
 async fn exec_resource_ls(client: &NanocldClient) -> IoResult<()> {
@@ -68,11 +68,11 @@ async fn exec_resource_history(
   Ok(())
 }
 
-async fn exec_resource_reset(
+async fn exec_resource_revert(
   client: &NanocldClient,
-  opts: &ResourceResetOpts,
+  opts: &ResourceRevertOpts,
 ) -> IoResult<()> {
-  let resource = client.reset_resource(&opts.name, &opts.key).await?;
+  let resource = client.revert_resource(&opts.name, &opts.key).await?;
 
   print_yml(resource)?;
   Ok(())
@@ -92,6 +92,6 @@ pub async fn exec_resource(
     ResourceCommands::History(opts) => {
       exec_resource_history(client, opts).await
     }
-    ResourceCommands::Reset(opts) => exec_resource_reset(client, opts).await,
+    ResourceCommands::Revert(opts) => exec_resource_revert(client, opts).await,
   }
 }

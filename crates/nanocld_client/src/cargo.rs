@@ -400,19 +400,19 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Reset a cargo to a specific history
+  /// ## Revert a cargo to a specific history
   ///
   /// ## Arguments
   ///
-  /// * [name](str) - The name of the cargo to reset
-  /// * [id](str) - The id of the history to reset to
+  /// * [name](str) - The name of the cargo to revert
+  /// * [id](str) - The id of the history to revert to
   /// * [namespace](Option<String>) - The namespace where belong the cargo
   ///
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The [Cargo](Cargo) reseted
-  ///   * [Err](HttpClientError) - The cargo could not be reseted
+  ///   * [Ok](Ok) - The [Cargo](Cargo) reverted
+  ///   * [Err](HttpClientError) - The cargo could not be reverted
   ///
   /// ## Example
   ///
@@ -420,10 +420,10 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_with_unix_default();
-  /// let cargo = client.reset_cargo("my-cargo", "my-history-id", None).await.unwrap();
+  /// let cargo = client.revert_cargo("my-cargo", "my-history-id", None).await.unwrap();
   /// ```
   ///
-  pub async fn reset_cargo(
+  pub async fn revert_cargo(
     &self,
     name: &str,
     id: &str,
@@ -431,7 +431,7 @@ impl NanocldClient {
   ) -> Result<Cargo, HttpClientError> {
     let res = self
       .send_patch(
-        format!("/{}/cargoes/{name}/histories/{id}/reset", &self.version),
+        format!("/{}/cargoes/{name}/histories/{id}/revert", &self.version),
         None::<String>,
         Some(GenericNspQuery { namespace }),
       )
@@ -545,7 +545,7 @@ mod tests {
 
     let history = histories.first().unwrap();
     client
-      .reset_cargo(CARGO_NAME, &history.key.to_string(), None)
+      .revert_cargo(CARGO_NAME, &history.key.to_string(), None)
       .await
       .unwrap();
 

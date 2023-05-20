@@ -30,9 +30,9 @@ use clap::{Parser, Subcommand};
 #[derive(Debug, Parser)]
 #[clap(about, version, name = "nanocl")]
 pub struct Cli {
-  /// Nanocld host
-  #[clap(long, short = 'H', default_value = "unix://run/nanocl/nanocl.sock")]
-  pub host: String,
+  /// Nanocld host default: unix://run/nanocl/nanocl.sock
+  #[clap(long, short = 'H')]
+  pub host: Option<String>,
   /// Commands
   #[clap(subcommand)]
   pub command: Commands,

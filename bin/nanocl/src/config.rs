@@ -1,13 +1,24 @@
 use std::fs;
 use serde::{Serialize, Deserialize};
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct CliConfig {
-  pub url: Option<String>,
+  pub host: String,
   pub ssl_cert: Option<String>,
   pub ssl_key: Option<String>,
   pub ssl_ca: Option<String>,
+}
+
+impl Default for CliConfig {
+  fn default() -> Self {
+    Self {
+      host: String::from("unix://run/nanocl/nanocl.sock"),
+      ssl_cert: None,
+      ssl_key: None,
+      ssl_ca: None,
+    }
+  }
 }
 
 pub fn read() -> CliConfig {

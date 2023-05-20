@@ -13,7 +13,7 @@ use crate::cargo::CargoInspect;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(feature = "serde", serde(tag = "Mode", rename_all = "PascalCase"))]
 pub enum ReplicationMode {
   /// Auto is used to automatically define that the number of replicas in the cluster
   /// This will ensure at least 1 replica exists in the cluster
@@ -28,13 +28,21 @@ pub enum ReplicationMode {
   /// UniqueByNodeNames is used to ensure one replica is running on each node name
   UniqueByNodeNames { names: Vec<String> },
   /// Number is used to manually set the number of replicas in one node
-  Number(i64),
+  Static(ReplicationStatic),
   /// NumberByNodes is used to manually set the number of replicas in each node
-  NumberByNodes(i64),
+  StaticByNodes(ReplicationStatic),
   /// NumberByNodeGroups is used to manually set the number of replicas in each node group
-  NumberByNodeGroups { groups: Vec<String>, number: i64 },
+  StaticByNodeGroups { groups: Vec<String>, number: i64 },
   /// NumberByNodeNames is used to manually set the number of replicas in each node name
-  NumberByNodeNames { names: Vec<String>, number: i64 },
+  StaticByNodeNames { names: Vec<String>, number: i64 },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ReplicationStatic {
+  pub number: i64,
 }
 
 /// A cargo config partial is used to create a Cargo

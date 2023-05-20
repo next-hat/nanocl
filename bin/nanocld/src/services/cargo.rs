@@ -18,7 +18,7 @@ use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 use nanocl_utils::http_error::HttpError;
 
 use crate::{utils, repositories};
-use crate::models::{DaemonState, CargoResetPath};
+use crate::models::{DaemonState, CargoRevertPath};
 
 /// List cargoes
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -383,25 +383,25 @@ async fn list_cargo_history(
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
-/// Reset a cargo to a specific history
+/// Revert a cargo to a specific history
 #[cfg_attr(feature = "dev", utoipa::path(
   patch,
   tag = "Cargoes",
-  path = "/cargoes/{Name}/histories/{Id}/reset",
+  path = "/cargoes/{Name}/histories/{Id}/revert",
   params(
     ("Name" = String, Path, description = "Name of the cargo"),
     ("Id" = String, Path, description = "Id of the cargo history"),
     ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
   ),
   responses(
-    (status = 200, description = "Cargo reset", body = Cargo),
+    (status = 200, description = "Cargo revert", body = Cargo),
     (status = 404, description = "Cargo does not exist", body = ApiError),
   ),
 ))]
-#[web::patch("/cargoes/{name}/histories/{id}/reset")]
-async fn reset_cargo(
+#[web::patch("/cargoes/{name}/histories/{id}/revert")]
+async fn revert_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<CargoResetPath>,
+  path: web::types::Path<CargoRevertPath>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
@@ -476,7 +476,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_cargo);
   config.service(inspect_cargo);
   config.service(list_cargo_history);
-  config.service(reset_cargo);
+  config.service(revert_cargo);
   config.service(exec_command);
   config.service(logs_cargo);
   config.service(list_cargo_instance);
@@ -623,7 +623,7 @@ mod tests {
     let id = histories[0].key;
     let res = srv
       .patch(format!(
-        "/v0.2/cargoes/{}/histories/{id}/reset",
+        "/v0.2/cargoes/{}/histories/{id}/revert",
         response.name
       ))
       .send()

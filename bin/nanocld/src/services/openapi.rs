@@ -227,7 +227,7 @@ impl Modify for VersionModifier {
     cargo::exec_command,
     cargo::kill_cargo,
     cargo::list_cargo_history,
-    cargo::reset_cargo,
+    cargo::revert_cargo,
     cargo::logs_cargo,
     // Cargo Image
     cargo_image::list_cargo_image,
@@ -259,7 +259,7 @@ impl Modify for VersionModifier {
     resource::delete_resource,
     resource::patch_resource,
     resource::list_resource_history,
-    resource::reset_resource,
+    resource::revert_resource,
     // Metric
     metric::list_metric,
     // Http Metric

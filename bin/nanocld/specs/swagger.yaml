@@ -401,13 +401,13 @@ paths:
                   $ref: '#/components/schemas/CargoConfig'
         '404':
           description: Cargo does not exist
-  /cargoes/{Name}/histories/{Id}/reset:
+  /cargoes/{Name}/histories/{Id}/revert:
     patch:
       tags:
       - Cargoes
-      summary: Reset a cargo to a specific history
-      description: Reset a cargo to a specific history
-      operationId: reset_cargo
+      summary: Revert a cargo to a specific history
+      description: Revert a cargo to a specific history
+      operationId: revert_cargo
       parameters:
       - name: Name
         in: path
@@ -430,7 +430,7 @@ paths:
           nullable: true
       responses:
         '200':
-          description: Cargo reset
+          description: Cargo revert
           content:
             application/json:
               schema:
@@ -1098,29 +1098,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /resources/{Name}/histories/{Id}/reset:
+  /resources/{Name}/histories/{Id}/revert:
     patch:
       tags:
       - Resources
-      summary: Reset a resource to a specific history
-      description: Reset a resource to a specific history
-      operationId: reset_resource
+      summary: Revert a resource to a specific history
+      description: Revert a resource to a specific history
+      operationId: revert_resource
       parameters:
       - name: Name
         in: path
-        description: The resource name to reset
+        description: The resource name to revert
         required: true
         schema:
           type: string
       - name: Id
         in: path
-        description: The resource history id to reset to
+        description: The resource history id to revert to
         required: true
         schema:
           type: string
       responses:
         '200':
-          description: The resource has been reset
+          description: The resource has been revert
           content:
             application/json:
               schema:
@@ -3922,99 +3922,120 @@ components:
           nullable: true
     ReplicationMode:
       oneOf:
-      - type: string
-        enum:
-        - Auto
-      - type: string
-        enum:
-        - Unique
-      - type: string
-        enum:
-        - UniqueByNode
       - type: object
         required:
-        - UniqueByNodeGroups
+        - Mode
         properties:
-          UniqueByNodeGroups:
-            type: object
-            description: UniqueByNodeGroups is used to ensure one replica is running on each node group
-            required:
-            - groups
-            properties:
-              groups:
-                type: array
-                items:
-                  type: string
+          Mode:
+            type: string
+            enum:
+            - Auto
       - type: object
         required:
-        - UniqueByNodeNames
+        - Mode
         properties:
-          UniqueByNodeNames:
-            type: object
-            description: UniqueByNodeNames is used to ensure one replica is running on each node name
-            required:
-            - names
-            properties:
-              names:
-                type: array
-                items:
-                  type: string
+          Mode:
+            type: string
+            enum:
+            - Unique
       - type: object
         required:
-        - Number
+        - Mode
         properties:
-          Number:
+          Mode:
+            type: string
+            enum:
+            - UniqueByNode
+      - type: object
+        description: UniqueByNodeGroups is used to ensure one replica is running on each node group
+        required:
+        - groups
+        - Mode
+        properties:
+          groups:
+            type: array
+            items:
+              type: string
+          Mode:
+            type: string
+            enum:
+            - UniqueByNodeGroups
+      - type: object
+        description: UniqueByNodeNames is used to ensure one replica is running on each node name
+        required:
+        - names
+        - Mode
+        properties:
+          names:
+            type: array
+            items:
+              type: string
+          Mode:
+            type: string
+            enum:
+            - UniqueByNodeNames
+      - allOf:
+        - $ref: '#/components/schemas/ReplicationStatic'
+        - type: object
+          required:
+          - Mode
+          properties:
+            Mode:
+              type: string
+              enum:
+              - Static
+      - allOf:
+        - $ref: '#/components/schemas/ReplicationStatic'
+        - type: object
+          required:
+          - Mode
+          properties:
+            Mode:
+              type: string
+              enum:
+              - StaticByNodes
+      - type: object
+        description: NumberByNodeGroups is used to manually set the number of replicas in each node group
+        required:
+        - groups
+        - number
+        - Mode
+        properties:
+          groups:
+            type: array
+            items:
+              type: string
+          number:
             type: integer
             format: int64
-            description: Number is used to manually set the number of replicas in one node
+          Mode:
+            type: string
+            enum:
+            - StaticByNodeGroups
       - type: object
+        description: NumberByNodeNames is used to manually set the number of replicas in each node name
         required:
-        - NumberByNodes
+        - names
+        - number
+        - Mode
         properties:
-          NumberByNodes:
+          names:
+            type: array
+            items:
+              type: string
+          number:
             type: integer
             format: int64
-            description: NumberByNodes is used to manually set the number of replicas in each node
-      - type: object
-        required:
-        - NumberByNodeGroups
-        properties:
-          NumberByNodeGroups:
-            type: object
-            description: NumberByNodeGroups is used to manually set the number of replicas in each node group
-            required:
-            - groups
-            - number
-            properties:
-              groups:
-                type: array
-                items:
-                  type: string
-              number:
-                type: integer
-                format: int64
-      - type: object
-        required:
-        - NumberByNodeNames
-        properties:
-          NumberByNodeNames:
-            type: object
-            description: NumberByNodeNames is used to manually set the number of replicas in each node name
-            required:
-            - names
-            - number
-            properties:
-              names:
-                type: array
-                items:
-                  type: string
-              number:
-                type: integer
-                format: int64
+          Mode:
+            type: string
+            enum:
+            - StaticByNodeNames
       description: |-
         Auto is used to automatically define that the number of replicas in the cluster
         Number is used to manually set the number of replicas
         Note: auto will ensure at least 1 replica exists in the cluster
+      discriminator:
+        propertyName: Mode
     Resource:
       type: object
       description: |-
