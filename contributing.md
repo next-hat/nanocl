@@ -175,6 +175,11 @@ Now you can run the CLI:
 
 To run tests, make sure all `Nanocl` services are running with `docker compose up`.<br/>
 Then be sure to have correct permission set on `/run/nanocl`
+You also need this entry in your `/etc/hosts`
+
+```
+127.0.0.1 nstore.nanocl.internal
+```
 
 - Run all tests
 

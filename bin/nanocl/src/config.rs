@@ -13,7 +13,7 @@ pub struct CliConfig {
 impl Default for CliConfig {
   fn default() -> Self {
     Self {
-      host: String::from("unix://run/nanocl/nanocl.sock"),
+      host: String::from("unix:///run/nanocl/nanocl.sock"),
       ssl_cert: None,
       ssl_key: None,
       ssl_ca: None,
