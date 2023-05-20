@@ -50,7 +50,7 @@ impl NanocldClient {
     }
   }
 
-  pub fn connect_to(url: &'static str) -> Self {
+  pub fn connect_to(url: &'static str, version: Option<String>) -> Self {
     match url {
       url if url.starts_with("http://") || url.starts_with("https://") => {
         let client = http::client::Client::build()
@@ -65,7 +65,7 @@ impl NanocldClient {
           url: url.into(),
           client,
           unix_socket: None,
-          version: format!("v{NANOCLD_DEFAULT_VERSION}"),
+          version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
         }
       }
       url if url.starts_with("unix://") => {
@@ -86,7 +86,7 @@ impl NanocldClient {
           url: "http://localhost".into(),
           client,
           unix_socket: Some(path.into()),
-          version: format!("v{NANOCLD_DEFAULT_VERSION}"),
+          version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
         }
       }
       _ => panic!("Invalid url: {}", url),
@@ -95,19 +95,6 @@ impl NanocldClient {
 
   pub fn set_version(&mut self, version: &str) {
     self.version = format!("v{version}")
-  }
-
-  pub fn connect_with_url(url: &str, version: &str) -> Self {
-    let client = http::client::Client::build()
-      .timeout(ntex::time::Millis::from_secs(100))
-      .finish();
-
-    NanocldClient {
-      client,
-      unix_socket: None,
-      url: url.to_owned(),
-      version: version.to_owned(),
-    }
   }
 
   fn send_error(

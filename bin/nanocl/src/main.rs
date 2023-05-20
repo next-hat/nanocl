@@ -27,7 +27,7 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
   let host = args.host.clone().unwrap_or(cli_conf.host);
 
   let url = Box::leak(host.clone().into_boxed_str());
-  let mut client = NanocldClient::connect_to(url);
+  let mut client = NanocldClient::connect_to(url, None);
 
   if let Err(HttpClientError::HttpError(err)) = client.get_version().await {
     if err.status == 505 {

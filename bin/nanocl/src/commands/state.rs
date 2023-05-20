@@ -235,10 +235,12 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
         .ok_or(IoError::not_fount("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
-      NanocldClient::connect_with_url(&url, version)
+      let url = Box::leak(url.into_boxed_str());
+      NanocldClient::connect_to(url, Some(version.into()))
     }
     api_version if meta.api_version.starts_with('v') => {
-      NanocldClient::connect_with_url(host, &api_version)
+      let url = Box::leak(host.to_owned().into_boxed_str());
+      NanocldClient::connect_to(url, Some(api_version))
     }
     _ => {
       let mut paths = meta
@@ -253,7 +255,9 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
         .ok_or(IoError::not_fount("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
-      NanocldClient::connect_with_url(&format!("https://{url}"), version)
+      let url = format!("https://{url}");
+      let url = Box::leak(url.into_boxed_str());
+      NanocldClient::connect_to(url, Some(version.into()))
     }
   };
   Ok(client)
