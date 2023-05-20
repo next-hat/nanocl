@@ -110,6 +110,7 @@ pub async fn list_by_resource(
   let models = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = dsl::resource_configs
+      .order(dsl::created_at.desc())
       .filter(dsl::resource_key.eq(key))
       .load::<ResourceConfigDbModel>(&mut conn)
       .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;

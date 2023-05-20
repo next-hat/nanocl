@@ -92,6 +92,7 @@ pub async fn find_by_list_query(
       sql = sql.offset(offset);
     }
     let items = sql
+      .order(dsl::created_at.desc())
       .get_results(&mut conn)
       .map_err(|err| err.map_err_context(|| "Cargo"))?;
     Ok::<_, IoError>(items)

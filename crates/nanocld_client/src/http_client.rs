@@ -22,6 +22,12 @@ pub struct NanocldClient {
   pub unix_socket: Option<String>,
 }
 
+impl std::fmt::Display for NanocldClient {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.url)
+  }
+}
+
 impl NanocldClient {
   pub fn connect_with_unix_default() -> Self {
     let client = http::client::Client::build()
@@ -44,8 +50,8 @@ impl NanocldClient {
     }
   }
 
-  pub fn connect_to(url: &'static str) -> Self {
-    let (client, url) = match url {
+  pub fn connect_to(url: &'static str, version: Option<String>) -> Self {
+    match url {
       url if url.starts_with("http://") || url.starts_with("https://") => {
         let client = http::client::Client::build()
           .connector(
@@ -55,9 +61,15 @@ impl NanocldClient {
           )
           .timeout(ntex::time::Millis::from_secs(100))
           .finish();
-        (client, url.to_owned())
+        NanocldClient {
+          url: url.into(),
+          client,
+          unix_socket: None,
+          version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
+        }
       }
       url if url.starts_with("unix://") => {
+        let path = url.trim_start_matches("unix://");
         let client = http::client::Client::build()
           .connector(
             http::client::Connector::default()
@@ -70,34 +82,19 @@ impl NanocldClient {
           )
           .timeout(ntex::time::Millis::from_secs(100))
           .finish();
-        (client, "http://localhost".into())
+        NanocldClient {
+          url: "http://localhost".into(),
+          client,
+          unix_socket: Some(path.into()),
+          version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
+        }
       }
       _ => panic!("Invalid url: {}", url),
-    };
-
-    NanocldClient {
-      url,
-      client,
-      unix_socket: None,
-      version: format!("v{NANOCLD_DEFAULT_VERSION}"),
     }
   }
 
   pub fn set_version(&mut self, version: &str) {
     self.version = format!("v{version}")
-  }
-
-  pub fn connect_with_url(url: &str, version: &str) -> Self {
-    let client = http::client::Client::build()
-      .timeout(ntex::time::Millis::from_secs(100))
-      .finish();
-
-    NanocldClient {
-      client,
-      unix_socket: None,
-      url: url.to_owned(),
-      version: version.to_owned(),
-    }
   }
 
   fn send_error(
@@ -142,23 +139,38 @@ impl NanocldClient {
   }
 
   fn delete(&self, url: String) -> http::client::ClientRequest {
-    self.client.delete(self.gen_url(url))
+    self
+      .client
+      .delete(self.gen_url(url))
+      .header("User-Agent", "nanocld.client.rs")
   }
 
   fn post(&self, url: String) -> http::client::ClientRequest {
-    self.client.post(self.gen_url(url))
+    self
+      .client
+      .post(self.gen_url(url))
+      .header("User-Agent", "nanocld.client.rs")
   }
 
   fn patch(&self, url: String) -> http::client::ClientRequest {
-    self.client.patch(self.gen_url(url))
+    self
+      .client
+      .patch(self.gen_url(url))
+      .header("User-Agent", "nanocld.client.rs")
   }
 
   fn put(&self, url: String) -> http::client::ClientRequest {
-    self.client.put(self.gen_url(url))
+    self
+      .client
+      .put(self.gen_url(url))
+      .header("User-Agent", "nanocld.client.rs")
   }
 
   fn head(&self, url: String) -> http::client::ClientRequest {
-    self.client.head(self.gen_url(url))
+    self
+      .client
+      .head(self.gen_url(url))
+      .header("User-Agent", "nanocld.client.rs")
   }
 
   pub(crate) async fn send_get<Q>(

@@ -4,6 +4,9 @@ use ntex::rt;
 use ntex::web;
 use ntex::util::Bytes;
 use futures::{StreamExt, TryStreamExt};
+use futures_util::TryFutureExt;
+use nanocl_stubs::cargo_config::ReplicationMode;
+use bollard_next::service::ContainerCreateResponse;
 
 use bollard_next::container::LogOutput;
 use nanocl_stubs::node::NodeContainerSummary;
@@ -57,90 +60,111 @@ async fn create_instance(
   number: i64,
   docker_api: &bollard_next::Docker,
 ) -> Result<Vec<String>, HttpError> {
-  let mut instances = Vec::new();
-  for current in 0..number {
-    let name = if current > 0 {
-      format!("{}-{}.c", cargo.key, current)
-    } else {
-      format!("{}.c", cargo.key)
-    };
+  let futures = (0..number)
+    .collect::<Vec<i64>>()
+    .into_iter()
+    .map(move |current| {
+      let name = if current > 0 {
+        format!("{current}-{}.c", cargo.key)
+      } else {
+        format!("{}.c", cargo.key)
+      };
 
-    let create_options = bollard_next::container::CreateContainerOptions {
-      name,
-      ..Default::default()
-    };
+      let create_options = bollard_next::container::CreateContainerOptions {
+        name: name.clone(),
+        ..Default::default()
+      };
 
-    // Add cargo label to the container to track it
-    let mut labels =
-      cargo.config.container.labels.to_owned().unwrap_or_default();
-    labels.insert("io.nanocl".into(), "enabled".into());
-    labels.insert("io.nanocl.c".into(), cargo.key.to_owned());
-    labels.insert("io.nanocl.n".into(), cargo.namespace_name.to_owned());
-    labels.insert("io.nanocl.cnsp".into(), cargo.namespace_name.to_owned());
+      // Add cargo label to the container to track it
+      let mut labels =
+        cargo.config.container.labels.to_owned().unwrap_or_default();
+      labels.insert("io.nanocl".into(), "enabled".into());
+      labels.insert("io.nanocl.c".into(), cargo.key.to_owned());
+      labels.insert("io.nanocl.n".into(), cargo.namespace_name.to_owned());
+      labels.insert("io.nanocl.cnsp".into(), cargo.namespace_name.to_owned());
 
-    let auto_remove = cargo
-      .config
-      .to_owned()
-      .container
-      .host_config
-      .unwrap_or_default()
-      .auto_remove
-      .unwrap_or(false);
+      let auto_remove = cargo
+        .config
+        .to_owned()
+        .container
+        .host_config
+        .unwrap_or_default()
+        .auto_remove
+        .unwrap_or(false);
 
-    let restart_policy = if auto_remove {
-      None
-    } else {
-      Some(
-        cargo
-          .config
-          .to_owned()
-          .container
-          .host_config
-          .unwrap_or_default()
-          .restart_policy
-          .unwrap_or(RestartPolicy {
-            name: Some(RestartPolicyNameEnum::ALWAYS),
-            maximum_retry_count: None,
-          }),
-      )
-    };
-
-    // Merge the cargo config with the container config
-    // And set his network mode to the cargo namespace
-    let config = bollard_next::container::Config {
-      attach_stderr: Some(true),
-      attach_stdout: Some(true),
-      tty: Some(true),
-      labels: Some(labels),
-      host_config: Some(HostConfig {
-        restart_policy,
-        network_mode: Some(
+      let restart_policy = if auto_remove {
+        None
+      } else {
+        Some(
           cargo
             .config
             .to_owned()
             .container
             .host_config
             .unwrap_or_default()
-            .network_mode
-            .unwrap_or(cargo.namespace_name.to_owned()),
-        ),
-        ..cargo
-          .config
-          .to_owned()
-          .container
-          .host_config
-          .unwrap_or_default()
-          .to_owned()
-      }),
-      ..cargo.config.container.to_owned()
-    };
+            .restart_policy
+            .unwrap_or(RestartPolicy {
+              name: Some(RestartPolicyNameEnum::ALWAYS),
+              maximum_retry_count: None,
+            }),
+        )
+      };
 
-    let res = docker_api
-      .create_container::<String>(Some(create_options), config)
-      .await?;
-    instances.push(res.id);
-  }
+      let mut env = cargo.config.container.env.clone().unwrap_or_default();
+      let hostname = match cargo.config.container.hostname {
+        Some(ref hostname) => format!("{current}-{hostname}"),
+        None => name,
+      };
 
+      env.push(format!("NANOCL_CARGO_KEY={}", cargo.key));
+      env.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));
+      env.push(format!("NANOCL_CARGO_INSTANCE={}", current));
+
+      // Merge the cargo config with the container config
+      // And set his network mode to the cargo namespace
+      let config = bollard_next::container::Config {
+        attach_stderr: Some(true),
+        attach_stdout: Some(true),
+        tty: Some(true),
+        hostname: Some(hostname),
+        labels: Some(labels),
+        env: Some(env),
+        host_config: Some(HostConfig {
+          restart_policy,
+          network_mode: Some(
+            cargo
+              .config
+              .to_owned()
+              .container
+              .host_config
+              .unwrap_or_default()
+              .network_mode
+              .unwrap_or(cargo.namespace_name.to_owned()),
+          ),
+          ..cargo
+            .config
+            .to_owned()
+            .container
+            .host_config
+            .unwrap_or_default()
+        }),
+        ..cargo.config.container.to_owned()
+      };
+
+      docker_api
+        .create_container::<String>(Some(create_options), config)
+        .map_err(HttpError::from)
+    })
+    .collect::<Vec<_>>();
+
+  let instances = futures::future::join_all(futures)
+    .await
+    .into_iter()
+    .collect::<Result<Vec<ContainerCreateResponse>, HttpError>>()?
+    .iter()
+    .map(|res| res.id.to_owned())
+    .collect();
+  // .map(|res| res.id)
   Ok(instances)
 }
 
@@ -198,7 +222,24 @@ pub async fn create(
     repositories::cargo::create(namespace, config, version, &state.pool)
       .await?;
 
-  if let Err(err) = create_instance(&cargo, 1, &state.docker_api).await {
+  let number = if let Some(mode) = &cargo.config.replication {
+    match mode {
+      ReplicationMode::Static(replication_static) => replication_static.number,
+      ReplicationMode::Auto => 1,
+      ReplicationMode::Unique => 1,
+      ReplicationMode::UniqueByNode => 1,
+      _ => 1,
+      // ReplicationMode::UniqueByNodeGroups { groups } => 1,
+      // ReplicationMode::UniqueByNodeNames { names } => 1,
+      // ReplicationMode::StaticByNodes(_) => 1,
+      // ReplicationMode::StaticByNodeGroups { groups, number } => 1,
+      // ReplicationMode::StaticByNodeNames { names, number } => 1,
+    }
+  } else {
+    1
+  };
+
+  if let Err(err) = create_instance(&cargo, number, &state.docker_api).await {
     repositories::cargo::delete_by_key(&cargo.key, &state.pool).await?;
     return Err(err);
   }
@@ -241,7 +282,8 @@ pub async fn start(
 
   let containers = list_instance(&cargo_key, &docker_api).await?;
 
-  let mut futures = Vec::new();
+  let mut autoremove_futs = Vec::new();
+  let mut futs = Vec::new();
 
   for container in containers {
     let id = container.id.unwrap_or_default();
@@ -249,7 +291,8 @@ pub async fn start(
     if auto_remove {
       let id = id.clone();
       let docker_api = docker_api.clone();
-      futures.push(async move {
+      autoremove_futs.push(async move {
+        let id = id.clone();
         let options = Some(WaitContainerOptions {
           condition: "removed",
         });
@@ -259,13 +302,20 @@ pub async fn start(
         }
       });
     }
-    docker_api.start_container::<String>(&id, None).await?;
+    let id = id.clone();
+    let docker_api = docker_api.clone();
+    let fut = async move {
+      let _ = docker_api.start_container::<String>(&id, None).await;
+    };
+    futs.push(fut);
   }
+
+  let _ = futures::future::join_all(futs).await;
 
   if auto_remove {
     let pool = state.pool.clone();
     rt::spawn(async move {
-      futures::future::join_all(futures).await;
+      futures::future::join_all(autoremove_futs).await;
       if let Err(err) =
         repositories::cargo::delete_by_key(&cargo_key, &pool).await
       {
@@ -421,28 +471,45 @@ pub async fn put(
       .await?;
   }
 
-  // Create instance with the new config
-  let new_instances = match create_instance(&cargo, 1, &state.docker_api).await
-  {
-    Err(err) => {
-      // If the creation of the new instance failed, we rename the old containers
-      for container in containers.iter().cloned() {
-        let names = container.names.unwrap_or_default();
-        let name = names[0].replace("-backup", "");
-
-        state
-          .docker_api
-          .rename_container(
-            &container.id.unwrap_or_default(),
-            bollard_next::container::RenameContainerOptions { name },
-          )
-          .await?;
-        log::error!("Unable to create cargo instance {} : {err}", cargo.key);
-      }
-      Vec::new()
+  let number = if let Some(mode) = &cargo.config.replication {
+    match mode {
+      ReplicationMode::Static(replication_static) => replication_static.number,
+      ReplicationMode::Auto => 1,
+      ReplicationMode::Unique => 1,
+      ReplicationMode::UniqueByNode => 1,
+      _ => 1,
+      // ReplicationMode::UniqueByNodeGroups { groups } => 1,
+      // ReplicationMode::UniqueByNodeNames { names } => 1,
+      // ReplicationMode::StaticByNodes(_) => 1,
+      // ReplicationMode::StaticByNodeGroups { groups, number } => 1,
+      // ReplicationMode::StaticByNodeNames { names, number } => 1,
     }
-    Ok(instances) => instances,
+  } else {
+    1
   };
+
+  // Create instance with the new config
+  let new_instances =
+    match create_instance(&cargo, number, &state.docker_api).await {
+      Err(err) => {
+        // If the creation of the new instance failed, we rename the old containers
+        for container in containers.iter().cloned() {
+          let names = container.names.unwrap_or_default();
+          let name = names[0].replace("-backup", "");
+
+          state
+            .docker_api
+            .rename_container(
+              &container.id.unwrap_or_default(),
+              bollard_next::container::RenameContainerOptions { name },
+            )
+            .await?;
+          log::error!("Unable to create cargo instance {} : {err}", cargo.key);
+        }
+        Vec::new()
+      }
+      Ok(instances) => instances,
+    };
 
   // start created containers
   if let Err(err) = start(cargo_key, state).await {

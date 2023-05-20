@@ -221,7 +221,7 @@ async fn attach_to_cargoes(
   Ok(())
 }
 
-fn gen_client(meta: &StateMeta) -> IoResult<NanocldClient> {
+fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
   let client = match meta.api_version.clone() {
     api_version if meta.api_version.starts_with("http") => {
       let mut paths = api_version
@@ -235,10 +235,12 @@ fn gen_client(meta: &StateMeta) -> IoResult<NanocldClient> {
         .ok_or(IoError::not_fount("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
-      NanocldClient::connect_with_url(&url, version)
+      let url = Box::leak(url.into_boxed_str());
+      NanocldClient::connect_to(url, Some(version.into()))
     }
     api_version if meta.api_version.starts_with('v') => {
-      NanocldClient::connect_with_unix_version(&api_version)
+      let url = Box::leak(host.to_owned().into_boxed_str());
+      NanocldClient::connect_to(url, Some(api_version))
     }
     _ => {
       let mut paths = meta
@@ -253,7 +255,9 @@ fn gen_client(meta: &StateMeta) -> IoResult<NanocldClient> {
         .ok_or(IoError::not_fount("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
-      NanocldClient::connect_with_url(&format!("https://{url}"), version)
+      let url = format!("https://{url}");
+      let url = Box::leak(url.into_boxed_str());
+      NanocldClient::connect_to(url, Some(version.into()))
     }
   };
   Ok(client)
@@ -380,10 +384,10 @@ async fn parse_state_file(
   read_from_file(&path)
 }
 
-async fn exec_state_apply(opts: &StateOpts) -> IoResult<()> {
+async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
   let (meta, yaml) = parse_state_file(&opts.file_path).await?;
 
-  let client = gen_client(&meta)?;
+  let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;
   let mut namespace = String::from("default");
   let mut cargoes = Vec::new();
@@ -449,9 +453,9 @@ async fn exec_state_apply(opts: &StateOpts) -> IoResult<()> {
   Ok(())
 }
 
-async fn exec_state_revert(opts: &StateOpts) -> IoResult<()> {
+async fn exec_state_revert(host: &str, opts: &StateOpts) -> IoResult<()> {
   let (meta, yaml) = parse_state_file(&opts.file_path).await?;
-  let client = gen_client(&meta)?;
+  let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;
   let yaml = inject_data(yaml.clone(), &args, &client).await?;
   let data = serde_json::to_value(&yaml)
@@ -480,9 +484,9 @@ async fn exec_state_revert(opts: &StateOpts) -> IoResult<()> {
   Ok(())
 }
 
-pub async fn exec_state(args: &StateArgs) -> IoResult<()> {
+pub async fn exec_state(host: &str, args: &StateArgs) -> IoResult<()> {
   match &args.commands {
-    StateCommands::Apply(opts) => exec_state_apply(opts).await,
-    StateCommands::Revert(opts) => exec_state_revert(opts).await,
+    StateCommands::Apply(opts) => exec_state_apply(host, opts).await,
+    StateCommands::Revert(opts) => exec_state_revert(host, opts).await,
   }
 }

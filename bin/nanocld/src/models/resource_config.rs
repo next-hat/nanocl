@@ -21,6 +21,7 @@ impl From<ResourceConfigDbModel> for ResourceConfig {
     ResourceConfig {
       key: item.key,
       version: item.version,
+      created_at: item.created_at,
       resource_key: item.resource_key,
       data: item.data,
     }

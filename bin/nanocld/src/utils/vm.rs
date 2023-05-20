@@ -211,7 +211,7 @@ pub async fn create_instance(
   }
 
   let config = bollard_next::container::Config {
-    image: Some("nexthat/nanocl-qemu:0.1.0".into()),
+    image: Some("nanocl-qemu:0.1.0".into()),
     tty: Some(true),
     hostname: vm.config.hostname.clone(),
     env: Some(env),

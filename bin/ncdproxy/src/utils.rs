@@ -327,13 +327,6 @@ async fn gen_http_server_block(
 server {{
   listen {listen_http};
 {http_host}{ssl}{includes}
-
-  error_page 495 496 497 /400_ssl.html;
-  location = /400_ssl.html {{
-    root /usr/share/nginx/html;
-    internal;
-  }}
-
 {locations}
 }}\n",
   );

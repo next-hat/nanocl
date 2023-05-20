@@ -17,8 +17,8 @@ pub enum ResourceCommands {
   Inspect(ResourceInspectOpts),
   /// Browse history of a resource
   History(ResourceHistoryOpts),
-  /// Reset a resource to a specific history
-  Reset(ResourceResetOpts),
+  /// Revert a resource to a specific history
+  Revert(ResourceRevertOpts),
 }
 
 /// Manage resources
@@ -85,9 +85,9 @@ pub struct ResourceHistoryOpts {
 }
 
 #[derive(Debug, Parser)]
-pub struct ResourceResetOpts {
-  /// The name of the resource to reset
+pub struct ResourceRevertOpts {
+  /// The name of the resource to revert
   pub name: String,
-  /// The key of the history to reset to
+  /// The key of the history to revert to
   pub key: String,
 }

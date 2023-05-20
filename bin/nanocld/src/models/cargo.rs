@@ -25,9 +25,9 @@ pub struct CargoUpdateDbModel {
   pub(crate) config_key: Option<uuid::Uuid>,
 }
 
-/// Structure used to serialize cargo reset path
+/// Structure used to serialize cargo revert path
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct CargoResetPath {
+pub struct CargoRevertPath {
   pub version: String,
   pub name: String,
   pub id: String,

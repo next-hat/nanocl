@@ -188,6 +188,7 @@ pub async fn list_by_cargo(
   let dbmodels = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let configs = dsl::cargo_configs
+      .order(dsl::created_at.desc())
       .filter(dsl::cargo_key.eq(key))
       .get_results::<CargoConfigDbModel>(&mut conn)
       .map_err(|err| err.map_err_context(|| "CargoConfig"))?;

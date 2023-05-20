@@ -11,7 +11,8 @@ use crate::utils::print::{print_yml, print_table};
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
-  CargoExecOpts, CargoHistoryOpts, CargoResetOpts, CargoLogsOpts, CargoRunOpts,
+  CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
+  CargoRunOpts,
 };
 
 use super::cargo_image::{self, exec_cargo_image_create};
@@ -204,13 +205,13 @@ async fn exec_cargo_logs(
   Ok(())
 }
 
-async fn exec_cargo_reset(
+async fn exec_cargo_revert(
   client: &NanocldClient,
   args: &CargoArgs,
-  opts: &CargoResetOpts,
+  opts: &CargoRevertOpts,
 ) -> IoResult<()> {
   let cargo = client
-    .reset_cargo(&opts.name, &opts.history_id, args.namespace.clone())
+    .revert_cargo(&opts.name, &opts.history_id, args.namespace.clone())
     .await?;
   print_yml(cargo)?;
   Ok(())
@@ -270,8 +271,8 @@ pub async fn exec_cargo(
     CargoCommands::History(opts) => {
       exec_cargo_history(client, args, opts).await
     }
-    CargoCommands::Reset(options) => {
-      exec_cargo_reset(client, args, options).await
+    CargoCommands::Revert(options) => {
+      exec_cargo_revert(client, args, options).await
     }
     CargoCommands::Logs(options) => {
       exec_cargo_logs(client, args, options).await

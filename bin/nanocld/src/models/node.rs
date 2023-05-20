@@ -19,6 +19,6 @@ impl NodeDbModel {
     let url =
       Box::leak(format!("http://{}:8081", self.ip_address).into_boxed_str());
 
-    NanocldClient::connect_to(url)
+    NanocldClient::connect_to(url, None)
   }
 }

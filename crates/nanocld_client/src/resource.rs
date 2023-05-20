@@ -209,14 +209,14 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  pub async fn reset_resource(
+  pub async fn revert_resource(
     &self,
     name: &str,
     key: &str,
   ) -> Result<Resource, HttpClientError> {
     let res = self
       .send_patch(
-        format!("/{}/resources/{name}/histories/{key}/reset", &self.version),
+        format!("/{}/resources/{name}/histories/{key}/revert", &self.version),
         None::<String>,
         None::<String>,
       )
