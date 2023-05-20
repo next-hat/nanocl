@@ -1,0 +1,63 @@
+# [nanocl/Deployment] $ nanocl state apply -f examples/minio.yml
+ApiVersion: v0.6
+Type: Deployment
+
+Namespace: next-hat
+
+Cargoes:
+  - Name: s3
+    Container:
+      Image: minio/minio:latest
+      Env:
+        - MINIO_BROWSER_REDIRECT_URL=http://console.s3.next-hat.internal
+        - MINIO_SERVER_URL=http://s3.next-hat.internal
+      HostConfig:
+        Dns:
+          - ${{ Namespaces.next-hat.Gateway }}
+          - 1.1.1.1
+        Binds:
+          - /opt/s3/data:/data
+      Cmd:
+        - server
+        - /data
+        - --console-address
+        - :9001
+
+Resources:
+  # Dns Rule for our namespace
+  - Name: next-hat.internal
+    Kind: DnsRule
+    Version: v0.1
+    Config:
+      Network: next-hat.nsp
+      Entries:
+        - Name: next-hat.internal
+          IpAddress: next-hat.nsp
+
+  # Proxy Rule for our namespace
+  - Name: s3.next-hat.internal
+    Kind: ProxyRule
+    Version: v0.4
+    Config:
+      Watch:
+        - s3.next-hat
+      Rules:
+        - Domain: s3.next-hat.internal
+          Network: next-hat.nsp
+          Locations:
+            - Path: /
+              Target:
+                CargoKey: s3.next-hat
+                CargoPort: 9000
+
+        - Domain: console.s3.next-hat.internal
+          Network: next-hat.nsp
+          Locations:
+            - Path: /
+              Version: 1.1
+              Headers:
+                - Upgrade $http_upgrade
+                - Connection "Upgrade"
+              Target:
+                CargoKey: s3.next-hat
+                CargoPort: 9001

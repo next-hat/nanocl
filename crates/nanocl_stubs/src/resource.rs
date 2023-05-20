@@ -74,6 +74,8 @@ pub struct ResourceConfig {
   pub key: uuid::Uuid,
   /// Version of the config
   pub version: String,
+  /// The creation date of the resource
+  pub created_at: chrono::NaiveDateTime,
   /// Resource key associated with the config
   pub resource_key: String,
   /// The config of the resource as a json object

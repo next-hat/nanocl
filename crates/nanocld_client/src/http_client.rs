@@ -142,23 +142,38 @@ impl NanocldClient {
   }
 
   fn delete(&self, url: String) -> http::client::ClientRequest {
-    self.client.delete(self.gen_url(url))
+    self
+      .client
+      .delete(self.gen_url(url))
+      .header("User-Agent", "nanocld.client.rs")
   }
 
   fn post(&self, url: String) -> http::client::ClientRequest {
-    self.client.post(self.gen_url(url))
+    self
+      .client
+      .post(self.gen_url(url))
+      .header("User-Agent", "nanocld.client.rs")
   }
 
   fn patch(&self, url: String) -> http::client::ClientRequest {
-    self.client.patch(self.gen_url(url))
+    self
+      .client
+      .patch(self.gen_url(url))
+      .header("User-Agent", "nanocld.client.rs")
   }
 
   fn put(&self, url: String) -> http::client::ClientRequest {
-    self.client.put(self.gen_url(url))
+    self
+      .client
+      .put(self.gen_url(url))
+      .header("User-Agent", "nanocld.client.rs")
   }
 
   fn head(&self, url: String) -> http::client::ClientRequest {
-    self.client.head(self.gen_url(url))
+    self
+      .client
+      .head(self.gen_url(url))
+      .header("User-Agent", "nanocld.client.rs")
   }
 
   pub(crate) async fn send_get<Q>(

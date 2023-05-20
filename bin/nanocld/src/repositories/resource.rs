@@ -178,6 +178,7 @@ pub async fn find(
           req.load(&mut conn)
         }
         None => resources::table
+          .order(resources::created_at.desc())
           .inner_join(resource_configs::table)
           .load(&mut conn),
       };

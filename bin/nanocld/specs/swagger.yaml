@@ -4060,6 +4060,7 @@ components:
       required:
       - Key
       - Version
+      - CreatedAt
       - ResourceKey
       - Data
       properties:
@@ -4070,6 +4071,10 @@ components:
         Version:
           type: string
           description: Version of the config
+        CreatedAt:
+          type: string
+          format: date-time
+          description: The creation date of the resource
         ResourceKey:
           type: string
           description: Resource key associated with the config
