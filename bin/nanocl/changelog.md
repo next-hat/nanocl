@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- StateFile use Kind instead of Type
+- Command to restart a cargo
 - Better state apply and revert templating
 - StateFile now use `Kind` instead of `Type`
 
