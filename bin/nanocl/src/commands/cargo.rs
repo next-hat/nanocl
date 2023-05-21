@@ -12,7 +12,7 @@ use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
   CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
-  CargoRunOpts,
+  CargoRunOpts, CargoRestartOpts,
 };
 
 use super::cargo_image::{self, exec_cargo_image_create};
@@ -99,6 +99,17 @@ async fn exec_cargo_stop(
 ) -> IoResult<()> {
   for name in &options.names {
     client.stop_cargo(name, args.namespace.clone()).await?;
+  }
+  Ok(())
+}
+
+async fn exec_cargo_restart(
+  client: &NanocldClient,
+  args: &CargoArgs,
+  options: &CargoRestartOpts,
+) -> IoResult<()> {
+  for name in &options.names {
+    client.restart_cargo(name, args.namespace.clone()).await?;
   }
   Ok(())
 }
@@ -278,5 +289,8 @@ pub async fn exec_cargo(
       exec_cargo_logs(client, args, options).await
     }
     CargoCommands::Run(options) => exec_cargo_run(client, args, options).await,
+    CargoCommands::Restart(options) => {
+      exec_cargo_restart(client, args, options).await
+    }
   }
 }

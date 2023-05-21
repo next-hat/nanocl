@@ -222,6 +222,7 @@ impl Modify for VersionModifier {
     cargo::delete_cargo,
     cargo::start_cargo,
     cargo::stop_cargo,
+    cargo::restart_cargo,
     cargo::put_cargo,
     cargo::patch_cargo,
     cargo::exec_command,

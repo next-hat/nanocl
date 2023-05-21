@@ -411,7 +411,7 @@ async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
     match result {
       Ok(true) => {}
       _ => {
-        return Err(IoError::interupted("Cargo remove", "interupted by user"))
+        return Err(IoError::interupted("StateRevert", "interupted by user"))
       }
     }
   }

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [untagged]
 
+### Added
+
+- Better state apply and revert templating
+- StateFile now use `Kind` instead of `Type`
+
 ### Fixed
 
 - Better handling of default host from cli arguments and config

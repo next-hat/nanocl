@@ -355,6 +355,34 @@ pub async fn stop(
   Ok(())
 }
 
+/// ## Restart containers of the given cargo
+///
+/// ## Arguments
+///
+/// - [cargo_key](str) - The cargo key
+/// - [docker_api](bollard_next::Docker) - The docker api
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///  - [Ok](Ok) - The containers has been restarted
+///  - [Err](HttpResponseError) - The containers has not been restarted
+///
+pub async fn restart(
+  cargo_key: &str,
+  docker_api: &bollard_next::Docker,
+) -> Result<(), HttpError> {
+  let containers = list_instance(cargo_key, docker_api).await?;
+
+  for container in containers {
+    docker_api
+      .restart_container(&container.id.unwrap_or_default(), None)
+      .await?;
+  }
+
+  Ok(())
+}
+
 /// Delete containers of the given cargo and the cargo itself
 ///
 /// ## Arguments

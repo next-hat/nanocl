@@ -231,6 +231,33 @@ pub(crate) async fn stop_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
+/// Restart a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/restart",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 202, description = "Cargo restarted"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
+#[web::post("/cargoes/{name}/restart")]
+pub(crate) async fn restart_cargo(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  utils::cargo::inspect(&key, &state).await?;
+  utils::cargo::restart(&key, &state.docker_api).await?;
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
 /// Create a new cargo config from scratch and add history entry
 #[cfg_attr(feature = "dev", utoipa::path(
   put,
@@ -470,6 +497,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(delete_cargo);
   config.service(start_cargo);
   config.service(stop_cargo);
+  config.service(restart_cargo);
   config.service(kill_cargo);
   config.service(patch_cargo);
   config.service(put_cargo);

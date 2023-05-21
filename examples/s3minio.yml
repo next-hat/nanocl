@@ -5,6 +5,8 @@ Kind: Deployment
 Args:
   - Name: namespace
     Type: String
+  - Name: domain
+    Type: String
 
 Namespace: ${{ Args.namespace }}
 
@@ -13,8 +15,8 @@ Cargoes:
     Container:
       Image: minio/minio:latest
       Env:
-        - MINIO_BROWSER_REDIRECT_URL=http://console.s3.next-hat.internal
-        - MINIO_SERVER_URL=http://s3.next-hat.internal
+        - MINIO_BROWSER_REDIRECT_URL=http://console.s3.${{ Args.domain }}
+        - MINIO_SERVER_URL=http://s3.${{ Args.domain }}
       HostConfig:
         Dns:
           - ${{ Namespaces[Args.namespace].Gateway }}
@@ -29,33 +31,35 @@ Cargoes:
 
 Resources:
   # Dns Rule for our namespace
-  - Name: next-hat.internal
+  - Name: dns-${{ Args.namespace }}
     Kind: DnsRule
     Version: v0.1
     Config:
-      Network: next-hat.nsp
+      Network: ${{ Args.namespace }}.nsp
       Entries:
-        - Name: next-hat.internal
-          IpAddress: next-hat.nsp
+        - Name: s3.${{ Args.domain }}
+          IpAddress: ${{ Args.namespace }}.nsp
+        - Name: console.s3.${{ Args.domain }}
+          IpAddress: ${{ Args.namespace }}.nsp
 
   # Proxy Rule for our namespace
-  - Name: s3.next-hat.internal
+  - Name: ${{ Args.domain }}
     Kind: ProxyRule
     Version: v0.4
     Config:
       Watch:
-        - s3.next-hat
+        - s3.${{ Args.namespace }}
       Rules:
-        - Domain: s3.next-hat.internal
-          Network: next-hat.nsp
+        - Domain: s3.${{ Args.domain }}
+          Network: ${{ Args.namespace }}.nsp
           Locations:
             - Path: /
               Target:
-                CargoKey: s3.next-hat
+                CargoKey: s3.${{ Args.namespace }}
                 CargoPort: 9000
 
-        - Domain: console.s3.next-hat.internal
-          Network: next-hat.nsp
+        - Domain: console.s3.${{ Args.domain }}
+          Network: ${{ Args.namespace }}.nsp
           Locations:
             - Path: /
               Version: 1.1
@@ -63,5 +67,5 @@ Resources:
                 - Upgrade $http_upgrade
                 - Connection "Upgrade"
               Target:
-                CargoKey: s3.next-hat
+                CargoKey: s3.${{ Args.namespace }}
                 CargoPort: 9001

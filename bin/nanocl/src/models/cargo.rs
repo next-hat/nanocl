@@ -115,6 +115,13 @@ pub struct CargoStopOpts {
   pub names: Vec<String>,
 }
 
+/// Restart Cargo options
+#[derive(Debug, Parser)]
+pub struct CargoRestartOpts {
+  // List of cargo to stop
+  pub names: Vec<String>,
+}
+
 /// Inspect Cargo options
 #[derive(Debug, Parser)]
 pub struct CargoInspectOpts {
@@ -218,6 +225,8 @@ pub enum CargoCommands {
   Start(CargoStartOpts),
   /// Stop a cargo by its name
   Stop(CargoStopOpts),
+  /// Restart a cargo by its name
+  Restart(CargoRestartOpts),
   /// Remove cargo by its name
   #[clap(alias("rm"))]
   Remove(CargoRemoveOpts),
