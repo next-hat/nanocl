@@ -1,4 +1,4 @@
-Type: Resource
+Kind: Resource
 ApiVersion: v0.6
 
 Resources:

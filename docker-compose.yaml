@@ -19,8 +19,9 @@ services:
     networks:
       - system
     volumes:
-      - /var/lib/nanocl/store/data:/cockroach/cockroach-data
+      - /var/lib/nanocl/store/ca:/ca
       - /var/lib/nanocl/store/certs:/certs
+      - /var/lib/nanocl/store/data:/cockroach/cockroach-data
     environment:
       - TZ=Europe/Paris
     command:

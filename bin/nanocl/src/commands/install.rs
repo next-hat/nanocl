@@ -82,7 +82,8 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
 
   let installer = utils::installer::get_template(opts.template.clone()).await?;
 
-  let installer = utils::state::compile(&installer, &args.clone().into())?;
+  let data: liquid::Object = args.clone().into();
+  let installer = utils::state::compile(&installer, &data)?;
 
   let deployment = serde_yaml::from_str::<StateDeployment>(&installer)
     .map_err(|err| {

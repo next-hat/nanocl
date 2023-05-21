@@ -1,4 +1,4 @@
-Type: Deployment
+Kind: Deployment
 ApiVersion: v0.6
 
 # This is the required component for nanocl ecosystem.
@@ -100,6 +100,7 @@ Cargoes:
       HostConfig:
         NetworkMode: system
         Binds:
+          - ${{ state_dir }}/store/ca:/ca
           - ${{ state_dir }}/store/certs:/certs
           - ${{ state_dir }}/store/data:/cockroach/cockroach-data
 

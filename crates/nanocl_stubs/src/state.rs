@@ -10,7 +10,7 @@ use super::resource::ResourcePartial;
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct StateMeta {
   pub api_version: String,
-  pub r#type: String,
+  pub kind: String,
 }
 
 #[derive(Debug, Clone)]

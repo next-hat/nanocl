@@ -1,3 +1,4 @@
+use liquid::ObjectView;
 use regex::Regex;
 
 use nanocld_client::stubs::state::StateMeta;
@@ -14,7 +15,7 @@ pub fn get_file_meta(data: &str) -> IoResult<StateMeta> {
 }
 
 /// Compile a StateFile with given data
-pub fn compile(data: &str, obj: &liquid::Object) -> IoResult<String> {
+pub fn compile(data: &str, obj: &dyn ObjectView) -> IoResult<String> {
   // replace "${{ }}" with "{{ }}" syntax for liquid
   let reg = Regex::new(r"\$\{\{(.+?)\}\}")
     .map_err(|err| IoError::invalid_data("Regex", &format!("{err}")))?;

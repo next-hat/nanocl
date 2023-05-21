@@ -14,9 +14,7 @@ use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
 };
-use nanocld_client::stubs::state::{
-  StateMeta, StateDeployment, StateCargo, StateStream,
-};
+use nanocld_client::stubs::state::{StateMeta, StateStream};
 
 use crate::utils;
 use crate::models::{StateArgs, StateCommands, StateOpts, StateBuildArgs};
@@ -111,32 +109,14 @@ fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
 }
 
 async fn hook_cargoes(
-  client: &NanocldClient,
   cargoes: Vec<CargoConfigPartial>,
 ) -> IoResult<Vec<CargoConfigPartial>> {
   let mut new_cargoes = Vec::new();
   for cargo in cargoes {
-    if client
-      .inspect_cargo_image(&cargo.container.image.clone().unwrap_or_default())
-      .await
-      .is_err()
-    {
-      download_cargo_image(client, &cargo).await?;
-    }
-
     let new_cargo = hook_binds(&cargo)?;
     new_cargoes.push(new_cargo);
   }
   Ok(new_cargoes)
-}
-
-fn inject_meta(
-  meta: StateMeta,
-  mut yml: serde_yaml::Value,
-) -> serde_yaml::Value {
-  yml["ApiVersion"] = serde_yaml::Value::String(meta.api_version);
-  yml["Type"] = serde_yaml::Value::String(meta.r#type);
-  yml
 }
 
 async fn attach_to_cargo(
@@ -309,7 +289,7 @@ fn parse_build_args(
       }
       "Number" => {
         let value =
-          matches.get_one::<i64>(arg).ok_or(IoError::invalid_data(
+          matches.get_one::<f64>(arg).ok_or(IoError::invalid_data(
             "BuildArgs".into(),
             format!("argument {arg} is missing"),
           ))?;
@@ -324,6 +304,17 @@ fn parse_build_args(
     }
   }
   Ok(args)
+}
+
+fn inject_namespace(
+  namespace: &str,
+  args: &HashMap<String, String>,
+) -> IoResult<String> {
+  let object = liquid::object!({
+    "Args": args,
+  });
+  let str = utils::state::compile(namespace, &object)?;
+  Ok(str)
 }
 
 /// Inject build arguments and environement variable to the StateFile
@@ -386,57 +377,56 @@ async fn parse_state_file(
 
 async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
   let (meta, yaml) = parse_state_file(&opts.file_path).await?;
-
   let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;
-  let mut namespace = String::from("default");
+  let namespace = String::from("default");
   let mut cargoes = Vec::new();
-  let yaml = match meta.r#type.as_str() {
-    "Cargo" => {
-      let mut data = serde_yaml::from_value::<StateCargo>(yaml)
-        .map_err(|err| err.map_err_context(|| "Unable to parse StateCargo"))?;
-      namespace = data.namespace.clone().unwrap_or(namespace);
+  let yaml = match meta.kind.as_str() {
+    "Deployment" | "Cargo" => {
+      let mut namespace =
+        yaml.get("Namespace").map_or(namespace.clone(), |v| {
+          v.as_str().unwrap_or(namespace.as_str()).to_owned()
+        });
+      namespace = inject_namespace(&namespace, &args)?;
       let _ = client.create_namespace(&namespace).await;
-      cargoes = hook_cargoes(&client, data.cargoes).await?;
-      data.cargoes = cargoes.clone();
-      let yml = serde_yaml::to_value(data).map_err(|err| {
-        err.map_err_context(|| "Unable to convert to yaml value")
-      })?;
-      let yml = inject_data(yml.clone(), &args, &client).await?;
-      inject_meta(meta, yml)
-    }
-    "Deployment" => {
-      let mut data =
-        serde_yaml::from_value::<StateDeployment>(yaml).map_err(|err| {
-          err.map_err_context(|| "Unable to parse StateDeployment")
-        })?;
-      namespace = data.namespace.clone().unwrap_or(namespace);
-      let _ = client.create_namespace(&namespace).await;
-      cargoes = hook_cargoes(&client, data.cargoes.unwrap_or_default()).await?;
-      data.cargoes = Some(cargoes.clone());
-      let yml = serde_yaml::to_value(data).map_err(|err| {
-        err.map_err_context(|| "Unable to convert to yaml value")
-      })?;
-      let yml = inject_data(yml.clone(), &args, &client).await?;
-      inject_meta(meta, yml)
+      let mut yml = inject_data(yaml.clone(), &args, &client).await?;
+      let current_cargoes: Vec<CargoConfigPartial> =
+        yml.get("Cargoes").map_or(Vec::new(), |v| {
+          serde_yaml::from_value(v.clone()).unwrap_or(Vec::new())
+        });
+      let hooked_cargoes = hook_cargoes(current_cargoes).await?;
+      cargoes = hooked_cargoes.clone();
+      yml["Cargoes"] = serde_yaml::to_value(&hooked_cargoes)
+        .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
+      yml
     }
     _ => inject_data(yaml.clone(), &args, &client).await?,
   };
-  let data = serde_json::to_value(&yaml)
-    .map_err(|err| err.map_err_context(|| "Unable to convert to yaml value"))?;
   let _ = utils::print::print_yml(&yaml);
   if !opts.skip_confirm {
     let result = Confirm::with_theme(&ColorfulTheme::default())
-      .with_prompt("Are you sure to apply this new state ?")
+      .with_prompt("Are you sure to apply this state?")
       .default(false)
       .interact();
     match result {
       Ok(true) => {}
       _ => {
-        return Err(IoError::interupted("State apply", "interupted by user"))
+        return Err(IoError::interupted("StateRevert", "interupted by user"))
       }
     }
   }
+  for cargo in &cargoes {
+    // Download cargoes images
+    if client
+      .inspect_cargo_image(&cargo.container.image.clone().unwrap_or_default())
+      .await
+      .is_err()
+    {
+      download_cargo_image(&client, cargo).await?;
+    }
+  }
+  let data = serde_json::to_value(&yaml)
+    .map_err(|err| err.map_err_context(|| "Unable to convert to yaml value"))?;
   let mut stream = client.apply_state(&data).await?;
 
   while let Some(res) = stream.next().await {

@@ -106,7 +106,7 @@ There is an example used to deploy our [documentation](https://docs.next-hat.com
 
 ```yaml
 ApiVersion: v0.6
-Type: Deployment
+Kind: Deployment
 
 Namespace: nexthat
 
