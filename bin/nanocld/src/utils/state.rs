@@ -31,7 +31,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
         msg: format!("unable to serialize payload {err}"),
       }
     })?;
-  match meta.r#type.as_str() {
+  match meta.kind.as_str() {
     "Deployment" => {
       let data = serde_json::from_value::<StateDeployment>(data.to_owned())
         .map_err(|err| HttpError {

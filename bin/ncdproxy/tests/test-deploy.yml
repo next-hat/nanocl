@@ -1,4 +1,4 @@
-Type: Cargo
+Kind: Cargo
 ApiVersion: v0.6
 
 Namespace: global

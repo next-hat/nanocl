@@ -1,8 +1,12 @@
 # [nanocl/Deployment] $ nanocl state apply -f examples/minio.yml
 ApiVersion: v0.6
-Type: Deployment
+Kind: Deployment
 
-Namespace: next-hat
+Args:
+  - Name: namespace
+    Type: String
+
+Namespace: ${{ Args.namespace }}
 
 Cargoes:
   - Name: s3
@@ -13,7 +17,7 @@ Cargoes:
         - MINIO_SERVER_URL=http://s3.next-hat.internal
       HostConfig:
         Dns:
-          - ${{ Namespaces.next-hat.Gateway }}
+          - ${{ Namespaces[Args.namespace].Gateway }}
           - 1.1.1.1
         Binds:
           - /opt/s3/data:/data
