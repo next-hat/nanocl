@@ -39,7 +39,7 @@ notify = { version = "5.1.0", default-features = false, features = [
   "macos_kqueue",
 ] }
 nanocld_client = { version = "0.7.0" }
-nanocl_utils = { version = "0.1.1", features = [
+nanocl_utils = { version = "0.1.2", features = [
   "ntex",
   "logger",
   "io_error",
