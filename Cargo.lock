@@ -278,15 +278,9 @@ dependencies = [
 
 [[package]]
 name = "base64"
-version = "0.13.1"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
-
-[[package]]
-name = "base64"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
+checksum = "3f1e31e207a6b8fb791a38ea3105e6cb541f55e4d029902d3039a4ad07cc4105"
 
 [[package]]
 name = "bit-set"
@@ -341,11 +335,11 @@ dependencies = [
 
 [[package]]
 name = "bollard-next"
-version = "0.14.9"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04dc62f8a25966b27b3f04f001410a8a32b9eb584dd7c5c38df8ab5eb18ccbce"
+checksum = "0f1f61c19eccd9a85ab5024f5beb15756e2c8d68a6c045b92d6da776619757a9"
 dependencies = [
- "base64 0.21.0",
+ "base64",
  "bollard-next-stubs",
  "bytes",
  "futures-core",
@@ -371,9 +365,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next-stubs"
-version = "1.42.0-rc.13"
+version = "1.43.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20f93084ee3ff8c1647fa50f922c1f1887d9e63a67396ff4b47e22e0d2e48b0f"
+checksum = "ae08928bad2950f29dd743845a601ce0539986554db8122d16a0b2a75dfa6c5c"
 dependencies = [
  "serde",
  "serde_with",
@@ -529,9 +523,9 @@ dependencies = [
 
 [[package]]
 name = "console"
-version = "0.15.6"
+version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0525278dce688103060006713371cedbad27186c7d913f33d866b498da0f595"
+checksum = "c926e00cc70edefdc64d3a5ff31cc65bb97a3460097762bd23afb4d8145fccf8"
 dependencies = [
  "encode_unicode",
  "lazy_static",
@@ -1422,7 +1416,7 @@ checksum = "e48354c4c4f088714424ddf090de1ff84acc82b2f08c192d46d226ae2529a465"
 dependencies = [
  "ahash 0.8.3",
  "anyhow",
- "base64 0.21.0",
+ "base64",
  "bytecount",
  "fancy-regex",
  "fraction",
@@ -1908,7 +1902,7 @@ checksum = "5807f908e7d45a81792e8d790d2457ca5faaf837b75c7aeee72ab0fd51ff8b74"
 dependencies = [
  "async-channel",
  "async-oneshot",
- "base64 0.21.0",
+ "base64",
  "bitflags",
  "encoding_rs",
  "httparse",
@@ -2855,11 +2849,11 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "2.3.3"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07ff71d2c147a7b57362cead5e22f772cd52f6ab31cfcd9edcd7f6aeb2a0afbe"
+checksum = "9f02d8aa6e3c385bf084924f660ce2a3a6bd333ba55b35e8590b321f35d88513"
 dependencies = [
- "base64 0.13.1",
+ "base64",
  "chrono",
  "hex",
  "indexmap",
