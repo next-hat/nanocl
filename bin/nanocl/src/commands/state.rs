@@ -28,11 +28,23 @@ async fn get_from_url(url: &str) -> IoResult<(StateMeta, serde_yaml::Value)> {
     format!("http://{url}")
   };
   let reqwest = ntex::http::Client::default();
-  let data = reqwest
-    .get(url.to_string())
-    .send()
-    .await
-    .map_err(|err| err.map_err_context(|| "Unable to get StateFile from url"))?
+  let mut res = reqwest.get(url.to_string()).send().await.map_err(|err| {
+    err.map_err_context(|| "Unable to get StateFile from url")
+  })?;
+
+  if res.status().is_redirection() {
+    let location = res
+      .headers()
+      .get("location")
+      .ok_or_else(|| IoError::invalid_data("Location", "is not specified"))?
+      .to_str()
+      .map_err(|err| IoError::invalid_data("Location", &format!("{err}")))?;
+    res = reqwest.get(location).send().await.map_err(|err| {
+      err.map_err_context(|| "Unable to get StateFile from url")
+    })?;
+  }
+
+  let data = res
     .body()
     .await
     .map_err(|err| err.map_err_context(|| "Cannot read response from url"))?
