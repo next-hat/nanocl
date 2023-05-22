@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [untagged]
 
+### Changed
+
+- Vm runtime image to `ghcr.io/nxthat/nanocl-qemu:7.1.0.0`
+
 ### Added
 
 - Endpoint to restart a cargo
