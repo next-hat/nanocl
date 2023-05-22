@@ -2812,6 +2812,12 @@ components:
             format: int32
           description: Initial console size, as an `[height, width]` array.
           nullable: true
+        Annotations:
+          type: object
+          description: Arbitrary non-identifying metadata attached to container and provided to the runtime when the container is started.
+          additionalProperties:
+            type: string
+          nullable: true
         CapAdd:
           type: array
           items:
@@ -3162,7 +3168,7 @@ components:
         VirtualSize:
           type: integer
           format: int64
-          description: Total size of the image including all layers it is composed of.  In versions of Docker before v1.10, this field was calculated from the image itself and all of its parent images. Docker v1.10 and up store images self-contained, and no longer use a parent-chain, making this field an equivalent of the Size field.  This field is kept for backward compatibility, but may be removed in a future version of the API.
+          description: 'Total size of the image including all layers it is composed of.  In versions of Docker before v1.10, this field was calculated from the image itself and all of its parent images. Images are now stored self-contained, and no longer use a parent-chain, making this field an equivalent of the Size field.  > **Deprecated**: this field is kept for backward compatibility, but > will be removed in API v1.44.'
           nullable: true
         GraphDriver:
           allOf:
@@ -3207,7 +3213,6 @@ components:
       - Created
       - Size
       - SharedSize
-      - VirtualSize
       - Labels
       - Containers
       properties:
@@ -3242,7 +3247,8 @@ components:
         VirtualSize:
           type: integer
           format: int64
-          description: Total size of the image including all layers it is composed of.  In versions of Docker before v1.10, this field was calculated from the image itself and all of its parent images. Docker v1.10 and up store images self-contained, and no longer use a parent-chain, making this field an equivalent of the Size field.  This field is kept for backward compatibility, but may be removed in a future version of the API.
+          description: 'Total size of the image including all layers it is composed of.  In versions of Docker before v1.10, this field was calculated from the image itself and all of its parent images. Images are now stored self-contained, and no longer use a parent-chain, making this field an equivalent of the Size field.  Deprecated: this field is kept for backward compatibility, and will be removed in API v1.44.'
+          nullable: true
         Labels:
           type: object
           description: User-defined key/value metadata.
@@ -4732,7 +4738,7 @@ components:
           type: array
           items:
             type: string
-          description: List of security features that are enabled on the daemon, such as apparmor, seccomp, SELinux, user-namespaces (userns), and rootless.  Additional configuration options for each security feature may be present, and are included as a comma-separated list of key/value pairs.
+          description: List of security features that are enabled on the daemon, such as apparmor, seccomp, SELinux, user-namespaces (userns), rootless and no-new-privileges.  Additional configuration options for each security feature may be present, and are included as a comma-separated list of key/value pairs.
           nullable: true
         ProductLicense:
           type: string
