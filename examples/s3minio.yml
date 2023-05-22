@@ -1,5 +1,5 @@
 # [nanocl/Deployment] $ nanocl state apply -f examples/minio.yml
-ApiVersion: v0.6
+ApiVersion: v0.7
 Kind: Deployment
 
 Args:

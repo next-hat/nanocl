@@ -1,5 +1,8 @@
+# Minio is a self hosted clone of amazon s3
+# $ nanocl state apply -f nhnr.io/sys/minio.yml
+
 Kind: Deployment
-ApiVersion: v0.6
+ApiVersion: v0.7
 
 Args:
   - Name: namespace
