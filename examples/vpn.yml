@@ -1,5 +1,5 @@
-# Minio is a self hosted clone of amazon s3
-# $ nanocl state apply -f nhnr.io/sys/minio.yml
+# Self hosted VPN server with L2TP/IPsec, IKEv2, and XAuth
+# $ nanocl state apply -f nhnr.io/sys/vpn.yml
 
 Kind: Deployment
 ApiVersion: v0.7
@@ -10,7 +10,7 @@ Args:
   - Name: public-ip
     Type: String
 
-Namespaces: ${{ Args.namespace }}
+Namespace: ${{ Args.namespace }}
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo
