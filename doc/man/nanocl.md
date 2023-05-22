@@ -13,9 +13,9 @@ The Self-Sufficient Hybrid-Cloud Orchestrator CLI
 
 # OPTIONS
 
-**-H**, **\--host**=*HOST* \[default: unix://run/nanocl/nanocl.sock\]
+**-H**, **\--host**=*HOST*
 
-:   Nanocld host
+:   Nanocld host default: unix://run/nanocl/nanocl.sock
 
 **-h**, **\--help**
 
@@ -81,4 +81,4 @@ nanocl-help(1)
 
 # VERSION
 
-v0.6.0
+v0.7.0

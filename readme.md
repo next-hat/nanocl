@@ -105,7 +105,7 @@ To install `Nanocl`, please refer to our online [installation guide](https://doc
 There is an example used to deploy our [documentation](https://docs.next-hat.com):
 
 ```yaml
-ApiVersion: v0.6
+ApiVersion: v0.7
 Kind: Deployment
 
 Namespace: nexthat

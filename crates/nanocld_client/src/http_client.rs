@@ -12,7 +12,7 @@ use nanocl_utils::http_client_error::HttpClientError;
 
 use crate::error::is_api_error;
 
-const NANOCLD_DEFAULT_VERSION: &str = "0.6.0";
+const NANOCLD_DEFAULT_VERSION: &str = "0.7.0";
 
 #[derive(Clone)]
 pub struct NanocldClient {
