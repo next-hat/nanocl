@@ -125,7 +125,7 @@ fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
   Ok(new_cargo)
 }
 
-async fn hook_cargoes(
+fn hook_cargoes(
   cargoes: Vec<CargoConfigPartial>,
 ) -> IoResult<Vec<CargoConfigPartial>> {
   let mut new_cargoes = Vec::new();
@@ -304,14 +304,6 @@ fn parse_build_args(
           ))?;
         args.insert(name, value.to_owned());
       }
-      "Number" => {
-        let value =
-          matches.get_one::<f64>(arg).ok_or(IoError::invalid_data(
-            "BuildArgs".into(),
-            format!("argument {arg} is missing"),
-          ))?;
-        args.insert(name, format!("{value}"));
-      }
       _ => {
         return Err(IoError::invalid_data(
           "StateFile".into(),
@@ -400,18 +392,20 @@ async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
   let mut cargoes = Vec::new();
   let yaml = match meta.kind.as_str() {
     "Deployment" | "Cargo" => {
-      let mut namespace =
-        yaml.get("Namespace").map_or(namespace.clone(), |v| {
-          v.as_str().unwrap_or(namespace.as_str()).to_owned()
-        });
+      let mut namespace = match yaml.get("Namespace") {
+        Some(namespace) => serde_yaml::from_value(namespace.clone())
+          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
+        None => "global".to_owned(),
+      };
       namespace = inject_namespace(&namespace, &args)?;
       let _ = client.create_namespace(&namespace).await;
       let mut yml = inject_data(yaml.clone(), &args, &client).await?;
-      let current_cargoes: Vec<CargoConfigPartial> =
-        yml.get("Cargoes").map_or(Vec::new(), |v| {
-          serde_yaml::from_value(v.clone()).unwrap_or(Vec::new())
-        });
-      let hooked_cargoes = hook_cargoes(current_cargoes).await?;
+      let current_cargoes: Vec<CargoConfigPartial> = match yml.get("Cargoes") {
+        Some(cargoes) => serde_yaml::from_value(cargoes.clone())
+          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
+        None => Vec::new(),
+      };
+      let hooked_cargoes = hook_cargoes(current_cargoes)?;
       cargoes = hooked_cargoes.clone();
       yml["Cargoes"] = serde_yaml::to_value(&hooked_cargoes)
         .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
@@ -427,9 +421,7 @@ async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
       .interact();
     match result {
       Ok(true) => {}
-      _ => {
-        return Err(IoError::interupted("StateRevert", "interupted by user"))
-      }
+      _ => return Err(IoError::interupted("StateApply", "interupted by user")),
     }
   }
   for cargo in &cargoes {

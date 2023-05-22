@@ -8,7 +8,7 @@ Args:
     Type: String
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/daemon/v0.6#tag/Cargoes/operation/create_cargo
+# https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
   - Name: srv
     Container:

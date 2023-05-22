@@ -54,6 +54,10 @@ pub struct CargoConfigPartial {
   /// Name of the cargo
   pub name: String,
   /// Replication configuration of the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub replication: Option<ReplicationMode>,
   /// Container configuration of the cargo
   pub container: Config,
@@ -68,10 +72,22 @@ pub struct CargoConfigPartial {
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoConfigUpdate {
   /// New name of the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub name: Option<String>,
   /// New replication configuration of the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub container: Option<Config>,
   /// New container configuration of the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub replication: Option<ReplicationMode>,
 }
 
@@ -104,6 +120,10 @@ pub struct CargoConfig {
   /// The key of the cargo
   pub cargo_key: String,
   /// Replication configuration of the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub replication: Option<ReplicationMode>,
   /// Container configuration of the cargo
   pub container: Config,
