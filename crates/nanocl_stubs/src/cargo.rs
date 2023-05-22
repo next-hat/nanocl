@@ -189,17 +189,27 @@ pub struct GenericCargoListQuery<NS> {
   /// Max amount of cargoes in response
   pub limit: Option<i64>,
   /// Offset of the first cargo in response
-  pub offset: Option<i64>
+  pub offset: Option<i64>,
 }
 
 impl<NS> GenericCargoListQuery<NS> {
   /// Create a GenericCargoListQuery with only the namespace specified
   pub fn of_namespace(nsp: NS) -> GenericCargoListQuery<NS> {
-    GenericCargoListQuery{ namespace: nsp, name: None, limit: None, offset: None }
+    GenericCargoListQuery {
+      namespace: nsp,
+      name: None,
+      limit: None,
+      offset: None,
+    }
   }
   /// Move fields to new query with different namespace
   pub fn merge<T>(self, nsp: T) -> GenericCargoListQuery<T> {
-    GenericCargoListQuery{ namespace: nsp, name: self.name, limit: self.limit, offset: self.offset }
+    GenericCargoListQuery {
+      namespace: nsp,
+      name: self.name,
+      limit: self.limit,
+      offset: self.offset,
+    }
   }
 }
 
@@ -231,7 +241,16 @@ pub struct CargoLogQuery {
 
 impl CargoLogQuery {
   pub fn of_namespace(nsp: String) -> CargoLogQuery {
-    CargoLogQuery { namespace: Some(nsp), since: None, until: None, timestamps: None, follow: None, tail: None, stderr: None, stdout: None }
+    CargoLogQuery {
+      namespace: Some(nsp),
+      since: None,
+      until: None,
+      timestamps: None,
+      follow: None,
+      tail: None,
+      stderr: None,
+      stdout: None,
+    }
   }
 }
 

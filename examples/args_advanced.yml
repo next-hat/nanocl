@@ -1,0 +1,35 @@
+Kind: Deployment
+ApiVersion: v0.6
+
+Args:
+  - Name: name
+    Type: String
+  - Name: domain
+    Type: String
+  - Name: image
+    Type: String
+  - Name: port
+    Type: String
+
+Namespace: global
+
+Cargoes:
+  - Name: ${{ Args.name }}
+    Container:
+      Image: ${{ Args.image }}
+
+Resources:
+  - Name: ${{ Args.domain }}
+    Kind: ProxyRule
+    Version: v0.4
+    Config:
+      Watch:
+        - ${{ Args.name }}.global
+      Rules:
+        - Domain: ${{ Args.domain }}
+          Network: Public
+          Locations:
+            - Path: /
+              Target:
+                CargoKey: ${{ Args.name }}.global
+                CargoPort: ${{ Args.port }}

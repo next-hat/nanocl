@@ -97,6 +97,17 @@ pub async fn apply_deployment(
         return Ok(());
       };
       for cargo in &cargoes {
+        if sx
+          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+            "Creating Cargo {0}",
+            cargo.name
+          ))))
+          .is_err()
+        {
+          // TODO: Delete previously created cargoes
+          log::warn!("User stopped the deployment");
+          break;
+        };
         let res =
           utils::cargo::create_or_put(&namespace, cargo, &version, &state)
             .await;
@@ -117,7 +128,7 @@ pub async fn apply_deployment(
 
         if sx
           .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-            "Cargo {0} created",
+            "Created Cargo {0}",
             cargo.name
           ))))
           .is_err()
@@ -158,7 +169,7 @@ pub async fn apply_deployment(
 
         if sx
           .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-            "Cargo {0} started",
+            "Started Cargo {0}",
             cargo.name
           ))))
           .is_err()
@@ -182,6 +193,17 @@ pub async fn apply_deployment(
 
     if let Some(resources) = &data.resources {
       for resource in resources {
+        if sx
+          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+            "Creating Resource {0}",
+            resource.name
+          ))))
+          .is_err()
+        {
+          // TODO: Delete previously created cargoes
+          log::warn!("User stopped the deployment");
+          break;
+        };
         let key = resource.name.to_owned();
         let res =
           utils::resource::create_or_patch(resource.clone(), &state.pool).await;
@@ -202,7 +224,7 @@ pub async fn apply_deployment(
 
         if sx
           .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-            "Resource {0} created",
+            "Created Resource {0}",
             resource.name
           ))))
           .is_err()
@@ -265,6 +287,17 @@ pub async fn apply_cargo(
     };
 
     for cargo in &data.cargoes {
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Creating Cargo {0}",
+          cargo.name
+        ))))
+        .is_err()
+      {
+        // TODO: Delete previously created cargoes
+        log::warn!("User stopped the deployment");
+        break;
+      };
       let res =
         utils::cargo::create_or_put(&namespace, cargo, &version, &state).await;
 
@@ -284,7 +317,7 @@ pub async fn apply_cargo(
 
       if sx
         .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Created cargo {0}",
+          "Created Cargo {0}",
           cargo.name
         ))))
         .is_err()
@@ -371,6 +404,16 @@ pub async fn apply_resource(
     };
 
     for resource in &data.resources {
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Creating Resource {0}",
+          resource.name
+        ))))
+        .is_err()
+      {
+        log::warn!("User stopped the deployment");
+        break;
+      }
       let key = resource.name.to_owned();
       let res =
         utils::resource::create_or_patch(resource.clone(), &state.pool).await;
@@ -391,7 +434,7 @@ pub async fn apply_resource(
 
       if sx
         .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Resource {0} created",
+          "Created Resource {0}",
           resource.name
         ))))
         .is_err()
@@ -453,7 +496,7 @@ pub async fn revert_deployment(
           Err(_) => {
             if sx
               .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-                "Cargo {0} not found skipping",
+                "Skipping Cargo {0} [NOT FOUND]",
                 cargo.name
               ))))
               .is_err()
@@ -465,11 +508,21 @@ pub async fn revert_deployment(
           }
         };
 
+        if sx
+          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+            "Deleting Cargo {0}",
+            cargo.name
+          ))))
+          .is_err()
+        {
+          log::warn!("User stopped the deployment");
+          break;
+        }
         utils::cargo::delete(&key, Some(true), &state).await?;
 
         if sx
           .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-            "Cargo {0} deleted",
+            "Deleted Cargo {0}",
             cargo.name
           ))))
           .is_err()
@@ -503,6 +556,16 @@ pub async fn revert_deployment(
 
       for resource in resources {
         let key = resource.name.to_owned();
+        if sx
+          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+            "Deleting Resource {0}",
+            resource.name
+          ))))
+          .is_err()
+        {
+          log::warn!("User stopped the deployment");
+          break;
+        }
         let resource =
           match repositories::resource::inspect_by_key(&key, &state.pool).await
           {
@@ -510,7 +573,7 @@ pub async fn revert_deployment(
             Err(_) => {
               if sx
                 .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-                  "Resource {0} not found skipping",
+                  "Skipping Resource {0} [NOT FOUND]",
                   resource.name
                 ))))
                 .is_err()
@@ -524,7 +587,7 @@ pub async fn revert_deployment(
         utils::resource::delete(resource.clone(), &state.pool).await?;
         if sx
           .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-            "Resource {0} deleted",
+            "Deleted Resource {0}",
             resource.name
           ))))
           .is_err()
@@ -574,13 +637,23 @@ pub async fn revert_cargo(
     };
 
     for cargo in &data.cargoes {
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Deleting Cargo {0}",
+          cargo.name
+        ))))
+        .is_err()
+      {
+        log::warn!("User stopped the deployment");
+        break;
+      }
       let key = utils::key::gen_key(&namespace, &cargo.name);
       let cargo = match utils::cargo::inspect(&key, &state).await {
         Ok(cargo) => cargo,
         Err(_) => {
           if sx
             .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-              "Cargo {0} not found",
+              "Skipping Cargo {0} [NOT FOUND]",
               cargo.name
             ))))
             .is_err()
@@ -594,7 +667,7 @@ pub async fn revert_cargo(
       utils::cargo::delete(&key, Some(true), &state).await?;
       if sx
         .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Cargo {0} deleted",
+          "Deleted Cargo {0}",
           cargo.name
         ))))
         .is_err()
@@ -637,6 +710,16 @@ pub async fn revert_resource(
     };
 
     for resource in &data.resources {
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Deleting Resource {0}",
+          resource.name
+        ))))
+        .is_err()
+      {
+        log::warn!("User stopped the deployment");
+        break;
+      }
       let key = resource.name.to_owned();
       let resource =
         match repositories::resource::inspect_by_key(&key, &state.pool).await {
@@ -644,7 +727,7 @@ pub async fn revert_resource(
           Err(_) => {
             if sx
               .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-                "Resource {0} not found skipping",
+                "Skipping Resource {0} [NOT FOUND]",
                 resource.name
               ))))
               .is_err()
@@ -658,7 +741,7 @@ pub async fn revert_resource(
       utils::resource::delete(resource.clone(), &state.pool).await?;
       if sx
         .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Resource {0} deleted",
+          "Deleted Resource {0}",
           resource.name
         ))))
         .is_err()
