@@ -21,7 +21,12 @@ use crate::models::{StateArgs, StateCommands, StateOpts, StateBuildArgs};
 
 use super::cargo_image::exec_cargo_image_create;
 
-async fn get_from_url(url: String) -> IoResult<(StateMeta, serde_yaml::Value)> {
+async fn get_from_url(url: &str) -> IoResult<(StateMeta, serde_yaml::Value)> {
+  let url = if url.starts_with("http") {
+    url.to_owned()
+  } else {
+    format!("http://{url}")
+  };
   let reqwest = ntex::http::Client::default();
   let data = reqwest
     .get(url.to_string())
@@ -358,13 +363,13 @@ async fn parse_state_file(
   path: &Option<String>,
 ) -> IoResult<(StateMeta, serde_yaml::Value)> {
   if let Some(path) = path {
-    if let Ok(url) = utils::url::parse_url(path) {
-      return get_from_url(url).await;
-    }
-    let path = std::path::Path::new(&path)
+    if let Ok(path) = std::path::Path::new(&path)
       .canonicalize()
-      .map_err(|err| err.map_err_context(|| format!("StateFile {path}")))?;
-    return read_from_file(&path);
+      .map_err(|err| err.map_err_context(|| format!("StateFile {path}")))
+    {
+      return read_from_file(&path);
+    }
+    return get_from_url(path).await;
   }
   if let Ok(path) = std::path::Path::new("StateFile.yaml").canonicalize() {
     return read_from_file(&path);
