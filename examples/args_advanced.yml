@@ -13,11 +13,15 @@ Args:
 
 Namespace: global
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
   - Name: ${{ Args.name }}
     Container:
       Image: ${{ Args.image }}
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
 Resources:
   - Name: ${{ Args.domain }}
     Kind: ProxyRule

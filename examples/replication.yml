@@ -3,6 +3,8 @@ ApiVersion: v0.7
 
 Namespace: global
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
 Resources:
   - Name: replication-example.com
     Kind: ProxyRule
@@ -20,12 +22,12 @@ Resources:
                 CargoPort: 9000
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/daemon/v0.6#tag/Cargoes/operation/create_cargo
+# https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
   - Name: replication-example
     Replication:
       Mode: Static
-      Number: 5000
+      Number: 4
     Container:
       Image: nexthat/nanocl-get-started:latest
       Env:

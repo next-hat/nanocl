@@ -4068,6 +4068,14 @@ components:
         Note: auto will ensure at least 1 replica exists in the cluster
       discriminator:
         propertyName: Mode
+    ReplicationStatic:
+      type: object
+      required:
+      - Number
+      properties:
+        Number:
+          type: integer
+          format: int64
     Resource:
       type: object
       description: |-

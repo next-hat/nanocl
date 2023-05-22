@@ -10,6 +10,8 @@ Args:
 
 Namespace: ${{ Args.namespace }}
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
   - Name: s3
     Container:
@@ -29,6 +31,8 @@ Cargoes:
         - --console-address
         - :9001
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
 Resources:
   # Dns Rule for our namespace
   - Name: dns-${{ Args.namespace }}

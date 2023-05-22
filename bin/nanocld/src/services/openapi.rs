@@ -40,6 +40,7 @@ use nanocl_stubs::cargo::{
 };
 use nanocl_stubs::cargo_config::{
   CargoConfig, CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
+  ReplicationStatic,
 };
 use nanocl_stubs::cargo_image::CargoImagePartial;
 use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
@@ -318,6 +319,7 @@ impl Modify for VersionModifier {
     CargoSummary,
     CargoConfigPartial,
     CargoConfigUpdate,
+    ReplicationStatic,
     // Container Image
     ImageSummary,
     ImageInspect,

@@ -388,11 +388,11 @@ async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
   let (meta, yaml) = parse_state_file(&opts.file_path).await?;
   let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;
-  let namespace = String::from("default");
+  let mut namespace = String::from("default");
   let mut cargoes = Vec::new();
   let yaml = match meta.kind.as_str() {
     "Deployment" | "Cargo" => {
-      let mut namespace = match yaml.get("Namespace") {
+      namespace = match yaml.get("Namespace") {
         Some(namespace) => serde_yaml::from_value(namespace.clone())
           .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
         None => "global".to_owned(),

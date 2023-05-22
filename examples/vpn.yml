@@ -48,6 +48,8 @@ Cargoes:
           net.ipv4.conf.eth0.send_redirects: "0"
           net.ipv4.conf.eth0.rp_filter: "0"
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
 Resources:
   - Name: vpn-dns
     Kind: DnsRule

@@ -1,6 +1,8 @@
 Kind: Resource
 ApiVersion: v0.7
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
 Resources:
   - Name: resource-example
     Kind: ProxyRule

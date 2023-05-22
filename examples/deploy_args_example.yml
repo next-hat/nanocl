@@ -7,6 +7,8 @@ Args:
   - Name: domain
     Type: String
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
 Resources:
   - Name: ${{ Args.domain }}
     Kind: ProxyRule
@@ -24,7 +26,7 @@ Resources:
                 CargoPort: 9000
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/daemon/v0.6#tag/Cargoes/operation/create_cargo
+# https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
   - Name: get-started
     Container:
