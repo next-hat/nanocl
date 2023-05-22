@@ -1,21 +1,23 @@
 Kind: Deployment
 ApiVersion: v0.6
 
-Namespace: vpn
-
 Args:
+  - Name: namespace
+    Type: String
   - Name: public-ip
     Type: String
+
+Namespaces: ${{ Args.namespace }}
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
-  - Name: srv
+  - Name: vpn
     Container:
       Image: hwdsl2/ipsec-vpn-server:latest
       Env:
         - VPN_PUBLIC_IP=${{ Args.public-ip }}
-        - VPN_DNS_SRV1=${{ Namespaces.vpn.Gateway }}
+        - VPN_DNS_SRV1=${{ Namespaces[ Args.namespace ].Gateway }}
         - VPN_DNS_SRV2=1.1.1.1
         - VPN_L2TP_NET=192.168.42.0/16
         - VPN_L2TP_LOCAL=192.168.42.1
@@ -23,13 +25,8 @@ Cargoes:
         - VPN_XAUTH_NET=192.168.43.0/16
         - VPN_XAUTH_POOL=192.168.43.10-192.168.83.254
       HostConfig:
-        PortBindings:
-          500/udp:
-            - HostPort: "500"
-          4500/udp:
-            - HostPort: "4500"
         Binds:
-          - /opt/nanocl-vpn:/etc/ipsec.d
+          - /opt/vpn:/etc/ipsec.d
           - /lib/modules:/lib/modules
         CapAdd:
           - NET_ADMIN
@@ -47,3 +44,31 @@ Cargoes:
           net.ipv4.conf.default.rp_filter: "0"
           net.ipv4.conf.eth0.send_redirects: "0"
           net.ipv4.conf.eth0.rp_filter: "0"
+
+Resources:
+  - Name: vpn-dns
+    Kind: DnsRule
+    Version: v0.1
+    Config:
+      Network: ${{ Args.namespace }}.nsp
+      Entries: []
+
+  - Name: vpn-proxy
+    Kind: ProxyRule
+    Version: v0.4
+    Config:
+      Watch:
+        - vpn.${{ Args.namespace }}
+      Rules:
+        - Network: Public
+          Protocol: Udp
+          Port: 500
+          Target:
+            CargoKey: vpn.${{ Args.namespace }}
+            CargoPort: 500
+        - Network: Public
+          Protocol: Udp
+          Port: 4500
+          Target:
+            CargoKey: vpn.${{ Args.namespace }}
+            CargoPort: 4500
