@@ -220,18 +220,18 @@ mod tests {
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::HTTP_VERSION_NOT_SUPPORTED,
+      StatusCode::NOT_FOUND,
       "Expect status to be {} got {}",
-      StatusCode::HTTP_VERSION_NOT_SUPPORTED,
+      StatusCode::NOT_FOUND,
       status
     );
     let resp = srv.get("/v5.2/info").send().await.unwrap();
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::HTTP_VERSION_NOT_SUPPORTED,
+      StatusCode::NOT_FOUND,
       "Expect status to be {} got {}",
-      StatusCode::HTTP_VERSION_NOT_SUPPORTED,
+      StatusCode::NOT_FOUND,
       status
     );
   }

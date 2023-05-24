@@ -104,8 +104,8 @@ impl From<CargoConfigPartial> for CargoConfigUpdate {
 /// A cargo config is the configuration of a cargo
 /// It used to know the state of the cargo
 /// It keep tracking of an history when you patch an existing cargo
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoConfig {

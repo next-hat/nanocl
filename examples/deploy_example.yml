@@ -19,8 +19,8 @@ Resources:
           Locations:
             - Path: /
               Target:
-                Url: http://deploy-example.com/v2
-                Redirect: Temporary
+                CargoKey: deploy-example2.global
+                CargoPort: 9000
 
             - Path: /v1
               Target:
@@ -28,10 +28,6 @@ Resources:
                 CargoPort: 9000
 
             - Path: /v2
-              Version: 1.1 # The http version to use for the request
-              Headers: # Add headers to the request to enable websocket
-                - Upgrade $http_upgrade # Upgrade the connection to websocket
-                - Connection "Upgrade" # Upgrade the connection to websocket
               Target:
                 CargoKey: deploy-example2.global
                 CargoPort: 9000
