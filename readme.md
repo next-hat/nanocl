@@ -36,6 +36,13 @@
 With `Nanocl`, you can **efficiently share resources** and **deploy applications**, **services**, and **databases** `publicly`, `privately`, or under a `VPN`.
 Whether you're running a **home lab** setup or a **large enterprise**, _Nanocl's cutting-edge technology_, crafted with precision using `Rust`, provides **unparalleled performance** and a **small footprint**.
 
+## ❓ Why Nanocl ?
+
+`Nanocl` is all about easing your container and VM management with Rust-powered platform. 
+With `Nanocl`, say goodbye to complex setups and hello to easy, efficient deployments.  
+We stand for robust performance and efficiency with simplicity, trimming the bloat to keep your systems lean. 
+***Join us and help shape the future of cloud computing - it's about time things got a bit more rusty***. 
+
 ## 📙 Table of Contents
 
 - [❓ What is Nanocl ?](#-what-is-nanocl)

@@ -54,7 +54,7 @@ libc = "0.2.139"
 dialoguer = "0.10.3"
 termios = "0.3.3"
 liquid = { version = "0.26.1", default-features = false }
-regex = "1.8.1"
+regex = "1.8.2"
 nanocld_client = { version = "0.7.0", features = ["tokio"] }
 nanocl_utils = { version = "0.1.2", features = [
   "io_error",
