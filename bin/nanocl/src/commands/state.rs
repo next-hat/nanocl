@@ -388,7 +388,7 @@ async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
   let (meta, yaml) = parse_state_file(&opts.file_path).await?;
   let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;
-  let mut namespace = String::from("default");
+  let mut namespace = String::from("global");
   let mut cargoes = Vec::new();
   let yaml = match meta.kind.as_str() {
     "Deployment" | "Cargo" => {
