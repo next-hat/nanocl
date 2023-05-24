@@ -1,3 +1,4 @@
+use ntex::http;
 use clap::Parser;
 
 use nanocl_utils::io_error::IoResult;
@@ -30,7 +31,7 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
   let mut client = NanocldClient::connect_to(url, None);
 
   if let Err(HttpClientError::HttpError(err)) = client.get_version().await {
-    if err.status == 505 {
+    if err.status == http::StatusCode::NOT_FOUND {
       eprintln!("You're daemon is outdated, please run `nanocl upgrade`");
       detect_version(&mut client).await?;
     }

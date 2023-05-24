@@ -1717,8 +1717,7 @@ components:
     CargoInspect:
       type: object
       description: |-
-        A Cargo Inspect is a detailed view of a cargo
-        It is used to inspect a cargo
+        Cargo Inspect is a detailed view of a cargo
         It contains all the information about the cargo
         It also contains the list of containers
       required:
@@ -1772,7 +1771,7 @@ components:
       type: object
       description: |-
         A Cargo Summary is a summary of a cargo
-        It is used to list all the cargos
+        It's the datastructure returned by the list operation
       required:
       - Key
       - CreatedAt
@@ -1794,7 +1793,7 @@ components:
         UpdatedAt:
           type: string
           format: date-time
-          description: Update date of the cargo
+          description: Last update of the cargo
         Name:
           type: string
           description: Name of the cargo

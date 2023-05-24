@@ -35,7 +35,7 @@ pub struct Cargo {
 }
 
 /// A Cargo Summary is a summary of a cargo
-/// It is used to list all the cargos
+/// It's the datastructure returned by the list operation
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -45,7 +45,7 @@ pub struct CargoSummary {
   pub key: String,
   /// Creation date of the cargo
   pub created_at: chrono::NaiveDateTime,
-  /// Update date of the cargo
+  /// Last update of the cargo
   pub updated_at: chrono::NaiveDateTime,
   /// Name of the cargo
   pub name: String,
@@ -61,8 +61,7 @@ pub struct CargoSummary {
   pub instance_running: usize,
 }
 
-/// A Cargo Inspect is a detailed view of a cargo
-/// It is used to inspect a cargo
+/// Cargo Inspect is a detailed view of a cargo
 /// It contains all the information about the cargo
 /// It also contains the list of containers
 #[derive(Default, Clone, Debug)]
