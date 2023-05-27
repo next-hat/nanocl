@@ -425,13 +425,20 @@ async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
     }
   }
   for cargo in &cargoes {
+    let is_missing = client
+    .inspect_cargo_image(&cargo.container.image.clone().unwrap_or_default())
+    .await
+    .is_err();
+
     // Download cargoes images
-    if client
-      .inspect_cargo_image(&cargo.container.image.clone().unwrap_or_default())
-      .await
-      .is_err()
+    if is_missing || opts.force_pull
     {
-      download_cargo_image(&client, cargo).await?;
+      if let Err(err) = download_cargo_image(&client, cargo).await {
+        eprintln!("{err}");
+        if is_missing {
+          return Err(err);
+        }
+      }
     }
   }
   let data = serde_json::to_value(&yaml)

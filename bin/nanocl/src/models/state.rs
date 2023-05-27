@@ -20,6 +20,9 @@ pub struct StateOpts {
   /// Path or url to the state
   #[clap(long, short = 'f')]
   pub file_path: Option<String>,
+  /// Force pulling images
+  #[clap(long, short = 'p')]
+  pub force_pull: bool,
   /// Attach to the logs of the deployed cargo when applying a state
   #[clap(long, short = 'a')]
   pub attach: bool,
