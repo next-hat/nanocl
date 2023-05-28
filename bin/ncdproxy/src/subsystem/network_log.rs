@@ -15,14 +15,32 @@ pub fn print_last_line(path: &Path) {
   if !path.exists() {
     return;
   }
-  let file = File::open(path).unwrap();
+  let file = match File::open(path) {
+    Ok(file) => file,
+    Err(e) => {
+      log::warn!("open file error: {:?}", e);
+      return;
+    }
+  };
   let mut buf_reader = BufReader::new(file);
 
-  let mut pos = buf_reader.seek(SeekFrom::End(-2)).unwrap();
+  let mut pos = match buf_reader.seek(SeekFrom::End(-2)) {
+    Ok(pos) => pos,
+    Err(e) => {
+      log::warn!("seek error: {:?}", e);
+      return;
+    }
+  };
   let mut last_line = String::new();
 
   while pos > 0 {
-    buf_reader.seek(SeekFrom::Start(pos)).unwrap();
+    match buf_reader.seek(SeekFrom::Start(pos)) {
+      Ok(_) => {}
+      Err(e) => {
+        log::warn!("seek error: {:?}", e);
+        return;
+      }
+    }
     let mut buffer = [0; 1];
     let res = buf_reader.read_exact(&mut buffer);
     if buffer[0] == b'\n' || res.is_err() {
@@ -32,7 +50,11 @@ pub fn print_last_line(path: &Path) {
     pos -= 1;
   }
 
-  let file_name = path.file_name().unwrap().to_str().unwrap();
+  let file_name = path
+    .file_name()
+    .unwrap_or_default()
+    .to_str()
+    .unwrap_or_default();
 
   log::debug!("{}", file_name);
   match file_name {
@@ -53,19 +75,25 @@ pub(crate) fn spawn() {
   rt::Arbiter::new().exec_fn(|| {
     let path = Path::new("/var/log/nginx/access");
     if !path.exists() {
-      log::debug!("{} doesn't exists", path.display());
+      log::debug!("{} doesn't exists logs wont be saved", path.display());
+      return;
     }
     let (tx, rx) = std::sync::mpsc::channel();
 
     // Automatically select the best implementation for your platform.
     // You can also access each implementation directly e.g. INotifyWatcher.
-    let mut watcher = RecommendedWatcher::new(
+    let mut watcher = match RecommendedWatcher::new(
       tx,
       Config::default()
         .with_compare_contents(true)
         .with_poll_interval(Duration::from_secs(2)),
-    )
-    .unwrap();
+    ) {
+      Ok(watcher) => watcher,
+      Err(e) => {
+        log::warn!("watcher error: {:?}", e);
+        return;
+      }
+    };
 
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
