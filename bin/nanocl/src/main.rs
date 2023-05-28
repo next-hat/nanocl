@@ -50,6 +50,7 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
     Commands::Install(opts) => commands::exec_install(opts).await,
     Commands::Uninstall(opts) => commands::exec_uninstall(opts).await,
     Commands::Upgrade(opts) => commands::exec_upgrade(&client, opts).await,
+    Commands::System(opts) => commands::exec_system(&client, opts).await,
   }
 }
 
