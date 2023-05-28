@@ -337,7 +337,7 @@ impl NanocldClient {
   pub async fn put_cargo(
     &self,
     name: &str,
-    config: CargoConfigUpdate,
+    config: CargoConfigPartial,
     namespace: Option<String>,
   ) -> Result<(), HttpClientError> {
     self
@@ -560,7 +560,7 @@ mod tests {
     client.start_cargo(CARGO_NAME, None).await.unwrap();
     client.inspect_cargo(CARGO_NAME, None).await.unwrap();
 
-    let new_cargo = CargoConfigUpdate {
+    let cargo_update = CargoConfigUpdate {
       container: Some(bollard_next::container::Config {
         image: Some("nexthat/nanocl-get-started:latest".into()),
         env: Some(vec!["TEST=1".into()]),
@@ -570,7 +570,7 @@ mod tests {
     };
 
     client
-      .patch_cargo(CARGO_NAME, new_cargo.clone(), None)
+      .patch_cargo(CARGO_NAME, cargo_update, None)
       .await
       .unwrap();
 

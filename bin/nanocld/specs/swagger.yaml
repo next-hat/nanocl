@@ -239,8 +239,8 @@ paths:
     put:
       tags:
       - Cargoes
-      summary: Create a new cargo config from scratch and add history entry
-      description: Create a new cargo config from scratch and add history entry
+      summary: Create a new cargo config and add history entry
+      description: Create a new cargo config and add history entry
       operationId: put_cargo
       parameters:
       - name: Name
@@ -260,7 +260,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoConfigUpdate'
+              $ref: '#/components/schemas/CargoConfigPartial'
         required: true
       responses:
         '200':

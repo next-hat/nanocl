@@ -158,7 +158,7 @@ async fn attach_to_cargo(
     let name = if index == 0 {
       cargo.name.clone()
     } else {
-      format!("{}-{}", cargo.name, index)
+      format!("{index}-{}", cargo.name)
     };
     let client = client.clone();
     let name = name.clone();
