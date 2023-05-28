@@ -5,28 +5,29 @@ use ntex::web;
 use ntex::util::Bytes;
 use futures::{StreamExt, TryStreamExt};
 use futures_util::TryFutureExt;
-use nanocl_stubs::cargo_config::ReplicationMode;
+use futures_util::stream::FuturesUnordered;
 use bollard_next::service::ContainerCreateResponse;
 
 use bollard_next::container::LogOutput;
-use nanocl_stubs::node::NodeContainerSummary;
 use bollard_next::container::WaitContainerOptions;
 use bollard_next::exec::{StartExecOptions, StartExecResults};
 use bollard_next::service::{ContainerSummary, HostConfig};
 use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
 use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 
-use nanocl_stubs::cargo::{CargoKillOptions, GenericCargoListQuery};
-use nanocl_stubs::cargo_config::Config as ContainerConfig;
-use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
+use nanocl_utils::http_error::HttpError;
+use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
-  CargoLogQuery,
+  CargoLogQuery, CargoKillOptions, GenericCargoListQuery,
+};
+use nanocl_stubs::cargo_config::{
+  CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
+  Config as ContainerConfig,
 };
 
 use crate::models::DaemonState;
 use crate::{utils, repositories};
-use nanocl_utils::http_error::HttpError;
 
 use super::stream::transform_stream;
 
@@ -59,11 +60,11 @@ async fn create_instance(
   cargo: &Cargo,
   number: i64,
   docker_api: &bollard_next::Docker,
-) -> Result<Vec<String>, HttpError> {
-  let futures = (0..number)
+) -> Result<Vec<ContainerCreateResponse>, HttpError> {
+  (0..number)
     .collect::<Vec<i64>>()
     .into_iter()
-    .map(move |current| {
+    .map(move |current| async move {
       let name = if current > 0 {
         format!("{current}-{}.c", cargo.key)
       } else {
@@ -151,21 +152,18 @@ async fn create_instance(
         ..cargo.config.container.to_owned()
       };
 
-      docker_api
+      let res = docker_api
         .create_container::<String>(Some(create_options), config)
         .map_err(HttpError::from)
-    })
-    .collect::<Vec<_>>();
+        .await?;
 
-  let instances = futures::future::join_all(futures)
+      Ok::<_, HttpError>(res)
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<ContainerCreateResponse, HttpError>>>()
     .await
     .into_iter()
-    .collect::<Result<Vec<ContainerCreateResponse>, HttpError>>()?
-    .iter()
-    .map(|res| res.id.to_owned())
-    .collect();
-  // .map(|res| res.id)
-  Ok(instances)
+    .collect::<Result<Vec<ContainerCreateResponse>, HttpError>>()
 }
 
 /// ## List containers based on the cargo key
@@ -229,11 +227,6 @@ pub async fn create(
       ReplicationMode::Unique => 1,
       ReplicationMode::UniqueByNode => 1,
       _ => 1,
-      // ReplicationMode::UniqueByNodeGroups { groups } => 1,
-      // ReplicationMode::UniqueByNodeNames { names } => 1,
-      // ReplicationMode::StaticByNodes(_) => 1,
-      // ReplicationMode::StaticByNodeGroups { groups, number } => 1,
-      // ReplicationMode::StaticByNodeNames { names, number } => 1,
     }
   } else {
     1
@@ -305,17 +298,21 @@ pub async fn start(
     let id = id.clone();
     let docker_api = docker_api.clone();
     let fut = async move {
-      let _ = docker_api.start_container::<String>(&id, None).await;
+      if let Err(err) = docker_api.start_container::<String>(&id, None).await {
+        log::warn!("Error while starting container {id} {err}");
+      }
     };
     futs.push(fut);
   }
 
-  let _ = futures::future::join_all(futs).await;
+  let _ = FuturesUnordered::from_iter(futs).collect::<Vec<_>>().await;
 
   if auto_remove {
     let pool = state.pool.clone();
     rt::spawn(async move {
-      futures::future::join_all(autoremove_futs).await;
+      let _ = FuturesUnordered::from_iter(autoremove_futs)
+        .collect::<Vec<_>>()
+        .await;
       if let Err(err) =
         repositories::cargo::delete_by_key(&cargo_key, &pool).await
       {
@@ -346,11 +343,21 @@ pub async fn stop(
 ) -> Result<(), HttpError> {
   let containers = list_instance(cargo_key, docker_api).await?;
 
-  for container in containers {
-    docker_api
-      .stop_container(&container.id.unwrap_or_default(), None)
-      .await?;
-  }
+  containers
+    .into_iter()
+    .map(|container| async {
+      let id = container.id.unwrap_or_default();
+      let docker_api = docker_api.clone();
+      docker_api
+        .stop_container(&id, None)
+        .await
+        .map_err(HttpError::from)
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()?;
 
   Ok(())
 }
@@ -374,13 +381,83 @@ pub async fn restart(
 ) -> Result<(), HttpError> {
   let containers = list_instance(cargo_key, docker_api).await?;
 
-  for container in containers {
-    docker_api
-      .restart_container(&container.id.unwrap_or_default(), None)
-      .await?;
-  }
+  containers
+    .into_iter()
+    .map(|container| async {
+      let id = container.id.unwrap_or_default();
+      let docker_api = docker_api.clone();
+      docker_api
+        .restart_container(&id, None)
+        .await
+        .map_err(HttpError::from)
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()?;
 
   Ok(())
+}
+
+async fn rename_instances_backup(
+  state: &DaemonState,
+  instances: &[ContainerSummary],
+) -> Result<(), HttpError> {
+  instances
+    .iter()
+    .map(|container| async {
+      let id = container.id.clone().unwrap_or_default();
+      let container_state = container.state.clone().unwrap_or_default();
+      if container_state == "restarting" {
+        state.docker_api.stop_container(&id, None).await?;
+      }
+      let names = container.names.clone().unwrap_or_default();
+      let name = format!("{}-backup", names[0]);
+      state
+        .docker_api
+        .rename_container(
+          &id,
+          bollard_next::container::RenameContainerOptions { name },
+        )
+        .await
+        .map_err(HttpError::from)
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<(), _>>()
+}
+
+async fn rename_instances_original(
+  state: &DaemonState,
+  instances: &[ContainerSummary],
+) -> Result<(), HttpError> {
+  instances
+    .iter()
+    .map(|container| async {
+      let id = container.id.clone().unwrap_or_default();
+      let container_state = container.state.clone().unwrap_or_default();
+      if container_state == "restarting" {
+        state.docker_api.stop_container(&id, None).await?;
+      }
+      let names = container.names.clone().unwrap_or_default();
+      let name = names[0].replace("-backup", "");
+      state
+        .docker_api
+        .rename_container(
+          &id,
+          bollard_next::container::RenameContainerOptions { name },
+        )
+        .await
+        .map_err(HttpError::from)
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<(), _>>()
 }
 
 /// Delete containers of the given cargo and the cargo itself
@@ -404,18 +481,26 @@ pub async fn delete(
 ) -> Result<(), HttpError> {
   let containers = list_instance(cargo_key, &state.docker_api).await?;
 
-  for container in containers {
-    state
-      .docker_api
-      .remove_container(
-        &container.id.unwrap_or_default(),
-        Some(RemoveContainerOptions {
-          force: force.unwrap_or(false),
-          ..Default::default()
-        }),
-      )
-      .await?;
-  }
+  containers
+    .into_iter()
+    .map(|container| async {
+      state
+        .docker_api
+        .remove_container(
+          &container.id.unwrap_or_default(),
+          Some(RemoveContainerOptions {
+            force: force.unwrap_or(false),
+            ..Default::default()
+          }),
+        )
+        .await
+        .map_err(HttpError::from)
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()?;
 
   repositories::cargo::delete_by_key(cargo_key, &state.pool).await?;
   repositories::cargo_config::delete_by_cargo_key(cargo_key, &state.pool)
@@ -424,11 +509,34 @@ pub async fn delete(
   Ok(())
 }
 
-/// Patch a cargo
-/// The cargo is patched and the containers are updated
-/// The containers are updated in parallel
-/// If one container fails to update, the other containers will continue to update
-/// The containers are updated with the new cargo configuration
+async fn delete_instances(
+  state: &DaemonState,
+  instances: &[String],
+) -> Result<(), HttpError> {
+  instances
+    .iter()
+    .map(|id| async {
+      state
+        .docker_api
+        .remove_container(
+          &id.clone(),
+          Some(RemoveContainerOptions {
+            force: true,
+            ..Default::default()
+          }),
+        )
+        .await
+        .map_err(HttpError::from)
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<(), _>>()
+}
+
+/// Put a cargo
+/// A new history entry is added and the containers are updated with the new cargo configuration
 ///
 /// ## Arguments
 /// - [cargo_key](str) - The cargo key
@@ -443,62 +551,18 @@ pub async fn delete(
 ///
 pub async fn put(
   cargo_key: &str,
-  config: &CargoConfigUpdate,
+  cargo_partial: &CargoConfigPartial,
   version: &str,
   state: &DaemonState,
 ) -> Result<Cargo, HttpError> {
-  let cargo = repositories::cargo::find_by_key(cargo_key, &state.pool).await?;
-
-  let cargo_config =
-    repositories::cargo_config::find_by_key(&cargo.config_key, &state.pool)
-      .await?;
-
-  // Todo should remove this as part of a patch
-  let cargo_partial = CargoConfigPartial {
-    name: config.name.to_owned().unwrap_or(cargo.name),
-    container: config
-      .container
-      .to_owned()
-      .unwrap_or(cargo_config.container),
-    replication: if config.replication.is_some() {
-      config.replication.to_owned()
-    } else {
-      cargo_config.replication.to_owned()
-    },
-  };
-
   let cargo = repositories::cargo::update_by_key(
     cargo_key,
-    &cargo_partial,
+    cargo_partial,
     version,
     &state.pool,
   )
   .await?;
-
-  let containers = list_instance(cargo_key, &state.docker_api).await?;
-
-  // Rename existing container to avoid name conflict
-  for container in containers.iter().cloned() {
-    let id = container.id.unwrap_or_default();
-
-    let container_state = container.state.unwrap_or_default();
-
-    if container_state == "restarting" {
-      state.docker_api.stop_container(&id, None).await?;
-    }
-
-    let names = container.names.unwrap_or_default();
-    let name = format!("{}-backup", names[0]);
-
-    state
-      .docker_api
-      .rename_container(
-        &id,
-        bollard_next::container::RenameContainerOptions { name },
-      )
-      .await?;
-  }
-
+  // Get the number of instance to create
   let number = if let Some(mode) = &cargo.config.replication {
     match mode {
       ReplicationMode::Static(replication_static) => replication_static.number,
@@ -506,82 +570,52 @@ pub async fn put(
       ReplicationMode::Unique => 1,
       ReplicationMode::UniqueByNode => 1,
       _ => 1,
-      // ReplicationMode::UniqueByNodeGroups { groups } => 1,
-      // ReplicationMode::UniqueByNodeNames { names } => 1,
-      // ReplicationMode::StaticByNodes(_) => 1,
-      // ReplicationMode::StaticByNodeGroups { groups, number } => 1,
-      // ReplicationMode::StaticByNodeNames { names, number } => 1,
     }
   } else {
     1
   };
+  let containers = list_instance(cargo_key, &state.docker_api).await?;
+
+  rename_instances_backup(state, &containers).await?;
 
   // Create instance with the new config
   let new_instances =
     match create_instance(&cargo, number, &state.docker_api).await {
+      // If the creation of the new instance failed, we rename the old containers
       Err(err) => {
-        // If the creation of the new instance failed, we rename the old containers
-        for container in containers.iter().cloned() {
-          let names = container.names.unwrap_or_default();
-          let name = names[0].replace("-backup", "");
-
-          state
-            .docker_api
-            .rename_container(
-              &container.id.unwrap_or_default(),
-              bollard_next::container::RenameContainerOptions { name },
-            )
-            .await?;
-          log::error!("Unable to create cargo instance {} : {err}", cargo.key);
-        }
-        Vec::new()
+        log::warn!("Unable to create cargo instance: {}", err);
+        log::warn!("Rollback to previous instance");
+        rename_instances_original(state, &containers).await?;
+        Vec::default()
       }
       Ok(instances) => instances,
     };
 
   // start created containers
-  if let Err(err) = start(cargo_key, state).await {
-    log::error!("Unable to start cargo instance {} : {err}", cargo.key);
-    // If the start of the new instance failed, we remove the new containers
-    for instance in new_instances {
-      state
-        .docker_api
-        .remove_container(
-          &instance,
-          Some(RemoveContainerOptions {
-            force: true,
-            ..Default::default()
-          }),
-        )
-        .await?;
-    }
-    // We rename the old containers
-    for container in containers.iter().cloned() {
-      let names = container.names.unwrap_or_default();
-      let name = names[0].replace("-backup", "");
-
-      state
-        .docker_api
-        .rename_container(
-          &container.id.unwrap_or_default(),
-          bollard_next::container::RenameContainerOptions { name },
-        )
-        .await?;
-    }
-  }
-
-  // Delete old cors
-  for container in containers {
-    state
-      .docker_api
-      .remove_container(
-        &container.id.unwrap_or_default(),
-        Some(RemoveContainerOptions {
-          force: true,
-          ..Default::default()
-        }),
+  match start(cargo_key, state).await {
+    Err(err) => {
+      log::error!("Unable to start cargo instance {} : {err}", cargo.key);
+      delete_instances(
+        state,
+        &new_instances
+          .iter()
+          .map(|i| i.id.clone())
+          .collect::<Vec<_>>(),
       )
       .await?;
+      rename_instances_original(state, &containers).await?;
+    }
+    Ok(_) => {
+      // Delete old containers
+      delete_instances(
+        state,
+        &containers
+          .iter()
+          .map(|c| c.id.clone().unwrap_or_default())
+          .collect::<Vec<_>>(),
+      )
+      .await?;
+    }
   }
 
   Ok(cargo)
@@ -785,9 +819,14 @@ pub async fn delete_by_namespace(
   let cargoes =
     repositories::cargo::find_by_namespace(&namespace, &state.pool).await?;
 
-  for cargo in cargoes {
-    delete(&cargo.key, None, state).await?;
-  }
+  cargoes
+    .into_iter()
+    .map(|cargo| async move { delete(&cargo.key, None, state).await })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<()>, HttpError>>()?;
 
   Ok(())
 }
@@ -864,7 +903,7 @@ pub async fn create_or_put(
         log::debug!("No changes detected for cargo {} skipping", &key);
         return Ok(());
       }
-      utils::cargo::put(&key, &cargo.clone().into(), version, state).await?;
+      utils::cargo::put(&key, cargo, version, state).await?;
     }
     Err(_err) => {
       utils::cargo::create(namespace, cargo, version, state).await?;
@@ -960,9 +999,10 @@ pub async fn patch(
     cargo.config.container
   };
 
-  let config = CargoConfigUpdate {
-    container: Some(container),
-    ..payload.to_owned()
+  let config = CargoConfigPartial {
+    name: cargo.name.clone(),
+    container,
+    replication: payload.replication.clone(),
   };
   utils::cargo::put(key, &config, version, state).await
 }

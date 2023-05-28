@@ -258,11 +258,11 @@ pub(crate) async fn restart_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Create a new cargo config from scratch and add history entry
+/// Create a new cargo config and add history entry
 #[cfg_attr(feature = "dev", utoipa::path(
   put,
   tag = "Cargoes",
-  request_body = CargoConfigUpdate,
+  request_body = CargoConfigPartial,
   path = "/cargoes/{Name}",
   params(
     ("Name" = String, Path, description = "Name of the cargo"),
@@ -276,7 +276,7 @@ pub(crate) async fn restart_cargo(
 #[web::put("/cargoes/{name}")]
 pub(crate) async fn put_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  payload: web::types::Json<CargoConfigUpdate>,
+  payload: web::types::Json<CargoConfigPartial>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -522,9 +522,7 @@ mod tests {
     Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
     CargoDeleteQuery, CargoListQuery,
   };
-  use nanocl_stubs::cargo_config::{
-    CargoConfigPartial, CargoConfigUpdate, CargoConfig,
-  };
+  use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfig};
 
   use crate::utils::tests::*;
   use crate::services::cargo_image::tests::ensure_test_image;
@@ -617,12 +615,13 @@ mod tests {
 
     let mut res = srv
       .put(format!("/v0.2/cargoes/{}", response.name))
-      .send_json(&CargoConfigUpdate {
-        container: Some(bollard_next::container::Config {
+      .send_json(&CargoConfigPartial {
+        name: main_test_cargo.to_string(),
+        container: bollard_next::container::Config {
           image: Some("nexthat/nanocl-get-started:latest".to_string()),
           env: Some(vec!["TEST=1".to_string()]),
           ..Default::default()
-        }),
+        },
         ..Default::default()
       })
       .await?;

@@ -129,12 +129,12 @@ pub struct CargoConfig {
   pub container: Config,
 }
 
-impl From<CargoConfig> for CargoConfigUpdate {
+impl From<CargoConfig> for CargoConfigPartial {
   fn from(cargo_config: CargoConfig) -> Self {
     Self {
-      name: Some(cargo_config.name),
-      container: Some(cargo_config.container),
+      name: cargo_config.name,
       replication: cargo_config.replication,
+      container: cargo_config.container,
     }
   }
 }
