@@ -200,6 +200,12 @@ async fn gen_locations(
               log::warn!("Unable to generate cargo upstream for location rule {:?} got error", rule);
               continue;
             };
+        let disable_logging =
+          if cargo_target.disable_logging.unwrap_or_default() {
+            "access_log off;"
+          } else {
+            ""
+          };
         let location = format!(
           "
   location {path} {{{version}{headers}
@@ -208,8 +214,10 @@ async fn gen_locations(
     proxy_set_header X-Forwarded-Proto  $scheme;
     proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
     proxy_set_header X-Real-IP          $remote_addr;
-    proxy_pass http://{upstream_key};
-  }}"
+    proxy_pass http://{upstream_key}{};
+    {disable_logging}
+  }}",
+          cargo_target.path.clone().unwrap_or("".into())
         );
         locations.push(location);
       }

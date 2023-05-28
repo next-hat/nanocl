@@ -1,0 +1,39 @@
+Kind: Deployment
+ApiVersion: v0.7
+
+Namespace: global
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
+Resources:
+  - Name: deploy-example.internal
+    Kind: ProxyRule
+    Version: v0.4
+    Config:
+      Watch:
+        - deploy-example.global
+        - deploy-example2.global
+      Rules:
+        - Domain: deploy-example.internal
+          Network: Public
+          Locations:
+            - Path: /
+              Target:
+                CargoKey: deploy-example.global
+                CargoPort: 9000
+
+            - Path: /v2/
+              Target:
+                CargoKey: deploy-example.global
+                CargoPort: 9000
+                Path: /v2/
+                DisableLogging: true
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
+Cargoes:
+  - Name: deploy-example
+    Container:
+      Image: nexthat/nanocl-get-started:latest
+      Env:
+        - APP=DISABLE_LOGGING
