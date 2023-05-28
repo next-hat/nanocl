@@ -40,6 +40,10 @@ pub struct CargoTarget {
   pub cargo_key: String,
   /// The cargo port
   pub cargo_port: u16,
+  /// The http path to target
+  pub path: Option<String>,
+  /// Disable logging
+  pub disable_logging: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
