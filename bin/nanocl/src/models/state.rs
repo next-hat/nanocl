@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 #[serde(rename_all = "PascalCase")]
 pub struct StateBuildArg {
   pub name: String,
-  pub r#type: String,
+  pub kind: String,
   pub default: Option<String>,
 }
 

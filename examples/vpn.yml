@@ -6,9 +6,9 @@ ApiVersion: v0.7
 
 Args:
   - Name: namespace
-    Type: String
+    Kind: String
   - Name: public-ip
-    Type: String
+    Kind: String
 
 Namespace: ${{ Args.namespace }}
 

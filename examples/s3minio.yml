@@ -4,9 +4,9 @@ Kind: Deployment
 
 Args:
   - Name: namespace
-    Type: String
+    Kind: String
   - Name: domain
-    Type: String
+    Kind: String
 
 Namespace: ${{ Args.namespace }}
 

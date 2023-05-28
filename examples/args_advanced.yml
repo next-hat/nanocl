@@ -3,13 +3,13 @@ ApiVersion: v0.7
 
 Args:
   - Name: name
-    Type: String
+    Kind: String
   - Name: domain
-    Type: String
+    Kind: String
   - Name: image
-    Type: String
+    Kind: String
   - Name: port
-    Type: String
+    Kind: String
 
 Namespace: global
 

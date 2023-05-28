@@ -5,7 +5,7 @@ Namespace: global
 
 Args:
   - Name: domain
-    Type: String
+    Kind: String
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource

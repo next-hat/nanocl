@@ -293,7 +293,7 @@ fn parse_build_args(
   for build_arg in build_args.args.unwrap_or_default() {
     let name = build_arg.name.to_owned();
     let arg: &'static str = Box::leak(name.to_owned().into_boxed_str());
-    match build_arg.r#type.as_str() {
+    match build_arg.kind.as_str() {
       "String" => {
         let value =
           matches.get_one::<String>(arg).ok_or(IoError::invalid_data(
@@ -305,7 +305,7 @@ fn parse_build_args(
       _ => {
         return Err(IoError::invalid_data(
           "StateFile".into(),
-          format!("unknown type {}", build_arg.r#type),
+          format!("unknown type {}", build_arg.kind),
         ))
       }
     }
