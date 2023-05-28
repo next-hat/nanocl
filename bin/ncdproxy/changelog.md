@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [untagged]
 
+### Added
+
+- Options `DisableLogging` and `Path` for `CargoTarget` to disable logging for specific path.
+
 ### Fixed
 
 - Thread background crash if `/var/log/nginx/access` doesn't exists.

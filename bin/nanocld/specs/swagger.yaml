@@ -1829,6 +1829,14 @@ components:
           format: int32
           description: The cargo port
           minimum: 0.0
+        Path:
+          type: string
+          description: The http path to target
+          nullable: true
+        DisableLogging:
+          type: boolean
+          description: Disable logging
+          nullable: true
     ClusterInfo:
       type: object
       description: ClusterInfo represents information about the swarm as is returned by the \"/info\" endpoint. Join-tokens are not included.

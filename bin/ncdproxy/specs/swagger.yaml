@@ -117,6 +117,14 @@ components:
           format: int32
           description: The cargo port
           minimum: 0.0
+        Path:
+          type: string
+          description: The http path to target
+          nullable: true
+        DisableLogging:
+          type: boolean
+          description: Disable logging
+          nullable: true
     HttpTarget:
       type: object
       required:
