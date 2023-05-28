@@ -3,10 +3,13 @@ use ntex::http;
 use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use ntex::channel::mpsc::Receiver;
+use futures_util::StreamExt;
+use futures_util::stream::FuturesUnordered;
 
 use nanocl_utils::http_error::HttpError;
 
 use nanocl_stubs::system::Event;
+use nanocl_stubs::cargo_config::CargoConfigPartial;
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateMeta, StateStream,
 };
@@ -67,190 +70,199 @@ pub async fn apply_deployment(
   data: &StateDeployment,
   version: &str,
   state: &DaemonState,
-) -> Result<Receiver<Result<Bytes, HttpError>>, HttpError> {
-  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
-
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
   let data = data.clone();
   let version = version.to_owned();
   let state = state.clone();
 
-  rt::spawn(async move {
-    // If we have a namespace and it doesn't exist, create it
-    // Unless we use `global` as default for the creation of cargoes
-    let namespace = if let Some(namespace) = &data.namespace {
-      utils::namespace::create_if_not_exists(namespace, &state).await?;
-      namespace.to_owned()
-    } else {
-      "global".into()
-    };
+  // If we have a namespace and it doesn't exist, create it
+  // Unless we use `global` as default for the creation of cargoes
+  let namespace = if let Some(namespace) = &data.namespace {
+    utils::namespace::create_if_not_exists(namespace, &state).await?;
+    namespace.to_owned()
+  } else {
+    "global".into()
+  };
 
-    if let Some(cargoes) = data.cargoes {
+  if let Some(cargoes) = data.cargoes {
+    if sx
+      .send(stream_to_bytes(StateStream::Msg(format!(
+        "Creating {0} cargoes in namespace: {namespace}",
+        cargoes.len()
+      ))))
+      .is_err()
+    {
+      // TODO: Delete namespace if it was created and it's not global
+      log::warn!("User stopped the deployment");
+      return Ok(());
+    };
+    create_cargoes(&namespace, &cargoes, &version, &state, sx.clone()).await;
+  }
+
+  if let Some(resources) = &data.resources {
+    for resource in resources {
       if sx
-        .send(stream_to_bytes(StateStream::Msg(format!(
-          "Creating {0} cargoes in namespace: {namespace}",
-          cargoes.len()
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Creating Resource {0}",
+          resource.name
         ))))
         .is_err()
       {
-        // TODO: Delete namespace if it was created and it's not global
+        // TODO: Delete previously created cargoes
+        log::warn!("User stopped the deployment");
+        break;
+      };
+      let key = resource.name.to_owned();
+      let res =
+        utils::resource::create_or_patch(resource.clone(), &state.pool).await;
+
+      if let Err(err) = res {
+        if sx
+          .send(utils::state::stream_to_bytes(StateStream::Error(
+            err.to_string(),
+          )))
+          .is_err()
+        {
+          // TODO: Delete previously created resources
+          log::warn!("User stopped the deployment");
+          return Ok(());
+        }
+        continue;
+      }
+
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Created Resource {0}",
+          resource.name
+        ))))
+        .is_err()
+      {
+        // TODO: Delete previously created cargoes
+        log::warn!("User stopped the deployment");
+        break;
+      };
+
+      let state_ptr = state.clone();
+      rt::spawn(async move {
+        let item =
+          repositories::resource::inspect_by_key(&key, &state_ptr.pool)
+            .await
+            .unwrap();
+        let _ = state_ptr
+          .event_emitter
+          .emit(Event::ResourcePatched(Box::new(item)))
+          .await;
+      });
+    }
+  }
+
+  Ok(())
+}
+
+async fn create_cargoes(
+  namespace: &str,
+  data: &[CargoConfigPartial],
+  version: &str,
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  data
+    .iter()
+    .map(|cargo| async {
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Creating Cargo {0}",
+          cargo.name
+        ))))
+        .is_err()
+      {
+        // TODO: Delete previously created cargoes
         log::warn!("User stopped the deployment");
         return Ok(());
       };
-      for cargo in &cargoes {
+      let res =
+        utils::cargo::create_or_put(namespace, cargo, version, state).await;
+
+      if let Err(err) = res {
         if sx
-          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-            "Creating Cargo {0}",
-            cargo.name
-          ))))
+          .send(utils::state::stream_to_bytes(StateStream::Error(
+            err.to_string(),
+          )))
           .is_err()
         {
           // TODO: Delete previously created cargoes
           log::warn!("User stopped the deployment");
-          break;
+          return Ok(());
         };
-        let res =
-          utils::cargo::create_or_put(&namespace, cargo, &version, &state)
-            .await;
-
-        if let Err(err) = res {
-          if sx
-            .send(utils::state::stream_to_bytes(StateStream::Error(
-              err.to_string(),
-            )))
-            .is_err()
-          {
-            // TODO: Delete previously created cargoes
-            log::warn!("User stopped the deployment");
-            return Ok(());
-          };
-          continue;
-        }
-
-        if sx
-          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-            "Created Cargo {0}",
-            cargo.name
-          ))))
-          .is_err()
-        {
-          // TODO: Delete previously created cargoes
-          log::warn!("User stopped the deployment");
-          break;
-        };
-
-        let key = utils::key::gen_key(&namespace, &cargo.name);
-        let state_ptr = state.clone();
-        rt::spawn(async move {
-          let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
-          let _ = state_ptr
-            .event_emitter
-            .emit(Event::CargoPatched(Box::new(cargo)))
-            .await;
-        });
-        let res = utils::cargo::start(
-          &utils::key::gen_key(&namespace, &cargo.name),
-          &state,
-        )
-        .await;
-
-        if let Err(err) = res {
-          if sx
-            .send(utils::state::stream_to_bytes(StateStream::Error(
-              err.to_string(),
-            )))
-            .is_err()
-          {
-            // TODO: Delete previously created cargoes
-            log::warn!("User stopped the deployment");
-            return Ok(());
-          };
-          continue;
-        }
-
-        if sx
-          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-            "Started Cargo {0}",
-            cargo.name
-          ))))
-          .is_err()
-        {
-          // TODO: Delete previously created cargoes
-          log::warn!("User stopped the deployment");
-          break;
-        };
-
-        let key = utils::key::gen_key(&namespace, &cargo.name);
-        let state_ptr = state.clone();
-        rt::spawn(async move {
-          let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
-          let _ = state_ptr
-            .event_emitter
-            .emit(Event::CargoStarted(Box::new(cargo)))
-            .await;
-        });
+        return Ok(());
       }
-    }
 
-    if let Some(resources) = &data.resources {
-      for resource in resources {
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Created Cargo {0}",
+          cargo.name
+        ))))
+        .is_err()
+      {
+        // TODO: Delete previously created cargoes
+        log::warn!("User stopped the deployment");
+      };
+
+      let key = utils::key::gen_key(namespace, &cargo.name);
+      let state_ptr = state.clone();
+      rt::spawn(async move {
+        let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
+        let _ = state_ptr
+          .event_emitter
+          .emit(Event::CargoPatched(Box::new(cargo)))
+          .await;
+      });
+      let res = utils::cargo::start(
+        &utils::key::gen_key(namespace, &cargo.name),
+        state,
+      )
+      .await;
+
+      if let Err(err) = res {
         if sx
-          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-            "Creating Resource {0}",
-            resource.name
-          ))))
+          .send(utils::state::stream_to_bytes(StateStream::Error(
+            err.to_string(),
+          )))
           .is_err()
         {
           // TODO: Delete previously created cargoes
           log::warn!("User stopped the deployment");
-          break;
+          return Ok(());
         };
-        let key = resource.name.to_owned();
-        let res =
-          utils::resource::create_or_patch(resource.clone(), &state.pool).await;
-
-        if let Err(err) = res {
-          if sx
-            .send(utils::state::stream_to_bytes(StateStream::Error(
-              err.to_string(),
-            )))
-            .is_err()
-          {
-            // TODO: Delete previously created resources
-            log::warn!("User stopped the deployment");
-            return Ok(());
-          }
-          continue;
-        }
-
-        if sx
-          .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-            "Created Resource {0}",
-            resource.name
-          ))))
-          .is_err()
-        {
-          // TODO: Delete previously created cargoes
-          log::warn!("User stopped the deployment");
-          break;
-        };
-
-        let state_ptr = state.clone();
-        rt::spawn(async move {
-          let item =
-            repositories::resource::inspect_by_key(&key, &state_ptr.pool)
-              .await
-              .unwrap();
-          let _ = state_ptr
-            .event_emitter
-            .emit(Event::ResourcePatched(Box::new(item)))
-            .await;
-        });
+        return Ok(());
       }
-    }
-    Ok::<_, HttpError>(())
-  });
 
-  Ok(rx)
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Started Cargo {0}",
+          cargo.name
+        ))))
+        .is_err()
+      {
+        // TODO: Delete previously created cargoes
+        log::warn!("User stopped the deployment");
+      };
+
+      let key = utils::key::gen_key(namespace, &cargo.name);
+      let state_ptr = state.clone();
+      rt::spawn(async move {
+        let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
+        let _ = state_ptr
+          .event_emitter
+          .emit(Event::CargoStarted(Box::new(cargo)))
+          .await;
+      });
+      Ok::<_, HttpError>(())
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
 }
 
 pub async fn apply_cargo(

@@ -1,4 +1,6 @@
-use ntex::web;
+use ntex::{web, rt};
+use ntex::util::Bytes;
+use ntex::channel::mpsc;
 
 use crate::utils;
 use nanocl_utils::http_error::HttpError;
@@ -11,23 +13,36 @@ pub(crate) async fn apply(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let state_file = utils::state::parse_state(&payload)?;
+  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
 
-  let res = match state_file {
-    StateData::Deployment(data) => {
-      utils::state::apply_deployment(&data, &version, &state).await?
-    }
-    StateData::Cargo(data) => {
-      utils::state::apply_cargo(&data, &version, &state).await?
-    }
-    StateData::Resource(data) => {
-      utils::state::apply_resource(&data, &state).await?
-    }
-  };
+  rt::spawn(async move {
+    match state_file {
+      StateData::Deployment(data) => {
+        if let Err(err) =
+          utils::state::apply_deployment(&data, &version, &state, sx).await
+        {
+          log::warn!("{err}");
+        }
+      }
+      StateData::Cargo(data) => {
+        if let Err(err) =
+          utils::state::apply_cargo(&data, &version, &state).await
+        {
+          log::warn!("{err}");
+        }
+      }
+      StateData::Resource(data) => {
+        if let Err(err) = utils::state::apply_resource(&data, &state).await {
+          log::warn!("{err}");
+        }
+      }
+    };
+  });
 
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(res),
+      .streaming(rx),
   )
 }
 
