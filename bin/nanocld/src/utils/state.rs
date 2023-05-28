@@ -1,3 +1,4 @@
+use nanocl_stubs::resource::ResourcePartial;
 use ntex::rt;
 use ntex::http;
 use ntex::util::Bytes;
@@ -298,100 +299,77 @@ pub async fn apply_cargo(
       return Ok(());
     };
 
-    for cargo in &data.cargoes {
-      if sx
-        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Creating Cargo {0}",
-          cargo.name
-        ))))
-        .is_err()
-      {
-        // TODO: Delete previously created cargoes
-        log::warn!("User stopped the deployment");
-        break;
-      };
-      let res =
-        utils::cargo::create_or_put(&namespace, cargo, &version, &state).await;
+    create_cargoes(&namespace, &data.cargoes, &version, &state, sx).await;
 
-      if let Err(err) = res {
-        if sx
-          .send(utils::state::stream_to_bytes(StateStream::Error(
-            err.to_string(),
-          )))
-          .is_err()
-        {
-          // TODO: Delete previously created cargoes
-          log::warn!("User stopped the deployment");
-          return Ok(());
-        };
-        continue;
-      }
-
-      if sx
-        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Created Cargo {0}",
-          cargo.name
-        ))))
-        .is_err()
-      {
-        // TODO: Delete previously created cargoes
-        log::warn!("User stopped the deployment");
-        break;
-      };
-
-      let key = utils::key::gen_key(&namespace, &cargo.name);
-      let state_ptr = state.clone();
-      rt::spawn(async move {
-        let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
-        let _ = state_ptr
-          .event_emitter
-          .emit(Event::CargoPatched(Box::new(cargo)))
-          .await;
-      });
-      let res = utils::cargo::start(
-        &utils::key::gen_key(&namespace, &cargo.name),
-        &state,
-      )
-      .await;
-      if let Err(err) = res {
-        if sx
-          .send(utils::state::stream_to_bytes(StateStream::Error(
-            err.to_string(),
-          )))
-          .is_err()
-        {
-          // TODO: Delete previously created cargoes
-          log::warn!("User stopped the deployment");
-          return Ok(());
-        };
-        continue;
-      }
-
-      if sx
-        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Started cargo {0}",
-          cargo.name
-        ))))
-        .is_err()
-      {
-        // TODO: Delete previously created cargoes
-        log::warn!("User stopped the deployment");
-        break;
-      };
-      let key = utils::key::gen_key(&namespace, &cargo.name);
-      let state_ptr = state.clone();
-      rt::spawn(async move {
-        let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
-        let _ = state_ptr
-          .event_emitter
-          .emit(Event::CargoStarted(Box::new(cargo)))
-          .await;
-      });
-    }
     Ok::<_, HttpError>(())
   });
 
   Ok(rx)
+}
+
+async fn create_resources(
+  data: &[ResourcePartial],
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  data
+    .iter()
+    .map(|resource| async {
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Creating Resource {0}",
+          resource.name
+        ))))
+        .is_err()
+      {
+        log::warn!("User stopped the deployment");
+        return Ok(());
+      };
+
+      let key = resource.name.to_owned();
+      let res =
+        utils::resource::create_or_patch(resource.clone(), &state.pool).await;
+
+      if let Err(err) = res {
+        if sx
+          .send(utils::state::stream_to_bytes(StateStream::Error(
+            err.to_string(),
+          )))
+          .is_err()
+        {
+          // TODO: Delete previously created resources
+          log::warn!("User stopped the deployment");
+          return Ok(());
+        }
+        return Ok(());
+      }
+
+      if sx
+        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+          "Created Resource {0}",
+          resource.name
+        ))))
+        .is_err()
+      {
+        log::warn!("User stopped the deployment");
+        // break;
+      }
+
+      let pool = state.pool.clone();
+      let event_emitter = state.event_emitter.clone();
+      rt::spawn(async move {
+        let resource = repositories::resource::inspect_by_key(&key, &pool)
+          .await
+          .unwrap();
+        let _ = event_emitter
+          .emit(Event::ResourcePatched(Box::new(resource)))
+          .await;
+      });
+      Ok::<_, HttpError>(())
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
 }
 
 pub async fn apply_resource(
@@ -415,57 +393,8 @@ pub async fn apply_resource(
       return Ok(());
     };
 
-    for resource in &data.resources {
-      if sx
-        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Creating Resource {0}",
-          resource.name
-        ))))
-        .is_err()
-      {
-        log::warn!("User stopped the deployment");
-        break;
-      }
-      let key = resource.name.to_owned();
-      let res =
-        utils::resource::create_or_patch(resource.clone(), &state.pool).await;
+    create_resources(&data.resources, &state, sx).await;
 
-      if let Err(err) = res {
-        if sx
-          .send(utils::state::stream_to_bytes(StateStream::Error(
-            err.to_string(),
-          )))
-          .is_err()
-        {
-          // TODO: Delete previously created resources
-          log::warn!("User stopped the deployment");
-          return Ok(());
-        }
-        continue;
-      }
-
-      if sx
-        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Created Resource {0}",
-          resource.name
-        ))))
-        .is_err()
-      {
-        log::warn!("User stopped the deployment");
-        break;
-      }
-
-      let pool = state.pool.clone();
-      let event_emitter = state.event_emitter.clone();
-      rt::spawn(async move {
-        let resource = repositories::resource::inspect_by_key(&key, &pool)
-          .await
-          .unwrap();
-        let _ = event_emitter
-          .emit(Event::ResourcePatched(Box::new(resource)))
-          .await;
-      });
-    }
     Ok::<_, HttpError>(())
   });
 
