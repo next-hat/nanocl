@@ -52,19 +52,36 @@ pub(crate) async fn revert(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let res = match utils::state::parse_state(&payload)? {
-    StateData::Deployment(data) => {
-      utils::state::revert_deployment(&data, &state).await?
-    }
-    StateData::Cargo(data) => utils::state::revert_cargo(&data, &state).await?,
-    StateData::Resource(data) => {
-      utils::state::revert_resource(&data, &state).await?
-    }
-  };
+  let state_file = utils::state::parse_state(&payload)?;
+  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
+
+  rt::spawn(async move {
+    match state_file {
+      StateData::Deployment(data) => {
+        if let Err(err) =
+          utils::state::revert_deployment(&data, &state, sx).await
+        {
+          log::warn!("{err}");
+        }
+      }
+      StateData::Cargo(data) => {
+        if let Err(err) = utils::state::revert_cargo(&data, &state, sx).await {
+          log::warn!("{err}");
+        }
+      }
+      StateData::Resource(data) => {
+        if let Err(err) = utils::state::revert_resource(&data, &state, sx).await
+        {
+          log::warn!("{err}");
+        }
+      }
+    };
+  });
+
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(res),
+      .streaming(rx),
   )
 }
 

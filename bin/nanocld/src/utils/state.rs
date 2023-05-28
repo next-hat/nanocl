@@ -3,7 +3,6 @@ use ntex::rt;
 use ntex::http;
 use ntex::util::Bytes;
 use ntex::channel::mpsc;
-use ntex::channel::mpsc::Receiver;
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
@@ -345,67 +344,54 @@ async fn delete_resources(
 pub async fn revert_deployment(
   data: &StateDeployment,
   state: &DaemonState,
-) -> Result<Receiver<Result<Bytes, HttpError>>, HttpError> {
-  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
-
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
   let data = data.clone();
   let state = state.clone();
 
-  rt::spawn(async move {
-    let namespace = if let Some(namespace) = &data.namespace {
-      namespace.to_owned()
-    } else {
-      "global".into()
-    };
+  let namespace = if let Some(namespace) = &data.namespace {
+    namespace.to_owned()
+  } else {
+    "global".into()
+  };
 
-    if let Some(cargoes) = &data.cargoes {
-      delete_cargoes(&namespace, cargoes, &state, sx.clone()).await;
-    }
+  if let Some(cargoes) = &data.cargoes {
+    delete_cargoes(&namespace, cargoes, &state, sx.clone()).await;
+  }
 
-    if let Some(resources) = &data.resources {
-      delete_resources(resources, &state, sx.clone()).await;
-    }
-    Ok::<_, HttpError>(())
-  });
-  Ok(rx)
+  if let Some(resources) = &data.resources {
+    delete_resources(resources, &state, sx.clone()).await;
+  }
+
+  Ok(())
 }
 
 pub async fn revert_cargo(
   data: &StateCargo,
   state: &DaemonState,
-) -> Result<Receiver<Result<Bytes, HttpError>>, HttpError> {
-  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
-
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
   let data = data.clone();
   let state = state.clone();
 
-  rt::spawn(async move {
-    let namespace = if let Some(namespace) = &data.namespace {
-      namespace.to_owned()
-    } else {
-      "global".into()
-    };
+  let namespace = if let Some(namespace) = &data.namespace {
+    namespace.to_owned()
+  } else {
+    "global".into()
+  };
 
-    delete_cargoes(&namespace, &data.cargoes, &state, sx).await;
-
-    Ok::<_, HttpError>(())
-  });
-  Ok(rx)
+  delete_cargoes(&namespace, &data.cargoes, &state, sx).await;
+  Ok(())
 }
 
 pub async fn revert_resource(
   data: &StateResources,
   state: &DaemonState,
-) -> Result<Receiver<Result<Bytes, HttpError>>, HttpError> {
-  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
-
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
   let data = data.clone();
   let state = state.clone();
 
-  rt::spawn(async move {
-    delete_resources(&data.resources, &state, sx).await;
-
-    Ok::<_, HttpError>(())
-  });
-  Ok(rx)
+  delete_resources(&data.resources, &state, sx).await;
+  Ok(())
 }
