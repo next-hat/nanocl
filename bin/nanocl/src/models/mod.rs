@@ -64,6 +64,8 @@ pub enum Commands {
   Upgrade(UpgradeOpts),
   /// Show all processes managed by nanocl
   Ps(ProcessOpts),
+  /// Manage system
+  System(SystemOpts),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for

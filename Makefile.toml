@@ -26,6 +26,11 @@ args = ["run", "--bin", "nanocl", "${@}"]
 command = "cargo"
 args = ["nextest", "run", "-p", "nanocld"]
 
+# Test daemon
+[tasks.tests-client]
+command = "cargo"
+args = ["nextest", "run", "-p", "nanocld_client"]
+
 # Test Cli
 [tasks.tests-cli]
 command = "cargo"

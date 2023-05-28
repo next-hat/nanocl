@@ -8,6 +8,7 @@ pub(crate) mod resource;
 pub(crate) mod state;
 pub(crate) mod vm;
 pub(crate) mod vm_image;
+pub(crate) mod http_metric;
 
 pub mod error;
 pub use http_client::*;
