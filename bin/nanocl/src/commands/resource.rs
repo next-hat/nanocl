@@ -1,10 +1,7 @@
-use dialoguer::Confirm;
-use dialoguer::theme::ColorfulTheme;
-
-use nanocl_utils::io_error::{IoError, IoResult};
+use nanocl_utils::io_error::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
 
-use crate::utils::print::{print_yml, print_table};
+use crate::utils;
 use crate::models::{
   ResourceArgs, ResourceCommands, ResourceRow, ResourceRemoveOpts,
   ResourceInspectOpts, ResourceRevertOpts, ResourceHistoryOpts,
@@ -18,7 +15,7 @@ async fn exec_resource_ls(client: &NanocldClient) -> IoResult<()> {
     .map(ResourceRow::from)
     .collect::<Vec<ResourceRow>>();
 
-  print_table(row);
+  utils::print::print_table(row);
   Ok(())
 }
 
@@ -27,19 +24,11 @@ async fn exec_resource_rm(
   options: &ResourceRemoveOpts,
 ) -> IoResult<()> {
   if !options.skip_confirm {
-    let result = Confirm::with_theme(&ColorfulTheme::default())
-      .with_prompt(format!("Delete resources {}?", options.names.join(",")))
-      .default(false)
-      .interact();
-    match result {
-      Ok(true) => {}
-      _ => {
-        return Err(IoError::interupted(
-          "Resource remove",
-          "interupted by user",
-        ))
-      }
-    }
+    utils::dialog::confirm(&format!(
+      "Delete resource {}?",
+      options.names.join(",")
+    ))
+    .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
   for name in &options.names {
     client.delete_resource(name).await?;
@@ -54,7 +43,7 @@ async fn exec_resource_inspect(
 ) -> IoResult<()> {
   let resource = client.inspect_resource(&opts.name).await?;
 
-  print_yml(resource)?;
+  utils::print::print_yml(resource)?;
   Ok(())
 }
 
@@ -64,7 +53,7 @@ async fn exec_resource_history(
 ) -> IoResult<()> {
   let history = client.list_history_resource(&opts.name).await?;
 
-  print_yml(history)?;
+  utils::print::print_yml(history)?;
   Ok(())
 }
 
@@ -74,7 +63,7 @@ async fn exec_resource_revert(
 ) -> IoResult<()> {
   let resource = client.revert_resource(&opts.name, &opts.key).await?;
 
-  print_yml(resource)?;
+  utils::print::print_yml(resource)?;
   Ok(())
 }
 

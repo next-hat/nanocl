@@ -3,8 +3,6 @@ use std::collections::HashMap;
 
 use ntex::rt;
 use clap::{Command, Arg};
-use dialoguer::Confirm;
-use dialoguer::theme::ColorfulTheme;
 use futures::StreamExt;
 use bollard_next::service::HostConfig;
 
@@ -413,26 +411,19 @@ async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
     }
     _ => inject_data(yaml.clone(), &args, &client).await?,
   };
-  let _ = utils::print::print_yml(&yaml);
   if !opts.skip_confirm {
-    let result = Confirm::with_theme(&ColorfulTheme::default())
-      .with_prompt("Are you sure to apply this state?")
-      .default(false)
-      .interact();
-    match result {
-      Ok(true) => {}
-      _ => return Err(IoError::interupted("StateApply", "interupted by user")),
-    }
+    utils::print::print_yml(&yaml)?;
+    utils::dialog::confirm("Are you sure to apply this state ?")
+      .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
   for cargo in &cargoes {
     let is_missing = client
-    .inspect_cargo_image(&cargo.container.image.clone().unwrap_or_default())
-    .await
-    .is_err();
+      .inspect_cargo_image(&cargo.container.image.clone().unwrap_or_default())
+      .await
+      .is_err();
 
     // Download cargoes images
-    if is_missing || opts.force_pull
-    {
+    if is_missing || opts.force_pull {
       if let Err(err) = download_cargo_image(&client, cargo).await {
         eprintln!("{err}");
         if is_missing {
@@ -466,18 +457,10 @@ async fn exec_state_revert(host: &str, opts: &StateOpts) -> IoResult<()> {
   let yaml = inject_data(yaml.clone(), &args, &client).await?;
   let data = serde_json::to_value(&yaml)
     .map_err(|err| err.map_err_context(|| "Unable to parse yaml"))?;
-  let _ = utils::print::print_yml(&yaml);
   if !opts.skip_confirm {
-    let result = Confirm::with_theme(&ColorfulTheme::default())
-      .with_prompt("Are you sure to revert this state ?")
-      .default(false)
-      .interact();
-    match result {
-      Ok(true) => {}
-      _ => {
-        return Err(IoError::interupted("StateRevert", "interupted by user"))
-      }
-    }
+    utils::print::print_yml(&yaml)?;
+    utils::dialog::confirm("Are you sure to revert this state ?")
+      .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
   let mut stream = client.revert_state(&data).await?;
   while let Some(res) = stream.next().await {

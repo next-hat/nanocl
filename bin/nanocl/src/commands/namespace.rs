@@ -1,10 +1,7 @@
-use dialoguer::Confirm;
-use dialoguer::theme::ColorfulTheme;
-
-use nanocl_utils::io_error::{IoError, IoResult};
+use nanocl_utils::io_error::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
 
-use crate::utils::print::{print_yml, print_table};
+use crate::utils;
 use crate::models::{
   NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow,
   NamespaceDeleteOpts,
@@ -16,7 +13,7 @@ async fn exec_namespace_ls(client: &NanocldClient) -> IoResult<()> {
     .into_iter()
     .map(NamespaceRow::from)
     .collect::<Vec<NamespaceRow>>();
-  print_table(namespaces);
+  utils::print::print_table(namespaces);
   Ok(())
 }
 
@@ -34,7 +31,7 @@ async fn exec_namespace_inspect(
   options: &NamespaceOpts,
 ) -> IoResult<()> {
   let namespace = client.inspect_namespace(&options.name).await?;
-  print_yml(namespace)?;
+  utils::print::print_yml(namespace)?;
   Ok(())
 }
 
@@ -43,19 +40,11 @@ async fn exec_namespace_rm(
   options: &NamespaceDeleteOpts,
 ) -> IoResult<()> {
   if !options.skip_confirm {
-    let result = Confirm::with_theme(&ColorfulTheme::default())
-      .with_prompt(format!("Delete namespaces {}?", options.names.join(",")))
-      .default(false)
-      .interact();
-    match result {
-      Ok(true) => {}
-      _ => {
-        return Err(IoError::interupted(
-          "Namespace remove",
-          "interupted by user",
-        ))
-      }
-    }
+    utils::dialog::confirm(&format!(
+      "Delete namespace {}?",
+      options.names.join(",")
+    ))
+    .map_err(|err| err.map_err_context(|| "Delete namespace"))?;
   }
 
   for name in &options.names {
