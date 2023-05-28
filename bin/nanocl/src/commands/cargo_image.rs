@@ -1,17 +1,14 @@
 use std::collections::HashMap;
 
-use dialoguer::Confirm;
-use dialoguer::theme::ColorfulTheme;
 use tokio_util::codec;
 use futures::StreamExt;
 use bollard_next::service::ProgressDetail;
 use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
 
-use nanocl_utils::io_error::{IoError, IoResult};
+use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 use nanocld_client::NanocldClient;
 
-use crate::utils::print::{print_yml, print_table};
-use crate::utils::math::calculate_percentage;
+use crate::utils;
 use crate::models::{
   CargoImageOpts, CargoImageCommands, CargoImageRemoveOpts,
   CargoImageInspectOpts, CargoImageRow, CargoImageImportOpts,
@@ -23,7 +20,7 @@ async fn exec_cargo_image_ls(client: &NanocldClient) -> IoResult<()> {
     .into_iter()
     .map(CargoImageRow::from)
     .collect::<Vec<CargoImageRow>>();
-  print_table(rows);
+  utils::print::print_table(rows);
   Ok(())
 }
 
@@ -32,19 +29,11 @@ async fn exec_cargo_image_rm(
   options: &CargoImageRemoveOpts,
 ) -> IoResult<()> {
   if !options.skip_confirm {
-    let result = Confirm::with_theme(&ColorfulTheme::default())
-      .with_prompt(format!("Delete cargo images {}?", options.names.join(",")))
-      .default(false)
-      .interact();
-    match result {
-      Ok(true) => {}
-      _ => {
-        return Err(IoError::interupted(
-          "Cargo image remove",
-          "interupted by user",
-        ))
-      }
-    }
+    utils::dialog::confirm(&format!(
+      "Delete cargo images {}?",
+      options.names.join(",")
+    ))
+    .map_err(|err| err.map_err_context(|| "Delete cargo images"))?;
   }
   for name in &options.names {
     client.delete_cargo_image(name).await?;
@@ -69,7 +58,7 @@ fn update_progress(
     .try_into()
     .unwrap_or_default();
   if let Some(pg) = layers.get(id) {
-    let percent = calculate_percentage(current, total);
+    let percent = utils::math::calculate_percentage(current, total);
     pg.set_position(percent);
   } else {
     let pg = ProgressBar::new(100);
@@ -80,7 +69,7 @@ fn update_progress(
     .progress_chars("=> ");
     pg.set_style(style);
     multiprogress.add(pg.to_owned());
-    let percent = calculate_percentage(current, total);
+    let percent = utils::math::calculate_percentage(current, total);
     pg.set_position(percent);
     layers.insert(id.to_owned(), pg);
   }
@@ -136,7 +125,7 @@ async fn exec_cargo_image_inspect(
   opts: &CargoImageInspectOpts,
 ) -> IoResult<()> {
   let image = client.inspect_cargo_image(&opts.name).await?;
-  print_yml(image)?;
+  utils::print::print_yml(image)?;
   Ok(())
 }
 

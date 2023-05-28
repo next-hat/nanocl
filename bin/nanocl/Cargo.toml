@@ -63,3 +63,4 @@ nanocl_utils = { version = "0.1.2", features = [
   "serde_json",
   "serde_yaml",
 ] }
+ctrlc = "3.3.1"

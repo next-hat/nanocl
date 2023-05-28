@@ -1,13 +1,11 @@
-use dialoguer::Confirm;
-use dialoguer::theme::ColorfulTheme;
 use futures::StreamExt;
 use bollard_next::exec::CreateExecOptions;
 
-use nanocl_utils::io_error::{IoError, IoResult};
+use nanocl_utils::io_error::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery, CargoLogQuery};
 
-use crate::utils::print::{print_yml, print_table};
+use crate::utils;
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
@@ -46,16 +44,11 @@ async fn exec_cargo_rm(
   options: &CargoRemoveOpts,
 ) -> IoResult<()> {
   if !options.skip_confirm {
-    let result = Confirm::with_theme(&ColorfulTheme::default())
-      .with_prompt(format!("Delete cargoes {}?", options.names.join(",")))
-      .default(false)
-      .interact();
-    match result {
-      Ok(true) => {}
-      _ => {
-        return Err(IoError::interupted("Cargo remove", "interupted by user"))
-      }
-    }
+    utils::dialog::confirm(&format!(
+      "Delete cargo  {}?",
+      options.names.join(",")
+    ))
+    .map_err(|err| err.map_err_context(|| "Delete cargo images"))?;
   }
   let query = CargoDeleteQuery {
     namespace: args.namespace.clone(),
@@ -77,7 +70,7 @@ async fn exec_cargo_ls(
     .into_iter()
     .map(CargoRow::from)
     .collect::<Vec<CargoRow>>();
-  print_table(rows);
+  utils::print::print_table(rows);
   Ok(())
 }
 
@@ -134,7 +127,7 @@ async fn exec_cargo_inspect(
   let cargo = client
     .inspect_cargo(&options.name, args.namespace.clone())
     .await?;
-  print_yml(cargo)?;
+  utils::print::print_yml(cargo)?;
   Ok(())
 }
 
@@ -174,7 +167,7 @@ async fn exec_cargo_history(
     .list_history_cargo(&opts.name, args.namespace.clone())
     .await?;
 
-  print_yml(histories)?;
+  utils::print::print_yml(histories)?;
   Ok(())
 }
 
@@ -224,7 +217,7 @@ async fn exec_cargo_revert(
   let cargo = client
     .revert_cargo(&opts.name, &opts.history_id, args.namespace.clone())
     .await?;
-  print_yml(cargo)?;
+  utils::print::print_yml(cargo)?;
   Ok(())
 }
 
