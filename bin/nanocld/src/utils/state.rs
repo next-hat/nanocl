@@ -244,6 +244,57 @@ pub async fn apply_resource(
   Ok(())
 }
 
+async fn delete_cargoes(
+  namespace: &str,
+  data: &[CargoConfigPartial],
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+    "Deleting {0} cargoes in namespace {namespace}",
+    data.len()
+  ))));
+
+  data
+    .iter()
+    .map(|cargo| async {
+      let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+        format!("Deleting Cargo {0}", cargo.name),
+      )));
+
+      let key = utils::key::gen_key(namespace, &cargo.name);
+
+      let res = utils::cargo::inspect(&key, state).await;
+      if res.is_err() {
+        let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+          format!("Skipping Cargo {0} [NOT FOUND]", cargo.name),
+        )));
+        return Ok(());
+      }
+
+      let cargo = res.unwrap();
+
+      utils::cargo::delete(&key, Some(true), state).await?;
+
+      let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+        format!("Deleted Cargo {0}", cargo.name),
+      )));
+
+      let event_emitter = state.event_emitter.clone();
+      let state_clone = state.clone();
+      rt::spawn(async move {
+        let cargo = utils::cargo::inspect(&key, &state_clone).await.unwrap();
+        let _ = event_emitter
+          .emit(Event::CargoDeleted(Box::new(cargo)))
+          .await;
+      });
+      Ok::<_, HttpError>(())
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
+}
+
 pub async fn revert_deployment(
   data: &StateDeployment,
   state: &DaemonState,
@@ -420,52 +471,7 @@ pub async fn revert_cargo(
       return Ok(());
     };
 
-    for cargo in &data.cargoes {
-      if sx
-        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Deleting Cargo {0}",
-          cargo.name
-        ))))
-        .is_err()
-      {
-        log::warn!("User stopped the deployment");
-        break;
-      }
-      let key = utils::key::gen_key(&namespace, &cargo.name);
-      let cargo = match utils::cargo::inspect(&key, &state).await {
-        Ok(cargo) => cargo,
-        Err(_) => {
-          if sx
-            .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-              "Skipping Cargo {0} [NOT FOUND]",
-              cargo.name
-            ))))
-            .is_err()
-          {
-            log::warn!("User stopped the deployment");
-            break;
-          }
-          continue;
-        }
-      };
-      utils::cargo::delete(&key, Some(true), &state).await?;
-      if sx
-        .send(utils::state::stream_to_bytes(StateStream::Msg(format!(
-          "Deleted Cargo {0}",
-          cargo.name
-        ))))
-        .is_err()
-      {
-        log::warn!("User stopped the deployment");
-        break;
-      }
-      let event_emitter = state.event_emitter.clone();
-      rt::spawn(async move {
-        let _ = event_emitter
-          .emit(Event::CargoDeleted(Box::new(cargo)))
-          .await;
-      });
-    }
+    delete_cargoes(&namespace, &data.cargoes, &state, sx).await;
 
     Ok::<_, HttpError>(())
   });
