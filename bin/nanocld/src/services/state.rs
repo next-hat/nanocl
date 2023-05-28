@@ -26,13 +26,14 @@ pub(crate) async fn apply(
       }
       StateData::Cargo(data) => {
         if let Err(err) =
-          utils::state::apply_cargo(&data, &version, &state).await
+          utils::state::apply_cargo(&data, &version, &state, sx).await
         {
           log::warn!("{err}");
         }
       }
       StateData::Resource(data) => {
-        if let Err(err) = utils::state::apply_resource(&data, &state).await {
+        if let Err(err) = utils::state::apply_resource(&data, &state, sx).await
+        {
           log::warn!("{err}");
         }
       }
