@@ -48,7 +48,7 @@ use nanocl_stubs::vm_config::{
   VmConfig, VmConfigPartial, VmConfigUpdate, VmDiskConfig, VmHostConfig,
 };
 use nanocl_stubs::resource::{
-  Resource, ResourcePatch, ResourceConfig, ResourcePartial,
+  Resource, ResourceUpdate, ResourceConfig, ResourcePartial,
 };
 use nanocl_stubs::dns::{ResourceDnsRule, DnsEntry};
 use nanocl_stubs::proxy::{
@@ -259,7 +259,7 @@ impl Modify for VersionModifier {
     resource::inspect_resource,
     resource::create_resource,
     resource::delete_resource,
-    resource::patch_resource,
+    resource::put_resource,
     resource::list_resource_history,
     resource::revert_resource,
     // Metric
@@ -382,7 +382,7 @@ impl Modify for VersionModifier {
     VmHostConfig,
     // Resource
     Resource,
-    ResourcePatch,
+    ResourceUpdate,
     ResourceConfig,
     ResourcePartial,
     // ProxyRules

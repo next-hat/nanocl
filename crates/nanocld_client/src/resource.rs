@@ -1,7 +1,7 @@
 use nanocl_utils::http_client_error::HttpClientError;
 
 use nanocl_stubs::resource::{
-  Resource, ResourcePartial, ResourceConfig, ResourceQuery, ResourcePatch,
+  Resource, ResourcePartial, ResourceConfig, ResourceQuery, ResourceUpdate,
 };
 
 use super::http_client::NanocldClient;
@@ -142,10 +142,10 @@ impl NanocldClient {
   /// let resource = client.patch_resource("my-resource", serde_json::json!({})).await;
   /// ```
   ///
-  pub async fn patch_resource(
+  pub async fn put_resource(
     &self,
     key: &str,
-    config: &ResourcePatch,
+    config: &ResourceUpdate,
   ) -> Result<Resource, HttpClientError> {
     let res = self
       .send_patch(
@@ -228,7 +228,7 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
-  use nanocl_stubs::resource::{ResourcePartial, ResourcePatch};
+  use nanocl_stubs::resource::{ResourcePartial, ResourceUpdate};
 
   use super::*;
 
@@ -273,14 +273,14 @@ mod tests {
     assert_eq!(resource.name, "test_resource2");
     assert_eq!(resource.kind, String::from("Custom"));
 
-    let new_resource = ResourcePatch {
+    let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
       config: config.clone(),
     };
 
     // patch
     let resource = client
-      .patch_resource("test_resource2", &new_resource)
+      .put_resource("test_resource2", &new_resource)
       .await
       .unwrap();
 

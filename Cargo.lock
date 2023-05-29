@@ -1817,6 +1817,7 @@ dependencies = [
  "nanocl_stubs",
  "nanocl_utils",
  "ntex",
+ "openssl",
  "serde",
  "serde_json",
  "tokio",

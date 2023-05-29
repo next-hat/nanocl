@@ -1,4 +1,3 @@
-use nanocl_stubs::resource::ResourcePartial;
 use ntex::rt;
 use ntex::http;
 use ntex::util::Bytes;
@@ -9,6 +8,7 @@ use futures_util::stream::FuturesUnordered;
 use nanocl_utils::http_error::HttpError;
 
 use nanocl_stubs::system::Event;
+use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateMeta, StateStream,
@@ -34,8 +34,26 @@ async fn create_cargoes(
       let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
         format!("Creating Cargo {0}", cargo.name),
       )));
-      let res =
-        utils::cargo::create_or_put(namespace, cargo, version, state).await;
+
+      let key = utils::key::gen_key(namespace, &cargo.name);
+      let res = match utils::cargo::inspect(&key, state).await {
+        Ok(existing) => {
+          let existing: CargoConfigPartial = existing.into();
+          if existing == *cargo {
+            let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+              format!("Skipping Cargo {0} not changed", cargo.name),
+            )));
+            return Ok(());
+          }
+          utils::cargo::put(&key, cargo, version, state).await
+        }
+        Err(_err) => {
+          let cargo =
+            utils::cargo::create(namespace, cargo, version, state).await?;
+          utils::cargo::start(&key, state).await?;
+          Ok(cargo)
+        }
+      };
 
       if let Err(err) = res {
         let _ = sx.send(utils::state::stream_to_bytes(StateStream::Error(
@@ -104,8 +122,22 @@ async fn create_resources(
         format!("Creating Resource {0}", resource.name),
       )));
       let key = resource.name.to_owned();
+
       let res =
-        utils::resource::create_or_patch(resource.clone(), &state.pool).await;
+        match repositories::resource::inspect_by_key(&key, &state.pool).await {
+          Err(_) => utils::resource::create(resource, &state.pool).await,
+          Ok(cur_resource) => {
+            let casted: ResourcePartial = cur_resource.into();
+            if *resource == casted {
+              let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+                format!("Skipping Resource {0} not changed", resource.name),
+              )));
+              return Ok(());
+            }
+            utils::resource::patch(&resource.clone(), &state.pool).await
+          }
+        };
+
       if let Err(err) = res {
         let _ = sx.send(utils::state::stream_to_bytes(StateStream::Error(
           err.to_string(),
@@ -323,7 +355,7 @@ async fn delete_resources(
           }
         };
 
-      utils::resource::delete(resource.clone(), &state.pool).await?;
+      utils::resource::delete(&resource.clone(), &state.pool).await?;
 
       let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
         format!("Deleted Resource {0}", resource.name),
