@@ -15,7 +15,9 @@ use nanocld_client::stubs::cargo_config::{
 use nanocld_client::stubs::state::{StateMeta, StateStream};
 
 use crate::utils;
-use crate::models::{StateArgs, StateCommands, StateOpts, StateBuildArgs};
+use crate::models::{
+  StateArgs, StateCommands, StateApplyOpts, StateRevertOpts, StateBuildArgs,
+};
 
 use super::cargo_image::exec_cargo_image_pull;
 
@@ -382,7 +384,7 @@ async fn parse_state_file(
   read_from_file(&path)
 }
 
-async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
+async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
   let (meta, yaml) = parse_state_file(&opts.file_path).await?;
   let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;
@@ -450,7 +452,7 @@ async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
   Ok(())
 }
 
-async fn exec_state_revert(host: &str, opts: &StateOpts) -> IoResult<()> {
+async fn exec_state_revert(host: &str, opts: &StateRevertOpts) -> IoResult<()> {
   let (meta, yaml) = parse_state_file(&opts.file_path).await?;
   let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;

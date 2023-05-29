@@ -16,7 +16,7 @@ pub struct StateBuildArgs {
 }
 
 #[derive(Debug, Parser)]
-pub struct StateOpts {
+pub struct StateApplyOpts {
   /// Path or url to the state
   #[clap(long, short = 'f')]
   pub file_path: Option<String>,
@@ -34,12 +34,25 @@ pub struct StateOpts {
   pub args: Vec<String>,
 }
 
+#[derive(Debug, Parser)]
+pub struct StateRevertOpts {
+  /// Path or url to the state
+  #[clap(long, short = 'f')]
+  pub file_path: Option<String>,
+  /// Skip the confirmation prompt
+  #[clap(short = 'y')]
+  pub skip_confirm: bool,
+  /// Additional arguments to pass to the file
+  #[clap(last = true, raw = true)]
+  pub args: Vec<String>,
+}
+
 #[derive(Debug, Subcommand)]
 pub enum StateCommands {
   /// Apply a state from a configuration file
-  Apply(StateOpts),
+  Apply(StateApplyOpts),
   /// Revert a state from a configuration file
-  Revert(StateOpts),
+  Revert(StateRevertOpts),
 }
 
 /// Manage configuration states
