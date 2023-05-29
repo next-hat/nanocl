@@ -6,7 +6,7 @@ use ntex::rt;
 use ntex::web;
 
 use nanocl_stubs::system::Event;
-use nanocl_stubs::resource::ResourcePatch;
+use nanocl_stubs::resource::ResourceUpdate;
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
 use crate::{utils, repositories};
@@ -104,7 +104,7 @@ pub(crate) async fn delete_resource(
 ) -> Result<web::HttpResponse, HttpError> {
   let resource =
     repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
-  utils::resource::delete(resource.clone(), &state.pool).await?;
+  utils::resource::delete(&resource, &state.pool).await?;
   rt::spawn(async move {
     let _ = state
       .event_emitter
@@ -116,8 +116,8 @@ pub(crate) async fn delete_resource(
 
 /// Patch a resource (update its version and/or config) and create a new history
 #[cfg_attr(feature = "dev", utoipa::path(
-  patch,
-  request_body = ResourcePatch,
+  put,
+  request_body = ResourceUpdate,
   tag = "Resources",
   path = "/resources/{Name}",
   params(
@@ -129,8 +129,8 @@ pub(crate) async fn delete_resource(
   ),
 ))]
 #[web::patch("/resources/{name}")]
-pub(crate) async fn patch_resource(
-  web::types::Json(payload): web::types::Json<ResourcePatch>,
+pub(crate) async fn put_resource(
+  web::types::Json(payload): web::types::Json<ResourceUpdate>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -143,7 +143,7 @@ pub(crate) async fn patch_resource(
     kind: resource.kind,
     config: payload.config,
   };
-  let resource = utils::resource::patch(new_resource, &state.pool).await?;
+  let resource = utils::resource::patch(&new_resource, &state.pool).await?;
   let resource_ptr = resource.clone();
   rt::spawn(async move {
     let _ = state
@@ -209,7 +209,7 @@ pub(crate) async fn revert_resource(
     kind: resource.kind,
     config: history.data,
   };
-  let resource = utils::resource::patch(new_resource, &state.pool).await?;
+  let resource = utils::resource::patch(&new_resource, &state.pool).await?;
   let resource_ptr = resource.clone();
   rt::spawn(async move {
     let _ = state
@@ -225,7 +225,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(delete_resource);
   config.service(list_resource);
   config.service(inspect_resource);
-  config.service(patch_resource);
+  config.service(put_resource);
   config.service(list_resource_history);
   config.service(revert_resource);
 }
@@ -238,7 +238,7 @@ mod tests {
   use ntex::http::StatusCode;
 
   use crate::utils::tests::*;
-  use nanocl_stubs::resource::{Resource, ResourcePartial, ResourcePatch};
+  use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceUpdate};
 
   #[ntex::test]
   async fn basic() -> TestRet {
@@ -302,7 +302,7 @@ mod tests {
       .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    let new_resource = ResourcePatch {
+    let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
       config: config.clone(),
     };

@@ -264,9 +264,9 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Resource> {
   Ok(item)
 }
 
-/// ## Update resource by key
+/// ## Put resource config by key
 ///
-/// Update a resource item in database by key
+/// Add an entry to the resource history by adding a new resource config
 ///
 /// ## Arguments
 ///
@@ -288,7 +288,7 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Resource> {
 /// let item = repositories::resource::update_by_id(String::from("my-resource"), json!({"foo": "bar"}), &pool).await;
 /// ```
 ///
-pub async fn patch(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
+pub async fn put(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
   use crate::schema::resources;
 
   let pool = pool.clone();
@@ -332,14 +332,4 @@ pub async fn patch(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     config: config.data,
   };
   Ok(item)
-}
-
-pub async fn create_or_patch(
-  resource: &ResourcePartial,
-  pool: &Pool,
-) -> IoResult<Resource> {
-  if inspect_by_key(&resource.name, pool).await.is_ok() {
-    return patch(resource, pool).await;
-  }
-  create(resource, pool).await
 }

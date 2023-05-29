@@ -1041,6 +1041,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+    put:
+      tags:
+      - Resources
+      summary: Patch a resource (update its version and/or config) and create a new history
+      description: Patch a resource (update its version and/or config) and create a new history
+      operationId: put_resource
+      parameters:
+      - name: Name
+        in: path
+        description: The resource name to patch
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceUpdate'
+        required: true
+      responses:
+        '200':
+          description: The patched resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '404':
+          description: Resource is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
     delete:
       tags:
       - Resources
@@ -1057,38 +1089,6 @@ paths:
       responses:
         '202':
           description: The resource and his history has been deleted
-        '404':
-          description: Resource is not existing
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
-    patch:
-      tags:
-      - Resources
-      summary: Patch a resource (update its version and/or config) and create a new history
-      description: Patch a resource (update its version and/or config) and create a new history
-      operationId: patch_resource
-      parameters:
-      - name: Name
-        in: path
-        description: The resource name to patch
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ResourcePatch'
-        required: true
-      responses:
-        '200':
-          description: The patched resource
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Resource'
         '404':
           description: Resource is not existing
           content:
@@ -4186,20 +4186,6 @@ components:
           description: The config of the resource (json object)
           additionalProperties:
             $ref: '#/components/schemas/Any'
-    ResourcePatch:
-      type: object
-      required:
-      - Version
-      - Config
-      properties:
-        Version:
-          type: string
-          description: Version of the config
-        Config:
-          type: object
-          description: The config of the resource as a json object
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
     ResourceProxyRule:
       type: object
       description: Define proxy rules to apply
@@ -4214,6 +4200,20 @@ components:
           description: Cargo to watch for changes
         Rules:
           $ref: '#/components/schemas/ProxyRule'
+    ResourceUpdate:
+      type: object
+      required:
+      - Version
+      - Config
+      properties:
+        Version:
+          type: string
+          description: Version of the config
+        Config:
+          type: object
+          description: The config of the resource as a json object
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
     ResourcesBlkioWeightDevice:
       type: object
       properties:

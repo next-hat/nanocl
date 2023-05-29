@@ -2,13 +2,16 @@ use std::error::Error;
 
 use ntex::rt;
 use ntex::http;
+
 use ntex::util::{Bytes, Stream};
 use ntex::channel::mpsc::Receiver;
+use ntex::connect::openssl::SslMethod;
 use futures::{StreamExt, TryStreamExt};
 
 use nanocl_utils::io_error::FromIo;
 use nanocl_utils::http_error::HttpError;
 use nanocl_utils::http_client_error::HttpClientError;
+use openssl::ssl::SslConnector;
 
 use crate::error::is_api_error;
 
@@ -51,12 +54,15 @@ impl NanocldClient {
   }
 
   pub fn connect_to(url: &'static str, version: Option<String>) -> Self {
+    let builder = SslConnector::builder(SslMethod::tls()).unwrap().build();
+
     match url {
       url if url.starts_with("http://") || url.starts_with("https://") => {
         let client = http::client::Client::build()
           .connector(
             http::client::Connector::default()
               .timeout(ntex::time::Millis::from_secs(100))
+              .openssl(builder)
               .finish(),
           )
           .timeout(ntex::time::Millis::from_secs(100))
@@ -77,6 +83,7 @@ impl NanocldClient {
                 let path = url.trim_start_matches("unix://");
                 Ok::<_, _>(rt::unix_connect(path).await?)
               }))
+              .openssl(builder)
               .timeout(ntex::time::Millis::from_secs(100))
               .finish(),
           )
