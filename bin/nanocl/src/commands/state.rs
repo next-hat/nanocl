@@ -17,7 +17,7 @@ use nanocld_client::stubs::state::{StateMeta, StateStream};
 use crate::utils;
 use crate::models::{StateArgs, StateCommands, StateOpts, StateBuildArgs};
 
-use super::cargo_image::exec_cargo_image_create;
+use super::cargo_image::exec_cargo_image_pull;
 
 async fn get_from_url(url: &str) -> IoResult<(StateMeta, serde_yaml::Value)> {
   let url = if url.starts_with("http") {
@@ -73,7 +73,7 @@ async fn download_cargo_image(
 ) -> IoResult<()> {
   match &cargo.container.image {
     Some(image) => {
-      exec_cargo_image_create(client, image).await?;
+      exec_cargo_image_pull(client, image).await?;
     }
     None => {
       return Err(IoError::invalid_data("Cargo image", "is not specified"))

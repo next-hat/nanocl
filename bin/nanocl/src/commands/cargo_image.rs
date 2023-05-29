@@ -75,7 +75,7 @@ fn update_progress(
   }
 }
 
-pub(crate) async fn exec_cargo_image_create(
+pub(crate) async fn exec_cargo_image_pull(
   client: &NanocldClient,
   name: &str,
 ) -> IoResult<()> {
@@ -154,8 +154,8 @@ pub async fn exec_cargo_image(
     CargoImageCommands::Inspect(opts) => {
       exec_cargo_image_inspect(client, opts).await
     }
-    CargoImageCommands::Create(opts) => {
-      exec_cargo_image_create(client, &opts.name).await
+    CargoImageCommands::Pull(opts) => {
+      exec_cargo_image_pull(client, &opts.name).await
     }
     CargoImageCommands::Remove(args) => exec_cargo_image_rm(client, args).await,
     CargoImageCommands::Import(opts) => {

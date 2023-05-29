@@ -115,9 +115,9 @@ pub async fn inspect(
   Ok(image)
 }
 
-/// # Download cargo image
+/// # Pull cargo image
 ///
-/// Download a cargo/container image from the docker registry
+/// Pull a cargo/container image from the docker registry
 ///
 /// ## Arguments
 ///
@@ -146,7 +146,7 @@ pub async fn inspect(
 /// }
 /// ```
 ///
-pub async fn download(
+pub async fn pull(
   from_image: &str,
   tag: &str,
   state: &DaemonState,
