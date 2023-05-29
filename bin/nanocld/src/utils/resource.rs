@@ -1,3 +1,4 @@
+use hyper::client::ResponseFuture;
 use ntex::http::StatusCode;
 use jsonschema::{JSONSchema, Draft};
 
@@ -7,7 +8,7 @@ use crate::repositories;
 use nanocl_utils::http_error::HttpError;
 use crate::models::{Pool, ResourceKindPartial};
 
-use super::ctrl_client::CtrlClient;
+use super::ctrl_client::{CtrlClient, self};
 
 /// Validate a resource from a custom config
 pub async fn validate_resource(
@@ -59,19 +60,31 @@ pub async fn validate_resource(
   Ok(())
 }
 
+async fn get_resource_client(
+  kind: &str,
+  version: &str,
+  pool: &Pool,
+) -> Result<CtrlClient, HttpError> {
+  let kind =
+    repositories::resource_kind::get_version(kind, version, pool).await?;
+  let url = "kind.url.as_str()";
+  let name = kind.resource_kind_name.as_str();
+  let ctrl_client = CtrlClient::new(name, url);
+
+  Ok(ctrl_client)
+}
+
 /// Hook when creating a resource
 async fn hook_create_resource(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<ResourcePartial, HttpError> {
-  let ctrl_client = match resource.kind.as_ref() {
-    "ProxyRule" => CtrlClient::new("ncdproxy", "unix:///run/nanocl/proxy.sock"),
-    "DnsRule" => CtrlClient::new("ncddns", "unix:///run/nanocl/dns.sock"),
-    _ => {
-      validate_resource(resource, pool).await?;
-      return Ok(resource.clone());
-    }
-  };
+  println!("{}", resource.kind);
+  validate_resource(resource, pool).await?;
+  println!("validated");
+
+  let ctrl_client =
+    get_resource_client(&resource.kind, &resource.version, pool).await?;
 
   let config = ctrl_client
     .apply_rule(&resource.version, &resource.name, &resource.config)
@@ -84,12 +97,12 @@ async fn hook_create_resource(
 }
 
 /// Hook when deleting a resource
-async fn hook_delete_resource(resource: &Resource) -> Result<(), HttpError> {
-  let ctrl_client = match resource.kind.as_ref() {
-    "ProxyRule" => CtrlClient::new("ncdproxy", "unix:///run/nanocl/proxy.sock"),
-    "DnsRule" => CtrlClient::new("ncddns", "unix:///run/nanocl/dns.sock"),
-    _ => return Ok(()),
-  };
+async fn hook_delete_resource(
+  resource: &Resource,
+  pool: &Pool,
+) -> Result<(), HttpError> {
+  let ctrl_client =
+    get_resource_client(&resource.kind, &resource.version, pool).await?;
 
   ctrl_client
     .delete_rule(&resource.version, &resource.name)
@@ -129,7 +142,7 @@ pub async fn create_or_patch(
 
 /// Delete a resource
 pub async fn delete(resource: Resource, pool: &Pool) -> Result<(), HttpError> {
-  if let Err(err) = hook_delete_resource(&resource).await {
+  if let Err(err) = hook_delete_resource(&resource, pool).await {
     log::warn!("{err}");
   }
   if resource.kind.as_str() == "Custom" {
