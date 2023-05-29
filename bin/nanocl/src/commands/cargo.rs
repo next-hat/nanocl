@@ -13,7 +13,7 @@ use crate::models::{
   CargoRunOpts, CargoRestartOpts,
 };
 
-use super::cargo_image::{self, exec_cargo_image_create};
+use super::cargo_image::{self, exec_cargo_image_pull};
 
 /// Execute cargo command
 ///
@@ -228,7 +228,7 @@ async fn exec_cargo_run(
 ) -> IoResult<()> {
   // Image is not existing so we donwload it
   if client.inspect_cargo_image(&opts.image).await.is_err() {
-    exec_cargo_image_create(client, &opts.image).await?;
+    exec_cargo_image_pull(client, &opts.image).await?;
   }
 
   let cargo = client

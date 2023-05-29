@@ -7,7 +7,7 @@ use nanocld_client::stubs::state::StateStream;
 
 use crate::utils;
 use crate::models::UpgradeOpts;
-use super::cargo_image::exec_cargo_image_create;
+use super::cargo_image::exec_cargo_image_pull;
 
 pub async fn exec_upgrade(
   client: &NanocldClient,
@@ -47,7 +47,7 @@ pub async fn exec_upgrade(
       format!("Cargo {} image", cargo.name),
       "is not specified".into(),
     ))?;
-    exec_cargo_image_create(client, &image).await?;
+    exec_cargo_image_pull(client, &image).await?;
   }
 
   let data =

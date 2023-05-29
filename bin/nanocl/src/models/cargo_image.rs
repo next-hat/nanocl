@@ -12,12 +12,14 @@ pub struct CargoImageRemoveOpts {
 }
 
 #[derive(Debug, Parser)]
-pub struct CargoImageCreateOpts {
+pub struct CargoImagePullOpts {
+  /// Name of the image to pull
   pub(crate) name: String,
 }
 
 #[derive(Debug, Parser)]
 pub struct CargoImageInspectOpts {
+  /// Name of the image to inspect
   pub(crate) name: String,
 }
 
@@ -26,8 +28,8 @@ pub enum CargoImageCommands {
   /// List cargo images
   #[clap(alias("ls"))]
   List,
-  /// Create a new cargo image
-  Create(CargoImageCreateOpts),
+  /// Pull a new cargo image
+  Pull(CargoImagePullOpts),
   /// Remove an existing cargo image
   #[clap(alias("rm"))]
   Remove(CargoImageRemoveOpts),

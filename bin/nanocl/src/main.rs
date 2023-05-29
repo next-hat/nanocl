@@ -104,7 +104,7 @@ mod tests {
     const IMAGE_NAME: &str = "busybox:1.26.0";
     // Try to create cargo image
     let args =
-      Cli::parse_from(["nanocl", "cargo", "image", "create", IMAGE_NAME]);
+      Cli::parse_from(["nanocl", "cargo", "image", "pull", IMAGE_NAME]);
     assert!(execute_args(&args).await.is_ok());
     // Try to list cargo images
     let args = Cli::parse_from(["nanocl", "cargo", "image", "ls"]);
@@ -126,7 +126,6 @@ mod tests {
       "../../tests/busybox.tar.gz",
     ]);
     let res = execute_args(&args).await;
-    println!("res : {res:#?}");
     assert!(res.is_ok());
   }
 
