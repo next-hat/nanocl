@@ -23,13 +23,13 @@ impl NanocldClient {
     Ok(Self::res_stream(res).await)
   }
 
-  pub async fn revert_state(
+  pub async fn remove_state(
     &self,
     data: &serde_json::Value,
   ) -> Result<Receiver<Result<StateStream, HttpError>>, HttpClientError> {
     let res = self
       .send_put(
-        format!("/{}/state/revert", &self.version),
+        format!("/{}/state/remove", &self.version),
         Some(data),
         None::<String>,
       )

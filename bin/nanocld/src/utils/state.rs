@@ -373,7 +373,7 @@ async fn delete_resources(
     .await;
 }
 
-pub async fn revert_deployment(
+pub async fn remove_deployment(
   data: &StateDeployment,
   state: &DaemonState,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
@@ -398,7 +398,7 @@ pub async fn revert_deployment(
   Ok(())
 }
 
-pub async fn revert_cargo(
+pub async fn remove_cargo(
   data: &StateCargo,
   state: &DaemonState,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
@@ -416,7 +416,7 @@ pub async fn revert_cargo(
   Ok(())
 }
 
-pub async fn revert_resource(
+pub async fn remove_resource(
   data: &StateResources,
   state: &DaemonState,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
