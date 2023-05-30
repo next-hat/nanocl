@@ -10,18 +10,16 @@ use ntex::http::StatusCode;
 use ntex::ws::WsConnection;
 
 use futures::SinkExt;
-use futures::channel::mpsc;
 use futures::StreamExt;
-
-use nanocl_stubs::config::DaemonConfig;
+use futures::channel::mpsc;
 
 use nanocl_utils::io_error::IoResult;
 use nanocl_utils::http_error::HttpError;
+use nanocl_stubs::config::DaemonConfig;
 
-use crate::models::DaemonState;
-use crate::models::NodeDbModel;
 use crate::repositories;
 use crate::version::VERSION;
+use crate::models::{DaemonState, NodeDbModel};
 
 #[derive(Clone)]
 pub struct NodeMessage {
@@ -215,6 +213,17 @@ pub fn watch_node(
       time::sleep(Duration::from_secs(5)).await;
     }
   });
+}
+
+pub async fn register(daemon_state: &DaemonState) -> IoResult<()> {
+  let node = NodeDbModel {
+    name: daemon_state.config.hostname.clone(),
+    ip_address: daemon_state.config.gateway.clone(),
+  };
+
+  repositories::node::create_if_not_exists(&node, &daemon_state.pool).await?;
+
+  Ok(())
 }
 
 pub async fn join_cluster(state: &DaemonState) -> IoResult<()> {
