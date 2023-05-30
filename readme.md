@@ -33,13 +33,8 @@
 ## ❓ Why Nanocl ?
 
 `Nanocl` is all about easing your container and VM management with Rust-powered platform.
-<<<<<<< Updated upstream
-With `Nanocl`, say goodbye to complex setups and hello to easy, efficient deployments.  
-We stand for robust performance and efficiency with simplicity, trimming the bloat to keep your systems lean. 
-=======
 With `Nanocl`, say goodbye to complex setups and hello to easy, efficient deployments.
 We stand for robust performance and efficiency with simplicity, trimming the bloat to keep your systems lean.
->>>>>>> Stashed changes
 **_Join us and help shape the future of cloud computing - it's about time things got a bit more rusty_**.
 
 ## 📙 Table of Contents
