@@ -17,17 +17,17 @@ pub struct StateBuildArgs {
 
 #[derive(Debug, Parser)]
 pub struct StateApplyOpts {
-  /// Path or url to the state
-  #[clap(long, short = 'f')]
-  pub file_path: Option<String>,
-  /// Force pulling images
+  /// Path or Url to the StateFile
+  #[clap(long, short = 's')]
+  pub state_location: Option<String>,
+  /// Force pulling images even if they exist
   #[clap(long, short = 'p')]
   pub force_pull: bool,
-  /// Attach to the logs of the deployed cargo when applying a state
-  #[clap(long, short = 'a')]
-  pub attach: bool,
+  /// Follow logs of the deployed cargo
+  #[clap(long, short = 'f')]
+  pub follow: bool,
   /// Skip the confirmation prompt
-  #[clap(short = 'y')]
+  #[clap(long = "yes", short = 'y')]
   pub skip_confirm: bool,
   /// Additional arguments to pass to the file
   #[clap(last = true, raw = true)]
@@ -35,12 +35,12 @@ pub struct StateApplyOpts {
 }
 
 #[derive(Debug, Parser)]
-pub struct StateRevertOpts {
-  /// Path or url to the state
-  #[clap(long, short = 'f')]
-  pub file_path: Option<String>,
+pub struct StateRemoveOpts {
+  /// Path or Url to the StateFile
+  #[clap(long, short = 's')]
+  pub state_location: Option<String>,
   /// Skip the confirmation prompt
-  #[clap(short = 'y')]
+  #[clap(long = "yes", short = 'y')]
   pub skip_confirm: bool,
   /// Additional arguments to pass to the file
   #[clap(last = true, raw = true)]
@@ -49,13 +49,14 @@ pub struct StateRevertOpts {
 
 #[derive(Debug, Subcommand)]
 pub enum StateCommands {
-  /// Apply a state from a configuration file
+  /// Create or Update elements from a StateFile
   Apply(StateApplyOpts),
-  /// Revert a state from a configuration file
-  Revert(StateRevertOpts),
+  /// Remove elements from a StateFile
+  #[clap(alias("rm"))]
+  Remove(StateRemoveOpts),
 }
 
-/// Manage configuration states
+/// Define, Run, or Remove Cargo or Virtual Machines
 #[derive(Debug, Parser)]
 pub struct StateArgs {
   #[clap(subcommand)]

@@ -38,10 +38,10 @@ Whether you're running a **home lab** setup or a **large enterprise**, _Nanocl's
 
 ## ❓ Why Nanocl ?
 
-`Nanocl` is all about easing your container and VM management with Rust-powered platform. 
+`Nanocl` is all about easing your container and VM management with Rust-powered platform.
 With `Nanocl`, say goodbye to complex setups and hello to easy, efficient deployments.  
 We stand for robust performance and efficiency with simplicity, trimming the bloat to keep your systems lean. 
-***Join us and help shape the future of cloud computing - it's about time things got a bit more rusty***. 
+**_Join us and help shape the future of cloud computing - it's about time things got a bit more rusty_**.
 
 ## 📙 Table of Contents
 
@@ -149,8 +149,8 @@ Resources:
                 CargoPort: 80
 ```
 
-To apply a state we can do it easily bu running `nanocl state apply -f path|url`<br />
-We can also revert a state by calling `nanocl state revert -f path|url`
+To apply a state we can do it easily bu running `nanocl state apply -s path|url`<br />
+We can also revert a state by calling `nanocl state rm -s path|url`
 
 ## 👨‍💻 Contributing
 

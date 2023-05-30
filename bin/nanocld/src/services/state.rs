@@ -47,8 +47,8 @@ pub(crate) async fn apply(
   )
 }
 
-#[web::put("/state/revert")]
-pub(crate) async fn revert(
+#[web::put("/state/remove")]
+pub(crate) async fn remove(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -59,18 +59,18 @@ pub(crate) async fn revert(
     match state_file {
       StateData::Deployment(data) => {
         if let Err(err) =
-          utils::state::revert_deployment(&data, &state, sx).await
+          utils::state::remove_deployment(&data, &state, sx).await
         {
           log::warn!("{err}");
         }
       }
       StateData::Cargo(data) => {
-        if let Err(err) = utils::state::revert_cargo(&data, &state, sx).await {
+        if let Err(err) = utils::state::remove_cargo(&data, &state, sx).await {
           log::warn!("{err}");
         }
       }
       StateData::Resource(data) => {
-        if let Err(err) = utils::state::revert_resource(&data, &state, sx).await
+        if let Err(err) = utils::state::remove_resource(&data, &state, sx).await
         {
           log::warn!("{err}");
         }
@@ -87,7 +87,7 @@ pub(crate) async fn revert(
 
 pub fn ntex_config(cfg: &mut web::ServiceConfig) {
   cfg.service(apply);
-  cfg.service(revert);
+  cfg.service(remove);
 }
 
 #[cfg(test)]
@@ -124,7 +124,7 @@ mod tests {
     // Revert examples/cargo_example.yml
     let data = parse_state_file("../../examples/cargo_example.yml")?;
     let req = srv
-      .put("/v0.5/state/revert")
+      .put("/v0.5/state/remove")
       .send_json(&data)
       .await
       .unwrap();
@@ -164,7 +164,7 @@ mod tests {
     // Revert examples/resource_ssl_example.yml
     let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
     let req = srv
-      .put("/v0.5/state/revert")
+      .put("/v0.5/state/remove")
       .send_json(&data)
       .await
       .unwrap();
@@ -177,7 +177,7 @@ mod tests {
     // Revert examples/deploy_example.yml
     let data = parse_state_file("../../examples/deploy_example.yml")?;
     let req = srv
-      .put("/v0.5/state/revert")
+      .put("/v0.5/state/remove")
       .send_json(&data)
       .await
       .unwrap();

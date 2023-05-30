@@ -189,7 +189,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -198,7 +198,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/resource_ssl_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -240,8 +240,8 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "state",
-      "revert",
-      "-yf",
+      "rm",
+      "-ys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -270,7 +270,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -279,7 +279,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-pyf",
+      "-pys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -288,7 +288,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -297,7 +297,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -305,8 +305,8 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "state",
-      "revert",
-      "-yf",
+      "rm",
+      "-ys",
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -314,8 +314,8 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "state",
-      "revert",
-      "-yf",
+      "rm",
+      "-ys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
