@@ -1,27 +1,39 @@
-use hyper::client::ResponseFuture;
 use ntex::http::StatusCode;
 use jsonschema::{JSONSchema, Draft};
 
 use nanocl_stubs::resource::{Resource, ResourcePartial};
+use serde_json::Value;
 
-use crate::repositories;
+use crate::{repositories};
 use nanocl_utils::http_error::HttpError;
 use crate::models::{Pool, ResourceKindPartial};
 
 use super::ctrl_client::{CtrlClient, self};
 
 /// Validate a resource from a custom config
-pub async fn validate_resource(
+pub async fn hook_create_resource(
   resource: &ResourcePartial,
   pool: &Pool,
-) -> Result<(), HttpError> {
+) -> Result<ResourcePartial, HttpError> {
+  let mut resource = resource.clone();
   match resource.kind.as_str() {
-    "Custom" => {
+    "Kind" => {
       let resource_kind = ResourceKindPartial {
         name: resource.name.to_owned(),
         version: resource.version.to_owned(),
-        schema: resource.config.clone(),
+        schema: resource.config.get("Schema").map(|item| item.clone()),
+        url: resource.config.get("Url").map(|item| match item {
+          Value::String(value) => value.clone(),
+          value => value.to_string(),
+        }),
       };
+
+      if resource_kind.schema.is_none() && resource_kind.url.is_none() {
+        return Err(HttpError {
+          msg: "Neither schema nor url provided".to_string(),
+          status: StatusCode::BAD_REQUEST,
+        });
+      }
 
       if repositories::resource_kind::find_by_name(&resource.name, pool)
         .await
@@ -38,61 +50,36 @@ pub async fn validate_resource(
         pool,
       )
       .await?;
-      let schema: JSONSchema = JSONSchema::options()
-        .with_draft(Draft::Draft7)
-        .compile(&kind.schema)
-        .map_err(|err| HttpError {
-          status: StatusCode::BAD_REQUEST,
-          msg: format!("Invalid schema {}", err),
+
+      if let Some(schema) = kind.schema {
+        let schema: JSONSchema = JSONSchema::options()
+          .with_draft(Draft::Draft7)
+          .compile(&schema)
+          .map_err(|err| HttpError {
+            status: StatusCode::BAD_REQUEST,
+            msg: format!("Invalid schema {}", err),
+          })?;
+        schema.validate(&resource.config).map_err(|err| {
+          let mut msg = String::from("Invalid config ");
+          for error in err {
+            msg += &format!("{} ", error);
+          }
+          HttpError {
+            status: StatusCode::BAD_REQUEST,
+            msg,
+          }
         })?;
-      schema.validate(&resource.config).map_err(|err| {
-        let mut msg = String::from("Invalid config ");
-        for error in err {
-          msg += &format!("{} ", error);
-        }
-        HttpError {
-          status: StatusCode::BAD_REQUEST,
-          msg,
-        }
-      })?;
+      }
+
+      if let Some(url) = kind.url {
+        let ctrl_client = CtrlClient::new(kind.resource_kind_name.clone(), &url);
+        let config = ctrl_client
+          .apply_rule(&resource.version, &resource.name, &resource.config)
+          .await?;
+        resource.config = config;
+      }
     }
   }
-  Ok(())
-}
-
-async fn get_resource_client(
-  kind: &str,
-  version: &str,
-  pool: &Pool,
-) -> Result<CtrlClient, HttpError> {
-  let kind =
-    repositories::resource_kind::get_version(kind, version, pool).await?;
-  let url = "kind.url.as_str()";
-  let name = kind.resource_kind_name.as_str();
-  let ctrl_client = CtrlClient::new(name, url);
-
-  Ok(ctrl_client)
-}
-
-/// Hook when creating a resource
-async fn hook_create_resource(
-  resource: &ResourcePartial,
-  pool: &Pool,
-) -> Result<ResourcePartial, HttpError> {
-  println!("{}", resource.kind);
-  validate_resource(resource, pool).await?;
-  println!("validated");
-
-  let ctrl_client =
-    get_resource_client(&resource.kind, &resource.version, pool).await?;
-
-  let config = ctrl_client
-    .apply_rule(&resource.version, &resource.name, &resource.config)
-    .await?;
-
-  let mut resource = resource.clone();
-  resource.config = config;
-
   Ok(resource)
 }
 
@@ -101,12 +88,19 @@ async fn hook_delete_resource(
   resource: &Resource,
   pool: &Pool,
 ) -> Result<(), HttpError> {
-  let ctrl_client =
-    get_resource_client(&resource.kind, &resource.version, pool).await?;
+  let kind = repositories::resource_kind::get_version(
+    &resource.kind,
+    &resource.version,
+    pool,
+  )
+  .await?;
+  if let Some(url) = kind.url {
+    let ctrl_client = CtrlClient::new(kind.resource_kind_name.clone(), &url);
+    ctrl_client
+      .delete_rule(&resource.version, &resource.name)
+      .await?;
+  }
 
-  ctrl_client
-    .delete_rule(&resource.version, &resource.name)
-    .await?;
   Ok(())
 }
 

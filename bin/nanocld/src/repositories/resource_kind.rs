@@ -18,6 +18,7 @@ pub async fn create_version(
     resource_kind_name: item.name.clone(),
     version: item.version.clone(),
     schema: item.schema.clone(),
+    url: item.url.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
   let pool = pool.clone();

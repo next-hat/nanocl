@@ -13,7 +13,7 @@ pub struct CtrlClient {
 }
 
 impl CtrlClient {
-  pub(crate) fn new(name: &str, url: &'static str) -> Self {
+  pub(crate) fn new(name: String, url: &str) -> Self {
     let (client, url) = match url {
       url if url.starts_with("unix://") => {
         let client = Client::build()
