@@ -3,8 +3,8 @@ use nanocl_utils::io_error::{FromIo, IoResult};
 
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::{event, repositories};
-use crate::models::{Pool, DaemonState, NodeDbModel};
+use crate::event;
+use crate::models::DaemonState;
 
 use crate::version::VERSION;
 
@@ -13,17 +13,6 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   fs::create_dir_all(vm_dir).await.map_err(|err| {
     err.map_err_context(|| "Unable to create {state_dir}/vms/images")
   })?;
-  Ok(())
-}
-
-async fn register_node(name: &str, gateway: &str, pool: &Pool) -> IoResult<()> {
-  let node = NodeDbModel {
-    name: name.to_owned(),
-    ip_address: gateway.to_owned(),
-  };
-
-  repositories::node::create_if_not_exists(&node, pool).await?;
-
   Ok(())
 }
 
@@ -51,8 +40,6 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   };
   super::system::register_namespace("system", false, &daemon_state).await?;
   super::system::register_namespace("global", true, &daemon_state).await?;
-  register_node(&daemon_conf.hostname, &daemon_conf.advertise_addr, &pool)
-    .await?;
   super::system::sync_containers(&docker, &pool).await?;
 
   Ok(daemon_state)

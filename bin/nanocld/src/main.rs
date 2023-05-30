@@ -19,11 +19,11 @@ mod repositories;
 
 /// # The Nanocl daemon
 ///
-/// Provides an api to manage network and containers accross physical hosts
-/// there are these advantages :
+/// Provides an api to manage containers and virtual machines accross physical hosts
+/// There are these advantages :
 /// - It's Opensource
 /// - It's Easy to use
-/// - It keep an history of all your containers and networks
+/// - It keep an history of all your containers and virtual machines
 ///
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
@@ -60,6 +60,7 @@ async fn main() -> std::io::Result<()> {
     std::process::exit(1);
   }
 
+  node::register(&daemon_state).await?;
   utils::proxy::spawn_logger(&daemon_state);
   utils::metric::spawn_logger(&daemon_state);
 
