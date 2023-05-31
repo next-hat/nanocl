@@ -28,12 +28,12 @@ Resources:
     Version: v0.4
     Config:
       Watch:
-        - ${{ Args.name }}.global
+        - ${{ Args.name }}.global.c
       Rules:
         - Domain: ${{ Args.domain }}
           Network: Public
           Locations:
             - Path: /
               Target:
-                CargoKey: ${{ Args.name }}.global
-                CargoPort: ${{ Args.port }}
+                Key: ${{ Args.name }}.global.c
+                Port: ${{ Args.port }}

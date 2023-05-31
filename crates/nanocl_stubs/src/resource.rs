@@ -87,6 +87,8 @@ pub struct ResourceConfig {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceQuery {
+  /// The kind of resource to target
   pub kind: Option<String>,
+  /// Match what contains the resource config
   pub contains: Option<String>,
 }

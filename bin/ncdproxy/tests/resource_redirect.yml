@@ -6,8 +6,7 @@ Resources:
     Kind: ProxyRule
     Version: v0.4
     Config:
-      Watch:
-        - get-started.global
+      Watch: []
       Rules:
         - Domain: get-started.com
           Network: Public

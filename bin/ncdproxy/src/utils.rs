@@ -7,7 +7,7 @@ use nanocld_client::stubs::cargo::{CargoInspect, CreateExecOptions};
 use nanocld_client::stubs::resource::{ResourceQuery, ResourcePartial};
 /// Import proxy types
 use nanocld_client::stubs::proxy::{
-  ProxyRule, StreamTarget, ProxyStreamProtocol, ProxyRuleHttp, CargoTarget,
+  ProxyRule, StreamTarget, ProxyStreamProtocol, ProxyRuleHttp, UpstreamTarget,
   ProxyHttpLocation, ProxyRuleStream, LocationTarget, ResourceProxyRule,
 };
 
@@ -129,12 +129,12 @@ upstream {upstream_key} {{
 
 async fn gen_cargo_upstream(
   kind: &NginxConfKind,
-  target: &CargoTarget,
+  target: &UpstreamTarget,
   client: &NanocldClient,
   nginx: &Nginx,
 ) -> IoResult<String> {
-  let port = target.cargo_port;
-  let (cargo_name, namespace) = extract_target_cargo(&target.cargo_key)?;
+  let port = target.port;
+  let (cargo_name, namespace) = extract_target_cargo(&target.key)?;
   let cargo = client
     .inspect_cargo(&cargo_name, Some(namespace.clone()))
     .await
@@ -146,7 +146,7 @@ async fn gen_cargo_upstream(
 
 fn extract_target_cargo(key: &str) -> IoResult<(String, String)> {
   let info = key.split('.').collect::<Vec<&str>>();
-  if info.len() != 2 {
+  if info.len() < 2 {
     return Err(IoError::invalid_data(
       "CargoKey",
       "Invalid cargo key expected <name>.<namespace>",
@@ -193,7 +193,7 @@ async fn gen_locations(
     );
 
     match &rule.target {
-      LocationTarget::Cargo(cargo_target) => {
+      LocationTarget::Upstream(cargo_target) => {
         let Ok(upstream_key) =
           gen_cargo_upstream(&NginxConfKind::Site, cargo_target, client, nginx)
             .await else {
@@ -350,7 +350,7 @@ async fn gen_stream_server_block(
   let mut listen = get_listen(&rule.network, port, client).await?;
 
   let upstream_key = match &rule.target {
-    StreamTarget::Cargo(cargo_target) => {
+    StreamTarget::Upstream(cargo_target) => {
       gen_cargo_upstream(&NginxConfKind::Stream, cargo_target, client, nginx)
         .await?
     }
@@ -524,7 +524,7 @@ pub(crate) async fn list_resource_by_cargo(
   client: &NanocldClient,
 ) -> IoResult<Vec<nanocld_client::stubs::resource::Resource>> {
   let namespace = namespace.unwrap_or("global".into());
-  let target_key = format!("{name}.{namespace}");
+  let target_key = format!("{name}.{namespace}.c");
   let query = ResourceQuery {
     contains: Some(serde_json::json!({ "Watch": [target_key] }).to_string()),
     kind: Some("ProxyRule".into()),
