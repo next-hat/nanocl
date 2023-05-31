@@ -12,7 +12,7 @@ use crate::utils::math::calculate_percentage;
 
 use crate::models::{
   VmImageArgs, VmImageCreateOpts, VmImageCommands, VmImageRow,
-  VmImageResizeOpts,
+  VmImageResizeOpts, VmImageListOpts,
 };
 use crate::utils::print::print_table;
 
@@ -60,14 +60,26 @@ async fn exec_vm_image_create(
   Ok(())
 }
 
-async fn exec_vm_image_ls(client: &NanocldClient) -> IoResult<()> {
+async fn exec_vm_image_ls(
+  client: &NanocldClient,
+  opts: &VmImageListOpts,
+) -> IoResult<()> {
   let items = client.list_vm_image().await?;
   let rows = items
     .into_iter()
     .map(VmImageRow::from)
     .collect::<Vec<VmImageRow>>();
 
-  print_table(rows);
+  match opts.quiet {
+    true => {
+      for row in rows {
+        println!("{}", row.name);
+      }
+    }
+    false => {
+      print_table(rows);
+    }
+  }
   Ok(())
 }
 
@@ -125,7 +137,7 @@ pub async fn exec_vm_image(
     VmImageCommands::Create(options) => {
       exec_vm_image_create(client, options).await
     }
-    VmImageCommands::List => exec_vm_image_ls(client).await,
+    VmImageCommands::List(opts) => exec_vm_image_ls(client, opts).await,
     VmImageCommands::Remove { names } => exec_vm_image_rm(client, names).await,
     VmImageCommands::Clone { name, clone_name } => {
       exec_vm_image_clone(client, name, clone_name).await

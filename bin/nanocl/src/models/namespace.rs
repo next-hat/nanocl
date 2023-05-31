@@ -15,7 +15,14 @@ pub enum NamespaceCommands {
   Remove(NamespaceDeleteOpts),
   /// List existing namespaces
   #[clap(alias("ls"))]
-  List,
+  List(NamespaceListOpts),
+}
+
+#[derive(Debug, Parser)]
+pub struct NamespaceListOpts {
+  /// Show only namespace names
+  #[clap(long, short)]
+  pub quiet: bool,
 }
 
 #[derive(Debug, Parser)]

@@ -4,16 +4,29 @@ use nanocld_client::NanocldClient;
 use crate::utils;
 use crate::models::{
   NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow,
-  NamespaceDeleteOpts,
+  NamespaceDeleteOpts, NamespaceListOpts,
 };
 
-async fn exec_namespace_ls(client: &NanocldClient) -> IoResult<()> {
+async fn exec_namespace_ls(
+  client: &NanocldClient,
+  options: &NamespaceListOpts,
+) -> IoResult<()> {
   let items = client.list_namespace().await?;
   let namespaces = items
     .into_iter()
     .map(NamespaceRow::from)
     .collect::<Vec<NamespaceRow>>();
-  utils::print::print_table(namespaces);
+
+  match options.quiet {
+    true => {
+      for namespace in namespaces {
+        println!("{}", namespace.name);
+      }
+    }
+    false => {
+      utils::print::print_table(namespaces);
+    }
+  }
   Ok(())
 }
 
@@ -59,7 +72,9 @@ pub async fn exec_namespace(
   args: &NamespaceArgs,
 ) -> IoResult<()> {
   match &args.commands {
-    NamespaceCommands::List => exec_namespace_ls(client).await,
+    NamespaceCommands::List(options) => {
+      exec_namespace_ls(client, options).await
+    }
     NamespaceCommands::Create(options) => {
       exec_namespace_create(client, options).await
     }
