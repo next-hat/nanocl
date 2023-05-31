@@ -52,6 +52,7 @@ pub enum VmCommands {
 #[derive(Debug, Parser)]
 pub struct VmListOpts {
   /// Show only vms name
+  #[clap(long, short)]
   pub quiet: bool,
 }
 
