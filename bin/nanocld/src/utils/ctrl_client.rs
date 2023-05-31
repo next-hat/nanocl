@@ -21,10 +21,11 @@ impl CtrlClient {
         let client = Client::build()
           .connector(
             Connector::default()
-              .connector(ntex::service::fn_service(move |_| async {
-                let path = url.trim_start_matches("unix://");
-                let io = rt::unix_connect("test").await?;
-                Ok(io)
+              .connector(ntex::service::fn_service(move |_| {
+                  let path = url.trim_start_matches("unix://").to_string();
+                  async move {
+                    Ok(rt::unix_connect(path).await?)
+                  }
               }))
               .timeout(ntex::time::Millis::from_secs(20))
               .finish(),
