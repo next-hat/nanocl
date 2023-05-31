@@ -1,7 +1,6 @@
 pub mod ws;
 pub mod key;
 pub mod stream;
-pub mod network;
 
 pub mod store;
 pub mod state;
