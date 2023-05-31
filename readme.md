@@ -39,7 +39,7 @@ We stand for robust performance and efficiency with simplicity, trimming the blo
 
 ## 📙 Table of Contents
 
-- [❓ Why Nanocl ?](#-why-nanocl)
+- [❓ Why Nanocl ?](#-why-nanocl-?)
 - [📙 Table of Contents](#-table-of-contents)
 - [🚀 Key Benefits](#-key-benefits)
 - [🧿 Architecture](#-architecture)
