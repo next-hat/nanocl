@@ -12,15 +12,28 @@ use crate::utils;
 use crate::models::{
   CargoImageOpts, CargoImageCommands, CargoImageRemoveOpts,
   CargoImageInspectOpts, CargoImageRow, CargoImageImportOpts,
+  CargoImageListOpts,
 };
 
-async fn exec_cargo_image_ls(client: &NanocldClient) -> IoResult<()> {
-  let items = client.list_cargo_image(None).await?;
+async fn exec_cargo_image_ls(
+  opts: &CargoImageListOpts,
+  client: &NanocldClient,
+) -> IoResult<()> {
+  let items = client.list_cargo_image(Some(opts.clone().into())).await?;
   let rows = items
     .into_iter()
     .map(CargoImageRow::from)
     .collect::<Vec<CargoImageRow>>();
-  utils::print::print_table(rows);
+  match opts.quiet {
+    true => {
+      for row in rows {
+        println!("{}", row.id);
+      }
+    }
+    false => {
+      utils::print::print_table(rows);
+    }
+  }
   Ok(())
 }
 
@@ -150,7 +163,7 @@ pub async fn exec_cargo_image(
   cmd: &CargoImageOpts,
 ) -> IoResult<()> {
   match &cmd.commands {
-    CargoImageCommands::List => exec_cargo_image_ls(client).await,
+    CargoImageCommands::List(opts) => exec_cargo_image_ls(opts, client).await,
     CargoImageCommands::Inspect(opts) => {
       exec_cargo_image_inspect(client, opts).await
     }
