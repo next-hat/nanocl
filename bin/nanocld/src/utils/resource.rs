@@ -72,7 +72,7 @@ pub async fn hook_create_resource(
       }
 
       if let Some(url) = kind.url {
-        let ctrl_client = CtrlClient::new(kind.resource_kind_name.clone(), &url);
+        let ctrl_client = CtrlClient::new(kind.resource_kind_name.clone(), url);
         let config = ctrl_client
           .apply_rule(&resource.version, &resource.name, &resource.config)
           .await?;
@@ -95,7 +95,7 @@ async fn hook_delete_resource(
   )
   .await?;
   if let Some(url) = kind.url {
-    let ctrl_client = CtrlClient::new(kind.resource_kind_name.clone(), &url);
+    let ctrl_client = CtrlClient::new(kind.resource_kind_name.clone(), url);
     ctrl_client
       .delete_rule(&resource.version, &resource.name)
       .await?;

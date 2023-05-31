@@ -1,3 +1,5 @@
+use std::rc;
+
 use ntex::rt;
 use ntex::http::{Client, StatusCode};
 use ntex::http::client::{Connector, ClientResponse};
@@ -13,7 +15,7 @@ pub struct CtrlClient {
 }
 
 impl CtrlClient {
-  pub(crate) fn new(name: String, url: &str) -> Self {
+  pub(crate) fn new(name: String, url: String) -> Self {
     let (client, url) = match url {
       url if url.starts_with("unix://") => {
         let client = Client::build()
@@ -21,7 +23,8 @@ impl CtrlClient {
             Connector::default()
               .connector(ntex::service::fn_service(move |_| async {
                 let path = url.trim_start_matches("unix://");
-                Ok::<_, _>(rt::unix_connect(path).await?)
+                let io = rt::unix_connect("test").await?;
+                Ok(io)
               }))
               .timeout(ntex::time::Millis::from_secs(20))
               .finish(),
@@ -29,7 +32,7 @@ impl CtrlClient {
           .timeout(ntex::time::Millis::from_secs(20))
           .finish();
 
-        (client, "http://localhost")
+        (client, "http://localhost".to_string())
       }
       url if url.starts_with("http://") || url.starts_with("https://") => {
         let client = Client::build().finish();
@@ -41,7 +44,7 @@ impl CtrlClient {
     Self {
       client,
       name: name.to_owned(),
-      base_url: url.to_owned(),
+      base_url: url,
     }
   }
 
