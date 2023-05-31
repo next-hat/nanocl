@@ -17,6 +17,31 @@ async fn on_event(
 ) -> IoResult<()> {
   match event {
     Event::CargoStarted(ev) => {
+      log::debug!("received cargo started event: {ev:#?}");
+      let resources = utils::list_resource_by_cargo(
+        &ev.name,
+        Some(ev.namespace_name),
+        &client,
+      )
+      .await?;
+      for resource in resources {
+        let resource: ResourcePartial = resource.into();
+        let proxy_rule = utils::serialize_proxy_rule(&resource)?;
+        if let Err(err) = utils::create_resource_conf(
+          &resource.name,
+          &proxy_rule,
+          &client,
+          &nginx,
+        )
+        .await
+        {
+          log::warn!("{err}");
+        }
+      }
+      utils::reload_config(&client).await?;
+    }
+    Event::CargoPatched(ev) => {
+      log::debug!("received cargo patched event: {ev:#?}");
       let resources = utils::list_resource_by_cargo(
         &ev.name,
         Some(ev.namespace_name),
@@ -40,6 +65,7 @@ async fn on_event(
       utils::reload_config(&client).await?;
     }
     Event::CargoStopped(ev) => {
+      log::debug!("received cargo stopped event: {ev:#?}");
       let resources = utils::list_resource_by_cargo(
         &ev.name,
         Some(ev.namespace_name),
@@ -53,6 +79,7 @@ async fn on_event(
       utils::reload_config(&client).await?;
     }
     Event::CargoDeleted(ev) => {
+      log::debug!("received cargo deleted event: {ev:#?}");
       let resources = utils::list_resource_by_cargo(
         &ev.name,
         Some(ev.namespace_name),
@@ -68,6 +95,7 @@ async fn on_event(
       if ev.kind.as_str() != "ProxyRule" {
         return Ok(());
       }
+      log::debug!("received resource created event: {ev:#?}");
       let resource: ResourcePartial = ev.as_ref().clone().into();
       let proxy_rule = utils::serialize_proxy_rule(&resource)?;
       if let Err(err) = utils::create_resource_conf(
@@ -86,6 +114,7 @@ async fn on_event(
       if ev.kind.as_str() != "ProxyRule" {
         return Ok(());
       }
+      log::debug!("received resource patched event: {ev:#?}");
       let resource: ResourcePartial = ev.as_ref().clone().into();
       let proxy_rule = utils::serialize_proxy_rule(&resource)?;
       if let Err(err) = utils::create_resource_conf(
@@ -104,6 +133,7 @@ async fn on_event(
       if ev.kind.as_str() != "ProxyRule" {
         return Ok(());
       }
+      log::debug!("received resource deleted event: {ev:#?}");
       nginx.delete_conf_file(&ev.name).await;
       utils::reload_config(&client).await?;
     }
