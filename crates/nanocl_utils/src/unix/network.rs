@@ -2,20 +2,26 @@ use std::io::Error;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::net::{IpAddr, Ipv4Addr};
-use libc::{c_char, sockaddr_in, gethostname};
+use libc::{sockaddr_in, gethostname, c_char};
 
 /// Get the default IP address of the system.
 /// This is used to determine the IP address of the host.
 /// We detect it by reading the default route to know the default interface name.
 /// Then we get the IP address of the interface.
-pub(crate) fn get_default_ip() -> std::io::Result<IpAddr> {
+pub fn get_default_ip() -> std::io::Result<IpAddr> {
   // Detect default interface name by reading the default route.
   let routes = std::fs::read_to_string("/proc/net/route")?;
   let mut default_interface = None;
   for line in routes.lines() {
     let mut parts = line.split_whitespace();
-    let interface = parts.next().unwrap();
-    let destination = parts.next().unwrap();
+    let interface = parts.next().ok_or(Error::new(
+      std::io::ErrorKind::InvalidData,
+      "Invalid route file unable to detect interface",
+    ))?;
+    let destination = parts.next().ok_or(Error::new(
+      std::io::ErrorKind::InvalidData,
+      "Invalid route file unable to detect destination",
+    ))?;
     if destination == "00000000" {
       default_interface = Some(interface);
       break;
@@ -26,7 +32,6 @@ pub(crate) fn get_default_ip() -> std::io::Result<IpAddr> {
     "No default route found",
   ))?;
 
-  log::info!("Default interface: {default_interface}");
   // Get the IP address of the default interface.
   // Using getifaddrs call from libc
   let mut ip = None;
@@ -59,8 +64,6 @@ pub(crate) fn get_default_ip() -> std::io::Result<IpAddr> {
     "No IP address found for the default interface",
   ))?;
 
-  log::info!("Default gateway address: {ip}");
-  log::info!("You can override it with the --gateway option.");
   Ok(ip)
 }
 
@@ -73,8 +76,6 @@ pub fn get_hostname() -> std::io::Result<String> {
   let c_str = unsafe { CStr::from_ptr(name.as_ptr()) };
   let hostname = c_str
     .to_str()
-    .map_err(|err| Error::new(std::io::ErrorKind::InvalidData, err))?;
-  log::info!("Default hostname: {hostname}");
-  log::info!("You can override it with the --hostname option.");
+    .map_err(|err| Error::new(std::io::ErrorKind::Other, err))?;
   Ok(hostname.to_owned())
 }

@@ -72,6 +72,7 @@ openssl = { version = "0.10.50", features = ["vendored"] }
 metrsd_client = "0.1.1"
 nanocl_stubs = { version = "0.7.0", features = ["serde"] }
 nanocl_utils = { version = "0.1.2", features = [
+  "unix",
   "ntex",
   "logger",
   "io_error",

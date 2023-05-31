@@ -5,6 +5,7 @@ use users::get_group_by_name;
 use bollard_next::container::StartContainerOptions;
 use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
+use nanocl_utils::unix;
 use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 use nanocld_client::stubs::state::StateDeployment;
 
@@ -31,7 +32,7 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
 
   let gateway = match &opts.gateway {
     None => {
-      let gateway = utils::network::get_default_ip()?;
+      let gateway = unix::network::get_default_ip()?;
       println!("Using default gateway: {}", gateway);
       gateway.to_string()
     }
@@ -64,7 +65,7 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
   let hostname = if let Some(hostname) = &opts.hostname {
     hostname.to_owned()
   } else {
-    let hostname = utils::network::get_hostname()?;
+    let hostname = unix::network::get_hostname()?;
     println!("Using default hostname: {hostname}");
     hostname
   };

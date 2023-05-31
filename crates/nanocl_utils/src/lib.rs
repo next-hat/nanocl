@@ -12,3 +12,6 @@ pub mod http_error;
 
 #[cfg(feature = "http_client_error")]
 pub mod http_client_error;
+
+#[cfg(feature = "unix")]
+pub mod unix;

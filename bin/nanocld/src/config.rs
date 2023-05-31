@@ -1,8 +1,8 @@
 use nanocl_stubs::config::{DaemonConfig, DaemonConfigFile};
 
+use nanocl_utils::unix;
 use nanocl_utils::io_error::{IoResult, FromIo};
 
-use crate::utils;
 use crate::cli::Cli;
 
 fn gen_daemon_conf(
@@ -38,7 +38,7 @@ fn gen_daemon_conf(
   } else if let Some(ref gateway) = config.gateway {
     gateway.to_owned()
   } else {
-    utils::network::get_default_ip()
+    unix::network::get_default_ip()
       .map_err(|err| err.map_err_context(|| "Gateway"))?
       .to_string()
   };
@@ -48,7 +48,7 @@ fn gen_daemon_conf(
   } else if let Some(ref hostname) = config.hostname {
     hostname.to_owned()
   } else {
-    utils::network::get_hostname()
+    unix::network::get_hostname()
       .map_err(|err| err.map_err_context(|| "Hostname"))?
   };
 
