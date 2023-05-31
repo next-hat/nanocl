@@ -27,13 +27,20 @@ pub enum VmImageCommands {
   Resize(VmImageResizeOpts),
   /// List VM images
   #[clap(alias("ls"))]
-  List,
+  List(VmImageListOpts),
   /// Remove a VM image
   #[clap(alias("rm"))]
   Remove {
     /// Names of the VM image
     names: Vec<String>,
   },
+}
+
+#[derive(Clone, Debug, Parser)]
+pub struct VmImageListOpts {
+  /// Show only images name
+  #[clap(long, short)]
+  pub quiet: bool,
 }
 
 #[derive(Clone, Debug, Parser)]

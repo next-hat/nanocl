@@ -12,13 +12,20 @@ pub enum ResourceCommands {
   Remove(ResourceRemoveOpts),
   /// List existing namespaces
   #[clap(alias("ls"))]
-  List,
+  List(ResourceListOpts),
   /// Inspect a resource
   Inspect(ResourceInspectOpts),
   /// Browse history of a resource
   History(ResourceHistoryOpts),
   /// Revert a resource to a specific history
   Revert(ResourceRevertOpts),
+}
+
+#[derive(Debug, Parser)]
+pub struct ResourceListOpts {
+  /// Show only resource names
+  #[clap(long, short)]
+  pub quiet: bool,
 }
 
 /// Manage resources
