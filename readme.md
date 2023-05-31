@@ -126,7 +126,7 @@ Resources:
     Version: v0.1
     Config:
       Watch:
-        - doc.nexthat
+        - doc.nexthat.c
       Rules:
         - Domain: docs.next-hat.com
           Network: Public
@@ -139,8 +139,8 @@ Resources:
           Locations:
             - Path: /
               Target:
-                CargoKey: doc.nexthat
-                CargoPort: 80
+                Key: doc.nexthat.c
+                Port: 80
 ```
 
 To apply a state we can do it easily bu running `nanocl state apply -s path|url`<br />

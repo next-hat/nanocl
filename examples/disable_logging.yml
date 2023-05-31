@@ -11,21 +11,21 @@ Resources:
     Version: v0.4
     Config:
       Watch:
-        - deploy-example.global
-        - deploy-example2.global
+        - deploy-example.global.c
+        - deploy-example2.global.c
       Rules:
         - Domain: deploy-example.internal
           Network: Public
           Locations:
             - Path: /
               Target:
-                CargoKey: deploy-example.global
-                CargoPort: 9000
+                Key: deploy-example.global.c
+                Port: 9000
 
             - Path: /v2/
               Target:
-                CargoKey: deploy-example.global
-                CargoPort: 9000
+                Key: deploy-example.global.c
+                Port: 9000
                 Path: /v2/
                 DisableLogging: true
 

@@ -11,26 +11,26 @@ Resources:
     Version: v0.4
     Config:
       Watch:
-        - deploy-example.global
-        - deploy-example2.global
+        - deploy-example.global.c
+        - deploy-example2.global.c
       Rules:
         - Domain: deploy-example.com
           Network: Public
           Locations:
             - Path: /
               Target:
-                CargoKey: deploy-example2.global
-                CargoPort: 9000
+                Key: deploy-example2.global.c
+                Port: 9000
 
             - Path: /v1
               Target:
-                CargoKey: deploy-example.global
-                CargoPort: 9000
+                Key: deploy-example.global.c
+                Port: 9000
 
             - Path: /v2
               Target:
-                CargoKey: deploy-example2.global
-                CargoPort: 9000
+                Key: deploy-example2.global.c
+                Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo

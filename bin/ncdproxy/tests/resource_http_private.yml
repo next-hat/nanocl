@@ -7,12 +7,12 @@ Resources:
     Version: v0.4
     Config:
       Watch:
-        - get-started.global
+        - get-started.global.c
       Rules:
         - Domain: get-started.com
           Network: Internal
           Locations:
             - Path: /
               Target:
-                CargoKey: get-started.global
-                CargoPort: 9000
+                Key: get-started.global.c
+                Port: 9000

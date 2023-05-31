@@ -54,7 +54,8 @@ use nanocl_stubs::dns::{ResourceDnsRule, DnsEntry};
 use nanocl_stubs::proxy::{
   ResourceProxyRule, ProxyRuleHttp, ProxyHttpLocation, ProxySslConfig,
   ProxyRuleStream, StreamTarget, ProxyStreamProtocol, UriTarget,
-  LocationTarget, HttpTarget, UrlRedirect, CargoTarget, ProxyRule, UnixTarget,
+  LocationTarget, HttpTarget, UrlRedirect, UpstreamTarget, ProxyRule,
+  UnixTarget,
 };
 
 use super::{
@@ -397,7 +398,7 @@ impl Modify for VersionModifier {
     LocationTarget,
     HttpTarget,
     UrlRedirect,
-    CargoTarget,
+    UpstreamTarget,
     UnixTarget,
     UriTarget,
     // DnsRules

@@ -1814,29 +1814,6 @@ components:
           type: integer
           description: Number of running instances
           minimum: 0.0
-    CargoTarget:
-      type: object
-      description: Defines a proxy rule target
-      required:
-      - CargoKey
-      - CargoPort
-      properties:
-        CargoKey:
-          type: string
-          description: The cargo key
-        CargoPort:
-          type: integer
-          format: int32
-          description: The cargo port
-          minimum: 0.0
-        Path:
-          type: string
-          description: The http path to target
-          nullable: true
-        DisableLogging:
-          type: boolean
-          description: Disable logging
-          nullable: true
     ClusterInfo:
       type: object
       description: ClusterInfo represents information about the swarm as is returned by the \"/info\" endpoint. Join-tokens are not included.
@@ -3339,7 +3316,7 @@ components:
       - locked
     LocationTarget:
       oneOf:
-      - $ref: '#/components/schemas/CargoTarget'
+      - $ref: '#/components/schemas/UpstreamTarget'
       - $ref: '#/components/schemas/HttpTarget'
       - $ref: '#/components/schemas/UnixTarget'
     Metric:
@@ -4278,7 +4255,7 @@ components:
           nullable: true
     StreamTarget:
       oneOf:
-      - $ref: '#/components/schemas/CargoTarget'
+      - $ref: '#/components/schemas/UpstreamTarget'
       - $ref: '#/components/schemas/UriTarget'
       - $ref: '#/components/schemas/UnixTarget'
     SwarmInfo:
@@ -4838,6 +4815,29 @@ components:
       properties:
         UnixPath:
           type: string
+    UpstreamTarget:
+      type: object
+      description: Config for targetting a cargo or a vm
+      required:
+      - Key
+      - Port
+      properties:
+        Key:
+          type: string
+          description: The key of the cargo or the vm to target
+        Port:
+          type: integer
+          format: int32
+          description: The port of the cargo or the vm to target
+          minimum: 0.0
+        Path:
+          type: string
+          description: The http path to target when using http
+          nullable: true
+        DisableLogging:
+          type: boolean
+          description: Disable logging for this target
+          nullable: true
     UriTarget:
       type: object
       required:

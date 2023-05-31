@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [untagged]
 
+### Changed
+
+- Target use generic Target `Key`, `Port` and `Watch` require to specify if it's cargo or vm with `.c` or `.v`
+
 ### Added
 
 - Options `DisableLogging` and `Path` for `CargoTarget` to disable logging for specific path.
