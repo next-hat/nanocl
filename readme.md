@@ -84,8 +84,8 @@ Simplified version of our architecture for a single node:
 
 To learn more about `Nanocl`, you can take a look at the following resources:
 
-- [Overview](https://docs.next-hat.com/guides/nanocl)
-- [Get Started](https://docs.next-hat.com/guides/nanocl/get-started)
+- [Overview](https://docs.next-hat.com/guides/nanocl/overview)
+- [Get Started](https://docs.next-hat.com/guides/nanocl/get-started/orientation-and-setup)
 - [CLI References](https://docs.next-hat.com/references/nanocl/cli)
 - [DAEMON References](https://docs.next-hat.com/references/nanocl/daemon/overview)
 
