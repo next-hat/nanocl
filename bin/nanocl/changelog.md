@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [untagged]
 
+### Changed
+
+- `nanocl state revert` is now `nanocl state remove`
+- `nanocl state apply` and `nanocl state remove` use options `-s` instead of `-f` to specify the file or url.
+- `nanocl state apply -f` now follow logs of created cargoes.
+
 ### Added
 
 - `nanocl state apply -p` to force repull container image.
+- Quiet option `-q` on list operation to only print name,id or key.
 
 ### Fixed
 

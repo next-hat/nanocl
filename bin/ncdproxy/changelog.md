@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Thread background crash if `/var/log/nginx/access` doesn't exists.
+- Updating a cargo wasn't refreshing the nginx config when using `nanocl cargo revert`.
 
 ## [0.4.3] - 2023-05-14
 
