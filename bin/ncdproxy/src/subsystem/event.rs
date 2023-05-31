@@ -1,7 +1,8 @@
+use futures::stream::FuturesUnordered;
 use ntex::rt;
 use futures::StreamExt;
 
-use nanocl_utils::io_error::IoResult;
+use nanocl_utils::io_error::{IoResult, IoError};
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;
@@ -9,6 +10,81 @@ use nanocld_client::stubs::resource::ResourcePartial;
 
 use crate::utils;
 use crate::nginx::Nginx;
+
+/// Update the nginx configuration when a cargo is started, patched
+async fn update_cargo_rule(
+  name: &str,
+  namespace: &str,
+  nginx: &Nginx,
+  client: &NanocldClient,
+) -> IoResult<()> {
+  let resources =
+    utils::list_resource_by_cargo(name, Some(namespace.to_owned()), client)
+      .await?;
+  resources
+    .into_iter()
+    .map(|resource| async {
+      let resource: ResourcePartial = resource.into();
+      let proxy_rule = utils::serialize_proxy_rule(&resource)?;
+      if let Err(err) =
+        utils::create_resource_conf(&resource.name, &proxy_rule, client, nginx)
+          .await
+      {
+        log::warn!("{err}");
+      }
+      Ok::<_, IoError>(())
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, IoError>>()?;
+  utils::reload_config(client).await?;
+  Ok(())
+}
+
+/// Update the nginx configuration when a cargo is stopped, deleted
+async fn delete_cargo_rule(
+  name: &str,
+  namespace: &str,
+  nginx: &Nginx,
+  client: &NanocldClient,
+) -> IoResult<()> {
+  let resources =
+    utils::list_resource_by_cargo(name, Some(namespace.to_owned()), client)
+      .await?;
+  resources
+    .into_iter()
+    .map(|resource| async {
+      let resource: ResourcePartial = resource.into();
+      nginx.delete_conf_file(&resource.name).await;
+      Ok::<_, IoError>(())
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, IoError>>()?;
+  utils::reload_config(client).await?;
+  Ok(())
+}
+
+/// Update the nginx configuration when a resource is created, patched
+async fn update_resource_rule(
+  resource: &ResourcePartial,
+  nginx: &Nginx,
+  client: &NanocldClient,
+) -> IoResult<()> {
+  let proxy_rule = utils::serialize_proxy_rule(resource)?;
+  if let Err(err) =
+    utils::create_resource_conf(&resource.name, &proxy_rule, client, nginx)
+      .await
+  {
+    log::warn!("{err}");
+  }
+  utils::reload_config(client).await?;
+  Ok(())
+}
 
 async fn on_event(
   event: Event,
@@ -18,78 +94,35 @@ async fn on_event(
   match event {
     Event::CargoStarted(ev) => {
       log::debug!("received cargo started event: {ev:#?}");
-      let resources = utils::list_resource_by_cargo(
-        &ev.name,
-        Some(ev.namespace_name),
-        &client,
-      )
-      .await?;
-      for resource in resources {
-        let resource: ResourcePartial = resource.into();
-        let proxy_rule = utils::serialize_proxy_rule(&resource)?;
-        if let Err(err) = utils::create_resource_conf(
-          &resource.name,
-          &proxy_rule,
-          &client,
-          &nginx,
-        )
-        .await
-        {
-          log::warn!("{err}");
-        }
+      if let Err(err) =
+        update_cargo_rule(&ev.name, &ev.namespace_name, &nginx, &client).await
+      {
+        log::warn!("{err}");
       }
-      utils::reload_config(&client).await?;
     }
     Event::CargoPatched(ev) => {
       log::debug!("received cargo patched event: {ev:#?}");
-      let resources = utils::list_resource_by_cargo(
-        &ev.name,
-        Some(ev.namespace_name),
-        &client,
-      )
-      .await?;
-      for resource in resources {
-        let resource: ResourcePartial = resource.into();
-        let proxy_rule = utils::serialize_proxy_rule(&resource)?;
-        if let Err(err) = utils::create_resource_conf(
-          &resource.name,
-          &proxy_rule,
-          &client,
-          &nginx,
-        )
-        .await
-        {
-          log::warn!("{err}");
-        }
+      if let Err(err) =
+        update_cargo_rule(&ev.name, &ev.namespace_name, &nginx, &client).await
+      {
+        log::warn!("{err}");
       }
-      utils::reload_config(&client).await?;
     }
     Event::CargoStopped(ev) => {
       log::debug!("received cargo stopped event: {ev:#?}");
-      let resources = utils::list_resource_by_cargo(
-        &ev.name,
-        Some(ev.namespace_name),
-        &client,
-      )
-      .await?;
-      for resource in resources {
-        let resource: ResourcePartial = resource.into();
-        nginx.delete_conf_file(&resource.name).await;
+      if let Err(err) =
+        delete_cargo_rule(&ev.name, &ev.namespace_name, &nginx, &client).await
+      {
+        log::warn!("{err}");
       }
-      utils::reload_config(&client).await?;
     }
     Event::CargoDeleted(ev) => {
       log::debug!("received cargo deleted event: {ev:#?}");
-      let resources = utils::list_resource_by_cargo(
-        &ev.name,
-        Some(ev.namespace_name),
-        &client,
-      )
-      .await?;
-      for resource in resources {
-        nginx.delete_conf_file(&resource.name).await;
+      if let Err(err) =
+        delete_cargo_rule(&ev.name, &ev.namespace_name, &nginx, &client).await
+      {
+        log::warn!("{err}");
       }
-      utils::reload_config(&client).await?;
     }
     Event::ResourceCreated(ev) => {
       if ev.kind.as_str() != "ProxyRule" {
@@ -97,18 +130,9 @@ async fn on_event(
       }
       log::debug!("received resource created event: {ev:#?}");
       let resource: ResourcePartial = ev.as_ref().clone().into();
-      let proxy_rule = utils::serialize_proxy_rule(&resource)?;
-      if let Err(err) = utils::create_resource_conf(
-        &resource.name,
-        &proxy_rule,
-        &client,
-        &nginx,
-      )
-      .await
-      {
+      if let Err(err) = update_resource_rule(&resource, &nginx, &client).await {
         log::warn!("{err}");
       }
-      utils::reload_config(&client).await?;
     }
     Event::ResourcePatched(ev) => {
       if ev.kind.as_str() != "ProxyRule" {
@@ -116,18 +140,9 @@ async fn on_event(
       }
       log::debug!("received resource patched event: {ev:#?}");
       let resource: ResourcePartial = ev.as_ref().clone().into();
-      let proxy_rule = utils::serialize_proxy_rule(&resource)?;
-      if let Err(err) = utils::create_resource_conf(
-        &resource.name,
-        &proxy_rule,
-        &client,
-        &nginx,
-      )
-      .await
-      {
+      if let Err(err) = update_resource_rule(&resource, &nginx, &client).await {
         log::warn!("{err}");
       }
-      utils::reload_config(&client).await?;
     }
     Event::ResourceDeleted(ev) => {
       if ev.kind.as_str() != "ProxyRule" {
