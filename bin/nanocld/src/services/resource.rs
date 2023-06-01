@@ -263,7 +263,7 @@ mod tests {
     let resource = ResourcePartial {
       name: "test_resource".to_owned(),
       version: "v0.0.1".to_owned(),
-      kind: "Custom".to_owned(),
+      kind: "Kind".to_owned(),
       config: config.clone(),
     };
 
