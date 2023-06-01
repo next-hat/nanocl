@@ -189,7 +189,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/basic_resources.yml",
     ]);
     // ensure that ProxyRule and DnsRule are available
