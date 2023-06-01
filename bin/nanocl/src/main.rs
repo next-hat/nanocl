@@ -199,7 +199,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
