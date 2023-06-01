@@ -213,12 +213,19 @@ pub struct CargoLogsOpts {
   pub follow: bool,
 }
 
+#[derive(Debug, Parser)]
+pub struct CargoListOpts {
+  /// Only show cargo names
+  #[clap(long, short)]
+  pub quiet: bool,
+}
+
 #[derive(Debug, Subcommand)]
 #[clap(about, version)]
 pub enum CargoCommands {
   /// List existing cargo
   #[clap(alias("ls"))]
-  List,
+  List(CargoListOpts),
   /// Create a new cargo
   Create(CargoCreateOpts),
   /// Start a cargo by its name

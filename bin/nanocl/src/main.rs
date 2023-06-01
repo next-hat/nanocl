@@ -50,6 +50,7 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
     Commands::Install(opts) => commands::exec_install(opts).await,
     Commands::Uninstall(opts) => commands::exec_uninstall(opts).await,
     Commands::Upgrade(opts) => commands::exec_upgrade(&client, opts).await,
+    Commands::System(opts) => commands::exec_system(&client, opts).await,
   }
 }
 
@@ -103,7 +104,7 @@ mod tests {
     const IMAGE_NAME: &str = "busybox:1.26.0";
     // Try to create cargo image
     let args =
-      Cli::parse_from(["nanocl", "cargo", "image", "create", IMAGE_NAME]);
+      Cli::parse_from(["nanocl", "cargo", "image", "pull", IMAGE_NAME]);
     assert!(execute_args(&args).await.is_ok());
     // Try to list cargo images
     let args = Cli::parse_from(["nanocl", "cargo", "image", "ls"]);
@@ -125,7 +126,6 @@ mod tests {
       "../../tests/busybox.tar.gz",
     ]);
     let res = execute_args(&args).await;
-    println!("res : {res:#?}");
     assert!(res.is_ok());
   }
 
@@ -189,7 +189,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -198,7 +198,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/resource_ssl_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -240,8 +240,8 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "state",
-      "revert",
-      "-yf",
+      "rm",
+      "-ys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -270,7 +270,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -279,7 +279,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-pyf",
+      "-pys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -288,7 +288,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -297,7 +297,7 @@ mod tests {
       "nanocl",
       "state",
       "apply",
-      "-yf",
+      "-ys",
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -305,8 +305,8 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "state",
-      "revert",
-      "-yf",
+      "rm",
+      "-ys",
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());
@@ -314,8 +314,8 @@ mod tests {
     let args = Cli::parse_from([
       "nanocl",
       "state",
-      "revert",
-      "-yf",
+      "rm",
+      "-ys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());

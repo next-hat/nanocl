@@ -5,9 +5,13 @@ use crate::utils;
 use crate::models::{
   ResourceArgs, ResourceCommands, ResourceRow, ResourceRemoveOpts,
   ResourceInspectOpts, ResourceRevertOpts, ResourceHistoryOpts,
+  ResourceListOpts,
 };
 
-async fn exec_resource_ls(client: &NanocldClient) -> IoResult<()> {
+async fn exec_resource_ls(
+  client: &NanocldClient,
+  opts: &ResourceListOpts,
+) -> IoResult<()> {
   let resources = client.list_resource(None).await?;
 
   let row = resources
@@ -15,7 +19,16 @@ async fn exec_resource_ls(client: &NanocldClient) -> IoResult<()> {
     .map(ResourceRow::from)
     .collect::<Vec<ResourceRow>>();
 
-  utils::print::print_table(row);
+  match opts.quiet {
+    true => {
+      for row in row {
+        println!("{}", row.name);
+      }
+    }
+    false => {
+      utils::print::print_table(row);
+    }
+  }
   Ok(())
 }
 
@@ -73,7 +86,7 @@ pub async fn exec_resource(
 ) -> IoResult<()> {
   match &args.commands {
     // ResourceCommands::Create(opts) => exec_create(client, opts).await,
-    ResourceCommands::List => exec_resource_ls(client).await,
+    ResourceCommands::List(opts) => exec_resource_ls(client, opts).await,
     ResourceCommands::Remove(opts) => exec_resource_rm(client, opts).await,
     ResourceCommands::Inspect(opts) => {
       exec_resource_inspect(client, opts).await

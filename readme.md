@@ -30,22 +30,16 @@
  </span>
 </blockquote>
 
-## ❓ What is Nanocl ?
+## ❓ Why Nanocl
 
-`Nanocl` is a **distributed system** that simplifies the management of `containers` and `virtual machines` across multiple `hosts` also called `nodes`.
-With `Nanocl`, you can **efficiently share resources** and **deploy applications**, **services**, and **databases** `publicly`, `privately`, or under a `VPN`.
-Whether you're running a **home lab** setup or a **large enterprise**, _Nanocl's cutting-edge technology_, crafted with precision using `Rust`, provides **unparalleled performance** and a **small footprint**.
-
-## ❓ Why Nanocl ?
-
-`Nanocl` is all about easing your container and VM management with Rust-powered platform. 
-With `Nanocl`, say goodbye to complex setups and hello to easy, efficient deployments.  
-We stand for robust performance and efficiency with simplicity, trimming the bloat to keep your systems lean. 
-***Join us and help shape the future of cloud computing - it's about time things got a bit more rusty***. 
+`Nanocl` is all about easing your container and VM management with Rust-powered platform.
+With `Nanocl`, say goodbye to complex setups and hello to easy, efficient deployments.
+We stand for robust performance and efficiency with simplicity, trimming the bloat to keep your systems lean.
+**_Join us and help shape the future of cloud computing - it's about time things got a bit more rusty_**.
 
 ## 📙 Table of Contents
 
-- [❓ What is Nanocl ?](#-what-is-nanocl)
+- [❓ Why Nanocl ?](#-why-nanocl)
 - [📙 Table of Contents](#-table-of-contents)
 - [🚀 Key Benefits](#-key-benefits)
 - [🧿 Architecture](#-architecture)
@@ -90,8 +84,8 @@ Simplified version of our architecture for a single node:
 
 To learn more about `Nanocl`, you can take a look at the following resources:
 
-- [Overview](https://docs.next-hat.com/guides/nanocl)
-- [Get Started](https://docs.next-hat.com/guides/nanocl/get-started)
+- [Overview](https://docs.next-hat.com/guides/nanocl/overview)
+- [Get Started](https://docs.next-hat.com/guides/nanocl/get-started/orientation-and-setup)
 - [CLI References](https://docs.next-hat.com/references/nanocl/cli)
 - [DAEMON References](https://docs.next-hat.com/references/nanocl/daemon/overview)
 
@@ -132,7 +126,7 @@ Resources:
     Version: v0.1
     Config:
       Watch:
-        - doc.nexthat
+        - doc.nexthat.c
       Rules:
         - Domain: docs.next-hat.com
           Network: Public
@@ -145,12 +139,12 @@ Resources:
           Locations:
             - Path: /
               Target:
-                CargoKey: doc.nexthat
-                CargoPort: 80
+                Key: doc.nexthat.c
+                Port: 80
 ```
 
-To apply a state we can do it easily bu running `nanocl state apply -f path|url`<br />
-We can also revert a state by calling `nanocl state revert -f path|url`
+To apply a state we can do it easily bu running `nanocl state apply -s path|url`<br />
+We can also revert a state by calling `nanocl state rm -s path|url`
 
 ## 👨‍💻 Contributing
 

@@ -1,7 +1,6 @@
 use clap::Parser;
 
-/// Nanocl daemon
-/// Self Sufficient Hybrid Cloud Orchestrator
+/// Nanocl Daemon - Self Sufficient Hybrid Cloud Orchestrator
 #[derive(Debug, Clone, Parser)]
 #[command(name = "Nanocl")]
 #[command(author = "nexthat team <team@next-hat.com>")]

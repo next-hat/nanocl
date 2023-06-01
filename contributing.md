@@ -200,8 +200,14 @@ You also need this entry in your `/etc/hosts`
   ```
 
 - Run only cli tests
+
   ```sh
   cargo make tests-cli
+  ```
+
+- Run only client tests
+  ```sh
+  cargo make tests-client
   ```
 
 ## 👌 Usefull Command

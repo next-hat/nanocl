@@ -30,16 +30,20 @@ pub struct ProxySslConfig {
   pub dh_param: Option<String>,
 }
 
-/// Defines a proxy rule target
+/// Config for targetting a cargo or a vm
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoTarget {
-  /// The cargo key
-  pub cargo_key: String,
-  /// The cargo port
-  pub cargo_port: u16,
+pub struct UpstreamTarget {
+  /// The key of the cargo or the vm to target
+  pub key: String,
+  /// The port of the cargo or the vm to target
+  pub port: u16,
+  /// The http path to target when using http
+  pub path: Option<String>,
+  /// Disable logging for this target
+  pub disable_logging: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -50,7 +54,7 @@ pub enum UrlRedirect {
   MovedPermanently,
   Permanent,
   Temporary,
-  // TODO ?
+  // TODO: Add other redirect types (https://developer.mozilla.org/en-US/docs/Web/HTTP/Redirections)
   // Found,
   // SeeOther,
 }
@@ -82,7 +86,7 @@ pub struct HttpTarget {
 #[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum LocationTarget {
   /// Target an existing cargo
-  Cargo(CargoTarget),
+  Upstream(UpstreamTarget),
   /// Target a specific http url
   Http(HttpTarget),
   /// Target a specific unix socket
@@ -112,7 +116,7 @@ pub struct UnixTarget {
 #[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum StreamTarget {
   /// Target an existing cargo
-  Cargo(CargoTarget),
+  Upstream(UpstreamTarget),
   /// Target a specific uri
   Uri(UriTarget),
   /// Target a specific unix socket

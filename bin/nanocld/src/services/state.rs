@@ -1,4 +1,6 @@
-use ntex::web;
+use ntex::{web, rt};
+use ntex::util::Bytes;
+use ntex::channel::mpsc;
 
 use crate::utils;
 use nanocl_utils::http_error::HttpError;
@@ -11,50 +13,81 @@ pub(crate) async fn apply(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let state_file = utils::state::parse_state(&payload)?;
+  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
 
-  let res = match state_file {
-    StateData::Deployment(data) => {
-      utils::state::apply_deployment(&data, &version, &state).await?
-    }
-    StateData::Cargo(data) => {
-      utils::state::apply_cargo(&data, &version, &state).await?
-    }
-    StateData::Resource(data) => {
-      utils::state::apply_resource(&data, &state).await?
-    }
-  };
+  rt::spawn(async move {
+    match state_file {
+      StateData::Deployment(data) => {
+        if let Err(err) =
+          utils::state::apply_deployment(&data, &version, &state, sx).await
+        {
+          log::warn!("{err}");
+        }
+      }
+      StateData::Cargo(data) => {
+        if let Err(err) =
+          utils::state::apply_cargo(&data, &version, &state, sx).await
+        {
+          log::warn!("{err}");
+        }
+      }
+      StateData::Resource(data) => {
+        if let Err(err) = utils::state::apply_resource(&data, &state, sx).await
+        {
+          log::warn!("{err}");
+        }
+      }
+    };
+  });
 
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(res),
+      .streaming(rx),
   )
 }
 
-#[web::put("/state/revert")]
-pub(crate) async fn revert(
+#[web::put("/state/remove")]
+pub(crate) async fn remove(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let res = match utils::state::parse_state(&payload)? {
-    StateData::Deployment(data) => {
-      utils::state::revert_deployment(&data, &state).await?
-    }
-    StateData::Cargo(data) => utils::state::revert_cargo(&data, &state).await?,
-    StateData::Resource(data) => {
-      utils::state::revert_resource(&data, &state).await?
-    }
-  };
+  let state_file = utils::state::parse_state(&payload)?;
+  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
+
+  rt::spawn(async move {
+    match state_file {
+      StateData::Deployment(data) => {
+        if let Err(err) =
+          utils::state::remove_deployment(&data, &state, sx).await
+        {
+          log::warn!("{err}");
+        }
+      }
+      StateData::Cargo(data) => {
+        if let Err(err) = utils::state::remove_cargo(&data, &state, sx).await {
+          log::warn!("{err}");
+        }
+      }
+      StateData::Resource(data) => {
+        if let Err(err) = utils::state::remove_resource(&data, &state, sx).await
+        {
+          log::warn!("{err}");
+        }
+      }
+    };
+  });
+
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(res),
+      .streaming(rx),
   )
 }
 
 pub fn ntex_config(cfg: &mut web::ServiceConfig) {
   cfg.service(apply);
-  cfg.service(revert);
+  cfg.service(remove);
 }
 
 #[cfg(test)]
@@ -91,7 +124,7 @@ mod tests {
     // Revert examples/cargo_example.yml
     let data = parse_state_file("../../examples/cargo_example.yml")?;
     let req = srv
-      .put("/v0.5/state/revert")
+      .put("/v0.5/state/remove")
       .send_json(&data)
       .await
       .unwrap();
@@ -131,7 +164,7 @@ mod tests {
     // Revert examples/resource_ssl_example.yml
     let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
     let req = srv
-      .put("/v0.5/state/revert")
+      .put("/v0.5/state/remove")
       .send_json(&data)
       .await
       .unwrap();
@@ -144,7 +177,7 @@ mod tests {
     // Revert examples/deploy_example.yml
     let data = parse_state_file("../../examples/deploy_example.yml")?;
     let req = srv
-      .put("/v0.5/state/revert")
+      .put("/v0.5/state/remove")
       .send_json(&data)
       .await
       .unwrap();

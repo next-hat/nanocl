@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Cargo instances handling with `FutureUnordored`
+- Better state apply and remove with `FutureUnordored` by [@cszach](https://github.com/cszach)
 
 ## [0.7.0] - 2023-05-22
 

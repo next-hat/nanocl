@@ -1,4 +1,5 @@
 use chrono::NaiveDateTime;
+use nanocld_client::stubs::cargo_image::ListCargoImagesOptions;
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
 use bollard_next::models::ImageSummary;
@@ -12,12 +13,14 @@ pub struct CargoImageRemoveOpts {
 }
 
 #[derive(Debug, Parser)]
-pub struct CargoImageCreateOpts {
+pub struct CargoImagePullOpts {
+  /// Name of the image to pull
   pub(crate) name: String,
 }
 
 #[derive(Debug, Parser)]
 pub struct CargoImageInspectOpts {
+  /// Name of the image to inspect
   pub(crate) name: String,
 }
 
@@ -25,9 +28,9 @@ pub struct CargoImageInspectOpts {
 pub enum CargoImageCommands {
   /// List cargo images
   #[clap(alias("ls"))]
-  List,
-  /// Create a new cargo image
-  Create(CargoImageCreateOpts),
+  List(CargoImageListOpts),
+  /// Pull a new cargo image
+  Pull(CargoImagePullOpts),
   /// Remove an existing cargo image
   #[clap(alias("rm"))]
   Remove(CargoImageRemoveOpts),
@@ -35,6 +38,35 @@ pub enum CargoImageCommands {
   Inspect(CargoImageInspectOpts),
   /// Import a cargo image from a tarball
   Import(CargoImageImportOpts),
+}
+
+#[derive(Clone, Debug, Parser)]
+pub struct CargoImageListOpts {
+  /// Show all images. Only images from a final layer (no children) are shown by default.
+  #[clap(long, short)]
+  pub all: bool,
+  // TODO: implement filters
+  // pub filters: Option<HashMap<String, Vec<String>>>,
+  /// Show digest information as a RepoDigests field on each image.
+  #[clap(long)]
+  pub digests: bool,
+  /// Compute and show shared size as a SharedSize field on each image.
+  #[clap(long)]
+  pub shared_size: bool,
+  /// Show only the numeric IDs of images.
+  #[clap(long, short)]
+  pub quiet: bool,
+}
+
+impl From<CargoImageListOpts> for ListCargoImagesOptions {
+  fn from(options: CargoImageListOpts) -> Self {
+    Self {
+      all: Some(options.all),
+      digests: Some(options.digests),
+      shared_size: Some(options.shared_size),
+      ..Default::default()
+    }
+  }
 }
 
 #[derive(Debug, Parser)]
@@ -54,11 +86,11 @@ pub struct CargoImageOpts {
 
 #[derive(Tabled)]
 pub struct CargoImageRow {
+  pub(crate) id: String,
   pub(crate) repositories: String,
   pub(crate) tag: String,
-  pub(crate) image_id: String,
-  pub(crate) created: String,
   pub(crate) size: String,
+  pub(crate) created: String,
 }
 
 fn convert_size(size: i64) -> String {
@@ -83,11 +115,11 @@ impl From<ImageSummary> for CargoImageRow {
     let created = created.format("%Y-%m-%d %H:%M:%S").to_string();
 
     Self {
+      id,
       repositories: vals.first().unwrap_or(&"<none>").to_string(),
       tag: vals.get(1).unwrap_or(&"<none>").to_string(),
-      image_id: id,
-      created,
       size: convert_size(value.size),
+      created,
     }
   }
 }

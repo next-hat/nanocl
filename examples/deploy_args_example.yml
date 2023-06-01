@@ -15,15 +15,15 @@ Resources:
     Version: v0.4
     Config:
       Watch:
-        - get-started.global
+        - get-started.global.c
       Rules:
         - Domain: ${{ Args.domain }}
           Network: Public
           Locations:
             - Path: /
               Target:
-                CargoKey: get-started.global
-                CargoPort: 9000
+                Key: get-started.global.c
+                Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo

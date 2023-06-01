@@ -2,7 +2,7 @@
 use serde::{Serialize, Deserialize};
 
 /// Resource partial is a payload used to create a new resource
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -22,7 +22,7 @@ pub struct ResourcePartial {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct ResourcePatch {
+pub struct ResourceUpdate {
   /// Version of the config
   pub version: String,
   /// The config of the resource as a json object
@@ -87,6 +87,8 @@ pub struct ResourceConfig {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceQuery {
+  /// The kind of resource to target
   pub kind: Option<String>,
+  /// Match what contains the resource config
   pub contains: Option<String>,
 }

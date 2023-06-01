@@ -39,14 +39,11 @@ mod tests {
   async fn test_scenario() {
     tests::before();
     let res =
-      tests::exec_nanocl("nanocl state apply -yf ../tests/test-deploy.yml")
-        .await;
+      tests::exec_nanocl("state apply -ys ../tests/test-deploy.yml").await;
 
     assert!(res.is_ok());
 
-    let res =
-      tests::exec_nanocl("nanocl state revert -yf ../tests/test-deploy.yml")
-        .await;
+    let res = tests::exec_nanocl("state rm -ys ../tests/test-deploy.yml").await;
 
     assert!(res.is_ok());
   }

@@ -50,7 +50,7 @@ pub enum Commands {
   Resource(ResourceArgs),
   /// Watch daemon events
   Events,
-  /// Apply or Reverse a state from a configuration file
+  /// Define, Run, or Remove Cargo or Virtual Machines
   State(StateArgs),
   /// Show nanocl host information
   Info,
@@ -64,6 +64,8 @@ pub enum Commands {
   Upgrade(UpgradeOpts),
   /// Show all processes managed by nanocl
   Ps(ProcessOpts),
+  /// Manage system
+  System(SystemOpts),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for

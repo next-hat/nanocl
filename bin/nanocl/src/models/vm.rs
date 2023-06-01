@@ -19,7 +19,7 @@ pub enum VmCommands {
   Create(VmCreateOpts),
   /// List vms
   #[clap(alias = "ls")]
-  List,
+  List(VmListOpts),
   #[clap(alias = "rm")]
   Remove {
     /// Names of the vm
@@ -47,6 +47,13 @@ pub enum VmCommands {
   },
   /// Patch a vm
   Patch(VmPatchOpts),
+}
+
+#[derive(Debug, Parser)]
+pub struct VmListOpts {
+  /// Show only vms name
+  #[clap(long, short)]
+  pub quiet: bool,
 }
 
 #[derive(Clone, Debug, Parser)]

@@ -7,11 +7,11 @@ Resources:
     Version: v0.4
     Config:
       Watch:
-        - get-started@global
+        - get-started.global.c
       Rules:
         - Protocol: Tcp
           Port: 9999
           Network: Public
           Target:
-            CargoKey: get-started@global
-            CargoPort: 9000
+            Key: get-started.global.c
+            Port: 9000

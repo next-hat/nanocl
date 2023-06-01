@@ -15,9 +15,11 @@ use nanocld_client::stubs::cargo_config::{
 use nanocld_client::stubs::state::{StateMeta, StateStream};
 
 use crate::utils;
-use crate::models::{StateArgs, StateCommands, StateOpts, StateBuildArgs};
+use crate::models::{
+  StateArgs, StateCommands, StateApplyOpts, StateRemoveOpts, StateBuildArgs,
+};
 
-use super::cargo_image::exec_cargo_image_create;
+use super::cargo_image::exec_cargo_image_pull;
 
 async fn get_from_url(url: &str) -> IoResult<(StateMeta, serde_yaml::Value)> {
   let url = if url.starts_with("http") {
@@ -73,7 +75,7 @@ async fn download_cargo_image(
 ) -> IoResult<()> {
   match &cargo.container.image {
     Some(image) => {
-      exec_cargo_image_create(client, image).await?;
+      exec_cargo_image_pull(client, image).await?;
     }
     None => {
       return Err(IoError::invalid_data("Cargo image", "is not specified"))
@@ -382,8 +384,8 @@ async fn parse_state_file(
   read_from_file(&path)
 }
 
-async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
-  let (meta, yaml) = parse_state_file(&opts.file_path).await?;
+async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
+  let (meta, yaml) = parse_state_file(&opts.state_location).await?;
   let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;
   let mut namespace = String::from("global");
@@ -444,14 +446,14 @@ async fn exec_state_apply(host: &str, opts: &StateOpts) -> IoResult<()> {
     }
   }
 
-  if opts.attach {
+  if opts.follow {
     attach_to_cargoes(&client, cargoes, &namespace).await?;
   }
   Ok(())
 }
 
-async fn exec_state_revert(host: &str, opts: &StateOpts) -> IoResult<()> {
-  let (meta, yaml) = parse_state_file(&opts.file_path).await?;
+async fn exec_state_remove(host: &str, opts: &StateRemoveOpts) -> IoResult<()> {
+  let (meta, yaml) = parse_state_file(&opts.state_location).await?;
   let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;
   let yaml = inject_data(yaml.clone(), &args, &client).await?;
@@ -462,7 +464,7 @@ async fn exec_state_revert(host: &str, opts: &StateOpts) -> IoResult<()> {
     utils::dialog::confirm("Are you sure to revert this state ?")
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
-  let mut stream = client.revert_state(&data).await?;
+  let mut stream = client.remove_state(&data).await?;
   while let Some(res) = stream.next().await {
     let res = res?;
     match res {
@@ -476,6 +478,6 @@ async fn exec_state_revert(host: &str, opts: &StateOpts) -> IoResult<()> {
 pub async fn exec_state(host: &str, args: &StateArgs) -> IoResult<()> {
   match &args.commands {
     StateCommands::Apply(opts) => exec_state_apply(host, opts).await,
-    StateCommands::Revert(opts) => exec_state_revert(host, opts).await,
+    StateCommands::Remove(opts) => exec_state_remove(host, opts).await,
   }
 }

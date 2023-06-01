@@ -116,26 +116,16 @@ pub async fn create(
 
 /// Patch a resource
 pub async fn patch(
-  resource: ResourcePartial,
+  resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
-  hook_create_resource(&resource, pool).await?;
-  let res = repositories::resource::patch(&resource, pool).await?;
-  Ok(res)
-}
-
-/// Create or patch a resource
-pub async fn create_or_patch(
-  resource: ResourcePartial,
-  pool: &Pool,
-) -> Result<Resource, HttpError> {
-  hook_create_resource(&resource, pool).await?;
-  let res = repositories::resource::create_or_patch(&resource, pool).await?;
+  hook_create_resource(resource, pool).await?;
+  let res = repositories::resource::put(resource, pool).await?;
   Ok(res)
 }
 
 /// Delete a resource
-pub async fn delete(resource: Resource, pool: &Pool) -> Result<(), HttpError> {
+pub async fn delete(resource: &Resource, pool: &Pool) -> Result<(), HttpError> {
   if let Err(err) = hook_delete_resource(&resource, pool).await {
     log::warn!("{err}");
   }

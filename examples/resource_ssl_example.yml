@@ -9,7 +9,7 @@ Resources:
     Version: v0.4
     Config:
       Watch:
-        - deploy-example.global
+        - deploy-example.global.c
       Rules:
         - Domain: deploy-example.com
           Network: Public
@@ -20,5 +20,5 @@ Resources:
           Locations:
             - Path: /
               Target:
-                CargoKey: deploy-example.global
-                CargoPort: 9000
+                Key: deploy-example.global.c
+                Port: 9000

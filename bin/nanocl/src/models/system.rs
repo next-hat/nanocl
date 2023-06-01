@@ -1,9 +1,53 @@
 use clap::Parser;
+use nanocld_client::stubs::http_metric::HttpMetricListQuery;
 use tabled::Tabled;
 use chrono::TimeZone;
 
 use nanocld_client::stubs::node::NodeContainerSummary;
 use nanocld_client::stubs::system::ProccessQuery;
+
+#[derive(Clone, Debug, Parser)]
+pub struct SystemOpts {
+  #[clap(subcommand)]
+  pub commands: SystemCommands,
+}
+
+#[derive(Clone, Debug, Parser)]
+pub enum SystemCommands {
+  /// System HTTP metrics information
+  Http(SystemHttpOpts),
+}
+
+#[derive(Clone, Debug, Parser)]
+pub struct SystemHttpOpts {
+  #[clap(subcommand)]
+  pub commands: SystemHttpCommands,
+}
+
+#[derive(Clone, Debug, Parser)]
+pub enum SystemHttpCommands {
+  /// Show HTTP metrics information
+  Logs(SystemHttpLogsOpts),
+}
+
+#[derive(Clone, Debug, Parser)]
+pub struct SystemHttpLogsOpts {
+  // #[clap(long, short)]
+  // pub follow: bool,
+  #[clap(long, short)]
+  pub limit: Option<i64>,
+  #[clap(long, short)]
+  pub offset: Option<i64>,
+}
+
+impl From<SystemHttpLogsOpts> for HttpMetricListQuery {
+  fn from(opts: SystemHttpLogsOpts) -> Self {
+    Self {
+      limit: opts.limit,
+      offset: opts.offset,
+    }
+  }
+}
 
 #[derive(Clone, Debug, Parser)]
 pub struct ProcessOpts {

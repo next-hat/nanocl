@@ -872,47 +872,6 @@ pub async fn kill(
   Ok(())
 }
 
-/// ## Create or patch cargo
-///
-/// Create a cargo if it does not exist or patch it if it exists
-///
-/// ## Arguments
-///
-/// - [namespace](str) - The namespace name
-/// - [cargo](CargoConfigPartial) - The cargo config
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
-///
-/// ## Returns
-///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The cargo has been created or patched
-///   - [Err](HttpResponseError) - The cargo has not been created or patched
-///
-pub async fn create_or_put(
-  namespace: &str,
-  cargo: &CargoConfigPartial,
-  version: &str,
-  state: &DaemonState,
-) -> Result<(), HttpError> {
-  let key = utils::key::gen_key(namespace, &cargo.name);
-  match utils::cargo::inspect(&key, state).await {
-    Ok(existing) => {
-      let existing: CargoConfigPartial = existing.into();
-      if existing == *cargo {
-        log::debug!("No changes detected for cargo {} skipping", &key);
-        return Ok(());
-      }
-      utils::cargo::put(&key, cargo, version, state).await?;
-    }
-    Err(_err) => {
-      utils::cargo::create(namespace, cargo, version, state).await?;
-      utils::cargo::start(&key, state).await?;
-    }
-  }
-  Ok(())
-}
-
 pub async fn patch(
   key: &str,
   payload: &CargoConfigUpdate,

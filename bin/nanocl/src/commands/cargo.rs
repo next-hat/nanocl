@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use bollard_next::exec::CreateExecOptions;
 
-use nanocl_utils::io_error::{IoResult, FromIo};
+use nanocl_utils::io_error::{FromIo, IoResult};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery, CargoLogQuery};
 
@@ -10,10 +10,10 @@ use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
   CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
-  CargoRunOpts, CargoRestartOpts,
+  CargoRunOpts, CargoRestartOpts, CargoListOpts,
 };
 
-use super::cargo_image::{self, exec_cargo_image_create};
+use super::cargo_image::{self, exec_cargo_image_pull};
 
 /// Execute cargo command
 ///
@@ -63,6 +63,7 @@ async fn exec_cargo_rm(
 async fn exec_cargo_ls(
   client: &NanocldClient,
   args: &CargoArgs,
+  opts: &CargoListOpts,
 ) -> IoResult<()> {
   let items = client.list_cargo(args.namespace.clone()).await?;
 
@@ -70,7 +71,16 @@ async fn exec_cargo_ls(
     .into_iter()
     .map(CargoRow::from)
     .collect::<Vec<CargoRow>>();
-  utils::print::print_table(rows);
+  match opts.quiet {
+    true => {
+      for row in rows {
+        println!("{}", row.name);
+      }
+    }
+    false => {
+      utils::print::print_table(rows);
+    }
+  }
   Ok(())
 }
 
@@ -228,7 +238,7 @@ async fn exec_cargo_run(
 ) -> IoResult<()> {
   // Image is not existing so we donwload it
   if client.inspect_cargo_image(&opts.image).await.is_err() {
-    exec_cargo_image_create(client, &opts.image).await?;
+    exec_cargo_image_pull(client, &opts.image).await?;
   }
 
   let cargo = client
@@ -247,7 +257,7 @@ pub async fn exec_cargo(
   args: &CargoArgs,
 ) -> IoResult<()> {
   match &args.commands {
-    CargoCommands::List => exec_cargo_ls(client, args).await,
+    CargoCommands::List(opts) => exec_cargo_ls(client, args, opts).await,
     CargoCommands::Create(options) => {
       exec_cargo_create(client, args, options).await
     }

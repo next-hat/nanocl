@@ -11,15 +11,15 @@ Resources:
     Version: v0.4
     Config:
       Watch:
-        - crash-example.global
+        - crash-example.global.c
       Rules:
         - Domain: crash-example.com
           Network: Public
           Locations:
             - Path: /
               Target:
-                CargoKey: crash-example.global
-                CargoPort: 9000
+                Key: crash-example.global.c
+                Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo

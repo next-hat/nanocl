@@ -28,6 +28,8 @@ pub struct ListCargoImagesOptions {
   pub filters: Option<HashMap<String, Vec<String>>>,
   /// Show digest information as a RepoDigests field on each image.
   pub digests: Option<bool>,
+  /// Compute and show shared size as a SharedSize field on each image.
+  pub shared_size: Option<bool>,
 }
 
 impl From<ListCargoImagesOptions>
