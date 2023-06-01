@@ -7,7 +7,7 @@ use nanocl_utils::io_error::{IoResult, IoError};
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;
-use nanocld_client::stubs::resource::{ResourcePartial, ResourceQuery};
+use nanocld_client::stubs::resource::{ResourcePartial};
 
 use crate::utils;
 use crate::nginx::Nginx;
@@ -215,7 +215,8 @@ async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
           match ensure_basic_resources(client).await {
             Ok(_) => break,
             Err(_) => {
-              log::warn!("Failed to ensure basic resource kinds exists")
+              log::warn!("Failed to ensure basic resource kinds exists, retrying in 2 seconds");
+              ntex::time::sleep(std::time::Duration::from_secs(2)).await;
             }
           }
         }
