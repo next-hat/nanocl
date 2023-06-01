@@ -193,7 +193,7 @@ mod tests {
       "../../examples/basic_resources.yml",
     ]);
     // ensure that ProxyRule and DnsRule are available
-    execute_args(&args).await;
+    _ = execute_args(&args).await;
 
     let args = Cli::parse_from([
       "nanocl",

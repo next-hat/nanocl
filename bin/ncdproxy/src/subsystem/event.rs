@@ -159,13 +159,6 @@ async fn on_event(
   Ok(())
 }
 
-fn resource_kind_query(kind: String) -> ResourceQuery {
-  ResourceQuery {
-    kind: Some("Kind".to_string()),
-    contains: Some(serde_json::json!({ "Name": kind }).to_string()),
-  }
-}
-
 async fn ensure_basic_resources(
   client: &NanocldClient,
 ) -> Result<(), HttpClientError> {
