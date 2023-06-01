@@ -1,5 +1,3 @@
-use std::rc;
-
 use ntex::rt;
 use ntex::http::{Client, StatusCode};
 use ntex::http::client::{Connector, ClientResponse};
@@ -22,10 +20,8 @@ impl CtrlClient {
           .connector(
             Connector::default()
               .connector(ntex::service::fn_service(move |_| {
-                  let path = url.trim_start_matches("unix://").to_string();
-                  async move {
-                    Ok(rt::unix_connect(path).await?)
-                  }
+                let path = url.trim_start_matches("unix://").to_string();
+                async move { Ok(rt::unix_connect(path).await?) }
               }))
               .timeout(ntex::time::Millis::from_secs(20))
               .finish(),

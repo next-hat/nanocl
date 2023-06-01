@@ -1,3 +1,4 @@
+use nanocl_utils::http_client_error::HttpClientError;
 use ntex::rt;
 use futures::StreamExt;
 
@@ -5,7 +6,7 @@ use nanocl_utils::io_error::IoResult;
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;
-use nanocld_client::stubs::resource::ResourcePartial;
+use nanocld_client::stubs::resource::{ResourcePartial, ResourceQuery};
 
 use crate::utils;
 use crate::nginx::Nginx;
@@ -113,6 +114,55 @@ async fn on_event(
   Ok(())
 }
 
+fn resource_kind_query(kind: String) -> ResourceQuery {
+  ResourceQuery {
+    kind: Some("Kind".to_string()),
+    contains: Some(serde_json::json!({ "Name": kind }).to_string()),
+  }
+}
+
+async fn ensure_basic_resources(
+  client: &NanocldClient,
+) -> Result<(), HttpClientError> {
+  let proxy_rule_kind = ResourcePartial {
+    kind: "Kind".to_string(),
+    name: "ProxyRule".to_string(),
+    config: serde_json::json!({
+        "Url": "unix:///run/nanocl/proxy.sock"
+    }),
+    version: "v1.0".to_string(),
+  };
+
+  let dns_rule_kind = ResourcePartial {
+    kind: "Kind".to_string(),
+    name: "DnsRule".to_string(),
+    config: serde_json::json!({
+        "Url": "unix:///run/nanocl/proxy.sock"
+    }),
+    version: "v1.0".to_string(),
+  };
+  if let Err(err) = client.create_resource(&proxy_rule_kind).await {
+    match err {
+      HttpClientError::HttpError(err) if err.status == 409 => {
+        log::info!("ProxyRule already exists. Skipping.")
+      }
+      _ => return Err(err),
+    }
+  }
+  if let Err(err) = client.create_resource(&dns_rule_kind).await {
+    match err {
+      HttpClientError::HttpError(err) if err.status == 409 => {
+        log::info!("DnsRule already exists. Skipping.")
+      }
+      _ => return Err(err),
+    }
+  }
+
+  log::info!("ProxyRule and DnsRule existing");
+
+  Ok(())
+}
+
 async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
   loop {
     log::info!("Subscribing to nanocl daemon events..");
@@ -122,6 +172,16 @@ async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
       }
       Ok(mut stream) => {
         log::info!("Subscribed to nanocl daemon events");
+
+        loop {
+          match ensure_basic_resources(client).await {
+            Ok(_) => break,
+            Err(_) => {
+              log::warn!("Failed to ensure basic resource kinds exists")
+            }
+          }
+        }
+
         while let Some(event) = stream.next().await {
           let Ok(event) = event else {
             break;

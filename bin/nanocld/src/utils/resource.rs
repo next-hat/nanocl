@@ -8,7 +8,7 @@ use crate::{repositories};
 use nanocl_utils::http_error::HttpError;
 use crate::models::{Pool, ResourceKindPartial};
 
-use super::ctrl_client::{CtrlClient, self};
+use super::ctrl_client::{CtrlClient};
 
 /// Validate a resource from a custom config
 pub async fn hook_create_resource(
