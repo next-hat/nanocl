@@ -245,16 +245,18 @@ mod tests {
     let srv = generate_server(ntex_config).await;
 
     let config = serde_json::json!({
-      "type": "object",
-      "required": [
-        "Watch"
-      ],
-      "properties": {
-        "Watch": {
-          "description": "Cargo to watch for changes",
-          "type": "array",
-          "items": {
-            "type": "string"
+      "Schema": {
+        "type": "object",
+        "required": [
+          "Watch"
+        ],
+        "properties": {
+          "Watch": {
+            "description": "Cargo to watch for changes",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }
@@ -275,7 +277,7 @@ mod tests {
     assert_eq!(resp.status(), StatusCode::CREATED);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, String::from("Custom"));
+    assert_eq!(resource.kind, String::from("Kind"));
 
     // List
     let mut resp = srv.get("/v0.2/resources").send().await.unwrap();
@@ -291,7 +293,7 @@ mod tests {
     assert_eq!(resp.status(), StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, String::from("Custom"));
+    assert_eq!(resource.kind, String::from("Kind"));
     assert_eq!(&resource.config, &config);
 
     // History
@@ -314,7 +316,7 @@ mod tests {
     assert_eq!(resp.status(), StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
-    assert_eq!(resource.kind, String::from("Custom"));
+    assert_eq!(resource.kind, String::from("Kind"));
 
     // Delete
     let resp = srv
