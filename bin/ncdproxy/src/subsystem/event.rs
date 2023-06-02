@@ -3,6 +3,7 @@ use futures::stream::FuturesUnordered;
 use ntex::rt;
 use futures::StreamExt;
 
+use nanocl_utils::versioning;
 use nanocl_utils::io_error::{IoResult, IoError};
 
 use nanocld_client::NanocldClient;
@@ -10,6 +11,7 @@ use nanocld_client::stubs::system::Event;
 use nanocld_client::stubs::resource::ResourcePartial;
 
 use crate::utils;
+use crate::version;
 use crate::nginx::Nginx;
 
 /// Update the nginx configuration when a cargo is started, patched
@@ -159,16 +161,15 @@ async fn on_event(
   Ok(())
 }
 
-async fn ensure_basic_resources(
-  client: &NanocldClient,
-) -> Result<(), HttpClientError> {
+async fn ensure_resource_config(client: &NanocldClient) {
+  let formated_version = versioning::format_version(version::VERSION);
   let proxy_rule_kind = ResourcePartial {
     kind: "Kind".to_string(),
     name: "ProxyRule".to_string(),
     config: serde_json::json!({
         "Url": "unix:///run/nanocl/proxy.sock"
     }),
-    version: "v0.4".to_string(),
+    version: format!("v{formated_version}"),
   };
 
   if let Err(err) = client.create_resource(&proxy_rule_kind).await {
@@ -176,13 +177,11 @@ async fn ensure_basic_resources(
       HttpClientError::HttpError(err) if err.status == 409 => {
         log::info!("ProxyRule already exists. Skipping.")
       }
-      _ => return Err(err),
+      _ => {
+        log::warn!("Unable to create ProxyRule: {err}");
+      }
     }
   }
-
-  log::info!("ProxyRule exists");
-
-  Ok(())
 }
 
 async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
@@ -195,15 +194,7 @@ async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
       Ok(mut stream) => {
         log::info!("Subscribed to nanocl daemon events");
 
-        loop {
-          match ensure_basic_resources(client).await {
-            Ok(_) => break,
-            Err(_) => {
-              log::warn!("Failed to ensure basic resource kinds exists, retrying in 2 seconds");
-              ntex::time::sleep(std::time::Duration::from_secs(2)).await;
-            }
-          }
-        }
+        ensure_resource_config(client).await;
 
         while let Some(event) = stream.next().await {
           let Ok(event) = event else {

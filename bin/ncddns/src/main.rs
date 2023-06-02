@@ -5,6 +5,7 @@ use nanocl_utils::io_error::IoResult;
 
 mod cli;
 mod utils;
+mod event;
 mod server;
 mod version;
 mod dnsmasq;
@@ -16,6 +17,9 @@ use dnsmasq::Dnsmasq;
 async fn run(cli: &Cli) -> IoResult<()> {
   logger::enable_logger("ncddns");
   log::info!("ncddns v{}", env!("CARGO_PKG_VERSION"));
+
+  // Spawn a new thread to events from nanocld
+  event::spawn();
 
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
   let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns.clone()).ensure()?;

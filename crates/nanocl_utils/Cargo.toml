@@ -25,6 +25,7 @@ serde_urlencoded = ["dep:serde_urlencoded"]
 http_error = ["ntex", "dep:serde_json"]
 http_client_error = ["ntex", "io_error", "http_error", "serde_urlencoded"]
 unix = ["dep:libc"]
+versioning = []
 
 [dependencies]
 ntex = { version = "0.6.7", optional = true }

@@ -18,12 +18,15 @@ pub async fn hook_create_resource(
   let mut resource = resource.clone();
   match resource.kind.as_str() {
     "Kind" => {
+      // Todo: validate the resource with a structure
       let resource_kind = ResourceKindPartial {
         name: resource.name.to_owned(),
         version: resource.version.to_owned(),
-        schema: resource.config.get("Schema").map(|item| item.clone()),
+        schema: resource.config.get("Schema").cloned(),
         url: resource.config.get("Url").map(|item| match item {
           Value::String(value) => value.clone(),
+          // Wtf ? so if it's not a string, we just convert it to a string ?
+          // Meaning that if it's a number an array or whatever, it will be converted to a string ?
           value => value.to_string(),
         }),
       };
@@ -126,7 +129,7 @@ pub async fn patch(
 
 /// Delete a resource
 pub async fn delete(resource: &Resource, pool: &Pool) -> Result<(), HttpError> {
-  if let Err(err) = hook_delete_resource(&resource, pool).await {
+  if let Err(err) = hook_delete_resource(resource, pool).await {
     log::warn!("{err}");
   }
   if resource.kind.as_str() == "Custom" {
