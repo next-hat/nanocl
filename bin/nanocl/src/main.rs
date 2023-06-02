@@ -190,6 +190,16 @@ mod tests {
       "state",
       "apply",
       "-ys",
+      "../../examples/basic_resources.yml",
+    ]);
+    // ensure that ProxyRule and DnsRule are available
+    _ = execute_args(&args).await;
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "apply",
+      "-ys",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_args(&args).await.is_ok());

@@ -1,0 +1,16 @@
+Kind: Resource
+ApiVersion: v0.7
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
+Resources:
+  - Name: ProxyRule
+    Kind: Kind
+    Version: v0.4
+    Config:
+      Url: unix:///run/nanocl/proxy.sock
+  - Name: DnsRule
+    Kind: Kind
+    Version: v0.4
+    Config:
+      Url: unix:///run/nanocl/proxy.sock

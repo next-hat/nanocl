@@ -15,3 +15,6 @@ pub mod http_client_error;
 
 #[cfg(feature = "unix")]
 pub mod unix;
+
+#[cfg(feature = "versioning")]
+pub mod versioning;

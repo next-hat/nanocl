@@ -6,7 +6,8 @@ use crate::schema::{resource_kinds, resource_kind_versions};
 pub struct ResourceKindPartial {
   pub(crate) name: String,
   pub(crate) version: String,
-  pub(crate) schema: serde_json::Value,
+  pub(crate) schema: Option<serde_json::Value>,
+  pub(crate) url: Option<String>,
 }
 
 #[derive(Clone, Debug, Queryable, Identifiable, Insertable)]
@@ -16,7 +17,8 @@ pub struct ResourceKindVersionDbModel {
   pub(crate) resource_kind_name: String,
   pub(crate) created_at: chrono::NaiveDateTime,
   pub(crate) version: String,
-  pub(crate) schema: serde_json::Value,
+  pub(crate) schema: Option<serde_json::Value>,
+  pub(crate) url: Option<String>,
 }
 
 #[derive(Clone, Debug, Queryable, Identifiable, Insertable)]

@@ -35,5 +35,6 @@ nanocl_utils = { version = "0.1.2", features = [
   "io_error",
   "http_error",
   "serde_json",
+  "versioning",
 ] }
 utoipa = { version = "3.2", features = ["yaml"], optional = true }

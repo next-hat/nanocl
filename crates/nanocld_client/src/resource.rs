@@ -240,16 +240,18 @@ mod tests {
     client.list_resource(None).await.unwrap();
 
     let config = serde_json::json!({
-      "type": "object",
-      "required": [
-        "Watch"
-      ],
-      "properties": {
-        "Watch": {
-          "description": "Cargo to watch for changes",
-          "type": "array",
-          "items": {
-            "type": "string"
+      "Schema": {
+        "type": "object",
+        "required": [
+          "Watch"
+        ],
+        "properties": {
+          "Watch": {
+            "description": "Cargo to watch for changes",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }
@@ -258,7 +260,7 @@ mod tests {
     let resource = ResourcePartial {
       name: "test_resource2".to_owned(),
       version: "v0.0.1".to_owned(),
-      kind: "Custom".to_owned(),
+      kind: "Kind".to_owned(),
       config: config.clone(),
     };
 
@@ -266,12 +268,12 @@ mod tests {
     let resource = client.create_resource(&resource).await.unwrap();
 
     assert_eq!(resource.name, "test_resource2");
-    assert_eq!(resource.kind, String::from("Custom"));
+    assert_eq!(resource.kind, String::from("Kind"));
 
     // inspect
     let resource = client.inspect_resource("test_resource2").await.unwrap();
     assert_eq!(resource.name, "test_resource2");
-    assert_eq!(resource.kind, String::from("Custom"));
+    assert_eq!(resource.kind, String::from("Kind"));
 
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
@@ -285,7 +287,7 @@ mod tests {
       .unwrap();
 
     assert_eq!(resource.name, "test_resource2");
-    assert_eq!(resource.kind, String::from("Custom"));
+    assert_eq!(resource.kind, String::from("Kind"));
 
     // history
     let history = client

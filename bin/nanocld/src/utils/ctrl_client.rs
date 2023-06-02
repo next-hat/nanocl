@@ -13,15 +13,16 @@ pub struct CtrlClient {
 }
 
 impl CtrlClient {
-  pub(crate) fn new(name: &str, url: &'static str) -> Self {
+  pub(crate) fn new(name: &str, url: &str) -> Self {
     let (client, url) = match url {
       url if url.starts_with("unix://") => {
+        let url = url.to_string();
         let client = Client::build()
           .connector(
             Connector::default()
-              .connector(ntex::service::fn_service(move |_| async {
-                let path = url.trim_start_matches("unix://");
-                Ok::<_, _>(rt::unix_connect(path).await?)
+              .connector(ntex::service::fn_service(move |_| {
+                let path = url.trim_start_matches("unix://").to_string();
+                async move { Ok(rt::unix_connect(path).await?) }
               }))
               .timeout(ntex::time::Millis::from_secs(20))
               .finish(),
@@ -40,8 +41,8 @@ impl CtrlClient {
 
     Self {
       client,
-      name: name.to_owned(),
-      base_url: url.to_owned(),
+      name: name.to_string(),
+      base_url: url.to_string(),
     }
   }
 

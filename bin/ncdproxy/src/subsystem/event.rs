@@ -1,7 +1,9 @@
+use nanocl_utils::http_client_error::HttpClientError;
 use futures::stream::FuturesUnordered;
 use ntex::rt;
 use futures::StreamExt;
 
+use nanocl_utils::versioning;
 use nanocl_utils::io_error::{IoResult, IoError};
 
 use nanocld_client::NanocldClient;
@@ -9,6 +11,7 @@ use nanocld_client::stubs::system::Event;
 use nanocld_client::stubs::resource::ResourcePartial;
 
 use crate::utils;
+use crate::version;
 use crate::nginx::Nginx;
 
 /// Update the nginx configuration when a cargo is started, patched
@@ -158,6 +161,29 @@ async fn on_event(
   Ok(())
 }
 
+async fn ensure_resource_config(client: &NanocldClient) {
+  let formated_version = versioning::format_version(version::VERSION);
+  let proxy_rule_kind = ResourcePartial {
+    kind: "Kind".to_string(),
+    name: "ProxyRule".to_string(),
+    config: serde_json::json!({
+        "Url": "unix:///run/nanocl/proxy.sock"
+    }),
+    version: format!("v{formated_version}"),
+  };
+
+  if let Err(err) = client.create_resource(&proxy_rule_kind).await {
+    match err {
+      HttpClientError::HttpError(err) if err.status == 409 => {
+        log::info!("ProxyRule already exists. Skipping.")
+      }
+      _ => {
+        log::warn!("Unable to create ProxyRule: {err}");
+      }
+    }
+  }
+}
+
 async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
   loop {
     log::info!("Subscribing to nanocl daemon events..");
@@ -167,6 +193,9 @@ async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
       }
       Ok(mut stream) => {
         log::info!("Subscribed to nanocl daemon events");
+
+        ensure_resource_config(client).await;
+
         while let Some(event) = stream.next().await {
           let Ok(event) = event else {
             break;
