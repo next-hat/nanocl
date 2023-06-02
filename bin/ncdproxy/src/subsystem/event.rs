@@ -7,7 +7,7 @@ use nanocl_utils::io_error::{IoResult, IoError};
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;
-use nanocld_client::stubs::resource::{ResourcePartial};
+use nanocld_client::stubs::resource::ResourcePartial;
 
 use crate::utils;
 use crate::nginx::Nginx;
@@ -168,17 +168,9 @@ async fn ensure_basic_resources(
     config: serde_json::json!({
         "Url": "unix:///run/nanocl/proxy.sock"
     }),
-    version: "v1.0".to_string(),
+    version: "v0.4".to_string(),
   };
 
-  let dns_rule_kind = ResourcePartial {
-    kind: "Kind".to_string(),
-    name: "DnsRule".to_string(),
-    config: serde_json::json!({
-        "Url": "unix:///run/nanocl/proxy.sock"
-    }),
-    version: "v1.0".to_string(),
-  };
   if let Err(err) = client.create_resource(&proxy_rule_kind).await {
     match err {
       HttpClientError::HttpError(err) if err.status == 409 => {
@@ -187,16 +179,8 @@ async fn ensure_basic_resources(
       _ => return Err(err),
     }
   }
-  if let Err(err) = client.create_resource(&dns_rule_kind).await {
-    match err {
-      HttpClientError::HttpError(err) if err.status == 409 => {
-        log::info!("DnsRule already exists. Skipping.")
-      }
-      _ => return Err(err),
-    }
-  }
 
-  log::info!("ProxyRule and DnsRule existing");
+  log::info!("ProxyRule exists");
 
   Ok(())
 }

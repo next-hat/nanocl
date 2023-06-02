@@ -4,11 +4,11 @@ use jsonschema::{JSONSchema, Draft};
 use nanocl_stubs::resource::{Resource, ResourcePartial};
 use serde_json::Value;
 
-use crate::{repositories};
+use crate::repositories;
 use nanocl_utils::http_error::HttpError;
 use crate::models::{Pool, ResourceKindPartial};
 
-use super::ctrl_client::{CtrlClient};
+use super::ctrl_client::CtrlClient;
 
 /// Validate a resource from a custom config
 pub async fn hook_create_resource(
@@ -72,7 +72,7 @@ pub async fn hook_create_resource(
       }
 
       if let Some(url) = kind.url {
-        let ctrl_client = CtrlClient::new(kind.resource_kind_name.clone(), url);
+        let ctrl_client = CtrlClient::new(&kind.resource_kind_name, &url);
         let config = ctrl_client
           .apply_rule(&resource.version, &resource.name, &resource.config)
           .await?;
@@ -95,7 +95,7 @@ async fn hook_delete_resource(
   )
   .await?;
   if let Some(url) = kind.url {
-    let ctrl_client = CtrlClient::new(kind.resource_kind_name.clone(), url);
+    let ctrl_client = CtrlClient::new(&kind.resource_kind_name, &url);
     ctrl_client
       .delete_rule(&resource.version, &resource.name)
       .await?;

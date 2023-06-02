@@ -13,9 +13,10 @@ pub struct CtrlClient {
 }
 
 impl CtrlClient {
-  pub(crate) fn new(name: String, url: String) -> Self {
+  pub(crate) fn new(name: &str, url: &str) -> Self {
     let (client, url) = match url {
       url if url.starts_with("unix://") => {
+        let url = url.to_string();
         let client = Client::build()
           .connector(
             Connector::default()
@@ -29,7 +30,7 @@ impl CtrlClient {
           .timeout(ntex::time::Millis::from_secs(20))
           .finish();
 
-        (client, "http://localhost".to_string())
+        (client, "http://localhost")
       }
       url if url.starts_with("http://") || url.starts_with("https://") => {
         let client = Client::build().finish();
@@ -40,8 +41,8 @@ impl CtrlClient {
 
     Self {
       client,
-      name: name.to_owned(),
-      base_url: url,
+      name: name.to_string(),
+      base_url: url.to_string(),
     }
   }
 

@@ -1,3 +1,6 @@
+use nanocl_utils::http_client_error::HttpClientError;
+use nanocld_client::NanocldClient;
+use nanocld_client::stubs::resource::ResourcePartial;
 use ntex::web;
 
 use nanocl_utils::ntex::middlewares;
@@ -5,6 +8,45 @@ use nanocl_utils::io_error::{IoResult, IoError};
 
 use crate::services;
 use crate::dnsmasq::Dnsmasq;
+
+async fn create_dns_rule_kind() -> Result<(), HttpClientError> {
+  let client = NanocldClient::connect_with_unix_default();
+  let dns_rule_kind = ResourcePartial {
+    kind: "Kind".to_string(),
+    name: "DnsRule".to_string(),
+    config: serde_json::json!({
+        "Url": "unix:///run/nanocl/dns.sock"
+    }),
+    version: "v0.1".to_string(),
+  };
+
+  if let Err(err) = client.create_resource(&dns_rule_kind).await {
+    match err {
+      HttpClientError::HttpError(err) if err.status == 409 => {
+        log::info!("DnsRule already exists. Skipping.")
+      }
+      _ => return Err(err),
+    }
+  }
+
+  Ok(())
+}
+
+async fn ensure_basic_resources() {
+  loop {
+    match create_dns_rule_kind().await {
+      Ok(_) => break,
+      Err(_) => {
+        log::warn!(
+          "Failed to ensure basic resource kinds exists, retrying in 2 seconds"
+        );
+        ntex::time::sleep(std::time::Duration::from_secs(2)).await;
+      }
+    }
+  }
+
+  log::info!("DnsRule exists");
+}
 
 pub fn generate(
   host: &str,
@@ -35,6 +77,10 @@ pub fn generate(
       ))
     }
   }
+
+  ntex::rt::spawn(async move {
+    ensure_basic_resources().await;
+  });
 
   #[cfg(feature = "dev")]
   {
