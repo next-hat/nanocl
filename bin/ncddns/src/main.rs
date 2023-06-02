@@ -18,7 +18,7 @@ async fn run(cli: &Cli) -> IoResult<()> {
   logger::enable_logger("ncddns");
   log::info!("ncddns v{}", env!("CARGO_PKG_VERSION"));
 
-  // Spawn a new thread to events from nanocld
+  // Spawn a new thread to listen events from nanocld
   event::spawn();
 
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());

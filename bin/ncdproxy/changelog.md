@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Target use generic Target `Key`, `Port` and `Watch` require to specify if it's cargo or vm with `.c` or `.v`
+- Target use generic Target `Key`, `Port` and `Watch` require to specify if it's cargo or vm with `.c` or `.v`.
+- The `ProxyRule` is no created at runtime.
 
 ### Added
 
