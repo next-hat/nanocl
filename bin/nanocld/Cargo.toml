@@ -1,6 +1,6 @@
 [package]
 name = "nanocld"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Self-Sufficient Hybrid-Cloud Orchestrator Daemon"
@@ -17,7 +17,12 @@ path = "src/main.rs"
 
 [features]
 default = ["release"]
-dev = ["dep:utoipa", "bollard-next/utoipa", "nanocl_stubs/utoipa", "nanocl_utils/ntex_swagger"]
+dev = [
+  "dep:utoipa",
+  "bollard-next/utoipa",
+  "nanocl_stubs/utoipa",
+  "nanocl_utils/ntex_swagger",
+]
 test = []
 release = []
 
