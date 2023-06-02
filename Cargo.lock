@@ -449,9 +449,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.3.0"
+version = "4.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93aae7a4192245f70fe75dd9157fc7b4a5bf53e88d30bd4396f7d8f9284d5acc"
+checksum = "b4ed2379f8603fa2b7509891660e802b88c70a79a6427a70abb5968054de2c28"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -460,9 +460,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.3.0"
+version = "4.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f423e341edefb78c9caba2d9c7f7687d0e72e89df3ce3394554754393ac3990"
+checksum = "72394f3339a76daf211e57d4bcb374410f3965dcc606dd0e03738c7888766980"
 dependencies = [
  "anstream",
  "anstyle",
@@ -474,18 +474,18 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.3.0"
+version = "4.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a04ddfaacc3bc9e6ea67d024575fafc2a813027cf374b8f24f7bc233c6b6be12"
+checksum = "7f6b5c519bab3ea61843a7923d074b04245624bb84a64a8c150f5deb014e388b"
 dependencies = [
  "clap",
 ]
 
 [[package]]
 name = "clap_derive"
-version = "4.3.0"
+version = "4.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "191d9573962933b4027f932c600cd252ce27a8ad5979418fe78e43c07996f27b"
+checksum = "59e9ef9a08ee1c0e1f2e162121665ac45ac3783b0f897db7244ae75ad9a8f65b"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -501,9 +501,9 @@ checksum = "2da6da31387c7e4ef160ffab6d5e7f00c42626fe39aea70a7b0f1773f7dd6c1b"
 
 [[package]]
 name = "clap_mangen"
-version = "0.2.11"
+version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bcbd911d903a985de775aabe3bcef9b88e2a7d943e36aa8691617012d2b7731"
+checksum = "8f2e32b579dae093c2424a8b7e2bea09c89da01e1ce5065eb2f0a6f1cc15cc1f"
 dependencies = [
  "clap",
  "roff",
@@ -1526,9 +1526,9 @@ checksum = "ef53942eb7bf7ff43a617b3e2c1c4a5ecf5944a7c1bc12d7ee39bbb15e5c1519"
 
 [[package]]
 name = "liquid"
-version = "0.26.2"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37a658eca713918ebafb1fa0efe00a9f491a29c2051925503b6fd0a46f5fc02e"
+checksum = "eefc214b0f57977e0036be6646a7ef9799b14456ae77a84808ddbe0c4cf326fb"
 dependencies = [
  "doc-comment",
  "liquid-core",
@@ -1539,9 +1539,9 @@ dependencies = [
 
 [[package]]
 name = "liquid-core"
-version = "0.26.2"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51c61fe6b338fa9a552a8ebd8635275fe1af61d003a2a77f72cf698f92a82c34"
+checksum = "cf5bf9a2ede54bdea60a387ded9bc9236d594210afb73ab55f4cbd53599711d3"
 dependencies = [
  "anymap2",
  "itertools",
@@ -1557,20 +1557,20 @@ dependencies = [
 
 [[package]]
 name = "liquid-derive"
-version = "0.26.2"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "814894c5a3d450589b579fc819fc1b3dff727f7336a52b834d9ede41eca0f2fe"
+checksum = "2438da425fd380eb2719a2a5880149697eea32a160e83b63e7848c1bee300406"
 dependencies = [
  "proc-macro2",
- "proc-quote",
- "syn 1.0.109",
+ "quote",
+ "syn 2.0.18",
 ]
 
 [[package]]
 name = "liquid-lib"
-version = "0.26.2"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2011911b97e2e0240aa2916a87d9ca1b2aa651b3b45274ed5a02a99ae8f1f3c"
+checksum = "4feb5c6363bdac5b5238725e296ed9efbe88576f07819970519f29ee29d0b11e"
 dependencies = [
  "itertools",
  "liquid-core",
@@ -2387,9 +2387,9 @@ checksum = "30fceb411f9a12ff9222c5f824026be368ff15dc2f13468d850c7d3f502205d6"
 
 [[package]]
 name = "papergrid"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fdfe703c51ddc52887ad78fc69cd2ea78d895ffcd6e955c9d03566db8ab5bb1"
+checksum = "ae7891b22598926e4398790c8fe6447930c72a67d36d983a49d6ce682ce83290"
 dependencies = [
  "bytecount",
  "fnv",
@@ -2569,42 +2569,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "proc-macro-hack"
-version = "0.5.20+deprecated"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc375e1527247fe1a97d8b7156678dfe7c1af2fc075c9a4db3690ecd2a148068"
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6aeca18b86b413c660b781aa319e4e2648a3e6f9eadc9b47e9038e6fe9f3451b"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "proc-quote"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e84ab161de78c915302ca325a19bee6df272800e2ae1a43fe3ef430bab2a100"
-dependencies = [
- "proc-macro-hack",
- "proc-macro2",
- "proc-quote-impl",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "proc-quote-impl"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fb3ec628b063cdbcf316e06a8b8c1a541d28fa6c0a8eacd2bfb2b7f49e88aa0"
-dependencies = [
- "proc-macro-hack",
- "proc-macro2",
- "quote",
 ]
 
 [[package]]
@@ -3070,9 +3040,9 @@ dependencies = [
 
 [[package]]
 name = "tabled"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da1a2e56bbf7bfdd08aaa7592157a742205459eff774b73bc01809ae2d99dc2a"
+checksum = "994ca3cfbe91dd1756a82a605a150fd7c9d9196cddc7af0612c1999cef224588"
 dependencies = [
  "papergrid",
  "tabled_derive",
