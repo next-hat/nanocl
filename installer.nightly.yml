@@ -1,5 +1,5 @@
 Kind: Deployment
-ApiVersion: v0.7
+ApiVersion: v0.8
 
 # This is the required component for nanocl ecosystem.
 # It is a deployment that will be parsed and used to spin up nanocl
