@@ -12,7 +12,7 @@ Args:
 Resources:
   - Name: ${{ Args.domain }}
     Kind: ProxyRule
-    Version: v0.4
+    Version: v0.5
     Config:
       Watch:
         - get-started.global.c

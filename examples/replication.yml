@@ -8,7 +8,7 @@ Namespace: global
 Resources:
   - Name: replication-example.com
     Kind: ProxyRule
-    Version: v0.4
+    Version: v0.5
     Config:
       Watch:
         - replication-example.global.c
