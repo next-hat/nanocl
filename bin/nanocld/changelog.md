@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Better state apply and remove with `FutureUnordored` by [@cszach](https://github.com/cszach)
 - Resource `Custom` renamed to `Kind` and allow custom url for hook by [@CreepyPvP](https://github.com/CreepyPvP)
 
+### Fixed
+
+- Unix socket permission when rebooting
+
 ## [0.7.0] - 2023-05-22
 
 ### Changed
