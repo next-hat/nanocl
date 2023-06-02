@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate diesel;
 
-use std::{fs, os::unix::prelude::PermissionsExt};
+use std::fs;
 use std::path::Path;
-use std::time::Duration;
+use std::os::unix::prelude::PermissionsExt;
 
 use ntex::rt;
 
@@ -30,19 +30,17 @@ async fn set_unix_permission() {
     log::debug!("set_unix_permission");
     let path = Path::new("/run/nanocl");
     if !path.exists() {
-      log::debug!("{} doesn't exists logs wont be saved", path.display());
+      log::debug!(
+        "{} doesn't exists cannot change unix socket permission",
+        path.display()
+      );
       return;
     }
     let (tx, rx) = std::sync::mpsc::channel();
 
     // Automatically select the best implementation for your platform.
     // You can also access each implementation directly e.g. INotifyWatcher.
-    let mut watcher = match RecommendedWatcher::new(
-      tx,
-      Config::default()
-        .with_compare_contents(true)
-        .with_poll_interval(Duration::from_secs(2)),
-    ) {
+    let mut watcher = match RecommendedWatcher::new(tx, Config::default()) {
       Ok(watcher) => watcher,
       Err(e) => {
         log::warn!("watcher error: {:?}", e);
@@ -60,7 +58,16 @@ async fn set_unix_permission() {
         Ok(event) => {
           log::debug!("event: {:?}", event);
           if event.kind.is_modify() || event.kind.is_create() {
-            let mut perms = fs::metadata(path).unwrap().permissions();
+            log::debug!(
+              "change detected, change permission of {}",
+              path.display()
+            );
+            let mut perms = match fs::metadata("/run/nanocl/nanocl.sock") {
+              Err(_) => {
+                continue;
+              }
+              Ok(perms) => perms.permissions(),
+            };
             #[cfg(feature = "dev")]
             {
               perms.set_mode(0o777);
