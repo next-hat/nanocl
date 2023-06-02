@@ -48,7 +48,7 @@ FROM alpine:3.17.3
 
 ## Install dependencies
 RUN apk update && apk upgrade
-RUN apk add libgcc openssl libpq util-linux inotify-tools bash cloud-utils cdrkit
+RUN apk add libgcc openssl libpq util-linux bash cloud-utils cdrkit
 
 ## Copy the binary
 COPY --from=builder /app/target/release/nanocld /usr/local/bin/nanocld
