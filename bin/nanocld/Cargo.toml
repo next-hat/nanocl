@@ -17,12 +17,7 @@ path = "src/main.rs"
 
 [features]
 default = ["release"]
-dev = [
-  "dep:utoipa",
-  "bollard-next/utoipa",
-  "nanocl_stubs/utoipa",
-  "nanocl_utils/ntex_swagger",
-]
+dev = ["dep:utoipa", "bollard-next/utoipa", "nanocl_stubs/utoipa", "nanocl_utils/ntex_swagger"]
 test = []
 release = []
 
@@ -84,3 +79,4 @@ nanocl_utils = { version = "0.1.2", features = [
   "bollard",
 ] }
 utoipa = { version = "3.2", features = ["yaml"], optional = true }
+notify = "6.0.0"

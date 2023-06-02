@@ -5,7 +5,7 @@ FROM rust:1.69.0-alpine3.17
 ARG tz=Europe/Paris
 
 # Install required dependencies
-RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base tzdata bash util-linux libgcc openssl libpq util-linux inotify-tools bash cloud-utils cdrkit
+RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git perl build-base tzdata util-linux libgcc openssl libpq util-linux bash cloud-utils cdrkit
 
 # Install cargo-watch
 RUN cargo install cargo-watch --locked
