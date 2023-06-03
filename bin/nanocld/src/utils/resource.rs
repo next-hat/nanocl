@@ -112,8 +112,18 @@ pub async fn create(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
-  hook_create_resource(resource, pool).await?;
-  let res = repositories::resource::create(resource, pool).await?;
+  if repositories::resource::inspect_by_key(&resource.name, pool)
+    .await
+    .is_ok()
+  {
+    return Err(HttpError {
+      status: StatusCode::CONFLICT,
+      msg: format!("Resource {} already exists", &resource.name),
+    });
+  }
+
+  let resource = hook_create_resource(resource, pool).await?;
+  let res = repositories::resource::create(&resource, pool).await?;
   Ok(res)
 }
 
@@ -122,8 +132,8 @@ pub async fn patch(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> Result<Resource, HttpError> {
-  hook_create_resource(resource, pool).await?;
-  let res = repositories::resource::put(resource, pool).await?;
+  let resource = hook_create_resource(resource, pool).await?;
+  let res = repositories::resource::put(&resource, pool).await?;
   Ok(res)
 }
 
@@ -132,7 +142,7 @@ pub async fn delete(resource: &Resource, pool: &Pool) -> Result<(), HttpError> {
   if let Err(err) = hook_delete_resource(resource, pool).await {
     log::warn!("{err}");
   }
-  if resource.kind.as_str() == "Custom" {
+  if resource.kind.as_str() == "Kind" {
     repositories::resource_kind::delete_version(&resource.name, pool).await?;
     repositories::resource_kind::delete(&resource.name, pool).await?;
   }

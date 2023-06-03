@@ -1,10 +1,11 @@
-use nanocl_utils::http_client_error::HttpClientError;
-use futures::stream::FuturesUnordered;
 use ntex::rt;
+use ntex::http;
 use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 
 use nanocl_utils::versioning;
 use nanocl_utils::io_error::{IoResult, IoError};
+use nanocl_utils::http_client_error::HttpClientError;
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;
@@ -172,13 +173,36 @@ async fn ensure_resource_config(client: &NanocldClient) {
     version: format!("v{formated_version}"),
   };
 
-  if let Err(err) = client.create_resource(&proxy_rule_kind).await {
-    match err {
-      HttpClientError::HttpError(err) if err.status == 409 => {
-        log::info!("ProxyRule already exists. Skipping.")
+  match client.inspect_resource(&proxy_rule_kind.name).await {
+    Ok(_) => {
+      if let Err(err) = client
+        .put_resource(&proxy_rule_kind.name, &proxy_rule_kind.clone().into())
+        .await
+      {
+        match err {
+          HttpClientError::HttpError(err)
+            if err.status == http::StatusCode::CONFLICT =>
+          {
+            log::info!("ProxyRule already exists. Skipping.")
+          }
+          _ => {
+            log::warn!("Unable to update ProxyRule: {err}");
+          }
+        }
       }
-      _ => {
-        log::warn!("Unable to create ProxyRule: {err}");
+    }
+    Err(_) => {
+      if let Err(err) = client.create_resource(&proxy_rule_kind).await {
+        match err {
+          HttpClientError::HttpError(err)
+            if err.status == http::StatusCode::CONFLICT =>
+          {
+            log::info!("ProxyRule already exists. Skipping.")
+          }
+          _ => {
+            log::warn!("Unable to create ProxyRule: {err}");
+          }
+        }
       }
     }
   }

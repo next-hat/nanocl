@@ -30,6 +30,15 @@ pub struct ResourceUpdate {
   pub config: serde_json::Value,
 }
 
+impl From<ResourcePartial> for ResourceUpdate {
+  fn from(resource: ResourcePartial) -> Self {
+    Self {
+      version: resource.version,
+      config: resource.config,
+    }
+  }
+}
+
 /// Resource is a configuration with a name and a kind
 /// It is used to define [proxy rules](ProxyRule) and other kind of config
 #[derive(Clone, Debug)]
@@ -80,7 +89,7 @@ pub struct ResourceConfig {
   pub resource_key: String,
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub data: serde_json::Value,
+  pub config: serde_json::Value,
 }
 
 #[derive(Debug, Default)]

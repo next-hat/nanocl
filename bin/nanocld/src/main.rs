@@ -57,10 +57,13 @@ async fn set_unix_permission() {
       match res {
         Ok(event) => {
           log::debug!("event: {:?}", event);
-          if event.kind.is_modify() || event.kind.is_create() {
+          if event.kind.is_modify()
+            || event.kind.is_create()
+            || event.kind.is_access()
+            || event.kind.is_other()
+          {
             log::debug!(
-              "change detected, change permission of {}",
-              path.display()
+              "change detected, change permission of /run/nanocl/nanocl.sock",
             );
             let mut perms = match fs::metadata("/run/nanocl/nanocl.sock") {
               Err(_) => {
@@ -71,12 +74,20 @@ async fn set_unix_permission() {
             #[cfg(feature = "dev")]
             {
               perms.set_mode(0o777);
-              fs::set_permissions("/run/nanocl/nanocl.sock", perms).unwrap();
+              if let Err(err) =
+                fs::set_permissions("/run/nanocl/nanocl.sock", perms)
+              {
+                log::warn!("set_unix_permission error: {err:?}");
+              }
             }
             #[cfg(not(feature = "dev"))]
             {
               perms.set_mode(0o770);
-              fs::set_permissions("/run/nanocl/nanocl.sock", perms).unwrap();
+              if let Err(err) =
+                fs::set_permissions("/run/nanocl/nanocl.sock", perms)
+              {
+                log::warn!("set_unix_permission error: {err:?}");
+              }
             }
             break;
           }

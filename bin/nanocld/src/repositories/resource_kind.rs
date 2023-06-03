@@ -48,10 +48,12 @@ pub async fn get_version(
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = dsl::resource_kind_versions
-      .filter(dsl::resource_kind_name.eq(name))
-      .filter(dsl::version.eq(version))
+      .filter(dsl::resource_kind_name.eq(&name))
+      .filter(dsl::version.eq(&version))
       .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceKindVersion"))?;
+      .map_err(|err| {
+        err.map_err_context(|| format!("Resource {name} {version}"))
+      })?;
     Ok::<_, IoError>(item)
   })
   .await?;
