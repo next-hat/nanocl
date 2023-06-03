@@ -1,4 +1,5 @@
 use ntex::rt;
+use ntex::http;
 use futures::StreamExt;
 use nanocl_utils::versioning;
 use nanocl_utils::http_client_error::HttpClientError;
@@ -18,13 +19,36 @@ async fn ensure_resource_config(client: &NanocldClient) {
     version: format!("v{formated_version}"),
   };
 
-  if let Err(err) = client.create_resource(&dns_rule_kind).await {
-    match err {
-      HttpClientError::HttpError(err) if err.status == 409 => {
-        log::info!("DnsRule already exists. Skipping.")
+  match client.inspect_resource(&dns_rule_kind.name).await {
+    Ok(_) => {
+      if let Err(err) = client
+        .put_resource(&dns_rule_kind.name, &dns_rule_kind.clone().into())
+        .await
+      {
+        match err {
+          HttpClientError::HttpError(err)
+            if err.status == http::StatusCode::CONFLICT =>
+          {
+            log::info!("DnsRule already exists. Skipping.")
+          }
+          _ => {
+            log::warn!("Unable to update DnsRule: {err}");
+          }
+        }
       }
-      _ => {
-        log::warn!("Unable to create DnsRule: {err}");
+    }
+    Err(_) => {
+      if let Err(err) = client.create_resource(&dns_rule_kind).await {
+        match err {
+          HttpClientError::HttpError(err)
+            if err.status == http::StatusCode::CONFLICT =>
+          {
+            log::info!("DnsRule already exists. Skipping.")
+          }
+          _ => {
+            log::warn!("Unable to create DnsRule: {err}");
+          }
+        }
       }
     }
   }

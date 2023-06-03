@@ -207,7 +207,7 @@ pub(crate) async fn revert_resource(
     name: resource.name,
     version: history.version,
     kind: resource.kind,
-    config: history.data,
+    config: history.config,
   };
   let resource = utils::resource::patch(&new_resource, &state.pool).await?;
   let resource_ptr = resource.clone();

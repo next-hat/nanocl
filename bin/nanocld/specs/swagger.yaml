@@ -24,7 +24,7 @@ info:
     email: team@next-hat.com
   license:
     name: MIT OR Apache-2.0
-  version: v0.7.0
+  version: v0.8.0
 servers:
 - url: /{Version}
   variables:
@@ -4107,7 +4107,7 @@ components:
       - Version
       - CreatedAt
       - ResourceKey
-      - Data
+      - Config
       properties:
         Key:
           type: string
@@ -4123,7 +4123,7 @@ components:
         ResourceKey:
           type: string
           description: Resource key associated with the config
-        Data:
+        Config:
           type: object
           description: The config of the resource as a json object
           additionalProperties:
