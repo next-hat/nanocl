@@ -43,7 +43,7 @@ Cargoes:
 
   - Name: ncdproxy
     Container:
-      Image: ghcr.io/nxthat/ncdproxy:0.4.3
+      Image: ghcr.io/nxthat/ncdproxy:0.5.0
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -70,7 +70,7 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ncddns:0.1.1
+      Image: ghcr.io/nxthat/ncddns:0.2.0
       Tty: true
       Cmd:
         - --conf-dir
@@ -106,7 +106,7 @@ Cargoes:
 
   - Name: ndaemon
     Container:
-      Image: ghcr.io/nxthat/nanocld:0.7.0
+      Image: ghcr.io/nxthat/nanocld:0.8.0
       Tty: true
       Hostname: ndaemon.nanocl.internal
       Cmd:
