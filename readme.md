@@ -97,7 +97,7 @@ To work properly `Nanocl` must have theses dependencies installed on the system:
 
 ## 💾 Installation
 
-To install `Nanocl`, please refer to our online [installation guide](https://docs.next-hat.com/setups/nanocl).
+To install `Nanocl`, please refer to our online [installation guide](https://docs.next-hat.com/setups/nanocl/linux/ubuntu).
 
 ## 🔧 Usage
 
