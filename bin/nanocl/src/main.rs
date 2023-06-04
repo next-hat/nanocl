@@ -1,5 +1,6 @@
 use ntex::http;
 use clap::Parser;
+use dotenv::dotenv;
 
 use nanocl_utils::io_error::IoResult;
 use nanocl_utils::http_client_error::HttpClientError;
@@ -57,6 +58,14 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
   let args = Cli::parse();
+  dotenv().ok();
+  ctrlc::set_handler(move || {
+    let term = dialoguer::console::Term::stdout();
+    let _ = term.show_cursor();
+    let _ = term.clear_last_lines(1);
+    std::process::exit(0);
+  })
+  .expect("Error setting Ctrl-C handler");
   if let Err(err) = execute_args(&args).await {
     eprintln!("{err}");
     err.exit();
