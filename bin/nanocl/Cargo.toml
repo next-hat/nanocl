@@ -1,6 +1,6 @@
 [package]
 name = "nanocl"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Self-Sufficient Hybrid-Cloud Orchestrator CLI"
