@@ -1,0 +1,51 @@
+Kind = "Deployment"
+ApiVersion = "v0.8"
+Namespace = "global"
+
+[[Cargoes]]
+Name = "deploy-example"
+
+[Cargoes.Container]
+Image = "nexthat/nanocl-get-started:latest"
+Env = ["APP=GET_STARTED1"]
+
+[[Cargoes]]
+Name = "deploy-example2"
+
+[Cargoes.Container]
+Image = "nexthat/nanocl-get-started:latest"
+Env = ["APP=GET_STARTED2"]
+
+
+[[Resources]]
+Name = "deploy-example.com"
+Kind = "ProxyRule"
+Version = "v0.5"
+
+[Resources.Config]
+Watch = ["deploy-example.global.c", "deploy-example2.global.c"]
+
+[[Resources.Config.Rules]]
+Domain = "deploy-example.com"
+Network = "Public"
+
+[[Resources.Config.Rules.Locations]]
+Path = "/"
+
+[Resources.Config.Rules.Locations.Target]
+Key = "deploy-example2.global.c"
+Port = 9_000
+
+[[Resources.Config.Rules.Locations]]
+Path = "/v1"
+
+[Resources.Config.Rules.Locations.Target]
+Key = "deploy-example.global.c"
+Port = 9_000
+
+[[Resources.Config.Rules.Locations]]
+Path = "/v2"
+
+[Resources.Config.Rules.Locations.Target]
+Key = "deploy-example2.global.c"
+Port = 9_000

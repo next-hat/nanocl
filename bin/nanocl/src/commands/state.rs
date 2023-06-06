@@ -17,11 +17,42 @@ use nanocld_client::stubs::state::{StateMeta, StateStream};
 use crate::utils;
 use crate::models::{
   StateArgs, StateCommands, StateApplyOpts, StateRemoveOpts, StateBuildArgs,
+  DisplayFormat,
 };
 
 use super::cargo_image::exec_cargo_image_pull;
 
-async fn get_from_url(url: &str) -> IoResult<(StateMeta, serde_yaml::Value)> {
+fn parse_data<T>(ext: &str, data: &str) -> IoResult<(DisplayFormat, T)>
+where
+  T: serde::Serialize + serde::de::DeserializeOwned,
+{
+  let res = match ext {
+    "yaml" | "yml" => {
+      (DisplayFormat::Yaml, serde_yaml::from_str(data)
+      .map_err(|err| err.map_err_context(|| "Unable to parse yaml"))?)
+    }
+    "toml" => {
+      (DisplayFormat::Toml, toml::from_str(data)
+      .map_err(|err| IoError::invalid_data("Unable to parse toml", &err.to_string()))?)
+    }
+    "json" => {
+      (DisplayFormat::Json, serde_json::from_str(data)
+      .map_err(|err| err.map_err_context(|| "Unable to parse json"))?)
+    }
+    _ => {
+      return Err(IoError::invalid_data(
+        "StateFile",
+        "has an invalid extension supported extensions are: .yaml, .yml, .json, .toml",
+      ))
+    }
+  };
+  Ok(res)
+}
+
+async fn get_from_url<T>(url: &str) -> IoResult<(DisplayFormat, StateMeta, T)>
+where
+  T: serde::Serialize + serde::de::DeserializeOwned,
+{
   let url = if url.starts_with("http") {
     url.to_owned()
   } else {
@@ -52,21 +83,38 @@ async fn get_from_url(url: &str) -> IoResult<(StateMeta, serde_yaml::Value)> {
   let data = std::str::from_utf8(&data).map_err(|err| {
     IoError::invalid_data("From utf8".into(), format!("{err}"))
   })?;
-  let meta = utils::state::get_file_meta(&String::from(data))?;
-  let yaml: serde_yaml::Value = serde_yaml::from_str(data).map_err(|err| {
-    err.map_err_context(|| "Unable to convert response into yaml")
-  })?;
-  Ok((meta, yaml))
+
+  let ext = url
+    .split('.')
+    .last()
+    .ok_or_else(|| IoError::invalid_data("StateFile", "has no extension"))?;
+
+  let meta = utils::state::get_file_meta(ext, data)?;
+  let (display, data) = parse_data(ext, data)?;
+  Ok((display, meta, data))
 }
 
-fn read_from_file(
+fn read_from_file<T>(
   path: &std::path::Path,
-) -> IoResult<(StateMeta, serde_yaml::Value)> {
+) -> IoResult<(DisplayFormat, StateMeta, T)>
+where
+  T: serde::Serialize + serde::de::DeserializeOwned,
+{
+  let ext = path.extension().ok_or_else(|| {
+    IoError::invalid_data(
+      "StateFile",
+      "has no extension supported extensions are: .yaml, .yml, .json, .toml",
+    )
+  })?;
+
+  let ext = ext.to_str().unwrap_or_default();
+
   let data = fs::read_to_string(path)?;
-  let meta = utils::state::get_file_meta(&String::from(&data))?;
-  let yaml: serde_yaml::Value = serde_yaml::from_str(&data)
-    .map_err(|err| err.map_err_context(|| "Unable to parse yaml"))?;
-  Ok((meta, yaml))
+  let meta = utils::state::get_file_meta(ext, &data)?;
+
+  let (display, data) = parse_data(ext, &data)?;
+
+  Ok((display, meta, data))
 }
 
 async fn download_cargo_image(
@@ -363,9 +411,12 @@ async fn inject_data(
   Ok(yaml)
 }
 
-async fn parse_state_file(
+async fn parse_state_file<T>(
   path: &Option<String>,
-) -> IoResult<(StateMeta, serde_yaml::Value)> {
+) -> IoResult<(DisplayFormat, StateMeta, T)>
+where
+  T: serde::Serialize + serde::de::DeserializeOwned,
+{
   if let Some(path) = path {
     if let Ok(path) = std::path::Path::new(&path)
       .canonicalize()
@@ -385,12 +436,12 @@ async fn parse_state_file(
 }
 
 async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
-  let (meta, yaml) = parse_state_file(&opts.state_location).await?;
+  let (display, meta, yaml) = parse_state_file(&opts.state_location).await?;
   let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;
   let mut namespace = String::from("global");
   let mut cargoes = Vec::new();
-  let yaml = match meta.kind.as_str() {
+  let data = match meta.kind.as_str() {
     "Deployment" | "Cargo" => {
       namespace = match yaml.get("Namespace") {
         Some(namespace) => serde_yaml::from_value(namespace.clone())
@@ -414,7 +465,7 @@ async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
     _ => inject_data(yaml.clone(), &args, &client).await?,
   };
   if !opts.skip_confirm {
-    utils::print::print_yml(&yaml)?;
+    utils::print::display_format(&display, &data)?;
     utils::dialog::confirm("Are you sure to apply this state ?")
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
@@ -434,8 +485,9 @@ async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
       }
     }
   }
-  let data = serde_json::to_value(&yaml)
-    .map_err(|err| err.map_err_context(|| "Unable to convert to yaml value"))?;
+  let data = serde_json::to_value(&data).map_err(|err| {
+    err.map_err_context(|| "Unable to create json payload for the daemon")
+  })?;
   let mut stream = client.apply_state(&data).await?;
 
   while let Some(res) = stream.next().await {
@@ -453,14 +505,14 @@ async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
 }
 
 async fn exec_state_remove(host: &str, opts: &StateRemoveOpts) -> IoResult<()> {
-  let (meta, yaml) = parse_state_file(&opts.state_location).await?;
+  let (display, meta, yaml) = parse_state_file(&opts.state_location).await?;
   let client = gen_client(host, &meta)?;
   let args = parse_build_args(&yaml, opts.args.clone())?;
-  let yaml = inject_data(yaml.clone(), &args, &client).await?;
-  let data = serde_json::to_value(&yaml)
+  let data = inject_data(yaml.clone(), &args, &client).await?;
+  let data = serde_json::to_value(&data)
     .map_err(|err| err.map_err_context(|| "Unable to parse yaml"))?;
   if !opts.skip_confirm {
-    utils::print::print_yml(&yaml)?;
+    utils::print::display_format(&display, &data)?;
     utils::dialog::confirm("Are you sure to revert this state ?")
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }

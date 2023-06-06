@@ -6,12 +6,27 @@ use nanocld_client::stubs::state::StateMeta;
 use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 
 /// Extract metadata eg: ApiVersion, Type from a StateFile
-pub fn get_file_meta(data: &str) -> IoResult<StateMeta> {
-  let meta = serde_yaml::from_str::<StateMeta>(data).map_err(|err| {
-    err.map_err_context(|| "Unable to extract meta from state file")
-  })?;
-
-  Ok(meta)
+pub fn get_file_meta(ext: &str, data: &str) -> IoResult<StateMeta> {
+  match ext {
+    "yaml" | "yml" => {
+      Ok(serde_yaml::from_str::<StateMeta>(data).map_err(|err| {
+        err.map_err_context(|| "Unable to extract meta from state file")
+      })?)
+    }
+    "json" => Ok(serde_json::from_str::<StateMeta>(data).map_err(|err| {
+      err.map_err_context(|| "Unable to extract meta from state file")
+    })?),
+    "toml" => Ok(toml::from_str::<StateMeta>(data).map_err(|err| {
+      IoError::invalid_data(
+        "Unable to extract meta from state file",
+        &err.to_string(),
+      )
+    })?),
+    _ => Err(IoError::invalid_data(
+      "State file",
+      &format!("Unsupported file extension: {}", ext),
+    )),
+  }
 }
 
 /// Compile a StateFile with given data

@@ -298,6 +298,15 @@ mod tests {
       "nanocl",
       "state",
       "apply",
+      "-ys",
+      "../../examples/deploy_example.toml",
+    ]);
+    assert!(execute_args(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "apply",
       "-pys",
       "../../examples/deploy_example.yml",
     ]);

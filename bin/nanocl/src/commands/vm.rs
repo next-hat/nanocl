@@ -15,8 +15,9 @@ use nanocld_client::stubs::cargo::{OutputLog, OutputKind};
 
 use crate::models::{
   VmArgs, VmCommands, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts, VmListOpts,
+  VmInspectOpts,
 };
-use crate::utils::print::{print_table, print_yml};
+use crate::utils;
 
 use super::vm_image::exec_vm_image;
 
@@ -49,7 +50,7 @@ pub async fn exec_vm_ls(
       }
     }
     false => {
-      print_table(rows);
+      utils::print::print_table(rows);
     }
   }
   Ok(())
@@ -70,11 +71,15 @@ pub async fn exec_vm_rm(
 pub async fn exec_vm_inspect(
   client: &NanocldClient,
   args: &VmArgs,
-  name: &str,
+  opts: &VmInspectOpts,
 ) -> IoResult<()> {
-  let vm = client.inspect_vm(name, args.namespace.clone()).await?;
+  let vm = client
+    .inspect_vm(&opts.name, args.namespace.clone())
+    .await?;
 
-  print_yml(vm)?;
+  let display = opts.display.clone().unwrap_or_default();
+
+  utils::print::display_format(&display, vm)?;
 
   Ok(())
 }
@@ -234,7 +239,7 @@ pub async fn exec_vm(client: &NanocldClient, args: &VmArgs) -> IoResult<()> {
     VmCommands::Create(options) => exec_vm_create(client, args, options).await,
     VmCommands::List(opts) => exec_vm_ls(client, args, opts).await,
     VmCommands::Remove { names } => exec_vm_rm(client, args, names).await,
-    VmCommands::Inspect { name } => exec_vm_inspect(client, args, name).await,
+    VmCommands::Inspect(opts) => exec_vm_inspect(client, args, opts).await,
     VmCommands::Start { name } => exec_vm_start(client, args, name).await,
     VmCommands::Stop { name } => exec_vm_stop(client, args, name).await,
     VmCommands::Run(options) => exec_vm_run(client, args, options).await,

@@ -56,7 +56,9 @@ async fn exec_resource_inspect(
 ) -> IoResult<()> {
   let resource = client.inspect_resource(&opts.name).await?;
 
-  utils::print::print_yml(resource)?;
+  let display = opts.display.clone().unwrap_or_default();
+
+  utils::print::display_format(&display, resource)?;
   Ok(())
 }
 

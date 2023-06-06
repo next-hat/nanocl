@@ -1762,6 +1762,7 @@ dependencies = [
  "termios",
  "tokio",
  "tokio-util",
+ "toml",
  "users",
 ]
 

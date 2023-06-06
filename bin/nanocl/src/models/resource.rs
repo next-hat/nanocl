@@ -4,6 +4,8 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::resource::Resource;
 
+use super::DisplayFormat;
+
 /// Resource commands
 #[derive(Debug, Subcommand)]
 pub enum ResourceCommands {
@@ -79,8 +81,11 @@ pub struct ResourceRemoveOpts {
   pub names: Vec<String>,
 }
 
-#[derive(Debug, Parser)]
+#[derive(Clone, Debug, Parser)]
 pub struct ResourceInspectOpts {
+  /// Display format
+  #[clap(long)]
+  pub display: Option<DisplayFormat>,
   /// The name of the resource to inspect
   pub name: String,
 }
