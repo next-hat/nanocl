@@ -61,10 +61,7 @@ async fn node_ws_service(
         con_state.borrow_mut().hb = Instant::now();
         None
       }
-      ws::Frame::Text(_text) => {
-        // println!("[SERVER] received text: {:#?}", text);
-        None
-      }
+      ws::Frame::Text(_text) => None,
       ws::Frame::Binary(_bytes) => {
         // println!("[SERVER] received bytes: {:#?}", bytes);
         None

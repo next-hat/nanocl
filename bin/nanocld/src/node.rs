@@ -179,9 +179,6 @@ pub fn watch_node(
                   })
                   .await;
               }
-              // ws::Frame::Pong(_) => {
-              //   let _ = sink.send(ws::Message::Ping(Bytes::new())).await;
-              // }
               ws::Frame::Ping(_) => {
                 let _ = sink.send(ws::Message::Pong(Bytes::new())).await;
               }

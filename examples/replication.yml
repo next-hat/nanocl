@@ -26,8 +26,7 @@ Resources:
 Cargoes:
   - Name: replication-example
     Replication:
-      Mode: Static
-      Number: 4
+      Mode: Auto
     Container:
       Image: nexthat/nanocl-get-started:latest
       Env:
