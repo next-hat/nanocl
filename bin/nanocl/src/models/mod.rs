@@ -24,7 +24,7 @@ pub use install::*;
 pub use uninstall::*;
 pub use upgrade::*;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 /// A self-sufficient hybrid-cloud manager
 #[derive(Debug, Parser)]
@@ -72,4 +72,17 @@ pub enum Commands {
   //   #[clap(arg_enum)]
   //   shell: Shell,
   // },
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+pub enum DisplayFormat {
+  Yaml,
+  Toml,
+  Json,
+}
+
+impl Default for DisplayFormat {
+  fn default() -> Self {
+    Self::Yaml
+  }
 }

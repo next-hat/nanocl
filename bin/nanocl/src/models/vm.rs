@@ -7,7 +7,7 @@ use nanocld_client::stubs::{
   vm::VmSummary,
 };
 
-use super::VmImageArgs;
+use super::{VmImageArgs, DisplayFormat};
 
 #[derive(Debug, Subcommand)]
 pub enum VmCommands {
@@ -26,10 +26,7 @@ pub enum VmCommands {
     names: Vec<String>,
   },
   /// Inspect a vm
-  Inspect {
-    /// Name of the vm
-    name: String,
-  },
+  Inspect(VmInspectOpts),
   /// Start a vm
   Start {
     /// Name of the vm
@@ -47,6 +44,15 @@ pub enum VmCommands {
   },
   /// Patch a vm
   Patch(VmPatchOpts),
+}
+
+#[derive(Debug, Parser)]
+pub struct VmInspectOpts {
+  /// Display format
+  #[clap(long)]
+  pub display: Option<DisplayFormat>,
+  /// Name of the vm
+  pub name: String,
 }
 
 #[derive(Debug, Parser)]

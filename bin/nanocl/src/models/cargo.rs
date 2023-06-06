@@ -11,7 +11,7 @@ use nanocld_client::stubs::{
   },
 };
 
-use super::cargo_image::CargoImageOpts;
+use super::{cargo_image::CargoImageOpts, DisplayFormat};
 
 /// Cargo delete options
 #[derive(Debug, Parser)]
@@ -125,6 +125,9 @@ pub struct CargoRestartOpts {
 /// Inspect Cargo options
 #[derive(Debug, Parser)]
 pub struct CargoInspectOpts {
+  /// Display format
+  #[clap(long)]
+  pub display: Option<DisplayFormat>,
   /// Name of cargo to inspect
   pub(crate) name: String,
 }
