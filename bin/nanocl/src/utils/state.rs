@@ -5,7 +5,7 @@ use nanocld_client::stubs::state::StateMeta;
 
 use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 
-/// Extract metadata eg: ApiVersion, Type from a StateFile
+/// Extract metadata eg: ApiVersion, Type from a Statefile
 pub fn get_file_meta(ext: &str, data: &str) -> IoResult<StateMeta> {
   match ext {
     "yaml" | "yml" => {
@@ -29,7 +29,7 @@ pub fn get_file_meta(ext: &str, data: &str) -> IoResult<StateMeta> {
   }
 }
 
-/// Compile a StateFile with given data
+/// Compile a Statefile with given data
 pub fn compile(data: &str, obj: &dyn ObjectView) -> IoResult<String> {
   // replace "${{ }}" with "{{ }}" syntax for liquid
   let reg = Regex::new(r"\$\{\{(.+?)\}\}")

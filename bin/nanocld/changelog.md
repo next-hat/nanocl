@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Endpoint to restart a cargo
-- StateFile use Kind instead of Type
+- Statefile use Kind instead of Type
 - Replication `Static` that can allow development tests
 
 ### Fixed

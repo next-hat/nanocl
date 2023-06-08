@@ -41,7 +41,7 @@ where
     }
     _ => {
       return Err(IoError::invalid_data(
-        "StateFile",
+        "Statefile",
         "has an invalid extension supported extensions are: .yaml, .yml, .json, .toml",
       ))
     }
@@ -60,7 +60,7 @@ where
   };
   let reqwest = ntex::http::Client::default();
   let mut res = reqwest.get(url.to_string()).send().await.map_err(|err| {
-    err.map_err_context(|| "Unable to get StateFile from url")
+    err.map_err_context(|| "Unable to get Statefile from url")
   })?;
 
   if res.status().is_redirection() {
@@ -71,7 +71,7 @@ where
       .to_str()
       .map_err(|err| IoError::invalid_data("Location", &format!("{err}")))?;
     res = reqwest.get(location).send().await.map_err(|err| {
-      err.map_err_context(|| "Unable to get StateFile from url")
+      err.map_err_context(|| "Unable to get Statefile from url")
     })?;
   }
 
@@ -87,7 +87,7 @@ where
   let ext = url
     .split('.')
     .last()
-    .ok_or_else(|| IoError::invalid_data("StateFile", "has no extension"))?;
+    .ok_or_else(|| IoError::invalid_data("Statefile", "has no extension"))?;
 
   let meta = utils::state::get_file_meta(ext, data)?;
   let (display, data) = parse_data(ext, data)?;
@@ -102,7 +102,7 @@ where
 {
   let ext = path.extension().ok_or_else(|| {
     IoError::invalid_data(
-      "StateFile",
+      "Statefile",
       "has no extension supported extensions are: .yaml, .yml, .json, .toml",
     )
   })?;
@@ -354,7 +354,7 @@ fn parse_build_args(
       }
       _ => {
         return Err(IoError::invalid_data(
-          "StateFile".into(),
+          "Statefile".into(),
           format!("unknown type {}", build_arg.kind),
         ))
       }
@@ -374,7 +374,7 @@ fn inject_namespace(
   Ok(str)
 }
 
-/// Inject build arguments and environement variable to the StateFile
+/// Inject build arguments and environement variable to the Statefile
 async fn inject_data(
   yaml: serde_yaml::Value,
   args: &HashMap<String, String>,
@@ -420,18 +420,21 @@ where
   if let Some(path) = path {
     if let Ok(path) = std::path::Path::new(&path)
       .canonicalize()
-      .map_err(|err| err.map_err_context(|| format!("StateFile {path}")))
+      .map_err(|err| err.map_err_context(|| format!("Statefile {path}")))
     {
       return read_from_file(&path);
     }
     return get_from_url(path).await;
   }
-  if let Ok(path) = std::path::Path::new("StateFile.yaml").canonicalize() {
+  if let Ok(path) = std::path::Path::new("Statefile.yaml").canonicalize() {
     return read_from_file(&path);
   }
-  let path = std::path::Path::new("StateFile.yml")
+  if let Ok(path) = std::path::Path::new("Statefile").canonicalize() {
+    return read_from_file(&path);
+  }
+  let path = std::path::Path::new("Statefile.yml")
     .canonicalize()
-    .map_err(|err| err.map_err_context(|| "StateFile StateFile.yml"))?;
+    .map_err(|err| err.map_err_context(|| "Statefile Statefile.yml"))?;
   read_from_file(&path)
 }
 
