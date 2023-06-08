@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, de::DeserializeOwned};
+
+use super::DisplayFormat;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "PascalCase")]
@@ -56,9 +58,19 @@ pub enum StateCommands {
   Remove(StateRemoveOpts),
 }
 
-/// Define, Run, or Remove Cargo or Virtual Machines
+/// Define, Run, or Remove Cargo or Virtual Machines from a StateFile
 #[derive(Debug, Parser)]
 pub struct StateArgs {
   #[clap(subcommand)]
   pub commands: StateCommands,
+}
+
+#[derive(Clone, Debug)]
+pub struct StateRef<T>
+where
+  T: Serialize + DeserializeOwned,
+{
+  pub raw: String,
+  pub format: DisplayFormat,
+  pub data: T,
 }
