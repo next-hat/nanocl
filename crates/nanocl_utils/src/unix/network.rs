@@ -3,14 +3,15 @@ use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::net::{IpAddr, Ipv4Addr};
 use libc::{sockaddr_in, gethostname, c_char};
+use crate::io_error::{FromIo, IoResult};
 
 /// Get the default IP address of the system.
 /// This is used to determine the IP address of the host.
 /// We detect it by reading the default route to know the default interface name.
 /// Then we get the IP address of the interface.
-pub fn get_default_ip() -> std::io::Result<IpAddr> {
-  // Detect default interface name by reading the default route.
-  let routes = std::fs::read_to_string("/proc/net/route")?;
+pub fn get_default_ip() -> IoResult<IpAddr> {
+  let routes = std::fs::read_to_string("/proc/net/route")
+    .map_err(|err| err.map_err_context(|| "Can't detect gateway"))?;
   let mut default_interface = None;
   for line in routes.lines() {
     let mut parts = line.split_whitespace();
@@ -38,7 +39,7 @@ pub fn get_default_ip() -> std::io::Result<IpAddr> {
   let mut ifaddrs = MaybeUninit::uninit();
   let ret = unsafe { libc::getifaddrs(ifaddrs.as_mut_ptr()) };
   if ret != 0 {
-    return Err(Error::last_os_error());
+    return Err(Error::last_os_error().into());
   }
   let ifaddrs = unsafe { ifaddrs.assume_init() };
   let mut ifa = ifaddrs;
