@@ -42,10 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- StateFile use Kind instead of Type
+- Statefile use Kind instead of Type
 - Command to restart a cargo
 - Better state apply and revert templating
-- StateFile now use `Kind` instead of `Type`
+- Statefile now use `Kind` instead of `Type`
 
 ### Fixed
 
@@ -57,15 +57,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Bind Daemon config and Gateway in `StateFile.yml`
-- Bind Namespaces Summary in `StateFile.yml`
+- Bind Daemon config and Gateway in `Statefile.yml`
+- Bind Namespaces Summary in `Statefile.yml`
 
 ## [0.6.1] - 2023-05-10
 
 ### Fixed
 
-- `-a` option when applying a `StateFile` now.
-- `Envs` are applied to the `StateFile` even if no `BuildArgs` are set.
+- `-a` option when applying a `Statefile` now.
+- `Envs` are applied to the `Statefile` even if no `BuildArgs` are set.
 
 ## [0.6.0] - 2023-04-30
 

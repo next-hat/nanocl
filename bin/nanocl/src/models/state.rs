@@ -17,7 +17,7 @@ pub struct StateBuildArgs {
 
 #[derive(Debug, Parser)]
 pub struct StateApplyOpts {
-  /// Path or Url to the StateFile
+  /// Path or Url to the Statefile
   #[clap(long, short = 's')]
   pub state_location: Option<String>,
   /// Force pulling images even if they exist
@@ -36,7 +36,7 @@ pub struct StateApplyOpts {
 
 #[derive(Debug, Parser)]
 pub struct StateRemoveOpts {
-  /// Path or Url to the StateFile
+  /// Path or Url to the Statefile
   #[clap(long, short = 's')]
   pub state_location: Option<String>,
   /// Skip the confirmation prompt
@@ -49,9 +49,9 @@ pub struct StateRemoveOpts {
 
 #[derive(Debug, Subcommand)]
 pub enum StateCommands {
-  /// Create or Update elements from a StateFile
+  /// Create or Update elements from a Statefile
   Apply(StateApplyOpts),
-  /// Remove elements from a StateFile
+  /// Remove elements from a Statefile
   #[clap(alias("rm"))]
   Remove(StateRemoveOpts),
 }
