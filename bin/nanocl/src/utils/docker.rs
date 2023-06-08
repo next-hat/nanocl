@@ -114,7 +114,7 @@ pub fn connect(docker_host: &str) -> IoResult<Docker> {
       docker_host if docker_host.starts_with("unix://") => {
         let path = docker_host.trim_start_matches("unix://");
         if !std::path::Path::new(&path).exists() {
-          return Err(IoError::not_fount("Docker connect", path));
+          return Err(IoError::not_fount("Unix socket file can't be found at", path));
         }
         Docker::connect_with_unix(path, 120, API_DEFAULT_VERSION).map_err(
           |err| {
