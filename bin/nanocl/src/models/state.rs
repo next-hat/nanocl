@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
-use serde::{Serialize, Deserialize, de::DeserializeOwned};
+use nanocld_client::stubs::state::StateMeta;
+use serde::{Serialize, Deserialize};
 
 use super::DisplayFormat;
 
@@ -65,12 +66,14 @@ pub struct StateArgs {
   pub commands: StateCommands,
 }
 
+/// Reference to a StateFile
 #[derive(Clone, Debug)]
 pub struct StateRef<T>
 where
-  T: Serialize + DeserializeOwned,
+  T: serde::Serialize + serde::de::DeserializeOwned,
 {
   pub raw: String,
   pub format: DisplayFormat,
+  pub meta: StateMeta,
   pub data: T,
 }
