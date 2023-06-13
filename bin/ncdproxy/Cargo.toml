@@ -28,7 +28,7 @@ serde_yaml = "0.9.19"
 bollard-next = "0.15.0"
 
 [dependencies]
-log = "0.4.17"
+log = "0.4.19"
 clap = { version = "4.1.7", features = ["derive"] }
 ntex = { version = "0.6.7", features = ["tokio"] }
 tokio = { version = "1.23.1", features = ["fs"] }

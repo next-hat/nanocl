@@ -36,7 +36,7 @@ serde_yaml = "0.9"
 [dependencies]
 bollard-next = { version = "0.15.0" }
 r2d2 = "0.8"
-log = "0.4.17"
+log = "0.4.19"
 futures = "0.3"
 serde_yaml = "0.9"
 env_logger = { version = "0.10" }
