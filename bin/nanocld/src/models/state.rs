@@ -1,11 +1,20 @@
 use nanocl_stubs::{
   config::DaemonConfig,
-  state::{StateDeployment, StateCargo, StateResources},
+  state::{StateDeployment, StateCargo, StateResource},
 };
 
 use crate::event::EventEmitter;
 
 use super::Pool;
+
+/// The SSL configuration
+/// If `ca` is `None`, the client will not verify the server's certificate
+#[derive(Clone)]
+pub struct SslConfig {
+  pub cert: String,
+  pub key: String,
+  pub ca: Option<String>,
+}
 
 #[derive(Clone)]
 pub struct DaemonState {
@@ -26,5 +35,5 @@ pub struct DaemonState {
 pub enum StateData {
   Deployment(StateDeployment),
   Cargo(StateCargo),
-  Resource(StateResources),
+  Resource(StateResource),
 }

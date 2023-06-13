@@ -2335,6 +2335,18 @@ components:
           format: int32
           description: Group id
           minimum: 0.0
+        ssl_cert:
+          type: string
+          description: SSL certificate
+          nullable: true
+        ssl_key:
+          type: string
+          description: SSL key
+          nullable: true
+        ssl_ca:
+          type: string
+          description: SSL CA
+          nullable: true
     DeviceMapping:
       type: object
       description: A device mapping between the host and container

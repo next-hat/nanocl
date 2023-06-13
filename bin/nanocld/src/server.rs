@@ -2,14 +2,17 @@ use ntex::web;
 use ntex_cors::Cors;
 
 use nanocl_utils::ntex::middlewares;
+use nanocl_stubs::config::DaemonConfig;
 
 use crate::services;
 use crate::models::DaemonState;
 
 pub async fn generate(
+  daemon_config: &DaemonConfig,
   daemon_state: DaemonState,
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("Preparing server");
+  log::debug!("Using config: {daemon_config:#?}");
   let hosts = daemon_state.config.hosts.clone();
   let mut server = web::HttpServer::new(move || {
     web::App::new()
@@ -97,7 +100,7 @@ mod tests {
     let daemon_state = subsystem::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
-    let server = generate(daemon_state).await;
+    let server = generate(&daemon_conf, daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     Ok(())
   }
@@ -111,7 +114,7 @@ mod tests {
     let daemon_state = subsystem::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
-    let server = generate(daemon_state).await;
+    let server = generate(&daemon_conf, daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     Ok(())
   }
@@ -126,13 +129,13 @@ mod tests {
     let daemon_state = subsystem::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
-    let server = generate(daemon_state).await;
+    let server = generate(&daemon_conf, daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = subsystem::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
-    let server2 = generate(daemon_state).await;
+    let server2 = generate(&daemon_conf, daemon_state).await;
     assert!(server2.is_err(), "Expect server to fail to run");
     Ok(())
   }
@@ -147,7 +150,7 @@ mod tests {
     let daemon_state = subsystem::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
-    let server = generate(daemon_state).await;
+    let server = generate(&daemon_conf, daemon_state).await;
     assert!(server.is_err(), "Expect server to fail to run");
     Ok(())
   }
@@ -162,7 +165,7 @@ mod tests {
     let daemon_state = subsystem::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
-    let server = generate(daemon_state).await;
+    let server = generate(&daemon_conf, daemon_state).await;
     assert!(server.is_err(), "Expect server to fail to run");
     Ok(())
   }

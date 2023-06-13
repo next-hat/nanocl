@@ -150,7 +150,7 @@ async fn main() -> std::io::Result<()> {
   utils::proxy::spawn_logger(&daemon_state);
   utils::metric::spawn_logger(&daemon_state);
 
-  match server::generate(daemon_state).await {
+  match server::generate(&config, daemon_state).await {
     Err(err) => {
       log::error!("Error while generating server {err}");
       std::process::exit(1);

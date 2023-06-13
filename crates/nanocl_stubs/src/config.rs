@@ -26,6 +26,12 @@ pub struct DaemonConfig {
   pub conf_dir: String,
   /// Group id
   pub gid: u32,
+  /// SSL certificate
+  pub ssl_cert: Option<String>,
+  /// SSL key
+  pub ssl_key: Option<String>,
+  /// SSL CA
+  pub ssl_ca: Option<String>,
 }
 
 /// Configuration File of the daemon
@@ -43,6 +49,12 @@ pub struct DaemonConfigFile {
   pub gateway: Option<String>,
   /// Hostname to use for the node automatically detected if not set
   pub hostname: Option<String>,
+  /// Ssl ca
+  pub ssl_ca: Option<String>,
+  /// Ssl key
+  pub ssl_key: Option<String>,
+  /// Ssl cert
+  pub ssl_cert: Option<String>,
 }
 
 impl Default for DaemonConfig {
@@ -57,6 +69,9 @@ impl Default for DaemonConfig {
       gateway: String::default(),
       nodes: Vec::default(),
       advertise_addr: String::default(),
+      ssl_ca: None,
+      ssl_key: None,
+      ssl_cert: None,
     }
   }
 }

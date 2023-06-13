@@ -37,6 +37,15 @@ pub struct Cli {
   /// Group id
   #[clap(long, default_value = "0")]
   pub(crate) gid: u32,
+  /// SSL certificate
+  #[clap(long)]
+  pub(crate) ssl_cert: Option<String>,
+  /// SSL key
+  #[clap(long)]
+  pub(crate) ssl_key: Option<String>,
+  /// SSL CA
+  #[clap(long)]
+  pub(crate) ssl_ca: Option<String>,
 }
 
 /// Cli arguments unit test

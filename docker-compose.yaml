@@ -1,5 +1,7 @@
 version: '3.9'
 
+name: nanocl_system
+
 networks:
   system:
     name: system
@@ -19,9 +21,9 @@ services:
     networks:
       - system
     volumes:
-      - /var/lib/nanocl/store/ca:/ca
-      - /var/lib/nanocl/store/certs:/certs
-      - /var/lib/nanocl/store/data:/cockroach/cockroach-data
+      - ${STATE_DIR:-${HOME}/.nanocl/state/store/ca}:/ca
+      - ${STATE_DIR:-${HOME}/.nanocl/state/store/certs}:/certs
+      - ${STATE_DIR:-${HOME}/.nanocl/state/store/data}:/cockroach/cockroach-data
     environment:
       - TZ=Europe/Paris
     command:
@@ -52,13 +54,16 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - /run/nanocl:/run/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl/run}:/run/nanocl
 
   nproxy:
     container_name: nproxy.system.c
     image: nproxy:dev
     tty: true
     network_mode: host
+    ports:
+      - 127.0.0.1:80:80
+      - 127.0.0.1:443:443
     environment:
       - TZ=Europe/Paris
     labels:
@@ -67,20 +72,19 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - /run:/run
-      - /var/lib/nanocl/proxy/letsencrypt:/etc/letsencrypt
-      - /var/lib/nanocl/proxy/certs:/etc/nginx/certs
-      - /var/lib/nanocl/proxy/logs:/var/log/nginx/access
-      - /var/lib/nanocl/proxy/html:/usr/share/nginx/html
-      - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
-      - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
-      - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled
+      - ${RUN_DIR:-${HOME}/.nanocl/run}:/run/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/letsencrypt}:/etc/letsencrypt
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/certs}:/etc/nginx/certs
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/html}:/usr/share/nginx/html
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/streams-enabled}:/etc/nginx/streams-enabled
 
   ncdproxy:
     container_name: ncdproxy.system.c
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
-    network_mode: host
     environment:
       - TZ=Europe/Paris
     command:
@@ -96,12 +100,12 @@ services:
       - io.nanocl.cnsp=system
     volumes:
       - ./:/project
-      - /run/nanocl:/run/nanocl
+      - ${RUN_DIR:-${HOME}/.nanocl/run}:/run/nanocl
       - ~/.cargo/registry:/usr/local/cargo/registry
-      - /var/lib/nanocl/proxy/logs:/var/log/nginx/access
-      - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
-      - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
-      - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/streams-enabled}:/etc/nginx/streams-enabled
 
   ndns:
     container_name: ndns.system.c
@@ -116,13 +120,12 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - /var/lib/nanocl/dns:/opt/dns
+      - ${STATE_DIR:-${HOME}/.nanocl/state/dns}:/opt/dns
 
   ncddns:
     container_name: ncddns.system.c
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
-    network_mode: host
     environment:
       - TZ=Europe/Paris
     command:
@@ -138,8 +141,8 @@ services:
       - io.nanocl.cnsp=system
     volumes:
       - ./:/project
-      - /var/lib/nanocl/dns:/opt/dns
-      - /run/nanocl:/run/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl/state/dns}/dns:/opt/dns
+      - ${RUN_DIR:-${HOME}/.nanocl/run}:/run/nanocl
       - ~/.cargo/registry:/usr/local/cargo/registry
 
   nanocld:
@@ -161,9 +164,9 @@ services:
     volumes:
       - ./:/project
       - ~/.cargo/registry:/usr/local/cargo/registry
-      - /var/lib/nanocl:/var/lib/nanocl
-      - /run/nanocl:/run/nanocl
-      - /run/docker.sock:/run/docker.sock
+      - ${STATE_DIR:-${HOME}/.nanocl/state}:/var/lib/nanocl
+      - ${RUN_DIR:-${HOME}/.nanocl/run}:/run/nanocl
+      - //var/run/docker.sock:/run/docker.sock
     command:
       - watch
       - -w

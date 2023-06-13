@@ -11,7 +11,7 @@ use nanocl_stubs::system::Event;
 use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
 use nanocl_stubs::state::{
-  StateDeployment, StateCargo, StateResources, StateMeta, StateStream,
+  StateDeployment, StateCargo, StateResource, StateMeta, StateStream,
 };
 
 use crate::{utils, repositories};
@@ -199,7 +199,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
       Ok(StateData::Cargo(data))
     }
     "Resource" => {
-      let data = serde_json::from_value::<StateResources>(data.to_owned())
+      let data = serde_json::from_value::<StateResource>(data.to_owned())
         .map_err(|err| HttpError {
           status: http::StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
@@ -265,7 +265,7 @@ pub async fn apply_cargo(
 }
 
 pub async fn apply_resource(
-  data: &StateResources,
+  data: &StateResource,
   state: &DaemonState,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
@@ -417,7 +417,7 @@ pub async fn remove_cargo(
 }
 
 pub async fn remove_resource(
-  data: &StateResources,
+  data: &StateResource,
   state: &DaemonState,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {

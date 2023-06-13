@@ -69,6 +69,9 @@ mod tests {
       nodes: Vec::default(),
       hostname: None,
       advertise_addr: None,
+      ssl_ca: None,
+      ssl_key: None,
+      ssl_cert: None,
     };
 
     let config = config::init(&args).expect("Expect to init config");

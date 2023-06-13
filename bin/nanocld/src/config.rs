@@ -1,7 +1,6 @@
-use nanocl_stubs::config::{DaemonConfig, DaemonConfigFile};
-
 use nanocl_utils::unix;
 use nanocl_utils::io_error::{IoResult, FromIo};
+use nanocl_stubs::config::{DaemonConfig, DaemonConfigFile};
 
 use crate::cli::Cli;
 
@@ -58,6 +57,24 @@ fn gen_daemon_conf(
     gateway.clone()
   };
 
+  let ssl_ca = if let Some(ref ssl_ca) = args.ssl_ca {
+    Some(ssl_ca.to_owned())
+  } else {
+    config.ssl_ca.as_ref().map(|ssl_ca| ssl_ca.to_owned())
+  };
+
+  let ssl_key = if let Some(ref ssl_key) = args.ssl_key {
+    Some(ssl_key.to_owned())
+  } else {
+    config.ssl_key.as_ref().map(|ssl_key| ssl_key.to_owned())
+  };
+
+  let ssl_cert = if let Some(ref ssl_cert) = args.ssl_cert {
+    Some(ssl_cert.to_owned())
+  } else {
+    config.ssl_cert.as_ref().map(|ssl_cert| ssl_cert.to_owned())
+  };
+
   Ok(DaemonConfig {
     hosts,
     gateway,
@@ -68,6 +85,9 @@ fn gen_daemon_conf(
     advertise_addr,
     nodes: args.nodes.clone(),
     conf_dir: args.conf_dir.clone(),
+    ssl_ca,
+    ssl_key,
+    ssl_cert,
   })
 }
 
@@ -150,6 +170,9 @@ mod tests {
       hostname: None,
       advertise_addr: None,
       nodes: Vec::default(),
+      ssl_ca: None,
+      ssl_key: None,
+      ssl_cert: None,
     };
 
     let config = DaemonConfigFile {
@@ -158,6 +181,9 @@ mod tests {
       docker_host: Some(String::from("/run/docker.sock")),
       gateway: None,
       hostname: None,
+      ssl_ca: None,
+      ssl_key: None,
+      ssl_cert: None,
     };
 
     let merged = gen_daemon_conf(&args, &config).unwrap();
@@ -237,6 +263,9 @@ mod tests {
       advertise_addr: None,
       hostname: None,
       nodes: Vec::default(),
+      ssl_ca: None,
+      ssl_key: None,
+      ssl_cert: None,
     };
 
     let config = init(&args).unwrap();
