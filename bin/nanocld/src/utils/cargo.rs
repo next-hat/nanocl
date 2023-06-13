@@ -83,6 +83,10 @@ async fn create_instance(
       labels.insert("io.nanocl.c".into(), cargo.key.to_owned());
       labels.insert("io.nanocl.n".into(), cargo.namespace_name.to_owned());
       labels.insert("io.nanocl.cnsp".into(), cargo.namespace_name.to_owned());
+      labels.insert(
+        "com.docker.compose.project".into(),
+        format!("nanocl_{}", cargo.namespace_name),
+      );
 
       let auto_remove = cargo
         .config

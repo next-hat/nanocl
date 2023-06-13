@@ -114,7 +114,10 @@ pub fn connect(docker_host: &str) -> IoResult<Docker> {
       docker_host if docker_host.starts_with("unix://") => {
         let path = docker_host.trim_start_matches("unix://");
         if !std::path::Path::new(&path).exists() {
-          return Err(IoError::not_fount("Unix socket file can't be found at", path));
+          return Err(IoError::not_fount(
+            "Unix socket file can't be found at",
+            path,
+          ));
         }
         Docker::connect_with_unix(path, 120, API_DEFAULT_VERSION).map_err(
           |err| {
@@ -161,6 +164,10 @@ pub fn hook_labels(
   hooked_labels.insert("io.nanocl.c".into(), key.to_owned());
   hooked_labels.insert("io.nanocl.n".into(), namespace.to_owned());
   hooked_labels.insert("io.nanocl.cnsp".into(), namespace.to_owned());
+  hooked_labels.insert(
+    "com.docker.compose.project".into(),
+    format!("nanocl_{namespace}"),
+  );
 
   hooked_labels
 }
