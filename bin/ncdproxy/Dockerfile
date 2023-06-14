@@ -1,5 +1,5 @@
 # stage 1 - generate recipe file for dependencies
-FROM rust:1.69.0-alpine3.17 as planner
+FROM rust:1.70.0-alpine3.17 as planner
 
 WORKDIR /app
 COPY ./Cargo.toml ./Cargo.toml
@@ -13,7 +13,7 @@ COPY ./bin/ncddns/Cargo.toml ./bin/ncddns/Cargo.toml
 COPY ./bin/ncdproxy/Cargo.toml ./bin/ncdproxy/Cargo.toml
 
 # stage 2 - Build our project
-FROM rust:1.69.0-alpine3.17 as builder
+FROM rust:1.70.0-alpine3.17 as builder
 
 ARG channel=stable
 
