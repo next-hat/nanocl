@@ -266,3 +266,13 @@ impl From<CargoLogQuery> for LogsOptions<String> {
     }
   }
 }
+
+/// Payload for the cargo scale endpoint
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+pub struct CargoScale {
+  /// Number of replicas to scale up or down can be negative value
+  pub replicas: isize,
+}

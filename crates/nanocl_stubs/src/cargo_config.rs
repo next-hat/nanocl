@@ -42,7 +42,7 @@ pub enum ReplicationMode {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ReplicationStatic {
-  pub number: i64,
+  pub number: usize,
 }
 
 /// A cargo config partial is used to create a Cargo
