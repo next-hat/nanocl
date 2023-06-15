@@ -2,6 +2,7 @@
 * Endpoints to manipulate cargoes
 */
 
+use nanocl_stubs::cargo::CargoScale;
 use ntex::rt;
 use ntex::web;
 use ntex::http::StatusCode;
@@ -492,6 +493,42 @@ async fn logs_cargo(
   )
 }
 
+/// Scale or Downscale number of instances
+#[cfg_attr(feature = "dev", utoipa::path(
+  patch,
+  tag = "Cargoes",
+  request_body = CargoScale,
+  path = "/cargoes/{Name}/scale",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 200, description = "Cargo scaled", body = Cargo),
+    (status = 404, description = "Cargo does not exist", body = ApiError),
+  ),
+))]
+#[web::patch("/cargoes/{name}/scale")]
+async fn scale_cargo(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  web::types::Json(payload): web::types::Json<CargoScale>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  utils::cargo::scale(&key, &payload, &state).await?;
+  let key = key.clone();
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
+    let _ = state
+      .event_emitter
+      .emit(Event::CargoPatched(Box::new(cargo)))
+      .await;
+  });
+  Ok(web::HttpResponse::Ok().into())
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
@@ -508,6 +545,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(exec_command);
   config.service(logs_cargo);
   config.service(list_cargo_instance);
+  config.service(scale_cargo);
 }
 
 #[cfg(test)]

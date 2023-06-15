@@ -37,6 +37,7 @@ use nanocl_stubs::namespace::{
 };
 use nanocl_stubs::cargo::{
   Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
+  CargoScale,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfig, CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
@@ -232,6 +233,7 @@ impl Modify for VersionModifier {
     cargo::list_cargo_history,
     cargo::revert_cargo,
     cargo::logs_cargo,
+    cargo::scale_cargo,
     // Cargo Image
     cargo_image::list_cargo_image,
     cargo_image::inspect_cargo_image,
@@ -321,6 +323,7 @@ impl Modify for VersionModifier {
     CargoConfigPartial,
     CargoConfigUpdate,
     ReplicationStatic,
+    CargoScale,
     // Container Image
     ImageSummary,
     ImageInspect,
