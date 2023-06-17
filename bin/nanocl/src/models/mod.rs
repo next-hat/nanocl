@@ -10,6 +10,7 @@ mod system;
 mod install;
 mod uninstall;
 mod upgrade;
+mod node;
 
 pub use system::*;
 pub use vm::*;
@@ -23,6 +24,7 @@ pub use state::*;
 pub use install::*;
 pub use uninstall::*;
 pub use upgrade::*;
+pub use node::*;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -48,6 +50,8 @@ pub enum Commands {
   Vm(VmArgs),
   /// Manage resources
   Resource(ResourceArgs),
+  /// Manage nodes (experimental)
+  Node(NodeArgs),
   /// Watch daemon events
   Events,
   /// Define, Run, or Remove Cargo or Virtual Machines

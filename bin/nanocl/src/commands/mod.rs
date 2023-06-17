@@ -12,6 +12,7 @@ mod system;
 mod install;
 mod uninstall;
 mod upgrade;
+mod node;
 
 pub use version::exec_version;
 pub use namespace::exec_namespace;
@@ -22,6 +23,7 @@ pub use state::exec_state;
 pub use info::exec_info;
 pub use vm::exec_vm;
 pub use system::exec_system;
+pub use node::exec_node;
 pub use system::exec_process;
 pub use install::exec_install;
 pub use upgrade::exec_upgrade;

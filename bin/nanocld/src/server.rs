@@ -82,7 +82,7 @@ mod tests {
 
   use super::*;
 
-  use crate::subsystem;
+  use crate::boot;
   use crate::config;
   use crate::cli::Cli;
   use crate::utils::tests::*;
@@ -94,7 +94,7 @@ mod tests {
     let args =
       Cli::parse_from(vec!["nanocl", "-H", "unix:///tmp/nanocl_test.sock"]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = subsystem::init(&daemon_conf)
+    let daemon_state = boot::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
     let server = generate(daemon_state).await;
@@ -108,7 +108,7 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9999"]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = subsystem::init(&daemon_conf)
+    let daemon_state = boot::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
     let server = generate(daemon_state).await;
@@ -123,13 +123,13 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9888"]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = subsystem::init(&daemon_conf)
+    let daemon_state = boot::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
     let server = generate(daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = subsystem::init(&daemon_conf)
+    let daemon_state = boot::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
     let server2 = generate(daemon_state).await;
@@ -144,7 +144,7 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "unix:///root/test.sock"]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = subsystem::init(&daemon_conf)
+    let daemon_state = boot::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
     let server = generate(daemon_state).await;
@@ -159,7 +159,7 @@ mod tests {
     before();
     let args = Cli::parse_from(vec!["nanocl", "-H", "not_valid"]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = subsystem::init(&daemon_conf)
+    let daemon_state = boot::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
     let server = generate(daemon_state).await;

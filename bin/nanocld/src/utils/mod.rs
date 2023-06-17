@@ -13,6 +13,7 @@ pub mod cargo;
 pub mod cargo_image;
 pub mod metric;
 pub mod ctrl_client;
+pub mod system;
 
 #[cfg(test)]
 pub mod tests {

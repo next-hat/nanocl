@@ -3,7 +3,7 @@ use nanocl_utils::io_error::{FromIo, IoResult};
 
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::event;
+use crate::{event, utils};
 use crate::models::DaemonState;
 
 use crate::version::VERSION;
@@ -29,7 +29,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   })?;
   ensure_state_dir(&daemon_conf.state_dir).await?;
 
-  let pool = super::store::init().await?;
+  let pool = utils::store::init().await?;
 
   let daemon_state = DaemonState {
     pool: pool.clone(),
@@ -38,9 +38,9 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     event_emitter: event::EventEmitter::new(),
     version: VERSION.to_owned(),
   };
-  super::system::register_namespace("system", false, &daemon_state).await?;
-  super::system::register_namespace("global", true, &daemon_state).await?;
-  super::system::sync_containers(&docker, &pool).await?;
+  utils::system::register_namespace("system", false, &daemon_state).await?;
+  utils::system::register_namespace("global", true, &daemon_state).await?;
+  utils::system::sync_containers(&docker, &pool).await?;
 
   Ok(daemon_state)
 }
