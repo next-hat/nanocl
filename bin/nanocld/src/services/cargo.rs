@@ -551,10 +551,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
 
-  use std::time::Duration;
-
   use ntex::http::StatusCode;
-  use ntex::time::sleep;
 
   use crate::services::ntex_config;
   use nanocl_stubs::generic::GenericNspQuery;
