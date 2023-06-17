@@ -551,7 +551,10 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
 
+  use std::time::Duration;
+
   use ntex::http::StatusCode;
+  use ntex::time::sleep;
 
   use crate::services::ntex_config;
   use nanocl_stubs::generic::GenericNspQuery;
@@ -796,9 +799,22 @@ mod tests {
 
     let res = srv
       .patch(format!("/v0.8/cargoes/{CARGO_NAME}/scale"))
-      .send_json(&CargoScale { replicas: -2 })
+      .send_json(&CargoScale { replicas: -1 })
       .await?;
     assert_eq!(res.status(), 200);
+
+    let res = srv
+      .post(format!("/v0.8/cargoes/{CARGO_NAME}/stop"))
+      .send()
+      .await?;
+    assert_eq!(res.status(), 202);
+
+    let res = srv
+      .delete(format!("/v0.8/cargoes/{CARGO_NAME}"))
+      .send()
+      .await?;
+
+    assert_eq!(res.status(), 202);
 
     Ok(())
   }

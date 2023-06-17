@@ -16,7 +16,7 @@ use crate::models::{Pool, DaemonState};
 /// system is the namespace used by internal nanocl components.
 /// where global is the namespace used by default.
 /// User can registed they own namespace to ensure better encaptusation.
-pub(crate) async fn register_namespace(
+pub async fn register_namespace(
   name: &str,
   create_network: bool,
   state: &DaemonState,
@@ -37,7 +37,7 @@ pub(crate) async fn register_namespace(
 
 /// Convert existing containers with our labels to cargo.
 /// We use it to be sure that all existing containers are registered as cargo.
-pub(crate) async fn sync_containers(
+pub async fn sync_containers(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> IoResult<()> {

@@ -52,6 +52,7 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
     Commands::Uninstall(opts) => commands::exec_uninstall(opts).await,
     Commands::Upgrade(opts) => commands::exec_upgrade(&client, opts).await,
     Commands::System(opts) => commands::exec_system(&client, opts).await,
+    Commands::Node(args) => commands::exec_node(&client, args).await,
   }
 }
 
@@ -372,6 +373,12 @@ mod tests {
     assert!(execute_args(&args).await.is_ok());
 
     let args = Cli::parse_from(["nanocl", "cargo", "rm", "-y", "cli-test-run"]);
+    assert!(execute_args(&args).await.is_ok());
+  }
+
+  #[ntex::test]
+  async fn node_list() {
+    let args = Cli::parse_from(["nanocl", "node", "ls"]);
     assert!(execute_args(&args).await.is_ok());
   }
 }

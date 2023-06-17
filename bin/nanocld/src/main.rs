@@ -13,7 +13,7 @@ mod cli;
 mod version;
 
 mod node;
-mod subsystem;
+mod boot;
 mod utils;
 mod event;
 mod schema;
@@ -133,7 +133,7 @@ async fn main() -> std::io::Result<()> {
   };
 
   // Boot and init internal dependencies
-  let daemon_state = subsystem::init(&config).await?;
+  let daemon_state = boot::init(&config).await?;
 
   // If init is true we don't start the server
   if args.init {
