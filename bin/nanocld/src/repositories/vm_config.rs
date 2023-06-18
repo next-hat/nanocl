@@ -70,7 +70,7 @@ pub async fn create(
     version: dbmodel.version,
     vm_key: dbmodel.vm_key,
     disk: item.disk.clone(),
-    host_config: item.host_config.clone(),
+    host_config: item.host_config.clone().unwrap_or_default(),
     hostname: item.hostname.clone(),
     user: item.user.clone(),
     labels: item.labels.clone(),
@@ -133,7 +133,7 @@ pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
     labels: config.labels,
     mac_address: config.mac_address,
     disk: config.disk,
-    host_config: config.host_config,
+    host_config: config.host_config.unwrap_or_default(),
     password: config.password,
     ssh_key: config.ssh_key,
   })
@@ -215,7 +215,7 @@ pub async fn list_by_vm(key: &str, pool: &Pool) -> IoResult<Vec<VmConfig>> {
         labels: config.labels,
         mac_address: config.mac_address,
         disk: config.disk,
-        host_config: config.host_config,
+        host_config: config.host_config.unwrap_or_default(),
         ssh_key: config.ssh_key,
         password: config.password,
       })

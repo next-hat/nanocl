@@ -175,8 +175,6 @@ pub async fn sync_vm_image(
       let file_path = file.path();
       let path = file_path.to_str().unwrap_or_default();
 
-      log::debug!("{file:#?}");
-
       if let Err(error) = utils::vm_image::create(name, path, pool).await {
         log::warn!("{error}")
       }

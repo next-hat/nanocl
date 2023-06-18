@@ -5011,7 +5011,6 @@ components:
       required:
       - Name
       - Disk
-      - HostConfig
       properties:
         Name:
           type: string
@@ -5045,7 +5044,9 @@ components:
             type: string
           nullable: true
         HostConfig:
-          $ref: '#/components/schemas/VmHostConfig'
+          allOf:
+          - $ref: '#/components/schemas/VmHostConfig'
+          nullable: true
     VmConfigUpdate:
       type: object
       description: |-

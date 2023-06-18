@@ -152,12 +152,12 @@ impl From<VmRunOpts> for VmConfigPartial {
         image: val.image,
         size: val.image_size,
       },
-      host_config: VmHostConfig {
+      host_config: Some(VmHostConfig {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
         ..Default::default()
-      },
+      }),
       ..Default::default()
     }
   }
@@ -200,12 +200,12 @@ impl From<VmCreateOpts> for VmConfigPartial {
       user: val.user,
       password: val.password,
       ssh_key: val.ssh_key,
-      host_config: VmHostConfig {
+      host_config: Some(VmHostConfig {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
         ..Default::default()
-      },
+      }),
       disk: VmDiskConfig {
         image: val.image,
         ..Default::default()

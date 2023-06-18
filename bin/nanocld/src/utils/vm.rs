@@ -178,7 +178,7 @@ pub async fn create_instance(
   let mut args: Vec<String> =
     vec!["-hda".into(), image.path.clone(), "--nographic".into()];
   let host_config = vm.config.host_config.clone();
-  let kvm = host_config.kvm.unwrap_or(true);
+  let kvm = host_config.kvm.unwrap_or(false);
   if kvm {
     args.push("-accel".into());
     args.push("kvm".into());
@@ -226,11 +226,11 @@ pub async fn create_instance(
       network_mode: Some(vm.namespace_name.to_owned()),
       binds: Some(vec![format!("{vmimagespath}:/var/lib/nanocl/vms/images")]),
       devices: Some(vec![
-        DeviceMapping {
-          path_on_host: Some("/dev/kvm".into()),
-          path_in_container: Some("/dev/kvm".into()),
-          cgroup_permissions: Some("rwm".into()),
-        },
+        // DeviceMapping {
+        //   path_on_host: Some("/dev/kvm".into()),
+        //   path_in_container: Some("/dev/kvm".into()),
+        //   cgroup_permissions: Some("rwm".into()),
+        // },
         DeviceMapping {
           path_on_host: Some("/dev/net/tun".into()),
           path_in_container: Some("/dev/net/tun".into()),
@@ -315,10 +315,12 @@ pub async fn patch(
   let vm_partial = VmConfigPartial {
     name: config.name.to_owned().unwrap_or(vm.name.clone()),
     disk: old_config.disk,
-    host_config: config
-      .host_config
-      .to_owned()
-      .unwrap_or(old_config.host_config),
+    host_config: Some(
+      config
+        .host_config
+        .to_owned()
+        .unwrap_or(old_config.host_config),
+    ),
     hostname: if config.hostname.is_some() {
       config.hostname.clone()
     } else {
