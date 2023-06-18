@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Cargo scale endpoint on `PATCH /cargoes/{Name}/scale` to scale up or down a Cargo.
+- Sync VM image directory to nanocld system by [@tyrone-wu](https://github.com/tyrone-wu)
 - Acceptance of `VirtualMachine` type for state files by [@tyrone-wu](https://github.com/tyrone-wu)
 
 ## [0.8.0] - 2023-06-03
