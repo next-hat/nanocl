@@ -157,7 +157,7 @@ pub async fn sync_containers(
   Ok(())
 }
 
-pub async fn sync_vm_image(
+pub async fn sync_vm_images(
   daemon_conf: &DaemonConfig,
   pool: &Pool,
 ) -> IoResult<()> {

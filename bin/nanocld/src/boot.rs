@@ -41,7 +41,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   utils::system::register_namespace("system", false, &daemon_state).await?;
   utils::system::register_namespace("global", true, &daemon_state).await?;
   utils::system::sync_containers(&docker, &pool).await?;
-  utils::system::sync_vm_image(daemon_conf, &pool).await?;
+  utils::system::sync_vm_images(daemon_conf, &pool).await?;
 
   Ok(daemon_state)
 }
