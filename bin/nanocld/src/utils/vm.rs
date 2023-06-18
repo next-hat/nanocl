@@ -179,10 +179,22 @@ pub async fn create_instance(
     vec!["-hda".into(), image.path.clone(), "--nographic".into()];
   let host_config = vm.config.host_config.clone();
   let kvm = host_config.kvm.unwrap_or(false);
+  let mut devices = vec![DeviceMapping {
+    path_on_host: Some("/dev/net/tun".into()),
+    path_in_container: Some("/dev/net/tun".into()),
+    cgroup_permissions: Some("rwm".into()),
+  }];
   if kvm {
     args.push("-accel".into());
     args.push("kvm".into());
+
+    devices.push(DeviceMapping {
+      path_on_host: Some("/dev/kvm".into()),
+      path_in_container: Some("/dev/kvm".into()),
+      cgroup_permissions: Some("rwm".into()),
+    });
   }
+
   let cpu = host_config.cpu;
   let cpu = if cpu > 0 { cpu.to_string() } else { "2".into() };
   let cpu = cpu.clone();
@@ -225,18 +237,7 @@ pub async fn create_instance(
     host_config: Some(HostConfig {
       network_mode: Some(vm.namespace_name.to_owned()),
       binds: Some(vec![format!("{vmimagespath}:/var/lib/nanocl/vms/images")]),
-      devices: Some(vec![
-        // DeviceMapping {
-        //   path_on_host: Some("/dev/kvm".into()),
-        //   path_in_container: Some("/dev/kvm".into()),
-        //   cgroup_permissions: Some("rwm".into()),
-        // },
-        DeviceMapping {
-          path_on_host: Some("/dev/net/tun".into()),
-          path_in_container: Some("/dev/net/tun".into()),
-          cgroup_permissions: Some("rwm".into()),
-        },
-      ]),
+      devices: Some(devices),
       cap_add: Some(vec!["NET_ADMIN".into()]),
       ..Default::default()
     }),
