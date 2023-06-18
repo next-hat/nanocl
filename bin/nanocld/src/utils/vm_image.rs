@@ -1,6 +1,7 @@
 use std::process::Stdio;
 
 use ntex::rt;
+use ntex::web;
 use ntex::util::Bytes;
 use ntex::http::StatusCode;
 use ntex::channel::mpsc::Receiver;
@@ -10,7 +11,7 @@ use tokio::process::Command;
 
 use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 
-use crate::repositories;
+use crate::{utils, repositories};
 use nanocl_utils::http_error::HttpError;
 use crate::models::{
   Pool, VmImageDbModel, QemuImgInfo, VmImageUpdateDbModel, DaemonState,
@@ -342,4 +343,34 @@ pub async fn resize_by_name(
 ) -> Result<VmImageDbModel, HttpError> {
   let image = repositories::vm_image::find_by_name(name, pool).await?;
   resize(&image, payload, pool).await
+}
+
+pub async fn create(
+  name: &str,
+  filepath: &str,
+  pool: &Pool,
+) -> Result<VmImageDbModel, HttpError> {
+  // Get image info
+  let image_info = match utils::vm_image::get_info(filepath).await {
+    Err(err) => {
+      let fp2 = filepath.to_owned();
+      let _ = web::block(move || std::fs::remove_file(fp2)).await;
+      return Err(err);
+    }
+    Ok(image_info) => image_info,
+  };
+
+  let vm_image = VmImageDbModel {
+    name: name.to_owned(),
+    created_at: chrono::Utc::now().naive_utc(),
+    kind: "Base".into(),
+    format: image_info.format,
+    size_actual: image_info.actual_size,
+    size_virtual: image_info.virtual_size,
+    path: filepath.to_owned(),
+    parent: None,
+  };
+
+  let image = repositories::vm_image::create(&vm_image, pool).await?;
+  Ok(image)
 }

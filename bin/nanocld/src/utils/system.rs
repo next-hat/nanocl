@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 
+use futures_util::StreamExt;
+use futures_util::stream::FuturesUnordered;
+use nanocl_stubs::config::DaemonConfig;
 use nanocl_utils::io_error::{FromIo, IoResult};
 
 use nanocl_stubs::namespace::NamespacePartial;
@@ -151,5 +154,37 @@ pub async fn sync_containers(
   }
 
   log::info!("Container synced");
+  Ok(())
+}
+
+pub async fn sync_vm_image(
+  daemon_conf: &DaemonConfig,
+  pool: &Pool,
+) -> IoResult<()> {
+  log::info!("Syncing existing vm");
+  let files =
+    std::fs::read_dir(format!("{}/vms/images", &daemon_conf.state_dir))?;
+
+  files
+    .into_iter()
+    .map(|file| async {
+      let file = file?;
+      let file_name = file.file_name();
+      let name = file_name.to_str().unwrap_or_default();
+
+      let file_path = file.path();
+      let path = file_path.to_str().unwrap_or_default();
+
+      log::debug!("{file:#?}");
+
+      if let Err(error) = utils::vm_image::create(name, path, pool).await {
+        log::warn!("{error}")
+      }
+      Ok::<_, std::io::Error>(())
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<_, std::io::Error>>>()
+    .await;
+  log::info!("VM Image synced");
   Ok(())
 }
