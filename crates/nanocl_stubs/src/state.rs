@@ -2,6 +2,7 @@
 use serde::{Serialize, Deserialize};
 
 use crate::cargo_config::CargoConfigPartial;
+use crate::vm_config::VmConfigPartial;
 
 use super::resource::ResourcePartial;
 
@@ -31,10 +32,19 @@ pub struct StateCargo {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct StateVirtualMachine {
+  pub namespace: Option<String>,
+  pub virtual_machines: Vec<VmConfigPartial>,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct StateDeployment {
   pub namespace: Option<String>,
   pub resources: Option<Vec<ResourcePartial>>,
   pub cargoes: Option<Vec<CargoConfigPartial>>,
+  pub virtual_machines: Option<Vec<VmConfigPartial>>,
 }
 
 #[derive(Debug, PartialEq)]
