@@ -1,3 +1,5 @@
+use nanocl_stubs::state::StateVirtualMachine;
+use nanocl_stubs::vm_config::VmDiskConfig;
 use ntex::rt;
 use ntex::http;
 use ntex::util::Bytes;
@@ -10,6 +12,7 @@ use nanocl_utils::http_error::HttpError;
 use nanocl_stubs::system::Event;
 use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
+use nanocl_stubs::vm_config::VmConfigPartial;
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResources, StateMeta, StateStream,
 };
@@ -66,7 +69,6 @@ async fn create_cargoes(
         format!("Created Cargo {0}", cargo.name),
       )));
 
-      let key = utils::key::gen_key(namespace, &cargo.name);
       let state_ptr = state.clone();
       rt::spawn(async move {
         let cargo = utils::cargo::inspect(&key, &state_ptr).await.unwrap();
@@ -90,6 +92,8 @@ async fn create_cargoes(
       let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
         format!("Started Cargo {0}", cargo.name),
       )));
+
+      // TODO: Refactor to remove duplicate gen_key call from line 41 :)
       let key = utils::key::gen_key(namespace, &cargo.name);
       let state_ptr = state.clone();
       rt::spawn(async move {
@@ -198,6 +202,14 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
         })?;
       Ok(StateData::Cargo(data))
     }
+    "VirtualMachine" => {
+      let data = serde_json::from_value::<StateVirtualMachine>(data.to_owned())
+        .map_err(|err| HttpError {
+          status: http::StatusCode::BAD_REQUEST,
+          msg: format!("unable to serialize payload {err}"),
+        })?;
+      Ok(StateData::VirtualMachine(data))
+    }
     "Resource" => {
       let data = serde_json::from_value::<StateResources>(data.to_owned())
         .map_err(|err| HttpError {
@@ -234,6 +246,10 @@ pub async fn apply_deployment(
 
   if let Some(cargoes) = data.cargoes {
     create_cargoes(&namespace, &cargoes, &version, &state, sx.clone()).await;
+  }
+
+  if let Some(vms) = data.virtual_machines {
+    create_vms(&namespace, &vms, &version, &state, sx.clone()).await;
   }
 
   if let Some(resources) = &data.resources {
@@ -391,6 +407,10 @@ pub async fn remove_deployment(
     delete_cargoes(&namespace, cargoes, &state, sx.clone()).await;
   }
 
+  if let Some(vms) = &data.virtual_machines {
+    delete_vms(&namespace, vms, &state, sx.clone()).await;
+  }
+
   if let Some(resources) = &data.resources {
     delete_resources(resources, &state, sx.clone()).await;
   }
@@ -425,5 +445,159 @@ pub async fn remove_resource(
   let state = state.clone();
 
   delete_resources(&data.resources, &state, sx).await;
+  Ok(())
+}
+
+pub async fn create_vms(
+  namespace: &str,
+  data: &[VmConfigPartial],
+  version: &str,
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+    "Creating {0} VMs in namespace: {namespace}",
+    data.len(),
+  ))));
+
+  data
+    .iter()
+    .map(|vm| async {
+      let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+        format!("Creating VM {0}", &vm.name),
+      )));
+
+      let key = utils::key::gen_key(namespace, &vm.name);
+      let res =
+        match utils::vm::inspect(&key, &state.docker_api, &state.pool).await {
+          Ok(existing) => {
+            let existing: VmConfigPartial = existing.into();
+            let vm = VmConfigPartial {
+              disk: VmDiskConfig {
+                image: format!("{}.{}", vm.disk.image, &key),
+                size: Some(vm.disk.size.unwrap_or(20)),
+              },
+              host_config: Some(vm.host_config.clone().unwrap_or_default()),
+              ..vm.clone()
+            };
+
+            if existing == vm {
+              let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+                format!("Skipping VM {0} not changed", vm.name),
+              )));
+              return Ok(());
+            }
+
+            utils::vm::put(&key, &vm, version, state).await
+          }
+          Err(_err) => {
+            let vm = utils::vm::create(vm, namespace, version, state).await?;
+            utils::vm::start(&key, &state.docker_api).await?;
+            Ok(vm)
+          }
+        };
+
+      if let Err(err) = res {
+        let _ = sx.send(utils::state::stream_to_bytes(StateStream::Error(
+          err.to_string(),
+        )));
+        return Ok(());
+      }
+
+      let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+        format!("Created VM {0}", vm.name),
+      )));
+
+      // Event emitter here
+
+      let res = utils::vm::start(&key, &state.docker_api).await;
+      if let Err(err) = res {
+        let _ = sx.send(utils::state::stream_to_bytes(StateStream::Error(
+          err.to_string(),
+        )));
+        return Ok(());
+      }
+      let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+        format!("Started VM {0}", vm.name),
+      )));
+
+      Ok::<_, HttpError>(())
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
+}
+
+pub async fn apply_vm(
+  data: &StateVirtualMachine,
+  version: &str,
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
+  let namespace = if let Some(namespace) = &data.namespace {
+    utils::namespace::create_if_not_exists(namespace, state).await?;
+    namespace.to_owned()
+  } else {
+    "global".into()
+  };
+
+  create_vms(&namespace, &data.virtual_machines, version, state, sx).await;
+  Ok(())
+}
+
+pub async fn delete_vms(
+  namespace: &str,
+  data: &[VmConfigPartial],
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(format!(
+    "Deleting {0} VMs in namespace {namespace}",
+    data.len()
+  ))));
+
+  data
+    .iter()
+    .map(|vm| async {
+      let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+        format!("Deleting VM {0}", vm.name),
+      )));
+
+      let key = utils::key::gen_key(namespace, &vm.name);
+      let res = utils::vm::inspect(&key, &state.docker_api, &state.pool).await;
+      if res.is_err() {
+        let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+          format!("Skipping VM {0} [NOT FOUND]", vm.name),
+        )));
+        return Ok(());
+      }
+
+      let vm = res.unwrap();
+      utils::vm::delete(&key, true, &state.docker_api, &state.pool).await?;
+      let _ = sx.send(utils::state::stream_to_bytes(StateStream::Msg(
+        format!("Deleted VM {0}", vm.name),
+      )));
+
+      // Event emitter here
+
+      Ok::<_, HttpError>(())
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
+}
+
+pub async fn remove_vm(
+  data: &StateVirtualMachine,
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
+  let namespace = if let Some(namespace) = &data.namespace {
+    namespace.to_owned()
+  } else {
+    "global".into()
+  };
+
+  delete_vms(&namespace, &data.virtual_machines, state, sx).await;
   Ok(())
 }

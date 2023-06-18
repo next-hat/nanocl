@@ -3,8 +3,10 @@ use std::collections::HashMap;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
+use crate::vm::VmInspect;
+
 /// Disk representation of a VM
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -16,7 +18,7 @@ pub struct VmDiskConfig {
 }
 
 /// A vm's resources (cpu, memory, network)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -43,7 +45,7 @@ impl Default for VmHostConfig {
       cpu: 1,
       memory: 512,
       net_iface: None,
-      kvm: None,
+      kvm: Some(false),
       dns: None,
       runtime: None,
       runtime_net: None,
@@ -52,7 +54,7 @@ impl Default for VmHostConfig {
 }
 
 /// A vm config partial is used to create a Vm
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -74,7 +76,7 @@ pub struct VmConfigPartial {
   /// User-defined key/value metadata.
   pub labels: Option<HashMap<String, String>>,
   /// A vm's resources (cpu, memory, network)
-  pub host_config: VmHostConfig,
+  pub host_config: Option<VmHostConfig>,
 }
 
 /// Payload used to patch a vm
@@ -108,7 +110,7 @@ impl From<VmConfigPartial> for VmConfigUpdate {
       hostname: vm_config.hostname,
       user: vm_config.user,
       labels: vm_config.labels,
-      host_config: Some(vm_config.host_config),
+      host_config: vm_config.host_config,
       password: vm_config.password,
       ssh_key: vm_config.ssh_key,
     }
@@ -161,6 +163,22 @@ impl From<VmConfig> for VmConfigUpdate {
       host_config: Some(vm_config.host_config),
       password: vm_config.password,
       ssh_key: vm_config.ssh_key,
+    }
+  }
+}
+
+impl From<VmInspect> for VmConfigPartial {
+  fn from(vm_inspect: VmInspect) -> Self {
+    Self {
+      name: vm_inspect.name,
+      hostname: vm_inspect.config.hostname,
+      user: vm_inspect.config.user,
+      password: vm_inspect.config.password,
+      ssh_key: vm_inspect.config.ssh_key,
+      disk: vm_inspect.config.disk,
+      mac_address: vm_inspect.config.mac_address,
+      labels: vm_inspect.config.labels,
+      host_config: Some(vm_inspect.config.host_config),
     }
   }
 }

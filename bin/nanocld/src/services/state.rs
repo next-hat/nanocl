@@ -31,6 +31,13 @@ pub(crate) async fn apply(
           log::warn!("{err}");
         }
       }
+      StateData::VirtualMachine(data) => {
+        if let Err(err) =
+          utils::state::apply_vm(&data, &version, &state, sx).await
+        {
+          log::warn!("{err}");
+        }
+      }
       StateData::Resource(data) => {
         if let Err(err) = utils::state::apply_resource(&data, &state, sx).await
         {
@@ -66,6 +73,11 @@ pub(crate) async fn remove(
       }
       StateData::Cargo(data) => {
         if let Err(err) = utils::state::remove_cargo(&data, &state, sx).await {
+          log::warn!("{err}");
+        }
+      }
+      StateData::VirtualMachine(data) => {
+        if let Err(err) = utils::state::remove_vm(&data, &state, sx).await {
           log::warn!("{err}");
         }
       }

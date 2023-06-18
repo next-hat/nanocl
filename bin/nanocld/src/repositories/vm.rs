@@ -321,7 +321,7 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
     user: config.user,
     mac_address: config.mac_address,
     labels: config.labels,
-    host_config: config.host_config,
+    host_config: config.host_config.unwrap_or_default(),
     password: config.password,
     ssh_key: config.ssh_key,
   };

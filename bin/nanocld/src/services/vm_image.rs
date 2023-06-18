@@ -8,7 +8,7 @@ use nanocl_stubs::vm_image::VmImageResizePayload;
 
 use crate::{utils, repositories};
 use nanocl_utils::http_error::HttpError;
-use crate::models::{DaemonState, VmImageDbModel};
+use crate::models::DaemonState;
 
 /// List virtual machine images
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -65,7 +65,6 @@ pub(crate) async fn import_vm_image(
   let vm_images_dir = format!("{state_dir}/vms/images");
   let filepath = format!("{vm_images_dir}/{name}.img");
   let fp = filepath.clone();
-  let fp2 = filepath.clone();
   let mut f = web::block(move || std::fs::File::create(fp))
     .await
     .map_err(|err| HttpError {
@@ -85,27 +84,7 @@ pub(crate) async fn import_vm_image(
       })?;
   }
 
-  // Get image info
-  let image_info = match utils::vm_image::get_info(&filepath).await {
-    Err(err) => {
-      let _ = web::block(move || std::fs::remove_file(fp2)).await;
-      return Err(err);
-    }
-    Ok(image_info) => image_info,
-  };
-
-  let vm_image = VmImageDbModel {
-    name: name.clone(),
-    created_at: chrono::Utc::now().naive_utc(),
-    kind: "Base".into(),
-    format: image_info.format,
-    size_actual: image_info.actual_size,
-    size_virtual: image_info.virtual_size,
-    path: filepath,
-    parent: None,
-  };
-
-  repositories::vm_image::create(&vm_image, &state.pool).await?;
+  utils::vm_image::create(&name, &filepath, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().into())
 }
