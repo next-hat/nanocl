@@ -303,12 +303,12 @@ pub async fn create(
 }
 
 pub async fn patch(
-  cargo_key: &str,
+  vm_key: &str,
   config: &VmConfigUpdate,
   version: &str,
   state: &DaemonState,
 ) -> Result<Vm, HttpError> {
-  let vm = repositories::vm::find_by_key(cargo_key, &state.pool).await?;
+  let vm = repositories::vm::find_by_key(vm_key, &state.pool).await?;
 
   let old_config =
     repositories::vm_config::find_by_key(&vm.config_key, &state.pool).await?;
@@ -350,25 +350,32 @@ pub async fn patch(
     },
   };
 
+  put(vm_key, &vm_partial, version, state).await
+}
+
+pub async fn put(
+  vm_key: &str,
+  vm_partial: &VmConfigPartial,
+  version: &str,
+  state: &DaemonState,
+) -> Result<Vm, HttpError> {
+  let vm = repositories::vm::find_by_key(vm_key, &state.pool).await?;
   let container_name = format!("{}.v", &vm.key);
 
   stop(&vm, &state.docker_api).await?;
-
   state
     .docker_api
     .remove_container(&container_name, None::<RemoveContainerOptions>)
     .await?;
 
   let vm =
-    repositories::vm::update_by_key(&vm.key, &vm_partial, version, &state.pool)
+    repositories::vm::update_by_key(&vm.key, vm_partial, version, &state.pool)
       .await?;
-
   let image =
     repositories::vm_image::find_by_name(&vm.config.disk.image, &state.pool)
       .await?;
 
   create_instance(&vm, &image, false, state).await?;
-  // Update the vm
   start(&vm.key, &state.docker_api).await?;
 
   Ok(vm)

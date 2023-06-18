@@ -1,5 +1,4 @@
 use nanocl_stubs::state::StateVirtualMachine;
-use nanocl_stubs::vm_config::VmConfigUpdate;
 use nanocl_stubs::vm_config::VmDiskConfig;
 use ntex::rt;
 use ntex::http;
@@ -489,17 +488,7 @@ pub async fn create_vms(
               return Ok(());
             }
 
-            // TODO: Refactor to be more neat :)
-            let config = VmConfigUpdate {
-              name: Some(vm.name.clone()),
-              hostname: vm.hostname.clone(),
-              user: vm.user.clone(),
-              password: vm.password.clone(),
-              ssh_key: vm.ssh_key.clone(),
-              labels: vm.labels.clone(),
-              host_config: vm.host_config.clone(),
-            };
-            utils::vm::patch(&key, &config, version, state).await
+            utils::vm::put(&key, &vm, version, state).await
           }
           Err(_err) => {
             let vm = utils::vm::create(vm, namespace, version, state).await?;
