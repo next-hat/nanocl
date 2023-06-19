@@ -113,10 +113,10 @@ mod tests {
   #[ntex::test]
   pub(crate) async fn basic() -> TestRet {
     // Generate server
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
 
     // Apply examples/cargo_example.yml
-    let data = parse_state_file("../../examples/cargo_example.yml")?;
+    let data = parse_statefile("../../examples/cargo_example.yml")?;
     let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
     assert_eq!(req.status(), 200);
     let mut stream = req.into_stream();
@@ -125,7 +125,7 @@ mod tests {
     }
 
     // Apply examples/deploy_example.yml
-    let data = parse_state_file("../../examples/cargo_example.yml")?;
+    let data = parse_statefile("../../examples/cargo_example.yml")?;
     let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
     assert_eq!(req.status(), 200);
     let mut stream = req.into_stream();
@@ -134,7 +134,7 @@ mod tests {
     }
 
     // Revert examples/cargo_example.yml
-    let data = parse_state_file("../../examples/cargo_example.yml")?;
+    let data = parse_statefile("../../examples/cargo_example.yml")?;
     let req = srv
       .put("/v0.5/state/remove")
       .send_json(&data)
@@ -147,7 +147,7 @@ mod tests {
     }
 
     // Apply examples/deploy_example.yml
-    let data = parse_state_file("../../examples/deploy_example.yml")?;
+    let data = parse_statefile("../../examples/deploy_example.yml")?;
     let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
     assert_eq!(req.status(), 200);
     let mut stream = req.into_stream();
@@ -156,7 +156,7 @@ mod tests {
     }
 
     // Apply examples/resource_ssl_example.yml
-    let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
+    let data = parse_statefile("../../examples/resource_ssl_example.yml")?;
     let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
     assert_eq!(req.status(), 200);
     let mut stream = req.into_stream();
@@ -165,7 +165,7 @@ mod tests {
     }
 
     // Apply examples/resource_ssl_example.yml
-    let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
+    let data = parse_statefile("../../examples/resource_ssl_example.yml")?;
     let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
     assert_eq!(req.status(), 200);
     let mut stream = req.into_stream();
@@ -174,7 +174,7 @@ mod tests {
     }
 
     // Revert examples/resource_ssl_example.yml
-    let data = parse_state_file("../../examples/resource_ssl_example.yml")?;
+    let data = parse_statefile("../../examples/resource_ssl_example.yml")?;
     let req = srv
       .put("/v0.5/state/remove")
       .send_json(&data)
@@ -187,7 +187,7 @@ mod tests {
     }
 
     // Revert examples/deploy_example.yml
-    let data = parse_state_file("../../examples/deploy_example.yml")?;
+    let data = parse_statefile("../../examples/deploy_example.yml")?;
     let req = srv
       .put("/v0.5/state/remove")
       .send_json(&data)

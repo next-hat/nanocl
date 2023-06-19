@@ -17,7 +17,7 @@ pub struct StateMeta {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct StateResources {
+pub struct StateResource {
   pub resources: Vec<ResourcePartial>,
 }
 

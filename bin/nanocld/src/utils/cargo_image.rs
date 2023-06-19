@@ -1,17 +1,18 @@
+use ntex::http;
 use ntex::util::Bytes;
-use ntex::http::StatusCode;
 use futures::StreamExt;
 
 use bollard_next::service::CreateImageInfo;
 use bollard_next::models::{ImageInspect, ImageSummary};
-use nanocl_stubs::generic::GenericDelete;
 
 use nanocl_utils::http_error::HttpError;
+use nanocl_stubs::generic::GenericDelete;
+
 use crate::models::DaemonState;
 
 use super::stream;
 
-/// # Parse image info
+/// ## Parse image info
 ///
 /// Get the image name and tag from a string
 ///
@@ -19,19 +20,11 @@ use super::stream;
 ///
 /// - [image_info](str) The string to parse
 ///
-/// ## Return
+/// ## Returns
 ///
 /// - [Result](Result) The result of the operation
-///   - [Ok](String, String) - The image name and tag
-///   - [Err](HttpResponseError) - An http response error if something went wrong
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use crate::utils::cargo_image;
-///
-/// let (name, tag) = cargo_image::parse_image_info("nginx:latest").unwrap();
-/// ```
+///   - [Ok]((String, String)) - The image name and tag
+///   - [Err](HttpError) - An http response error if something went wrong
 ///
 pub fn parse_image_info(
   image_info: &str,
@@ -41,7 +34,7 @@ pub fn parse_image_info(
   if image_info.len() != 2 {
     return Err(HttpError {
       msg: String::from("missing tag in image name"),
-      status: StatusCode::BAD_REQUEST,
+      status: http::StatusCode::BAD_REQUEST,
     });
   }
 
@@ -50,27 +43,17 @@ pub fn parse_image_info(
   Ok((image_name, image_tag))
 }
 
-/// ## List cargo image
+/// ## List
 ///
 /// List all cargo images installed
 ///
 /// ## Arguments
 /// - [docker_api](bollard_next::Docker) docker api client
 ///
-/// ## Return
+/// ## Returns
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Vec<ImageSummary>) - A list of image summary
-///   - [Err](HttpResponseError) - An http response error if something went wrong
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use bollard_next::Docker;
-/// use crate::utils::cargo_image;
-///
-/// let docker_api = Docker::connect_with_local_defaults().unwrap();
-/// let result = cargo_image::list(&docker_api).await;
-/// ```
+///   - [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn list(
   opts: &bollard_next::image::ListImagesOptions<String>,
@@ -81,32 +64,22 @@ pub async fn list(
   Ok(items)
 }
 
-/// # Inspect cargo image
+/// ## Inspect by name
 ///
-/// Get detailed information on a cargo image
+/// Get detailed information on a cargo image by name
 ///
 /// ## Arguments
 ///
 /// - [image_name](str) name of the image to inspect
 /// - [docker_api](bollard_next::Docker) docker api client
 ///
-/// ## Return
+/// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](ImageInspect) - Image inspect
-///   - [Err](HttpResponseError) - An http response error if something went wrong
+///   - [Err](HttpError) - An http response error if something went wrong
 ///
-/// ## Example
-///
-/// ```rust,norun
-/// use bollard_next::Docker;
-/// use crate::utils::cargo_image;
-///
-/// let docker_api = Docker::connect_with_local_defaults().unwrap();
-/// let result = cargo_image::inspect("nginx:latest", &docker_api).await;
-/// ```
-///
-pub async fn inspect(
+pub async fn inspect_by_name(
   image_name: &str,
   state: &DaemonState,
 ) -> Result<ImageInspect, HttpError> {
@@ -115,9 +88,9 @@ pub async fn inspect(
   Ok(image)
 }
 
-/// # Pull cargo image
+/// ## Pull
 ///
-/// Pull a cargo/container image from the docker registry
+/// Pull a cargo/container image from the docker registry by name and tag
 ///
 /// ## Arguments
 ///
@@ -125,33 +98,18 @@ pub async fn inspect(
 /// - [tag](str) tag of the image to download
 /// - [docker_api](bollard_next::Docker) docker api client
 ///
-///
-/// ## Return
+/// ## Returns
 ///
 /// - [Result](Result) The result of the operation
 ///   - [Ok](Receiver<Result<Bytes, web::error::Error>>) - A stream of bytes
-///   - [Err](HttpResponseError) - An http response error if something went wrong
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use bollard_next::Docker;
-/// use futures::StreamExt;
-/// use crate::utils::cargo_image;
-///
-/// let docker_api = Docker::connect_with_local_defaults().unwrap();
-/// let stream = cargo_image::download("nginx:latest", &docker_api).await.unwrap();
-/// while let Some(result) = stream.next().await {
-///  // Do something with the result
-/// }
-/// ```
+///   - [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn pull(
-  from_image: &str,
+  image_name: &str,
   tag: &str,
   state: &DaemonState,
 ) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
-  let from_image = from_image.to_owned();
+  let from_image = image_name.to_owned();
   let tag = tag.to_owned();
   let docker_api = state.docker_api.clone();
 
@@ -169,30 +127,20 @@ pub async fn pull(
   Ok(stream)
 }
 
-/// Delete cargo image
+/// ## Delete
 ///
-/// Delete an installed cargo/container image
+/// Delete an installed cargo/container image by id or name
 ///
 /// ## Arguments
 ///
 /// - [image_name](str) name of the image to delete
 /// - [docker_api](bollard_next::Docker) docker api client
 ///
-/// ## Return
+/// ## Returns
 ///
 /// - [Result](Result) The result of the operation
 ///   - [Ok](GenericDelete) - A generic delete response
-///   - [Err](HttpResponseError) - An http response error if something went wrong
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use bollard_next::Docker;
-/// use crate::utils::cargo_image;
-///
-/// let docker_api = Docker::connect_with_local_defaults().unwrap();
-/// let result = cargo_image::delete("nginx:latest", &docker_api).await;
-/// ```
+///   - [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn delete(
   id_or_name: &str,
@@ -203,6 +151,5 @@ pub async fn delete(
     .remove_image(id_or_name, None, None)
     .await?;
   let res = GenericDelete { count: 1 };
-
   Ok(res)
 }

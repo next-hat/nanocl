@@ -8,6 +8,20 @@ use crate::models::DaemonState;
 
 use crate::version::VERSION;
 
+/// ## Ensure state dir
+///
+/// Ensure that the state dir exists and is ready to use
+///
+/// ## Arguments
+///
+/// - [state_dir](str) - The state dir path
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The state dir exists
+///   - [Err](IoError) - The state dir does not exists
+///
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   let vm_dir = format!("{state_dir}/vms/images");
   fs::create_dir_all(vm_dir).await.map_err(|err| {
@@ -16,8 +30,21 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   Ok(())
 }
 
-/// Init function called before http server start
-/// to initialize our state
+/// ## Init
+///
+/// Init function called before http server start.
+/// To boot and initialize our state and database.
+///
+/// ## Arguments
+///
+/// - [daemon_conf](DaemonConfig) - The daemon configuration
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](DaemonState) - The daemon state
+///   - [Err](IoError) - The daemon state has not been initialized
+///
 pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   let docker = bollard_next::Docker::connect_with_unix(
     &daemon_conf.docker_host,
@@ -28,9 +55,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     err.map_err_context(|| "Unable to connect to docker daemon")
   })?;
   ensure_state_dir(&daemon_conf.state_dir).await?;
-
   let pool = utils::store::init().await?;
-
   let daemon_state = DaemonState {
     pool: pool.clone(),
     docker_api: docker.clone(),
@@ -71,9 +96,7 @@ mod tests {
       hostname: None,
       advertise_addr: None,
     };
-
     let config = config::init(&args).expect("Expect to init config");
-
     // test function init
     let _ = init(&config).await.expect("Expect to init state");
 

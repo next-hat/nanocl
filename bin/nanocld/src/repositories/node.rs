@@ -4,31 +4,56 @@ use diesel::prelude::*;
 use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 
 use crate::utils;
-use crate::models::{NodeDbModel, Pool};
+use crate::models::{Pool, NodeDbModel};
 
+/// ## Create
+///
+/// Create a new node item in database
+///
+/// ## Arguments
+///
+/// - [node](NodeDbModel) - Node item
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](NodeDbModel) - The created node item
+///   - [Err](IoError) - Error during the operation
+///
 pub async fn create(node: &NodeDbModel, pool: &Pool) -> IoResult<NodeDbModel> {
   use crate::schema::nodes::dsl;
-
   let node = node.clone();
   let pool = pool.clone();
-
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = diesel::insert_into(dsl::nodes)
       .values(&node)
       .get_result(&mut conn)
       .map_err(|err| err.map_err_context(|| "nodes"))?;
-
     Ok::<_, IoError>(item)
   })
   .await?;
-
   Ok(item)
 }
 
+/// ## Find by name
+///
+/// Find a node by name in database
+///
+/// ## Arguments
+///
+/// - [name](str) - Node name
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](NodeDbModel) - The node item
+///   - [Err](IoError) - Error during the operation
+///
 pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<NodeDbModel> {
   use crate::schema::nodes::dsl;
-
   let name = name.to_owned();
   let pool = pool.clone();
   let exists = web::block(move || {
@@ -41,10 +66,24 @@ pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<NodeDbModel> {
     Ok::<_, IoError>(item)
   })
   .await?;
-
   Ok(exists)
 }
 
+/// ## Create if not exists
+///
+/// Create a node if not exists in database from a `NodeDbModel`.
+///
+/// ## Arguments
+///
+/// - [node](NodeDbModel) - Node item
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](NodeDbModel) - The created node item
+///   - [Err](IoError) - Error during the operation
+///
 pub async fn create_if_not_exists(
   node: &NodeDbModel,
   pool: &Pool,
@@ -55,9 +94,22 @@ pub async fn create_if_not_exists(
   }
 }
 
+/// ## List
+///
+/// List all nodes in database
+///
+/// ## Arguments
+///
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](Vec<NodeDbModel>) - The list of node items
+///   - [Err](IoError) - Error during the operation
+///
 pub async fn list(pool: &Pool) -> IoResult<Vec<NodeDbModel>> {
   use crate::schema::nodes::dsl;
-
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -68,16 +120,29 @@ pub async fn list(pool: &Pool) -> IoResult<Vec<NodeDbModel>> {
     Ok::<_, IoError>(items)
   })
   .await?;
-
   Ok(items)
 }
 
+/// ## List unless
+///
+/// List all nodes in database unless the given name
+///
+/// ## Arguments
+///
+/// - [name](str) - Node name
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](Vec<NodeDbModel>) - The list of node items
+///   - [Err](IoError) - Error during the operation
+///
 pub async fn list_unless(
   name: &str,
   pool: &Pool,
 ) -> IoResult<Vec<NodeDbModel>> {
   use crate::schema::nodes::dsl;
-
   let name = name.to_owned();
   let pool = pool.clone();
   let items = web::block(move || {
@@ -90,6 +155,5 @@ pub async fn list_unless(
     Ok::<_, IoError>(items)
   })
   .await?;
-
   Ok(items)
 }

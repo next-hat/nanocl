@@ -2,7 +2,7 @@
 * Endpoints to manipulate cargo images
 */
 use ntex::web;
-use ntex::http::StatusCode;
+use ntex::http;
 use futures::StreamExt;
 use tokio_util::codec;
 use tokio::io::AsyncWriteExt;
@@ -54,7 +54,7 @@ pub(crate) async fn inspect_cargo_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let image = utils::cargo_image::inspect(&path.1, &state).await?;
+  let image = utils::cargo_image::inspect_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&image))
 }
 
@@ -131,26 +131,26 @@ pub(crate) async fn import_cargo_image(
   let mut f = File::create(&file_path_ptr)
     .await
     .map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
+      status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Error while creating the file {err}"),
     })?;
   while let Some(bytes) = payload.next().await {
     let bytes = bytes.map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
+      status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Error while payload: {err}"),
     })?;
     f.write_all(&bytes).await.map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
+      status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Error while writing the file {err}"),
     })?;
   }
   f.shutdown().await.map_err(|err| HttpError {
-    status: StatusCode::INTERNAL_SERVER_ERROR,
+    status: http::StatusCode::INTERNAL_SERVER_ERROR,
     msg: format!("Error while closing the file {err}"),
   })?;
   drop(f);
   let file = File::open(&file_path_ptr).await.map_err(|err| HttpError {
-    status: StatusCode::INTERNAL_SERVER_ERROR,
+    status: http::StatusCode::INTERNAL_SERVER_ERROR,
     msg: format!("Error while opening the file {err}"),
   })?;
 
@@ -167,7 +167,7 @@ pub(crate) async fn import_cargo_image(
   let mut stream = state.docker_api.import_image(options, body, None);
   while let Some(res) = stream.next().await {
     let _ = res.map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
+      status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Error while importing the image {err}"),
     })?;
   }
@@ -193,7 +193,7 @@ pub mod tests {
 
   use crate::services::ntex_config;
 
-  use ntex::http::StatusCode;
+  use ntex::http;
   use bollard_next::service::ImageInspect;
   use futures::{StreamExt, TryStreamExt};
 
@@ -233,7 +233,7 @@ pub mod tests {
 
   /// Test utils to ensure the cargo image exists
   pub async fn ensure_test_image() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
     let image = CargoImagePartial {
       name: "nexthat/nanocl-get-started:latest".to_owned(),
     };
@@ -250,15 +250,15 @@ pub mod tests {
   /// Basic test to list cargo images
   #[ntex::test]
   pub async fn basic_list() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
 
     let resp = list(&srv).await?;
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::OK,
+      http::StatusCode::OK,
       "Expect basic to return status {} got {}",
-      StatusCode::OK,
+      http::StatusCode::OK,
       status
     );
 
@@ -270,7 +270,7 @@ pub mod tests {
   /// It works locally though but timeout in the CI
   #[ntex::test]
   pub async fn upload_tarball() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
 
     let curr_path = std::env::current_dir().unwrap();
     let filepath =
@@ -297,7 +297,7 @@ pub mod tests {
   /// Basic test to create cargo image with wrong name
   #[ntex::test]
   pub async fn basic_create_wrong_name() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
 
     let payload = CargoImagePartial {
       name: "test".to_string(),
@@ -306,9 +306,9 @@ pub mod tests {
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::BAD_REQUEST,
+      http::StatusCode::BAD_REQUEST,
       "Expect basic to return status {} got {}",
-      StatusCode::BAD_REQUEST,
+      http::StatusCode::BAD_REQUEST,
       status
     );
 
@@ -319,7 +319,7 @@ pub mod tests {
   #[ntex::test]
   async fn basic() -> TestRet {
     const TEST_IMAGE: &str = "busybox:unstable-musl";
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
 
     // Create
     let payload = CargoImagePartial {
@@ -329,9 +329,9 @@ pub mod tests {
     let status = res.status();
     assert_eq!(
       status,
-      StatusCode::OK,
+      http::StatusCode::OK,
       "Expect create to return status {} got {}",
-      StatusCode::OK,
+      http::StatusCode::OK,
       status
     );
     let content_type = res
@@ -355,9 +355,9 @@ pub mod tests {
     let status = res.status();
     assert_eq!(
       status,
-      StatusCode::OK,
+      http::StatusCode::OK,
       "Expect inspect to return status {} got {}",
-      StatusCode::OK,
+      http::StatusCode::OK,
       status
     );
     let _body: ImageInspect = res
@@ -370,9 +370,9 @@ pub mod tests {
     let status = res.status();
     assert_eq!(
       status,
-      StatusCode::OK,
+      http::StatusCode::OK,
       "Expect delete to return status {} got {}",
-      StatusCode::OK,
+      http::StatusCode::OK,
       status
     );
     let body: GenericDelete = res

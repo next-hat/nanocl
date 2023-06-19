@@ -109,7 +109,7 @@ where
   }
 }
 
-/// Compile a StateFile with given data
+/// Compile a Statefile with given data
 pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
   // replace "${{ }}" with "{{ }}" syntax for liquid
   let reg = Regex::new(r"\$\{\{(.+?)\}\}")

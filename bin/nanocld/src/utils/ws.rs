@@ -9,8 +9,17 @@ use ntex::channel::oneshot;
 
 use crate::models::{WsConState, HEARTBEAT_INTERVAL, CLIENT_TIMEOUT};
 
-/// helper method that sends ping to client every second.
-/// also this method checks heartbeats from client
+/// ## Heartbeat
+///
+/// Websocket helper method that sends ping to client every second.
+/// Also this method checks heartbeats from client.
+///
+/// ## Arguments
+///
+/// - [state](Rc<RefCell<WsConState>>) Reference to websocket connection state
+/// - [sink](ws::WsSink) Reference to websocket sink
+/// - [rx](oneshot::Receiver<()>) Reference to oneshot receiver
+///
 pub async fn heartbeat(
   state: Rc<RefCell<WsConState>>,
   sink: ws::WsSink,

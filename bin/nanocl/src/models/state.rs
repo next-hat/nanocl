@@ -59,14 +59,14 @@ pub enum StateCommands {
   Remove(StateRemoveOpts),
 }
 
-/// Define, Run, or Remove Cargo or Virtual Machines from a StateFile
+/// Define, Run, or Remove Cargo or Virtual Machines from a Statefile
 #[derive(Debug, Parser)]
 pub struct StateArgs {
   #[clap(subcommand)]
   pub commands: StateCommands,
 }
 
-/// Reference to a StateFile
+/// Reference to a Statefile
 #[derive(Clone, Debug)]
 pub struct StateRef<T>
 where

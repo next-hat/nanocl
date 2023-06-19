@@ -15,23 +15,17 @@ use crate::models::{Pool, DBConn};
 
 /// ## Create pool
 ///
-/// Create a pool connection to cockroachdb
+/// Create a pool connection to the store `cockroachdb`
 ///
 /// ## Arguments
 ///
-/// [host](String) Host to connect to
+/// - [host](str) Host to connect to
 ///
 /// ## Returns
 ///
-/// - [Pool](Pool) R2d2 pool connection for postgres
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use crate::utils;
-///
-/// let pool = utils::create_pool("localhost".to_string()).await;
-/// ```
+/// - [Result](Result) Result of the operation
+///   - [Ok](Pool) - The pool has been created
+///   - [Err](IoError) - The pool has not been created
 ///
 pub async fn create_pool(host: &str) -> IoResult<Pool> {
   // ?sslmode=verify-full
@@ -46,9 +40,9 @@ pub async fn create_pool(host: &str) -> IoResult<Pool> {
   })
 }
 
-/// ## Get connection from the pool
+/// ## Get pool conn
 ///
-/// Get connection from the connection pool
+/// Get connection from the connection pool for the store `cockroachdb`
 ///
 /// ## Arguments
 ///
@@ -58,16 +52,7 @@ pub async fn create_pool(host: &str) -> IoResult<Pool> {
 ///
 /// - [Result](Result) Result of the operation
 ///   - [Ok](DBConn) - The connection has been retrieved
-///   - [Err](HttpResponseError) - The connection has not been retrieved
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use crate::utils;
-///
-/// let pool = utils::store::create_pool("localhost".to_string()).await;
-/// let conn = utils::store::get_pool_conn(&pool);
-/// ```
+///   - [Err](IoError) - The connection has not been retrieved
 ///
 pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
   let conn = match pool.get() {
@@ -82,8 +67,21 @@ pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
   Ok(conn)
 }
 
-/// Wait for store to be ready
-/// We loop until a tcp connection can be established to the store
+/// ## Wait store
+///
+/// Wait for store to be ready to accept tcp connection.
+/// We loop until a tcp connection can be established to the store.
+///
+/// ## Arguments
+///
+/// - [addr](str) Address of the store
+///
+/// ## Returns
+///
+/// - [Result](Result) Result of the operation
+///   - [Ok](()) - The store is ready
+///   - [Err](IoError) - The store is not ready
+///
 async fn wait_store(addr: &str) -> IoResult<()> {
   // Open tcp connection to check if store is ready
   let addr = addr
@@ -104,10 +102,19 @@ async fn wait_store(addr: &str) -> IoResult<()> {
   Ok(())
 }
 
-/// Ensure existance of a container for our store
-/// we use cockroachdb with a postgresql connector.
-/// we also run latest migration on our database to have the latest schema.
+/// ## Init
+///
+/// Ensure existance of a container for our store.
+/// We use cockroachdb with a postgresql connector.
+/// We also run latest migration on our database to have the latest schema.
 /// It will return a connection Pool that will be use in our State.
+///
+/// ## Returns
+///
+/// - [Result](Result) Result of the operation
+///   - [Ok](Pool) - The pool has been created
+///   - [Err](IoError) - The pool has not been created
+///
 pub(crate) async fn init() -> IoResult<Pool> {
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
   let store_addr = "nstore.nanocl.internal:26257";

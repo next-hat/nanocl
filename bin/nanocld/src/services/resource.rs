@@ -31,7 +31,7 @@ pub(crate) async fn list_resource(
   web::types::Query(query): web::types::Query<ResourceQuery>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let items = repositories::resource::find(&state.pool, Some(query)).await?;
+  let items = repositories::resource::find(Some(query), &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -173,7 +173,7 @@ pub(crate) async fn list_resource_history(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let items =
-    repositories::resource_config::list_by_resource(&path.1, &state.pool)
+    repositories::resource_config::list_by_resource_key(&path.1, &state.pool)
       .await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
@@ -235,14 +235,14 @@ mod tests {
 
   use crate::services::ntex_config;
 
-  use ntex::http::StatusCode;
+  use ntex::http;
 
   use crate::utils::tests::*;
   use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceUpdate};
 
   #[ntex::test]
   async fn basic() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
 
     let config = serde_json::json!({
       "Schema": {
@@ -274,14 +274,14 @@ mod tests {
       .send_json(&resource)
       .await
       .unwrap();
-    assert_eq!(resp.status(), StatusCode::CREATED);
+    assert_eq!(resp.status(), http::StatusCode::CREATED);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
 
     // List
     let mut resp = srv.get("/v0.2/resources").send().await.unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(resp.status(), http::StatusCode::OK);
     let _ = resp.json::<Vec<Resource>>().await.unwrap();
 
     // Inspect
@@ -290,7 +290,7 @@ mod tests {
       .send()
       .await
       .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(resp.status(), http::StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
@@ -302,7 +302,7 @@ mod tests {
       .send()
       .await
       .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(resp.status(), http::StatusCode::OK);
 
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
@@ -313,7 +313,7 @@ mod tests {
       .send_json(&new_resource)
       .await
       .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
+    assert_eq!(resp.status(), http::StatusCode::OK);
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
@@ -324,7 +324,7 @@ mod tests {
       .send()
       .await
       .unwrap();
-    assert_eq!(resp.status(), StatusCode::ACCEPTED);
+    assert_eq!(resp.status(), http::StatusCode::ACCEPTED);
     Ok(())
   }
 }

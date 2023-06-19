@@ -25,6 +25,10 @@ mod repositories;
 
 use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
 
+/// ## Set unix permission
+///
+/// Watch for change in the run directory and set the permission of the unix socket
+///
 async fn set_unix_permission() {
   rt::Arbiter::new().exec_fn(|| {
     log::debug!("set_unix_permission");
@@ -37,7 +41,6 @@ async fn set_unix_permission() {
       return;
     }
     let (tx, rx) = std::sync::mpsc::channel();
-
     // Automatically select the best implementation for your platform.
     // You can also access each implementation directly e.g. INotifyWatcher.
     let mut watcher = match RecommendedWatcher::new(tx, Config::default()) {
@@ -47,11 +50,9 @@ async fn set_unix_permission() {
         return;
       }
     };
-
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
     watcher.watch(path, RecursiveMode::Recursive).unwrap();
-
     log::debug!("watching change of: {}", path.display());
     for res in rx {
       match res {
@@ -102,7 +103,7 @@ async fn set_unix_permission() {
   });
 }
 
-/// # The Nanocl daemon
+/// ## The Nanocl daemon
 ///
 /// Provides an api to manage containers and virtual machines accross physical hosts
 /// There are these advantages :
@@ -114,7 +115,6 @@ async fn set_unix_permission() {
 async fn main() -> std::io::Result<()> {
   // Parse command line arguments
   let args = cli::Cli::parse();
-
   // Build env logger
   if std::env::var("LOG_LEVEL").is_err() {
     std::env::set_var("LOG_LEVEL", "nanocld=info,warn,error,nanocld=debug");
@@ -123,7 +123,6 @@ async fn main() -> std::io::Result<()> {
     .parse_env("LOG_LEVEL")
     .format_target(false)
     .init();
-
   let config = match config::init(&args) {
     Err(err) => {
       log::error!("{err}");
@@ -131,26 +130,21 @@ async fn main() -> std::io::Result<()> {
     }
     Ok(config) => config,
   };
-
   // Boot and init internal dependencies
   let daemon_state = boot::init(&config).await?;
-
   // If init is true we don't start the server
   if args.init {
     return Ok(());
   }
-
   if let Err(err) = node::join_cluster(&daemon_state).await {
     log::error!("{err}");
     std::process::exit(1);
   }
-
   set_unix_permission().await;
   node::register(&daemon_state).await?;
   utils::proxy::spawn_logger(&daemon_state);
   utils::metric::spawn_logger(&daemon_state);
-
-  match server::generate(daemon_state).await {
+  match server::gen(daemon_state).await {
     Err(err) => {
       log::error!("Error while generating server {err}");
       std::process::exit(1);

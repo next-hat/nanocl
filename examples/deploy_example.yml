@@ -46,18 +46,3 @@ Cargoes:
       Image: nexthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED2
-
-VirtualMachines:
-  - Name: vm-example
-    Disk:
-      Image: test-ubuntu22
-    HostConfig:
-      Cpu: 1
-      Memory: 2048
-
-  - Name: vm-example2
-    Disk:
-      Image: test-ubuntu22
-    HostConfig:
-      Cpu: 2
-      Memory: 2048

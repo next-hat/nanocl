@@ -3,10 +3,10 @@ use std::time::Duration;
 
 use ntex::rt;
 use ntex::ws;
+use ntex::http;
 use ntex::time;
 use ntex::io::Base;
 use ntex::util::Bytes;
-use ntex::http::StatusCode;
 use ntex::ws::WsConnection;
 
 use futures::SinkExt;
@@ -44,13 +44,13 @@ impl NodeClient {
       .finish()
       .map_err(|err| HttpError {
         msg: format!("Failed to build websocket connection: {}", err),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
+        status: http::StatusCode::INTERNAL_SERVER_ERROR,
       })?
       .connect()
       .await
       .map_err(|err| HttpError {
         msg: format!("Failed to connect to websocket: {}", err),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
+        status: http::StatusCode::INTERNAL_SERVER_ERROR,
       })?;
 
     Ok(con)

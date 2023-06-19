@@ -14,6 +14,10 @@ pub struct VmDiskConfig {
   /// Name of the image to use
   pub image: String,
   /// Virtual size allowed for the disk
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub size: Option<u64>,
 }
 
@@ -28,14 +32,34 @@ pub struct VmHostConfig {
   /// Memory of the vm
   pub memory: u64,
   /// default network interface of the vm
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub net_iface: Option<String>,
   /// Enable KVM
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub kvm: Option<bool>,
   /// A list of DNS servers for the vm to use.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub dns: Option<Vec<String>>,
   /// Container image name to use for vm default: nexthat/nanocl-qemu
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub runtime: Option<String>,
   // Container network to use, default to the vm namespace
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub runtime_net: Option<String>,
 }
 
@@ -62,20 +86,48 @@ pub struct VmConfigPartial {
   /// Name of the vm
   pub name: String,
   /// Hostname of the vm
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub hostname: Option<String>,
   /// Default user of the vm (cloud)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub user: Option<String>,
   /// Default password of the vm (cloud)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub password: Option<String>,
   /// Default ssh key for the user
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub ssh_key: Option<String>,
   /// Disk config of the vm
   pub disk: VmDiskConfig,
   /// Mac address of the vm
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub mac_address: Option<String>,
   /// User-defined key/value metadata.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub labels: Option<HashMap<String, String>>,
   /// A vm's resources (cpu, memory, network)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub host_config: Option<VmHostConfig>,
 }
 
@@ -88,18 +140,46 @@ pub struct VmConfigPartial {
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmConfigUpdate {
   /// Name of the vm
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub name: Option<String>,
   /// Hostname of the vm
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub hostname: Option<String>,
   /// Default user of the vm (cloud)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub user: Option<String>,
   /// Default password of the vm (cloud)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub password: Option<String>,
   /// Default ssh key for the user
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub ssh_key: Option<String>,
   /// User-defined key/value metadata.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub labels: Option<HashMap<String, String>>,
   /// A vm's resources (cpu, memory, network)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub host_config: Option<VmHostConfig>,
 }
 
@@ -136,18 +216,42 @@ pub struct VmConfig {
   /// The key of the vm
   pub vm_key: String,
   /// Hostname of the vm
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub hostname: Option<String>,
   /// Default password of the vm (cloud)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub password: Option<String>,
   /// Default ssh key for the user
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub ssh_key: Option<String>,
   /// Default user of the vm (cloud)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub user: Option<String>,
   /// Disk config of the vm
   pub disk: VmDiskConfig,
   /// Mac address of the vm
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub mac_address: Option<String>,
   /// User-defined key/value metadata.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub labels: Option<HashMap<String, String>>,
   /// A vm's resources (cpu, memory, network)
   pub host_config: VmHostConfig,

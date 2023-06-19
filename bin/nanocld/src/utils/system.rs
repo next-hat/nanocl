@@ -4,9 +4,9 @@ use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
-use nanocl_stubs::config::DaemonConfig;
 use nanocl_utils::io_error::{FromIo, IoResult};
 
+use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_config::CargoConfigPartial;
 
@@ -14,11 +14,26 @@ use crate::version::VERSION;
 use crate::{utils, repositories};
 use crate::models::{Pool, DaemonState};
 
+/// ## Register namespace
+///
 /// Ensure existance of specific namespace in our store.
 /// We use it to be sure `system` and `global` namespace exists.
 /// system is the namespace used by internal nanocl components.
 /// where global is the namespace used by default.
 /// User can registed they own namespace to ensure better encaptusation.
+///
+/// ## Arguments
+///
+/// - [name](str) Name of the namespace to register
+/// - [create_network](bool) If true we create the network for the namespace
+/// - [state](DaemonState) The daemon state
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The namespace has been registered
+///   - [Err](IoError) - The namespace has not been registered
+///
 pub async fn register_namespace(
   name: &str,
   create_network: bool,
@@ -38,8 +53,22 @@ pub async fn register_namespace(
   Ok(())
 }
 
+/// ## Sync containers
+///
 /// Convert existing containers with our labels to cargo.
 /// We use it to be sure that all existing containers are registered as cargo.
+///
+/// ## Arguments
+///
+/// - [docker_api](bollard_next::Docker) - The docker api
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The containers has been synced
+///   - [Err](IoError) - The containers has not been synced
+///
 pub async fn sync_containers(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
@@ -70,7 +99,6 @@ pub async fn sync_containers(
     if cargo_inspected.contains_key(metadata[0]) {
       continue;
     }
-
     // We inspect the container to have all the information we need
     let container = docker_api
       .inspect_container(
@@ -82,7 +110,6 @@ pub async fn sync_containers(
     let config = container.config.unwrap_or_default();
     let mut config: bollard_next::container::Config = config.into();
     config.host_config = container.host_config;
-
     // TODO: handle network config
     // If the container is replicated by nanocl we should not have any network settings
     // Because we want docker to automatically set ip address and other network settings.
@@ -94,13 +121,11 @@ pub async fn sync_containers(
     // if let Some(_endpoints_config) = network_settings.networks {
     //   // config.networking_config = Some(NetworkingConfig { endpoints_config });
     // }
-
     let new_cargo = CargoConfigPartial {
       name: metadata[0].to_owned(),
       container: config.to_owned(),
       ..Default::default()
     };
-
     cargo_inspected.insert(metadata[0].to_owned(), true);
     match repositories::cargo::inspect_by_key(cargo_key, pool).await {
       // If the cargo is already in our store and the config is different we update it
@@ -128,7 +153,6 @@ pub async fn sync_containers(
           metadata[0],
           metadata[1]
         );
-
         if repositories::namespace::find_by_name(metadata[1], pool)
           .await
           .is_err()
@@ -141,7 +165,6 @@ pub async fn sync_containers(
           )
           .await?;
         }
-
         repositories::cargo::create(
           metadata[1],
           &new_cargo,
@@ -152,11 +175,26 @@ pub async fn sync_containers(
       }
     }
   }
-
   log::info!("Container synced");
   Ok(())
 }
 
+/// ## Sync vm images
+///
+/// Check for vm images inside the vm images directory
+/// and create them in the database if they don't exist
+///
+/// ## Arguments
+///
+/// - [daemon_conf](DaemonConfig) - The daemon configuration
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The vm images has been synced
+///   - [Err](IoError) - The vm images has not been synced
+///
 pub async fn sync_vm_images(
   daemon_conf: &DaemonConfig,
   pool: &Pool,
@@ -164,17 +202,14 @@ pub async fn sync_vm_images(
   log::info!("Syncing existing vm");
   let files =
     std::fs::read_dir(format!("{}/vms/images", &daemon_conf.state_dir))?;
-
   files
     .into_iter()
     .map(|file| async {
       let file = file?;
       let file_name = file.file_name();
       let name = file_name.to_str().unwrap_or_default();
-
       let file_path = file.path();
       let path = file_path.to_str().unwrap_or_default();
-
       if let Err(error) = utils::vm_image::create(name, path, pool).await {
         log::warn!("{error}")
       }
