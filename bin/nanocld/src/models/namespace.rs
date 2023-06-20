@@ -2,7 +2,12 @@ use serde::{Serialize, Deserialize};
 
 use crate::schema::namespaces;
 
-/// Structure to create a namespace in database
+/// ## NamespaceDbModel
+///
+/// This structure represent the namespace in the database.
+/// A namespace is a group of cargo or virtual machine that share the same network.
+/// It is used to isolate the services.
+///
 #[derive(
   Debug, Clone, Serialize, Deserialize, Identifiable, Insertable, Queryable,
 )]
@@ -10,6 +15,8 @@ use crate::schema::namespaces;
 #[diesel(table_name = namespaces)]
 #[serde(rename_all = "PascalCase")]
 pub struct NamespaceDbModel {
+  /// The name of the namespace
   pub(crate) name: String,
+  /// The created at date
   pub(crate) created_at: chrono::NaiveDateTime,
 }
