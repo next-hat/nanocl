@@ -23,10 +23,22 @@ pub struct ProxySslConfig {
   /// Path to the certificate key
   pub certificate_key: String,
   /// Path to the certificate client
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub certificate_client: Option<String>,
   /// Enable or disable client verification
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub verify_client: Option<bool>,
   /// Path to the dhparam file
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub dh_param: Option<String>,
 }
 
@@ -41,8 +53,16 @@ pub struct UpstreamTarget {
   /// The port of the cargo or the vm to target
   pub port: u16,
   /// The http path to target when using http
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub path: Option<String>,
   /// Disable logging for this target
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub disable_logging: Option<bool>,
 }
 
@@ -77,6 +97,10 @@ pub struct HttpTarget {
   /// Url to target
   pub url: String,
   /// Redirect type if it's a redirect
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub redirect: Option<UrlRedirect>,
 }
 
@@ -146,6 +170,10 @@ pub struct ProxyRuleStream {
   /// The port to open on nodes
   pub port: u16,
   /// The ssl configuration
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub ssl: Option<ProxySslConfig>,
   /// The target
   pub target: StreamTarget,
@@ -162,8 +190,16 @@ pub struct ProxyHttpLocation {
   /// The target cargo
   pub target: LocationTarget,
   /// Extras header to add
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub headers: Option<Vec<String>>,
   /// Http version to use
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub version: Option<f64>,
 }
 
@@ -174,14 +210,26 @@ pub struct ProxyHttpLocation {
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProxyRuleHttp {
   /// The domain
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub domain: Option<String>,
   /// Type of private | public | internal | namespace:$namespace_name
   pub network: String,
   /// The locations to handle multiple paths
   pub locations: Vec<ProxyHttpLocation>,
   /// The ssl configuration
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub ssl: Option<ProxySslConfig>,
   /// Path to extra config file to include
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub includes: Option<Vec<String>>,
 }
 

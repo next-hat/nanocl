@@ -484,7 +484,7 @@ async fn exec_state_remove(host: &str, opts: &StateRemoveOpts) -> IoResult<()> {
     inject_data(&state_ref.format, &state_ref.raw, &args, &client).await?;
   if !opts.skip_confirm {
     utils::print::display_format(&state_ref.format, &data)?;
-    utils::dialog::confirm("Are you sure to revert this state ?")
+    utils::dialog::confirm("Are you sure to remove this state ?")
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
   let mut stream = client.remove_state(&data).await?;

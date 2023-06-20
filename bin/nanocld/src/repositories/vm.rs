@@ -14,28 +14,20 @@ use crate::models::{
 
 use super::vm_config;
 
-/// ## Find vm items by namespace
+/// ## Find by namespace
+///
+/// Find a vm by a `NamespaceDbModel` in database and return a `Vec<VmDbModel>`
 ///
 /// ## Arguments
 ///
-/// - [nsp](NamespaceItem) - Namespace item
+/// - [nsp](NamespaceDbModel) - Namespace item
 /// - [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///  - [Ok](Vec<VmDbModel>) - List a vm found
-///  - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// use nanocl_stubs::namespace::NamespaceItem;
-/// let nsp = NamespaceItem {
-///  name: String::from("test"),
-/// };
-/// let items = find_by_namespace(nsp, &pool).await;
-/// ```
+///  - [Err](IoError) - Error during the operation
 ///
 pub async fn find_by_namespace(
   nsp: &NamespaceDbModel,
@@ -54,38 +46,22 @@ pub async fn find_by_namespace(
   Ok(items)
 }
 
-/// ## Create vm
+/// ## Create
 ///
 /// Create a vm item in database for given namespace
+/// from a `VmConfigPartial` and return a `Vm`.
 ///
 /// ## Arguments
 ///
-/// - [nsp](String) - Namespace name
-/// - [item](VmPartial) - Vm item
+/// - [nsp](str) - Namespace name
+/// - [item](VmConfigPartial) - Vm item
 /// - [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Vm) - The vm created
-///   - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// use nanocl_stubs::vm::VmConfigPartial;
-///
-/// let item = VmConfigPartial {
-///   //... fill required data
-///   name: String::from("test"),
-///   container: bollard_next::container::Config {
-///     image: Some(String::from("test")),
-///     ..Default::default()
-///   },
-///   ..Default::default()
-/// };
-/// let vm = create(String::from("test"), item, &pool).await;
-/// ```
+///   - [Err](IoError) - Error during the operation
 ///
 pub async fn create(
   nsp: &str,
@@ -94,9 +70,7 @@ pub async fn create(
   pool: &Pool,
 ) -> IoResult<Vm> {
   use crate::schema::vms::dsl;
-
   let nsp = nsp.to_owned();
-
   // test if the name of the vm include a . in the name and throw error if true
   if item.name.contains('.') {
     return Err(IoError::invalid_data(
@@ -104,12 +78,9 @@ pub async fn create(
       "Name cannot contain a dot.",
     ));
   }
-
   let pool = pool.clone();
   let key = utils::key::gen_key(&nsp, &item.name);
-
   let config = vm_config::create(&key, item, version, &pool).await?;
-
   let new_item = VmDbModel {
     key,
     name: item.name.clone(),
@@ -117,7 +88,6 @@ pub async fn create(
     namespace_name: nsp,
     config_key: config.key,
   };
-
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::insert_into(dsl::vms)
@@ -127,7 +97,6 @@ pub async fn create(
     Ok::<_, IoError>(new_item)
   })
   .await?;
-
   let vm = Vm {
     key: item.key,
     name: item.name,
@@ -135,34 +104,26 @@ pub async fn create(
     namespace_name: item.namespace_name,
     config,
   };
-
   Ok(vm)
 }
 
-/// ## Delete vm by key
+/// ## Delete by key
 ///
 /// Delete a vm item in database for given key
 ///
 /// ## Arguments
 ///
-/// - [key](String) - Vm key
+/// - [key](str) - Vm key
 /// - [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](GenericDelete) - The number of deleted items
-///   - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// let res = delete_by_key(String::from("test"), &pool).await;
-/// ```
+///   - [Err](IoError) - Error during the operation
 ///
 pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::vms::dsl;
-
   let key = key.to_owned();
   let pool = pool.clone();
   let res = web::block(move || {
@@ -174,30 +135,23 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
     Ok::<_, IoError>(res)
   })
   .await?;
-
   Ok(GenericDelete { count: res })
 }
 
-/// ## Find vm by key
+/// ## Find by key
 ///
 /// Find a vm item in database for given key
 ///
 /// ## Arguments
 ///
-/// - [key](String) - Vm key
+/// - [key](str) - Vm key
 /// - [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](VmDbModel) - The vm found
-///   - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// let vm = find_by_key(String::from("test"), &pool).await;
-/// ```
+///   - [Err](IoError) - Error during the operation
 ///
 pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
   use crate::schema::vms::dsl;
@@ -217,37 +171,22 @@ pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
   Ok(item)
 }
 
-/// ## Update vm by key
+/// ## Update by key
 ///
 /// Update a vm item in database for given key
 ///
 /// ## Arguments
 ///
-/// - [key](String) - Vm key
+/// - [key](str) - Vm key
 /// - [item](VmConfigPartial) - Vm config
+/// - [version](str) - Vm version
 /// - [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Vm) - The vm updated
-///   - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// use nanocl_stubs::vm::VmConfigPartial;
-/// let item = VmConfigPartial {
-///  //... fill required data
-///  name: String::from("test"),
-///  container: bollard_next::container::Config {
-///   image: Some(String::from("test")),
-///   ..Default::default()
-///  },
-///  ..Default::default()
-/// };
-/// let vm = update_by_key(String::from("test"), item, &pool).await;
-/// ```
+///   - [Err](IoError) - Error during the operation
 ///
 pub async fn update_by_key(
   key: &str,
@@ -256,19 +195,15 @@ pub async fn update_by_key(
   pool: &Pool,
 ) -> IoResult<Vm> {
   use crate::schema::vms::dsl;
-
   let key = key.to_owned();
   let pool = pool.clone();
-
   let vmdb = find_by_key(&key, &pool).await?;
   let config = vm_config::create(&key, item, version, &pool).await?;
-
   let new_item = VmUpdateDbModel {
     name: Some(item.name.clone()),
     config_key: Some(config.key),
     ..Default::default()
   };
-
   web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     diesel::update(dsl::vms.filter(dsl::key.eq(key)))
@@ -278,7 +213,6 @@ pub async fn update_by_key(
     Ok::<_, IoError>(())
   })
   .await?;
-
   let vm = Vm {
     key: vmdb.key,
     name: vmdb.name,
@@ -286,14 +220,27 @@ pub async fn update_by_key(
     namespace_name: vmdb.namespace_name,
     config,
   };
-
   Ok(vm)
 }
 
+/// ## Inspect by key
+///
+/// Inspect a vm item in database for given key and return a `Vm`.
+///
+/// ## Arguments
+///
+/// - [key](str) - Vm key
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](Vm) - The vm found
+///   - [Err](IoError) - Error during the operation
+///
 pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
   use crate::schema::vms;
   use crate::schema::vm_configs;
-
   let key = key.to_owned();
   let pool = pool.clone();
   let item: (VmDbModel, VmConfigDbModel) = web::block(move || {
@@ -306,10 +253,8 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
     Ok::<_, IoError>(item)
   })
   .await?;
-
   let config = serde_json::from_value::<VmConfigPartial>(item.1.config)
     .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
-
   let config = VmConfig {
     key: item.1.key,
     created_at: item.0.created_at,
@@ -325,7 +270,6 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
     password: config.password,
     ssh_key: config.ssh_key,
   };
-
   let item = Vm {
     key: item.0.key,
     name: item.0.name,
@@ -333,6 +277,5 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
     namespace_name: item.0.namespace_name,
     config,
   };
-
   Ok(item)
 }

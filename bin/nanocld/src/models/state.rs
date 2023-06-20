@@ -1,12 +1,18 @@
 use nanocl_stubs::{
   config::DaemonConfig,
-  state::{StateDeployment, StateCargo, StateResources, StateVirtualMachine},
+  state::{StateDeployment, StateCargo, StateResource, StateVirtualMachine},
 };
 
 use crate::event::EventEmitter;
 
 use super::Pool;
 
+/// ## DaemonState
+///
+/// This structure represent the state of the daemon.
+/// Used to share the state between the different handlers.
+/// It contains the database connection pool, the docker client, the config and the event emitter.
+///
 #[derive(Clone)]
 pub struct DaemonState {
   /// The database connection pool
@@ -22,10 +28,14 @@ pub struct DaemonState {
   pub(crate) version: String,
 }
 
+/// ## StateData
+///
+/// This enum represent the different `Statefile` format that can be parsed.
+///
 #[derive(Debug)]
 pub enum StateData {
   Deployment(StateDeployment),
   Cargo(StateCargo),
   VirtualMachine(StateVirtualMachine),
-  Resource(StateResources),
+  Resource(StateResource),
 }

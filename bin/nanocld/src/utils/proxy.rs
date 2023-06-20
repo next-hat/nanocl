@@ -5,6 +5,17 @@ use bollard_next::container::{LogsOptions, LogOutput};
 use crate::repositories;
 use crate::models::{DaemonState, HttpMetricPartial};
 
+/// ## Spawn logger
+///
+/// Create a background thread that will watch the logs of the `ncdproxy.system.c` container
+/// The `ncdproxy` is a container that run to update the proxy rules.
+/// He will print http metrics to the logs.
+/// This function will parse the logs and save the metrics to the database.
+///
+/// ## Arguments
+///
+/// - [state](DaemonState) - Daemon state
+///
 pub(crate) fn spawn_logger(state: &DaemonState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(move || {

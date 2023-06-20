@@ -39,28 +39,19 @@ pub mod tests {
 
   type Config = fn(&mut ServiceConfig);
 
-  /// ## Get store ip address
+  /// ## Get store addr
   ///
-  /// Get the ip address of the store container
+  /// Get the ip address of the store container for tests purpose
   ///
   /// ## Arguments
   ///
-  /// [docker_api](Docker) Reference to docker api
+  /// - [docker_api](bollard_next::Docker) Reference to docker api
   ///
   /// ## Returns
   ///
   /// - [Result](Result) Result of the operation
   ///   - [Ok](String) - The ip address of the store
-  ///   - [Err](HttpResponseError) - The ip address of the store has not been retrieved
-  ///
-  /// ## Example
-  ///
-  /// ```rust,norun
-  /// use crate::utils;
-  ///
-  /// let docker_api = Docker::connect_with_local_defaults().unwrap();
-  /// let ip_address = utils::store::get_store_ip_addr(&docker_api).await;
-  /// ```
+  ///   - [Err](IoError) - The ip address of the store has not been retrieved
   ///
   pub async fn get_store_addr(
     docker_api: &bollard_next::Docker,
@@ -85,6 +76,10 @@ pub mod tests {
     Ok(ip_address.to_owned())
   }
 
+  /// ## Before
+  ///
+  /// Set the log level to info and build a test env logger for tests purpose
+  ///
   pub fn before() {
     // Build a test env logger
     if std::env::var("LOG_LEVEL").is_err() {
@@ -96,6 +91,14 @@ pub mod tests {
       .try_init();
   }
 
+  /// ## Gen docker client
+  ///
+  /// Generate a docker client for tests purpose
+  ///
+  /// ## Returns
+  ///
+  /// - [bollard_next::Docker](bollard_next::Docker) - The docker client
+  ///
   pub fn gen_docker_client() -> bollard_next::Docker {
     let socket_path = env::var("DOCKER_SOCKET_PATH")
       .unwrap_or_else(|_| String::from("/run/docker.sock"));
@@ -107,7 +110,21 @@ pub mod tests {
     .unwrap()
   }
 
-  pub fn parse_state_file(
+  /// ## Parse statefile
+  ///
+  /// Parse a state file from yaml to json format for tests purpose
+  ///
+  /// ## Arguments
+  ///
+  /// - [path](str) Path to the state file
+  ///
+  /// ## Returns
+  ///
+  /// - [Result](Result) Result of the operation
+  ///   - [Ok](serde_json::Value) - The state file parsed
+  ///   - [Err](Box) - The state file has not been parsed
+  ///
+  pub fn parse_statefile(
     path: &str,
   ) -> Result<serde_json::Value, Box<dyn std::error::Error + 'static>> {
     let data = fs::read_to_string(path)?;
@@ -116,6 +133,14 @@ pub mod tests {
     Ok(data)
   }
 
+  /// ## Gen postgre pool
+  ///
+  /// Generate a postgre pool for tests purpose
+  ///
+  /// ## Returns
+  ///
+  /// - [Pool](Pool) - The postgre pool
+  ///
   pub async fn gen_postgre_pool() -> Pool {
     let docker_api = gen_docker_client();
     let ip_addr = get_store_addr(&docker_api).await.unwrap();
@@ -125,7 +150,19 @@ pub mod tests {
       .expect("Failed to connect to store at: {ip_addr}")
   }
 
-  pub async fn generate_server(routes: Config) -> test::TestServer {
+  /// ## Gen server
+  ///
+  /// Generate a test server for tests purpose
+  ///
+  /// ## Arguments
+  ///
+  /// - [routes](Config) Routes to configure
+  ///
+  /// ## Returns
+  ///
+  /// - [TestServer](TestServer) - The test server
+  ///
+  pub async fn gen_server(routes: Config) -> test::TestServer {
     before();
     // Build a test daemon config
     let config = DaemonConfig {

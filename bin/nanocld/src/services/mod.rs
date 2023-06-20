@@ -1,4 +1,5 @@
 use ntex::web;
+use ntex::http;
 use nanocl_utils::ntex::middlewares;
 use nanocl_utils::http_error::HttpError;
 
@@ -21,7 +22,7 @@ mod vm_image;
 
 pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
   Err(HttpError {
-    status: ntex::http::StatusCode::NOT_FOUND,
+    status: http::StatusCode::NOT_FOUND,
     msg: "Route or method unhandled".into(),
   })
 }
@@ -73,7 +74,7 @@ mod tests {
   use super::*;
 
   use crate::version;
-  use ntex::http::StatusCode;
+  use ntex::http;
 
   use nanocl_stubs::system::Version;
 
@@ -81,14 +82,14 @@ mod tests {
 
   #[ntex::test]
   pub async fn get_version() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
     let mut resp = srv.get("/v0.5/version").send().await?;
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::OK,
+      http::StatusCode::OK,
       "Expect status to be {} got {}",
-      StatusCode::OK,
+      http::StatusCode::OK,
       status
     );
     let body: Version = resp
@@ -118,14 +119,14 @@ mod tests {
 
   #[ntex::test]
   async fn test_ping() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
     let resp = srv.head("/v0.5/_ping").send().await?;
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::ACCEPTED,
+      http::StatusCode::ACCEPTED,
       "Expect status to be {} got {}",
-      StatusCode::ACCEPTED,
+      http::StatusCode::ACCEPTED,
       status
     );
     Ok(())
@@ -133,14 +134,14 @@ mod tests {
 
   #[ntex::test]
   async fn test_unhandled_route() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
     let resp = srv.get("/v0.1/unhandled").send().await?;
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::NOT_FOUND,
+      http::StatusCode::NOT_FOUND,
       "Expect status to be {} got {}",
-      StatusCode::NOT_FOUND,
+      http::StatusCode::NOT_FOUND,
       status
     );
     Ok(())

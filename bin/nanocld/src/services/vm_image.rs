@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use ntex::web;
-use ntex::http::StatusCode;
+use ntex::http;
 use futures::StreamExt;
 
 use nanocl_stubs::vm_image::VmImageResizePayload;
@@ -56,7 +56,7 @@ pub(crate) async fn import_vm_image(
     .is_ok()
   {
     return Err(HttpError {
-      status: StatusCode::BAD_REQUEST,
+      status: http::StatusCode::BAD_REQUEST,
       msg: format!("Vm image {name} already used"),
     });
   }
@@ -68,18 +68,18 @@ pub(crate) async fn import_vm_image(
   let mut f = web::block(move || std::fs::File::create(fp))
     .await
     .map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
+      status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Unable to create vm image {name}: {err}"),
     })?;
   while let Some(bytes) = payload.next().await {
     let bytes = bytes.map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
+      status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Unable to create vm image {name}: {err}"),
     })?;
     f = web::block(move || f.write_all(&bytes).map(|_| f))
       .await
       .map_err(|err| HttpError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
+        status: http::StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Unable to create vm image {name}: {err}"),
       })?;
   }
@@ -194,7 +194,7 @@ pub(crate) async fn delete_vm_image(
 ) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
 
-  utils::vm_image::delete(&name, &state.pool).await?;
+  utils::vm_image::delete_by_name(&name, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().into())
 }

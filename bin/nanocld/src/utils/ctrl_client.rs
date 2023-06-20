@@ -6,13 +6,18 @@ use nanocl_utils::io_error::FromIo;
 use nanocl_utils::http_error::HttpError;
 use nanocl_utils::http_client_error::HttpClientError;
 
+/// Controller client
 pub struct CtrlClient {
+  /// Name of the controller eg: (ProxyRule)
   pub(crate) name: String,
+  /// HTTP client
   pub(crate) client: Client,
+  /// Base url
   pub(crate) base_url: String,
 }
 
 impl CtrlClient {
+  /// Create a new controller client
   pub(crate) fn new(name: &str, url: &str) -> Self {
     let (client, url) = match url {
       url if url.starts_with("unix://") => {
@@ -46,10 +51,12 @@ impl CtrlClient {
     }
   }
 
+  /// Format url with base url
   fn format_url(&self, path: &str) -> String {
     format!("{}{}", self.base_url, path)
   }
 
+  /// Check if the response is an API error
   async fn is_api_error(
     &self,
     res: &mut ClientResponse,
@@ -72,6 +79,7 @@ impl CtrlClient {
     Ok(())
   }
 
+  /// Parse http response to json
   async fn res_json<T>(
     &self,
     res: &mut ClientResponse,
@@ -86,6 +94,7 @@ impl CtrlClient {
     Ok(body)
   }
 
+  /// Call apply rule method on controller
   pub(crate) async fn apply_rule(
     &self,
     version: &str,
@@ -104,6 +113,7 @@ impl CtrlClient {
     self.res_json(&mut res).await
   }
 
+  /// Call delete rule method on controller
   pub(crate) async fn delete_rule(
     &self,
     version: &str,

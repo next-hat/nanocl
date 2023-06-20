@@ -6,10 +6,10 @@ use std::time::Instant;
 use ntex::rt;
 use ntex::ws;
 use ntex::web;
+use ntex::http;
 use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use ntex::channel::oneshot;
-use ntex::http::StatusCode;
 use ntex::web::{HttpRequest, Error};
 use ntex::{pipeline, fn_service, Service};
 use ntex::service::{fn_shutdown, map_config, fn_factory_with_config};
@@ -46,7 +46,9 @@ pub(crate) async fn list_vm(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
 
-  let vms = utils::vm::list(&namespace, &state.docker_api, &state.pool).await?;
+  let vms =
+    utils::vm::list_by_namespace(&namespace, &state.docker_api, &state.pool)
+      .await?;
 
   Ok(web::HttpResponse::Ok().json(&vms))
 }
@@ -74,7 +76,8 @@ pub(crate) async fn inspect_vm(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
 
-  let vm = utils::vm::inspect(&key, &state.docker_api, &state.pool).await?;
+  let vm =
+    utils::vm::inspect_by_key(&key, &state.docker_api, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().json(&vm))
 }
@@ -103,7 +106,7 @@ pub(crate) async fn start_vm(
   let key = utils::key::gen_key(&namespace, &name);
 
   repositories::vm::find_by_key(&key, &state.pool).await?;
-  utils::vm::start(&key, &state.docker_api).await?;
+  utils::vm::start_by_key(&key, &state.docker_api).await?;
 
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -160,7 +163,7 @@ pub(crate) async fn delete_vm(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
 
-  utils::vm::delete(&key, true, &state.docker_api, &state.pool).await?;
+  utils::vm::delete_by_key(&key, true, &state.docker_api, &state.pool).await?;
 
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -214,7 +217,7 @@ pub(crate) async fn list_vm_history(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let histories =
-    repositories::vm_config::list_by_vm(&key, &state.pool).await?;
+    repositories::vm_config::list_by_vm_key(&key, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
@@ -277,7 +280,7 @@ async fn ws_attach_service(
     )
     .await
     .map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
+      status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: err.to_string(),
     })?;
 
@@ -411,20 +414,20 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use crate::services::ntex_config;
 
-  use ntex::http::StatusCode;
+  use ntex::http;
 
   use crate::utils::tests::*;
 
   #[ntex::test]
   pub(crate) async fn list_vm() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
     let resp = srv.get("/v0.2/vms").send().await?;
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::OK,
+      http::StatusCode::OK,
       "Expect status to be {} got {}",
-      StatusCode::OK,
+      http::StatusCode::OK,
       status
     );
     Ok(())

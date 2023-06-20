@@ -1,28 +1,27 @@
 use std::collections::HashMap;
 
-use ntex::http::StatusCode;
+use ntex::http;
 
 use bollard_next::models::ContainerSummary;
 use bollard_next::container::ListContainersOptions;
 use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
+use nanocl_utils::http_error::HttpError;
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
   NamespaceListQuery,
 };
 
-use crate::models::DaemonState;
-use crate::utils;
-use crate::repositories;
-use crate::models::Pool;
-use nanocl_utils::http_error::HttpError;
+use crate::{utils, repositories};
+use crate::models::{Pool, DaemonState};
 
 use super::cargo;
 
-/// ## Create a namespace
+/// ## Create
 ///
-/// Create a new namespace with his associated network
+/// Create a new namespace with his associated network.
+/// Each vm and cargo created on this namespace will use the same network.
 ///
 /// ## Arguments
 ///
@@ -33,17 +32,8 @@ use super::cargo;
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///  - [Ok](Namespace) - The namespace has been created
-///  - [Err](HttpResponseError) - The namespace has not been created
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use bollard_next::Docker;
-///
-/// let docker_api = Docker::connect_with_local_defaults().unwrap();
-/// let result = namespace::create("my-namespace", &docker_api, &pool).await;
-/// ```
+///   - [Ok](Namespace) - The namespace has been created
+///   - [Err](HttpError) - The namespace has not been created
 ///
 pub async fn create(
   namespace: &NamespacePartial,
@@ -54,7 +44,7 @@ pub async fn create(
   {
     return Err(HttpError {
       msg: format!("namespace {} error: already exist", &namespace.name),
-      status: StatusCode::CONFLICT,
+      status: http::StatusCode::CONFLICT,
     });
   }
   if state
@@ -76,13 +66,13 @@ pub async fn create(
   Ok(Namespace { name: res.name })
 }
 
-/// ## Remove a namespace
+/// ## Delete by name
 ///
-/// Remove a namespace and his associated network with all his cargoes
+/// Delete a namespace by name and remove all associated cargo and vm.
 ///
 /// ## Arguments
 ///
-/// - [name](String) - The namespace name
+/// - [name](str) - The namespace name
 /// - [docker_api](bollard_next::Docker) - The docker api
 /// - [pool](Pool) - The database pool
 ///
@@ -90,16 +80,7 @@ pub async fn create(
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](GenericDelete) - The namespace has been removed
-///   - [Err](HttpResponseError) - The namespace has not been removed
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use bollard_next::Docker;
-///
-/// let docker_api = Docker::connect_with_local_defaults().unwrap();
-/// let result = namespace::delete_by_name("my-namespace", &docker_api, &pool).await;
-/// ```
+///   - [Err](HttpError) - The namespace has not been removed
 ///
 pub async fn delete_by_name(
   name: &str,
@@ -113,31 +94,22 @@ pub async fn delete_by_name(
   Ok(res)
 }
 
-/// ## List existing container in a namespace
+/// ## List instances
 ///
-/// List containers based on the namespace
+/// List all instances on a namespace
 ///
 /// ## Arguments
 ///
-/// - [namespace](String) - The namespace
+/// - [namespace](str) - The namespace
 /// - [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Vec<ContainerSummary>) - The containers have been listed
-///   - [Err](HttpResponseError) - The containers have not been listed
+///   - [Err](HttpError) - The containers have not been listed
 ///
-/// ## Example
-///
-/// ```rust,norun
-/// use bollard_next::Docker;
-///
-/// let docker_api = Docker::connect_with_local_defaults().unwrap();
-/// let result = namespace::list_instance("my-namespace", &docker_api).await;
-/// ```
-///
-pub async fn list_instance(
+pub async fn list_instances(
   namespace: &str,
   docker_api: &bollard_next::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpError> {
@@ -150,11 +122,10 @@ pub async fn list_instance(
     ..Default::default()
   });
   let containers = docker_api.list_containers(options).await?;
-
   Ok(containers)
 }
 
-/// ## List namespaces
+/// ## List
 ///
 /// List all existing namespaces
 ///
@@ -167,16 +138,7 @@ pub async fn list_instance(
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Vec<NamespaceSummary>) - The namespaces have been listed
-///   - [Err](HttpResponseError) - The namespaces have not been listed
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use bollard_next::Docker;
-///
-/// let docker_api = Docker::connect_with_local_defaults().unwrap();
-/// let result = namespace::list(&docker_api, &pool).await;
-/// ```
+///   - [Err](HttpError) - The namespaces have not been listed
 ///
 pub async fn list(
   query: &NamespaceListQuery,
@@ -188,24 +150,21 @@ pub async fn list(
   for item in items {
     let cargo_count =
       repositories::cargo::count_by_namespace(&item.name, pool).await?;
-    let instance_count = list_instance(&item.name, docker_api).await?.len();
-
+    let instance_count = list_instances(&item.name, docker_api).await?.len();
     let network = docker_api
       .inspect_network(&item.name, None::<InspectNetworkOptions<String>>)
       .await?;
     let ipam = network.ipam.unwrap_or_default();
     let ipam_config = ipam.config.unwrap_or_default();
-
     let gateway = ipam_config
       .get(0)
       .ok_or(HttpError {
         msg: format!("Unable to get gateway for network {}", &item.name),
-        status: StatusCode::INTERNAL_SERVER_ERROR,
+        status: http::StatusCode::INTERNAL_SERVER_ERROR,
       })?
       .gateway
       .clone()
       .unwrap_or_default();
-
     new_items.push(NamespaceSummary {
       name: item.name.to_owned(),
       cargoes: cargo_count,
@@ -216,32 +175,22 @@ pub async fn list(
   Ok(new_items)
 }
 
-/// ## Inspect a namespace
+/// ## Inspect by name
 ///
 /// Get detailed information about a namespace
 ///
 /// ## Arguments
 ///
-/// - [namespace](String) - The namespace
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
+/// - [name](str) - The namespace name
+/// - [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](NamespaceInspect) - The namespace has been inspected
-///   - [Err](HttpResponseError) - The namespace has not been inspected
+///   - [Err](HttpError) - The namespace has not been inspected
 ///
-/// ## Example
-///
-/// ```rust,norun
-/// use bollard_next::Docker;
-///
-/// let docker_api = Docker::connect_with_local_defaults().unwrap();
-/// let result = namespace::inspect("my-namespace", &docker_api, &pool).await;
-/// ```
-///
-pub async fn inspect(
+pub async fn inspect_by_name(
   name: &str,
   state: &DaemonState,
 ) -> Result<NamespaceInspect, HttpError> {
@@ -253,7 +202,7 @@ pub async fn inspect(
   log::debug!("Found namespace cargoes to inspect {:?}", &cargo_db_models);
   let mut cargoes = Vec::new();
   for cargo in cargo_db_models {
-    let cargo = cargo::inspect(&cargo.key, state).await?;
+    let cargo = cargo::inspect_by_key(&cargo.key, state).await?;
     cargoes.push(cargo);
   }
   let network = state
@@ -267,29 +216,20 @@ pub async fn inspect(
   })
 }
 
-/// ## Create a namespace if not exists
+/// ## Create if not exists
 ///
+/// Create a namespace if it does not exists
 ///
 /// ## Arguments
 ///
-/// - [name](String) - The namespace name
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
+/// - [name](str) - The namespace name
+/// - [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///  - [Ok](()) - The namespace will exists
-///  - [Err](HttpResponseError) - An error occured
-///
-/// ## Example
-///
-/// ```rust,norun
-/// use bollard_next::Docker;
-///
-/// let docker_api = Docker::connect_with_local_defaults().unwrap();
-/// let result = namespace::create_if_not_exists("my-namespace", &docker_api, &pool).await;
-/// ```
+///  - [Err](HttpError) - An error occured
 ///
 pub async fn create_if_not_exists(
   name: &str,

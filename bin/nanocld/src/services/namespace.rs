@@ -52,7 +52,7 @@ pub(crate) async fn inspect_namespace(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let namespace = utils::namespace::inspect(&path.1, &state).await?;
+  let namespace = utils::namespace::inspect_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&namespace))
 }
 
@@ -184,7 +184,7 @@ mod test_namespace {
 
   #[ntex::test]
   async fn basic() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
 
     test_fail_create(&srv).await?;
     test_create(&srv).await?;

@@ -22,7 +22,7 @@ codegen-units = 1
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocl_utils = { path = "crates/nanocl_utils" }
 nanocld_client = { path = "crates/nanocld_client" }
-ntex-cors = { git = "https://github.com/ntex-rs/ntex-extras.git" }
+# ntex-cors = { git = "https://github.com/ntex-rs/ntex-extras.git" }
 #ntex-files = { git = "https://github.com/leon3s/ntex-extras", branch = "upgrade-ntex-version" }
 #ntex-multipart = { git = "https://github.com/leon3s/ntex-extras" }
 #bollard-next = { path = "../bollard" }

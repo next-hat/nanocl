@@ -1,16 +1,34 @@
-use ntex::http::StatusCode;
+use ntex::http;
+use serde_json::Value;
 use jsonschema::{JSONSchema, Draft};
 
+use nanocl_utils::http_error::HttpError;
 use nanocl_stubs::resource::{Resource, ResourcePartial};
-use serde_json::Value;
 
 use crate::repositories;
-use nanocl_utils::http_error::HttpError;
 use crate::models::{Pool, ResourceKindPartial};
 
 use super::ctrl_client::CtrlClient;
 
-/// Validate a resource from a custom config
+/// ## Hook create resource
+///
+/// This hook is called when a resource is created.
+/// It call a custom controller at a specific url or just validate a schema.
+/// If the resource is a Kind Kind, it will create a resource Kind with an associated version.
+/// To call a custom controller, the resource Kind must have a Url field in his config.
+/// Unless it must have a Schema field in his config that is a JSONSchema to validate the resource.
+///
+/// ## Arguments
+///
+/// - [resource](ResourcePartial) - The resource to create
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](ResourcePartial) - The resource has been hooked
+///   - [Err](HttpError) - The resource has not been hooked
+///
 pub async fn hook_create_resource(
   resource: &ResourcePartial,
   pool: &Pool,
@@ -30,14 +48,12 @@ pub async fn hook_create_resource(
           value => value.to_string(),
         }),
       };
-
       if resource_kind.schema.is_none() && resource_kind.url.is_none() {
         return Err(HttpError {
           msg: "Neither schema nor url provided".to_string(),
-          status: StatusCode::BAD_REQUEST,
+          status: http::StatusCode::BAD_REQUEST,
         });
       }
-
       if repositories::resource_kind::find_by_name(&resource.name, pool)
         .await
         .is_err()
@@ -53,13 +69,12 @@ pub async fn hook_create_resource(
         pool,
       )
       .await?;
-
       if let Some(schema) = kind.schema {
         let schema: JSONSchema = JSONSchema::options()
           .with_draft(Draft::Draft7)
           .compile(&schema)
           .map_err(|err| HttpError {
-            status: StatusCode::BAD_REQUEST,
+            status: http::StatusCode::BAD_REQUEST,
             msg: format!("Invalid schema {}", err),
           })?;
         schema.validate(&resource.config).map_err(|err| {
@@ -68,12 +83,11 @@ pub async fn hook_create_resource(
             msg += &format!("{} ", error);
           }
           HttpError {
-            status: StatusCode::BAD_REQUEST,
+            status: http::StatusCode::BAD_REQUEST,
             msg,
           }
         })?;
       }
-
       if let Some(url) = kind.url {
         let ctrl_client = CtrlClient::new(&kind.resource_kind_name, &url);
         let config = ctrl_client
@@ -86,7 +100,23 @@ pub async fn hook_create_resource(
   Ok(resource)
 }
 
-/// Hook when deleting a resource
+/// ## Hook delete resource
+///
+/// This hook is called when a resource is deleted.
+/// It call a custom controller at a specific url.
+/// If the resource is a Kind Kind, it will delete the resource Kind with an associated version.
+///
+/// ## Arguments
+///
+/// - [resource](Resource) - The resource to delete
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The resource has been hooked
+///   - [Err](HttpError) - The resource has not been hooked
+///
 async fn hook_delete_resource(
   resource: &Resource,
   pool: &Pool,
@@ -103,11 +133,25 @@ async fn hook_delete_resource(
       .delete_rule(&resource.version, &resource.name)
       .await?;
   }
-
   Ok(())
 }
 
-/// Create a resource
+/// ## Create
+///
+/// This function create a resource.
+/// It will call the hook_create_resource function to hook the resource.
+///
+/// ## Arguments
+///
+/// - [resource](ResourcePartial) - The resource to create
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](Resource) - The resource has been created
+///   - [Err](HttpError) - The resource has not been created
+///
 pub async fn create(
   resource: &ResourcePartial,
   pool: &Pool,
@@ -117,7 +161,7 @@ pub async fn create(
     .is_ok()
   {
     return Err(HttpError {
-      status: StatusCode::CONFLICT,
+      status: http::StatusCode::CONFLICT,
       msg: format!("Resource {} already exists", &resource.name),
     });
   }
@@ -127,7 +171,22 @@ pub async fn create(
   Ok(res)
 }
 
-/// Patch a resource
+/// ## Patch
+///
+/// This function patch a resource.
+/// It will call the hook_create_resource function to hook the resource.
+///
+/// ## Arguments
+///
+/// - [resource](ResourcePartial) - The resource to patch
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](Resource) - The resource has been patched
+///   - [Err](HttpError) - The resource has not been patched
+///
 pub async fn patch(
   resource: &ResourcePartial,
   pool: &Pool,
@@ -137,7 +196,22 @@ pub async fn patch(
   Ok(res)
 }
 
-/// Delete a resource
+/// ## Delete
+///
+/// This function delete a resource.
+/// It will call the hook_delete_resource function to hook the resource.
+///
+/// ## Arguments
+///
+/// - [resource](Resource) - The resource to delete
+/// - [pool](Pool) - The database pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The resource has been deleted
+///   - [Err](HttpError) - The resource has not been deleted
+///
 pub async fn delete(resource: &Resource, pool: &Pool) -> Result<(), HttpError> {
   if let Err(err) = hook_delete_resource(resource, pool).await {
     log::warn!("{err}");

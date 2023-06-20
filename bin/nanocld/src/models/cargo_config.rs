@@ -2,7 +2,15 @@ use crate::schema::cargo_configs;
 
 use super::cargo::CargoDbModel;
 
-/// A cargo config item is the object stored in database
+/// ## CargoConfigDbModel
+///
+/// This structure represent the cargo config in the database.
+/// A cargo config represent the configuration of container that can be replicated.
+/// It is stored as a json object in the database.
+/// We use the cargo key as a foreign key to link the cargo config to the cargo.
+/// And the version is used to know which version of the config is used
+/// to ensure consistency between updates.
+///
 #[derive(Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = cargo_configs)]

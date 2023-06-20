@@ -9,7 +9,7 @@ use ntex::rt;
 use ntex::web;
 use ntex::web::Error;
 use ntex::util::Bytes;
-use ntex::http::StatusCode;
+use ntex::http;
 use ntex::time::interval;
 use futures::Stream;
 use ntex::web::error::BlockingError;
@@ -19,7 +19,9 @@ use nanocl_stubs::system::Event;
 
 use nanocl_utils::http_error::HttpError;
 
-// Wrap Receiver in our own type, with correct error type
+/// ## Client
+/// Stream: Wrap Receiver in our own type, with correct error type
+///
 pub struct Client(pub Receiver<Bytes>);
 
 impl Stream for Client {
@@ -48,7 +50,7 @@ impl ToBytes for Event {
 
   fn to_bytes(&self) -> Result<Bytes, Self::Error> {
     let mut data = serde_json::to_vec(&self).map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
+      status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Unable to serialize event: {err}"),
     })?;
     data.push(b'\n');
@@ -82,7 +84,7 @@ impl EventEmitter {
       .inner
       .lock()
       .map_err(|err| HttpError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
+        status: http::StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Unable to lock event emitter mutex: {err}"),
       })?
       .clients
@@ -97,7 +99,7 @@ impl EventEmitter {
       .inner
       .lock()
       .map_err(|err| HttpError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
+        status: http::StatusCode::INTERNAL_SERVER_ERROR,
         msg: format!("Unable to lock event emitter mutex: {err}"),
       })?
       .clients = alive_clients;
@@ -125,7 +127,7 @@ impl EventEmitter {
         .inner
         .lock()
         .map_err(|err| HttpError {
-          status: StatusCode::INTERNAL_SERVER_ERROR,
+          status: http::StatusCode::INTERNAL_SERVER_ERROR,
           msg: format!("Unable to lock event emitter mutex: {err}"),
         })?
         .clients
@@ -138,7 +140,7 @@ impl EventEmitter {
     })
     .await
     .map_err(|err| HttpError {
-      status: StatusCode::INTERNAL_SERVER_ERROR,
+      status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Unable to spawn task to emit message: {err}"),
     })??;
     Ok(())
@@ -153,7 +155,7 @@ impl EventEmitter {
         .inner
         .lock()
         .map_err(|err| HttpError {
-          status: StatusCode::INTERNAL_SERVER_ERROR,
+          status: http::StatusCode::INTERNAL_SERVER_ERROR,
           msg: format!("Unable to lock event emitter mutex: {err}"),
         })?
         .clients
@@ -164,7 +166,7 @@ impl EventEmitter {
     .map_err(|err| match err {
       BlockingError::Error(err) => err,
       BlockingError::Canceled => HttpError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
+        status: http::StatusCode::INTERNAL_SERVER_ERROR,
         msg: "Unable to subscribe to metrics server furture got cancelled"
           .into(),
       },

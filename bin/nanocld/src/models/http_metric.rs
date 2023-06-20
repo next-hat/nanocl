@@ -4,6 +4,10 @@ use serde::{Serialize, Deserialize, Deserializer};
 
 use crate::schema::http_metrics;
 
+/// ## deserialize empty string
+///
+/// Serde helper to deserialize string that can be empty to `Option<String>`.
+///
 fn deserialize_empty_string<'de, D>(
   deserializer: D,
 ) -> Result<Option<String>, D::Error>
@@ -18,6 +22,10 @@ where
   }
 }
 
+/// ## deserialize string to i64
+///
+/// Serde helper to deserialize string to `i64`.
+///
 fn deserialize_string_to_i64<'de, D>(deserializer: D) -> Result<i64, D::Error>
 where
   D: Deserializer<'de>,
@@ -27,16 +35,9 @@ where
   Ok(res)
 }
 
-// Not more required for now
-fn _deserialize_string_to_i32<'de, D>(deserializer: D) -> Result<i32, D::Error>
-where
-  D: Deserializer<'de>,
-{
-  let buf = String::deserialize(deserializer)?;
-  let res = buf.parse::<i32>().unwrap_or_default();
-  Ok(res)
-}
-
+/// ## deserialize string to f64
+///
+/// Serde helper to deserialize string to `f64`.
 fn deserialize_string_to_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
   D: Deserializer<'de>,
@@ -46,41 +47,66 @@ where
   Ok(res)
 }
 
+/// ## HttpMetricPartial
+///
+/// This structure represent a partial http metric.
+/// It is used to insert http metrics in the database.
+///
 #[derive(Clone, Debug, Serialize, Deserialize, Insertable)]
 #[serde(rename_all(serialize = "PascalCase"))]
 #[diesel(table_name = http_metrics)]
 pub struct HttpMetricPartial {
+  /// The date gmt of the metric
   pub date_gmt: DateTime<FixedOffset>,
+  /// The target uri of the request
   pub uri: String,
+  /// The target host of the request
   pub host: String,
+  /// The remote address of the request
   pub remote_addr: String,
+  /// The real ip remote address of the request
   pub realip_remote_addr: String,
+  /// The server protocol of the request
   pub server_protocol: String,
+  /// The method of the request
   pub request_method: String,
+  /// The bytes sent of the request
   #[serde(deserialize_with = "deserialize_string_to_i64")]
   pub bytes_sent: i64,
+  /// The content length of the request
   #[serde(deserialize_with = "deserialize_string_to_i64")]
   pub content_length: i64,
+  /// The status of the request
   #[serde(deserialize_with = "deserialize_string_to_i64")]
   pub status: i64,
+  /// The time of the request
   #[serde(deserialize_with = "deserialize_string_to_f64")]
   pub request_time: f64,
+  /// The number of bytes send in the body of the request
   #[serde(deserialize_with = "deserialize_string_to_i64")]
   pub body_bytes_sent: i64,
+  /// The proxy host of the request
   #[serde(deserialize_with = "deserialize_empty_string")]
   pub proxy_host: Option<String>,
+  /// The upstream address of the request
   #[serde(deserialize_with = "deserialize_empty_string")]
   pub upstream_addr: Option<String>,
+  /// The query string of the request
   #[serde(deserialize_with = "deserialize_empty_string")]
   pub query_string: Option<String>,
+  /// The body of the request
   #[serde(deserialize_with = "deserialize_empty_string")]
   pub request_body: Option<String>,
+  /// The content type of the request
   #[serde(deserialize_with = "deserialize_empty_string")]
   pub content_type: Option<String>,
+  /// The http user agent of the request
   #[serde(deserialize_with = "deserialize_empty_string")]
   pub http_user_agent: Option<String>,
+  /// The http referrer of the request
   #[serde(deserialize_with = "deserialize_empty_string")]
   pub http_referrer: Option<String>,
+  /// The http accept language of the request
   #[serde(deserialize_with = "deserialize_empty_string")]
   pub http_accept_language: Option<String>,
 }
@@ -116,6 +142,12 @@ impl HttpMetricPartial {
   }
 }
 
+/// ## HttpMetricDbModel
+///
+/// This structure represent a http metric in the database.
+/// A http metric is a data point that can be used to monitor the health of a service.
+/// We use the `node_name` to link the metric to the node that handled the request.
+///
 #[derive(
   Clone, Debug, Identifiable, Insertable, Queryable, Serialize, Deserialize,
 )]
@@ -123,33 +155,57 @@ impl HttpMetricPartial {
 #[diesel(table_name = http_metrics)]
 #[serde(rename_all = "PascalCase")]
 pub struct HttpMetricDbModel {
+  /// The key of the metric in the database `UUID`
   pub key: Uuid,
+  /// When the metric was created
   pub created_at: chrono::NaiveDateTime,
+  /// When the metric will expire
   pub expire_at: chrono::NaiveDateTime,
+  /// The date gmt of the metric
   pub date_gmt: chrono::NaiveDateTime,
+  /// The status of the request
   pub status: i64,
+  /// The bytes sent of the request
   pub bytes_sent: i64,
+  /// The content length of the request
   pub content_length: i64,
+  /// The number of bytes send in the body of the request
   pub body_bytes_sent: i64,
+  /// The time of the request
   pub request_time: f64,
+  /// The node that handled the request
   pub node_name: String,
+  /// The target uri of the request
   pub uri: String,
+  /// The target host of the request
   pub host: String,
+  /// The remote address of the request
   pub remote_addr: String,
+  /// The real ip remote address of the request
   pub realip_remote_addr: String,
+  /// The server protocol of the request
   pub server_protocol: String,
+  /// The method of the request
   pub request_method: String,
+  /// The proxy host of the request
   pub proxy_host: Option<String>,
+  /// The upstream address of the request
   pub upstream_addr: Option<String>,
+  /// The query string of the request
   pub query_string: Option<String>,
+  /// The body of the request
   pub request_body: Option<String>,
+  /// The content type of the request
   pub content_type: Option<String>,
+  /// The http user agent of the request
   pub http_user_agent: Option<String>,
+  /// The http referrer of the request
   pub http_referrer: Option<String>,
+  /// The http accept language of the request
   pub http_accept_language: Option<String>,
 }
 
-// TODO - implement Stream Metrics support for tcp/udp protocols
+// TODO: implement Stream Metrics support for tcp/udp protocols
 // #[derive(Clone, Debug, Serialize, Deserialize)]
 // #[serde(rename_all(serialize = "PascalCase"))]
 // pub struct StreamMetricPartial {

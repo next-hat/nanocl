@@ -1,4 +1,5 @@
 use ntex::web;
+use ntex::http;
 
 use nanocl_utils::ntex::middlewares;
 use nanocl_utils::http_error::HttpError;
@@ -13,7 +14,7 @@ mod system;
 
 pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
   Err(HttpError {
-    status: ntex::http::StatusCode::NOT_FOUND,
+    status: http::StatusCode::NOT_FOUND,
     msg: "Route or method unhandled".into(),
   })
 }

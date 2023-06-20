@@ -5,15 +5,15 @@ use std::sync::Arc;
 use ntex::web;
 use diesel::prelude::*;
 
+use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
-
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 
 use crate::utils;
 use crate::models::{Pool, NamespaceDbModel};
 
-/// ## Create namespace
+/// ## Create
 ///
 /// Create a namespace in database
 ///
@@ -26,29 +26,15 @@ use crate::models::{Pool, NamespaceDbModel};
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](NamespaceDbModel) - Namespace created
-///   - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// use crate::repositories;
-/// use nanocl_stubs::namespace::NamespacePartial;
-///
-/// let item = NamespacePartial {
-///   name: "my-namespace".into(),
-/// };
-/// let namespace = repositories::namespace::create(item, &pool).await;
-/// ```
+///   - [Err](IoError) - Error during the operation
 ///
 pub async fn create(
   item: &NamespacePartial,
   pool: &Pool,
 ) -> IoResult<NamespaceDbModel> {
   use crate::schema::namespaces::dsl;
-
   let item = item.clone();
   let pool = pool.clone();
-
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = NamespaceDbModel {
@@ -62,11 +48,10 @@ pub async fn create(
     Ok::<_, IoError>(item)
   })
   .await?;
-
   Ok(item)
 }
 
-/// ## List namespaces
+/// ## List
 ///
 /// List all namespaces in database
 ///
@@ -78,22 +63,13 @@ pub async fn create(
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Vec<NamespaceDbModel>) - List of namespaces
-///   - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// use crate::repositories;
-///
-/// let namespaces = repositories::namespace::list(&pool).await;
-/// ```
+///   - [Err](IoError) - Error during the operation
 ///
 pub async fn list(
   query: &NamespaceListQuery,
   pool: &Pool,
 ) -> IoResult<Vec<NamespaceDbModel>> {
   use crate::schema::namespaces::dsl;
-
   let query = query.clone();
   let pool = pool.clone();
   let items = web::block(move || {
@@ -114,42 +90,31 @@ pub async fn list(
     Ok::<_, IoError>(items)
   })
   .await?;
-
   Ok(items)
 }
 
-/// ## Delete namespace by name
+/// ## Delete by name
 ///
 /// Delete a namespace by name in database
 ///
 /// ## Arguments
 ///
-/// - [name](String) - Name of the namespace to delete
+/// - [name](str) - Name of the namespace to delete
 /// - [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](GenericDelete) - Number of deleted namespaces
-///   - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// use crate::repositories;
-///
-/// let count = repositories::namespace::delete_by_name("my-namespace".into(), &pool).await;
-/// ```
+///   - [Err](IoError) - Error during the operation
 ///
 pub async fn delete_by_name(
   name: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
   use crate::schema::namespaces::dsl;
-
   let name = name.to_owned();
   let pool = pool.clone();
-
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let count = diesel::delete(dsl::namespaces.filter(dsl::name.eq(name)))
@@ -158,42 +123,31 @@ pub async fn delete_by_name(
     Ok::<_, IoError>(count)
   })
   .await?;
-
   Ok(GenericDelete { count })
 }
 
-/// ## Find namespace by name
+/// ## Find by name
 ///
 /// Find a namespace by name in database
 ///
 /// ## Arguments
 ///
-/// - [name](String) - Name of the namespace to find
+/// - [name](str) - Name of the namespace to find
 /// - [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](NamespaceDbModel) - Namespace found
-///   - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// use crate::repositories;
-///
-/// let namespace = repositories::namespace::find_by_name("my-namespace".into(), &pool).await;
-/// ```
+///   - [Err](IoError) - Error during the operation
 ///
 pub async fn find_by_name(
   name: &str,
   pool: &Pool,
 ) -> IoResult<NamespaceDbModel> {
   use crate::schema::namespaces::dsl;
-
   let name = name.to_owned();
   let pool = pool.clone();
-
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = dsl::namespaces
@@ -203,39 +157,28 @@ pub async fn find_by_name(
     Ok::<_, IoError>(item)
   })
   .await?;
-
   Ok(item)
 }
 
-/// ## Exist namespace by name
+/// ## Exist by name
 ///
 /// Check if a namespace exist by name in database
 ///
 /// ## Arguments
 ///
-/// - [name](String) - Name of the namespace to check
+/// - [name](str) - Name of the namespace to check
 /// - [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](bool) - Existence of the namespace
-///   - [Err](HttpResponseError) - Error during the operation
-///
-/// ## Examples
-///
-/// ```rust,norun
-/// use crate::repositories;
-///
-/// let exist = repositories::namespace::exist_by_name("my-namespace".into(), &pool).await.unwrap();
-/// ```
+///   - [Err](IoError) - Error during the operation
 ///
 pub async fn exist_by_name(name: &str, pool: &Pool) -> IoResult<bool> {
   use crate::schema::namespaces::dsl;
-
   let name = name.to_owned();
   let pool = pool.clone();
-
   let exist = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let exist = Arc::new(dsl::namespaces)
@@ -246,6 +189,5 @@ pub async fn exist_by_name(name: &str, pool: &Pool) -> IoResult<bool> {
     Ok::<_, IoError>(exist)
   })
   .await?;
-
   Ok(exist.is_some())
 }

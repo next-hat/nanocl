@@ -174,21 +174,21 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use crate::services::ntex_config;
 
-  use ntex::http::StatusCode;
+  use ntex::http;
   use nanocl_stubs::system::HostInfo;
 
   use crate::utils::tests::*;
 
   #[ntex::test]
   async fn watch_events() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
     let resp = srv.get("/v0.2/events").send().await?;
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::OK,
+      http::StatusCode::OK,
       "Expect status to be {} got {}",
-      StatusCode::OK,
+      http::StatusCode::OK,
       status
     );
     Ok(())
@@ -196,14 +196,14 @@ mod tests {
 
   #[ntex::test]
   async fn system_info() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
     let mut resp = srv.get("/v0.2/info").send().await?;
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::OK,
+      http::StatusCode::OK,
       "Expect status to be {} got {}",
-      StatusCode::OK,
+      http::StatusCode::OK,
       status
     );
     let _ = resp
@@ -215,23 +215,23 @@ mod tests {
 
   #[ntex::test]
   async fn wrong_version() {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
     let resp = srv.get("/v12.44/info").send().await.unwrap();
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::NOT_FOUND,
+      http::StatusCode::NOT_FOUND,
       "Expect status to be {} got {}",
-      StatusCode::NOT_FOUND,
+      http::StatusCode::NOT_FOUND,
       status
     );
     let resp = srv.get("/v5.2/info").send().await.unwrap();
     let status = resp.status();
     assert_eq!(
       status,
-      StatusCode::NOT_FOUND,
+      http::StatusCode::NOT_FOUND,
       "Expect status to be {} got {}",
-      StatusCode::NOT_FOUND,
+      http::StatusCode::NOT_FOUND,
       status
     );
   }

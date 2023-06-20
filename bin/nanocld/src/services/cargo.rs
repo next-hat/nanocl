@@ -2,17 +2,16 @@
 * Endpoints to manipulate cargoes
 */
 
-use nanocl_stubs::cargo::CargoScale;
 use ntex::rt;
 use ntex::web;
-use ntex::http::StatusCode;
+use ntex::http;
 
 use bollard_next::exec::CreateExecOptions;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
-  CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery,
+  CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery, CargoScale,
 };
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
@@ -68,7 +67,7 @@ pub(crate) async fn list_cargo_instance(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let instances = utils::cargo::list_instance(&key, &state.docker_api).await?;
+  let instances = utils::cargo::list_instances(&key, &state.docker_api).await?;
   Ok(web::HttpResponse::Ok().json(&instances))
 }
 
@@ -93,7 +92,7 @@ async fn inspect_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let cargo = utils::cargo::inspect(&key, &state).await?;
+  let cargo = utils::cargo::inspect_by_key(&key, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -122,7 +121,7 @@ pub(crate) async fn create_cargo(
     utils::cargo::create(&namespace, &payload, &version, &state).await?;
   let key = cargo.key.to_owned();
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
     let _ = state
       .event_emitter
       .emit(Event::CargoCreated(Box::new(cargo)))
@@ -154,8 +153,8 @@ pub(crate) async fn delete_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let cargo = utils::cargo::inspect(&key, &state).await?;
-  utils::cargo::delete(&key, qs.force, &state).await?;
+  let cargo = utils::cargo::inspect_by_key(&key, &state).await?;
+  utils::cargo::delete_by_key(&key, qs.force, &state).await?;
   rt::spawn(async move {
     let _ = state
       .event_emitter
@@ -187,9 +186,9 @@ pub(crate) async fn start_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::start(&key, &state).await?;
+  utils::cargo::start_by_key(&key, &state).await?;
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
     let _ = state
       .event_emitter
       .emit(Event::CargoStarted(Box::new(cargo)))
@@ -220,10 +219,10 @@ pub(crate) async fn stop_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::inspect(&key, &state).await?;
-  utils::cargo::stop(&key, &state.docker_api).await?;
+  utils::cargo::inspect_by_key(&key, &state).await?;
+  utils::cargo::stop_by_key(&key, &state.docker_api).await?;
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
     let _ = state
       .event_emitter
       .emit(Event::CargoStopped(Box::new(cargo)))
@@ -254,7 +253,7 @@ pub(crate) async fn restart_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::inspect(&key, &state).await?;
+  utils::cargo::inspect_by_key(&key, &state).await?;
   utils::cargo::restart(&key, &state.docker_api).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
@@ -285,7 +284,7 @@ pub(crate) async fn put_cargo(
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::put(&key, &payload, &path.0, &state).await?;
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
     let _ = state
       .event_emitter
       .emit(Event::CargoPatched(Box::new(cargo)))
@@ -320,7 +319,7 @@ pub(crate) async fn patch_cargo(
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::patch(&key, &payload, &path.0, &state).await?;
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
     let _ = state
       .event_emitter
       .emit(Event::CargoPatched(Box::new(cargo)))
@@ -380,7 +379,7 @@ async fn kill_cargo(
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::kill(&key, &payload, &state.docker_api).await?;
+  utils::cargo::kill_by_name(&key, &payload, &state.docker_api).await?;
   Ok(web::HttpResponse::Ok().into())
 }
 
@@ -407,7 +406,7 @@ async fn list_cargo_history(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let histories =
-    repositories::cargo_config::list_by_cargo(&key, &state.pool).await?;
+    repositories::cargo_config::list_by_cargo_key(&key, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
@@ -435,7 +434,7 @@ async fn revert_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo_key = utils::key::gen_key(&namespace, &path.name);
   let config_id = uuid::Uuid::parse_str(&path.id).map_err(|err| HttpError {
-    status: StatusCode::BAD_REQUEST,
+    status: http::StatusCode::BAD_REQUEST,
     msg: format!("Invalid config id : {err}"),
   })?;
   let config =
@@ -449,7 +448,7 @@ async fn revert_cargo(
   .await?;
   let key = cargo_key.clone();
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
     let _ = state
       .event_emitter
       .emit(Event::CargoPatched(Box::new(cargo)))
@@ -520,7 +519,7 @@ async fn scale_cargo(
   utils::cargo::scale(&key, &payload, &state).await?;
   let key = key.clone();
   rt::spawn(async move {
-    let cargo = utils::cargo::inspect(&key, &state).await.unwrap();
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
     let _ = state
       .event_emitter
       .emit(Event::CargoPatched(Box::new(cargo)))
@@ -550,25 +549,24 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-
-  use ntex::http::StatusCode;
-
   use crate::services::ntex_config;
-  use nanocl_stubs::generic::GenericNspQuery;
+  use crate::utils::tests::*;
+  use crate::services::cargo_image::tests::ensure_test_image;
+
+  use ntex::http;
   use futures::{TryStreamExt, StreamExt};
+
+  use nanocl_stubs::generic::GenericNspQuery;
+  use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
   use nanocl_stubs::cargo::{
     Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
     CargoDeleteQuery, CargoListQuery, CargoScale,
   };
-  use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfig};
-
-  use crate::utils::tests::*;
-  use crate::services::cargo_image::tests::ensure_test_image;
 
   /// Test to create start patch stop and delete a cargo with valid data
   #[ntex::test]
   async fn basic() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
     ensure_test_image().await?;
 
     let test_cargoes = vec![
@@ -731,7 +729,7 @@ mod tests {
 
   #[ntex::test]
   async fn exec() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
 
     const CARGO_NAME: &str = "nstore";
 
@@ -747,7 +745,7 @@ mod tests {
       })
       .await?;
 
-    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.status(), http::StatusCode::OK);
     let mut stream = res.into_stream();
     let mut payload = Vec::new();
     while let Some(data) = stream.next().await {
@@ -765,7 +763,7 @@ mod tests {
 
   #[ntex::test]
   async fn scale() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
 
     const CARGO_NAME: &str = "api-test-scale";
     let res = srv
@@ -818,7 +816,7 @@ mod tests {
 
   #[ntex::test]
   async fn logs() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
 
     const CARGO_NAME: &str = "nstore";
 
@@ -831,7 +829,7 @@ mod tests {
       .send()
       .await?;
 
-    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.status(), http::StatusCode::OK);
     let mut stream = res.into_stream();
     let mut payload = Vec::new();
     let data = stream.next().await.unwrap().unwrap();

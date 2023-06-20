@@ -80,7 +80,7 @@ mod tests {
 
   #[ntex::test]
   async fn basic() -> TestRet {
-    let srv = generate_server(ntex_config).await;
+    let srv = gen_server(ntex_config).await;
     test_list(&srv).await?;
     test_count(&srv).await?;
     Ok(())
