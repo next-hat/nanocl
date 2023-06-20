@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::time::Duration;
+use std::collections::HashMap;
 
 use ntex::rt;
 use ntex::ws;
@@ -52,7 +52,6 @@ impl NodeClient {
         msg: format!("Failed to connect to websocket: {}", err),
         status: http::StatusCode::INTERNAL_SERVER_ERROR,
       })?;
-
     Ok(con)
   }
 }
@@ -93,7 +92,7 @@ impl NodeClients {
       }
       #[allow(unused_variables)]
       NodeClientsMessage::ReceiveMessage { msg } => {
-        // println!("[CLIENT] received {}", msg.data);
+        log::debug!("Received message from node: {}", msg.data);
       }
     }
   }
@@ -217,9 +216,7 @@ pub async fn register(daemon_state: &DaemonState) -> IoResult<()> {
     name: daemon_state.config.hostname.clone(),
     ip_address: daemon_state.config.gateway.clone(),
   };
-
   repositories::node::create_if_not_exists(&node, &daemon_state.pool).await?;
-
   Ok(())
 }
 
