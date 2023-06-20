@@ -20,8 +20,8 @@ use crate::models::{Pool, ResourceConfigDbModel};
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///  - [Ok](ResourceConfigDbModel) - Resource config created
-/// - [Err](IoError) - Error during the operation
+///   - [Ok](ResourceConfigDbModel) - Resource config created
+///   - [Err](IoError) - Error during the operation
 ///
 pub async fn create(
   item: &ResourceConfigDbModel,

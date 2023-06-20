@@ -2067,7 +2067,8 @@ dependencies = [
 [[package]]
 name = "ntex-cors"
 version = "0.3.0"
-source = "git+https://github.com/ntex-rs/ntex-extras.git#c7f1ba1d488ec010caebbdacf33fd63239ed681f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ed4c21ff50b16b7f5f2e2c3ada3f2fc05bdfd1a0cd52665fb0a7b1681f5d00c"
 dependencies = [
  "derive_more",
  "futures",
@@ -3258,9 +3259,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.24"
+version = "0.1.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f57e3ca2a01450b1a921183a9c9cbfda207fd822cef4ccb00a65402cbba7a74"
+checksum = "8803eee176538f94ae9a14b55b2804eb7e1441f8210b1c31290b3bccdccff73b"
 dependencies = [
  "proc-macro2",
  "quote",
