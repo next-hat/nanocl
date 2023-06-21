@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sync VM image directory to nanocld system by [@tyrone-wu](https://github.com/tyrone-wu)
 - Acceptance of `VirtualMachine` type for state files by [@tyrone-wu](https://github.com/tyrone-wu)
 
+### Fixed
+
+- VM runtime with default to latest `nanocl-qemu` image
+- Removed useless devices bindings to start a VM
+
 ## [0.8.0] - 2023-06-03
 
 ### Changed
