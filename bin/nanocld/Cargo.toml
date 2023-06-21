@@ -68,7 +68,7 @@ chrono = { version = "0.4.24", default-features = false, features = [
 ] }
 jsonschema = { version = "0.17.0", default-features = false }
 nanocld_client = { version = "0.8.0", features = ["tokio"] }
-openssl = { version = "0.10.50", features = ["vendored"] }
+openssl = { version = "0.10.55", features = ["vendored"] }
 metrsd_client = "0.1.1"
 nanocl_stubs = { version = "0.8.0", features = ["serde"] }
 nanocl_utils = { version = "0.1.3", features = [
