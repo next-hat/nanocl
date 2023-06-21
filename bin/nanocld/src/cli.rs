@@ -37,6 +37,15 @@ pub struct Cli {
   /// Group id
   #[clap(long, default_value = "0")]
   pub(crate) gid: u32,
+  /// Docker daemon ssl certificate
+  #[clap(long)]
+  pub(crate) ssl_cert: Option<String>,
+  /// Docker daemon ssl key
+  #[clap(long)]
+  pub(crate) ssl_key: Option<String>,
+  /// Docker daemon ssl ca
+  #[clap(long)]
+  pub(crate) ssl_ca: Option<String>,
 }
 
 /// Cli arguments unit test
@@ -68,6 +77,12 @@ mod tests {
       "/var/lib/nanocl",
       "--conf-dir",
       "/etc/nanocl",
+      "--ssl-cert",
+      "/path/to/cert",
+      "--ssl-key",
+      "/path/to/key",
+      "--ssl-ca",
+      "/path/to/ca",
     ]);
     assert_eq!(
       args.hosts,
@@ -77,5 +92,8 @@ mod tests {
     assert_eq!(args.docker_host, Some(String::from("/run/docker.sock")));
     assert_eq!(args.state_dir, Some(String::from("/var/lib/nanocl")));
     assert_eq!(args.conf_dir, String::from("/etc/nanocl"));
+    assert_eq!(args.ssl_cert, Some(String::from("/path/to/cert")));
+    assert_eq!(args.ssl_key, Some(String::from("/path/to/key")));
+    assert_eq!(args.ssl_ca, Some(String::from("/path/to/ca")));
   }
 }

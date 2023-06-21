@@ -154,6 +154,9 @@ mod tests {
       hostname: None,
       advertise_addr: None,
       nodes: Vec::default(),
+      ssl_ca: None,
+      ssl_cert: None,
+      ssl_key: None,
     };
     let config = DaemonConfigFile {
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
@@ -228,6 +231,9 @@ mod tests {
       advertise_addr: None,
       hostname: None,
       nodes: Vec::default(),
+      ssl_ca: None,
+      ssl_cert: None,
+      ssl_key: None,
     };
     let config = init(&args).unwrap();
     assert_eq!(config.hosts, args.hosts.unwrap());
