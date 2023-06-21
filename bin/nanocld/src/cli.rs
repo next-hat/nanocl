@@ -37,13 +37,13 @@ pub struct Cli {
   /// Group id
   #[clap(long, default_value = "0")]
   pub(crate) gid: u32,
-  /// Docker daemon ssl certificate
+  /// ssl certificate
   #[clap(long)]
   pub(crate) ssl_cert: Option<String>,
-  /// Docker daemon ssl key
+  /// ssl key
   #[clap(long)]
   pub(crate) ssl_key: Option<String>,
-  /// Docker daemon ssl ca
+  /// ssl ca
   #[clap(long)]
   pub(crate) ssl_ca: Option<String>,
 }
