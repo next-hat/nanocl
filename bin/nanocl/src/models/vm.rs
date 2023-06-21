@@ -134,6 +134,9 @@ pub struct VmRunOpts {
   /// Size of the disk in GB
   #[clap(long = "img-size")]
   pub image_size: Option<u64>,
+  /// Enable KVM
+  #[clap(long)]
+  pub kvm: bool,
   /// Name of the vm
   pub name: String,
   /// Name of the vm image
@@ -156,6 +159,7 @@ impl From<VmRunOpts> for VmConfigPartial {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
+        kvm: Some(val.kvm),
         ..Default::default()
       }),
       ..Default::default()
@@ -186,6 +190,9 @@ pub struct VmCreateOpts {
   /// Ssh key for the user
   #[clap(long)]
   pub ssh_key: Option<String>,
+  /// Enable KVM
+  #[clap(long)]
+  pub kvm: bool,
   /// Name of the vm
   pub name: String,
   /// Name of the vm image
@@ -204,6 +211,7 @@ impl From<VmCreateOpts> for VmConfigPartial {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
+        kvm: Some(val.kvm),
         ..Default::default()
       }),
       disk: VmDiskConfig {
