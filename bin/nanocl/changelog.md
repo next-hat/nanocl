@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Acceptance of `VirtualMachine` type for state files by [@tyrone-wu](https://github.com/tyrone-wu)
 - Option `-kvm` when running or creating a VM
+- vm start,stop,remove take an array of name
+- vm run `-a` options to attach to the vm directly after the run
 
 ## [0.8.1] - 2023-06-04
 
