@@ -293,11 +293,7 @@ pub async fn create_instance(
     vec!["-hda".into(), image.path.clone(), "--nographic".into()];
   let host_config = vm.config.host_config.clone();
   let kvm = host_config.kvm.unwrap_or(false);
-  let mut devices = vec![DeviceMapping {
-    path_on_host: Some("/dev/net/tun".into()),
-    path_in_container: Some("/dev/net/tun".into()),
-    cgroup_permissions: Some("rwm".into()),
-  }];
+  let mut devices = vec![];
   if kvm {
     args.push("-accel".into());
     args.push("kvm".into());
@@ -331,8 +327,12 @@ pub async fn create_instance(
   if let Some(ssh_key) = &vm.config.ssh_key {
     env.push(format!("SSH_KEY={ssh_key}"));
   }
+  let image = match &vm.config.host_config.runtime {
+    Some(runtime) => runtime.to_owned(),
+    None => "ghcr.io/nxthat/nanocl-qemu:8.0.2.0".into(),
+  };
   let config = bollard_next::container::Config {
-    image: Some("ghcr.io/nxthat/nanocl-qemu:7.1.0.0".into()),
+    image: Some(image),
     tty: Some(true),
     hostname: vm.config.hostname.clone(),
     env: Some(env),
@@ -383,6 +383,11 @@ pub async fn create(
   version: &str,
   state: &DaemonState,
 ) -> Result<Vm, HttpError> {
+  log::debug!(
+    "Creating VM {} in namespace {} with version: {version}",
+    vm.name,
+    namespace
+  );
   let vm_key = utils::key::gen_key(namespace, &vm.name);
   let mut vm = vm.clone();
   if repositories::vm::find_by_key(&vm_key, &state.pool)
