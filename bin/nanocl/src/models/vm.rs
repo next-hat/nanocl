@@ -21,22 +21,13 @@ pub enum VmCommands {
   #[clap(alias = "ls")]
   List(VmListOpts),
   #[clap(alias = "rm")]
-  Remove {
-    /// Names of the vm
-    names: Vec<String>,
-  },
+  Remove(VmNamesOpts),
   /// Inspect a vm
   Inspect(VmInspectOpts),
   /// Start a vm
-  Start {
-    /// Name of the vm
-    name: String,
-  },
+  Start(VmNamesOpts),
   /// Stop a vm
-  Stop {
-    /// Name of the vm
-    name: String,
-  },
+  Stop(VmNamesOpts),
   /// Attach to a vm
   Attach {
     /// Name of the vm
@@ -44,6 +35,12 @@ pub enum VmCommands {
   },
   /// Patch a vm
   Patch(VmPatchOpts),
+}
+
+#[derive(Debug, Parser)]
+pub struct VmNamesOpts {
+  /// Names of the vm
+  pub names: Vec<String>,
 }
 
 #[derive(Debug, Parser)]
@@ -137,6 +134,9 @@ pub struct VmRunOpts {
   /// Enable KVM
   #[clap(long)]
   pub kvm: bool,
+  /// Attach to the vm
+  #[clap(short, long)]
+  pub attach: bool,
   /// Name of the vm
   pub name: String,
   /// Name of the vm image
