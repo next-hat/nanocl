@@ -342,7 +342,6 @@ pub async fn create_instance(
     attach_stdin: Some(true),
     attach_stdout: Some(true),
     open_stdin: Some(true),
-    stdin_once: Some(true),
     host_config: Some(HostConfig {
       network_mode: Some(vm.namespace_name.to_owned()),
       binds: Some(vec![format!("{vmimagespath}:/var/lib/nanocl/vms/images")]),
