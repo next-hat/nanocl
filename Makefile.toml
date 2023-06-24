@@ -19,7 +19,15 @@ args = ["run", "--bin", "nanocld", "${@}"]
 # Run cli
 [tasks.run-cli]
 command = "cargo"
-args = ["run", "--bin", "nanocl", "${@}"]
+args = [
+  "run",
+  "--no-default-features",
+  "--features",
+  "dev",
+  "--bin",
+  "nanocl",
+  "${@}",
+]
 
 # Test daemon
 [tasks.tests-daemon]
@@ -59,8 +67,6 @@ args = [
   "--no-default-features",
   "--features",
   "test",
-  "-j",
-  "1",
   "--nocapture",
 ]
 

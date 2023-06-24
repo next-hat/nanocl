@@ -6,12 +6,10 @@ use std::path::Path;
 use std::os::unix::prelude::PermissionsExt;
 
 use ntex::rt;
-
 use clap::Parser;
 
 mod cli;
 mod version;
-
 mod node;
 mod boot;
 mod utils;

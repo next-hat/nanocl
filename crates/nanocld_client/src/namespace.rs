@@ -17,7 +17,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let namespaces = client.list_namespace().await;
   /// ```
   ///
@@ -78,7 +78,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let namespace = client.inspect_namespace("my-namespace").await?;
   /// ```
   ///
@@ -115,7 +115,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// client.delete_namespace("my-namespace").await?;
   /// ```
   ///
@@ -141,7 +141,7 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const NAMESPACE: &str = "clientnt";
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
 
     client.list_namespace().await.unwrap();
 

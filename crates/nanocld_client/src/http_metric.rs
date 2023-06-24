@@ -23,7 +23,7 @@ mod tests {
 
   #[ntex::test]
   async fn list_metric() -> Result<(), HttpClientError> {
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
     let res = client.list_http_metric(None::<HttpMetricListQuery>).await;
     assert!(res.is_ok());
     Ok(())

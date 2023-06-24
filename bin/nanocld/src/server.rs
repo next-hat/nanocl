@@ -1,5 +1,5 @@
 use ntex::web;
-use ntex_cors::Cors;
+// use ntex_cors::Cors;
 
 use nanocl_utils::ntex::middlewares;
 
@@ -36,7 +36,7 @@ pub async fn gen(
       .state(
         web::types::PayloadConfig::new(20_000_000_000), // <- limit size of the payload
       )
-      .wrap(Cors::new().finish())
+      // .wrap(Cors::new().finish())
       .wrap(middlewares::SerializeError)
       // Default logger middleware
       // .wrap(web::middleware::Logger::default())
@@ -107,8 +107,13 @@ mod tests {
   #[ntex::test]
   async fn server_on_tmp_unix_socket() -> TestRet {
     before();
-    let args =
-      Cli::parse_from(vec!["nanocl", "-H", "unix:///tmp/nanocl_test.sock"]);
+    let args = Cli::parse_from(vec![
+      "nanocl",
+      "-H",
+      "unix:///tmp/nanocl_test.sock",
+      "--state-dir",
+      "/tmp/nanocl",
+    ]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)
       .await
@@ -122,7 +127,13 @@ mod tests {
   #[ntex::test]
   async fn server_on_tcp_socket() -> TestRet {
     before();
-    let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9999"]);
+    let args = Cli::parse_from(vec![
+      "nanocl",
+      "-H",
+      "tcp://127.0.0.1:9999",
+      "--state-dir",
+      "/tmp/nanocl",
+    ]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)
       .await
@@ -137,7 +148,13 @@ mod tests {
   #[ntex::test]
   async fn server_on_same_tcp_socket() -> TestRet {
     before();
-    let args = Cli::parse_from(vec!["nanocl", "-H", "tcp://127.0.0.1:9888"]);
+    let args = Cli::parse_from(vec![
+      "nanocl",
+      "-H",
+      "tcp://127.0.0.1:9888",
+      "--state-dir",
+      "/tmp/nanocl",
+    ]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)
       .await
@@ -158,7 +175,13 @@ mod tests {
   #[ntex::test]
   async fn server_on_invalid_unix_socket() -> TestRet {
     before();
-    let args = Cli::parse_from(vec!["nanocl", "-H", "unix:///root/test.sock"]);
+    let args = Cli::parse_from(vec![
+      "nanocl",
+      "-H",
+      "unix:///root/test.sock",
+      "--state-dir",
+      "/tmp/nanocl",
+    ]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)
       .await
@@ -173,7 +196,13 @@ mod tests {
   #[ntex::test]
   async fn server_on_invalid_host() -> TestRet {
     before();
-    let args = Cli::parse_from(vec!["nanocl", "-H", "not_valid"]);
+    let args = Cli::parse_from(vec![
+      "nanocl",
+      "-H",
+      "not_valid",
+      "--state-dir",
+      "/tmp/nanocl",
+    ]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)
       .await

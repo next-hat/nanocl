@@ -25,7 +25,7 @@ use crate::version::VERSION;
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   let vm_dir = format!("{state_dir}/vms/images");
   fs::create_dir_all(vm_dir).await.map_err(|err| {
-    err.map_err_context(|| "Unable to create {state_dir}/vms/images")
+    err.map_err_context(|| format!("Unable to create {state_dir}/vms/images"))
   })?;
   Ok(())
 }
@@ -89,7 +89,7 @@ mod tests {
       init: false,
       hosts: None,
       docker_host: None,
-      state_dir: None,
+      state_dir: Some(String::from("/tmp/nanocl")),
       conf_dir: String::from("/etc/nanocl"),
       gateway: None,
       nodes: Vec::default(),
@@ -98,7 +98,7 @@ mod tests {
     };
     let config = config::init(&args).expect("Expect to init config");
     // test function init
-    let _ = init(&config).await.expect("Expect to init state");
+    let _ = init(&config).await.unwrap();
 
     Ok(())
   }

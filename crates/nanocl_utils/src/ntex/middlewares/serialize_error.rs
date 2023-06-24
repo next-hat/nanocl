@@ -1,7 +1,7 @@
 use ntex::web;
 use ntex::http;
 use ntex::util::BytesMut;
-use ntex::{Service, Middleware, util::BoxFuture};
+use ntex::{Service, Middleware, util::BoxFuture, ServiceCtx};
 use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer};
 use futures::StreamExt;
 
@@ -31,9 +31,13 @@ where
 
   ntex::forward_poll_ready!(service);
 
-  fn call(&self, req: WebRequest<Err>) -> Self::Future<'_> {
+  fn call<'a>(
+    &'a self,
+    req: WebRequest<Err>,
+    ctx: ServiceCtx<'a, Self>,
+  ) -> Self::Future<'_> {
     Box::pin(async move {
-      let mut res = self.service.call(req).await?;
+      let mut res = ctx.call(&self.service, req).await?;
       if res.status() == http::StatusCode::BAD_REQUEST {
         let content_type = res.headers().get(http::header::CONTENT_TYPE);
         if let Some(content_type) = content_type {
