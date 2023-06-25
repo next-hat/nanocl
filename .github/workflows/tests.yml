@@ -56,7 +56,7 @@ jobs:
           cargo build --no-default-features --features test --bin nanocld --hosts tcp://0.0.0.0:8585
           docker compose -f ./docker-compose.test.yaml up -d
           cargo run --no-default-features --features test --bin nanocld -- --init
-          cargo run --no-default-features --features test --bin nanocld &
+          cargo run --no-default-features --features test --bin nanocld --hosts tcp://0.0.0.0:8585 &
           sleep 8
           sudo mkdir -p /var/lib/nanocl/proxy
           sudo chmod 777 -R /run/nanocl
