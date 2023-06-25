@@ -53,10 +53,10 @@ jobs:
           docker buildx build --load --cache-from type=local,src=.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
           cargo build --no-default-features --features test --bin nanocl
           cargo build --no-default-features --features test --bin ncdproxy
-          cargo build --no-default-features --features test --bin nanocld --hosts tcp://0.0.0.0:8585
+          cargo build --no-default-features --features test --bin nanocld
           docker compose -f ./docker-compose.test.yaml up -d
           cargo run --no-default-features --features test --bin nanocld -- --init
-          cargo run --no-default-features --features test --bin nanocld --hosts tcp://0.0.0.0:8585 &
+          cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 &
           sleep 8
           sudo mkdir -p /var/lib/nanocl/proxy
           sudo chmod 777 -R /run/nanocl

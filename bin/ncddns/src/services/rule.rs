@@ -78,16 +78,18 @@ mod tests {
     let resource = yaml["Resources"][0].clone();
     let name = resource["Name"].as_str().unwrap();
 
-    let res = test_srv
-      .put(format!("/v0.1/rules/{name}"))
+    let mut res = test_srv
+      .put(format!("/v0.2/rules/{name}"))
       .send_json(&resource["Config"])
       .await
       .unwrap();
 
+    println!("{:#?}", res);
+    let json = res.json::<serde_json::Value>().await.unwrap();
+    println!("{:#?}", json);
     assert_eq!(res.status(), http::StatusCode::OK);
-
     let res = test_srv
-      .delete(format!("/v0.1/rules/{name}"))
+      .delete(format!("/v0.2/rules/{name}"))
       .send()
       .await
       .unwrap();
