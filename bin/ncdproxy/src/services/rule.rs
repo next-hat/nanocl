@@ -96,12 +96,15 @@ mod tests {
 
     let payload = resource["Config"].clone();
 
-    let res = test_srv
+    let mut res = test_srv
       .put(format!("/v0.4/rules/{name}"))
       .send_json(&payload)
       .await
       .unwrap();
 
+    println!("{:#?}", res);
+    let json = res.json::<serde_json::Value>().await.unwrap();
+    println!("{:#?}", json);
     assert_eq!(res.status(), http::StatusCode::OK);
 
     let res = test_srv

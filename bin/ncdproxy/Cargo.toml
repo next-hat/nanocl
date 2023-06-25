@@ -18,6 +18,7 @@ path = "src/main.rs"
 
 [features]
 dev = ["dep:utoipa", "nanocld_client/utoipa", "nanocl_utils/ntex_swagger"]
+test = []
 
 [build-dependencies]
 clap = { version = "4.1.7", features = ["derive"] }
