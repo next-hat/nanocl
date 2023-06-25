@@ -242,7 +242,13 @@ async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
 pub(crate) fn spawn(nginx: &Nginx) {
   let nginx = nginx.clone();
   rt::Arbiter::new().exec_fn(move || {
-    let client = NanocldClient::connect_with_unix_default();
+    #[allow(unused)]
+    let mut client = NanocldClient::connect_with_unix_default();
+    #[cfg(any(feature = "dev", feature = "test"))]
+    {
+      client =
+        NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    }
     ntex::rt::spawn(async move {
       r#loop(&client, &nginx).await;
     });
