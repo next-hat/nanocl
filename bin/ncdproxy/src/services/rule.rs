@@ -26,7 +26,13 @@ pub async fn apply_rule(
   nginx: web::types::State<Nginx>,
   web::types::Json(payload): web::types::Json<ResourceProxyRule>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let client = NanocldClient::connect_with_unix_default();
+  #[allow(unused)]
+  let mut client = NanocldClient::connect_with_unix_default();
+  #[cfg(any(feature = "dev", feature = "test"))]
+  {
+    client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+  }
 
   utils::create_resource_conf(&path.1, &payload, &client, &nginx).await?;
   utils::reload_config(&client).await?;
@@ -51,7 +57,13 @@ pub async fn remove_rule(
   path: web::types::Path<(String, String)>,
   nginx: web::types::State<Nginx>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let client = NanocldClient::connect_with_unix_default();
+  #[allow(unused)]
+  let mut client = NanocldClient::connect_with_unix_default();
+  #[cfg(any(feature = "dev", feature = "test"))]
+  {
+    client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+  }
 
   nginx.delete_conf_file(&path.1).await;
   utils::reload_config(&client).await?;
@@ -84,12 +96,15 @@ mod tests {
 
     let payload = resource["Config"].clone();
 
-    let res = test_srv
+    let mut res = test_srv
       .put(format!("/v0.4/rules/{name}"))
       .send_json(&payload)
       .await
       .unwrap();
 
+    println!("{:#?}", res);
+    let json = res.json::<serde_json::Value>().await.unwrap();
+    println!("{:#?}", json);
     assert_eq!(res.status(), http::StatusCode::OK);
 
     let res = test_srv

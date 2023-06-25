@@ -1,8 +1,8 @@
 /// Versionning middleware
 use std::rc::Rc;
 
-use ntex::{Service, Middleware};
-use futures::future::{ok, Either, Ready};
+use ntex::{Service, ServiceCtx, Middleware};
+use futures::future::{ok, Either, Ready, LocalBoxFuture};
 use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
 
 struct Inner {
@@ -68,11 +68,15 @@ where
 {
   type Response = WebResponse;
   type Error = Error;
-  type Future<'f> = Either<S::Future<'f>, Ready<Result<Self::Response, Self::Error>>> where Self: 'f;
+  type Future<'f> = Either<LocalBoxFuture<'f, Result<Self::Response, S::Error>>, Ready<Result<Self::Response, S::Error>>> where Self: 'f;
 
   ntex::forward_poll_ready!(service);
 
-  fn call(&self, mut req: WebRequest<Err>) -> Self::Future<'_> {
+  fn call<'a>(
+    &'a self,
+    mut req: WebRequest<Err>,
+    ctx: ServiceCtx<'a, Self>,
+  ) -> Self::Future<'_> {
     let version = req.match_info_mut().get("version");
     match version {
       None => {}
@@ -91,6 +95,6 @@ where
         }
       }
     }
-    Either::Left(self.service.call(req))
+    Either::Left(Box::pin(async move { ctx.call(&self.service, req).await }))
   }
 }

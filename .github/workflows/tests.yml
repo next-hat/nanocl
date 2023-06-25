@@ -45,7 +45,7 @@ jobs:
       # Setup daemon for the tests
       - name: Setup
         run: |
-          sudo sh -c "echo '\n127.0.0.1 nstore.nanocl.internal' >> /etc/hosts"
+          sudo sh -c "echo '\n127.0.0.1 nstore.nanocl.internal\n127.0.0.1 ndaemon.nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v22.2.7
           docker pull ghcr.io/nxthat/metrsd:0.2.0
           docker pull nexthat/nanocl-get-started:latest
@@ -56,7 +56,7 @@ jobs:
           cargo build --no-default-features --features test --bin nanocld
           docker compose -f ./docker-compose.test.yaml up -d
           cargo run --no-default-features --features test --bin nanocld -- --init
-          cargo run --no-default-features --features test --bin nanocld &
+          cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 &
           sleep 8
           sudo mkdir -p /var/lib/nanocl/proxy
           sudo chmod 777 -R /run/nanocl

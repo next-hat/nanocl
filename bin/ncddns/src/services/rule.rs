@@ -27,7 +27,13 @@ pub(crate) async fn apply_rule(
   dnsmasq: web::types::State<Dnsmasq>,
   web::types::Json(payload): web::types::Json<ResourceDnsRule>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let client = NanocldClient::connect_with_unix_default();
+  #[allow(unused)]
+  let mut client = NanocldClient::connect_with_unix_default();
+  #[cfg(any(feature = "dev", feature = "test"))]
+  {
+    client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+  }
   utils::write_rule(&path.1, &payload, &dnsmasq, &client).await?;
   utils::reload_service(&client).await?;
   Ok(web::HttpResponse::Ok().json(&payload))
@@ -50,7 +56,13 @@ pub(crate) async fn remove_rule(
   path: web::types::Path<(String, String)>,
   dnsmasq: web::types::State<Dnsmasq>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let client = NanocldClient::connect_with_unix_default();
+  #[allow(unused)]
+  let mut client = NanocldClient::connect_with_unix_default();
+  #[cfg(any(feature = "dev", feature = "test"))]
+  {
+    client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+  }
   dnsmasq.remove_config(&path.1).await?;
   utils::reload_service(&client).await?;
   Ok(web::HttpResponse::Ok().finish())
@@ -78,16 +90,18 @@ mod tests {
     let resource = yaml["Resources"][0].clone();
     let name = resource["Name"].as_str().unwrap();
 
-    let res = test_srv
-      .put(format!("/v0.1/rules/{name}"))
+    let mut res = test_srv
+      .put(format!("/v0.2/rules/{name}"))
       .send_json(&resource["Config"])
       .await
       .unwrap();
 
+    println!("{:#?}", res);
+    let json = res.json::<serde_json::Value>().await.unwrap();
+    println!("{:#?}", json);
     assert_eq!(res.status(), http::StatusCode::OK);
-
     let res = test_srv
-      .delete(format!("/v0.1/rules/{name}"))
+      .delete(format!("/v0.2/rules/{name}"))
       .send()
       .await
       .unwrap();

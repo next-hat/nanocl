@@ -6,7 +6,8 @@ Namespace: global
 VirtualMachines:
   - Name: vm-test
     Disk:
-      Image: test-ubuntu22-clone
+      Image: ubuntu-22
     HostConfig:
       Cpu: 2
       Memory: 2048
+      Kvm: true

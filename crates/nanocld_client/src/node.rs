@@ -20,7 +20,7 @@ mod tests {
 
   #[ntex::test]
   async fn basic() {
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
     let node = client.list_node().await;
     assert!(node.is_ok());
   }

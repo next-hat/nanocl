@@ -570,16 +570,16 @@ mod tests {
     ensure_test_image().await?;
 
     let test_cargoes = vec![
-      "daemon-test-cargo1",
-      "another-test-cargo",
-      "daemon-test-cargo3",
+      "1daemon-test-cargo",
+      "2another-test-cargo",
+      "2daemon-test-cargo",
     ];
     let main_test_cargo = test_cargoes[0];
 
     for test_cargo in test_cargoes.iter() {
       let test_cargo = test_cargo.to_string();
       let mut res = srv
-        .post("/v0.8/cargoes")
+        .post("/v0.9/cargoes")
         .send_json(&CargoConfigPartial {
           name: test_cargo.clone(),
           container: bollard_next::container::Config {
@@ -589,9 +589,12 @@ mod tests {
           ..Default::default()
         })
         .await?;
-      assert_eq!(res.status(), 201);
 
-      let response = res.json::<Cargo>().await?;
+      println!("res: {:?}", res);
+      let json = res.json::<serde_json::Value>().await?;
+      println!("json: {:?}", json);
+      assert_eq!(res.status(), 201);
+      let response: Cargo = serde_json::from_value(json).unwrap();
       assert_eq!(response.name, test_cargo);
       assert_eq!(response.namespace_name, "global");
       assert_eq!(
@@ -601,7 +604,7 @@ mod tests {
     }
 
     let mut res = srv
-      .get("/v0.8/cargoes")
+      .get("/v0.9/cargoes")
       .query(&CargoListQuery {
         name: Some(test_cargoes.get(1).unwrap().to_string()),
         namespace: None,
@@ -615,7 +618,7 @@ mod tests {
     assert_eq!(cargoes[0].name, test_cargoes[1].to_string());
 
     let mut res = srv
-      .get("/v0.8/cargoes")
+      .get("/v0.9/cargoes")
       .query(&CargoListQuery {
         name: None,
         namespace: None,
@@ -629,7 +632,7 @@ mod tests {
     assert_eq!(cargoes.len(), 1);
 
     let mut res = srv
-      .get(format!("/v0.8/cargoes/{main_test_cargo}/inspect"))
+      .get(format!("/v0.9/cargoes/{main_test_cargo}/inspect"))
       .send()
       .await?;
     assert_eq!(res.status(), 200);
@@ -637,20 +640,20 @@ mod tests {
     let response = res.json::<CargoInspect>().await?;
     assert_eq!(response.name, main_test_cargo);
 
-    let mut res = srv.get("/v0.8/cargoes").send().await?;
+    let mut res = srv.get("/v0.9/cargoes").send().await?;
     assert_eq!(res.status(), 200);
     let cargoes = res.json::<Vec<CargoSummary>>().await?;
     assert!(!cargoes.is_empty());
     assert_eq!(cargoes[0].namespace_name, "global");
 
     let res = srv
-      .post(format!("/v0.8/cargoes/{}/start", response.name))
+      .post(format!("/v0.9/cargoes/{}/start", response.name))
       .send()
       .await?;
     assert_eq!(res.status(), 202);
 
     let mut res = srv
-      .put(format!("/v0.8/cargoes/{}", response.name))
+      .put(format!("/v0.9/cargoes/{}", response.name))
       .send_json(&CargoConfigPartial {
         name: main_test_cargo.to_string(),
         container: bollard_next::container::Config {
@@ -676,7 +679,7 @@ mod tests {
     );
 
     let mut res = srv
-      .get(format!("/v0.8/cargoes/{}/histories", response.name))
+      .get(format!("/v0.9/cargoes/{}/histories", response.name))
       .send()
       .await?;
     assert_eq!(res.status(), 200);
@@ -686,7 +689,7 @@ mod tests {
     let id = histories[0].key;
     let res = srv
       .patch(format!(
-        "/v0.8/cargoes/{}/histories/{id}/revert",
+        "/v0.9/cargoes/{}/histories/{id}/revert",
         response.name
       ))
       .send()
@@ -695,19 +698,19 @@ mod tests {
     assert_eq!(res.status(), 200);
 
     let res = srv
-      .post(format!("/v0.8/cargoes/{}/stop", response.name))
+      .post(format!("/v0.9/cargoes/{}/stop", response.name))
       .send()
       .await?;
     assert_eq!(res.status(), 202);
 
     let res = srv
-      .delete(format!("/v0.8/cargoes/{}", response.name))
+      .delete(format!("/v0.9/cargoes/{}", response.name))
       .send()
       .await?;
     assert_eq!(res.status(), 202);
 
     let res = srv
-      .delete(format!("/v0.8/cargoes/{}", test_cargoes[1]))
+      .delete(format!("/v0.9/cargoes/{}", test_cargoes[1]))
       .query(&CargoDeleteQuery {
         namespace: None,
         force: Some(true),
@@ -716,7 +719,7 @@ mod tests {
       .await?;
     assert_eq!(res.status(), 202);
     let res = srv
-      .delete(format!("/v0.8/cargoes/{}", test_cargoes[2]))
+      .delete(format!("/v0.9/cargoes/{}", test_cargoes[2]))
       .query(&CargoDeleteQuery {
         namespace: None,
         force: Some(true),
@@ -734,7 +737,7 @@ mod tests {
     const CARGO_NAME: &str = "nstore";
 
     let res = srv
-      .post(format!("/v0.8/cargoes/{CARGO_NAME}/exec"))
+      .post(format!("/v0.9/cargoes/{CARGO_NAME}/exec"))
       .query(&GenericNspQuery {
         namespace: Some("system".into()),
       })
@@ -767,7 +770,7 @@ mod tests {
 
     const CARGO_NAME: &str = "api-test-scale";
     let res = srv
-      .post("/v0.8/cargoes")
+      .post("/v0.9/cargoes")
       .send_json(&CargoConfigPartial {
         name: CARGO_NAME.to_string(),
         container: bollard_next::container::Config {
@@ -780,32 +783,32 @@ mod tests {
     assert_eq!(res.status(), 201);
 
     let res = srv
-      .post(format!("/v0.8/cargoes/{CARGO_NAME}/start"))
+      .post(format!("/v0.9/cargoes/{CARGO_NAME}/start"))
       .send()
       .await?;
     assert_eq!(res.status(), 202);
 
     let res = srv
-      .patch(format!("/v0.8/cargoes/{CARGO_NAME}/scale"))
+      .patch(format!("/v0.9/cargoes/{CARGO_NAME}/scale"))
       .send_json(&CargoScale { replicas: 2 })
       .await?;
 
     assert_eq!(res.status(), 200);
 
     let res = srv
-      .patch(format!("/v0.8/cargoes/{CARGO_NAME}/scale"))
+      .patch(format!("/v0.9/cargoes/{CARGO_NAME}/scale"))
       .send_json(&CargoScale { replicas: -1 })
       .await?;
     assert_eq!(res.status(), 200);
 
     let res = srv
-      .post(format!("/v0.8/cargoes/{CARGO_NAME}/stop"))
+      .post(format!("/v0.9/cargoes/{CARGO_NAME}/stop"))
       .send()
       .await?;
     assert_eq!(res.status(), 202);
 
     let res = srv
-      .delete(format!("/v0.8/cargoes/{CARGO_NAME}"))
+      .delete(format!("/v0.9/cargoes/{CARGO_NAME}"))
       .send()
       .await?;
 
@@ -821,7 +824,7 @@ mod tests {
     const CARGO_NAME: &str = "nstore";
 
     let res = srv
-      .get(format!("/v0.8/cargoes/{CARGO_NAME}/logs"))
+      .get(format!("/v0.9/cargoes/{CARGO_NAME}/logs"))
       .query(&GenericNspQuery {
         namespace: Some("system".into()),
       })

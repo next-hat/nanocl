@@ -11,7 +11,7 @@ use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use ntex::channel::oneshot;
 use ntex::web::{HttpRequest, Error};
-use ntex::{pipeline, fn_service, Service};
+use ntex::{chain, fn_service, Service};
 use ntex::service::{fn_shutdown, map_config, fn_factory_with_config};
 use futures::StreamExt;
 use futures::future::ready;
@@ -361,7 +361,7 @@ async fn ws_attach_service(
   });
 
   // pipe our service with on_shutdown callback
-  Ok(pipeline(service).and_then(on_shutdown))
+  Ok(chain(service).and_then(on_shutdown))
 }
 
 /// Attach to a virtual machine via websocket

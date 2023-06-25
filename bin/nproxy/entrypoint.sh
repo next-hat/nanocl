@@ -20,7 +20,4 @@ if [ ! -f /usr/share/nginx/html/index.html ]; then
   cp /html/index.html /usr/share/nginx/html/index.html
 fi
 
-## Remove tmp files
-rm -f /html/403.html /html/502.html /html/index.html /html/default.conf
-
 nginx -g "daemon off;"

@@ -39,7 +39,7 @@ impl NodeClient {
   }
 
   pub async fn connect(&self) -> Result<WsConnection<Base>, HttpError> {
-    let url = format!("http://{}:8081/{VERSION}/nodes/ws", self.ip_addr);
+    let url = format!("http://{}/{VERSION}/nodes/ws", self.ip_addr);
     let con = ws::WsClient::build(url)
       .finish()
       .map_err(|err| HttpError {

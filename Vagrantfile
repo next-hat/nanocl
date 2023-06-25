@@ -39,6 +39,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "node1" do |node1|
     node1.vm.box = "debian/bullseye64"
+    config.vm.hostname = "nanocl-n1"
     node1.vm.provider :libvirt do |domain|
       domain.memory = 4096
       domain.cpus = 4
@@ -47,6 +48,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "node2" do |node2|
     node2.vm.box = "debian/bullseye64"
+    config.vm.hostname = "nanocl-n2"
     node2.vm.provider :libvirt do |domain|
       domain.memory = 4096
       domain.cpus = 4
@@ -55,6 +57,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "node3" do |node3|
     node3.vm.box = "debian/bullseye64"
+    config.vm.hostname = "nanocl-n3"
     node3.vm.provider :libvirt do |domain|
       domain.memory = 4096
       domain.cpus = 4

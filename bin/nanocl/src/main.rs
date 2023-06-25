@@ -26,7 +26,12 @@ async fn detect_version(client: &mut NanocldClient) -> IoResult<()> {
 async fn execute_args(args: &Cli) -> IoResult<()> {
   let cli_conf = config::read();
 
-  let host = args.host.clone().unwrap_or(cli_conf.host);
+  #[allow(unused)]
+  let mut host = args.host.clone().unwrap_or(cli_conf.host);
+  #[cfg(any(feature = "dev", feature = "test"))]
+  {
+    host = args.host.clone().unwrap_or("http://localhost:8585".into());
+  }
 
   let url = Box::leak(host.clone().into_boxed_str());
   let mut client = NanocldClient::connect_to(url, None);
@@ -166,7 +171,7 @@ mod tests {
 
     let args = Cli::parse_from(["nanocl", "cargo", "history", CARGO_NAME]);
     assert!(execute_args(&args).await.is_ok());
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
     let history = client
       .list_history_cargo(CARGO_NAME, None)
       .await
@@ -235,7 +240,7 @@ mod tests {
       Cli::parse_from(["nanocl", "resource", "history", "resource-example"]);
     assert!(execute_args(&args).await.is_ok());
 
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
     let history = client
       .list_history_resource("resource-example")
       .await

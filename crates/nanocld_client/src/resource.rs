@@ -22,7 +22,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let namespaces = client.list_resource().await;
   /// ```
   ///
@@ -57,7 +57,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   /// use nanocl_stubs::resource::ResourceKind;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let resource = client.create_resource(&ResourcePartial {
   ///   name: "my-resource".into(),
   ///   kind: String::from("Custom")s,
@@ -100,7 +100,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let resource = client.inspect_resource("my-resource").await;
   /// ```
   ///
@@ -138,7 +138,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let resource = client.patch_resource("my-resource", serde_json::json!({})).await;
   /// ```
   ///
@@ -177,7 +177,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let resource = client.delete_resource("my-resource").await;
   /// ```
   ///
@@ -234,7 +234,7 @@ mod tests {
 
   #[ntex::test]
   async fn basic() {
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
 
     // list
     client.list_resource(None).await.unwrap();
