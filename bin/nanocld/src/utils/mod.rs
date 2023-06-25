@@ -126,7 +126,7 @@ pub mod tests {
     before();
     // Build a test daemon config
     let config = DaemonConfig {
-      state_dir: String::from("/var/lib/nanocl"),
+      state_dir: String::from("/tmp/var/lib/nanocl"),
       ..Default::default()
     };
     let event_emitter = EventEmitter::new();
