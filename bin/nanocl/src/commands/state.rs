@@ -4,8 +4,10 @@ use std::collections::HashMap;
 use ntex::rt;
 use futures::StreamExt;
 use clap::{Arg, Command};
-use bollard_next::service::HostConfig;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use indicatif::{MultiProgress, ProgressBar};
+use bollard_next::service::HostConfig;
 
 use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
@@ -14,8 +16,6 @@ use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
 };
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 
 use crate::utils;
 use crate::models::{
