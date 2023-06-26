@@ -1,7 +1,10 @@
-use liquid::ObjectView;
-use regex::Regex;
+use std::collections::HashMap;
 
-use nanocld_client::stubs::state::StateMeta;
+use regex::Regex;
+use liquid::ObjectView;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+
+use nanocld_client::stubs::state::{StateMeta, StateStream, StateStreamStatus};
 
 use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 
@@ -128,4 +131,35 @@ pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
     IoError::invalid_data("Template rendering", &format!("{err}"))
   })?;
   Ok(output)
+}
+
+pub fn update_progress(
+  multiprogress: &MultiProgress,
+  layers: &mut HashMap<String, ProgressBar>,
+  id: &str,
+  state_stream: &StateStream,
+) {
+  if let Some(pg) = layers.get(id) {
+    pg.set_prefix(format!(
+      "{:#?}:{}",
+      &state_stream.status, &state_stream.kind
+    ));
+    if state_stream.status != StateStreamStatus::Pending {
+      pg.finish();
+    }
+  } else {
+    let spinner_style =
+      ProgressStyle::with_template("{spinner} {prefix:.bold} {wide_msg}")
+        .unwrap()
+        .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈-");
+    let pg = multiprogress.add(ProgressBar::new(1));
+    pg.enable_steady_tick(std::time::Duration::from_millis(50));
+    pg.set_style(spinner_style);
+    pg.set_message(state_stream.key.to_string());
+    pg.set_prefix(format!(
+      "{:#?}:{}",
+      &state_stream.status, &state_stream.kind
+    ));
+    layers.insert(id.to_owned(), pg);
+  }
 }
