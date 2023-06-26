@@ -54,6 +54,33 @@ services:
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
 
+  ncvpnkit:
+    container_name: ncvpnkit.system.c
+    image: ghcr.io/nxthat/nanocl-dev:dev
+    tty: true
+    hostname: ncvpnkit.nanocl.internal
+    networks:
+      - system
+    environment:
+      - TZ=Europe/Paris
+      - USER_HOME=${HOME}
+    labels:
+      - io.nanocl=enabled
+      - io.nanocl.c=ndaemon.system
+      - io.nanocl.n=system
+      - io.nanocl.cnsp=system
+    volumes:
+      - ./:/project
+      - ~/.cargo/registry:/usr/local/cargo/registry
+      - //run/guest-services/nanocl:/run/nanocl
+      - //run/host-services/backend.sock:/run/host-services/backend.sock
+    command:
+      - watch
+      - -w
+      - /project/bin/ncvpnkit/src
+      - -x
+      - run --no-default-features --features dev --bin ncvpnkit
+
   nproxy:
     container_name: nproxy.system.c
     image: nproxy:dev

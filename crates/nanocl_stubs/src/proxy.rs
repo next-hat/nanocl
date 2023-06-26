@@ -157,6 +157,15 @@ pub enum ProxyStreamProtocol {
   Udp,
 }
 
+impl ToString for ProxyStreamProtocol {
+  fn to_string(&self) -> String {
+    match self {
+      ProxyStreamProtocol::Tcp => "tcp".into(),
+      ProxyStreamProtocol::Udp => "udp".into(),
+    }
+  }
+}
+
 /// Proxy rules modes
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
