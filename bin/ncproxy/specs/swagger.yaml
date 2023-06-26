@@ -22,115 +22,115 @@ info:
     name: MIT OR Apache-2.0
   version: v0.5.0
 servers:
-  - url: /{Version}
-    variables:
-      Version:
-        default: v0.4
-        description: API version
-        enum:
-          - v0.4
-          - v0.3
-          - v0.2
-          - v0.1
+- url: /{Version}
+  variables:
+    Version:
+      default: v0.4
+      description: API version
+      enum:
+      - v0.4
+      - v0.3
+      - v0.2
+      - v0.1
 paths:
   /_ping:
     head:
       tags:
-        - System
+      - System
       summary: Get version information
       description: Get version information
       operationId: head_ping
       responses:
-        "202":
+        '202':
           description: Server is up
   /rules/{Name}:
     put:
       tags:
-        - Rules
+      - Rules
       summary: Create/Update a new ProxyRule
       description: Create/Update a new ProxyRule
       operationId: apply_rule
       parameters:
-        - name: Name
-          in: path
-          description: Name of the rule
-          required: true
-          schema:
-            type: string
+      - name: Name
+        in: path
+        description: Name of the rule
+        required: true
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ResourceProxyRule"
+              $ref: '#/components/schemas/ResourceProxyRule'
         required: true
       responses:
-        "200":
+        '200':
           description: The created rule
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ResourceProxyRule"
+                $ref: '#/components/schemas/ResourceProxyRule'
     delete:
       tags:
-        - Rules
+      - Rules
       summary: Delete a ProxyRule
       description: Delete a ProxyRule
       operationId: remove_rule
       parameters:
-        - name: Name
-          in: path
-          description: Name of the rule
-          required: true
-          schema:
-            type: string
+      - name: Name
+        in: path
+        description: Name of the rule
+        required: true
+        schema:
+          type: string
       responses:
-        "200":
+        '200':
           description: Rule has been deleted
   /version:
     get:
       tags:
-        - System
+      - System
       summary: Get version information
       description: Get version information
       operationId: get_version
       responses:
-        "200":
+        '200':
           description: Version information
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Version"
+                $ref: '#/components/schemas/Version'
 components:
   schemas:
     HttpTarget:
       type: object
       required:
-        - Url
+      - Url
       properties:
         Url:
           type: string
           description: Url to target
         Redirect:
           allOf:
-            - $ref: "#/components/schemas/UrlRedirect"
+          - $ref: '#/components/schemas/UrlRedirect'
           nullable: true
     LocationTarget:
       oneOf:
-        - $ref: "#/components/schemas/UpstreamTarget"
-        - $ref: "#/components/schemas/HttpTarget"
-        - $ref: "#/components/schemas/UnixTarget"
+      - $ref: '#/components/schemas/UpstreamTarget'
+      - $ref: '#/components/schemas/HttpTarget'
+      - $ref: '#/components/schemas/UnixTarget'
     ProxyHttpLocation:
       type: object
       description: Defines a proxy rule location
       required:
-        - Path
-        - Target
+      - Path
+      - Target
       properties:
         Path:
           type: string
           description: The path
         Target:
-          $ref: "#/components/schemas/LocationTarget"
+          $ref: '#/components/schemas/LocationTarget'
         Headers:
           type: array
           items:
@@ -144,19 +144,15 @@ components:
           nullable: true
     ProxyRule:
       oneOf:
-        - type: array
-          items:
-            $ref: "#/components/schemas/ProxyRuleHttp"
-        - type: array
-          items:
-            $ref: "#/components/schemas/ProxyRuleStream"
+      - $ref: '#/components/schemas/ProxyRuleHttp'
+      - $ref: '#/components/schemas/ProxyRuleStream'
       description: Proxy rules modes
     ProxyRuleHttp:
       type: object
       description: Defines a proxy rule http config
       required:
-        - Network
-        - Locations
+      - Network
+      - Locations
       properties:
         Domain:
           type: string
@@ -168,11 +164,11 @@ components:
         Locations:
           type: array
           items:
-            $ref: "#/components/schemas/ProxyHttpLocation"
+            $ref: '#/components/schemas/ProxyHttpLocation'
           description: The locations to handle multiple paths
         Ssl:
           allOf:
-            - $ref: "#/components/schemas/ProxySslConfig"
+          - $ref: '#/components/schemas/ProxySslConfig'
           nullable: true
         Includes:
           type: array
@@ -184,16 +180,16 @@ components:
       type: object
       description: Proxy rules modes
       required:
-        - Network
-        - Protocol
-        - Port
-        - Target
+      - Network
+      - Protocol
+      - Port
+      - Target
       properties:
         Network:
           type: string
           description: Type of the network binding private | public | internal | namespace:$namespace_name
         Protocol:
-          $ref: "#/components/schemas/ProxyStreamProtocol"
+          $ref: '#/components/schemas/ProxyStreamProtocol'
         Port:
           type: integer
           format: int32
@@ -201,15 +197,15 @@ components:
           minimum: 0.0
         Ssl:
           allOf:
-            - $ref: "#/components/schemas/ProxySslConfig"
+          - $ref: '#/components/schemas/ProxySslConfig'
           nullable: true
         Target:
-          $ref: "#/components/schemas/StreamTarget"
+          $ref: '#/components/schemas/StreamTarget'
     ProxySslConfig:
       type: object
       required:
-        - Certificate
-        - CertificateKey
+      - Certificate
+      - CertificateKey
       properties:
         Certificate:
           type: string
@@ -233,14 +229,14 @@ components:
       type: string
       description: Proxy rules modes
       enum:
-        - Tcp
-        - Udp
+      - Tcp
+      - Udp
     ResourceProxyRule:
       type: object
       description: Define proxy rules to apply
       required:
-        - Watch
-        - Rules
+      - Watch
+      - Rules
       properties:
         Watch:
           type: array
@@ -248,16 +244,19 @@ components:
             type: string
           description: Cargo to watch for changes
         Rules:
-          $ref: "#/components/schemas/ProxyRule"
+          type: array
+          items:
+            $ref: '#/components/schemas/ProxyRule'
+          description: The rule
     StreamTarget:
       oneOf:
-        - $ref: "#/components/schemas/UpstreamTarget"
-        - $ref: "#/components/schemas/UriTarget"
-        - $ref: "#/components/schemas/UnixTarget"
+      - $ref: '#/components/schemas/UpstreamTarget'
+      - $ref: '#/components/schemas/UriTarget'
+      - $ref: '#/components/schemas/UnixTarget'
     UnixTarget:
       type: object
       required:
-        - UnixPath
+      - UnixPath
       properties:
         UnixPath:
           type: string
@@ -265,8 +264,8 @@ components:
       type: object
       description: Config for targetting a cargo or a vm
       required:
-        - Key
-        - Port
+      - Key
+      - Port
       properties:
         Key:
           type: string
@@ -287,7 +286,7 @@ components:
     UriTarget:
       type: object
       required:
-        - Uri
+      - Uri
       properties:
         Uri:
           type: string
@@ -295,17 +294,17 @@ components:
     UrlRedirect:
       type: string
       enum:
-        - MovedPermanently
-        - Permanent
-        - Temporary
+      - MovedPermanently
+      - Permanent
+      - Temporary
     Version:
       type: object
       description: Version contain details about the current version nanocl
       required:
-        - Arch
-        - Channel
-        - Version
-        - CommitId
+      - Arch
+      - Channel
+      - Version
+      - CommitId
       properties:
         Arch:
           type: string
@@ -316,7 +315,7 @@ components:
         CommitId:
           type: string
 tags:
-  - name: Rules
-    description: Rules management endpoints.
-  - name: System
-    description: System management endpoints.
+- name: Rules
+  description: Rules management endpoints.
+- name: System
+  description: System management endpoints.
