@@ -3861,12 +3861,8 @@ components:
           nullable: true
     ProxyRule:
       oneOf:
-      - type: array
-        items:
-          $ref: '#/components/schemas/ProxyRuleHttp'
-      - type: array
-        items:
-          $ref: '#/components/schemas/ProxyRuleStream'
+      - $ref: '#/components/schemas/ProxyRuleHttp'
+      - $ref: '#/components/schemas/ProxyRuleStream'
       description: Proxy rules modes
     ProxyRuleHttp:
       type: object
@@ -4225,7 +4221,10 @@ components:
             type: string
           description: Cargo to watch for changes
         Rules:
-          $ref: '#/components/schemas/ProxyRule'
+          type: array
+          items:
+            $ref: '#/components/schemas/ProxyRule'
+          description: The rule
     ResourceUpdate:
       type: object
       required:
