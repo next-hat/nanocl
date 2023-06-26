@@ -85,7 +85,7 @@ async fn main() -> std::io::Result<()> {
   ctrlc::set_handler(move || {
     let term = dialoguer::console::Term::stdout();
     let _ = term.show_cursor();
-    let _ = term.clear_last_lines(1);
+    let _ = term.clear_last_lines(0);
     std::process::exit(0);
   })
   .expect("Error setting Ctrl-C handler");

@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+
 use futures::StreamExt;
+use indicatif::{ProgressBar, MultiProgress};
 
 use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo_config::CargoConfigPartial;
-use nanocld_client::stubs::state::StateStream;
 
 use crate::utils;
 use crate::models::UpgradeOpts;
@@ -56,12 +58,12 @@ pub async fn exec_upgrade(
     })?;
   let mut stream = client.apply_state(&data).await?;
 
+  let multiprogress = MultiProgress::new();
+  multiprogress.set_move_cursor(false);
+  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
   while let Some(res) = stream.next().await {
     let res = res?;
-    match res {
-      StateStream::Error(err) => eprintln!("{err}"),
-      StateStream::Msg(msg) => println!("{msg}"),
-    }
+    utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
   Ok(())
 }

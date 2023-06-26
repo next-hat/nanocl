@@ -2,17 +2,18 @@ use std::fs;
 use std::collections::HashMap;
 
 use ntex::rt;
-use clap::{Command, Arg};
 use futures::StreamExt;
+use clap::{Arg, Command};
 use bollard_next::service::HostConfig;
+use indicatif::{MultiProgress, ProgressBar};
 
 use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
+use nanocld_client::stubs::state::StateMeta;
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
 };
-use nanocld_client::stubs::state::{StateMeta, StateStream};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -461,13 +462,12 @@ async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
     err.map_err_context(|| "Unable to create json payload for the daemon")
   })?;
   let mut stream = client.apply_state(&data).await?;
-
+  let multiprogress = MultiProgress::new();
+  multiprogress.set_move_cursor(false);
+  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
   while let Some(res) = stream.next().await {
     let res = res?;
-    match res {
-      StateStream::Error(err) => eprintln!("{err}"),
-      StateStream::Msg(msg) => println!("{msg}"),
-    }
+    utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
 
   if opts.follow {
@@ -488,12 +488,12 @@ async fn exec_state_remove(host: &str, opts: &StateRemoveOpts) -> IoResult<()> {
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
   let mut stream = client.remove_state(&data).await?;
+  let multiprogress = MultiProgress::new();
+  multiprogress.set_move_cursor(false);
+  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
   while let Some(res) = stream.next().await {
     let res = res?;
-    match res {
-      StateStream::Error(err) => eprintln!("{err}"),
-      StateStream::Msg(msg) => println!("{msg}"),
-    }
+    utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
   Ok(())
 }
