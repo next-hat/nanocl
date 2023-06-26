@@ -15,8 +15,8 @@ use cli::Cli;
 use dnsmasq::Dnsmasq;
 
 async fn run(cli: &Cli) -> IoResult<()> {
-  logger::enable_logger("ncddns");
-  log::info!("ncddns v{}", env!("CARGO_PKG_VERSION"));
+  logger::enable_logger("ncdns");
+  log::info!("ncdns v{}", env!("CARGO_PKG_VERSION"));
 
   // Spawn a new thread to listen events from nanocld
   event::spawn();
@@ -49,11 +49,11 @@ mod tests {
   #[ntex::test]
   async fn run_wrong_host() -> IoResult<()> {
     let cli = Cli::parse_from([
-      "ncddns",
+      "ncdns",
       "--host",
       "wrong://dsadsa",
       "--conf-dir",
-      "/tmp/ncddns",
+      "/tmp/ncdns",
       "--dns",
       "1.1.1.1",
     ]);

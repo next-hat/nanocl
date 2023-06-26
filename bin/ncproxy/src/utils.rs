@@ -549,7 +549,7 @@ pub(crate) mod tests {
   pub fn before() {
     // Build a test env logger
     std::env::set_var("TEST", "true");
-    logger::enable_logger("ncdproxy");
+    logger::enable_logger("ncproxy");
   }
 
   pub async fn exec_nanocl(arg: &str) -> std::io::Result<Output> {

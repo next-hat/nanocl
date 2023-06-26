@@ -10,8 +10,8 @@ COPY ./crates/nanocl_utils/Cargo.toml ./crates/nanocl_utils/Cargo.toml
 COPY ./crates/nanocld_client/Cargo.toml ./crates/nanocld_client/Cargo.toml
 COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
 COPY ./bin/nanocld/Cargo.toml ./bin/nanocld/Cargo.toml
-COPY ./bin/ncdproxy/Cargo.toml ./bin/ncdproxy/Cargo.toml
-COPY ./bin/ncddns/Cargo.toml ./bin/ncddns/Cargo.toml
+COPY ./bin/ncproxy/Cargo.toml ./bin/ncproxy/Cargo.toml
+COPY ./bin/ncdns/Cargo.toml ./bin/ncdns/Cargo.toml
 
 # stage 2 - Build our project
 FROM rust:1.70.0-alpine3.17 as builder
@@ -32,11 +32,11 @@ COPY ./bin/nanocl/build.rs ./bin/nanocl/build.rs
 COPY ./bin/nanocld/src ./bin/nanocld/src
 COPY ./bin/nanocld/specs ./bin/nanocld/specs
 COPY ./bin/nanocld/build.rs ./bin/nanocld/build.rs
-COPY ./bin/ncdproxy/src ./bin/ncdproxy/src
-COPY ./bin/ncdproxy/build.rs ./bin/ncdproxy/build.rs
-COPY ./bin/ncdproxy/specs ./bin/ncdproxy/specs
-COPY ./bin/ncddns/build.rs ./bin/ncddns/build.rs
-COPY ./bin/ncddns/src ./bin/ncddns/src
+COPY ./bin/ncproxy/src ./bin/ncproxy/src
+COPY ./bin/ncproxy/build.rs ./bin/ncproxy/build.rs
+COPY ./bin/ncproxy/specs ./bin/ncproxy/specs
+COPY ./bin/ncdns/build.rs ./bin/ncdns/build.rs
+COPY ./bin/ncdns/src ./bin/ncdns/src
 COPY .git ./.git
 ENV NANOCL_CHANNEL=$channel
 ENV RUSTFLAGS="-C target-feature=+crt-static"

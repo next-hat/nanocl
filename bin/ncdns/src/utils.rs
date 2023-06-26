@@ -101,7 +101,7 @@ pub mod tests {
   pub fn before() {
     // Build a test env logger
     std::env::set_var("TEST", "true");
-    logger::enable_logger("ncddns");
+    logger::enable_logger("ncdns");
   }
 
   // Generate a test server

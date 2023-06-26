@@ -7,8 +7,8 @@ use crate::models::{DaemonState, HttpMetricPartial};
 
 /// ## Spawn logger
 ///
-/// Create a background thread that will watch the logs of the `ncdproxy.system.c` container
-/// The `ncdproxy` is a container that run to update the proxy rules.
+/// Create a background thread that will watch the logs of the `ncproxy.system.c` container
+/// The `ncproxy` is a container that run to update the proxy rules.
 /// He will print http metrics to the logs.
 /// This function will parse the logs and save the metrics to the database.
 ///
@@ -22,7 +22,7 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
     rt::spawn(async move {
       let now = chrono::Utc::now().timestamp();
       let mut res = state.docker_api.logs(
-        "ncdproxy.system.c",
+        "ncproxy.system.c",
         Some(LogsOptions::<String> {
           follow: true,
           stdout: true,

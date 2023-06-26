@@ -35,11 +35,11 @@ bin # Binaries (executable)
 │       ├── services # Function to accept http requests
 │       ├── subsystem # Function executed before starting the server
 │       └── utils # Utils functions for the project
-├── ncddns # Nanocl Controller Daemon DNS REST API
+├── ncdns # Nanocl Controller Daemon DNS REST API
 │   ├── specs # OpenApi specification
 │   ├── tests # Test configurations
 │   └── src # Rust source code
-├── ncdproxy # Nanocl Controller Daemon PROXY REST API
+├── ncproxy # Nanocl Controller Daemon PROXY REST API
 │   ├── specs # OpenApi specification
 │   ├── tests # Test configuration
 │   └── src # Rust source code

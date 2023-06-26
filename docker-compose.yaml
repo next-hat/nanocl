@@ -52,7 +52,7 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - ${STATE_DIR:-${HOME}/.nanocl/run}:/run/nanocl
+      - //run/guest-services/nanocl:/run/nanocl
 
   nproxy:
     container_name: nproxy.system.c
@@ -67,7 +67,7 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - ${RUN_DIR:-${HOME}/.nanocl/run}:/run/nanocl
+      - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/letsencrypt}:/etc/letsencrypt
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/certs}:/etc/nginx/certs
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
@@ -76,8 +76,8 @@ services:
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/streams-enabled}:/etc/nginx/streams-enabled
 
-  ncdproxy:
-    container_name: ncdproxy.system.c
+  ncproxy:
+    container_name: ncproxy.system.c
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
     ports:
@@ -89,18 +89,18 @@ services:
     command:
       - watch
       - -w
-      - /project/bin/ncdproxy/src
+      - /project/bin/ncproxy/src
       - -x
-      - run --no-default-features --features dev --bin ncdproxy
+      - run --no-default-features --features dev --bin ncproxy
     labels:
       - io.nanocl=enabled
-      - io.nanocl.c=ncdproxy.system
+      - io.nanocl.c=ncproxy.system
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
       - ./:/project
       - ~/.cargo/registry:/usr/local/cargo/registry
-      - ${RUN_DIR:-${HOME}/.nanocl/run}:/run/nanocl
+      - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
@@ -121,8 +121,8 @@ services:
     volumes:
       - ${STATE_DIR:-${HOME}/.nanocl/state/dns}:/opt/dns
 
-  ncddns:
-    container_name: ncddns.system.c
+  ncdns:
+    container_name: ncdns.system.c
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
     ports:
@@ -134,18 +134,18 @@ services:
     command:
       - watch
       - -w
-      - /project/bin/ncddns/src
+      - /project/bin/ncdns/src
       - -x
-      - run --no-default-features --features dev --bin ncddns -- --conf-dir /opt/dns
+      - run --no-default-features --features dev --bin ncdns -- --conf-dir /opt/dns
     labels:
       - io.nanocl=enabled
-      - io.nanocl.c=ncddns.system
+      - io.nanocl.c=ncdns.system
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
       - ./:/project
       - ${STATE_DIR:-${HOME}/.nanocl/state/dns}/dns:/opt/dns
-      - ${RUN_DIR:-${HOME}/.nanocl/run}:/run/nanocl
+      - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
       - ~/.cargo/registry:/usr/local/cargo/registry
 
   nanocld:
@@ -168,7 +168,7 @@ services:
       - ./:/project
       - ~/.cargo/registry:/usr/local/cargo/registry
       - ${STATE_DIR:-${HOME}/.nanocl/state}:/var/lib/nanocl
-      - ${RUN_DIR:-${HOME}/.nanocl/run}:/run/nanocl
+      - //run/guest-services/nanocl:/run/nanocl
       - //var/run/docker.sock:/run/docker.sock
     command:
       - watch

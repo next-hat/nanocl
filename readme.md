@@ -70,9 +70,9 @@ The following components will be installed during `nanocl setup` and are require
 - `ndaemon` as **REST API** to manage everything
 - `nmetrics` to monitor cpu, memory and network usage
 - `nproxy` proxy to redirect traffic to our **containers** and **virtual machines**
-- `ncdproxy` to update proxy configuration based on the current state
+- `ncproxy` to update proxy configuration based on the current state
 - `ndns` to manage the dns entries for the **containers** and **virtual machines**
-- `ncddns` to update dns entries based on the current state
+- `ncdns` to update dns entries based on the current state
 
 Simplified version of our architecture for a single node:
 

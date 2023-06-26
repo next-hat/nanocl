@@ -55,6 +55,6 @@ fn main() -> std::io::Result<()> {
   set_env_target_arch()?;
   set_env_git_commit_hash()?;
   std::fs::create_dir_all(MAN_PATH)?;
-  generate_man_command("ncdproxy", Cli::command())?;
+  generate_man_command("ncproxy", Cli::command())?;
   Ok(())
 }
