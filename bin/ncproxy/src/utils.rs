@@ -418,29 +418,29 @@ async fn resource_to_nginx_conf(
   nginx: &Nginx,
   name: &str,
   resource_proxy: &ResourceProxyRule,
-) -> IoResult<(NginxConfKind, String)> {
-  let conf = match &resource_proxy.rules {
-    ProxyRule::Http(rules) => {
-      let mut conf = String::new();
-      for rule in rules {
-        conf += &gen_http_server_block(rule, client, nginx).await?;
+) -> IoResult<()> {
+  let mut http_conf = String::new();
+  let mut stream_conf = String::new();
+  for rule in resource_proxy.rules.iter() {
+    match rule {
+      ProxyRule::Http(rule) => {
+        http_conf += &gen_http_server_block(rule, client, nginx).await?;
       }
-      (NginxConfKind::Site, conf)
-    }
-    ProxyRule::Stream(rules) => {
-      let mut conf = String::new();
-
-      for rule in rules {
-        conf += &gen_stream_server_block(rule, client, nginx).await?;
+      ProxyRule::Stream(rule) => {
+        stream_conf += &gen_stream_server_block(rule, client, nginx).await?;
       }
-
-      (NginxConfKind::Stream, conf)
     }
-  };
+  }
   log::info!("Generation conf for {name}");
-  log::info!("Config type: {}", conf.0);
-  log::info!("Config content: \n{}", conf.1);
-  Ok(conf)
+  if !http_conf.is_empty() {
+    nginx.write_conf_file(name, &http_conf, &NginxConfKind::Site)?;
+    log::info!("HTTP config generated:\n{http_conf}");
+  }
+  if !stream_conf.is_empty() {
+    nginx.write_conf_file(name, &stream_conf, &NginxConfKind::Stream)?;
+    log::info!("Stream config generated:\n{stream_conf}");
+  }
+  Ok(())
 }
 
 /// Reload the proxy configuration
@@ -477,9 +477,7 @@ pub(crate) async fn create_resource_conf(
   client: &NanocldClient,
   nginx: &Nginx,
 ) -> IoResult<()> {
-  let (kind, conf) =
-    resource_to_nginx_conf(client, nginx, name, proxy_rule).await?;
-  nginx.write_conf_file(name, &conf, &kind)?;
+  resource_to_nginx_conf(client, nginx, name, proxy_rule).await?;
   Ok(())
 }
 

@@ -8,9 +8,9 @@ use serde::{Serialize, Deserialize};
 #[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum ProxyRule {
   /// Redirect http trafic
-  Http(Vec<ProxyRuleHttp>),
+  Http(ProxyRuleHttp),
   /// Redirect tcp and udp trafic
-  Stream(Vec<ProxyRuleStream>),
+  Stream(ProxyRuleStream),
 }
 
 #[derive(Debug, Clone)]
@@ -251,5 +251,5 @@ pub struct ResourceProxyRule {
   /// Cargo to watch for changes
   pub watch: Vec<String>,
   /// The rule
-  pub rules: ProxyRule,
+  pub rules: Vec<ProxyRule>,
 }

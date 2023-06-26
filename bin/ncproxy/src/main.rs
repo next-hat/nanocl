@@ -15,7 +15,8 @@ async fn main() -> std::io::Result<()> {
   let cli = cli::Cli::parse();
 
   logger::enable_logger("ncproxy");
-  log::info!("ncproxy v{}", version::VERSION);
+  log::info!("ncproxy_{}_{}", version::ARCH, version::CHANNEL);
+  log::info!("v{}:{}", version::VERSION, version::COMMIT_ID);
 
   let nginx = match subsystem::init(&cli) {
     Err(err) => {

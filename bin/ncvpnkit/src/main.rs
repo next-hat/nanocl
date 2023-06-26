@@ -120,13 +120,13 @@ async fn on_event(
       if resource.kind.as_str() != "ProxyRule" {
         return Ok(());
       }
-      let rule = resource_to_proxy_rule(resource)?;
-      if let ProxyRule::Stream(data) = rule.rules {
-        for rule_stream in data.into_iter() {
-          if rule_stream.network != "Public" {
+      let r_proxy_rule = resource_to_proxy_rule(resource)?;
+      for rule in r_proxy_rule.rules.into_iter() {
+        if let ProxyRule::Stream(stream) = rule {
+          if stream.network != "Public" {
             continue;
           }
-          let port = rule_stream_to_vpnkit_port(&rule_stream);
+          let port = rule_stream_to_vpnkit_port(&stream);
           apply_rule(&port, vpnkit_client).await;
         }
       }
@@ -135,13 +135,13 @@ async fn on_event(
       if resource.kind.as_str() != "ProxyRule" {
         return Ok(());
       }
-      let rule = resource_to_proxy_rule(resource)?;
-      if let ProxyRule::Stream(data) = rule.rules {
-        for rule_stream in data.into_iter() {
-          if rule_stream.network != "Public" {
+      let r_proxy_rule = resource_to_proxy_rule(resource)?;
+      for rule in r_proxy_rule.rules.into_iter() {
+        if let ProxyRule::Stream(stream) = rule {
+          if stream.network != "Public" {
             continue;
           }
-          let port = rule_stream_to_vpnkit_port(&rule_stream);
+          let port = rule_stream_to_vpnkit_port(&stream);
           apply_rule(&port, vpnkit_client).await;
         }
       }
@@ -150,13 +150,13 @@ async fn on_event(
       if resource.kind.as_str() != "ProxyRule" {
         return Ok(());
       }
-      let rule = resource_to_proxy_rule(resource)?;
-      if let ProxyRule::Stream(data) = rule.rules {
-        for rule_stream in data.into_iter() {
-          if rule_stream.network != "Public" {
+      let r_proxy_rule = resource_to_proxy_rule(resource)?;
+      for rule in r_proxy_rule.rules.into_iter() {
+        if let ProxyRule::Stream(stream) = rule {
+          if stream.network != "Public" {
             continue;
           }
-          let port = rule_stream_to_vpnkit_port(&rule_stream);
+          let port = rule_stream_to_vpnkit_port(&stream);
           remove_rule(&port, vpnkit_client).await;
         }
       }
