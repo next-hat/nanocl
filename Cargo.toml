@@ -3,8 +3,9 @@ members = [
   "crates/nanocl_stubs",
   "crates/nanocl_utils",
   "crates/nanocld_client",
-  "bin/ncdproxy",
-  "bin/ncddns",
+  "bin/ncproxy",
+  "bin/ncdns",
+  "bin/ncvpnkit",
   "bin/nanocld",
   "bin/nanocl",
 ]

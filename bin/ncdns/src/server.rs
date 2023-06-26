@@ -54,8 +54,8 @@ mod tests {
 
   #[ntex::test]
   async fn generate_unix_and_tcp() -> IoResult<()> {
-    let dnsmasq = Dnsmasq::new("/tmp/ncddns");
-    let server = generate("unix:///tmp/ncddns.sock", &dnsmasq)?;
+    let dnsmasq = Dnsmasq::new("/tmp/ncdns");
+    let server = generate("unix:///tmp/ncdns.sock", &dnsmasq)?;
     server.stop(true).await;
     let server = generate("tcp://0.0.0.0:9987", &dnsmasq)?;
     server.stop(true).await;
@@ -64,7 +64,7 @@ mod tests {
 
   #[test]
   fn generate_wrong_host() -> IoResult<()> {
-    let dnsmasq = Dnsmasq::new("/tmp/ncddns");
+    let dnsmasq = Dnsmasq::new("/tmp/ncdns");
     let server = generate("wrong://dsadsa", &dnsmasq);
     assert!(server.is_err());
     Ok(())

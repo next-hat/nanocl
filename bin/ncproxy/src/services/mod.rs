@@ -28,7 +28,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
     let api_doc = ApiDoc::openapi();
     std::fs::write(
-      "./bin/ncddns/specs/swagger.yaml",
+      "./bin/ncproxy/specs/swagger.yaml",
       api_doc.to_yaml().expect("Unable to convert ApiDoc to yaml"),
     )
     .expect("Unable to write swagger.yaml");

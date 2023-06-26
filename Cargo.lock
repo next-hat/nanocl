@@ -1870,7 +1870,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ncddns"
+name = "ncdns"
 version = "0.2.0"
 dependencies = [
  "clap",
@@ -1888,7 +1888,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ncdproxy"
+name = "ncproxy"
 version = "0.5.0"
 dependencies = [
  "bollard-next",
@@ -1905,6 +1905,14 @@ dependencies = [
  "serde_yaml",
  "tokio",
  "utoipa",
+]
+
+[[package]]
+name = "ncvpnkit"
+version = "0.1.0"
+dependencies = [
+ "ntex",
+ "vpnkitrc",
 ]
 
 [[package]]
@@ -3432,6 +3440,17 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "vpnkitrc"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "407ff89a1652c3fd109a82e73fc461d7453a9227fc334e0d810e2623120f30b3"
+dependencies = [
+ "ntex",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "waker-fn"

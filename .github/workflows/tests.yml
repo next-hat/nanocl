@@ -52,7 +52,7 @@ jobs:
           docker buildx build --load --cache-from type=local,src=.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
           docker buildx build --load --cache-from type=local,src=.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
           cargo build --no-default-features --features test --bin nanocl
-          cargo build --no-default-features --features test --bin ncdproxy
+          cargo build --no-default-features --features test --bin ncproxy
           cargo build --no-default-features --features test --bin nanocld
           docker compose -f ./docker-compose.test.yaml up -d
           cargo run --no-default-features --features test --bin nanocld -- --init
@@ -61,7 +61,7 @@ jobs:
           sudo mkdir -p /var/lib/nanocl/proxy
           sudo chmod 777 -R /run/nanocl
           sudo chmod 777 -R /var/lib/nanocl
-          cargo run --no-default-features --features test --bin ncdproxy -- --conf-dir /var/lib/nanocl/proxy &
+          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /var/lib/nanocl/proxy &
           sleep 8
           sudo chmod 777 -R /run/nanocl
           mkdir -p /tmp/nginx/sites-enabled

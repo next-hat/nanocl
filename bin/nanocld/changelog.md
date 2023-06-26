@@ -87,5 +87,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Namespace network information
-- Upgrade ncdproxy to 0.3
+- Upgrade ncproxy to 0.3
 - Upgrade nproxy to 1.23.4.0
