@@ -70,8 +70,10 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - ./:/project
-      - ~/.cargo/registry:/usr/local/cargo/registry
+      - type: bind
+        source: .
+        target: /project
+      - /project/target
       - //run/guest-services/nanocl:/run/nanocl
       - //run/host-services/backend.sock:/run/host-services/backend.sock
     command:
@@ -125,8 +127,10 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - ./:/project
-      - ~/.cargo/registry:/usr/local/cargo/registry
+      - type: bind
+        source: .
+        target: /project
+      - /project/target
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
@@ -170,10 +174,12 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - ./:/project
+      - type: bind
+        source: .
+        target: /project
+      - /project/target
       - ${STATE_DIR:-${HOME}/.nanocl/state/dns}/dns:/opt/dns
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
-      - ~/.cargo/registry:/usr/local/cargo/registry
 
   nanocld:
     container_name: ndaemon.system.c
@@ -192,8 +198,10 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - ./:/project
-      - ~/.cargo/registry:/usr/local/cargo/registry
+      - type: bind
+        source: .
+        target: /project
+      - /project/target
       - ${STATE_DIR:-${HOME}/.nanocl/state}:/var/lib/nanocl
       - //run/guest-services/nanocl:/run/nanocl
       - //var/run/docker.sock:/run/docker.sock
