@@ -11,8 +11,10 @@ mod install;
 mod uninstall;
 mod upgrade;
 mod node;
+mod context;
 
 pub use system::*;
+pub use context::*;
 pub use vm::*;
 pub use vm_image::*;
 pub use namespace::*;
@@ -56,6 +58,8 @@ pub enum Commands {
   Events,
   /// Define, Run, or Remove Cargo or Virtual Machines
   State(StateArgs),
+  /// Manage contexts
+  Context(ContextArgs),
   /// Show nanocl host information
   Info,
   /// Show nanocl version information

@@ -13,24 +13,40 @@ mod models;
 mod version;
 mod commands;
 
-use models::{Cli, Commands};
+use models::{Cli, Commands, Context};
 
 async fn detect_version(client: &mut NanocldClient) -> IoResult<()> {
   client.set_version("0.1.0");
   let version = client.get_version().await?;
   client.set_version(&version.version);
-
   Ok(())
 }
 
 async fn execute_args(args: &Cli) -> IoResult<()> {
+  Context::ensure()?;
   let cli_conf = config::read();
+  let mut context = Context::new();
+  if cli_conf.current_context != "default" {
+    match Context::read_by_name(&cli_conf.current_context) {
+      Err(_) => {
+        Context::r#use("default")?;
+      }
+      Ok(cur_context) => {
+        context = cur_context;
+      }
+    }
+  }
 
   #[allow(unused)]
-  let mut host = args.host.clone().unwrap_or(cli_conf.host);
+  let mut host = args
+    .host
+    .clone()
+    .unwrap_or(context.endpoints.get("Nanocl").unwrap().host.clone());
   #[cfg(any(feature = "dev", feature = "test"))]
   {
-    host = args.host.clone().unwrap_or("http://localhost:8585".into());
+    if context.name == "default" {
+      host = args.host.clone().unwrap_or("http://localhost:8585".into());
+    }
   }
 
   let url = Box::leak(host.clone().into_boxed_str());
@@ -58,6 +74,7 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
     Commands::Upgrade(opts) => commands::exec_upgrade(&client, opts).await,
     Commands::System(opts) => commands::exec_system(&client, opts).await,
     Commands::Node(args) => commands::exec_node(&client, args).await,
+    Commands::Context(args) => commands::exec_context(&context, args).await,
   }
 }
 

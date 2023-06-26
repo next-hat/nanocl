@@ -1,0 +1,6 @@
+Name: desktop-linux
+MetaData:
+  Description: Docker desktop
+Endpoints:
+  Nanocl:
+    Host: unix:///home/leone/.nanocl/run/nanocl.sock

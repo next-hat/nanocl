@@ -13,7 +13,9 @@ mod install;
 mod uninstall;
 mod upgrade;
 mod node;
+mod context;
 
+pub use context::exec_context;
 pub use version::exec_version;
 pub use namespace::exec_namespace;
 pub use cargo::exec_cargo;
