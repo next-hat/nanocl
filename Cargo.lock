@@ -1523,9 +1523,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.146"
+version = "0.2.147"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f92be4933c13fd498862a9e02a3055f8a8d9c039ce33db97306fd5a6caa7f29b"
+checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 
 [[package]]
 name = "linux-raw-sys"
@@ -1911,7 +1911,12 @@ dependencies = [
 name = "ncvpnkit"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
+ "log",
+ "nanocl_utils",
+ "nanocld_client",
  "ntex",
+ "serde_json",
  "vpnkitrc",
 ]
 
@@ -2180,9 +2185,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-service"
-version = "1.2.1"
+version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf716b3acfb6681d1732df30acefb15565d36f1c3aca70c53f92855ca1625414"
+checksum = "0e64e966cee36b5842c9f60985204d8592e6ba0f27642e45392f5c8214e47749"
 dependencies = [
  "pin-project-lite",
  "slab",
@@ -2220,9 +2225,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-util"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c5ce114d6204323d522484949a70446c1029b8fe59963e451cf33c2b00961e9"
+checksum = "7f8a1a84837b0c76109522e232eba3484b788848b5ddcde20f4389199904cf1c"
 dependencies = [
  "bitflags 1.3.2",
  "futures-core",
@@ -2588,9 +2593,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.62"
+version = "1.0.63"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe8df9bd9fe9d1742a9e17f8129712801b428f6d4c6059d79bacea58f0b0142d"
+checksum = "7b368fba921b0dce7e60f5e04ec15e565b3303972b42bcfde1d0713b881959eb"
 dependencies = [
  "unicode-ident",
 ]
@@ -3443,9 +3448,9 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vpnkitrc"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "407ff89a1652c3fd109a82e73fc461d7453a9227fc334e0d810e2623120f30b3"
+checksum = "fe9b0d2dd906d8810b4a8a9f3962e8f1e1c51649aedae0c72e3e3d8291fc39bb"
 dependencies = [
  "ntex",
  "serde",
