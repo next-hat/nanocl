@@ -168,4 +168,5 @@ Cargoes:
         NetworkMode: system
         Binds:
           - //run/guest-services/nanocl:/run/nanocl
+          - //run/host-services/backend.sock:/run/host-services/backend.sock
   # {% endif %}
