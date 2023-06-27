@@ -45,7 +45,7 @@ ntex = { version = "0.7.2", features = ["tokio"] }
 serde = { version = "1.0", features = ["derive"] }
 clap = { version = "4.1.7", features = ["derive", "cargo"] }
 tokio = { version = "1.23.1", features = ["fs"] }
-hyper = "0.14.20"
+hyper = "0.14.27"
 users = "0.11.0"
 tokio-util = "0.7.7"
 chrono = { version = "0.4.24", default-features = false, features = [
