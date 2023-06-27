@@ -90,6 +90,8 @@ args = [
   "--output-path",
   "./lcov.info",
   "--lcov",
+  "-j",
+  "1",
 ]
 
 # Release
