@@ -3,10 +3,10 @@ name: Draft Nightly Image
 on:
   push:
     branches:
-      - "release/nightly/bin/*"
+      - "release/nightly/bin/**"
   pull_request:
     branches:
-      - "release/nightly/bin/*"
+      - "release/nightly/bin/**"
     types: [opened, synchronize]
 
 env:
