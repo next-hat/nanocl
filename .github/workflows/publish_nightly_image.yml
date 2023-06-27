@@ -55,7 +55,7 @@ jobs:
 
       # Build daemon image
       - name: Build image
-        run: docker buildx build --cache-from type=local,src=/tmp/.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache --builder=buildx-multi-arch --platform=linux/amd64,linux/arm64 --build-arg channel=$CHANNEL --push -t ghcr.io/nxthat/$BINARY_NAME:$VERSION-$CHANNEL -f ./bin/$BINARY_NAME/Dockerfile .
+        run: docker buildx build --builder=buildx-multi-arch --platform=linux/amd64,linux/arm64 --build-arg channel=$CHANNEL --push -t ghcr.io/nxthat/$BINARY_NAME:$VERSION-$CHANNEL -f ./bin/$BINARY_NAME/Dockerfile .
       # Export it as tar.gz
       # - name: Export image
       #   run: docker save ghcr.io/nxthat/$BINARY_NAME:$VERSION-$CHANNEL | gzip > /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz
