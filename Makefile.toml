@@ -47,16 +47,7 @@ args = ["nextest", "run", "-p", "nanocl"]
 # Test all
 [tasks.tests]
 command = "cargo"
-args = [
-  "nextest",
-  "run",
-  "--no-default-features",
-  "--features",
-  "test",
-  "-j",
-  "1",
-  "${@}",
-]
+args = ["nextest", "run", "--no-default-features", "--features", "test", "${@}"]
 
 # Test all with debug output
 [tasks.tests-debug]
@@ -77,15 +68,7 @@ args = ["compose", "up"]
 # Test coverage
 [tasks.cov]
 command = "cargo"
-args = [
-  "llvm-cov",
-  "nextest",
-  "--no-default-features",
-  "--features",
-  "test",
-  "-j",
-  "1",
-]
+args = ["llvm-cov", "nextest", "--no-default-features", "--features", "test"]
 
 # Test all with coverage for codecov
 [tasks.covgen]
@@ -96,8 +79,6 @@ args = [
   "--no-default-features",
   "--features",
   "test",
-  "-j",
-  "1",
   "--output-path",
   "./lcov.info",
   "--lcov",

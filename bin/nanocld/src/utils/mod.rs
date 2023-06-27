@@ -125,8 +125,12 @@ pub mod tests {
   pub async fn gen_server(routes: Config) -> test::TestServer {
     before();
     // Build a test daemon config
+    let home = env::var("HOME").expect("Failed to get home dir");
+    let docker_host = env::var("DOCKER_SOCKET_PATH")
+      .unwrap_or_else(|_| String::from("/run/docker.sock"));
     let config = DaemonConfig {
-      state_dir: String::from("/tmp/var/lib/nanocl"),
+      state_dir: format!("{home}/.nanocl/state"),
+      docker_host,
       ..Default::default()
     };
     let event_emitter = EventEmitter::new();

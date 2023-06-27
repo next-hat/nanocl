@@ -41,9 +41,9 @@ Cargoes:
           - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
           - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
-  - Name: ncproxy
+  - Name: ncdproxy
     Container:
-      Image: ghcr.io/nxthat/ncproxy:0.5.0
+      Image: ghcr.io/nxthat/ncdproxy:0.5.0
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -66,11 +66,11 @@ Cargoes:
         Binds:
           - ${{ state_dir }}/dns:/opt/dns
 
-  - Name: ncdns
+  - Name: ncddns
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ncdns:0.2.0
+      Image: ghcr.io/nxthat/ncddns:0.2.0
       Tty: true
       Cmd:
         - --conf-dir
