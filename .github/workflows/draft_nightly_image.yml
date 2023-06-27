@@ -32,9 +32,9 @@ jobs:
       - name: Set info
         run: |
           echo "CHANNEL=$(echo GITHUB_REF | awk -F\/ '{print $4}')" >> $GITHUB_ENV
-          echo "NANOCL_CHANNEL=$(echo ${GITHUB_REF##*/} | awk -F\/ '{print $4}')" >> $GITHUB_ENV
-          echo "BINARY_NAME=$(echo ${GITHUB_REF##*/} | awk -F\/ '{print $6}')" >> $GITHUB_ENV
-          echo "VERSION=$(echo ${GITHUB_REF##*/} | awk -F\/ '{print $7}')" >> $GITHUB_ENV
+          echo "NANOCL_CHANNEL=$(echo ${GITHUB_REF##*/} | awk -F/ '{print $4}')" >> $GITHUB_ENV
+          echo "BINARY_NAME=$(echo ${GITHUB_REF##*/} | awk -F/ '{print $6}')" >> $GITHUB_ENV
+          echo "VERSION=$(echo ${GITHUB_REF##*/} | awk -F/ '{print $7}')" >> $GITHUB_ENV
       # Print info for debug
       - name: Print Info
         run: |
