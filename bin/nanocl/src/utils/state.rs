@@ -144,6 +144,11 @@ pub fn update_progress(
       "{:#?}:{}",
       &state_stream.status, &state_stream.kind
     ));
+
+    if let Some(ctx) = &state_stream.context {
+      pg.set_message(format!("{}: {}", state_stream.key, ctx));
+    }
+
     if state_stream.status != StateStreamStatus::Pending {
       pg.finish();
     }

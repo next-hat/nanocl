@@ -5,6 +5,7 @@ pub struct InstallOpts {
   /// The docker host to install nanocl default is unix:///var/run/docker.sock
   #[clap(long)]
   pub(crate) docker_host: Option<String>,
+  /// Specify if the docker host is docker desktop detected if docker context is desktop-linux
   #[clap(long = "docker-desktop")]
   pub(crate) is_docker_desktop: bool,
   /// The state directory to store the state of the nanocl daemon default is /var/lib/nanocl

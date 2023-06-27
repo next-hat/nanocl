@@ -8,7 +8,7 @@ Namespace: global
 Resources:
   - Name: tcp-example
     Kind: ProxyRule
-    Version: v0.5
+    Version: v0.6
     Config:
       Watch:
         - tcp-example.global.c

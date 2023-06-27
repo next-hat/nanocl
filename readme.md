@@ -123,7 +123,7 @@ Cargoes:
 Resources:
   - Name: docs.next-hat.com
     Kind: ProxyRule
-    Version: v0.5
+    Version: v0.6
     Config:
       Watch:
         - doc.nexthat.c

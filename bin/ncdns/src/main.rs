@@ -16,7 +16,8 @@ use dnsmasq::Dnsmasq;
 
 async fn run(cli: &Cli) -> IoResult<()> {
   logger::enable_logger("ncdns");
-  log::info!("ncdns v{}", env!("CARGO_PKG_VERSION"));
+  log::info!("ncdns_{}_{}", version::ARCH, version::CHANNEL);
+  log::info!("v{}:{}", version::VERSION, version::COMMIT_ID);
 
   // Spawn a new thread to listen events from nanocld
   event::spawn();
