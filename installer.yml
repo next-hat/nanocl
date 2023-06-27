@@ -131,6 +131,6 @@ Cargoes:
         NetworkMode: system
         Binds:
           - /run/nanocl:/run/nanocl
-          - /run/docker.sock:/run/docker.sock
+          - //var/run/docker.sock:/run/docker.sock
           - ${{ state_dir }}:${{ state_dir }}
           - ${{ conf_dir }}:${{ conf_dir }}

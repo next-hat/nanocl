@@ -16,6 +16,9 @@ use crate::models::{InstallOpts, NanocldArgs};
 pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
   println!("Installing Nanocl components on your system");
 
+  let detected_host = utils::docker::detect_docker_host()?;
+  println!("Detected docker host: {:#?}", detected_host);
+
   let docker_host = opts
     .docker_host
     .as_deref()
@@ -116,35 +119,35 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
       .map_err(|err| err.map_err_context(|| "Nanocl system network"))?;
   }
 
-  for cargo in cargoes {
-    let image = cargo.container.image.clone().ok_or(IoError::invalid_data(
-      format!("Cargo {} image", cargo.name),
-      "is not specified".into(),
-    ))?;
-    let mut image_detail = image.split(':');
-    let from_image = image_detail.next().ok_or(IoError::invalid_data(
-      format!("Cargo {} image", cargo.name),
-      "invalid format expect image:tag".into(),
-    ))?;
-    let tag = image_detail.next().ok_or(IoError::invalid_data(
-      format!("Cargo {} image", cargo.name),
-      "invalid format expect image:tag".into(),
-    ))?;
-    utils::docker::install_image(from_image, tag, &docker).await?;
-    let container = utils::docker::create_cargo_container(
-      &cargo,
-      &deployment.namespace.clone().unwrap_or("system".into()),
-      &docker,
-    )
-    .await?;
-    docker
-      .start_container(&container.id, None::<StartContainerOptions<String>>)
-      .await
-      .map_err(|err| {
-        err.map_err_context(|| format!("Unable to start cargo {}", cargo.name))
-      })?;
-    ntex::time::sleep(Duration::from_secs(2)).await;
-  }
+  // for cargo in cargoes {
+  //   let image = cargo.container.image.clone().ok_or(IoError::invalid_data(
+  //     format!("Cargo {} image", cargo.name),
+  //     "is not specified".into(),
+  //   ))?;
+  //   let mut image_detail = image.split(':');
+  //   let from_image = image_detail.next().ok_or(IoError::invalid_data(
+  //     format!("Cargo {} image", cargo.name),
+  //     "invalid format expect image:tag".into(),
+  //   ))?;
+  //   let tag = image_detail.next().ok_or(IoError::invalid_data(
+  //     format!("Cargo {} image", cargo.name),
+  //     "invalid format expect image:tag".into(),
+  //   ))?;
+  //   utils::docker::install_image(from_image, tag, &docker).await?;
+  //   let container = utils::docker::create_cargo_container(
+  //     &cargo,
+  //     &deployment.namespace.clone().unwrap_or("system".into()),
+  //     &docker,
+  //   )
+  //   .await?;
+  //   docker
+  //     .start_container(&container.id, None::<StartContainerOptions<String>>)
+  //     .await
+  //     .map_err(|err| {
+  //       err.map_err_context(|| format!("Unable to start cargo {}", cargo.name))
+  //     })?;
+  //   ntex::time::sleep(Duration::from_secs(2)).await;
+  // }
 
   println!("Nanocl have been installed successfully!");
   Ok(())

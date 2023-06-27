@@ -47,7 +47,16 @@ args = ["nextest", "run", "-p", "nanocl"]
 # Test all
 [tasks.tests]
 command = "cargo"
-args = ["nextest", "run", "--no-default-features", "--features", "test", "${@}"]
+args = [
+  "nextest",
+  "run",
+  "--no-default-features",
+  "--features",
+  "test",
+  "${@}",
+  "-j",
+  "1",
+]
 
 # Test all with debug output
 [tasks.tests-debug]

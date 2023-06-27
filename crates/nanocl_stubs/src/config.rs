@@ -62,5 +62,5 @@ impl Default for DaemonConfig {
 }
 
 fn default_host() -> String {
-  "/run/docker.sock".to_owned()
+  "/var/run/docker.sock".to_owned()
 }

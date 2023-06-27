@@ -19,6 +19,7 @@ use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 use nanocld_client::stubs::cargo_config::Config as ContainerConfig;
 
+use crate::models::DockerContextMeta;
 use crate::utils::hash;
 use crate::utils::math::calculate_percentage;
 
@@ -207,13 +208,13 @@ pub async fn create_cargo_container(
   Ok(container)
 }
 
-pub fn detect_docker_host() -> std::io::Result<String> {
+pub fn detect_docker_host() -> std::io::Result<(String, bool)> {
   let home = std::env::var("HOME").map_err(|_| {
     std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
   })?;
   let path = format!("{home}/.docker/config.json");
   let Ok(str) = std::fs::read_to_string(path) else {
-    return Ok("/var/run/docker.sock".into());
+    return Ok(("unix:///var/run/docker.sock".into(), false));
   };
   let config =
     serde_json::from_str::<serde_json::Value>(&str).map_err(|err| {
@@ -223,19 +224,31 @@ pub fn detect_docker_host() -> std::io::Result<String> {
       )
     })?;
   let context = config["currentContext"].as_str().unwrap_or("default");
+  if context == "default" {
+    return Ok(("unix:///var/run/docker.sock".into(), false));
+  }
   let hash = hash::calculate_SHA256(context);
   let path = format!("{home}/.docker/contexts/meta/{hash}/meta.json",);
   let str = std::fs::read_to_string(path)?;
   let config =
-    serde_json::from_str::<serde_json::Value>(&str).map_err(|err| {
+    serde_json::from_str::<DockerContextMeta>(&str).map_err(|err| {
       std::io::Error::new(
         std::io::ErrorKind::InvalidData,
         format!("Could not parse docker config: {err}"),
       )
     })?;
-  let host = config["dockerHost"]
-    .as_str()
-    .unwrap_or("unix:///var/run/docker.sock");
-  println!("host: {}", host);
-  Ok(context.into())
+  let Some(endpoint) = config.endpoints.get("docker") else {
+    return Ok(("unix:///var/run/docker.sock".into(), false));
+  };
+  if !endpoint.host.starts_with("unix://") {
+    return Err(std::io::Error::new(
+      std::io::ErrorKind::InvalidData,
+      format!("No unix docker endpoint unsupported yet: {}", endpoint.host),
+    ));
+  }
+  if context == "desktop-linux" {
+    return Ok((endpoint.host.to_owned(), true));
+  }
+  println!("host: {}", endpoint.host);
+  Ok((endpoint.host.to_owned(), false))
 }
