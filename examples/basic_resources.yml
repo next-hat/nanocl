@@ -6,11 +6,11 @@ ApiVersion: v0.8
 Resources:
   - Name: ProxyRule
     Kind: Kind
-    Version: v0.5
+    Version: v0.6
     Config:
       Url: unix:///run/nanocl/proxy.sock
   - Name: DnsRule
     Kind: Kind
-    Version: v0.5
+    Version: v0.3
     Config:
       Url: unix:///run/nanocl/proxy.sock
