@@ -68,7 +68,15 @@ args = ["compose", "up"]
 # Test coverage
 [tasks.cov]
 command = "cargo"
-args = ["llvm-cov", "nextest", "--no-default-features", "--features", "test"]
+args = [
+  "llvm-cov",
+  "nextest",
+  "--no-default-features",
+  "--features",
+  "test",
+  "-j",
+  "1",
+]
 
 # Test all with coverage for codecov
 [tasks.covgen]

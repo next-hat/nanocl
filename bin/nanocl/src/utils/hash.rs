@@ -1,5 +1,6 @@
 use ring::digest;
 
+#[warn(non_snake_case)]
 pub fn calculate_SHA256(name: &str) -> String {
   let mut context = digest::Context::new(&digest::SHA256);
   context.update(name.as_bytes());
