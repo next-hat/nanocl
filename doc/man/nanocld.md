@@ -1,58 +1,52 @@
-NAME
-====
+# NAME
 
 Nanocl - Nanocl daemon Self Sufficient Hybrid Cloud Orchestrator
 
-SYNOPSIS
-========
+# SYNOPSIS
 
 **Nanocl** \[**\--init**\] \[**-H**\|**\--hosts**\]
 \[**\--docker-host**\] \[**\--state-dir**\] \[**\--config-dir**\]
 \[**-h**\|**\--help**\] \[**-V**\|**\--version**\]
 
-DESCRIPTION
-===========
+# DESCRIPTION
 
 Nanocl daemon Self Sufficient Hybrid Cloud Orchestrator
 
-OPTIONS
-=======
+# OPTIONS
 
-**\--init**=*INIT*
+**\--init**=_INIT_
 
-:   Ensure state is inited
+: Ensure state is inited
 
-**-H**, **\--hosts**=*HOSTS*
+**-H**, **\--hosts**=_HOSTS_
 
-:   Hosts to listen to use tcp:// and unix:// \[default:
-    unix:///run/nanocl.sock\]
+: Hosts to listen to use tcp:// and unix:// \[default:
+unix:///run/nanocl.sock\]
 
-**\--docker-host**=*DOCKER\_HOST*
+**\--docker-host**=_DOCKER_HOST_
 
-:   Docker daemon socket to connect \[default: unix:///run/docker.sock\]
+: Docker daemon socket to connect \[default: unix:///var/run/docker.sock\]
 
-**\--state-dir**=*STATE\_DIR*
+**\--state-dir**=_STATE_DIR_
 
-:   State directory \[default: /var/lib/nanocl\]
+: State directory \[default: /var/lib/nanocl\]
 
-**\--config-dir**=*CONFIG\_DIR* \[default: /etc/nanocl\]
+**\--config-dir**=_CONFIG_DIR_ \[default: /etc/nanocl\]
 
-:   Config directory
+: Config directory
 
 **-h**, **\--help**
 
-:   Print help
+: Print help
 
 **-V**, **\--version**
 
-:   Print version
+: Print version
 
-VERSION
-=======
+# VERSION
 
 v0.1.19
 
-AUTHORS
-=======
+# AUTHORS
 
 nexthat team \<team\@next-hat.com\>

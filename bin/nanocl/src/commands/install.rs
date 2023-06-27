@@ -15,12 +15,14 @@ use crate::models::{InstallOpts, NanocldArgs};
 /// Execute install command
 pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
   println!("Installing Nanocl components on your system");
-
-  let docker_host = opts
-    .docker_host
-    .as_deref()
-    .unwrap_or("unix:///var/run/docker.sock")
-    .to_owned();
+  let home_dir = std::env::var("HOME").map_err(|err| {
+    IoError::interupted("Unable to get $HOME env variable", &err.to_string())
+  })?;
+  let detected_host = utils::docker::detect_docker_host()?;
+  let (docker_host, is_docker_desktop) = match &opts.docker_host {
+    Some(docker_host) => (docker_host.to_owned(), opts.is_docker_desktop),
+    None => detected_host,
+  };
 
   let state_dir = opts
     .state_dir
@@ -79,6 +81,8 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
     gid: gid.gid(),
     hostname,
     advertise_addr,
+    is_docker_desktop,
+    home_dir,
   };
 
   let installer = utils::installer::get_template(opts.template.clone()).await?;

@@ -92,3 +92,15 @@ impl From<Context> for ContextRow {
     }
   }
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct DockerContextMetaEndpoint {
+  pub host: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct DockerContextMeta {
+  pub endpoints: HashMap<String, DockerContextMetaEndpoint>,
+}

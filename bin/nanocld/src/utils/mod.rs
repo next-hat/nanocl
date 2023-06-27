@@ -63,7 +63,7 @@ pub mod tests {
   ///
   pub fn gen_docker_client() -> bollard_next::Docker {
     let socket_path = env::var("DOCKER_SOCKET_PATH")
-      .unwrap_or_else(|_| String::from("/run/docker.sock"));
+      .unwrap_or_else(|_| String::from("/var/run/docker.sock"));
     println!("Using docker socket path: {}", socket_path);
     bollard_next::Docker::connect_with_unix(
       &socket_path,
@@ -127,7 +127,7 @@ pub mod tests {
     // Build a test daemon config
     let home = env::var("HOME").expect("Failed to get home dir");
     let docker_host = env::var("DOCKER_SOCKET_PATH")
-      .unwrap_or_else(|_| String::from("/run/docker.sock"));
+      .unwrap_or_else(|_| String::from("/var/run/docker.sock"));
     let config = DaemonConfig {
       state_dir: format!("{home}/.nanocl/state"),
       docker_host,

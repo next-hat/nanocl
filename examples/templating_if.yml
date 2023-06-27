@@ -2,10 +2,6 @@
 Kind: Deployment
 ApiVersion: v0.8
 
-Args:
-  - Name: docker-host
-    Kind: String
-
 Namespace: global
 
 # See all options:
@@ -16,9 +12,6 @@ Cargoes:
       Image: nexthat/nanocl-get-started:latest
       HostConfig:
         Binds:
-          # {% if Args.docker-host contains '.sock' %}
-          - /var/run/docker.sock:/var/run/docker.sock
-          # {% endif %}
           # {% if freestyle %}
           - /tmp:/tmp
           # {% endif %}

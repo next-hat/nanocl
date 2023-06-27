@@ -1,13 +1,33 @@
 # Create Builder image
-FROM rust:1.70.0-alpine3.17
+FROM --platform=$BUILDPLATFORM rust:1.70.0-alpine3.17
 
 # Setup timezone
 ARG tz=Europe/Paris
 
 # Install required dependencies
-RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git perl build-base tzdata util-linux libgcc openssl libpq util-linux bash cloud-utils cdrkit
+RUN apk add --update alpine-sdk \
+  musl-dev \
+  g++ \
+  make \
+  libpq-dev \
+  openssl-dev \
+  git \
+  perl \
+  build-base \
+  tzdata \
+  util-linux \
+  libgcc \
+  openssl \
+  libpq \
+  util-linux \
+  bash \
+  cloud-utils \
+  cdrkit \
+  && rm -rf /var/cache/apk/* \
+  && rm -rf /tmp/* \
+  && rm -rf /var/log/* \
+  && rm -rf /var/tmp/*
 
-# Install cargo-watch
 RUN cargo install cargo-watch --locked
 
 # Create project directory

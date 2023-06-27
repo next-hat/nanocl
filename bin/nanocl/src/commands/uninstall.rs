@@ -10,7 +10,7 @@ pub async fn exec_uninstall(opts: &UninstallOpts) -> IoResult<()> {
   let docker_host = opts
     .docker_host
     .clone()
-    .unwrap_or("unix:///run/docker.sock".into());
+    .unwrap_or("unix:///var/run/docker.sock".into());
 
   let docker = utils::docker::connect(&docker_host)?;
 
