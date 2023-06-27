@@ -12,7 +12,6 @@ mod config;
 mod models;
 mod version;
 mod commands;
-
 use models::{Cli, Commands, Context};
 
 async fn detect_version(client: &mut NanocldClient) -> IoResult<()> {

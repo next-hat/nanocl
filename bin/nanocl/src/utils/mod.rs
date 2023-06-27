@@ -5,3 +5,4 @@ pub mod docker;
 pub mod installer;
 pub mod dialog;
 pub mod context;
+pub mod hash;

@@ -1,7 +1,5 @@
-use crate::{
-  models::{Context, ContextRow},
-  config,
-};
+use crate::config;
+use crate::models::{Context, ContextRow};
 
 impl Context {
   pub fn new() -> Self {

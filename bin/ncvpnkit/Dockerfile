@@ -43,10 +43,10 @@ COPY .git ./.git
 ENV NANOCL_CHANNEL=$channel
 ENV RUSTFLAGS="-C target-feature=+crt-static"
 RUN export ARCH=$(uname -m) \
-  && cargo build --release --target=$ARCH-unknown-linux-musl --features release --bin ncproxy
+  && cargo build --release --target=$ARCH-unknown-linux-musl --features release --bin ncvpnkit
 RUN export ARCH=$(uname -m) \
-  && upx --lzma --best /app/target/$ARCH-unknown-linux-musl/release/ncproxy \
-  && cp /app/target/$ARCH-unknown-linux-musl/release/ncproxy /bin/ncproxy
+  && upx --lzma --best /app/target/$ARCH-unknown-linux-musl/release/ncvpnkit \
+  && cp /app/target/$ARCH-unknown-linux-musl/release/ncvpnkit /bin/ncvpnkit
 
 # stage 4 - create runtime image
 FROM --platform=$BUILDPLATFORM scratch
@@ -54,6 +54,6 @@ FROM --platform=$BUILDPLATFORM scratch
 LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
 LABEL org.opencontainers.image.description Nanocl Controller Proxy
 
-COPY --from=builder /bin/ncproxy /bin/ncproxy
+COPY --from=builder /bin/ncvpnkit /bin/ncvpnkit
 
-ENTRYPOINT ["ncproxy"]
+ENTRYPOINT ["ncvpnkit"]

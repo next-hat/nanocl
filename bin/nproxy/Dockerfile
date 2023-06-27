@@ -4,8 +4,14 @@ USER root
 
 ENV TZ="Europe/Paris"
 
-RUN apt-get update -y
-RUN apt-get install -y nginx-extras certbot python3-certbot-nginx
+RUN apt-get update && \
+  apt-get install -y nginx-extras \
+  certbot \
+  python3-certbot-nginx \
+  && rm -rf /var/lib/apt/lists/* \
+  && rm -rf /tmp/* \
+  && rm -rf /var/log/* \
+  && rm -rf /var/tmp/*
 
 EXPOSE 80/tcp 443/tcp
 
