@@ -52,7 +52,7 @@ RUN export ARCH=$(uname -m) \
 FROM --platform=$BUILDPLATFORM scratch
 
 LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
-LABEL org.opencontainers.image.description Nanocl Controller Proxy
+LABEL org.opencontainers.image.description Nanocl Controller Vpnkit
 
 COPY --from=builder /bin/ncvpnkit /bin/ncvpnkit
 
