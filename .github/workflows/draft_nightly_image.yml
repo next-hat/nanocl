@@ -39,7 +39,7 @@ jobs:
       # Print info for debug
       - name: Print Info
         run: |
-          echo ${GITHUB_REF##*/}
+          echo ${GITHUB_REF#*/}
           echo $BRANCH_NAME
           echo $BINARY_NAME
           echo $CHANNEL
