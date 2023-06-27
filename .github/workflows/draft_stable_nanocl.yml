@@ -3,11 +3,11 @@ name: Draft Stable Nanocl
 on:
   push:
     branches:
-      - "release-stable-nanocl-*"
+      - "release/stable/nanocl/*"
   pull_request:
     branches:
-      - "release-stable-nanocl-*"
-    types: [opened, synchronize, closed]
+      - "release/stable/nanocl/*"
+    types: [opened, synchronize]
 
 env:
   CARGO_TERM_COLOR: always

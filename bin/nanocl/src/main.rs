@@ -1,9 +1,9 @@
-use ntex::http;
+// use ntex::http;
 use clap::Parser;
 use dotenv::dotenv;
 
 use nanocl_utils::io_error::IoResult;
-use nanocl_utils::http_client_error::HttpClientError;
+// use nanocl_utils::http_client_error::HttpClientError;
 
 use nanocld_client::NanocldClient;
 
@@ -14,12 +14,12 @@ mod version;
 mod commands;
 use models::{Cli, Commands, Context};
 
-async fn detect_version(client: &mut NanocldClient) -> IoResult<()> {
-  client.set_version("0.1.0");
-  let version = client.get_version().await?;
-  client.set_version(&version.version);
-  Ok(())
-}
+// async fn detect_version(client: &mut NanocldClient) -> IoResult<()> {
+//   client.set_version("0.1.0");
+//   let version = client.get_version().await?;
+//   client.set_version(&version.version);
+//   Ok(())
+// }
 
 async fn execute_args(args: &Cli) -> IoResult<()> {
   Context::ensure()?;
@@ -49,14 +49,7 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
   }
 
   let url = Box::leak(host.clone().into_boxed_str());
-  let mut client = NanocldClient::connect_to(url, None);
-
-  if let Err(HttpClientError::HttpError(err)) = client.get_version().await {
-    if err.status == http::StatusCode::NOT_FOUND {
-      eprintln!("You're daemon is outdated, please run `nanocl upgrade`");
-      detect_version(&mut client).await?;
-    }
-  }
+  let client = NanocldClient::connect_to(url, None);
 
   match &args.command {
     Commands::Namespace(args) => commands::exec_namespace(&client, args).await,

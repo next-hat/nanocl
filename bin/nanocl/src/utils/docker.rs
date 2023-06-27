@@ -249,6 +249,5 @@ pub fn detect_docker_host() -> std::io::Result<(String, bool)> {
   if context == "desktop-linux" {
     return Ok((endpoint.host.to_owned(), true));
   }
-  println!("host: {}", endpoint.host);
   Ok((endpoint.host.to_owned(), false))
 }

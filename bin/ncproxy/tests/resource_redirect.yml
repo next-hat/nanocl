@@ -4,7 +4,7 @@ ApiVersion: v0.8
 Resources:
   - Name: proxy-get-started
     Kind: ProxyRule
-    Version: v0.5
+    Version: v0.6
     Config:
       Watch: []
       Rules:

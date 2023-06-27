@@ -8,7 +8,7 @@ Namespace: global
 Resources:
   - Name: deploy-example.internal
     Kind: ProxyRule
-    Version: v0.5
+    Version: v0.6
     Config:
       Watch:
         - deploy-example.global.c
