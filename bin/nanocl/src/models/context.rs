@@ -61,7 +61,7 @@ impl std::default::Default for Context {
           "Nanocl".into(),
           ContextEndpoint {
             host: std::env::var("NANOCL_HOST")
-              .unwrap_or("unix://run/nanocl/nanocl.sock".into()),
+              .unwrap_or("unix:///run/nanocl/nanocl.sock".into()),
           },
         );
         map
