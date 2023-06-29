@@ -130,7 +130,6 @@ async fn main() -> std::io::Result<()> {
     }
     Ok(config) => config,
   };
-  println!("config: {:#?}", config);
   // Boot and init internal dependencies
   let daemon_state = boot::init(&config).await?;
   // If init is true we don't start the server

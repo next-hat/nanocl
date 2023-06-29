@@ -145,14 +145,22 @@ pub async fn exec_vm_attach(
   const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
   let conn = client.attach_vm(name, args.namespace.clone()).await?;
   let (mut tx, mut rx) = mpsc::unbounded();
-
+  // start heartbeat task
+  let sink = conn.sink();
+  rt::spawn(async move {
+    loop {
+      time::sleep(HEARTBEAT_INTERVAL).await;
+      if sink.send(ws::Message::Ping(Bytes::new())).await.is_err() {
+        return;
+      }
+    }
+  });
   // // Get the current terminal settings
   let mut termios = Termios::from_fd(std::io::stdin().as_raw_fd())?;
   // Save a copy of the original terminal settings
   let original_termios = termios;
   // Disable canonical mode and echo
   termios.c_lflag &= !(ICANON | ECHO);
-
   // Redirect the output of the console to the TTY device
   let mut stderr = std::io::stderr();
   let mut stdout = std::io::stdout();
@@ -163,7 +171,6 @@ pub async fn exec_vm_attach(
   // start console read loop
   thread::spawn(move || loop {
     let mut input = [0; 1];
-
     if std::io::stdin().read(&mut input).is_err() {
       println!("Unable to read stdin");
       return;
@@ -176,7 +183,6 @@ pub async fn exec_vm_attach(
       return;
     }
   });
-
   // read console commands
   let sink = conn.sink();
   rt::spawn(async move {
@@ -186,22 +192,9 @@ pub async fn exec_vm_attach(
       }
     }
   });
-
-  // start heartbeat task
-  let sink = conn.sink();
-  rt::spawn(async move {
-    loop {
-      time::sleep(HEARTBEAT_INTERVAL).await;
-      if sink.send(ws::Message::Ping(Bytes::new())).await.is_err() {
-        return;
-      }
-    }
-  });
-
   // run ws dispatcher
   let sink = conn.sink();
   let mut rx = conn.seal().receiver();
-
   while let Some(frame) = rx.next().await {
     match frame {
       Ok(ws::Frame::Binary(text)) => {

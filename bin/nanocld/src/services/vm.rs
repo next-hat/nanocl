@@ -259,10 +259,9 @@ async fn ws_attach_service(
   web::Error,
 > {
   // start heartbeat task
-  let (tx, rx) = oneshot::channel();
   let con_state = Rc::new(RefCell::new(WsConState::new()));
+  let (tx, rx) = oneshot::channel();
   rt::spawn(utils::ws::heartbeat(con_state.clone(), sink.clone(), rx));
-
   let (scmd, mut rcmd) = mpsc::channel::<Result<Bytes, web::Error>>();
 
   let stream = state
@@ -325,7 +324,6 @@ async fn ws_attach_service(
           break;
         }
       };
-
       if stdin.write_all(&cmd).await.is_err() {
         break;
       }

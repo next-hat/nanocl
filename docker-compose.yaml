@@ -203,7 +203,6 @@ services:
         target: /project
       - /project/target
       - ${STATE_DIR:-${HOME}/.nanocl/state}:${STATE_DIR:-${HOME}/.nanocl/state}
-      - //var/lib/nanocl/state:${STATE_DIR:-${HOME}/.nanocl/state}
       - //run/guest-services/nanocl:/run/nanocl
       - //var/run/docker.sock:/run/docker.sock
     command:
