@@ -10,6 +10,7 @@ use nanocld_client::stubs::proxy::{
   ProxyRule, StreamTarget, ProxyStreamProtocol, ProxyRuleHttp, UpstreamTarget,
   ProxyHttpLocation, ProxyRuleStream, LocationTarget, ResourceProxyRule,
 };
+use nanocld_client::stubs::vm::VmInspect;
 
 use crate::nginx::{Nginx, NginxConfKind};
 
@@ -109,7 +110,7 @@ fn create_cargo_upstream(
     ));
   }
   log::debug!("ip_addresses: {:?}", ip_addresses);
-  let upstream_key = format!("{}-{}", cargo.key, port);
+  let upstream_key = format!("cargo-{}-{}", cargo.key, port);
   let upstream = format!(
     "
 upstream {upstream_key} {{
@@ -127,34 +128,110 @@ upstream {upstream_key} {{
   Ok(upstream_key)
 }
 
-async fn gen_cargo_upstream(
+fn create_vm_upstream(
+  kind: &NginxConfKind,
+  port: u16,
+  vm: &VmInspect,
+  nginx: &Nginx,
+) -> IoResult<String> {
+  let mut ip_addresses = Vec::new();
+
+  for node_container in vm.instances.iter() {
+    let networks = node_container
+      .network_settings
+      .clone()
+      .unwrap_or_default()
+      .networks
+      .unwrap_or_default();
+
+    let network = networks.get(&vm.namespace_name);
+
+    let Some(network) = network else {
+      log::warn!("empty ip address for vm {}", &vm.name);
+      log::warn!("Instance is unhealthy, skipping");
+      continue;
+    };
+    let Some(ip_address) = network.ip_address.clone() else {
+      log::warn!("empty ip address for cargo {}", &vm.name);
+      log::warn!("Instance is unhealthy, skipping");
+      continue;
+    };
+    if ip_address.is_empty() {
+      log::warn!("empty ip address for cargo {}", &vm.name);
+      log::warn!("Instance is unhealthy, skipping");
+      continue;
+    }
+    ip_addresses.push(ip_address);
+  }
+  log::debug!("ip_addresses: {:?}", ip_addresses);
+  let upstream_key = format!("vm-{}-{}", vm.key, port);
+  let upstream = format!(
+    "
+upstream {upstream_key} {{
+  hash $remote_addr consistent;
+{}
+}}
+",
+    ip_addresses
+      .iter()
+      .map(|ip_address| format!("  server {ip_address}:{port};"))
+      .collect::<Vec<String>>()
+      .join("\n")
+  );
+  nginx.write_conf_file(&upstream_key, &upstream, kind)?;
+  Ok(upstream_key)
+}
+
+async fn gen_upstream(
   kind: &NginxConfKind,
   target: &UpstreamTarget,
   client: &NanocldClient,
   nginx: &Nginx,
 ) -> IoResult<String> {
   let port = target.port;
-  let (cargo_name, namespace) = extract_target_cargo(&target.key)?;
-  let cargo = client
-    .inspect_cargo(&cargo_name, Some(namespace.clone()))
-    .await
-    .map_err(|err| {
-      err.map_err_context(|| format!("Unable to inspect cargo {cargo_name}"))
-    })?;
-  create_cargo_upstream(kind, port, &cargo, nginx)
+  let (target_name, target_namespace, target_kind) =
+    extract_upstream_target(&target.key)?;
+
+  match target_kind.as_str() {
+    "c" => {
+      let cargo = client
+        .inspect_cargo(&target_name, Some(target_namespace.clone()))
+        .await
+        .map_err(|err| {
+          err.map_err_context(|| {
+            format!("Unable to inspect cargo {target_name}")
+          })
+        })?;
+      create_cargo_upstream(kind, port, &cargo, nginx)
+    }
+    "v" => {
+      let vm = client
+        .inspect_vm(&target_name, Some(target_namespace.clone()))
+        .await
+        .map_err(|err| {
+          err.map_err_context(|| format!("Unable to inspect vm {target_name}"))
+        })?;
+      create_vm_upstream(kind, port, &vm, nginx)
+    }
+    _ => Err(IoError::invalid_data(
+      "UpstreamTarget",
+      &format!("Unknown Kind {}", target_kind),
+    )),
+  }
 }
 
-fn extract_target_cargo(key: &str) -> IoResult<(String, String)> {
+fn extract_upstream_target(key: &str) -> IoResult<(String, String, String)> {
   let info = key.split('.').collect::<Vec<&str>>();
-  if info.len() < 2 {
+  if info.len() < 3 {
     return Err(IoError::invalid_data(
-      "CargoKey",
-      "Invalid cargo key expected <name>.<namespace>",
+      "TargetKey",
+      "Invalid expected <name>.<namespace>.<kind>",
     ));
   }
-  let namespace = info[1].to_owned();
   let name = info[0].to_owned();
-  Ok((name, namespace))
+  let namespace = info[1].to_owned();
+  let kind = info[2].to_owned();
+  Ok((name, namespace, kind))
 }
 
 async fn gen_unix_stream(path: &str, nginx: &Nginx) -> IoResult<String> {
@@ -193,15 +270,15 @@ async fn gen_locations(
     );
 
     match &rule.target {
-      LocationTarget::Upstream(cargo_target) => {
+      LocationTarget::Upstream(upstream_target) => {
         let Ok(upstream_key) =
-          gen_cargo_upstream(&NginxConfKind::Site, cargo_target, client, nginx)
+          gen_upstream(&NginxConfKind::Site, upstream_target, client, nginx)
             .await else {
               log::warn!("Unable to generate cargo upstream for location rule {:?} got error", rule);
               continue;
             };
         let disable_logging =
-          if cargo_target.disable_logging.unwrap_or_default() {
+          if upstream_target.disable_logging.unwrap_or_default() {
             "access_log off;"
           } else {
             ""
@@ -217,7 +294,7 @@ async fn gen_locations(
     proxy_pass http://{upstream_key}{};
     {disable_logging}
   }}",
-          cargo_target.path.clone().unwrap_or("".into())
+          upstream_target.path.clone().unwrap_or("".into())
         );
         locations.push(location);
       }
@@ -351,8 +428,7 @@ async fn gen_stream_server_block(
 
   let upstream_key = match &rule.target {
     StreamTarget::Upstream(cargo_target) => {
-      gen_cargo_upstream(&NginxConfKind::Stream, cargo_target, client, nginx)
-        .await?
+      gen_upstream(&NginxConfKind::Stream, cargo_target, client, nginx).await?
     }
     StreamTarget::Unix(unix) => gen_unix_stream(&unix.unix_path, nginx).await?,
     StreamTarget::Uri(_) => {

@@ -202,7 +202,8 @@ services:
         source: .
         target: /project
       - /project/target
-      - ${STATE_DIR:-${HOME}/.nanocl/state}:/var/lib/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl/state}:${STATE_DIR:-${HOME}/.nanocl/state}
+      - //var/lib/nanocl/state:${STATE_DIR:-${HOME}/.nanocl/state}
       - //run/guest-services/nanocl:/run/nanocl
       - //var/run/docker.sock:/run/docker.sock
     command:
@@ -210,4 +211,4 @@ services:
       - -w
       - /project/bin/nanocld/src
       - -x
-      - run --no-default-features --features dev --bin nanocld -- --gid 1001
+      - run --no-default-features --features dev --bin nanocld -- --gid 1001 --state-dir ${STATE_DIR:-${HOME}/.nanocl/state}

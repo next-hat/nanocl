@@ -7,6 +7,7 @@ use nanocld_client::stubs::system::Event;
 use nanocld_client::stubs::resource::Resource;
 use nanocld_client::stubs::proxy::{
   ResourceProxyRule, ProxyRule, ProxyStreamProtocol, ProxyRuleStream,
+  UpstreamTarget, StreamTarget,
 };
 
 mod version;
@@ -92,7 +93,10 @@ async fn remove_rule(port: &VpnKitPort, vpnkit_client: &VpnKitRc) {
 ///
 /// Convert a `ProxyRuleStream` to a `VpnKitPort`
 ///
-fn rule_stream_to_vpnkit_port(rule_stream: &ProxyRuleStream) -> VpnKitPort {
+fn rule_stream_to_vpnkit_port(
+  rule_stream: &ProxyRuleStream,
+  target: &UpstreamTarget,
+) -> VpnKitPort {
   VpnKitPort {
     proto: match rule_stream.protocol {
       ProxyStreamProtocol::Tcp => Some(VpnKitProtocol::TCP),
@@ -101,7 +105,7 @@ fn rule_stream_to_vpnkit_port(rule_stream: &ProxyRuleStream) -> VpnKitPort {
     out_ip: Some("0.0.0.0".into()),
     out_port: Some(rule_stream.port.into()),
     in_ip: Some("127.0.0.1".into()),
-    in_port: Some(rule_stream.port.into()),
+    in_port: Some(target.port.into()),
     ..Default::default()
   }
 }
@@ -126,8 +130,15 @@ async fn on_event(
           if stream.network != "Public" {
             continue;
           }
-          let port = rule_stream_to_vpnkit_port(&stream);
-          apply_rule(&port, vpnkit_client).await;
+          match &stream.target {
+            StreamTarget::Upstream(upstream) => {
+              let port = rule_stream_to_vpnkit_port(&stream, upstream);
+              apply_rule(&port, vpnkit_client).await;
+            }
+            _ => {
+              continue;
+            }
+          }
         }
       }
     }
@@ -141,8 +152,15 @@ async fn on_event(
           if stream.network != "Public" {
             continue;
           }
-          let port = rule_stream_to_vpnkit_port(&stream);
-          apply_rule(&port, vpnkit_client).await;
+          match &stream.target {
+            StreamTarget::Upstream(upstream) => {
+              let port = rule_stream_to_vpnkit_port(&stream, upstream);
+              apply_rule(&port, vpnkit_client).await;
+            }
+            _ => {
+              continue;
+            }
+          }
         }
       }
     }
@@ -156,8 +174,15 @@ async fn on_event(
           if stream.network != "Public" {
             continue;
           }
-          let port = rule_stream_to_vpnkit_port(&stream);
-          remove_rule(&port, vpnkit_client).await;
+          match &stream.target {
+            StreamTarget::Upstream(upstream) => {
+              let port = rule_stream_to_vpnkit_port(&stream, upstream);
+              remove_rule(&port, vpnkit_client).await;
+            }
+            _ => {
+              continue;
+            }
+          }
         }
       }
     }

@@ -126,6 +126,7 @@ pub async fn create_snap(
       msg: format!("Vm image {name} already used"),
     });
   }
+  println!("State config {:#?}", state.config);
   let imagepath = image.path.clone();
   let snapshotpath =
     format!("{}/vms/images/{}.img", state.config.state_dir, name);
