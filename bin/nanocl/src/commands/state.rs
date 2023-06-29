@@ -422,18 +422,18 @@ async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
       };
       namespace = inject_namespace(&namespace, &args)?;
       let _ = client.create_namespace(&namespace).await;
-      let mut json: serde_yaml::Value =
+      let mut yaml: serde_yaml::Value =
         inject_data(&state_ref.format, &state_ref.raw, &args, &client).await?;
-      let current_cargoes: Vec<CargoConfigPartial> = match json.get("Cargoes") {
+      let current_cargoes: Vec<CargoConfigPartial> = match yaml.get("Cargoes") {
         Some(cargoes) => serde_yaml::from_value(cargoes.clone())
           .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
         None => Vec::new(),
       };
       let hooked_cargoes = hook_cargoes(current_cargoes)?;
       cargoes = hooked_cargoes.clone();
-      json["Cargoes"] = serde_yaml::to_value(&hooked_cargoes)
+      yaml["Cargoes"] = serde_yaml::to_value(&hooked_cargoes)
         .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
-      json
+      yaml
     }
     _ => inject_data(&state_ref.format, &state_ref.raw, &args, &client).await?,
   };
