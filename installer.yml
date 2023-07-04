@@ -11,7 +11,7 @@ Namespace: system
 Cargoes:
   - Name: nmetrics
     Container:
-      Image: ghcr.io/nxthat/metrsd:0.2.0
+      Image: ghcr.io/nxthat/metrsd:0.3.1
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -21,36 +21,48 @@ Cargoes:
       HostConfig:
         NetworkMode: system
         Binds:
+          # {% if is_docker_desktop %}
+          - //run/guest-services/nanocl:/run/nanocl
+          # {% else %}
           - /run/nanocl:/run/nanocl
+          # {% endif %}
 
   - Name: nproxy
     Container:
-      Image: ghcr.io/nxthat/nproxy:1.24.0.2
+      Image: ghcr.io/nxthat/nproxy:1.25.0.0
       Tty: true
       Env:
         - TZ=Europe/Paris
       HostConfig:
         NetworkMode: host
         Binds:
+          # {% if is_docker_desktop %}
+          - //run:/run
+          # {% else %}
           - /run:/run
-          - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
+          # {% endif %}
           - ${{ state_dir }}/proxy/certs:/etc/nginx/certs
+          - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
           - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
           - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
           - ${{ state_dir }}/proxy/html:/usr/share/nginx/html
           - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
           - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
-  - Name: ncdproxy
+  - Name: ncproxy
     Container:
-      Image: ghcr.io/nxthat/ncdproxy:0.5.0
+      Image: ghcr.io/nxthat/ncproxy:0.6.0
       Tty: true
       Env:
         - TZ=Europe/Paris
       HostConfig:
         NetworkMode: system
         Binds:
+          # {% if is_docker_desktop %}
+          - //run/guest-services/nanocl:/run/nanocl
+          # {% else %}
           - /run/nanocl:/run/nanocl
+          # {% endif %}
           - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
           - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
           - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
@@ -60,17 +72,17 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ndns:2.87.0
+      Image: ghcr.io/nxthat/ndns:2.87.0.1
       HostConfig:
         NetworkMode: host
         Binds:
           - ${{ state_dir }}/dns:/opt/dns
 
-  - Name: ncddns
+  - Name: ncdns
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ncddns:0.2.0
+      Image: ghcr.io/nxthat/ncdns:0.3.0
       Tty: true
       Cmd:
         - --conf-dir
@@ -82,12 +94,16 @@ Cargoes:
       HostConfig:
         NetworkMode: system
         Binds:
+          # {% if is_docker_desktop %}
+          - //run/guest-services/nanocl:/run/nanocl
+          # {% else %}
           - /run/nanocl:/run/nanocl
+          # {% endif %}
           - ${{ state_dir }}/dns:/opt/dns
 
   - Name: nstore
     Container:
-      Image: cockroachdb/cockroach:v22.2.7
+      Image: cockroachdb/cockroach:v23.1.4
       Tty: true
       Hostname: nstore.nanocl.internal
       Env:
@@ -106,7 +122,7 @@ Cargoes:
 
   - Name: ndaemon
     Container:
-      Image: ghcr.io/nxthat/nanocld:0.8.0
+      Image: ghcr.io/nxthat/nanocld:0.9.0
       Tty: true
       Hostname: ndaemon.nanocl.internal
       Cmd:
@@ -115,7 +131,7 @@ Cargoes:
         - --conf-dir
         - ${{ conf_dir }}
         - --docker-host
-        - ${{ docker_host }}
+        - /var/run/docker.sock
         - --gateway
         - ${{ gateway }}
         - --hostname
@@ -130,7 +146,27 @@ Cargoes:
       HostConfig:
         NetworkMode: system
         Binds:
+          # {% if is_docker_desktop %}
+          - //run/guest-services/nanocl:/run/nanocl
+          # {% else %}
           - /run/nanocl:/run/nanocl
-          - //var/run/docker.sock:/run/docker.sock
+          # {% endif %}
+          - //var/run/docker.sock:/var/run/docker.sock
           - ${{ state_dir }}:${{ state_dir }}
           - ${{ conf_dir }}:${{ conf_dir }}
+
+  # Enable vpnkit on docker desktop
+  # {% if is_docker_desktop %}
+  - Name: ncvpnkit
+    Container:
+      Image: ghcr.io/nxthat/ncvpnkit:0.1.0
+      Tty: true
+      Hostname: ncvpnkit.nanocl.internal
+      Env:
+        - USER_HOME=${{ home_dir }}
+      HostConfig:
+        NetworkMode: system
+        Binds:
+          - //run/guest-services/nanocl:/run/nanocl
+          - //run/host-services/backend.sock:/run/host-services/backend.sock
+  # {% endif %}
