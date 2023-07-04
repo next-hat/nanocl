@@ -3,10 +3,10 @@ name: Draft Stable Nanocl
 on:
   push:
     branches:
-      - "release/stable/nanocl/*"
+      - "release/stable/bin/nanocl/**"
   pull_request:
     branches:
-      - "release/stable/nanocl/*"
+      - "release/stable/bin/nanocl/**"
     types: [opened, synchronize]
 
 env:
