@@ -30,7 +30,7 @@ ntex = { version = "0.7.2", features = ["openssl"] }
 serde = { version = "1.0.166", features = ["derive"] }
 bollard-next = { version = "0.15.0" }
 nanocl_stubs = { version = "0.9.1", features = ["serde"] }
-nanocl_utils = { version = "0.2.0", features = [
+nanocl_utils = { version = "0.2.1", features = [
   "io_error",
   "http_client_error",
 ] }
