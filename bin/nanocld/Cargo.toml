@@ -44,7 +44,7 @@ serde_json = "1.0.88"
 diesel_migrations = "2.0.0"
 clap = { version = "4.3.10", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
-serde = { version = "1.0.148", features = ["derive"] }
+serde = { version = "1.0.166", features = ["derive"] }
 uuid = { version = "1.2", features = ["serde", "v4"] }
 ntex = { version = "0.7.2", features = ["openssl", "tokio"] }
 diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
