@@ -3,10 +3,10 @@ name: Publish Stable Image
 on:
   push:
     branches:
-      - "release/stable/*"
+      - "release/stable/bin/**"
   pull_request:
     branches:
-      - "release/stable/*"
+      - "release/stable/bin/**"
     types: [opened, synchronize]
 
 env:
@@ -28,6 +28,13 @@ jobs:
         with:
           path: /tmp/.buildx-cache
           key: buildx-cache
+      # Login to ghcr.io
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: nexthatbot
+          password: ${{ secrets.BOT_TOKEN }}
       # Extract branch info
       - name: Set info
         run: |
@@ -48,7 +55,7 @@ jobs:
       # Build daemon image
       # Build daemon image
       - name: Build image
-        run: docker buildx build --builder=buildx-multi-arch --platform=linux/amd64,linux/arm64 --build-arg channel=$CHANNEL --push --label org.opencontainers.image.source=https://github.com/nxthat/nanocl -t ghcr.io/nxthat/$BINARY_NAME:$VERSION-$CHANNEL -t ghcr.io/nxthat/$BINARY_NAME:$CHANNEL -f ./bin/$BINARY_NAME/Dockerfile .
+        run: docker buildx build --builder=buildx-multi-arch --platform=linux/amd64,linux/arm64 --build-arg channel=$CHANNEL --push --label org.opencontainers.image.source=https://github.com/nxthat/nanocl -t ghcr.io/nxthat/$BINARY_NAME:$VERSION -t ghcr.io/nxthat/$BINARY_NAME:latest -f ./bin/$BINARY_NAME/Dockerfile .
       # Export it as tar.gz
       # - name: Export image
       #   run: docker save ghcr.io/nxthat/$BINARY_NAME:$VERSION | gzip > /tmp/$BINARY_NAME-$VERSION.tar.gz
