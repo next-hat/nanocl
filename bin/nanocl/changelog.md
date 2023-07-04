@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0] - 2023-27-06
+## [0.9.0] - 2023-07-04
 
 ### Added
 
@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker desktop compatible installation
 - Accept `.toml` and `.json` along side `.yml`
 - Context to manage multiple nanocl host
+- `--kvm` options when patching a virtual machine
 
 ### Changed
 
