@@ -20,6 +20,7 @@ pub enum VmCommands {
   /// List vms
   #[clap(alias = "ls")]
   List(VmListOpts),
+  /// Remove vms
   #[clap(alias = "rm")]
   Remove(VmNamesOpts),
   /// Inspect a vm
@@ -81,6 +82,9 @@ pub struct VmPatchOpts {
   /// Memory of the vm in MB default to 512
   #[clap(long = "mem")]
   pub memory: Option<u64>,
+  /// Enable KVM
+  #[clap(long)]
+  pub kvm: bool,
   /// network interface of the vm
   #[clap(long)]
   pub net_iface: Option<String>,
@@ -95,6 +99,7 @@ impl From<VmPatchOpts> for VmConfigUpdate {
       ssh_key: val.ssh_key,
       hostname: val.hostname,
       host_config: Some(VmHostConfig {
+        kvm: Some(val.kvm),
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,

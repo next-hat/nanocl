@@ -60,7 +60,7 @@ pub struct VmHostConfig {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub runtime_net: Option<String>,
+  pub runtime_network: Option<String>,
 }
 
 impl Default for VmHostConfig {
@@ -72,7 +72,7 @@ impl Default for VmHostConfig {
       kvm: Some(false),
       dns: None,
       runtime: None,
-      runtime_net: None,
+      runtime_network: None,
     }
   }
 }

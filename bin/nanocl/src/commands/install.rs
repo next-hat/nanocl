@@ -173,7 +173,7 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
         map.insert(
           "Nanocl".into(),
           ContextEndpoint {
-            host: format!("unix:///{home_dir}/.nanocl/run/nanocl.sock"),
+            host: format!("unix://{home_dir}/.nanocl/run/nanocl.sock"),
           },
         );
         map

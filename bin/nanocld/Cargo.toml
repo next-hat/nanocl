@@ -27,7 +27,7 @@ test = []
 release = []
 
 [build-dependencies]
-clap = { version = "4.1.7", features = ["derive"] }
+clap = { version = "4.3.10", features = ["derive"] }
 clap_mangen = { version = "0.2" }
 
 [dev-dependencies]
@@ -42,9 +42,9 @@ serde_yaml = "0.9"
 env_logger = { version = "0.10" }
 serde_json = "1.0.88"
 diesel_migrations = "2.0.0"
-clap = { version = "4.1.7", features = ["derive"] }
+clap = { version = "4.3.10", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
-serde = { version = "1.0.148", features = ["derive"] }
+serde = { version = "1.0.166", features = ["derive"] }
 uuid = { version = "1.2", features = ["serde", "v4"] }
 ntex = { version = "0.7.2", features = ["openssl", "tokio"] }
 diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
@@ -55,7 +55,7 @@ diesel = { version = "2.0.1", features = [
   "uuid",
   "serde_json",
 ] }
-tokio = { version = "1.23.1", features = ["fs", "process", "io-std"] }
+tokio = { version = "1.29.1", features = ["fs", "process", "io-std"] }
 hyper = "0.14.27"
 tokio-util = "0.7.7"
 futures-util = "0.3.26"
@@ -66,10 +66,10 @@ chrono = { version = "0.4.24", default-features = false, features = [
   "serde",
 ] }
 jsonschema = { version = "0.17.0", default-features = false }
-nanocld_client = { version = "0.9.0", features = ["tokio"] }
+nanocld_client = { version = "0.9.1", features = ["tokio"] }
 openssl = { version = "0.10.50", features = ["vendored"] }
 metrsd_client = "0.3.0"
-nanocl_stubs = { version = "0.9.0", features = ["serde"] }
+nanocl_stubs = { version = "0.9.1", features = ["serde"] }
 nanocl_utils = { version = "0.2.0", features = [
   "unix",
   "ntex",

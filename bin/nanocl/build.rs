@@ -90,7 +90,14 @@ pub fn generate_man_pages() -> Result<()> {
 }
 
 fn set_channel() -> Result<()> {
-  let channel = std::env::var("NANOCL_CHANNEL").unwrap_or("stable".into());
+  #[allow(unused)]
+  let mut default_channel = "stable";
+  #[cfg(any(feature = "dev", feature = "test"))]
+  {
+    default_channel = "nightly";
+  }
+  let channel =
+    std::env::var("NANOCL_CHANNEL").unwrap_or(default_channel.into());
   println!("cargo:rustc-env=CHANNEL={channel}");
   Ok(())
 }

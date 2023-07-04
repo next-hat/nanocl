@@ -343,8 +343,14 @@ pub async fn create_instance(
     attach_stdout: Some(true),
     open_stdin: Some(true),
     host_config: Some(HostConfig {
-      network_mode: Some(vm.namespace_name.to_owned()),
-      binds: Some(vec![format!("{vmimagespath}:/var/lib/nanocl/vms/images")]),
+      network_mode: Some(
+        vm.config
+          .host_config
+          .runtime_network
+          .clone()
+          .unwrap_or(vm.namespace_name.to_owned()),
+      ),
+      binds: Some(vec![format!("{vmimagespath}:{vmimagespath}")]),
       devices: Some(devices),
       cap_add: Some(vec!["NET_ADMIN".into()]),
       ..Default::default()
