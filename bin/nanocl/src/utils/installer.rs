@@ -10,7 +10,11 @@ use crate::version::{VERSION, CHANNEL};
 async fn get() -> Result<String, HttpClientError> {
   let client = http::client::Client::new();
 
-  let url = format!("https://raw.githubusercontent.com/nxthat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.nightly.yml");
+  let url = if CHANNEL == "nightly" {
+    format!("https://raw.githubusercontent.com/nxthat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.nightly.yml")
+  } else {
+    format!("https://raw.githubusercontent.com/nxthat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.yml")
+  };
 
   let mut res = client.get(url).send().await.map_err(|err| {
     err.map_err_context(|| "Unable to fetch installer template")

@@ -70,7 +70,7 @@ nanocld_client = { version = "0.9.1", features = ["tokio"] }
 openssl = { version = "0.10.50", features = ["vendored"] }
 metrsd_client = "0.3.0"
 nanocl_stubs = { version = "0.9.1", features = ["serde"] }
-nanocl_utils = { version = "0.2.0", features = [
+nanocl_utils = { version = "0.2.1", features = [
   "unix",
   "ntex",
   "logger",
