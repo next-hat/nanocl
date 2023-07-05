@@ -2,7 +2,7 @@ use uuid::Uuid;
 use chrono::{DateTime, FixedOffset};
 use serde::{Serialize, Deserialize, Deserializer};
 
-use crate::schema::http_metrics;
+use crate::schema;
 
 /// ## deserialize empty string
 ///
@@ -52,9 +52,8 @@ where
 /// This structure represent a partial http metric.
 /// It is used to insert http metrics in the database.
 ///
-#[derive(Clone, Debug, Serialize, Deserialize, Insertable)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all(serialize = "PascalCase"))]
-#[diesel(table_name = http_metrics)]
 pub struct HttpMetricPartial {
   /// The date gmt of the metric
   pub date_gmt: DateTime<FixedOffset>,
@@ -111,8 +110,14 @@ pub struct HttpMetricPartial {
   pub http_accept_language: Option<String>,
 }
 
-impl HttpMetricPartial {
-  pub(crate) fn to_db_model(&self, node_name: &str) -> HttpMetricDbModel {
+pub trait ToDbModel {
+  type DbModel;
+  fn to_db_model(&self, _node_name: &str) -> Self::DbModel;
+}
+
+impl ToDbModel for HttpMetricPartial {
+  type DbModel = HttpMetricDbModel;
+  fn to_db_model(&self, node_name: &str) -> Self::DbModel {
     HttpMetricDbModel {
       key: Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
@@ -152,7 +157,7 @@ impl HttpMetricPartial {
   Clone, Debug, Identifiable, Insertable, Queryable, Serialize, Deserialize,
 )]
 #[diesel(primary_key(key))]
-#[diesel(table_name = http_metrics)]
+#[diesel(table_name = schema::http_metrics)]
 #[serde(rename_all = "PascalCase")]
 pub struct HttpMetricDbModel {
   /// The key of the metric in the database `UUID`
@@ -205,16 +210,86 @@ pub struct HttpMetricDbModel {
   pub http_accept_language: Option<String>,
 }
 
-// TODO: implement Stream Metrics support for tcp/udp protocols
-// #[derive(Clone, Debug, Serialize, Deserialize)]
-// #[serde(rename_all(serialize = "PascalCase"))]
-// pub struct StreamMetricPartial {
-//   pub date_gmt: DateTime<FixedOffset>,
-//   pub remote_addr: String,
-//   pub upstream_addr: String,
-//   pub protocol: String,
-//   pub status: i64,
-//   pub session_time: String,
-//   pub bytes_sent: String,
-//   pub bytes_received: String,
-// }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "PascalCase"))]
+pub struct StreamMetricPartial {
+  pub date_gmt: DateTime<FixedOffset>,
+  pub remote_addr: String,
+  pub upstream_addr: String,
+  pub protocol: Option<String>,
+  #[serde(deserialize_with = "deserialize_string_to_i64")]
+  pub status: i64,
+  pub session_time: String,
+  #[serde(deserialize_with = "deserialize_string_to_i64")]
+  pub bytes_sent: i64,
+  #[serde(deserialize_with = "deserialize_string_to_i64")]
+  pub bytes_received: i64,
+  #[serde(deserialize_with = "deserialize_string_to_i64")]
+  pub upstream_bytes_sent: i64,
+  #[serde(deserialize_with = "deserialize_string_to_i64")]
+  pub upstream_bytes_received: i64,
+  pub upstream_connect_time: String,
+}
+
+#[derive(
+  Clone, Debug, Identifiable, Insertable, Queryable, Serialize, Deserialize,
+)]
+#[diesel(primary_key(key))]
+#[diesel(table_name = schema::stream_metrics)]
+#[serde(rename_all = "PascalCase")]
+pub struct StreamMetricDbModel {
+  /// The key of the metric in the database `UUID`
+  pub key: Uuid,
+  /// When the metric was created
+  pub created_at: chrono::NaiveDateTime,
+  /// When the metric will expire
+  pub expire_at: chrono::NaiveDateTime,
+  /// The date gmt of the metric
+  pub date_gmt: chrono::NaiveDateTime,
+  /// The remote address of the request
+  pub remote_addr: String,
+  /// The upstream address of the request
+  pub upstream_addr: String,
+  /// The protocol of the request
+  pub protocol: Option<String>,
+  /// The status of the request
+  pub status: i64,
+  /// The session time of the request
+  pub session_time: String,
+  /// The bytes sent of the request
+  pub bytes_sent: i64,
+  /// The bytes received of the request
+  pub bytes_received: i64,
+  /// Number of bytes sent to upstream request
+  pub upstream_bytes_sent: i64,
+  /// Number of bytes received from upstream response
+  pub upstream_bytes_received: i64,
+  /// Time to connect to upstream
+  pub upstream_connect_time: String,
+  /// The node that handled the request
+  pub node_name: String,
+}
+
+impl ToDbModel for StreamMetricPartial {
+  type DbModel = StreamMetricDbModel;
+
+  fn to_db_model(&self, node_name: &str) -> Self::DbModel {
+    Self::DbModel {
+      key: Uuid::new_v4(),
+      created_at: chrono::Utc::now().naive_utc(),
+      expire_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30),
+      date_gmt: self.date_gmt.naive_utc(),
+      remote_addr: self.remote_addr.clone(),
+      upstream_addr: self.upstream_addr.clone(),
+      protocol: self.protocol.clone(),
+      status: self.status,
+      session_time: self.session_time.clone(),
+      bytes_sent: self.bytes_sent,
+      bytes_received: self.bytes_received,
+      upstream_bytes_sent: self.upstream_bytes_sent,
+      upstream_bytes_received: self.upstream_bytes_received,
+      upstream_connect_time: self.upstream_connect_time.clone(),
+      node_name: node_name.to_string(),
+    }
+  }
+}

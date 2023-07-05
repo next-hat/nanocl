@@ -1,5 +1,10 @@
 use ntex::web;
-use diesel::prelude::*;
+use diesel::{
+  prelude::*,
+  associations::HasTable,
+  query_builder::{InsertStatement, AsQuery},
+  query_dsl::LoadQuery,
+};
 
 use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 
@@ -34,6 +39,44 @@ pub async fn create(
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::insert_into(dsl::http_metrics)
+      .values(item)
+      .get_result(&mut conn)
+      .map_err(|err| err.map_err_context(|| "HttpMetric"))?;
+    Ok::<_, IoError>(res)
+  })
+  .await?;
+  Ok(item)
+}
+
+/// ## Create
+///
+/// Create a new entry in database
+///
+/// ## Arguments
+///
+/// - [item] The database entity that must be inserted into database
+/// - [pool](Pool) - Database connection pool
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](item) - The inserted database item
+///   - [Err](IoError) - Error during the operation
+///
+pub async fn generic_insert<T>(item: T, pool: &Pool) -> IoResult<T>
+where
+  T: Send + HasTable + 'static,
+  T: diesel::Insertable<<T as diesel::associations::HasTable>::Table>,
+  InsertStatement<
+    <T as HasTable>::Table,
+    <T as diesel::Insertable<<T as HasTable>::Table>>::Values,
+  >: AsQuery + LoadQuery<'static, PgConnection, T> + Send,
+{
+  let pool = pool.clone();
+  let item = web::block(move || {
+    let table_name = <T as HasTable>::table();
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let res = diesel::insert_into(table_name)
       .values(item)
       .get_result(&mut conn)
       .map_err(|err| err.map_err_context(|| "HttpMetric"))?;
