@@ -22,7 +22,7 @@ jobs:
 
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
           components: clippy
           override: true
 
@@ -39,7 +39,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
           components: rustfmt
           override: true
       - uses: actions-rs/cargo@v1
