@@ -8,4 +8,7 @@ pub struct UninstallOpts {
   /// Uninstall template to use for nanocl by default it's detected
   #[clap(short, long)]
   pub(crate) template: Option<String>,
+  /// Specify if the docker host is docker desktop detected if docker context is desktop-linux
+  #[clap(long = "docker-desktop")]
+  pub(crate) is_docker_desktop: bool,
 }

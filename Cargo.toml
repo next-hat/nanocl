@@ -3,8 +3,9 @@ members = [
   "crates/nanocl_stubs",
   "crates/nanocl_utils",
   "crates/nanocld_client",
-  "bin/ncdproxy",
-  "bin/ncddns",
+  "bin/ncproxy",
+  "bin/ncdns",
+  "bin/ncvpnkit",
   "bin/nanocld",
   "bin/nanocl",
 ]
@@ -22,6 +23,7 @@ codegen-units = 1
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocl_utils = { path = "crates/nanocl_utils" }
 nanocld_client = { path = "crates/nanocld_client" }
+# vpnkitrc = { path = "../vpnkitrc" }
 # ntex-cors = { git = "https://github.com/ntex-rs/ntex-extras.git" }
 #ntex-files = { git = "https://github.com/leon3s/ntex-extras", branch = "upgrade-ntex-version" }
 #ntex-multipart = { git = "https://github.com/leon3s/ntex-extras" }

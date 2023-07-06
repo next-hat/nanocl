@@ -43,7 +43,7 @@ fn gen_daemon_conf(
   } else if let Some(ref docker_host) = config.docker_host {
     docker_host.to_owned()
   } else {
-    String::from("/run/docker.sock")
+    String::from("/var/run/docker.sock")
   };
   let gateway = if let Some(ref gateway) = args.gateway {
     gateway.to_owned()
@@ -147,7 +147,7 @@ mod tests {
       gid: 0,
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
-      docker_host: Some(String::from("/run/docker.sock")),
+      docker_host: Some(String::from("/var/run/docker.sock")),
       conf_dir: String::from("/etc/nanocl"),
       init: false,
       gateway: None,
@@ -161,7 +161,7 @@ mod tests {
     let config = DaemonConfigFile {
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
-      docker_host: Some(String::from("/run/docker.sock")),
+      docker_host: Some(String::from("/var/run/docker.sock")),
       gateway: None,
       hostname: None,
     };
@@ -224,7 +224,7 @@ mod tests {
       gid: 0,
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
-      docker_host: Some(String::from("/run/docker.sock")),
+      docker_host: Some(String::from("/var/run/docker.sock")),
       conf_dir: String::from("/etc/nanocl"),
       init: false,
       gateway: None,

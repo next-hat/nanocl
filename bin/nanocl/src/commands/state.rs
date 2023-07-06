@@ -2,19 +2,20 @@ use std::fs;
 use std::collections::HashMap;
 
 use ntex::rt;
-use clap::{Command, Arg};
 use futures::StreamExt;
+use clap::{Arg, Command};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use indicatif::{MultiProgress, ProgressBar};
 use bollard_next::service::HostConfig;
 
 use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
+use nanocld_client::stubs::state::StateMeta;
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
 };
-use nanocld_client::stubs::state::{StateMeta, StateStream};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 
 use crate::utils;
 use crate::models::{
@@ -421,18 +422,18 @@ async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
       };
       namespace = inject_namespace(&namespace, &args)?;
       let _ = client.create_namespace(&namespace).await;
-      let mut json: serde_yaml::Value =
+      let mut yaml: serde_yaml::Value =
         inject_data(&state_ref.format, &state_ref.raw, &args, &client).await?;
-      let current_cargoes: Vec<CargoConfigPartial> = match json.get("Cargoes") {
+      let current_cargoes: Vec<CargoConfigPartial> = match yaml.get("Cargoes") {
         Some(cargoes) => serde_yaml::from_value(cargoes.clone())
           .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
         None => Vec::new(),
       };
       let hooked_cargoes = hook_cargoes(current_cargoes)?;
       cargoes = hooked_cargoes.clone();
-      json["Cargoes"] = serde_yaml::to_value(&hooked_cargoes)
+      yaml["Cargoes"] = serde_yaml::to_value(&hooked_cargoes)
         .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
-      json
+      yaml
     }
     _ => inject_data(&state_ref.format, &state_ref.raw, &args, &client).await?,
   };
@@ -461,13 +462,12 @@ async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
     err.map_err_context(|| "Unable to create json payload for the daemon")
   })?;
   let mut stream = client.apply_state(&data).await?;
-
+  let multiprogress = MultiProgress::new();
+  multiprogress.set_move_cursor(false);
+  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
   while let Some(res) = stream.next().await {
     let res = res?;
-    match res {
-      StateStream::Error(err) => eprintln!("{err}"),
-      StateStream::Msg(msg) => println!("{msg}"),
-    }
+    utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
 
   if opts.follow {
@@ -488,12 +488,12 @@ async fn exec_state_remove(host: &str, opts: &StateRemoveOpts) -> IoResult<()> {
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
   let mut stream = client.remove_state(&data).await?;
+  let multiprogress = MultiProgress::new();
+  multiprogress.set_move_cursor(false);
+  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
   while let Some(res) = stream.next().await {
     let res = res?;
-    match res {
-      StateStream::Error(err) => eprintln!("{err}"),
-      StateStream::Msg(msg) => println!("{msg}"),
-    }
+    utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
   Ok(())
 }

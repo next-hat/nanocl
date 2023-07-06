@@ -24,7 +24,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let images = client.list_cargo_image().await;
   /// ```
   ///
@@ -59,7 +59,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let mut stream = client.create_cargo_image("my-image").await;
   /// while let Some(info) = stream.try_next().await {
   ///  println!("{:?}", info);
@@ -104,7 +104,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// client.delete_cargo_image("my-image:mylabel").await;
   /// ```
   ///
@@ -140,7 +140,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let image = client.inspect_cargo_image("my-image:mylabel").await;
   /// ```
   ///
@@ -184,7 +184,7 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const IMAGE: &str = "busybox:1.26.1";
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
 
     let mut stream = client.create_cargo_image(IMAGE).await.unwrap();
     while let Some(_info) = stream.next().await {}

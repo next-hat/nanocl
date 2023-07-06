@@ -2,13 +2,16 @@ use ntex::rt;
 use futures::StreamExt;
 use bollard_next::container::{LogsOptions, LogOutput};
 
-use crate::repositories;
+use crate::{
+  repositories,
+  models::{ToDbModel, StreamMetricPartial},
+};
 use crate::models::{DaemonState, HttpMetricPartial};
 
 /// ## Spawn logger
 ///
-/// Create a background thread that will watch the logs of the `ncdproxy.system.c` container
-/// The `ncdproxy` is a container that run to update the proxy rules.
+/// Create a background thread that will watch the logs of the `ncproxy.system.c` container
+/// The `ncproxy` is a container that run to update the proxy rules.
 /// He will print http metrics to the logs.
 /// This function will parse the logs and save the metrics to the database.
 ///
@@ -22,7 +25,7 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
     rt::spawn(async move {
       let now = chrono::Utc::now().timestamp();
       let mut res = state.docker_api.logs(
-        "ncdproxy.system.c",
+        "ncproxy.system.c",
         Some(LogsOptions::<String> {
           follow: true,
           stdout: true,
@@ -73,7 +76,33 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                   }
                 }
               }
-              log if log.starts_with("#STREAM") => {}
+              log if log.starts_with("#STREAM") => {
+                let trimmed_log = log.trim_start_matches("#STREAM");
+                let stream_metric =
+                  serde_json::from_str::<StreamMetricPartial>(trimmed_log);
+
+                match stream_metric
+                  .map(|metric| metric.to_db_model(&state.config.hostname))
+                {
+                  Ok(stream_db_model) => {
+                    let insert_result =
+                      repositories::http_metric::generic_insert(
+                        stream_db_model,
+                        &state.pool,
+                      )
+                      .await;
+
+                    if let Err(db_error) = insert_result {
+                      log::warn!("Failed to save tcp metric: {db_error}");
+                    }
+                  }
+                  Err(stream_parsing_error) => {
+                    log::warn!(
+                      "Failed to parse tcp metric: {stream_parsing_error}"
+                    );
+                  }
+                }
+              }
               _ => {}
             }
           }

@@ -87,20 +87,26 @@ pub async fn exec_vm_inspect(
 pub async fn exec_vm_start(
   client: &NanocldClient,
   args: &VmArgs,
-  name: &str,
+  names: &[String],
 ) -> IoResult<()> {
-  client.start_vm(name, args.namespace.clone()).await?;
-
+  for name in names {
+    if let Err(err) = client.start_vm(name, args.namespace.clone()).await {
+      eprintln!("Failed to start vm {}: {}", name, err);
+    }
+  }
   Ok(())
 }
 
 pub async fn exec_vm_stop(
   client: &NanocldClient,
   args: &VmArgs,
-  name: &str,
+  names: &[String],
 ) -> IoResult<()> {
-  client.stop_vm(name, args.namespace.clone()).await?;
-
+  for name in names {
+    if let Err(err) = client.stop_vm(name, args.namespace.clone()).await {
+      eprintln!("Failed to stop vm {}: {}", name, err);
+    }
+  }
   Ok(())
 }
 
@@ -112,7 +118,9 @@ pub async fn exec_vm_run(
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.clone()).await?;
   client.start_vm(&vm.name, args.namespace.clone()).await?;
-
+  if options.attach {
+    exec_vm_attach(client, args, &options.name).await?;
+  }
   Ok(())
 }
 
@@ -125,7 +133,6 @@ pub async fn exec_vm_patch(
   client
     .patch_vm(&options.name, &vm, args.namespace.clone())
     .await?;
-
   Ok(())
 }
 
@@ -138,14 +145,22 @@ pub async fn exec_vm_attach(
   const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
   let conn = client.attach_vm(name, args.namespace.clone()).await?;
   let (mut tx, mut rx) = mpsc::unbounded();
-
+  // start heartbeat task
+  let sink = conn.sink();
+  rt::spawn(async move {
+    loop {
+      time::sleep(HEARTBEAT_INTERVAL).await;
+      if sink.send(ws::Message::Ping(Bytes::new())).await.is_err() {
+        return;
+      }
+    }
+  });
   // // Get the current terminal settings
   let mut termios = Termios::from_fd(std::io::stdin().as_raw_fd())?;
   // Save a copy of the original terminal settings
   let original_termios = termios;
   // Disable canonical mode and echo
   termios.c_lflag &= !(ICANON | ECHO);
-
   // Redirect the output of the console to the TTY device
   let mut stderr = std::io::stderr();
   let mut stdout = std::io::stdout();
@@ -156,7 +171,6 @@ pub async fn exec_vm_attach(
   // start console read loop
   thread::spawn(move || loop {
     let mut input = [0; 1];
-
     if std::io::stdin().read(&mut input).is_err() {
       println!("Unable to read stdin");
       return;
@@ -169,7 +183,6 @@ pub async fn exec_vm_attach(
       return;
     }
   });
-
   // read console commands
   let sink = conn.sink();
   rt::spawn(async move {
@@ -179,22 +192,9 @@ pub async fn exec_vm_attach(
       }
     }
   });
-
-  // start heartbeat task
-  let sink = conn.sink();
-  rt::spawn(async move {
-    loop {
-      time::sleep(HEARTBEAT_INTERVAL).await;
-      if sink.send(ws::Message::Ping(Bytes::new())).await.is_err() {
-        return;
-      }
-    }
-  });
-
   // run ws dispatcher
   let sink = conn.sink();
   let mut rx = conn.seal().receiver();
-
   while let Some(frame) = rx.next().await {
     match frame {
       Ok(ws::Frame::Binary(text)) => {
@@ -238,10 +238,10 @@ pub async fn exec_vm(client: &NanocldClient, args: &VmArgs) -> IoResult<()> {
     VmCommands::Image(args) => exec_vm_image(client, args).await,
     VmCommands::Create(options) => exec_vm_create(client, args, options).await,
     VmCommands::List(opts) => exec_vm_ls(client, args, opts).await,
-    VmCommands::Remove { names } => exec_vm_rm(client, args, names).await,
+    VmCommands::Remove(opts) => exec_vm_rm(client, args, &opts.names).await,
     VmCommands::Inspect(opts) => exec_vm_inspect(client, args, opts).await,
-    VmCommands::Start { name } => exec_vm_start(client, args, name).await,
-    VmCommands::Stop { name } => exec_vm_stop(client, args, name).await,
+    VmCommands::Start(opts) => exec_vm_start(client, args, &opts.names).await,
+    VmCommands::Stop(opts) => exec_vm_stop(client, args, &opts.names).await,
     VmCommands::Run(options) => exec_vm_run(client, args, options).await,
     VmCommands::Patch(options) => exec_vm_patch(client, args, options).await,
     VmCommands::Attach { name } => exec_vm_attach(client, args, name).await,

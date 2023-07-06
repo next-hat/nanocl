@@ -12,16 +12,16 @@ services:
   nstore:
     container_name: nstore.system.c
     hostname: nstore.nanocl.internal
-    image: cockroachdb/cockroach:v22.2.7
+    image: cockroachdb/cockroach:v23.1.4
     tty: true
     ports:
       - 26257:26257
     networks:
       - system
     volumes:
-      - /var/lib/nanocl/store/ca:/ca
-      - /var/lib/nanocl/store/certs:/certs
-      - /var/lib/nanocl/store/data:/cockroach/cockroach-data
+      - ${STATE_DIR:-${HOME}/.nanocl/state/store/ca}:/ca
+      - ${STATE_DIR:-${HOME}/.nanocl/state/store/certs}:/certs
+      - ${STATE_DIR:-${HOME}/.nanocl/state/store/data}:/cockroach/cockroach-data
     environment:
       - TZ=Europe/Paris
     command:
@@ -36,7 +36,7 @@ services:
 
   nmetrics:
     container_name: nmetrics.system.c
-    image: ghcr.io/nxthat/metrsd:0.2.0
+    image: ghcr.io/nxthat/metrsd:0.3.1
     tty: true
     networks:
       - system
@@ -52,7 +52,36 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - /run/nanocl:/run/nanocl
+      - //run/guest-services/nanocl:/run/nanocl
+
+  ncvpnkit:
+    container_name: ncvpnkit.system.c
+    image: ghcr.io/nxthat/nanocl-dev:dev
+    tty: true
+    hostname: ncvpnkit.nanocl.internal
+    networks:
+      - system
+    environment:
+      - TZ=Europe/Paris
+      - USER_HOME=${HOME}
+    labels:
+      - io.nanocl=enabled
+      - io.nanocl.c=ndaemon.system
+      - io.nanocl.n=system
+      - io.nanocl.cnsp=system
+    volumes:
+      - type: bind
+        source: .
+        target: /project
+      - /project/target
+      - //run/guest-services/nanocl:/run/nanocl
+      - //run/host-services/backend.sock:/run/host-services/backend.sock
+    command:
+      - watch
+      - -w
+      - /project/bin/ncvpnkit/src
+      - -x
+      - run --no-default-features --features dev --bin ncvpnkit
 
   nproxy:
     container_name: nproxy.system.c
@@ -67,41 +96,46 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - /run:/run
-      - /var/lib/nanocl/proxy/letsencrypt:/etc/letsencrypt
-      - /var/lib/nanocl/proxy/certs:/etc/nginx/certs
-      - /var/lib/nanocl/proxy/logs:/var/log/nginx/access
-      - /var/lib/nanocl/proxy/html:/usr/share/nginx/html
-      - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
-      - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
-      - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled
+      - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/letsencrypt}:/etc/letsencrypt
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/certs}:/etc/nginx/certs
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/html}:/usr/share/nginx/html
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/streams-enabled}:/etc/nginx/streams-enabled
 
-  ncdproxy:
-    container_name: ncdproxy.system.c
+  ncproxy:
+    container_name: ncproxy.system.c
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
-    network_mode: host
+    ports:
+      - 8686:8686
+    networks:
+      - system
     environment:
       - TZ=Europe/Paris
     command:
       - watch
       - -w
-      - /project/bin/ncdproxy/src
+      - /project/bin/ncproxy/src
       - -x
-      - run --no-default-features --features dev --bin ncdproxy
+      - run --no-default-features --features dev --bin ncproxy
     labels:
       - io.nanocl=enabled
-      - io.nanocl.c=ncdproxy.system
+      - io.nanocl.c=ncproxy.system
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - ./:/project
-      - /run/nanocl:/run/nanocl
-      - ~/.cargo/registry:/usr/local/cargo/registry
-      - /var/lib/nanocl/proxy/logs:/var/log/nginx/access
-      - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
-      - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
-      - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled
+      - type: bind
+        source: .
+        target: /project
+      - /project/target
+      - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/streams-enabled}:/etc/nginx/streams-enabled
 
   ndns:
     container_name: ndns.system.c
@@ -116,31 +150,36 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - /var/lib/nanocl/dns:/opt/dns
+      - ${STATE_DIR:-${HOME}/.nanocl/state/dns}:/opt/dns
 
-  ncddns:
-    container_name: ncddns.system.c
+  ncdns:
+    container_name: ncdns.system.c
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
-    network_mode: host
+    ports:
+      - 8787:8787
+    networks:
+      - system
     environment:
       - TZ=Europe/Paris
     command:
       - watch
       - -w
-      - /project/bin/ncddns/src
+      - /project/bin/ncdns/src
       - -x
-      - run --no-default-features --features dev --bin ncddns -- --conf-dir /opt/dns
+      - run --no-default-features --features dev --bin ncdns -- --conf-dir /opt/dns
     labels:
       - io.nanocl=enabled
-      - io.nanocl.c=ncddns.system
+      - io.nanocl.c=ncdns.system
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - ./:/project
-      - /var/lib/nanocl/dns:/opt/dns
-      - /run/nanocl:/run/nanocl
-      - ~/.cargo/registry:/usr/local/cargo/registry
+      - type: bind
+        source: .
+        target: /project
+      - /project/target
+      - ${STATE_DIR:-${HOME}/.nanocl/state/dns}/dns:/opt/dns
+      - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
 
   nanocld:
     container_name: ndaemon.system.c
@@ -159,14 +198,16 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - ./:/project
-      - ~/.cargo/registry:/usr/local/cargo/registry
-      - /var/lib/nanocl:/var/lib/nanocl
-      - /run/nanocl:/run/nanocl
-      - /run/docker.sock:/run/docker.sock
+      - type: bind
+        source: .
+        target: /project
+      - /project/target
+      - ${STATE_DIR:-${HOME}/.nanocl/state}:${STATE_DIR:-${HOME}/.nanocl/state}
+      - //run/guest-services/nanocl:/run/nanocl
+      - //var/run/docker.sock:/run/docker.sock
     command:
       - watch
       - -w
       - /project/bin/nanocld/src
       - -x
-      - run --no-default-features --features dev --bin nanocld -- --gid 1001
+      - run --no-default-features --features dev --bin nanocld -- --gid 1001 --state-dir ${STATE_DIR:-${HOME}/.nanocl/state}

@@ -7,7 +7,7 @@ use ntex::rt;
 use ntex::web;
 use ntex::channel::oneshot;
 use ntex::util::ByteString;
-use ntex::{Service, fn_service, pipeline};
+use ntex::{Service, fn_service, chain};
 use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
 use futures::future::ready;
 
@@ -78,7 +78,7 @@ async fn node_ws_service(
   });
 
   // pipe our service with on_shutdown callback
-  Ok(pipeline(service).and_then(on_shutdown))
+  Ok(chain(service).and_then(on_shutdown))
 }
 
 /// Websocket endpoint for communication between nodes used internally

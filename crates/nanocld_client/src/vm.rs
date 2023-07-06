@@ -1,9 +1,9 @@
-use nanocl_utils::io_error::FromIo;
 use ntex::rt;
 use ntex::ws;
 use ntex::io::Base;
 use ntex::ws::WsConnection;
 
+use nanocl_utils::io_error::FromIo;
 use nanocl_utils::http_client_error::HttpClientError;
 
 use nanocl_stubs::generic::GenericNspQuery;
@@ -132,21 +132,25 @@ impl NanocldClient {
     } else {
       "".to_string()
     };
-
+    let url = format!("{}/{}/vms/{name}/attach{qs}", self.url, &self.version);
     // open websockets connection over http transport
-    let con = ws::WsClient::build(format!(
-      "http://localhost/{}/vms/{name}/attach{qs}",
-      &self.version
-    ))
-    .connector(ntex::service::fn_service(|_| async {
-      Ok::<_, _>(rt::unix_connect("/run/nanocl/nanocl.sock").await?)
-    }))
-    .finish()
-    .map_err(|err| err.map_err_context(|| "/run/nanocl/nanocl.sock"))?
-    .connect()
-    .await
-    .map_err(|err| err.map_err_context(|| "/run/nanocl/nanocl.sock"))?;
-
+    let con = match &self.unix_socket {
+      Some(path) => ws::WsClient::build(&url)
+        .connector(ntex::service::fn_service(|_| async move {
+          Ok::<_, _>(rt::unix_connect(&path).await?)
+        }))
+        .finish()
+        .map_err(|err| err.map_err_context(|| path))?
+        .connect()
+        .await
+        .map_err(|err| err.map_err_context(|| path))?,
+      None => ws::WsClient::build(&url)
+        .finish()
+        .map_err(|err| err.map_err_context(|| &self.url))?
+        .connect()
+        .await
+        .map_err(|err| err.map_err_context(|| &self.url))?,
+    };
     Ok(con)
   }
 }

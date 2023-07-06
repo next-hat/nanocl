@@ -12,7 +12,7 @@ pub struct Cli {
   /// Hosts to listen to use tcp:// and unix:// [default: unix:///run/nanocl.sock]
   #[clap(short = 'H', long = "hosts")]
   pub(crate) hosts: Option<Vec<String>>,
-  /// Docker daemon socket to connect [default: unix:///run/docker.sock]
+  /// Docker daemon socket to connect [default: unix:///var/run/docker.sock]
   #[clap(long)]
   pub(crate) docker_host: Option<String>,
   /// State directory
@@ -72,7 +72,7 @@ mod tests {
       "-H",
       "unix:///run/nanocl.sock",
       "--docker-host",
-      "/run/docker.sock",
+      "/var/run/docker.sock",
       "--state-dir",
       "/var/lib/nanocl",
       "--conf-dir",
@@ -89,7 +89,7 @@ mod tests {
       Some(vec![String::from("unix:///run/nanocl.sock")])
     );
     assert!(!args.init);
-    assert_eq!(args.docker_host, Some(String::from("/run/docker.sock")));
+    assert_eq!(args.docker_host, Some(String::from("/var/run/docker.sock")));
     assert_eq!(args.state_dir, Some(String::from("/var/lib/nanocl")));
     assert_eq!(args.conf_dir, String::from("/etc/nanocl"));
     assert_eq!(args.ssl_cert, Some(String::from("/path/to/cert")));

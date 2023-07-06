@@ -33,7 +33,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let new_cargo = CargoConfigPartial {
   ///  name: String::from("my-cargo"),
   ///  container: bollard_next::container::Config {
@@ -75,7 +75,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// client.delete_cargo("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -107,7 +107,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let cargo = client.inspect_cargo("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -142,7 +142,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// client.start_cargo("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -178,7 +178,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// client.stop_cargo("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -214,7 +214,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// client.restart_cargo("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -249,7 +249,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let cargoes = client.list_cargoes(None).await.unwrap();
   /// ```
   ///
@@ -285,7 +285,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let cargo_config = CargoConfigPatch {
   ///   name: "my-cargo-renamed".into(),
   /// };
@@ -327,7 +327,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let cargo_config = CargoConfigPatch {
   ///   name: "my-cargo-renamed".into(),
   /// };
@@ -371,7 +371,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   /// use nanocld_client::models::cargo_config::CreateExecOptions;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let exec = CreateExecOptions {
   ///  cmd: vec!["echo".into(), "hello".into()],
   /// ..Default::default()
@@ -417,7 +417,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let histories = client.list_history("my-cargo", None).await.unwrap();
   /// ```
   ///
@@ -455,7 +455,7 @@ impl NanocldClient {
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_with_unix_default();
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let cargo = client.revert_cargo("my-cargo", "my-history-id", None).await.unwrap();
   /// ```
   ///
@@ -543,7 +543,7 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const CARGO_NAME: &str = "client-test-cargo";
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
 
     client.list_cargo(None).await.unwrap();
 
@@ -594,7 +594,7 @@ mod tests {
 
   #[ntex::test]
   async fn create_cargo_wrong_image() {
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
 
     let new_cargo = CargoConfigPartial {
       name: "client-test-cargowi".into(),
@@ -615,7 +615,7 @@ mod tests {
 
   #[ntex::test]
   async fn create_cargo_duplicate_name() {
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
 
     let new_cargo = CargoConfigPartial {
       name: "client-test-cargodup".into(),
@@ -642,7 +642,7 @@ mod tests {
 
   #[ntex::test]
   async fn exec_cargo() {
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
 
     let exec = CreateExecOptions {
       cmd: Some(vec!["echo".into(), "hello".into()]),
@@ -657,7 +657,7 @@ mod tests {
 
   #[ntex::test]
   async fn logs_cargo() {
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
 
     let mut rx = client
       .logs_cargo("nstore", &CargoLogQuery::of_namespace("system".into()))

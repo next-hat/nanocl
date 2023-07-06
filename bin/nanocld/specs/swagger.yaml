@@ -24,7 +24,7 @@ info:
     email: team@next-hat.com
   license:
     name: MIT OR Apache-2.0
-  version: v0.8.0
+  version: v0.9.0
 servers:
 - url: /{Version}
   variables:
@@ -3861,12 +3861,8 @@ components:
           nullable: true
     ProxyRule:
       oneOf:
-      - type: array
-        items:
-          $ref: '#/components/schemas/ProxyRuleHttp'
-      - type: array
-        items:
-          $ref: '#/components/schemas/ProxyRuleStream'
+      - $ref: '#/components/schemas/ProxyRuleHttp'
+      - $ref: '#/components/schemas/ProxyRuleStream'
       description: Proxy rules modes
     ProxyRuleHttp:
       type: object
@@ -4225,7 +4221,10 @@ components:
             type: string
           description: Cargo to watch for changes
         Rules:
-          $ref: '#/components/schemas/ProxyRule'
+          type: array
+          items:
+            $ref: '#/components/schemas/ProxyRule'
+          description: The rule
     ResourceUpdate:
       type: object
       required:
@@ -5134,7 +5133,7 @@ components:
           type: string
           description: 'Container image name to use for vm default: nexthat/nanocl-qemu'
           nullable: true
-        RuntimeNet:
+        RuntimeNetwork:
           type: string
           nullable: true
     VmImage:

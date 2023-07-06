@@ -1,6 +1,6 @@
 name: Tests
 
-on: [push]
+on: [push, pull_request, workflow_dispatch]
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,6 +32,8 @@ jobs:
           components: llvm-tools-preview
       # Cache Rust
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('./Cargo.lock') }}
       # Install cargo make
       - uses: davidB/rust-cargo-make@v1
       # Install llvm-cov
@@ -45,23 +47,23 @@ jobs:
       # Setup daemon for the tests
       - name: Setup
         run: |
-          sudo sh -c "echo '\n127.0.0.1 nstore.nanocl.internal' >> /etc/hosts"
+          sudo sh -c "echo '\n127.0.0.1 nstore.nanocl.internal\n127.0.0.1 ndaemon.nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v22.2.7
           docker pull ghcr.io/nxthat/metrsd:0.2.0
           docker pull nexthat/nanocl-get-started:latest
           docker buildx build --load --cache-from type=local,src=.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
           docker buildx build --load --cache-from type=local,src=.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
           cargo build --no-default-features --features test --bin nanocl
-          cargo build --no-default-features --features test --bin ncdproxy
+          cargo build --no-default-features --features test --bin ncproxy
           cargo build --no-default-features --features test --bin nanocld
           docker compose -f ./docker-compose.test.yaml up -d
           cargo run --no-default-features --features test --bin nanocld -- --init
-          cargo run --no-default-features --features test --bin nanocld &
+          cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 &
           sleep 8
           sudo mkdir -p /var/lib/nanocl/proxy
           sudo chmod 777 -R /run/nanocl
           sudo chmod 777 -R /var/lib/nanocl
-          cargo run --no-default-features --features test --bin ncdproxy -- --conf-dir /var/lib/nanocl/proxy &
+          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /var/lib/nanocl/proxy &
           sleep 8
           sudo chmod 777 -R /run/nanocl
           mkdir -p /tmp/nginx/sites-enabled

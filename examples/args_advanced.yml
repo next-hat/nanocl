@@ -25,7 +25,7 @@ Cargoes:
 Resources:
   - Name: ${{ Args.domain }}
     Kind: ProxyRule
-    Version: v0.5
+    Version: v0.6
     Config:
       Watch:
         - ${{ Args.name }}.global.c

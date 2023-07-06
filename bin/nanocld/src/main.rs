@@ -6,12 +6,10 @@ use std::path::Path;
 use std::os::unix::prelude::PermissionsExt;
 
 use ntex::rt;
-
 use clap::Parser;
 
 mod cli;
 mod version;
-
 mod node;
 mod boot;
 mod utils;
@@ -123,6 +121,8 @@ async fn main() -> std::io::Result<()> {
     .parse_env("LOG_LEVEL")
     .format_target(false)
     .init();
+  log::info!("nanocld_{}_{}", version::ARCH, version::CHANNEL);
+  log::info!("v{}:{}", version::VERSION, version::COMMIT_ID);
   let config = match config::init(&args) {
     Err(err) => {
       log::error!("{err}");

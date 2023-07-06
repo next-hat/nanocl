@@ -7,10 +7,11 @@ use crate::utils;
 use crate::models::UninstallOpts;
 
 pub async fn exec_uninstall(opts: &UninstallOpts) -> IoResult<()> {
-  let docker_host = opts
-    .docker_host
-    .clone()
-    .unwrap_or("unix:///run/docker.sock".into());
+  let detected_host = utils::docker::detect_docker_host()?;
+  let (docker_host, _) = match &opts.docker_host {
+    Some(docker_host) => (docker_host.to_owned(), opts.is_docker_desktop),
+    None => detected_host,
+  };
 
   let docker = utils::docker::connect(&docker_host)?;
 

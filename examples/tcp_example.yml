@@ -1,0 +1,31 @@
+Kind: Deployment
+ApiVersion: v0.8
+
+Namespace: global
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
+Resources:
+  - Name: tcp-example
+    Kind: ProxyRule
+    Version: v0.6
+    Config:
+      Watch:
+        - tcp-example.global.c
+      Rules:
+        - Domain: tcp-example.com
+          Network: Public
+          Protocol: Tcp
+          Port: 9000
+          Target:
+            Key: tcp-example.global.c
+            Port: 9000
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
+Cargoes:
+  - Name: tcp-example
+    Container:
+      Image: nexthat/nanocl-get-started:latest
+      Env:
+        - APP=GET_STARTED1

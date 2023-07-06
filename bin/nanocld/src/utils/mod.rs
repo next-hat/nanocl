@@ -25,7 +25,6 @@ pub mod tests {
   use ntex::http::client::ClientResponse;
   use ntex::http::client::error::SendRequestError;
 
-  use nanocl_utils::io_error::{IoError, FromIo, IoResult};
   use nanocl_stubs::config::DaemonConfig;
 
   use crate::version::VERSION;
@@ -38,43 +37,6 @@ pub mod tests {
   pub type TestRet = Result<(), Box<dyn std::error::Error + 'static>>;
 
   type Config = fn(&mut ServiceConfig);
-
-  /// ## Get store addr
-  ///
-  /// Get the ip address of the store container for tests purpose
-  ///
-  /// ## Arguments
-  ///
-  /// - [docker_api](bollard_next::Docker) Reference to docker api
-  ///
-  /// ## Returns
-  ///
-  /// - [Result](Result) Result of the operation
-  ///   - [Ok](String) - The ip address of the store
-  ///   - [Err](IoError) - The ip address of the store has not been retrieved
-  ///
-  pub async fn get_store_addr(
-    docker_api: &bollard_next::Docker,
-  ) -> IoResult<String> {
-    let container = docker_api
-      .inspect_container("nstore.system.c", None)
-      .await
-      .map_err(|err| {
-        err.map_err_context(|| "Unable to inspect nstore.system.c container")
-      })?;
-    let networks = container
-      .network_settings
-      .unwrap_or_default()
-      .networks
-      .unwrap_or_default();
-    let ip_address = networks
-      .get("system")
-      .ok_or(IoError::invalid_data("Network", "system not found"))?
-      .ip_address
-      .as_ref()
-      .ok_or(IoError::invalid_data("IpAddress", "not detected"))?;
-    Ok(ip_address.to_owned())
-  }
 
   /// ## Before
   ///
@@ -101,7 +63,8 @@ pub mod tests {
   ///
   pub fn gen_docker_client() -> bollard_next::Docker {
     let socket_path = env::var("DOCKER_SOCKET_PATH")
-      .unwrap_or_else(|_| String::from("/run/docker.sock"));
+      .unwrap_or_else(|_| String::from("/var/run/docker.sock"));
+    println!("Using docker socket path: {}", socket_path);
     bollard_next::Docker::connect_with_unix(
       &socket_path,
       120,
@@ -142,10 +105,7 @@ pub mod tests {
   /// - [Pool](Pool) - The postgre pool
   ///
   pub async fn gen_postgre_pool() -> Pool {
-    let docker_api = gen_docker_client();
-    let ip_addr = get_store_addr(&docker_api).await.unwrap();
-
-    store::create_pool(&format!("{ip_addr}:26257"))
+    store::create_pool("nstore.nanocl.internal:26257")
       .await
       .expect("Failed to connect to store at: {ip_addr}")
   }
@@ -165,8 +125,12 @@ pub mod tests {
   pub async fn gen_server(routes: Config) -> test::TestServer {
     before();
     // Build a test daemon config
+    let home = env::var("HOME").expect("Failed to get home dir");
+    let docker_host = env::var("DOCKER_SOCKET_PATH")
+      .unwrap_or_else(|_| String::from("/var/run/docker.sock"));
     let config = DaemonConfig {
-      state_dir: String::from("/var/lib/nanocl"),
+      state_dir: format!("{home}/.nanocl/state"),
+      docker_host,
       ..Default::default()
     };
     let event_emitter = EventEmitter::new();

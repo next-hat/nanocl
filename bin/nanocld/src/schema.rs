@@ -125,6 +125,26 @@ diesel::table! {
 }
 
 diesel::table! {
+    stream_metrics (key) {
+        key -> Uuid,
+        created_at -> Timestamptz,
+        expire_at -> Timestamptz,
+        date_gmt -> Timestamptz,
+        remote_addr -> Varchar,
+        upstream_addr -> Varchar,
+        protocol -> Nullable<Varchar>,
+        status -> Int8,
+        session_time -> Varchar,
+        bytes_sent -> Int8,
+        bytes_received -> Int8,
+        upstream_bytes_sent -> Int8,
+        upstream_bytes_received -> Int8,
+        upstream_connect_time -> Varchar,
+        node_name -> Varchar,
+    }
+}
+
+diesel::table! {
     vm_configs (key) {
         key -> Uuid,
         created_at -> Timestamptz,
@@ -179,6 +199,7 @@ diesel::allow_tables_to_appear_in_same_query!(
   resource_kind_versions,
   resource_kinds,
   resources,
+  stream_metrics,
   vm_configs,
   vm_images,
   vms,

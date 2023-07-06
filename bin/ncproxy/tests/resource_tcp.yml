@@ -1,0 +1,17 @@
+Kind: Resource
+ApiVersion: v0.8
+
+Resources:
+  - Name: proxy-get-started
+    Kind: ProxyRule
+    Version: v0.6
+    Config:
+      Watch:
+        - get-started.global.c
+      Rules:
+        - Protocol: Tcp
+          Port: 9999
+          Network: Public
+          Target:
+            Key: get-started.global.c
+            Port: 9000

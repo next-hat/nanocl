@@ -1,9 +1,9 @@
-use ntex::http;
+// use ntex::http;
 use clap::Parser;
 use dotenv::dotenv;
 
 use nanocl_utils::io_error::IoResult;
-use nanocl_utils::http_client_error::HttpClientError;
+// use nanocl_utils::http_client_error::HttpClientError;
 
 use nanocld_client::NanocldClient;
 
@@ -12,31 +12,44 @@ mod config;
 mod models;
 mod version;
 mod commands;
+use models::{Cli, Commands, Context};
 
-use models::{Cli, Commands};
-
-async fn detect_version(client: &mut NanocldClient) -> IoResult<()> {
-  client.set_version("0.1.0");
-  let version = client.get_version().await?;
-  client.set_version(&version.version);
-
-  Ok(())
-}
+// async fn detect_version(client: &mut NanocldClient) -> IoResult<()> {
+//   client.set_version("0.1.0");
+//   let version = client.get_version().await?;
+//   client.set_version(&version.version);
+//   Ok(())
+// }
 
 async fn execute_args(args: &Cli) -> IoResult<()> {
+  Context::ensure()?;
   let cli_conf = config::read();
-
-  let host = args.host.clone().unwrap_or(cli_conf.host);
-
-  let url = Box::leak(host.clone().into_boxed_str());
-  let mut client = NanocldClient::connect_to(url, None);
-
-  if let Err(HttpClientError::HttpError(err)) = client.get_version().await {
-    if err.status == http::StatusCode::NOT_FOUND {
-      eprintln!("You're daemon is outdated, please run `nanocl upgrade`");
-      detect_version(&mut client).await?;
+  let mut context = Context::new();
+  if cli_conf.current_context != "default" {
+    match Context::read_by_name(&cli_conf.current_context) {
+      Err(_) => {
+        Context::r#use("default")?;
+      }
+      Ok(cur_context) => {
+        context = cur_context;
+      }
     }
   }
+
+  #[allow(unused)]
+  let mut host = args
+    .host
+    .clone()
+    .unwrap_or(context.endpoints.get("Nanocl").unwrap().host.clone());
+  #[cfg(any(feature = "dev", feature = "test"))]
+  {
+    if context.name == "default" {
+      host = args.host.clone().unwrap_or("http://localhost:8585".into());
+    }
+  }
+
+  let url = Box::leak(host.clone().into_boxed_str());
+  let client = NanocldClient::connect_to(url, None);
 
   match &args.command {
     Commands::Namespace(args) => commands::exec_namespace(&client, args).await,
@@ -53,6 +66,7 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
     Commands::Upgrade(opts) => commands::exec_upgrade(&client, opts).await,
     Commands::System(opts) => commands::exec_system(&client, opts).await,
     Commands::Node(args) => commands::exec_node(&client, args).await,
+    Commands::Context(args) => commands::exec_context(&context, args).await,
   }
 }
 
@@ -63,7 +77,7 @@ async fn main() -> std::io::Result<()> {
   ctrlc::set_handler(move || {
     let term = dialoguer::console::Term::stdout();
     let _ = term.show_cursor();
-    let _ = term.clear_last_lines(1);
+    let _ = term.clear_last_lines(0);
     std::process::exit(0);
   })
   .expect("Error setting Ctrl-C handler");
@@ -166,7 +180,7 @@ mod tests {
 
     let args = Cli::parse_from(["nanocl", "cargo", "history", CARGO_NAME]);
     assert!(execute_args(&args).await.is_ok());
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
     let history = client
       .list_history_cargo(CARGO_NAME, None)
       .await
@@ -235,7 +249,7 @@ mod tests {
       Cli::parse_from(["nanocl", "resource", "history", "resource-example"]);
     assert!(execute_args(&args).await.is_ok());
 
-    let client = NanocldClient::connect_with_unix_default();
+    let client = NanocldClient::connect_to("http://localhost:8585", None);
     let history = client
       .list_history_resource("resource-example")
       .await

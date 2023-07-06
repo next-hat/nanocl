@@ -65,7 +65,7 @@ async fn create_instances(
     .into_iter()
     .map(move |current| async move {
       let name = if current > 0 || start > 0 {
-        format!("{}-{}.c", cargo.key, current + start)
+        format!("{}-{}.c", current + start, cargo.key)
       } else {
         format!("{}.c", cargo.key)
       };

@@ -5,6 +5,9 @@ pub struct InstallOpts {
   /// The docker host to install nanocl default is unix:///var/run/docker.sock
   #[clap(long)]
   pub(crate) docker_host: Option<String>,
+  /// Specify if the docker host is docker desktop detected if docker context is desktop-linux
+  #[clap(long = "docker-desktop")]
+  pub(crate) is_docker_desktop: bool,
   /// The state directory to store the state of the nanocl daemon default is /var/lib/nanocl
   #[clap(long)]
   pub(crate) state_dir: Option<String>,
@@ -42,6 +45,8 @@ pub struct NanocldArgs {
   pub(crate) hostname: String,
   pub(crate) gid: u32,
   pub(crate) advertise_addr: String,
+  pub(crate) home_dir: String,
+  pub(crate) is_docker_desktop: bool,
 }
 
 impl From<NanocldArgs> for liquid::Object {
@@ -55,6 +60,8 @@ impl From<NanocldArgs> for liquid::Object {
       "hostname": args.hostname,
       "gid": args.gid,
       "advertise_addr": args.advertise_addr,
+      "is_docker_desktop": args.is_docker_desktop,
+      "home_dir": args.home_dir,
     })
   }
 }

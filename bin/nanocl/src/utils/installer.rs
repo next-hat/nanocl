@@ -4,16 +4,16 @@ use nanocl_utils::io_error::{FromIo, IoResult};
 use nanocl_utils::http_error::HttpError;
 use nanocl_utils::http_client_error::HttpClientError;
 
-use crate::version::CHANNEL;
+use crate::version::{VERSION, CHANNEL};
 
 /// Get template from our GitHub repo
 async fn get() -> Result<String, HttpClientError> {
   let client = http::client::Client::new();
 
   let url = if CHANNEL == "nightly" {
-    "https://raw.githubusercontent.com/nxthat/nanocl/nightly/installer.nightly.yml"
+    format!("https://raw.githubusercontent.com/nxthat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.nightly.yml")
   } else {
-    "https://raw.githubusercontent.com/nxthat/nanocl/nightly/installer.yml"
+    format!("https://raw.githubusercontent.com/nxthat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.yml")
   };
 
   let mut res = client.get(url).send().await.map_err(|err| {

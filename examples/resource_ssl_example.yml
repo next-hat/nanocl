@@ -6,7 +6,7 @@ ApiVersion: v0.8
 Resources:
   - Name: resource-example
     Kind: ProxyRule
-    Version: v0.5
+    Version: v0.6
     Config:
       Watch:
         - deploy-example.global.c

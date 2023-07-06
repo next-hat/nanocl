@@ -1,0 +1,81 @@
+name: Publish nightly image
+
+on:
+  push:
+    branches:
+      - "release/nightly/bin/**"
+  pull_request:
+    branches:
+      - "release/nightly/bin/**"
+    types: [opened, synchronize]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release_image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      # Install buildx
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+      # Set buildx cache
+      - name: Cache register
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: buildx-cache
+      # Login to ghcr.io
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: nexthatbot
+          password: ${{ secrets.BOT_TOKEN }}
+      # Extract branch info
+      - name: Set info
+        run: |
+          echo "CHANNEL=$(echo ${GITHUB_REF} | awk -F/ '{print $4}')" >> $GITHUB_ENV
+          echo "NANOCL_CHANNEL=$(echo ${GITHUB_REF} | awk -F/ '{print $4}')" >> $GITHUB_ENV
+          echo "BINARY_NAME=$(echo ${GITHUB_REF} | awk -F/ '{print $6}')" >> $GITHUB_ENV
+          echo "VERSION=$(echo ${GITHUB_REF} | awk -F/ '{print $7}')" >> $GITHUB_ENV
+      # Print info for debug
+      - name: Print Info
+        run: |
+          echo $GITHUB_REF
+          echo $BRANCH_NAME
+          echo $BINARY_NAME
+          echo $CHANNEL
+          echo $VERSION
+      # Create buildx multiarch
+      - name: Create buildx multiarch
+        run: docker buildx create --use --name=buildx-multi-arch --driver=docker-container --driver-opt=network=host
+      # Build daemon image
+      - name: Build image
+        run: docker buildx build --builder=buildx-multi-arch --platform=linux/amd64,linux/arm64 --build-arg channel=$CHANNEL --push --label org.opencontainers.image.source=https://github.com/nxthat/nanocl -t ghcr.io/nxthat/$BINARY_NAME:$VERSION-$CHANNEL -t ghcr.io/nxthat/$BINARY_NAME:$CHANNEL -f ./bin/$BINARY_NAME/Dockerfile .
+      # Export it as tar.gz
+      # - name: Export image
+      #   run: docker save ghcr.io/nxthat/$BINARY_NAME:$VERSION-$CHANNEL | gzip > /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz
+      # Upload it to release
+      - name: Test if release already exists
+        id: release-exists
+        continue-on-error: true
+        run: gh release view $BINARY_NAME-$VERSION-$CHANNEL
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+      - name: Create new draft release
+        if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
+        run: gh release create -t $BINARY_NAME-$VERSION-$CHANNEL -d $BINARY_NAME-$VERSION-$CHANNEL -F ./bin/$BINARY_NAME/changelog.md
+        #  /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz#$BINARY_NAME-image;
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
+      # - name: Update draft release
+      #   if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
+      #   run: |
+      #     gh release delete-asset -y $BINARY_NAME-$VERSION-$CHANNEL $BINARY_NAME-$VERSION-$CHANNEL.tar.gz || true
+      #     gh release upload $BINARY_NAME-$VERSION-$CHANNEL /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz#$BINARY_NAME-image
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}

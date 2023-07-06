@@ -10,31 +10,43 @@ use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 use nanocld_client::stubs::state::StateDeployment;
 
 use crate::utils;
-use crate::models::{InstallOpts, NanocldArgs};
+use crate::models::{
+  InstallOpts, NanocldArgs, Context, ContextMetaData, ContextEndpoint,
+};
 
 /// Execute install command
 pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
   println!("Installing Nanocl components on your system");
-
-  let docker_host = opts
-    .docker_host
-    .as_deref()
-    .unwrap_or("unix:///var/run/docker.sock")
-    .to_owned();
-
-  let state_dir = opts
-    .state_dir
-    .as_deref()
-    .unwrap_or("/var/lib/nanocl")
-    .to_owned();
+  let home_dir = std::env::var("HOME").map_err(|err| {
+    IoError::interupted("Unable to get $HOME env variable", &err.to_string())
+  })?;
+  let detected_host = utils::docker::detect_docker_host()?;
+  let (docker_host, is_docker_desktop) = match &opts.docker_host {
+    Some(docker_host) => (docker_host.to_owned(), opts.is_docker_desktop),
+    None => detected_host,
+  };
+  let state_dir = match &opts.state_dir {
+    Some(state_dir) => state_dir.to_owned(),
+    None => {
+      if is_docker_desktop {
+        format!("{}/.nanocl/state", home_dir)
+      } else {
+        "/var/lib/nanocl".into()
+      }
+    }
+  };
 
   let conf_dir = opts.conf_dir.as_deref().unwrap_or("/etc/nanocl").to_owned();
 
   let gateway = match &opts.gateway {
     None => {
-      let gateway = unix::network::get_default_ip()?;
-      println!("Using default gateway: {}", gateway);
-      gateway.to_string()
+      if is_docker_desktop {
+        "127.0.0.1".into()
+      } else {
+        let gateway = unix::network::get_default_ip()?;
+        println!("Using default gateway: {}", gateway);
+        gateway.to_string()
+      }
     }
     Some(gateway) => gateway.clone(),
   };
@@ -79,6 +91,8 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
     gid: gid.gid(),
     hostname,
     advertise_addr,
+    is_docker_desktop,
+    home_dir: home_dir.clone(),
   };
 
   let installer = utils::installer::get_template(opts.template.clone()).await?;
@@ -130,7 +144,9 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
       format!("Cargo {} image", cargo.name),
       "invalid format expect image:tag".into(),
     ))?;
-    utils::docker::install_image(from_image, tag, &docker).await?;
+    if docker.inspect_image(&image).await.is_err() {
+      utils::docker::install_image(from_image, tag, &docker).await?;
+    }
     let container = utils::docker::create_cargo_container(
       &cargo,
       &deployment.namespace.clone().unwrap_or("system".into()),
@@ -146,6 +162,30 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
     ntex::time::sleep(Duration::from_secs(2)).await;
   }
 
+  if is_docker_desktop {
+    let context = Context {
+      name: "desktop-linux".into(),
+      meta_data: ContextMetaData {
+        description: "Docker desktop".into(),
+      },
+      endpoints: {
+        let mut map = HashMap::new();
+        map.insert(
+          "Nanocl".into(),
+          ContextEndpoint {
+            host: format!("unix://{home_dir}/.nanocl/run/nanocl.sock"),
+          },
+        );
+        map
+      },
+    };
+    if let Err(err) = Context::write(&context) {
+      eprintln!("WARN: Unable to create context for docker desktop: {err}");
+    }
+    if let Err(err) = Context::r#use("desktop-linux") {
+      eprintln!("WARN: Unable to use context for docker desktop: {err}");
+    }
+  }
   println!("Nanocl have been installed successfully!");
   Ok(())
 }

@@ -15,7 +15,7 @@ use openssl::ssl::SslConnector;
 
 use crate::error::is_api_error;
 
-const NANOCLD_DEFAULT_VERSION: &str = "0.7.0";
+const NANOCLD_DEFAULT_VERSION: &str = "0.9.0";
 
 #[derive(Clone)]
 pub struct NanocldClient {
@@ -149,35 +149,35 @@ impl NanocldClient {
     self
       .client
       .delete(self.gen_url(url))
-      .header("User-Agent", "nanocld.client.rs")
+      .header("User-Agent", "nanocld_client")
   }
 
   fn post(&self, url: String) -> http::client::ClientRequest {
     self
       .client
       .post(self.gen_url(url))
-      .header("User-Agent", "nanocld.client.rs")
+      .header("User-Agent", "nanocld_client")
   }
 
   fn patch(&self, url: String) -> http::client::ClientRequest {
     self
       .client
       .patch(self.gen_url(url))
-      .header("User-Agent", "nanocld.client.rs")
+      .header("User-Agent", "nanocld_client")
   }
 
   fn put(&self, url: String) -> http::client::ClientRequest {
     self
       .client
       .put(self.gen_url(url))
-      .header("User-Agent", "nanocld.client.rs")
+      .header("User-Agent", "nanocld_client")
   }
 
   fn head(&self, url: String) -> http::client::ClientRequest {
     self
       .client
       .head(self.gen_url(url))
-      .header("User-Agent", "nanocld.client.rs")
+      .header("User-Agent", "nanocld_client")
   }
 
   pub(crate) async fn send_get<Q>(

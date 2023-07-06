@@ -115,7 +115,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
     }
     _ => Err(HttpError {
       status: http::StatusCode::BAD_REQUEST,
-      msg: "unknown type".into(),
+      msg: format!("Unknown Statefile Kind: {}", meta.kind),
     }),
   }
 }
@@ -141,54 +141,38 @@ async fn apply_cargoes(
   state: &DaemonState,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {
-  send(
-    StateStream::Msg(format!(
-      "Applying {} cargoes in namespace: {namespace}",
-      data.len(),
-    )),
-    sx,
-  );
   data
     .iter()
     .map(|cargo| async {
-      send(
-        StateStream::Msg(format!("Applying Cargo {}", cargo.name)),
-        sx,
-      );
       let key = utils::key::gen_key(namespace, &cargo.name);
-      let res = match utils::cargo::inspect_by_key(&key, state).await {
+      send(StateStream::new_cargo_pending(&key), sx);
+      match utils::cargo::inspect_by_key(&key, state).await {
         Ok(existing) => {
           let existing: CargoConfigPartial = existing.into();
           if existing == *cargo {
-            send(
-              StateStream::Msg(format!(
-                "Skipping Cargo {} [NO CHANGE]",
-                cargo.name
-              )),
-              sx,
-            );
-            return Ok(());
+            send(StateStream::new_cargo_unchanged(&key), sx);
+            return;
           }
-          utils::cargo::put(&key, cargo, version, state).await
+          if let Err(err) = utils::cargo::put(&key, cargo, version, state).await
+          {
+            send(StateStream::new_cargo_error(&key, &err.to_string()), sx);
+            return;
+          }
         }
         Err(_err) => {
-          utils::cargo::create(namespace, cargo, version, state).await
+          if let Err(err) =
+            utils::cargo::create(namespace, cargo, version, state).await
+          {
+            send(StateStream::new_cargo_error(&key, &err.to_string()), sx);
+            return;
+          }
+          let res = utils::cargo::start_by_key(&key, state).await;
+          if let Err(err) = res {
+            send(StateStream::new_cargo_error(&key, &err.to_string()), sx);
+            return;
+          }
         }
       };
-      if let Err(err) = res {
-        send(
-          StateStream::Error(format!(
-            "Unable to apply Cargo {}: {err}",
-            cargo.name
-          )),
-          sx,
-        );
-        return Ok(());
-      }
-      send(
-        StateStream::Msg(format!("Applied Cargo {}", cargo.name)),
-        sx,
-      );
       let key_ptr = key.clone();
       let state_ptr = state.clone();
       rt::spawn(async move {
@@ -200,37 +184,7 @@ async fn apply_cargoes(
           .emit(Event::CargoPatched(Box::new(cargo)))
           .await;
       });
-      let res = utils::cargo::start_by_key(
-        &utils::key::gen_key(namespace, &cargo.name),
-        state,
-      )
-      .await;
-      if let Err(err) = res {
-        send(
-          StateStream::Error(format!(
-            "Unable to start Cargo: {}: {err}",
-            cargo.name
-          )),
-          sx,
-        );
-        return Ok(());
-      }
-      send(
-        StateStream::Msg(format!("Started Cargo {}", cargo.name)),
-        sx,
-      );
-      let key_ptr = key.clone();
-      let state_ptr = state.clone();
-      rt::spawn(async move {
-        let cargo = utils::cargo::inspect_by_key(&key_ptr, &state_ptr)
-          .await
-          .unwrap();
-        let _ = state_ptr
-          .event_emitter
-          .emit(Event::CargoStarted(Box::new(cargo)))
-          .await;
-      });
-      Ok::<_, HttpError>(())
+      send(StateStream::new_cargo_success(&key), sx);
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
@@ -257,64 +211,48 @@ pub async fn apply_vms(
   state: &DaemonState,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {
-  send(
-    StateStream::Msg(format!(
-      "Applying {} VMs in namespace: {namespace}",
-      data.len(),
-    )),
-    sx,
-  );
   data
     .iter()
     .map(|vm| async {
-      send(StateStream::Msg(format!("Applying VM: {}", &vm.name)), sx);
       let key = utils::key::gen_key(namespace, &vm.name);
-      let res =
-        match utils::vm::inspect_by_key(&key, &state.docker_api, &state.pool)
-          .await
-        {
-          Ok(existing) => {
-            let existing: VmConfigPartial = existing.into();
-            let vm = VmConfigPartial {
-              disk: VmDiskConfig {
-                image: format!("{}.{}", vm.disk.image, &key),
-                size: Some(vm.disk.size.unwrap_or(20)),
-              },
-              host_config: Some(vm.host_config.clone().unwrap_or_default()),
-              ..vm.clone()
-            };
-            if existing == vm {
-              send(
-                StateStream::Msg(format!(
-                  "Skipping VM {} [NO CHANGE]",
-                  vm.name
-                )),
-                sx,
-              );
-              return Ok(());
-            }
-            utils::vm::put(&key, &vm, version, state).await
+      send(StateStream::new_vm_pending(&key), sx);
+      match utils::vm::inspect_by_key(&key, &state.docker_api, &state.pool)
+        .await
+      {
+        Ok(existing) => {
+          let existing: VmConfigPartial = existing.into();
+          let vm = VmConfigPartial {
+            disk: VmDiskConfig {
+              image: format!("{}.{}", vm.disk.image, &key),
+              size: Some(vm.disk.size.unwrap_or(20)),
+            },
+            host_config: Some(vm.host_config.clone().unwrap_or_default()),
+            ..vm.clone()
+          };
+          if existing == vm {
+            send(StateStream::new_vm_unchanged(&key), sx);
+            return;
           }
-          Err(_err) => utils::vm::create(vm, namespace, version, state).await,
-        };
-      if let Err(err) = res {
-        send(
-          StateStream::Error(format!("Failed to apply VM {}: {err}", &vm.name)),
-          sx,
-        );
-        return Ok(());
-      }
-      send(StateStream::Msg(format!("Applied VM: {}", &vm.name)), sx);
-      // TODO: Add event emitter for VM
-      if let Err(err) = utils::vm::start_by_key(&key, &state.docker_api).await {
-        send(
-          StateStream::Error(format!("Failed to start VM {}: {err}", &vm.name)),
-          sx,
-        );
-        return Ok(());
-      }
-      send(StateStream::Msg(format!("Started VM: {}", &vm.name)), sx);
-      Ok::<_, HttpError>(())
+          if let Err(err) = utils::vm::put(&key, &vm, version, state).await {
+            send(StateStream::new_vm_error(&key, &err.to_string()), sx);
+            return;
+          }
+        }
+        Err(_err) => {
+          if let Err(err) =
+            utils::vm::create(vm, namespace, version, state).await
+          {
+            send(StateStream::new_vm_error(&key, &err.to_string()), sx);
+            return;
+          }
+          let res = utils::vm::start_by_key(&key, &state.docker_api).await;
+          if let Err(err) = res {
+            send(StateStream::new_vm_error(&key, &err.to_string()), sx);
+            return;
+          }
+        }
+      };
+      send(StateStream::new_vm_success(&key), sx);
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
@@ -343,61 +281,40 @@ async fn apply_resources(
   state: &DaemonState,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {
-  send(
-    StateStream::Msg(format!("Applying {} resources", data.len())),
-    sx,
-  );
   data
     .iter()
     .map(|resource| async {
-      send(
-        StateStream::Msg(format!("Applying Resource {}", resource.name)),
-        sx,
-      );
       let key = resource.name.to_owned();
+      send(StateStream::new_resource_pending(&key), sx);
       let res =
         match repositories::resource::inspect_by_key(&key, &state.pool).await {
           Err(_) => utils::resource::create(resource, &state.pool).await,
           Ok(cur_resource) => {
             let casted: ResourcePartial = cur_resource.into();
             if *resource == casted {
-              send(
-                StateStream::Msg(format!(
-                  "Skipping Resource {} [NO CHANGE]",
-                  resource.name
-                )),
-                sx,
-              );
-              return Ok(());
+              send(StateStream::new_resource_unchanged(&key), sx);
+              return;
             }
             utils::resource::patch(&resource.clone(), &state.pool).await
           }
         };
       if let Err(err) = res {
-        send(
-          StateStream::Error(format!(
-            "Unable to apply Resource {}: {err}",
-            resource.name
-          )),
-          sx,
-        );
-        return Ok(());
+        send(StateStream::new_resource_error(&key, &err.to_string()), sx);
+        return;
       }
-      send(
-        StateStream::Msg(format!("Applied Resource {}", resource.name)),
-        sx,
-      );
-      let pool = state.pool.clone();
+      let key_ptr = key.to_owned();
+      let pool_ptr = state.pool.clone();
       let event_emitter = state.event_emitter.clone();
       rt::spawn(async move {
-        let resource = repositories::resource::inspect_by_key(&key, &pool)
-          .await
-          .unwrap();
+        let resource =
+          repositories::resource::inspect_by_key(&key_ptr, &pool_ptr)
+            .await
+            .unwrap();
         let _ = event_emitter
           .emit(Event::ResourcePatched(Box::new(resource)))
           .await;
       });
-      Ok::<_, HttpError>(())
+      send(StateStream::new_resource_success(&key), sx);
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
@@ -427,46 +344,31 @@ async fn remove_cargoes(
   state: &DaemonState,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {
-  send(
-    StateStream::Msg(format!(
-      "Deleting {} cargoes in namespace {namespace}",
-      data.len()
-    )),
-    sx,
-  );
   data
     .iter()
     .map(|cargo| async {
-      send(
-        StateStream::Msg(format!("Deleting Cargo {}", cargo.name)),
-        sx,
-      );
       let key = utils::key::gen_key(namespace, &cargo.name);
+      send(StateStream::new_cargo_pending(&key), sx);
       let cargo = match utils::cargo::inspect_by_key(&key, state).await {
         Ok(cargo) => cargo,
         Err(_) => {
-          send(
-            StateStream::Msg(format!(
-              "Skipping Cargo {} [NOT FOUND]",
-              cargo.name
-            )),
-            sx,
-          );
-          return Ok(());
+          send(StateStream::new_cargo_not_found(&key), sx);
+          return;
         }
       };
-      utils::cargo::delete_by_key(&key, Some(true), state).await?;
-      send(
-        StateStream::Msg(format!("Deleted Cargo {}", cargo.name)),
-        sx,
-      );
+      if let Err(err) =
+        utils::cargo::delete_by_key(&key, Some(true), state).await
+      {
+        send(StateStream::new_cargo_error(&key, &err.to_string()), sx);
+        return;
+      }
+      send(StateStream::new_cargo_success(&key), sx);
       let event_emitter = state.event_emitter.clone();
       rt::spawn(async move {
         let _ = event_emitter
           .emit(Event::CargoDeleted(Box::new(cargo)))
           .await;
       });
-      Ok::<_, HttpError>(())
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
@@ -490,32 +392,25 @@ pub async fn remove_vms(
   state: &DaemonState,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {
-  send(
-    StateStream::Msg(format!(
-      "Deleting {} VMs in namespace: {namespace}",
-      data.len(),
-    )),
-    sx,
-  );
   data
     .iter()
     .map(|vm| async {
-      send(StateStream::Msg(format!("Deleting VM: {}", &vm.name)), sx);
       let key = utils::key::gen_key(namespace, &vm.name);
+      send(StateStream::new_vm_pending(&key), sx);
       let res =
         utils::vm::inspect_by_key(&key, &state.docker_api, &state.pool).await;
       if res.is_err() {
-        send(
-          StateStream::Error(format!("Skiping VM {} [NOT FOUND]", vm.name)),
-          sx,
-        );
-        return Ok(());
+        send(StateStream::new_vm_not_found(&key), sx);
+        return;
       }
-      utils::vm::delete_by_key(&key, true, &state.docker_api, &state.pool)
-        .await?;
-      send(StateStream::Msg(format!("Deleted VM: {}", &vm.name)), sx);
-      // Event emitter here
-      Ok::<_, HttpError>(())
+      if let Err(err) =
+        utils::vm::delete_by_key(&key, true, &state.docker_api, &state.pool)
+          .await
+      {
+        send(StateStream::new_vm_error(&key, &err.to_string()), sx);
+        return;
+      }
+      send(StateStream::new_vm_success(&key), sx);
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
@@ -543,17 +438,10 @@ async fn remove_resources(
   state: &DaemonState,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {
-  send(
-    StateStream::Msg(format!("Deleting {} resources", data.len())),
-    sx,
-  );
   data
     .iter()
     .map(|resource| async {
-      send(
-        StateStream::Msg(format!("Deleting Resource {}", resource.name)),
-        sx,
-      );
+      send(StateStream::new_resource_pending(&resource.name), sx);
       let resource = match repositories::resource::inspect_by_key(
         &resource.name,
         &state.pool,
@@ -562,28 +450,25 @@ async fn remove_resources(
       {
         Ok(resource) => resource,
         Err(_) => {
-          send(
-            StateStream::Msg(format!(
-              "Skipping Resource {} [NOT FOUND]",
-              resource.name
-            )),
-            sx,
-          );
-          return Ok(());
+          send(StateStream::new_resource_not_found(&resource.name), sx);
+          return;
         }
       };
-      utils::resource::delete(&resource, &state.pool).await?;
-      send(
-        StateStream::Msg(format!("Deleted Resource {}", resource.name)),
-        sx,
-      );
+      if let Err(err) = utils::resource::delete(&resource, &state.pool).await {
+        send(
+          StateStream::new_resource_error(&resource.name, &err.to_string()),
+          sx,
+        );
+        return;
+      }
+      let resource_ptr = resource.clone();
       let event_emitter = state.event_emitter.clone();
       rt::spawn(async move {
         let _ = event_emitter
-          .emit(Event::ResourceDeleted(Box::new(resource)))
+          .emit(Event::ResourceDeleted(Box::new(resource_ptr)))
           .await;
       });
-      Ok::<_, HttpError>(())
+      send(StateStream::new_resource_success(&resource.name), sx);
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()

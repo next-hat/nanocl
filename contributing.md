@@ -35,11 +35,11 @@ bin # Binaries (executable)
 │       ├── services # Function to accept http requests
 │       ├── subsystem # Function executed before starting the server
 │       └── utils # Utils functions for the project
-├── ncddns # Nanocl Controller Daemon DNS REST API
+├── ncdns # Nanocl Controller Daemon DNS REST API
 │   ├── specs # OpenApi specification
 │   ├── tests # Test configurations
 │   └── src # Rust source code
-├── ncdproxy # Nanocl Controller Daemon PROXY REST API
+├── ncproxy # Nanocl Controller Daemon PROXY REST API
 │   ├── specs # OpenApi specification
 │   ├── tests # Test configuration
 │   └── src # Rust source code
@@ -122,25 +122,14 @@ docker compose up
 
 ### 🐋 Docker Desktop
 
-If you can have Docker installed normally with his default socket on `/run/docker.sock` you can also change the context:
+If you can have Docker installed normally with his default socket on `/var/run/docker.sock` you can also change the context:
 
 ```sh
 docker context ls
 docker context use default
 ```
 
-In case you want to be using Docker desktop, you need to update this line:
-
-```yaml
-volumes:
-  - /run/docker.sock:/run/docker.sock # by /home/{your_user}/.docker/desktop/docker.sock:/run/docker.sock
-```
-
-On the `nanocld` service, afterward you can start the daemon using:
-
-```sh
-docker compose up
-```
+In case you want to be using Docker desktop, you will not be able to reach services that aren't public.
 
 Once started, a swagger should be available on [http://localhost:8585/explorer](http://localhost:8585/explorer).
 

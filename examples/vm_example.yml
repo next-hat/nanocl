@@ -1,12 +1,30 @@
-Kind: VirtualMachine
+Kind: Deployment
 ApiVersion: v0.8
 
 Namespace: global
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
+Resources:
+  - Name: vm-test
+    Kind: ProxyRule
+    Version: v0.6
+    Config:
+      Watch:
+        - vm-test.global.v
+      Rules:
+        - Domain: deploy-example.com
+          Network: Public
+          Protocol: Tcp
+          Port: 5555
+          Target:
+            Key: vm-test.global.v
+            Port: 22
+
 VirtualMachines:
   - Name: vm-test
     Disk:
-      Image: test-ubuntu22-clone
+      Image: ubuntu-22
     HostConfig:
       Cpu: 2
       Memory: 2048

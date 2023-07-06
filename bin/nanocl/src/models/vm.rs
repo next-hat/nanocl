@@ -20,23 +20,15 @@ pub enum VmCommands {
   /// List vms
   #[clap(alias = "ls")]
   List(VmListOpts),
+  /// Remove vms
   #[clap(alias = "rm")]
-  Remove {
-    /// Names of the vm
-    names: Vec<String>,
-  },
+  Remove(VmNamesOpts),
   /// Inspect a vm
   Inspect(VmInspectOpts),
   /// Start a vm
-  Start {
-    /// Name of the vm
-    name: String,
-  },
+  Start(VmNamesOpts),
   /// Stop a vm
-  Stop {
-    /// Name of the vm
-    name: String,
-  },
+  Stop(VmNamesOpts),
   /// Attach to a vm
   Attach {
     /// Name of the vm
@@ -44,6 +36,12 @@ pub enum VmCommands {
   },
   /// Patch a vm
   Patch(VmPatchOpts),
+}
+
+#[derive(Debug, Parser)]
+pub struct VmNamesOpts {
+  /// Names of the vm
+  pub names: Vec<String>,
 }
 
 #[derive(Debug, Parser)]
@@ -84,6 +82,9 @@ pub struct VmPatchOpts {
   /// Memory of the vm in MB default to 512
   #[clap(long = "mem")]
   pub memory: Option<u64>,
+  /// Enable KVM
+  #[clap(long)]
+  pub kvm: bool,
   /// network interface of the vm
   #[clap(long)]
   pub net_iface: Option<String>,
@@ -98,6 +99,7 @@ impl From<VmPatchOpts> for VmConfigUpdate {
       ssh_key: val.ssh_key,
       hostname: val.hostname,
       host_config: Some(VmHostConfig {
+        kvm: Some(val.kvm),
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
@@ -134,6 +136,12 @@ pub struct VmRunOpts {
   /// Size of the disk in GB
   #[clap(long = "img-size")]
   pub image_size: Option<u64>,
+  /// Enable KVM
+  #[clap(long)]
+  pub kvm: bool,
+  /// Attach to the vm
+  #[clap(short, long)]
+  pub attach: bool,
   /// Name of the vm
   pub name: String,
   /// Name of the vm image
@@ -156,6 +164,7 @@ impl From<VmRunOpts> for VmConfigPartial {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
+        kvm: Some(val.kvm),
         ..Default::default()
       }),
       ..Default::default()
@@ -186,6 +195,9 @@ pub struct VmCreateOpts {
   /// Ssh key for the user
   #[clap(long)]
   pub ssh_key: Option<String>,
+  /// Enable KVM
+  #[clap(long)]
+  pub kvm: bool,
   /// Name of the vm
   pub name: String,
   /// Name of the vm image
@@ -204,6 +216,7 @@ impl From<VmCreateOpts> for VmConfigPartial {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
+        kvm: Some(val.kvm),
         ..Default::default()
       }),
       disk: VmDiskConfig {
