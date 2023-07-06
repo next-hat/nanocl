@@ -1,6 +1,6 @@
 name: Tests
 
-on: [push, workflow_dispatch, pull_request_target]
+on: [push, pull_request, workflow_dispatch]
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,6 +32,8 @@ jobs:
           components: llvm-tools-preview
       # Cache Rust
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('./Cargo.lock') }}
       # Install cargo make
       - uses: davidB/rust-cargo-make@v1
       # Install llvm-cov
