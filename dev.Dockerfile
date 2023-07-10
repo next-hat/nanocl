@@ -43,4 +43,4 @@ ENV RUSTFLAGS="-C target-feature=-crt-static"
 LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
 LABEL org.opencontainers.image.description The dev image for nanocl services
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["cargo"]

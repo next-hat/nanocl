@@ -21,6 +21,8 @@ Resources:
             Key: vm-test.global.v
             Port: 22
 
+# See all options:
+# https://docs.next-hat.com/references/nanocl/virtual-machine
 VirtualMachines:
   - Name: vm-test
     Disk:
