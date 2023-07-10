@@ -13,7 +13,7 @@ use crate::vm::VmInspect;
 pub struct VmDiskConfig {
   /// Name of the image to use
   pub image: String,
-  /// Virtual size allowed for the disk
+  /// Virtual size allowed for the disk in GB (default: 20)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -27,40 +27,44 @@ pub struct VmDiskConfig {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmHostConfig {
-  /// Number of cpu of the vm
+  /// Number of cpu of the vm (default: 1)
   pub cpu: u64,
-  /// Memory of the vm
+  /// Memory of the vm in MB (default: 512)
   pub memory: u64,
-  /// default network interface of the vm
+  /// Network interface of the vm to setup (default: ens3)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub net_iface: Option<String>,
-  /// Enable KVM
+  /// Network interface to link the vm (default: eth0)
+  pub link_net_iface: Option<String>,
+  /// Enable KVM acceleration (default: false)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub kvm: Option<bool>,
-  /// A list of DNS servers for the vm to use.
+  /// A list of DNS servers for the vm to use
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub dns: Option<Vec<String>>,
-  /// Container image name to use for vm default: nexthat/nanocl-qemu
+  /// Container image name to use for vm (default: nanocl-qemu)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub runtime: Option<String>,
-  // Container network to use, default to the vm namespace
+  // Container network to use (default: vm namespace)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub runtime_network: Option<String>,
+  /// Use host tun device
+  pub host_tun: Option<bool>,
 }
 
 impl Default for VmHostConfig {
@@ -69,15 +73,17 @@ impl Default for VmHostConfig {
       cpu: 1,
       memory: 512,
       net_iface: None,
-      kvm: Some(false),
+      kvm: None,
       dns: None,
       runtime: None,
+      host_tun: None,
+      link_net_iface: None,
       runtime_network: None,
     }
   }
 }
 
-/// A vm config partial is used to create a Vm
+/// A vm config partial is used to create a vm
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -85,33 +91,33 @@ impl Default for VmHostConfig {
 pub struct VmConfigPartial {
   /// Name of the vm
   pub name: String,
-  /// Hostname of the vm
+  /// Hostname of the vm (default: generated from name)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub hostname: Option<String>,
-  /// Default user of the vm (cloud)
+  /// Default user of the vm (default: cloud)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub user: Option<String>,
-  /// Default password of the vm (cloud)
+  /// Default password of the vm (default: cloud)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub password: Option<String>,
-  /// Default ssh key for the user
+  /// Default ssh pub key for the user (recommended)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub ssh_key: Option<String>,
-  /// Disk config of the vm
+  /// Disk config of the vm (image, size) required
   pub disk: VmDiskConfig,
-  /// Mac address of the vm
+  /// Mac address of the vm (default: generated)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
