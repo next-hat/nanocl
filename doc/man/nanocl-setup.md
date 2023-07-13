@@ -4,10 +4,10 @@ nanocl
 
 # SYNOPSIS
 
-**nanocl** \[**\--docker-host**\] \[**\--state-dir**\]
-\[**\--conf-dir**\] \[**\--gateway**\] \[**\--advertise-addr**\]
-\[**\--deamon-hosts**\] \[**\--group**\] \[**\--hostname**\]
-\[**-t**\|**\--template**\] \[**-h**\|**\--help**\]
+**nanocl** \[**\--docker-host**\] \[**\--docker-desktop**\]
+\[**\--state-dir**\] \[**\--conf-dir**\] \[**\--gateway**\]
+\[**\--advertise-addr**\] \[**\--deamon-hosts**\] \[**\--group**\]
+\[**\--hostname**\] \[**-t**\|**\--template**\] \[**-h**\|**\--help**\]
 
 # DESCRIPTION
 
@@ -17,6 +17,11 @@ nanocl
 
 :   The docker host to install nanocl default is
     unix:///var/run/docker.sock
+
+**\--docker-desktop**
+
+:   Specify if the docker host is docker desktop detected if docker
+    context is desktop-linux
 
 **\--state-dir**=*STATE_DIR*
 

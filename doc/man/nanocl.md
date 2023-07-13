@@ -43,13 +43,21 @@ nanocl-resource(1)
 
 :   Manage resources
 
+nanocl-node(1)
+
+:   Manage nodes (experimental)
+
 nanocl-events(1)
 
 :   Watch daemon events
 
 nanocl-state(1)
 
-:   Apply or Reverse a state from a configuration file
+:   Define, Run, or Remove Cargo or Virtual Machines
+
+nanocl-context(1)
+
+:   Manage contexts
 
 nanocl-info(1)
 
@@ -75,10 +83,14 @@ nanocl-ps(1)
 
 :   Show all processes managed by nanocl
 
+nanocl-system(1)
+
+:   Manage system
+
 nanocl-help(1)
 
 :   Print this message or the help of the given subcommand(s)
 
 # VERSION
 
-v0.7.0
+v0.9.0

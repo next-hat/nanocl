@@ -1,6 +1,7 @@
 # NAME
 
-nanocl - Manage configuration states
+nanocl - Define, Run, or Remove Cargo or Virtual Machines from a
+Statefile
 
 # SYNOPSIS
 
@@ -8,7 +9,7 @@ nanocl - Manage configuration states
 
 # DESCRIPTION
 
-Manage configuration states
+Define, Run, or Remove Cargo or Virtual Machines from a Statefile
 
 # OPTIONS
 
@@ -20,11 +21,11 @@ Manage configuration states
 
 nanocl-apply(1)
 
-:   Apply a state from a configuration file
+:   Create or Update elements from a Statefile
 
-nanocl-revert(1)
+nanocl-remove(1)
 
-:   Revert a state from a configuration file
+:   Remove elements from a Statefile
 
 nanocl-help(1)
 

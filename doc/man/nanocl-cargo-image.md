@@ -22,9 +22,9 @@ nanocl cargo image-list(1)
 
 :   List cargo images
 
-nanocl cargo image-create(1)
+nanocl cargo image-pull(1)
 
-:   Create a new cargo image
+:   Pull a new cargo image
 
 nanocl cargo image-remove(1)
 

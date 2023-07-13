@@ -69,8 +69,28 @@ pub fn generate_man_pages() -> Result<()> {
       command: CargoImageOpts::command(),
     },
     ManPage {
+      name: "nanocl-cargo-run",
+      command: CargoRunOpts::command(),
+    },
+    ManPage {
+      name: "nanocl-vm",
+      command: VmArgs::command(),
+    },
+    ManPage {
+      name: "nanocl-vm-run",
+      command: VmRunOpts::command(),
+    },
+    ManPage {
       name: "nanocl-state",
       command: StateArgs::command(),
+    },
+    ManPage {
+      name: "nanocl-state-apply",
+      command: StateApplyOpts::command(),
+    },
+    ManPage {
+      name: "nanocl-state-remove",
+      command: StateRemoveOpts::command(),
     },
     ManPage {
       name: "nanocl-resource",
