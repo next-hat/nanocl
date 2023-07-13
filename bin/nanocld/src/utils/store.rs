@@ -28,8 +28,9 @@ use crate::models::{Pool, DBConn};
 ///   - [Err](IoError) - The pool has not been created
 ///
 pub async fn create_pool(host: &str) -> IoResult<Pool> {
-  // ?sslmode=verify-full
-  let db_url = "postgres://root:root@".to_owned() + host + "/defaultdb";
+  // let options = format!("/defaultdb?sslmode=verify-full&sslrootcert=/var/lib/nanocl/store/certs/ca.crt");
+  let options = "/defaultdb";
+  let db_url = format!("postgres://root:root@{host}{options}");
   web::block(move || {
     let manager = ConnectionManager::<PgConnection>::new(db_url);
     r2d2::Pool::builder().build(manager)

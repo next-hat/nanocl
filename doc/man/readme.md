@@ -1,7 +1,17 @@
 # Man Page
 ## Summary
+* [nanocl-cargo-image.md](./nanocl-cargo-image.md)
+* [nanocl-cargo-run.md](./nanocl-cargo-run.md)
+* [nanocl-cargo.md](./nanocl-cargo.md)
 * [nanocl-namespace-create.md](./nanocl-namespace-create.md)
 * [nanocl-namespace.md](./nanocl-namespace.md)
+* [nanocl-resource.md](./nanocl-resource.md)
+* [nanocl-setup.md](./nanocl-setup.md)
+* [nanocl-state-apply.md](./nanocl-state-apply.md)
+* [nanocl-state-remove.md](./nanocl-state-remove.md)
+* [nanocl-state.md](./nanocl-state.md)
+* [nanocl-vm-run.md](./nanocl-vm-run.md)
+* [nanocl-vm.md](./nanocl-vm.md)
 * [nanocl.md](./nanocl.md)
 * [nanocld.md](./nanocld.md)
 * [readme.md](./readme.md)
