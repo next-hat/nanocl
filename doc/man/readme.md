@@ -14,4 +14,6 @@
 * [nanocl-vm.md](./nanocl-vm.md)
 * [nanocl.md](./nanocl.md)
 * [nanocld.md](./nanocld.md)
+* [ncdproxy.md](./ncdproxy.md)
+* [ncproxy.md](./ncproxy.md)
 * [readme.md](./readme.md)
