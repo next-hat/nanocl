@@ -199,7 +199,7 @@ pub async fn sync_vm_images(
   daemon_conf: &DaemonConfig,
   pool: &Pool,
 ) -> IoResult<()> {
-  log::info!("Syncing existing vm");
+  log::info!("Syncing existing VM images");
   let files =
     std::fs::read_dir(format!("{}/vms/images", &daemon_conf.state_dir))?;
   files
@@ -207,10 +207,16 @@ pub async fn sync_vm_images(
     .map(|file| async {
       let file = file?;
       let file_name = file.file_name();
-      let name = file_name.to_str().unwrap_or_default();
+      let file_name = file_name.to_str().unwrap_or_default();
+      let dot_split_name = file_name.split('.').collect::<Vec<&str>>();
+      let name = if dot_split_name.len() > 1 {
+        dot_split_name[..dot_split_name.len() - 1].join(".")
+      } else {
+        dot_split_name[0].to_owned()
+      };
       let file_path = file.path();
       let path = file_path.to_str().unwrap_or_default();
-      if let Err(error) = utils::vm_image::create(name, path, pool).await {
+      if let Err(error) = utils::vm_image::create(&name, path, pool).await {
         log::warn!("{error}")
       }
       Ok::<_, std::io::Error>(())
@@ -218,6 +224,6 @@ pub async fn sync_vm_images(
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<Result<_, std::io::Error>>>()
     .await;
-  log::info!("VM Image synced");
+  log::info!("Synced VM images");
   Ok(())
 }
