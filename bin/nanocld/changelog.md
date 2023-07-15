@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2023-07-15
+
+### Added
+
+- Log tcp/udp request by [@Narayanbhat166](https://github.com/Narayanbhat166)
+
+### Fixed
+
+- Virtual image sync naming
+
 ## [0.9.0] - 2023-07-04
 
 ### Added
