@@ -19,7 +19,7 @@ clap = { version = "4.3.10", features = ["derive"] }
 clap_mangen = { version = "0.2" }
 
 [dev-dependencies]
-serde_yaml = "0.9.19"
+serde_yaml = "0.9.24"
 
 [dependencies]
 log = "0.4.17"
