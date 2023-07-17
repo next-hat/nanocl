@@ -18,7 +18,7 @@ utoipa = ["dep:utoipa"]
 
 [dependencies]
 bollard-next = { version = "0.15.0" }
-uuid = { version = "1.2.2" }
+uuid = { version = "1.4.1" }
 serde_json = "1.0.91"
 chrono = { version = "0.4.24", default-features = false, features = [
   "std",
