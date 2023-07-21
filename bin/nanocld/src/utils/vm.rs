@@ -292,8 +292,12 @@ pub async fn create_instance(
   let mut args: Vec<String> =
     vec!["-hda".into(), image.path.clone(), "--nographic".into()];
   let host_config = vm.config.host_config.clone();
-  let kvm = host_config.kvm.unwrap_or(false);
-  let mut devices = vec![];
+  let kvm = host_config.kvm.unwrap_or_default();
+  let mut devices = vec![DeviceMapping {
+    path_on_host: Some("/dev/net/tun".into()),
+    path_in_container: Some("/dev/net/tun".into()),
+    cgroup_permissions: Some("rwm".into()),
+  }];
   if kvm {
     args.push("-accel".into());
     args.push("kvm".into());
@@ -302,9 +306,10 @@ pub async fn create_instance(
       path_in_container: Some("/dev/kvm".into()),
       cgroup_permissions: Some("rwm".into()),
     });
+    log::debug!("KVM enabled /dev/kvm mapped");
   }
   let cpu = host_config.cpu;
-  let cpu = if cpu > 0 { cpu.to_string() } else { "2".into() };
+  let cpu = if cpu > 0 { cpu.to_string() } else { "1".into() };
   let cpu = cpu.clone();
   args.push("-smp".into());
   args.push(cpu.clone());
@@ -312,20 +317,34 @@ pub async fn create_instance(
   let memory = if memory > 0 {
     format!("{memory}M")
   } else {
-    "2G".into()
+    "512M".into()
   };
   args.push("-m".into());
   args.push(memory);
-  let mut env: Vec<String> = Vec::new();
-  env.push(format!("DELETE_SSH_KEY={disable_keygen}"));
+  let mut envs: Vec<String> = Vec::new();
+  let net_iface = vm
+    .config
+    .host_config
+    .net_iface
+    .clone()
+    .unwrap_or("ens3".into());
+  let link_net_iface = vm
+    .config
+    .host_config
+    .link_net_iface
+    .clone()
+    .unwrap_or("eth0".into());
+  envs.push(format!("DEFAULT_INTERFACE={link_net_iface}"));
+  envs.push(format!("FROM_NETWORK={net_iface}"));
+  envs.push(format!("DELETE_SSH_KEY={disable_keygen}"));
   if let Some(user) = &vm.config.user {
-    env.push(format!("USER={user}"));
+    envs.push(format!("USER={user}"));
   }
   if let Some(password) = &vm.config.password {
-    env.push(format!("PASSWORD={password}"));
+    envs.push(format!("PASSWORD={password}"));
   }
   if let Some(ssh_key) = &vm.config.ssh_key {
-    env.push(format!("SSH_KEY={ssh_key}"));
+    envs.push(format!("SSH_KEY={ssh_key}"));
   }
   let image = match &vm.config.host_config.runtime {
     Some(runtime) => runtime.to_owned(),
@@ -335,7 +354,7 @@ pub async fn create_instance(
     image: Some(image),
     tty: Some(true),
     hostname: vm.config.hostname.clone(),
-    env: Some(env),
+    env: Some(envs),
     labels: Some(labels),
     cmd: Some(args),
     attach_stderr: Some(true),

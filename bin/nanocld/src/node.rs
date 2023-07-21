@@ -134,7 +134,7 @@ pub fn watch_node(
               sender: tx,
             })
             .await;
-          // start server messages handler, it reads chat messages and sends to the peer
+          // start server messages handler, it reads messages and sends to the peer
           rt::spawn(messages(con.sink(), rx));
 
           let _ = srv

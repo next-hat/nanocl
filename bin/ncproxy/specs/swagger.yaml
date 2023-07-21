@@ -194,7 +194,7 @@ components:
           type: integer
           format: int32
           description: The port to open on nodes
-          minimum: 0.0
+          minimum: 0
         Ssl:
           allOf:
           - $ref: '#/components/schemas/ProxySslConfig'
@@ -274,7 +274,7 @@ components:
           type: integer
           format: int32
           description: The port of the cargo or the vm to target
-          minimum: 0.0
+          minimum: 0
         Path:
           type: string
           description: The http path to target when using http
