@@ -25,7 +25,7 @@ clap = { version = "4.3.16", features = ["derive"] }
 clap_mangen = { version = "0.2" }
 
 [dev-dependencies]
-serde_yaml = "0.9.24"
+serde_yaml = "0.9.25"
 bollard-next = "0.15.0"
 
 [dependencies]
