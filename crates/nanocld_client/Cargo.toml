@@ -34,4 +34,4 @@ nanocl_utils = { version = "0.2.1", features = [
   "io_error",
   "http_client_error",
 ] }
-openssl = { version = "0.10.52", features = ["vendored"] }
+openssl = { version = "0.10.56", features = ["vendored"] }
