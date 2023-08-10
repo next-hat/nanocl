@@ -1,3 +1,6 @@
+use serde::{Serialize, Deserialize};
+use clap::{Parser, Subcommand, ValueEnum};
+
 mod namespace;
 mod cargo;
 mod cargo_image;
@@ -27,8 +30,6 @@ pub use install::*;
 pub use uninstall::*;
 pub use upgrade::*;
 pub use node::*;
-
-use clap::{Parser, Subcommand, ValueEnum};
 
 /// A self-sufficient hybrid-cloud manager
 #[derive(Debug, Parser)]
@@ -82,11 +83,23 @@ pub enum Commands {
   // },
 }
 
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, Debug, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "PascalCase")]
 pub enum DisplayFormat {
   Yaml,
   Toml,
   Json,
+}
+
+impl ToString for DisplayFormat {
+  fn to_string(&self) -> String {
+    match self {
+      Self::Yaml => "yaml",
+      Self::Toml => "toml",
+      Self::Json => "json",
+    }
+    .to_string()
+  }
 }
 
 impl Default for DisplayFormat {

@@ -1,6 +1,7 @@
 use nanocl_utils::io_error::IoResult;
 
 use crate::utils;
+use crate::config::CommandConfig;
 use crate::models::{Context, ContextArgs, ContextCommands, ContextRow};
 
 fn exec_list(context: &Context) -> IoResult<()> {
@@ -35,9 +36,10 @@ fn exec_from(path: &str) -> IoResult<()> {
 }
 
 pub async fn exec_context(
-  context: &Context,
-  args: &ContextArgs,
+  cmd_conf: &CommandConfig<&ContextArgs>,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let context = &cmd_conf.context;
   match &args.commands {
     ContextCommands::List => exec_list(context)?,
     ContextCommands::Use { name } => exec_use(name)?,

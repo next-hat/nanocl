@@ -1,4 +1,4 @@
-use crate::config;
+use crate::config::CliConfig;
 use crate::models::{Context, ContextRow};
 
 impl Context {
@@ -80,7 +80,7 @@ impl Context {
       })?;
     }
     let path = format!("{home}/.nanocl/conf.yml");
-    let mut config = config::read();
+    let mut config = CliConfig::new();
     config.current_context = name.to_string();
     let s = serde_yaml::to_string(&config).map_err(|err| {
       std::io::Error::new(

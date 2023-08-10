@@ -9,23 +9,27 @@ use nanocl_utils::unix;
 use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 use nanocld_client::stubs::state::StateDeployment;
 
+use crate::config::CommandConfig;
 use crate::utils;
 use crate::models::{
   InstallOpts, NanocldArgs, Context, ContextMetaData, ContextEndpoint,
 };
 
 /// Execute install command
-pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
+pub async fn exec_install(
+  cmd_conf: &CommandConfig<&InstallOpts>,
+) -> IoResult<()> {
+  let args = cmd_conf.args;
   println!("Installing Nanocl components on your system");
   let home_dir = std::env::var("HOME").map_err(|err| {
     IoError::interupted("Unable to get $HOME env variable", &err.to_string())
   })?;
   let detected_host = utils::docker::detect_docker_host()?;
-  let (docker_host, is_docker_desktop) = match &opts.docker_host {
-    Some(docker_host) => (docker_host.to_owned(), opts.is_docker_desktop),
+  let (docker_host, is_docker_desktop) = match &args.docker_host {
+    Some(docker_host) => (docker_host.to_owned(), args.is_docker_desktop),
     None => detected_host,
   };
-  let state_dir = match &opts.state_dir {
+  let state_dir = match &args.state_dir {
     Some(state_dir) => state_dir.to_owned(),
     None => {
       if is_docker_desktop {
@@ -36,9 +40,9 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
     }
   };
 
-  let conf_dir = opts.conf_dir.as_deref().unwrap_or("/etc/nanocl").to_owned();
+  let conf_dir = args.conf_dir.as_deref().unwrap_or("/etc/nanocl").to_owned();
 
-  let gateway = match &opts.gateway {
+  let gateway = match &args.gateway {
     None => {
       if is_docker_desktop {
         "127.0.0.1".into()
@@ -51,14 +55,14 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
     Some(gateway) => gateway.clone(),
   };
 
-  let advertise_addr = match &opts.advertise_addr {
+  let advertise_addr = match &args.advertise_addr {
     None => gateway.clone(),
     Some(advertise_addr) => advertise_addr.clone(),
   };
 
-  let group = opts.group.as_deref().unwrap_or("nanocl");
+  let group = args.group.as_deref().unwrap_or("nanocl");
 
-  let hosts = opts
+  let hosts = args
     .deamon_hosts
     .clone()
     .unwrap_or(vec!["unix:///run/nanocl/nanocl.sock".into()]);
@@ -74,7 +78,7 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
     ),
   ))?;
 
-  let hostname = if let Some(hostname) = &opts.hostname {
+  let hostname = if let Some(hostname) = &args.hostname {
     hostname.to_owned()
   } else {
     let hostname = unix::network::get_hostname()?;
@@ -82,7 +86,7 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
     hostname
   };
 
-  let args = NanocldArgs {
+  let nanocld_args = NanocldArgs {
     docker_host,
     state_dir,
     conf_dir,
@@ -95,9 +99,9 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
     home_dir: home_dir.clone(),
   };
 
-  let installer = utils::installer::get_template(opts.template.clone()).await?;
+  let installer = utils::installer::get_template(args.template.clone()).await?;
 
-  let data: liquid::Object = args.clone().into();
+  let data: liquid::Object = nanocld_args.clone().into();
   let installer = utils::state::compile(&installer, &data)?;
 
   let deployment = serde_yaml::from_str::<StateDeployment>(&installer)
@@ -109,7 +113,7 @@ pub async fn exec_install(opts: &InstallOpts) -> IoResult<()> {
     .cargoes
     .ok_or(IoError::invalid_data("Cargoes", "Not founds"))?;
 
-  let docker = utils::docker::connect(&args.docker_host)?;
+  let docker = utils::docker::connect(&nanocld_args.docker_host)?;
 
   if docker
     .inspect_network("system", None::<InspectNetworkOptions<String>>)

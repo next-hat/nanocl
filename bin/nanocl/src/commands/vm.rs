@@ -10,39 +10,37 @@ use futures::{SinkExt, StreamExt};
 use termios::{TCSANOW, tcsetattr, Termios, ICANON, ECHO};
 
 use nanocl_utils::io_error::{IoResult, FromIo};
-use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::{OutputLog, OutputKind};
 
+use crate::utils;
+use crate::config::CommandConfig;
 use crate::models::{
   VmArgs, VmCommands, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts, VmListOpts,
   VmInspectOpts,
 };
-use crate::utils;
 
 use super::vm_image::exec_vm_image;
 
 pub async fn exec_vm_create(
-  client: &NanocldClient,
-  args: &VmArgs,
+  cmd_conf: &CommandConfig<&VmArgs>,
   options: &VmCreateOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.clone()).await?;
-
   println!("{}", &vm.key);
-
   Ok(())
 }
 
 pub async fn exec_vm_ls(
-  client: &NanocldClient,
-  args: &VmArgs,
+  cmd_conf: &CommandConfig<&VmArgs>,
   opts: &VmListOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let items = client.list_vm(args.namespace.clone()).await?;
-
   let rows = items.into_iter().map(VmRow::from).collect::<Vec<VmRow>>();
-
   match opts.quiet {
     true => {
       for row in rows {
@@ -57,38 +55,40 @@ pub async fn exec_vm_ls(
 }
 
 pub async fn exec_vm_rm(
-  client: &NanocldClient,
-  args: &VmArgs,
+  cmd_conf: &CommandConfig<&VmArgs>,
   names: &[String],
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   for name in names {
     client.delete_vm(name, args.namespace.clone()).await?;
   }
-
   Ok(())
 }
 
 pub async fn exec_vm_inspect(
-  client: &NanocldClient,
-  args: &VmArgs,
+  cmd_conf: &CommandConfig<&VmArgs>,
   opts: &VmInspectOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let vm = client
     .inspect_vm(&opts.name, args.namespace.clone())
     .await?;
-
-  let display = opts.display.clone().unwrap_or_default();
-
+  let display = opts
+    .display
+    .clone()
+    .unwrap_or(cmd_conf.config.display_format.clone());
   utils::print::display_format(&display, vm)?;
-
   Ok(())
 }
 
 pub async fn exec_vm_start(
-  client: &NanocldClient,
-  args: &VmArgs,
+  cmd_conf: &CommandConfig<&VmArgs>,
   names: &[String],
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   for name in names {
     if let Err(err) = client.start_vm(name, args.namespace.clone()).await {
       eprintln!("Failed to start vm {}: {}", name, err);
@@ -98,10 +98,11 @@ pub async fn exec_vm_start(
 }
 
 pub async fn exec_vm_stop(
-  client: &NanocldClient,
-  args: &VmArgs,
+  cmd_conf: &CommandConfig<&VmArgs>,
   names: &[String],
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   for name in names {
     if let Err(err) = client.stop_vm(name, args.namespace.clone()).await {
       eprintln!("Failed to stop vm {}: {}", name, err);
@@ -111,24 +112,26 @@ pub async fn exec_vm_stop(
 }
 
 pub async fn exec_vm_run(
-  client: &NanocldClient,
-  args: &VmArgs,
+  cmd_conf: &CommandConfig<&VmArgs>,
   options: &VmRunOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.clone()).await?;
   client.start_vm(&vm.name, args.namespace.clone()).await?;
   if options.attach {
-    exec_vm_attach(client, args, &options.name).await?;
+    exec_vm_attach(cmd_conf, &options.name).await?;
   }
   Ok(())
 }
 
 pub async fn exec_vm_patch(
-  client: &NanocldClient,
-  args: &VmArgs,
+  cmd_conf: &CommandConfig<&VmArgs>,
   options: &VmPatchOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let vm = options.clone().into();
   client
     .patch_vm(&options.name, &vm, args.namespace.clone())
@@ -137,10 +140,11 @@ pub async fn exec_vm_patch(
 }
 
 pub async fn exec_vm_attach(
-  client: &NanocldClient,
-  args: &VmArgs,
+  cmd_conf: &CommandConfig<&VmArgs>,
   name: &str,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   /// How often heartbeat pings are sent
   const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
   let conn = client.attach_vm(name, args.namespace.clone()).await?;
@@ -233,17 +237,19 @@ pub async fn exec_vm_attach(
   Ok(())
 }
 
-pub async fn exec_vm(client: &NanocldClient, args: &VmArgs) -> IoResult<()> {
+pub async fn exec_vm(cmd_conf: &CommandConfig<&VmArgs>) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   match &args.commands {
     VmCommands::Image(args) => exec_vm_image(client, args).await,
-    VmCommands::Create(options) => exec_vm_create(client, args, options).await,
-    VmCommands::List(opts) => exec_vm_ls(client, args, opts).await,
-    VmCommands::Remove(opts) => exec_vm_rm(client, args, &opts.names).await,
-    VmCommands::Inspect(opts) => exec_vm_inspect(client, args, opts).await,
-    VmCommands::Start(opts) => exec_vm_start(client, args, &opts.names).await,
-    VmCommands::Stop(opts) => exec_vm_stop(client, args, &opts.names).await,
-    VmCommands::Run(options) => exec_vm_run(client, args, options).await,
-    VmCommands::Patch(options) => exec_vm_patch(client, args, options).await,
-    VmCommands::Attach { name } => exec_vm_attach(client, args, name).await,
+    VmCommands::Create(options) => exec_vm_create(cmd_conf, options).await,
+    VmCommands::List(opts) => exec_vm_ls(cmd_conf, opts).await,
+    VmCommands::Remove(opts) => exec_vm_rm(cmd_conf, &opts.names).await,
+    VmCommands::Inspect(opts) => exec_vm_inspect(cmd_conf, opts).await,
+    VmCommands::Start(opts) => exec_vm_start(cmd_conf, &opts.names).await,
+    VmCommands::Stop(opts) => exec_vm_stop(cmd_conf, &opts.names).await,
+    VmCommands::Run(options) => exec_vm_run(cmd_conf, options).await,
+    VmCommands::Patch(options) => exec_vm_patch(cmd_conf, options).await,
+    VmCommands::Attach { name } => exec_vm_attach(cmd_conf, name).await,
   }
 }

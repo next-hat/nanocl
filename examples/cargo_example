@@ -1,0 +1,11 @@
+Kind: Cargo
+ApiVersion: v0.8
+
+Namespace: cargo-example
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
+Cargoes:
+  - Name: cargo-example
+    Container:
+      Image: nexthat/nanocl-get-started:latest

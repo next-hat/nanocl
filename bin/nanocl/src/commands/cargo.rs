@@ -2,10 +2,10 @@ use futures::StreamExt;
 use bollard_next::exec::CreateExecOptions;
 
 use nanocl_utils::io_error::{FromIo, IoResult};
-use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery, CargoLogQuery};
 
 use crate::utils;
+use crate::config::CommandConfig;
 use crate::models::{
   CargoArgs, CargoCreateOpts, CargoCommands, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
@@ -28,10 +28,11 @@ use super::cargo_image::{self, exec_cargo_image_pull};
 ///   * [Err](IoError) - Operation failed
 ///
 async fn exec_cargo_create(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoCreateOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let cargo = opts.clone().into();
   let item = client.create_cargo(&cargo, args.namespace.clone()).await?;
   println!("{}", &item.key);
@@ -39,10 +40,11 @@ async fn exec_cargo_create(
 }
 
 async fn exec_cargo_rm(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoRemoveOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   if !opts.skip_confirm {
     utils::dialog::confirm(&format!("Delete cargo  {}?", opts.names.join(",")))
       .map_err(|err| err.map_err_context(|| "Delete cargo images"))?;
@@ -58,10 +60,11 @@ async fn exec_cargo_rm(
 }
 
 async fn exec_cargo_ls(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoListOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let items = client.list_cargo(args.namespace.clone()).await?;
 
   let rows = items
@@ -82,10 +85,11 @@ async fn exec_cargo_ls(
 }
 
 async fn exec_cargo_start(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoStartOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   client
     .start_cargo(&opts.name, args.namespace.clone())
     .await?;
@@ -93,10 +97,11 @@ async fn exec_cargo_start(
 }
 
 async fn exec_cargo_stop(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoStopOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   for name in &opts.names {
     client.stop_cargo(name, args.namespace.clone()).await?;
   }
@@ -104,10 +109,11 @@ async fn exec_cargo_stop(
 }
 
 async fn exec_cargo_restart(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoRestartOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   for name in &opts.names {
     client.restart_cargo(name, args.namespace.clone()).await?;
   }
@@ -115,10 +121,11 @@ async fn exec_cargo_restart(
 }
 
 async fn exec_cargo_patch(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoPatchOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let cargo = opts.clone().into();
   client
     .patch_cargo(&opts.name, cargo, args.namespace.clone())
@@ -127,25 +134,29 @@ async fn exec_cargo_patch(
 }
 
 async fn exec_cargo_inspect(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoInspectOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let cargo = client
     .inspect_cargo(&opts.name, args.namespace.clone())
     .await?;
 
-  let display = opts.display.clone().unwrap_or_default();
-
+  let display = opts
+    .display
+    .clone()
+    .unwrap_or(cmd_conf.config.display_format.clone());
   utils::print::display_format(&display, cargo)?;
   Ok(())
 }
 
 async fn exec_cargo_exec(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoExecOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let exec: CreateExecOptions = opts.clone().into();
   let mut stream = client
     .exec_cargo(&opts.name, exec, args.namespace.clone())
@@ -168,10 +179,11 @@ async fn exec_cargo_exec(
 }
 
 async fn exec_cargo_history(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoHistoryOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let histories = client
     .list_history_cargo(&opts.name, args.namespace.clone())
     .await?;
@@ -181,10 +193,11 @@ async fn exec_cargo_history(
 }
 
 async fn exec_cargo_logs(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoLogsOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let query = CargoLogQuery {
     namespace: args.namespace.clone(),
     tail: opts.tail.clone(),
@@ -219,10 +232,11 @@ async fn exec_cargo_logs(
 }
 
 async fn exec_cargo_revert(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoRevertOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   let cargo = client
     .revert_cargo(&opts.name, &opts.history_id, args.namespace.clone())
     .await?;
@@ -231,10 +245,11 @@ async fn exec_cargo_revert(
 }
 
 async fn exec_cargo_run(
-  client: &NanocldClient,
-  args: &CargoArgs,
+  cmd_conf: &CommandConfig<&CargoArgs>,
   opts: &CargoRunOpts,
 ) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   // Image is not existing so we donwload it
   if client.inspect_cargo_image(&opts.image).await.is_err() {
     exec_cargo_image_pull(client, &opts.image).await?;
@@ -251,32 +266,25 @@ async fn exec_cargo_run(
   Ok(())
 }
 
-pub async fn exec_cargo(
-  client: &NanocldClient,
-  args: &CargoArgs,
-) -> IoResult<()> {
+pub async fn exec_cargo(cmd_conf: &CommandConfig<&CargoArgs>) -> IoResult<()> {
+  let args = cmd_conf.args;
+  let client = &cmd_conf.client;
   match &args.commands {
-    CargoCommands::List(opts) => exec_cargo_ls(client, args, opts).await,
-    CargoCommands::Create(opts) => exec_cargo_create(client, args, opts).await,
-    CargoCommands::Remove(opts) => exec_cargo_rm(client, args, opts).await,
+    CargoCommands::List(opts) => exec_cargo_ls(cmd_conf, opts).await,
+    CargoCommands::Create(opts) => exec_cargo_create(cmd_conf, opts).await,
+    CargoCommands::Remove(opts) => exec_cargo_rm(cmd_conf, opts).await,
     CargoCommands::Image(opts) => {
       cargo_image::exec_cargo_image(client, opts).await
     }
-    CargoCommands::Start(opts) => exec_cargo_start(client, args, opts).await,
-    CargoCommands::Stop(opts) => exec_cargo_stop(client, args, opts).await,
-    CargoCommands::Patch(opts) => exec_cargo_patch(client, args, opts).await,
-    CargoCommands::Inspect(opts) => {
-      exec_cargo_inspect(client, args, opts).await
-    }
-    CargoCommands::Exec(opts) => exec_cargo_exec(client, args, opts).await,
-    CargoCommands::History(opts) => {
-      exec_cargo_history(client, args, opts).await
-    }
-    CargoCommands::Revert(opts) => exec_cargo_revert(client, args, opts).await,
-    CargoCommands::Logs(opts) => exec_cargo_logs(client, args, opts).await,
-    CargoCommands::Run(opts) => exec_cargo_run(client, args, opts).await,
-    CargoCommands::Restart(opts) => {
-      exec_cargo_restart(client, args, opts).await
-    }
+    CargoCommands::Start(opts) => exec_cargo_start(cmd_conf, opts).await,
+    CargoCommands::Stop(opts) => exec_cargo_stop(cmd_conf, opts).await,
+    CargoCommands::Patch(opts) => exec_cargo_patch(cmd_conf, opts).await,
+    CargoCommands::Inspect(opts) => exec_cargo_inspect(cmd_conf, opts).await,
+    CargoCommands::Exec(opts) => exec_cargo_exec(cmd_conf, opts).await,
+    CargoCommands::History(opts) => exec_cargo_history(cmd_conf, opts).await,
+    CargoCommands::Revert(opts) => exec_cargo_revert(cmd_conf, opts).await,
+    CargoCommands::Logs(opts) => exec_cargo_logs(cmd_conf, opts).await,
+    CargoCommands::Run(opts) => exec_cargo_run(cmd_conf, opts).await,
+    CargoCommands::Restart(opts) => exec_cargo_restart(cmd_conf, opts).await,
   }
 }
