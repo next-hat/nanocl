@@ -22,7 +22,7 @@ clap_mangen = { version = "0.2" }
 serde_yaml = "0.9.25"
 
 [dependencies]
-log = "0.4.17"
+log = "0.4.20"
 clap = { version = "4.3.19", features = ["derive"] }
 ntex = { version = "0.7.2", features = ["tokio"] }
 tokio = { version = "1.29.1", features = ["fs"] }

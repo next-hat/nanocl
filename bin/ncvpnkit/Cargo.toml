@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-log = "0.4.17"
+log = "0.4.20"
 futures-util = "0.3.28"
 ntex = { version = "0.7.2", features = ["tokio"] }
 vpnkitrc = { version = "0.1.1", features = ["tokio"] }
