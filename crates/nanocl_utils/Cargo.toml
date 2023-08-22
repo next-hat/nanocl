@@ -32,7 +32,7 @@ ntex = { version = "0.7.3", optional = true }
 log = { version = "0.4.20", optional = true }
 env_logger = { version = "0.10.0", optional = true }
 serde_yaml = { version = "0.9", optional = true }
-serde_json = { version = "1.0.104", optional = true }
+serde_json = { version = "1.0.105", optional = true }
 bollard-next = { version = "0.15.0", optional = true }
 diesel = { version = "2.0.1", default-features = false, optional = true }
 futures = { version = "0.3.25", optional = true }
