@@ -37,4 +37,4 @@ nanocl_utils = { version = "0.2.1", features = [
   "serde_json",
   "versioning",
 ] }
-utoipa = { version = "3.4", features = ["yaml"], optional = true }
+utoipa = { version = "3.5", features = ["yaml"], optional = true }
