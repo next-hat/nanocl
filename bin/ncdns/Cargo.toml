@@ -15,7 +15,7 @@ dev = ["dep:utoipa", "nanocld_client/utoipa", "nanocl_utils/ntex_swagger"]
 test = []
 
 [build-dependencies]
-clap = { version = "4.3.23", features = ["derive"] }
+clap = { version = "4.4.1", features = ["derive"] }
 clap_mangen = { version = "0.2" }
 
 [dev-dependencies]
@@ -23,7 +23,7 @@ serde_yaml = "0.9.25"
 
 [dependencies]
 log = "0.4.20"
-clap = { version = "4.3.23", features = ["derive"] }
+clap = { version = "4.4.1", features = ["derive"] }
 ntex = { version = "0.7.3", features = ["tokio"] }
 tokio = { version = "1.32.0", features = ["fs"] }
 futures = "0.3.26"
