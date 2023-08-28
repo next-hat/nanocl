@@ -1,12 +1,11 @@
 use nanocl_utils::io_error::IoResult;
 
 use crate::utils;
-use crate::config::CommandConfig;
+use crate::config::CliConfig;
 use crate::models::{NodeArgs, NodeCommands, NodeRow};
 
-pub async fn exec_node(cmd_conf: &CommandConfig<&NodeArgs>) -> IoResult<()> {
-  let args = cmd_conf.args;
-  let client = &cmd_conf.client;
+pub async fn exec_node(cli_conf: &CliConfig, args: &NodeArgs) -> IoResult<()> {
+  let client = &cli_conf.client;
   match args.commands {
     NodeCommands::List => {
       let nodes = client

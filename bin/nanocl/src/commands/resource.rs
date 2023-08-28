@@ -1,6 +1,6 @@
 use nanocl_utils::io_error::{IoResult, FromIo};
 
-use crate::config::CommandConfig;
+use crate::config::CliConfig;
 use crate::utils;
 use crate::models::{
   ResourceArgs, ResourceCommands, ResourceRow, ResourceRemoveOpts,
@@ -9,10 +9,10 @@ use crate::models::{
 };
 
 async fn exec_resource_ls(
-  cmd_conf: &CommandConfig<&ResourceArgs>,
+  cli_conf: &CliConfig,
   opts: &ResourceListOpts,
 ) -> IoResult<()> {
-  let client = &cmd_conf.client;
+  let client = &cli_conf.client;
   let resources = client.list_resource(None).await?;
   let row = resources
     .into_iter()
@@ -32,10 +32,10 @@ async fn exec_resource_ls(
 }
 
 async fn exec_resource_rm(
-  cmd_conf: &CommandConfig<&ResourceArgs>,
+  cli_conf: &CliConfig,
   options: &ResourceRemoveOpts,
 ) -> IoResult<()> {
-  let client = &cmd_conf.client;
+  let client = &cli_conf.client;
   if !options.skip_confirm {
     utils::dialog::confirm(&format!(
       "Delete resource {}?",
@@ -50,53 +50,54 @@ async fn exec_resource_rm(
 }
 
 async fn exec_resource_inspect(
-  cmd_conf: &CommandConfig<&ResourceArgs>,
+  cli_conf: &CliConfig,
   opts: &ResourceInspectOpts,
 ) -> IoResult<()> {
-  let client = &cmd_conf.client;
+  let client = &cli_conf.client;
   let resource = client.inspect_resource(&opts.name).await?;
   let display = opts
     .display
     .clone()
-    .unwrap_or(cmd_conf.config.display_format.clone());
+    .unwrap_or(cli_conf.user_config.display_format.clone());
   utils::print::display_format(&display, resource)?;
   Ok(())
 }
 
 async fn exec_resource_history(
-  cmd_conf: &CommandConfig<&ResourceArgs>,
+  cli_conf: &CliConfig,
   opts: &ResourceHistoryOpts,
 ) -> IoResult<()> {
-  let client = &cmd_conf.client;
+  let client = &cli_conf.client;
   let history = client.list_history_resource(&opts.name).await?;
   utils::print::print_yml(history)?;
   Ok(())
 }
 
 async fn exec_resource_revert(
-  cmd_conf: &CommandConfig<&ResourceArgs>,
+  cli_conf: &CliConfig,
   opts: &ResourceRevertOpts,
 ) -> IoResult<()> {
-  let client = &cmd_conf.client;
+  let client = &cli_conf.client;
   let resource = client.revert_resource(&opts.name, &opts.key).await?;
   utils::print::print_yml(resource)?;
   Ok(())
 }
 
 pub async fn exec_resource(
-  cmd_conf: &CommandConfig<&ResourceArgs>,
+  cli_conf: &CliConfig,
+  args: &ResourceArgs,
 ) -> IoResult<()> {
-  match &cmd_conf.args.commands {
-    ResourceCommands::List(opts) => exec_resource_ls(cmd_conf, opts).await,
-    ResourceCommands::Remove(opts) => exec_resource_rm(cmd_conf, opts).await,
+  match &args.commands {
+    ResourceCommands::List(opts) => exec_resource_ls(cli_conf, opts).await,
+    ResourceCommands::Remove(opts) => exec_resource_rm(cli_conf, opts).await,
     ResourceCommands::Inspect(opts) => {
-      exec_resource_inspect(cmd_conf, opts).await
+      exec_resource_inspect(cli_conf, opts).await
     }
     ResourceCommands::History(opts) => {
-      exec_resource_history(cmd_conf, opts).await
+      exec_resource_history(cli_conf, opts).await
     }
     ResourceCommands::Revert(opts) => {
-      exec_resource_revert(cmd_conf, opts).await
+      exec_resource_revert(cli_conf, opts).await
     }
   }
 }

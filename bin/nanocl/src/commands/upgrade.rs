@@ -6,16 +6,16 @@ use indicatif::{ProgressBar, MultiProgress};
 use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 
-use crate::config::CommandConfig;
+use crate::config::CliConfig;
 use crate::utils;
 use crate::models::UpgradeOpts;
 use super::cargo_image::exec_cargo_image_pull;
 
 pub async fn exec_upgrade(
-  cmd_conf: &CommandConfig<&UpgradeOpts>,
+  cli_conf: &CliConfig,
+  args: &UpgradeOpts,
 ) -> IoResult<()> {
-  let args = cmd_conf.args;
-  let client = &cmd_conf.client;
+  let client = &cli_conf.client;
   let config = client.info().await?.config;
 
   let data = liquid::object!({

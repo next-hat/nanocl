@@ -1,9 +1,7 @@
-// use ntex::http;
 use clap::Parser;
 use dotenv::dotenv;
 
 use nanocl_utils::io_error::IoResult;
-// use nanocl_utils::http_client_error::HttpClientError;
 
 use nanocld_client::NanocldClient;
 
@@ -13,18 +11,15 @@ mod models;
 mod version;
 mod commands;
 
-use config::{CliConfig, CommandConfig};
+use config::{UserConfig, CliConfig};
 use models::{Cli, Commands, Context};
 
-fn create_command_config<T>(
-  cli_args: &Cli,
-  args: T,
-) -> IoResult<CommandConfig<T>> {
+fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
   Context::ensure()?;
-  let cli_conf = CliConfig::new();
+  let user_conf = UserConfig::new();
   let mut context = Context::new();
-  if cli_conf.current_context != "default" {
-    match Context::read_by_name(&cli_conf.current_context) {
+  if user_conf.current_context != "default" {
+    match Context::read_by_name(&user_conf.current_context) {
       Err(_) => {
         Context::r#use("default")?;
       }
@@ -33,7 +28,6 @@ fn create_command_config<T>(
       }
     }
   }
-
   #[allow(unused)]
   let mut host = cli_args
     .host
@@ -48,80 +42,36 @@ fn create_command_config<T>(
         .unwrap_or("http://localhost:8585".into());
     }
   }
-
   let url = Box::leak(host.clone().into_boxed_str());
   let client = NanocldClient::connect_to(url, None);
-  Ok(CommandConfig::<T> {
+  Ok(CliConfig {
     host,
     client,
     context,
-    args,
-    config: cli_conf,
+    user_config: user_conf,
   })
 }
 
 async fn execute_args(cli_args: &Cli) -> IoResult<()> {
+  let cli_conf = create_cli_config(cli_args)?;
   match &cli_args.command {
     Commands::Namespace(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_namespace(&cmd_conf).await
+      commands::exec_namespace(&cli_conf, args).await
     }
-    Commands::Resource(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_resource(&cmd_conf).await
-    }
-    Commands::Cargo(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_cargo(&cmd_conf).await
-    }
-    Commands::Events => {
-      let cmd_conf = create_command_config(cli_args, None::<u8>)?;
-      commands::exec_events(&cmd_conf).await
-    }
-    Commands::State(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_state(&cmd_conf).await
-    }
-    Commands::Version => {
-      let cmd_conf = create_command_config(cli_args, None::<u8>)?;
-      commands::exec_version(&cmd_conf).await
-    }
-    Commands::Vm(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_vm(&cmd_conf).await
-    }
-    Commands::Ps(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_process(&cmd_conf).await
-    }
-    Commands::Install(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_install(&cmd_conf).await
-    }
-    Commands::Uninstall(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_uninstall(&cmd_conf).await
-    }
-    Commands::Upgrade(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_upgrade(&cmd_conf).await
-    }
-    Commands::System(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_system(&cmd_conf).await
-    }
-    Commands::Node(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_node(&cmd_conf).await
-    }
-    Commands::Context(args) => {
-      let cmd_conf = create_command_config(cli_args, args)?;
-      commands::exec_context(&cmd_conf).await
-    }
-    Commands::Info => {
-      let cmd_conf = create_command_config(cli_args, None::<u8>)?;
-      commands::exec_info(&cmd_conf).await
-    }
+    Commands::Resource(args) => commands::exec_resource(&cli_conf, args).await,
+    Commands::Cargo(args) => commands::exec_cargo(&cli_conf, args).await,
+    Commands::Events => commands::exec_events(&cli_conf).await,
+    Commands::State(args) => commands::exec_state(&cli_conf, args).await,
+    Commands::Version => commands::exec_version(&cli_conf).await,
+    Commands::Vm(args) => commands::exec_vm(&cli_conf, args).await,
+    Commands::Ps(args) => commands::exec_process(&cli_conf, args).await,
+    Commands::Install(args) => commands::exec_install(args).await,
+    Commands::Uninstall(args) => commands::exec_uninstall(args).await,
+    Commands::Upgrade(args) => commands::exec_upgrade(&cli_conf, args).await,
+    Commands::System(args) => commands::exec_system(&cli_conf, args).await,
+    Commands::Node(args) => commands::exec_node(&cli_conf, args).await,
+    Commands::Context(args) => commands::exec_context(&cli_conf, args).await,
+    Commands::Info => commands::exec_info(&cli_conf).await,
   }
 }
 

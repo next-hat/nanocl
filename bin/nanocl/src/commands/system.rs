@@ -1,7 +1,7 @@
 use nanocl_utils::io_error::IoResult;
 use nanocld_client::NanocldClient;
 
-use crate::config::CommandConfig;
+use crate::config::CliConfig;
 use crate::models::{
   ProcessOpts, ProcessRow, SystemOpts, SystemHttpOpts, SystemHttpCommands,
   SystemCommands,
@@ -10,10 +10,10 @@ use crate::utils;
 use crate::utils::print::print_table;
 
 pub async fn exec_process(
-  cmd_conf: &CommandConfig<&ProcessOpts>,
+  cli_conf: &CliConfig,
+  args: &ProcessOpts,
 ) -> IoResult<()> {
-  let args = cmd_conf.args;
-  let client = &cmd_conf.client;
+  let client = &cli_conf.client;
   let opts = args.clone().into();
   let items = client.process(Some(opts)).await?;
   let rows = items
@@ -39,10 +39,10 @@ pub async fn exec_http(
 }
 
 pub async fn exec_system(
-  cmd_conf: &CommandConfig<&SystemOpts>,
+  cli_conf: &CliConfig,
+  args: &SystemOpts,
 ) -> IoResult<()> {
-  let args = cmd_conf.args;
-  let client = &cmd_conf.client;
+  let client = &cli_conf.client;
   match &args.commands {
     SystemCommands::Http(opts) => exec_http(client, opts).await,
   }

@@ -9,17 +9,13 @@ use nanocl_utils::unix;
 use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 use nanocld_client::stubs::state::StateDeployment;
 
-use crate::config::CommandConfig;
 use crate::utils;
 use crate::models::{
   InstallOpts, NanocldArgs, Context, ContextMetaData, ContextEndpoint,
 };
 
 /// Execute install command
-pub async fn exec_install(
-  cmd_conf: &CommandConfig<&InstallOpts>,
-) -> IoResult<()> {
-  let args = cmd_conf.args;
+pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   println!("Installing Nanocl components on your system");
   let home_dir = std::env::var("HOME").map_err(|err| {
     IoError::interupted("Unable to get $HOME env variable", &err.to_string())

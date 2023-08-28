@@ -17,7 +17,7 @@ use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
 };
 
-use crate::config::CommandConfig;
+use crate::config::CliConfig;
 use crate::utils;
 use crate::models::{
   StateArgs, StateCommands, StateApplyOpts, StateRemoveOpts, StateBuildArgs,
@@ -414,11 +414,11 @@ where
 }
 
 async fn exec_state_apply(
-  cmd_conf: &CommandConfig<&StateArgs>,
+  cli_conf: &CliConfig,
   opts: &StateApplyOpts,
 ) -> IoResult<()> {
-  let host = &cmd_conf.host;
-  let format = cmd_conf.config.display_format.clone();
+  let host = &cli_conf.host;
+  let format = cli_conf.user_config.display_format.clone();
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
   let client = gen_client(host, &state_ref.meta)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
@@ -488,11 +488,11 @@ async fn exec_state_apply(
 }
 
 async fn exec_state_remove(
-  cmd_conf: &CommandConfig<&StateArgs>,
+  cli_conf: &CliConfig,
   opts: &StateRemoveOpts,
 ) -> IoResult<()> {
-  let host = &cmd_conf.host;
-  let format = cmd_conf.config.display_format.clone();
+  let host = &cli_conf.host;
+  let format = cli_conf.user_config.display_format.clone();
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
   let client = gen_client(host, &state_ref.meta)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
@@ -514,9 +514,12 @@ async fn exec_state_remove(
   Ok(())
 }
 
-pub async fn exec_state(cmd_conf: &CommandConfig<&StateArgs>) -> IoResult<()> {
-  match &cmd_conf.args.commands {
-    StateCommands::Apply(opts) => exec_state_apply(cmd_conf, opts).await,
-    StateCommands::Remove(opts) => exec_state_remove(cmd_conf, opts).await,
+pub async fn exec_state(
+  cli_conf: &CliConfig,
+  args: &StateArgs,
+) -> IoResult<()> {
+  match &args.commands {
+    StateCommands::Apply(opts) => exec_state_apply(cli_conf, opts).await,
+    StateCommands::Remove(opts) => exec_state_remove(cli_conf, opts).await,
   }
 }

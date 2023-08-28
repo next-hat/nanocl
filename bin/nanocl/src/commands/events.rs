@@ -2,10 +2,10 @@ use futures::StreamExt;
 
 use nanocl_utils::io_error::IoResult;
 
-use crate::{utils::print::print_yml, config::CommandConfig};
+use crate::{utils::print::print_yml, config::CliConfig};
 
-pub async fn exec_events(cmd_conf: &CommandConfig<Option<u8>>) -> IoResult<()> {
-  let client = &cmd_conf.client;
+pub async fn exec_events(cli_conf: &CliConfig) -> IoResult<()> {
+  let client = &cli_conf.client;
   let mut stream = client.watch_events().await?;
 
   while let Some(event) = stream.next().await {

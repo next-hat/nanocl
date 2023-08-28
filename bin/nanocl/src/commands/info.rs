@@ -1,10 +1,10 @@
 use nanocl_utils::io_error::IoResult;
 
 use crate::utils;
-use crate::config::CommandConfig;
+use crate::config::CliConfig;
 
-pub async fn exec_info(cmd_conf: &CommandConfig<Option<u8>>) -> IoResult<()> {
-  let client = &cmd_conf.client;
+pub async fn exec_info(cli_conf: &CliConfig) -> IoResult<()> {
+  let client = &cli_conf.client;
   let info = client.info().await?;
   utils::print::print_yml(info)?;
   Ok(())

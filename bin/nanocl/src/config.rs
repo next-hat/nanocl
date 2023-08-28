@@ -11,7 +11,7 @@ use crate::models::{DisplayFormat, Context};
 ///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct CliConfig {
+pub struct UserConfig {
   #[serde(default = "default_current_context")]
   pub current_context: String,
   #[serde(default)]
@@ -30,7 +30,7 @@ fn default_current_context() -> String {
 ///
 /// This is the default configuration used when no configuration file is found
 ///
-impl Default for CliConfig {
+impl Default for UserConfig {
   fn default() -> Self {
     Self {
       current_context: default_current_context(),
@@ -41,7 +41,7 @@ impl Default for CliConfig {
 
 /// ## CliConfig implementations
 ///
-impl CliConfig {
+impl UserConfig {
   /// ## New CliConfig
   ///
   /// This function is used to create a new CliConfig struct
@@ -52,16 +52,16 @@ impl CliConfig {
     // Get user config path
     let home_path = match std::env::var("HOME") {
       Ok(home) => home,
-      Err(_) => return CliConfig::default(),
+      Err(_) => return UserConfig::default(),
     };
     let path = format!("{}/.nanocl/conf.yml", home_path);
     let s = match fs::read_to_string(path) {
       Ok(s) => s,
-      Err(_) => return CliConfig::default(),
+      Err(_) => return UserConfig::default(),
     };
-    match serde_yaml::from_str::<CliConfig>(&s) {
+    match serde_yaml::from_str::<UserConfig>(&s) {
       Ok(config) => config,
-      Err(_) => CliConfig::default(),
+      Err(_) => UserConfig::default(),
     }
   }
 }
@@ -72,15 +72,13 @@ impl CliConfig {
 /// It is used to pass the configuration to the command functions.
 /// And contains the host, the client, the context and the command arguments.
 ///
-pub struct CommandConfig<T> {
+pub struct CliConfig {
   /// Nanocld host to use
   pub host: String,
   /// Nanocld client generated from the host
   pub client: NanocldClient,
   /// Current context
   pub context: Context,
-  /// Command arguments
-  pub args: T,
   /// User configuration
-  pub config: CliConfig,
+  pub user_config: UserConfig,
 }
