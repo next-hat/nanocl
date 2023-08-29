@@ -17,6 +17,7 @@ use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
 };
 
+use crate::config::CliConfig;
 use crate::utils;
 use crate::models::{
   StateArgs, StateCommands, StateApplyOpts, StateRemoveOpts, StateBuildArgs,
@@ -69,18 +70,20 @@ where
   Ok(state_ref)
 }
 
-fn read_from_file<T>(path: &std::path::Path) -> IoResult<StateRef<T>>
+fn read_from_file<T>(
+  path: &std::path::Path,
+  format: &DisplayFormat,
+) -> IoResult<StateRef<T>>
 where
   T: serde::Serialize + serde::de::DeserializeOwned,
 {
-  let ext = path.extension().ok_or_else(|| {
-    IoError::invalid_data(
-      "Statefile",
-      "has no extension supported extensions are: .yaml, .yml, .json, .toml",
-    )
-  })?;
+  let default_format = format.to_string();
+  let ext = path
+    .extension()
+    .unwrap_or(std::ffi::OsStr::new(&default_format))
+    .to_str();
 
-  let ext = ext.to_str().unwrap_or_default();
+  let ext = ext.unwrap_or_default();
   let data = fs::read_to_string(path)?;
   let state_ref = utils::state::get_state_ref::<T>(ext, &data)?;
 
@@ -382,7 +385,10 @@ where
   Ok(data)
 }
 
-async fn parse_state_file<T>(path: &Option<String>) -> IoResult<StateRef<T>>
+async fn parse_state_file<T>(
+  path: &Option<String>,
+  format: &DisplayFormat,
+) -> IoResult<StateRef<T>>
 where
   T: serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -391,24 +397,29 @@ where
       .canonicalize()
       .map_err(|err| err.map_err_context(|| format!("Statefile {path}")))
     {
-      return read_from_file(&path);
+      return read_from_file(&path, format);
     }
     return get_from_url::<T>(path).await;
   }
   if let Ok(path) = std::path::Path::new("Statefile.yaml").canonicalize() {
-    return read_from_file(&path);
+    return read_from_file(&path, format);
   }
   if let Ok(path) = std::path::Path::new("Statefile").canonicalize() {
-    return read_from_file(&path);
+    return read_from_file(&path, format);
   }
   let path = std::path::Path::new("Statefile.yml")
     .canonicalize()
     .map_err(|err| err.map_err_context(|| "Statefile Statefile.yml"))?;
-  read_from_file(&path)
+  read_from_file(&path, format)
 }
 
-async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
-  let state_ref = parse_state_file(&opts.state_location).await?;
+async fn exec_state_apply(
+  cli_conf: &CliConfig,
+  opts: &StateApplyOpts,
+) -> IoResult<()> {
+  let host = &cli_conf.host;
+  let format = cli_conf.user_config.display_format.clone();
+  let state_ref = parse_state_file(&opts.state_location, &format).await?;
   let client = gen_client(host, &state_ref.meta)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let mut namespace = String::from("global");
@@ -476,8 +487,13 @@ async fn exec_state_apply(host: &str, opts: &StateApplyOpts) -> IoResult<()> {
   Ok(())
 }
 
-async fn exec_state_remove(host: &str, opts: &StateRemoveOpts) -> IoResult<()> {
-  let state_ref = parse_state_file(&opts.state_location).await?;
+async fn exec_state_remove(
+  cli_conf: &CliConfig,
+  opts: &StateRemoveOpts,
+) -> IoResult<()> {
+  let host = &cli_conf.host;
+  let format = cli_conf.user_config.display_format.clone();
+  let state_ref = parse_state_file(&opts.state_location, &format).await?;
   let client = gen_client(host, &state_ref.meta)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let data: serde_json::Value =
@@ -498,9 +514,12 @@ async fn exec_state_remove(host: &str, opts: &StateRemoveOpts) -> IoResult<()> {
   Ok(())
 }
 
-pub async fn exec_state(host: &str, args: &StateArgs) -> IoResult<()> {
+pub async fn exec_state(
+  cli_conf: &CliConfig,
+  args: &StateArgs,
+) -> IoResult<()> {
   match &args.commands {
-    StateCommands::Apply(opts) => exec_state_apply(host, opts).await,
-    StateCommands::Remove(opts) => exec_state_remove(host, opts).await,
+    StateCommands::Apply(opts) => exec_state_apply(cli_conf, opts).await,
+    StateCommands::Remove(opts) => exec_state_remove(cli_conf, opts).await,
   }
 }

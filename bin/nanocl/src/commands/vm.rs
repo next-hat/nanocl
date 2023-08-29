@@ -3,46 +3,80 @@ use std::io::{Read, Write};
 use std::os::fd::AsRawFd;
 use std::time::Duration;
 
-use ntex::{ws, rt, time};
+use ntex::rt;
+use ntex::ws;
+use ntex::time;
 use ntex::util::Bytes;
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
 use termios::{TCSANOW, tcsetattr, Termios, ICANON, ECHO};
 
 use nanocl_utils::io_error::{IoResult, FromIo};
-use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo::{OutputLog, OutputKind};
 
+use crate::utils;
+use crate::config::CliConfig;
 use crate::models::{
   VmArgs, VmCommands, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts, VmListOpts,
   VmInspectOpts,
 };
-use crate::utils;
 
 use super::vm_image::exec_vm_image;
 
+/// ## Exec vm create
+///
+/// Function executed when running `nanocl vm create`
+/// It will create a new virtual machine but not start it
+///
+/// ## Arguments
+///
+/// - [cli_conf](CliConfig) The cli configuration
+/// - [args](VmArgs) The command arguments
+/// - [options](VmCreateOpts) The command options
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](IoError) - An error occured
+///
 pub async fn exec_vm_create(
-  client: &NanocldClient,
+  cli_conf: &CliConfig,
   args: &VmArgs,
   options: &VmCreateOpts,
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.clone()).await?;
-
   println!("{}", &vm.key);
-
   Ok(())
 }
 
+/// ## Exec vm ls
+///
+/// Function executed when running `nanocl vm ls`
+/// It will list existing virtual machine and output them on stdout as a table.
+///
+/// ## Arguments
+///
+/// - [cli_conf](CliConfig) The cli configuration
+/// - [args](VmArgs) The command arguments
+/// - [opts](VmListOpts) The command options
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](IoError) - An error occured
+///
 pub async fn exec_vm_ls(
-  client: &NanocldClient,
+  cli_conf: &CliConfig,
   args: &VmArgs,
   opts: &VmListOpts,
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   let items = client.list_vm(args.namespace.clone()).await?;
-
   let rows = items.into_iter().map(VmRow::from).collect::<Vec<VmRow>>();
-
   match opts.quiet {
     true => {
       for row in rows {
@@ -56,39 +90,94 @@ pub async fn exec_vm_ls(
   Ok(())
 }
 
+/// ## Exec vm rm
+///
+/// Function executed when running `nanocl vm rm`
+/// It will remove a virtual machine from the system
+///
+/// ## Arguments
+///
+/// - [cli_conf](CliConfig) The cli configuration
+/// - [args](VmArgs) The command arguments
+/// - [names](Vec<String>) The list of virtual machine names to remove
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](IoError) - An error occured
+///
 pub async fn exec_vm_rm(
-  client: &NanocldClient,
+  cli_conf: &CliConfig,
   args: &VmArgs,
   names: &[String],
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   for name in names {
     client.delete_vm(name, args.namespace.clone()).await?;
   }
-
   Ok(())
 }
 
+/// ## Exec vm inspect
+///
+/// Function executed when running `nanocl vm inspect`
+/// It will inspect a virtual machine
+/// and output the result on stdout as yaml, toml or json
+/// depending on user configuration
+///
+/// ## Arguments
+///
+/// - [cli_conf](CliConfig) The cli configuration
+/// - [args](VmArgs) The command arguments
+/// - [opts](VmInspectOpts) The command options
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](IoError) - An error occured
+///
 pub async fn exec_vm_inspect(
-  client: &NanocldClient,
+  cli_conf: &CliConfig,
   args: &VmArgs,
   opts: &VmInspectOpts,
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   let vm = client
     .inspect_vm(&opts.name, args.namespace.clone())
     .await?;
-
-  let display = opts.display.clone().unwrap_or_default();
-
+  let display = opts
+    .display
+    .clone()
+    .unwrap_or(cli_conf.user_config.display_format.clone());
   utils::print::display_format(&display, vm)?;
-
   Ok(())
 }
 
+/// ## Exec vm start
+///
+/// Function executed when running `nanocl vm start`
+/// It will start a virtual machine that was previously created or stopped
+///
+/// ## Arguments
+///
+/// - [cli_conf](CliConfig) The cli configuration
+/// - [args](VmArgs) The command arguments
+/// - [names](Vec<String>) The list of virtual machine names to start
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](IoError) - An error occured
+///
 pub async fn exec_vm_start(
-  client: &NanocldClient,
+  cli_conf: &CliConfig,
   args: &VmArgs,
   names: &[String],
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   for name in names {
     if let Err(err) = client.start_vm(name, args.namespace.clone()).await {
       eprintln!("Failed to start vm {}: {}", name, err);
@@ -97,11 +186,29 @@ pub async fn exec_vm_start(
   Ok(())
 }
 
+/// ## Exec vm stop
+///
+/// Function executed when running `nanocl vm stop`
+/// It will stop a virtual machine that was previously started
+///
+/// ## Arguments
+///
+/// - [cli_conf](CliConfig) The cli configuration
+/// - [args](VmArgs) The command arguments
+/// - [names](Vec<String>) The list of virtual machine names to stop
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](IoError) - An error occured
+///
 pub async fn exec_vm_stop(
-  client: &NanocldClient,
+  cli_conf: &CliConfig,
   args: &VmArgs,
   names: &[String],
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   for name in names {
     if let Err(err) = client.stop_vm(name, args.namespace.clone()).await {
       eprintln!("Failed to stop vm {}: {}", name, err);
@@ -110,25 +217,62 @@ pub async fn exec_vm_stop(
   Ok(())
 }
 
+/// ## Exec vm run
+///
+/// Function executed when running `nanocl vm run`
+/// It will create a new virtual machine, start it.
+/// If the `attach` option is set, it will attach to the virtual machine console.
+///
+/// ## Arguments
+///
+/// - [cli_conf](CliConfig) The cli configuration
+/// - [args](VmArgs) The command arguments
+/// - [options](VmRunOpts) The command options
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](IoError) - An error occured
+///
 pub async fn exec_vm_run(
-  client: &NanocldClient,
+  cli_conf: &CliConfig,
   args: &VmArgs,
   options: &VmRunOpts,
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.clone()).await?;
   client.start_vm(&vm.name, args.namespace.clone()).await?;
   if options.attach {
-    exec_vm_attach(client, args, &options.name).await?;
+    exec_vm_attach(cli_conf, args, &options.name).await?;
   }
   Ok(())
 }
 
+/// ## Exec vm patch
+///
+/// Function executed when running `nanocl vm patch`
+/// It will patch a virtual machine with the provided options
+///
+/// ## Arguments
+///
+/// - [cli_conf](CliConfig) The cli configuration
+/// - [args](VmArgs) The command arguments
+/// - [options](VmPatchOpts) The command options
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](IoError) - An error occured
+///
 pub async fn exec_vm_patch(
-  client: &NanocldClient,
+  cli_conf: &CliConfig,
   args: &VmArgs,
   options: &VmPatchOpts,
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   let vm = options.clone().into();
   client
     .patch_vm(&options.name, &vm, args.namespace.clone())
@@ -136,11 +280,29 @@ pub async fn exec_vm_patch(
   Ok(())
 }
 
+/// ## Exec vm attach
+///
+/// Function executed when running `nanocl vm attach`
+/// It will attach to a virtual machine console
+///
+/// ## Arguments
+///
+/// - [cli_conf](CliConfig) The cli configuration
+/// - [args](VmArgs) The command arguments
+/// - [name](&str) The name of the virtual machine to attach to
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](IoError) - An error occured
+///
 pub async fn exec_vm_attach(
-  client: &NanocldClient,
+  cli_conf: &CliConfig,
   args: &VmArgs,
   name: &str,
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   /// How often heartbeat pings are sent
   const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
   let conn = client.attach_vm(name, args.namespace.clone()).await?;
@@ -233,17 +395,36 @@ pub async fn exec_vm_attach(
   Ok(())
 }
 
-pub async fn exec_vm(client: &NanocldClient, args: &VmArgs) -> IoResult<()> {
+/// ## Exec vm
+///
+/// Function executed when running `nanocl vm`
+/// It will execute the subcommand passed as argument
+///
+/// ## Arguments
+///
+/// - [cli_conf](CliConfig) The cli configuration
+/// - [args](VmArgs) The command arguments
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](IoError) - An error occured
+///
+pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArgs) -> IoResult<()> {
+  let client = &cli_conf.client;
   match &args.commands {
     VmCommands::Image(args) => exec_vm_image(client, args).await,
-    VmCommands::Create(options) => exec_vm_create(client, args, options).await,
-    VmCommands::List(opts) => exec_vm_ls(client, args, opts).await,
-    VmCommands::Remove(opts) => exec_vm_rm(client, args, &opts.names).await,
-    VmCommands::Inspect(opts) => exec_vm_inspect(client, args, opts).await,
-    VmCommands::Start(opts) => exec_vm_start(client, args, &opts.names).await,
-    VmCommands::Stop(opts) => exec_vm_stop(client, args, &opts.names).await,
-    VmCommands::Run(options) => exec_vm_run(client, args, options).await,
-    VmCommands::Patch(options) => exec_vm_patch(client, args, options).await,
-    VmCommands::Attach { name } => exec_vm_attach(client, args, name).await,
+    VmCommands::Create(options) => {
+      exec_vm_create(cli_conf, args, options).await
+    }
+    VmCommands::List(opts) => exec_vm_ls(cli_conf, args, opts).await,
+    VmCommands::Remove(opts) => exec_vm_rm(cli_conf, args, &opts.names).await,
+    VmCommands::Inspect(opts) => exec_vm_inspect(cli_conf, args, opts).await,
+    VmCommands::Start(opts) => exec_vm_start(cli_conf, args, &opts.names).await,
+    VmCommands::Stop(opts) => exec_vm_stop(cli_conf, args, &opts.names).await,
+    VmCommands::Run(options) => exec_vm_run(cli_conf, args, options).await,
+    VmCommands::Patch(options) => exec_vm_patch(cli_conf, args, options).await,
+    VmCommands::Attach { name } => exec_vm_attach(cli_conf, args, name).await,
   }
 }

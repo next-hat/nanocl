@@ -1,6 +1,7 @@
 use nanocl_utils::io_error::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
 
+use crate::config::CliConfig;
 use crate::utils;
 use crate::models::{
   NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow,
@@ -68,9 +69,10 @@ async fn exec_namespace_rm(
 }
 
 pub async fn exec_namespace(
-  client: &NanocldClient,
+  cli_conf: &CliConfig,
   args: &NamespaceArgs,
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   match &args.commands {
     NamespaceCommands::List(options) => {
       exec_namespace_ls(client, options).await

@@ -16,8 +16,8 @@ use crate::models::{
 };
 
 async fn exec_cargo_image_ls(
-  opts: &CargoImageListOpts,
   client: &NanocldClient,
+  opts: &CargoImageListOpts,
 ) -> IoResult<()> {
   let items = client.list_cargo_image(Some(opts.clone().into())).await?;
   let rows = items
@@ -160,10 +160,10 @@ async fn exec_cargo_image_import(
 
 pub async fn exec_cargo_image(
   client: &NanocldClient,
-  cmd: &CargoImageOpts,
+  opts: &CargoImageOpts,
 ) -> IoResult<()> {
-  match &cmd.commands {
-    CargoImageCommands::List(opts) => exec_cargo_image_ls(opts, client).await,
+  match &opts.commands {
+    CargoImageCommands::List(opts) => exec_cargo_image_ls(client, opts).await,
     CargoImageCommands::Inspect(opts) => {
       exec_cargo_image_inspect(client, opts).await
     }

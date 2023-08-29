@@ -4,17 +4,18 @@ use futures::StreamExt;
 use indicatif::{ProgressBar, MultiProgress};
 
 use nanocl_utils::io_error::{IoError, FromIo, IoResult};
-use nanocld_client::NanocldClient;
 use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 
+use crate::config::CliConfig;
 use crate::utils;
 use crate::models::UpgradeOpts;
 use super::cargo_image::exec_cargo_image_pull;
 
 pub async fn exec_upgrade(
-  client: &NanocldClient,
-  opts: &UpgradeOpts,
+  cli_conf: &CliConfig,
+  args: &UpgradeOpts,
 ) -> IoResult<()> {
+  let client = &cli_conf.client;
   let config = client.info().await?.config;
 
   let data = liquid::object!({
@@ -27,7 +28,7 @@ pub async fn exec_upgrade(
     "gid": config.gid,
   });
 
-  let installer = utils::installer::get_template(opts.template.clone()).await?;
+  let installer = utils::installer::get_template(args.template.clone()).await?;
 
   let installer = utils::state::compile(&installer, &data)?;
 

@@ -1,9 +1,7 @@
-// use ntex::http;
 use clap::Parser;
 use dotenv::dotenv;
 
 use nanocl_utils::io_error::IoResult;
-// use nanocl_utils::http_client_error::HttpClientError;
 
 use nanocld_client::NanocldClient;
 
@@ -12,21 +10,16 @@ mod config;
 mod models;
 mod version;
 mod commands;
+
+use config::{UserConfig, CliConfig};
 use models::{Cli, Commands, Context};
 
-// async fn detect_version(client: &mut NanocldClient) -> IoResult<()> {
-//   client.set_version("0.1.0");
-//   let version = client.get_version().await?;
-//   client.set_version(&version.version);
-//   Ok(())
-// }
-
-async fn execute_args(args: &Cli) -> IoResult<()> {
+fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
   Context::ensure()?;
-  let cli_conf = config::read();
+  let user_conf = UserConfig::new();
   let mut context = Context::new();
-  if cli_conf.current_context != "default" {
-    match Context::read_by_name(&cli_conf.current_context) {
+  if user_conf.current_context != "default" {
+    match Context::read_by_name(&user_conf.current_context) {
       Err(_) => {
         Context::r#use("default")?;
       }
@@ -35,38 +28,50 @@ async fn execute_args(args: &Cli) -> IoResult<()> {
       }
     }
   }
-
   #[allow(unused)]
-  let mut host = args
+  let mut host = cli_args
     .host
     .clone()
     .unwrap_or(context.endpoints.get("Nanocl").unwrap().host.clone());
   #[cfg(any(feature = "dev", feature = "test"))]
   {
     if context.name == "default" {
-      host = args.host.clone().unwrap_or("http://localhost:8585".into());
+      host = cli_args
+        .host
+        .clone()
+        .unwrap_or("http://localhost:8585".into());
     }
   }
-
   let url = Box::leak(host.clone().into_boxed_str());
   let client = NanocldClient::connect_to(url, None);
+  Ok(CliConfig {
+    host,
+    client,
+    context,
+    user_config: user_conf,
+  })
+}
 
-  match &args.command {
-    Commands::Namespace(args) => commands::exec_namespace(&client, args).await,
-    Commands::Resource(args) => commands::exec_resource(&client, args).await,
-    Commands::Cargo(args) => commands::exec_cargo(&client, args).await,
-    Commands::Events => commands::exec_events(&client).await,
-    Commands::State(args) => commands::exec_state(&host, args).await,
-    Commands::Version => commands::exec_version(&client).await,
-    Commands::Info => commands::exec_info(&client).await,
-    Commands::Vm(args) => commands::exec_vm(&client, args).await,
-    Commands::Ps(opts) => commands::exec_process(&client, opts).await,
-    Commands::Install(opts) => commands::exec_install(opts).await,
-    Commands::Uninstall(opts) => commands::exec_uninstall(opts).await,
-    Commands::Upgrade(opts) => commands::exec_upgrade(&client, opts).await,
-    Commands::System(opts) => commands::exec_system(&client, opts).await,
-    Commands::Node(args) => commands::exec_node(&client, args).await,
-    Commands::Context(args) => commands::exec_context(&context, args).await,
+async fn execute_args(cli_args: &Cli) -> IoResult<()> {
+  let cli_conf = create_cli_config(cli_args)?;
+  match &cli_args.command {
+    Commands::Namespace(args) => {
+      commands::exec_namespace(&cli_conf, args).await
+    }
+    Commands::Resource(args) => commands::exec_resource(&cli_conf, args).await,
+    Commands::Cargo(args) => commands::exec_cargo(&cli_conf, args).await,
+    Commands::Events => commands::exec_events(&cli_conf).await,
+    Commands::State(args) => commands::exec_state(&cli_conf, args).await,
+    Commands::Version => commands::exec_version(&cli_conf).await,
+    Commands::Vm(args) => commands::exec_vm(&cli_conf, args).await,
+    Commands::Ps(args) => commands::exec_process(&cli_conf, args).await,
+    Commands::Install(args) => commands::exec_install(args).await,
+    Commands::Uninstall(args) => commands::exec_uninstall(args).await,
+    Commands::Upgrade(args) => commands::exec_upgrade(&cli_conf, args).await,
+    Commands::System(args) => commands::exec_system(&cli_conf, args).await,
+    Commands::Node(args) => commands::exec_node(&cli_conf, args).await,
+    Commands::Context(args) => commands::exec_context(&cli_conf, args).await,
+    Commands::Info => commands::exec_info(&cli_conf).await,
   }
 }
 
