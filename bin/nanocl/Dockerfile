@@ -1,5 +1,5 @@
 # stage 1 - generate recipe file for dependencies
-FROM --platform=$BUILDPLATFORM rust:1.70.0-alpine3.17 as planner
+FROM --platform=$BUILDPLATFORM rust:1.72.0-alpine3.18 as planner
 
 WORKDIR /app
 COPY ./Cargo.toml ./Cargo.toml
@@ -14,7 +14,7 @@ COPY ./bin/ncvpnkit/Cargo.toml ./bin/ncvpnkit/Cargo.toml
 COPY ./bin/ncdns/Cargo.toml ./bin/ncdns/Cargo.toml
 
 # stage 2 - Build our project
-FROM --platform=$BUILDPLATFORM rust:1.70.0-alpine3.17 as builder
+FROM --platform=$BUILDPLATFORM rust:1.72.0-alpine3.18 as builder
 
 ARG channel=stable
 ## Build our nanocl daemon binary
