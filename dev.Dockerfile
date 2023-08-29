@@ -1,5 +1,5 @@
 # Create Builder image
-FROM --platform=$BUILDPLATFORM rust:1.70.0-alpine3.17
+FROM --platform=$BUILDPLATFORM rust:1.72.0-alpine3.18
 
 # Setup timezone
 ARG tz=Europe/Paris
@@ -33,9 +33,6 @@ RUN cargo install cargo-watch --locked
 # Create project directory
 RUN mkdir -p /project
 WORKDIR /project
-
-COPY ./dev.entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 ENV TZ=${tz}
 ENV RUSTFLAGS="-C target-feature=-crt-static"

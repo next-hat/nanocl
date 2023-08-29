@@ -273,10 +273,11 @@ async fn gen_locations(
       LocationTarget::Upstream(upstream_target) => {
         let Ok(upstream_key) =
           gen_upstream(&NginxConfKind::Site, upstream_target, client, nginx)
-            .await else {
-              log::warn!("Unable to generate cargo upstream for location rule {:?} got error", rule);
-              continue;
-            };
+            .await
+        else {
+          log::warn!("Unable to generate cargo upstream for location rule {:?} got error", rule);
+          continue;
+        };
         let disable_logging =
           if upstream_target.disable_logging.unwrap_or_default() {
             "access_log off;"
