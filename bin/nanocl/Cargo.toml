@@ -22,29 +22,29 @@ test = []
 
 [build-dependencies]
 liquid = "0.26.1"
-tabled = "0.13.0"
+tabled = "0.14.0"
 clap_complete = "4.1.4"
 clap_mangen = { version = "0.2" }
-clap = { version = "4.3.19", features = ["derive"] }
+clap = { version = "4.4.1", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 chrono = { version = "0.4.24", default-features = false, features = [
   "std",
   "clock",
 ] }
-bollard-next = { version = "0.15.0" }
+bollard-next = { version = "0.15.1" }
 nanocld_client = { version = "0.9.1" }
 
 [dependencies]
-bollard-next = { version = "0.15.0" }
+bollard-next = { version = "0.15.1" }
 futures = "0.3"
 serde_yaml = "0.9"
-tabled = "0.13.0"
+tabled = "0.14.0"
 indicatif = "0.17.6"
-serde_json = "1.0.104"
-ntex = { version = "0.7.2", features = ["tokio"] }
+serde_json = "1.0.105"
+ntex = { version = "0.7.3", features = ["tokio"] }
 serde = { version = "1.0", features = ["derive"] }
-clap = { version = "4.3.19", features = ["derive", "cargo"] }
-tokio = { version = "1.29.1", features = ["fs"] }
+clap = { version = "4.4.1", features = ["derive", "cargo"] }
+tokio = { version = "1.32.0", features = ["fs"] }
 hyper = "0.14.27"
 users = "0.11.0"
 tokio-util = "0.7.7"
