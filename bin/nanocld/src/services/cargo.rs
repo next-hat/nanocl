@@ -569,7 +569,7 @@ mod tests {
     let srv = gen_server(ntex_config).await;
     ensure_test_image().await?;
 
-    let test_cargoes = vec![
+    let test_cargoes = [
       "1daemon-test-cargo",
       "2another-test-cargo",
       "2daemon-test-cargo",

@@ -3791,13 +3791,15 @@ components:
           nullable: true
         PrivatePort:
           type: integer
-          format: int64
+          format: int32
           description: Port on the container
+          minimum: 0
         PublicPort:
           type: integer
-          format: int64
+          format: int32
           description: Port exposed on the host
           nullable: true
+          minimum: 0
         Type:
           allOf:
           - $ref: '#/components/schemas/PortTypeEnum'
