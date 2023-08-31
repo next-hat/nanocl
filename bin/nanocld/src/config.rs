@@ -194,7 +194,7 @@ mod tests {
       }
     );
     // It should return an error if the file is not a valid yaml
-    let content = r#"state_dir; /var/lib/nanocl\n"#;
+    let content = "state_dir; /var/lib/nanocl\n";
     std::fs::write(&config_path, content).unwrap();
     let config = read_config_file(&config_dir);
     assert!(config.is_err());

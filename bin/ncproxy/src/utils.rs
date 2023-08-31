@@ -26,6 +26,15 @@ pub(crate) fn serialize_proxy_rule(
   Ok(proxy_rule)
 }
 
+/// Get public address of host
+async fn get_host_addr(client: &NanocldClient) -> IoResult<String> {
+  let info = client
+    .info()
+    .await
+    .map_err(|err| err.map_err_context(|| "Unable to get host info"))?;
+  Ok(info.host_gateway)
+}
+
 async fn get_namespace_addr(
   name: &str,
   client: &NanocldClient,
@@ -54,7 +63,10 @@ async fn get_listen(
   client: &NanocldClient,
 ) -> IoResult<String> {
   match network {
-    "Public" => Ok(format!("{port}")),
+    "Public" => {
+      let ip = get_host_addr(client).await?;
+      Ok(format!("{ip}:{port}"))
+    }
     "Internal" => Ok(format!("127.0.0.1:{port}")),
     network if network.ends_with(".nsp") => {
       let namespace = network.trim_end_matches(".nsp");
