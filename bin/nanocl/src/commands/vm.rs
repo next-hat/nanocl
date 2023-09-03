@@ -17,7 +17,7 @@ use nanocld_client::stubs::cargo::{OutputLog, OutputKind};
 use crate::utils;
 use crate::config::CliConfig;
 use crate::models::{
-  VmArgs, VmCommands, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts, VmListOpts,
+  VmArgs, VmCommand, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts, VmListOpts,
   VmInspectOpts,
 };
 
@@ -413,18 +413,16 @@ pub async fn exec_vm_attach(
 ///
 pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArgs) -> IoResult<()> {
   let client = &cli_conf.client;
-  match &args.commands {
-    VmCommands::Image(args) => exec_vm_image(client, args).await,
-    VmCommands::Create(options) => {
-      exec_vm_create(cli_conf, args, options).await
-    }
-    VmCommands::List(opts) => exec_vm_ls(cli_conf, args, opts).await,
-    VmCommands::Remove(opts) => exec_vm_rm(cli_conf, args, &opts.names).await,
-    VmCommands::Inspect(opts) => exec_vm_inspect(cli_conf, args, opts).await,
-    VmCommands::Start(opts) => exec_vm_start(cli_conf, args, &opts.names).await,
-    VmCommands::Stop(opts) => exec_vm_stop(cli_conf, args, &opts.names).await,
-    VmCommands::Run(options) => exec_vm_run(cli_conf, args, options).await,
-    VmCommands::Patch(options) => exec_vm_patch(cli_conf, args, options).await,
-    VmCommands::Attach { name } => exec_vm_attach(cli_conf, args, name).await,
+  match &args.command {
+    VmCommand::Image(args) => exec_vm_image(client, args).await,
+    VmCommand::Create(options) => exec_vm_create(cli_conf, args, options).await,
+    VmCommand::List(opts) => exec_vm_ls(cli_conf, args, opts).await,
+    VmCommand::Remove(opts) => exec_vm_rm(cli_conf, args, &opts.names).await,
+    VmCommand::Inspect(opts) => exec_vm_inspect(cli_conf, args, opts).await,
+    VmCommand::Start(opts) => exec_vm_start(cli_conf, args, &opts.names).await,
+    VmCommand::Stop(opts) => exec_vm_stop(cli_conf, args, &opts.names).await,
+    VmCommand::Run(options) => exec_vm_run(cli_conf, args, options).await,
+    VmCommand::Patch(options) => exec_vm_patch(cli_conf, args, options).await,
+    VmCommand::Attach { name } => exec_vm_attach(cli_conf, args, name).await,
   }
 }

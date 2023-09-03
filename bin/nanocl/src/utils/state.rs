@@ -10,8 +10,22 @@ use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 
 use crate::models::{DisplayFormat, StateRef};
 
-/// Extract metadata eg: ApiVersion, Type from a Statefile
+/// ## Get state ref
+///
+/// Extract metadata eg: `ApiVersion`, `Kind` from a Statefile
 /// and return a StateRef with the raw data and the format
+///
+/// ## Arguments
+///
+/// - [ext](str) The file extension eg: yaml, json, toml
+/// - [raw](str) The raw data of the Statefile
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](StateRef) The StateRef
+///   - [Err](IoError) An error occured
+///
 pub fn get_state_ref<T>(ext: &str, raw: &str) -> IoResult<StateRef<T>>
 where
   T: serde::Serialize + serde::de::DeserializeOwned,
@@ -87,7 +101,21 @@ where
   }
 }
 
+/// ## serialize_ext
+///
 /// Serialize a Statefile for given format eg: yaml, json, toml and given data
+///
+/// ## Arguments
+///
+/// - [format](DisplayFormat) The format to serialize to
+/// - [data](str) The data to serialize
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](T) The serialized data
+///   - [Err](IoError) An error occured
+///
 pub fn serialize_ext<T>(format: &DisplayFormat, data: &str) -> IoResult<T>
 where
   T: serde::Serialize + serde::de::DeserializeOwned,
@@ -112,7 +140,21 @@ where
   }
 }
 
+/// ## Compile
+///
 /// Compile a Statefile with given data
+///
+/// ## Arguments
+///
+/// - [raw](str) The raw data of the Statefile
+/// - [obj](ObjectView) The data to compile with
+///
+/// ## Returns
+///
+/// - [Result](Result) The result of the operation
+///   - [Ok](String) The compiled data
+///   - [Err](IoError) An error occured
+///
 pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
   // replace "${{ }}" with "{{ }}" syntax for liquid
   let reg = Regex::new(r"\$\{\{(.+?)\}\}")
@@ -133,6 +175,17 @@ pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
   Ok(output)
 }
 
+/// ## Update progress
+///
+/// Update the progress bar for a given state stream
+///
+/// ## Arguments
+///
+/// - [multiprogress](MultiProgress) The multiprogress bar
+/// - [layers](HashMap<String, ProgressBar>) The layers of progress bars
+/// - [id](str) The id of the progress bar
+/// - [state_stream](StateStream) The state stream to update
+///
 pub fn update_progress(
   multiprogress: &MultiProgress,
   layers: &mut HashMap<String, ProgressBar>,

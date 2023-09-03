@@ -1,45 +1,70 @@
 use clap::Parser;
-use nanocld_client::stubs::http_metric::HttpMetricListQuery;
 use tabled::Tabled;
 use chrono::TimeZone;
 
-use nanocld_client::stubs::node::NodeContainerSummary;
 use nanocld_client::stubs::system::ProccessQuery;
+use nanocld_client::stubs::node::NodeContainerSummary;
+use nanocld_client::stubs::http_metric::HttpMetricListQuery;
 
+/// ## SystemOpts
+///
+/// System command options
+///
 #[derive(Clone, Debug, Parser)]
 pub struct SystemOpts {
+  /// Command to run
   #[clap(subcommand)]
-  pub commands: SystemCommands,
+  pub command: SystemCommand,
 }
 
+/// ## SystemCommand
+///
+/// Available system commands
+///
 #[derive(Clone, Debug, Parser)]
-pub enum SystemCommands {
+pub enum SystemCommand {
   /// System HTTP metrics information
   Http(SystemHttpOpts),
 }
 
+/// ## SystemHttpOpts
+///
+/// System HTTP metrics options
+///
 #[derive(Clone, Debug, Parser)]
 pub struct SystemHttpOpts {
+  /// Command to run
   #[clap(subcommand)]
-  pub commands: SystemHttpCommands,
+  pub command: SystemHttpCommand,
 }
 
+/// ## SystemHttpCommand
+///
+/// Available system http commands
+///
 #[derive(Clone, Debug, Parser)]
-pub enum SystemHttpCommands {
+pub enum SystemHttpCommand {
   /// Show HTTP metrics information
   Logs(SystemHttpLogsOpts),
 }
 
+/// ## SystemHttpLogsOpts
+///
+/// System HTTP logs options
+///
 #[derive(Clone, Debug, Parser)]
 pub struct SystemHttpLogsOpts {
   // #[clap(long, short)]
   // pub follow: bool,
+  /// Limit the number of results
   #[clap(long, short)]
   pub limit: Option<i64>,
+  /// Offset the number of results
   #[clap(long, short)]
   pub offset: Option<i64>,
 }
 
+/// Convert SystemHttpLogsOpts to HttpMetricListQuery
 impl From<SystemHttpLogsOpts> for HttpMetricListQuery {
   fn from(opts: SystemHttpLogsOpts) -> Self {
     Self {
@@ -49,6 +74,10 @@ impl From<SystemHttpLogsOpts> for HttpMetricListQuery {
   }
 }
 
+/// ## ProcessOpts
+///
+/// Process command options
+///
 #[derive(Clone, Debug, Parser)]
 pub struct ProcessOpts {
   /// Return containers for all nodes by default only the current node
@@ -65,6 +94,7 @@ pub struct ProcessOpts {
   pub namespace: Option<String>,
 }
 
+/// Convert ProcessOpts to ProccessQuery
 impl From<ProcessOpts> for ProccessQuery {
   fn from(opts: ProcessOpts) -> Self {
     Self {
@@ -76,18 +106,31 @@ impl From<ProcessOpts> for ProccessQuery {
   }
 }
 
+/// ## ProcessRow
+///
+/// A row for the process table
+///
 #[derive(Tabled)]
 pub struct ProcessRow {
+  /// Node name
   node: String,
+  /// Name of the instance of the cargo or the vm
   name: String,
+  /// Namespace of the cargo or the vm
   namespace: String,
+  /// Kind of instance cargo or vm
   kind: String,
+  /// Image used by the cargo or the vm
   image: String,
+  /// Status of the cargo or the vm
   status: String,
+  /// IP address of the cargo or the vm
   ip_address: String,
+  /// When the cargo or the vm was created
   created: String,
 }
 
+/// Convert NodeContainerSummary to ProcessRow
 impl From<NodeContainerSummary> for ProcessRow {
   fn from(summary: NodeContainerSummary) -> Self {
     let container = summary.container;
@@ -105,17 +148,12 @@ impl From<NodeContainerSummary> for ProcessRow {
       },
       None => "Undefined".to_owned(),
     };
-
     let network = container.network_settings.unwrap_or_default();
-
     let networks = network.networks.unwrap_or_default();
-
     let mut ipaddr = String::default();
-
     if let Some(network) = networks.get(namespace) {
       ipaddr = network.ip_address.clone().unwrap_or_default();
     }
-
     let binding = chrono::Local::now();
     let tz = binding.offset();
     // Convert the created_at and updated_at to the current timezone
@@ -123,7 +161,6 @@ impl From<NodeContainerSummary> for ProcessRow {
       .timestamp_opt(container.created.unwrap_or_default(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
-
     Self {
       node: summary.node,
       kind,

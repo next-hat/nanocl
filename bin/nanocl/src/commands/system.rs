@@ -3,8 +3,8 @@ use nanocld_client::NanocldClient;
 
 use crate::config::CliConfig;
 use crate::models::{
-  ProcessOpts, ProcessRow, SystemOpts, SystemHttpOpts, SystemHttpCommands,
-  SystemCommands,
+  ProcessOpts, ProcessRow, SystemOpts, SystemHttpOpts, SystemHttpCommand,
+  SystemCommand,
 };
 use crate::utils;
 use crate::utils::print::print_table;
@@ -28,8 +28,8 @@ pub async fn exec_http(
   client: &NanocldClient,
   opts: &SystemHttpOpts,
 ) -> IoResult<()> {
-  match &opts.commands {
-    SystemHttpCommands::Logs(opts) => {
+  match &opts.command {
+    SystemHttpCommand::Logs(opts) => {
       let logs = client.list_http_metric(Some(opts.clone().into())).await?;
       utils::print::print_yml(logs)?;
     }
@@ -43,7 +43,7 @@ pub async fn exec_system(
   args: &SystemOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  match &args.commands {
-    SystemCommands::Http(opts) => exec_http(client, opts).await,
+  match &args.command {
+    SystemCommand::Http(opts) => exec_http(client, opts).await,
   }
 }

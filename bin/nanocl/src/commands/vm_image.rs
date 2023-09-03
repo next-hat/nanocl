@@ -11,7 +11,7 @@ use nanocld_client::stubs::vm_image::VmImageCloneStream;
 use crate::utils::math::calculate_percentage;
 
 use crate::models::{
-  VmImageArgs, VmImageCreateOpts, VmImageCommands, VmImageRow,
+  VmImageArgs, VmImageCreateOpts, VmImageCommand, VmImageRow,
   VmImageResizeOpts, VmImageListOpts,
 };
 use crate::utils::print::print_table;
@@ -133,15 +133,15 @@ pub async fn exec_vm_image(
   client: &NanocldClient,
   args: &VmImageArgs,
 ) -> IoResult<()> {
-  match &args.commands {
-    VmImageCommands::Create(options) => {
+  match &args.command {
+    VmImageCommand::Create(options) => {
       exec_vm_image_create(client, options).await
     }
-    VmImageCommands::List(opts) => exec_vm_image_ls(client, opts).await,
-    VmImageCommands::Remove { names } => exec_vm_image_rm(client, names).await,
-    VmImageCommands::Clone { name, clone_name } => {
+    VmImageCommand::List(opts) => exec_vm_image_ls(client, opts).await,
+    VmImageCommand::Remove { names } => exec_vm_image_rm(client, names).await,
+    VmImageCommand::Clone { name, clone_name } => {
       exec_vm_image_clone(client, name, clone_name).await
     }
-    VmImageCommands::Resize(opts) => exec_vm_resize(client, opts).await,
+    VmImageCommand::Resize(opts) => exec_vm_resize(client, opts).await,
   }
 }

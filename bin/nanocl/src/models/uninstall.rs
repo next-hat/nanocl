@@ -1,5 +1,9 @@
 use clap::Parser;
 
+/// ## UninstallOpts
+///
+/// Uninstall command options
+///
 #[derive(Debug, Clone, Parser)]
 pub struct UninstallOpts {
   /// The docker host where nanocl is installed default is unix:///var/run/docker.sock

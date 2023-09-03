@@ -4,20 +4,35 @@ use serde::{Serialize, Deserialize};
 
 use super::DisplayFormat;
 
+/// ## StateBuildArg
+///
+/// Statefile argument definition to build the Statefile
+///
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct StateBuildArg {
+  /// Name of the build arg
   pub name: String,
+  /// Kind of the build arg
   pub kind: String,
+  /// Default value of the build arg
   pub default: Option<String>,
 }
 
+/// ## StateBuildArgs
+///
+/// Statefile arguments definition to build the Statefile
+///
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
 pub struct StateBuildArgs {
   pub args: Option<Vec<StateBuildArg>>,
 }
 
+/// ## StateApplyOpts
+///
+/// `nanocl state apply` options
+///
 #[derive(Debug, Parser)]
 pub struct StateApplyOpts {
   /// Path or Url to the Statefile
@@ -37,6 +52,10 @@ pub struct StateApplyOpts {
   pub args: Vec<String>,
 }
 
+/// ## StateRemoveOpts
+///
+/// `nanocl state rm` options
+///
 #[derive(Debug, Parser)]
 pub struct StateRemoveOpts {
   /// Path or Url to the Statefile

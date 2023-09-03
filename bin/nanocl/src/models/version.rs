@@ -1,6 +1,8 @@
 use clap::Parser;
 
-/// Show nanocl version information
+/// ## VersionArgs
+///
+/// Version command args
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl-version")]
 pub struct VersionArgs {}
