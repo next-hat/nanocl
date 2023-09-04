@@ -55,7 +55,7 @@ chrono = { version = "0.4.24", default-features = false, features = [
 dialoguer = "0.10.3"
 termios = "0.3.3"
 liquid = "0.26.1"
-regex = "1.9.3"
+regex = "1.9.5"
 nanocld_client = { version = "0.9.1", features = ["tokio"] }
 nanocl_utils = { version = "0.2.1", features = [
   "unix",
