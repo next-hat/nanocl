@@ -4303,6 +4303,101 @@ components:
             type: string
           description: List of command-line arguments to pass to the runtime when invoked.
           nullable: true
+    StateCargo:
+      type: object
+      description: |
+        ## StateCargo
+
+        Statefile that represent the `Cargo` kind
+      required:
+      - Cargoes
+      properties:
+        Namespace:
+          type: string
+          description: Namespace where the cargoes are deployed
+          nullable: true
+        Cargoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/CargoConfigPartial'
+          description: List of cargoes to create and run
+    StateDeployment:
+      type: object
+      description: |
+        ## StateDeployment
+
+        Statefile that represent the `Deployment` kind
+      properties:
+        Namespace:
+          type: string
+          description: Namespace where the cargoes and virtual machines are deployed
+          nullable: true
+        Resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourcePartial'
+          description: List of resources to create
+          nullable: true
+        Cargoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/CargoConfigPartial'
+          description: List of cargoes to create and run
+          nullable: true
+        VirtualMachines:
+          type: array
+          items:
+            $ref: '#/components/schemas/VmConfigPartial'
+          description: List of virtual machines to create and run
+          nullable: true
+    StateMeta:
+      type: object
+      description: |
+        ## StateMeta
+
+        Statefile metadata information that are always present
+      required:
+      - ApiVersion
+      - Kind
+      properties:
+        ApiVersion:
+          type: string
+          description: Api version to use or remote url
+        Kind:
+          type: string
+          description: Kind of Statefile (Deployment, Cargo, VirtualMachine, Resource)
+    StateResource:
+      type: object
+      description: |
+        ## StateResource
+
+        Statefile that represent the `Resource` kind
+      required:
+      - Resources
+      properties:
+        Resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourcePartial'
+          description: List of resources to create
+    StateVirtualMachine:
+      type: object
+      description: |
+        ## StateVirtualMachine
+
+        Statefile that represent the `VirtualMachine` kind
+      required:
+      - VirtualMachines
+      properties:
+        Namespace:
+          type: string
+          description: Namespace where the virtual machines are deployed
+          nullable: true
+        VirtualMachines:
+          type: array
+          items:
+            $ref: '#/components/schemas/VmConfigPartial'
+          description: List of virtual machines to create and run
     StreamTarget:
       oneOf:
       - $ref: '#/components/schemas/UpstreamTarget'
