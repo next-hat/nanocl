@@ -3,12 +3,28 @@ use nanocld_client::NanocldClient;
 
 use crate::config::CliConfig;
 use crate::models::{
-  ProcessOpts, ProcessRow, SystemOpts, SystemHttpOpts, SystemHttpCommands,
-  SystemCommands,
+  ProcessOpts, ProcessRow, SystemArg, SystemHttpArg, SystemHttpCommand,
+  SystemCommand,
 };
 use crate::utils;
 use crate::utils::print::print_table;
 
+/// ## Exec process
+///
+/// Function that execute when running `nanocl ps`
+/// Will print the list of existing instances of cargoes and virtual machines
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [args](ProcessOpts) The process options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 pub async fn exec_process(
   cli_conf: &CliConfig,
   args: &ProcessOpts,
@@ -24,26 +40,56 @@ pub async fn exec_process(
   Ok(())
 }
 
+/// ## Exec http
+///
+/// Function that execute when running `nanocl system http`
+/// Will print the list of http request
+///
+/// ## Arguments
+///
+/// * [client](NanocldClient) The nanocl daemon client
+/// * [opts](SystemHttpArg) The system http options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 pub async fn exec_http(
   client: &NanocldClient,
-  opts: &SystemHttpOpts,
+  opts: &SystemHttpArg,
 ) -> IoResult<()> {
-  match &opts.commands {
-    SystemHttpCommands::Logs(opts) => {
+  match &opts.command {
+    SystemHttpCommand::Logs(opts) => {
       let logs = client.list_http_metric(Some(opts.clone().into())).await?;
       utils::print::print_yml(logs)?;
     }
   }
-
   Ok(())
 }
 
+/// ## Exec system
+///
+/// Function that execute when running `nanocl system`
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [args](SystemArg) The system options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 pub async fn exec_system(
   cli_conf: &CliConfig,
-  args: &SystemOpts,
+  args: &SystemArg,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  match &args.commands {
-    SystemCommands::Http(opts) => exec_http(client, opts).await,
+  match &args.command {
+    SystemCommand::Http(opts) => exec_http(client, opts).await,
   }
 }

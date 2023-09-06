@@ -4,15 +4,22 @@ use tabled::Tabled;
 use clap::{Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
-/// Manage contexts
+/// ## ContextArg
+///
+/// `nanocl context` available arguments
+///
 #[derive(Debug, Parser)]
-pub struct ContextArgs {
+pub struct ContextArg {
   #[clap(subcommand)]
-  pub commands: ContextCommands,
+  pub command: ContextCommand,
 }
 
+/// ## ContextCommand
+///
+/// `nanocl context` available commands
+///
 #[derive(Debug, Subcommand)]
-pub enum ContextCommands {
+pub enum ContextCommand {
   /// List contexts
   #[clap(alias = "ls")]
   List,
@@ -28,18 +35,30 @@ pub enum ContextCommands {
   },
 }
 
+/// ## ContextEndpoint
+///
+/// A context endpoint definition
+///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ContextEndpoint {
   pub host: String,
 }
 
+/// ## ContextMetaData
+///
+/// A context metadata definition
+///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ContextMetaData {
   pub description: String,
 }
 
+/// ## Context
+///
+/// A context definition is a user defined set of endpoints to manage remote nanocl clusters
+///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Context {
@@ -48,6 +67,7 @@ pub struct Context {
   pub endpoints: HashMap<String, ContextEndpoint>,
 }
 
+/// Default value for a Context
 impl std::default::Default for Context {
   fn default() -> Self {
     Self {
@@ -70,14 +90,23 @@ impl std::default::Default for Context {
   }
 }
 
+/// ## ContextRow
+///
+/// A row of the context table
+///
 #[derive(Clone, Debug, Tabled)]
 pub struct ContextRow {
+  /// Name of the context
   pub name: String,
+  /// Description of the context
   pub description: String,
+  /// Endpoint of the context
   pub endpoint: String,
+  /// Current context indicator
   pub current: String,
 }
 
+/// Convert Context to ContextRow
 impl From<Context> for ContextRow {
   fn from(context: Context) -> Self {
     let endpoint = context
@@ -93,12 +122,20 @@ impl From<Context> for ContextRow {
   }
 }
 
+/// ## DockerContextMetaEndpoint
+///
+/// A docker context endpoint definition used to parse the docker context metadata endpoint
+///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DockerContextMetaEndpoint {
   pub host: String,
 }
 
+/// ## DockerContextMeta
+///
+/// A docker context metadata definition used to parse the docker context metadata
+///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DockerContextMeta {

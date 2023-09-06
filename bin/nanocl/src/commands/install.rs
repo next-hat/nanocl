@@ -11,10 +11,24 @@ use nanocld_client::stubs::state::StateDeployment;
 
 use crate::utils;
 use crate::models::{
-  InstallOpts, NanocldArgs, Context, ContextMetaData, ContextEndpoint,
+  InstallOpts, NanocldArg, Context, ContextMetaData, ContextEndpoint,
 };
 
-/// Execute install command
+/// ## Exec install
+///
+/// This function is called when running `nanocl install`
+/// It will install nanocl system containers
+///
+/// ## Arguments
+///
+/// * [args](InstallOpts) The command arguments
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   println!("Installing Nanocl components on your system");
   let home_dir = std::env::var("HOME").map_err(|err| {
@@ -35,9 +49,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       }
     }
   };
-
   let conf_dir = args.conf_dir.as_deref().unwrap_or("/etc/nanocl").to_owned();
-
   let gateway = match &args.gateway {
     None => {
       if is_docker_desktop {
@@ -50,19 +62,15 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     }
     Some(gateway) => gateway.clone(),
   };
-
   let advertise_addr = match &args.advertise_addr {
     None => gateway.clone(),
     Some(advertise_addr) => advertise_addr.clone(),
   };
-
   let group = args.group.as_deref().unwrap_or("nanocl");
-
   let hosts = args
     .deamon_hosts
     .clone()
     .unwrap_or(vec!["unix:///run/nanocl/nanocl.sock".into()]);
-
   let gid = get_group_by_name(group).ok_or(IoError::not_fount(
     "Group",
     &format!(
@@ -73,7 +81,6 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   And try again"
     ),
   ))?;
-
   let hostname = if let Some(hostname) = &args.hostname {
     hostname.to_owned()
   } else {
@@ -81,8 +88,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     println!("Using default hostname: {hostname}");
     hostname
   };
-
-  let nanocld_args = NanocldArgs {
+  let nanocld_args = NanocldArg {
     docker_host,
     state_dir,
     conf_dir,
@@ -94,23 +100,17 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     is_docker_desktop,
     home_dir: home_dir.clone(),
   };
-
   let installer = utils::installer::get_template(args.template.clone()).await?;
-
   let data: liquid::Object = nanocld_args.clone().into();
   let installer = utils::state::compile(&installer, &data)?;
-
   let deployment = serde_yaml::from_str::<StateDeployment>(&installer)
     .map_err(|err| {
       err.map_err_context(|| "Unable to extract deployment from installer")
     })?;
-
   let cargoes = deployment
     .cargoes
     .ok_or(IoError::invalid_data("Cargoes", "Not founds"))?;
-
   let docker = utils::docker::connect(&nanocld_args.docker_host)?;
-
   if docker
     .inspect_network("system", None::<InspectNetworkOptions<String>>)
     .await
@@ -129,7 +129,6 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       .await
       .map_err(|err| err.map_err_context(|| "Nanocl system network"))?;
   }
-
   for cargo in cargoes {
     let image = cargo.container.image.clone().ok_or(IoError::invalid_data(
       format!("Cargo {} image", cargo.name),
@@ -161,7 +160,6 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       })?;
     ntex::time::sleep(Duration::from_secs(2)).await;
   }
-
   if is_docker_desktop {
     let context = Context {
       name: "desktop-linux".into(),

@@ -2,19 +2,23 @@ use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
-use nanocld_client::stubs::{
-  vm_config::{VmConfigPartial, VmDiskConfig, VmHostConfig, VmConfigUpdate},
-  vm::VmSummary,
+use nanocld_client::stubs::vm::VmSummary;
+use nanocld_client::stubs::vm_config::{
+  VmConfigPartial, VmDiskConfig, VmHostConfig, VmConfigUpdate,
 };
 
-use super::{VmImageArgs, DisplayFormat};
+use super::{VmImageArg, DisplayFormat};
 
+/// ## VmCommands
+///
+/// `nanocl vm` available commands
+///
 #[derive(Debug, Subcommand)]
-pub enum VmCommands {
+pub enum VmCommand {
   /// Run a vm
   Run(VmRunOpts),
   /// Manage vm images
-  Image(VmImageArgs),
+  Image(VmImageArg),
   /// Create a vm
   Create(VmCreateOpts),
   /// List vms
@@ -38,12 +42,20 @@ pub enum VmCommands {
   Patch(VmPatchOpts),
 }
 
+/// ## VmNamesOpts
+///
+/// Generic names options
+///
 #[derive(Debug, Parser)]
 pub struct VmNamesOpts {
   /// Names of the vm
   pub names: Vec<String>,
 }
 
+/// ## VmInspectOpts
+///
+/// `nanocl vm inspect` available options
+///
 #[derive(Debug, Parser)]
 pub struct VmInspectOpts {
   /// Display format
@@ -53,6 +65,10 @@ pub struct VmInspectOpts {
   pub name: String,
 }
 
+/// ## VmListOpts
+///
+/// `nanocl vm list` available options
+///
 #[derive(Debug, Parser)]
 pub struct VmListOpts {
   /// Show only vms name
@@ -60,6 +76,10 @@ pub struct VmListOpts {
   pub quiet: bool,
 }
 
+/// ## VmPatchOpts
+///
+/// `nanocl vm patch` available options
+///
 #[derive(Clone, Debug, Parser)]
 pub struct VmPatchOpts {
   /// Name of the vm
@@ -90,6 +110,7 @@ pub struct VmPatchOpts {
   pub net_iface: Option<String>,
 }
 
+/// Convert VmPatchOpts to VmConfigUpdate
 impl From<VmPatchOpts> for VmConfigUpdate {
   fn from(val: VmPatchOpts) -> Self {
     Self {
@@ -110,6 +131,10 @@ impl From<VmPatchOpts> for VmConfigUpdate {
   }
 }
 
+/// ## VmRunOpts
+///
+/// `nanocl vm run` available options
+///
 #[derive(Clone, Debug, Parser)]
 pub struct VmRunOpts {
   /// hostname of the vm
@@ -148,6 +173,7 @@ pub struct VmRunOpts {
   pub image: String,
 }
 
+/// Convert VmRunOpts to VmConfigPartial
 impl From<VmRunOpts> for VmConfigPartial {
   fn from(val: VmRunOpts) -> Self {
     Self {
@@ -172,6 +198,10 @@ impl From<VmRunOpts> for VmConfigPartial {
   }
 }
 
+/// ## VmCreateOpts
+///
+/// `nanocl vm create` available options
+///
 #[derive(Clone, Debug, Parser)]
 pub struct VmCreateOpts {
   /// hostname of the vm
@@ -204,6 +234,7 @@ pub struct VmCreateOpts {
   pub image: String,
 }
 
+/// Convert VmCreateOpts to VmConfigPartial
 impl From<VmCreateOpts> for VmConfigPartial {
   fn from(val: VmCreateOpts) -> Self {
     Self {
@@ -228,17 +259,29 @@ impl From<VmCreateOpts> for VmConfigPartial {
   }
 }
 
+/// ## VmRow
+///
+/// A row for the vm table
+///
 #[derive(Tabled)]
 pub struct VmRow {
+  /// Name of the vm
   pub(crate) name: String,
+  /// Namespace of the vm
   pub(crate) namespace: String,
+  /// Disk of the vm
   pub(crate) disk: String,
+  /// Number of instances
   pub(crate) instances: String,
+  /// Config version
   pub(crate) config_version: String,
+  /// When the vm was created
   pub(crate) created_at: String,
+  /// When the vm was last updated
   pub(crate) updated_at: String,
 }
 
+/// Convert VmSummary to VmRow
 impl From<VmSummary> for VmRow {
   fn from(vm: VmSummary) -> Self {
     // Convert the created_at and updated_at to the current timezone
@@ -265,12 +308,16 @@ impl From<VmSummary> for VmRow {
   }
 }
 
-/// Manage configuration states
+/// ## VmArg
+///
+/// `nanocl vm` available arguments
+///
 #[derive(Debug, Parser)]
-pub struct VmArgs {
+pub struct VmArg {
   /// namespace to target by default global is used
   #[clap(long, short)]
   pub namespace: Option<String>,
+  /// subcommand to run
   #[clap(subcommand)]
-  pub commands: VmCommands,
+  pub command: VmCommand,
 }

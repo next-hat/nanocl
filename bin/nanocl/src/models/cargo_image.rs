@@ -4,28 +4,45 @@ use tabled::Tabled;
 use clap::{Parser, Subcommand};
 use bollard_next::models::ImageSummary;
 
+/// ## CargoImageRemoveOpts
+///
+/// `nanocl cargo image remove` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoImageRemoveOpts {
+  /// Skip confirmation
   #[clap(short = 'y')]
   pub skip_confirm: bool,
   /// List of image names to delete
   pub(crate) names: Vec<String>,
 }
 
+/// ## CargoImagePullOpts
+///
+/// `nanocl cargo image pull` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoImagePullOpts {
   /// Name of the image to pull
   pub(crate) name: String,
 }
 
+/// ## CargoImageInspectOpts
+///
+/// `nanocl cargo image inspect` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoImageInspectOpts {
   /// Name of the image to inspect
   pub(crate) name: String,
 }
 
+/// ## CargoImageCommand
+///
+/// `nanocl cargo image` available commands
+///
 #[derive(Debug, Subcommand)]
-pub enum CargoImageCommands {
+pub enum CargoImageCommand {
   /// List cargo images
   #[clap(alias("ls"))]
   List(CargoImageListOpts),
@@ -40,6 +57,10 @@ pub enum CargoImageCommands {
   Import(CargoImageImportOpts),
 }
 
+/// ## CargoImageListOpts
+///
+/// `nanocl cargo image list` available options
+///
 #[derive(Clone, Debug, Parser)]
 pub struct CargoImageListOpts {
   /// Show all images. Only images from a final layer (no children) are shown by default.
@@ -58,6 +79,7 @@ pub struct CargoImageListOpts {
   pub quiet: bool,
 }
 
+/// Convert CargoImageListOpts to ListCargoImagesOptions
 impl From<CargoImageListOpts> for ListCargoImagesOptions {
   fn from(options: CargoImageListOpts) -> Self {
     Self {
@@ -69,6 +91,10 @@ impl From<CargoImageListOpts> for ListCargoImagesOptions {
   }
 }
 
+/// ## CargoImageImportOpts
+///
+/// `nanocl cargo image import` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoImageImportOpts {
   /// path to tar archive
@@ -76,23 +102,47 @@ pub struct CargoImageImportOpts {
   pub(crate) file_path: String,
 }
 
-/// Manage container images
+/// ## CargoImageArg
+///
+/// `nanocl cargo image` available arguments
+///
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl cargo image")]
-pub struct CargoImageOpts {
+pub struct CargoImageArg {
   #[clap(subcommand)]
-  pub(crate) commands: CargoImageCommands,
+  pub(crate) command: CargoImageCommand,
 }
 
+/// ## CargoImageRow
+///
+/// A row of the cargo image table
+///
 #[derive(Tabled)]
 pub struct CargoImageRow {
+  /// Image ID
   pub(crate) id: String,
+  /// Repository name
   pub(crate) repositories: String,
+  /// Tag name
   pub(crate) tag: String,
+  /// Size of the image
   pub(crate) size: String,
+  /// Created date
   pub(crate) created: String,
 }
 
+/// ## Convert size
+///
+/// Convert size in bytes to human readable format
+///
+/// ## Arguments
+///
+/// - [size](i64) size in bytes
+///
+/// ## Return
+///
+/// - [String](String) human readable size
+///
 fn convert_size(size: i64) -> String {
   if size >= 1_000_000_000 {
     format!("{} GB", size / 1024 / 1024 / 1024)
@@ -101,6 +151,7 @@ fn convert_size(size: i64) -> String {
   }
 }
 
+/// Convert ImageSummary to CargoImageRow
 impl From<ImageSummary> for CargoImageRow {
   fn from(value: ImageSummary) -> Self {
     let binding = value

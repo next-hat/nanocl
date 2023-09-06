@@ -17,15 +17,29 @@ use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
 };
 
-use crate::config::CliConfig;
 use crate::utils;
+use crate::config::CliConfig;
 use crate::models::{
-  StateArgs, StateCommands, StateApplyOpts, StateRemoveOpts, StateBuildArgs,
+  StateArg, StateCommand, StateApplyOpts, StateRemoveOpts, StateBuildArg,
   DisplayFormat, StateRef,
 };
 
 use super::cargo_image::exec_cargo_image_pull;
 
+/// ## Get from url
+///
+/// Get Statefile from url and return a StateRef with the raw data and the format
+///
+/// ## Arguments
+///
+/// * [url](str) The url of the Statefile
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](StateRef) The StateRef
+///   * [Err](IoError) An error occured
+///
 async fn get_from_url<T>(url: &str) -> IoResult<StateRef<T>>
 where
   T: serde::Serialize + serde::de::DeserializeOwned,
@@ -39,7 +53,6 @@ where
   let mut res = reqwest.get(url.to_string()).send().await.map_err(|err| {
     err.map_err_context(|| "Unable to get Statefile from url")
   })?;
-
   if res.status().is_redirection() {
     let location = res
       .headers()
@@ -51,7 +64,6 @@ where
       err.map_err_context(|| "Unable to get Statefile from url")
     })?;
   }
-
   let data = res
     .body()
     .await
@@ -60,16 +72,29 @@ where
   let data = std::str::from_utf8(&data).map_err(|err| {
     IoError::invalid_data("From utf8".into(), format!("{err}"))
   })?;
-
   let ext = url
     .split('.')
     .last()
     .ok_or_else(|| IoError::invalid_data("Statefile", "has no extension"))?;
-
   let state_ref = utils::state::get_state_ref(ext, data)?;
   Ok(state_ref)
 }
 
+/// ## Read from file
+///
+/// Read Statefile from file and return a StateRef with the raw data and the format
+///
+/// ## Arguments
+///
+/// * [path](std::path::Path) The path of the Statefile
+/// * [format](DisplayFormat) The format of the Statefile
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](StateRef) The StateRef
+///   * [Err](IoError) An error occured
+///
 fn read_from_file<T>(
   path: &std::path::Path,
   format: &DisplayFormat,
@@ -90,6 +115,21 @@ where
   Ok(state_ref)
 }
 
+/// ## Download cargo image
+///
+/// Download cargo image if it's not already downloaded and if the force pull flag is set
+///
+/// ## Arguments
+///
+/// * [client](NanocldClient) The client to the daemon
+/// * [cargo](CargoConfigPartial) The cargo config
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](IoError) An error occured
+///
 async fn download_cargo_image(
   client: &NanocldClient,
   cargo: &CargoConfigPartial,
@@ -105,6 +145,20 @@ async fn download_cargo_image(
   Ok(())
 }
 
+/// ## Hook binds
+///
+/// Hook cargoes binds to replace relative path with absolute path
+///
+/// ## Arguments
+///
+/// * [cargo](CargoConfigPartial) The cargo config
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](CargoConfigPartial) The cargo config
+///   * [Err](IoError) An error occured
+///
 fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
   let new_cargo = match &cargo.container.host_config {
     None => cargo.clone(),
@@ -146,6 +200,20 @@ fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
   Ok(new_cargo)
 }
 
+/// ## Hook cargoes
+///
+/// Hook cargoes binds to replace relative path with absolute path
+///
+/// ## Arguments
+///
+/// * [cargoes](Vec<CargoConfigPartial>) The cargoes config
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Vec<CargoConfigPartial>) The cargoes config
+///   * [Err](IoError) An error occured
+///
 fn hook_cargoes(
   cargoes: Vec<CargoConfigPartial>,
 ) -> IoResult<Vec<CargoConfigPartial>> {
@@ -157,6 +225,22 @@ fn hook_cargoes(
   Ok(new_cargoes)
 }
 
+/// ## Attach to cargo
+///
+/// Attach to a cargo and print its logs
+///
+/// ## Arguments
+///
+/// * [client](NanocldClient) The client to the daemon
+/// * [cargo](CargoConfigPartial) The cargo config
+/// * [namespace](str) The namespace of the cargo
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Vec<rt::JoinHandle<()>>) The list of futures
+///   * [Err](IoError) An error occured
+///
 async fn attach_to_cargo(
   client: &NanocldClient,
   cargo: CargoConfigPartial,
@@ -225,6 +309,22 @@ async fn attach_to_cargo(
   Ok(futures)
 }
 
+/// ## Attach to cargoes
+///
+/// Attach to a list of cargoes and print their logs
+///
+/// ## Arguments
+///
+/// * [client](NanocldClient) The client to the daemon
+/// * [cargoes](Vec<CargoConfigPartial>) The list of cargoes
+/// * [namespace](str) The namespace of the cargoes
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](IoError) An error occured
+///
 async fn attach_to_cargoes(
   client: &NanocldClient,
   cargoes: Vec<CargoConfigPartial>,
@@ -239,6 +339,21 @@ async fn attach_to_cargoes(
   Ok(())
 }
 
+/// ## Gen client
+///
+/// Generate a nanocl daemon client based on the api version specified in the Statefile
+///
+/// ## Arguments
+///
+/// * [host](str) The host of the daemon
+/// * [meta](StateMeta) The meta of the Statefile
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](NanocldClient) The nanocl daemon client
+///   * [Err](IoError) An error occured
+///
 fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
   let client = match meta.api_version.clone() {
     api_version if meta.api_version.starts_with("http") => {
@@ -281,17 +396,31 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
   Ok(client)
 }
 
+/// ## Parse build args
+///
+/// Parse `Args` from a Statefile and ask the user to input their values
+///
+/// ## Arguments
+///
+/// * [yaml](serde_yaml::Value) The yaml value of the Statefile
+/// * [args](Vec<String>) The list of arguments
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](HashMap) The list of arguments
+///   * [Err](IoError) An error occured
+///
 fn parse_build_args(
   yaml: &serde_yaml::Value,
   args: Vec<String>,
 ) -> IoResult<HashMap<String, String>> {
-  let build_args: StateBuildArgs = serde_yaml::from_value(yaml.clone())
+  let build_args: StateBuildArg = serde_yaml::from_value(yaml.clone())
     .map_err(|err| err.map_err_context(|| "Unable to extract BuildArgs"))?;
-
   let mut cmd = Command::new("nanocl state args")
     .about("Validate state args")
     .bin_name("nanocl state args --");
-  // Add string nanocl state args as fist element of args
+  // Add string nanocl state args as first element of args
   let mut args = args;
   args.insert(0, "nanocl state apply --".into());
   for build_arg in build_args.args.clone().unwrap_or_default() {
@@ -310,9 +439,7 @@ fn parse_build_args(
     cmd = cmd.arg(cmd_arg);
   }
   let matches = cmd.get_matches_from(args);
-
   let mut args = std::collections::HashMap::new();
-
   for build_arg in build_args.args.unwrap_or_default() {
     let name = build_arg.name.to_owned();
     let arg: &'static str = Box::leak(name.to_owned().into_boxed_str());
@@ -320,7 +447,7 @@ fn parse_build_args(
       "String" => {
         let value =
           matches.get_one::<String>(arg).ok_or(IoError::invalid_data(
-            "BuildArgs".into(),
+            "BuildArg".into(),
             format!("argument {arg} is missing"),
           ))?;
         args.insert(name, value.to_owned());
@@ -336,6 +463,21 @@ fn parse_build_args(
   Ok(args)
 }
 
+/// ## Inject namespace
+///
+/// Inject `Args` to the namespace value
+///
+/// ## Arguments
+///
+/// * [namespace](str) The namespace value
+/// * [args](HashMap<String, String>) The list of arguments
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](String) The namespace value
+///   * [Err](IoError) An error occured
+///
 fn inject_namespace(
   namespace: &str,
   args: &HashMap<String, String>,
@@ -347,7 +489,23 @@ fn inject_namespace(
   Ok(str)
 }
 
-/// Inject build arguments and environement variable to the Statefile
+/// ## Inject data
+///
+/// Inject `Args`, `Envs`, `Config`, `HostGateway` and `Namespaces` to the Statefile
+///
+/// ## Arguments
+///
+/// * [ext](DisplayFormat) The format of the Statefile
+/// * [raw](str) The raw data of the Statefile
+/// * [args](HashMap<String, String>) The list of arguments
+/// * [client](NanocldClient) The client to the daemon
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Serialize) The data of the Statefile
+///   * [Err](IoError) An error occured
+///
 async fn inject_data<T>(
   ext: &DisplayFormat,
   raw: &str,
@@ -363,7 +521,6 @@ where
     let value = value.to_string_lossy().to_string();
     envs.insert(key, value);
   }
-
   let info = client.info().await?;
   let namespaces = client.list_namespace().await?.into_iter().fold(
     HashMap::new(),
@@ -372,7 +529,6 @@ where
       acc
     },
   );
-
   let data = liquid::object!({
     "Args": args,
     "Envs": envs,
@@ -385,6 +541,21 @@ where
   Ok(data)
 }
 
+/// ## Parse state file
+///
+/// Parse a Statefile from a path or url and return a StateRef with the raw data and the format
+///
+/// ## Arguments
+///
+/// * [path](Option<String>) The path or url of the Statefile if empty set to current path + Statefile.yml
+/// * [format](DisplayFormat) The format of the Statefile
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](StateRef) The StateRef
+///   * [Err](IoError) An error occured
+///
 async fn parse_state_file<T>(
   path: &Option<String>,
   format: &DisplayFormat,
@@ -413,6 +584,21 @@ where
   read_from_file(&path, format)
 }
 
+/// ## Exec state apply
+///
+/// Function called when running `nanocl state apply`
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [opts](StateApplyOpts) The state apply options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](IoError) An error occured
+///
 async fn exec_state_apply(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
@@ -458,7 +644,6 @@ async fn exec_state_apply(
       .inspect_cargo_image(&cargo.container.image.clone().unwrap_or_default())
       .await
       .is_err();
-
     // Download cargoes images
     if is_missing || opts.force_pull {
       if let Err(err) = download_cargo_image(&client, cargo).await {
@@ -480,13 +665,27 @@ async fn exec_state_apply(
     let res = res?;
     utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
-
   if opts.follow {
     attach_to_cargoes(&client, cargoes, &namespace).await?;
   }
   Ok(())
 }
 
+/// ## Exec state remove
+///
+/// Function called when running `nanocl state rm`
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [opts](StateRemoveOpts) The state remove options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](IoError) An error occured
+///
 async fn exec_state_remove(
   cli_conf: &CliConfig,
   opts: &StateRemoveOpts,
@@ -514,12 +713,24 @@ async fn exec_state_remove(
   Ok(())
 }
 
-pub async fn exec_state(
-  cli_conf: &CliConfig,
-  args: &StateArgs,
-) -> IoResult<()> {
-  match &args.commands {
-    StateCommands::Apply(opts) => exec_state_apply(cli_conf, opts).await,
-    StateCommands::Remove(opts) => exec_state_remove(cli_conf, opts).await,
+/// ## Exec state
+///
+/// Function called when running `nanocl state` with correct arguments
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [args](StateArg) The state arguments
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](IoError) An error occured
+///
+pub async fn exec_state(cli_conf: &CliConfig, args: &StateArg) -> IoResult<()> {
+  match &args.command {
+    StateCommand::Apply(opts) => exec_state_apply(cli_conf, opts).await,
+    StateCommand::Remove(opts) => exec_state_remove(cli_conf, opts).await,
   }
 }

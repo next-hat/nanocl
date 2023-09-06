@@ -1,28 +1,40 @@
-use nanocld_client::stubs::node::Node;
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
+use nanocld_client::stubs::node::Node;
 
-/// Manage resources
+/// ## NodeArg
+///
+/// `nanocl node` available arguments
+///
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl-resource")]
-pub struct NodeArgs {
+pub struct NodeArg {
   #[clap(subcommand)]
-  pub commands: NodeCommands,
+  pub command: NodeCommand,
 }
 
+/// ## NodeCommand
+///
+/// `nanocl node` available commands
+///
 #[derive(Debug, Subcommand)]
-pub enum NodeCommands {
+pub enum NodeCommand {
   /// List nodes
   #[clap(alias = "ls")]
   List,
 }
 
+/// ## NodeRow
+///
+/// A row of the node table
+///
 #[derive(Debug, Tabled)]
 pub struct NodeRow {
   pub name: String,
   pub ip_address: String,
 }
 
+/// Convert a Node to a NodeRow
 impl From<Node> for NodeRow {
   fn from(node: Node) -> Self {
     Self {

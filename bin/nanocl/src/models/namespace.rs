@@ -3,9 +3,12 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::namespace::NamespaceSummary;
 
-/// Namespace commands
+/// ## NamespaceCommand
+///
+/// `nanocl namespace` available commands
+///
 #[derive(Debug, Subcommand)]
-pub enum NamespaceCommands {
+pub enum NamespaceCommand {
   /// Create new namespace
   Create(NamespaceOpts),
   /// Inspect a namespace
@@ -18,6 +21,10 @@ pub enum NamespaceCommands {
   List(NamespaceListOpts),
 }
 
+/// ## NamespaceListOpts
+///
+/// `nanocl namespace list` available options
+///
 #[derive(Debug, Parser)]
 pub struct NamespaceListOpts {
   /// Show only namespace names
@@ -25,6 +32,10 @@ pub struct NamespaceListOpts {
   pub quiet: bool,
 }
 
+/// ## NamespaceDeleteOpts
+///
+/// `nanocl namespace delete` available options
+///
 #[derive(Debug, Parser)]
 pub struct NamespaceDeleteOpts {
   /// skip confirmation
@@ -34,28 +45,44 @@ pub struct NamespaceDeleteOpts {
   pub names: Vec<String>,
 }
 
-/// Manage namespaces
+/// ## NamespaceArg
+///
+/// `nanocl namespace` available arguments
+///
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl namespace")]
-pub struct NamespaceArgs {
+pub struct NamespaceArg {
   #[clap(subcommand)]
-  pub commands: NamespaceCommands,
+  pub command: NamespaceCommand,
 }
 
+/// ## NamespaceOpts
+///
+/// `nanocl namespace create` and `nanocl namespace inspect` generic name option
+///
 #[derive(Debug, Parser)]
 pub struct NamespaceOpts {
   /// name of the namespace to create
   pub name: String,
 }
 
+/// ## NamespaceRow
+///
+/// A row of the namespace table
+///
 #[derive(Tabled)]
 pub struct NamespaceRow {
+  /// Name of the namespace
   pub(crate) name: String,
+  /// Number of cargoes
   pub(crate) cargoes: i64,
+  /// Number of instances
   pub(crate) instances: i64,
+  /// Default gateway of the namespace
   pub(crate) gateway: String,
 }
 
+/// Convert a NamespaceSummary to a NamespaceRow
 impl From<NamespaceSummary> for NamespaceRow {
   fn from(item: NamespaceSummary) -> Self {
     Self {

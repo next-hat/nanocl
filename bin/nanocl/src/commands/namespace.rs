@@ -4,10 +4,25 @@ use nanocld_client::NanocldClient;
 use crate::config::CliConfig;
 use crate::utils;
 use crate::models::{
-  NamespaceArgs, NamespaceCommands, NamespaceOpts, NamespaceRow,
+  NamespaceArg, NamespaceCommand, NamespaceOpts, NamespaceRow,
   NamespaceDeleteOpts, NamespaceListOpts,
 };
 
+/// ## Exec namespace ls
+///
+/// Function that execute when running `nanocl namespace ls`
+///
+/// ## Arguments
+///
+/// * [client](NanocldClient) The nanocl daemon client
+/// * [options](NamespaceListOpts) The namespace list options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 async fn exec_namespace_ls(
   client: &NanocldClient,
   options: &NamespaceListOpts,
@@ -17,7 +32,6 @@ async fn exec_namespace_ls(
     .into_iter()
     .map(NamespaceRow::from)
     .collect::<Vec<NamespaceRow>>();
-
   match options.quiet {
     true => {
       for namespace in namespaces {
@@ -31,6 +45,21 @@ async fn exec_namespace_ls(
   Ok(())
 }
 
+/// ## Exec namespace create
+///
+/// Function that execute when running `nanocl namespace create`
+///
+/// ## Arguments
+///
+/// * [client](NanocldClient) The nanocl daemon client
+/// * [options](NamespaceOpts) The namespace options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 async fn exec_namespace_create(
   client: &NanocldClient,
   options: &NamespaceOpts,
@@ -40,6 +69,21 @@ async fn exec_namespace_create(
   Ok(())
 }
 
+/// ## Exec namespace inspect
+///
+/// Function that execute when running `nanocl namespace inspect`
+///
+/// ## Arguments
+///
+/// * [client](NanocldClient) The nanocl daemon client
+/// * [options](NamespaceOpts) The namespace options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 async fn exec_namespace_inspect(
   client: &NanocldClient,
   options: &NamespaceOpts,
@@ -49,6 +93,21 @@ async fn exec_namespace_inspect(
   Ok(())
 }
 
+/// ## Exec namespace rm
+///
+/// Function that execute when running `nanocl namespace rm`
+///
+/// ## Arguments
+///
+/// * [client](NanocldClient) The nanocl daemon client
+/// * [options](NamespaceDeleteOpts) The namespace delete options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 async fn exec_namespace_rm(
   client: &NanocldClient,
   options: &NamespaceDeleteOpts,
@@ -60,30 +119,41 @@ async fn exec_namespace_rm(
     ))
     .map_err(|err| err.map_err_context(|| "Delete namespace"))?;
   }
-
   for name in &options.names {
     client.delete_namespace(name).await?;
   }
-
   Ok(())
 }
 
+/// ## Exec namespace
+///
+/// Function that execute when running `nanocl namespace`
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [args](NamespaceArg) The namespace options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 pub async fn exec_namespace(
   cli_conf: &CliConfig,
-  args: &NamespaceArgs,
+  args: &NamespaceArg,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  match &args.commands {
-    NamespaceCommands::List(options) => {
-      exec_namespace_ls(client, options).await
-    }
-    NamespaceCommands::Create(options) => {
+  match &args.command {
+    NamespaceCommand::List(options) => exec_namespace_ls(client, options).await,
+    NamespaceCommand::Create(options) => {
       exec_namespace_create(client, options).await
     }
-    NamespaceCommands::Inspect(options) => {
+    NamespaceCommand::Inspect(options) => {
       exec_namespace_inspect(client, options).await
     }
-    NamespaceCommands::Remove(options) => {
+    NamespaceCommand::Remove(options) => {
       exec_namespace_rm(client, options).await
     }
   }

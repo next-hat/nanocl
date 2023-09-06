@@ -7,7 +7,7 @@ use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery, CargoLogQuery};
 use crate::utils;
 use crate::config::CliConfig;
 use crate::models::{
-  CargoArgs, CargoCreateOpts, CargoCommands, CargoRemoveOpts, CargoRow,
+  CargoArg, CargoCreateOpts, CargoCommand, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
   CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
   CargoRunOpts, CargoRestartOpts, CargoListOpts,
@@ -15,21 +15,25 @@ use crate::models::{
 
 use super::cargo_image::{self, exec_cargo_image_pull};
 
-/// Execute cargo command
+/// ## Exec cargo create
+///
+/// Execute the `nanocl cargo create` command to create a new cargo
 ///
 /// ## Arguments
-/// * [client](NanocldClient) - Nanocl client
-/// * [args](CargoArgs) - Cargo arguments
-/// * [opts](CargoCommands) - Cargo command
 ///
-/// ## Returns
-/// * [Result](Result) - Result of the operation
-///   * [Ok](Ok) - Operation was successful
-///   * [Err](IoError) - Operation failed
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
 ///
 async fn exec_cargo_create(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoCreateOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -39,9 +43,25 @@ async fn exec_cargo_create(
   Ok(())
 }
 
+/// ## Exec cargo rm
+///
+/// Execute the `nanocl cargo rm` command to remove a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_rm(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoRemoveOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -59,14 +79,29 @@ async fn exec_cargo_rm(
   Ok(())
 }
 
+/// ## Exec cargo ls
+///
+/// Execute the `nanocl cargo ls` command to list cargos
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_ls(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoListOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let items = client.list_cargo(args.namespace.clone()).await?;
-
   let rows = items
     .into_iter()
     .map(CargoRow::from)
@@ -84,9 +119,25 @@ async fn exec_cargo_ls(
   Ok(())
 }
 
+/// ## Exec cargo start
+///
+/// Execute the `nanocl cargo start` command to start a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_start(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoStartOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -96,9 +147,25 @@ async fn exec_cargo_start(
   Ok(())
 }
 
+/// ## Exec cargo stop
+///
+/// Execute the `nanocl cargo stop` command to stop a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_stop(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoStopOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -108,9 +175,25 @@ async fn exec_cargo_stop(
   Ok(())
 }
 
+/// ## Exec cargo restart
+///
+/// Execute the `nanocl cargo restart` command to restart a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_restart(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoRestartOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -120,9 +203,25 @@ async fn exec_cargo_restart(
   Ok(())
 }
 
+/// ## Exec cargo patch
+///
+/// Execute the `nanocl cargo patch` command to patch a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_patch(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoPatchOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -133,16 +232,31 @@ async fn exec_cargo_patch(
   Ok(())
 }
 
+/// ## Exec cargo inspect
+///
+/// Execute the `nanocl cargo inspect` command to inspect a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_inspect(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoInspectOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let cargo = client
     .inspect_cargo(&opts.name, args.namespace.clone())
     .await?;
-
   let display = opts
     .display
     .clone()
@@ -151,9 +265,25 @@ async fn exec_cargo_inspect(
   Ok(())
 }
 
+/// ## Exec cargo exec
+///
+/// Execute the `nanocl cargo exec` command to execute a command in a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_exec(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoExecOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -161,7 +291,6 @@ async fn exec_cargo_exec(
   let mut stream = client
     .exec_cargo(&opts.name, exec, args.namespace.clone())
     .await?;
-
   while let Some(output) = stream.next().await {
     let output = output?;
     match output.kind {
@@ -178,23 +307,54 @@ async fn exec_cargo_exec(
   Ok(())
 }
 
+/// ## Exec cargo history
+///
+/// Execute the `nanocl cargo history` command to list the history of a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_history(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoHistoryOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let histories = client
     .list_history_cargo(&opts.name, args.namespace.clone())
     .await?;
-
   utils::print::print_yml(histories)?;
   Ok(())
 }
 
+/// ## Exec cargo logs
+///
+/// Execute the `nanocl cargo logs` command to list the logs of a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_logs(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoLogsOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -231,9 +391,25 @@ async fn exec_cargo_logs(
   Ok(())
 }
 
+/// ## Exec cargo revert
+///
+/// Execute the `nanocl cargo revert` command to revert a cargo to a previous state
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_revert(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoRevertOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -244,9 +420,25 @@ async fn exec_cargo_revert(
   Ok(())
 }
 
+/// ## Exec cargo run
+///
+/// Execute the `nanocl cargo run` command to run a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
 async fn exec_cargo_run(
   cli_conf: &CliConfig,
-  args: &CargoArgs,
+  args: &CargoArg,
   opts: &CargoRunOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -254,48 +446,53 @@ async fn exec_cargo_run(
   if client.inspect_cargo_image(&opts.image).await.is_err() {
     exec_cargo_image_pull(client, &opts.image).await?;
   }
-
   let cargo = client
     .create_cargo(&opts.clone().into(), args.namespace.clone())
     .await?;
-
   client
     .start_cargo(&cargo.name, Some(cargo.namespace_name))
     .await?;
-
   Ok(())
 }
 
-pub async fn exec_cargo(
-  cli_conf: &CliConfig,
-  args: &CargoArgs,
-) -> IoResult<()> {
+/// ## Exec cargo
+///
+/// Function that execute when running `nanocl cargo`
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
+pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
   let client = &cli_conf.client;
-  match &args.commands {
-    CargoCommands::List(opts) => exec_cargo_ls(cli_conf, args, opts).await,
-    CargoCommands::Create(opts) => {
-      exec_cargo_create(cli_conf, args, opts).await
-    }
-    CargoCommands::Remove(opts) => exec_cargo_rm(cli_conf, args, opts).await,
-    CargoCommands::Image(opts) => {
+  match &args.command {
+    CargoCommand::List(opts) => exec_cargo_ls(cli_conf, args, opts).await,
+    CargoCommand::Create(opts) => exec_cargo_create(cli_conf, args, opts).await,
+    CargoCommand::Remove(opts) => exec_cargo_rm(cli_conf, args, opts).await,
+    CargoCommand::Image(opts) => {
       cargo_image::exec_cargo_image(client, opts).await
     }
-    CargoCommands::Start(opts) => exec_cargo_start(cli_conf, args, opts).await,
-    CargoCommands::Stop(opts) => exec_cargo_stop(cli_conf, args, opts).await,
-    CargoCommands::Patch(opts) => exec_cargo_patch(cli_conf, args, opts).await,
-    CargoCommands::Inspect(opts) => {
+    CargoCommand::Start(opts) => exec_cargo_start(cli_conf, args, opts).await,
+    CargoCommand::Stop(opts) => exec_cargo_stop(cli_conf, args, opts).await,
+    CargoCommand::Patch(opts) => exec_cargo_patch(cli_conf, args, opts).await,
+    CargoCommand::Inspect(opts) => {
       exec_cargo_inspect(cli_conf, args, opts).await
     }
-    CargoCommands::Exec(opts) => exec_cargo_exec(cli_conf, args, opts).await,
-    CargoCommands::History(opts) => {
+    CargoCommand::Exec(opts) => exec_cargo_exec(cli_conf, args, opts).await,
+    CargoCommand::History(opts) => {
       exec_cargo_history(cli_conf, args, opts).await
     }
-    CargoCommands::Revert(opts) => {
-      exec_cargo_revert(cli_conf, args, opts).await
-    }
-    CargoCommands::Logs(opts) => exec_cargo_logs(cli_conf, args, opts).await,
-    CargoCommands::Run(opts) => exec_cargo_run(cli_conf, args, opts).await,
-    CargoCommands::Restart(opts) => {
+    CargoCommand::Revert(opts) => exec_cargo_revert(cli_conf, args, opts).await,
+    CargoCommand::Logs(opts) => exec_cargo_logs(cli_conf, args, opts).await,
+    CargoCommand::Run(opts) => exec_cargo_run(cli_conf, args, opts).await,
+    CargoCommand::Restart(opts) => {
       exec_cargo_restart(cli_conf, args, opts).await
     }
   }

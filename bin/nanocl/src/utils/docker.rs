@@ -19,11 +19,21 @@ use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 use nanocld_client::stubs::cargo_config::Config as ContainerConfig;
 
-use crate::models::DockerContextMeta;
 use crate::utils::hash;
 use crate::utils::math::calculate_percentage;
+use crate::models::DockerContextMeta;
 
+/// ## Update image progress
+///
 /// Update progress bar for install image
+///
+/// ## Arguments
+///
+/// * [multiprogress](MultiProgress) The multiprogress bar
+/// * [layers](HashMap) The layers
+/// * [id](str) The id of the layer
+/// * [progress](ProgressDetail) The progress detail
+///
 fn update_image_progress(
   multiprogress: &MultiProgress,
   layers: &mut HashMap<String, ProgressBar>,
@@ -58,7 +68,22 @@ fn update_image_progress(
   }
 }
 
-/// Install image directly with docker
+/// ## Install image
+///
+/// Install image directly with docker and output progress
+///
+/// ## Arguments
+///
+/// * [from_image](str) The image to install
+/// * [tag](str) The tag of the image
+/// * [docker_api](Docker) The docker client
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The image has been installed
+///   * [Err](IoError) An error occured
+///
 pub async fn install_image(
   from_image: &str,
   tag: &str,
@@ -109,7 +134,20 @@ pub async fn install_image(
   Ok(())
 }
 
+/// ## Connect
+///
 /// Generate a docker client from the docker host
+///
+/// ## Arguments
+///
+/// * [docker_host](str) The docker host
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Docker) The docker client
+///   * [Err](IoError) An error occured
+///
 pub fn connect(docker_host: &str) -> IoResult<Docker> {
   let docker = match &docker_host {
     docker_host if docker_host.starts_with("unix://") => {
@@ -151,6 +189,20 @@ pub fn connect(docker_host: &str) -> IoResult<Docker> {
   Ok(docker)
 }
 
+/// ## Hook labels
+///
+/// Hook labels for a container
+///
+/// ## Arguments
+///
+/// * [key](str) The key of the container
+/// * [namespace](str) The namespace of the container
+/// * [labels](HashMap<String, String>) The labels of the container
+///
+/// ## Return
+///
+/// * [HashMap<String, String>](HashMap<String, String>) The hooked labels
+///
 pub fn hook_labels(
   key: &str,
   namespace: &str,
@@ -169,6 +221,22 @@ pub fn hook_labels(
   hooked_labels
 }
 
+/// ## Create cargo container
+///
+/// Create a container from a cargo config
+///
+/// ## Arguments
+///
+/// * [cargo](CargoConfigPartial) The cargo config
+/// * [namespace](str) The namespace of the container
+/// * [docker](Docker) The docker client
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](ContainerCreateResponse) The container
+///   * [Err](IoError) An error occured
+///
 pub async fn create_cargo_container(
   cargo: &CargoConfigPartial,
   namespace: &str,
@@ -208,6 +276,16 @@ pub async fn create_cargo_container(
   Ok(container)
 }
 
+/// ## Detect docker host
+///
+/// Detect docker host from docker config
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok]((String, bool)) The docker host
+///   * [Err](IoError) An error occured
+///
 pub fn detect_docker_host() -> std::io::Result<(String, bool)> {
   let home = std::env::var("HOME").map_err(|_| {
     std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")

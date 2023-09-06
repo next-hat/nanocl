@@ -6,7 +6,16 @@ use nanocl_utils::http_client_error::HttpClientError;
 
 use crate::version::{VERSION, CHANNEL};
 
-/// Get template from our GitHub repo
+/// ## Get
+///
+/// Get template from our GitHub repo for installation
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](String) The template
+///   * [Err](HttpClientError) An error occured
+///
 async fn get() -> Result<String, HttpClientError> {
   let client = http::client::Client::new();
 
@@ -39,7 +48,20 @@ async fn get() -> Result<String, HttpClientError> {
   Ok(body)
 }
 
+/// ## Get template
+///
 /// Get template from our GitHub repo or from the specified file if it's provided
+///
+/// ## Arguments
+///
+/// * [template](Option<String>) The template file
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](String) The template
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 pub async fn get_template(template: Option<String>) -> IoResult<String> {
   match template {
     None => {

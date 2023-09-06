@@ -40,27 +40,31 @@ pub struct Cli {
   pub host: Option<String>,
   /// Commands
   #[clap(subcommand)]
-  pub command: Commands,
+  pub command: Command,
 }
 
+/// ## Commands
+///
+/// `nanocl` available commands
+///
 #[derive(Debug, Subcommand)]
-pub enum Commands {
+pub enum Command {
   /// Manage namespaces
-  Namespace(NamespaceArgs),
+  Namespace(NamespaceArg),
   /// Manage cargoes
-  Cargo(CargoArgs),
+  Cargo(CargoArg),
   /// Manage virtual machines
-  Vm(VmArgs),
+  Vm(VmArg),
   /// Manage resources
-  Resource(ResourceArgs),
+  Resource(ResourceArg),
   /// Manage nodes (experimental)
-  Node(NodeArgs),
+  Node(NodeArg),
   /// Watch daemon events
   Events,
   /// Define, Run, or Remove Cargo or Virtual Machines
-  State(StateArgs),
+  State(StateArg),
   /// Manage contexts
-  Context(ContextArgs),
+  Context(ContextArg),
   /// Show nanocl host information
   Info,
   /// Show nanocl version information
@@ -74,7 +78,7 @@ pub enum Commands {
   /// Show all processes managed by nanocl
   Ps(ProcessOpts),
   /// Manage system
-  System(SystemOpts),
+  System(SystemArg),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for
@@ -83,14 +87,20 @@ pub enum Commands {
   // },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ValueEnum)]
+/// ## DisplayFormat
+///
+/// `nanocl` available display formats `yaml` by default
+///
+#[derive(Default, Clone, Debug, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "PascalCase")]
 pub enum DisplayFormat {
+  #[default]
   Yaml,
   Toml,
   Json,
 }
 
+/// Convert DisplayFormat to String
 impl ToString for DisplayFormat {
   fn to_string(&self) -> String {
     match self {
@@ -99,11 +109,5 @@ impl ToString for DisplayFormat {
       Self::Json => "json",
     }
     .to_string()
-  }
-}
-
-impl Default for DisplayFormat {
-  fn default() -> Self {
-    Self::Yaml
   }
 }

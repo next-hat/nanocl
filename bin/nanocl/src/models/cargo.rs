@@ -1,19 +1,19 @@
-use bollard_next::exec::CreateExecOptions;
-use chrono::TimeZone;
 use tabled::Tabled;
+use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
-use nanocld_client::stubs::{
-  cargo::CargoSummary,
-  cargo_config::{
-    CargoConfigUpdate, Config as ContainerConfig, CargoConfigPartial,
-    HostConfig,
-  },
+use bollard_next::exec::CreateExecOptions;
+use nanocld_client::stubs::cargo::CargoSummary;
+use nanocld_client::stubs::cargo_config::{
+  CargoConfigUpdate, Config as ContainerConfig, CargoConfigPartial, HostConfig,
 };
 
-use super::{cargo_image::CargoImageOpts, DisplayFormat};
+use super::{cargo_image::CargoImageArg, DisplayFormat};
 
-/// Cargo delete options
+/// ## CargoRemoveOpts
+///
+/// `nanocl cargo remove` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoRemoveOpts {
   /// Skip confirmation
@@ -26,7 +26,10 @@ pub struct CargoRemoveOpts {
   pub names: Vec<String>,
 }
 
-/// Create cargo options
+/// ## CargoCreateOpts
+///
+/// `nanocl cargo create` available options
+///
 #[derive(Debug, Clone, Parser)]
 pub struct CargoCreateOpts {
   /// Name of the cargo
@@ -41,6 +44,7 @@ pub struct CargoCreateOpts {
   pub(crate) env: Option<Vec<String>>,
 }
 
+/// Convert CargoCreateOpts to CargoConfigPartial
 impl From<CargoCreateOpts> for CargoConfigPartial {
   fn from(val: CargoCreateOpts) -> Self {
     Self {
@@ -61,6 +65,10 @@ impl From<CargoCreateOpts> for CargoConfigPartial {
   }
 }
 
+/// ## CargoRunOpts
+///
+/// `nanocl cargo run` available options
+///
 #[derive(Debug, Clone, Parser)]
 pub struct CargoRunOpts {
   /// Name of the cargo
@@ -79,6 +87,7 @@ pub struct CargoRunOpts {
   pub command: Vec<String>,
 }
 
+/// Convert CargoRunOpts to CargoConfigPartial
 impl From<CargoRunOpts> for CargoConfigPartial {
   fn from(val: CargoRunOpts) -> Self {
     Self {
@@ -101,28 +110,40 @@ impl From<CargoRunOpts> for CargoConfigPartial {
   }
 }
 
-/// Start Cargo options
+/// ## CargoStartOpts
+///
+/// `nanocl cargo start` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoStartOpts {
   // Name of cargo to start
   pub name: String,
 }
 
-/// Stop Cargo options
+/// ## CargoStopOpts
+///
+/// `nanocl cargo stop` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoStopOpts {
   // List of cargo to stop
   pub names: Vec<String>,
 }
 
-/// Restart Cargo options
+/// ## CargoRestartOpts
+///
+/// `nanocl cargo restart` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoRestartOpts {
   // List of cargo to stop
   pub names: Vec<String>,
 }
 
-/// Inspect Cargo options
+/// ## CargoInspectOpts
+///
+/// `nanocl cargo inspect` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoInspectOpts {
   /// Display format
@@ -132,20 +153,29 @@ pub struct CargoInspectOpts {
   pub(crate) name: String,
 }
 
-/// Patch Cargo options
+/// ## CargoPatchOpts
+///
+/// `nanocl cargo patch` available options
+///
 #[derive(Debug, Clone, Parser)]
 pub struct CargoPatchOpts {
+  /// Name of cargo to update
   pub(crate) name: String,
+  /// New name of cargo
   #[clap(short = 'n', long = "name")]
   pub(crate) new_name: Option<String>,
+  /// New image of cargo
   #[clap(short, long = "image")]
   pub(crate) image: Option<String>,
+  /// New environment variables of cargo
   #[clap(short, long = "env")]
   pub(crate) env: Option<Vec<String>>,
+  /// New volumes of cargo
   #[clap(short, long = "volume")]
   pub(crate) volumes: Option<Vec<String>>,
 }
 
+/// Convert CargoPatchOpts to CargoConfigUpdate
 impl From<CargoPatchOpts> for CargoConfigUpdate {
   fn from(val: CargoPatchOpts) -> Self {
     CargoConfigUpdate {
@@ -160,7 +190,10 @@ impl From<CargoPatchOpts> for CargoConfigUpdate {
   }
 }
 
-/// Execute a command inside a cargo options
+/// ## CargoExecOpts
+///
+/// `nanocl cargo exec` available options
+///
 #[derive(Debug, Clone, Parser)]
 pub struct CargoExecOpts {
   /// Name of cargo to execute command
@@ -170,6 +203,7 @@ pub struct CargoExecOpts {
   pub command: Vec<String>,
 }
 
+/// Convert CargoExecOpts to CreateExecOptions
 impl From<CargoExecOpts> for CreateExecOptions {
   fn from(val: CargoExecOpts) -> Self {
     CreateExecOptions {
@@ -181,12 +215,20 @@ impl From<CargoExecOpts> for CreateExecOptions {
   }
 }
 
+/// ## CargoHistoryOpts
+///
+/// `nanocl cargo history` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoHistoryOpts {
   /// Name of cargo to browse history
   pub name: String,
 }
 
+/// ## CargoRevertOpts
+///
+/// `nanocl cargo revert` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoRevertOpts {
   /// Name of cargo to revert
@@ -195,6 +237,10 @@ pub struct CargoRevertOpts {
   pub history_id: String,
 }
 
+/// ## CargoLogsOpts
+///
+/// `nanocl cargo logs` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoLogsOpts {
   /// Name of cargo to show logs
@@ -216,6 +262,10 @@ pub struct CargoLogsOpts {
   pub follow: bool,
 }
 
+/// ## CargoListOpts
+///
+/// `nanocl cargo list` available options
+///
 #[derive(Debug, Parser)]
 pub struct CargoListOpts {
   /// Only show cargo names
@@ -223,9 +273,13 @@ pub struct CargoListOpts {
   pub quiet: bool,
 }
 
+/// ## CargoCommand
+///
+/// `nanocl cargo` available commands
+///
 #[derive(Debug, Subcommand)]
 #[clap(about, version)]
-pub enum CargoCommands {
+pub enum CargoCommand {
   /// List existing cargo
   #[clap(alias("ls"))]
   List(CargoListOpts),
@@ -245,7 +299,7 @@ pub enum CargoCommands {
   /// Update a cargo by its name
   Patch(CargoPatchOpts),
   /// Manage cargo image
-  Image(CargoImageOpts),
+  Image(CargoImageArg),
   /// Execute a command inside a cargo
   Exec(CargoExecOpts),
   /// List cargo history
@@ -258,28 +312,43 @@ pub enum CargoCommands {
   Run(CargoRunOpts),
 }
 
-/// Manage cargoes
+/// ## CargoArg
+///
+/// `nanocl cargo` available arguments
+///
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl cargo")]
-pub struct CargoArgs {
+pub struct CargoArg {
   /// namespace to target by default global is used
   #[clap(long, short)]
   pub namespace: Option<String>,
   #[clap(subcommand)]
-  pub commands: CargoCommands,
+  pub command: CargoCommand,
 }
 
+/// ## CargoRow
+///
+/// A row of the cargo table
+///
 #[derive(Tabled)]
 pub struct CargoRow {
+  /// Name of the cargo
   pub(crate) name: String,
+  /// Name of the namespace
   pub(crate) namespace: String,
+  /// Image of the cargo
   pub(crate) image: String,
+  /// Number of running instances
   pub(crate) instances: String,
+  /// Config version of the cargo
   pub(crate) config_version: String,
+  /// When the cargo was created
   pub(crate) created_at: String,
+  /// When the cargo was last updated
   pub(crate) updated_at: String,
 }
 
+/// Convert CargoSummary to CargoRow
 impl From<CargoSummary> for CargoRow {
   fn from(cargo: CargoSummary) -> Self {
     let binding = chrono::Local::now();

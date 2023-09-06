@@ -1,13 +1,29 @@
 use nanocl_utils::io_error::{IoResult, FromIo};
 
-use crate::config::CliConfig;
 use crate::utils;
+use crate::config::CliConfig;
 use crate::models::{
-  ResourceArgs, ResourceCommands, ResourceRow, ResourceRemoveOpts,
+  ResourceArg, ResourceCommand, ResourceRow, ResourceRemoveOpts,
   ResourceInspectOpts, ResourceRevertOpts, ResourceHistoryOpts,
   ResourceListOpts,
 };
 
+/// ## Exec resource ls
+///
+/// Function that execute when running `nanocl resource ls`
+/// Will list available resources
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [opts](ResourceListOpts) The resource list options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 async fn exec_resource_ls(
   cli_conf: &CliConfig,
   opts: &ResourceListOpts,
@@ -31,6 +47,21 @@ async fn exec_resource_ls(
   Ok(())
 }
 
+/// ## Exec resource rm
+///
+/// Function that execute when running `nanocl resource rm`
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [options](ResourceRemoveOpts) The resource remove options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 async fn exec_resource_rm(
   cli_conf: &CliConfig,
   options: &ResourceRemoveOpts,
@@ -49,6 +80,21 @@ async fn exec_resource_rm(
   Ok(())
 }
 
+/// ## Exec resource inspect
+///
+/// Function that execute when running `nanocl resource inspect`
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [opts](ResourceInspectOpts) The resource inspect options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 async fn exec_resource_inspect(
   cli_conf: &CliConfig,
   opts: &ResourceInspectOpts,
@@ -63,6 +109,21 @@ async fn exec_resource_inspect(
   Ok(())
 }
 
+/// ## Exec resource history
+///
+/// Function that execute when running `nanocl resource history`
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [opts](ResourceHistoryOpts) The resource history options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 async fn exec_resource_history(
   cli_conf: &CliConfig,
   opts: &ResourceHistoryOpts,
@@ -73,6 +134,21 @@ async fn exec_resource_history(
   Ok(())
 }
 
+/// ## Exec resource revert
+///
+/// Function that execute when running `nanocl resource revert`
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [opts](ResourceRevertOpts) The resource revert options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 async fn exec_resource_revert(
   cli_conf: &CliConfig,
   opts: &ResourceRevertOpts,
@@ -83,21 +159,34 @@ async fn exec_resource_revert(
   Ok(())
 }
 
+/// ## Exec resource
+///
+/// Function that execute when running `nanocl resource`
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [args](ResourceArg) The resource options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///
 pub async fn exec_resource(
   cli_conf: &CliConfig,
-  args: &ResourceArgs,
+  args: &ResourceArg,
 ) -> IoResult<()> {
-  match &args.commands {
-    ResourceCommands::List(opts) => exec_resource_ls(cli_conf, opts).await,
-    ResourceCommands::Remove(opts) => exec_resource_rm(cli_conf, opts).await,
-    ResourceCommands::Inspect(opts) => {
+  match &args.command {
+    ResourceCommand::List(opts) => exec_resource_ls(cli_conf, opts).await,
+    ResourceCommand::Remove(opts) => exec_resource_rm(cli_conf, opts).await,
+    ResourceCommand::Inspect(opts) => {
       exec_resource_inspect(cli_conf, opts).await
     }
-    ResourceCommands::History(opts) => {
+    ResourceCommand::History(opts) => {
       exec_resource_history(cli_conf, opts).await
     }
-    ResourceCommands::Revert(opts) => {
-      exec_resource_revert(cli_conf, opts).await
-    }
+    ResourceCommand::Revert(opts) => exec_resource_revert(cli_conf, opts).await,
   }
 }
