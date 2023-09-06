@@ -1,5 +1,9 @@
 use clap::Parser;
 
+/// ## InstallOpts
+///
+/// `nanocl install` available options
+///
 #[derive(Debug, Clone, Parser)]
 pub struct InstallOpts {
   /// The docker host to install nanocl default is unix:///var/run/docker.sock
@@ -34,34 +38,49 @@ pub struct InstallOpts {
   pub(crate) template: Option<String>,
 }
 
-/// This is the struct that will be passed to nanocl daemon
+/// ## NanocldArg
+///
+/// Arguments for the nanocl daemon used by the install template
+///
 #[derive(Debug, Clone)]
-pub struct NanocldArgs {
+pub struct NanocldArg {
+  /// Docker host to use
   pub(crate) docker_host: String,
+  /// State directory to use
   pub(crate) state_dir: String,
+  /// Configuration directory to use
   pub(crate) conf_dir: String,
+  /// Public ip address of the current node
   pub(crate) gateway: String,
+  /// Hosts to connect to
   pub(crate) hosts: Vec<String>,
+  /// Hostname of the current node
   pub(crate) hostname: String,
+  /// Group id to use
   pub(crate) gid: u32,
+  /// Advertise address to broadcast to other nodes
   pub(crate) advertise_addr: String,
+  /// Home directory of the current user
   pub(crate) home_dir: String,
+  /// Specify if the docker host is docker desktop
+  /// detected if docker context is desktop-linux
   pub(crate) is_docker_desktop: bool,
 }
 
-impl From<NanocldArgs> for liquid::Object {
-  fn from(args: NanocldArgs) -> Self {
+/// Convert Nanocld to liquid::Object
+impl From<NanocldArg> for liquid::Object {
+  fn from(arg: NanocldArg) -> Self {
     liquid::object!({
-      "docker_host": args.docker_host,
-      "state_dir": args.state_dir,
-      "conf_dir": args.conf_dir,
-      "gateway": args.gateway,
-      "hosts": args.hosts,
-      "hostname": args.hostname,
-      "gid": args.gid,
-      "advertise_addr": args.advertise_addr,
-      "is_docker_desktop": args.is_docker_desktop,
-      "home_dir": args.home_dir,
+      "docker_host": arg.docker_host,
+      "state_dir": arg.state_dir,
+      "conf_dir": arg.conf_dir,
+      "gateway": arg.gateway,
+      "hosts": arg.hosts,
+      "hostname": arg.hostname,
+      "gid": arg.gid,
+      "advertise_addr": arg.advertise_addr,
+      "is_docker_desktop": arg.is_docker_desktop,
+      "home_dir": arg.home_dir,
     })
   }
 }

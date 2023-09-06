@@ -8,13 +8,13 @@ use nanocl_utils::io_error::IoResult;
 ///
 /// ## Arguments
 ///
-/// - [msg](str) The message to display
+/// * [msg](str) The message to display
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](()) The operation is confirmed
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation is confirmed
+///   * [Err](IoError) An error occured
 ///
 pub fn confirm(msg: &str) -> IoResult<()> {
   let result = Confirm::with_theme(&ColorfulTheme::default())

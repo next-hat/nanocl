@@ -6,11 +6,11 @@ use ring::digest;
 ///
 /// ## Arguments
 ///
-/// - [name](str) The string to hash
+/// * [name](str) The string to hash
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [String](String) The hash
+/// * [String](String) The hash
 ///
 #[allow(non_snake_case)]
 pub fn calculate_SHA256(name: &str) -> String {

@@ -6,9 +6,12 @@ use nanocld_client::stubs::resource::Resource;
 
 use super::DisplayFormat;
 
-/// Resource commands
+/// ## ResourceCommand
+///
+/// `nanocl resource` available commands
+///
 #[derive(Debug, Subcommand)]
-pub enum ResourceCommands {
+pub enum ResourceCommand {
   /// Remove existing resource
   #[clap(alias("rm"))]
   Remove(ResourceRemoveOpts),
@@ -23,6 +26,10 @@ pub enum ResourceCommands {
   Revert(ResourceRevertOpts),
 }
 
+/// ## ResourceListOpts
+///
+/// `nanocl resource list` available options
+///
 #[derive(Debug, Parser)]
 pub struct ResourceListOpts {
   /// Show only resource names
@@ -30,14 +37,21 @@ pub struct ResourceListOpts {
   pub quiet: bool,
 }
 
-/// Manage resources
+/// ## ResourceArg
+///
+/// `nanocl resource` available arguments
+///
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl-resource")]
-pub struct ResourceArgs {
+pub struct ResourceArg {
   #[clap(subcommand)]
-  pub commands: ResourceCommands,
+  pub command: ResourceCommand,
 }
 
+/// ## ResourceRow
+///
+/// A row of the resource table
+///
 #[derive(Debug, Tabled)]
 pub struct ResourceRow {
   pub name: String,
@@ -72,6 +86,10 @@ impl From<Resource> for ResourceRow {
   }
 }
 
+/// ## ResourceRemoveOpts
+///
+/// `nanocl resource remove` available options
+///
 #[derive(Debug, Parser)]
 pub struct ResourceRemoveOpts {
   /// Skip confirmation
@@ -81,6 +99,10 @@ pub struct ResourceRemoveOpts {
   pub names: Vec<String>,
 }
 
+/// ## ResourceInspectOpts
+///
+/// `nanocl resource inspect` available options
+///
 #[derive(Clone, Debug, Parser)]
 pub struct ResourceInspectOpts {
   /// Display format
@@ -90,12 +112,20 @@ pub struct ResourceInspectOpts {
   pub name: String,
 }
 
+/// ## ResourceHistoryOpts
+///
+/// `nanocl resource history` available options
+///
 #[derive(Debug, Parser)]
 pub struct ResourceHistoryOpts {
   /// The name of the resource to browse history
   pub name: String,
 }
 
+/// ## ResourceRevertOpts
+///
+/// `nanocl resource revert` available options
+///
 #[derive(Debug, Parser)]
 pub struct ResourceRevertOpts {
   /// The name of the resource to revert

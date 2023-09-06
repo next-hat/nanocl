@@ -15,11 +15,11 @@ impl Context {
   ///
   /// Ensure that the contexts directory exists in $HOME/.nanocl/contexts
   ///
-  /// ## Returns
+  /// ## Return
   ///
-  /// - [Result](Result) The result of the operation
-  ///   - [Ok](()) The operation was successful
-  ///   - [Err](IoError) An error occured
+  /// * [Result](Result) The result of the operation
+  ///   * [Ok](()) The operation was successful
+  ///   * [Err](Err) An error occured
   ///
   pub fn ensure() -> std::io::Result<()> {
     let home = std::env::var("HOME").map_err(|_| {
@@ -36,13 +36,13 @@ impl Context {
   ///
   /// ## Arguments
   ///
-  /// - [path](str) The path to the context file
+  /// * [path](str) The path to the context file
   ///
-  /// ## Returns
+  /// ## Return
   ///
-  /// - [Result](Result) The result of the operation
-  ///   - [Ok](Context) The context
-  ///   - [Err](IoError) An error occured
+  /// * [Result](Result) The result of the operation
+  ///   * [Ok](Context) The context
+  ///   * [Err](Err) An error occured
   ///
   pub fn read(path: &str) -> std::io::Result<Context> {
     let s = std::fs::read_to_string(path)?;
@@ -61,13 +61,13 @@ impl Context {
   ///
   /// ## Arguments
   ///
-  /// - [name](str) The name of the context
+  /// * [name](str) The name of the context
   ///
-  /// ## Returns
+  /// ## Return
   ///
-  /// - [Result](Result) The result of the operation
-  ///   - [Ok](Context) The context
-  ///   - [Err](IoError) An error occured
+  /// * [Result](Result) The result of the operation
+  ///   * [Ok](Context) The context
+  ///   * [Err](Err) An error occured
   ///
   pub fn read_by_name(name: &str) -> std::io::Result<Context> {
     let home = std::env::var("HOME").map_err(|_| {
@@ -84,13 +84,13 @@ impl Context {
   ///
   /// ## Arguments
   ///
-  /// - [context](Context) The context to write
+  /// * [context](Context) The context to write
   ///
-  /// ## Returns
+  /// ## Return
   ///
-  /// - [Result](Result) The result of the operation
-  ///   - [Ok](()) The operation was successful
-  ///   - [Err](IoError) An error occured
+  /// * [Result](Result) The result of the operation
+  ///   * [Ok](()) The operation was successful
+  ///   * [Err](Err) An error occured
   ///
   pub fn write(context: &Context) -> std::io::Result<()> {
     let home = std::env::var("HOME").map_err(|_| {
@@ -111,11 +111,11 @@ impl Context {
   ///
   /// List all contexts
   ///
-  /// ## Returns
+  /// ## Return
   ///
-  /// - [Result](Result) The result of the operation
-  ///   - [Ok](Vec<ContextRow>) The list of contexts
-  ///   - [Err](IoError) An error occured
+  /// * [Result](Result) The result of the operation
+  ///   * [Ok](Vec<ContextRow>) The list of contexts
+  ///   * [Err](Err) An error occured
   ///
   pub fn list() -> std::io::Result<Vec<ContextRow>> {
     let home = std::env::var("HOME").map_err(|_| {
@@ -140,13 +140,13 @@ impl Context {
   ///
   /// ## Arguments
   ///
-  /// - [name](str) The name of the context
+  /// * [name](str) The name of the context
   ///
-  /// ## Returns
+  /// ## Return
   ///
-  /// - [Result](Result) The result of the operation
-  ///   - [Ok](()) The operation was successful
-  ///   - [Err](IoError) An error occured
+  /// * [Result](Result) The result of the operation
+  ///   * [Ok](()) The operation was successful
+  ///   * [Err](Err) An error occured
   ///
   pub fn r#use(name: &str) -> std::io::Result<()> {
     let home = std::env::var("HOME").map_err(|_| {

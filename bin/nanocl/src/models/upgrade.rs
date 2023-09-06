@@ -2,7 +2,7 @@ use clap::Parser;
 
 /// ## UpgradeOpts
 ///
-/// Upgrade command options
+/// `nanocl upgrade` available options
 ///
 #[derive(Debug, Clone, Parser)]
 pub struct UpgradeOpts {

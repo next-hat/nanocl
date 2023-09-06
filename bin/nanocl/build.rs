@@ -5,16 +5,26 @@ use clap::*;
 
 include!("./src/models/mod.rs");
 
-/// Man page name and command to generate
+/// ## ManPage
+///
+/// Definition of a man page to generate for given command
+///
 struct ManPage<'a> {
   name: &'a str,
   command: clap::Command,
 }
 
-/// Path where to generate the files
+/// ## MAN PATH
+///
+/// Path where to render the man pages
+///
 const MAN_PATH: &str = "./target/man";
 
-/// Set the git commit hash as an environment variable
+/// ## Set env git commit hash
+///
+/// Execute the git command to extract the hash of the current commit
+/// and set it as an environment variable for the produced binary
+///
 fn set_env_git_commit_hash() -> Result<()> {
   let output = std::process::Command::new("git")
     .args(["rev-parse", "HEAD"])
@@ -27,7 +37,10 @@ fn set_env_git_commit_hash() -> Result<()> {
   Ok(())
 }
 
-/// Set the target architecture as an environment variable
+/// ## Set env target arch
+///
+/// Set the target arch as an environment variable for the produced binary
+///
 fn set_env_target_arch() -> Result<()> {
   let arch = std::env::var("CARGO_CFG_TARGET_ARCH")
     .map_err(|e| Error::new(ErrorKind::Other, e))?;
@@ -37,7 +50,21 @@ fn set_env_target_arch() -> Result<()> {
   Ok(())
 }
 
+/// ## Generate man page
+///
 /// Function to generate a man page
+///
+/// ## Arguments
+///
+/// * [name](str) Name of the man page
+/// * [app](clap::Command) Command to generate
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Ok) Operation was successful
+///   * [Err](Err) Operation failed
+///
 fn generate_man_page<'a>(name: &'a str, app: &'a clap::Command) -> Result<()> {
   let man = clap_mangen::Man::new(app.to_owned());
   // clap_mangen::multiple
@@ -45,28 +72,31 @@ fn generate_man_page<'a>(name: &'a str, app: &'a clap::Command) -> Result<()> {
   man.render(&mut man_buffer)?;
   let out_dir = std::env::current_dir()?;
   std::fs::write(out_dir.join(format!("{MAN_PATH}/{name}.1")), man_buffer)?;
-
   Ok(())
 }
 
-/// Generate all man pages
+/// ## Generate man pages
+///
+/// Generate manpage for nanocl and all subcommands
+/// and write them inside [MAN_PATH](MAN_PATH)
+///
 pub fn generate_man_pages() -> Result<()> {
-  let man_pages: Vec<ManPage> = vec![
+  let man_pages = [
     ManPage {
       name: "nanocl",
       command: Cli::command(),
     },
     ManPage {
       name: "nanocl-namespace",
-      command: NamespaceArgs::command(),
+      command: NamespaceArg::command(),
     },
     ManPage {
       name: "nanocl-cargo",
-      command: CargoArgs::command(),
+      command: CargoArg::command(),
     },
     ManPage {
       name: "nanocl-cargo-image",
-      command: CargoImageOpts::command(),
+      command: CargoImageArg::command(),
     },
     ManPage {
       name: "nanocl-cargo-run",
@@ -74,7 +104,7 @@ pub fn generate_man_pages() -> Result<()> {
     },
     ManPage {
       name: "nanocl-vm",
-      command: VmArgs::command(),
+      command: VmArg::command(),
     },
     ManPage {
       name: "nanocl-vm-run",
@@ -82,7 +112,7 @@ pub fn generate_man_pages() -> Result<()> {
     },
     ManPage {
       name: "nanocl-state",
-      command: StateArgs::command(),
+      command: StateArg::command(),
     },
     ManPage {
       name: "nanocl-state-apply",
@@ -94,14 +124,13 @@ pub fn generate_man_pages() -> Result<()> {
     },
     ManPage {
       name: "nanocl-resource",
-      command: ResourceArgs::command(),
+      command: ResourceArg::command(),
     },
     ManPage {
       name: "nanocl-setup",
       command: InstallOpts::command(),
     },
   ];
-
   fs::create_dir_all(MAN_PATH)?;
   for page in man_pages {
     generate_man_page(page.name, &page.command)?;
@@ -109,6 +138,10 @@ pub fn generate_man_pages() -> Result<()> {
   Ok(())
 }
 
+/// ## Set channel
+///
+/// Set the release channel as an environment variable for the produced binary
+///
 fn set_channel() -> Result<()> {
   #[allow(unused)]
   let mut default_channel = "stable";
@@ -122,6 +155,13 @@ fn set_channel() -> Result<()> {
   Ok(())
 }
 
+/// ## Main
+///
+/// Main entrypoint of the build script
+/// The build script will add some environment variables for the production build.
+/// In order to track bug in a better way, the channel,
+/// the git commit hash and the target arch will be statically linked into the binary.
+///
 fn main() -> Result<()> {
   set_env_target_arch()?;
   set_channel()?;

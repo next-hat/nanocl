@@ -14,13 +14,13 @@ use crate::models::UninstallOpts;
 ///
 /// ## Arguments
 ///
-/// - [args](UninstallOpts) The command arguments
+/// * [args](UninstallOpts) The command arguments
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](IoError) - An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) An error occured
 ///
 pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
   let detected_host = utils::docker::detect_docker_host()?;

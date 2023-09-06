@@ -29,10 +29,10 @@ use crate::models::DockerContextMeta;
 ///
 /// ## Arguments
 ///
-/// - [multiprogress](MultiProgress) The multiprogress bar
-/// - [layers](HashMap<String, ProgressBar>) The layers
-/// - [id](str) The id of the layer
-/// - [progress](ProgressDetail) The progress detail
+/// * [multiprogress](MultiProgress) The multiprogress bar
+/// * [layers](HashMap) The layers
+/// * [id](str) The id of the layer
+/// * [progress](ProgressDetail) The progress detail
 ///
 fn update_image_progress(
   multiprogress: &MultiProgress,
@@ -74,15 +74,15 @@ fn update_image_progress(
 ///
 /// ## Arguments
 ///
-/// - [from_image](str) The image to install
-/// - [tag](str) The tag of the image
-/// - [docker_api](Docker) The docker client
+/// * [from_image](str) The image to install
+/// * [tag](str) The tag of the image
+/// * [docker_api](Docker) The docker client
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [IoResult<()>](IoResult<()>) The result of the operation
-///   - [Ok](()) The image has been installed
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The image has been installed
+///   * [Err](IoError) An error occured
 ///
 pub async fn install_image(
   from_image: &str,
@@ -140,13 +140,13 @@ pub async fn install_image(
 ///
 /// ## Arguments
 ///
-/// - [docker_host](str) The docker host
+/// * [docker_host](str) The docker host
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](Docker) The docker client
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](Docker) The docker client
+///   * [Err](IoError) An error occured
 ///
 pub fn connect(docker_host: &str) -> IoResult<Docker> {
   let docker = match &docker_host {
@@ -195,13 +195,13 @@ pub fn connect(docker_host: &str) -> IoResult<Docker> {
 ///
 /// ## Arguments
 ///
-/// - [key](str) The key of the container
-/// - [namespace](str) The namespace of the container
-/// - [labels](HashMap<String, String>) The labels of the container
+/// * [key](str) The key of the container
+/// * [namespace](str) The namespace of the container
+/// * [labels](HashMap<String, String>) The labels of the container
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [HashMap<String, String>](HashMap<String, String>) The hooked labels
+/// * [HashMap<String, String>](HashMap<String, String>) The hooked labels
 ///
 pub fn hook_labels(
   key: &str,
@@ -227,15 +227,15 @@ pub fn hook_labels(
 ///
 /// ## Arguments
 ///
-/// - [cargo](CargoConfigPartial) The cargo config
-/// - [namespace](str) The namespace of the container
-/// - [docker](Docker) The docker client
+/// * [cargo](CargoConfigPartial) The cargo config
+/// * [namespace](str) The namespace of the container
+/// * [docker](Docker) The docker client
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](ContainerCreateResponse) The container
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](ContainerCreateResponse) The container
+///   * [Err](IoError) An error occured
 ///
 pub async fn create_cargo_container(
   cargo: &CargoConfigPartial,
@@ -280,11 +280,11 @@ pub async fn create_cargo_container(
 ///
 /// Detect docker host from docker config
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok]((String, bool)) The docker host
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok]((String, bool)) The docker host
+///   * [Err](IoError) An error occured
 ///
 pub fn detect_docker_host() -> std::io::Result<(String, bool)> {
   let home = std::env::var("HOME").map_err(|_| {

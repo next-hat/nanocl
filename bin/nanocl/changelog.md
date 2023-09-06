@@ -87,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `-a` option when applying a `Statefile` now.
-- `Envs` are applied to the `Statefile` even if no `BuildArgs` are set.
+- `Envs` are applied to the `Statefile` even if no `BuildArg` are set.
 
 ## [0.6.0] - 2023-04-30
 

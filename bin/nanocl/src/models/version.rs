@@ -1,8 +1,9 @@
 use clap::Parser;
 
-/// ## VersionArgs
+/// ## VersionArg
 ///
-/// Version command args
+/// `nanocl version` available arguments
+///
 #[derive(Debug, Parser)]
 #[clap(name = "nanocl-version")]
-pub struct VersionArgs {}
+pub struct VersionArg {}

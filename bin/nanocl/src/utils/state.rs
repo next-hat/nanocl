@@ -17,14 +17,14 @@ use crate::models::{DisplayFormat, StateRef};
 ///
 /// ## Arguments
 ///
-/// - [ext](str) The file extension eg: yaml, json, toml
-/// - [raw](str) The raw data of the Statefile
+/// * [ext](str) The file extension eg: yaml, json, toml
+/// * [raw](str) The raw data of the Statefile
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](StateRef) The StateRef
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](StateRef) The StateRef
+///   * [Err](IoError) An error occured
 ///
 pub fn get_state_ref<T>(ext: &str, raw: &str) -> IoResult<StateRef<T>>
 where
@@ -107,14 +107,14 @@ where
 ///
 /// ## Arguments
 ///
-/// - [format](DisplayFormat) The format to serialize to
-/// - [data](str) The data to serialize
+/// * [format](DisplayFormat) The format to serialize into
+/// * [data](str) The data to serialize
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](T) The serialized data
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](T) The serialized data
+///   * [Err](IoError) An error occured
 ///
 pub fn serialize_ext<T>(format: &DisplayFormat, data: &str) -> IoResult<T>
 where
@@ -146,21 +146,20 @@ where
 ///
 /// ## Arguments
 ///
-/// - [raw](str) The raw data of the Statefile
-/// - [obj](ObjectView) The data to compile with
+/// * [raw](str) The raw data of the Statefile
+/// * [obj](ObjectView) The data to compile with
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](String) The compiled data
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](String) The compiled data
+///   * [Err](IoError) An error occured
 ///
 pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
   // replace "${{ }}" with "{{ }}" syntax for liquid
   let reg = Regex::new(r"\$\{\{(.+?)\}\}")
     .map_err(|err| IoError::invalid_data("Regex", &format!("{err}")))?;
   let template = reg.replace_all(raw, "{{ $1 }}").to_string();
-
   let template = liquid::ParserBuilder::with_stdlib()
     .build()
     .unwrap()
@@ -168,7 +167,6 @@ pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
     .map_err(|err| {
       IoError::invalid_data("Template parsing", &format!("{err}"))
     })?;
-
   let output = template.render(&obj).map_err(|err| {
     IoError::invalid_data("Template rendering", &format!("{err}"))
   })?;
@@ -181,10 +179,10 @@ pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
 ///
 /// ## Arguments
 ///
-/// - [multiprogress](MultiProgress) The multiprogress bar
-/// - [layers](HashMap<String, ProgressBar>) The layers of progress bars
-/// - [id](str) The id of the progress bar
-/// - [state_stream](StateStream) The state stream to update
+/// * [multiprogress](MultiProgress) The multiprogress bar
+/// * [layers](HashMap) The layers of progress bars
+/// * [id](str) The id of the progress bar
+/// * [state_stream](StateStream) The state stream to update
 ///
 pub fn update_progress(
   multiprogress: &MultiProgress,

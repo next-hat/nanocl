@@ -8,11 +8,11 @@ use crate::models::DisplayFormat;
 
 /// ## Print table
 ///
-/// Print a table from an iterator of tabled::Tabled
+/// Print a table from an iterator of [Tabled](tabled::Tabled) elements
 ///
 /// ## Arguments
 ///
-/// - [iter](impl IntoIterator<Item = T>) The iterator of tabled::Tabled
+/// * [iter](IntoIterator) The iterator of [Tabled](tabled::Tabled) elements
 ///
 pub fn print_table<T>(iter: impl IntoIterator<Item = T>)
 where
@@ -29,6 +29,20 @@ where
   println!("{table}");
 }
 
+/// ## Print yml
+///
+/// Print yaml from a serializable data
+///
+/// ## Arguments
+///
+/// * [data](serde::Serialize) The serializable data
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](IoError) An error occured
+///
 pub fn print_yml<T>(data: T) -> IoResult<()>
 where
   T: serde::Serialize,
@@ -45,13 +59,13 @@ where
 ///
 /// ## Arguments
 ///
-/// - [data](T) The serializable data
+/// * [data](serde::Serialize) The serializable data
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](()) The operation was successful
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](IoError) An error occured
 ///
 pub fn print_json<T>(data: T) -> IoResult<()>
 where
@@ -69,13 +83,13 @@ where
 ///
 /// ## Arguments
 ///
-/// - [data](T) The serializable data
+/// * [data](serde::Serialize) The serializable data
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](()) The operation was successful
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](IoError) An error occured
 ///
 pub fn print_toml<T>(data: T) -> IoResult<()>
 where
@@ -97,14 +111,14 @@ where
 ///
 /// ## Arguments
 ///
-/// - [format](DisplayFormat) The format to display the data
-/// - [data](T) The serializable data
+/// * [format](DisplayFormat) The format to display the data
+/// * [data](serde::Serialize) The serializable data
 ///
-/// ## Returns
+/// ## Return
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](()) The operation was successful
-///   - [Err](IoError) An error occured
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](IoError) An error occured
 ///
 pub fn display_format<T>(format: &DisplayFormat, data: T) -> IoResult<()>
 where

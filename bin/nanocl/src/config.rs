@@ -42,7 +42,7 @@ impl Default for UserConfig {
 /// ## CliConfig implementations
 ///
 impl UserConfig {
-  /// ## New CliConfig
+  /// ## New
   ///
   /// This function is used to create a new CliConfig struct
   /// It will read the configuration file located in the user's home directory
@@ -66,9 +66,9 @@ impl UserConfig {
   }
 }
 
-/// ## CommandConfig
+/// ## Cli Config
 ///
-/// A new CommandConfig is created for each command.
+/// A new `CliConfig` is created for each command.
 /// It is used to pass the configuration to the command functions.
 /// And contains the host, the client, the context and the command arguments.
 ///

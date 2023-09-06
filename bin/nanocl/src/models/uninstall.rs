@@ -2,7 +2,7 @@ use clap::Parser;
 
 /// ## UninstallOpts
 ///
-/// Uninstall command options
+/// `nanocl uninstall` available options
 ///
 #[derive(Debug, Clone, Parser)]
 pub struct UninstallOpts {

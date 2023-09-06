@@ -2,23 +2,23 @@ use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
-use nanocld_client::stubs::{
-  vm_config::{VmConfigPartial, VmDiskConfig, VmHostConfig, VmConfigUpdate},
-  vm::VmSummary,
+use nanocld_client::stubs::vm::VmSummary;
+use nanocld_client::stubs::vm_config::{
+  VmConfigPartial, VmDiskConfig, VmHostConfig, VmConfigUpdate,
 };
 
-use super::{VmImageArgs, DisplayFormat};
+use super::{VmImageArg, DisplayFormat};
 
 /// ## VmCommands
 ///
-/// Available virtual machine commands
+/// `nanocl vm` available commands
 ///
 #[derive(Debug, Subcommand)]
 pub enum VmCommand {
   /// Run a vm
   Run(VmRunOpts),
   /// Manage vm images
-  Image(VmImageArgs),
+  Image(VmImageArg),
   /// Create a vm
   Create(VmCreateOpts),
   /// List vms
@@ -54,7 +54,7 @@ pub struct VmNamesOpts {
 
 /// ## VmInspectOpts
 ///
-/// Inspect options
+/// `nanocl vm inspect` available options
 ///
 #[derive(Debug, Parser)]
 pub struct VmInspectOpts {
@@ -67,7 +67,7 @@ pub struct VmInspectOpts {
 
 /// ## VmListOpts
 ///
-/// List options
+/// `nanocl vm list` available options
 ///
 #[derive(Debug, Parser)]
 pub struct VmListOpts {
@@ -78,7 +78,7 @@ pub struct VmListOpts {
 
 /// ## VmPatchOpts
 ///
-/// Patch options
+/// `nanocl vm patch` available options
 ///
 #[derive(Clone, Debug, Parser)]
 pub struct VmPatchOpts {
@@ -133,7 +133,7 @@ impl From<VmPatchOpts> for VmConfigUpdate {
 
 /// ## VmRunOpts
 ///
-/// Run options
+/// `nanocl vm run` available options
 ///
 #[derive(Clone, Debug, Parser)]
 pub struct VmRunOpts {
@@ -200,7 +200,7 @@ impl From<VmRunOpts> for VmConfigPartial {
 
 /// ## VmCreateOpts
 ///
-/// Create options
+/// `nanocl vm create` available options
 ///
 #[derive(Clone, Debug, Parser)]
 pub struct VmCreateOpts {
@@ -308,12 +308,12 @@ impl From<VmSummary> for VmRow {
   }
 }
 
-/// ## VmArgs
+/// ## VmArg
 ///
-/// Vm arguments that include subcommands
+/// `nanocl vm` available arguments
 ///
 #[derive(Debug, Parser)]
-pub struct VmArgs {
+pub struct VmArg {
   /// namespace to target by default global is used
   #[clap(long, short)]
   pub namespace: Option<String>,

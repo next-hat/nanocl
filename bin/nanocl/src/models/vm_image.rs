@@ -4,21 +4,9 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::vm_image::{VmImage, VmImageResizePayload};
 
-/// ## VmImageCreateOpts
+/// ## VmImageCommand
 ///
-/// Create a base VM image options
-///
-#[derive(Debug, Parser)]
-pub struct VmImageCreateOpts {
-  /// Name of the VM image
-  pub name: String,
-  /// Path or url to the VM image
-  pub file_path: String,
-}
-
-/// ## VmImageCommands
-///
-/// Available virtual machine image commands
+/// `nanocl vm image` available commands
 ///
 #[derive(Debug, Subcommand)]
 pub enum VmImageCommand {
@@ -44,9 +32,21 @@ pub enum VmImageCommand {
   },
 }
 
+/// ## VmImageCreateOpts
+///
+/// `nanocl vm image create` available options
+///
+#[derive(Debug, Parser)]
+pub struct VmImageCreateOpts {
+  /// Name of the VM image
+  pub name: String,
+  /// Path or url to the VM image
+  pub file_path: String,
+}
+
 /// ## VmImageListOpts
 ///
-/// List VM images options
+/// `nanocl vm image list` available options
 ///
 #[derive(Clone, Debug, Parser)]
 pub struct VmImageListOpts {
@@ -57,7 +57,7 @@ pub struct VmImageListOpts {
 
 /// ## VmImageResizeOpts
 ///
-/// Resize a VM image options
+/// `nanocl vm image resize` available options
 ///
 #[derive(Clone, Debug, Parser)]
 pub struct VmImageResizeOpts {
@@ -80,12 +80,12 @@ impl From<VmImageResizeOpts> for VmImageResizePayload {
   }
 }
 
-/// ## VmImageArgs
+/// ## VmImageArg
 ///
-/// Vm image arguments
+/// `nanocl vm image` available arguments
 ///
 #[derive(Debug, Parser)]
-pub struct VmImageArgs {
+pub struct VmImageArg {
   /// Command to run
   #[clap(subcommand)]
   pub command: VmImageCommand,
