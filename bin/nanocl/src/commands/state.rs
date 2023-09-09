@@ -451,6 +451,12 @@ fn parse_build_args(
             format!("argument {arg} is missing"),
           ))?;
         args.insert(name, value.to_owned());
+      },
+      "Boolean"=>{
+        let value = matches.get_one::<String>(arg).ok_or(IoError::invalid_data(
+          "BuildArg".into(), format!("argument {arg} is missing")
+        ))?;
+        args.insert(name, value.to_string());
       }
       _ => {
         return Err(IoError::invalid_data(
@@ -460,6 +466,8 @@ fn parse_build_args(
       }
     }
   }
+
+  println!("args: {:#?}", args);
   Ok(args)
 }
 
