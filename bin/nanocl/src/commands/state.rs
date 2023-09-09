@@ -467,7 +467,6 @@ fn parse_build_args(
     }
   }
 
-  println!("args: {:#?}", args);
   Ok(args)
 }
 
