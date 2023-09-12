@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 log = "0.4.20"
 futures-util = "0.3.28"
-ntex = { version = "0.7.3", features = ["tokio"] }
+ntex = { version = "0.7.4", features = ["tokio"] }
 vpnkitrc = { version = "0.1.1", features = ["tokio"] }
 nanocld_client = { version = "0.9.1" }
 nanocl_utils = { version = "0.2.1", features = ["logger"] }
