@@ -1,7 +1,7 @@
 use std::time::Duration;
 use std::collections::HashMap;
 
-use users::get_group_by_name;
+use nix::unistd::Group;
 use bollard_next::container::StartContainerOptions;
 use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
@@ -71,16 +71,18 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     .deamon_hosts
     .clone()
     .unwrap_or(vec!["unix:///run/nanocl/nanocl.sock".into()]);
-  let gid = get_group_by_name(group).ok_or(IoError::not_fount(
-    "Group",
-    &format!(
-      "Error cannot find group: {group}\n\
+  let group = Group::from_name(group)
+    .map_err(|err| IoError::new("Group", err.into()))?
+    .ok_or(IoError::not_fount(
+      "Group",
+      &format!(
+        "Error cannot find group: {group}\n\
   You can create it with: sudo groupadd {group}\n\
   And be sure to add yourself to it: sudo usermod -aG {group} $USER\n\
   Then update your current session: newgrp {group}\n\
   And try again"
-    ),
-  ))?;
+      ),
+    ))?;
   let hostname = if let Some(hostname) = &args.hostname {
     hostname.to_owned()
   } else {
@@ -94,10 +96,10 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     conf_dir,
     gateway,
     hosts,
-    gid: gid.gid(),
     hostname,
     advertise_addr,
     is_docker_desktop,
+    gid: group.gid.into(),
     home_dir: home_dir.clone(),
   };
   let installer = utils::installer::get_template(args.template.clone()).await?;
