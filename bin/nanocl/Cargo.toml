@@ -27,7 +27,7 @@ clap_complete = "4.4.1"
 clap_mangen = { version = "0.2" }
 clap = { version = "4.4.4", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
-chrono = { version = "0.4.30", default-features = false, features = [
+chrono = { version = "0.4.31", default-features = false, features = [
   "std",
   "clock",
 ] }
@@ -47,7 +47,7 @@ clap = { version = "4.4.4", features = ["derive", "cargo"] }
 tokio = { version = "1.32.0", features = ["fs"] }
 hyper = "0.14.27"
 tokio-util = "0.7.7"
-chrono = { version = "0.4.30", default-features = false, features = [
+chrono = { version = "0.4.31", default-features = false, features = [
   "std",
   "clock",
 ] }
