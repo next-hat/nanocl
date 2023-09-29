@@ -196,11 +196,29 @@ impl From<CargoPatchOpts> for CargoConfigUpdate {
 ///
 #[derive(Debug, Clone, Parser)]
 pub struct CargoExecOpts {
+  /// Allocate a pseudo-TTY.
+  #[clap(short = 't', long = "tty")]
+  pub tty: bool,
   /// Name of cargo to execute command
   pub name: String,
   /// Command to execute
   #[clap(last = true, raw = true)]
   pub command: Vec<String>,
+  /// Override the key sequence for detaching a container.
+  #[clap(long)]
+  pub detach_keys: Option<String>,
+  /// Set environment variables
+  #[clap(short)]
+  pub env: Option<Vec<String>>,
+  /// Give extended privileges to the command
+  #[clap(long)]
+  pub privileged: bool,
+  /// Username or UID (format: "<name|uid>[:<group|gid>]")
+  #[clap(short)]
+  pub user: Option<String>,
+  /// Working directory inside the container
+  #[clap(short, long = "workdir")]
+  pub working_dir: Option<String>,
 }
 
 /// Convert CargoExecOpts to CreateExecOptions
@@ -208,6 +226,12 @@ impl From<CargoExecOpts> for CreateExecOptions {
   fn from(val: CargoExecOpts) -> Self {
     CreateExecOptions {
       cmd: Some(val.command),
+      tty: Some(val.tty),
+      detach_keys: val.detach_keys,
+      env: val.env,
+      privileged: Some(val.privileged),
+      user: val.user,
+      working_dir: val.working_dir,
       attach_stderr: Some(true),
       attach_stdout: Some(true),
       ..Default::default()

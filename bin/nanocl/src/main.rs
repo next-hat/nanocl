@@ -320,7 +320,7 @@ mod tests {
   /// Test cargo exec command
   #[ntex::test]
   async fn cargo_exec() {
-    let args = Cli::parse_from([
+    let mut args = Cli::parse_from([
       "nanocl",
       "cargo",
       "--namespace",
@@ -330,6 +330,60 @@ mod tests {
       "--",
       "echo",
       "hello",
+    ]);
+    assert!(execute_arg(&args).await.is_ok());
+
+    args = Cli::parse_from([
+      "nanocl",
+      "cargo",
+      "--namespace",
+      "system",
+      "exec",
+      "nstore",
+      "-e",
+      "A=test",
+      "--",
+      "env",
+    ]);
+    assert!(execute_arg(&args).await.is_ok());
+
+    args = Cli::parse_from([
+      "nanocl",
+      "cargo",
+      "--namespace",
+      "system",
+      "exec",
+      "nstore",
+      "--privileged",
+      "--",
+      "whoami",
+    ]);
+    assert!(execute_arg(&args).await.is_ok());
+
+    args = Cli::parse_from([
+      "nanocl",
+      "cargo",
+      "--namespace",
+      "system",
+      "exec",
+      "nstore",
+      "-t",
+      "--",
+      "ls",
+    ]);
+    assert!(execute_arg(&args).await.is_ok());
+
+    args = Cli::parse_from([
+      "nanocl",
+      "cargo",
+      "--namespace",
+      "system",
+      "exec",
+      "nstore",
+      "-u",
+      "0",
+      "--",
+      "whoami",
     ]);
     assert!(execute_arg(&args).await.is_ok());
   }

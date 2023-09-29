@@ -8,4 +8,4 @@ Namespace: cargo-example
 Cargoes:
   - Name: cargo-example
     Container:
-      Image: nexthat/nanocl-get-started:latest
+      Image: alpine:latest
