@@ -869,7 +869,13 @@ pub async fn exec_command(
   let result = state.docker_api.create_exec(&name, args.to_owned()).await?;
   let res = state
     .docker_api
-    .start_exec(&result.id, Some(StartExecOptions::default()))
+    .start_exec(
+      &result.id,
+      Some(StartExecOptions {
+        tty: args.tty.unwrap_or_default(),
+        ..Default::default()
+      }),
+    )
     .await?;
   match res {
     StartExecResults::Detached => Ok(web::HttpResponse::Ok().finish()),
