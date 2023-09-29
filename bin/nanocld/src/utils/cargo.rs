@@ -111,8 +111,14 @@ async fn create_instances(
       };
       let mut env = cargo.config.container.env.clone().unwrap_or_default();
       let hostname = match cargo.config.container.hostname {
-        Some(ref hostname) => format!("{current}-{hostname}"),
-        None => name,
+        Some(ref hostname) => {
+          if current > 0 {
+            format!("{current}-{hostname}")
+          } else {
+            hostname.to_owned()
+          }
+        }
+        None => name.replace('.', "-"),
       };
       env.push(format!("NANOCL_CARGO_KEY={}", cargo.key));
       env.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));

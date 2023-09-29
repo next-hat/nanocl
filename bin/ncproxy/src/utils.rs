@@ -65,7 +65,7 @@ async fn get_listen(
   match network {
     "Public" => {
       let ip = get_host_addr(client).await?;
-      Ok(format!("{ip}:{port}"))
+      Ok(format!("{port}"))
     }
     "Internal" => Ok(format!("127.0.0.1:{port}")),
     network if network.ends_with(".nsp") => {
