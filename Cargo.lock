@@ -67,9 +67,9 @@ dependencies = [
 
 [[package]]
 name = "anstream"
-version = "0.6.1"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6cd65a4b849ace0b7f6daeebcc1a1d111282227ca745458c61dbf670e52a597"
+checksum = "2ab91ebe16eb252986481c5b62f6098f3b698a45e34b5b98200cf20dd2484a44"
 dependencies = [
  "anstyle",
  "anstyle-parse",
@@ -105,9 +105,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle-wincon"
-version = "3.0.0"
+version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0238ca56c96dfa37bdf7c373c8886dd591322500aceeeccdb2216fe06dc2f796"
+checksum = "f0699d10d2f4d628a98ee7b57b289abbc98ff3bad977cb3152709d4bf2330628"
 dependencies = [
  "anstyle",
  "windows-sys 0.48.0",
@@ -179,7 +179,7 @@ dependencies = [
  "log",
  "parking",
  "polling",
- "rustix 0.37.23",
+ "rustix 0.37.24",
  "slab",
  "socket2 0.4.9",
  "waker-fn",
@@ -365,9 +365,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next"
-version = "0.15.1"
+version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ad4ba65009ea35ca6787826c83707ec409ba9246a32a2b328b3099b10b11512"
+checksum = "cc439121e812a1ce78d81eb8f652c8a9f628da01363aeccec2726885fa1307e3"
 dependencies = [
  "base64",
  "bollard-next-stubs",
@@ -395,9 +395,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next-stubs"
-version = "1.43.0-rc.3"
+version = "1.43.0-rc.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a45490c284084153b8627204a1786ef5471feda90335cf8a62bde1d8a8b171f7"
+checksum = "f12b6ab394124b6905fe4d88cc624aa7e50a0f4171433c9ececca2dfa23d9095"
 dependencies = [
  "serde",
  "serde_repr",
@@ -2788,9 +2788,9 @@ checksum = "d626bb9dae77e28219937af045c257c28bfd3f69333c512553507f5f9798cb76"
 
 [[package]]
 name = "rustix"
-version = "0.37.23"
+version = "0.37.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d69718bf81c6127a49dc64e44a742e8bb9213c0ff8869a22c308f84c1d4ab06"
+checksum = "4279d76516df406a8bd37e7dff53fd37d1a093f997a3c34a5c21658c126db06d"
 dependencies = [
  "bitflags 1.3.2",
  "errno",
