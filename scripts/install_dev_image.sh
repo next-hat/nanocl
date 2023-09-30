@@ -1,7 +1,7 @@
 #!/bin/sh
 ## name: build_dev_image.sh
 
-docker pull cockroachdb/cockroach:v23.1.8
+docker pull cockroachdb/cockroach:v23.1.10
 docker pull ghcr.io/nxthat/metrsd:0.3.1
 docker pull nexthat/nanocl-get-started:latest
 docker pull ghcr.io/nxthat/nanocl-dev:dev

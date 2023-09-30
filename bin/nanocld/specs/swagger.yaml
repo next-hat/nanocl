@@ -29,15 +29,8 @@ servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.6
+      default: v0.9
       description: API version
-      enum:
-      - v0.6
-      - v0.5
-      - v0.4
-      - v0.3
-      - v0.2
-      - v0.1
 paths:
   /_ping:
     head:
