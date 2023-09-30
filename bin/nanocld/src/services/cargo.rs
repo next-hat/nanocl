@@ -6,8 +6,6 @@ use ntex::rt;
 use ntex::web;
 use ntex::http;
 
-use bollard_next::exec::CreateExecOptions;
-
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
@@ -328,33 +326,6 @@ pub(crate) async fn patch_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-/// Execute a command in a cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Cargoes",
-  request_body = CreateExecOptions,
-  path = "/cargoes/{Name}/exec",
-  params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
-  ),
-  responses(
-    (status = 200, description = "Event Stream of the command output", content_type = "text/event-stream"),
-    (status = 404, description = "Cargo does not exist"),
-  ),
-))]
-#[web::post("/cargoes/{name}/exec")]
-async fn exec_command(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<CreateExecOptions>,
-  path: web::types::Path<(String, String)>,
-  state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::exec_command(&key, &payload, &state).await
-}
-
 /// Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
@@ -541,7 +512,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(inspect_cargo);
   config.service(list_cargo_history);
   config.service(revert_cargo);
-  config.service(exec_command);
   config.service(logs_cargo);
   config.service(list_cargo_instance);
   config.service(scale_cargo);
@@ -559,8 +529,8 @@ mod tests {
   use nanocl_stubs::generic::GenericNspQuery;
   use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
   use nanocl_stubs::cargo::{
-    Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
-    CargoDeleteQuery, CargoListQuery, CargoScale,
+    Cargo, CargoSummary, CargoInspect, OutputLog, CargoDeleteQuery,
+    CargoListQuery, CargoScale,
   };
 
   /// Test to create start patch stop and delete a cargo with valid data
@@ -579,7 +549,7 @@ mod tests {
     for test_cargo in test_cargoes.iter() {
       let test_cargo = test_cargo.to_string();
       let mut res = srv
-        .post("/v0.9/cargoes")
+        .post("/v0.10/cargoes")
         .send_json(&CargoConfigPartial {
           name: test_cargo.clone(),
           container: bollard_next::container::Config {
@@ -604,7 +574,7 @@ mod tests {
     }
 
     let mut res = srv
-      .get("/v0.9/cargoes")
+      .get("/v0.10/cargoes")
       .query(&CargoListQuery {
         name: Some(test_cargoes.get(1).unwrap().to_string()),
         namespace: None,
@@ -618,7 +588,7 @@ mod tests {
     assert_eq!(cargoes[0].name, test_cargoes[1].to_string());
 
     let mut res = srv
-      .get("/v0.9/cargoes")
+      .get("/v0.10/cargoes")
       .query(&CargoListQuery {
         name: None,
         namespace: None,
@@ -632,7 +602,7 @@ mod tests {
     assert_eq!(cargoes.len(), 1);
 
     let mut res = srv
-      .get(format!("/v0.9/cargoes/{main_test_cargo}/inspect"))
+      .get(format!("/v0.10/cargoes/{main_test_cargo}/inspect"))
       .send()
       .await?;
     assert_eq!(res.status(), 200);
@@ -640,20 +610,20 @@ mod tests {
     let response = res.json::<CargoInspect>().await?;
     assert_eq!(response.name, main_test_cargo);
 
-    let mut res = srv.get("/v0.9/cargoes").send().await?;
+    let mut res = srv.get("/v0.10/cargoes").send().await?;
     assert_eq!(res.status(), 200);
     let cargoes = res.json::<Vec<CargoSummary>>().await?;
     assert!(!cargoes.is_empty());
     assert_eq!(cargoes[0].namespace_name, "global");
 
     let res = srv
-      .post(format!("/v0.9/cargoes/{}/start", response.name))
+      .post(format!("/v0.10/cargoes/{}/start", response.name))
       .send()
       .await?;
     assert_eq!(res.status(), 202);
 
     let mut res = srv
-      .put(format!("/v0.9/cargoes/{}", response.name))
+      .put(format!("/v0.10/cargoes/{}", response.name))
       .send_json(&CargoConfigPartial {
         name: main_test_cargo.to_string(),
         container: bollard_next::container::Config {
@@ -679,7 +649,7 @@ mod tests {
     );
 
     let mut res = srv
-      .get(format!("/v0.9/cargoes/{}/histories", response.name))
+      .get(format!("/v0.10/cargoes/{}/histories", response.name))
       .send()
       .await?;
     assert_eq!(res.status(), 200);
@@ -689,7 +659,7 @@ mod tests {
     let id = histories[0].key;
     let res = srv
       .patch(format!(
-        "/v0.9/cargoes/{}/histories/{id}/revert",
+        "/v0.10/cargoes/{}/histories/{id}/revert",
         response.name
       ))
       .send()
@@ -698,19 +668,19 @@ mod tests {
     assert_eq!(res.status(), 200);
 
     let res = srv
-      .post(format!("/v0.9/cargoes/{}/stop", response.name))
+      .post(format!("/v0.10/cargoes/{}/stop", response.name))
       .send()
       .await?;
     assert_eq!(res.status(), 202);
 
     let res = srv
-      .delete(format!("/v0.9/cargoes/{}", response.name))
+      .delete(format!("/v0.10/cargoes/{}", response.name))
       .send()
       .await?;
     assert_eq!(res.status(), 202);
 
     let res = srv
-      .delete(format!("/v0.9/cargoes/{}", test_cargoes[1]))
+      .delete(format!("/v0.10/cargoes/{}", test_cargoes[1]))
       .query(&CargoDeleteQuery {
         namespace: None,
         force: Some(true),
@@ -719,7 +689,7 @@ mod tests {
       .await?;
     assert_eq!(res.status(), 202);
     let res = srv
-      .delete(format!("/v0.9/cargoes/{}", test_cargoes[2]))
+      .delete(format!("/v0.10/cargoes/{}", test_cargoes[2]))
       .query(&CargoDeleteQuery {
         namespace: None,
         force: Some(true),
@@ -727,40 +697,6 @@ mod tests {
       .send()
       .await?;
     assert_eq!(res.status(), 202);
-    Ok(())
-  }
-
-  #[ntex::test]
-  async fn exec() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-
-    const CARGO_NAME: &str = "nstore";
-
-    let res = srv
-      .post(format!("/v0.9/cargoes/{CARGO_NAME}/exec"))
-      .query(&GenericNspQuery {
-        namespace: Some("system".into()),
-      })
-      .unwrap()
-      .send_json(&CreateExecOptions {
-        cmd: Some(vec!["ls".into(), "/".into(), "-lra".into()]),
-        ..Default::default()
-      })
-      .await?;
-
-    assert_eq!(res.status(), http::StatusCode::OK);
-    let mut stream = res.into_stream();
-    let mut payload = Vec::new();
-    while let Some(data) = stream.next().await {
-      let Ok(data) = data else {
-        break;
-      };
-      payload.extend_from_slice(&data);
-      if data.last() == Some(&b'\n') {
-        let _ = serde_json::from_slice::<OutputLog>(&payload)?;
-        payload.clear();
-      }
-    }
     Ok(())
   }
 
@@ -770,7 +706,7 @@ mod tests {
 
     const CARGO_NAME: &str = "api-test-scale";
     let res = srv
-      .post("/v0.9/cargoes")
+      .post("/v0.10/cargoes")
       .send_json(&CargoConfigPartial {
         name: CARGO_NAME.to_string(),
         container: bollard_next::container::Config {
@@ -783,32 +719,32 @@ mod tests {
     assert_eq!(res.status(), 201);
 
     let res = srv
-      .post(format!("/v0.9/cargoes/{CARGO_NAME}/start"))
+      .post(format!("/v0.10/cargoes/{CARGO_NAME}/start"))
       .send()
       .await?;
     assert_eq!(res.status(), 202);
 
     let res = srv
-      .patch(format!("/v0.9/cargoes/{CARGO_NAME}/scale"))
+      .patch(format!("/v0.10/cargoes/{CARGO_NAME}/scale"))
       .send_json(&CargoScale { replicas: 2 })
       .await?;
 
     assert_eq!(res.status(), 200);
 
     let res = srv
-      .patch(format!("/v0.9/cargoes/{CARGO_NAME}/scale"))
+      .patch(format!("/v0.10/cargoes/{CARGO_NAME}/scale"))
       .send_json(&CargoScale { replicas: -1 })
       .await?;
     assert_eq!(res.status(), 200);
 
     let res = srv
-      .post(format!("/v0.9/cargoes/{CARGO_NAME}/stop"))
+      .post(format!("/v0.10/cargoes/{CARGO_NAME}/stop"))
       .send()
       .await?;
     assert_eq!(res.status(), 202);
 
     let res = srv
-      .delete(format!("/v0.9/cargoes/{CARGO_NAME}"))
+      .delete(format!("/v0.10/cargoes/{CARGO_NAME}"))
       .send()
       .await?;
 
@@ -824,7 +760,7 @@ mod tests {
     const CARGO_NAME: &str = "nstore";
 
     let res = srv
-      .get(format!("/v0.9/cargoes/{CARGO_NAME}/logs"))
+      .get(format!("/v0.10/cargoes/{CARGO_NAME}/logs"))
       .query(&GenericNspQuery {
         namespace: Some("system".into()),
       })

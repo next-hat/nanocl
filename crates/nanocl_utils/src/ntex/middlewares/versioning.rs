@@ -81,7 +81,63 @@ where
     match version {
       None => {}
       Some(version) => {
-        if version.replace('v', "").as_str() > self.inner.version.as_str() {
+        let version_number = version.replace('v', "");
+        let versions = version_number.split('.').collect::<Vec<&str>>();
+        let major = versions.first();
+        let minor = versions.get(1);
+        let current_versions =
+          self.inner.version.split('.').collect::<Vec<&str>>();
+        let current_major = current_versions.first();
+        let current_minor = current_versions.get(1);
+
+        if minor.is_none()
+          || major.is_none()
+          || current_major.is_none()
+          || current_minor.is_none()
+        {
+          let msg = format!("{version} is invalid");
+          return Either::Right(ok(
+            req.into_response(
+              HttpResponse::NotFound()
+                .json(&serde_json::json!({
+                  "msg": msg,
+                }))
+                .into_body(),
+            ),
+          ));
+        }
+
+        let minor_number = minor.unwrap().parse::<usize>();
+        let major_number = major.unwrap().parse::<usize>();
+        let current_minor_number = current_minor.unwrap().parse::<usize>();
+        let current_major_number = current_major.unwrap().parse::<usize>();
+
+        if minor_number.is_err()
+          || major_number.is_err()
+          || current_minor_number.is_err()
+          || current_major_number.is_err()
+        {
+          let msg = format!("{version} is not a number");
+          return Either::Right(ok(
+            req.into_response(
+              HttpResponse::NotFound()
+                .json(&serde_json::json!({
+                  "msg": msg,
+                }))
+                .into_body(),
+            ),
+          ));
+        }
+
+        let minor_number = minor_number.unwrap();
+        let major_number = major_number.unwrap();
+        let current_minor_number = current_minor_number.unwrap();
+        let current_major_number = current_major_number.unwrap();
+
+        if major_number > current_major_number
+          || (major_number == current_major_number
+            && minor_number > current_minor_number)
+        {
           let msg = format!("{version} is not supported");
           return Either::Right(ok(
             req.into_response(
@@ -95,6 +151,7 @@ where
         }
       }
     }
+
     Either::Left(Box::pin(async move { ctx.call(&self.service, req).await }))
   }
 }

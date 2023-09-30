@@ -1,6 +1,6 @@
 [package]
 name = "nanocl"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Self-Sufficient Hybrid-Cloud Orchestrator CLI"
@@ -32,7 +32,7 @@ chrono = { version = "0.4.31", default-features = false, features = [
   "clock",
 ] }
 bollard-next = { version = "0.15.2" }
-nanocld_client = { version = "0.9.1" }
+nanocld_client = { version = "0.10.0" }
 
 [dependencies]
 bollard-next = { version = "0.15.2" }
@@ -55,7 +55,7 @@ dialoguer = "0.10.3"
 termios = "0.3.3"
 liquid = "0.26.1"
 regex = "1.9.3"
-nanocld_client = { version = "0.9.1", features = ["tokio"] }
+nanocld_client = { version = "0.10.0", features = ["tokio"] }
 nanocl_utils = { version = "0.2.1", features = [
   "unix",
   "io_error",

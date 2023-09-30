@@ -1,3 +1,5 @@
+use futures::StreamExt;
+use nanocld_client::bollard_next;
 use nanocld_client::NanocldClient;
 use nanocl_utils::io_error::{IoResult, FromIo, IoError};
 
@@ -63,9 +65,10 @@ async fn get_listen(
   client: &NanocldClient,
 ) -> IoResult<String> {
   match network {
+    "All" => Ok(format!("{port}")),
     "Public" => {
       let ip = get_host_addr(client).await?;
-      Ok(format!("{port}"))
+      Ok(format!("{ip}:{port}"))
     }
     "Internal" => Ok(format!("127.0.0.1:{port}")),
     network if network.ends_with(".nsp") => {
@@ -536,24 +539,48 @@ async fn resource_to_nginx_conf(
 /// This function will reload the nginx configuration
 pub(crate) async fn reload_config(client: &NanocldClient) -> IoResult<()> {
   log::info!("Reloading proxy configuration");
-  let exec = CreateExecOptions {
-    cmd: Some(vec!["nginx".into(), "-s".into(), "reopen".into()]),
-    ..Default::default()
-  };
-  client
-    .exec_cargo("nproxy", exec, Some("system".into()))
-    .await
-    .map_err(|err| err.map_err_context(|| "Unable to reopen proxy configs"))?;
-  let exec = CreateExecOptions {
+
+  let exec_options = CreateExecOptions {
     cmd: Some(vec!["nginx".into(), "-s".into(), "reload".into()]),
     ..Default::default()
   };
-  client
-    .exec_cargo("nproxy", exec, Some("system".into()))
+
+  let start_res = client
+    .create_exec("nproxy", exec_options, Some("system".into()))
     .await
     .map_err(|err| err.map_err_context(|| "Unable to reload proxy configs"))?;
-  log::info!("Proxy configuration reloaded");
-  Ok(())
+
+  let mut start_stream = client
+    .start_exec(
+      &start_res.id,
+      bollard_next::exec::StartExecOptions::default(),
+    )
+    .await
+    .map_err(|err| err.map_err_context(|| "Unable to reload proxy configs"))?;
+
+  let mut output = String::default();
+
+  while let Some(output_log) = start_stream.next().await {
+    let Ok(output_log) = output_log else {
+      break;
+    };
+
+    output += &output_log.data;
+  }
+
+  let inspect_result = client.inspect_exec(&start_res.id).await?;
+
+  match inspect_result.exit_code {
+    Some(code) => {
+      if code == 0 {
+        log::info!("Proxy configuration reloaded");
+        return Ok(());
+      }
+
+      Err(IoError::invalid_data("nproxy reload", &output))
+    }
+    None => Ok(()),
+  }
 }
 
 /// Create a new resource configuration

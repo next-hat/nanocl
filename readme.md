@@ -106,7 +106,7 @@ To install `Nanocl`, please refer to our online [installation guide](https://doc
 There is an example used to deploy our [documentation](https://docs.next-hat.com):
 
 ```yaml
-ApiVersion: v0.8
+ApiVersion: v0.10
 Kind: Deployment
 
 Namespace: nexthat
@@ -123,7 +123,7 @@ Cargoes:
 Resources:
   - Name: docs.next-hat.com
     Kind: ProxyRule
-    Version: v0.6
+    Version: v0.7
     Config:
       Watch:
         - doc.nexthat.c
