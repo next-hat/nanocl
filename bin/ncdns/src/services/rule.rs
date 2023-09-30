@@ -5,7 +5,7 @@ use nanocl_utils::http_error::HttpError;
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::dns::ResourceDnsRule;
 
-use crate::utils;
+use crate::utils::{self, remove_entries};
 use crate::dnsmasq::Dnsmasq;
 
 /// Create/Update a new DnsRule
@@ -23,7 +23,8 @@ use crate::dnsmasq::Dnsmasq;
 ))]
 #[web::put("/rules/{name}")]
 pub(crate) async fn apply_rule(
-  path: web::types::Path<(String, String)>,
+  // To follow the ressource service convention, we have to use a tuple
+  _path: web::types::Path<(String, String)>,
   dnsmasq: web::types::State<Dnsmasq>,
   web::types::Json(payload): web::types::Json<ResourceDnsRule>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -34,7 +35,7 @@ pub(crate) async fn apply_rule(
     client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
   }
-  utils::write_rule(&path.1, &payload, &dnsmasq, &client).await?;
+  utils::write_entries(&payload, &dnsmasq, &client).await?;
   utils::reload_service(&client).await?;
   Ok(web::HttpResponse::Ok().json(&payload))
 }
@@ -63,7 +64,15 @@ pub(crate) async fn remove_rule(
     client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
   }
-  dnsmasq.remove_config(&path.1).await?;
+  let rule = client.inspect_resource(&path.1).await?;
+  let dns_rule = serde_json::from_value::<ResourceDnsRule>(rule.config)
+    .map_err(|err| {
+      HttpError::bad_request(format!(
+        "Unable to serialize the DnsRule: {}",
+        err
+      ))
+    })?;
+  remove_entries(&dns_rule, &dnsmasq, &client).await?;
   utils::reload_service(&client).await?;
   Ok(web::HttpResponse::Ok().finish())
 }

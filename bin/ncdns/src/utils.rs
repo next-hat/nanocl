@@ -1,4 +1,4 @@
-use nanocld_client::NanocldClient;
+use nanocld_client::{NanocldClient, stubs::resource::ResourceQuery};
 use nanocld_client::stubs::dns::ResourceDnsRule;
 
 use nanocl_utils::io_error::{FromIo, IoResult, IoError};
@@ -59,21 +59,18 @@ async fn get_network_addr(
 /// Reload the dns service
 /// TODO: use a better way to reload the service, we may have to move from dnsmasq to something else
 pub(crate) async fn reload_service(client: &NanocldClient) -> IoResult<()> {
-  client.stop_cargo("ndns", Some("system".into())).await?;
-  client.start_cargo("ndns", Some("system".into())).await?;
+  client.restart_cargo("ndns", Some("system".into())).await?;
   Ok(())
 }
 
 /// Convert a ResourceDnsRule into a dnsmasq config and write it to a file
-pub(crate) async fn write_rule(
-  name: &str,
+pub(crate) async fn write_entries(
   dns_rule: &ResourceDnsRule,
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
   let listen_address = get_network_addr(&dns_rule.network, client).await?;
-  let mut entries = String::new();
-
+  let mut file_content = format!("listen-address={listen_address}\n");
   for entry in &dns_rule.entries {
     let ip_address = match entry.ip_address.as_str() {
       namespace if namespace.ends_with(".nsp") => {
@@ -82,11 +79,87 @@ pub(crate) async fn write_rule(
       }
       _ => entry.ip_address.clone(),
     };
-    entries += &format!("address=/{}/{}\n", entry.name, ip_address);
+    file_content += &format!("address=/{}/{}\n", entry.name, ip_address);
   }
+  dnsmasq
+    .write_config(&dns_rule.network, &file_content)
+    .await?;
+  Ok(())
+}
 
-  let file_content = format!("listen-address={listen_address}\n{entries}");
-  dnsmasq.write_config(name, &file_content).await?;
+pub(crate) async fn update_entries(
+  dns_rule: &ResourceDnsRule,
+  dnsmasq: &Dnsmasq,
+  client: &NanocldClient,
+) -> IoResult<()> {
+  let query = ResourceQuery {
+    contains: Some(
+      serde_json::json!({ "Network": dns_rule.network }).to_string(),
+    ),
+    kind: Some("DnsRule".into()),
+  };
+  let resources = client.list_resource(Some(query)).await.map_err(|err| {
+    err.map_err_context(|| "Unable to list resources from nanocl daemon")
+  })?;
+  let mut entries = Vec::new();
+  for resource in resources {
+    let mut dns_rule = serde_json::from_value::<ResourceDnsRule>(
+      resource.config,
+    )
+    .map_err(|err| err.map_err_context(|| "Unable to serialize the DnsRule"))?;
+    entries.append(&mut dns_rule.entries);
+  }
+  let listen_address = get_network_addr(&dns_rule.network, client).await?;
+  let mut file_content = format!("listen-address={listen_address}\n");
+  for entry in &entries {
+    let ip_address = match entry.ip_address.as_str() {
+      namespace if namespace.ends_with(".nsp") => {
+        let namespace = namespace.trim_end_matches(".nsp");
+        get_namespace_addr(namespace, client).await?
+      }
+      _ => entry.ip_address.clone(),
+    };
+    file_content += &format!("address=/{}/{}\n", entry.name, ip_address);
+  }
+  dnsmasq
+    .write_config(&dns_rule.network, &file_content)
+    .await?;
+  reload_service(client).await?;
+  Ok(())
+}
+
+pub(crate) async fn remove_entries(
+  dns_rule: &ResourceDnsRule,
+  dnsmasq: &Dnsmasq,
+  client: &NanocldClient,
+) -> IoResult<()> {
+  let content = dnsmasq.read_config(&dns_rule.network).await?;
+  println!("{}", content);
+  let mut file_content = String::new();
+  let lines = content.lines();
+  let listen_address = get_network_addr(&dns_rule.network, client).await?;
+  let empty_entries = format!("listen-address={listen_address}\n");
+  for line in lines {
+    let mut found = false;
+    for entry in &dns_rule.entries {
+      if line.starts_with(&format!("address=/{}/", entry.name)) {
+        found = true;
+        println!("Found {}", line);
+        break;
+      }
+    }
+    if !found {
+      file_content.push_str(&format!("{line}\n"));
+    }
+  }
+  println!("{}", file_content);
+  if file_content == empty_entries {
+    dnsmasq.remove_config(&dns_rule.network).await?;
+    return Ok(());
+  }
+  dnsmasq
+    .write_config(&dns_rule.network, &file_content)
+    .await?;
   Ok(())
 }
 

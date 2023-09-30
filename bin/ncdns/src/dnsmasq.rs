@@ -133,6 +133,16 @@ conf-dir={}/dnsmasq.d,*.conf
     Ok(())
   }
 
+  pub(crate) async fn read_config(&self, name: &str) -> IoResult<String> {
+    let file_path = format!("{}/dnsmasq.d/{name}.conf", &self.config_dir);
+    let content =
+      tokio::fs::read_to_string(file_path).await.map_err(|err| {
+        err
+          .map_err_context(|| format!("unable to read domains file for {name}"))
+      })?;
+    Ok(content)
+  }
+
   /// Remove domain records file for dnsmasq
   pub(crate) async fn remove_config(&self, name: &str) -> IoResult<()> {
     let file_path = format!("{}/dnsmasq.d/{name}.conf", &self.config_dir);
