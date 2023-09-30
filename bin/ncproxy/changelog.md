@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.7.0]
 
 ### Added
+
 - Option All to bind all network interfaces [@anonkey](https://github.com/anonkey)
 
 ### Changed
+
 - Public no longer bind all network interfaces [@anonkey](https://github.com/anonkey)
 - Removed reopen on reload [@anonkey](https://github.com/anonkey)
 - Better error handling on reload [@anonkey](https://github.com/anonkey)

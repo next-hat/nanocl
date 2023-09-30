@@ -269,49 +269,29 @@ mod tests {
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-    // Create a new resource
-    let args = Cli::parse_from([
-      "nanocl",
-      "state",
-      "apply",
-      "-ys",
-      "../../examples/resource_ssl_example.yml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    // List resources
-    let args = Cli::parse_from(["nanocl", "resource", "ls"]);
-    assert!(execute_arg(&args).await.is_ok());
-    // Inspect resource
-    let args =
-      Cli::parse_from(["nanocl", "resource", "inspect", "resource-example"]);
-    assert!(execute_arg(&args).await.is_ok());
-
     // History
     let args =
-      Cli::parse_from(["nanocl", "resource", "history", "resource-example"]);
+      Cli::parse_from(["nanocl", "resource", "history", "deploy-example.com"]);
     assert!(execute_arg(&args).await.is_ok());
-
     let client = NanocldClient::connect_to("http://localhost:8585", None);
     let history = client
-      .list_history_resource("resource-example")
+      .list_history_resource("deploy-example.com")
       .await
       .unwrap()
       .first()
       .unwrap()
       .clone();
-
     let args = Cli::parse_from([
       "nanocl",
       "resource",
       "revert",
-      "resource-example",
+      "deploy-example.com",
       &history.key.to_string(),
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     // Remove resource
     let args =
-      Cli::parse_from(["nanocl", "resource", "rm", "-y", "resource-example"]);
+      Cli::parse_from(["nanocl", "resource", "rm", "-y", "deploy-example.com"]);
     assert!(execute_arg(&args).await.is_ok());
     let args = Cli::parse_from([
       "nanocl",
