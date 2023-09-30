@@ -9,7 +9,9 @@ Args:
   - Name: image
     Kind: String
   - Name: port
-    Kind: String
+    Kind: Number
+  - Name: ssl_enabled
+    Kind: Boolean
 
 Namespace: global
 
@@ -32,6 +34,14 @@ Resources:
       Rules:
         - Domain: ${{ Args.domain }}
           Network: Public
+          # {% if Args.ssl_enabled %}
+          Ssl:
+            Certificate: /etc/letsencrypt/live/${{ Args.domain }}/fullchain.pem
+            CertificateKey: /etc/letsencrypt/live/${{ Args.domain }}/privkey.pem
+            Dhparam: /etc/letsencrypt/ssl-dhparams.pem
+          Includes:
+            - /etc/letsencrypt/options-ssl-nginx.conf
+          # {% endif %}
           Locations:
             - Path: /
               Target:

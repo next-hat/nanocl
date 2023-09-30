@@ -20,10 +20,10 @@ async fn run(cli: &Cli) -> IoResult<()> {
   log::info!("v{}:{}", version::VERSION, version::COMMIT_ID);
 
   // Spawn a new thread to listen events from nanocld
-  event::spawn();
 
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
   let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns.clone()).ensure()?;
+  event::spawn(&dnsmasq);
 
   let server = server::generate(&cli.host, &dnsmasq)?;
   server.await?;

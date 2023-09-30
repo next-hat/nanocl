@@ -178,7 +178,7 @@ services:
         source: .
         target: /project
       - /project/target
-      - ${STATE_DIR:-${HOME}/.nanocl/state/dns}/dns:/opt/dns
+      - ${STATE_DIR:-${HOME}/.nanocl/state/dns}:/opt/dns
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
 
   nanocld:
