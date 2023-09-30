@@ -9,13 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Options for cargo exec: tty, detach_keys, env, privileged, user, working_dir  [@anonkey](https://github.com/anonkey)
+- Options for cargo exec: tty, detach_keys, env, privileged, user, working_dir [@anonkey](https://github.com/anonkey)
 - return executed command status code from cargo exec [@anonkey](https://github.com/anonkey)
+- Arguments Number and Boolean for Statefile
 
 ### Changed
 
 - Use of nanocld-client v0.10.0 (exec_cargo becomes create_exec and start_exec) [@anonkey](https://github.com/anonkey)
-
 
 ## [0.9.0] - 2023-07-04
 
