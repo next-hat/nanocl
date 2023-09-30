@@ -13,31 +13,3 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-  - package-ecosystem: "docker"
-    directory: "/bin/nanocl"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "docker"
-    directory: "/bin/nanocld"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "docker"
-    directory: "/bin/ncdns"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "docker"
-    directory: "/bin/nproxy"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "docker"
-    directory: "/bin/ncvpnkit"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "docker"
-    directory: "/bin/ndns"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "docker"
-    directory: "/bin/nproxy"
-    schedule:
-      interval: "weekly"
