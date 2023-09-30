@@ -3,9 +3,10 @@ use std::collections::HashMap;
 
 use ntex::rt;
 use futures::StreamExt;
-use clap::{Arg, Command};
+use clap::{Arg, Command, ArgAction};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde_json::{Map, Value};
 use indicatif::{MultiProgress, ProgressBar};
 use bollard_next::service::HostConfig;
 
@@ -414,7 +415,7 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
 fn parse_build_args(
   yaml: &serde_yaml::Value,
   args: Vec<String>,
-) -> IoResult<HashMap<String, String>> {
+) -> IoResult<serde_json::Value> {
   let build_args: StateBuildArg = serde_yaml::from_value(yaml.clone())
     .map_err(|err| err.map_err_context(|| "Unable to extract BuildArgs"))?;
   let mut cmd = Command::new("nanocl state args")
@@ -429,17 +430,23 @@ fn parse_build_args(
     let mut cmd_arg = Arg::new(arg).long(arg);
     match build_arg.default {
       Some(default) => {
-        let default_value: &'static str = Box::leak(default.into_boxed_str());
-        cmd_arg = cmd_arg.default_value(default_value);
+        if build_arg.kind != "Boolean" {
+          let default_value: &'static str = Box::leak(default.into_boxed_str());
+          cmd_arg = cmd_arg.default_value(default_value);
+        }
       }
       None => {
-        cmd_arg = cmd_arg.required(true);
+        if build_arg.kind == "Boolean" {
+          cmd_arg = cmd_arg.action(ArgAction::SetTrue);
+        } else {
+          cmd_arg = cmd_arg.required(true);
+        }
       }
     }
     cmd = cmd.arg(cmd_arg);
   }
   let matches = cmd.get_matches_from(args);
-  let mut args = std::collections::HashMap::new();
+  let mut args = Map::new();
   for build_arg in build_args.args.unwrap_or_default() {
     let name = build_arg.name.to_owned();
     let arg: &'static str = Box::leak(name.to_owned().into_boxed_str());
@@ -450,7 +457,26 @@ fn parse_build_args(
             "BuildArg".into(),
             format!("argument {arg} is missing"),
           ))?;
-        args.insert(name, value.to_owned());
+        args.insert(name, Value::String(value.to_owned()));
+      }
+      "Boolean" => {
+        let value = matches.get_flag(&name);
+        println!("Boolean {value}");
+        args.insert(name, Value::Bool(value));
+      }
+      "Number" => {
+        let value =
+          matches.get_one::<String>(arg).ok_or(IoError::invalid_data(
+            "BuildArg".into(),
+            format!("argument {arg} is missing"),
+          ))?;
+        let value = value.parse::<usize>().map_err(|err| {
+          IoError::invalid_data(
+            "BuildArg".into(),
+            format!("argument {arg} is not a number: {err}"),
+          )
+        })?;
+        args.insert(name, Value::Number(value.into()));
       }
       _ => {
         return Err(IoError::invalid_data(
@@ -460,6 +486,7 @@ fn parse_build_args(
       }
     }
   }
+  let args = Value::Object(args);
   Ok(args)
 }
 
@@ -480,7 +507,7 @@ fn parse_build_args(
 ///
 fn inject_namespace(
   namespace: &str,
-  args: &HashMap<String, String>,
+  args: &serde_json::Value,
 ) -> IoResult<String> {
   let object = liquid::object!({
     "Args": args,
@@ -509,7 +536,7 @@ fn inject_namespace(
 async fn inject_data<T>(
   ext: &DisplayFormat,
   raw: &str,
-  args: &HashMap<String, String>,
+  args: &serde_json::Value,
   client: &NanocldClient,
 ) -> IoResult<T>
 where
