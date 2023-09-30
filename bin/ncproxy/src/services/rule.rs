@@ -35,7 +35,11 @@ pub async fn apply_rule(
   }
 
   utils::create_resource_conf(&path.1, &payload, &client, &nginx).await?;
-  utils::reload_config(&client).await?;
+  if let Err(err) = utils::reload_config(&client).await {
+    nginx.delete_conf_file(&path.1).await;
+    utils::reload_config(&client).await?;
+    return Err(HttpError::bad_request(err.to_string()));
+  }
 
   Ok(web::HttpResponse::Ok().json(&payload))
 }
