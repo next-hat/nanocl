@@ -541,15 +541,15 @@ pub(crate) async fn reload_config(client: &NanocldClient) -> IoResult<()> {
   log::info!("Reloading proxy configuration");
 
   let exec_options = CreateExecOptions {
+    attach_stderr: Some(true),
+    attach_stdout: Some(true),
     cmd: Some(vec!["nginx".into(), "-s".into(), "reload".into()]),
     ..Default::default()
   };
-
   let start_res = client
     .create_exec("nproxy", exec_options, Some("system".into()))
     .await
     .map_err(|err| err.map_err_context(|| "Unable to reload proxy configs"))?;
-
   let mut start_stream = client
     .start_exec(
       &start_res.id,
@@ -557,26 +557,20 @@ pub(crate) async fn reload_config(client: &NanocldClient) -> IoResult<()> {
     )
     .await
     .map_err(|err| err.map_err_context(|| "Unable to reload proxy configs"))?;
-
   let mut output = String::default();
-
   while let Some(output_log) = start_stream.next().await {
     let Ok(output_log) = output_log else {
       break;
     };
-
     output += &output_log.data;
   }
-
   let inspect_result = client.inspect_exec(&start_res.id).await?;
-
   match inspect_result.exit_code {
     Some(code) => {
       if code == 0 {
         log::info!("Proxy configuration reloaded");
         return Ok(());
       }
-
       Err(IoError::invalid_data("nproxy reload", &output))
     }
     None => Ok(()),
