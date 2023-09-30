@@ -97,6 +97,7 @@ services:
       - io.nanocl.cnsp=system
     volumes:
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/run}:/run
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/letsencrypt}:/etc/letsencrypt
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/certs}:/etc/nginx/certs
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
