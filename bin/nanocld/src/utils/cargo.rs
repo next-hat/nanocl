@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use ntex::rt;
-use ntex::web;
 use ntex::util::Bytes;
 use futures::{StreamExt, TryStreamExt};
 use futures_util::TryFutureExt;
@@ -10,7 +9,6 @@ use bollard_next::service::ContainerCreateResponse;
 
 use bollard_next::container::LogOutput;
 use bollard_next::container::WaitContainerOptions;
-use bollard_next::exec::{StartExecOptions, StartExecResults};
 use bollard_next::service::{ContainerSummary, HostConfig};
 use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
 use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
@@ -18,8 +16,8 @@ use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 use nanocl_utils::http_error::HttpError;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, OutputLog, CreateExecOptions,
-  CargoLogQuery, CargoKillOptions, GenericCargoListQuery, CargoScale,
+  Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,
+  CargoKillOptions, GenericCargoListQuery, CargoScale,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
@@ -842,52 +840,6 @@ pub async fn delete_by_namespace(
     .into_iter()
     .collect::<Result<Vec<()>, HttpError>>()?;
   Ok(())
-}
-
-/// ## Exec command
-///
-/// Execute a command in a cargo instance and return the output stream
-///
-/// ## Arguments
-///
-/// - [name](str) - The cargo name
-/// - [args](CreateExecOptions) - The exec options
-/// - [state](DaemonState) - The daemon state
-///
-/// ## Returns
-///
-/// - [Result](Result) - The result of the operation
-///  - [Ok](web::HttpResponse) - The output stream
-///  - [Err](HttpError) - The command has not been executed
-///
-pub async fn exec_command(
-  name: &str,
-  args: &CreateExecOptions,
-  state: &DaemonState,
-) -> Result<web::HttpResponse, HttpError> {
-  let name = format!("{name}.c");
-  let result = state.docker_api.create_exec(&name, args.to_owned()).await?;
-  let res = state
-    .docker_api
-    .start_exec(
-      &result.id,
-      Some(StartExecOptions {
-        tty: args.tty.unwrap_or_default(),
-        ..Default::default()
-      }),
-    )
-    .await?;
-  match res {
-    StartExecResults::Detached => Ok(web::HttpResponse::Ok().finish()),
-    StartExecResults::Attached { output, .. } => {
-      let stream = transform_stream::<LogOutput, OutputLog>(output);
-      Ok(
-        web::HttpResponse::Ok()
-          .content_type("nanocl/streaming-v1")
-          .streaming(stream),
-      )
-    }
-  }
 }
 
 /// ## Kill by name

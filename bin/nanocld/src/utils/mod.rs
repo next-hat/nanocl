@@ -8,6 +8,7 @@ pub mod proxy;
 pub mod resource;
 pub mod namespace;
 pub mod vm;
+pub mod exec;
 pub mod vm_image;
 pub mod cargo;
 pub mod cargo_image;

@@ -1,5 +1,5 @@
 Kind: Deployment
-ApiVersion: v0.8
+ApiVersion: v0.10
 
 Namespace: global
 
@@ -12,7 +12,7 @@ Args:
 Resources:
   - Name: ${{ Args.domain }}
     Kind: ProxyRule
-    Version: v0.6
+    Version: v0.7
     Config:
       Watch:
         - get-started.global.c

@@ -54,7 +54,7 @@ impl IoError {
     )
   }
 
-  pub fn not_fount<M>(context: M, message: M) -> Self
+  pub fn not_found<M>(context: M, message: M) -> Self
   where
     M: ToString + std::fmt::Display,
   {

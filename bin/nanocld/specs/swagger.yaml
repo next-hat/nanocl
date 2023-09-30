@@ -24,7 +24,7 @@ info:
     email: team@next-hat.com
   license:
     name: MIT OR Apache-2.0
-  version: v0.9.2
+  version: v0.10.0
 servers:
 - url: /{Version}
   variables:
@@ -235,6 +235,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /cargoes/{CargoName}/exec:
+    post:
+      tags:
+      - Cargoes
+      operationId: create_exec_command
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExecOptions'
+        required: true
+      responses:
+        '200':
+          description: Event Stream of the command output
+        '404':
+          description: Cargo does not exist
   /cargoes/{Name}:
     put:
       tags:
@@ -335,38 +365,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Cargo'
-        '404':
-          description: Cargo does not exist
-  /cargoes/{Name}/exec:
-    post:
-      tags:
-      - Cargoes
-      summary: Execute a command in a cargo
-      description: Execute a command in a cargo
-      operationId: exec_command
-      parameters:
-      - name: Name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateExecOptions'
-        required: true
-      responses:
-        '200':
-          description: Event Stream of the command output
         '404':
           description: Cargo does not exist
   /cargoes/{Name}/histories:
@@ -726,6 +724,52 @@ paths:
             text/plain:
               schema:
                 type: string
+  /exec/{Id}/cargo/inspect:
+    post:
+      tags:
+      - Exec
+      summary: Inspect a command executed in a cargo
+      description: Inspect a command executed in a cargo
+      operationId: inspect_exec_command
+      parameters:
+      - name: Id
+        in: path
+        description: Exec id to inspect
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Inspect exec infos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/bollard_next.models.ExecInspectResponse'
+        '404':
+          description: Exec instance does not exist
+  /exec/{Id}/cargo/start:
+    post:
+      tags:
+      - Exec
+      operationId: start_exec_command
+      parameters:
+      - name: Id
+        in: path
+        description: Exec command id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartExecOptions'
+        required: true
+      responses:
+        '200':
+          description: Event Stream of the command output
+        '404':
+          description: Cargo does not exist
   /http_metrics:
     get:
       tags:

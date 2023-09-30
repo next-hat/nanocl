@@ -1,5 +1,5 @@
 Kind: Resource
-ApiVersion: v0.9
+ApiVersion: v0.10
 
 Resources:
   - Name: dns-get-started

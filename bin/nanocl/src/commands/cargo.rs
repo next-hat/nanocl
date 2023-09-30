@@ -1,5 +1,7 @@
+use std::process;
+
 use futures::StreamExt;
-use bollard_next::exec::CreateExecOptions;
+use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
 use nanocl_utils::io_error::{FromIo, IoResult};
 use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery, CargoLogQuery};
@@ -288,9 +290,20 @@ async fn exec_cargo_exec(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let exec: CreateExecOptions = opts.clone().into();
-  let mut stream = client
-    .exec_cargo(&opts.name, exec, args.namespace.clone())
+  let result = client
+    .create_exec(&opts.name, exec, args.namespace.clone())
     .await?;
+
+  let mut stream = client
+    .start_exec(
+      &result.id,
+      StartExecOptions {
+        tty: opts.tty,
+        ..Default::default()
+      },
+    )
+    .await?;
+
   while let Some(output) = stream.next().await {
     let output = output?;
     match output.kind {
@@ -304,7 +317,18 @@ async fn exec_cargo_exec(
       OutputKind::Console => print!("{}", &output.data),
     }
   }
-  Ok(())
+
+  let exec_infos = client.inspect_exec(&result.id).await?;
+
+  match exec_infos.exit_code {
+    Some(code) => {
+      if code == 0 {
+        return Ok(());
+      }
+      process::exit(code.try_into().unwrap_or(1))
+    }
+    None => Ok(()),
+  }
 }
 
 /// ## Exec cargo history
@@ -368,6 +392,7 @@ async fn exec_cargo_logs(
     stderr: None,
     stdout: None,
   };
+
   let mut stream = client.logs_cargo(&opts.name, &query).await?;
   while let Some(log) = stream.next().await {
     let log = match log {
