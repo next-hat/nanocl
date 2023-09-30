@@ -63,8 +63,8 @@ use nanocl_stubs::state::{
 };
 
 use super::{
-  node, system, namespace, cargo, cargo_image, vm, vm_image, resource, metric,
-  http_metric,
+  node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
+  metric, http_metric,
 };
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -231,12 +231,15 @@ impl Modify for VersionModifier {
     cargo::restart_cargo,
     cargo::put_cargo,
     cargo::patch_cargo,
-    cargo::exec_command,
     cargo::kill_cargo,
     cargo::list_cargo_history,
     cargo::revert_cargo,
     cargo::logs_cargo,
     cargo::scale_cargo,
+    // Exec
+    exec::create_exec_command,
+    exec::start_exec_command,
+    exec::inspect_exec_command,
     // Cargo Image
     cargo_image::list_cargo_image,
     cargo_image::inspect_cargo_image,

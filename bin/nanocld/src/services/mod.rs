@@ -8,6 +8,7 @@ use crate::version;
 #[cfg(feature = "dev")]
 mod openapi;
 
+mod exec;
 mod state;
 mod node;
 mod namespace;
@@ -55,6 +56,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(
     web::scope("/{version}")
       .wrap(versioning)
+      .configure(exec::ntex_config)
       .configure(state::ntex_config)
       .configure(node::ntex_config)
       .configure(namespace::ntex_config)

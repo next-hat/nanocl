@@ -199,6 +199,8 @@ You also need this entry in your `/etc/hosts`
   cargo make tests-client
   ```
 
+On test fails make sure to remove any resource or cargo still alive after tests
+
 ## 👌 Usefull Command
 
 Some usefull command to know:
@@ -225,3 +227,7 @@ Some usefull command to know:
   ```sh
   nanocl cargo -n system exec nproxy -- certbot --nginx --email email@email.com --agree-tos -d your-domain.com
   ```
+
+## Version bumping
+
+On version bump of api or proxy, example files have to be updated to the last version to avoid test failing

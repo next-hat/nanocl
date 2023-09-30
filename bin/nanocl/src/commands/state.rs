@@ -365,7 +365,7 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
       let path_ptr = paths.clone();
       let version = path_ptr
         .last()
-        .ok_or(IoError::not_fount("Version", "is not specified"))?;
+        .ok_or(IoError::not_found("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
       let url = Box::leak(url.into_boxed_str());
@@ -385,7 +385,7 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
       let path_ptr = paths.clone();
       let version = path_ptr
         .last()
-        .ok_or(IoError::not_fount("Version", "is not specified"))?;
+        .ok_or(IoError::not_found("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
       let url = format!("https://{url}");

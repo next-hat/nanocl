@@ -15,11 +15,11 @@ async fn get_namespace_addr(
   })?;
   let ipam = namespace.network.ipam.unwrap_or_default();
   let configs = ipam.config.unwrap_or_default();
-  let config = configs.get(0).ok_or(IoError::not_fount(
+  let config = configs.get(0).ok_or(IoError::not_found(
     "NamespaceNetworkConfigs",
     "Unable to get index 0",
   ))?;
-  config.gateway.clone().ok_or(IoError::not_fount(
+  config.gateway.clone().ok_or(IoError::not_found(
     "NamespaceNetworkGateway",
     "Unable to get gateway",
   ))

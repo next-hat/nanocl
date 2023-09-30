@@ -168,7 +168,10 @@ mod tests {
     assert!(execute_arg(&args).await.is_ok());
     // Try to list cargo images
     let args = Cli::parse_from(["nanocl", "cargo", "image", "ls"]);
-    assert!(execute_arg(&args).await.is_ok());
+    let res = execute_arg(&args).await;
+
+    println!("{:?}", res);
+    assert!(res.is_ok());
     // Try to inspect cargo image
     let args =
       Cli::parse_from(["nanocl", "cargo", "image", "inspect", IMAGE_NAME]);
@@ -212,7 +215,10 @@ mod tests {
       "nanocl", "cargo", "patch", CARGO_NAME, "--image", IMAGE_NAME, "--env",
       "TEST=1",
     ]);
-    assert!(execute_arg(&args).await.is_ok());
+    let ret = execute_arg(&args).await;
+
+    println!("{:?}", ret);
+    assert!(ret.is_ok());
 
     let args = Cli::parse_from(["nanocl", "cargo", "history", CARGO_NAME]);
     assert!(execute_arg(&args).await.is_ok());

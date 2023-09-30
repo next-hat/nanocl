@@ -1,10 +1,10 @@
 Kind: Resource
-ApiVersion: v0.8
+ApiVersion: v0.10
 
 Resources:
   - Name: proxy-get-started
     Kind: ProxyRule
-    Version: v0.6
+    Version: v0.7
     Config:
       Watch: []
       Rules:

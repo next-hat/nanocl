@@ -73,7 +73,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     .unwrap_or(vec!["unix:///run/nanocl/nanocl.sock".into()]);
   let group = Group::from_name(group)
     .map_err(|err| IoError::new("Group", err.into()))?
-    .ok_or(IoError::not_fount(
+    .ok_or(IoError::not_found(
       "Group",
       &format!(
         "Error cannot find group: {group}\n\

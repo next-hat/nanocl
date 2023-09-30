@@ -1,4 +1,3 @@
-use ntex::channel::mpsc;
 use ntex::channel::mpsc::Receiver;
 
 use nanocl_utils::http_error::HttpError;
@@ -7,8 +6,8 @@ use nanocl_utils::http_client_error::HttpClientError;
 use bollard_next::service::ContainerSummary;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, CreateExecOptions, OutputLog,
-  CargoKillOptions, CargoDeleteQuery, CargoLogQuery,
+  Cargo, CargoSummary, CargoInspect, OutputLog, CargoKillOptions,
+  CargoDeleteQuery, CargoLogQuery,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigUpdate, CargoConfigPartial, CargoConfig,
@@ -350,55 +349,6 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## Exec command inside a cargo
-  ///
-  /// ## Arguments
-  ///
-  /// - [name](str) - The name of the cargo to exec the command in
-  /// - [exec](CreateExecOptions) - The config for the exec command
-  /// - [namespace](Option<String>) - The namespace where belong the cargo
-  ///
-  /// ## Returns
-  ///
-  /// - [Result](Result)
-  ///  - [Ok](Ok) - A [mpsc::Receiver](mpsc::Receiver) of [ExecOutput](ExecOutput)
-  /// - [Err](HttpClientError) - The command could not be executed
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use futures::StreamExt;
-  /// use nanocld_client::NanocldClient;
-  /// use nanocld_client::models::cargo_config::CreateExecOptions;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let exec = CreateExecOptions {
-  ///  cmd: vec!["echo".into(), "hello".into()],
-  /// ..Default::default()
-  /// };
-  /// let mut rx = client.exec_cargo("my-cargo", exec, None).await.unwrap();
-  /// while let Some(output) = rx.next().await {
-  ///  println!("{}", output);
-  /// };
-  /// ```
-  ///
-  pub async fn exec_cargo(
-    &self,
-    name: &str,
-    exec: CreateExecOptions,
-    namespace: Option<String>,
-  ) -> Result<mpsc::Receiver<Result<OutputLog, HttpError>>, HttpClientError> {
-    let res = self
-      .send_post(
-        format!("/{}/cargoes/{name}/exec", &self.version),
-        Some(exec),
-        Some(GenericNspQuery { namespace }),
-      )
-      .await?;
-
-    Ok(Self::res_stream(res).await)
-  }
-
   /// ## List all the cargo histories
   ///
   /// ## Arguments
@@ -638,21 +588,6 @@ mod tests {
       .delete_cargo("client-test-cargodup", &CargoDeleteQuery::default())
       .await
       .unwrap();
-  }
-
-  #[ntex::test]
-  async fn exec_cargo() {
-    let client = NanocldClient::connect_to("http://localhost:8585", None);
-
-    let exec = CreateExecOptions {
-      cmd: Some(vec!["echo".into(), "hello".into()]),
-      ..Default::default()
-    };
-    let mut rx = client
-      .exec_cargo("nstore", exec, Some("system".into()))
-      .await
-      .unwrap();
-    while let Some(_out) = rx.next().await {}
   }
 
   #[ntex::test]
