@@ -10,6 +10,8 @@ Args:
     Kind: String
   - Name: port
     Kind: String
+  - Name: ssl_enabled
+    Kind: Number
 
 Namespace: global
 

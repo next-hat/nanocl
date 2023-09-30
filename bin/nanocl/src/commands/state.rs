@@ -452,6 +452,25 @@ fn parse_build_args(
           ))?;
         args.insert(name, value.to_owned());
       }
+      "Boolean" => {
+        let value = matches.contains_id(&name);
+        println!("Boolean {value}");
+        args.insert(name, value.to_string());
+      }
+      "Number" => {
+        let value =
+          matches.get_one::<String>(arg).ok_or(IoError::invalid_data(
+            "BuildArg".into(),
+            format!("argument {arg} is missing"),
+          ))?;
+        let value = value.parse::<usize>().map_err(|err| {
+          IoError::invalid_data(
+            "BuildArg".into(),
+            format!("argument {arg} is not a number: {err}"),
+          )
+        })?;
+        args.insert(name, value.to_string());
+      }
       _ => {
         return Err(IoError::invalid_data(
           "Statefile".into(),

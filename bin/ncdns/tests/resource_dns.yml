@@ -1,5 +1,5 @@
 Kind: Resource
-ApiVersion: v0.8
+ApiVersion: v0.9
 
 Resources:
   - Name: dns-get-started
@@ -12,13 +12,13 @@ Resources:
           IpAddress: 127.0.0.1
         - Name: test1.com
           IpAddress: global.nsp
-  - Name: dns-get-started-2
-    Kind: DnsRule
-    Version: v0.3
-    Config:
-      Network: system.nsp
-      Entries:
-        - Name: test2.com
-          IpAddress: 127.0.0.1
-        - Name: test3.com
-          IpAddress: global.nsp
+  # - Name: dns-get-started-2
+  #   Kind: DnsRule
+  #   Version: v0.3
+  #   Config:
+  #     Network: system.nsp
+  #     Entries:
+  #       - Name: test2.com
+  #         IpAddress: 127.0.0.1
+  #       - Name: test3.com
+  #         IpAddress: global.nsp
