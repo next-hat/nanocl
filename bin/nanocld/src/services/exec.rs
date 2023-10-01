@@ -22,7 +22,7 @@ use crate::models::DaemonState;
     ("Id" = String, Path, description = "Exec id to inspect"),
   ),
   responses(
-    (status = 200, description = "Inspect exec infos", body = bollard_next::models::ExecInspectResponse),
+    (status = 200, description = "Inspect exec infos", body = ExecInspectResponse),
     (status = 404, description = "Exec instance does not exist"),
   ),
 ))]
