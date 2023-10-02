@@ -1,3 +1,4 @@
+use bollard_next::exec::StartExecOptions;
 use ntex::util::HashMap;
 use serde::{Serialize, Deserialize};
 use utoipa::{OpenApi, Modify, ToSchema};
@@ -22,7 +23,7 @@ use bollard_next::service::{
   ImageInspectMetadata, ImageInspectRootFs, SwarmSpecCaConfigExternalCas,
   SwarmSpecTaskDefaultsLogDriver, GenericResourcesInnerDiscreteResourceSpec,
   Network, GenericResourcesInner, GenericResourcesInnerNamedResourceSpec,
-  NetworkContainer, Ipam, IpamConfig,
+  NetworkContainer, Ipam, IpamConfig, ExecInspectResponse, ProcessConfig,
 };
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::generic::GenericCount;
@@ -374,6 +375,9 @@ impl Modify for VersionModifier {
     NetworkContainer,
     Ipam,
     IpamConfig,
+    ExecInspectResponse,
+    StartExecOptions,
+    ProcessConfig,
     // Network
     Network,
     // Vm Image

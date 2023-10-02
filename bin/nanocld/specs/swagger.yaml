@@ -737,7 +737,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/bollard_next.models.ExecInspectResponse'
+                $ref: '#/components/schemas/ExecInspectResponse'
         '404':
           description: Exec instance does not exist
   /exec/{Id}/cargo/start:
@@ -2571,6 +2571,46 @@ components:
           additionalProperties:
             type: string
           nullable: true
+    ExecInspectResponse:
+      type: object
+      properties:
+        CanRemove:
+          type: boolean
+          nullable: true
+        DetachKeys:
+          type: string
+          nullable: true
+        ID:
+          type: string
+          nullable: true
+        Running:
+          type: boolean
+          nullable: true
+        ExitCode:
+          type: integer
+          format: int64
+          nullable: true
+        ProcessConfig:
+          allOf:
+          - $ref: '#/components/schemas/ProcessConfig'
+          nullable: true
+        OpenStdin:
+          type: boolean
+          nullable: true
+        OpenStderr:
+          type: boolean
+          nullable: true
+        OpenStdout:
+          type: boolean
+          nullable: true
+        ContainerID:
+          type: string
+          nullable: true
+        Pid:
+          type: integer
+          format: int64
+          description: The system process ID for the exec process.
+          nullable: true
     GenericCount:
       type: object
       required:
@@ -3875,6 +3915,26 @@ components:
       - tcp
       - udp
       - sctp
+    ProcessConfig:
+      type: object
+      properties:
+        privileged:
+          type: boolean
+          nullable: true
+        user:
+          type: string
+          nullable: true
+        tty:
+          type: boolean
+          nullable: true
+        entrypoint:
+          type: string
+          nullable: true
+        arguments:
+          type: array
+          items:
+            type: string
+          nullable: true
     ProxyHttpLocation:
       type: object
       description: Defines a proxy rule location
@@ -4340,6 +4400,24 @@ components:
             type: string
           description: List of command-line arguments to pass to the runtime when invoked.
           nullable: true
+    StartExecOptions:
+      type: object
+      description: Exec configuration used in the [Create Exec API](Docker::create_exec())
+      required:
+      - Detach
+      - Tty
+      properties:
+        Detach:
+          type: boolean
+          description: Detach from the command.
+        Tty:
+          type: boolean
+          description: Allocate a pseudo-TTY.
+        OutputCapacity:
+          type: integer
+          description: The maximum size for a line of output. The default is 8 * 1024 (roughly 1024 characters).
+          nullable: true
+          minimum: 0
     StateCargo:
       type: object
       description: |

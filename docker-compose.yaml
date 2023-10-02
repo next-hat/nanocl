@@ -206,6 +206,7 @@ services:
       - ${STATE_DIR:-${HOME}/.nanocl/state}:/var/lib/nanocl
       - //run/guest-services/nanocl:/run/nanocl
       - //var/run/docker.sock:/run/docker.sock
+      - ../bollard:/bollard
     command:
       - watch
       - -w
