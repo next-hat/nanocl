@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Options for cargo exec: tty, detach_keys, env, privileged, user, working_dir [@anonkey](https://github.com/anonkey)
 - return executed command status code from cargo exec [@anonkey](https://github.com/anonkey)
 - Arguments Number and Boolean for Statefile
+- Os,OsFamilly and Context inside the Statefile templating variable
 
 ### Changed
 
