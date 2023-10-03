@@ -82,6 +82,7 @@ services:
       - /project/bin/ncvpnkit/src
       - -x
       - run --no-default-features --features dev --bin ncvpnkit
+      - ../bollard:/bollard
 
   nproxy:
     container_name: nproxy.system.c
@@ -137,6 +138,7 @@ services:
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/streams-enabled}:/etc/nginx/streams-enabled
+      - ../bollard:/bollard
 
   ndns:
     container_name: ndns.system.c
@@ -181,6 +183,7 @@ services:
       - /project/target
       - ${STATE_DIR:-${HOME}/.nanocl/state/dns}:/opt/dns
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
+      - ../bollard:/bollard
 
   nanocld:
     container_name: ndaemon.system.c

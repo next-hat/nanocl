@@ -28,7 +28,7 @@ futures = "0.3.25"
 serde_json = "1.0.107"
 ntex = { version = "0.7.5", features = ["openssl"] }
 serde = { version = "1.0.183", features = ["derive"] }
-bollard-next = { version = "0.15.2" }
+bollard-next = { version = "0.15.3" }
 nanocl_stubs = { version = "0.9.1", features = ["serde"] }
 nanocl_utils = { version = "0.2.1", features = [
   "io_error",
