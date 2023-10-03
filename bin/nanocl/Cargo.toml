@@ -31,11 +31,11 @@ chrono = { version = "0.4.31", default-features = false, features = [
   "std",
   "clock",
 ] }
-bollard-next = { version = "0.15.2" }
+bollard-next = { version = "0.15.3" }
 nanocld_client = { version = "0.10.0" }
 
 [dependencies]
-bollard-next = { version = "0.15.2" }
+bollard-next = { version = "0.15.3" }
 futures = "0.3"
 serde_yaml = "0.9"
 tabled = "0.14.0"

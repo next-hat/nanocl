@@ -347,7 +347,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next"
-version = "0.15.2"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e0654049157d860c23c38ed46ce7e79f602216922eb92dfc59a3bac843c3e17"
 dependencies = [
  "base64",
  "bollard-next-stubs",
@@ -376,6 +378,8 @@ dependencies = [
 [[package]]
 name = "bollard-next-stubs"
 version = "1.43.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f12b6ab394124b6905fe4d88cc624aa7e50a0f4171433c9ececca2dfa23d9095"
 dependencies = [
  "serde",
  "serde_repr",

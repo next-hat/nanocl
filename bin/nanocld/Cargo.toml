@@ -34,7 +34,7 @@ clap_mangen = { version = "0.2" }
 serde_yaml = "0.9"
 
 [dependencies]
-bollard-next = { version = "0.15.2" }
+bollard-next = { version = "0.15.3" }
 r2d2 = "0.8"
 log = "0.4.20"
 futures = "0.3"
