@@ -1972,9 +1972,9 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a37face4d6dfad0b8b343b08279f086c4f1215f423c9065b680ac7d9b40c5bf"
+checksum = "527d8d38d101e396ac82f2f609c7135acf6f419aef3e8b2e18824ae42280f6a0"
 dependencies = [
  "async-channel",
  "async-oneshot",
