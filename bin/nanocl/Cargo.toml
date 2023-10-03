@@ -67,5 +67,5 @@ nanocl_utils = { version = "0.2.1", features = [
 ctrlc = "3.3.1"
 dotenv = "0.15.0"
 toml = "0.8.0"
-ring = "0.16.19"
+ring = "0.17.0"
 nix = { version = "0.27.1", features = ["user"] }
