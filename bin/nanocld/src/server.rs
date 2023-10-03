@@ -1,5 +1,5 @@
 use ntex::web;
-// use ntex_cors::Cors;
+use ntex_cors::Cors;
 
 use nanocl_utils::ntex::middlewares;
 
@@ -36,12 +36,12 @@ pub async fn gen(
       .state(
         web::types::PayloadConfig::new(20_000_000_000), // <- limit size of the payload
       )
-      // .wrap(Cors::new().finish())
+      .wrap(Cors::new().finish())
       .wrap(middlewares::SerializeError)
       // Default logger middleware
-      // .wrap(web::middleware::Logger::default())
+      .wrap(web::middleware::Logger::default())
       // Set Json body max size
-      // .state(web::types::JsonConfig::default().limit(4096))
+      .state(web::types::JsonConfig::default().limit(4096))
       .configure(services::ntex_config)
       .default_service(web::route().to(services::unhandled))
   });
