@@ -22,7 +22,7 @@ use crate::utils;
 use crate::config::CliConfig;
 use crate::models::{
   StateArg, StateCommand, StateApplyOpts, StateRemoveOpts, StateBuildArg,
-  DisplayFormat, StateRef,
+  DisplayFormat, StateRef, Context,
 };
 
 use super::cargo_image::exec_cargo_image_pull;
@@ -537,6 +537,7 @@ async fn inject_data<T>(
   ext: &DisplayFormat,
   raw: &str,
   args: &serde_json::Value,
+  context: &Context,
   client: &NanocldClient,
 ) -> IoResult<T>
 where
@@ -559,6 +560,9 @@ where
   let data = liquid::object!({
     "Args": args,
     "Envs": envs,
+    "Context": context,
+    "Os": std::env::consts::OS,
+    "OsFamily": std::env::consts::FAMILY,
     "Config": info.config,
     "HostGateway": info.host_gateway,
     "Namespaces": namespaces,
@@ -646,8 +650,14 @@ async fn exec_state_apply(
       };
       namespace = inject_namespace(&namespace, &args)?;
       let _ = client.create_namespace(&namespace).await;
-      let mut yaml: serde_yaml::Value =
-        inject_data(&state_ref.format, &state_ref.raw, &args, &client).await?;
+      let mut yaml: serde_yaml::Value = inject_data(
+        &state_ref.format,
+        &state_ref.raw,
+        &args,
+        &cli_conf.context,
+        &client,
+      )
+      .await?;
       let current_cargoes: Vec<CargoConfigPartial> = match yaml.get("Cargoes") {
         Some(cargoes) => serde_yaml::from_value(cargoes.clone())
           .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
@@ -659,7 +669,16 @@ async fn exec_state_apply(
         .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
       yaml
     }
-    _ => inject_data(&state_ref.format, &state_ref.raw, &args, &client).await?,
+    _ => {
+      inject_data(
+        &state_ref.format,
+        &state_ref.raw,
+        &args,
+        &cli_conf.context,
+        &client,
+      )
+      .await?
+    }
   };
   if !opts.skip_confirm {
     utils::print::display_format(&state_ref.format, &data)?;
@@ -722,8 +741,14 @@ async fn exec_state_remove(
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
   let client = gen_client(host, &state_ref.meta)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
-  let data: serde_json::Value =
-    inject_data(&state_ref.format, &state_ref.raw, &args, &client).await?;
+  let data: serde_json::Value = inject_data(
+    &state_ref.format,
+    &state_ref.raw,
+    &args,
+    &cli_conf.context,
+    &client,
+  )
+  .await?;
   if !opts.skip_confirm {
     utils::print::display_format(&state_ref.format, &data)?;
     utils::dialog::confirm("Are you sure to remove this state ?")
