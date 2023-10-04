@@ -3,7 +3,8 @@ use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
 use bollard_next::exec::CreateExecOptions;
-use nanocld_client::stubs::cargo::CargoSummary;
+use bollard_next::container::MemoryStatsStats;
+use nanocld_client::stubs::cargo::{CargoStats, CargoSummary};
 use nanocld_client::stubs::cargo_config::{
   CargoConfigUpdate, Config as ContainerConfig, CargoConfigPartial, HostConfig,
 };
@@ -286,6 +287,21 @@ pub struct CargoLogsOpts {
   pub follow: bool,
 }
 
+/// ## CargoStatsOpts
+///
+/// `nanocl cargo stats` available options
+///
+#[derive(Debug, Parser)]
+pub struct CargoStatsOpts {
+  /// Names of cargo to show stats
+  pub names: Vec<String>,
+  /// Disable streaming stats and only pull the first result
+  #[clap(long)]
+  pub no_stream: bool,
+  // TODO: Show all containers (default shows just running)
+  // pub all: bool,
+}
+
 /// ## CargoListOpts
 ///
 /// `nanocl cargo list` available options
@@ -334,6 +350,8 @@ pub enum CargoCommand {
   Logs(CargoLogsOpts),
   /// Run a cargo
   Run(CargoRunOpts),
+  /// Show stats of cargo
+  Stats(CargoStatsOpts),
 }
 
 /// ## CargoArg
@@ -394,6 +412,100 @@ impl From<CargoSummary> for CargoRow {
       instances: format!("{}/{}", cargo.instance_running, cargo.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
+    }
+  }
+}
+
+#[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
+pub struct CargoStatsRow {
+  key: String,
+  #[tabled(rename = "CPU %")]
+  cpu_usage: String,
+  #[tabled(rename = "MEM USAGE / LIMIT")]
+  mem_usage_limit: String,
+  #[tabled(rename = "MEM %")]
+  mem: String,
+  #[tabled(rename = "NET I/O")]
+  net_io: String,
+  #[tabled(rename = "BLOCK I/O")]
+  block_io: String,
+  pids: String,
+}
+
+impl From<CargoStats> for CargoStatsRow {
+  fn from(stats: CargoStats) -> Self {
+    let key = stats.name.replace('/', "");
+    let cpu_delta = stats.cpu_stats.cpu_usage.total_usage as f64
+      - stats.precpu_stats.cpu_usage.total_usage as f64;
+    let system_cpu_delta = stats.cpu_stats.system_cpu_usage.unwrap_or_default()
+      as f64
+      - stats.precpu_stats.system_cpu_usage.unwrap_or_default() as f64;
+    let number_cpus = stats.cpu_stats.online_cpus.unwrap_or_default() as f64;
+    let cpu_usage = format!(
+      "{:.2}%",
+      ((cpu_delta / system_cpu_delta) * number_cpus) * 100.0
+    );
+    let available_memory = stats.memory_stats.limit.unwrap_or_default() as f64;
+    let used_memory = stats.memory_stats.usage.unwrap_or_default() as f64;
+    let memory_usage = if let Some(memory_stats) = stats.memory_stats.stats {
+      match memory_stats {
+        MemoryStatsStats::V1(mem_stat) => used_memory - mem_stat.cache as f64,
+        MemoryStatsStats::V2(mem_stat) => {
+          used_memory - mem_stat.inactive_file as f64
+        }
+      }
+    } else {
+      0.00
+    };
+    let net_io = if let Some(networks) = stats.networks {
+      // calculate total network io
+      let mut total_rx = 0;
+      let mut total_tx = 0;
+      for (_, network) in networks {
+        total_rx += network.rx_bytes;
+        total_tx += network.tx_bytes;
+      }
+      format!(
+        "{:.1}MB / {:.1}MB",
+        // convert to MB
+        total_rx as f64 / 1000.00 / 1000.00,
+        // convert to MB
+        total_tx as f64 / 1000.00 / 1000.00
+      )
+    } else {
+      String::default()
+    };
+    let (total_read, total_write) = if let Some(io_service_bytes_recursive) =
+      stats.blkio_stats.io_service_bytes_recursive
+    {
+      (
+        io_service_bytes_recursive[0].value as f64,
+        io_service_bytes_recursive[1].value as f64,
+      )
+    } else {
+      (0.00, 0.00)
+    };
+    let block_io = format!(
+      "{:.1}MB / {:.1}GB",
+      total_read / 1000.00 / 1000.00,
+      total_write / 1000.00 / 1000.00 / 1000.00
+    );
+    let pids = format!("{}", stats.pids_stats.current.unwrap_or_default());
+    Self {
+      key,
+      cpu_usage,
+      mem_usage_limit: format!(
+        "{:.1}MiB / {:.2}GiB",
+        // convert to MiB
+        memory_usage / 1024.00 / 1024.00,
+        // convert to GiB
+        available_memory / 1024.00 / 1024.00 / 1024.00
+      ),
+      mem: format!("{:.2}%", (memory_usage / available_memory) * 100.0),
+      net_io,
+      block_io,
+      pids,
     }
   }
 }

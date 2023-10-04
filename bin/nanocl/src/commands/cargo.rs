@@ -4,7 +4,9 @@ use futures::StreamExt;
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
 use nanocl_utils::io_error::{FromIo, IoResult};
-use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery, CargoLogQuery};
+use nanocld_client::stubs::cargo::{
+  OutputKind, CargoDeleteQuery, CargoLogQuery, CargoStatsQuery,
+};
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -12,7 +14,7 @@ use crate::models::{
   CargoArg, CargoCreateOpts, CargoCommand, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
   CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
-  CargoRunOpts, CargoRestartOpts, CargoListOpts,
+  CargoRunOpts, CargoRestartOpts, CargoListOpts, CargoStatsOpts, CargoStatsRow,
 };
 
 use super::cargo_image::{self, exec_cargo_image_pull};
@@ -416,6 +418,51 @@ async fn exec_cargo_logs(
   Ok(())
 }
 
+/// ## Exec cargo stats
+///
+/// Execute the `nanocl cargo stats` command to list the stats of a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
+async fn exec_cargo_stats(
+  cli_conf: &CliConfig,
+  args: &CargoArg,
+  opts: &CargoStatsOpts,
+) -> IoResult<()> {
+  let client = &cli_conf.client;
+  let query = CargoStatsQuery {
+    namespace: args.namespace.clone(),
+    stream: if opts.no_stream { Some(false) } else { None },
+    one_shot: Some(false),
+  };
+  let mut stream = client.stats_cargo(&opts.names[0], &query).await?;
+  while let Some(stats) = stream.next().await {
+    let stats = match stats {
+      Ok(stats) => stats,
+      Err(e) => {
+        eprintln!("Error: {e}");
+        break;
+      }
+    };
+    let stats_row = CargoStatsRow::from(stats);
+    // clear terminal
+    let term = dialoguer::console::Term::stdout();
+    let _ = term.clear_screen();
+    utils::print::print_table([stats_row]);
+  }
+  Ok(())
+}
+
 /// ## Exec cargo revert
 ///
 /// Execute the `nanocl cargo revert` command to revert a cargo to a previous state
@@ -520,5 +567,6 @@ pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
     CargoCommand::Restart(opts) => {
       exec_cargo_restart(cli_conf, args, opts).await
     }
+    CargoCommand::Stats(opts) => exec_cargo_stats(cli_conf, args, opts).await,
   }
 }

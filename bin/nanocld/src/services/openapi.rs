@@ -38,7 +38,7 @@ use nanocl_stubs::namespace::{
 };
 use nanocl_stubs::cargo::{
   Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
-  CargoScale,
+  CargoScale, CargoStats,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfig, CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
@@ -236,6 +236,7 @@ impl Modify for VersionModifier {
     cargo::revert_cargo,
     cargo::logs_cargo,
     cargo::scale_cargo,
+    cargo::stats_cargo,
     // Exec
     exec::create_exec_command,
     exec::start_exec_command,
@@ -330,6 +331,7 @@ impl Modify for VersionModifier {
     CargoConfigUpdate,
     ReplicationStatic,
     CargoScale,
+    CargoStats,
     // Container Image
     ImageSummary,
     ImageInspect,

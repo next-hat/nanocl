@@ -6,8 +6,7 @@ This section tell which versions are currently being supported with security upd
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+| 0.10.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
 

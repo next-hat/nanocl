@@ -1,9 +1,12 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard_next::container::{LogOutput, KillContainerOptions, LogsOptions};
+use bollard_next::container::{
+  LogOutput, KillContainerOptions, LogsOptions, StatsOptions,
+};
 
 pub use bollard_next::exec::CreateExecOptions;
+pub use bollard_next::container::Stats as CargoStats;
 
 use crate::node::NodeContainerSummary;
 
@@ -236,6 +239,28 @@ pub struct CargoLogQuery {
   pub stderr: Option<bool>,
   /// Include stdout in response
   pub stdout: Option<bool>,
+}
+
+/// Stats cargo query
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct CargoStatsQuery {
+  /// Name of the namespace
+  pub namespace: Option<String>,
+  /// Stream the output. If false, the stats will be output once and then it will disconnect.
+  pub stream: Option<bool>,
+  /// Only get a single stat instead of waiting for 2 cycles. Must be used with `stream=false`.
+  pub one_shot: Option<bool>,
+}
+
+impl From<CargoStatsQuery> for StatsOptions {
+  fn from(query: CargoStatsQuery) -> StatsOptions {
+    StatsOptions {
+      stream: query.stream.unwrap_or(true),
+      one_shot: query.one_shot.unwrap_or_default(),
+    }
+  }
 }
 
 impl CargoLogQuery {

@@ -7,7 +7,7 @@ use bollard_next::service::ContainerSummary;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoKillOptions,
-  CargoDeleteQuery, CargoLogQuery,
+  CargoDeleteQuery, CargoLogQuery, CargoStatsQuery, CargoStats,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigUpdate, CargoConfigPartial, CargoConfig,
@@ -449,6 +449,39 @@ impl NanocldClient {
     Ok(Self::res_stream(res).await)
   }
 
+  /// ## Get the stats of a cargo
+  /// The stats are streamed as a [Receiver](Receiver) of [CargoOutput](CargoOutput)
+  ///
+  /// ## Arguments
+  ///
+  /// * [name](str) - The name of the cargo to get the stats
+  /// * [namespace](Option<String>) - The namespace where belong the cargo
+  ///
+  pub async fn stats_cargo(
+    &self,
+    name: &str,
+    query: &CargoStatsQuery,
+  ) -> Result<Receiver<Result<CargoStats, HttpError>>, HttpClientError> {
+    let res = self
+      .send_get(
+        format!("/{}/cargoes/{name}/stats", &self.version),
+        Some(query),
+      )
+      .await?;
+
+    Ok(Self::res_stream(res).await)
+  }
+
+  /// ## Kill a cargo
+  ///
+  /// Kill a cargo by it's name
+  ///
+  /// ## Arguments
+  ///
+  /// * [name](str) - The name of the cargo to kill
+  /// * [options](CargoKillOptions) - The options to kill the cargo
+  /// * [namespace](Option<String>) - The namespace to kill the cargo from
+  ///
   pub async fn kill_cargo(
     &self,
     name: &str,

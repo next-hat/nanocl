@@ -677,6 +677,50 @@ paths:
           description: Cargo started
         '404':
           description: Cargo does not exist
+  /cargoes/{Name}/stats:
+    get:
+      tags:
+      - Cargoes
+      summary: Get stats of a cargo instance
+      description: Get stats of a cargo instance
+      operationId: stats_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo instance usually `name` or `name-number`
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: Stream
+        in: query
+        description: Only logs returned since timestamp
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      - name: OneShot
+        in: query
+        description: Only logs returned until timestamp
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      responses:
+        '200':
+          description: Cargo stats
+          content:
+            application/vdn.nanocl.raw-stream:
+              schema:
+                $ref: '#/components/schemas/CargoStats'
+        '404':
+          description: Cargo does not exist
   /cargoes/{Name}/stop:
     post:
       tags:
@@ -4513,6 +4557,55 @@ components:
           items:
             $ref: '#/components/schemas/VmConfigPartial'
           description: List of virtual machines to create and run
+    Stats:
+      type: object
+      description: Statistics for the container.
+      required:
+      - read
+      - preread
+      - num_procs
+      - pids_stats
+      - memory_stats
+      - blkio_stats
+      - cpu_stats
+      - precpu_stats
+      - storage_stats
+      - name
+      - id
+      properties:
+        read:
+          type: string
+        preread:
+          type: string
+        num_procs:
+          type: integer
+          format: int32
+          minimum: 0
+        pids_stats:
+          $ref: '#/components/schemas/PidsStats'
+        network:
+          allOf:
+          - $ref: '#/components/schemas/NetworkStats'
+          nullable: true
+        networks:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/NetworkStats'
+          nullable: true
+        memory_stats:
+          $ref: '#/components/schemas/MemoryStats'
+        blkio_stats:
+          $ref: '#/components/schemas/BlkioStats'
+        cpu_stats:
+          $ref: '#/components/schemas/CPUStats'
+        precpu_stats:
+          $ref: '#/components/schemas/CPUStats'
+        storage_stats:
+          $ref: '#/components/schemas/StorageStats'
+        name:
+          type: string
+        id:
+          type: string
     StreamTarget:
       oneOf:
       - $ref: '#/components/schemas/UpstreamTarget'
