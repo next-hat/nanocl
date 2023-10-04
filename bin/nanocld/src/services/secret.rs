@@ -196,7 +196,7 @@ mod test_secret {
 
   async fn test_create(srv: &TestServer) -> TestRet {
     let new_secret = SecretPartial {
-      key: String::from("test secret"),
+      key: String::from("test-secret"),
       kind: String::from("test"),
       immutable: None,
       data: json!({
@@ -229,10 +229,7 @@ mod test_secret {
 
   async fn test_inspect_by_id(srv: &TestServer) -> TestRet {
     let resp = srv
-      .get(format!(
-        "/v0.10/secrets/{name}/inspect",
-        name = "controller-default"
-      ))
+      .get(format!("/v0.10/secrets/{key}/inspect", key = "test-secret"))
       .send()
       .await?;
 
@@ -242,10 +239,7 @@ mod test_secret {
 
   async fn test_delete(srv: &TestServer) -> TestRet {
     let mut resp = srv
-      .delete(format!(
-        "/v0.10/secrets/{name}",
-        name = "controller-default"
-      ))
+      .delete(format!("/v0.10/secrets/{key}", key = "test-secret"))
       .send()
       .await?;
 
