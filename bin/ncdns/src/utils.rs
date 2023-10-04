@@ -1,5 +1,5 @@
-use nanocld_client::{NanocldClient, stubs::resource::ResourceQuery};
 use nanocld_client::stubs::dns::ResourceDnsRule;
+use nanocld_client::{NanocldClient, stubs::resource::ResourceQuery};
 
 use nanocl_utils::io_error::{FromIo, IoResult, IoError};
 
@@ -110,7 +110,8 @@ pub(crate) async fn update_entries(
     entries.append(&mut dns_rule.entries);
   }
   let listen_address = get_network_addr(&dns_rule.network, client).await?;
-  let mut file_content = format!("listen-address={listen_address}\n");
+  let mut file_content =
+    format!("bind-dynamic\nlisten-address={listen_address}\n");
   for entry in &entries {
     let ip_address = match entry.ip_address.as_str() {
       namespace if namespace.ends_with(".nsp") => {
