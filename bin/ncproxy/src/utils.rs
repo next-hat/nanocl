@@ -4,6 +4,8 @@ use nanocld_client::NanocldClient;
 use nanocl_utils::io_error::{IoResult, FromIo, IoError};
 
 use nanocld_client::stubs::cargo::{CargoInspect, CreateExecOptions};
+use nanocld_client::stubs::proxy::ProxySsl;
+use nanocld_client::stubs::proxy::ProxySslConfig;
 use nanocld_client::stubs::resource::{ResourceQuery, ResourcePartial};
 use nanocld_client::stubs::proxy::{
   ProxyRule, StreamTarget, ProxyStreamProtocol, ProxyRuleHttp, UpstreamTarget,
@@ -355,6 +357,23 @@ async fn gen_locations(
   Ok(locations)
 }
 
+async fn get_ssl_config(
+  ssl: &ProxySsl,
+  client: &NanocldClient,
+) -> IoResult<ProxySslConfig> {
+  match ssl {
+    ProxySsl::Config(ssl_config) => Ok(ssl_config.clone()),
+    ProxySsl::Secret(secret) => {
+      let secret = client.inspect_secret(secret).await?;
+      let ssl_config = serde_json::from_value::<ProxySslConfig>(secret.data)
+        .map_err(|err| {
+          err.map_err_context(|| "Unable to deserialize ProxySslConfig")
+        })?;
+      Ok(ssl_config)
+    }
+  }
+}
+
 async fn gen_http_server_block(
   rule: &ProxyRuleHttp,
   client: &NanocldClient,
@@ -373,6 +392,7 @@ async fn gen_http_server_block(
   };
 
   let ssl = if let Some(ssl) = &rule.ssl {
+    let ssl = get_ssl_config(ssl, client).await?;
     let certificate = &ssl.certificate;
     let certificate_key = &ssl.certificate_key;
     let ssl_dh_param = match &ssl.dh_param {
@@ -453,6 +473,7 @@ async fn gen_stream_server_block(
   };
 
   let ssl = if let Some(ssl) = &rule.ssl {
+    let ssl = get_ssl_config(ssl, client).await?;
     let certificate = &ssl.certificate;
     let certificate_key = &ssl.certificate_key;
     let ssl_dh_param = match &ssl.dh_param {
@@ -655,7 +676,32 @@ pub(crate) async fn list_resource_by_cargo(
     .into_iter()
     .chain(stream_resources.into_iter())
     .collect::<Vec<nanocld_client::stubs::resource::Resource>>();
-  log::debug!("matching resources for {target_key}:\n{:?}", resources);
+  log::debug!(
+    "matching resources for target: {target_key}:\n{:?}",
+    resources
+  );
+  Ok(resources)
+}
+
+/// List resources from nanocl daemon
+/// This function will list all resources that contains the target key
+/// in the watch list
+/// The target key is the name of the cargo @ the namespace
+/// The namespace is optional, if not provided, it will be set to "global"
+pub(crate) async fn list_resource_by_secret(
+  secret: &str,
+  client: &NanocldClient,
+) -> IoResult<Vec<nanocld_client::stubs::resource::Resource>> {
+  let query = ResourceQuery {
+    contains: Some(
+      serde_json::json!({ "Rules": [ { "Ssl": secret }  ] }).to_string(),
+    ),
+    kind: Some("ProxyRule".into()),
+  };
+  let resources = client.list_resource(Some(query)).await.map_err(|err| {
+    err.map_err_context(|| "Unable to list resources from nanocl daemon")
+  })?;
+  log::debug!("matching resources for secret: {secret}:\n{:?}", resources);
   Ok(resources)
 }
 
