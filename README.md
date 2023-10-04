@@ -116,7 +116,7 @@ Namespace: nexthat
 Cargoes:
   - Name: doc
     Container:
-      Image: nexthat-doc:0.4.1
+      Image: nexthat-doc:0.9.6
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
@@ -128,12 +128,7 @@ Resources:
       Rules:
       - Domain: docs.next-hat.com
         Network: Public
-        Ssl:
-          Certificate: /etc/letsencrypt/live/docs.next-hat.com/fullchain.pem
-          CertificateKey: /etc/letsencrypt/live/docs.next-hat.com/privkey.pem
-          Dhparam: /etc/letsencrypt/ssl-dhparams.pem
-        Includes:
-          - /etc/letsencrypt/options-ssl-nginx.conf
+        Ssl: cert.next-hat.com
         Locations:
           - Path: /
             Target:
