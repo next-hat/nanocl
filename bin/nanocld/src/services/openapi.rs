@@ -2,7 +2,11 @@ use bollard_next::exec::StartExecOptions;
 use ntex::util::HashMap;
 use serde::{Serialize, Deserialize};
 use utoipa::{OpenApi, Modify, ToSchema};
-use bollard_next::container::Config;
+use bollard_next::container::{
+  Config, ThrottlingData, CPUUsage, BlkioStatsEntry, MemoryStats,
+  MemoryStatsStats, PidsStats, NetworkStats, BlkioStats, CPUStats,
+  StorageStats, MemoryStatsStatsV1, MemoryStatsStatsV2,
+};
 use bollard_next::service::{
   PortBinding, MountBindOptionsPropagationEnum, MountVolumeOptionsDriverConfig,
   MountBindOptions, MountTmpfsOptions, MountTypeEnum, MountVolumeOptions,
@@ -332,6 +336,18 @@ impl Modify for VersionModifier {
     ReplicationStatic,
     CargoScale,
     CargoStats,
+    PidsStats,
+    NetworkStats,
+    BlkioStats,
+    CPUStats,
+    StorageStats,
+    MemoryStats,
+    MemoryStatsStats,
+    MemoryStatsStatsV1,
+    MemoryStatsStatsV2,
+    BlkioStatsEntry,
+    CPUUsage,
+    ThrottlingData,
     // Container Image
     ImageSummary,
     ImageInspect,

@@ -1,12 +1,16 @@
 use std::process;
+use std::collections::HashMap;
 
-use futures::StreamExt;
+use futures::stream::FuturesUnordered;
+use futures::{StreamExt, SinkExt};
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
+use futures::channel::mpsc;
 use nanocl_utils::io_error::{FromIo, IoResult};
 use nanocld_client::stubs::cargo::{
   OutputKind, CargoDeleteQuery, CargoLogQuery, CargoStatsQuery,
 };
+use ntex::rt;
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -439,26 +443,55 @@ async fn exec_cargo_stats(
   args: &CargoArg,
   opts: &CargoStatsOpts,
 ) -> IoResult<()> {
-  let client = &cli_conf.client;
+  let client = cli_conf.client.clone();
   let query = CargoStatsQuery {
     namespace: args.namespace.clone(),
     stream: if opts.no_stream { Some(false) } else { None },
     one_shot: Some(false),
   };
-  let mut stream = client.stats_cargo(&opts.names[0], &query).await?;
-  while let Some(stats) = stream.next().await {
-    let stats = match stats {
-      Ok(stats) => stats,
-      Err(e) => {
-        eprintln!("Error: {e}");
-        break;
+  let mut stats_cargoes = HashMap::new();
+  let (tx, mut rx) = mpsc::unbounded();
+  let futures = opts
+    .names
+    .iter()
+    .map(|name| {
+      let name = name.clone();
+      let query = query.clone();
+      let mut tx = tx.clone();
+      let client = client.clone();
+      async move {
+        let Ok(mut stream) = client.stats_cargo(&name, &query).await else {
+          return;
+        };
+        while let Some(stats) = stream.next().await {
+          let stats = match stats {
+            Ok(stats) => stats,
+            Err(e) => {
+              eprintln!("Error: {e}");
+              break;
+            }
+          };
+          if let Err(err) = tx.send(stats).await {
+            eprintln!("Error: {err}");
+            break;
+          }
+        }
       }
-    };
-    let stats_row = CargoStatsRow::from(stats);
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>();
+  rt::spawn(futures);
+  while let Some(stats) = rx.next().await {
+    stats_cargoes.insert(stats.name.clone(), stats.clone());
+    // convert stats_cargoes in a Arrays of CargoStatsRow
+    let stats = stats_cargoes
+      .values()
+      .map(|stats| CargoStatsRow::from(stats.clone()))
+      .collect::<Vec<CargoStatsRow>>();
     // clear terminal
     let term = dialoguer::console::Term::stdout();
     let _ = term.clear_screen();
-    utils::print::print_table([stats_row]);
+    utils::print::print_table(stats);
   }
   Ok(())
 }

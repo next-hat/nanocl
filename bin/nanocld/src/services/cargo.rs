@@ -476,7 +476,7 @@ async fn logs_cargo(
     ("OneShot" = Option<bool>, Query, description = "Only logs returned until timestamp"),
   ),
   responses(
-    (status = 200, description = "Cargo stats", content_type = "application/vdn.nanocl.raw-stream", body = CargoStats),
+    (status = 200, description = "Cargo stats", content_type = "application/vdn.nanocl.raw-stream", body = Stats),
     (status = 404, description = "Cargo does not exist"),
   ),
 ))]
