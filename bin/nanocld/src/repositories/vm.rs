@@ -269,6 +269,7 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
     host_config: config.host_config.unwrap_or_default(),
     password: config.password,
     ssh_key: config.ssh_key,
+    metadata: config.metadata,
   };
   let item = Vm {
     key: item.0.key,

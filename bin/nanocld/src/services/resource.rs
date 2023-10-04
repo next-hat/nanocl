@@ -142,6 +142,7 @@ pub(crate) async fn put_resource(
     version: payload.version,
     kind: resource.kind,
     config: payload.config,
+    metadata: payload.metadata,
   };
   let resource = utils::resource::patch(&new_resource, &state.pool).await?;
   let resource_ptr = resource.clone();
@@ -208,6 +209,7 @@ pub(crate) async fn revert_resource(
     version: history.version,
     kind: resource.kind,
     config: history.config,
+    metadata: history.metadata,
   };
   let resource = utils::resource::patch(&new_resource, &state.pool).await?;
   let resource_ptr = resource.clone();
@@ -267,6 +269,7 @@ mod tests {
       version: "v0.0.1".to_owned(),
       kind: "Kind".to_owned(),
       config: config.clone(),
+      metadata: None,
     };
 
     let mut resp = srv
@@ -307,6 +310,7 @@ mod tests {
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
       config: config.clone(),
+      metadata: None,
     };
     let mut resp = srv
       .patch("/v0.2/resources/test_resource")

@@ -91,6 +91,12 @@ impl Default for VmHostConfig {
 pub struct VmConfigPartial {
   /// Name of the vm
   pub name: String,
+  /// The metadata (user defined)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub metadata: Option<serde_json::Value>,
   /// Hostname of the vm (default: generated from name)
   #[cfg_attr(
     feature = "serde",
@@ -151,6 +157,12 @@ pub struct VmConfigUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub name: Option<String>,
+  /// The metadata (user defined)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub metadata: Option<serde_json::Value>,
   /// Hostname of the vm
   #[cfg_attr(
     feature = "serde",
@@ -199,6 +211,7 @@ impl From<VmConfigPartial> for VmConfigUpdate {
       host_config: vm_config.host_config,
       password: vm_config.password,
       ssh_key: vm_config.ssh_key,
+      metadata: vm_config.metadata,
     }
   }
 }
@@ -221,6 +234,12 @@ pub struct VmConfig {
   pub version: String,
   /// The key of the vm
   pub vm_key: String,
+  /// The metadata (user defined)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub metadata: Option<serde_json::Value>,
   /// Hostname of the vm
   #[cfg_attr(
     feature = "serde",
@@ -273,6 +292,7 @@ impl From<VmConfig> for VmConfigUpdate {
       host_config: Some(vm_config.host_config),
       password: vm_config.password,
       ssh_key: vm_config.ssh_key,
+      metadata: vm_config.metadata,
     }
   }
 }
@@ -289,6 +309,7 @@ impl From<VmInspect> for VmConfigPartial {
       mac_address: vm_inspect.config.mac_address,
       labels: vm_inspect.config.labels,
       host_config: Some(vm_inspect.config.host_config),
+      metadata: vm_inspect.config.metadata,
     }
   }
 }

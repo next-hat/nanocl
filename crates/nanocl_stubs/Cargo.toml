@@ -13,6 +13,7 @@ repository = "https://github.com/nxthat/nanocl"
 bench = false
 
 [features]
+default = ["serde"]
 serde = ["dep:serde", "uuid/serde", "chrono/serde"]
 utoipa = ["dep:utoipa"]
 

@@ -61,6 +61,8 @@ pub struct CargoConfigPartial {
   pub replication: Option<ReplicationMode>,
   /// Container configuration of the cargo
   pub container: Config,
+  /// Metadata of the cargo (user defined)
+  pub metadata: Option<serde_json::Value>,
 }
 
 /// Payload used to patch a cargo
@@ -89,6 +91,8 @@ pub struct CargoConfigUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub replication: Option<ReplicationMode>,
+  /// New metadata of the cargo (user defined)
+  pub metadata: Option<serde_json::Value>,
 }
 
 impl From<CargoConfigPartial> for CargoConfigUpdate {
@@ -97,6 +101,7 @@ impl From<CargoConfigPartial> for CargoConfigUpdate {
       name: Some(cargo_config.name),
       container: Some(cargo_config.container),
       replication: cargo_config.replication,
+      metadata: cargo_config.metadata,
     }
   }
 }
@@ -127,6 +132,8 @@ pub struct CargoConfig {
   pub replication: Option<ReplicationMode>,
   /// Container configuration of the cargo
   pub container: Config,
+  /// Metadata of the cargo (user defined)
+  pub metadata: Option<serde_json::Value>,
 }
 
 impl From<CargoConfig> for CargoConfigPartial {
@@ -135,6 +142,7 @@ impl From<CargoConfig> for CargoConfigPartial {
       name: cargo_config.name,
       replication: cargo_config.replication,
       container: cargo_config.container,
+      metadata: cargo_config.metadata,
     }
   }
 }
@@ -145,6 +153,7 @@ impl From<CargoInspect> for CargoConfigPartial {
       name: cargo_inspect.name,
       replication: cargo_inspect.config.replication,
       container: cargo_inspect.config.container,
+      metadata: cargo_inspect.config.metadata,
     }
   }
 }

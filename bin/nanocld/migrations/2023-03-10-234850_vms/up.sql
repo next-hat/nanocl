@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS "vm_configs" (
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "vm_key" VARCHAR NOT NULL,
   "version" VARCHAR NOT NULL,
-  "config" JSON NOT NULL
+  "config" JSON NOT NULL,
+  "metadata" JSON
 );
 
 CREATE TABLE IF NOT EXISTS "vms" (
