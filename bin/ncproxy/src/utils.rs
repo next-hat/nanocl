@@ -379,6 +379,11 @@ async fn get_ssl_config(
         tokio::fs::write(&certificate_client_path, certificate_client).await?;
         ssl_config.certificate_client = Some(certificate_client_path);
       }
+      if let Some(dh_param) = ssl_config.dh_param {
+        let dh_param_path = format!("/opt/secrets/{}.pem", secret.key);
+        tokio::fs::write(&dh_param_path, dh_param).await?;
+        ssl_config.dh_param = Some(dh_param_path);
+      }
       ssl_config.certificate = cert_path;
       ssl_config.certificate_key = key_path;
       Ok(ssl_config)
