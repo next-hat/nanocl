@@ -100,6 +100,7 @@ services:
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/run}:/run
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/letsencrypt}:/etc/letsencrypt
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/certs}:/etc/nginx/certs
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/secrets}:/opt/secrets
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/html}:/usr/share/nginx/html
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
@@ -133,6 +134,7 @@ services:
         target: /project
       - /project/target
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/secrets}:/opt/secrets
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/sites-enabled}:/etc/nginx/sites-enabled

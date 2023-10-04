@@ -4763,7 +4763,7 @@ components:
           description: The locations to handle multiple paths
         Ssl:
           allOf:
-          - $ref: '#/components/schemas/ProxySslConfig'
+          - $ref: '#/components/schemas/ProxySsl'
           nullable: true
         Includes:
           type: array
@@ -4792,7 +4792,7 @@ components:
           minimum: 0
         Ssl:
           allOf:
-          - $ref: '#/components/schemas/ProxySslConfig'
+          - $ref: '#/components/schemas/ProxySsl'
           nullable: true
         Target:
           $ref: '#/components/schemas/StreamTarget'

@@ -365,10 +365,22 @@ async fn get_ssl_config(
     ProxySsl::Config(ssl_config) => Ok(ssl_config.clone()),
     ProxySsl::Secret(secret) => {
       let secret = client.inspect_secret(secret).await?;
-      let ssl_config = serde_json::from_value::<ProxySslConfig>(secret.data)
-        .map_err(|err| {
-          err.map_err_context(|| "Unable to deserialize ProxySslConfig")
-        })?;
+      let mut ssl_config =
+        serde_json::from_value::<ProxySslConfig>(secret.data).map_err(
+          |err| err.map_err_context(|| "Unable to deserialize ProxySslConfig"),
+        )?;
+      let cert_path = format!("/opt/secrets/{}.cert", secret.key);
+      tokio::fs::write(&cert_path, ssl_config.certificate.clone()).await?;
+      let key_path = format!("/opt/secrets/{}.key", secret.key);
+      tokio::fs::write(&key_path, ssl_config.certificate_key.clone()).await?;
+      if let Some(certificate_client) = ssl_config.certificate_client {
+        let certificate_client_path =
+          format!("/opt/secrets/{}.client.cert", secret.key);
+        tokio::fs::write(&certificate_client_path, certificate_client).await?;
+        ssl_config.certificate_client = Some(certificate_client_path);
+      }
+      ssl_config.certificate = cert_path;
+      ssl_config.certificate_key = key_path;
       Ok(ssl_config)
     }
   }
@@ -392,41 +404,43 @@ async fn gen_http_server_block(
   };
 
   let ssl = if let Some(ssl) = &rule.ssl {
-    let ssl = get_ssl_config(ssl, client).await?;
-    let certificate = &ssl.certificate;
-    let certificate_key = &ssl.certificate_key;
-    let ssl_dh_param = match &ssl.dh_param {
-      Some(ssl_dh_param) => {
-        format!("\n  ssl_dhparam          {ssl_dh_param};\n")
-      }
-      None => String::default(),
-    };
-    let listen_https = get_listen(&rule.network, 443, client).await?;
-    let mut base = format!(
-      "
-  listen {listen_https} http2 ssl;
+    if let Ok(ssl) = get_ssl_config(ssl, client).await {
+      let certificate = &ssl.certificate;
+      let certificate_key = &ssl.certificate_key;
+      let ssl_dh_param = match &ssl.dh_param {
+        Some(ssl_dh_param) => {
+          format!("\n  ssl_dhparam          {ssl_dh_param};\n")
+        }
+        None => String::default(),
+      };
+      let listen_https = get_listen(&rule.network, 443, client).await?;
+      let mut base = format!(
+        "
+    listen {listen_https} http2 ssl;
 
-  if ($scheme != https) {{
-    return 301 https://$host$request_uri;
-  }}
+    if ($scheme != https) {{
+      return 301 https://$host$request_uri;
+    }}
 
-  ssl_certificate      {certificate};
-  ssl_certificate_key  {certificate_key};{ssl_dh_param}
-"
-    );
-
-    if let Some(certificate_client) = &ssl.certificate_client {
-      base += &format!("  ssl_client_certificate {certificate_client};\n");
-    }
-
-    if let Some(client_verification) = &ssl.verify_client {
-      base += &format!(
-        "  ssl_verify_client {};\n",
-        if *client_verification { "on" } else { "off" }
+    ssl_certificate      {certificate};
+    ssl_certificate_key  {certificate_key};{ssl_dh_param}
+  "
       );
-    }
 
-    base
+      if let Some(certificate_client) = &ssl.certificate_client {
+        base += &format!("  ssl_client_certificate {certificate_client};\n");
+      }
+
+      if let Some(client_verification) = &ssl.verify_client {
+        base += &format!(
+          "  ssl_verify_client {};\n",
+          if *client_verification { "on" } else { "off" }
+        );
+      }
+      base
+    } else {
+      String::default()
+    }
   } else {
     String::default()
   };
