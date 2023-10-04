@@ -3,15 +3,6 @@ ApiVersion: v0.10
 
 Namespace: global
 
-Secrets:
-  - Name: cert-deploy-example
-    Kind: Tls
-    Data:
-      Tls.key: |
-        My private key
-      Tls.crt: |
-        My certificate
-
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
@@ -24,7 +15,6 @@ Resources:
       Rules:
         - Domain: deploy-example.com
           Network: All
-          Ssl: cert-deploy-example
           Locations:
             - Path: /
               Target:
