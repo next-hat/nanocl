@@ -197,7 +197,7 @@ mod test_secret {
   async fn test_create(srv: &TestServer) -> TestRet {
     let new_secret = SecretPartial {
       key: String::from("test secret"),
-      kind: String::from("Tls"),
+      kind: String::from("test"),
       immutable: None,
       data: json!({
         "Tls": { "cert": "MY CERT", "key": "MY KEY" },
