@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - inspect_exec endpoint [@anonkey](https://github.com/anonkey)
 - stats_cargo endpoint
+- metadata attribute for vm cargo and resource
 
 ### Removed
 
