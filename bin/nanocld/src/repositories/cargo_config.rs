@@ -62,6 +62,7 @@ pub async fn create(
     replication: item.replication.clone(),
     container: item.container.clone(),
     metadata: item.metadata.clone(),
+    secrets: item.secrets.clone(),
   };
   Ok(config)
 }
@@ -108,6 +109,7 @@ pub async fn find_by_key(
     replication: config.replication,
     container: config.container,
     metadata: config.metadata,
+    secrets: config.secrets,
   })
 }
 
@@ -192,6 +194,7 @@ pub async fn list_by_cargo_key(
         replication: config.replication,
         container: config.container,
         metadata: config.metadata,
+        secrets: config.secrets,
       })
     })
     .collect::<Result<Vec<CargoConfig>, IoError>>()?;

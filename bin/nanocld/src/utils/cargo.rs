@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use nanocl_stubs::cargo::CargoStatsQuery;
 use ntex::rt;
 use ntex::util::Bytes;
 use futures::{StreamExt, TryStreamExt};
@@ -21,14 +20,15 @@ use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,
   CargoKillOptions, GenericCargoListQuery, CargoScale, CargoStats,
+  CargoStatsQuery,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
   Config as ContainerConfig,
 };
 
-use crate::models::DaemonState;
 use crate::{utils, repositories};
+use crate::models::DaemonState;
 
 use super::stream::transform_stream;
 
@@ -59,106 +59,143 @@ async fn create_instances(
   cargo: &Cargo,
   start: usize,
   number: usize,
-  docker_api: &bollard_next::Docker,
+  state: &DaemonState,
 ) -> Result<Vec<ContainerCreateResponse>, HttpError> {
+  let mut secret_envs: Vec<String> = Vec::new();
+
+  if let Some(secrets) = &cargo.config.secrets {
+    let fetched_secrets = secrets
+      .iter()
+      .map(|secret| async move {
+        let secret =
+          repositories::secret::find_by_key(secret, &state.pool).await?;
+        if secret.kind.as_str() != "Env" {
+          return Ok::<_, HttpError>(Vec::new());
+        }
+        let envs = serde_json::from_value::<Vec<String>>(secret.data).map_err(
+          |err| {
+            HttpError::internal_server_error(format!(
+              "Invalid secret data for secret {} {err}",
+              secret.key
+            ))
+          },
+        )?;
+        Ok::<_, HttpError>(envs)
+      })
+      .collect::<FuturesUnordered<_>>()
+      .collect::<Vec<_>>()
+      .await
+      .into_iter()
+      .collect::<Result<Vec<_>, _>>()?;
+    // Flatten the secrets
+    secret_envs = fetched_secrets.into_iter().flatten().collect();
+  }
+  log::debug!("Using secret envs: {secret_envs:?}");
+
   (0..number)
     .collect::<Vec<usize>>()
     .into_iter()
-    .map(move |current| async move {
-      let name = if current > 0 || start > 0 {
-        format!("{}-{}.c", current + start, cargo.key)
-      } else {
-        format!("{}.c", cargo.key)
-      };
-      let create_options = bollard_next::container::CreateContainerOptions {
-        name: name.clone(),
-        ..Default::default()
-      };
-      // Add cargo label to the container to track it
-      let mut labels =
-        cargo.config.container.labels.to_owned().unwrap_or_default();
-      labels.insert("io.nanocl".into(), "enabled".into());
-      labels.insert("io.nanocl.c".into(), cargo.key.to_owned());
-      labels.insert("io.nanocl.n".into(), cargo.namespace_name.to_owned());
-      labels.insert("io.nanocl.cnsp".into(), cargo.namespace_name.to_owned());
-      labels.insert(
-        "com.docker.compose.project".into(),
-        format!("nanocl_{}", cargo.namespace_name),
-      );
-      let auto_remove = cargo
-        .config
-        .to_owned()
-        .container
-        .host_config
-        .unwrap_or_default()
-        .auto_remove
-        .unwrap_or(false);
-      let restart_policy = if auto_remove {
-        None
-      } else {
-        Some(
-          cargo
-            .config
-            .to_owned()
-            .container
-            .host_config
-            .unwrap_or_default()
-            .restart_policy
-            .unwrap_or(RestartPolicy {
-              name: Some(RestartPolicyNameEnum::ALWAYS),
-              maximum_retry_count: None,
-            }),
-        )
-      };
-      let mut env = cargo.config.container.env.clone().unwrap_or_default();
-      let hostname = match cargo.config.container.hostname {
-        Some(ref hostname) => {
-          if current > 0 {
-            format!("{current}-{hostname}")
-          } else {
-            hostname.to_owned()
-          }
-        }
-        None => name.replace('.', "-"),
-      };
-      env.push(format!("NANOCL_CARGO_KEY={}", cargo.key));
-      env.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));
-      env.push(format!("NANOCL_CARGO_INSTANCE={}", current));
-      // Merge the cargo config with the container config
-      // And set his network mode to the cargo namespace
-      let config = bollard_next::container::Config {
-        attach_stderr: Some(true),
-        attach_stdout: Some(true),
-        tty: Some(true),
-        hostname: Some(hostname),
-        labels: Some(labels),
-        env: Some(env),
-        host_config: Some(HostConfig {
-          restart_policy,
-          network_mode: Some(
+    .map(move |current| {
+      let secret_envs = secret_envs.clone();
+      async move {
+        let name = if current > 0 || start > 0 {
+          format!("{}-{}.c", current + start, cargo.key)
+        } else {
+          format!("{}.c", cargo.key)
+        };
+        let create_options = bollard_next::container::CreateContainerOptions {
+          name: name.clone(),
+          ..Default::default()
+        };
+        // Add cargo label to the container to track it
+        let mut labels =
+          cargo.config.container.labels.to_owned().unwrap_or_default();
+        labels.insert("io.nanocl".into(), "enabled".into());
+        labels.insert("io.nanocl.c".into(), cargo.key.to_owned());
+        labels.insert("io.nanocl.n".into(), cargo.namespace_name.to_owned());
+        labels.insert("io.nanocl.cnsp".into(), cargo.namespace_name.to_owned());
+        labels.insert(
+          "com.docker.compose.project".into(),
+          format!("nanocl_{}", cargo.namespace_name),
+        );
+        let auto_remove = cargo
+          .config
+          .to_owned()
+          .container
+          .host_config
+          .unwrap_or_default()
+          .auto_remove
+          .unwrap_or(false);
+        let restart_policy = if auto_remove {
+          None
+        } else {
+          Some(
             cargo
               .config
               .to_owned()
               .container
               .host_config
               .unwrap_or_default()
-              .network_mode
-              .unwrap_or(cargo.namespace_name.to_owned()),
-          ),
-          ..cargo
-            .config
-            .to_owned()
-            .container
-            .host_config
-            .unwrap_or_default()
-        }),
-        ..cargo.config.container.to_owned()
-      };
-      let res = docker_api
-        .create_container::<String>(Some(create_options), config)
-        .map_err(HttpError::from)
-        .await?;
-      Ok::<_, HttpError>(res)
+              .restart_policy
+              .unwrap_or(RestartPolicy {
+                name: Some(RestartPolicyNameEnum::ALWAYS),
+                maximum_retry_count: None,
+              }),
+          )
+        };
+        let mut env = cargo.config.container.env.clone().unwrap_or_default();
+        // add secret_envs to env
+        env.extend(secret_envs.clone());
+        let hostname = match cargo.config.container.hostname {
+          Some(ref hostname) => {
+            if current > 0 {
+              format!("{current}-{hostname}")
+            } else {
+              hostname.to_owned()
+            }
+          }
+          None => name.replace('.', "-"),
+        };
+        env.push(format!("NANOCL_CARGO_KEY={}", cargo.key));
+        env.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));
+        env.push(format!("NANOCL_CARGO_INSTANCE={}", current));
+        // Merge the cargo config with the container config
+        // And set his network mode to the cargo namespace
+        let config = bollard_next::container::Config {
+          attach_stderr: Some(true),
+          attach_stdout: Some(true),
+          tty: Some(true),
+          hostname: Some(hostname),
+          labels: Some(labels),
+          env: Some(env),
+          host_config: Some(HostConfig {
+            restart_policy,
+            network_mode: Some(
+              cargo
+                .config
+                .to_owned()
+                .container
+                .host_config
+                .unwrap_or_default()
+                .network_mode
+                .unwrap_or(cargo.namespace_name.to_owned()),
+            ),
+            ..cargo
+              .config
+              .to_owned()
+              .container
+              .host_config
+              .unwrap_or_default()
+          }),
+          ..cargo.config.container.to_owned()
+        };
+        let res = state
+          .docker_api
+          .create_container::<String>(Some(create_options), config)
+          .map_err(HttpError::from)
+          .await?;
+        Ok::<_, HttpError>(res)
+      }
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<Result<ContainerCreateResponse, HttpError>>>()
@@ -236,8 +273,7 @@ pub async fn create(
   } else {
     1
   };
-  if let Err(err) = create_instances(&cargo, 0, number, &state.docker_api).await
-  {
+  if let Err(err) = create_instances(&cargo, 0, number, state).await {
     repositories::cargo::delete_by_key(&cargo.key, &state.pool).await?;
     return Err(err);
   }
@@ -623,17 +659,16 @@ pub async fn put(
   let containers = list_instances(cargo_key, &state.docker_api).await?;
   restore_instances_backup(&containers, state).await?;
   // Create instance with the new config
-  let new_instances =
-    match create_instances(&cargo, 0, number, &state.docker_api).await {
-      // If the creation of the new instance failed, we rename the old containers
-      Err(err) => {
-        log::warn!("Unable to create cargo instance: {}", err);
-        log::warn!("Rollback to previous instance");
-        rename_instances_original(&containers, state).await?;
-        Vec::default()
-      }
-      Ok(instances) => instances,
-    };
+  let new_instances = match create_instances(&cargo, 0, number, state).await {
+    // If the creation of the new instance failed, we rename the old containers
+    Err(err) => {
+      log::warn!("Unable to create cargo instance: {}", err);
+      log::warn!("Rollback to previous instance");
+      rename_instances_original(&containers, state).await?;
+      Vec::default()
+    }
+    Ok(instances) => instances,
+  };
   // start created containers
   match start_by_key(cargo_key, state).await {
     Err(err) => {
@@ -971,6 +1006,11 @@ pub async fn patch(
     name: cargo.name.clone(),
     container,
     replication: payload.replication.clone(),
+    secrets: if payload.secrets.is_some() {
+      payload.secrets.clone()
+    } else {
+      cargo.config.secrets
+    },
     metadata: if payload.metadata.is_some() {
       payload.metadata.clone()
     } else {
@@ -1092,8 +1132,7 @@ pub async fn scale(
     let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
     let to_add = options.replicas.unsigned_abs();
     let created_instances =
-      create_instances(&cargo, instances.len(), to_add, &state.docker_api)
-        .await?;
+      create_instances(&cargo, instances.len(), to_add, state).await?;
     created_instances
       .iter()
       .map(|instance| async {

@@ -2011,16 +2011,22 @@ components:
         It keep tracking of an history when you patch an existing cargo
       required:
       - Key
+      - CargoKey
+      - Version
       - CreatedAt
       - Name
-      - Version
-      - CargoKey
       - Container
       properties:
         Key:
           type: string
           format: uuid
           description: Unique identifier of the cargo config
+        CargoKey:
+          type: string
+          description: The key of the cargo
+        Version:
+          type: string
+          description: Version of the config
         CreatedAt:
           type: string
           format: date-time
@@ -2028,20 +2034,20 @@ components:
         Name:
           type: string
           description: Name of the cargo
-        Version:
-          type: string
-          description: Version of the config
-        CargoKey:
-          type: string
-          description: The key of the cargo
-        Replication:
-          allOf:
-          - $ref: '#/components/schemas/ReplicationMode'
+        Metadata:
+          description: Metadata of the cargo (user defined)
+          nullable: true
+        Secrets:
+          type: array
+          items:
+            type: string
+          description: List of secrets to use as environment variables
           nullable: true
         Container:
           $ref: '#/components/schemas/Config'
-        Metadata:
-          description: Metadata of the cargo (user defined)
+        Replication:
+          allOf:
+          - $ref: '#/components/schemas/ReplicationMode'
           nullable: true
     CargoConfigPartial:
       type: object
@@ -2053,14 +2059,20 @@ components:
         Name:
           type: string
           description: Name of the cargo
-        Replication:
-          allOf:
-          - $ref: '#/components/schemas/ReplicationMode'
+        Metadata:
+          description: Metadata of the cargo (user defined)
+          nullable: true
+        Secrets:
+          type: array
+          items:
+            type: string
+          description: List of secrets to use as environment variables
           nullable: true
         Container:
           $ref: '#/components/schemas/Config'
-        Metadata:
-          description: Metadata of the cargo (user defined)
+        Replication:
+          allOf:
+          - $ref: '#/components/schemas/ReplicationMode'
           nullable: true
     CargoConfigUpdate:
       type: object
@@ -2073,6 +2085,15 @@ components:
           type: string
           description: New name of the cargo
           nullable: true
+        Metadata:
+          description: New metadata of the cargo (user defined)
+          nullable: true
+        Secrets:
+          type: array
+          items:
+            type: string
+          description: List of secrets to use as environment variables
+          nullable: true
         Container:
           allOf:
           - $ref: '#/components/schemas/Config'
@@ -2080,9 +2101,6 @@ components:
         Replication:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
-          nullable: true
-        Metadata:
-          description: New metadata of the cargo (user defined)
           nullable: true
     CargoImagePartial:
       type: object
@@ -5312,6 +5330,12 @@ components:
           items:
             $ref: '#/components/schemas/ResourcePartial'
           description: List of resources to create
+          nullable: true
+        Secrets:
+          type: array
+          items:
+            $ref: '#/components/schemas/SecretPartial'
+          description: List of secrets to create
           nullable: true
         Cargoes:
           type: array

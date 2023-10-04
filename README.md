@@ -124,23 +124,21 @@ Resources:
   - Name: docs.next-hat.com
     Kind: ProxyRule
     Version: v0.7
-    Config:
-      Watch:
-        - doc.nexthat.c
+    Data:
       Rules:
-        - Domain: docs.next-hat.com
-          Network: Public
-          Ssl:
-            Certificate: /etc/letsencrypt/live/docs.next-hat.com/fullchain.pem
-            CertificateKey: /etc/letsencrypt/live/docs.next-hat.com/privkey.pem
-            Dhparam: /etc/letsencrypt/ssl-dhparams.pem
-          Includes:
-            - /etc/letsencrypt/options-ssl-nginx.conf
-          Locations:
-            - Path: /
-              Target:
-                Key: doc.nexthat.c
-                Port: 80
+      - Domain: docs.next-hat.com
+        Network: Public
+        Ssl:
+          Certificate: /etc/letsencrypt/live/docs.next-hat.com/fullchain.pem
+          CertificateKey: /etc/letsencrypt/live/docs.next-hat.com/privkey.pem
+          Dhparam: /etc/letsencrypt/ssl-dhparams.pem
+        Includes:
+          - /etc/letsencrypt/options-ssl-nginx.conf
+        Locations:
+          - Path: /
+            Target:
+              Key: doc.nexthat.c
+              Port: 80
 ```
 
 To apply a state we can do it easily bu running `nanocl state apply -s path|url`<br />
