@@ -6,7 +6,7 @@ diesel::table! {
         created_at -> Timestamptz,
         cargo_key -> Varchar,
         version -> Varchar,
-        config -> Jsonb,
+        data -> Jsonb,
         metadata -> Nullable<Jsonb>,
     }
 }
@@ -127,6 +127,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    secrets (key) {
+        key -> Varchar,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+        kind -> Varchar,
+        immutable -> Bool,
+        data -> Jsonb,
+        metadata -> Nullable<Jsonb>,
+    }
+}
+
+diesel::table! {
     stream_metrics (key) {
         key -> Uuid,
         created_at -> Timestamptz,
@@ -202,6 +214,7 @@ diesel::allow_tables_to_appear_in_same_query!(
   resource_kind_versions,
   resource_kinds,
   resources,
+  secrets,
   stream_metrics,
   vm_configs,
   vm_images,

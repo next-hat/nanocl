@@ -9,24 +9,21 @@ Resources:
   - Name: deploy-example.com
     Kind: ProxyRule
     Version: v0.7
-    Config:
-      Watch:
-        - deploy-example.global.c
-        - deploy-example2.global.c
+    Metadata:
+      Cert: certbot
+    Data:
       Rules:
         - Domain: deploy-example.com
-          Network: Public
+          Network: All
           Locations:
             - Path: /
               Target:
                 Key: deploy-example2.global.c
                 Port: 9000
-
             - Path: /v1
               Target:
                 Key: deploy-example.global.c
                 Port: 9000
-
             - Path: /v2
               Target:
                 Key: deploy-example2.global.c
@@ -39,7 +36,7 @@ Cargoes:
     Container:
       Image: nexthat/nanocl-get-started:latest
       Env:
-        - APP=GET_STARTED1
+        - APP=GET_STARTED
 
   - Name: deploy-example2
     Container:

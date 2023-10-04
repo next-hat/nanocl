@@ -37,7 +37,7 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: item.name.to_owned(),
     version: item.version.to_owned(),
-    data: item.config.clone(),
+    data: item.data.clone(),
     metadata: item.metadata.clone(),
   };
   let config = resource_config::create(&config, &pool).await?;
@@ -63,7 +63,7 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     kind: item.kind,
     version: config.version,
     config_key: config.key,
-    config: config.data,
+    data: config.data,
     metadata: config.metadata,
   };
   Ok(item)
@@ -162,7 +162,7 @@ pub async fn find(
         kind: resource.kind,
         version: config.version,
         config_key: resource.config_key,
-        config: config.data,
+        data: config.data,
         metadata: config.metadata,
       })
     })
@@ -207,7 +207,7 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Resource> {
     kind: res.0.kind,
     version: res.1.version,
     config_key: res.0.config_key,
-    config: res.1.data,
+    data: res.1.data,
     metadata: res.1.metadata,
   };
   Ok(item)
@@ -240,7 +240,7 @@ pub async fn put(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: resource.name.to_owned(),
     version: item.version.clone(),
-    data: item.config.clone(),
+    data: item.data.clone(),
     metadata: item.metadata.clone(),
   };
   let config = resource_config::create(&config, &pool).await?;
@@ -265,7 +265,7 @@ pub async fn put(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     kind: resource.kind,
     version: config.version,
     config_key: config.key,
-    config: config.data,
+    data: config.data,
     metadata: config.metadata,
   };
   Ok(item)

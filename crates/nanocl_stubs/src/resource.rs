@@ -11,12 +11,17 @@ pub struct ResourcePartial {
   pub name: String,
   /// The kind of the resource
   pub kind: String,
-  /// Version of the config
+  /// Version of the data
   pub version: String,
-  /// The config of the resource (json object)
+  /// The data of the resource (json object)
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub config: serde_json::Value,
+  pub data: serde_json::Value,
   /// The metadata of the resource (user defined)
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub metadata: Option<serde_json::Value>,
 }
 
@@ -29,9 +34,13 @@ pub struct ResourceUpdate {
   pub version: String,
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub config: serde_json::Value,
+  pub data: serde_json::Value,
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub metadata: Option<serde_json::Value>,
 }
 
@@ -39,7 +48,7 @@ impl From<ResourcePartial> for ResourceUpdate {
   fn from(resource: ResourcePartial) -> Self {
     Self {
       version: resource.version,
-      config: resource.config,
+      data: resource.data,
       metadata: resource.metadata,
     }
   }
@@ -66,8 +75,13 @@ pub struct Resource {
   pub config_key: uuid::Uuid,
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub config: serde_json::Value,
+  pub data: serde_json::Value,
   /// The metadata of the resource (user defined)
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub metadata: Option<serde_json::Value>,
 }
 
@@ -77,7 +91,7 @@ impl From<Resource> for ResourcePartial {
       name: resource.name,
       kind: resource.kind,
       version: resource.version,
-      config: resource.config,
+      data: resource.data,
       metadata: resource.metadata,
     }
   }
@@ -90,16 +104,21 @@ impl From<Resource> for ResourcePartial {
 pub struct ResourceConfig {
   /// Key of the resource
   pub key: uuid::Uuid,
-  /// Version of the config
+  /// Version of the resource
   pub version: String,
   /// The creation date of the resource
   pub created_at: chrono::NaiveDateTime,
-  /// Resource key associated with the config
+  /// Resource key associated with the data
   pub resource_key: String,
-  /// The config of the resource as a json object
+  /// The data of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub config: serde_json::Value,
+  pub data: serde_json::Value,
   /// The metadata of the resource (user defined)
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub metadata: Option<serde_json::Value>,
 }
 

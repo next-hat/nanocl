@@ -14,6 +14,7 @@ mod uninstall;
 mod upgrade;
 mod node;
 mod context;
+mod secret;
 
 pub use context::exec_context;
 pub use version::exec_version;
@@ -30,3 +31,4 @@ pub use system::exec_process;
 pub use install::exec_install;
 pub use upgrade::exec_upgrade;
 pub use uninstall::exec_uninstall;
+pub use secret::exec_secret;

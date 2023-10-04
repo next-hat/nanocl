@@ -23,3 +23,5 @@ pub mod resource;
 pub mod resource_kind;
 /// Manage resource_configs table
 pub mod resource_config;
+/// Manage secrets table
+pub mod secret;

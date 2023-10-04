@@ -20,6 +20,7 @@ mod metric;
 mod http_metric;
 mod vm;
 mod vm_image;
+mod secret;
 
 pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
   Err(HttpError {
@@ -67,7 +68,8 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
       .configure(vm_image::ntex_config)
       .configure(vm::ntex_config)
       .configure(metric::ntex_config)
-      .configure(http_metric::ntex_config),
+      .configure(http_metric::ntex_config)
+      .configure(secret::ntex_config),
   );
 }
 

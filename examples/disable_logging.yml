@@ -9,10 +9,7 @@ Resources:
   - Name: deploy-example.internal
     Kind: ProxyRule
     Version: v0.7
-    Config:
-      Watch:
-        - deploy-example.global.c
-        - deploy-example2.global.c
+    Data:
       Rules:
         - Domain: deploy-example.internal
           Network: Public

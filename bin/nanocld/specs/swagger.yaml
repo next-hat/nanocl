@@ -1278,6 +1278,142 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+  /secrets:
+    get:
+      tags:
+      - Secrets
+      summary: List secrets
+      description: List secrets
+      operationId: list_secret
+      responses:
+        '200':
+          description: List of secret
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Secret'
+    post:
+      tags:
+      - Secrets
+      summary: Create a secret
+      description: Create a secret
+      operationId: create_secret
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecretPartial'
+        required: true
+      responses:
+        '200':
+          description: List of secret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Secret'
+        '409':
+          description: Namespace already exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /secrets/{Key}:
+    delete:
+      tags:
+      - Secrets
+      summary: Delete a secret
+      description: Delete a secret
+      operationId: delete_secret
+      parameters:
+      - name: Name
+        in: path
+        description: The secret name to delete
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Delete response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericDelete'
+        '404':
+          description: Namespace is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    patch:
+      tags:
+      - Secrets
+      summary: Scale or Downscale number of instances
+      description: Scale or Downscale number of instances
+      operationId: patch_secret
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecretUpdate'
+        required: true
+      responses:
+        '200':
+          description: Secret scaled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Secret'
+        '404':
+          description: Secret does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /secrets/{Key}/inspect:
+    get:
+      tags:
+      - Secrets
+      summary: Get detailed information about a secret
+      description: Get detailed information about a secret
+      operationId: inspect_secret
+      parameters:
+      - name: Name
+        in: path
+        description: The secret name to inspect
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Detailed information about a secret
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Secret'
+        '404':
+          description: Namespace is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
   /version:
     get:
       tags:
@@ -4841,7 +4977,7 @@ components:
       - Version
       - Kind
       - ConfigKey
-      - Config
+      - Data
       properties:
         Name:
           type: string
@@ -4864,14 +5000,16 @@ components:
           type: string
           format: uuid
           description: The config of the resource
-        Config:
+        Data:
           type: object
           description: The config of the resource as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
         Metadata:
+          type: object
           description: The metadata of the resource (user defined)
-          nullable: true
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
     ResourceConfig:
       type: object
       required:
@@ -4879,7 +5017,7 @@ components:
       - Version
       - CreatedAt
       - ResourceKey
-      - Config
+      - Data
       properties:
         Key:
           type: string
@@ -4887,22 +5025,24 @@ components:
           description: Key of the resource
         Version:
           type: string
-          description: Version of the config
+          description: Version of the resource
         CreatedAt:
           type: string
           format: date-time
           description: The creation date of the resource
         ResourceKey:
           type: string
-          description: Resource key associated with the config
-        Config:
+          description: Resource key associated with the data
+        Data:
           type: object
-          description: The config of the resource as a json object
+          description: The data of the resource as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
         Metadata:
+          type: object
           description: The metadata of the resource (user defined)
-          nullable: true
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
     ResourceDnsRule:
       type: object
       required:
@@ -4922,7 +5062,7 @@ components:
       - Name
       - Kind
       - Version
-      - Config
+      - Data
       properties:
         Name:
           type: string
@@ -4932,43 +5072,38 @@ components:
           description: The kind of the resource
         Version:
           type: string
-          description: Version of the config
-        Config:
+          description: Version of the data
+        Data:
           type: object
-          description: The config of the resource (json object)
+          description: The data of the resource (json object)
           additionalProperties:
             $ref: '#/components/schemas/Any'
         Metadata:
+          type: object
           description: The metadata of the resource (user defined)
-          nullable: true
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
     ResourceProxyRule:
       type: object
       description: Define proxy rules to apply
       required:
-      - Watch
       - Rules
       properties:
-        Watch:
-          type: array
-          items:
-            type: string
-          description: Cargo to watch for changes
         Rules:
           type: array
           items:
             $ref: '#/components/schemas/ProxyRule'
-          description: The rule
+          description: The rules to apply
     ResourceUpdate:
       type: object
       required:
       - Version
-      - Config
-      - Metadata
+      - Data
       properties:
         Version:
           type: string
           description: Version of the config
-        Config:
+        Data:
           type: object
           description: The config of the resource as a json object
           additionalProperties:
@@ -5040,6 +5175,91 @@ components:
             type: string
           description: List of command-line arguments to pass to the runtime when invoked.
           nullable: true
+    Secret:
+      type: object
+      description: |
+        ## SecretDbModel
+
+        This structure represent the secret in the database.
+        A secret is a key/value pair that can be used by the user to store
+        sensitive data. It is stored as a json object in the database.
+      required:
+      - Key
+      - CreatedAt
+      - UpdatedAt
+      - Kind
+      - Immutable
+      - Data
+      properties:
+        Key:
+          type: string
+          description: The key of the secret
+        CreatedAt:
+          type: string
+          format: date-time
+          description: The creation date
+        UpdatedAt:
+          type: string
+          format: date-time
+          description: The last update date
+        Kind:
+          type: string
+          description: The kind of secret
+        Immutable:
+          type: boolean
+          description: The secret cannot be updated
+        Data:
+          description: The secret data
+        Metadata:
+          nullable: true
+    SecretPartial:
+      type: object
+      description: |
+        ## SecretPartial
+
+        A partial secret object. This is used to create a secret.
+        A secret is a key/value pair that can be used by the user to store
+        sensitive data. It is stored as a json object in the database.
+      required:
+      - Key
+      - Kind
+      - Data
+      properties:
+        Key:
+          type: string
+          description: The key of the secret
+        Kind:
+          type: string
+          description: The kind of secret
+        Immutable:
+          type: boolean
+          description: The secret cannot be updated
+          nullable: true
+        Data:
+          type: object
+          description: The secret data
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Metadata:
+          type: object
+          description: The metadata of the resource (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+    SecretUpdate:
+      type: object
+      required:
+      - Data
+      properties:
+        Data:
+          type: object
+          description: The data of the secret as a json object
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Metadata:
+          type: object
+          description: The metadata of the secret (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
     StartExecOptions:
       type: object
       description: Exec configuration used in the [Create Exec API](Docker::create_exec())

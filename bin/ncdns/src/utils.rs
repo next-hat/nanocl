@@ -103,10 +103,10 @@ pub(crate) async fn update_entries(
   })?;
   let mut entries = Vec::new();
   for resource in resources {
-    let mut dns_rule = serde_json::from_value::<ResourceDnsRule>(
-      resource.config,
-    )
-    .map_err(|err| err.map_err_context(|| "Unable to serialize the DnsRule"))?;
+    let mut dns_rule = serde_json::from_value::<ResourceDnsRule>(resource.data)
+      .map_err(|err| {
+        err.map_err_context(|| "Unable to serialize the DnsRule")
+      })?;
     entries.append(&mut dns_rule.entries);
   }
   let listen_address = get_network_addr(&dns_rule.network, client).await?;

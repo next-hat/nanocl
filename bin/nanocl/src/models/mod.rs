@@ -15,8 +15,10 @@ mod uninstall;
 mod upgrade;
 mod node;
 mod context;
+mod secret;
 
 pub use system::*;
+pub use secret::*;
 pub use context::*;
 pub use vm::*;
 pub use vm_image::*;
@@ -79,6 +81,8 @@ pub enum Command {
   Ps(ProcessOpts),
   /// Manage system
   System(SystemArg),
+  /// Manage secrets
+  Secret(SecretArg),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for

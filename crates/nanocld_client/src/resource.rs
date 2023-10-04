@@ -261,7 +261,7 @@ mod tests {
       name: "test_resource2".to_owned(),
       version: "v0.0.1".to_owned(),
       kind: "Kind".to_owned(),
-      config: config.clone(),
+      data: config.clone(),
       metadata: None,
     };
 
@@ -278,7 +278,7 @@ mod tests {
 
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
-      config: config.clone(),
+      data: config.clone(),
       metadata: None,
     };
 

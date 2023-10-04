@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS "cargo_configs" (
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "cargo_key" VARCHAR NOT NULL,
   "version" VARCHAR NOT NULL,
-  "config" JSON NOT NULL,
+  "data" JSON NOT NULL,
   "metadata" JSON
 );
 

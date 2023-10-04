@@ -320,7 +320,7 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
     Ok::<_, IoError>(item)
   })
   .await?;
-  let config = serde_json::from_value::<CargoConfigPartial>(item.1.config)
+  let config = serde_json::from_value::<CargoConfigPartial>(item.1.data)
     .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
   let config = CargoConfig {
     key: item.1.key,
