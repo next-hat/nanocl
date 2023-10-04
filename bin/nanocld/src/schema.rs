@@ -7,6 +7,7 @@ diesel::table! {
         cargo_key -> Varchar,
         version -> Varchar,
         config -> Jsonb,
+        metadata -> Nullable<Jsonb>,
     }
 }
 
@@ -95,6 +96,7 @@ diesel::table! {
         resource_key -> Varchar,
         version -> Varchar,
         data -> Jsonb,
+        metadata -> Nullable<Jsonb>,
     }
 }
 
@@ -151,6 +153,7 @@ diesel::table! {
         vm_key -> Varchar,
         version -> Varchar,
         config -> Jsonb,
+        metadata -> Nullable<Jsonb>,
     }
 }
 

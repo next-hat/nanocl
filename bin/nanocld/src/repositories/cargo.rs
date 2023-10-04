@@ -330,6 +330,7 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
     cargo_key: item.1.cargo_key,
     replication: config.replication,
     container: config.container,
+    metadata: config.metadata,
   };
   let item = Cargo {
     key: item.0.key,

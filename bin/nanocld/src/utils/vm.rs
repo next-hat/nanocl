@@ -509,6 +509,11 @@ pub async fn patch(
     } else {
       old_config.labels
     },
+    metadata: if config.metadata.is_some() {
+      config.metadata.clone()
+    } else {
+      old_config.metadata
+    },
   };
   put(vm_key, &vm_partial, version, state).await
 }

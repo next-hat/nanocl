@@ -25,6 +25,8 @@ pub struct ResourceConfigDbModel {
   pub(crate) version: String,
   /// The data of the config
   pub(crate) data: serde_json::Value,
+  /// The metadata (user defined)
+  pub(crate) metadata: Option<serde_json::Value>,
 }
 
 /// Helper to convert a `ResourceConfigDbModel` to a `ResourceConfig`
@@ -36,6 +38,7 @@ impl From<ResourceConfigDbModel> for ResourceConfig {
       created_at: item.created_at,
       resource_key: item.resource_key,
       config: item.data,
+      metadata: item.metadata,
     }
   }
 }

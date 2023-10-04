@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS "resource_configs" (
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "resource_key" VARCHAR NOT NULL,
   "version" VARCHAR NOT NULL,
-  "data" JSON NOT NULL
+  "data" JSON NOT NULL,
+  "metadata" JSON
 );
 
 CREATE TABLE IF NOT EXISTS "resource_kinds" (

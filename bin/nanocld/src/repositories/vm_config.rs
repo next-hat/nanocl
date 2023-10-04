@@ -35,13 +35,18 @@ pub async fn create(
 ) -> IoResult<VmConfig> {
   use crate::schema::vm_configs::dsl;
   let pool = pool.clone();
+  let mut config = serde_json::to_value(item.to_owned())
+    .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+  if let Some(meta) = config.as_object_mut() {
+    meta.remove("Metadata");
+  }
   let dbmodel = VmConfigDbModel {
     key: uuid::Uuid::new_v4(),
     vm_key: vm_key.to_owned(),
     version: version.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
-    config: serde_json::to_value(item.to_owned())
-      .map_err(|err| err.map_err_context(|| "VmConfig"))?,
+    config,
+    metadata: item.metadata.clone(),
   };
   let dbmodel = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -66,6 +71,7 @@ pub async fn create(
     mac_address: item.mac_address.clone(),
     password: item.password.clone(),
     ssh_key: item.ssh_key.clone(),
+    metadata: item.metadata.clone(),
   };
   Ok(config)
 }
@@ -114,6 +120,7 @@ pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
     host_config: config.host_config.unwrap_or_default(),
     password: config.password,
     ssh_key: config.ssh_key,
+    metadata: config.metadata,
   })
 }
 
@@ -198,6 +205,7 @@ pub async fn list_by_vm_key(key: &str, pool: &Pool) -> IoResult<Vec<VmConfig>> {
         host_config: config.host_config.unwrap_or_default(),
         ssh_key: config.ssh_key,
         password: config.password,
+        metadata: config.metadata,
       })
     })
     .collect::<Result<Vec<VmConfig>, IoError>>()?;

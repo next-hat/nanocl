@@ -171,6 +171,7 @@ async fn ensure_resource_config(client: &NanocldClient) {
       "Url": "unix:///run/nanocl/proxy.sock"
     }),
     version: format!("v{formated_version}"),
+    metadata: None,
   };
 
   match client.inspect_resource(&proxy_rule_kind.name).await {

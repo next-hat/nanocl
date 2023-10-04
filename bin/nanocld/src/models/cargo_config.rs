@@ -26,4 +26,6 @@ pub struct CargoConfigDbModel {
   pub(crate) version: String,
   /// The config
   pub(crate) config: serde_json::Value,
+  // The metadata (user defined)
+  pub(crate) metadata: Option<serde_json::Value>,
 }

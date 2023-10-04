@@ -971,6 +971,11 @@ pub async fn patch(
     name: cargo.name.clone(),
     container,
     replication: payload.replication.clone(),
+    metadata: if payload.metadata.is_some() {
+      payload.metadata.clone()
+    } else {
+      cargo.config.metadata
+    },
   };
   utils::cargo::put(key, &config, version, state).await
 }

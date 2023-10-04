@@ -262,6 +262,7 @@ mod tests {
       version: "v0.0.1".to_owned(),
       kind: "Kind".to_owned(),
       config: config.clone(),
+      metadata: None,
     };
 
     // create
@@ -278,6 +279,7 @@ mod tests {
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
       config: config.clone(),
+      metadata: None,
     };
 
     // patch

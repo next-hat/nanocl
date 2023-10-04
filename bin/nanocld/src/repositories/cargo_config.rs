@@ -42,6 +42,7 @@ pub async fn create(
     created_at: chrono::Utc::now().naive_utc(),
     config: serde_json::to_value(item.clone())
       .map_err(|e| e.map_err_context(|| "Invalid Config"))?,
+    metadata: item.metadata.clone(),
   };
   let dbmodel = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -60,6 +61,7 @@ pub async fn create(
     cargo_key: dbmodel.cargo_key,
     replication: item.replication.clone(),
     container: item.container.clone(),
+    metadata: item.metadata.clone(),
   };
   Ok(config)
 }
@@ -105,6 +107,7 @@ pub async fn find_by_key(
     cargo_key: dbmodel.cargo_key,
     replication: config.replication,
     container: config.container,
+    metadata: config.metadata,
   })
 }
 
@@ -187,6 +190,7 @@ pub async fn list_by_cargo_key(
         cargo_key: dbmodel.cargo_key,
         replication: config.replication,
         container: config.container,
+        metadata: config.metadata,
       })
     })
     .collect::<Result<Vec<CargoConfig>, IoError>>()?;

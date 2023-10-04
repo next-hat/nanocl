@@ -16,6 +16,8 @@ pub struct ResourcePartial {
   /// The config of the resource (json object)
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub config: serde_json::Value,
+  /// The metadata of the resource (user defined)
+  pub metadata: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +30,9 @@ pub struct ResourceUpdate {
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub config: serde_json::Value,
+  /// The config of the resource as a json object
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
+  pub metadata: Option<serde_json::Value>,
 }
 
 impl From<ResourcePartial> for ResourceUpdate {
@@ -35,6 +40,7 @@ impl From<ResourcePartial> for ResourceUpdate {
     Self {
       version: resource.version,
       config: resource.config,
+      metadata: resource.metadata,
     }
   }
 }
@@ -61,6 +67,8 @@ pub struct Resource {
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub config: serde_json::Value,
+  /// The metadata of the resource (user defined)
+  pub metadata: Option<serde_json::Value>,
 }
 
 impl From<Resource> for ResourcePartial {
@@ -70,6 +78,7 @@ impl From<Resource> for ResourcePartial {
       kind: resource.kind,
       version: resource.version,
       config: resource.config,
+      metadata: resource.metadata,
     }
   }
 }
@@ -90,6 +99,8 @@ pub struct ResourceConfig {
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub config: serde_json::Value,
+  /// The metadata of the resource (user defined)
+  pub metadata: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Default)]

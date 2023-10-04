@@ -1904,6 +1904,9 @@ components:
           nullable: true
         Container:
           $ref: '#/components/schemas/Config'
+        Metadata:
+          description: Metadata of the cargo (user defined)
+          nullable: true
     CargoConfigPartial:
       type: object
       description: A cargo config partial is used to create a Cargo
@@ -1920,6 +1923,9 @@ components:
           nullable: true
         Container:
           $ref: '#/components/schemas/Config'
+        Metadata:
+          description: Metadata of the cargo (user defined)
+          nullable: true
     CargoConfigUpdate:
       type: object
       description: |-
@@ -1938,6 +1944,9 @@ components:
         Replication:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
+          nullable: true
+        Metadata:
+          description: New metadata of the cargo (user defined)
           nullable: true
     CargoImagePartial:
       type: object
@@ -4860,6 +4869,9 @@ components:
           description: The config of the resource as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
+        Metadata:
+          description: The metadata of the resource (user defined)
+          nullable: true
     ResourceConfig:
       type: object
       required:
@@ -4888,6 +4900,9 @@ components:
           description: The config of the resource as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
+        Metadata:
+          description: The metadata of the resource (user defined)
+          nullable: true
     ResourceDnsRule:
       type: object
       required:
@@ -4923,6 +4938,9 @@ components:
           description: The config of the resource (json object)
           additionalProperties:
             $ref: '#/components/schemas/Any'
+        Metadata:
+          description: The metadata of the resource (user defined)
+          nullable: true
     ResourceProxyRule:
       type: object
       description: Define proxy rules to apply
@@ -4945,11 +4963,17 @@ components:
       required:
       - Version
       - Config
+      - Metadata
       properties:
         Version:
           type: string
           description: Version of the config
         Config:
+          type: object
+          description: The config of the resource as a json object
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Metadata:
           type: object
           description: The config of the resource as a json object
           additionalProperties:
@@ -5895,6 +5919,9 @@ components:
         VmKey:
           type: string
           description: The key of the vm
+        Metadata:
+          description: The metadata (user defined)
+          nullable: true
         Hostname:
           type: string
           description: Hostname of the vm
@@ -5935,6 +5962,9 @@ components:
         Name:
           type: string
           description: Name of the vm
+        Metadata:
+          description: The metadata (user defined)
+          nullable: true
         Hostname:
           type: string
           description: 'Hostname of the vm (default: generated from name)'
@@ -5977,6 +6007,9 @@ components:
         Name:
           type: string
           description: Name of the vm
+          nullable: true
+        Metadata:
+          description: The metadata (user defined)
           nullable: true
         Hostname:
           type: string
