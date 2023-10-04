@@ -1,8 +1,9 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use crate::cargo_config::CargoConfigPartial;
+use crate::secret::SecretPartial;
 use crate::vm_config::VmConfigPartial;
+use crate::cargo_config::CargoConfigPartial;
 
 use super::resource::ResourcePartial;
 
@@ -32,6 +33,19 @@ pub struct StateMeta {
 pub struct StateResource {
   /// List of resources to create
   pub resources: Vec<ResourcePartial>,
+}
+
+/// ## StateSecret
+///
+/// Statefile that represent the `Secret` kind
+///
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct StateSecret {
+  /// List of secrets to create
+  pub secrets: Vec<SecretPartial>,
 }
 
 /// ## StateCargo
@@ -77,6 +91,8 @@ pub struct StateDeployment {
   pub namespace: Option<String>,
   /// List of resources to create
   pub resources: Option<Vec<ResourcePartial>>,
+  /// List of secrets to create
+  pub secrets: Option<Vec<SecretPartial>>,
   /// List of cargoes to create and run
   pub cargoes: Option<Vec<CargoConfigPartial>>,
   /// List of virtual machines to create and run
@@ -271,6 +287,51 @@ impl StateStream {
       kind: "Resource".to_string(),
       context: Some(err.to_owned()),
       status: StateStreamStatus::Failed,
+    }
+  }
+
+  pub fn new_secret_error(key: &str, err: &str) -> Self {
+    StateStream {
+      key: key.to_owned(),
+      kind: "Secret".to_string(),
+      context: Some(err.to_owned()),
+      status: StateStreamStatus::Failed,
+    }
+  }
+
+  pub fn new_secret_pending(key: &str) -> Self {
+    StateStream {
+      key: key.to_owned(),
+      kind: "Secret".to_string(),
+      context: None,
+      status: StateStreamStatus::Pending,
+    }
+  }
+
+  pub fn new_secret_not_found(key: &str) -> Self {
+    StateStream {
+      key: key.to_owned(),
+      kind: "Secret".to_string(),
+      context: None,
+      status: StateStreamStatus::NotFound,
+    }
+  }
+
+  pub fn new_secret_unchanged(key: &str) -> Self {
+    StateStream {
+      key: key.to_owned(),
+      kind: "Secret".to_string(),
+      context: None,
+      status: StateStreamStatus::UnChanged,
+    }
+  }
+
+  pub fn new_secret_success(key: &str) -> Self {
+    StateStream {
+      key: key.to_owned(),
+      kind: "Secret".to_string(),
+      context: None,
+      status: StateStreamStatus::Success,
     }
   }
 }

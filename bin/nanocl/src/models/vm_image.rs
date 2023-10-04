@@ -96,6 +96,7 @@ pub struct VmImageArg {
 /// A row for the vm image table
 ///
 #[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
 pub struct VmImageRow {
   /// Name of the VM image
   pub name: String,
@@ -106,6 +107,7 @@ pub struct VmImageRow {
   /// Size of the VM image
   pub size: String,
   /// When the VM image was created
+  #[tabled(rename = "CREATED AT")]
   pub created_at: String,
 }
 

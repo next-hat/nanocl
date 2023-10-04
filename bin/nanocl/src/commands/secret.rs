@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::IoResult;
+use nanocl_utils::io_error::{IoResult, FromIo};
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -51,6 +51,10 @@ async fn exec_secret_rm(
   opts: &SecretRemoveOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  if !opts.skip_confirm {
+    utils::dialog::confirm(&format!("Delete secret {}?", opts.keys.join(",")))
+      .map_err(|err| err.map_err_context(|| "Delete secret"))?;
+  }
   for key in &opts.keys {
     client.delete_secret(key).await?;
   }

@@ -47,6 +47,18 @@ impl From<SecretPartial> for SecretDbModel {
   }
 }
 
+impl From<SecretDbModel> for SecretPartial {
+  fn from(val: SecretDbModel) -> Self {
+    SecretPartial {
+      key: val.key,
+      kind: val.kind,
+      immutable: Some(val.immutable),
+      data: val.data,
+      metadata: val.metadata,
+    }
+  }
+}
+
 impl From<SecretDbModel> for Secret {
   fn from(val: SecretDbModel) -> Self {
     Secret {

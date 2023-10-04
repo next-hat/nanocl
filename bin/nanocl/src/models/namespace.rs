@@ -71,6 +71,7 @@ pub struct NamespaceOpts {
 /// A row of the namespace table
 ///
 #[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
 pub struct NamespaceRow {
   /// Name of the namespace
   pub(crate) name: String,

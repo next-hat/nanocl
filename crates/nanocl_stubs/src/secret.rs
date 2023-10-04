@@ -7,7 +7,7 @@ use serde::{Serialize, Deserialize};
 /// A secret is a key/value pair that can be used by the user to store
 /// sensitive data. It is stored as a json object in the database.
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]

@@ -156,6 +156,28 @@ async fn on_event(
       nginx.delete_conf_file(&ev.name).await;
       utils::reload_config(&client).await?;
     }
+    Event::SecretPatched(secret) => {
+      let resources =
+        utils::list_resource_by_secret(&secret.key, &client).await?;
+      for resource in resources {
+        let resource: ResourcePartial = resource.into();
+        if let Err(err) = update_resource_rule(&resource, &nginx, &client).await
+        {
+          log::warn!("{err}");
+        }
+      }
+    }
+    Event::SecretCreated(secret) => {
+      let resources =
+        utils::list_resource_by_secret(&secret.key, &client).await?;
+      for resource in resources {
+        let resource: ResourcePartial = resource.into();
+        if let Err(err) = update_resource_rule(&resource, &nginx, &client).await
+        {
+          log::warn!("{err}");
+        }
+      }
+    }
     // Ignore other events
     _ => {}
   }

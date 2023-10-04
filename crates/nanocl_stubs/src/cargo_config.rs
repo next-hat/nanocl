@@ -53,20 +53,26 @@ pub struct ReplicationStatic {
 pub struct CargoConfigPartial {
   /// Name of the cargo
   pub name: String,
-  /// Replication configuration of the cargo
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub replication: Option<ReplicationMode>,
-  /// Container configuration of the cargo
-  pub container: Config,
   /// Metadata of the cargo (user defined)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub metadata: Option<serde_json::Value>,
+  /// List of secrets to use as environment variables
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub secrets: Option<Vec<String>>,
+  /// Container configuration of the cargo
+  pub container: Config,
+  /// Replication configuration of the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub replication: Option<ReplicationMode>,
 }
 
 /// Payload used to patch a cargo
@@ -83,6 +89,18 @@ pub struct CargoConfigUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub name: Option<String>,
+  /// New metadata of the cargo (user defined)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub metadata: Option<serde_json::Value>,
+  /// List of secrets to use as environment variables
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub secrets: Option<Vec<String>>,
   /// New replication configuration of the cargo
   #[cfg_attr(
     feature = "serde",
@@ -95,12 +113,6 @@ pub struct CargoConfigUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub replication: Option<ReplicationMode>,
-  /// New metadata of the cargo (user defined)
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub metadata: Option<serde_json::Value>,
 }
 
 impl From<CargoConfigPartial> for CargoConfigUpdate {
@@ -110,6 +122,7 @@ impl From<CargoConfigPartial> for CargoConfigUpdate {
       container: Some(cargo_config.container),
       replication: cargo_config.replication,
       metadata: cargo_config.metadata,
+      secrets: cargo_config.secrets,
     }
   }
 }
@@ -124,28 +137,34 @@ impl From<CargoConfigPartial> for CargoConfigUpdate {
 pub struct CargoConfig {
   /// Unique identifier of the cargo config
   pub key: uuid::Uuid,
+  /// The key of the cargo
+  pub cargo_key: String,
+  /// Version of the config
+  pub version: String,
   /// Creation date of the cargo config
   pub created_at: chrono::NaiveDateTime,
   /// Name of the cargo
   pub name: String,
-  /// Version of the config
-  pub version: String,
-  /// The key of the cargo
-  pub cargo_key: String,
-  /// Replication configuration of the cargo
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub replication: Option<ReplicationMode>,
-  /// Container configuration of the cargo
-  pub container: Config,
   /// Metadata of the cargo (user defined)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub metadata: Option<serde_json::Value>,
+  /// List of secrets to use as environment variables
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub secrets: Option<Vec<String>>,
+  /// Container configuration of the cargo
+  pub container: Config,
+  /// Replication configuration of the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub replication: Option<ReplicationMode>,
 }
 
 impl From<CargoConfig> for CargoConfigPartial {
@@ -155,6 +174,7 @@ impl From<CargoConfig> for CargoConfigPartial {
       replication: cargo_config.replication,
       container: cargo_config.container,
       metadata: cargo_config.metadata,
+      secrets: cargo_config.secrets,
     }
   }
 }
@@ -166,6 +186,7 @@ impl From<CargoInspect> for CargoConfigPartial {
       replication: cargo_inspect.config.replication,
       container: cargo_inspect.config.container,
       metadata: cargo_inspect.config.metadata,
+      secrets: cargo_inspect.config.secrets,
     }
   }
 }

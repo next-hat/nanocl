@@ -44,6 +44,11 @@ pub(crate) async fn apply(
           log::warn!("{err}");
         }
       }
+      StateData::Secret(data) => {
+        if let Err(err) = utils::state::apply_secret(&data, &state, sx).await {
+          log::warn!("{err}");
+        }
+      }
     };
   });
 
@@ -84,6 +89,11 @@ pub(crate) async fn remove(
       StateData::Resource(data) => {
         if let Err(err) = utils::state::remove_resource(&data, &state, sx).await
         {
+          log::warn!("{err}");
+        }
+      }
+      StateData::Secret(data) => {
+        if let Err(err) = utils::state::remove_secret(&data, &state, sx).await {
           log::warn!("{err}");
         }
       }

@@ -42,6 +42,15 @@ pub struct ProxySslConfig {
   pub dh_param: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
+pub enum ProxySsl {
+  Config(ProxySslConfig),
+  Secret(String),
+}
+
 /// Config for targetting a cargo or a vm
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -183,7 +192,7 @@ pub struct ProxyRuleStream {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub ssl: Option<ProxySslConfig>,
+  pub ssl: Option<ProxySsl>,
   /// The target
   pub target: StreamTarget,
 }
@@ -233,7 +242,7 @@ pub struct ProxyRuleHttp {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub ssl: Option<ProxySslConfig>,
+  pub ssl: Option<ProxySsl>,
   /// Path to extra config file to include
   #[cfg_attr(
     feature = "serde",

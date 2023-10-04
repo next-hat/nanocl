@@ -9,11 +9,12 @@ use nanocl_utils::http_error::HttpError;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::resource::ResourcePartial;
+use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
 use nanocl_stubs::cargo_config::CargoConfigPartial;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmDiskConfig};
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateVirtualMachine, StateResource, StateMeta,
-  StateStream,
+  StateStream, StateSecret,
 };
 
 use crate::{utils, repositories};
@@ -113,11 +114,90 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
         })?;
       Ok(StateData::Resource(data))
     }
+    "Secret" => {
+      let data = serde_json::from_value::<StateSecret>(data.to_owned())
+        .map_err(|err| HttpError {
+          status: http::StatusCode::BAD_REQUEST,
+          msg: format!("unable to serialize payload {err}"),
+        })?;
+      Ok(StateData::Secret(data))
+    }
     _ => Err(HttpError {
       status: http::StatusCode::BAD_REQUEST,
       msg: format!("Unknown Statefile Kind: {}", meta.kind),
     }),
   }
+}
+
+/// ## Apply Secret
+///
+/// Apply the list of secrets to the system.
+/// It will create the secrets if they don't exist.
+/// If they exists but are not up to date, it will update them.
+///
+/// ## Arguments
+///
+/// - [data](Vec<SecretPartial>) - The list of secrets to apply
+/// - [state](DaemonState) - The system state
+/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
+async fn apply_secrets(
+  data: &[SecretPartial],
+  state: &DaemonState,
+  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  data
+    .iter()
+    .map(|secret| async {
+      let key = secret.key.to_owned();
+      send(StateStream::new_secret_pending(&key), sx);
+      match repositories::secret::find_by_key(&key, &state.pool).await {
+        Ok(existing) => {
+          let existing: SecretPartial = existing.clone().into();
+          if existing == *secret {
+            send(StateStream::new_secret_unchanged(&key), sx);
+            return;
+          }
+          if let Err(err) = repositories::secret::update_by_key(
+            &key,
+            &SecretUpdate {
+              data: secret.data.to_owned(),
+              metadata: secret.metadata.to_owned(),
+            },
+            &state.pool,
+          )
+          .await
+          {
+            send(StateStream::new_secret_error(&key, &err.to_string()), sx);
+            return;
+          }
+        }
+        Err(_err) => {
+          if let Err(err) =
+            repositories::secret::create(secret, &state.pool).await
+          {
+            send(StateStream::new_secret_error(&key, &err.to_string()), sx);
+            return;
+          }
+        }
+      };
+      let key_ptr = key.clone();
+      let state_ptr = state.clone();
+      rt::spawn(async move {
+        let secret =
+          repositories::secret::find_by_key(&key_ptr, &state_ptr.pool)
+            .await
+            .unwrap();
+        let _ = state_ptr
+          .event_emitter
+          .emit(Event::SecretPatched(Box::new(secret.into())))
+          .await;
+      });
+      send(StateStream::new_secret_success(&key), sx);
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
 }
 
 /// ## Apply cargoes
@@ -321,6 +401,60 @@ async fn apply_resources(
     .await;
 }
 
+/// ## Remove secrets
+///
+/// Delete secrets from the system based on a list of secrets
+///
+/// ## Arguments
+///
+/// - [data](Vec<SecretPartial>) - The list of secrets to delete
+/// - [state](DaemonState) - The system state
+/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](HttpError) - An http response error if something went wrong
+///
+async fn remove_secrets(
+  data: &[SecretPartial],
+  state: &DaemonState,
+  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  data
+    .iter()
+    .map(|secret| async {
+      let key = secret.key.to_owned();
+      send(StateStream::new_secret_pending(&key), sx);
+      let secret =
+        match repositories::secret::find_by_key(&key, &state.pool).await {
+          Ok(secret) => secret,
+          Err(_) => {
+            send(StateStream::new_secret_not_found(&key), sx);
+            return;
+          }
+        };
+      if let Err(err) =
+        repositories::secret::delete_by_key(&secret.key, &state.pool).await
+      {
+        send(StateStream::new_secret_error(&key, &err.to_string()), sx);
+        return;
+      }
+      let secret_ptr = secret.clone();
+      let event_emitter = state.event_emitter.clone();
+      rt::spawn(async move {
+        let _ = event_emitter
+          .emit(Event::SecretDeleted(Box::new(secret_ptr.into())))
+          .await;
+      });
+      send(StateStream::new_secret_success(&key), sx);
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
+}
+
 /// ## Remove cargoes
 ///
 /// Delete cargoes from the system based on a list of cargoes for a namespace
@@ -505,6 +639,9 @@ pub async fn apply_deployment(
   } else {
     "global".into()
   };
+  if let Some(secrets) = &data.secrets {
+    apply_secrets(secrets, state, &sx).await;
+  }
   if let Some(cargoes) = &data.cargoes {
     apply_cargoes(&namespace, cargoes, version, state, &sx).await;
   }
@@ -611,6 +748,32 @@ pub async fn apply_resource(
   Ok(())
 }
 
+/// ## Apply Secret
+///
+/// Apply a Statefile Kind Secret to the system.
+/// It will create secrets or update them if they are not up to date.
+///
+/// ## Arguments
+///
+/// - [data](StateSecret) - The secret Statefile
+/// - [state](DaemonState) - The system state
+/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](HttpError) - An http response error if something went wrong
+///
+pub async fn apply_secret(
+  data: &StateSecret,
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
+  apply_secrets(&data.secrets, state, &sx).await;
+  Ok(())
+}
+
 /// ## Remove Deployment
 ///
 /// This will remove all content of a Kind Deployment Statefile from the system.
@@ -645,6 +808,9 @@ pub async fn remove_deployment(
   }
   if let Some(resources) = &data.resources {
     remove_resources(resources, state, &sx).await;
+  }
+  if let Some(secrets) = &data.secrets {
+    remove_secrets(secrets, state, &sx).await;
   }
   Ok(())
 }
@@ -731,5 +897,30 @@ pub async fn remove_resource(
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
   remove_resources(&data.resources, state, &sx).await;
+  Ok(())
+}
+
+/// ## Remove secret
+///
+/// This will remove all content of a Kind Secret Statefile from the system.
+///
+/// ## Arguments
+///
+/// - [data](StateSecret) - The secret statefile data
+/// - [state](DaemonState) - The system state
+/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](HttpError) - An http response error if something went wrong
+///
+pub async fn remove_secret(
+  data: &StateSecret,
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
+  remove_secrets(&data.secrets, state, &sx).await;
   Ok(())
 }
