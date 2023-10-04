@@ -141,7 +141,7 @@ pub(crate) async fn put_resource(
     name: path.1.clone(),
     version: payload.version,
     kind: resource.kind,
-    config: payload.config,
+    data: payload.data,
     metadata: payload.metadata,
   };
   let resource = utils::resource::patch(&new_resource, &state.pool).await?;
@@ -208,7 +208,7 @@ pub(crate) async fn revert_resource(
     name: resource.name,
     version: history.version,
     kind: resource.kind,
-    config: history.config,
+    data: history.data,
     metadata: history.metadata,
   };
   let resource = utils::resource::patch(&new_resource, &state.pool).await?;
@@ -268,7 +268,7 @@ mod tests {
       name: "test_resource".to_owned(),
       version: "v0.0.1".to_owned(),
       kind: "Kind".to_owned(),
-      config: config.clone(),
+      data: config.clone(),
       metadata: None,
     };
 
@@ -297,7 +297,7 @@ mod tests {
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
-    assert_eq!(&resource.config, &config);
+    assert_eq!(&resource.data, &config);
 
     // History
     let _ = srv
@@ -309,7 +309,7 @@ mod tests {
 
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
-      config: config.clone(),
+      data: config.clone(),
       metadata: None,
     };
     let mut resp = srv

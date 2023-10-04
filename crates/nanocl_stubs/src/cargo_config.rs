@@ -62,6 +62,10 @@ pub struct CargoConfigPartial {
   /// Container configuration of the cargo
   pub container: Config,
   /// Metadata of the cargo (user defined)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub metadata: Option<serde_json::Value>,
 }
 
@@ -92,6 +96,10 @@ pub struct CargoConfigUpdate {
   )]
   pub replication: Option<ReplicationMode>,
   /// New metadata of the cargo (user defined)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub metadata: Option<serde_json::Value>,
 }
 
@@ -133,6 +141,10 @@ pub struct CargoConfig {
   /// Container configuration of the cargo
   pub container: Config,
   /// Metadata of the cargo (user defined)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub metadata: Option<serde_json::Value>,
 }
 

@@ -3,11 +3,8 @@ use nanocld_client::bollard_next;
 use nanocld_client::NanocldClient;
 use nanocl_utils::io_error::{IoResult, FromIo, IoError};
 
-/// Import cargo types
 use nanocld_client::stubs::cargo::{CargoInspect, CreateExecOptions};
-/// Import resource types
 use nanocld_client::stubs::resource::{ResourceQuery, ResourcePartial};
-/// Import proxy types
 use nanocld_client::stubs::proxy::{
   ProxyRule, StreamTarget, ProxyStreamProtocol, ProxyRuleHttp, UpstreamTarget,
   ProxyHttpLocation, ProxyRuleStream, LocationTarget, ResourceProxyRule,
@@ -21,7 +18,7 @@ pub(crate) fn serialize_proxy_rule(
   resource: &ResourcePartial,
 ) -> IoResult<ResourceProxyRule> {
   let proxy_rule =
-    serde_json::from_value::<ResourceProxyRule>(resource.config.to_owned())
+    serde_json::from_value::<ResourceProxyRule>(resource.data.to_owned())
       .map_err(|err| {
         err.map_err_context(|| "Unable to serialize ResourceProxyRule")
       })?;
@@ -634,12 +631,31 @@ pub(crate) async fn list_resource_by_cargo(
   let namespace = namespace.unwrap_or("global".into());
   let target_key = format!("{name}.{namespace}.c");
   let query = ResourceQuery {
-    contains: Some(serde_json::json!({ "Watch": [target_key] }).to_string()),
+    contains: Some(
+      serde_json::json!({ "Rules": [ { "Locations": [ { "Target": { "Key": target_key } } ] }  ] }).to_string(),
+    ),
     kind: Some("ProxyRule".into()),
   };
-  let resources = client.list_resource(Some(query)).await.map_err(|err| {
-    err.map_err_context(|| "Unable to list resources from nanocl daemon")
-  })?;
+  let http_ressources =
+    client.list_resource(Some(query)).await.map_err(|err| {
+      err.map_err_context(|| "Unable to list resources from nanocl daemon")
+    })?;
+  let query = ResourceQuery {
+    contains: Some(
+      serde_json::json!({ "Rules": [ {  "Target": { "Key": target_key } } ] })
+        .to_string(),
+    ),
+    kind: Some("ProxyRule".into()),
+  };
+  let stream_resources =
+    client.list_resource(Some(query)).await.map_err(|err| {
+      err.map_err_context(|| "Unable to list resources from nanocl daemon")
+    })?;
+  let resources = http_ressources
+    .into_iter()
+    .chain(stream_resources.into_iter())
+    .collect::<Vec<nanocld_client::stubs::resource::Resource>>();
+  log::debug!("matching resources for {target_key}:\n{:?}", resources);
   Ok(resources)
 }
 

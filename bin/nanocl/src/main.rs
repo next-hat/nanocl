@@ -85,6 +85,7 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Namespace(args) => commands::exec_namespace(&cli_conf, args).await,
     Command::Resource(args) => commands::exec_resource(&cli_conf, args).await,
     Command::Cargo(args) => commands::exec_cargo(&cli_conf, args).await,
+    Command::Secret(args) => commands::exec_secret(&cli_conf, args).await,
     Command::Events => commands::exec_events(&cli_conf).await,
     Command::State(args) => commands::exec_state(&cli_conf, args).await,
     Command::Version => commands::exec_version(&cli_conf).await,

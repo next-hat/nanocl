@@ -235,19 +235,13 @@ components:
       type: object
       description: Define proxy rules to apply
       required:
-      - Watch
       - Rules
       properties:
-        Watch:
-          type: array
-          items:
-            type: string
-          description: Cargo to watch for changes
         Rules:
           type: array
           items:
             $ref: '#/components/schemas/ProxyRule'
-          description: The rule
+          description: The rules to apply
     StreamTarget:
       oneOf:
       - $ref: '#/components/schemas/UpstreamTarget'

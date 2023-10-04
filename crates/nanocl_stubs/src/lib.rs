@@ -16,3 +16,4 @@ pub mod vm_config;
 pub mod vm_image;
 pub mod metric;
 pub mod http_metric;
+pub mod secret;

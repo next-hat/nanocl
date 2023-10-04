@@ -40,7 +40,7 @@ pub async fn create(
     cargo_key,
     version,
     created_at: chrono::Utc::now().naive_utc(),
-    config: serde_json::to_value(item.clone())
+    data: serde_json::to_value(item.clone())
       .map_err(|e| e.map_err_context(|| "Invalid Config"))?,
     metadata: item.metadata.clone(),
   };
@@ -97,7 +97,7 @@ pub async fn find_by_key(
     Ok::<_, IoError>(config)
   })
   .await?;
-  let config = serde_json::from_value::<CargoConfigPartial>(dbmodel.config)
+  let config = serde_json::from_value::<CargoConfigPartial>(dbmodel.data)
     .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
   Ok(CargoConfig {
     key: dbmodel.key,
@@ -180,8 +180,9 @@ pub async fn list_by_cargo_key(
   let configs = dbmodels
     .into_iter()
     .map(|dbmodel| {
-      let config = serde_json::from_value::<CargoConfigPartial>(dbmodel.config)
-        .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
+      let config =
+        serde_json::from_value::<CargoConfigPartial>(dbmodel.data)
+          .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
       Ok(CargoConfig {
         key: dbmodel.key,
         created_at: dbmodel.created_at,

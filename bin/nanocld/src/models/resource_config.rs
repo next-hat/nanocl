@@ -37,7 +37,7 @@ impl From<ResourceConfigDbModel> for ResourceConfig {
       version: item.version,
       created_at: item.created_at,
       resource_key: item.resource_key,
-      config: item.data,
+      data: item.data,
       metadata: item.metadata,
     }
   }

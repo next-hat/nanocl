@@ -65,8 +65,8 @@ pub(crate) async fn remove_rule(
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
   }
   let rule = client.inspect_resource(&path.1).await?;
-  let dns_rule = serde_json::from_value::<ResourceDnsRule>(rule.config)
-    .map_err(|err| {
+  let dns_rule =
+    serde_json::from_value::<ResourceDnsRule>(rule.data).map_err(|err| {
       HttpError::bad_request(format!(
         "Unable to serialize the DnsRule: {}",
         err

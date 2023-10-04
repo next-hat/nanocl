@@ -248,8 +248,6 @@ pub struct ProxyRuleHttp {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceProxyRule {
-  /// Cargo to watch for changes
-  pub watch: Vec<String>,
-  /// The rule
+  /// The rules to apply
   pub rules: Vec<ProxyRule>,
 }

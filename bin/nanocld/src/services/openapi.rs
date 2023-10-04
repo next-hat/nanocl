@@ -30,6 +30,7 @@ use bollard_next::service::{
   NetworkContainer, Ipam, IpamConfig, ExecInspectResponse, ProcessConfig,
 };
 use nanocl_stubs::config::DaemonConfig;
+use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 use nanocl_stubs::generic::GenericCount;
 use nanocl_stubs::system::{Version, HostInfo};
 use nanocl_stubs::metric::{Metric, MetricKind};
@@ -69,7 +70,7 @@ use nanocl_stubs::state::{
 
 use super::{
   node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
-  metric, http_metric,
+  metric, http_metric, secret,
 };
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -224,6 +225,12 @@ impl Modify for VersionModifier {
     namespace::inspect_namespace,
     namespace::create_namespace,
     namespace::delete_namespace,
+    // Secret
+    secret::list_secret,
+    secret::inspect_secret,
+    secret::create_secret,
+    secret::delete_secret,
+    secret::patch_secret,
     // Cargo
     cargo::list_cargo,
     cargo::list_cargo_instance,
@@ -286,6 +293,10 @@ impl Modify for VersionModifier {
     // Node
     Node,
     NodeContainerSummary,
+    // Secret
+    Secret,
+    SecretPartial,
+    SecretUpdate,
     // System
     Version,
     HostInfo,

@@ -9,7 +9,7 @@ Resources:
   - Name: tcp-example
     Kind: ProxyRule
     Version: v0.7
-    Config:
+    Data:
       Watch:
         - tcp-example.global.c
       Rules:

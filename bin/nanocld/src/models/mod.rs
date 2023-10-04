@@ -44,5 +44,8 @@ pub use resource_kind::*;
 mod resource_config;
 pub use resource_config::*;
 
+mod secret;
+pub use secret::*;
+
 pub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;

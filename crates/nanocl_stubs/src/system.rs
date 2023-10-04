@@ -8,6 +8,7 @@ use crate::config::DaemonConfig;
 
 use super::cargo::CargoInspect;
 use super::resource::Resource;
+use super::secret::Secret;
 
 /// HostInfo contains information about the host and the docker daemon
 #[derive(Debug, Clone)]
@@ -58,6 +59,12 @@ pub enum Event {
   ResourceDeleted(Box<Resource>),
   /// ResourcePatched is sent when a resource is patched
   ResourcePatched(Box<Resource>),
+  /// SecretCreated is sent when a secret is created
+  SecretCreated(Box<Secret>),
+  /// SecretDeleted is sent when a secret is deleted
+  SecretDeleted(Box<Secret>),
+  /// SecretPatched is sent when a secret is patched
+  SecretPatched(Box<Secret>),
 }
 
 impl std::fmt::Display for Event {
@@ -77,6 +84,15 @@ impl std::fmt::Display for Event {
       }
       Event::ResourcePatched(resource) => {
         write!(f, "ResourcePatched({})", resource.name)
+      }
+      Event::SecretCreated(secret) => {
+        write!(f, "SecretCreated({})", secret.key)
+      }
+      Event::SecretDeleted(secret) => {
+        write!(f, "SecretDeleted({})", secret.key)
+      }
+      Event::SecretPatched(secret) => {
+        write!(f, "SecretPatched({})", secret.key)
       }
     }
   }

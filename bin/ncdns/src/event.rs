@@ -17,7 +17,7 @@ async fn ensure_resource_config(client: &NanocldClient) {
   let dns_rule_kind = ResourcePartial {
     kind: "Kind".to_string(),
     name: "DnsRule".to_string(),
-    config: serde_json::json!({
+    data: serde_json::json!({
       "Url": "unix:///run/nanocl/dns.sock"
     }),
     version: format!("v{formated_version}"),
@@ -76,7 +76,7 @@ async fn r#loop(dnsmasq: &Dnsmasq, client: &NanocldClient) {
           match e {
             Event::ResourceCreated(resource) => {
               let dns_rule =
-                serde_json::from_value::<ResourceDnsRule>(resource.config);
+                serde_json::from_value::<ResourceDnsRule>(resource.data);
               let Ok(dns_rule) = dns_rule else {
                 log::warn!("Unable to serialize the DnsRule");
                 continue;
@@ -88,7 +88,7 @@ async fn r#loop(dnsmasq: &Dnsmasq, client: &NanocldClient) {
             }
             Event::ResourcePatched(resource) => {
               let dns_rule =
-                serde_json::from_value::<ResourceDnsRule>(resource.config);
+                serde_json::from_value::<ResourceDnsRule>(resource.data);
               let Ok(dns_rule) = dns_rule else {
                 log::warn!("Unable to serialize the DnsRule");
                 continue;
