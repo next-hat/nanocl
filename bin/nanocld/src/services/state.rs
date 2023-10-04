@@ -92,7 +92,11 @@ pub(crate) async fn remove(
           log::warn!("{err}");
         }
       }
-      StateData::Secret(_) => {}
+      StateData::Secret(data) => {
+        if let Err(err) = utils::state::remove_secret(&data, &state, sx).await {
+          log::warn!("{err}");
+        }
+      }
     };
   });
 

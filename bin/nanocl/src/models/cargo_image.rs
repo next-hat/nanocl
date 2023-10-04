@@ -118,6 +118,7 @@ pub struct CargoImageArg {
 /// A row of the cargo image table
 ///
 #[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
 pub struct CargoImageRow {
   /// Image ID
   pub(crate) id: String,
@@ -128,7 +129,8 @@ pub struct CargoImageRow {
   /// Size of the image
   pub(crate) size: String,
   /// Created date
-  pub(crate) created: String,
+  #[tabled(rename = "CREATED AT")]
+  pub(crate) created_at: String,
 }
 
 /// ## Convert size
@@ -170,7 +172,7 @@ impl From<ImageSummary> for CargoImageRow {
       repositories: vals.first().unwrap_or(&"<none>").to_string(),
       tag: vals.get(1).unwrap_or(&"<none>").to_string(),
       size: convert_size(value.size),
-      created,
+      created_at: created,
     }
   }
 }

@@ -373,6 +373,7 @@ pub struct CargoArg {
 /// A row of the cargo table
 ///
 #[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
 pub struct CargoRow {
   /// Name of the cargo
   pub(crate) name: String,
@@ -383,7 +384,7 @@ pub struct CargoRow {
   /// Number of running instances
   pub(crate) instances: String,
   /// Config version of the cargo
-  pub(crate) config_version: String,
+  pub(crate) version: String,
   /// When the cargo was created
   pub(crate) created_at: String,
   /// When the cargo was last updated
@@ -408,7 +409,7 @@ impl From<CargoSummary> for CargoRow {
       name: cargo.name,
       namespace: cargo.namespace_name,
       image: cargo.config.container.image.unwrap_or_default(),
-      config_version: cargo.config.version,
+      version: cargo.config.version,
       instances: format!("{}/{}", cargo.instance_running, cargo.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

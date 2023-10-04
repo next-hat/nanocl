@@ -39,6 +39,9 @@ pub struct SecretArg {
 ///
 #[derive(Debug, Parser)]
 pub struct SecretRemoveOpts {
+  /// Skip confirmation
+  #[clap(short = 'y')]
+  pub skip_confirm: bool,
   /// List of secret to remove
   pub keys: Vec<String>,
 }
@@ -57,9 +60,17 @@ pub struct SecretInspectOpts {
 }
 
 #[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
 pub struct SecretRow {
+  /// The key of the secret
   pub key: String,
+  /// The kind of secret
+  pub kind: String,
+  /// When the secret have been created
+  #[tabled(rename = "CREATED AT")]
   pub created_at: String,
+  /// When the secret have been updated
+  #[tabled(rename = "UPDATED AT")]
   pub updated_at: String,
 }
 
@@ -79,6 +90,7 @@ impl From<Secret> for SecretRow {
       .format("%Y-%m-%d %H:%M:%S");
     Self {
       key: secret.key,
+      kind: secret.kind,
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
     }

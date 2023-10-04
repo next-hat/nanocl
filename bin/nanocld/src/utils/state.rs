@@ -401,6 +401,60 @@ async fn apply_resources(
     .await;
 }
 
+/// ## Remove secrets
+///
+/// Delete secrets from the system based on a list of secrets
+///
+/// ## Arguments
+///
+/// - [data](Vec<SecretPartial>) - The list of secrets to delete
+/// - [state](DaemonState) - The system state
+/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](HttpError) - An http response error if something went wrong
+///
+async fn remove_secrets(
+  data: &[SecretPartial],
+  state: &DaemonState,
+  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  data
+    .iter()
+    .map(|secret| async {
+      let key = secret.key.to_owned();
+      send(StateStream::new_secret_pending(&key), sx);
+      let secret =
+        match repositories::secret::find_by_key(&key, &state.pool).await {
+          Ok(secret) => secret,
+          Err(_) => {
+            send(StateStream::new_secret_not_found(&key), sx);
+            return;
+          }
+        };
+      if let Err(err) =
+        repositories::secret::delete_by_key(&secret.key, &state.pool).await
+      {
+        send(StateStream::new_secret_error(&key, &err.to_string()), sx);
+        return;
+      }
+      let secret_ptr = secret.clone();
+      let event_emitter = state.event_emitter.clone();
+      rt::spawn(async move {
+        let _ = event_emitter
+          .emit(Event::SecretDeleted(Box::new(secret_ptr.into())))
+          .await;
+      });
+      send(StateStream::new_secret_success(&key), sx);
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
+}
+
 /// ## Remove cargoes
 ///
 /// Delete cargoes from the system based on a list of cargoes for a namespace
@@ -755,6 +809,9 @@ pub async fn remove_deployment(
   if let Some(resources) = &data.resources {
     remove_resources(resources, state, &sx).await;
   }
+  if let Some(secrets) = &data.secrets {
+    remove_secrets(secrets, state, &sx).await;
+  }
   Ok(())
 }
 
@@ -840,5 +897,30 @@ pub async fn remove_resource(
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
   remove_resources(&data.resources, state, &sx).await;
+  Ok(())
+}
+
+/// ## Remove secret
+///
+/// This will remove all content of a Kind Secret Statefile from the system.
+///
+/// ## Arguments
+///
+/// - [data](StateSecret) - The secret statefile data
+/// - [state](DaemonState) - The system state
+/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](()) - The operation was successful
+///   - [Err](HttpError) - An http response error if something went wrong
+///
+pub async fn remove_secret(
+  data: &StateSecret,
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
+  remove_secrets(&data.secrets, state, &sx).await;
   Ok(())
 }

@@ -264,6 +264,7 @@ impl From<VmCreateOpts> for VmConfigPartial {
 /// A row for the vm table
 ///
 #[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
 pub struct VmRow {
   /// Name of the vm
   pub(crate) name: String,
@@ -274,10 +275,12 @@ pub struct VmRow {
   /// Number of instances
   pub(crate) instances: String,
   /// Config version
-  pub(crate) config_version: String,
+  pub(crate) version: String,
   /// When the vm was created
+  #[tabled(rename = "CREATED AT")]
   pub(crate) created_at: String,
   /// When the vm was last updated
+  #[tabled(rename = "UPDATED AT")]
   pub(crate) updated_at: String,
 }
 
@@ -300,7 +303,7 @@ impl From<VmSummary> for VmRow {
       name: vm.name,
       namespace: vm.namespace_name,
       disk: vm.config.disk.image,
-      config_version: vm.config.version,
+      version: vm.config.version,
       instances: format!("{}/{}", vm.running_instances, vm.instances),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

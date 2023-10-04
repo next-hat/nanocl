@@ -111,6 +111,7 @@ impl From<ProcessOpts> for ProccessQuery {
 /// A row for the process table
 ///
 #[derive(Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
 pub struct ProcessRow {
   /// Node name
   node: String,
@@ -125,7 +126,7 @@ pub struct ProcessRow {
   /// Status of the cargo or the vm
   status: String,
   /// IP address of the cargo or the vm
-  ip_address: String,
+  ip: String,
   /// When the cargo or the vm was created
   created: String,
 }
@@ -168,7 +169,7 @@ impl From<NodeContainerSummary> for ProcessRow {
       namespace: namespace.to_owned(),
       image: container.image.unwrap_or_default(),
       status: container.status.unwrap_or_default(),
-      ip_address: ipaddr,
+      ip: ipaddr,
       created: format!("{created_at}"),
     }
   }
