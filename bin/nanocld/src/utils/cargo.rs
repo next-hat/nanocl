@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use nanocl_stubs::cargo::CargoStatsQuery;
 use ntex::rt;
 use ntex::util::Bytes;
 use futures::{StreamExt, TryStreamExt};
@@ -11,13 +12,15 @@ use bollard_next::container::LogOutput;
 use bollard_next::container::WaitContainerOptions;
 use bollard_next::service::{ContainerSummary, HostConfig};
 use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
-use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
+use bollard_next::container::{
+  ListContainersOptions, RemoveContainerOptions, Stats,
+};
 
 use nanocl_utils::http_error::HttpError;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,
-  CargoKillOptions, GenericCargoListQuery, CargoScale,
+  CargoKillOptions, GenericCargoListQuery, CargoScale, CargoStats,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
@@ -998,6 +1001,34 @@ pub fn get_logs(
   let stream =
     docker_api.logs(&format!("{name}.c"), Some(query.clone().into()));
   let stream = transform_stream::<LogOutput, OutputLog>(stream);
+  Ok(stream)
+}
+
+/// ## Get stats
+///
+/// Get the stats of a cargo instance
+/// The cargo name can be used if the cargo has only one instance
+///
+/// ## Arguments
+///
+/// - [name](str): The cargo name
+/// - [query](CargoStatsQuery): The query parameters
+/// - [docker_api](bollard_next::Docker): The docker api
+///
+/// ## Returns
+///
+/// - [Result](Result) - The result of the operation
+///   - [Ok](Stream) - The stream of logs
+///   - [Err](HttpError) - The logs could not be retrieved
+///
+pub fn get_stats(
+  name: &str,
+  query: &CargoStatsQuery,
+  docker_api: &bollard_next::Docker,
+) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
+  let stream =
+    docker_api.stats(&format!("{name}.c"), Some(query.clone().into()));
+  let stream = transform_stream::<Stats, CargoStats>(stream);
   Ok(stream)
 }
 

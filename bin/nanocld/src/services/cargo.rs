@@ -9,7 +9,8 @@ use ntex::http;
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
-  CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery, CargoScale,
+  CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery,
+  CargoStatsQuery, CargoScale,
 };
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
@@ -463,6 +464,38 @@ async fn logs_cargo(
   )
 }
 
+/// Get stats of a cargo instance
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/stats",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("Stream" = Option<bool>, Query, description = "Only logs returned since timestamp"),
+    ("OneShot" = Option<bool>, Query, description = "Only logs returned until timestamp"),
+  ),
+  responses(
+    (status = 200, description = "Cargo stats", content_type = "application/vdn.nanocl.raw-stream", body = Stats),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
+#[web::get("/cargoes/{name}/stats")]
+async fn stats_cargo(
+  web::types::Query(qs): web::types::Query<CargoStatsQuery>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  let stream = utils::cargo::get_stats(&key, &qs, &state.docker_api)?;
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("application/vdn.nanocl.raw-stream")
+      .streaming(stream),
+  )
+}
+
 /// Scale or Downscale number of instances
 #[cfg_attr(feature = "dev", utoipa::path(
   patch,
@@ -515,6 +548,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(logs_cargo);
   config.service(list_cargo_instance);
   config.service(scale_cargo);
+  config.service(stats_cargo);
 }
 
 #[cfg(test)]

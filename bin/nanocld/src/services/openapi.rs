@@ -2,7 +2,11 @@ use bollard_next::exec::StartExecOptions;
 use ntex::util::HashMap;
 use serde::{Serialize, Deserialize};
 use utoipa::{OpenApi, Modify, ToSchema};
-use bollard_next::container::Config;
+use bollard_next::container::{
+  Config, ThrottlingData, CPUUsage, BlkioStatsEntry, MemoryStats,
+  MemoryStatsStats, PidsStats, NetworkStats, BlkioStats, CPUStats,
+  StorageStats, MemoryStatsStatsV1, MemoryStatsStatsV2,
+};
 use bollard_next::service::{
   PortBinding, MountBindOptionsPropagationEnum, MountVolumeOptionsDriverConfig,
   MountBindOptions, MountTmpfsOptions, MountTypeEnum, MountVolumeOptions,
@@ -38,7 +42,7 @@ use nanocl_stubs::namespace::{
 };
 use nanocl_stubs::cargo::{
   Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
-  CargoScale,
+  CargoScale, CargoStats,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfig, CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
@@ -236,6 +240,7 @@ impl Modify for VersionModifier {
     cargo::revert_cargo,
     cargo::logs_cargo,
     cargo::scale_cargo,
+    cargo::stats_cargo,
     // Exec
     exec::create_exec_command,
     exec::start_exec_command,
@@ -330,6 +335,19 @@ impl Modify for VersionModifier {
     CargoConfigUpdate,
     ReplicationStatic,
     CargoScale,
+    CargoStats,
+    PidsStats,
+    NetworkStats,
+    BlkioStats,
+    CPUStats,
+    StorageStats,
+    MemoryStats,
+    MemoryStatsStats,
+    MemoryStatsStatsV1,
+    MemoryStatsStatsV2,
+    BlkioStatsEntry,
+    CPUUsage,
+    ThrottlingData,
     // Container Image
     ImageSummary,
     ImageInspect,

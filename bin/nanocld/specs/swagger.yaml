@@ -677,6 +677,50 @@ paths:
           description: Cargo started
         '404':
           description: Cargo does not exist
+  /cargoes/{Name}/stats:
+    get:
+      tags:
+      - Cargoes
+      summary: Get stats of a cargo instance
+      description: Get stats of a cargo instance
+      operationId: stats_cargo
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo instance usually `name` or `name-number`
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the cargo
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: Stream
+        in: query
+        description: Only logs returned since timestamp
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      - name: OneShot
+        in: query
+        description: Only logs returned until timestamp
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      responses:
+        '200':
+          description: Cargo stats
+          content:
+            application/vdn.nanocl.raw-stream:
+              schema:
+                $ref: '#/components/schemas/Stats'
+        '404':
+          description: Cargo does not exist
   /cargoes/{Name}/stop:
     post:
       tags:
@@ -1670,12 +1714,126 @@ components:
       properties:
         msg:
           type: string
+    BlkioStats:
+      type: object
+      description: I/O statistics for the container.
+      properties:
+        io_service_bytes_recursive:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlkioStatsEntry'
+          nullable: true
+        io_serviced_recursive:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlkioStatsEntry'
+          nullable: true
+        io_queue_recursive:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlkioStatsEntry'
+          nullable: true
+        io_service_time_recursive:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlkioStatsEntry'
+          nullable: true
+        io_wait_time_recursive:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlkioStatsEntry'
+          nullable: true
+        io_merged_recursive:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlkioStatsEntry'
+          nullable: true
+        io_time_recursive:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlkioStatsEntry'
+          nullable: true
+        sectors_recursive:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlkioStatsEntry'
+          nullable: true
+    BlkioStatsEntry:
+      type: object
+      required:
+      - major
+      - minor
+      - op
+      - value
+      properties:
+        major:
+          type: integer
+          format: int64
+          minimum: 0
+        minor:
+          type: integer
+          format: int64
+          minimum: 0
+        op:
+          type: string
+        value:
+          type: integer
+          format: int64
+          minimum: 0
     BollardDate:
       type: string
       title: BollardDate
       description: BollardDate
       example: 2021-01-01T00:00:00.000000000Z
       nullable: true
+    CPUStats:
+      type: object
+      description: General CPU statistics for the container.
+      required:
+      - cpu_usage
+      - throttling_data
+      properties:
+        cpu_usage:
+          $ref: '#/components/schemas/CPUUsage'
+        system_cpu_usage:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        online_cpus:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        throttling_data:
+          $ref: '#/components/schemas/ThrottlingData'
+    CPUUsage:
+      type: object
+      description: CPU usage statistics for the container.
+      required:
+      - usage_in_usermode
+      - total_usage
+      - usage_in_kernelmode
+      properties:
+        percpu_usage:
+          type: array
+          items:
+            type: integer
+            format: int64
+            minimum: 0
+          nullable: true
+        usage_in_usermode:
+          type: integer
+          format: int64
+          minimum: 0
+        total_usage:
+          type: integer
+          format: int64
+          minimum: 0
+        usage_in_kernelmode:
+          type: integer
+          format: int64
+          minimum: 0
     Cargo:
       type: object
       description: |-
@@ -3445,6 +3603,405 @@ components:
       - $ref: '#/components/schemas/UpstreamTarget'
       - $ref: '#/components/schemas/HttpTarget'
       - $ref: '#/components/schemas/UnixTarget'
+    MemoryStats:
+      type: object
+      description: General memory statistics for the container.
+      properties:
+        stats:
+          allOf:
+          - $ref: '#/components/schemas/MemoryStatsStats'
+          nullable: true
+        max_usage:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        usage:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        failcnt:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        limit:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        commit:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        commit_peak:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        commitbytes:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        commitpeakbytes:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        privateworkingset:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+    MemoryStatsStats:
+      oneOf:
+      - $ref: '#/components/schemas/MemoryStatsStatsV1'
+      - $ref: '#/components/schemas/MemoryStatsStatsV2'
+      description: Granular memory statistics for the container.
+    MemoryStatsStatsV1:
+      type: object
+      description: |-
+        Granular memory statistics for the container, v1 cgroups.
+
+        Exposed in the docker library [here](https://github.com/moby/moby/blob/40d9e2aff130b42ba0f83d5238b9b53184c8ab3b/daemon/daemon_unix.go#L1436).
+      required:
+      - cache
+      - dirty
+      - mapped_file
+      - total_inactive_file
+      - pgpgout
+      - rss
+      - total_mapped_file
+      - writeback
+      - unevictable
+      - pgpgin
+      - total_unevictable
+      - pgmajfault
+      - total_rss
+      - total_rss_huge
+      - total_writeback
+      - total_inactive_anon
+      - rss_huge
+      - hierarchical_memory_limit
+      - total_pgfault
+      - total_active_file
+      - active_anon
+      - total_active_anon
+      - total_pgpgout
+      - total_cache
+      - total_dirty
+      - inactive_anon
+      - active_file
+      - pgfault
+      - inactive_file
+      - total_pgmajfault
+      - total_pgpgin
+      properties:
+        cache:
+          type: integer
+          format: int64
+          minimum: 0
+        dirty:
+          type: integer
+          format: int64
+          minimum: 0
+        mapped_file:
+          type: integer
+          format: int64
+          minimum: 0
+        total_inactive_file:
+          type: integer
+          format: int64
+          minimum: 0
+        pgpgout:
+          type: integer
+          format: int64
+          minimum: 0
+        rss:
+          type: integer
+          format: int64
+          minimum: 0
+        total_mapped_file:
+          type: integer
+          format: int64
+          minimum: 0
+        writeback:
+          type: integer
+          format: int64
+          minimum: 0
+        unevictable:
+          type: integer
+          format: int64
+          minimum: 0
+        pgpgin:
+          type: integer
+          format: int64
+          minimum: 0
+        total_unevictable:
+          type: integer
+          format: int64
+          minimum: 0
+        pgmajfault:
+          type: integer
+          format: int64
+          minimum: 0
+        total_rss:
+          type: integer
+          format: int64
+          minimum: 0
+        total_rss_huge:
+          type: integer
+          format: int64
+          minimum: 0
+        total_writeback:
+          type: integer
+          format: int64
+          minimum: 0
+        total_inactive_anon:
+          type: integer
+          format: int64
+          minimum: 0
+        rss_huge:
+          type: integer
+          format: int64
+          minimum: 0
+        hierarchical_memory_limit:
+          type: integer
+          format: int64
+          minimum: 0
+        total_pgfault:
+          type: integer
+          format: int64
+          minimum: 0
+        total_active_file:
+          type: integer
+          format: int64
+          minimum: 0
+        active_anon:
+          type: integer
+          format: int64
+          minimum: 0
+        total_active_anon:
+          type: integer
+          format: int64
+          minimum: 0
+        total_pgpgout:
+          type: integer
+          format: int64
+          minimum: 0
+        total_cache:
+          type: integer
+          format: int64
+          minimum: 0
+        total_dirty:
+          type: integer
+          format: int64
+          minimum: 0
+        inactive_anon:
+          type: integer
+          format: int64
+          minimum: 0
+        active_file:
+          type: integer
+          format: int64
+          minimum: 0
+        pgfault:
+          type: integer
+          format: int64
+          minimum: 0
+        inactive_file:
+          type: integer
+          format: int64
+          minimum: 0
+        total_pgmajfault:
+          type: integer
+          format: int64
+          minimum: 0
+        total_pgpgin:
+          type: integer
+          format: int64
+          minimum: 0
+        hierarchical_memsw_limit:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        shmem:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        total_shmem:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+    MemoryStatsStatsV2:
+      type: object
+      description: |-
+        Granular memory statistics for the container, v2 cgroups.
+
+        Exposed in the docker library [here](https://github.com/moby/moby/blob/40d9e2aff130b42ba0f83d5238b9b53184c8ab3b/daemon/daemon_unix.go#L1542).
+      required:
+      - anon
+      - file
+      - kernel_stack
+      - slab
+      - sock
+      - shmem
+      - file_mapped
+      - file_dirty
+      - file_writeback
+      - anon_thp
+      - inactive_anon
+      - active_anon
+      - inactive_file
+      - active_file
+      - unevictable
+      - slab_reclaimable
+      - slab_unreclaimable
+      - pgfault
+      - pgmajfault
+      - workingset_refault
+      - workingset_activate
+      - workingset_nodereclaim
+      - pgrefill
+      - pgscan
+      - pgsteal
+      - pgactivate
+      - pgdeactivate
+      - pglazyfree
+      - pglazyfreed
+      - thp_fault_alloc
+      - thp_collapse_alloc
+      properties:
+        anon:
+          type: integer
+          format: int64
+          minimum: 0
+        file:
+          type: integer
+          format: int64
+          minimum: 0
+        kernel_stack:
+          type: integer
+          format: int64
+          minimum: 0
+        slab:
+          type: integer
+          format: int64
+          minimum: 0
+        sock:
+          type: integer
+          format: int64
+          minimum: 0
+        shmem:
+          type: integer
+          format: int64
+          minimum: 0
+        file_mapped:
+          type: integer
+          format: int64
+          minimum: 0
+        file_dirty:
+          type: integer
+          format: int64
+          minimum: 0
+        file_writeback:
+          type: integer
+          format: int64
+          minimum: 0
+        anon_thp:
+          type: integer
+          format: int64
+          minimum: 0
+        inactive_anon:
+          type: integer
+          format: int64
+          minimum: 0
+        active_anon:
+          type: integer
+          format: int64
+          minimum: 0
+        inactive_file:
+          type: integer
+          format: int64
+          minimum: 0
+        active_file:
+          type: integer
+          format: int64
+          minimum: 0
+        unevictable:
+          type: integer
+          format: int64
+          minimum: 0
+        slab_reclaimable:
+          type: integer
+          format: int64
+          minimum: 0
+        slab_unreclaimable:
+          type: integer
+          format: int64
+          minimum: 0
+        pgfault:
+          type: integer
+          format: int64
+          minimum: 0
+        pgmajfault:
+          type: integer
+          format: int64
+          minimum: 0
+        workingset_refault:
+          type: integer
+          format: int64
+          minimum: 0
+        workingset_activate:
+          type: integer
+          format: int64
+          minimum: 0
+        workingset_nodereclaim:
+          type: integer
+          format: int64
+          minimum: 0
+        pgrefill:
+          type: integer
+          format: int64
+          minimum: 0
+        pgscan:
+          type: integer
+          format: int64
+          minimum: 0
+        pgsteal:
+          type: integer
+          format: int64
+          minimum: 0
+        pgactivate:
+          type: integer
+          format: int64
+          minimum: 0
+        pgdeactivate:
+          type: integer
+          format: int64
+          minimum: 0
+        pglazyfree:
+          type: integer
+          format: int64
+          minimum: 0
+        pglazyfreed:
+          type: integer
+          format: int64
+          minimum: 0
+        thp_fault_alloc:
+          type: integer
+          format: int64
+          minimum: 0
+        thp_collapse_alloc:
+          type: integer
+          format: int64
+          minimum: 0
     Metric:
       type: object
       description: Metric entry
@@ -3774,6 +4331,51 @@ components:
         IPv6Address:
           type: string
           nullable: true
+    NetworkStats:
+      type: object
+      description: Network statistics for the container.
+      required:
+      - rx_dropped
+      - rx_bytes
+      - rx_errors
+      - tx_packets
+      - tx_dropped
+      - rx_packets
+      - tx_errors
+      - tx_bytes
+      properties:
+        rx_dropped:
+          type: integer
+          format: int64
+          minimum: 0
+        rx_bytes:
+          type: integer
+          format: int64
+          minimum: 0
+        rx_errors:
+          type: integer
+          format: int64
+          minimum: 0
+        tx_packets:
+          type: integer
+          format: int64
+          minimum: 0
+        tx_dropped:
+          type: integer
+          format: int64
+          minimum: 0
+        rx_packets:
+          type: integer
+          format: int64
+          minimum: 0
+        tx_errors:
+          type: integer
+          format: int64
+          minimum: 0
+        tx_bytes:
+          type: integer
+          format: int64
+          minimum: 0
     NetworkingConfig:
       type: object
       description: NetworkingConfig represents the container's networking configuration for each of its interfaces. It is used for the networking configs specified in the `docker create` and `docker network connect` commands.
@@ -3828,6 +4430,20 @@ components:
           type: string
           description: IP address and ports at which this node can be reached.
           nullable: true
+    PidsStats:
+      type: object
+      description: Process ID statistics for the container.
+      properties:
+        current:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        limit:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
     PluginsInfo:
       type: object
       description: 'Available plugins per type.  <p><br /></p>  > **Note**: Only unmanaged (V1) plugins are included in this list. > V1 plugins are \"lazily\" loaded, and are not returned in this list > if there is no resource using the plugin.'
@@ -4513,6 +5129,79 @@ components:
           items:
             $ref: '#/components/schemas/VmConfigPartial'
           description: List of virtual machines to create and run
+    Stats:
+      type: object
+      description: Statistics for the container.
+      required:
+      - read
+      - preread
+      - num_procs
+      - pids_stats
+      - memory_stats
+      - blkio_stats
+      - cpu_stats
+      - precpu_stats
+      - storage_stats
+      - name
+      - id
+      properties:
+        read:
+          type: string
+        preread:
+          type: string
+        num_procs:
+          type: integer
+          format: int32
+          minimum: 0
+        pids_stats:
+          $ref: '#/components/schemas/PidsStats'
+        network:
+          allOf:
+          - $ref: '#/components/schemas/NetworkStats'
+          nullable: true
+        networks:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/NetworkStats'
+          nullable: true
+        memory_stats:
+          $ref: '#/components/schemas/MemoryStats'
+        blkio_stats:
+          $ref: '#/components/schemas/BlkioStats'
+        cpu_stats:
+          $ref: '#/components/schemas/CPUStats'
+        precpu_stats:
+          $ref: '#/components/schemas/CPUStats'
+        storage_stats:
+          $ref: '#/components/schemas/StorageStats'
+        name:
+          type: string
+        id:
+          type: string
+    StorageStats:
+      type: object
+      description: File I/O statistics for the container.
+      properties:
+        read_count_normalized:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        read_size_bytes:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        write_count_normalized:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+        write_size_bytes:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
     StreamTarget:
       oneOf:
       - $ref: '#/components/schemas/UpstreamTarget'
@@ -5052,6 +5741,26 @@ components:
           format: int64
           description: Rate
           nullable: true
+    ThrottlingData:
+      type: object
+      description: CPU throttling statistics.
+      required:
+      - periods
+      - throttled_periods
+      - throttled_time
+      properties:
+        periods:
+          type: integer
+          format: int64
+          minimum: 0
+        throttled_periods:
+          type: integer
+          format: int64
+          minimum: 0
+        throttled_time:
+          type: integer
+          format: int64
+          minimum: 0
     TlsInfo:
       type: object
       description: Information about the issuer of leaf TLS certificates and the trusted root CA certificate.

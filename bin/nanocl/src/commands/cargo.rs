@@ -1,10 +1,16 @@
 use std::process;
+use std::collections::HashMap;
 
-use futures::StreamExt;
+use futures::stream::FuturesUnordered;
+use futures::{StreamExt, SinkExt};
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
+use futures::channel::mpsc;
 use nanocl_utils::io_error::{FromIo, IoResult};
-use nanocld_client::stubs::cargo::{OutputKind, CargoDeleteQuery, CargoLogQuery};
+use nanocld_client::stubs::cargo::{
+  OutputKind, CargoDeleteQuery, CargoLogQuery, CargoStatsQuery,
+};
+use ntex::rt;
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -12,7 +18,7 @@ use crate::models::{
   CargoArg, CargoCreateOpts, CargoCommand, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
   CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
-  CargoRunOpts, CargoRestartOpts, CargoListOpts,
+  CargoRunOpts, CargoRestartOpts, CargoListOpts, CargoStatsOpts, CargoStatsRow,
 };
 
 use super::cargo_image::{self, exec_cargo_image_pull};
@@ -416,6 +422,80 @@ async fn exec_cargo_logs(
   Ok(())
 }
 
+/// ## Exec cargo stats
+///
+/// Execute the `nanocl cargo stats` command to list the stats of a cargo
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli configuration
+/// * [args](CargoArg) Cargo arguments
+/// * [opts](CargoCommand) Cargo command
+///
+/// ## Return
+///
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) Operation was successful
+///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///
+async fn exec_cargo_stats(
+  cli_conf: &CliConfig,
+  args: &CargoArg,
+  opts: &CargoStatsOpts,
+) -> IoResult<()> {
+  let client = cli_conf.client.clone();
+  let query = CargoStatsQuery {
+    namespace: args.namespace.clone(),
+    stream: if opts.no_stream { Some(false) } else { None },
+    one_shot: Some(false),
+  };
+  let mut stats_cargoes = HashMap::new();
+  let (tx, mut rx) = mpsc::unbounded();
+  let futures = opts
+    .names
+    .iter()
+    .map(|name| {
+      let name = name.clone();
+      let query = query.clone();
+      let mut tx = tx.clone();
+      let client = client.clone();
+      async move {
+        let Ok(mut stream) = client.stats_cargo(&name, &query).await else {
+          return;
+        };
+        while let Some(stats) = stream.next().await {
+          let stats = match stats {
+            Ok(stats) => stats,
+            Err(e) => {
+              eprintln!("Error: {e}");
+              break;
+            }
+          };
+          if let Err(err) = tx.send(stats).await {
+            eprintln!("Error: {err}");
+            break;
+          }
+        }
+      }
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>();
+  rt::spawn(futures);
+  while let Some(stats) = rx.next().await {
+    stats_cargoes.insert(stats.name.clone(), stats.clone());
+    // convert stats_cargoes in a Arrays of CargoStatsRow
+    let stats = stats_cargoes
+      .values()
+      .map(|stats| CargoStatsRow::from(stats.clone()))
+      .collect::<Vec<CargoStatsRow>>();
+    // clear terminal
+    let term = dialoguer::console::Term::stdout();
+    let _ = term.clear_screen();
+    utils::print::print_table(stats);
+  }
+  Ok(())
+}
+
 /// ## Exec cargo revert
 ///
 /// Execute the `nanocl cargo revert` command to revert a cargo to a previous state
@@ -520,5 +600,6 @@ pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
     CargoCommand::Restart(opts) => {
       exec_cargo_restart(cli_conf, args, opts).await
     }
+    CargoCommand::Stats(opts) => exec_cargo_stats(cli_conf, args, opts).await,
   }
 }

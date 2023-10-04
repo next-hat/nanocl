@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - return executed command status code from cargo exec [@anonkey](https://github.com/anonkey)
 - Arguments Number and Boolean for Statefile
 - Os,OsFamilly and Context inside the Statefile templating variable
+- Cargo stats command
 
 ### Changed
 
