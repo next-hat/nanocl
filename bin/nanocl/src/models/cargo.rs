@@ -386,8 +386,10 @@ pub struct CargoRow {
   /// Config version of the cargo
   pub(crate) version: String,
   /// When the cargo was created
+  #[tabled(rename = "CREATED AT")]
   pub(crate) created_at: String,
   /// When the cargo was last updated
+  #[tabled(rename = "CREATED AT")]
   pub(crate) updated_at: String,
 }
 

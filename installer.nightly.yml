@@ -105,7 +105,7 @@ Cargoes:
 
   - Name: nstore
     Container:
-      Image: cockroachdb/cockroach:v23.1.10
+      Image: cockroachdb/cockroach:v23.1.11
       Tty: true
       Hostname: nstore.nanocl.internal
       Env:
