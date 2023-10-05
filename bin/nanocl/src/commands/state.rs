@@ -22,7 +22,7 @@ use crate::utils;
 use crate::config::CliConfig;
 use crate::models::{
   StateArg, StateCommand, StateApplyOpts, StateRemoveOpts, StateBuildArg,
-  DisplayFormat, StateRef, Context,
+  DisplayFormat, StateRef, Context, StateLogsOpts,
 };
 
 use super::cargo_image::exec_cargo_image_pull;
@@ -201,31 +201,6 @@ fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
   Ok(new_cargo)
 }
 
-/// ## Hook cargoes
-///
-/// Hook cargoes binds to replace relative path with absolute path
-///
-/// ## Arguments
-///
-/// * [cargoes](Vec<CargoConfigPartial>) The cargoes config
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Vec<CargoConfigPartial>) The cargoes config
-///   * [Err](IoError) An error occured
-///
-fn hook_cargoes(
-  cargoes: Vec<CargoConfigPartial>,
-) -> IoResult<Vec<CargoConfigPartial>> {
-  let mut new_cargoes = Vec::new();
-  for cargo in cargoes {
-    let new_cargo = hook_binds(&cargo)?;
-    new_cargoes.push(new_cargo);
-  }
-  Ok(new_cargoes)
-}
-
 /// ## Attach to cargo
 ///
 /// Attach to a cargo and print its logs
@@ -242,13 +217,16 @@ fn hook_cargoes(
 ///   * [Ok](Vec<rt::JoinHandle<()>>) The list of futures
 ///   * [Err](IoError) An error occured
 ///
-async fn attach_to_cargo(
+pub async fn log_cargo(
   client: &NanocldClient,
   cargo: CargoConfigPartial,
-  namespace: &str,
+  opts: &CargoLogQuery,
 ) -> IoResult<Vec<rt::JoinHandle<()>>> {
   let cargo = match client
-    .inspect_cargo(&cargo.name, Some(namespace.to_owned()))
+    .inspect_cargo(
+      &cargo.name,
+      Some(opts.namespace.to_owned().unwrap_or("global".to_string())),
+    )
     .await
   {
     Err(err) => {
@@ -260,20 +238,30 @@ async fn attach_to_cargo(
     }
     Ok(cargo) => cargo,
   };
+
   let mut futures = Vec::new();
   for (index, _) in cargo.instances.iter().enumerate() {
-    let namespace = namespace.to_owned();
     let name = if index == 0 {
-      cargo.name.clone()
+      cargo.name.to_owned()
     } else {
       format!("{index}-{}", cargo.name)
     };
-    let client = client.clone();
-    let name = name.clone();
+    let namespace = opts.namespace.to_owned().unwrap_or("global".to_string());
+    let client = client.to_owned();
+    let since = opts.since;
+    let until = opts.until;
+    let timestamps = opts.timestamps;
+    let tail = opts.tail.to_owned();
+    let follow = opts.follow;
+
     let fut = rt::spawn(async move {
       let query = CargoLogQuery {
         namespace: Some(namespace),
-        follow: Some(true),
+        follow,
+        since,
+        until,
+        tail,
+        timestamps,
         ..Default::default()
       };
       match client.logs_cargo(&name, &query).await {
@@ -326,18 +314,43 @@ async fn attach_to_cargo(
 ///   * [Ok](()) The operation was successful
 ///   * [Err](IoError) An error occured
 ///
-async fn attach_to_cargoes(
+pub async fn log_cargoes(
   client: &NanocldClient,
   cargoes: Vec<CargoConfigPartial>,
-  namespace: &str,
+  opts: &CargoLogQuery,
 ) -> IoResult<()> {
   let mut futures = Vec::new();
   for cargo in cargoes {
-    let more_futures = attach_to_cargo(client, cargo, namespace).await?;
+    let more_futures = log_cargo(client, cargo, opts).await?;
     futures.extend(more_futures);
   }
   futures::future::join_all(futures).await;
   Ok(())
+}
+
+/// ## Hook cargoes
+///
+/// Hook cargoes binds to replace relative path with absolute path
+///
+/// ## Arguments
+///
+/// * [cargoes](Vec<CargoConfigPartial>) The cargoes config
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Vec<CargoConfigPartial>) The cargoes config
+///   * [Err](IoError) An error occured
+///
+fn hook_cargoes(
+  cargoes: Vec<CargoConfigPartial>,
+) -> IoResult<Vec<CargoConfigPartial>> {
+  let mut new_cargoes = Vec::new();
+  for cargo in cargoes {
+    let new_cargo = hook_binds(&cargo)?;
+    new_cargoes.push(new_cargo);
+  }
+  Ok(new_cargoes)
 }
 
 /// ## Gen client
@@ -712,8 +725,94 @@ async fn exec_state_apply(
     utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
   if opts.follow {
-    attach_to_cargoes(&client, cargoes, &namespace).await?;
+    let query = CargoLogQuery {
+      namespace: Some(namespace),
+      follow: Some(true),
+      ..Default::default()
+    };
+    log_cargoes(&client, cargoes, &query).await?;
   }
+  Ok(())
+}
+
+/// ## Exec state logs
+///
+/// Follow logs of all cargoes in state
+///
+/// ## Arguments
+///
+/// * [cli_conf](CliConfig) The cli config
+/// * [opts](StateLogsOpts) The state logs options
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](()) The operation was successful
+///   * [Err](IoError) An error occured
+///
+async fn exec_state_logs(
+  cli_conf: &CliConfig,
+  opts: &StateLogsOpts,
+) -> IoResult<()> {
+  let host = &cli_conf.host;
+  let format = cli_conf.user_config.display_format.clone();
+  let state_ref = parse_state_file(&opts.state_location, &format).await?;
+  let client = gen_client(host, &state_ref.meta)?;
+  let args = parse_build_args(&state_ref.data, opts.args.clone())?;
+  let mut namespace = String::from("global");
+  let cargoes = match state_ref.meta.kind.as_str() {
+    "Deployment" | "Cargo" => {
+      namespace = match state_ref.data.get("Namespace") {
+        Some(namespace) => serde_yaml::from_value(namespace.clone())
+          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
+        None => "global".to_owned(),
+      };
+      namespace = inject_namespace(&namespace, &args)?;
+      let _ = client.create_namespace(&namespace).await;
+      let yaml: serde_yaml::Value = inject_data(
+        &state_ref.format,
+        &state_ref.raw,
+        &args,
+        &cli_conf.context,
+        &client,
+      )
+      .await?;
+      let cargoes: Vec<CargoConfigPartial> = match yaml.get("Cargoes") {
+        Some(cargoes) => serde_yaml::from_value(cargoes.clone())
+          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
+        None => Vec::new(),
+      };
+
+      Ok(cargoes)
+    }
+    _ => {
+      let context = opts.state_location.as_ref().unwrap_or(&namespace);
+
+      Err(IoError::invalid_input(
+        context,
+        &("Only Cargo or Deployment  statefile kind can be logged".to_string()),
+      ))
+    }
+  }
+  .unwrap();
+
+  let tail_string = opts.tail.clone().unwrap_or_default();
+  let tail = tail_string.as_str();
+  let log_opts = CargoLogQuery {
+    since: opts.since,
+    until: opts.until,
+    tail: if tail.is_empty() {
+      None
+    } else {
+      Some(tail.to_string())
+    },
+    timestamps: Some(opts.timestamps),
+    follow: Some(opts.follow),
+    namespace: Some(namespace),
+    ..Default::default()
+  };
+  log_cargoes(&client, cargoes, &log_opts).await?;
+
   Ok(())
 }
 
@@ -784,5 +883,6 @@ pub async fn exec_state(cli_conf: &CliConfig, args: &StateArg) -> IoResult<()> {
   match &args.command {
     StateCommand::Apply(opts) => exec_state_apply(cli_conf, opts).await,
     StateCommand::Remove(opts) => exec_state_remove(cli_conf, opts).await,
+    StateCommand::Logs(opts) => exec_state_logs(cli_conf, opts).await,
   }
 }

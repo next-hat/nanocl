@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Arguments Number and Boolean for Statefile
 - Os,OsFamilly and Context inside the Statefile templating variable
 - Cargo stats command
+- State logs command
 - Secret management
 
 ### Changed

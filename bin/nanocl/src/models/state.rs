@@ -52,6 +52,35 @@ pub struct StateApplyOpts {
   pub args: Vec<String>,
 }
 
+/// ## StateLogsOpts
+///
+/// `nanocl state logs` available options
+///
+#[derive(Debug, Parser)]
+pub struct StateLogsOpts {
+  /// Path or Url to the Statefile
+  #[clap(long, short = 's')]
+  pub state_location: Option<String>,
+  /// Additional arguments to pass to the file
+  #[clap(last = true, raw = true)]
+  pub args: Vec<String>,
+  /// Only include logs since unix timestamp
+  #[clap(long)]
+  pub since: Option<i64>,
+  /// Only include logs until unix timestamp
+  #[clap(short = 'u')]
+  pub until: Option<i64>,
+  /// If integer only return last n logs, if "all" returns all logs
+  #[clap(short = 't')]
+  pub tail: Option<String>,
+  /// Bool, if set include timestamp to ever log line
+  #[clap(long = "timestamps")]
+  pub timestamps: bool,
+  /// Bool, if set open the log as stream
+  #[clap(short = 'f')]
+  pub follow: bool,
+}
+
 /// ## StateRemoveOpts
 ///
 /// `nanocl state rm` available options
@@ -77,6 +106,8 @@ pub struct StateRemoveOpts {
 pub enum StateCommand {
   /// Create or Update elements from a Statefile
   Apply(StateApplyOpts),
+  /// Logs elements from a Statefile
+  Logs(StateLogsOpts),
   /// Remove elements from a Statefile
   #[clap(alias("rm"))]
   Remove(StateRemoveOpts),
