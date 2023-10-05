@@ -270,6 +270,7 @@ mod tests {
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
+
     // History
     let args =
       Cli::parse_from(["nanocl", "resource", "history", "deploy-example.com"]);
@@ -400,6 +401,18 @@ mod tests {
       "state",
       "apply",
       "-pys",
+      "../../examples/deploy_example.yml",
+    ]);
+    assert!(execute_arg(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "logs",
+      "-t",
+      "10",
+      "--timestamps",
+      "-s",
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
