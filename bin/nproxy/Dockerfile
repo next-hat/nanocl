@@ -2,12 +2,8 @@ FROM nginx:1.25.0-bullseye
 
 USER root
 
-ENV TZ="Europe/Paris"
-
 RUN apt-get update && \
   apt-get install -y nginx-extras \
-  certbot \
-  python3-certbot-nginx \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /tmp/* \
   && rm -rf /var/log/* \
