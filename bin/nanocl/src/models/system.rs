@@ -128,7 +128,8 @@ pub struct ProcessRow {
   /// IP address of the cargo or the vm
   ip: String,
   /// When the cargo or the vm was created
-  created: String,
+  #[tabled(rename = "CREATED AT")]
+  created_at: String,
 }
 
 /// Convert NodeContainerSummary to ProcessRow
@@ -170,7 +171,7 @@ impl From<NodeContainerSummary> for ProcessRow {
       image: container.image.unwrap_or_default(),
       status: container.status.unwrap_or_default(),
       ip: ipaddr,
-      created: format!("{created_at}"),
+      created_at: format!("{created_at}"),
     }
   }
 }

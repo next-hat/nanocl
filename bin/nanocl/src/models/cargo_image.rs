@@ -123,7 +123,7 @@ pub struct CargoImageRow {
   /// Image ID
   pub(crate) id: String,
   /// Repository name
-  pub(crate) repositories: String,
+  pub(crate) repository: String,
   /// Tag name
   pub(crate) tag: String,
   /// Size of the image
@@ -169,7 +169,7 @@ impl From<ImageSummary> for CargoImageRow {
 
     Self {
       id,
-      repositories: vals.first().unwrap_or(&"<none>").to_string(),
+      repository: vals.first().unwrap_or(&"<none>").to_string(),
       tag: vals.get(1).unwrap_or(&"<none>").to_string(),
       size: convert_size(value.size),
       created_at: created,
