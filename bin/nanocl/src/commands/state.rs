@@ -782,20 +782,16 @@ async fn exec_state_logs(
           .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
         None => Vec::new(),
       };
-
       Ok(cargoes)
     }
     _ => {
       let context = opts.state_location.as_ref().unwrap_or(&namespace);
-
       Err(IoError::invalid_input(
         context,
         &("Only Cargo or Deployment  statefile kind can be logged".to_string()),
       ))
     }
-  }
-  .unwrap();
-
+  }?;
   let tail_string = opts.tail.clone().unwrap_or_default();
   let tail = tail_string.as_str();
   let log_opts = CargoLogQuery {
