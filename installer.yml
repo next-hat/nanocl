@@ -29,7 +29,7 @@ Cargoes:
 
   - Name: nproxy
     Container:
-      Image: ghcr.io/nxthat/nproxy:1.25.0.0
+      Image: ghcr.io/nxthat/nproxy:1.25.0.1
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -52,7 +52,7 @@ Cargoes:
 
   - Name: ncproxy
     Container:
-      Image: ghcr.io/nxthat/ncproxy:0.6.0
+      Image: ghcr.io/nxthat/ncproxy:0.7.0
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -74,7 +74,7 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ndns:2.87.0.1
+      Image: ghcr.io/nxthat/ndns:2.89.0.0
       HostConfig:
         NetworkMode: host
         Binds:
@@ -84,7 +84,7 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
-      Image: ghcr.io/nxthat/ncdns:0.3.0
+      Image: ghcr.io/nxthat/ncdns:0.3.1
       Tty: true
       Cmd:
         - --conf-dir
@@ -105,7 +105,7 @@ Cargoes:
 
   - Name: nstore
     Container:
-      Image: cockroachdb/cockroach:v23.1.10
+      Image: cockroachdb/cockroach:v23.1.11
       Tty: true
       Hostname: nstore.nanocl.internal
       Env:
@@ -124,7 +124,7 @@ Cargoes:
 
   - Name: ndaemon
     Container:
-      Image: ghcr.io/nxthat/nanocld:0.9.0
+      Image: ghcr.io/nxthat/nanocld:0.10.0
       Tty: true
       Hostname: ndaemon.nanocl.internal
       Cmd:
