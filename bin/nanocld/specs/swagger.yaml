@@ -4796,6 +4796,10 @@ components:
           nullable: true
         Target:
           $ref: '#/components/schemas/StreamTarget'
+    ProxySsl:
+      oneOf:
+      - $ref: '#/components/schemas/ProxySslConfig'
+      - type: string
     ProxySslConfig:
       type: object
       required:

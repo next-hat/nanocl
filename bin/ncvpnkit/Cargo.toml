@@ -11,5 +11,5 @@ futures-util = "0.3.28"
 ntex = { version = "0.7.5", features = ["tokio"] }
 vpnkitrc = { version = "0.1.1", features = ["tokio"] }
 nanocld_client = { version = "0.10.0" }
-nanocl_utils = { version = "0.2.1", features = ["logger"] }
+nanocl_utils = { version = "0.2.3", features = ["logger"] }
 serde_json = "1.0.107"

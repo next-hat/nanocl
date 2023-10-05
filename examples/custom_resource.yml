@@ -4,18 +4,21 @@ ApiVersion: v0.10
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
-  - Name: VpnUser
-    Kind: Kind
-    Version: v0.1
-    Data:
-      Url: vpn.nanocl.internal
-      Schema:
-        title: VpnUser
-        description: Create a new vpn user
-        type: object
-        required:
-          - Username
-        properties:
-          Username:
-            description: Cargo to watch for changes
-            type: string
+- Name: VpnUser
+  Kind: Kind
+  Version: v0.1
+  Data:
+    Url: vpn.nanocl.internal
+    Schema:
+      title: VpnUser
+      description: Create a new vpn user
+      type: object
+      required:
+      - Username
+      properties:
+        Username:
+          description: Username for the vpn user
+          type: string
+        Password:
+          description: Password for the vpn user
+          type: string

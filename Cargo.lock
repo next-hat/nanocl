@@ -1808,7 +1808,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_utils"
-version = "0.2.1"
+version = "0.2.3"
 dependencies = [
  "bollard-next",
  "diesel",
