@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ntex::http;
+use ntex::{http, rt};
 
 use bollard_next::Docker;
 use bollard_next::service::{HostConfig, DeviceMapping, ContainerSummary};
@@ -9,12 +9,13 @@ use bollard_next::container::{
   StopContainerOptions, RemoveContainerOptions,
 };
 
+use nanocl_stubs::system::Event;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
 use nanocl_utils::http_error::HttpError;
-use crate::models::{Pool, VmDbModel, VmImageDbModel, DaemonState};
+use crate::models::{Pool, VmImageDbModel, DaemonState};
 
 /// ## Start by key
 ///
@@ -23,7 +24,7 @@ use crate::models::{Pool, VmDbModel, VmImageDbModel, DaemonState};
 /// ## Arguments
 ///
 /// - [vm_key](str) - The vm key
-/// - [docker_api](bollard_next::Docker) - The docker api
+/// - [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
@@ -33,16 +34,23 @@ use crate::models::{Pool, VmDbModel, VmImageDbModel, DaemonState};
 ///
 pub async fn start_by_key(
   vm_key: &str,
-  docker_api: &Docker,
+  state: &DaemonState,
 ) -> Result<(), HttpError> {
   let container_name = format!("{}.v", vm_key);
-  docker_api
+  state.docker_api
     .start_container(&container_name, None::<StartContainerOptions<String>>)
     .await
     .map_err(|e| HttpError {
       msg: format!("Unable to start container got error : {e}"),
       status: http::StatusCode::INTERNAL_SERVER_ERROR,
     })?;
+  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
+  let event_emitter = state.event_emitter.clone();
+  rt::spawn(async move {
+    let _ = event_emitter
+      .emit(Event::VmRunned(Box::new(vm)))
+      .await;
+  });
   Ok(())
 }
 
@@ -53,7 +61,7 @@ pub async fn start_by_key(
 /// ## Arguments
 ///
 /// - [vm](VmDbModel) - The vm model
-/// - [docker_api](bollard_next::Docker) - The docker api
+/// - [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
@@ -62,17 +70,24 @@ pub async fn start_by_key(
 ///   - [Err](HttpError) - The vm has not been stopped
 ///
 pub async fn stop(
-  vm: &VmDbModel,
-  docker_api: &Docker,
+  vm: &Vm,
+  state: &DaemonState,
 ) -> Result<(), HttpError> {
   let container_name = format!("{}.v", vm.key);
-  docker_api
+  state.docker_api
     .stop_container(&container_name, None::<StopContainerOptions>)
     .await
     .map_err(|e| HttpError {
       msg: format!("Unable to stop container got error : {e}"),
       status: http::StatusCode::INTERNAL_SERVER_ERROR,
     })?;
+  let vm_ptr = vm.clone();
+  let event_emitter = state.event_emitter.clone();
+  rt::spawn(async move {
+    let _ = event_emitter
+      .emit(Event::VmStopped(Box::new(vm_ptr)))
+      .await;
+  });
   Ok(())
 }
 
@@ -83,8 +98,7 @@ pub async fn stop(
 /// ## Arguments
 ///
 /// - [vm_key](str) - The vm key
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
+/// - [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
@@ -94,12 +108,11 @@ pub async fn stop(
 ///
 pub async fn stop_by_key(
   vm_key: &str,
-  docker_api: &Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<(), HttpError> {
-  let vm = repositories::vm::find_by_key(vm_key, pool).await?;
+  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
 
-  stop(&vm, docker_api).await
+  stop(&vm, &state).await
 }
 
 /// ## Inspect by key
@@ -182,8 +195,7 @@ pub async fn list_instances_by_key(
 ///
 /// - [vm_key](str) - The vm key
 /// - [force](bool) - Force the deletion
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
+/// - [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
@@ -194,21 +206,27 @@ pub async fn list_instances_by_key(
 pub async fn delete_by_key(
   vm_key: &str,
   force: bool,
-  docker_api: &Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> Result<(), HttpError> {
-  let vm = repositories::vm::inspect_by_key(vm_key, pool).await?;
+  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
   let options = bollard_next::container::RemoveContainerOptions {
     force,
     ..Default::default()
   };
   let container_name = format!("{}.v", vm_key);
-  let _ = docker_api
+  let _ = state.docker_api
     .remove_container(&container_name, Some(options))
     .await;
-  repositories::vm::delete_by_key(vm_key, pool).await?;
-  repositories::vm_config::delete_by_vm_key(&vm.key, pool).await?;
-  utils::vm_image::delete_by_name(&vm.config.disk.image, pool).await?;
+  repositories::vm::delete_by_key(vm_key, &state.pool).await?;
+  repositories::vm_config::delete_by_vm_key(&vm.key, &state.pool).await?;
+  utils::vm_image::delete_by_name(&vm.config.disk.image, &state.pool).await?;
+  let event_emitter = state.event_emitter.clone();
+  let vm_ptr = vm.clone();
+  rt::spawn(async move {
+    let _ = event_emitter
+      .emit(Event::VmDeleted(Box::new(vm_ptr)))
+      .await;
+  });
   Ok(())
 }
 
@@ -381,6 +399,13 @@ pub async fn create_instance(
     ..Default::default()
   });
   state.docker_api.create_container(options, config).await?;
+  let event_emitter = state.event_emitter.clone();
+  let vm_ptr = vm.clone();
+  rt::spawn(async move {
+    let _ = event_emitter
+      .emit(Event::VmCreated(Box::new(vm_ptr)))
+      .await;
+  });
   Ok(())
 }
 
@@ -542,9 +567,9 @@ pub async fn put(
   version: &str,
   state: &DaemonState,
 ) -> Result<Vm, HttpError> {
-  let vm = repositories::vm::find_by_key(vm_key, &state.pool).await?;
+  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
   let container_name = format!("{}.v", &vm.key);
-  stop(&vm, &state.docker_api).await?;
+  stop(&vm, &state).await?;
   state
     .docker_api
     .remove_container(&container_name, None::<RemoveContainerOptions>)
@@ -556,6 +581,13 @@ pub async fn put(
     repositories::vm_image::find_by_name(&vm.config.disk.image, &state.pool)
       .await?;
   create_instance(&vm, &image, false, state).await?;
-  start_by_key(&vm.key, &state.docker_api).await?;
+  start_by_key(&vm.key, &state).await?;
+  let event_emitter = state.event_emitter.clone();
+  let vm_ptr = vm.clone();
+  rt::spawn(async move {
+    let _ = event_emitter
+      .emit(Event::VmPatched(Box::new(vm_ptr)))
+      .await;
+  });
   Ok(vm)
 }

@@ -106,7 +106,7 @@ pub(crate) async fn start_vm(
   let key = utils::key::gen_key(&namespace, &name);
 
   repositories::vm::find_by_key(&key, &state.pool).await?;
-  utils::vm::start_by_key(&key, &state.docker_api).await?;
+  utils::vm::start_by_key(&key, &state).await?;
 
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -135,7 +135,7 @@ pub(crate) async fn stop_vm(
   let key = utils::key::gen_key(&namespace, &name);
 
   repositories::vm::find_by_key(&key, &state.pool).await?;
-  utils::vm::stop_by_key(&key, &state.docker_api, &state.pool).await?;
+  utils::vm::stop_by_key(&key, &state).await?;
 
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -163,7 +163,7 @@ pub(crate) async fn delete_vm(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
 
-  utils::vm::delete_by_key(&key, true, &state.docker_api, &state.pool).await?;
+  utils::vm::delete_by_key(&key, true, &state).await?;
 
   Ok(web::HttpResponse::Ok().finish())
 }
