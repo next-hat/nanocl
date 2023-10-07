@@ -37,7 +37,8 @@ pub async fn start_by_key(
   state: &DaemonState,
 ) -> Result<(), HttpError> {
   let container_name = format!("{}.v", vm_key);
-  state.docker_api
+  state
+    .docker_api
     .start_container(&container_name, None::<StartContainerOptions<String>>)
     .await
     .map_err(|e| HttpError {
@@ -47,9 +48,7 @@ pub async fn start_by_key(
   let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
   let event_emitter = state.event_emitter.clone();
   rt::spawn(async move {
-    let _ = event_emitter
-      .emit(Event::VmRunned(Box::new(vm)))
-      .await;
+    let _ = event_emitter.emit(Event::VmRunned(Box::new(vm))).await;
   });
   Ok(())
 }
@@ -69,12 +68,10 @@ pub async fn start_by_key(
 ///   - [Ok](()) - The vm has been stopped
 ///   - [Err](HttpError) - The vm has not been stopped
 ///
-pub async fn stop(
-  vm: &Vm,
-  state: &DaemonState,
-) -> Result<(), HttpError> {
+pub async fn stop(vm: &Vm, state: &DaemonState) -> Result<(), HttpError> {
   let container_name = format!("{}.v", vm.key);
-  state.docker_api
+  state
+    .docker_api
     .stop_container(&container_name, None::<StopContainerOptions>)
     .await
     .map_err(|e| HttpError {
@@ -84,9 +81,7 @@ pub async fn stop(
   let vm_ptr = vm.clone();
   let event_emitter = state.event_emitter.clone();
   rt::spawn(async move {
-    let _ = event_emitter
-      .emit(Event::VmStopped(Box::new(vm_ptr)))
-      .await;
+    let _ = event_emitter.emit(Event::VmStopped(Box::new(vm_ptr))).await;
   });
   Ok(())
 }
@@ -214,7 +209,8 @@ pub async fn delete_by_key(
     ..Default::default()
   };
   let container_name = format!("{}.v", vm_key);
-  let _ = state.docker_api
+  let _ = state
+    .docker_api
     .remove_container(&container_name, Some(options))
     .await;
   repositories::vm::delete_by_key(vm_key, &state.pool).await?;
@@ -223,9 +219,7 @@ pub async fn delete_by_key(
   let event_emitter = state.event_emitter.clone();
   let vm_ptr = vm.clone();
   rt::spawn(async move {
-    let _ = event_emitter
-      .emit(Event::VmDeleted(Box::new(vm_ptr)))
-      .await;
+    let _ = event_emitter.emit(Event::VmDeleted(Box::new(vm_ptr))).await;
   });
   Ok(())
 }
@@ -402,9 +396,7 @@ pub async fn create_instance(
   let event_emitter = state.event_emitter.clone();
   let vm_ptr = vm.clone();
   rt::spawn(async move {
-    let _ = event_emitter
-      .emit(Event::VmCreated(Box::new(vm_ptr)))
-      .await;
+    let _ = event_emitter.emit(Event::VmCreated(Box::new(vm_ptr))).await;
   });
   Ok(())
 }
@@ -585,9 +577,7 @@ pub async fn put(
   let event_emitter = state.event_emitter.clone();
   let vm_ptr = vm.clone();
   rt::spawn(async move {
-    let _ = event_emitter
-      .emit(Event::VmPatched(Box::new(vm_ptr)))
-      .await;
+    let _ = event_emitter.emit(Event::VmPatched(Box::new(vm_ptr))).await;
   });
   Ok(vm)
 }

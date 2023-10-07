@@ -105,11 +105,21 @@ impl std::fmt::Display for Event {
       Event::SecretPatched(secret) => {
         write!(f, "SecretPatched({})", secret.key)
       }
-      Event::VmCreated(vm) => {write!(f, "VmCreated({})", vm.name)}
-      Event::VmDeleted(vm) => {write!(f, "VmDeleted({})", vm.name)}
-      Event::VmPatched(vm) => {write!(f, "VmPatched({})", vm.name)}
-      Event::VmRunned(vm) => {write!(f, "VmRunned({})", vm.name)}
-      Event::VmStopped(vm) => {write!(f, "VmStopped({})", vm.name)}
+      Event::VmCreated(vm) => {
+        write!(f, "VmCreated({})", vm.name)
+      }
+      Event::VmDeleted(vm) => {
+        write!(f, "VmDeleted({})", vm.name)
+      }
+      Event::VmPatched(vm) => {
+        write!(f, "VmPatched({})", vm.name)
+      }
+      Event::VmRunned(vm) => {
+        write!(f, "VmRunned({})", vm.name)
+      }
+      Event::VmStopped(vm) => {
+        write!(f, "VmStopped({})", vm.name)
+      }
     }
   }
 }
