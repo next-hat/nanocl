@@ -9,6 +9,7 @@ use crate::config::DaemonConfig;
 use super::cargo::CargoInspect;
 use super::resource::Resource;
 use super::secret::Secret;
+use super::vm::Vm;
 
 /// HostInfo contains information about the host and the docker daemon
 #[derive(Debug, Clone)]
@@ -65,6 +66,16 @@ pub enum Event {
   SecretDeleted(Box<Secret>),
   /// SecretPatched is sent when a secret is patched
   SecretPatched(Box<Secret>),
+  /// VmCreated is sent when a vm is created
+  VmCreated(Box<Vm>),
+  /// VmDeleted is sent when a vm is deleted
+  VmDeleted(Box<Vm>),
+  /// VmPatched is sent when a vm is patched
+  VmPatched(Box<Vm>),
+  /// VmRunned is sent when a vm is runned
+  VmRunned(Box<Vm>),
+  /// VmStopped is sent when a vm is stopped
+  VmStopped(Box<Vm>),
 }
 
 impl std::fmt::Display for Event {
@@ -93,6 +104,21 @@ impl std::fmt::Display for Event {
       }
       Event::SecretPatched(secret) => {
         write!(f, "SecretPatched({})", secret.key)
+      }
+      Event::VmCreated(vm) => {
+        write!(f, "VmCreated({})", vm.name)
+      }
+      Event::VmDeleted(vm) => {
+        write!(f, "VmDeleted({})", vm.name)
+      }
+      Event::VmPatched(vm) => {
+        write!(f, "VmPatched({})", vm.name)
+      }
+      Event::VmRunned(vm) => {
+        write!(f, "VmRunned({})", vm.name)
+      }
+      Event::VmStopped(vm) => {
+        write!(f, "VmStopped({})", vm.name)
       }
     }
   }

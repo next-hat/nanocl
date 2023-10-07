@@ -325,7 +325,7 @@ pub async fn apply_vms(
             send(StateStream::new_vm_error(&key, &err.to_string()), sx);
             return;
           }
-          let res = utils::vm::start_by_key(&key, &state.docker_api).await;
+          let res = utils::vm::start_by_key(&key, &state).await;
           if let Err(err) = res {
             send(StateStream::new_vm_error(&key, &err.to_string()), sx);
             return;
@@ -537,10 +537,7 @@ pub async fn remove_vms(
         send(StateStream::new_vm_not_found(&key), sx);
         return;
       }
-      if let Err(err) =
-        utils::vm::delete_by_key(&key, true, &state.docker_api, &state.pool)
-          .await
-      {
+      if let Err(err) = utils::vm::delete_by_key(&key, true, &state).await {
         send(StateStream::new_vm_error(&key, &err.to_string()), sx);
         return;
       }

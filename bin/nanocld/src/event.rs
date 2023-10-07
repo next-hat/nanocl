@@ -182,6 +182,7 @@ mod tests {
 
   use futures::StreamExt;
   use nanocl_stubs::cargo::CargoInspect;
+  use nanocl_stubs::vm::Vm;
 
   use crate::utils::tests::*;
 
@@ -242,6 +243,51 @@ mod tests {
     let cargo = CargoInspect::default();
     event_emitter
       .emit(Event::CargoPatched(Box::new(cargo)))
+      .await
+      .unwrap();
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    // Send vm created event
+    let vm = Vm::default();
+    event_emitter
+      .emit(Event::VmCreated(Box::new(vm)))
+      .await
+      .unwrap();
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    // Send vm deleted event
+    let vm = Vm::default();
+    event_emitter
+      .emit(Event::VmDeleted(Box::new(vm)))
+      .await
+      .unwrap();
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    // Send vm patched event
+    let vm = Vm::default();
+    event_emitter
+      .emit(Event::VmPatched(Box::new(vm)))
+      .await
+      .unwrap();
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    // Send vm runned event
+    let vm = Vm::default();
+    event_emitter
+      .emit(Event::VmRunned(Box::new(vm)))
+      .await
+      .unwrap();
+    let event = client.next().await.unwrap().unwrap();
+    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+
+    // Send vm stopped event
+    let vm = Vm::default();
+    event_emitter
+      .emit(Event::VmStopped(Box::new(vm)))
       .await
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
