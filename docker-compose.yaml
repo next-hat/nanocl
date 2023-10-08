@@ -207,7 +207,7 @@ services:
       - /project/target
       - ${STATE_DIR:-${HOME}/.nanocl/state}:/var/lib/nanocl
       - //run/guest-services/nanocl:/run/nanocl
-      - //var/run/docker.sock:/run/docker.sock
+      - /var/run/docker.sock:/run/docker.sock
     command:
       - watch
       - -w
