@@ -82,6 +82,6 @@ nanocl_utils = { version = "0.2.3", features = [
   "diesel",
   "bollard",
 ] }
-utoipa = { version = "3.5", features = ["yaml"], optional = true }
+utoipa = { version = "4.0", features = ["yaml"], optional = true }
 notify = "6.1.1"
 ntex-cors = "0.4.0"

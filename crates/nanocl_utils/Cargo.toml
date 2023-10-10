@@ -36,7 +36,7 @@ serde_json = { version = "1.0.107", optional = true }
 bollard-next = { version = "0.15.3", optional = true }
 diesel = { version = "2.1.2", default-features = false, optional = true }
 futures = { version = "0.3.25", optional = true }
-utoipa = { version = "3.5", features = ["yaml"], optional = true }
+utoipa = { version = "4.0", features = ["yaml"], optional = true }
 utoipa-swagger-ui = { version = "3.1", optional = true }
 serde_urlencoded = { version = "0.7.1", optional = true }
 libc = { version = "0.2.139", optional = true }
