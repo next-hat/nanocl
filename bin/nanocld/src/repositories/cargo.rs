@@ -1,3 +1,7 @@
+use nanocl_macros_getters::{
+  repository_delete_by_id, repository_find_by_id, repository_update_by_id,
+  repository_create,
+};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -7,6 +11,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::cargo::{Cargo, GenericCargoListQuery};
 use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
 
+use crate::serializers::cargo::serialize_cargo;
 use crate::utils;
 use crate::models::{
   Pool, CargoDbModel, NamespaceDbModel, CargoUpdateDbModel, CargoConfigDbModel,
@@ -114,7 +119,6 @@ pub async fn create(
       "Name cannot contain a dot.",
     ));
   }
-  let pool = pool.clone();
   let key = utils::key::gen_key(&nsp, &item.name);
   let config = cargo_config::create(&key, &item, &version, &pool).await?;
   let new_item = CargoDbModel {
@@ -124,22 +128,10 @@ pub async fn create(
     namespace_name: nsp,
     config_key: config.key,
   };
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::cargoes)
-      .values(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(new_item)
-  })
-  .await?;
-  let cargo = Cargo {
-    key: item.key,
-    name: item.name,
-    config_key: config.key,
-    namespace_name: item.namespace_name,
-    config,
-  };
+
+  let item = repository_create!(dsl::cargoes, new_item, pool, "Cargo");
+
+  let cargo = serialize_cargo(item, config);
   Ok(cargo)
 }
 
@@ -160,17 +152,9 @@ pub async fn create(
 ///
 pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::cargoes::dsl;
-  let key = key.to_owned();
-  let pool = pool.clone();
-  let res = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::delete(dsl::cargoes)
-      .filter(dsl::key.eq(key))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
+
+  let res = repository_delete_by_id!(dsl::cargoes, key, pool, "Cargo");
+
   Ok(GenericDelete { count: res })
 }
 
@@ -191,20 +175,11 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 ///
 pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDbModel> {
   use crate::schema::cargoes::dsl;
-  let key = key.to_owned();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = dsl::cargoes
-      .filter(dsl::key.eq(key))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
+
+  let item = repository_find_by_id!(dsl::cargoes, key, pool, "Cargo");
+
   Ok(item)
 }
-
 /// ## Update by key
 ///
 /// Update a cargo item in database for given key
@@ -228,33 +203,29 @@ pub async fn update_by_key(
   pool: &Pool,
 ) -> IoResult<Cargo> {
   use crate::schema::cargoes::dsl;
-  let key = key.to_owned();
-  let item = item.clone();
   let version = version.to_owned();
-  let pool = pool.clone();
   let cargodb = find_by_key(&key, &pool).await?;
   let config = cargo_config::create(&key, &item, &version, &pool).await?;
   let new_item = CargoUpdateDbModel {
-    name: Some(item.name),
+    name: Some(item.name.to_owned()),
     config_key: Some(config.key),
     ..Default::default()
   };
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::update(dsl::cargoes.filter(dsl::key.eq(key)))
-      .set(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
-  let cargo = Cargo {
-    key: cargodb.key,
-    name: cargodb.name,
-    config_key: config.key,
-    namespace_name: cargodb.namespace_name,
-    config,
-  };
+
+  repository_update_by_id!(dsl::cargoes, key, new_item, pool, "Cargo");
+  // let key = key.to_owned();
+  // let pool = pool.clone();
+  // web::block(move || {
+  // let mut conn = utils::store::get_pool_conn(&pool)?;
+  // let v = diesel::update(dsl::cargoes.filter(dsl::key.eq(key)))
+  //   .set(&new_item)
+  //   .execute(&mut conn)
+  //   .map_err(|err| err.map_err_context(|| "Cargo"))?;
+  //   Ok::<_, IoError>(())
+  // })
+  // .await?;
+
+  let cargo = serialize_cargo(cargodb, config);
   Ok(cargo)
 }
 

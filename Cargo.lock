@@ -1795,6 +1795,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nanocl_macros_getters"
+version = "0.0.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.37",
+]
+
+[[package]]
 name = "nanocl_stubs"
 version = "0.10.0"
 dependencies = [
@@ -1843,6 +1852,7 @@ dependencies = [
  "libc",
  "log",
  "metrsd_client",
+ "nanocl_macros_getters",
  "nanocl_stubs",
  "nanocl_utils",
  "nanocld_client",

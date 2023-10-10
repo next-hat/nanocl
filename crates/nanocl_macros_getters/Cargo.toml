@@ -1,0 +1,18 @@
+[package]
+name = "nanocl_macros_getters"
+version = "0.0.1"
+edition = "2021"
+authors = ["nanocl contributors <team@next-hat.com>"]
+description = "Nanocl shared macros"
+readme = "readme.md"
+license = "MIT OR Apache-2.0"
+homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
+repository = "https://github.com/nxthat/nanocl"
+
+[lib]
+bench = false
+
+[dependencies]
+syn = "2.0.37"
+proc-macro2 = "1.0.67"
+quote = "1.0.33"

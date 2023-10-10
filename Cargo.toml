@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "crates/nanocl_macros_getters",
   "crates/nanocl_stubs",
   "crates/nanocl_utils",
   "crates/nanocld_client",
@@ -21,6 +22,7 @@ lto = true
 codegen-units = 1
 
 [patch.crates-io]
+nanocl_macros_getters = { path = "crates/nanocl_macros_getters" }
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocl_utils = { path = "crates/nanocl_utils" }
 nanocld_client = { path = "crates/nanocld_client" }

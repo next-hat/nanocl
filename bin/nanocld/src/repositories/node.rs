@@ -1,3 +1,4 @@
+use nanocl_macros_getters::{repository_create_with_res, repository_find_by_id};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -24,16 +25,17 @@ use crate::models::{Pool, NodeDbModel};
 pub async fn create(node: &NodeDbModel, pool: &Pool) -> IoResult<NodeDbModel> {
   use crate::schema::nodes::dsl;
   let node = node.clone();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = diesel::insert_into(dsl::nodes)
-      .values(&node)
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "nodes"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
+  let item = repository_create_with_res!(dsl::nodes, node, pool, "Nodes");
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let item = diesel::insert_into(dsl::nodes)
+  //     .values(&node)
+  //     .get_result(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "nodes"))?;
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
   Ok(item)
 }
 
@@ -54,19 +56,20 @@ pub async fn create(node: &NodeDbModel, pool: &Pool) -> IoResult<NodeDbModel> {
 ///
 pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<NodeDbModel> {
   use crate::schema::nodes::dsl;
-  let name = name.to_owned();
-  let pool = pool.clone();
-  let exists = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = dsl::nodes
-      .filter(dsl::name.eq(name))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "nodes"))?;
+  let item = repository_find_by_id!(dsl::nodes, name, pool, "Nodes");
+  // let name = name.to_owned();
+  // let pool = pool.clone();
+  // let exists = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let item = dsl::nodes
+  //     .filter(dsl::name.eq(name))
+  //     .get_result(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "nodes"))?;
 
-    Ok::<_, IoError>(item)
-  })
-  .await?;
-  Ok(exists)
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
+  Ok(item)
 }
 
 /// ## Create if not exists

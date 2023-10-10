@@ -1,3 +1,7 @@
+use nanocl_macros_getters::{
+  repository_create, repository_create_with_res, repository_find_by_id,
+  repository_delete_by,
+};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -36,16 +40,23 @@ pub async fn create_version(
     url: item.url.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::resource_kind_versions)
-      .values(&kind_version)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceKindVersion"))?;
-    Ok::<_, IoError>(kind_version)
-  })
-  .await?;
+
+  let item = repository_create_with_res!(
+    dsl::resource_kind_versions,
+    kind_version,
+    pool,
+    "ResourceKindVersion"
+  );
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::insert_into(dsl::resource_kind_versions)
+  //     .values(&kind_version)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "ResourceKindVersion"))?;
+  //   Ok::<_, IoError>(kind_version)
+  // })
+  // .await?;
   Ok(item)
 }
 
@@ -108,18 +119,20 @@ pub async fn find_by_name(
   name: &str,
   pool: &Pool,
 ) -> IoResult<ResourceKindDbModel> {
-  use crate::schema::resource_kinds;
-  let pool = pool.clone();
-  let name = name.to_owned();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = resource_kinds::dsl::resource_kinds
-      .filter(resource_kinds::dsl::name.eq(name))
-      .get_result::<ResourceKindDbModel>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
-    Ok::<_, IoError>(items)
-  })
-  .await?;
+  use crate::schema::resource_kinds::dsl;
+  let item =
+    repository_find_by_id!(dsl::resource_kinds, name, pool, "ResourceKind");
+  // let pool = pool.clone();
+  // let name = name.to_owned();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let items = resource_kinds::dsl::resource_kinds
+  //     .filter(resource_kinds::dsl::name.eq(name))
+  //     .get_result::<ResourceKindDbModel>(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
+  //   Ok::<_, IoError>(items)
+  // })
+  // .await?;
   Ok(item)
 }
 
@@ -147,16 +160,19 @@ pub async fn create(
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::resource_kinds)
-      .values(&kind)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
-    Ok::<_, IoError>(kind)
-  })
-  .await?;
+
+  let item =
+    repository_create!(dsl::resource_kinds, kind, pool, "ResourceKind");
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::insert_into(dsl::resource_kinds)
+  //     .values(&kind)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
+  //   Ok::<_, IoError>(kind)
+  // })
+  // .await?;
   Ok(item)
 }
 
@@ -177,18 +193,25 @@ pub async fn create(
 ///
 pub async fn delete_version(name: &str, pool: &Pool) -> IoResult<()> {
   use crate::schema::resource_kind_versions::dsl;
-  let pool = pool.clone();
-  let name = name.to_owned();
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::delete(
-      dsl::resource_kind_versions.filter(dsl::resource_kind_name.eq(name)),
-    )
-    .execute(&mut conn)
-    .map_err(|err| err.map_err_context(|| "ResourceKindVersion"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
+  repository_delete_by!(
+    dsl::resource_kind_versions,
+    dsl::resource_kind_name,
+    name,
+    pool,
+    "ResourceKindVersion"
+  );
+  // let pool = pool.clone();
+  // let name = name.to_owned();
+  // web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::delete(
+  //     dsl::resource_kind_versions.filter(dsl::resource_kind_name.eq(name)),
+  //   )
+  //   .execute(&mut conn)
+  //   .map_err(|err| err.map_err_context(|| "ResourceKindVersion"))?;
+  //   Ok::<_, IoError>(())
+  // })
+  // .await?;
   Ok(())
 }
 
@@ -209,15 +232,22 @@ pub async fn delete_version(name: &str, pool: &Pool) -> IoResult<()> {
 ///
 pub async fn delete(name: &str, pool: &Pool) -> IoResult<()> {
   use crate::schema::resource_kinds::dsl;
-  let pool = pool.clone();
-  let name = name.to_owned();
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::delete(dsl::resource_kinds.filter(dsl::name.eq(name)))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
+  repository_delete_by!(
+    dsl::resource_kinds,
+    dsl::name,
+    name,
+    pool,
+    "ResourceKindVersion"
+  );
+  // let pool = pool.clone();
+  // let name = name.to_owned();
+  // web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::delete(dsl::resource_kinds.filter(dsl::name.eq(name)))
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
+  //   Ok::<_, IoError>(())
+  // })
+  // .await?;
   Ok(())
 }

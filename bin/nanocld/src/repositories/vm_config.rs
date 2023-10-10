@@ -1,3 +1,4 @@
+use nanocl_macros_getters::{repository_delete_by, repository_create};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -6,6 +7,7 @@ use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};
 
 use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 
+use crate::serializers::vm_config::serialize_vm_config;
 use crate::utils;
 use crate::models::{Pool, VmConfigDbModel};
 
@@ -48,31 +50,17 @@ pub async fn create(
     config,
     metadata: item.metadata.clone(),
   };
-  let dbmodel = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::vm_configs)
-      .values(&dbmodel)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
-    Ok::<_, IoError>(dbmodel)
-  })
-  .await?;
-  let config = VmConfig {
-    key: dbmodel.key,
-    created_at: dbmodel.created_at,
-    name: item.name.clone(),
-    version: dbmodel.version,
-    vm_key: dbmodel.vm_key,
-    disk: item.disk.clone(),
-    host_config: item.host_config.clone().unwrap_or_default(),
-    hostname: item.hostname.clone(),
-    user: item.user.clone(),
-    labels: item.labels.clone(),
-    mac_address: item.mac_address.clone(),
-    password: item.password.clone(),
-    ssh_key: item.ssh_key.clone(),
-    metadata: item.metadata.clone(),
-  };
+  let dbmodel = repository_create!(dsl::vm_configs, dbmodel, pool, "VmConfig");
+  // let dbmodel = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::insert_into(dsl::vm_configs)
+  //     .values(&dbmodel)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+  //   Ok::<_, IoError>(dbmodel)
+  // })
+  // .await?;
+  let config = serialize_vm_config(dbmodel, item);
   Ok(config)
 }
 
@@ -104,24 +92,10 @@ pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
     Ok::<_, IoError>(config)
   })
   .await?;
-  let config = serde_json::from_value::<VmConfigPartial>(dbmodel.config)
-    .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
-  Ok(VmConfig {
-    key: dbmodel.key,
-    created_at: dbmodel.created_at,
-    name: config.name,
-    version: dbmodel.version,
-    vm_key: dbmodel.vm_key,
-    hostname: config.hostname,
-    user: config.user,
-    labels: config.labels,
-    mac_address: config.mac_address,
-    disk: config.disk,
-    host_config: config.host_config.unwrap_or_default(),
-    password: config.password,
-    ssh_key: config.ssh_key,
-    metadata: config.metadata,
-  })
+  let config =
+    serde_json::from_value::<VmConfigPartial>(dbmodel.config.clone())
+      .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
+  Ok(serialize_vm_config(dbmodel, &config))
 }
 
 /// ## Delete by vm key
@@ -144,17 +118,19 @@ pub async fn delete_by_vm_key(
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
   use crate::schema::vm_configs::dsl;
-  let key = key.to_owned();
-  let pool = pool.clone();
-  let res = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::delete(dsl::vm_configs)
-      .filter(dsl::vm_key.eq(key))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
+  let res =
+    repository_delete_by!(dsl::vm_configs, dsl::vm_key, key, pool, "VmConfig");
+  // let key = key.to_owned();
+  // let pool = pool.clone();
+  // let res = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let res = diesel::delete(dsl::vm_configs)
+  //     .filter(dsl::vm_key.eq(key))
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+  //   Ok::<_, IoError>(res)
+  // })
+  // .await?;
   Ok(GenericDelete { count: res })
 }
 
@@ -189,24 +165,10 @@ pub async fn list_by_vm_key(key: &str, pool: &Pool) -> IoResult<Vec<VmConfig>> {
   let configs = dbmodels
     .into_iter()
     .map(|dbmodel| {
-      let config = serde_json::from_value::<VmConfigPartial>(dbmodel.config)
-        .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
-      Ok(VmConfig {
-        key: dbmodel.key,
-        created_at: dbmodel.created_at,
-        name: config.name,
-        version: dbmodel.version,
-        vm_key: dbmodel.vm_key,
-        hostname: config.hostname,
-        user: config.user,
-        labels: config.labels,
-        mac_address: config.mac_address,
-        disk: config.disk,
-        host_config: config.host_config.unwrap_or_default(),
-        ssh_key: config.ssh_key,
-        password: config.password,
-        metadata: config.metadata,
-      })
+      let config =
+        serde_json::from_value::<VmConfigPartial>(dbmodel.config.clone())
+          .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
+      Ok(serialize_vm_config(dbmodel, &config))
     })
     .collect::<Result<Vec<VmConfig>, IoError>>()?;
   Ok(configs)

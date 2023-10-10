@@ -1,6 +1,10 @@
 //! Repository to manage secrets in database
 //! We can create delete list or inspect a secret
 
+use nanocl_macros_getters::{
+  repository_create, repository_delete_by_id, repository_update_by_id,
+  repository_find_by_id,
+};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -32,18 +36,19 @@ pub async fn create(
   pool: &Pool,
 ) -> IoResult<SecretDbModel> {
   use crate::schema::secrets::dsl;
-  let item = item.clone();
   let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item: SecretDbModel = item.clone().into();
-    diesel::insert_into(dsl::secrets)
-      .values(&item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Secret"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
+  let item: SecretDbModel = item.clone().into();
+  let item = repository_create!(dsl::secrets, item, pool, "Secret");
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::insert_into(dsl::secrets)
+  //     .values(&item)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Secret"))?;
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
+
   Ok(item)
 }
 
@@ -102,16 +107,19 @@ pub async fn list(pool: &Pool) -> IoResult<Vec<SecretDbModel>> {
 ///
 pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::secrets::dsl;
-  let key = key.to_owned();
-  let pool = pool.clone();
-  let count = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let count = diesel::delete(dsl::secrets.filter(dsl::key.eq(key)))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Secret"))?;
-    Ok::<_, IoError>(count)
-  })
-  .await?;
+
+  let count = repository_delete_by_id!(dsl::secrets, key, pool, "Secret");
+
+  // let key = key.to_owned();
+  // let pool = pool.clone();
+  // let count = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let count = diesel::delete(dsl::secrets.filter(dsl::key.eq(key)))
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Secret"))?;
+  //   Ok::<_, IoError>(count)
+  // })
+  // .await?;
   Ok(GenericDelete { count })
 }
 
@@ -132,17 +140,18 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 ///
 pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<SecretDbModel> {
   use crate::schema::secrets::dsl;
-  let key = key.to_owned();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = dsl::secrets
-      .filter(dsl::key.eq(key))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Secret"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
+  let item = repository_find_by_id!(dsl::secrets, key, pool, "Secret");
+  // let key = key.to_owned();
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let item = dsl::secrets
+  //     .filter(dsl::key.eq(key))
+  //     .get_result(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Secret"))?;
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
   Ok(item)
 }
 
@@ -170,21 +179,23 @@ pub async fn update_by_key(
   use crate::schema::secrets::dsl;
   let key = key.to_owned();
   let item = item.clone();
-  let pool = pool.clone();
   let mut secret = find_by_key(&key, &pool).await?;
   let new_item = SecretUpdateDbModel {
     data: Some(item.data.clone()),
     metadata: item.metadata.clone(),
   };
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::update(dsl::secrets.filter(dsl::key.eq(key)))
-      .set(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
+
+  repository_update_by_id!(dsl::secrets, key, new_item, pool, "Cargo");
+  // let pool = pool.clone();
+  // web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::update(dsl::secrets.filter(dsl::key.eq(key)))
+  //     .set(&new_item)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Cargo"))?;
+  //   Ok::<_, IoError>(())
+  // })
+  // .await?;
   secret.data = item.data;
   secret.metadata = item.metadata;
   Ok(secret)

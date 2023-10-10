@@ -1,3 +1,7 @@
+use nanocl_macros_getters::{
+  repository_create, repository_find_by_id, repository_delete_by_id,
+  repository_delete_by,
+};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -6,6 +10,7 @@ use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
 
+use crate::serializers::cargo_config::serialize_cargo_config;
 use crate::utils;
 use crate::models::{Pool, CargoConfigDbModel};
 
@@ -34,7 +39,6 @@ pub async fn create(
   use crate::schema::cargo_configs::dsl;
   let cargo_key = cargo_key.to_owned();
   let version = version.to_owned();
-  let pool = pool.clone();
   let dbmodel = CargoConfigDbModel {
     key: uuid::Uuid::new_v4(),
     cargo_key,
@@ -44,26 +48,24 @@ pub async fn create(
       .map_err(|e| e.map_err_context(|| "Invalid Config"))?,
     metadata: item.metadata.clone(),
   };
-  let dbmodel = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::cargo_configs)
-      .values(&dbmodel)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
-    Ok::<_, IoError>(dbmodel)
-  })
-  .await?;
-  let config = CargoConfig {
-    key: dbmodel.key,
-    created_at: dbmodel.created_at,
-    name: item.name.clone(),
-    version: dbmodel.version,
-    cargo_key: dbmodel.cargo_key,
-    replication: item.replication.clone(),
-    container: item.container.clone(),
-    metadata: item.metadata.clone(),
-    secrets: item.secrets.clone(),
-  };
+
+  let dbmodel =
+    repository_create!(dsl::cargo_configs, dbmodel, pool, "CargoConfig");
+
+  // let pool = pool.clone();
+  // let dbmodel: CargoConfigDbModel = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::insert_into(dsl::cargo_configs)
+  //     .values(&dbmodel)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
+  //   Ok::<_, IoError>(dbmodel)
+  // })
+  // .await?;
+
+  // let item = item.clone();
+
+  let config = serialize_cargo_config(dbmodel, item);
   Ok(config)
 }
 
@@ -88,29 +90,25 @@ pub async fn find_by_key(
 ) -> IoResult<CargoConfig> {
   use crate::schema::cargo_configs::dsl;
   let key = *key;
-  let pool = pool.clone();
-  let dbmodel = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let config = dsl::cargo_configs
-      .filter(dsl::key.eq(key))
-      .get_result::<CargoConfigDbModel>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
-    Ok::<_, IoError>(config)
-  })
-  .await?;
-  let config = serde_json::from_value::<CargoConfigPartial>(dbmodel.data)
-    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
-  Ok(CargoConfig {
-    key: dbmodel.key,
-    created_at: dbmodel.created_at,
-    name: config.name,
-    version: dbmodel.version,
-    cargo_key: dbmodel.cargo_key,
-    replication: config.replication,
-    container: config.container,
-    metadata: config.metadata,
-    secrets: config.secrets,
-  })
+
+  let dbmodel: CargoConfigDbModel =
+    repository_find_by_id!(dsl::cargo_configs, key, pool, "CargoConfig");
+  // let pool = pool.clone();
+  // let dbmodel = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let config = dsl::cargo_configs
+  //     .filter(dsl::key.eq(key))
+  //     .get_result::<CargoConfigDbModel>(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
+  //   Ok::<_, IoError>(config)
+  // })
+  // .await?;
+
+  let config =
+    serde_json::from_value::<CargoConfigPartial>(dbmodel.data.clone())
+      .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
+
+  Ok(serialize_cargo_config(dbmodel, &config))
 }
 
 /// ## Delete by cargo key
@@ -133,17 +131,24 @@ pub async fn delete_by_cargo_key(
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
   use crate::schema::cargo_configs::dsl;
-  let key = key.to_owned();
-  let pool = pool.clone();
-  let res = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::delete(dsl::cargo_configs)
-      .filter(dsl::cargo_key.eq(key))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
+  // let key = key.to_owned();
+  // let pool = pool.clone();
+  // let res = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let res = diesel::delete(dsl::cargo_configs)
+  //     .filter(dsl::cargo_key.eq(key))
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
+  //   Ok::<_, IoError>(res)
+  // })
+  // .await?;
+  let res = repository_delete_by!(
+    dsl::cargo_configs,
+    dsl::cargo_key,
+    key,
+    pool,
+    "CargoConfig"
+  );
   Ok(GenericDelete { count: res })
 }
 
@@ -183,19 +188,9 @@ pub async fn list_by_cargo_key(
     .into_iter()
     .map(|dbmodel| {
       let config =
-        serde_json::from_value::<CargoConfigPartial>(dbmodel.data)
+        serde_json::from_value::<CargoConfigPartial>(dbmodel.data.clone())
           .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
-      Ok(CargoConfig {
-        key: dbmodel.key,
-        created_at: dbmodel.created_at,
-        name: config.name,
-        version: dbmodel.version,
-        cargo_key: dbmodel.cargo_key,
-        replication: config.replication,
-        container: config.container,
-        metadata: config.metadata,
-        secrets: config.secrets,
-      })
+      Ok(serialize_cargo_config(dbmodel, &config))
     })
     .collect::<Result<Vec<CargoConfig>, IoError>>()?;
   Ok(configs)

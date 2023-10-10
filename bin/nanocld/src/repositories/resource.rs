@@ -1,3 +1,4 @@
+use nanocl_macros_getters::{repository_create, repository_delete_by_id};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -6,6 +7,7 @@ use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceQuery};
 
+use crate::serializers::resource::serialize_resource;
 use crate::{utils, repositories};
 use crate::models::{
   Pool, ResourceDbModel, ResourceConfigDbModel, ResourceUpdateModel,
@@ -47,25 +49,18 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     kind: item.kind.clone(),
     config_key: config.key.to_owned(),
   };
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::resources)
-      .values(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Resource"))?;
-    Ok::<_, IoError>(new_item)
-  })
-  .await?;
-  let item = Resource {
-    name: item.key,
-    created_at: item.created_at,
-    updated_at: config.created_at,
-    kind: item.kind,
-    version: config.version,
-    config_key: config.key,
-    data: config.data,
-    metadata: config.metadata,
-  };
+
+  let dbmodel = repository_create!(dsl::resources, new_item, pool, "Resources");
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::insert_into(dsl::resources)
+  //     .values(&new_item)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Resource"))?;
+  //   Ok::<_, IoError>(new_item)
+  // })
+  // .await?;
+  let item = serialize_resource(dbmodel, config);
   Ok(item)
 }
 
@@ -86,17 +81,18 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
 ///
 pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::resources::dsl;
-  let key = key.to_owned();
-  let pool = pool.clone();
-  let count = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let count = diesel::delete(dsl::resources)
-      .filter(dsl::key.eq(key))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Resource"))?;
-    Ok::<_, IoError>(count)
-  })
-  .await?;
+  let count = repository_delete_by_id!(dsl::resources, key, pool, "Resources");
+  // let key = key.to_owned();
+  // let pool = pool.clone();
+  // let count = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let count = diesel::delete(dsl::resources)
+  //     .filter(dsl::key.eq(key))
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Resource"))?;
+  //   Ok::<_, IoError>(count)
+  // })
+  // .await?;
   Ok(GenericDelete { count })
 }
 

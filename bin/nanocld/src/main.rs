@@ -8,6 +8,7 @@ use std::os::unix::prelude::PermissionsExt;
 use ntex::rt;
 use clap::Parser;
 
+mod serializers;
 mod cli;
 mod version;
 mod node;

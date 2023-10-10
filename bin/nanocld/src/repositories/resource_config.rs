@@ -1,3 +1,4 @@
+use nanocl_macros_getters::{repository_create, repository_delete_by};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -29,17 +30,19 @@ pub async fn create(
 ) -> IoResult<ResourceConfigDbModel> {
   use crate::schema::resource_configs::dsl;
   let item = item.clone();
-  let pool = pool.clone();
-  let dbmodel = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::resource_configs)
-      .values(&item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
-  Ok(dbmodel)
+  let item =
+    repository_create!(dsl::resource_configs, item, pool, "ResourceConfig");
+  // let pool = pool.clone();
+  // let dbmodel = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::insert_into(dsl::resource_configs)
+  //     .values(&item)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
+  Ok(item)
 }
 
 /// ## Delete by resource key
@@ -59,16 +62,24 @@ pub async fn create(
 ///
 pub async fn delete_by_resource_key(key: &str, pool: &Pool) -> IoResult<()> {
   use crate::schema::resource_configs::dsl;
-  let key = key.to_owned();
-  let pool = pool.clone();
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::delete(dsl::resource_configs.filter(dsl::resource_key.eq(key)))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
+
+  repository_delete_by!(
+    dsl::resource_configs,
+    dsl::resource_key,
+    key,
+    pool,
+    "ResourceConfig"
+  );
+  // let key = key.to_owned();
+  // let pool = pool.clone();
+  // web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::delete(dsl::resource_configs.filter(dsl::resource_key.eq(key)))
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
+  //   Ok::<_, IoError>(())
+  // })
+  // .await?;
   Ok(())
 }
 

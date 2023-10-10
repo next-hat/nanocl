@@ -1,3 +1,7 @@
+use nanocl_macros_getters::{
+  repository_create, repository_delete_by_id, repository_find_by_id,
+  repository_update_by_id,
+};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -78,7 +82,6 @@ pub async fn create(
       "Name cannot contain a dot.",
     ));
   }
-  let pool = pool.clone();
   let key = utils::key::gen_key(&nsp, &item.name);
   let config = vm_config::create(&key, item, version, &pool).await?;
   let new_item = VmDbModel {
@@ -88,15 +91,17 @@ pub async fn create(
     namespace_name: nsp,
     config_key: config.key,
   };
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::vms)
-      .values(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Vm"))?;
-    Ok::<_, IoError>(new_item)
-  })
-  .await?;
+  let item = repository_create!(dsl::vms, new_item, pool, "Vm");
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::insert_into(dsl::vms)
+  //     .values(&new_item)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Vm"))?;
+  //   Ok::<_, IoError>(new_item)
+  // })
+  // .await?;
   let vm = Vm {
     key: item.key,
     name: item.name,
@@ -124,17 +129,18 @@ pub async fn create(
 ///
 pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::vms::dsl;
-  let key = key.to_owned();
-  let pool = pool.clone();
-  let res = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::delete(dsl::vms)
-      .filter(dsl::key.eq(key))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Vm"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
+  let res = repository_delete_by_id!(dsl::vms, key, pool, "Vm");
+  // let key = key.to_owned();
+  // let pool = pool.clone();
+  // let res = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let res = diesel::delete(dsl::vms)
+  //     .filter(dsl::key.eq(key))
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Vm"))?;
+  //   Ok::<_, IoError>(res)
+  // })
+  // .await?;
   Ok(GenericDelete { count: res })
 }
 
@@ -156,17 +162,18 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
   use crate::schema::vms::dsl;
 
-  let key = key.to_owned();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = dsl::vms
-      .filter(dsl::key.eq(key))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Vm"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
+  let item = repository_find_by_id!(dsl::vms, key, pool, "Vm");
+  // let key = key.to_owned();
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let item = dsl::vms
+  //     .filter(dsl::key.eq(key))
+  //     .get_result(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Vm"))?;
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
 
   Ok(item)
 }
@@ -196,7 +203,6 @@ pub async fn update_by_key(
 ) -> IoResult<Vm> {
   use crate::schema::vms::dsl;
   let key = key.to_owned();
-  let pool = pool.clone();
   let vmdb = find_by_key(&key, &pool).await?;
   let config = vm_config::create(&key, item, version, &pool).await?;
   let new_item = VmUpdateDbModel {
@@ -204,15 +210,18 @@ pub async fn update_by_key(
     config_key: Some(config.key),
     ..Default::default()
   };
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::update(dsl::vms.filter(dsl::key.eq(key)))
-      .set(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Vm"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
+
+  repository_update_by_id!(dsl::vms, new_item, key, pool, "Vm");
+  // let pool = pool.clone();
+  // web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::update(dsl::vms.filter(dsl::key.eq(key)))
+  //     .set(&new_item)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Vm"))?;
+  //   Ok::<_, IoError>(())
+  // })
+  // .await?;
   let vm = Vm {
     key: vmdb.key,
     name: vmdb.name,

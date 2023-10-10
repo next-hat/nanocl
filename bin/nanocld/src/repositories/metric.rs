@@ -1,3 +1,4 @@
+use nanocl_macros_getters::{repository_create, repository_create_with_res};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -26,18 +27,21 @@ pub async fn create(
   pool: &Pool,
 ) -> IoResult<MetricDbModel> {
   use crate::schema::metrics::dsl;
+  // let item = *item;
   let item = item.clone();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::insert_into(dsl::metrics)
-      .values(item)
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Metric"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
-  Ok(item)
+  let result: MetricDbModel =
+    repository_create_with_res!(dsl::metrics, item, pool, "Metric");
+  // let pool = pool.clone();
+  // let result = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let res = diesel::insert_into(dsl::metrics)
+  //     .values(item)
+  //     .get_result(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Metric"))?;
+  //   Ok::<_, IoError>(res)
+  // })
+  // .await?;
+  Ok(result)
 }
 
 /// ## List by kind

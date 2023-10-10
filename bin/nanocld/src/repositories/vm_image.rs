@@ -1,3 +1,7 @@
+use nanocl_macros_getters::{
+  repository_create, repository_find_by_id, repository_delete_by_id,
+  repository_update_by_id, repository_update_by_id_with_res,
+};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -27,16 +31,17 @@ pub async fn create(
 ) -> IoResult<VmImageDbModel> {
   use crate::schema::vm_images::dsl;
   let item = item.clone();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = diesel::insert_into(dsl::vm_images)
-      .values(&item)
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmImage"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
+  let item = repository_create!(dsl::vm_images, item, pool, "VmImage");
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let item = diesel::insert_into(dsl::vm_images)
+  //     .values(&item)
+  //     .get_result(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "VmImage"))?;
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
   Ok(item)
 }
 
@@ -57,17 +62,18 @@ pub async fn create(
 ///
 pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<VmImageDbModel> {
   use crate::schema::vm_images::dsl;
-  let name = name.to_owned();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = dsl::vm_images
-      .filter(dsl::name.eq(&name))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmImage"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
+  let item = repository_find_by_id!(dsl::vm_images, name, pool, "VmImage");
+  // let name = name.to_owned();
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let item = dsl::vm_images
+  //     .filter(dsl::name.eq(&name))
+  //     .get_result(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "VmImage"))?;
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
   Ok(item)
 }
 
@@ -122,16 +128,17 @@ pub async fn find_by_parent(
 ///
 pub async fn delete_by_name(name: &str, pool: &Pool) -> IoResult<()> {
   use crate::schema::vm_images::dsl;
-  let name = name.to_owned();
-  let pool = pool.clone();
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::delete(dsl::vm_images.filter(dsl::name.eq(name)))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmImage"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
+  repository_delete_by_id!(dsl::vm_images, name, pool, "VmImage");
+  // let name = name.to_owned();
+  // let pool = pool.clone();
+  // web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::delete(dsl::vm_images.filter(dsl::name.eq(name)))
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "VmImage"))?;
+  //   Ok::<_, IoError>(())
+  // })
+  // .await?;
   Ok(())
 }
 
@@ -185,17 +192,24 @@ pub async fn update_by_name(
   pool: &Pool,
 ) -> IoResult<VmImageDbModel> {
   use crate::schema::vm_images::dsl;
-  let name = name.to_owned();
+  // let name = name.to_owned();
   let item = item.clone();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = diesel::update(dsl::vm_images.filter(dsl::name.eq(name)))
-      .set(item)
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmImage"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
+  let item = repository_update_by_id_with_res!(
+    dsl::vm_images,
+    name,
+    item,
+    pool,
+    "VmImage"
+  );
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let item = diesel::update(dsl::vm_images.filter(dsl::name.eq(name)))
+  //     .set(item)
+  //     .get_result(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "VmImage"))?;
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
   Ok(item)
 }

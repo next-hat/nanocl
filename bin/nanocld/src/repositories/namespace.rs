@@ -2,6 +2,9 @@
 //! We can create delete list or inspect a namespace
 use std::sync::Arc;
 
+use nanocl_macros_getters::{
+  repository_find_by_id, repository_delete_by_id, repository_create,
+};
 use ntex::web;
 use diesel::prelude::*;
 
@@ -34,20 +37,22 @@ pub async fn create(
 ) -> IoResult<NamespaceDbModel> {
   use crate::schema::namespaces::dsl;
   let item = item.clone();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = NamespaceDbModel {
-      name: item.name,
-      created_at: chrono::Utc::now().naive_utc(),
-    };
-    diesel::insert_into(dsl::namespaces)
-      .values(&item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Namespace"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
+  let item = NamespaceDbModel {
+    name: item.name,
+    created_at: chrono::Utc::now().naive_utc(),
+  };
+
+  let item = repository_create!(dsl::namespaces, item, pool, "Namespace");
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   diesel::insert_into(dsl::namespaces)
+  //     .values(&item)
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Namespace"))?;
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
   Ok(item)
 }
 
@@ -113,16 +118,18 @@ pub async fn delete_by_name(
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
   use crate::schema::namespaces::dsl;
-  let name = name.to_owned();
-  let pool = pool.clone();
-  let count = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let count = diesel::delete(dsl::namespaces.filter(dsl::name.eq(name)))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Namespace"))?;
-    Ok::<_, IoError>(count)
-  })
-  .await?;
+  // let name = name.to_owned();
+  // let pool = pool.clone();
+  // let count = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let count = diesel::delete(dsl::namespaces.filter(dsl::name.eq(name)))
+  //     .execute(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Namespace"))?;
+  //   Ok::<_, IoError>(count)
+  // })
+  // .await?;
+  let count =
+    repository_delete_by_id!(dsl::namespaces, name, pool, "Namespace");
   Ok(GenericDelete { count })
 }
 
@@ -146,17 +153,18 @@ pub async fn find_by_name(
   pool: &Pool,
 ) -> IoResult<NamespaceDbModel> {
   use crate::schema::namespaces::dsl;
-  let name = name.to_owned();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = dsl::namespaces
-      .filter(dsl::name.eq(name))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Namespace"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
+  // let name = name.to_owned();
+  // let pool = pool.clone();
+  // let item = web::block(move || {
+  //   let mut conn = utils::store::get_pool_conn(&pool)?;
+  //   let item = dsl::namespaces
+  //     .filter(dsl::name.eq(name))
+  //     .get_result(&mut conn)
+  //     .map_err(|err| err.map_err_context(|| "Namespace"))?;
+  //   Ok::<_, IoError>(item)
+  // })
+  // .await?;
+  let item = repository_find_by_id!(dsl::namespaces, name, pool, "Namespace");
   Ok(item)
 }
 
