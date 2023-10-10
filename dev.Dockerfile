@@ -1,5 +1,5 @@
 # Create Builder image
-FROM --platform=$BUILDPLATFORM rust:1.72.1-alpine3.18
+FROM --platform=$BUILDPLATFORM rust:1.73.0-alpine3.18
 
 # Setup timezone
 ARG tz=Europe/Paris
