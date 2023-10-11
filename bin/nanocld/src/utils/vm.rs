@@ -107,7 +107,7 @@ pub async fn stop_by_key(
 ) -> Result<(), HttpError> {
   let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
 
-  stop(&vm, &state).await
+  stop(&vm, state).await
 }
 
 /// ## Inspect by key
@@ -561,7 +561,7 @@ pub async fn put(
 ) -> Result<Vm, HttpError> {
   let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
   let container_name = format!("{}.v", &vm.key);
-  stop(&vm, &state).await?;
+  stop(&vm, state).await?;
   state
     .docker_api
     .remove_container(&container_name, None::<RemoveContainerOptions>)
@@ -573,7 +573,7 @@ pub async fn put(
     repositories::vm_image::find_by_name(&vm.config.disk.image, &state.pool)
       .await?;
   create_instance(&vm, &image, false, state).await?;
-  start_by_key(&vm.key, &state).await?;
+  start_by_key(&vm.key, state).await?;
   let event_emitter = state.event_emitter.clone();
   let vm_ptr = vm.clone();
   rt::spawn(async move {

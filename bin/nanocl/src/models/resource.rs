@@ -53,11 +53,19 @@ pub struct ResourceArg {
 /// A row of the resource table
 ///
 #[derive(Debug, Tabled)]
+#[tabled(rename_all = "UPPERCASE")]
 pub struct ResourceRow {
+  /// Name of the resource
   pub name: String,
+  /// Kind of resource
   pub kind: String,
-  pub config_version: String,
+  /// Version of the ressource
+  pub version: String,
+  /// When the resource was created
+  #[tabled(rename = "CREATED AT")]
   pub created_at: String,
+  /// When the resource was updated
+  #[tabled(rename = "UPDATED AT")]
   pub updated_at: String,
 }
 
@@ -78,7 +86,7 @@ impl From<Resource> for ResourceRow {
 
     Self {
       name: resource.name,
-      config_version: resource.version,
+      version: resource.version,
       kind: resource.kind,
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

@@ -43,9 +43,9 @@ dependencies = [
 
 [[package]]
 name = "aho-corasick"
-version = "1.1.1"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea5d730647d4fadd988536d06fecce94b7b4f2a7efdae548f1cf4b63205518ab"
+checksum = "b2969dcb958b36655471fc61f7e416fa76033bdd4bfed0678d8fee1e2d07a1f0"
 dependencies = [
  "memchr",
 ]
@@ -216,15 +216,15 @@ dependencies = [
  "cfg-if",
  "event-listener 3.0.0",
  "futures-lite",
- "rustix 0.38.17",
+ "rustix 0.38.18",
  "windows-sys 0.48.0",
 ]
 
 [[package]]
 name = "async-signal"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1079d27511f6c038736279421774ef4ad4bdd2e300825f4a48c4cc463a57cedf"
+checksum = "d2a5415b7abcdc9cd7d63d6badba5288b2ca017e3fbd4173b8f405449f1a2399"
 dependencies = [
  "async-io",
  "async-lock",
@@ -232,7 +232,7 @@ dependencies = [
  "cfg-if",
  "futures-core",
  "futures-io",
- "rustix 0.38.17",
+ "rustix 0.38.18",
  "signal-hook-registry",
  "slab",
  "windows-sys 0.48.0",
@@ -364,9 +364,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next"
-version = "0.15.3"
+version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e0654049157d860c23c38ed46ce7e79f602216922eb92dfc59a3bac843c3e17"
+checksum = "59d5c84e9e467a689a78f1972eb835232c15b24e40a329de3559f1eb2b1d8554"
 dependencies = [
  "base64",
  "bollard-next-stubs",
@@ -388,20 +388,20 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
- "utoipa 3.5.0",
+ "utoipa",
  "winapi",
 ]
 
 [[package]]
 name = "bollard-next-stubs"
-version = "1.43.0-rc.4"
+version = "1.43.0-rc.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f12b6ab394124b6905fe4d88cc624aa7e50a0f4171433c9ececca2dfa23d9095"
+checksum = "e1c522573ba683e30dec3af7ae129ecdc847ffe4904d7de38af34f09e7e3cce3"
 dependencies = [
  "serde",
  "serde_repr",
  "serde_with",
- "utoipa 3.5.0",
+ "utoipa",
 ]
 
 [[package]]
@@ -867,23 +867,12 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
 name = "errno"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "add4f07d43996f76ef320709726a556a9d4f965d9410d8d0271132d2f8293480"
+checksum = "ac3e13f66a2f95e32a39eaa81f6b95d42878ca0e1db0c7543723dfe12557e860"
 dependencies = [
- "errno-dragonfly",
  "libc",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "errno-dragonfly"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa68f1b12764fab894d2755d2518754e71b4fd80ecfb822714a1206c2aab39bf"
-dependencies = [
- "cc",
- "libc",
 ]
 
 [[package]]
@@ -1466,7 +1455,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb0889898416213fab133e1d33a0e5858a48177452750691bde3666d0fdbaf8b"
 dependencies = [
  "hermit-abi",
- "rustix 0.38.17",
+ "rustix 0.38.18",
  "windows-sys 0.48.0",
 ]
 
@@ -1590,9 +1579,9 @@ checksum = "ef53942eb7bf7ff43a617b3e2c1c4a5ecf5944a7c1bc12d7ee39bbb15e5c1519"
 
 [[package]]
 name = "linux-raw-sys"
-version = "0.4.8"
+version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3852614a3bd9ca9804678ba6be5e3b8ce76dfc902cae004e3e0c44051b6e88db"
+checksum = "da2479e8c062e40bf0066ffa0bc823de0a9368974af99c9f6df941d2c231e03f"
 
 [[package]]
 name = "liquid"
@@ -1811,7 +1800,7 @@ dependencies = [
  "nix 0.27.1",
  "ntex",
  "regex",
- "ring 0.17.2",
+ "ring 0.17.3",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1830,7 +1819,7 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
- "utoipa 4.0.0",
+ "utoipa",
  "uuid",
 ]
 
@@ -1848,7 +1837,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "serde_yaml",
- "utoipa 4.0.0",
+ "utoipa",
  "utoipa-swagger-ui",
 ]
 
@@ -1885,7 +1874,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
- "utoipa 4.0.0",
+ "utoipa",
  "uuid",
 ]
 
@@ -1929,7 +1918,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
- "utoipa 4.0.0",
+ "utoipa",
 ]
 
 [[package]]
@@ -1949,7 +1938,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
- "utoipa 4.0.0",
+ "utoipa",
 ]
 
 [[package]]
@@ -2661,9 +2650,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.68"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b1106fec09662ec6dd98ccac0f81cef56984d0b49f75c92d8cbad76e20c005c"
+checksum = "134c189feb4956b20f6f547d2cf727d4c0fe06722b20a0eec87ed445a97f92da"
 dependencies = [
  "unicode-ident",
 ]
@@ -2763,9 +2752,9 @@ dependencies = [
 
 [[package]]
 name = "ring"
-version = "0.17.2"
+version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "911b295d2d302948838c8ac142da1ee09fa7863163b44e6715bc9357905878b8"
+checksum = "9babe80d5c16becf6594aa32ad2be8fe08498e7ae60b77de8df700e67f191d7e"
 dependencies = [
  "cc",
  "getrandom",
@@ -2856,14 +2845,14 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.38.17"
+version = "0.38.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f25469e9ae0f3d0047ca8b93fc56843f38e6774f0914a107ff8b41be8be8e0b7"
+checksum = "5a74ee2d7c2581cd139b42447d7d9389b889bdaad3a73f1ebb16f2a3237bb19c"
 dependencies = [
  "bitflags 2.4.0",
  "errno",
  "libc",
- "linux-raw-sys 0.4.8",
+ "linux-raw-sys 0.4.10",
  "windows-sys 0.48.0",
 ]
 
@@ -2947,9 +2936,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.19"
+version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad977052201c6de01a8ef2aa3378c4bd23217a056337d1d6da40468d267a4fb0"
+checksum = "836fa6a3e1e547f9a2c4040802ec865b5d85f4014efe00555d7090a3dcaa1090"
 
 [[package]]
 name = "serde"
@@ -3222,7 +3211,7 @@ dependencies = [
  "cfg-if",
  "fastrand 2.0.1",
  "redox_syscall 0.3.5",
- "rustix 0.38.17",
+ "rustix 0.38.18",
  "windows-sys 0.48.0",
 ]
 
@@ -3533,18 +3522,6 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "utoipa"
-version = "3.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d82b1bc5417102a73e8464c686eef947bdfb99fcdfc0a4f228e81afa9526470a"
-dependencies = [
- "indexmap 2.0.2",
- "serde",
- "serde_json",
- "utoipa-gen 3.5.0",
-]
-
-[[package]]
-name = "utoipa"
 version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b208a50ff438dcdc887ea3f2db59530bd2f4bc3d2c70630e4d7ee7a281a1d1b"
@@ -3553,19 +3530,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "utoipa-gen 4.0.0",
-]
-
-[[package]]
-name = "utoipa-gen"
-version = "3.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05d96dcd6fc96f3df9b3280ef480770af1b7c5d14bc55192baa9b067976d920c"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 2.0.38",
+ "utoipa-gen",
 ]
 
 [[package]]
@@ -3592,7 +3557,7 @@ dependencies = [
  "rust-embed",
  "serde",
  "serde_json",
- "utoipa 4.0.0",
+ "utoipa",
  "zip",
 ]
 
