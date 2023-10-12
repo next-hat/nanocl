@@ -2,7 +2,9 @@ use diesel::prelude::*;
 
 use serde::{Deserialize, Serialize};
 
-use crate::schema::resources;
+use nanocl_stubs::resource;
+
+use crate::schema;
 
 /// ## ResourceDbModel
 ///
@@ -17,7 +19,7 @@ use crate::schema::resources;
   Debug, Queryable, Identifiable, Insertable, Serialize, Deserialize,
 )]
 #[diesel(primary_key(key))]
-#[diesel(table_name = resources)]
+#[diesel(table_name = schema::resources)]
 pub struct ResourceDbModel {
   /// The key of the resource
   pub(crate) key: String,
@@ -29,12 +31,30 @@ pub struct ResourceDbModel {
   pub(crate) config_key: uuid::Uuid,
 }
 
+impl ResourceDbModel {
+  pub fn into_resource(
+    self,
+    config: super::ResourceConfigDbModel,
+  ) -> resource::Resource {
+    resource::Resource {
+      name: self.key,
+      created_at: self.created_at,
+      updated_at: config.created_at,
+      kind: self.kind,
+      version: config.version,
+      config_key: config.key,
+      data: config.data,
+      metadata: config.metadata,
+    }
+  }
+}
+
 /// ## ResourceUpdateModel
 ///
 /// This structure represent the update of a resource in the database.
 ///
 #[derive(AsChangeset)]
-#[diesel(table_name = resources)]
+#[diesel(table_name = schema::resources)]
 pub struct ResourceUpdateModel {
   /// The key of the resource
   pub(crate) key: Option<String>,

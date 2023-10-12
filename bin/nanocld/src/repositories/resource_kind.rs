@@ -1,12 +1,11 @@
+use nanocl_stubs::generic;
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_utils::io_error;
+use nanocl_utils::io_error::FromIo;
 
-use crate::utils;
-use crate::models::{
-  Pool, ResourceKindPartial, ResourceKindDbModel, ResourceKindVersionDbModel,
-};
+use crate::{utils, schema, models};
 
 /// ## Create version
 ///
@@ -15,38 +14,28 @@ use crate::models::{
 ///
 /// ## Arguments
 ///
-/// - [item](ResourceKindPartial) - Resource kind item
-/// - [pool](Pool) - Database connection pool
+/// - [item](models::ResourceKindPartial) - Resource kind item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](ResourceKindDbModel) - Resource kind created
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::ResourceKindDbModel) - Resource kind created
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn create_version(
-  item: &ResourceKindPartial,
-  pool: &Pool,
-) -> IoResult<ResourceKindVersionDbModel> {
-  use crate::schema::resource_kind_versions::dsl;
-  let kind_version = ResourceKindVersionDbModel {
+  item: &models::ResourceKindPartial,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::ResourceKindVersionDbModel> {
+  let kind_version = models::ResourceKindVersionDbModel {
     resource_kind_name: item.name.clone(),
     version: item.version.clone(),
     schema: item.schema.clone(),
     url: item.url.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::resource_kind_versions)
-      .values(&kind_version)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceKindVersion"))?;
-    Ok::<_, IoError>(kind_version)
-  })
-  .await?;
-  Ok(item)
+
+  utils::repository::generic_insert_with_res(pool, kind_version).await
 }
 
 /// ## Get version
@@ -57,19 +46,19 @@ pub async fn create_version(
 ///
 /// - [name](str) - Resource kind name
 /// - [version](str) - Resource kind version
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](ResourceKindVersionDbModel) - Resource kind version
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::ResourceKindVersionDbModel) - Resource kind version
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn get_version(
   name: &str,
   version: &str,
-  pool: &Pool,
-) -> IoResult<ResourceKindVersionDbModel> {
+  pool: &models::Pool,
+) -> io_error::IoResult<models::ResourceKindVersionDbModel> {
   use crate::schema::resource_kind_versions::dsl;
   let pool = pool.clone();
   let name = name.to_owned();
@@ -83,7 +72,7 @@ pub async fn get_version(
       .map_err(|err| {
         err.map_err_context(|| format!("Resource {name} {version}"))
       })?;
-    Ok::<_, IoError>(item)
+    Ok::<_, io_error::IoError>(item)
   })
   .await?;
   Ok(item)
@@ -96,68 +85,51 @@ pub async fn get_version(
 /// ## Arguments
 ///
 /// - [name](str) - Resource kind name
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](ResourceKindDbModel) - Resource kind
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::ResourceKindDbModel) - Resource kind
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn find_by_name(
   name: &str,
-  pool: &Pool,
-) -> IoResult<ResourceKindDbModel> {
-  use crate::schema::resource_kinds;
-  let pool = pool.clone();
+  pool: &models::Pool,
+) -> io_error::IoResult<models::ResourceKindDbModel> {
   let name = name.to_owned();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = resource_kinds::dsl::resource_kinds
-      .filter(resource_kinds::dsl::name.eq(name))
-      .get_result::<ResourceKindDbModel>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
-    Ok::<_, IoError>(items)
-  })
-  .await?;
-  Ok(item)
+
+  utils::repository::generic_find_by_id::<schema::resource_kinds::table, _, _>(
+    pool, name,
+  )
+  .await
 }
 
 /// ## Create
 ///
-/// Create a resource kind in database from a `ResourceKindPartial`
+/// Create a resource kind in database from a `models::ResourceKindPartial`
 ///
 /// ## Arguments
 ///
-/// - [item](ResourceKindPartial) - Resource kind item
-/// - [pool](Pool) - Database connection pool
+/// - [item](models::ResourceKindPartial) - Resource kind item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](ResourceKindDbModel) - Resource kind created
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::ResourceKindDbModel) - Resource kind created
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn create(
-  item: &ResourceKindPartial,
-  pool: &Pool,
-) -> IoResult<ResourceKindDbModel> {
-  use crate::schema::resource_kinds::dsl;
-  let kind = ResourceKindDbModel {
+  item: &models::ResourceKindPartial,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::ResourceKindDbModel> {
+  let kind = models::ResourceKindDbModel {
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::resource_kinds)
-      .values(&kind)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
-    Ok::<_, IoError>(kind)
-  })
-  .await?;
-  Ok(item)
+
+  utils::repository::generic_insert_with_res(pool, kind).await
 }
 
 /// ## Delete version
@@ -167,29 +139,25 @@ pub async fn create(
 /// ## Arguments
 ///
 /// - [name](str) - Resource kind name
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](()) - Resource kind version deleted
-///   - [Err](IoError) - Error during the operation
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn delete_version(name: &str, pool: &Pool) -> IoResult<()> {
-  use crate::schema::resource_kind_versions::dsl;
-  let pool = pool.clone();
+pub async fn delete_version(
+  name: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<generic::GenericDelete> {
   let name = name.to_owned();
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::delete(
-      dsl::resource_kind_versions.filter(dsl::resource_kind_name.eq(name)),
-    )
-    .execute(&mut conn)
-    .map_err(|err| err.map_err_context(|| "ResourceKindVersion"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
-  Ok(())
+
+  utils::repository::generic_delete::<schema::resource_kind_versions::table, _>(
+    pool,
+    schema::resource_kind_versions::resource_kind_name.eq(name),
+  )
+  .await
 }
 
 /// ## Delete
@@ -199,25 +167,22 @@ pub async fn delete_version(name: &str, pool: &Pool) -> IoResult<()> {
 /// ## Arguments
 ///
 /// - [name](str) - Resource kind name
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](()) - Resource kind deleted
-///   - [Err](IoError) - Error during the operation
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn delete(name: &str, pool: &Pool) -> IoResult<()> {
-  use crate::schema::resource_kinds::dsl;
-  let pool = pool.clone();
+pub async fn delete(
+  name: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<generic::GenericDelete> {
   let name = name.to_owned();
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::delete(dsl::resource_kinds.filter(dsl::name.eq(name)))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
-  Ok(())
+
+  utils::repository::generic_delete_by_id::<schema::resource_kinds::table, _>(
+    pool, name,
+  )
+  .await
 }

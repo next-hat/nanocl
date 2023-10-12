@@ -7,6 +7,7 @@ pub mod state;
 pub mod proxy;
 pub mod resource;
 pub mod namespace;
+pub mod repository;
 pub mod vm;
 pub mod exec;
 pub mod vm_image;

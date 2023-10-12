@@ -1,10 +1,10 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_utils::io_error;
+use nanocl_utils::io_error::FromIo;
 
-use crate::utils;
-use crate::models::{Pool, MetricDbModel, MetricInsertDbModel};
+use crate::{utils, models};
 
 /// ## Create
 ///
@@ -12,32 +12,22 @@ use crate::models::{Pool, MetricDbModel, MetricInsertDbModel};
 ///
 /// ## Arguments
 ///
-/// - [item](MetricInsertDbModel) - Metric item
-/// - [pool](Pool) - Database connection pool
+/// - [item](models::MetricInsertDbModel) - Metric item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](MetricDbModel) - The created metric item
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::MetricDbModel) - The created metric item
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn create(
-  item: &MetricInsertDbModel,
-  pool: &Pool,
-) -> IoResult<MetricDbModel> {
-  use crate::schema::metrics::dsl;
+  item: &models::MetricInsertDbModel,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::MetricDbModel> {
   let item = item.clone();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::insert_into(dsl::metrics)
-      .values(item)
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Metric"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
-  Ok(item)
+
+  utils::repository::generic_insert_with_res(pool, item).await
 }
 
 /// ## List by kind
@@ -52,18 +42,18 @@ pub async fn create(
 /// ## Arguments
 ///
 /// - [kind](str) - Metric kind
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<MetricDbModel>) - The list of metrics
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](Vec<models::MetricDbModel>) - The list of metrics
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn list_by_kind(
   kind: &str,
-  pool: &Pool,
-) -> IoResult<Vec<MetricDbModel>> {
+  pool: &models::Pool,
+) -> io_error::IoResult<Vec<models::MetricDbModel>> {
   use crate::schema::metrics::dsl;
   let kind = kind.to_owned();
   let pool = pool.clone();
@@ -73,9 +63,9 @@ pub async fn list_by_kind(
       .order((dsl::node_name, dsl::created_at.desc()))
       .distinct_on(dsl::node_name)
       .filter(dsl::kind.eq(kind))
-      .load::<MetricDbModel>(&mut conn)
+      .load::<models::MetricDbModel>(&mut conn)
       .map_err(|err| err.map_err_context(|| "Metric"))?;
-    Ok::<_, IoError>(res)
+    Ok::<_, io_error::IoError>(res)
   })
   .await?;
   Ok(items)

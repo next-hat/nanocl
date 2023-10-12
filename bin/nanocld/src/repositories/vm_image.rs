@@ -1,95 +1,83 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_utils::io_error;
+use nanocl_utils::io_error::FromIo;
 
-use crate::utils;
-use crate::models::{Pool, VmImageDbModel, VmImageUpdateDbModel};
+use nanocl_stubs::generic;
+
+use crate::{utils, models, schema};
 
 /// ## Create
 ///
-/// Create a vm image in database for given `VmImageDbModel`
+/// Create a vm image in database for given `models::VmImageDbModel`
 ///
 /// ## Arguments
 ///
-/// - [item](VmImageDbModel) - Vm image item
-/// - [pool](Pool) - Database connection pool
+/// - [item](models::VmImageDbModel) - Vm image item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](VmImageDbModel) - Vm image created
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::VmImageDbModel) - Vm image created
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn create(
-  item: &VmImageDbModel,
-  pool: &Pool,
-) -> IoResult<VmImageDbModel> {
-  use crate::schema::vm_images::dsl;
+  item: &models::VmImageDbModel,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::VmImageDbModel> {
   let item = item.clone();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = diesel::insert_into(dsl::vm_images)
-      .values(&item)
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmImage"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
-  Ok(item)
+
+  utils::repository::generic_insert_with_res(pool, item).await
 }
 
 /// ## Find by name
 ///
-/// Find a vm image by his name in database and return a `VmImageDbModel`
+/// Find a vm image by his name in database and return a `models::VmImageDbModel`
 ///
 /// ## Arguments
 ///
 /// - [name](str) - Vm image name
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](VmImageDbModel) - Vm image found
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::VmImageDbModel) - Vm image found
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<VmImageDbModel> {
-  use crate::schema::vm_images::dsl;
+pub async fn find_by_name(
+  name: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::VmImageDbModel> {
   let name = name.to_owned();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = dsl::vm_images
-      .filter(dsl::name.eq(&name))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmImage"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
-  Ok(item)
+
+  utils::repository::generic_find_by_id::<schema::vm_images::table, _, _>(
+    pool, name,
+  )
+  .await
 }
 
 /// ## Find by parent
 ///
-/// Find all vm images in database by his parent and return a `Vec<VmImageDbModel>`
+/// Find all vm images in database by his parent and return a `Vec<models::VmImageDbModel>`
 ///
 /// ## Arguments
 ///
 /// - [parent](str) - Vm image parent
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<VmImageDbModel>) - Vm images found
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](Vec<models::VmImageDbModel>) - Vm images found
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn find_by_parent(
   parent: &str,
-  pool: &Pool,
-) -> IoResult<Vec<VmImageDbModel>> {
+  pool: &models::Pool,
+) -> io_error::IoResult<Vec<models::VmImageDbModel>> {
   use crate::schema::vm_images::dsl;
   let parent = parent.to_owned();
   let pool = pool.clone();
@@ -97,9 +85,9 @@ pub async fn find_by_parent(
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = dsl::vm_images
       .filter(dsl::parent.eq(&parent))
-      .load::<VmImageDbModel>(&mut conn)
+      .load::<models::VmImageDbModel>(&mut conn)
       .map_err(|err| err.map_err_context(|| "VmImage"))?;
-    Ok::<_, IoError>(items)
+    Ok::<_, io_error::IoError>(items)
   })
   .await?;
   Ok(items)
@@ -112,52 +100,51 @@ pub async fn find_by_parent(
 /// ## Arguments
 ///
 /// - [name](str) - Vm image name
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](()) - Vm image deleted
-///   - [Err](IoError) - Error during the operation
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn delete_by_name(name: &str, pool: &Pool) -> IoResult<()> {
-  use crate::schema::vm_images::dsl;
+pub async fn delete_by_name(
+  name: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<generic::GenericDelete> {
   let name = name.to_owned();
-  let pool = pool.clone();
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::delete(dsl::vm_images.filter(dsl::name.eq(name)))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmImage"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
-  Ok(())
+
+  utils::repository::generic_delete_by_id::<schema::vm_images::table, _>(
+    pool, name,
+  )
+  .await
 }
 
 /// ## List
 ///
-/// List all vm images in database and return a `Vec<VmImageDbModel>`
+/// List all vm images in database and return a `Vec<models::VmImageDbModel>`
 ///
 /// ## Arguments
 ///
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<VmImageDbModel>) - Vm images found
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](Vec<models::VmImageDbModel>) - Vm images found
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn list(pool: &Pool) -> IoResult<Vec<VmImageDbModel>> {
+pub async fn list(
+  pool: &models::Pool,
+) -> io_error::IoResult<Vec<models::VmImageDbModel>> {
   use crate::schema::vm_images::dsl;
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = dsl::vm_images
-      .load::<VmImageDbModel>(&mut conn)
+      .load::<models::VmImageDbModel>(&mut conn)
       .map_err(|err| err.map_err_context(|| "VmImage"))?;
-    Ok::<_, IoError>(items)
+    Ok::<_, io_error::IoError>(items)
   })
   .await?;
   Ok(items)
@@ -170,32 +157,28 @@ pub async fn list(pool: &Pool) -> IoResult<Vec<VmImageDbModel>> {
 /// ## Arguments
 ///
 /// - [name](str) - Vm image name
-/// - [item](VmImageUpdateDbModel) - Vm image to update
-/// - [pool](Pool) - Database connection pool
+/// - [item](models::VmImageUpdateDbModel) - Vm image to update
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](VmImageDbModel) - Vm image updated
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::VmImageDbModel) - Vm image updated
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn update_by_name(
   name: &str,
-  item: &VmImageUpdateDbModel,
-  pool: &Pool,
-) -> IoResult<VmImageDbModel> {
-  use crate::schema::vm_images::dsl;
-  let name = name.to_owned();
+  item: &models::VmImageUpdateDbModel,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::VmImageDbModel> {
   let item = item.clone();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = diesel::update(dsl::vm_images.filter(dsl::name.eq(name)))
-      .set(item)
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmImage"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
-  Ok(item)
+  let name = name.to_owned();
+
+  utils::repository::generic_update_by_id_with_res::<
+    schema::vm_images::table,
+    models::VmImageUpdateDbModel,
+    _,
+    models::VmImageDbModel,
+  >(pool, name, item)
+  .await
 }

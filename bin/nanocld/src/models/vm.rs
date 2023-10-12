@@ -1,4 +1,6 @@
-use crate::schema::vms;
+use nanocl_stubs::{vm_config, vm};
+
+use crate::schema;
 
 use super::namespace::NamespaceDbModel;
 
@@ -12,7 +14,7 @@ use super::namespace::NamespaceDbModel;
 ///
 #[derive(Clone, Debug, Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = vms)]
+#[diesel(table_name = schema::vms)]
 #[diesel(belongs_to(NamespaceDbModel, foreign_key = namespace_name))]
 pub struct VmDbModel {
   /// The key of the vm
@@ -27,12 +29,24 @@ pub struct VmDbModel {
   pub(crate) namespace_name: String,
 }
 
+impl VmDbModel {
+  pub fn into_vm(self, config: vm_config::VmConfig) -> vm::Vm {
+    vm::Vm {
+      key: self.key,
+      name: self.name,
+      config_key: config.key,
+      namespace_name: self.namespace_name,
+      config,
+    }
+  }
+}
+
 /// ## VmUpdateDbModel
 ///
 /// This structure is used to update a vm in the database.
 ///
 #[derive(Debug, Default, AsChangeset)]
-#[diesel(table_name = vms)]
+#[diesel(table_name = schema::vms)]
 pub struct VmUpdateDbModel {
   /// The key of the vm
   pub(crate) key: Option<String>,
