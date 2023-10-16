@@ -1800,7 +1800,7 @@ dependencies = [
  "nix 0.27.1",
  "ntex",
  "regex",
- "ring 0.17.3",
+ "ring 0.17.4",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2752,9 +2752,9 @@ dependencies = [
 
 [[package]]
 name = "ring"
-version = "0.17.3"
+version = "0.17.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9babe80d5c16becf6594aa32ad2be8fe08498e7ae60b77de8df700e67f191d7e"
+checksum = "fce3045ffa7c981a6ee93f640b538952e155f1ae3a1a02b84547fc7a56b7059a"
 dependencies = [
  "cc",
  "getrandom",
