@@ -46,7 +46,7 @@ clap = { version = "4.4.5", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
 serde = { version = "1.0.189", features = ["derive"] }
 uuid = { version = "1.4", features = ["serde", "v4"] }
-ntex = { version = "0.7.5", features = ["openssl", "tokio"] }
+ntex = { version = "0.7.6", features = ["openssl", "tokio"] }
 diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
 diesel = { version = "2.1.2", features = [
   "postgres",
