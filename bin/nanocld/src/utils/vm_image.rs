@@ -23,14 +23,14 @@ use crate::models::{
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The name of the vm image to delete
-/// - [pool](Pool) - The database pool
+/// * [name](str) - The name of the vm image to delete
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The vm image has been deleted
-///   - [Err](HttpError) - The vm image has not been deleted
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The vm image has been deleted
+///   * [Err](HttpError) - The vm image has not been deleted
 ///
 pub async fn delete_by_name(name: &str, pool: &Pool) -> Result<(), HttpError> {
   let vm_image = repositories::vm_image::find_by_name(name, pool).await?;
@@ -57,13 +57,13 @@ pub async fn delete_by_name(name: &str, pool: &Pool) -> Result<(), HttpError> {
 ///
 /// ## Arguments
 ///
-/// - [path](str) - The path of the vm image
+/// * [path](str) - The path of the vm image
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](QemuImgInfo) - The info of the vm image
-///   - [Err](HttpError) - The info of the vm image has not been retrieved
+/// * [Result](Result) - The result of the operation
+///   * [Ok](QemuImgInfo) - The info of the vm image
+///   * [Err](HttpError) - The info of the vm image has not been retrieved
 ///
 pub async fn get_info(path: &str) -> Result<QemuImgInfo, HttpError> {
   let ouput = Command::new("qemu-img")
@@ -100,16 +100,16 @@ pub async fn get_info(path: &str) -> Result<QemuImgInfo, HttpError> {
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The name of the snapshot
-/// - [size](u64) - The size of the snapshot
-/// - [image](VmImageDbModel) - The base vm image
-/// - [state](DaemonState) - The daemon state
+/// * [name](str) - The name of the snapshot
+/// * [size](u64) - The size of the snapshot
+/// * [image](VmImageDbModel) - The base vm image
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](VmImageDbModel) - The created vm image
-///   - [Err](HttpError) - The vm image has not been created
+/// * [Result](Result) - The result of the operation
+///   * [Ok](VmImageDbModel) - The created vm image
+///   * [Err](HttpError) - The vm image has not been created
 ///
 pub async fn create_snap(
   name: &str,
@@ -188,15 +188,15 @@ pub async fn create_snap(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The name of the clone
-/// - [image](VmImageDbModel) - The snapshot vm image
-/// - [state](DaemonState) - The daemon state
+/// * [name](str) - The name of the clone
+/// * [image](VmImageDbModel) - The snapshot vm image
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](VmImageDbModel) - The created vm image
-///   - [Err](HttpError) - The vm image has not been created
+/// * [Result](Result) - The result of the operation
+///   * [Ok](VmImageDbModel) - The created vm image
+///   * [Err](HttpError) - The vm image has not been created
 ///
 pub async fn clone(
   name: &str,
@@ -340,15 +340,15 @@ pub async fn clone(
 ///
 /// ## Arguments
 ///
-/// - [image](VmImageDbModel) - The image to resize
-/// - [payload](VmImageResizePayload) - The payload containing the new size
-/// - [pool](Pool) - The database pool
+/// * [image](VmImageDbModel) - The image to resize
+/// * [payload](VmImageResizePayload) - The payload containing the new size
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](VmImageDbModel) - The resized image
-///   - [Err](HttpError) - The error
+/// * [Result](Result) - The result of the operation
+///   * [Ok](VmImageDbModel) - The resized image
+///   * [Err](HttpError) - The error
 ///
 pub async fn resize(
   image: &VmImageDbModel,
@@ -398,15 +398,15 @@ pub async fn resize(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The name of the image to resize
-/// - [payload](VmImageResizePayload) - The payload containing the new size
-/// - [pool](Pool) - The database pool
+/// * [name](str) - The name of the image to resize
+/// * [payload](VmImageResizePayload) - The payload containing the new size
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](VmImageDbModel) - The resized image
-///   - [Err](HttpError) - The error
+/// * [Result](Result) - The result of the operation
+///   * [Ok](VmImageDbModel) - The resized image
+///   * [Err](HttpError) - The error
 ///
 pub async fn resize_by_name(
   name: &str,
@@ -423,15 +423,15 @@ pub async fn resize_by_name(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The name of the image
-/// - [filepath](str) - The path to the image file
-/// - [pool](Pool) - The database pool
+/// * [name](str) - The name of the image
+/// * [filepath](str) - The path to the image file
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](VmImageDbModel) - The created image
-///   - [Err](HttpError) - The error
+/// * [Result](Result) - The result of the operation
+///   * [Ok](VmImageDbModel) - The created image
+///   * [Err](HttpError) - The error
 ///
 pub async fn create(
   name: &str,

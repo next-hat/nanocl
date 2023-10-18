@@ -16,8 +16,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - [Vec](Vec) of [ImageSummary](bollard_next::models::ImageSummary)
-  ///   * [Err](Err) - [HttpClientError](HttpClientError) if the request failed
+  ///   * [Ok](Ok) * [Vec](Vec) of [ImageSummary](bollard_next::models::ImageSummary)
+  ///   * [Err](Err) * [HttpClientError](HttpClientError) if the request failed
   ///
   /// ## Example
   ///
@@ -51,8 +51,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - [mpsc::Receiver](mpsc::Receiver) of [CreateImageInfo](bollard_next::models::CreateImageInfo) as Stream
-  ///   * [Err](Err) - [HttpClientError](HttpClientError) if the request failed
+  ///   * [Ok](Ok) * [mpsc::Receiver](mpsc::Receiver) of [CreateImageInfo](bollard_next::models::CreateImageInfo) as Stream
+  ///   * [Err](Err) * [HttpClientError](HttpClientError) if the request failed
   ///
   /// ## Example
   ///
@@ -97,7 +97,7 @@ impl NanocldClient {
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The image was successfully deleted
-  ///   * [Err](Err) - [HttpClientError](HttpClientError) if the request failed
+  ///   * [Err](Err) * [HttpClientError](HttpClientError) if the request failed
   ///
   /// ## Example
   ///
@@ -132,8 +132,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - [ImageInspect](bollard_next::models::ImageInspect) of the image
-  ///   * [Err](Err) - [HttpClientError](HttpClientError) if the request failed
+  ///   * [Ok](Ok) * [ImageInspect](bollard_next::models::ImageInspect) of the image
+  ///   * [Err](Err) * [HttpClientError](HttpClientError) if the request failed
   ///
   /// ## Example
   ///

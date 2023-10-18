@@ -7,7 +7,6 @@ pub mod state;
 pub mod proxy;
 pub mod resource;
 pub mod namespace;
-pub mod repository;
 pub mod vm;
 pub mod exec;
 pub mod vm_image;
@@ -61,7 +60,7 @@ pub mod tests {
   ///
   /// ## Returns
   ///
-  /// - [bollard_next::Docker](bollard_next::Docker) - The docker client
+  /// * [bollard_next::Docker](bollard_next::Docker) - The docker client
   ///
   pub fn gen_docker_client() -> bollard_next::Docker {
     let socket_path = env::var("DOCKER_SOCKET_PATH")
@@ -81,13 +80,13 @@ pub mod tests {
   ///
   /// ## Arguments
   ///
-  /// - [path](str) Path to the state file
+  /// * [path](str) Path to the state file
   ///
   /// ## Returns
   ///
-  /// - [Result](Result) Result of the operation
-  ///   - [Ok](serde_json::Value) - The state file parsed
-  ///   - [Err](Box) - The state file has not been parsed
+  /// * [Result](Result) Result of the operation
+  ///   * [Ok](serde_json::Value) - The state file parsed
+  ///   * [Err](Box) - The state file has not been parsed
   ///
   pub fn parse_statefile(
     path: &str,
@@ -104,7 +103,7 @@ pub mod tests {
   ///
   /// ## Returns
   ///
-  /// - [Pool](Pool) - The postgre pool
+  /// * [Pool](Pool) - The postgre pool
   ///
   pub async fn gen_postgre_pool() -> Pool {
     store::create_pool("nstore.nanocl.internal:26257")
@@ -118,11 +117,11 @@ pub mod tests {
   ///
   /// ## Arguments
   ///
-  /// - [routes](Config) Routes to configure
+  /// * [routes](Config) Routes to configure
   ///
   /// ## Returns
   ///
-  /// - [TestServer](TestServer) - The test server
+  /// * [TestServer](TestServer) - The test server
   ///
   pub async fn gen_server(routes: Config) -> test::TestServer {
     before();

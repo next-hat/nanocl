@@ -114,26 +114,26 @@ Namespace: nexthat
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
-  - Name: doc
-    Container:
-      Image: nexthat-doc:0.9.6
+- Name: doc
+  Container:
+    Image: nexthat-doc:0.9.6
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
-  - Name: docs.next-hat.com
-    Kind: ProxyRule
-    Version: v0.7
-    Data:
-      Rules:
-      - Domain: docs.next-hat.com
+- Name: docs.next-hat.com
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Domain: docs.next-hat.com
         Network: Public
         Ssl: cert.next-hat.com
         Locations:
-          - Path: /
-            Target:
-              Key: doc.nexthat.c
-              Port: 80
+        - Path: /
+          Target:
+            Key: doc.nexthat.c
+            Port: 80
 ```
 
 To apply a state we can do it easily bu running `nanocl state apply -s path|url`<br />

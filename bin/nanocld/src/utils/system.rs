@@ -24,15 +24,15 @@ use crate::models::{Pool, DaemonState};
 ///
 /// ## Arguments
 ///
-/// - [name](str) Name of the namespace to register
-/// - [create_network](bool) If true we create the network for the namespace
-/// - [state](DaemonState) The daemon state
+/// * [name](str) Name of the namespace to register
+/// * [create_network](bool) If true we create the network for the namespace
+/// * [state](DaemonState) The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The namespace has been registered
-///   - [Err](IoError) - The namespace has not been registered
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The namespace has been registered
+///   * [Err](IoError) - The namespace has not been registered
 ///
 pub async fn register_namespace(
   name: &str,
@@ -60,14 +60,14 @@ pub async fn register_namespace(
 ///
 /// ## Arguments
 ///
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
+/// * [docker_api](bollard_next::Docker) - The docker api
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The containers has been synced
-///   - [Err](IoError) - The containers has not been synced
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The containers has been synced
+///   * [Err](IoError) - The containers has not been synced
 ///
 pub async fn sync_containers(
   docker_api: &bollard_next::Docker,
@@ -186,14 +186,14 @@ pub async fn sync_containers(
 ///
 /// ## Arguments
 ///
-/// - [daemon_conf](DaemonConfig) - The daemon configuration
-/// - [pool](Pool) - The database pool
+/// * [daemon_conf](DaemonConfig) - The daemon configuration
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The vm images has been synced
-///   - [Err](IoError) - The vm images has not been synced
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The vm images has been synced
+///   * [Err](IoError) - The vm images has not been synced
 ///
 pub async fn sync_vm_images(
   daemon_conf: &DaemonConfig,

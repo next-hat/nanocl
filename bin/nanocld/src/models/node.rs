@@ -28,7 +28,7 @@ impl NodeDbModel {
   ///
   /// # Returns
   ///
-  /// - [client](NanocldClient) - The client for the node
+  /// * [client](NanocldClient) - The client for the node
   ///
   pub fn to_http_client(&self) -> NanocldClient {
     let url =

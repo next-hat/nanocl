@@ -2,13 +2,11 @@ use ntex::rt;
 use futures::StreamExt;
 use bollard_next::container::{LogsOptions, LogOutput};
 
-use crate::{
-  repositories,
-  models::{ToDbModel, StreamMetricPartial, StreamMetricDbModel},
+use crate::repositories;
+use crate::models::{
+  ToDbModel, DaemonState, HttpMetricPartial, StreamMetricPartial,
+  StreamMetricDbModel,
 };
-use crate::models::{DaemonState, HttpMetricPartial};
-
-use super::repository::generic_insert_with_res;
 
 /// ## Spawn logger
 ///
@@ -19,7 +17,7 @@ use super::repository::generic_insert_with_res;
 ///
 /// ## Arguments
 ///
-/// - [state](DaemonState) - Daemon state
+/// * [state](DaemonState) - Daemon state
 ///
 pub(crate) fn spawn_logger(state: &DaemonState) {
   let state = state.clone();
@@ -88,7 +86,7 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                 {
                   Ok(stream_db_model) => {
                     let insert_result =
-                      generic_insert_with_res::<
+                      repositories::generic::generic_insert_with_res::<
                         crate::schema::stream_metrics::table,
                         _,
                         StreamMetricDbModel,

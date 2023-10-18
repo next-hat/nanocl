@@ -139,11 +139,11 @@ pub struct CargoImageRow {
 ///
 /// ## Arguments
 ///
-/// - [size](i64) size in bytes
+/// * [size](i64) size in bytes
 ///
 /// ## Return
 ///
-/// - [String](String) human readable size
+/// * [String](String) human readable size
 ///
 fn convert_size(size: i64) -> String {
   if size >= 1_000_000_000 {

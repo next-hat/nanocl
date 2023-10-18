@@ -15,15 +15,15 @@ impl NanocldClient {
   ///
   /// ## Arguments
   ///
-  /// - [name](str) - The name of the cargo to exec the command in
-  /// - [exec](CreateExecOptions) - The config for the exec command
-  /// - [namespace](Option<String>) - The namespace where belong the cargo
+  /// * [name](str) - The name of the cargo to exec the command in
+  /// * [exec](CreateExecOptions) - The config for the exec command
+  /// * [namespace](Option<String>) - The namespace where belong the cargo
   ///
   /// ## Returns
   ///
-  /// - [Result](Result)
-  ///  - [Ok](Ok) - The created exec command
-  /// - [Err](HttpClientError) - The command could not be executed
+  /// * [Result](Result)
+  ///  * [Ok](Ok) - The created exec command
+  /// * [Err](HttpClientError) - The command could not be executed
   ///
   /// ## Example
   ///
@@ -61,13 +61,13 @@ impl NanocldClient {
   ///
   /// ## Arguments
   ///
-  /// - [id](str) - Id of command to inspect
+  /// * [id](str) - Id of command to inspect
   ///
   /// ## Returns
   ///
-  /// - [Result](Result)
-  ///  - [Ok](Ok) - Infos of the inspected command
-  /// - [Err](HttpClientError) - The command could not be executed
+  /// * [Result](Result)
+  ///  * [Ok](Ok) - Infos of the inspected command
+  /// * [Err](HttpClientError) - The command could not be executed
   ///
   /// ## Example
   ///
@@ -113,15 +113,15 @@ impl NanocldClient {
   ///
   /// ## Arguments
   ///
-  /// - [id](str) - Id of command to run
-  /// - [exec](CreateExecOptions) - The config for the exec command
-  /// - [namespace](Option<String>) - The namespace where belong the cargo
+  /// * [id](str) - Id of command to run
+  /// * [exec](CreateExecOptions) - The config for the exec command
+  /// * [namespace](Option<String>) - The namespace where belong the cargo
   ///
   /// ## Returns
   ///
-  /// - [Result](Result)
-  ///  - [Ok](Ok) - A [mpsc::Receiver](mpsc::Receiver) of [ExecOutput](ExecOutput)
-  /// - [Err](HttpClientError) - The command could not be executed
+  /// * [Result](Result)
+  ///  * [Ok](Ok) - A [mpsc::Receiver](mpsc::Receiver) of [ExecOutput](ExecOutput)
+  /// * [Err](HttpClientError) - The command could not be executed
   ///
   /// ## Example
   ///

@@ -1,37 +1,34 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error;
-use nanocl_utils::io_error::FromIo;
+use nanocl_utils::io_error::{IoError, IoResult, FromIo};
+use nanocl_stubs::generic::GenericDelete;
+use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceQuery};
 
-use nanocl_stubs::{generic, resource};
-
-use crate::{utils, models, repositories, schema};
-
-use super::resource_config;
+use crate::{utils, repositories};
+use crate::models::{
+  Pool, ResourceDbModel, ResourceUpdateModel, ResourceConfigDbModel,
+};
 
 /// ## Create
 ///
-/// Create a resource item in database from a `resource::ResourcePartial`
-/// and return a `resource::Resource` with the generated key.
+/// Create a resource item in database from a `ResourcePartial`
+/// and return a `Resource` with the generated key.
 ///
 /// ## Arguments
 ///
-/// - [item](resource::ResourcePartial) - resource::Resource item
-/// - [pool](models::Pool) - Database connection pool
+/// * [item](ResourcePartial) - Resource item
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](resource::Resource) - resource::Resource created
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Resource) - Resource created
+///   * [Err](IoError) - Error during the operation
 ///
-pub async fn create(
-  item: &resource::ResourcePartial,
-  pool: &models::Pool,
-) -> io_error::IoResult<resource::Resource> {
+pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
   let pool = pool.clone();
-  let config = models::ResourceConfigDbModel {
+  let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: item.name.to_owned(),
@@ -39,17 +36,15 @@ pub async fn create(
     data: item.data.clone(),
     metadata: item.metadata.clone(),
   };
-  let config = resource_config::create(&config, &pool).await?;
-  let new_item = models::ResourceDbModel {
+  let config = repositories::resource_config::create(&config, &pool).await?;
+  let new_item = ResourceDbModel {
     key: item.name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: item.kind.clone(),
     config_key: config.key.to_owned(),
   };
-
-  let dbmodel: models::ResourceDbModel =
-    utils::repository::generic_insert_with_res(&pool, new_item).await?;
-
+  let dbmodel: ResourceDbModel =
+    super::generic::generic_insert_with_res(&pool, new_item).await?;
   let item = dbmodel.into_resource(config);
   Ok(item)
 }
@@ -60,25 +55,19 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - resource::Resource key
-/// - [pool](models::Pool) - Database connection pool
+/// * [key](str) - Resource key
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](generic::GenericDelete) - Number of deleted items
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](GenericDelete) - Number of deleted items
+///   * [Err](IoError) - Error during the operation
 ///
-pub async fn delete_by_key(
-  key: &str,
-  pool: &models::Pool,
-) -> io_error::IoResult<generic::GenericDelete> {
+pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
+  use crate::schema::resources;
   let key = key.to_owned();
-
-  utils::repository::generic_delete_by_id::<schema::resources::table, _>(
-    pool, key,
-  )
-  .await
+  super::generic::generic_delete_by_id::<resources::table, _>(pool, key).await
 }
 
 /// ## Find
@@ -87,23 +76,23 @@ pub async fn delete_by_key(
 ///
 /// ## Arguments
 ///
-/// - [query](resource::ResourceQuery) - Query to filter resources
-/// - [pool](models::Pool) - Database connection pool
+/// * [query](ResourceQuery) - Query to filter resources
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<resource::Resource>) - List of resources
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<Resource>) - List of resources
+///   * [Err](IoError) - Error during the operation
 ///
 pub async fn find(
-  query: Option<resource::ResourceQuery>,
-  pool: &models::Pool,
-) -> io_error::IoResult<Vec<resource::Resource>> {
+  query: Option<ResourceQuery>,
+  pool: &Pool,
+) -> IoResult<Vec<Resource>> {
   use crate::schema::resources;
   use crate::schema::resource_configs;
   let pool = pool.clone();
-  let res: Vec<(models::ResourceDbModel, models::ResourceConfigDbModel)> =
+  let res: Vec<(ResourceDbModel, ResourceConfigDbModel)> =
     web::block(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let req = match query {
@@ -127,9 +116,8 @@ pub async fn find(
           .inner_join(resource_configs::table)
           .load(&mut conn),
       };
-      let res =
-        req.map_err(|err| err.map_err_context(|| "resource::Resource"))?;
-      Ok::<_, io_error::IoError>(res)
+      let res = req.map_err(|err| err.map_err_context(|| "Resource"))?;
+      Ok::<_, IoError>(res)
     })
     .await?;
   let items = res
@@ -137,9 +125,9 @@ pub async fn find(
     .map(|e| {
       let resource = e.0;
       let config = e.1;
-      Ok::<_, io_error::IoError>(resource.into_resource(config))
+      Ok::<_, IoError>(resource.into_resource(config))
     })
-    .collect::<Result<Vec<resource::Resource>, io_error::IoError>>()?;
+    .collect::<Result<Vec<Resource>, IoError>>()?;
   Ok(items)
 }
 
@@ -149,63 +137,57 @@ pub async fn find(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - resource::Resource key
-/// - [pool](models::Pool) - Database connection pool
+/// * [key](str) - Resource key
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](resource::Resource) - resource::Resource item
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Resource) - Resource item
+///   * [Err](IoError) - Error during the operation
 ///
-pub async fn inspect_by_key(
-  key: &str,
-  pool: &models::Pool,
-) -> io_error::IoResult<resource::Resource> {
+pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Resource> {
   use crate::schema::resources;
   use crate::schema::resource_configs;
   let key = key.to_owned();
   let pool = pool.clone();
-  let res: (models::ResourceDbModel, models::ResourceConfigDbModel) =
-    web::block(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let res = resources::table
-        .inner_join(resource_configs::table)
-        .filter(resources::key.eq(key))
-        .get_result(&mut conn)
-        .map_err(|err| err.map_err_context(|| "resource::Resource"))?;
-      Ok::<_, io_error::IoError>(res)
-    })
-    .await?;
+  let res: (ResourceDbModel, ResourceConfigDbModel) = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let res = resources::table
+      .inner_join(resource_configs::table)
+      .filter(resources::key.eq(key))
+      .get_result(&mut conn)
+      .map_err(|err| err.map_err_context(|| "Resource"))?;
+    Ok::<_, IoError>(res)
+  })
+  .await?;
   let item = res.0.into_resource(res.1);
   Ok(item)
 }
 
 /// ## Put
 ///
-/// Set given `resource::ResourcePartial` as the current config for the resource
-/// and return a `resource::Resource` with the new config
+/// Set given `ResourcePartial` as the current config for the resource
+/// and return a `Resource` with the new config
 ///
 /// ## Arguments
 ///
-/// - [item](resource::ResourcePartial) - resource::Resource item to put
-/// - [pool](models::Pool) - Database connection pool
+/// * [item](ResourcePartial) - Resource item to put
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](resource::Resource) - resource::Resource item
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Resource) - Resource item
+///   * [Err](IoError) - Error during the operation
 ///
-/// //TODO: Normalize names
-pub async fn put(
-  item: &resource::ResourcePartial,
-  pool: &models::Pool,
-) -> io_error::IoResult<resource::Resource> {
+///
+pub async fn put(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
+  use crate::schema::resources;
   let key = item.name.clone();
   let resource =
     repositories::resource::inspect_by_key(&item.name, pool).await?;
-  let config = models::ResourceConfigDbModel {
+  let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: resource.name.to_owned(),
@@ -213,20 +195,18 @@ pub async fn put(
     data: item.data.clone(),
     metadata: item.metadata.clone(),
   };
-  let config = resource_config::create(&config, &pool).await?;
-  let resource_update = models::ResourceUpdateModel {
+  let config = repositories::resource_config::create(&config, pool).await?;
+  let resource_update = ResourceUpdateModel {
     key: None,
     config_key: Some(config.key.to_owned()),
   };
-
-  let dbmodel = utils::repository::generic_update_by_id_with_res::<
-    schema::resources::table,
+  let dbmodel = super::generic::generic_update_by_id_with_res::<
+    resources::table,
     _,
     _,
-    models::ResourceDbModel,
+    ResourceDbModel,
   >(pool, key, resource_update)
   .await?;
-
   let item = dbmodel.into_resource(config);
   Ok(item)
 }

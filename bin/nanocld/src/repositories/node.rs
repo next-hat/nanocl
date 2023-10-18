@@ -1,10 +1,10 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error;
-use nanocl_utils::io_error::FromIo;
+use nanocl_utils::io_error::{IoError, IoResult, FromIo};
 
-use crate::{utils, schema, models};
+use crate::utils;
+use crate::models::{Pool, NodeDbModel};
 
 /// ## Create
 ///
@@ -12,24 +12,22 @@ use crate::{utils, schema, models};
 ///
 /// ## Arguments
 ///
-/// - [node](models::NodeDbModel) - Node item
-/// - [pool](models::Pool) - Database connection pool
+/// * [node](NodeDbModel) - Node item
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](models::NodeDbModel) - The created node item
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](NodeDbModel) - The created node item
+///   * [Err](IoError) - Error during the operation
 ///
-pub async fn create(
-  node: &models::NodeDbModel,
-  pool: &models::Pool,
-) -> io_error::IoResult<models::NodeDbModel> {
-  let node: models::NodeDbModel = node.clone();
-  utils::repository::generic_insert_with_res::<
-    schema::nodes::table,
-    models::NodeDbModel,
-    models::NodeDbModel,
+pub async fn create(node: &NodeDbModel, pool: &Pool) -> IoResult<NodeDbModel> {
+  use crate::schema::nodes;
+  let node: NodeDbModel = node.clone();
+  super::generic::generic_insert_with_res::<
+    nodes::table,
+    NodeDbModel,
+    NodeDbModel,
   >(pool, node)
   .await
 }
@@ -40,46 +38,40 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - Node name
-/// - [pool](models::Pool) - Database connection pool
+/// * [name](str) - Node name
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](models::NodeDbModel) - The node item
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](NodeDbModel) - The node item
+///   * [Err](IoError) - Error during the operation
 ///
-pub async fn find_by_name(
-  name: &str,
-  pool: &models::Pool,
-) -> io_error::IoResult<models::NodeDbModel> {
+pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<NodeDbModel> {
+  use crate::schema::nodes;
   let name = name.to_owned();
-
-  utils::repository::generic_find_by_id::<schema::nodes::table, _, _>(
-    pool, name,
-  )
-  .await
+  super::generic::generic_find_by_id::<nodes::table, _, _>(pool, name).await
 }
 
 /// ## Create if not exists
 ///
-/// Create a node if not exists in database from a `models::NodeDbModel`.
+/// Create a node if not exists in database from a `NodeDbModel`.
 ///
 /// ## Arguments
 ///
-/// - [node](models::NodeDbModel) - Node item
-/// - [pool](models::Pool) - Database connection pool
+/// * [node](NodeDbModel) - Node item
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](models::NodeDbModel) - The created node item
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](NodeDbModel) - The created node item
+///   * [Err](IoError) - Error during the operation
 ///
 pub async fn create_if_not_exists(
-  node: &models::NodeDbModel,
-  pool: &models::Pool,
-) -> io_error::IoResult<models::NodeDbModel> {
+  node: &NodeDbModel,
+  pool: &Pool,
+) -> IoResult<NodeDbModel> {
   match find_by_name(&node.name, pool).await {
     Err(_) => create(node, pool).await,
     Ok(node) => Ok(node),
@@ -92,26 +84,23 @@ pub async fn create_if_not_exists(
 ///
 /// ## Arguments
 ///
-/// - [pool](models::Pool) - Database connection pool
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<models::NodeDbModel>) - The list of node items
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<NodeDbModel>) - The list of node items
+///   * [Err](IoError) - Error during the operation
 ///
-pub async fn list(
-  pool: &models::Pool,
-) -> io_error::IoResult<Vec<models::NodeDbModel>> {
-  use crate::schema::nodes::dsl;
+pub async fn list(pool: &Pool) -> IoResult<Vec<NodeDbModel>> {
+  use crate::schema::nodes;
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = dsl::nodes
-      .load::<models::NodeDbModel>(&mut conn)
+    let items = nodes::dsl::nodes
+      .load::<NodeDbModel>(&mut conn)
       .map_err(|err| err.map_err_context(|| "nodes"))?;
-
-    Ok::<_, io_error::IoError>(items)
+    Ok::<_, IoError>(items)
   })
   .await?;
   Ok(items)
@@ -123,30 +112,29 @@ pub async fn list(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - Node name
-/// - [pool](models::Pool) - Database connection pool
+/// * [name](str) - Node name
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<models::NodeDbModel>) - The list of node items
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<NodeDbModel>) - The list of node items
+///   * [Err](IoError) - Error during the operation
 ///
 pub async fn list_unless(
   name: &str,
-  pool: &models::Pool,
-) -> io_error::IoResult<Vec<models::NodeDbModel>> {
-  use crate::schema::nodes::dsl;
+  pool: &Pool,
+) -> IoResult<Vec<NodeDbModel>> {
+  use crate::schema::nodes;
   let name = name.to_owned();
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = dsl::nodes
-      .filter(dsl::name.ne(name))
-      .load::<models::NodeDbModel>(&mut conn)
+    let items = nodes::dsl::nodes
+      .filter(nodes::dsl::name.ne(name))
+      .load::<NodeDbModel>(&mut conn)
       .map_err(|err| err.map_err_context(|| "nodes"))?;
-
-    Ok::<_, io_error::IoError>(items)
+    Ok::<_, IoError>(items)
   })
   .await?;
   Ok(items)

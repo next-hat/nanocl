@@ -26,13 +26,13 @@ use crate::models::{StateData, DaemonState};
 ///
 /// ## Arguments
 ///
-/// - [state_stream](StateStream) - The state stream to convert
+/// * [state_stream](StateStream) - The state stream to convert
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Bytes) - The bytes to send to the client
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Bytes) - The bytes to send to the client
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 fn stream_to_bytes(state_stream: StateStream) -> Result<Bytes, HttpError> {
   let bytes =
@@ -49,8 +49,8 @@ fn stream_to_bytes(state_stream: StateStream) -> Result<Bytes, HttpError> {
 ///
 /// ## Arguments
 ///
-/// - [state_stream](StateStream) - The state stream to send
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [state_stream](StateStream) - The state stream to send
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 fn send(
   state_stream: StateStream,
@@ -65,13 +65,13 @@ fn send(
 ///
 /// ## Arguments
 ///
-/// - [data](serde_json::Value) - The state payload
+/// * [data](serde_json::Value) - The state payload
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](StateData) - The state data
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](StateData) - The state data
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
   let meta =
@@ -137,9 +137,9 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
 ///
 /// ## Arguments
 ///
-/// - [data](Vec<SecretPartial>) - The list of secrets to apply
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](Vec<SecretPartial>) - The list of secrets to apply
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 async fn apply_secrets(
   data: &[SecretPartial],
@@ -208,11 +208,11 @@ async fn apply_secrets(
 ///
 /// ## Arguments
 ///
-/// - [namespace](str) - The namespace name
-/// - [data](Vec<CargoConfigPartial>) - The list of cargoes to apply
-/// - [version](str) - The version of the cargoes
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [namespace](str) - The namespace name
+/// * [data](Vec<CargoConfigPartial>) - The list of cargoes to apply
+/// * [version](str) - The version of the cargoes
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 async fn apply_cargoes(
   namespace: &str,
@@ -278,11 +278,11 @@ async fn apply_cargoes(
 ///
 /// ## Arguments
 ///
-/// - [namespace](str) - The namespace to apply the VMs to
-/// - [data](Vec<VmConfigPartial>) - The VMs to apply
-/// - [version](str) - The version of the VMs
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [namespace](str) - The namespace to apply the VMs to
+/// * [data](Vec<VmConfigPartial>) - The VMs to apply
+/// * [version](str) - The version of the VMs
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 pub async fn apply_vms(
   namespace: &str,
@@ -346,15 +346,15 @@ pub async fn apply_vms(
 ///
 /// ## Arguments
 ///
-/// - [data](Vec<ResourcePartial>) - The list of resources to apply
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](Vec<ResourcePartial>) - The list of resources to apply
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 async fn apply_resources(
   data: &[ResourcePartial],
@@ -407,15 +407,15 @@ async fn apply_resources(
 ///
 /// ## Arguments
 ///
-/// - [data](Vec<SecretPartial>) - The list of secrets to delete
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](Vec<SecretPartial>) - The list of secrets to delete
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 async fn remove_secrets(
   data: &[SecretPartial],
@@ -461,16 +461,16 @@ async fn remove_secrets(
 ///
 /// ## Arguments
 ///
-/// - [namespace](str) - The namespace of the cargoes
-/// - [data](Vec<CargoConfigPartial>) - The list of cargoes to delete
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [namespace](str) - The namespace of the cargoes
+/// * [data](Vec<CargoConfigPartial>) - The list of cargoes to delete
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 async fn remove_cargoes(
   namespace: &str,
@@ -515,10 +515,10 @@ async fn remove_cargoes(
 ///
 /// ## Arguments
 ///
-/// - [namespace](str) - The namespace to delete the VMs from
-/// - [data](Vec<VmConfigPartial>) - The VMs to delete
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [namespace](str) - The namespace to delete the VMs from
+/// * [data](Vec<VmConfigPartial>) - The VMs to delete
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 pub async fn remove_vms(
   namespace: &str,
@@ -554,15 +554,15 @@ pub async fn remove_vms(
 ///
 /// ## Arguments
 ///
-/// - [data](Vec<ResourcePartial>) - The list of resources to delete
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](Vec<ResourcePartial>) - The list of resources to delete
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 async fn remove_resources(
   data: &[ResourcePartial],
@@ -613,16 +613,16 @@ async fn remove_resources(
 ///
 /// ## Arguments
 ///
-/// - [data](StateDeployment) - The deployment statefile
-/// - [version](str) - The version of the deployment
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](StateDeployment) - The deployment statefile
+/// * [version](str) - The version of the deployment
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn apply_deployment(
   data: &StateDeployment,
@@ -658,16 +658,16 @@ pub async fn apply_deployment(
 ///
 /// ## Arguments
 ///
-/// - [data](StateCargo) - The cargo statefile
-/// - [version](str) - The version of the cargo
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](StateCargo) - The cargo statefile
+/// * [version](str) - The version of the cargo
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn apply_cargo(
   data: &StateCargo,
@@ -692,16 +692,16 @@ pub async fn apply_cargo(
 ///
 /// ## Arguments
 ///
-/// - [data](StateVirtualMachine) - The VM statefile data
-/// - [version](str) - The version of the VMs
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](StateVirtualMachine) - The VM statefile data
+/// * [version](str) - The version of the VMs
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn apply_vm(
   data: &StateVirtualMachine,
@@ -726,15 +726,15 @@ pub async fn apply_vm(
 ///
 /// ## Arguments
 ///
-/// - [data](StateResource) - The resource statefile
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](StateResource) - The resource statefile
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn apply_resource(
   data: &StateResource,
@@ -752,15 +752,15 @@ pub async fn apply_resource(
 ///
 /// ## Arguments
 ///
-/// - [data](StateSecret) - The secret Statefile
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](StateSecret) - The secret Statefile
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn apply_secret(
   data: &StateSecret,
@@ -777,15 +777,15 @@ pub async fn apply_secret(
 ///
 /// ## Arguments
 ///
-/// - [data](StateDeployment) - The deployment statefile data
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](StateDeployment) - The deployment statefile data
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn remove_deployment(
   data: &StateDeployment,
@@ -818,15 +818,15 @@ pub async fn remove_deployment(
 ///
 /// ## Arguments
 ///
-/// - [data](StateCargo) - The cargo statefile data
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](StateCargo) - The cargo statefile data
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn remove_cargo(
   data: &StateCargo,
@@ -848,15 +848,15 @@ pub async fn remove_cargo(
 ///
 /// ## Arguments
 ///
-/// - [data](StateVirtualMachine) - The VM statefile data
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](StateVirtualMachine) - The VM statefile data
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn remove_vm(
   data: &StateVirtualMachine,
@@ -878,15 +878,15 @@ pub async fn remove_vm(
 ///
 /// ## Arguments
 ///
-/// - [data](StateResource) - The resource statefile data
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](StateResource) - The resource statefile data
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn remove_resource(
   data: &StateResource,
@@ -903,15 +903,15 @@ pub async fn remove_resource(
 ///
 /// ## Arguments
 ///
-/// - [data](StateSecret) - The secret statefile data
-/// - [state](DaemonState) - The system state
-/// - [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [data](StateSecret) - The secret statefile data
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The operation was successful
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The operation was successful
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn remove_secret(
   data: &StateSecret,
