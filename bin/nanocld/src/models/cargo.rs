@@ -1,3 +1,5 @@
+use nanocl_stubs::{cargo_config, cargo};
+
 use crate::schema::cargoes;
 
 use super::namespace::NamespaceDbModel;
@@ -25,7 +27,17 @@ pub struct CargoDbModel {
   /// The namespace name
   pub(crate) namespace_name: String,
 }
-
+impl CargoDbModel {
+  pub fn into_cargo(self, config: cargo_config::CargoConfig) -> cargo::Cargo {
+    cargo::Cargo {
+      key: self.key,
+      name: self.name,
+      config_key: config.key,
+      namespace_name: self.namespace_name,
+      config,
+    }
+  }
+}
 /// ## CargoUpdateDbModel
 ///
 /// This structure is used to update a cargo in the database.

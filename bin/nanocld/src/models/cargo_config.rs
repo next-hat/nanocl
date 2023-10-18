@@ -1,4 +1,6 @@
-use crate::schema::cargo_configs;
+use nanocl_stubs::cargo_config;
+
+use crate::schema;
 
 use super::cargo::CargoDbModel;
 
@@ -13,7 +15,7 @@ use super::cargo::CargoDbModel;
 ///
 #[derive(Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = cargo_configs)]
+#[diesel(table_name = schema::cargo_configs)]
 #[diesel(belongs_to(CargoDbModel, foreign_key = cargo_key))]
 pub struct CargoConfigDbModel {
   /// The key of the cargo config
@@ -28,4 +30,24 @@ pub struct CargoConfigDbModel {
   pub(crate) data: serde_json::Value,
   // The metadata (user defined)
   pub(crate) metadata: Option<serde_json::Value>,
+}
+
+impl CargoConfigDbModel {
+  pub fn into_cargo_config(
+    self,
+    config: &cargo_config::CargoConfigPartial,
+  ) -> cargo_config::CargoConfig {
+    let config = config.clone();
+    cargo_config::CargoConfig {
+      key: self.key,
+      created_at: self.created_at,
+      name: config.name,
+      version: self.version,
+      cargo_key: self.cargo_key,
+      replication: config.replication,
+      container: config.container,
+      metadata: config.metadata,
+      secrets: config.secrets,
+    }
+  }
 }

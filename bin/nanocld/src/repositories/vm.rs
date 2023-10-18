@@ -1,45 +1,38 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_stubs::vm::Vm;
-use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};
+use nanocl_stubs::{generic, vm, vm_config};
 
 use nanocl_utils::io_error::{IoError, FromIo, IoResult};
 
-use crate::utils;
-use crate::models::{
-  Pool, VmDbModel, NamespaceDbModel, VmConfigDbModel, VmUpdateDbModel,
-};
-
-use super::vm_config;
+use crate::{utils, schema, models};
 
 /// ## Find by namespace
 ///
-/// Find a vm by a `NamespaceDbModel` in database and return a `Vec<VmDbModel>`
+/// Find a vm by a `models::NamespaceDbModel` in database and return a `Vec<models::VmDbModel>`
 ///
 /// ## Arguments
 ///
-/// - [nsp](NamespaceDbModel) - Namespace item
-/// - [pool](Pool) - Database connection pool
+/// - [nsp](models::NamespaceDbModel) - Namespace item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///  - [Ok](Vec<VmDbModel>) - List a vm found
+///  - [Ok](Vec<models::VmDbModel>) - List a vm found
 ///  - [Err](IoError) - Error during the operation
 ///
 pub async fn find_by_namespace(
-  nsp: &NamespaceDbModel,
-  pool: &Pool,
-) -> IoResult<Vec<VmDbModel>> {
+  nsp: &models::NamespaceDbModel,
+  pool: &models::Pool,
+) -> IoResult<Vec<models::VmDbModel>> {
   let nsp = nsp.clone();
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = VmDbModel::belonging_to(&nsp)
+    let items = models::VmDbModel::belonging_to(&nsp)
       .load(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Vm"))?;
+      .map_err(|err| err.map_err_context(|| "vm::Vm"))?;
     Ok::<_, IoError>(items)
   })
   .await?;
@@ -49,61 +42,48 @@ pub async fn find_by_namespace(
 /// ## Create
 ///
 /// Create a vm item in database for given namespace
-/// from a `VmConfigPartial` and return a `Vm`.
+/// from a `vm_config::VmConfigPartial` and return a `vm::Vm`.
 ///
 /// ## Arguments
 ///
 /// - [nsp](str) - Namespace name
-/// - [item](VmConfigPartial) - Vm item
-/// - [pool](Pool) - Database connection pool
+/// - [item](vm_config::VmConfigPartial) - vm::Vm item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vm) - The vm created
+///   - [Ok](vm::Vm) - The vm created
 ///   - [Err](IoError) - Error during the operation
 ///
 pub async fn create(
   nsp: &str,
-  item: &VmConfigPartial,
+  item: &vm_config::VmConfigPartial,
   version: &str,
-  pool: &Pool,
-) -> IoResult<Vm> {
-  use crate::schema::vms::dsl;
+  pool: &models::Pool,
+) -> IoResult<vm::Vm> {
   let nsp = nsp.to_owned();
   // test if the name of the vm include a . in the name and throw error if true
   if item.name.contains('.') {
     return Err(IoError::invalid_data(
-      "VmConfigPartial",
+      "vm_config::VmConfigPartial",
       "Name cannot contain a dot.",
     ));
   }
-  let pool = pool.clone();
   let key = utils::key::gen_key(&nsp, &item.name);
-  let config = vm_config::create(&key, item, version, &pool).await?;
-  let new_item = VmDbModel {
+  let config = super::vm_config::create(&key, item, version, pool).await?;
+  let new_item = models::VmDbModel {
     key,
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
     config_key: config.key,
   };
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::vms)
-      .values(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Vm"))?;
-    Ok::<_, IoError>(new_item)
-  })
-  .await?;
-  let vm = Vm {
-    key: item.key,
-    name: item.name,
-    config_key: config.key,
-    namespace_name: item.namespace_name,
-    config,
-  };
+
+  let item: models::VmDbModel =
+    utils::repository::generic_insert_with_res(pool, new_item).await?;
+
+  let vm = item.into_vm(config);
   Ok(vm)
 }
 
@@ -113,29 +93,23 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - Vm key
-/// - [pool](Pool) - Database connection pool
+/// - [key](str) - vm::Vm key
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](GenericDelete) - The number of deleted items
+///   - [Ok](generic::GenericDelete) - The number of deleted items
 ///   - [Err](IoError) - Error during the operation
 ///
-pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
-  use crate::schema::vms::dsl;
+pub async fn delete_by_key(
+  key: &str,
+  pool: &models::Pool,
+) -> IoResult<generic::GenericDelete> {
   let key = key.to_owned();
-  let pool = pool.clone();
-  let res = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::delete(dsl::vms)
-      .filter(dsl::key.eq(key))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Vm"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
-  Ok(GenericDelete { count: res })
+
+  utils::repository::generic_delete_by_id::<schema::vms::table, _>(pool, key)
+    .await
 }
 
 /// ## Find by key
@@ -144,31 +118,23 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 ///
 /// ## Arguments
 ///
-/// - [key](str) - Vm key
-/// - [pool](Pool) - Database connection pool
+/// - [key](str) - vm::Vm key
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](VmDbModel) - The vm found
+///   - [Ok](models::VmDbModel) - The vm found
 ///   - [Err](IoError) - Error during the operation
 ///
-pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
-  use crate::schema::vms::dsl;
-
+pub async fn find_by_key(
+  key: &str,
+  pool: &models::Pool,
+) -> IoResult<models::VmDbModel> {
   let key = key.to_owned();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = dsl::vms
-      .filter(dsl::key.eq(key))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Vm"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
 
-  Ok(item)
+  utils::repository::generic_find_by_id::<schema::vms::table, _, _>(pool, key)
+    .await
 }
 
 /// ## Update by key
@@ -177,85 +143,81 @@ pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
 ///
 /// ## Arguments
 ///
-/// - [key](str) - Vm key
-/// - [item](VmConfigPartial) - Vm config
-/// - [version](str) - Vm version
-/// - [pool](Pool) - Database connection pool
+/// - [key](str) - vm::Vm key
+/// - [item](vm_config::VmConfigPartial) - vm::Vm config
+/// - [version](str) - vm::Vm version
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vm) - The vm updated
+///   - [Ok](vm::Vm) - The vm updated
 ///   - [Err](IoError) - Error during the operation
 ///
 pub async fn update_by_key(
   key: &str,
-  item: &VmConfigPartial,
+  item: &vm_config::VmConfigPartial,
   version: &str,
-  pool: &Pool,
-) -> IoResult<Vm> {
-  use crate::schema::vms::dsl;
+  pool: &models::Pool,
+) -> IoResult<vm::Vm> {
   let key = key.to_owned();
-  let pool = pool.clone();
-  let vmdb = find_by_key(&key, &pool).await?;
-  let config = vm_config::create(&key, item, version, &pool).await?;
-  let new_item = VmUpdateDbModel {
+  let vmdb = find_by_key(&key, pool).await?;
+  let config = super::vm_config::create(&key, item, version, pool).await?;
+  let new_item = models::VmUpdateDbModel {
     name: Some(item.name.clone()),
     config_key: Some(config.key),
     ..Default::default()
   };
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::update(dsl::vms.filter(dsl::key.eq(key)))
-      .set(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Vm"))?;
-    Ok::<_, IoError>(())
-  })
+
+  utils::repository::generic_update_by_id::<
+    schema::vms::table,
+    models::VmUpdateDbModel,
+    _,
+  >(pool, key, new_item)
   .await?;
-  let vm = Vm {
-    key: vmdb.key,
-    name: vmdb.name,
-    config_key: config.key,
-    namespace_name: vmdb.namespace_name,
-    config,
-  };
+
+  let vm = vmdb.into_vm(config);
   Ok(vm)
 }
 
 /// ## Inspect by key
 ///
-/// Inspect a vm item in database for given key and return a `Vm`.
+/// Inspect a vm item in database for given key and return a `vm::Vm`.
 ///
 /// ## Arguments
 ///
-/// - [key](str) - Vm key
-/// - [pool](Pool) - Database connection pool
+/// - [key](str) - vm::Vm key
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vm) - The vm found
+///   - [Ok](vm::Vm) - The vm found
 ///   - [Err](IoError) - Error during the operation
 ///
-pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
+pub async fn inspect_by_key(
+  key: &str,
+  pool: &models::Pool,
+) -> IoResult<vm::Vm> {
   use crate::schema::vms;
   use crate::schema::vm_configs;
   let key = key.to_owned();
   let pool = pool.clone();
-  let item: (VmDbModel, VmConfigDbModel) = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = vms::table
-      .inner_join(vm_configs::table)
-      .filter(vms::key.eq(key))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Vm"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
-  let config = serde_json::from_value::<VmConfigPartial>(item.1.config)
-    .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
-  let config = VmConfig {
+  let item: (models::VmDbModel, models::VmConfigDbModel) =
+    web::block(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let item = vms::table
+        .inner_join(vm_configs::table)
+        .filter(vms::key.eq(key))
+        .get_result(&mut conn)
+        .map_err(|err| err.map_err_context(|| "vm::Vm"))?;
+      Ok::<_, IoError>(item)
+    })
+    .await?;
+  let config =
+    serde_json::from_value::<vm_config::VmConfigPartial>(item.1.config)
+      .map_err(|err| err.map_err_context(|| "vm_config::VmConfigPartial"))?;
+  let config = vm_config::VmConfig {
     key: item.1.key,
     created_at: item.0.created_at,
     name: config.name,
@@ -271,12 +233,6 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
     ssh_key: config.ssh_key,
     metadata: config.metadata,
   };
-  let item = Vm {
-    key: item.0.key,
-    name: item.0.name,
-    config_key: item.1.key,
-    namespace_name: item.0.namespace_name,
-    config,
-  };
+  let item = item.0.into_vm(config);
   Ok(item)
 }

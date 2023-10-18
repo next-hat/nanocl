@@ -1,67 +1,62 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_utils::io_error;
+use nanocl_utils::io_error::FromIo;
 
-use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::cargo::{Cargo, GenericCargoListQuery};
-use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
+use nanocl_stubs::{generic, cargo, cargo_config};
 
-use crate::utils;
-use crate::models::{
-  Pool, CargoDbModel, NamespaceDbModel, CargoUpdateDbModel, CargoConfigDbModel,
-};
-
-use super::cargo_config;
+use crate::{utils, models};
 
 /// ## Find by namespace
 ///
-/// Find a cargo by a `NamespaceDbModel` in database and return a `Vec<CargoDbModel>`.
+/// Find a cargo by a `models::NamespaceDbModel` in database and return a `Vec<models::CargoDbModel>`.
 ///
 /// ## Arguments
 ///
-/// - [nsp](NamespaceDbModel) - Namespace item
-/// - [pool](Pool) - Database connection pool
+/// - [nsp](models::NamespaceDbModel) - Namespace item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///  - [Ok](Vec<CargoDbModel>) - List a cargo found
-///  - [Err](IoError) - Error during the operation
+///  - [Ok](Vec<models::CargoDbModel>) - List a cargo found
+///  - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn find_by_namespace(
-  nsp: &NamespaceDbModel,
-  pool: &Pool,
-) -> IoResult<Vec<CargoDbModel>> {
-  let query = GenericCargoListQuery::of_namespace(nsp.clone());
+  nsp: &models::NamespaceDbModel,
+  pool: &models::Pool,
+) -> io_error::IoResult<Vec<models::CargoDbModel>> {
+  let query = cargo::GenericCargoListQuery::of_namespace(nsp.clone());
   list_by_query(&query, pool).await
 }
 
 /// ## List by query
 ///
-/// List a cargo by a `GenericCargoListQuery` in database and return a `Vec<CargoDbModel>`.
+/// List a cargo by a `cargo::GenericCargoListQuery` in database and return a `Vec<models::CargoDbModel>`.
 ///
 /// ## Arguments
 ///
-/// - [query](GenericCargoListQuery) - Query containing namespace, name filter and pagination info
-/// - [pool](Pool) - Database connection pool
+/// - [query](cargo::GenericCargoListQuery) - Query containing namespace, name filter and pagination info
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///  - [Ok](Vec<CargoDbModel>) - List a cargo found
-///  - [Err](IoError) - Error during the operation
+///  - [Ok](Vec<models::CargoDbModel>) - List a cargo found
+///  - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn list_by_query(
-  query: &GenericCargoListQuery<NamespaceDbModel>,
-  pool: &Pool,
-) -> IoResult<Vec<CargoDbModel>> {
+  query: &cargo::GenericCargoListQuery<models::NamespaceDbModel>,
+  pool: &models::Pool,
+) -> io_error::IoResult<Vec<models::CargoDbModel>> {
   use crate::schema::cargoes::dsl;
   let query = query.clone();
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let mut sql = CargoDbModel::belonging_to(&query.namespace).into_boxed();
+    let mut sql =
+      models::CargoDbModel::belonging_to(&query.namespace).into_boxed();
     if let Some(name) = &query.name {
       sql = sql.filter(dsl::name.ilike(format!("%{name}%")));
     }
@@ -74,8 +69,8 @@ pub async fn list_by_query(
     let items = sql
       .order(dsl::created_at.desc())
       .get_results(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(items)
+      .map_err(|err| err.map_err_context(|| "cargo::Cargo"))?;
+    Ok::<_, io_error::IoError>(items)
   })
   .await?;
   Ok(items)
@@ -88,58 +83,45 @@ pub async fn list_by_query(
 /// ## Arguments
 ///
 /// - [nsp](str) - Namespace name
-/// - [item](Cargo) - Cargo item
-/// - [pool](Pool) - Database connection pool
+/// - [item](cargo::Cargo) - cargo::Cargo item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Cargo) - The cargo created
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](cargo::Cargo) - The cargo created
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn create(
   nsp: &str,
-  item: &CargoConfigPartial,
+  item: &cargo_config::CargoConfigPartial,
   version: &str,
-  pool: &Pool,
-) -> IoResult<Cargo> {
-  use crate::schema::cargoes::dsl;
+  pool: &models::Pool,
+) -> io_error::IoResult<cargo::Cargo> {
   let nsp = nsp.to_owned();
   let item = item.to_owned();
   let version = version.to_owned();
   // test if the name of the cargo include a . in the name and throw error if true
   if item.name.contains('.') {
-    return Err(IoError::invalid_input(
-      "CargoConfigPartial",
+    return Err(io_error::IoError::invalid_input(
+      "cargo_config::CargoConfigPartial",
       "Name cannot contain a dot.",
     ));
   }
-  let pool = pool.clone();
   let key = utils::key::gen_key(&nsp, &item.name);
-  let config = cargo_config::create(&key, &item, &version, &pool).await?;
-  let new_item = CargoDbModel {
+  let config = super::cargo_config::create(&key, &item, &version, pool).await?;
+  let new_item = models::CargoDbModel {
     key,
     name: item.name,
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
     config_key: config.key,
   };
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::cargoes)
-      .values(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(new_item)
-  })
-  .await?;
-  let cargo = Cargo {
-    key: item.key,
-    name: item.name,
-    config_key: config.key,
-    namespace_name: item.namespace_name,
-    config,
-  };
+
+  let item: models::CargoDbModel =
+    utils::repository::generic_insert_with_res(pool, new_item).await?;
+
+  let cargo = item.into_cargo(config);
   Ok(cargo)
 }
 
@@ -149,29 +131,26 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - Cargo key
-/// - [pool](Pool) - Database connection pool
+/// - [key](str) - cargo::Cargo key
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](GenericDelete) - The number of deleted items
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](generic::GenericDelete) - The number of deleted items
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
-  use crate::schema::cargoes::dsl;
+pub async fn delete_by_key(
+  key: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<generic::GenericDelete> {
   let key = key.to_owned();
-  let pool = pool.clone();
-  let res = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::delete(dsl::cargoes)
-      .filter(dsl::key.eq(key))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
-  Ok(GenericDelete { count: res })
+
+  utils::repository::generic_delete_by_id::<crate::schema::cargoes::table, _>(
+    pool,
+    key.to_owned(),
+  )
+  .await
 }
 
 /// ## Find by key
@@ -180,81 +159,68 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 ///
 /// ## Arguments
 ///
-/// - [key](str) - Cargo key
-/// - [pool](Pool) - Database connection pool
+/// - [key](str) - cargo::Cargo key
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](CargoDbModel) - The cargo found
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::CargoDbModel) - The cargo found
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDbModel> {
-  use crate::schema::cargoes::dsl;
+pub async fn find_by_key(
+  key: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::CargoDbModel> {
   let key = key.to_owned();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = dsl::cargoes
-      .filter(dsl::key.eq(key))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
-  Ok(item)
-}
 
+  utils::repository::generic_find_by_id::<crate::schema::cargoes::table, _, _>(
+    pool,
+    key.to_owned(),
+  )
+  .await
+}
 /// ## Update by key
 ///
 /// Update a cargo item in database for given key
 ///
 /// ## Arguments
 ///
-/// - [key](str) - Cargo key
-/// - [item](CargoConfigPartial) - Cargo config
-/// - [pool](Pool) - Database connection pool
+/// - [key](str) - cargo::Cargo key
+/// - [item](cargo_config::CargoConfigPartial) - cargo::Cargo config
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Cargo) - The cargo updated
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](cargo::Cargo) - The cargo updated
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn update_by_key(
   key: &str,
-  item: &CargoConfigPartial,
+  item: &cargo_config::CargoConfigPartial,
   version: &str,
-  pool: &Pool,
-) -> IoResult<Cargo> {
-  use crate::schema::cargoes::dsl;
-  let key = key.to_owned();
-  let item = item.clone();
+  pool: &models::Pool,
+) -> io_error::IoResult<cargo::Cargo> {
   let version = version.to_owned();
-  let pool = pool.clone();
-  let cargodb = find_by_key(&key, &pool).await?;
-  let config = cargo_config::create(&key, &item, &version, &pool).await?;
-  let new_item = CargoUpdateDbModel {
-    name: Some(item.name),
+  let cargodb = find_by_key(key, pool).await?;
+  let config = super::cargo_config::create(key, item, &version, pool).await?;
+  let new_item = models::CargoUpdateDbModel {
+    name: Some(item.name.to_owned()),
     config_key: Some(config.key),
     ..Default::default()
   };
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::update(dsl::cargoes.filter(dsl::key.eq(key)))
-      .set(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(())
-  })
+
+  let key = key.to_owned();
+
+  utils::repository::generic_update_by_id::<
+    crate::schema::cargoes::table,
+    models::CargoUpdateDbModel,
+    _,
+  >(pool, key.to_owned(), new_item)
   .await?;
-  let cargo = Cargo {
-    key: cargodb.key,
-    name: cargodb.name,
-    config_key: config.key,
-    namespace_name: cargodb.namespace_name,
-    config,
-  };
+
+  let cargo = cargodb.into_cargo(config);
   Ok(cargo)
 }
 
@@ -265,16 +231,20 @@ pub async fn update_by_key(
 /// ## Arguments
 ///
 /// - [namespace](str) - Namespace name
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](i64) - The number of cargo items
-///   - [Err](IoError) - Error during the operation
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn count_by_namespace(nsp: &str, pool: &Pool) -> IoResult<i64> {
+pub async fn count_by_namespace(
+  nsp: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<i64> {
   use crate::schema::cargoes;
+
   let nsp = nsp.to_owned();
   let pool = pool.clone();
   let count = web::block(move || {
@@ -283,8 +253,8 @@ pub async fn count_by_namespace(nsp: &str, pool: &Pool) -> IoResult<i64> {
       .filter(cargoes::namespace_name.eq(nsp))
       .count()
       .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(count)
+      .map_err(|err| err.map_err_context(|| "cargo::Cargo"))?;
+    Ok::<_, io_error::IoError>(count)
   })
   .await?;
   Ok(count)
@@ -296,49 +266,41 @@ pub async fn count_by_namespace(nsp: &str, pool: &Pool) -> IoResult<i64> {
 ///
 /// ## Arguments
 ///
-/// - [key](str) - Cargo key
-/// - [pool](Pool) - Database connection pool
+/// - [key](str) - cargo::Cargo key
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Cargo) - The cargo found
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](cargo::Cargo) - The cargo found
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
+pub async fn inspect_by_key(
+  key: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<cargo::Cargo> {
   use crate::schema::cargoes;
   use crate::schema::cargo_configs;
   let key = key.to_owned();
   let pool = pool.clone();
-  let item: (CargoDbModel, CargoConfigDbModel) = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = cargoes::table
-      .inner_join(cargo_configs::table)
-      .filter(cargoes::key.eq(key))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
-  let config = serde_json::from_value::<CargoConfigPartial>(item.1.data)
-    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
-  let config = CargoConfig {
-    key: item.1.key,
-    created_at: item.0.created_at,
-    name: config.name,
-    version: item.1.version,
-    cargo_key: item.1.cargo_key,
-    replication: config.replication,
-    container: config.container,
-    metadata: config.metadata,
-    secrets: config.secrets,
-  };
-  let item = Cargo {
-    key: item.0.key,
-    name: item.0.name,
-    config_key: item.1.key,
-    namespace_name: item.0.namespace_name,
-    config,
-  };
+  let item: (models::CargoDbModel, models::CargoConfigDbModel) =
+    web::block(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let item = cargoes::table
+        .inner_join(cargo_configs::table)
+        .filter(cargoes::key.eq(key))
+        .get_result(&mut conn)
+        .map_err(|err| err.map_err_context(|| "cargo::Cargo"))?;
+      Ok::<_, io_error::IoError>(item)
+    })
+    .await?;
+  let config = serde_json::from_value::<cargo_config::CargoConfigPartial>(
+    item.1.data.clone(),
+  )
+  .map_err(|err| err.map_err_context(|| "cargo_config::CargoConfigPartial"))?;
+
+  let config = item.1.into_cargo_config(&config);
+
+  let item = item.0.into_cargo(config);
   Ok(item)
 }

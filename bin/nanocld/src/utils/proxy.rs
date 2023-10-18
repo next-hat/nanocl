@@ -4,9 +4,11 @@ use bollard_next::container::{LogsOptions, LogOutput};
 
 use crate::{
   repositories,
-  models::{ToDbModel, StreamMetricPartial},
+  models::{ToDbModel, StreamMetricPartial, StreamMetricDbModel},
 };
 use crate::models::{DaemonState, HttpMetricPartial};
+
+use super::repository::generic_insert_with_res;
 
 /// ## Spawn logger
 ///
@@ -86,10 +88,11 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                 {
                   Ok(stream_db_model) => {
                     let insert_result =
-                      repositories::http_metric::generic_insert(
-                        stream_db_model,
-                        &state.pool,
-                      )
+                      generic_insert_with_res::<
+                        crate::schema::stream_metrics::table,
+                        _,
+                        StreamMetricDbModel,
+                      >(&state.pool, stream_db_model)
                       .await;
 
                     if let Err(db_error) = insert_result {

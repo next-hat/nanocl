@@ -1,6 +1,8 @@
-use crate::schema::vm_configs;
+use nanocl_stubs::vm_config;
 
-use super::vm::VmDbModel;
+use crate::schema;
+
+use super::vm;
 
 /// ## VmConfigDbModel
 ///
@@ -13,8 +15,8 @@ use super::vm::VmDbModel;
 ///
 #[derive(Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = vm_configs)]
-#[diesel(belongs_to(VmDbModel, foreign_key = vm_key))]
+#[diesel(table_name = schema::vm_configs)]
+#[diesel(belongs_to(vm::VmDbModel, foreign_key = vm_key))]
 pub struct VmConfigDbModel {
   /// The key of the vm config
   pub(crate) key: uuid::Uuid,
@@ -28,4 +30,28 @@ pub struct VmConfigDbModel {
   pub(crate) config: serde_json::Value,
   /// The metadata (user defined)
   pub(crate) metadata: Option<serde_json::Value>,
+}
+
+impl VmConfigDbModel {
+  pub fn into_vm_config(
+    self,
+    config: &vm_config::VmConfigPartial,
+  ) -> vm_config::VmConfig {
+    vm_config::VmConfig {
+      key: self.key,
+      created_at: self.created_at,
+      name: config.name.clone(),
+      version: self.version,
+      vm_key: self.vm_key,
+      disk: config.disk.clone(),
+      host_config: config.host_config.clone().unwrap_or_default(),
+      hostname: config.hostname.clone(),
+      user: config.user.clone(),
+      labels: config.labels.clone(),
+      mac_address: config.mac_address.clone(),
+      password: config.password.clone(),
+      ssh_key: config.ssh_key.clone(),
+      metadata: config.metadata.clone(),
+    }
+  }
 }

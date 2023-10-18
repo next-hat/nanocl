@@ -1,38 +1,37 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_utils::io_error;
+use nanocl_utils::io_error::FromIo;
 
-use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceQuery};
+use nanocl_stubs::{generic, resource};
 
-use crate::{utils, repositories};
-use crate::models::{
-  Pool, ResourceDbModel, ResourceConfigDbModel, ResourceUpdateModel,
-};
+use crate::{utils, models, repositories, schema};
 
 use super::resource_config;
 
 /// ## Create
 ///
-/// Create a resource item in database from a `ResourcePartial`
-/// and return a `Resource` with the generated key.
+/// Create a resource item in database from a `resource::ResourcePartial`
+/// and return a `resource::Resource` with the generated key.
 ///
 /// ## Arguments
 ///
-/// - [item](ResourcePartial) - Resource item
-/// - [pool](Pool) - Database connection pool
+/// - [item](resource::ResourcePartial) - resource::Resource item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Resource) - Resource created
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](resource::Resource) - resource::Resource created
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
-  use crate::schema::resources::dsl;
+pub async fn create(
+  item: &resource::ResourcePartial,
+  pool: &models::Pool,
+) -> io_error::IoResult<resource::Resource> {
   let pool = pool.clone();
-  let config = ResourceConfigDbModel {
+  let config = models::ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: item.name.to_owned(),
@@ -41,31 +40,17 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     metadata: item.metadata.clone(),
   };
   let config = resource_config::create(&config, &pool).await?;
-  let new_item = ResourceDbModel {
+  let new_item = models::ResourceDbModel {
     key: item.name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: item.kind.clone(),
     config_key: config.key.to_owned(),
   };
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::resources)
-      .values(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Resource"))?;
-    Ok::<_, IoError>(new_item)
-  })
-  .await?;
-  let item = Resource {
-    name: item.key,
-    created_at: item.created_at,
-    updated_at: config.created_at,
-    kind: item.kind,
-    version: config.version,
-    config_key: config.key,
-    data: config.data,
-    metadata: config.metadata,
-  };
+
+  let dbmodel: models::ResourceDbModel =
+    utils::repository::generic_insert_with_res(&pool, new_item).await?;
+
+  let item = dbmodel.into_resource(config);
   Ok(item)
 }
 
@@ -75,29 +60,25 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
 ///
 /// ## Arguments
 ///
-/// - [key](str) - Resource key
-/// - [pool](Pool) - Database connection pool
+/// - [key](str) - resource::Resource key
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](GenericDelete) - Number of deleted items
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](generic::GenericDelete) - Number of deleted items
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
-  use crate::schema::resources::dsl;
+pub async fn delete_by_key(
+  key: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<generic::GenericDelete> {
   let key = key.to_owned();
-  let pool = pool.clone();
-  let count = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let count = diesel::delete(dsl::resources)
-      .filter(dsl::key.eq(key))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Resource"))?;
-    Ok::<_, IoError>(count)
-  })
-  .await?;
-  Ok(GenericDelete { count })
+
+  utils::repository::generic_delete_by_id::<schema::resources::table, _>(
+    pool, key,
+  )
+  .await
 }
 
 /// ## Find
@@ -106,23 +87,23 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 ///
 /// ## Arguments
 ///
-/// - [query](ResourceQuery) - Query to filter resources
-/// - [pool](Pool) - Database connection pool
+/// - [query](resource::ResourceQuery) - Query to filter resources
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<Resource>) - List of resources
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](Vec<resource::Resource>) - List of resources
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn find(
-  query: Option<ResourceQuery>,
-  pool: &Pool,
-) -> IoResult<Vec<Resource>> {
+  query: Option<resource::ResourceQuery>,
+  pool: &models::Pool,
+) -> io_error::IoResult<Vec<resource::Resource>> {
   use crate::schema::resources;
   use crate::schema::resource_configs;
   let pool = pool.clone();
-  let res: Vec<(ResourceDbModel, ResourceConfigDbModel)> =
+  let res: Vec<(models::ResourceDbModel, models::ResourceConfigDbModel)> =
     web::block(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let req = match query {
@@ -146,8 +127,9 @@ pub async fn find(
           .inner_join(resource_configs::table)
           .load(&mut conn),
       };
-      let res = req.map_err(|err| err.map_err_context(|| "Resource"))?;
-      Ok::<_, IoError>(res)
+      let res =
+        req.map_err(|err| err.map_err_context(|| "resource::Resource"))?;
+      Ok::<_, io_error::IoError>(res)
     })
     .await?;
   let items = res
@@ -155,18 +137,9 @@ pub async fn find(
     .map(|e| {
       let resource = e.0;
       let config = e.1;
-      Ok::<_, IoError>(Resource {
-        name: resource.key,
-        created_at: resource.created_at,
-        updated_at: config.created_at,
-        kind: resource.kind,
-        version: config.version,
-        config_key: resource.config_key,
-        data: config.data,
-        metadata: config.metadata,
-      })
+      Ok::<_, io_error::IoError>(resource.into_resource(config))
     })
-    .collect::<Result<Vec<Resource>, IoError>>()?;
+    .collect::<Result<Vec<resource::Resource>, io_error::IoError>>()?;
   Ok(items)
 }
 
@@ -176,66 +149,63 @@ pub async fn find(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - Resource key
-/// - [pool](Pool) - Database connection pool
+/// - [key](str) - resource::Resource key
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Resource) - Resource item
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](resource::Resource) - resource::Resource item
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Resource> {
+pub async fn inspect_by_key(
+  key: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<resource::Resource> {
   use crate::schema::resources;
   use crate::schema::resource_configs;
   let key = key.to_owned();
   let pool = pool.clone();
-  let res: (ResourceDbModel, ResourceConfigDbModel) = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = resources::table
-      .inner_join(resource_configs::table)
-      .filter(resources::key.eq(key))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Resource"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
-  let item = Resource {
-    name: res.0.key,
-    created_at: res.0.created_at,
-    updated_at: res.1.created_at,
-    kind: res.0.kind,
-    version: res.1.version,
-    config_key: res.0.config_key,
-    data: res.1.data,
-    metadata: res.1.metadata,
-  };
+  let res: (models::ResourceDbModel, models::ResourceConfigDbModel) =
+    web::block(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let res = resources::table
+        .inner_join(resource_configs::table)
+        .filter(resources::key.eq(key))
+        .get_result(&mut conn)
+        .map_err(|err| err.map_err_context(|| "resource::Resource"))?;
+      Ok::<_, io_error::IoError>(res)
+    })
+    .await?;
+  let item = res.0.into_resource(res.1);
   Ok(item)
 }
 
 /// ## Put
 ///
-/// Set given `ResourcePartial` as the current config for the resource
-/// and return a `Resource` with the new config
+/// Set given `resource::ResourcePartial` as the current config for the resource
+/// and return a `resource::Resource` with the new config
 ///
 /// ## Arguments
 ///
-/// - [item](ResourcePartial) - Resource item to put
-/// - [pool](Pool) - Database connection pool
+/// - [item](resource::ResourcePartial) - resource::Resource item to put
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Resource) - Resource item
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](resource::Resource) - resource::Resource item
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn put(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
-  use crate::schema::resources;
-  let pool = pool.clone();
+/// //TODO: Normalize names
+pub async fn put(
+  item: &resource::ResourcePartial,
+  pool: &models::Pool,
+) -> io_error::IoResult<resource::Resource> {
   let key = item.name.clone();
   let resource =
-    repositories::resource::inspect_by_key(&item.name, &pool).await?;
-  let config = ResourceConfigDbModel {
+    repositories::resource::inspect_by_key(&item.name, pool).await?;
+  let config = models::ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: resource.name.to_owned(),
@@ -244,29 +214,19 @@ pub async fn put(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     metadata: item.metadata.clone(),
   };
   let config = resource_config::create(&config, &pool).await?;
-  let resource_update = ResourceUpdateModel {
+  let resource_update = models::ResourceUpdateModel {
     key: None,
     config_key: Some(config.key.to_owned()),
   };
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::update(resources::table)
-      .filter(resources::key.eq(key))
-      .set(&resource_update)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Resource"))?;
-    Ok::<_, IoError>(())
-  })
+
+  let dbmodel = utils::repository::generic_update_by_id_with_res::<
+    schema::resources::table,
+    _,
+    _,
+    models::ResourceDbModel,
+  >(pool, key, resource_update)
   .await?;
-  let item = Resource {
-    name: resource.name,
-    created_at: resource.created_at,
-    updated_at: config.created_at,
-    kind: resource.kind,
-    version: config.version,
-    config_key: config.key,
-    data: config.data,
-    metadata: config.metadata,
-  };
+
+  let item = dbmodel.into_resource(config);
   Ok(item)
 }

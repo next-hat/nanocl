@@ -1,18 +1,12 @@
 use ntex::web;
-use diesel::{
-  prelude::*,
-  associations::HasTable,
-  query_builder::{InsertStatement, AsQuery},
-  query_dsl::LoadQuery,
-};
+use diesel::prelude::*;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_utils::io_error::FromIo;
+use nanocl_utils::io_error;
 
-use nanocl_stubs::generic::GenericCount;
-use nanocl_stubs::http_metric::{HttpMetricListQuery, HttpMetricCountQuery};
+use nanocl_stubs::{generic, http_metric};
 
-use crate::utils;
-use crate::models::{Pool, HttpMetricDbModel};
+use crate::{utils, models};
 
 /// ## Create
 ///
@@ -20,70 +14,21 @@ use crate::models::{Pool, HttpMetricDbModel};
 ///
 /// ## Arguments
 ///
-/// - [item](HttpMetricDbModel) - Http metric item
-/// - [pool](Pool) - Database connection pool
+/// - [item](models::HttpMetricDbModel) - Http metric item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](HttpMetricDbModel) - The created http metric item
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::HttpMetricDbModel) - The created http metric item
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn create(
-  item: &HttpMetricDbModel,
-  pool: &Pool,
-) -> IoResult<HttpMetricDbModel> {
-  use crate::schema::http_metrics::dsl;
+  item: &models::HttpMetricDbModel,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::HttpMetricDbModel> {
   let item = item.clone();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::insert_into(dsl::http_metrics)
-      .values(item)
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "HttpMetric"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
-  Ok(item)
-}
-
-/// ## Create
-///
-/// Create a new entry in database
-///
-/// ## Arguments
-///
-/// - [item] The database entity that must be inserted into database
-/// - [pool](Pool) - Database connection pool
-///
-/// ## Returns
-///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](item) - The inserted database item
-///   - [Err](IoError) - Error during the operation
-///
-pub async fn generic_insert<T>(item: T, pool: &Pool) -> IoResult<T>
-where
-  T: Send + HasTable + 'static,
-  T: diesel::Insertable<<T as diesel::associations::HasTable>::Table>,
-  InsertStatement<
-    <T as HasTable>::Table,
-    <T as diesel::Insertable<<T as HasTable>::Table>>::Values,
-  >: AsQuery + LoadQuery<'static, PgConnection, T> + Send,
-{
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let table_name = <T as HasTable>::table();
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::insert_into(table_name)
-      .values(item)
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "HttpMetric"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
-  Ok(item)
+  utils::repository::generic_insert_with_res(pool, item).await
 }
 
 /// ## List
@@ -92,19 +37,19 @@ where
 ///
 /// ## Arguments
 ///
-/// - [filter](HttpMetricListQuery) - Http metric filter
-/// - [pool](Pool) - Database connection pool
+/// - [filter](http_metric::HttpMetricListQuery) - Http metric filter
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<HttpMetricDbModel>) - The list of http metrics
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](Vec<models::HttpMetricDbModel>) - The list of http metrics
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn list(
-  filter: &HttpMetricListQuery,
-  pool: &Pool,
-) -> IoResult<Vec<HttpMetricDbModel>> {
+  filter: &http_metric::HttpMetricListQuery,
+  pool: &models::Pool,
+) -> io_error::IoResult<Vec<models::HttpMetricDbModel>> {
   use crate::schema::http_metrics::dsl;
   let filter = filter.clone();
   let pool = pool.clone();
@@ -122,7 +67,7 @@ pub async fn list(
     let res = query
       .get_results(&mut conn)
       .map_err(|err| err.map_err_context(|| "HttpMetric"))?;
-    Ok::<_, IoError>(res)
+    Ok::<_, io_error::IoError>(res)
   })
   .await?;
   Ok(items)
@@ -134,19 +79,19 @@ pub async fn list(
 ///
 /// ## Arguments
 ///
-/// - [filter](HttpMetricCountQuery) - Http metric filter
-/// - [pool](Pool) - Database connection pool
+/// - [filter](http_metric::HttpMetricCountQuery) - Http metric filter
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](GenericCount) - The count of http metrics
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](generic::GenericCount) - The count of http metrics
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn count(
-  filter: &HttpMetricCountQuery,
-  pool: &Pool,
-) -> IoResult<GenericCount> {
+  filter: &http_metric::HttpMetricCountQuery,
+  pool: &models::Pool,
+) -> io_error::IoResult<generic::GenericCount> {
   use crate::schema::http_metrics::dsl;
   let filter = filter.clone();
   let pool = pool.clone();
@@ -163,9 +108,9 @@ pub async fn count(
     let res = query
       .count()
       .get_result(&mut conn)
-      .map(|count: i64| GenericCount { count })
+      .map(|count: i64| generic::GenericCount { count })
       .map_err(|err| err.map_err_context(|| "HttpMetric"))?;
-    Ok::<_, IoError>(res)
+    Ok::<_, io_error::IoError>(res)
   })
   .await?;
   Ok(count)

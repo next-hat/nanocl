@@ -1,46 +1,44 @@
+use nanocl_stubs::vm_config::VmConfigPartial;
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};
+use nanocl_stubs::{generic, vm_config};
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_utils::io_error;
+use nanocl_utils::io_error::FromIo;
 
-use crate::utils;
-use crate::models::{Pool, VmConfigDbModel};
+use crate::{utils, schema, models};
 
 /// ## Create
 ///
-/// Create a vm config item in database for given `VmConfigPartial`
-/// and return a `VmConfig` with the generated key
+/// Create a vm config item in database for given `vm_config::VmConfigPartial`
+/// and return a `vm_config::VmConfig` with the generated key
 ///
 /// ## Arguments
 ///
 /// - [vm_key](str) - Vm key
-/// - [item](VmConfigPartial) - Vm config item
+/// - [item](vm_config::VmConfigPartial) - Vm config item
 /// - [version](str) - Vm config version
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](VmConfig) - The created vm config
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](vm_config::VmConfig) - The created vm config
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn create(
   vm_key: &str,
-  item: &VmConfigPartial,
+  item: &vm_config::VmConfigPartial,
   version: &str,
-  pool: &Pool,
-) -> IoResult<VmConfig> {
-  use crate::schema::vm_configs::dsl;
-  let pool = pool.clone();
+  pool: &models::Pool,
+) -> io_error::IoResult<vm_config::VmConfig> {
   let mut config = serde_json::to_value(item.to_owned())
-    .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+    .map_err(|err| err.map_err_context(|| "vm_config::VmConfig"))?;
   if let Some(meta) = config.as_object_mut() {
     meta.remove("Metadata");
   }
-  let dbmodel = VmConfigDbModel {
+  let dbmodel = models::VmConfigDbModel {
     key: uuid::Uuid::new_v4(),
     vm_key: vm_key.to_owned(),
     version: version.to_owned(),
@@ -48,32 +46,10 @@ pub async fn create(
     config,
     metadata: item.metadata.clone(),
   };
-  let dbmodel = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::vm_configs)
-      .values(&dbmodel)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
-    Ok::<_, IoError>(dbmodel)
-  })
-  .await?;
-  let config = VmConfig {
-    key: dbmodel.key,
-    created_at: dbmodel.created_at,
-    name: item.name.clone(),
-    version: dbmodel.version,
-    vm_key: dbmodel.vm_key,
-    disk: item.disk.clone(),
-    host_config: item.host_config.clone().unwrap_or_default(),
-    hostname: item.hostname.clone(),
-    user: item.user.clone(),
-    labels: item.labels.clone(),
-    mac_address: item.mac_address.clone(),
-    password: item.password.clone(),
-    ssh_key: item.ssh_key.clone(),
-    metadata: item.metadata.clone(),
-  };
-  Ok(config)
+
+  let dbmodel: models::VmConfigDbModel =
+    utils::repository::generic_insert_with_res(pool, dbmodel).await?;
+  Ok(dbmodel.into_vm_config(item))
 }
 
 /// ## Find by key
@@ -83,47 +59,32 @@ pub async fn create(
 /// ## Arguments
 ///
 /// - [key](uuid::Uuid) - Vm config key
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](VmConfig) - The found vm config
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](vm_config::VmConfig) - The found vm config
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
-  use crate::schema::vm_configs::dsl;
+pub async fn find_by_key(
+  key: &uuid::Uuid,
+  pool: &models::Pool,
+) -> io_error::IoResult<vm_config::VmConfig> {
   let key = *key;
-  let pool = pool.clone();
-  let dbmodel = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let config = dsl::vm_configs
-      .filter(dsl::key.eq(key))
-      .get_result::<VmConfigDbModel>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
-    Ok::<_, IoError>(config)
-  })
-  .await?;
-  let config = serde_json::from_value::<VmConfigPartial>(dbmodel.config)
-    .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
-  Ok(VmConfig {
-    key: dbmodel.key,
-    created_at: dbmodel.created_at,
-    name: config.name,
-    version: dbmodel.version,
-    vm_key: dbmodel.vm_key,
-    hostname: config.hostname,
-    user: config.user,
-    labels: config.labels,
-    mac_address: config.mac_address,
-    disk: config.disk,
-    host_config: config.host_config.unwrap_or_default(),
-    password: config.password,
-    ssh_key: config.ssh_key,
-    metadata: config.metadata,
-  })
-}
 
+  let dbmodel = utils::repository::generic_find_by_id::<
+    schema::vm_configs::table,
+    _,
+    models::VmConfigDbModel,
+  >(pool, key)
+  .await?;
+
+  let config =
+    serde_json::from_value::<VmConfigPartial>(dbmodel.config.clone())
+      .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
+  Ok(dbmodel.into_vm_config(&config))
+}
 /// ## Delete by vm key
 ///
 /// Delete all vm config items in database for given vm key
@@ -131,31 +92,21 @@ pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
 /// ## Arguments
 ///
 /// - [key](str) - Vm key
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](GenericDelete) - The number of deleted items
-///   - [Err](IoError) - Error during the operation
+///   - [{Ok}) - The number of deleted items
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn delete_by_vm_key(
   key: &str,
-  pool: &Pool,
-) -> IoResult<GenericDelete> {
-  use crate::schema::vm_configs::dsl;
+  pool: &models::Pool,
+) -> io_error::IoResult<generic::GenericDelete> {
   let key = key.to_owned();
-  let pool = pool.clone();
-  let res = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::delete(dsl::vm_configs)
-      .filter(dsl::vm_key.eq(key))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
-  Ok(GenericDelete { count: res })
+  utils::repository::generic_delete_by_id::<schema::vms::table, _>(pool, key)
+    .await
 }
 
 /// ## List by vm key
@@ -165,15 +116,18 @@ pub async fn delete_by_vm_key(
 /// ## Arguments
 ///
 /// - [key](str) - Vm key
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<VmConfig>) - The list of vm configs
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](Vec<vm_config::VmConfig>) - The list of vm configs
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn list_by_vm_key(key: &str, pool: &Pool) -> IoResult<Vec<VmConfig>> {
+pub async fn list_by_vm_key(
+  key: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<Vec<vm_config::VmConfig>> {
   use crate::schema::vm_configs::dsl;
   let key = key.to_owned();
   let pool = pool.clone();
@@ -181,33 +135,20 @@ pub async fn list_by_vm_key(key: &str, pool: &Pool) -> IoResult<Vec<VmConfig>> {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let configs = dsl::vm_configs
       .filter(dsl::vm_key.eq(key))
-      .get_results::<VmConfigDbModel>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
-    Ok::<_, IoError>(configs)
+      .get_results::<models::VmConfigDbModel>(&mut conn)
+      .map_err(|err| err.map_err_context(|| "vm_config::VmConfig"))?;
+    Ok::<_, io_error::IoError>(configs)
   })
   .await?;
   let configs = dbmodels
     .into_iter()
-    .map(|dbmodel| {
-      let config = serde_json::from_value::<VmConfigPartial>(dbmodel.config)
-        .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
-      Ok(VmConfig {
-        key: dbmodel.key,
-        created_at: dbmodel.created_at,
-        name: config.name,
-        version: dbmodel.version,
-        vm_key: dbmodel.vm_key,
-        hostname: config.hostname,
-        user: config.user,
-        labels: config.labels,
-        mac_address: config.mac_address,
-        disk: config.disk,
-        host_config: config.host_config.unwrap_or_default(),
-        ssh_key: config.ssh_key,
-        password: config.password,
-        metadata: config.metadata,
-      })
+    .map(|dbmodel: models::VmConfigDbModel| {
+      let config = serde_json::from_value::<vm_config::VmConfigPartial>(
+        dbmodel.config.clone(),
+      )
+      .map_err(|err| err.map_err_context(|| "vm_config::VmConfigPartial"))?;
+      Ok(dbmodel.into_vm_config(&config))
     })
-    .collect::<Result<Vec<VmConfig>, IoError>>()?;
+    .collect::<Result<Vec<vm_config::VmConfig>, io_error::IoError>>()?;
   Ok(configs)
 }

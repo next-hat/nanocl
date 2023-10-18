@@ -1,13 +1,12 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_utils::io_error;
+use nanocl_utils::io_error::FromIo;
 
-use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
+use nanocl_stubs::{generic, cargo_config};
 
-use crate::utils;
-use crate::models::{Pool, CargoConfigDbModel};
+use crate::{utils, models, schema};
 
 /// ## Create
 ///
@@ -16,26 +15,24 @@ use crate::models::{Pool, CargoConfigDbModel};
 /// ## Arguments
 ///
 /// - [cargo_key](str) - Cargo key
-/// - [item](CargoConfigPartial) - Cargo config item
-/// - [pool](Pool) - Database connection pool
+/// - [item](cargo_config::CargoConfigPartial) - Cargo config item
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](CargoConfig) - The created cargo config
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](cargo_config::CargoConfig) - The created cargo config
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn create(
   cargo_key: &str,
-  item: &CargoConfigPartial,
+  item: &cargo_config::CargoConfigPartial,
   version: &str,
-  pool: &Pool,
-) -> IoResult<CargoConfig> {
-  use crate::schema::cargo_configs::dsl;
+  pool: &models::Pool,
+) -> io_error::IoResult<cargo_config::CargoConfig> {
   let cargo_key = cargo_key.to_owned();
   let version = version.to_owned();
-  let pool = pool.clone();
-  let dbmodel = CargoConfigDbModel {
+  let dbmodel = models::CargoConfigDbModel {
     key: uuid::Uuid::new_v4(),
     cargo_key,
     version,
@@ -44,26 +41,15 @@ pub async fn create(
       .map_err(|e| e.map_err_context(|| "Invalid Config"))?,
     metadata: item.metadata.clone(),
   };
-  let dbmodel = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::insert_into(dsl::cargo_configs)
-      .values(&dbmodel)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
-    Ok::<_, IoError>(dbmodel)
-  })
+
+  let dbmodel = utils::repository::generic_insert_with_res::<
+    _,
+    _,
+    models::CargoConfigDbModel,
+  >(pool, dbmodel)
   .await?;
-  let config = CargoConfig {
-    key: dbmodel.key,
-    created_at: dbmodel.created_at,
-    name: item.name.clone(),
-    version: dbmodel.version,
-    cargo_key: dbmodel.cargo_key,
-    replication: item.replication.clone(),
-    container: item.container.clone(),
-    metadata: item.metadata.clone(),
-    secrets: item.secrets.clone(),
-  };
+
+  let config = dbmodel.into_cargo_config(item);
   Ok(config)
 }
 
@@ -74,43 +60,33 @@ pub async fn create(
 /// ## Arguments
 ///
 /// - [key](uuid::Uuid) - Cargo config key
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](CargoConfig) - The found cargo config
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](cargo_config::CargoConfig) - The found cargo config
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn find_by_key(
   key: &uuid::Uuid,
-  pool: &Pool,
-) -> IoResult<CargoConfig> {
-  use crate::schema::cargo_configs::dsl;
+  pool: &models::Pool,
+) -> io_error::IoResult<cargo_config::CargoConfig> {
   let key = *key;
-  let pool = pool.clone();
-  let dbmodel = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let config = dsl::cargo_configs
-      .filter(dsl::key.eq(key))
-      .get_result::<CargoConfigDbModel>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
-    Ok::<_, IoError>(config)
-  })
+
+  let dbmodel: models::CargoConfigDbModel = utils::repository::generic_find_by_id::<
+    schema::cargo_configs::table,
+    _,
+    _,
+  >(pool, key)
   .await?;
-  let config = serde_json::from_value::<CargoConfigPartial>(dbmodel.data)
-    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
-  Ok(CargoConfig {
-    key: dbmodel.key,
-    created_at: dbmodel.created_at,
-    name: config.name,
-    version: dbmodel.version,
-    cargo_key: dbmodel.cargo_key,
-    replication: config.replication,
-    container: config.container,
-    metadata: config.metadata,
-    secrets: config.secrets,
-  })
+
+  let config = serde_json::from_value::<cargo_config::CargoConfigPartial>(
+    dbmodel.data.clone(),
+  )
+  .map_err(|err| err.map_err_context(|| "cargo_config::CargoConfigPartial"))?;
+
+  Ok(dbmodel.into_cargo_config(&config))
 }
 
 /// ## Delete by cargo key
@@ -120,31 +96,25 @@ pub async fn find_by_key(
 /// ## Arguments
 ///
 /// - [key](str) - Cargo key
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](GenericDelete) - The number of deleted items
-///   - [Err](IoError) - Error during the operation
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn delete_by_cargo_key(
   key: &str,
-  pool: &Pool,
-) -> IoResult<GenericDelete> {
-  use crate::schema::cargo_configs::dsl;
+  pool: &models::Pool,
+) -> io_error::IoResult<generic::GenericDelete> {
   let key = key.to_owned();
-  let pool = pool.clone();
-  let res = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::delete(dsl::cargo_configs)
-      .filter(dsl::cargo_key.eq(key))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
-  Ok(GenericDelete { count: res })
+
+  utils::repository::generic_delete::<schema::cargo_configs::table, _>(
+    pool,
+    schema::cargo_configs::dsl::cargo_key.eq(key),
+  )
+  .await
 }
 
 /// ## List by cargo key
@@ -154,49 +124,41 @@ pub async fn delete_by_cargo_key(
 /// ## Arguments
 ///
 /// - [key](str) - Cargo key
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<CargoConfig>) - The list of cargo configs
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](Vec<cargo_config::CargoConfig>) - The list of cargo configs
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn list_by_cargo_key(
   key: &str,
-  pool: &Pool,
-) -> IoResult<Vec<CargoConfig>> {
-  use crate::schema::cargo_configs::dsl;
+  pool: &models::Pool,
+) -> io_error::IoResult<Vec<cargo_config::CargoConfig>> {
   let key = key.to_owned();
   let pool = pool.clone();
   let dbmodels = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let configs = dsl::cargo_configs
-      .order(dsl::created_at.desc())
-      .filter(dsl::cargo_key.eq(key))
-      .get_results::<CargoConfigDbModel>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
-    Ok::<_, IoError>(configs)
+    let configs = schema::cargo_configs::dsl::cargo_configs
+      .order(schema::cargo_configs::dsl::created_at.desc())
+      .filter(schema::cargo_configs::dsl::cargo_key.eq(key))
+      .get_results::<models::CargoConfigDbModel>(&mut conn)
+      .map_err(|err| err.map_err_context(|| "cargo_config::CargoConfig"))?;
+    Ok::<_, io_error::IoError>(configs)
   })
   .await?;
   let configs = dbmodels
     .into_iter()
-    .map(|dbmodel| {
-      let config =
-        serde_json::from_value::<CargoConfigPartial>(dbmodel.data)
-          .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
-      Ok(CargoConfig {
-        key: dbmodel.key,
-        created_at: dbmodel.created_at,
-        name: config.name,
-        version: dbmodel.version,
-        cargo_key: dbmodel.cargo_key,
-        replication: config.replication,
-        container: config.container,
-        metadata: config.metadata,
-        secrets: config.secrets,
-      })
+    .map(|dbmodel: models::CargoConfigDbModel| {
+      let config = serde_json::from_value::<cargo_config::CargoConfigPartial>(
+        dbmodel.data.clone(),
+      )
+      .map_err(|err| {
+        err.map_err_context(|| "cargo_config::CargoConfigPartial")
+      })?;
+      Ok(dbmodel.into_cargo_config(&config))
     })
-    .collect::<Result<Vec<CargoConfig>, IoError>>()?;
+    .collect::<Result<Vec<cargo_config::CargoConfig>, io_error::IoError>>()?;
   Ok(configs)
 }

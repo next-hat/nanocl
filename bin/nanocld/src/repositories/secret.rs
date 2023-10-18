@@ -1,16 +1,14 @@
 //! Repository to manage secrets in database
 //! We can create delete list or inspect a secret
-
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_utils::io_error;
+use nanocl_utils::io_error::FromIo;
 
-use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
+use nanocl_stubs::{generic, secret};
 
-use crate::utils;
-use crate::models::{Pool, SecretDbModel, SecretUpdateDbModel};
+use crate::{utils, schema, models};
 
 /// ## Create
 ///
@@ -18,33 +16,22 @@ use crate::models::{Pool, SecretDbModel, SecretUpdateDbModel};
 ///
 /// ## Arguments
 ///
-/// - [item](SecretPartial) - Secret to create
-/// - [pool](Pool) - Database connection pool
+/// - [item](secret::SecretPartial) - Secret to create
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](SecretDbModel) - Secret created
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::SecretDbModel) - Secret created
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn create(
-  item: &SecretPartial,
-  pool: &Pool,
-) -> IoResult<SecretDbModel> {
-  use crate::schema::secrets::dsl;
-  let item = item.clone();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item: SecretDbModel = item.clone().into();
-    diesel::insert_into(dsl::secrets)
-      .values(&item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Secret"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
-  Ok(item)
+  item: &secret::SecretPartial,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::SecretDbModel> {
+  let item: models::SecretDbModel = item.clone().into();
+
+  utils::repository::generic_insert_with_res(pool, item).await
 }
 
 /// ## List
@@ -53,15 +40,17 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<SecretDbModel>) - List of secrets
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](Vec<models::SecretDbModel>) - List of secrets
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn list(pool: &Pool) -> IoResult<Vec<SecretDbModel>> {
+pub async fn list(
+  pool: &models::Pool,
+) -> io_error::IoResult<Vec<models::SecretDbModel>> {
   use crate::schema::secrets::dsl;
   let pool = pool.clone();
   let items = web::block(move || {
@@ -79,7 +68,7 @@ pub async fn list(pool: &Pool) -> IoResult<Vec<SecretDbModel>> {
     let items = sql
       .load(&mut conn)
       .map_err(|err| err.map_err_context(|| "Secret"))?;
-    Ok::<_, IoError>(items)
+    Ok::<_, io_error::IoError>(items)
   })
   .await?;
   Ok(items)
@@ -92,27 +81,24 @@ pub async fn list(pool: &Pool) -> IoResult<Vec<SecretDbModel>> {
 /// ## Arguments
 ///
 /// - [key](str) - Key of the secret to delete
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](GenericDelete) - Number of deleted secrets
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](generic::GenericDelete) - Number of deleted secrets
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
-  use crate::schema::secrets::dsl;
+pub async fn delete_by_key(
+  key: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<generic::GenericDelete> {
   let key = key.to_owned();
-  let pool = pool.clone();
-  let count = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let count = diesel::delete(dsl::secrets.filter(dsl::key.eq(key)))
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Secret"))?;
-    Ok::<_, IoError>(count)
-  })
-  .await?;
-  Ok(GenericDelete { count })
+
+  utils::repository::generic_delete_by_id::<schema::secrets::table, _>(
+    pool, key,
+  )
+  .await
 }
 
 /// ## Find by key
@@ -122,28 +108,24 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 /// ## Arguments
 ///
 /// - [key](str) - Name of the secret to find
-/// - [pool](Pool) - Database connection pool
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
-///   - [Ok](SecretDbModel) - Secret found
-///   - [Err](IoError) - Error during the operation
+///   - [Ok](models::SecretDbModel) - Secret found
+///   - [Err](io_error::IoError) - Error during the operation
 ///
-pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<SecretDbModel> {
-  use crate::schema::secrets::dsl;
+pub async fn find_by_key(
+  key: &str,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::SecretDbModel> {
   let key = key.to_owned();
-  let pool = pool.clone();
-  let item = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = dsl::secrets
-      .filter(dsl::key.eq(key))
-      .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Secret"))?;
-    Ok::<_, IoError>(item)
-  })
-  .await?;
-  Ok(item)
+
+  utils::repository::generic_find_by_id::<schema::secrets::table, _, _>(
+    pool, key,
+  )
+  .await
 }
 
 /// ## Update by key
@@ -153,40 +135,38 @@ pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<SecretDbModel> {
 /// ## Arguments
 ///
 /// - [key](str) - Secret key
-/// - [item](SecretUpdate) - New secret data
-/// - [pool](Pool) - Database connection pool
+/// - [item](secret::SecretUpdate) - New secret data
+/// - [pool](models::Pool) - Database connection pool
 ///
 /// ## Returns
 ///
 /// - [Result](Result) - The result of the operation
 ///   - [Ok](Cargo) - The secret updated
-///   - [Err](IoError) - Error during the operation
+///   - [Err](io_error::IoError) - Error during the operation
 ///
 pub async fn update_by_key(
   key: &str,
-  item: &SecretUpdate,
-  pool: &Pool,
-) -> IoResult<SecretDbModel> {
-  use crate::schema::secrets::dsl;
+  item: &secret::SecretUpdate,
+  pool: &models::Pool,
+) -> io_error::IoResult<models::SecretDbModel> {
   let key = key.to_owned();
   let item = item.clone();
-  let pool = pool.clone();
-  let mut secret = find_by_key(&key, &pool).await?;
-  let new_item = SecretUpdateDbModel {
+  let mut secret = find_by_key(&key, pool).await?;
+  let new_item = models::SecretUpdateDbModel {
     data: Some(item.data.clone()),
     metadata: item.metadata.clone(),
   };
-  web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    diesel::update(dsl::secrets.filter(dsl::key.eq(key)))
-      .set(&new_item)
-      .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
-    Ok::<_, IoError>(())
-  })
+
+  utils::repository::generic_update_by_id::<
+    schema::secrets::table,
+    models::SecretUpdateDbModel,
+    _,
+  >(pool, key, new_item)
   .await?;
+
   secret.data = item.data;
   secret.metadata = item.metadata;
+
   Ok(secret)
 }
 
@@ -197,15 +177,15 @@ pub async fn update_by_key(
 // / ## Arguments
 // /
 // / - [key](str) - Name of the secret to check
-// / - [pool](Pool) - Database connection pool
+// / - [pool](models::Pool) - Database connection pool
 // /
 // / ## Returns
 // /
 // / - [Result](Result) - The result of the operation
 // /   - [Ok](bool) - Existence of the secret
-// /   - [Err](IoError) - Error during the operation
+// /   - [Err](io_error::IoError) - Error during the operation
 // /
-// pub async fn exist_by_key(key: &str, pool: &Pool) -> IoResult<bool> {
+// pub async fn exist_by_key(key: &str, pool: &models::Pool) -> io_error::IoResult<bool> {
 //   use crate::schema::secrets::dsl;
 //   let key = key.to_owned();
 //   let pool = pool.clone();
@@ -213,10 +193,10 @@ pub async fn update_by_key(
 //     let mut conn = utils::store::get_pool_conn(&pool)?;
 //     let exist = Arc::new(dsl::secrets)
 //       .filter(dsl::key.eq(key))
-//       .get_result::<SecretDbModel>(&mut conn)
+//       .get_result::<models::SecretDbModel>(&mut conn)
 //       .optional()
 //       .map_err(|err| err.map_err_context(|| "Secret"))?;
-//     Ok::<_, IoError>(exist)
+//     Ok::<_, io_error::IoError>(exist)
 //   })
 //   .await?;
 //   Ok(exist.is_some())
