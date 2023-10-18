@@ -99,9 +99,19 @@ pub async fn delete_by_vm_key(
   key: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
-  use crate::schema::vms;
+  use crate::schema::vm_configs;
   let key = key.to_owned();
-  super::generic::generic_delete_by_id::<vms::table, _>(pool, key).await
+  let pool = pool.clone();
+  let res = web::block(move || {
+    let mut conn = utils::store::get_pool_conn(&pool)?;
+    let res = diesel::delete(vm_configs::dsl::vm_configs)
+      .filter(vm_configs::dsl::vm_key.eq(key))
+      .execute(&mut conn)
+      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+    Ok::<_, IoError>(res)
+  })
+  .await?;
+  Ok(GenericDelete { count: res })
 }
 
 /// ## List by vm key
