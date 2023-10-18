@@ -14,11 +14,11 @@ use nanocl_utils::http_error::HttpError;
 ///
 /// ## Arguments
 ///
-/// - [nsp](Option<String>) The namespace to resolve
+/// * [nsp](Option<String>) The namespace to resolve
 ///
 /// ## Returns
 ///
-/// - [namespace](String) The resolved namespace
+/// * [namespace](String) The resolved namespace
 ///
 pub fn resolve_nsp(nsp: &Option<String>) -> String {
   match nsp {
@@ -33,12 +33,12 @@ pub fn resolve_nsp(nsp: &Option<String>) -> String {
 ///
 /// ## Arguments
 ///
-/// - [m1](str)  The key of the first model
-/// - [m2](str) The name of the second model
+/// * [m1](str)  The key of the first model
+/// * [m2](str) The name of the second model
 ///
 /// ## Returns
 ///
-/// - [key](String) The generated key based on params
+/// * [key](String) The generated key based on params
 ///
 pub fn gen_key(nsp: &str, name: &str) -> String {
   name.to_owned() + "." + nsp
@@ -51,13 +51,13 @@ pub fn gen_key(nsp: &str, name: &str) -> String {
 ///
 /// ## Arguments
 ///
-/// - [name](str) The name to validate
+/// * [name](str) The name to validate
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The name is valid
-///   - [Err](HttpError) - The name is invalid
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The name is valid
+///   * [Err](HttpError) - The name is invalid
 ///
 pub fn validate_name(name: &str) -> Result<(), HttpError> {
   // Ensure name only contain a-z, A-Z, 0-9, - and _

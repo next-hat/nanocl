@@ -6,14 +6,14 @@ Note: `Nanocl` heavily utilizes [ntex](https://ntex.rs) as **client** and **serv
 
 ## 📙 Table of Contents
 
-- [📁 Project Structure](#-project-structure)
-- [💾 Installation](#-installation)
-  - [🐧 Ubuntu](#-ubuntu)
-  - [🦀 Rust](#-rust)
-- [🏃 Running](#-running)
-  - [🐋 Docker Desktop](#-docker-desktop)
-- [🧪 Testing](#-testing)
-- [👌 Usefull Command](#-usefull-command)
+* [📁 Project Structure](#-project-structure)
+* [💾 Installation](#-installation)
+  * [🐧 Ubuntu](#-ubuntu)
+  * [🦀 Rust](#-rust)
+* [🏃 Running](#-running)
+  * [🐋 Docker Desktop](#-docker-desktop)
+* [🧪 Testing](#-testing)
+* [👌 Usefull Command](#-usefull-command)
 
 ## 📁 Project Structure
 
@@ -64,12 +64,13 @@ git clone https://github.com/nxthat/nanocl
 
 To build and run `Nanocl` you will need these dependencies
 
-- [rust](https://www.rust-lang.org) >= 1.67
-- [docker](https://www.docker.com) >= 1.41
-- gcc
-- make
-- libpq-dev
-- openssl-dev
+* [rust](https://www.rust-lang.org) >= 1.67
+* [docker](https://www.docker.com) >= 1.41
+
+* gcc
+* make
+* libpq-dev
+* openssl-dev
 
 ### 🐧 Ubuntu
 

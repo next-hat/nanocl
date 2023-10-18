@@ -11,14 +11,14 @@ use crate::cli::Cli;
 ///
 /// ## Arguments
 ///
-/// - [args](Cli) - The cli arguments
-/// - [config](DaemonConfigFile) - The config file
+/// * [args](Cli) - The cli arguments
+/// * [config](DaemonConfigFile) - The config file
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](DaemonConfig) - The daemon config
-///   - [Err](IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](DaemonConfig) - The daemon config
+///   * [Err](IoError) - Error during the operation
 ///
 fn gen_daemon_conf(
   args: &Cli,
@@ -86,13 +86,13 @@ fn gen_daemon_conf(
 ///
 /// ## Arguments
 ///
-/// - [config_dir](str) - Config dir
+/// * [config_dir](str) - Config dir
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](DaemonConfigFile) - The config file
-///   - [Err](IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](DaemonConfigFile) - The config file
+///   * [Err](IoError) - Error during the operation
 ///
 fn read_config_file(config_dir: &str) -> IoResult<DaemonConfigFile> {
   let config_path = std::path::Path::new(&config_dir).join("nanocl.conf");
@@ -120,13 +120,13 @@ fn read_config_file(config_dir: &str) -> IoResult<DaemonConfigFile> {
 ///
 /// ## Arguments
 ///
-/// - [args](Cli) - Cli arguments
+/// * [args](Cli) - Cli arguments
 ///
 /// ## Returns
 ///
-/// - [IoResult](IoResult) - The result of the operation
-///   - [Ok](DaemonConfig) - The created cargo config
-///   - [Err](DaemonError) - Error during the operation
+/// * [IoResult](IoResult) - The result of the operation
+///   * [Ok](DaemonConfig) - The created cargo config
+///   * [Err](DaemonError) - Error during the operation
 ///
 pub fn init(args: &Cli) -> IoResult<DaemonConfig> {
   let file_config = read_config_file(&args.conf_dir)?;

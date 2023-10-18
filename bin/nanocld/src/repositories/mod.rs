@@ -1,4 +1,7 @@
 /// Functions helper to manipulate database models.
+///
+/// Generic functions
+pub mod generic;
 /// Manage nodes table
 pub mod node;
 /// Manage metrics table

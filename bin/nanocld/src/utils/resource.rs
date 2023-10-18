@@ -20,14 +20,14 @@ use super::ctrl_client::CtrlClient;
 ///
 /// ## Arguments
 ///
-/// - [resource](ResourcePartial) - The resource to create
-/// - [pool](Pool) - The database pool
+/// * [resource](ResourcePartial) - The resource to create
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](ResourcePartial) - The resource has been hooked
-///   - [Err](HttpError) - The resource has not been hooked
+/// * [Result](Result) - The result of the operation
+///   * [Ok](ResourcePartial) - The resource has been hooked
+///   * [Err](HttpError) - The resource has not been hooked
 ///
 pub async fn hook_create_resource(
   resource: &ResourcePartial,
@@ -108,14 +108,14 @@ pub async fn hook_create_resource(
 ///
 /// ## Arguments
 ///
-/// - [resource](Resource) - The resource to delete
-/// - [pool](Pool) - The database pool
+/// * [resource](Resource) - The resource to delete
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The resource has been hooked
-///   - [Err](HttpError) - The resource has not been hooked
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The resource has been hooked
+///   * [Err](HttpError) - The resource has not been hooked
 ///
 async fn hook_delete_resource(
   resource: &Resource,
@@ -143,14 +143,14 @@ async fn hook_delete_resource(
 ///
 /// ## Arguments
 ///
-/// - [resource](ResourcePartial) - The resource to create
-/// - [pool](Pool) - The database pool
+/// * [resource](ResourcePartial) - The resource to create
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Resource) - The resource has been created
-///   - [Err](HttpError) - The resource has not been created
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Resource) - The resource has been created
+///   * [Err](HttpError) - The resource has not been created
 ///
 pub async fn create(
   resource: &ResourcePartial,
@@ -178,14 +178,14 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [resource](ResourcePartial) - The resource to patch
-/// - [pool](Pool) - The database pool
+/// * [resource](ResourcePartial) - The resource to patch
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Resource) - The resource has been patched
-///   - [Err](HttpError) - The resource has not been patched
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Resource) - The resource has been patched
+///   * [Err](HttpError) - The resource has not been patched
 ///
 pub async fn patch(
   resource: &ResourcePartial,
@@ -203,14 +203,14 @@ pub async fn patch(
 ///
 /// ## Arguments
 ///
-/// - [resource](Resource) - The resource to delete
-/// - [pool](Pool) - The database pool
+/// * [resource](Resource) - The resource to delete
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The resource has been deleted
-///   - [Err](HttpError) - The resource has not been deleted
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The resource has been deleted
+///   * [Err](HttpError) - The resource has not been deleted
 ///
 pub async fn delete(resource: &Resource, pool: &Pool) -> Result<(), HttpError> {
   if let Err(err) = hook_delete_resource(resource, pool).await {

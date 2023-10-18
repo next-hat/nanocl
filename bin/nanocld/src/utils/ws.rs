@@ -16,9 +16,9 @@ use crate::models::{WsConState, HEARTBEAT_INTERVAL, CLIENT_TIMEOUT};
 ///
 /// ## Arguments
 ///
-/// - [state](Rc<RefCell<WsConState>>) Reference to websocket connection state
-/// - [sink](ws::WsSink) Reference to websocket sink
-/// - [rx](oneshot::Receiver<()>) Reference to oneshot receiver
+/// * [state](Rc<RefCell<WsConState>>) Reference to websocket connection state
+/// * [sink](ws::WsSink) Reference to websocket sink
+/// * [rx](oneshot::Receiver<()>) Reference to oneshot receiver
 ///
 pub async fn heartbeat(
   state: Rc<RefCell<WsConState>>,

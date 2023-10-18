@@ -11,15 +11,15 @@ use nanocl_utils::http_error::HttpError;
 ///
 /// ## Arguments
 ///
-/// - [stream](impl StreamExt<Item = Result<I, impl std::error::Error>>) The stream to transform
-///   - [I](I) - The type of the stream items
-///   - [T](T) - The type to transform the stream items into
+/// * [stream](impl StreamExt<Item = Result<I, impl std::error::Error>>) The stream to transform
+///   * [I](I) - The type of the stream items
+///   * [T](T) - The type to transform the stream items into
 ///
 /// ## Returns
 ///
-/// - [impl StreamExt<Item = Result<Bytes, HttpError>>](impl StreamExt<Item = Result<Bytes, HttpError>>) - The transformed stream
-///   - [Bytes](Bytes) - The transformed stream items
-///   - [HttpError](HttpError) - An http response error if something went wrong
+/// * [impl StreamExt<Item = Result<Bytes, HttpError>>](impl StreamExt<Item = Result<Bytes, HttpError>>) - The transformed stream
+///   * [Bytes](Bytes) - The transformed stream items
+///   * [HttpError](HttpError) - An http response error if something went wrong
 ///
 pub(crate) fn transform_stream<I, T>(
   stream: impl StreamExt<Item = Result<I, impl std::error::Error>>,

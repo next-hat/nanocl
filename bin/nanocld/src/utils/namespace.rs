@@ -25,15 +25,15 @@ use super::cargo;
 ///
 /// ## Arguments
 ///
-/// - [namespace](NamespacePartial) - The namespace name
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
+/// * [namespace](NamespacePartial) - The namespace name
+/// * [docker_api](bollard_next::Docker) - The docker api
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Namespace) - The namespace has been created
-///   - [Err](HttpError) - The namespace has not been created
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Namespace) - The namespace has been created
+///   * [Err](HttpError) - The namespace has not been created
 ///
 pub async fn create(
   namespace: &NamespacePartial,
@@ -72,15 +72,15 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The namespace name
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
+/// * [name](str) - The namespace name
+/// * [docker_api](bollard_next::Docker) - The docker api
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](GenericDelete) - The namespace has been removed
-///   - [Err](HttpError) - The namespace has not been removed
+/// * [Result](Result) - The result of the operation
+///   * [Ok](GenericDelete) - The namespace has been removed
+///   * [Err](HttpError) - The namespace has not been removed
 ///
 pub async fn delete_by_name(
   name: &str,
@@ -100,14 +100,14 @@ pub async fn delete_by_name(
 ///
 /// ## Arguments
 ///
-/// - [namespace](str) - The namespace
-/// - [docker_api](bollard_next::Docker) - The docker api
+/// * [namespace](str) - The namespace
+/// * [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<ContainerSummary>) - The containers have been listed
-///   - [Err](HttpError) - The containers have not been listed
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<ContainerSummary>) - The containers have been listed
+///   * [Err](HttpError) - The containers have not been listed
 ///
 pub async fn list_instances(
   namespace: &str,
@@ -131,14 +131,14 @@ pub async fn list_instances(
 ///
 /// ## Arguments
 ///
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
+/// * [docker_api](bollard_next::Docker) - The docker api
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<NamespaceSummary>) - The namespaces have been listed
-///   - [Err](HttpError) - The namespaces have not been listed
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<NamespaceSummary>) - The namespaces have been listed
+///   * [Err](HttpError) - The namespaces have not been listed
 ///
 pub async fn list(
   query: &NamespaceListQuery,
@@ -181,14 +181,14 @@ pub async fn list(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The namespace name
-/// - [state](DaemonState) - The daemon state
+/// * [name](str) - The namespace name
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](NamespaceInspect) - The namespace has been inspected
-///   - [Err](HttpError) - The namespace has not been inspected
+/// * [Result](Result) - The result of the operation
+///   * [Ok](NamespaceInspect) - The namespace has been inspected
+///   * [Err](HttpError) - The namespace has not been inspected
 ///
 pub async fn inspect_by_name(
   name: &str,
@@ -222,14 +222,14 @@ pub async fn inspect_by_name(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The namespace name
-/// - [state](DaemonState) - The daemon state
+/// * [name](str) - The namespace name
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///  - [Ok](()) - The namespace will exists
-///  - [Err](HttpError) - An error occured
+/// * [Result](Result) - The result of the operation
+///  * [Ok](()) - The namespace will exists
+///  * [Err](HttpError) - An error occured
 ///
 pub async fn create_if_not_exists(
   name: &str,

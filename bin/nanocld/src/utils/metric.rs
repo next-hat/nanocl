@@ -17,9 +17,9 @@ use crate::models::{Pool, MetricInsertDbModel, DaemonState};
 ///
 /// ## Arguments
 ///
-/// - [node](str) - Name of the node
-/// - [ev](MetrsdEvent) - Metric event
-/// - [pool](Pool) - Database pool
+/// * [node](str) - Name of the node
+/// * [ev](MetrsdEvent) - Metric event
+/// * [pool](Pool) - Database pool
 ///
 async fn save_metric(node: &str, ev: &MetrsdEvent, pool: &Pool) {
   match ev {
@@ -66,7 +66,7 @@ async fn save_metric(node: &str, ev: &MetrsdEvent, pool: &Pool) {
 ///
 /// ## Arguments
 ///
-/// - [state](DaemonState) - Daemon state
+/// * [state](DaemonState) - Daemon state
 ///
 pub(crate) fn spawn_logger(state: &DaemonState) {
   let state = state.clone();

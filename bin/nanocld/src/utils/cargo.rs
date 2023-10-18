@@ -45,15 +45,15 @@ use super::stream::transform_stream;
 ///
 /// ## Arguments
 ///
-/// - [cargo](Cargo) - The cargo
-/// - [number](i64) - The number of containers to create
-/// - [docker_api](bollard_next::Docker) - The docker api
+/// * [cargo](Cargo) - The cargo
+/// * [number](i64) - The number of containers to create
+/// * [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The containers has been created
-///   - [Err](HttpError) - The containers has not been created
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The containers has been created
+///   * [Err](HttpError) - The containers has not been created
 ///
 async fn create_instances(
   cargo: &Cargo,
@@ -210,14 +210,14 @@ async fn create_instances(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - The cargo key
-/// - [docker_api](bollard_next::Docker) - The docker api
+/// * [key](str) - The cargo key
+/// * [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<ContainerSummary>) - The containers have been listed
-///   - [Err](HttpError) - The containers have not been listed
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<ContainerSummary>) - The containers have been listed
+///   * [Err](HttpError) - The containers have not been listed
 ///
 pub async fn list_instances(
   key: &str,
@@ -242,16 +242,16 @@ pub async fn list_instances(
 ///
 /// ## Arguments
 ///
-/// - [namespace](str) - The namespace
-/// - [config](CargoConfigPartial) - The cargo config partial
-/// - [version](str) - The cargo version
-/// - [state](DaemonState) - The daemon state
+/// * [namespace](str) - The namespace
+/// * [config](CargoConfigPartial) - The cargo config partial
+/// * [version](str) - The cargo version
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Cargo) - The cargo has been created
-///   - [Err](HttpError) - The cargo has not been created
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Cargo) - The cargo has been created
+///   * [Err](HttpError) - The cargo has not been created
 ///
 pub async fn create(
   namespace: &str,
@@ -287,14 +287,14 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - The cargo key
-/// - [state](DaemonState) - The daemon state
+/// * [key](str) - The cargo key
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The containers has been started
-///   - [Err](HttpError) - The containers has not been started
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The containers has been started
+///   * [Err](HttpError) - The containers has not been started
 ///
 pub async fn start_by_key(
   key: &str,
@@ -363,14 +363,14 @@ pub async fn start_by_key(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - The cargo key
-/// - [docker_api](bollard_next::Docker) - The docker api
+/// * [key](str) - The cargo key
+/// * [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The containers has been stopped
-///   - [Err](HttpError) - The containers has not been stopped
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The containers has been stopped
+///   * [Err](HttpError) - The containers has not been stopped
 ///
 pub async fn stop_by_key(
   key: &str,
@@ -401,14 +401,14 @@ pub async fn stop_by_key(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - The cargo key
-/// - [docker_api](bollard_next::Docker) - The docker api
+/// * [key](str) - The cargo key
+/// * [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The containers has been restarted
-///   - [Err](HttpError) - The containers has not been restarted
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The containers has been restarted
+///   * [Err](HttpError) - The containers has not been restarted
 ///
 pub async fn restart(
   key: &str,
@@ -440,14 +440,14 @@ pub async fn restart(
 ///
 /// ## Arguments
 ///
-/// - [instances](Vec<ContainerSummary>) - The instances to restore
-/// - [state](DaemonState) - The daemon state
+/// * [instances](Vec<ContainerSummary>) - The instances to restore
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The instances has been restored
-///   - [Err](HttpError) - The instances has not been restored
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The instances has been restored
+///   * [Err](HttpError) - The instances has not been restored
 ///
 async fn restore_instances_backup(
   instances: &[ContainerSummary],
@@ -487,14 +487,14 @@ async fn restore_instances_backup(
 ///
 /// ## Arguments
 ///
-/// - [instances](Vec<ContainerSummary>) - The instances to rename
-/// - [state](DaemonState) - The daemon state
+/// * [instances](Vec<ContainerSummary>) - The instances to rename
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The containers has been renamed
-///   - [Err](HttpError) - The containers has not been renamed
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The containers has been renamed
+///   * [Err](HttpError) - The containers has not been renamed
 ///
 async fn rename_instances_original(
   instances: &[ContainerSummary],
@@ -532,15 +532,15 @@ async fn rename_instances_original(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - The cargo key
-/// - [force](Option<bool>) - Force the deletion of the cargo
-/// - [state](DaemonState) - The daemon state
+/// * [key](str) - The cargo key
+/// * [force](Option<bool>) - Force the deletion of the cargo
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The cargo has been deleted
-///   - [Err](HttpError) - The cargo has not been deleted
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The cargo has been deleted
+///   * [Err](HttpError) - The cargo has not been deleted
 ///
 pub async fn delete_by_key(
   key: &str,
@@ -580,14 +580,14 @@ pub async fn delete_by_key(
 ///
 /// ## Arguments
 ///
-/// - [instances](Vec<ContainerSummary>) - The instances to delete
-/// - [state](DaemonState) - The daemon state
+/// * [instances](Vec<ContainerSummary>) - The instances to delete
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The containers has been deleted
-///   - [Err](HttpError) - The containers has not been deleted
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The containers has been deleted
+///   * [Err](HttpError) - The containers has not been deleted
 ///
 async fn delete_instances(
   instances: &[String],
@@ -621,15 +621,15 @@ async fn delete_instances(
 /// with the new cargo configuration
 ///
 /// ## Arguments
-/// - [cargo_key](str) - The cargo key
-/// - [cargo_partial](CargoConfigPartial) - The cargo config
-/// - [version](str) - The version of the api to use
-/// - [state](DaemonState) - The daemon state
+/// * [cargo_key](str) - The cargo key
+/// * [cargo_partial](CargoConfigPartial) - The cargo config
+/// * [version](str) - The version of the api to use
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Cargo) - The cargo has been patched
-///   - [Err](HttpError) - The cargo has not been patched
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Cargo) - The cargo has been patched
+///   * [Err](HttpError) - The cargo has not been patched
 ///
 pub async fn put(
   cargo_key: &str,
@@ -704,14 +704,14 @@ pub async fn put(
 ///
 /// ## Arguments
 ///
-/// - [query](GenericCargoListQuery) - The filter query
-/// - [state](DaemonState) - The daemon state
+/// * [query](GenericCargoListQuery) - The filter query
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<ContainerSummary>) - The containers of the cargo
-///   - [Err](HttpError) - The containers of the cargo has not been listed
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<ContainerSummary>) - The containers of the cargo
+///   * [Err](HttpError) - The containers of the cargo has not been listed
 ///
 pub async fn list(
   query: GenericCargoListQuery<&str>,
@@ -775,14 +775,14 @@ pub async fn list(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - The cargo key
-/// - [state](DaemonState) - The daemon state
+/// * [key](str) - The cargo key
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](CargoInspect) - The cargo information
-///   - [Err](HttpError) - The cargo has not been inspected
+/// * [Result](Result) - The result of the operation
+///   * [Ok](CargoInspect) - The cargo information
+///   * [Err](HttpError) - The cargo has not been inspected
 ///
 pub async fn inspect_by_key(
   key: &str,
@@ -852,14 +852,14 @@ pub async fn inspect_by_key(
 ///
 /// ## Arguments
 ///
-/// - [namespace](str) - The namespace name
-/// - [state](DaemonState) - The daemon state
+/// * [namespace](str) - The namespace name
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The cargoes has been deleted
-///   - [Err](HttpError) - The cargo has not been deleted
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The cargoes has been deleted
+///   * [Err](HttpError) - The cargo has not been deleted
 ///
 pub async fn delete_by_namespace(
   namespace: &str,
@@ -887,15 +887,15 @@ pub async fn delete_by_namespace(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The cargo name
-/// - [options](CargoKillOptions) - The kill options
-/// - [docker_api](bollard_next::Docker) - The docker api
+/// * [name](str) - The cargo name
+/// * [options](CargoKillOptions) - The kill options
+/// * [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///  - [Ok](()) - The signal has been sent
-///  - [Err](HttpError) - The signal has not been sent
+/// * [Result](Result) - The result of the operation
+///  * [Ok](()) - The signal has been sent
+///  * [Err](HttpError) - The signal has not been sent
 ///
 pub async fn kill_by_name(
   name: &str,
@@ -914,16 +914,16 @@ pub async fn kill_by_name(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - The cargo key
-/// - [payload](CargoConfigUpdate) - The cargo config update
-/// - [version](str) - The cargo version
-/// - [state](DaemonState) - The daemon state
+/// * [key](str) - The cargo key
+/// * [payload](CargoConfigUpdate) - The cargo config update
+/// * [version](str) - The cargo version
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///  - [Ok](Cargo) - The cargo has been patched
-///  - [Err](HttpError) - The cargo has not been patched
+/// * [Result](Result) - The result of the operation
+///  * [Ok](Cargo) - The cargo has been patched
+///  * [Err](HttpError) - The cargo has not been patched
 ///
 pub async fn patch(
   key: &str,
@@ -1028,15 +1028,15 @@ pub async fn patch(
 ///
 /// ## Arguments
 ///
-/// - [name](str): The cargo name
-/// - [query](CargoLogQuery): The query parameters
-/// - [docker_api](bollard_next::Docker): The docker api
+/// * [name](str): The cargo name
+/// * [query](CargoLogQuery): The query parameters
+/// * [docker_api](bollard_next::Docker): The docker api
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Stream) - The stream of logs
-///   - [Err](HttpError) - The logs could not be retrieved
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Stream) - The stream of logs
+///   * [Err](HttpError) - The logs could not be retrieved
 ///
 pub fn get_logs(
   name: &str,
@@ -1056,15 +1056,15 @@ pub fn get_logs(
 ///
 /// ## Arguments
 ///
-/// - [name](str): The cargo name
-/// - [query](CargoStatsQuery): The query parameters
-/// - [docker_api](bollard_next::Docker): The docker api
+/// * [name](str): The cargo name
+/// * [query](CargoStatsQuery): The query parameters
+/// * [docker_api](bollard_next::Docker): The docker api
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Stream) - The stream of logs
-///   - [Err](HttpError) - The logs could not be retrieved
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Stream) - The stream of logs
+///   * [Err](HttpError) - The logs could not be retrieved
 ///
 pub fn get_stats(
   name: &str,
@@ -1083,15 +1083,15 @@ pub fn get_stats(
 ///
 /// ## Arguments
 ///
-/// - [key](str) - The cargo key
-/// - [options](CargoScale) - The scale options
-/// - [state](DaemonState) - The daemon state
+/// * [key](str) - The cargo key
+/// * [options](CargoScale) - The scale options
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The cargo has been scaled
-///   - [Err](HttpError) - The cargo has not been scaled
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The cargo has been scaled
+///   * [Err](HttpError) - The cargo has not been scaled
 ///
 pub async fn scale(
   key: &str,

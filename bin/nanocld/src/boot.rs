@@ -14,13 +14,13 @@ use crate::version::VERSION;
 ///
 /// ## Arguments
 ///
-/// - [state_dir](str) - The state dir path
+/// * [state_dir](str) - The state dir path
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The state dir exists
-///   - [Err](IoError) - The state dir does not exists
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The state dir exists
+///   * [Err](IoError) - The state dir does not exists
 ///
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   let vm_dir = format!("{state_dir}/vms/images");
@@ -37,13 +37,13 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
 ///
 /// ## Arguments
 ///
-/// - [daemon_conf](DaemonConfig) - The daemon configuration
+/// * [daemon_conf](DaemonConfig) - The daemon configuration
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](DaemonState) - The daemon state
-///   - [Err](IoError) - The daemon state has not been initialized
+/// * [Result](Result) - The result of the operation
+///   * [Ok](DaemonState) - The daemon state
+///   * [Err](IoError) - The daemon state has not been initialized
 ///
 pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   let docker = bollard_next::Docker::connect_with_unix(

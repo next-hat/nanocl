@@ -18,13 +18,13 @@ use super::stream;
 ///
 /// ## Arguments
 ///
-/// - [image_info](str) The string to parse
+/// * [image_info](str) The string to parse
 ///
 /// ## Returns
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok]((String, String)) - The image name and tag
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) The result of the operation
+///   * [Ok]((String, String)) - The image name and tag
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub fn parse_image_info(
   image_info: &str,
@@ -48,12 +48,12 @@ pub fn parse_image_info(
 /// List all cargo images installed
 ///
 /// ## Arguments
-/// - [docker_api](bollard_next::Docker) docker api client
+/// * [docker_api](bollard_next::Docker) docker api client
 ///
 /// ## Returns
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<ImageSummary>) - A list of image summary
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<ImageSummary>) - A list of image summary
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn list(
   opts: &bollard_next::image::ListImagesOptions<String>,
@@ -70,14 +70,14 @@ pub async fn list(
 ///
 /// ## Arguments
 ///
-/// - [image_name](str) name of the image to inspect
-/// - [docker_api](bollard_next::Docker) docker api client
+/// * [image_name](str) name of the image to inspect
+/// * [docker_api](bollard_next::Docker) docker api client
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](ImageInspect) - Image inspect
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) - The result of the operation
+///   * [Ok](ImageInspect) - Image inspect
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn inspect_by_name(
   image_name: &str,
@@ -94,15 +94,15 @@ pub async fn inspect_by_name(
 ///
 /// ## Arguments
 ///
-/// - [image_name](str) name of the image to download
-/// - [tag](str) tag of the image to download
-/// - [docker_api](bollard_next::Docker) docker api client
+/// * [image_name](str) name of the image to download
+/// * [tag](str) tag of the image to download
+/// * [docker_api](bollard_next::Docker) docker api client
 ///
 /// ## Returns
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](Receiver<Result<Bytes, web::error::Error>>) - A stream of bytes
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) The result of the operation
+///   * [Ok](Receiver<Result<Bytes, web::error::Error>>) - A stream of bytes
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn pull(
   image_name: &str,
@@ -133,14 +133,14 @@ pub async fn pull(
 ///
 /// ## Arguments
 ///
-/// - [image_name](str) name of the image to delete
-/// - [docker_api](bollard_next::Docker) docker api client
+/// * [image_name](str) name of the image to delete
+/// * [docker_api](bollard_next::Docker) docker api client
 ///
 /// ## Returns
 ///
-/// - [Result](Result) The result of the operation
-///   - [Ok](GenericDelete) - A generic delete response
-///   - [Err](HttpError) - An http response error if something went wrong
+/// * [Result](Result) The result of the operation
+///   * [Ok](GenericDelete) - A generic delete response
+///   * [Err](HttpError) - An http response error if something went wrong
 ///
 pub async fn delete(
   id_or_name: &str,

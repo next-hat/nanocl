@@ -24,7 +24,7 @@ impl WsConState {
   ///
   /// # Returns
   ///
-  /// - [con_state](WsConState) - The new WsConState
+  /// * [con_state](WsConState) - The new WsConState
   ///
   pub(crate) fn new() -> Self {
     Self { hb: Instant::now() }

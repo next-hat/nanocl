@@ -16,15 +16,15 @@ use super::stream::transform_stream;
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The cargo name
-/// - [args](CreateExecOptions) - The exec options
-/// - [state](DaemonState) - The daemon state
+/// * [name](str) - The cargo name
+/// * [args](CreateExecOptions) - The exec options
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///  - [Ok](bollard_next::exec::CreateExecResults) - The output stream
-///  - [Err](HttpError) - The command has not been executed
+/// * [Result](Result) - The result of the operation
+///  * [Ok](bollard_next::exec::CreateExecResults) - The output stream
+///  * [Err](HttpError) - The command has not been executed
 ///
 pub async fn create_exec_command(
   name: &str,
@@ -43,16 +43,16 @@ pub async fn create_exec_command(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - The cargo name
-/// - [exec_id](str) - The cargo name
-/// - [args](StartExecOptions) - The exec options
-/// - [state](DaemonState) - The daemon state
+/// * [name](str) - The cargo name
+/// * [exec_id](str) - The cargo name
+/// * [args](StartExecOptions) - The exec options
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///  - [Ok](web::HttpResponse) - The output stream
-///  - [Err](HttpError) - The command has not been executed
+/// * [Result](Result) - The result of the operation
+///  * [Ok](web::HttpResponse) - The output stream
+///  * [Err](HttpError) - The command has not been executed
 ///
 pub async fn start_exec_command(
   exec_id: &str,
@@ -82,14 +82,14 @@ pub async fn start_exec_command(
 ///
 /// ## Arguments
 ///
-/// - [exec_id](String) - Exec command id to inspect
-/// - [state](DaemonState) - The daemon state
+/// * [exec_id](String) - Exec command id to inspect
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///  - [Ok](bollard_next::models::ExecInspectResponse) - The output stream
-///  - [Err](HttpError) - The command has not been found
+/// * [Result](Result) - The result of the operation
+///  * [Ok](bollard_next::models::ExecInspectResponse) - The output stream
+///  * [Err](HttpError) - The command has not been found
 ///
 pub async fn inspect_exec_command(
   exec_id: &str,

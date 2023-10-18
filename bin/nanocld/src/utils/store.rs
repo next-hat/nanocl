@@ -19,13 +19,13 @@ use crate::models::{Pool, DBConn};
 ///
 /// ## Arguments
 ///
-/// - [host](str) Host to connect to
+/// * [host](str) Host to connect to
 ///
 /// ## Returns
 ///
-/// - [Result](Result) Result of the operation
-///   - [Ok](Pool) - The pool has been created
-///   - [Err](IoError) - The pool has not been created
+/// * [Result](Result) Result of the operation
+///   * [Ok](Pool) - The pool has been created
+///   * [Err](IoError) - The pool has not been created
 ///
 pub async fn create_pool(host: &str) -> IoResult<Pool> {
   // let options = format!("/defaultdb?sslmode=verify-full&sslrootcert=/var/lib/nanocl/store/certs/ca.crt");
@@ -51,9 +51,9 @@ pub async fn create_pool(host: &str) -> IoResult<Pool> {
 ///
 /// ## Returns
 ///
-/// - [Result](Result) Result of the operation
-///   - [Ok](DBConn) - The connection has been retrieved
-///   - [Err](IoError) - The connection has not been retrieved
+/// * [Result](Result) Result of the operation
+///   * [Ok](DBConn) - The connection has been retrieved
+///   * [Err](IoError) - The connection has not been retrieved
 ///
 pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
   let conn = match pool.get() {
@@ -75,13 +75,13 @@ pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
 ///
 /// ## Arguments
 ///
-/// - [addr](str) Address of the store
+/// * [addr](str) Address of the store
 ///
 /// ## Returns
 ///
-/// - [Result](Result) Result of the operation
-///   - [Ok](()) - The store is ready
-///   - [Err](IoError) - The store is not ready
+/// * [Result](Result) Result of the operation
+///   * [Ok](()) - The store is ready
+///   * [Err](IoError) - The store is not ready
 ///
 async fn wait_store(addr: &str) -> IoResult<()> {
   // Open tcp connection to check if store is ready
@@ -112,9 +112,9 @@ async fn wait_store(addr: &str) -> IoResult<()> {
 ///
 /// ## Returns
 ///
-/// - [Result](Result) Result of the operation
-///   - [Ok](Pool) - The pool has been created
-///   - [Err](IoError) - The pool has not been created
+/// * [Result](Result) Result of the operation
+///   * [Ok](Pool) - The pool has been created
+///   * [Err](IoError) - The pool has not been created
 ///
 pub(crate) async fn init() -> IoResult<Pool> {
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");

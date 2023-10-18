@@ -23,14 +23,14 @@ use crate::models::{Pool, VmImageDbModel, DaemonState};
 ///
 /// ## Arguments
 ///
-/// - [vm_key](str) - The vm key
-/// - [state](DaemonState) - The daemon state
+/// * [vm_key](str) - The vm key
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The vm has been started
-///   - [Err](HttpError) - The vm has not been started
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The vm has been started
+///   * [Err](HttpError) - The vm has not been started
 ///
 pub async fn start_by_key(
   vm_key: &str,
@@ -59,14 +59,14 @@ pub async fn start_by_key(
 ///
 /// ## Arguments
 ///
-/// - [vm](VmDbModel) - The vm model
-/// - [state](DaemonState) - The daemon state
+/// * [vm](VmDbModel) - The vm model
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The vm has been stopped
-///   - [Err](HttpError) - The vm has not been stopped
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The vm has been stopped
+///   * [Err](HttpError) - The vm has not been stopped
 ///
 pub async fn stop(vm: &Vm, state: &DaemonState) -> Result<(), HttpError> {
   let container_name = format!("{}.v", vm.key);
@@ -92,14 +92,14 @@ pub async fn stop(vm: &Vm, state: &DaemonState) -> Result<(), HttpError> {
 ///
 /// ## Arguments
 ///
-/// - [vm_key](str) - The vm key
-/// - [state](DaemonState) - The daemon state
+/// * [vm_key](str) - The vm key
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The vm has been stopped
-///   - [Err](HttpError) - The vm has not been stopped
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The vm has been stopped
+///   * [Err](HttpError) - The vm has not been stopped
 ///
 pub async fn stop_by_key(
   vm_key: &str,
@@ -116,15 +116,15 @@ pub async fn stop_by_key(
 ///
 /// ## Arguments
 ///
-/// - [vm_key](str) - The vm key
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
+/// * [vm_key](str) - The vm key
+/// * [docker_api](bollard_next::Docker) - The docker api
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](VmInspect) - The vm has been inspected
-///   - [Err](HttpError) - The vm has not been inspected
+/// * [Result](Result) - The result of the operation
+///   * [Ok](VmInspect) - The vm has been inspected
+///   * [Err](HttpError) - The vm has not been inspected
 ///
 pub async fn inspect_by_key(
   vm_key: &str,
@@ -157,14 +157,14 @@ pub async fn inspect_by_key(
 ///
 /// ## Arguments
 ///
-/// - [vm_key](str) - The vm key
-/// - [docker_api](bollard_next::Docker) - The docker api
+/// * [vm_key](str) - The vm key
+/// * [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<ContainerSummary>) - The list of instances
-///   - [Err](HttpError) - The list of instances has not been retrieved
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<ContainerSummary>) - The list of instances
+///   * [Err](HttpError) - The list of instances has not been retrieved
 ///
 pub async fn list_instances_by_key(
   vm_key: &str,
@@ -188,15 +188,15 @@ pub async fn list_instances_by_key(
 ///
 /// ## Arguments
 ///
-/// - [vm_key](str) - The vm key
-/// - [force](bool) - Force the deletion
-/// - [state](DaemonState) - The daemon state
+/// * [vm_key](str) - The vm key
+/// * [force](bool) - Force the deletion
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The vm has been deleted
-///   - [Err](HttpError) - The vm has not been deleted
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The vm has been deleted
+///   * [Err](HttpError) - The vm has not been deleted
 ///
 pub async fn delete_by_key(
   vm_key: &str,
@@ -230,15 +230,15 @@ pub async fn delete_by_key(
 ///
 /// ## Arguments
 ///
-/// - [nsp](str) - The namespace name
-/// - [docker_api](bollard_next::Docker) - The docker api
-/// - [pool](Pool) - The database pool
+/// * [nsp](str) - The namespace name
+/// * [docker_api](bollard_next::Docker) - The docker api
+/// * [pool](Pool) - The database pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<VmSummary>) - The list of VMs
-///   - [Err](HttpError) - The list of VMs has not been retrieved
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<VmSummary>) - The list of VMs
+///   * [Err](HttpError) - The list of VMs has not been retrieved
 ///
 pub async fn list_by_namespace(
   nsp: &str,
@@ -279,16 +279,16 @@ pub async fn list_by_namespace(
 ///
 /// ## Arguments
 ///
-/// - [vm](Vm) - The VM
-/// - [image](VmImageDbModel) - The VM image
-/// - [disable_keygen](bool) - Disable SSH key generation
-/// - [state](DaemonState) - The daemon state
+/// * [vm](Vm) - The VM
+/// * [image](VmImageDbModel) - The VM image
+/// * [disable_keygen](bool) - Disable SSH key generation
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](()) - The VM instance has been created
-///   - [Err](HttpError) - The VM instance has not been created
+/// * [Result](Result) - The result of the operation
+///   * [Ok](()) - The VM instance has been created
+///   * [Err](HttpError) - The VM instance has not been created
 ///
 pub async fn create_instance(
   vm: &Vm,
@@ -407,16 +407,16 @@ pub async fn create_instance(
 ///
 /// ## Arguments
 ///
-/// - [vm](VmConfigPartial) - The VM configuration
-/// - [namespace](str) - The namespace
-/// - [version](str) - The version
-/// - [state](DaemonState) - The daemon state
+/// * [vm](VmConfigPartial) - The VM configuration
+/// * [namespace](str) - The namespace
+/// * [version](str) - The version
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vm) - The VM has been created
-///   - [Err](HttpError) - The VM has not been created
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vm) - The VM has been created
+///   * [Err](HttpError) - The VM has not been created
 ///
 pub async fn create(
   vm: &VmConfigPartial,
@@ -471,16 +471,16 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [vm_key](str) - The VM key
-/// - [config](VmConfigUpdate) - The VM configuration
-/// - [version](str) - The version
-/// - [state](DaemonState) - The daemon state
+/// * [vm_key](str) - The VM key
+/// * [config](VmConfigUpdate) - The VM configuration
+/// * [version](str) - The version
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vm) - The VM has been patched
-///   - [Err](HttpError) - The VM has not been patched
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vm) - The VM has been patched
+///   * [Err](HttpError) - The VM has not been patched
 ///
 pub async fn patch(
   vm_key: &str,
@@ -542,16 +542,16 @@ pub async fn patch(
 ///
 /// ## Arguments
 ///
-/// - [vm_key](str) - The VM key
-/// - [vm_partial](VmConfigPartial) - The VM configuration
-/// - [version](str) - The version
-/// - [state](DaemonState) - The daemon state
+/// * [vm_key](str) - The VM key
+/// * [vm_partial](VmConfigPartial) - The VM configuration
+/// * [version](str) - The version
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vm) - The VM has been put
-///   - [Err](HttpError) - The VM has not been put
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vm) - The VM has been put
+///   * [Err](HttpError) - The VM has not been put
 ///
 pub async fn put(
   vm_key: &str,

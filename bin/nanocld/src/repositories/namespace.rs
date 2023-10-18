@@ -1,16 +1,12 @@
-//! Repository to manage namespaces in database
-//! We can create delete list or inspect a namespace
-use std::sync::Arc;
-
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error;
-use nanocl_utils::io_error::FromIo;
+use nanocl_utils::io_error::{IoError, IoResult, FromIo};
+use nanocl_stubs::generic::GenericDelete;
+use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
 
-use nanocl_stubs::{generic, namespace};
-
-use crate::{utils, schema, models};
+use crate::utils;
+use crate::models::{Pool, NamespaceDbModel};
 
 /// ## Create
 ///
@@ -18,25 +14,24 @@ use crate::{utils, schema, models};
 ///
 /// ## Arguments
 ///
-/// - [item](namespace::NamespacePartial) - Namespace to create
-/// - [pool](models::Pool) - Database connection pool
+/// * [item](NamespacePartial) - Namespace to create
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](models::NamespaceDbModel) - Namespace created
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](NamespaceDbModel) - Namespace created
+///   * [Err](IoError) - Error during the operation
 ///
 pub async fn create(
-  item: &namespace::NamespacePartial,
-  pool: &models::Pool,
-) -> io_error::IoResult<models::NamespaceDbModel> {
-  let item = models::NamespaceDbModel {
+  item: &NamespacePartial,
+  pool: &Pool,
+) -> IoResult<NamespaceDbModel> {
+  let item = NamespaceDbModel {
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
-
-  utils::repository::generic_insert_with_res(pool, item).await
+  super::generic::generic_insert_with_res(pool, item).await
 }
 
 /// ## List
@@ -45,18 +40,19 @@ pub async fn create(
 ///
 /// ## Arguments
 ///
-/// - [pool](models::Pool) - Database connection pool
+/// * [query](NamespaceListQuery) - Namespace list query
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](Vec<models::NamespaceDbModel>) - List of namespaces
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Vec<NamespaceDbModel>) - List of namespaces
+///   * [Err](IoError) - Error during the operation
 ///
 pub async fn list(
-  query: &namespace::NamespaceListQuery,
-  pool: &models::Pool,
-) -> io_error::IoResult<Vec<models::NamespaceDbModel>> {
+  query: &NamespaceListQuery,
+  pool: &Pool,
+) -> IoResult<Vec<NamespaceDbModel>> {
   use crate::schema::namespaces::dsl;
   let query = query.clone();
   let pool = pool.clone();
@@ -75,7 +71,7 @@ pub async fn list(
     let items = sql
       .load(&mut conn)
       .map_err(|err| err.map_err_context(|| "Namespace"))?;
-    Ok::<_, io_error::IoError>(items)
+    Ok::<_, IoError>(items)
   })
   .await?;
   Ok(items)
@@ -87,25 +83,22 @@ pub async fn list(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - Name of the namespace to delete
-/// - [pool](models::Pool) - Database connection pool
+/// * [name](str) - Name of the namespace to delete
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](generic::GenericDelete) - Number of deleted namespaces
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](GenericDelete) - Number of deleted namespaces
+///   * [Err](IoError) - Error during the operation
 ///
 pub async fn delete_by_name(
   name: &str,
-  pool: &models::Pool,
-) -> io_error::IoResult<generic::GenericDelete> {
+  pool: &Pool,
+) -> IoResult<GenericDelete> {
+  use crate::schema::namespaces;
   let name = name.to_owned();
-
-  utils::repository::generic_delete_by_id::<schema::namespaces::table, _>(
-    pool, name,
-  )
-  .await
+  super::generic::generic_delete_by_id::<namespaces::table, _>(pool, name).await
 }
 
 /// ## Find by name
@@ -114,25 +107,23 @@ pub async fn delete_by_name(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - Name of the namespace to find
-/// - [pool](models::Pool) - Database connection pool
+/// * [name](str) - Name of the namespace to find
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](models::NamespaceDbModel) - Namespace found
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](NamespaceDbModel) - Namespace found
+///   * [Err](IoError) - Error during the operation
 ///
 pub async fn find_by_name(
   name: &str,
-  pool: &models::Pool,
-) -> io_error::IoResult<models::NamespaceDbModel> {
+  pool: &Pool,
+) -> IoResult<NamespaceDbModel> {
+  use crate::schema::namespaces;
   let name = name.to_owned();
-
-  utils::repository::generic_find_by_id::<schema::namespaces::table, _, _>(
-    pool, name,
-  )
-  .await
+  super::generic::generic_find_by_id::<namespaces::table, _, _>(pool, name)
+    .await
 }
 
 /// ## Exist by name
@@ -141,31 +132,27 @@ pub async fn find_by_name(
 ///
 /// ## Arguments
 ///
-/// - [name](str) - Name of the namespace to check
-/// - [pool](models::Pool) - Database connection pool
+/// * [name](str) - Name of the namespace to check
+/// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
 ///
-/// - [Result](Result) - The result of the operation
-///   - [Ok](bool) - Existence of the namespace
-///   - [Err](io_error::IoError) - Error during the operation
+/// * [Result](Result) - The result of the operation
+///   * [Ok](bool) - Existence of the namespace
+///   * [Err](IoError) - Error during the operation
 ///
-pub async fn exist_by_name(
-  name: &str,
-  pool: &models::Pool,
-) -> io_error::IoResult<bool> {
-  use crate::schema::namespaces::dsl;
+pub async fn exist_by_name(name: &str, pool: &Pool) -> IoResult<bool> {
+  use crate::schema::namespaces;
   let name = name.to_owned();
   let pool = pool.clone();
   let exist = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    //TODO: remove Arc ?
-    let exist = Arc::new(dsl::namespaces)
-      .filter(dsl::name.eq(name))
-      .get_result::<models::NamespaceDbModel>(&mut conn)
+    let exist = namespaces::dsl::namespaces
+      .filter(namespaces::dsl::name.eq(name))
+      .get_result::<NamespaceDbModel>(&mut conn)
       .optional()
       .map_err(|err| err.map_err_context(|| "Namespace"))?;
-    Ok::<_, io_error::IoError>(exist)
+    Ok::<_, IoError>(exist)
   })
   .await?;
   Ok(exist.is_some())
