@@ -28,7 +28,7 @@ pub async fn create(
   pool: &Pool,
 ) -> IoResult<HttpMetricDbModel> {
   let item = item.clone();
-  super::generic::generic_insert_with_res(pool, item).await
+  super::generic::insert_with_res(item, pool).await
 }
 
 /// ## List

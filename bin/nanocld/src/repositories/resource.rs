@@ -27,7 +27,6 @@ use crate::models::{
 ///   * [Err](IoError) - Error during the operation
 ///
 pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
-  let pool = pool.clone();
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
@@ -36,7 +35,7 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     data: item.data.clone(),
     metadata: item.metadata.clone(),
   };
-  let config = repositories::resource_config::create(&config, &pool).await?;
+  let config = repositories::resource_config::create(&config, pool).await?;
   let new_item = ResourceDbModel {
     key: item.name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
@@ -44,7 +43,7 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     config_key: config.key.to_owned(),
   };
   let dbmodel: ResourceDbModel =
-    super::generic::generic_insert_with_res(&pool, new_item).await?;
+    super::generic::insert_with_res(new_item, pool).await?;
   let item = dbmodel.into_resource(config);
   Ok(item)
 }
@@ -67,7 +66,7 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
 pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::resources;
   let key = key.to_owned();
-  super::generic::generic_delete_by_id::<resources::table, _>(pool, key).await
+  super::generic::delete_by_id::<resources::table, _>(key, pool).await
 }
 
 /// ## Find
@@ -200,12 +199,12 @@ pub async fn put(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     key: None,
     config_key: Some(config.key.to_owned()),
   };
-  let dbmodel = super::generic::generic_update_by_id_with_res::<
+  let dbmodel = super::generic::update_by_id_with_res::<
     resources::table,
     _,
     _,
     ResourceDbModel,
-  >(pool, key, resource_update)
+  >(key, resource_update, pool)
   .await?;
   let item = dbmodel.into_resource(config);
   Ok(item)

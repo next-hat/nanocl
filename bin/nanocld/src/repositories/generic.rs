@@ -1,9 +1,8 @@
 use ntex::web;
 use diesel::{
   associations, pg, query_dsl, Table, helper_types, query_builder, AsChangeset,
-  Insertable,
+  Insertable, RunQueryDsl,
 };
-use diesel::RunQueryDsl;
 
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_utils::io_error::{IoResult, FromIo};
@@ -11,7 +10,7 @@ use nanocl_utils::io_error::{IoResult, FromIo};
 use crate::utils;
 use crate::models::Pool;
 
-pub async fn generic_find_by_id<T, Pk, R>(pool: &Pool, pk: Pk) -> IoResult<R>
+pub async fn find_by_id<T, Pk, R>(pk: Pk, pool: &Pool) -> IoResult<R>
 where
   T: query_dsl::methods::FindDsl<Pk> + associations::HasTable<Table = T>,
   diesel::dsl::Find<T, Pk>:
@@ -29,13 +28,12 @@ where
     Ok(res)
   })
   .await?;
-
   Ok(item)
 }
 
-pub async fn generic_delete<T, P>(
-  pool: &Pool,
+pub async fn delete<T, P>(
   predicate: P,
+  pool: &Pool,
 ) -> IoResult<GenericDelete>
 where
   T: query_dsl::methods::FilterDsl<P> + associations::HasTable<Table = T>,
@@ -56,14 +54,10 @@ where
     Ok(item)
   })
   .await?;
-
   Ok(GenericDelete { count })
 }
 
-pub async fn generic_delete_by_id<T, Pk>(
-  pool: &Pool,
-  pk: Pk,
-) -> IoResult<GenericDelete>
+pub async fn delete_by_id<T, Pk>(pk: Pk, pool: &Pool) -> IoResult<GenericDelete>
 where
   T: query_dsl::methods::FindDsl<Pk> + associations::HasTable<Table = T>,
   helper_types::Find<T, Pk>: query_builder::IntoUpdateTarget,
@@ -82,14 +76,13 @@ where
     Ok(item)
   })
   .await?;
-
   Ok(GenericDelete { count })
 }
 
-pub async fn generic_update_by_id<T, V, Pk>(
-  pool: &Pool,
+pub async fn update_by_id<T, V, Pk>(
   pk: Pk,
   values: V,
+  pool: &Pool,
 ) -> IoResult<usize>
 where
   T: query_dsl::methods::FindDsl<Pk> + associations::HasTable<Table = T>,
@@ -107,7 +100,6 @@ where
   Pk: Send + 'static,
 {
   let pool = pool.clone();
-
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::update(<T as associations::HasTable>::table().find(pk))
@@ -117,14 +109,13 @@ where
     Ok(res)
   })
   .await?;
-
   Ok(res)
 }
 
-pub async fn generic_update_by_id_with_res<T, V, Pk, R>(
-  pool: &Pool,
+pub async fn update_by_id_with_res<T, V, Pk, R>(
   pk: Pk,
   values: V,
+  pool: &Pool,
 ) -> IoResult<R>
 where
   T: query_dsl::methods::FindDsl<Pk> + associations::HasTable<Table = T>,
@@ -143,7 +134,6 @@ where
   R: Send + 'static,
 {
   let pool = pool.clone();
-
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::update(<T as associations::HasTable>::table().find(pk))
@@ -153,14 +143,10 @@ where
     Ok(res)
   })
   .await?;
-
   Ok(res)
 }
 
-pub async fn generic_insert_with_res<T, V, R>(
-  pool: &Pool,
-  values: V,
-) -> IoResult<R>
+pub async fn insert_with_res<T, V, R>(values: V, pool: &Pool) -> IoResult<R>
 where
   T: associations::HasTable<Table = T> + Table,
   V: Insertable<T>,
@@ -179,6 +165,5 @@ where
     Ok(res)
   })
   .await?;
-
   Ok(item)
 }

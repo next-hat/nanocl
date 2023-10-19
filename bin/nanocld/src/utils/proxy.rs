@@ -5,7 +5,6 @@ use bollard_next::container::{LogsOptions, LogOutput};
 use crate::repositories;
 use crate::models::{
   ToDbModel, DaemonState, HttpMetricPartial, StreamMetricPartial,
-  StreamMetricDbModel,
 };
 
 /// ## Spawn logger
@@ -85,14 +84,11 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                   .map(|metric| metric.to_db_model(&state.config.hostname))
                 {
                   Ok(stream_db_model) => {
-                    let insert_result =
-                      repositories::generic::generic_insert_with_res::<
-                        crate::schema::stream_metrics::table,
-                        _,
-                        StreamMetricDbModel,
-                      >(&state.pool, stream_db_model)
-                      .await;
-
+                    let insert_result = repositories::stream_metric::create(
+                      &stream_db_model,
+                      &state.pool,
+                    )
+                    .await;
                     if let Err(db_error) = insert_result {
                       log::warn!("Failed to save tcp metric: {db_error}");
                     }

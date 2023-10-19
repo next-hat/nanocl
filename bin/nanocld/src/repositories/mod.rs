@@ -8,6 +8,8 @@ pub mod node;
 pub mod metric;
 /// Manage HTTP metrics table
 pub mod http_metric;
+/// Manage stream metrics table
+pub mod stream_metric;
 /// Manage namespaces table
 pub mod namespace;
 /// Manage cargoes table

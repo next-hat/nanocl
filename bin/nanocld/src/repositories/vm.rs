@@ -82,8 +82,7 @@ pub async fn create(
     namespace_name: nsp,
     config_key: config.key,
   };
-  let item: VmDbModel =
-    super::generic::generic_insert_with_res(pool, new_item).await?;
+  let item: VmDbModel = super::generic::insert_with_res(new_item, pool).await?;
   let vm = item.into_vm(config);
   Ok(vm)
 }
@@ -106,7 +105,7 @@ pub async fn create(
 pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::vms;
   let key = key.to_owned();
-  super::generic::generic_delete_by_id::<vms::table, _>(pool, key).await
+  super::generic::delete_by_id::<vms::table, _>(key, pool).await
 }
 
 /// ## Find by key
@@ -127,7 +126,7 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
   use crate::schema::vms;
   let key = key.to_owned();
-  super::generic::generic_find_by_id::<vms::table, _, _>(pool, key).await
+  super::generic::find_by_id::<vms::table, _, _>(key, pool).await
 }
 
 /// ## Update by key
@@ -162,8 +161,8 @@ pub async fn update_by_key(
     config_key: Some(config.key),
     ..Default::default()
   };
-  super::generic::generic_update_by_id::<vms::table, VmUpdateDbModel, _>(
-    pool, key, new_item,
+  super::generic::update_by_id::<vms::table, VmUpdateDbModel, _>(
+    key, new_item, pool,
   )
   .await?;
   let vm = vmdb.into_vm(config);

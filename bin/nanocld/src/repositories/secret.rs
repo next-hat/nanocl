@@ -28,7 +28,7 @@ pub async fn create(
   pool: &Pool,
 ) -> IoResult<SecretDbModel> {
   let item: SecretDbModel = item.clone().into();
-  super::generic::generic_insert_with_res(pool, item).await
+  super::generic::insert_with_res(item, pool).await
 }
 
 /// ## List
@@ -78,7 +78,7 @@ pub async fn list(pool: &Pool) -> IoResult<Vec<SecretDbModel>> {
 pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::secrets;
   let key = key.to_owned();
-  super::generic::generic_delete_by_id::<secrets::table, _>(pool, key).await
+  super::generic::delete_by_id::<secrets::table, _>(key, pool).await
 }
 
 /// ## Find by key
@@ -99,7 +99,7 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<SecretDbModel> {
   use crate::schema::secrets;
   let key = key.to_owned();
-  super::generic::generic_find_by_id::<secrets::table, _, _>(pool, key).await
+  super::generic::find_by_id::<secrets::table, _, _>(key, pool).await
 }
 
 /// ## Update by key
@@ -131,11 +131,9 @@ pub async fn update_by_key(
     data: Some(item.data.clone()),
     metadata: item.metadata.clone(),
   };
-  super::generic::generic_update_by_id::<
-    secrets::table,
-    SecretUpdateDbModel,
-    _,
-  >(pool, key, new_item)
+  super::generic::update_by_id::<secrets::table, SecretUpdateDbModel, _>(
+    key, new_item, pool,
+  )
   .await?;
   secret.data = item.data;
   secret.metadata = item.metadata;

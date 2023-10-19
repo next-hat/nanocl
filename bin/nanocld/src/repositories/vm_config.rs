@@ -46,7 +46,7 @@ pub async fn create(
     metadata: item.metadata.clone(),
   };
   let dbmodel: VmConfigDbModel =
-    super::generic::generic_insert_with_res(pool, dbmodel).await?;
+    super::generic::insert_with_res(dbmodel, pool).await?;
   Ok(dbmodel.into_vm_config(item))
 }
 
@@ -68,12 +68,11 @@ pub async fn create(
 pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
   use crate::schema::vm_configs;
   let key = *key;
-  let dbmodel = super::generic::generic_find_by_id::<
-    vm_configs::table,
-    _,
-    VmConfigDbModel,
-  >(pool, key)
-  .await?;
+  let dbmodel =
+    super::generic::find_by_id::<vm_configs::table, _, VmConfigDbModel>(
+      key, pool,
+    )
+    .await?;
   let config =
     serde_json::from_value::<VmConfigPartial>(dbmodel.config.clone())
       .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;

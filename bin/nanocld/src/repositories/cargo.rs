@@ -120,7 +120,7 @@ pub async fn create(
     config_key: config.key,
   };
   let item: CargoDbModel =
-    super::generic::generic_insert_with_res(pool, new_item).await?;
+    super::generic::insert_with_res(new_item, pool).await?;
   let cargo = item.into_cargo(config);
   Ok(cargo)
 }
@@ -143,11 +143,7 @@ pub async fn create(
 pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::cargoes;
   let key = key.to_owned();
-  super::generic::generic_delete_by_id::<cargoes::table, _>(
-    pool,
-    key.to_owned(),
-  )
-  .await
+  super::generic::delete_by_id::<cargoes::table, _>(key, pool).await
 }
 
 /// ## Find by key
@@ -168,11 +164,7 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDbModel> {
   use crate::schema::cargoes;
   let key = key.to_owned();
-  super::generic::generic_find_by_id::<cargoes::table, _, _>(
-    pool,
-    key.to_owned(),
-  )
-  .await
+  super::generic::find_by_id::<cargoes::table, _, _>(key, pool).await
 }
 
 /// ## Update by key
@@ -207,11 +199,9 @@ pub async fn update_by_key(
     ..Default::default()
   };
   let key = key.to_owned();
-  super::generic::generic_update_by_id::<
-    cargoes::table,
-    CargoUpdateDbModel,
-    _,
-  >(pool, key.to_owned(), new_item)
+  super::generic::update_by_id::<cargoes::table, CargoUpdateDbModel, _>(
+    key, new_item, pool,
+  )
   .await?;
   let cargo = cargodb.into_cargo(config);
   Ok(cargo)

@@ -26,7 +26,7 @@ pub async fn create(
   pool: &Pool,
 ) -> IoResult<MetricDbModel> {
   let item = item.clone();
-  super::generic::generic_insert_with_res(pool, item).await
+  super::generic::insert_with_res(item, pool).await
 }
 
 /// ## List by kind

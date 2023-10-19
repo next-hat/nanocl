@@ -27,7 +27,7 @@ pub async fn create(
   pool: &Pool,
 ) -> IoResult<VmImageDbModel> {
   let item = item.clone();
-  super::generic::generic_insert_with_res(pool, item).await
+  super::generic::insert_with_res(item, pool).await
 }
 
 /// ## Find by name
@@ -48,7 +48,7 @@ pub async fn create(
 pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<VmImageDbModel> {
   use crate::schema::vm_images;
   let name = name.to_owned();
-  super::generic::generic_find_by_id::<vm_images::table, _, _>(pool, name).await
+  super::generic::find_by_id::<vm_images::table, _, _>(name, pool).await
 }
 
 /// ## Find by parent
@@ -106,7 +106,7 @@ pub async fn delete_by_name(
 ) -> IoResult<GenericDelete> {
   use crate::schema::vm_images;
   let name = name.to_owned();
-  super::generic::generic_delete_by_id::<vm_images::table, _>(pool, name).await
+  super::generic::delete_by_id::<vm_images::table, _>(name, pool).await
 }
 
 /// ## List
@@ -161,11 +161,11 @@ pub async fn update_by_name(
   use crate::schema::vm_images;
   let item = item.clone();
   let name = name.to_owned();
-  super::generic::generic_update_by_id_with_res::<
+  super::generic::update_by_id_with_res::<
     vm_images::table,
     VmImageUpdateDbModel,
     _,
     VmImageDbModel,
-  >(pool, name, item)
+  >(name, item, pool)
   .await
 }

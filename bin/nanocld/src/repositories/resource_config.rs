@@ -28,7 +28,7 @@ pub async fn create(
   pool: &Pool,
 ) -> IoResult<ResourceConfigDbModel> {
   let item = item.clone();
-  super::generic::generic_insert_with_res(pool, item).await
+  super::generic::insert_with_res(item, pool).await
 }
 
 /// ## Delete by resource key
@@ -52,9 +52,9 @@ pub async fn delete_by_resource_key(
 ) -> IoResult<GenericDelete> {
   use crate::schema::resource_configs;
   let key = key.to_owned();
-  super::generic::generic_delete::<resource_configs::table, _>(
-    pool,
+  super::generic::delete::<resource_configs::table, _>(
     resource_configs::dsl::resource_key.eq(key),
+    pool,
   )
   .await
 }
