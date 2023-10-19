@@ -31,7 +31,7 @@ pub async fn create(
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
-  super::generic::generic_insert_with_res(pool, item).await
+  super::generic::insert_with_res(item, pool).await
 }
 
 /// ## List
@@ -98,7 +98,7 @@ pub async fn delete_by_name(
 ) -> IoResult<GenericDelete> {
   use crate::schema::namespaces;
   let name = name.to_owned();
-  super::generic::generic_delete_by_id::<namespaces::table, _>(pool, name).await
+  super::generic::delete_by_id::<namespaces::table, _>(name, pool).await
 }
 
 /// ## Find by name
@@ -122,8 +122,7 @@ pub async fn find_by_name(
 ) -> IoResult<NamespaceDbModel> {
   use crate::schema::namespaces;
   let name = name.to_owned();
-  super::generic::generic_find_by_id::<namespaces::table, _, _>(pool, name)
-    .await
+  super::generic::find_by_id::<namespaces::table, _, _>(name, pool).await
 }
 
 /// ## Exist by name

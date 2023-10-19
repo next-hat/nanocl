@@ -41,13 +41,9 @@ pub async fn create(
       .map_err(|e| e.map_err_context(|| "Invalid Config"))?,
     metadata: item.metadata.clone(),
   };
-
   let dbmodel =
-    super::generic::generic_insert_with_res::<_, _, CargoConfigDbModel>(
-      pool, dbmodel,
-    )
-    .await?;
-
+    super::generic::insert_with_res::<_, _, CargoConfigDbModel>(dbmodel, pool)
+      .await?;
   let config = dbmodel.into_cargo_config(item);
   Ok(config)
 }
@@ -74,8 +70,7 @@ pub async fn find_by_key(
   use crate::schema::cargo_configs;
   let key = *key;
   let dbmodel: CargoConfigDbModel =
-    super::generic::generic_find_by_id::<cargo_configs::table, _, _>(pool, key)
-      .await?;
+    super::generic::find_by_id::<cargo_configs::table, _, _>(key, pool).await?;
   let config =
     serde_json::from_value::<CargoConfigPartial>(dbmodel.data.clone())
       .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
@@ -103,9 +98,9 @@ pub async fn delete_by_cargo_key(
 ) -> IoResult<GenericDelete> {
   use crate::schema::cargo_configs;
   let key = key.to_owned();
-  super::generic::generic_delete::<cargo_configs::table, _>(
-    pool,
+  super::generic::delete::<cargo_configs::table, _>(
     cargo_configs::dsl::cargo_key.eq(key),
+    pool,
   )
   .await
 }

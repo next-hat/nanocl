@@ -36,7 +36,7 @@ pub async fn create_version(
     url: item.url.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
-  super::generic::generic_insert_with_res(pool, kind_version).await
+  super::generic::insert_with_res(kind_version, pool).await
 }
 
 /// ## Get version
@@ -100,8 +100,7 @@ pub async fn find_by_name(
 ) -> IoResult<ResourceKindDbModel> {
   use crate::schema::resource_kinds;
   let name = name.to_owned();
-  super::generic::generic_find_by_id::<resource_kinds::table, _, _>(pool, name)
-    .await
+  super::generic::find_by_id::<resource_kinds::table, _, _>(name, pool).await
 }
 
 /// ## Create
@@ -128,7 +127,7 @@ pub async fn create(
     created_at: chrono::Utc::now().naive_utc(),
   };
 
-  super::generic::generic_insert_with_res(pool, kind).await
+  super::generic::insert_with_res(kind, pool).await
 }
 
 /// ## Delete version
@@ -152,9 +151,9 @@ pub async fn delete_version(
 ) -> IoResult<GenericDelete> {
   use crate::schema::resource_kind_versions;
   let name = name.to_owned();
-  super::generic::generic_delete::<resource_kind_versions::table, _>(
-    pool,
+  super::generic::delete::<resource_kind_versions::table, _>(
     resource_kind_versions::resource_kind_name.eq(name),
+    pool,
   )
   .await
 }
@@ -177,6 +176,5 @@ pub async fn delete_version(
 pub async fn delete(name: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::resource_kinds;
   let name = name.to_owned();
-  super::generic::generic_delete_by_id::<resource_kinds::table, _>(pool, name)
-    .await
+  super::generic::delete_by_id::<resource_kinds::table, _>(name, pool).await
 }

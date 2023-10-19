@@ -24,11 +24,9 @@ use crate::models::{Pool, NodeDbModel};
 pub async fn create(node: &NodeDbModel, pool: &Pool) -> IoResult<NodeDbModel> {
   use crate::schema::nodes;
   let node: NodeDbModel = node.clone();
-  super::generic::generic_insert_with_res::<
-    nodes::table,
-    NodeDbModel,
-    NodeDbModel,
-  >(pool, node)
+  super::generic::insert_with_res::<nodes::table, NodeDbModel, NodeDbModel>(
+    node, pool,
+  )
   .await
 }
 
@@ -50,7 +48,7 @@ pub async fn create(node: &NodeDbModel, pool: &Pool) -> IoResult<NodeDbModel> {
 pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<NodeDbModel> {
   use crate::schema::nodes;
   let name = name.to_owned();
-  super::generic::generic_find_by_id::<nodes::table, _, _>(pool, name).await
+  super::generic::find_by_id::<nodes::table, _, _>(name, pool).await
 }
 
 /// ## Create if not exists
