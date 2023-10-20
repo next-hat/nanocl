@@ -127,13 +127,13 @@ Resources:
   Data:
     Rules:
     - Domain: docs.next-hat.com
-        Network: Public
-        Ssl: cert.next-hat.com
-        Locations:
-        - Path: /
-          Target:
-            Key: doc.nexthat.c
-            Port: 80
+      Network: Public
+      Ssl: cert.next-hat.com
+      Locations:
+      - Path: /
+        Target:
+          Key: doc.nexthat.c
+          Port: 80
 ```
 
 To apply a state we can do it easily bu running `nanocl state apply -s path|url`<br />
