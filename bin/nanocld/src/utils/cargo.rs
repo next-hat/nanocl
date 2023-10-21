@@ -7,12 +7,12 @@ use futures_util::TryFutureExt;
 use futures_util::stream::FuturesUnordered;
 use bollard_next::service::ContainerCreateResponse;
 
-use bollard_next::container::LogOutput;
-use bollard_next::container::WaitContainerOptions;
-use bollard_next::service::{ContainerSummary, HostConfig};
-use bollard_next::service::{RestartPolicy, RestartPolicyNameEnum};
 use bollard_next::container::{
-  ListContainersOptions, RemoveContainerOptions, Stats,
+  Stats, LogOutput, ListContainersOptions, CreateContainerOptions,
+  StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
+};
+use bollard_next::service::{
+  HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
 };
 
 use nanocl_utils::http_error::HttpError;
@@ -61,8 +61,8 @@ async fn create_instances(
   number: usize,
   state: &DaemonState,
 ) -> Result<Vec<ContainerCreateResponse>, HttpError> {
+  execute_before(cargo, &state.docker_api).await?;
   let mut secret_envs: Vec<String> = Vec::new();
-
   if let Some(secrets) = &cargo.config.secrets {
     let fetched_secrets = secrets
       .iter()
@@ -90,8 +90,6 @@ async fn create_instances(
     // Flatten the secrets
     secret_envs = fetched_secrets.into_iter().flatten().collect();
   }
-  log::debug!("Using secret envs: {secret_envs:?}");
-
   (0..number)
     .collect::<Vec<usize>>()
     .into_iter()
@@ -202,6 +200,40 @@ async fn create_instances(
     .await
     .into_iter()
     .collect::<Result<Vec<ContainerCreateResponse>, HttpError>>()
+}
+
+async fn execute_before(
+  cargo: &Cargo,
+  docker_api: &bollard_next::Docker,
+) -> Result<(), HttpError> {
+  match cargo.config.before.clone() {
+    Some(mut before) => {
+      let image = before
+        .image
+        .clone()
+        .unwrap_or(cargo.config.container.image.clone().unwrap());
+      before.image = Some(image);
+      before.host_config = Some(HostConfig {
+        network_mode: Some(cargo.namespace_name.clone()),
+        auto_remove: Some(true),
+        ..before.host_config.unwrap_or_default()
+      });
+      let container = docker_api
+        .create_container(None::<CreateContainerOptions<String>>, before)
+        .await?;
+      docker_api
+        .start_container(&container.id, None::<StartContainerOptions<String>>)
+        .await?;
+      let options = Some(WaitContainerOptions {
+        condition: "removed",
+      });
+      let mut stream = docker_api.wait_container(&container.id, options);
+      // Wait for the container to be removed
+      while (stream.next().await).is_some() {}
+      Ok(())
+    }
+    None => Ok(()),
+  }
 }
 
 /// ## List instances
@@ -1005,6 +1037,11 @@ pub async fn patch(
   let config = CargoConfigPartial {
     name: cargo.name.clone(),
     container,
+    before: if payload.before.is_some() {
+      payload.before.clone()
+    } else {
+      cargo.config.before
+    },
     replication: payload.replication.clone(),
     secrets: if payload.secrets.is_some() {
       payload.secrets.clone()

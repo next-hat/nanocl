@@ -9,8 +9,6 @@ Resources:
   - Name: deploy-example.com
     Kind: ProxyRule
     Version: v0.7
-    Metadata:
-      Cert: certbot
     Data:
       Rules:
         - Domain: deploy-example.com
@@ -33,6 +31,9 @@ Resources:
 # https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
   - Name: deploy-example
+    Before:
+      Image: alpine:latest
+      Cmd: ["/bin/sh", "-c", "sleep 5"]
     Container:
       Image: nexthat/nanocl-get-started:latest
       Env:

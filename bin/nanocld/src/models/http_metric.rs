@@ -2,7 +2,7 @@ use uuid::Uuid;
 use chrono::{DateTime, FixedOffset};
 use serde::{Serialize, Deserialize, Deserializer};
 
-use crate::schema;
+use crate::schema::{http_metrics, stream_metrics};
 
 /// ## deserialize empty string
 ///
@@ -157,7 +157,7 @@ impl ToDbModel for HttpMetricPartial {
   Clone, Debug, Identifiable, Insertable, Queryable, Serialize, Deserialize,
 )]
 #[diesel(primary_key(key))]
-#[diesel(table_name = schema::http_metrics)]
+#[diesel(table_name = http_metrics)]
 #[serde(rename_all = "PascalCase")]
 pub struct HttpMetricDbModel {
   /// The key of the metric in the database `UUID`
@@ -235,7 +235,7 @@ pub struct StreamMetricPartial {
   Clone, Debug, Identifiable, Insertable, Queryable, Serialize, Deserialize,
 )]
 #[diesel(primary_key(key))]
-#[diesel(table_name = schema::stream_metrics)]
+#[diesel(table_name = stream_metrics)]
 #[serde(rename_all = "PascalCase")]
 pub struct StreamMetricDbModel {
   /// The key of the metric in the database `UUID`

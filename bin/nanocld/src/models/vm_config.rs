@@ -1,6 +1,6 @@
 use nanocl_stubs::vm_config;
 
-use crate::schema;
+use crate::schema::vm_configs;
 
 use super::vm;
 
@@ -15,7 +15,7 @@ use super::vm;
 ///
 #[derive(Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = schema::vm_configs)]
+#[diesel(table_name = vm_configs)]
 #[diesel(belongs_to(vm::VmDbModel, foreign_key = vm_key))]
 pub struct VmConfigDbModel {
   /// The key of the vm config
