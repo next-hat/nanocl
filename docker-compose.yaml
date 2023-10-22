@@ -8,6 +8,10 @@ networks:
     driver_opts:
       com.docker.network.bridge.name: nanocl.system
 
+volumes:
+  nanocl_target:
+  nanocl_registry:
+
 services:
   nstore:
     container_name: nstore.system.c
@@ -73,7 +77,8 @@ services:
       - type: bind
         source: .
         target: /project
-      - /project/target
+      - nanocl_target:/project/target
+      - nanocl_registry:/usr/local/cargo/registry
       - //run/guest-services/nanocl:/run/nanocl
       - //run/host-services/backend.sock:/run/host-services/backend.sock
     command:
@@ -132,7 +137,8 @@ services:
       - type: bind
         source: .
         target: /project
-      - /project/target
+      - nanocl_target:/project/target
+      - nanocl_registry:/usr/local/cargo/registry
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/secrets}:/opt/secrets
       - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
@@ -180,7 +186,8 @@ services:
       - type: bind
         source: .
         target: /project
-      - /project/target
+      - nanocl_target:/project/target
+      - nanocl_registry:/usr/local/cargo/registry
       - ${STATE_DIR:-${HOME}/.nanocl/state/dns}:/opt/dns
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
 
@@ -204,7 +211,8 @@ services:
       - type: bind
         source: .
         target: /project
-      - /project/target
+      - nanocl_target:/project/target
+      - nanocl_registry:/usr/local/cargo/registry
       - ${STATE_DIR:-${HOME}/.nanocl/state}:/var/lib/nanocl
       - //run/guest-services/nanocl:/run/nanocl
       - /var/run/docker.sock:/run/docker.sock
