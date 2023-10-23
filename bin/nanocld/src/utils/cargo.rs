@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use ntex::rt;
+use ntex::time::sleep;
 use ntex::util::Bytes;
 use futures::{StreamExt, TryStreamExt};
 use futures_util::TryFutureExt;
@@ -10,6 +12,7 @@ use bollard_next::service::ContainerCreateResponse;
 use bollard_next::container::{
   Stats, LogOutput, ListContainersOptions, CreateContainerOptions,
   StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
+  LogsOptions,
 };
 use bollard_next::service::{
   HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
@@ -228,8 +231,27 @@ async fn execute_before(
         condition: "removed",
       });
       let mut stream = docker_api.wait_container(&container.id, options);
-      // Wait for the container to be removed
-      while (stream.next().await).is_some() {}
+      while let Some(wait_status) = stream.next().await {
+        match wait_status {
+          Ok(wait_status) => {
+            log::debug!("Wait status: {wait_status:?}");
+            if wait_status.status_code != 0 {
+              let error = match wait_status.error {
+                Some(error) => error.message.unwrap_or("Unknown error".into()),
+                None => "Unknown error".into(),
+              };
+              return Err(HttpError::internal_server_error(format!(
+                "Error while waiting for before container: {error}"
+              )));
+            }
+          }
+          Err(err) => {
+            return Err(HttpError::internal_server_error(format!(
+              "Error while waiting for before container: {err}"
+            )));
+          }
+        }
+      }
       Ok(())
     }
     None => Ok(()),

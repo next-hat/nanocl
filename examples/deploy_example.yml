@@ -33,7 +33,7 @@ Cargoes:
   - Name: deploy-example
     Before:
       Image: alpine:latest
-      Cmd: ["/bin/sh", "-c", "sleep 5"]
+      Cmd: ["/bin/sh", "-c", "sleep 2"]
     Container:
       Image: nexthat/nanocl-get-started:latest
       Env:
