@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use nanocl_stubs::resource;
 
-use crate::schema;
+use crate::schema::resources;
 
 /// ## ResourceDbModel
 ///
@@ -19,7 +19,7 @@ use crate::schema;
   Debug, Queryable, Identifiable, Insertable, Serialize, Deserialize,
 )]
 #[diesel(primary_key(key))]
-#[diesel(table_name = schema::resources)]
+#[diesel(table_name = resources)]
 pub struct ResourceDbModel {
   /// The key of the resource
   pub(crate) key: String,
@@ -54,7 +54,7 @@ impl ResourceDbModel {
 /// This structure represent the update of a resource in the database.
 ///
 #[derive(AsChangeset)]
-#[diesel(table_name = schema::resources)]
+#[diesel(table_name = resources)]
 pub struct ResourceUpdateModel {
   /// The key of the resource
   pub(crate) key: Option<String>,

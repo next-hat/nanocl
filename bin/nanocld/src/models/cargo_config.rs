@@ -1,6 +1,6 @@
 use nanocl_stubs::cargo_config;
 
-use crate::schema;
+use crate::schema::cargo_configs;
 
 use super::cargo::CargoDbModel;
 
@@ -15,7 +15,7 @@ use super::cargo::CargoDbModel;
 ///
 #[derive(Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = schema::cargo_configs)]
+#[diesel(table_name = cargo_configs)]
 #[diesel(belongs_to(CargoDbModel, foreign_key = cargo_key))]
 pub struct CargoConfigDbModel {
   /// The key of the cargo config
@@ -44,6 +44,7 @@ impl CargoConfigDbModel {
       name: config.name,
       version: self.version,
       cargo_key: self.cargo_key,
+      before: config.before,
       replication: config.replication,
       container: config.container,
       metadata: config.metadata,

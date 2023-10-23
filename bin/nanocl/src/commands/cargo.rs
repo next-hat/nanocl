@@ -1,16 +1,16 @@
 use std::process;
 use std::collections::HashMap;
 
-use futures::stream::FuturesUnordered;
+use ntex::rt;
+use futures::channel::mpsc;
 use futures::{StreamExt, SinkExt};
+use futures::stream::FuturesUnordered;
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
-use futures::channel::mpsc;
 use nanocl_utils::io_error::{FromIo, IoResult};
 use nanocld_client::stubs::cargo::{
   OutputKind, CargoDeleteQuery, CargoLogQuery, CargoStatsQuery,
 };
-use ntex::rt;
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -21,7 +21,7 @@ use crate::models::{
   CargoRunOpts, CargoRestartOpts, CargoListOpts, CargoStatsOpts, CargoStatsRow,
 };
 
-use super::cargo_image::{self, exec_cargo_image_pull};
+use super::cargo_image::{exec_cargo_image, exec_cargo_image_pull};
 
 /// ## Exec cargo create
 ///
@@ -299,7 +299,6 @@ async fn exec_cargo_exec(
   let result = client
     .create_exec(&opts.name, exec, args.namespace.clone())
     .await?;
-
   let mut stream = client
     .start_exec(
       &result.id,
@@ -309,7 +308,6 @@ async fn exec_cargo_exec(
       },
     )
     .await?;
-
   while let Some(output) = stream.next().await {
     let output = output?;
     match output.kind {
@@ -323,9 +321,7 @@ async fn exec_cargo_exec(
       OutputKind::Console => print!("{}", &output.data),
     }
   }
-
   let exec_infos = client.inspect_exec(&result.id).await?;
-
   match exec_infos.exit_code {
     Some(code) => {
       if code == 0 {
@@ -398,7 +394,6 @@ async fn exec_cargo_logs(
     stderr: None,
     stdout: None,
   };
-
   let mut stream = client.logs_cargo(&opts.name, &query).await?;
   while let Some(log) = stream.next().await {
     let log = match log {
@@ -581,9 +576,7 @@ pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
     CargoCommand::List(opts) => exec_cargo_ls(cli_conf, args, opts).await,
     CargoCommand::Create(opts) => exec_cargo_create(cli_conf, args, opts).await,
     CargoCommand::Remove(opts) => exec_cargo_rm(cli_conf, args, opts).await,
-    CargoCommand::Image(opts) => {
-      cargo_image::exec_cargo_image(client, opts).await
-    }
+    CargoCommand::Image(opts) => exec_cargo_image(client, opts).await,
     CargoCommand::Start(opts) => exec_cargo_start(cli_conf, args, opts).await,
     CargoCommand::Stop(opts) => exec_cargo_stop(cli_conf, args, opts).await,
     CargoCommand::Patch(opts) => exec_cargo_patch(cli_conf, args, opts).await,

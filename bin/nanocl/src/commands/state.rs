@@ -108,11 +108,9 @@ where
     .extension()
     .unwrap_or(std::ffi::OsStr::new(&default_format))
     .to_str();
-
   let ext = ext.unwrap_or_default();
   let data = fs::read_to_string(path)?;
   let state_ref = utils::state::get_state_ref::<T>(ext, &data)?;
-
   Ok(state_ref)
 }
 
@@ -238,7 +236,6 @@ pub async fn log_cargo(
     }
     Ok(cargo) => cargo,
   };
-
   let mut futures = Vec::new();
   for (index, _) in cargo.instances.iter().enumerate() {
     let name = if index == 0 {
@@ -253,7 +250,6 @@ pub async fn log_cargo(
     let timestamps = opts.timestamps;
     let tail = opts.tail.to_owned();
     let follow = opts.follow;
-
     let fut = rt::spawn(async move {
       let query = CargoLogQuery {
         namespace: Some(namespace),
