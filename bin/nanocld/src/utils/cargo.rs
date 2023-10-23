@@ -1,8 +1,6 @@
 use std::collections::HashMap;
-use std::time::Duration;
 
 use ntex::rt;
-use ntex::time::sleep;
 use ntex::util::Bytes;
 use futures::{StreamExt, TryStreamExt};
 use futures_util::TryFutureExt;
@@ -12,7 +10,6 @@ use bollard_next::service::ContainerCreateResponse;
 use bollard_next::container::{
   Stats, LogOutput, ListContainersOptions, CreateContainerOptions,
   StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
-  LogsOptions,
 };
 use bollard_next::service::{
   HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
