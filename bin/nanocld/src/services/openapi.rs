@@ -190,7 +190,7 @@ struct VersionModifier;
 impl Modify for VersionModifier {
   fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
     let variable = utoipa::openapi::ServerVariableBuilder::default()
-      .default_value("v0.9")
+      .default_value("v0.11")
       .description(Some("API version"))
       .build();
 

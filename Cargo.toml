@@ -15,10 +15,10 @@ members = [
 opt-level = 0
 
 [profile.release]
-opt-level = "z"
 strip = true
-lto = true
-codegen-units = 1
+# opt-level = "z"
+# lto = true
+# codegen-units = 1
 
 [patch.crates-io]
 nanocl_stubs = { path = "crates/nanocl_stubs" }
