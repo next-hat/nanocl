@@ -97,6 +97,7 @@ pub(crate) async fn update_entries(
       serde_json::json!({ "Network": dns_rule.network }).to_string(),
     ),
     kind: Some("DnsRule".into()),
+    ..Default::default()
   };
   let resources = client.list_resource(Some(query)).await.map_err(|err| {
     err.map_err_context(|| "Unable to list resources from nanocl daemon")

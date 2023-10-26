@@ -29,7 +29,7 @@ servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.9
+      default: v0.11
       description: API version
 paths:
   /_ping:
@@ -5046,6 +5046,10 @@ components:
             $ref: '#/components/schemas/Any'
     ResourceConfig:
       type: object
+      description: |
+        ## ResourceConfig
+
+        The config of the resource
       required:
       - Key
       - Version

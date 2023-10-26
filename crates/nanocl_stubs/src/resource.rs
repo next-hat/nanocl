@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
@@ -97,6 +99,10 @@ impl From<Resource> for ResourcePartial {
   }
 }
 
+/// ## ResourceConfig
+///
+/// The config of the resource
+///
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -122,12 +128,21 @@ pub struct ResourceConfig {
   pub metadata: Option<serde_json::Value>,
 }
 
+/// ResourceQuery
+///
+/// Query filter when listing resources
 #[derive(Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ResourceQuery {
   /// The kind of resource to target
   pub kind: Option<String>,
-  /// Match what contains the resource config
+  /// Match what contains the resource data
   pub contains: Option<String>,
+  /// Test if key exist in the resource data
+  pub exists: Option<String>,
+  /// Match what contains the metadata of the resource
+  pub meta_contains: Option<String>,
+  /// Test if key exist in the metadata of the resource
+  pub meta_exists: Option<String>,
 }

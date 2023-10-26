@@ -102,10 +102,23 @@ pub async fn find(
           if let Some(kind) = &qs.kind {
             req = req.filter(resources::kind.eq(kind.to_string()));
           }
+          if let Some(exists) = &qs.exists {
+            req = req.filter(resource_configs::metadata.has_key(exists));
+          }
           if let Some(contains) = &qs.contains {
             let contains = serde_json::from_str::<serde_json::Value>(contains)
               .map_err(|err| err.map_err_context(|| "Contains"))?;
             req = req.filter(resource_configs::data.contains(contains));
+          }
+          if let Some(meta_exists) = &qs.meta_exists {
+            req = req.filter(resource_configs::metadata.has_key(meta_exists));
+          }
+          if let Some(meta_contains) = &qs.meta_contains {
+            let meta_contains =
+              serde_json::from_str::<serde_json::Value>(meta_contains)
+                .map_err(|err| err.map_err_context(|| "Meta contains"))?;
+            req =
+              req.filter(resource_configs::metadata.contains(meta_contains));
           }
           req = req.order(resources::created_at.desc());
           req.load(&mut conn)

@@ -675,6 +675,7 @@ pub(crate) async fn list_resource_by_cargo(
       serde_json::json!({ "Rules": [ { "Locations": [ { "Target": { "Key": target_key } } ] }  ] }).to_string(),
     ),
     kind: Some("ProxyRule".into()),
+    ..Default::default()
   };
   let http_ressources =
     client.list_resource(Some(query)).await.map_err(|err| {
@@ -686,6 +687,7 @@ pub(crate) async fn list_resource_by_cargo(
         .to_string(),
     ),
     kind: Some("ProxyRule".into()),
+    ..Default::default()
   };
   let stream_resources =
     client.list_resource(Some(query)).await.map_err(|err| {
@@ -716,6 +718,7 @@ pub(crate) async fn list_resource_by_secret(
       serde_json::json!({ "Rules": [ { "Ssl": secret }  ] }).to_string(),
     ),
     kind: Some("ProxyRule".into()),
+    ..Default::default()
   };
   let resources = client.list_resource(Some(query)).await.map_err(|err| {
     err.map_err_context(|| "Unable to list resources from nanocl daemon")

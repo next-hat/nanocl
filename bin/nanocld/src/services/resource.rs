@@ -240,12 +240,13 @@ mod tests {
   use ntex::http;
 
   use crate::utils::tests::*;
-  use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceUpdate};
+  use nanocl_stubs::resource::{
+    Resource, ResourcePartial, ResourceUpdate, ResourceQuery,
+  };
 
   #[ntex::test]
   async fn basic() -> TestRet {
     let srv = gen_server(ntex_config).await;
-
     let config = serde_json::json!({
       "Schema": {
         "type": "object",
@@ -263,17 +264,17 @@ mod tests {
         }
       }
     });
-
     let resource = ResourcePartial {
       name: "test_resource".to_owned(),
       version: "v0.0.1".to_owned(),
       kind: "Kind".to_owned(),
       data: config.clone(),
-      metadata: None,
+      metadata: Some(serde_json::json!({
+        "Test": "gg",
+      })),
     };
-
     let mut resp = srv
-      .post("/v0.2/resources")
+      .post("/v0.10/resources")
       .send_json(&resource)
       .await
       .unwrap();
@@ -281,15 +282,27 @@ mod tests {
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
-
-    // List
-    let mut resp = srv.get("/v0.2/resources").send().await.unwrap();
+    // Basic list
+    let mut resp = srv.get("/v0.10/resources").send().await.unwrap();
     assert_eq!(resp.status(), http::StatusCode::OK);
     let _ = resp.json::<Vec<Resource>>().await.unwrap();
-
+    // Using filter exists
+    let mut resp = srv
+      .get("/v0.10/resources")
+      .query(&ResourceQuery {
+        exists: Some(String::from("Schema")),
+        ..Default::default()
+      })
+      .unwrap()
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(resp.status(), http::StatusCode::OK);
+    let resources = resp.json::<Vec<Resource>>().await.unwrap();
+    assert!(resources.len() == 1, "Unable to filter by exists");
     // Inspect
     let mut resp = srv
-      .get("/v0.2/resources/test_resource")
+      .get("/v0.10/resources/test_resource")
       .send()
       .await
       .unwrap();
@@ -298,22 +311,20 @@ mod tests {
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
     assert_eq!(&resource.data, &config);
-
     // History
     let _ = srv
-      .get("/v0.2/resources/test_resource/histories")
+      .get("/v0.10/resources/test_resource/histories")
       .send()
       .await
       .unwrap();
     assert_eq!(resp.status(), http::StatusCode::OK);
-
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
       data: config.clone(),
       metadata: None,
     };
     let mut resp = srv
-      .patch("/v0.2/resources/test_resource")
+      .patch("/v0.10/resources/test_resource")
       .send_json(&new_resource)
       .await
       .unwrap();
@@ -321,10 +332,9 @@ mod tests {
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
-
     // Delete
     let resp = srv
-      .delete("/v0.2/resources/test_resource")
+      .delete("/v0.10/resources/test_resource")
       .send()
       .await
       .unwrap();

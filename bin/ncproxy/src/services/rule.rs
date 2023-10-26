@@ -68,10 +68,8 @@ pub async fn remove_rule(
     client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
   }
-
   nginx.delete_conf_file(&path.1).await;
   utils::reload_config(&client).await?;
-
   Ok(web::HttpResponse::Ok().finish())
 }
 
