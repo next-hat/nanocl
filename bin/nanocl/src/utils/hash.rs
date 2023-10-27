@@ -26,7 +26,7 @@ pub fn calculate_SHA256(name: &str) -> String {
 #[cfg(test)]
 mod tests {
   #[test]
-  fn test_sha256() {
+  fn sha256() {
     let hash = super::calculate_SHA256("test");
     assert_eq!(
       hash,

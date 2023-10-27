@@ -20,7 +20,10 @@ use crate::models::{DaemonState, ResourceRevertPath};
   path = "/resources",
   params(
     ("Kind" = Option<String>, Query, description = "Filter by resource kind"),
-    ("Contains" = Option<String>, Query, description = "Filter by resource content"),
+    ("Exists" = Option<String>, Query, description = "Filter by resource by existing key in data"),
+    ("Contains" = Option<String>, Query, description = "Filter by resource data"),
+    ("MetaContains" = Option<String>, Query, description = "Filter by resource metadata"),
+    ("MetaExists" = Option<String>, Query, description = "Filter by resource existing key in metadata"),
   ),
   responses(
     (status = 200, description = "List of resources", body = [Resource]),
@@ -234,18 +237,18 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-
-  use crate::services::ntex_config;
-
   use ntex::http;
+  use nanocl_stubs::resource::{
+    Resource, ResourcePartial, ResourceUpdate, ResourceQuery,
+  };
 
+  use crate::version::VERSION;
   use crate::utils::tests::*;
-  use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceUpdate};
+  use crate::services::ntex_config;
 
   #[ntex::test]
   async fn basic() -> TestRet {
     let srv = gen_server(ntex_config).await;
-
     let config = serde_json::json!({
       "Schema": {
         "type": "object",
@@ -263,17 +266,17 @@ mod tests {
         }
       }
     });
-
     let resource = ResourcePartial {
       name: "test_resource".to_owned(),
       version: "v0.0.1".to_owned(),
       kind: "Kind".to_owned(),
       data: config.clone(),
-      metadata: None,
+      metadata: Some(serde_json::json!({
+        "Test": "gg",
+      })),
     };
-
     let mut resp = srv
-      .post("/v0.2/resources")
+      .post(format!("/v{VERSION}/resources"))
       .send_json(&resource)
       .await
       .unwrap();
@@ -281,15 +284,89 @@ mod tests {
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
-
-    // List
-    let mut resp = srv.get("/v0.2/resources").send().await.unwrap();
+    // Basic list
+    let mut resp = srv
+      .get(format!("/v{VERSION}/resources"))
+      .send()
+      .await
+      .unwrap();
     assert_eq!(resp.status(), http::StatusCode::OK);
     let _ = resp.json::<Vec<Resource>>().await.unwrap();
-
+    // Using filter exists
+    let mut resp = srv
+      .get(format!("/v{VERSION}/resources"))
+      .query(&ResourceQuery {
+        exists: Some(String::from("Schema")),
+        ..Default::default()
+      })
+      .unwrap()
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(resp.status(), http::StatusCode::OK);
+    let resources = resp.json::<Vec<Resource>>().await.unwrap();
+    println!("Filter resource result:\n{resources:?}");
+    assert!(resources.len() == 1, "Unable to filter by exists");
+    // Using filter contains
+    let mut resp = srv
+      .get(format!("/v{VERSION}/resources"))
+      .query(&ResourceQuery {
+        contains: Some(String::from("{\"Schema\": {\"type\": \"object\"}}")),
+        ..Default::default()
+      })
+      .unwrap()
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(
+      resp.status(),
+      http::StatusCode::OK,
+      "Invalid status code when filter by contains"
+    );
+    let resources = resp.json::<Vec<Resource>>().await.unwrap();
+    println!("Filter resource result:\n{resources:?}");
+    assert!(resources.len() == 1, "Unable to filter by contains");
+    // Using meta exists
+    let mut resp = srv
+      .get(format!("/v{VERSION}/resources"))
+      .query(&ResourceQuery {
+        meta_exists: Some(String::from("Test")),
+        ..Default::default()
+      })
+      .unwrap()
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(
+      resp.status(),
+      http::StatusCode::OK,
+      "Invalid status code when filter by meta exists"
+    );
+    let resources = resp.json::<Vec<Resource>>().await.unwrap();
+    println!("Filter resource result:\n{resources:?}");
+    assert!(resources.len() == 1, "Unable to filter by meta exists");
+    // Filter by meta contains
+    let mut resp = srv
+      .get(format!("/v{VERSION}/resources"))
+      .query(&ResourceQuery {
+        meta_contains: Some(String::from("{\"Test\": \"gg\"}")),
+        ..Default::default()
+      })
+      .unwrap()
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(
+      resp.status(),
+      http::StatusCode::OK,
+      "Invalid status code when filter by meta contains"
+    );
+    let resources = resp.json::<Vec<Resource>>().await.unwrap();
+    println!("Filter resource result:\n{resources:?}");
+    assert!(resources.len() == 1, "Unable to filter by meta contains");
     // Inspect
     let mut resp = srv
-      .get("/v0.2/resources/test_resource")
+      .get(format!("/v{VERSION}/resources/test_resource"))
       .send()
       .await
       .unwrap();
@@ -298,22 +375,20 @@ mod tests {
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
     assert_eq!(&resource.data, &config);
-
     // History
     let _ = srv
-      .get("/v0.2/resources/test_resource/histories")
+      .get(format!("/v{VERSION}/resources/test_resource/histories"))
       .send()
       .await
       .unwrap();
     assert_eq!(resp.status(), http::StatusCode::OK);
-
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
       data: config.clone(),
       metadata: None,
     };
     let mut resp = srv
-      .patch("/v0.2/resources/test_resource")
+      .patch(format!("/v{VERSION}/resources/test_resource"))
       .send_json(&new_resource)
       .await
       .unwrap();
@@ -321,10 +396,9 @@ mod tests {
     let resource = resp.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
-
     // Delete
     let resp = srv
-      .delete("/v0.2/resources/test_resource")
+      .delete(format!("/v{VERSION}/resources/test_resource"))
       .send()
       .await
       .unwrap();

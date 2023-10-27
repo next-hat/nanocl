@@ -2,15 +2,14 @@ Kind: Resource
 ApiVersion: v0.10
 
 Resources:
-  - Name: proxy-get-started
-    Kind: ProxyRule
-    Version: v0.7
-    Config:
-      Watch: []
-      Rules:
-        - Domain: get-started.com
-          Network: Public
-          Locations:
-            - Path: /
-              Target:
-                Url: https://google.com
+- Name: proxy-get-started
+  Kind: ProxyRule
+  Version: v0.7
+  Config:
+    Rules:
+    - Domain: get-started.com
+      Network: All
+      Locations:
+      - Path: /
+        Target:
+          Url: https://google.com

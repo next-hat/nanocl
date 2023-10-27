@@ -67,7 +67,6 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   utils::system::register_namespace("global", true, &daemon_state).await?;
   utils::system::sync_containers(&docker, &pool).await?;
   utils::system::sync_vm_images(daemon_conf, &pool).await?;
-
   Ok(daemon_state)
 }
 
@@ -79,7 +78,6 @@ mod tests {
   use crate::config;
   use crate::cli::Cli;
   use crate::utils::tests::*;
-
   /// Test init
   #[ntex::test]
   async fn basic_init() -> TestRet {
@@ -99,7 +97,6 @@ mod tests {
     let config = config::init(&args).expect("Expect to init config");
     // test function init
     let _ = init(&config).await.unwrap();
-
     Ok(())
   }
 }

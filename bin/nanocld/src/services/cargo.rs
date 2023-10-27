@@ -581,32 +581,32 @@ mod tests {
     let main_test_cargo = test_cargoes[0];
 
     for test_cargo in test_cargoes.iter() {
-      let test_cargo = test_cargo.to_string();
+      let test_cargo = test_cargo.to_owned();
       let mut res = srv
         .post("/v0.10/cargoes")
         .send_json(&CargoConfigPartial {
-          name: test_cargo.clone(),
+          name: test_cargo.to_owned(),
           container: bollard_next::container::Config {
-            image: Some("nexthat/nanocl-get-started:latest".to_string()),
+            image: Some("nexthat/nanocl-get-started:latest".to_owned()),
             ..Default::default()
           },
           ..Default::default()
         })
         .await?;
-
       println!("res: {:?}", res);
       let json = res.json::<serde_json::Value>().await?;
       println!("json: {:?}", json);
-      assert_eq!(res.status(), 201);
+      assert_eq!(res.status(), 201, "Invalid Cargo create status code");
       let response: Cargo = serde_json::from_value(json).unwrap();
-      assert_eq!(response.name, test_cargo);
-      assert_eq!(response.namespace_name, "global");
+      assert_eq!(response.name, test_cargo, "Invalid cargo name");
+      assert_eq!(response.namespace_name, "global", "Invalid cargo namespace");
       assert_eq!(
         response.config.container.image,
-        Some("nexthat/nanocl-get-started:latest".to_string())
+        Some("nexthat/nanocl-get-started:latest".to_owned())
       );
     }
 
+    println!("test_cargoes: {:?}\nfinished", test_cargoes);
     let mut res = srv
       .get("/v0.10/cargoes")
       .query(&CargoListQuery {
@@ -617,9 +617,13 @@ mod tests {
       })?
       .send()
       .await?;
-    assert_eq!(res.status(), 200);
+    assert_eq!(res.status(), 200, "Invalid Cargo list status code");
     let cargoes = res.json::<Vec<CargoSummary>>().await?;
-    assert_eq!(cargoes[0].name, test_cargoes[1].to_string());
+    assert_eq!(
+      cargoes[0].name,
+      test_cargoes.get(1).unwrap().to_string(),
+      "Invalid cargo name while filtering"
+    );
 
     let mut res = srv
       .get("/v0.10/cargoes")

@@ -33,14 +33,12 @@ pub async fn apply_rule(
     client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
   }
-
   utils::create_resource_conf(&path.1, &payload, &client, &nginx).await?;
   if let Err(err) = utils::reload_config(&client).await {
     nginx.delete_conf_file(&path.1).await;
     utils::reload_config(&client).await?;
     return Err(HttpError::bad_request(err.to_string()));
   }
-
   Ok(web::HttpResponse::Ok().json(&payload))
 }
 
@@ -68,10 +66,8 @@ pub async fn remove_rule(
     client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
   }
-
   nginx.delete_conf_file(&path.1).await;
   utils::reload_config(&client).await?;
-
   Ok(web::HttpResponse::Ok().finish())
 }
 
@@ -84,39 +80,37 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
 
   use ntex::http;
-
   use crate::utils::tests;
+  use crate::version::VERSION;
 
   #[ntex::test]
   async fn rules() {
     let test_srv = tests::generate_server();
-
     let resource: &str = include_str!("../../tests/resource_redirect.yml");
-
     let yaml: serde_yaml::Value = serde_yaml::from_str(resource).unwrap();
-
     let resource = yaml["Resources"][0].clone();
     let name = resource["Name"].as_str().unwrap();
-
     let payload = resource["Config"].clone();
-
     let mut res = test_srv
-      .put(format!("/v0.4/rules/{name}"))
+      .put(format!("/v{VERSION}/rules/{name}"))
       .send_json(&payload)
       .await
       .unwrap();
-
-    println!("{:#?}", res);
-    let json = res.json::<serde_json::Value>().await.unwrap();
-    println!("{:#?}", json);
-    assert_eq!(res.status(), http::StatusCode::OK);
-
+    let _ = res.json::<serde_json::Value>().await.unwrap();
+    assert_eq!(
+      res.status(),
+      http::StatusCode::OK,
+      "Incorrect status code when PUT a rule"
+    );
     let res = test_srv
-      .delete(format!("/v0.4/rules/{}", name))
+      .delete(format!("/v{VERSION}/rules/{}", name))
       .send()
       .await
       .unwrap();
-
-    assert_eq!(res.status(), http::StatusCode::OK);
+    assert_eq!(
+      res.status(),
+      http::StatusCode::OK,
+      "Incorrect status code when DELETE a rule"
+    );
   }
 }

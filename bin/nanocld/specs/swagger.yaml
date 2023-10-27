@@ -29,7 +29,7 @@ servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.9
+      default: v0.11
       description: API version
 paths:
   /_ping:
@@ -1100,9 +1100,30 @@ paths:
         schema:
           type: string
           nullable: true
+      - name: Exists
+        in: query
+        description: Filter by resource by existing key in data
+        required: false
+        schema:
+          type: string
+          nullable: true
       - name: Contains
         in: query
-        description: Filter by resource content
+        description: Filter by resource data
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: MetaContains
+        in: query
+        description: Filter by resource metadata
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: MetaExists
+        in: query
+        description: Filter by resource existing key in metadata
         required: false
         schema:
           type: string
@@ -5046,6 +5067,10 @@ components:
             $ref: '#/components/schemas/Any'
     ResourceConfig:
       type: object
+      description: |
+        ## ResourceConfig
+
+        The config of the resource
       required:
       - Key
       - Version
