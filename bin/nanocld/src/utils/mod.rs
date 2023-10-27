@@ -27,6 +27,7 @@ pub mod tests {
   use ntex::http::client::error::SendRequestError;
 
   use nanocl_stubs::config::DaemonConfig;
+  use nanocl_utils::ntex::test_client::TestClient;
 
   use crate::version::VERSION;
   use crate::services;
@@ -153,5 +154,13 @@ pub mod tests {
         .configure(routes)
         .default_service(web::route().to(services::unhandled))
     })
+  }
+
+  pub async fn generate_test_client(
+    routes: Config,
+    version: &str,
+  ) -> TestClient {
+    let srv = gen_server(routes).await;
+    TestClient::new(srv, version)
   }
 }

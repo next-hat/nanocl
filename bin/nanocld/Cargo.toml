@@ -22,6 +22,7 @@ dev = [
   "bollard-next/utoipa",
   "nanocl_stubs/utoipa",
   "nanocl_utils/ntex_swagger",
+  "nanocl_utils/ntex_test_client",
 ]
 test = []
 release = []
@@ -33,6 +34,7 @@ nanocl_utils = { version = "0.3.0", features = ["build_tools"] }
 
 [dev-dependencies]
 serde_yaml = "0.9"
+nanocl_utils = { version = "0.3.0", features = ["ntex_test_client"] }
 
 [dependencies]
 bollard-next = { version = "0.15.4" }
