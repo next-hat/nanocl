@@ -237,15 +237,14 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-
-  use crate::services::ntex_config;
-
   use ntex::http;
-
-  use crate::utils::tests::*;
   use nanocl_stubs::resource::{
     Resource, ResourcePartial, ResourceUpdate, ResourceQuery,
   };
+
+  use crate::version::VERSION;
+  use crate::utils::tests::*;
+  use crate::services::ntex_config;
 
   #[ntex::test]
   async fn basic() -> TestRet {
@@ -277,7 +276,7 @@ mod tests {
       })),
     };
     let mut resp = srv
-      .post("/v0.10/resources")
+      .post(format!("/v{VERSION}/resources"))
       .send_json(&resource)
       .await
       .unwrap();
@@ -286,12 +285,16 @@ mod tests {
     assert_eq!(resource.name, "test_resource");
     assert_eq!(resource.kind, String::from("Kind"));
     // Basic list
-    let mut resp = srv.get("/v0.10/resources").send().await.unwrap();
+    let mut resp = srv
+      .get(format!("/v{VERSION}/resources"))
+      .send()
+      .await
+      .unwrap();
     assert_eq!(resp.status(), http::StatusCode::OK);
     let _ = resp.json::<Vec<Resource>>().await.unwrap();
     // Using filter exists
     let mut resp = srv
-      .get("/v0.10/resources")
+      .get(format!("/v{VERSION}/resources"))
       .query(&ResourceQuery {
         exists: Some(String::from("Schema")),
         ..Default::default()
@@ -304,9 +307,66 @@ mod tests {
     let resources = resp.json::<Vec<Resource>>().await.unwrap();
     println!("Filter resource result:\n{resources:?}");
     assert!(resources.len() == 1, "Unable to filter by exists");
+    // Using filter contains
+    let mut resp = srv
+      .get(format!("/v{VERSION}/resources"))
+      .query(&ResourceQuery {
+        contains: Some(String::from("{\"Schema\": {\"type\": \"object\"}}")),
+        ..Default::default()
+      })
+      .unwrap()
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(
+      resp.status(),
+      http::StatusCode::OK,
+      "Invalid status code when filter by contains"
+    );
+    let resources = resp.json::<Vec<Resource>>().await.unwrap();
+    println!("Filter resource result:\n{resources:?}");
+    assert!(resources.len() == 1, "Unable to filter by contains");
+    // Using meta exists
+    let mut resp = srv
+      .get(format!("/v{VERSION}/resources"))
+      .query(&ResourceQuery {
+        meta_exists: Some(String::from("Test")),
+        ..Default::default()
+      })
+      .unwrap()
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(
+      resp.status(),
+      http::StatusCode::OK,
+      "Invalid status code when filter by meta exists"
+    );
+    let resources = resp.json::<Vec<Resource>>().await.unwrap();
+    println!("Filter resource result:\n{resources:?}");
+    assert!(resources.len() == 1, "Unable to filter by meta exists");
+    // Filter by meta contains
+    let mut resp = srv
+      .get(format!("/v{VERSION}/resources"))
+      .query(&ResourceQuery {
+        meta_contains: Some(String::from("{\"Test\": \"gg\"}")),
+        ..Default::default()
+      })
+      .unwrap()
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(
+      resp.status(),
+      http::StatusCode::OK,
+      "Invalid status code when filter by meta contains"
+    );
+    let resources = resp.json::<Vec<Resource>>().await.unwrap();
+    println!("Filter resource result:\n{resources:?}");
+    assert!(resources.len() == 1, "Unable to filter by meta contains");
     // Inspect
     let mut resp = srv
-      .get("/v0.10/resources/test_resource")
+      .get(format!("/v{VERSION}/resources/test_resource"))
       .send()
       .await
       .unwrap();
@@ -317,7 +377,7 @@ mod tests {
     assert_eq!(&resource.data, &config);
     // History
     let _ = srv
-      .get("/v0.10/resources/test_resource/histories")
+      .get(format!("/v{VERSION}/resources/test_resource/histories"))
       .send()
       .await
       .unwrap();
@@ -328,7 +388,7 @@ mod tests {
       metadata: None,
     };
     let mut resp = srv
-      .patch("/v0.10/resources/test_resource")
+      .patch(format!("/v{VERSION}/resources/test_resource"))
       .send_json(&new_resource)
       .await
       .unwrap();
@@ -338,7 +398,7 @@ mod tests {
     assert_eq!(resource.kind, String::from("Kind"));
     // Delete
     let resp = srv
-      .delete("/v0.10/resources/test_resource")
+      .delete(format!("/v{VERSION}/resources/test_resource"))
       .send()
       .await
       .unwrap();
