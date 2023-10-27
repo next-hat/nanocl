@@ -26,12 +26,18 @@ http_error = ["ntex", "dep:serde_json"]
 http_client_error = ["ntex", "io_error", "http_error", "serde_urlencoded"]
 unix = ["dep:libc"]
 versioning = []
+<<<<<<< Updated upstream
+=======
+build_tools = ["dep:clap", "dep:clap_mangen"]
+ntex_test_client = ["dep:ntex", "dep:serde"]
+>>>>>>> Stashed changes
 
 [dependencies]
 ntex = { version = "0.7.7", optional = true }
 log = { version = "0.4.20", optional = true }
 env_logger = { version = "0.10.0", optional = true }
 serde_yaml = { version = "0.9", optional = true }
+serde = { version = "1.0.189", features = ["derive"], optional = true }
 serde_json = { version = "1.0.107", optional = true }
 bollard-next = { version = "0.15.4", optional = true }
 diesel = { version = "2.1.2", default-features = false, optional = true }

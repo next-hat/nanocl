@@ -1836,6 +1836,7 @@ dependencies = [
  "libc",
  "log",
  "ntex",
+ "serde",
  "serde_json",
  "serde_urlencoded",
  "serde_yaml",

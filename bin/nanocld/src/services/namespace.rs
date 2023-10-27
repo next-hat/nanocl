@@ -108,89 +108,79 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod test_namespace {
-  use crate::services::ntex_config;
-
   use serde_json::json;
 
-  use nanocl_stubs::namespace::NamespacePartial;
   use nanocl_stubs::generic::GenericDelete;
+  use nanocl_stubs::namespace::{Namespace, NamespacePartial};
+  use nanocl_utils::ntex::test_client::TestClient;
 
+  use crate::version::VERSION;
+  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
-  async fn test_list(srv: &TestServer) -> TestRet {
-    let resp = srv.get("/v0.2/namespaces").send().await?;
+  const ENDPOINT: &str = "/namespaces";
 
-    assert!(resp.status().is_success());
-    Ok(())
+  async fn list(client: &TestClient) {
+    let res = client.send_get(ENDPOINT, None::<String>).await;
+    assert!(res.status().is_success(), "Expect success on list");
+    let _ = TestClient::res_json::<Vec<Namespace>>(res).await;
   }
 
-  async fn test_create(srv: &TestServer) -> TestRet {
+  async fn create(client: &TestClient) {
     let new_namespace = NamespacePartial {
       name: String::from("controller-default"),
     };
-
-    let resp = srv
-      .post("/v0.2/namespaces")
-      .send_json(&new_namespace)
-      .await?;
-
-    assert!(resp.status().is_success());
-    Ok(())
+    let res = client
+      .send_post(ENDPOINT, Some(new_namespace), None::<String>)
+      .await;
+    assert!(res.status().is_success(), "Expect success on create");
   }
 
-  async fn test_fail_create(srv: &TestServer) -> TestRet {
-    let resp = srv
-      .post("/v0.2/namespaces")
-      .send_json(&json!({
+  async fn test_fail_create(client: &TestClient) {
+    let res = client
+      .send_post(
+        ENDPOINT,
+        Some(&json!({
           "name": 1,
-      }))
-      .await?;
-
-    assert!(resp.status().is_client_error());
-
-    let resp = srv.post("/v0.2/namespaces").send().await?;
-
-    assert!(resp.status().is_client_error());
-    Ok(())
+        })),
+        None::<String>,
+      )
+      .await;
+    assert!(
+      res.status().is_client_error(),
+      "Expect error for invalid body"
+    );
+    let res = client
+      .send_post(ENDPOINT, None::<String>, None::<String>)
+      .await;
+    assert!(res.status().is_client_error(), "Expect error when no body");
   }
 
-  async fn test_inspect_by_id(srv: &TestServer) -> TestRet {
-    let resp = srv
-      .get(format!(
-        "/v0.2/namespaces/{name}/inspect",
-        name = "controller-default"
-      ))
-      .send()
-      .await?;
-
-    assert!(resp.status().is_success());
-    Ok(())
+  async fn inspect_by_id(client: &TestClient) {
+    const NAME: &str = "controller-default";
+    let res = client
+      .send_get(&format!("{ENDPOINT}/{NAME}/inspect"), None::<String>)
+      .await;
+    assert!(res.status().is_success(), "Expect success on inspect_by_id");
   }
 
-  async fn test_delete(srv: &TestServer) -> TestRet {
-    let mut resp = srv
-      .delete(format!(
-        "/v0.2/namespaces/{name}",
-        name = "controller-default"
-      ))
-      .send()
-      .await?;
-
-    let body = resp.json::<GenericDelete>().await?;
-    assert_eq!(body.count, 1);
-    assert!(resp.status().is_success());
-    Ok(())
+  async fn delete(client: &TestClient) {
+    const NAME: &str = "controller-default";
+    let res = client
+      .send_delete(&format!("{ENDPOINT}/{NAME}"), None::<String>)
+      .await;
+    assert!(res.status().is_success(), "Expect success on delete");
+    let body = TestClient::res_json::<GenericDelete>(res).await;
+    assert_eq!(body.count, 1, "Expect 1 item deleted");
   }
 
   #[ntex::test]
-  async fn basic() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-
-    test_fail_create(&srv).await?;
-    test_create(&srv).await?;
-    test_inspect_by_id(&srv).await?;
-    test_list(&srv).await?;
-    test_delete(&srv).await?;
-    Ok(())
+  async fn basic() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    test_fail_create(&client).await;
+    create(&client).await;
+    inspect_by_id(&client).await;
+    list(&client).await;
+    delete(&client).await;
   }
 }
