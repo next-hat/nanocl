@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 

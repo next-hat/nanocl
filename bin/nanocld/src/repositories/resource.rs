@@ -103,7 +103,7 @@ pub async fn find(
             req = req.filter(resources::kind.eq(kind.to_string()));
           }
           if let Some(exists) = &qs.exists {
-            req = req.filter(resource_configs::metadata.has_key(exists));
+            req = req.filter(resource_configs::data.has_key(exists));
           }
           if let Some(contains) = &qs.contains {
             let contains = serde_json::from_str::<serde_json::Value>(contains)

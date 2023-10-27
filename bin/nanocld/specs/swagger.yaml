@@ -1100,9 +1100,30 @@ paths:
         schema:
           type: string
           nullable: true
+      - name: Exists
+        in: query
+        description: Filter by resource by existing key in data
+        required: false
+        schema:
+          type: string
+          nullable: true
       - name: Contains
         in: query
-        description: Filter by resource content
+        description: Filter by resource data
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: MetaContains
+        in: query
+        description: Filter by resource metadata
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: MetaExists
+        in: query
+        description: Filter by resource existing key in metadata
         required: false
         schema:
           type: string

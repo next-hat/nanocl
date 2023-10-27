@@ -20,7 +20,10 @@ use crate::models::{DaemonState, ResourceRevertPath};
   path = "/resources",
   params(
     ("Kind" = Option<String>, Query, description = "Filter by resource kind"),
-    ("Contains" = Option<String>, Query, description = "Filter by resource content"),
+    ("Exists" = Option<String>, Query, description = "Filter by resource by existing key in data"),
+    ("Contains" = Option<String>, Query, description = "Filter by resource data"),
+    ("MetaContains" = Option<String>, Query, description = "Filter by resource metadata"),
+    ("MetaExists" = Option<String>, Query, description = "Filter by resource existing key in metadata"),
   ),
   responses(
     (status = 200, description = "List of resources", body = [Resource]),
@@ -299,6 +302,7 @@ mod tests {
       .unwrap();
     assert_eq!(resp.status(), http::StatusCode::OK);
     let resources = resp.json::<Vec<Resource>>().await.unwrap();
+    println!("Filter resource result:\n{resources:?}");
     assert!(resources.len() == 1, "Unable to filter by exists");
     // Inspect
     let mut resp = srv
