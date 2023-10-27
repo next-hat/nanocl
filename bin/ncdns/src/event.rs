@@ -108,9 +108,7 @@ async fn r#loop(dnsmasq: &Dnsmasq, client: &NanocldClient) {
         }
       }
     }
-    log::warn!(
-      "Unsubscribed from nanocl daemon events, retrying to subscribe in 2 seconds"
-    );
+    log::warn!("Retrying to subscribe in 2 seconds");
     ntex::time::sleep(std::time::Duration::from_secs(2)).await;
   }
 }

@@ -170,8 +170,13 @@ async fn on_event(
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
   logger::enable_logger("ncvpnkit");
-  log::info!("ncvpnkit_{}_{}", version::ARCH, version::CHANNEL);
-  log::info!("v{}:{}", version::VERSION, version::COMMIT_ID);
+  log::info!(
+    "ncvpnkit_{}_{}_v{}:{}",
+    version::ARCH,
+    version::CHANNEL,
+    version::VERSION,
+    version::COMMIT_ID
+  );
   let user_home = match std::env::var("USER_HOME") {
     Err(err) => {
       log::error!("Unable to get USER_HOME env variable: {err}");
@@ -181,7 +186,6 @@ async fn main() -> std::io::Result<()> {
   };
   let vpnkit_client = VpnKitRc::connect_uds("/run/host-services/backend.sock");
   let nanocl_client = NanocldClient::connect_with_unix_default();
-
   let proxy_default = vec![
     VpnKitPort {
       proto: Some(VpnKitProtocol::TCP),
@@ -200,14 +204,12 @@ async fn main() -> std::io::Result<()> {
       ..Default::default()
     },
   ];
-
   let nanocld_unix_default = VpnKitPort {
     proto: Some(VpnKitProtocol::UNIX),
     out_path: Some(format!("{user_home}/.nanocl/run/nanocl.sock")),
     in_path: Some("/run/guest-services/nanocl/nanocl.sock".into()),
     ..Default::default()
   };
-
   loop {
     log::info!("Subscribing to nanocl daemon events..");
     match nanocl_client.watch_events().await {
@@ -230,9 +232,7 @@ async fn main() -> std::io::Result<()> {
         }
       }
     }
-    log::warn!(
-      "Unsubscribed from nanocl daemon events, retrying to subscribe in 2 seconds"
-    );
+    log::warn!("Retrying to subscribe in 2 seconds");
     ntex::time::sleep(std::time::Duration::from_secs(2)).await;
   }
 }

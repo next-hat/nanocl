@@ -27,21 +27,17 @@ async fn run(cli: &Cli) -> IoResult<()> {
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
   let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns.clone()).ensure()?;
   event::spawn(&dnsmasq);
-
   let server = server::generate(&cli.host, &dnsmasq)?;
   server.await?;
-
   Ok(())
 }
 
 #[ntex::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = Cli::parse();
-
   if let Err(err) = run(&cli).await {
     err.exit();
   }
-
   Ok(())
 }
 
