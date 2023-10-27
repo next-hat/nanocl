@@ -19,9 +19,9 @@ services:
     networks:
       - system
     volumes:
-      - ${STATE_DIR:-${HOME}/.nanocl/state/store/ca}:/ca
-      - ${STATE_DIR:-${HOME}/.nanocl/state/store/certs}:/certs
-      - ${STATE_DIR:-${HOME}/.nanocl/state/store/data}:/cockroach/cockroach-data
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/store/ca}:/ca
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/store/certs}:/certs
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/store/data}:/cockroach/cockroach-data
     environment:
       - TZ=Europe/Paris
     command:
@@ -97,15 +97,15 @@ services:
       - io.nanocl.cnsp=system
     volumes:
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/run}:/run
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/letsencrypt}:/etc/letsencrypt
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/certs}:/etc/nginx/certs
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/secrets}:/opt/secrets
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/html}:/usr/share/nginx/html
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/streams-enabled}:/etc/nginx/streams-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/run}:/run
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/letsencrypt}:/etc/letsencrypt
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/certs}:/etc/nginx/certs
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/secrets}:/opt/secrets
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/logs}:/var/log/nginx/access
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/html}:/usr/share/nginx/html
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/conf.d}:/etc/nginx/conf.d
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/streams-enabled}:/etc/nginx/streams-enabled
 
   ncproxy:
     container_name: ncproxy.system.c
@@ -134,11 +134,11 @@ services:
         target: /project
       - /project/target
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/secrets}:/opt/secrets
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/logs}:/var/log/nginx/access
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/conf.d}:/etc/nginx/conf.d
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
-      - ${STATE_DIR:-${HOME}/.nanocl/state/proxy/streams-enabled}:/etc/nginx/streams-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/secrets}:/opt/secrets
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/logs}:/var/log/nginx/access
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/conf.d}:/etc/nginx/conf.d
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/sites-enabled}:/etc/nginx/sites-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/proxy/streams-enabled}:/etc/nginx/streams-enabled
 
   ndns:
     container_name: ndns.system.c
@@ -153,7 +153,7 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - ${STATE_DIR:-${HOME}/.nanocl/state/dns}:/opt/dns
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/dns}:/opt/dns
 
   ncdns:
     container_name: ncdns.system.c
@@ -181,7 +181,7 @@ services:
         source: .
         target: /project
       - /project/target
-      - ${STATE_DIR:-${HOME}/.nanocl/state/dns}:/opt/dns
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state/dns}:/opt/dns
       - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
 
   nanocld:
@@ -205,7 +205,7 @@ services:
         source: .
         target: /project
       - /project/target
-      - ${STATE_DIR:-${HOME}/.nanocl/state}:/var/lib/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}:/var/lib/nanocl
       - //run/guest-services/nanocl:/run/nanocl
       - /var/run/docker.sock:/run/docker.sock
     command:
