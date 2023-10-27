@@ -18,3 +18,6 @@ pub mod unix;
 
 #[cfg(feature = "versioning")]
 pub mod versioning;
+
+#[cfg(feature = "build_tools")]
+pub mod build_tools;

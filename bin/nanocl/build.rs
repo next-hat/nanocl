@@ -1,7 +1,9 @@
 use std::fs;
-use std::io::{Result, Error, ErrorKind};
+use std::io::Result;
 
 use clap::*;
+
+use nanocl_utils::build_tools::*;
 
 include!("./src/models/mod.rs");
 
@@ -19,61 +21,6 @@ struct ManPage<'a> {
 /// Path where to render the man pages
 ///
 const MAN_PATH: &str = "./target/man";
-
-/// ## Set env git commit hash
-///
-/// Execute the git command to extract the hash of the current commit
-/// and set it as an environment variable for the produced binary
-///
-fn set_env_git_commit_hash() -> Result<()> {
-  let output = std::process::Command::new("git")
-    .args(["rev-parse", "HEAD"])
-    .output()?;
-
-  let git_hash = String::from_utf8(output.stdout).unwrap();
-
-  println!("cargo:rustc-env=GIT_HASH={git_hash}");
-
-  Ok(())
-}
-
-/// ## Set env target arch
-///
-/// Set the target arch as an environment variable for the produced binary
-///
-fn set_env_target_arch() -> Result<()> {
-  let arch = std::env::var("CARGO_CFG_TARGET_ARCH")
-    .map_err(|e| Error::new(ErrorKind::Other, e))?;
-
-  println!("cargo:rustc-env=TARGET_ARCH={arch}");
-
-  Ok(())
-}
-
-/// ## Generate man page
-///
-/// Function to generate a man page
-///
-/// ## Arguments
-///
-/// * [name](str) Name of the man page
-/// * [app](clap::Command) Command to generate
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok) Operation was successful
-///   * [Err](Err) Operation failed
-///
-fn generate_man_page<'a>(name: &'a str, app: &'a clap::Command) -> Result<()> {
-  let man = clap_mangen::Man::new(app.to_owned());
-  // clap_mangen::multiple
-  let mut man_buffer: Vec<u8> = Default::default();
-  man.render(&mut man_buffer)?;
-  let out_dir = std::env::current_dir()?;
-  std::fs::write(out_dir.join(format!("{MAN_PATH}/{name}.1")), man_buffer)?;
-  Ok(())
-}
 
 /// ## Generate man pages
 ///
@@ -133,25 +80,8 @@ pub fn generate_man_pages() -> Result<()> {
   ];
   fs::create_dir_all(MAN_PATH)?;
   for page in man_pages {
-    generate_man_page(page.name, &page.command)?;
+    generate_man_page(page.name, &page.command, MAN_PATH)?;
   }
-  Ok(())
-}
-
-/// ## Set channel
-///
-/// Set the release channel as an environment variable for the produced binary
-///
-fn set_channel() -> Result<()> {
-  #[allow(unused)]
-  let mut default_channel = "stable";
-  #[cfg(any(feature = "dev", feature = "test"))]
-  {
-    default_channel = "nightly";
-  }
-  let channel =
-    std::env::var("NANOCL_CHANNEL").unwrap_or(default_channel.into());
-  println!("cargo:rustc-env=CHANNEL={channel}");
   Ok(())
 }
 
