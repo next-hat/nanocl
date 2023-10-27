@@ -29,6 +29,7 @@ release = []
 [build-dependencies]
 clap = { version = "4.4.5", features = ["derive"] }
 clap_mangen = { version = "0.2" }
+nanocl_utils = { version = "0.3.0", features = ["build_tools"] }
 
 [dev-dependencies]
 serde_yaml = "0.9"
@@ -70,7 +71,7 @@ nanocld_client = { version = "0.10.0", features = ["tokio"] }
 openssl = { version = "0.10.56", features = ["vendored"] }
 metrsd_client = "0.3.0"
 nanocl_stubs = { version = "0.10.0", features = ["serde"] }
-nanocl_utils = { version = "0.2.3", features = [
+nanocl_utils = { version = "0.3.0", features = [
   "unix",
   "ntex",
   "logger",

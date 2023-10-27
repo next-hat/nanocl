@@ -121,8 +121,13 @@ async fn main() -> std::io::Result<()> {
     .parse_env("LOG_LEVEL")
     .format_target(false)
     .init();
-  log::info!("nanocld_{}_{}", version::ARCH, version::CHANNEL);
-  log::info!("v{}:{}", version::VERSION, version::COMMIT_ID);
+  log::info!(
+    "nanocld_{}_{}_v{}:{}",
+    version::ARCH,
+    version::CHANNEL,
+    version::VERSION,
+    version::COMMIT_ID
+  );
   let config = match config::init(&args) {
     Err(err) => {
       log::error!("{err}");

@@ -16,11 +16,14 @@ use dnsmasq::Dnsmasq;
 
 async fn run(cli: &Cli) -> IoResult<()> {
   logger::enable_logger("ncdns");
-  log::info!("ncdns_{}_{}", version::ARCH, version::CHANNEL);
-  log::info!("v{}:{}", version::VERSION, version::COMMIT_ID);
-
+  log::info!(
+    "ncdns_{}_{}_v{}:{}",
+    version::ARCH,
+    version::CHANNEL,
+    version::VERSION,
+    version::COMMIT_ID
+  );
   // Spawn a new thread to listen events from nanocld
-
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
   let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns.clone()).ensure()?;
   event::spawn(&dnsmasq);
