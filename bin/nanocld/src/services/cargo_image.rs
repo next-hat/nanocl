@@ -4,18 +4,18 @@
 use ntex::web;
 use ntex::http;
 use futures::StreamExt;
-use tokio_util::codec;
-use tokio::io::AsyncWriteExt;
 use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use tokio_util::codec;
 
 use bollard_next::image::ImportImageOptions;
 
+use nanocl_utils::http_error::HttpError;
 use nanocl_stubs::cargo_image::{
   CargoImagePartial, ListCargoImagesOptions, CargoImageImportOptions,
 };
 
 use crate::utils;
-use nanocl_utils::http_error::HttpError;
 use crate::models::DaemonState;
 
 /// List container images
@@ -153,14 +153,12 @@ pub(crate) async fn import_cargo_image(
     status: http::StatusCode::INTERNAL_SERVER_ERROR,
     msg: format!("Error while opening the file {err}"),
   })?;
-
   // sending the file to the docker api
   let byte_stream =
     codec::FramedRead::new(file, codec::BytesCodec::new()).map(|r| {
       let bytes = r?.freeze();
       Ok::<_, std::io::Error>(bytes)
     });
-
   let quiet = query.quiet.unwrap_or(false);
   let body = hyper::Body::wrap_stream(byte_stream);
   let options = ImportImageOptions { quiet };
@@ -171,11 +169,9 @@ pub(crate) async fn import_cargo_image(
       msg: format!("Error while importing the image {err}"),
     })?;
   }
-
   if let Err(err) = tokio::fs::remove_file(&filepath).await {
     log::warn!("Error while deleting the file {filepath}: {err}");
   }
-
   Ok(web::HttpResponse::Ok().into())
 }
 
@@ -191,149 +187,130 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 pub mod tests {
 
-  use crate::services::ntex_config;
-
   use ntex::http;
-  use bollard_next::service::ImageInspect;
-  use futures::{StreamExt, TryStreamExt};
-
-  use nanocl_stubs::{generic::GenericDelete, cargo_image::CargoImagePartial};
   use tokio_util::codec;
+  use ntex::http::client::ClientResponse;
+  use futures::{StreamExt, TryStreamExt};
+  use bollard_next::service::ImageInspect;
 
+  use nanocl_stubs::generic::GenericDelete;
+  use nanocl_stubs::cargo_image::CargoImagePartial;
+  use nanocl_utils::ntex::test_client::{TestClient, test_status};
+
+  use crate::version::VERSION;
+  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
+  const ENDPOINT: &str = "/cargoes/images";
+
   /// Test utils to list cargo images
-  pub async fn list(srv: &TestServer) -> TestReqRet {
-    srv.get("/v0.2/cargoes/images").send().await
+  pub async fn list(client: &TestClient) -> ClientResponse {
+    client.send_get(ENDPOINT, None::<String>).await
   }
 
   /// Test utils to create cargo image
   pub async fn create(
-    srv: &TestServer,
+    client: &TestClient,
     payload: &CargoImagePartial,
-  ) -> TestReqRet {
-    srv.post("/v0.2/cargoes/images").send_json(payload).await
+  ) -> ClientResponse {
+    client
+      .send_post(ENDPOINT, Some(payload), None::<String>)
+      .await
   }
 
   /// Test utils to inspect cargo image
-  pub async fn inspect(srv: &TestServer, id_or_name: &str) -> TestReqRet {
-    srv
-      .get(format!("/v0.2/cargoes/images/{id_or_name}"))
-      .send()
+  pub async fn inspect(
+    client: &TestClient,
+    id_or_name: &str,
+  ) -> ClientResponse {
+    client
+      .send_get(&format!("{ENDPOINT}/{id_or_name}"), None::<String>)
       .await
   }
 
   /// Test utils to delete cargo image
-  pub async fn delete(srv: &TestServer, id_or_name: &str) -> TestReqRet {
-    srv
-      .delete(format!("/v0.2/cargoes/images/{id_or_name}"))
-      .send()
+  pub async fn delete(client: &TestClient, id_or_name: &str) -> ClientResponse {
+    client
+      .send_delete(&format!("{ENDPOINT}/{id_or_name}"), None::<String>)
       .await
   }
 
   /// Test utils to ensure the cargo image exists
-  pub async fn ensure_test_image() -> TestRet {
-    let srv = gen_server(ntex_config).await;
+  pub async fn ensure_test_image() {
+    let client = generate_test_client(ntex_config, VERSION).await;
     let image = CargoImagePartial {
       name: "nexthat/nanocl-get-started:latest".to_owned(),
     };
-    let res = create(&srv, &image).await?;
+    let res = create(&client, &image).await;
     let mut stream = res.into_stream();
     while let Some(chunk) = stream.next().await {
       if let Err(err) = chunk {
-        panic!("Error while creating image {}", &err);
+        panic!("Error while creating test cargo image {err}");
       }
     }
-    Ok(())
   }
 
   /// Basic test to list cargo images
   #[ntex::test]
-  pub async fn basic_list() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-
-    let resp = list(&srv).await?;
+  pub async fn basic_list() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    let resp = list(&client).await;
     let status = resp.status();
-    assert_eq!(
-      status,
-      http::StatusCode::OK,
-      "Expect basic to return status {} got {}",
-      http::StatusCode::OK,
-      status
-    );
-
-    Ok(())
+    test_status!(status, http::StatusCode::OK, "basic cargo image list");
   }
 
   /// Test to upload a cargo image as tarball
   /// Fail in the CI, need to investigate
   /// It works locally though but timeout in the CI
   #[ntex::test]
-  pub async fn upload_tarball() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-
+  pub async fn upload_tarball() {
+    let client = generate_test_client(ntex_config, VERSION).await;
     let curr_path = std::env::current_dir().unwrap();
     let filepath =
       std::path::Path::new(&curr_path).join("../../tests/busybox.tar.gz");
-
     let file = tokio::fs::File::open(&filepath)
       .await
       .expect("Open file for upload tarball failed");
-
     let byte_stream = codec::FramedRead::new(file, codec::BytesCodec::new())
       .map(|r| {
         let bytes = ntex::util::Bytes::from(r?.freeze().to_vec());
         Ok::<_, std::io::Error>(bytes)
       });
-
-    srv
-      .post("/v0.2/cargoes/images/import")
+    client
+      .post(&format!("{ENDPOINT}/import"))
       .send_stream(byte_stream)
-      .await?;
-
-    Ok(())
+      .await
+      .expect("Upload tarball failed");
   }
 
   /// Basic test to create cargo image with wrong name
   #[ntex::test]
-  pub async fn basic_create_wrong_name() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-
+  pub async fn basic_create_wrong_name() {
+    let client = generate_test_client(ntex_config, VERSION).await;
     let payload = CargoImagePartial {
       name: "test".to_string(),
     };
-    let resp = create(&srv, &payload).await?;
+    let resp = create(&client, &payload).await;
     let status = resp.status();
-    assert_eq!(
+    test_status!(
       status,
       http::StatusCode::BAD_REQUEST,
-      "Expect basic to return status {} got {}",
-      http::StatusCode::BAD_REQUEST,
-      status
+      "basic cargo image create wrong name"
     );
-
-    Ok(())
   }
 
   /// Basic test to create, inspect and delete a cargo image
   #[ntex::test]
-  async fn basic() -> TestRet {
+  async fn basic() {
     const TEST_IMAGE: &str = "busybox:unstable-musl";
-    let srv = gen_server(ntex_config).await;
-
+    let client = generate_test_client(ntex_config, VERSION).await;
     // Create
     let payload = CargoImagePartial {
       name: TEST_IMAGE.to_owned(),
     };
-    let res = create(&srv, &payload).await?;
+    let res = create(&client, &payload).await;
     let status = res.status();
-    assert_eq!(
-      status,
-      http::StatusCode::OK,
-      "Expect create to return status {} got {}",
-      http::StatusCode::OK,
-      status
-    );
+    test_status!(status, http::StatusCode::OK, "cargo image create");
     let content_type = res
       .header("content-type")
       .expect("Expect create response to have content type header")
@@ -349,32 +326,18 @@ pub mod tests {
         panic!("Error while creating image {}", &err);
       }
     }
-
     // Inspect
-    let mut res = inspect(&srv, TEST_IMAGE).await?;
+    let mut res = inspect(&client, TEST_IMAGE).await;
     let status = res.status();
-    assert_eq!(
-      status,
-      http::StatusCode::OK,
-      "Expect inspect to return status {} got {}",
-      http::StatusCode::OK,
-      status
-    );
+    test_status!(status, http::StatusCode::OK, "basic inspect image");
     let _body: ImageInspect = res
       .json()
       .await
       .expect("Expect inspect to return ImageInspect json data");
-
     // Delete
-    let mut res = delete(&srv, TEST_IMAGE).await?;
+    let mut res = delete(&client, TEST_IMAGE).await;
     let status = res.status();
-    assert_eq!(
-      status,
-      http::StatusCode::OK,
-      "Expect delete to return status {} got {}",
-      http::StatusCode::OK,
-      status
-    );
+    test_status!(status, http::StatusCode::OK, "basic delete image");
     let body: GenericDelete = res
       .json()
       .await
@@ -384,7 +347,5 @@ pub mod tests {
       "Expect delete to return count 1 got {}",
       body.count
     );
-
-    Ok(())
   }
 }

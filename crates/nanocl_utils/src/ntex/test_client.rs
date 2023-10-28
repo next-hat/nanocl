@@ -1,6 +1,23 @@
 use ntex::web::test::TestServer;
 use ntex::http::client::{ClientRequest, ClientResponse};
 
+#[macro_export]
+macro_rules! test_status {
+  // macth like arm for macro
+  ($expected:expr,$current:expr,$context:expr) => {
+    // macro expand to this code
+    {
+      assert_eq!(
+        $expected, $current,
+        "Expect {} to return status {} got: {}",
+        $context, $expected, $current,
+      );
+    }
+  };
+}
+
+pub use test_status;
+
 pub struct TestClient {
   srv: TestServer,
   version: String,
@@ -18,39 +35,39 @@ impl TestClient {
     format!("v{}{url}", self.version)
   }
 
-  fn get(&self, url: &str) -> ClientRequest {
+  pub fn get(&self, url: &str) -> ClientRequest {
     self.srv.get(self.gen_url(url))
   }
 
-  fn delete(&self, url: &str) -> ClientRequest {
+  pub fn delete(&self, url: &str) -> ClientRequest {
     self
       .srv
       .delete(self.gen_url(url))
       .header("User-Agent", "nanocld_client")
   }
 
-  fn post(&self, url: &str) -> ClientRequest {
+  pub fn post(&self, url: &str) -> ClientRequest {
     self
       .srv
       .post(self.gen_url(url))
       .header("User-Agent", "nanocld_client")
   }
 
-  fn patch(&self, url: &str) -> ClientRequest {
+  pub fn patch(&self, url: &str) -> ClientRequest {
     self
       .srv
       .patch(self.gen_url(url))
       .header("User-Agent", "nanocld_client")
   }
 
-  fn put(&self, url: &str) -> ClientRequest {
+  pub fn put(&self, url: &str) -> ClientRequest {
     self
       .srv
       .put(self.gen_url(url))
       .header("User-Agent", "nanocld_client")
   }
 
-  fn head(&self, url: &str) -> ClientRequest {
+  pub fn head(&self, url: &str) -> ClientRequest {
     self
       .srv
       .head(self.gen_url(url))
@@ -63,9 +80,14 @@ impl TestClient {
   {
     let mut req = self.get(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap()
+      req = req.query(&query).unwrap_or_else(|err| {
+        panic!("Failed to serialize query GET {url}: {err}")
+      })
     }
-    req.send().await.unwrap()
+    req
+      .send()
+      .await
+      .unwrap_or_else(|err| panic!("Failed to send GET {url}: {err}"))
   }
 
   pub async fn send_post<Q, B>(
@@ -80,11 +102,18 @@ impl TestClient {
   {
     let mut req = self.post(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap();
+      req = req.query(&query).unwrap_or_else(|err| {
+        panic!("Failed to serialize query POST {url}: {err}")
+      });
     }
     match body {
-      None => req.send().await.unwrap(),
-      Some(body) => req.send_json(&body).await.unwrap(),
+      None => req
+        .send()
+        .await
+        .unwrap_or_else(|err| panic!("Failed to send POST {url}: {err}")),
+      Some(body) => req.send_json(&body).await.unwrap_or_else(|err| {
+        panic!("Failed to send with body POST {url}: {err}")
+      }),
     }
   }
 
@@ -98,9 +127,14 @@ impl TestClient {
   {
     let mut req = self.delete(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap()
+      req = req.query(&query).unwrap_or_else(|err| {
+        panic!("Failed to serialize query DELETE {url}: {err}")
+      })
     }
-    req.send().await.unwrap()
+    req
+      .send()
+      .await
+      .unwrap_or_else(|err| panic!("Failed to send DELETE {url}: {err}"))
   }
 
   pub async fn send_patch<B, Q>(
@@ -115,11 +149,18 @@ impl TestClient {
   {
     let mut req = self.patch(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap()
+      req = req.query(&query).unwrap_or_else(|err| {
+        panic!("Failed to serialize query PATCH {url}: {err}")
+      })
     }
     match body {
-      None => req.send().await.unwrap(),
-      Some(body) => req.send_json(&body).await.unwrap(),
+      None => req
+        .send()
+        .await
+        .unwrap_or_else(|err| panic!("Failed to send PATCH {url}: {err}")),
+      Some(body) => req.send_json(&body).await.unwrap_or_else(|err| {
+        panic!("Failed to send with body PATCH {url}: {err}")
+      }),
     }
   }
 
@@ -133,9 +174,14 @@ impl TestClient {
   {
     let mut req = self.head(url);
     if let Some(query) = query {
-      req = req.query(&query).unwrap()
+      req = req.query(&query).unwrap_or_else(|err| {
+        panic!("Failed to serialize query HEAD {url}: {err}")
+      })
     }
-    req.send().await.unwrap()
+    req
+      .send()
+      .await
+      .unwrap_or_else(|err| panic!("Failed to send HEAD {url}: {err}"))
   }
 
   pub async fn send_put<B, Q>(
