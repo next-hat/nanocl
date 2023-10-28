@@ -2,21 +2,17 @@ use ntex::web::test::TestServer;
 use ntex::http::client::{ClientRequest, ClientResponse};
 
 #[macro_export]
-macro_rules! test_status {
-  // macth like arm for macro
-  ($expected:expr,$current:expr,$context:expr) => {
-    // macro expand to this code
-    {
-      assert_eq!(
-        $expected, $current,
-        "Expect {} to return status {} got: {}",
-        $context, $expected, $current,
-      );
-    }
-  };
+macro_rules! test_status_code {
+  ($expected:expr,$current:expr,$context:expr) => {{
+    assert_eq!(
+      $expected, $current,
+      "Expect {} to return status {} got: {}",
+      $context, $expected, $current,
+    );
+  }};
 }
 
-pub use test_status;
+pub use test_status_code;
 
 pub struct TestClient {
   srv: TestServer,

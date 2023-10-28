@@ -562,7 +562,7 @@ mod tests {
     Cargo, CargoSummary, CargoInspect, OutputLog, CargoDeleteQuery,
     CargoListQuery, CargoScale,
   };
-  use nanocl_utils::ntex::test_client::{TestClient, test_status};
+  use nanocl_utils::ntex::test_client::{TestClient, test_status_code};
 
   use crate::version::VERSION;
   use crate::services::ntex_config;
@@ -599,7 +599,11 @@ mod tests {
         )
         .await;
       let status = res.status();
-      test_status!(status, http::StatusCode::CREATED, "basic cargo create");
+      test_status_code!(
+        status,
+        http::StatusCode::CREATED,
+        "basic cargo create"
+      );
       let cargo = TestClient::res_json::<Cargo>(res).await;
       assert_eq!(cargo.name, test_cargo, "Invalid cargo name");
       assert_eq!(cargo.namespace_name, "global", "Invalid cargo namespace");
@@ -619,7 +623,7 @@ mod tests {
         }),
       )
       .await;
-    test_status!(
+    test_status_code!(
       res.status(),
       http::StatusCode::OK,
       "basic cargo list filter name"
@@ -641,7 +645,7 @@ mod tests {
         }),
       )
       .await;
-    test_status!(
+    test_status_code!(
       res.status(),
       http::StatusCode::OK,
       "basic cargo list limit 1"
@@ -655,7 +659,11 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(res.status(), http::StatusCode::OK, "basic cargo inspect");
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "basic cargo inspect"
+    );
     let response = res.json::<CargoInspect>().await.unwrap();
     assert_eq!(
       response.name, main_test_cargo,
@@ -663,7 +671,7 @@ mod tests {
       response.name
     );
     let mut res = client.send_get(ENDPOINT, None::<String>).await;
-    test_status!(res.status(), http::StatusCode::OK, "basic cargo list");
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo list");
     let cargoes = res.json::<Vec<CargoSummary>>().await.unwrap();
     assert!(!cargoes.is_empty(), "Expected to find cargoes");
     let res = client
@@ -673,7 +681,7 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(
+    test_status_code!(
       res.status(),
       http::StatusCode::ACCEPTED,
       "basic cargo start"
@@ -693,7 +701,7 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(res.status(), http::StatusCode::OK, "basic cargo patch");
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo patch");
     let patch_response = res.json::<Cargo>().await.unwrap();
     assert_eq!(patch_response.name, main_test_cargo);
     assert_eq!(patch_response.namespace_name, "global");
@@ -711,7 +719,11 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(res.status(), http::StatusCode::OK, "basic cargo history");
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "basic cargo history"
+    );
     let histories = res.json::<Vec<CargoConfig>>().await.unwrap();
     assert!(histories.len() > 1, "Expected to find cargo histories");
     let id = histories[0].key;
@@ -722,7 +734,7 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(res.status(), http::StatusCode::OK, "basic cargo revert");
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo revert");
     let res = client
       .send_post(
         &format!("{ENDPOINT}/{main_test_cargo}/stop"),
@@ -730,7 +742,11 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(res.status(), http::StatusCode::ACCEPTED, "basic cargo stop");
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "basic cargo stop"
+    );
     for test_cargo in test_cargoes.iter() {
       let res = client
         .send_delete(
@@ -741,7 +757,7 @@ mod tests {
           }),
         )
         .await;
-      test_status!(
+      test_status_code!(
         res.status(),
         http::StatusCode::ACCEPTED,
         "basic cargo delete"
@@ -767,7 +783,7 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(
+    test_status_code!(
       res.status(),
       http::StatusCode::CREATED,
       "scale cargo create"
@@ -779,7 +795,7 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(
+    test_status_code!(
       res.status(),
       http::StatusCode::ACCEPTED,
       "scale cargo start"
@@ -791,7 +807,11 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(res.status(), http::StatusCode::OK, "scale cargo scale up");
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "scale cargo scale up"
+    );
     let res = client
       .send_patch(
         &format!("{ENDPOINT}/{CARGO_NAME}/scale"),
@@ -799,7 +819,11 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(res.status(), http::StatusCode::OK, "scale cargo scale down");
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "scale cargo scale down"
+    );
     let res = client
       .send_post(
         &format!("{ENDPOINT}/{CARGO_NAME}/stop"),
@@ -807,11 +831,15 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status!(res.status(), http::StatusCode::ACCEPTED, "scale cargo stop");
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "scale cargo stop"
+    );
     let res = client
       .send_delete(&format!("{ENDPOINT}/{CARGO_NAME}"), None::<String>)
       .await;
-    test_status!(
+    test_status_code!(
       res.status(),
       http::StatusCode::ACCEPTED,
       "scale cargo delete"
@@ -830,7 +858,7 @@ mod tests {
         }),
       )
       .await;
-    test_status!(res.status(), http::StatusCode::OK, "logs cargo logs");
+    test_status_code!(res.status(), http::StatusCode::OK, "logs cargo logs");
     let mut stream = res.into_stream();
     let mut payload = Vec::new();
     let data = stream.next().await.unwrap().unwrap();

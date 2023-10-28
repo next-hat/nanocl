@@ -195,7 +195,7 @@ pub mod tests {
 
   use nanocl_stubs::generic::GenericDelete;
   use nanocl_stubs::cargo_image::CargoImagePartial;
-  use nanocl_utils::ntex::test_client::{TestClient, test_status};
+  use nanocl_utils::ntex::test_client::{TestClient, test_status_code};
 
   use crate::version::VERSION;
   use crate::services::ntex_config;
@@ -256,7 +256,7 @@ pub mod tests {
     let client = generate_test_client(ntex_config, VERSION).await;
     let resp = list(&client).await;
     let status = resp.status();
-    test_status!(status, http::StatusCode::OK, "basic cargo image list");
+    test_status_code!(status, http::StatusCode::OK, "basic cargo image list");
   }
 
   /// Test to upload a cargo image as tarball
@@ -292,7 +292,7 @@ pub mod tests {
     };
     let resp = create(&client, &payload).await;
     let status = resp.status();
-    test_status!(
+    test_status_code!(
       status,
       http::StatusCode::BAD_REQUEST,
       "basic cargo image create wrong name"
@@ -310,7 +310,7 @@ pub mod tests {
     };
     let res = create(&client, &payload).await;
     let status = res.status();
-    test_status!(status, http::StatusCode::OK, "cargo image create");
+    test_status_code!(status, http::StatusCode::OK, "cargo image create");
     let content_type = res
       .header("content-type")
       .expect("Expect create response to have content type header")
@@ -329,7 +329,7 @@ pub mod tests {
     // Inspect
     let mut res = inspect(&client, TEST_IMAGE).await;
     let status = res.status();
-    test_status!(status, http::StatusCode::OK, "basic inspect image");
+    test_status_code!(status, http::StatusCode::OK, "basic inspect image");
     let _body: ImageInspect = res
       .json()
       .await
@@ -337,7 +337,7 @@ pub mod tests {
     // Delete
     let mut res = delete(&client, TEST_IMAGE).await;
     let status = res.status();
-    test_status!(status, http::StatusCode::OK, "basic delete image");
+    test_status_code!(status, http::StatusCode::OK, "basic delete image");
     let body: GenericDelete = res
       .json()
       .await
