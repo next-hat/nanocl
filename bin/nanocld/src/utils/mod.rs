@@ -23,8 +23,6 @@ pub mod tests {
   use std::fs;
   use std::env;
   use ntex::web::{*, self};
-  use ntex::http::client::ClientResponse;
-  use ntex::http::client::error::SendRequestError;
 
   use nanocl_stubs::config::DaemonConfig;
   use nanocl_utils::ntex::test_client::TestClient;
@@ -35,7 +33,6 @@ pub mod tests {
   use crate::models::{Pool, DaemonState};
 
   pub use ntex::web::test::TestServer;
-  pub type TestReqRet = Result<ClientResponse, SendRequestError>;
   pub type TestRet = Result<(), Box<dyn std::error::Error + 'static>>;
 
   type Config = fn(&mut ServiceConfig);
