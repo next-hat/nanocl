@@ -553,10 +553,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use crate::services::ntex_config;
-  use crate::utils::tests::*;
-  use crate::services::cargo_image::tests::ensure_test_image;
-
   use ntex::http;
   use futures::{TryStreamExt, StreamExt};
 
@@ -566,115 +562,147 @@ mod tests {
     Cargo, CargoSummary, CargoInspect, OutputLog, CargoDeleteQuery,
     CargoListQuery, CargoScale,
   };
+  use nanocl_utils::ntex::test_client::{TestClient, test_status_code};
+
+  use crate::version::VERSION;
+  use crate::services::ntex_config;
+  use crate::services::cargo_image::tests::ensure_test_image;
+  use crate::utils::tests::*;
+
+  const ENDPOINT: &str = "/cargoes";
 
   /// Test to create start patch stop and delete a cargo with valid data
   #[ntex::test]
-  async fn basic() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-    ensure_test_image().await?;
-
+  async fn basic() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    ensure_test_image().await;
     let test_cargoes = [
       "1daemon-test-cargo",
       "2another-test-cargo",
       "2daemon-test-cargo",
     ];
     let main_test_cargo = test_cargoes[0];
-
     for test_cargo in test_cargoes.iter() {
       let test_cargo = test_cargo.to_owned();
-      let mut res = srv
-        .post("/v0.10/cargoes")
-        .send_json(&CargoConfigPartial {
-          name: test_cargo.to_owned(),
-          container: bollard_next::container::Config {
-            image: Some("nexthat/nanocl-get-started:latest".to_owned()),
+      let res = client
+        .send_post(
+          ENDPOINT,
+          Some(&CargoConfigPartial {
+            name: test_cargo.to_owned(),
+            container: bollard_next::container::Config {
+              image: Some("nexthat/nanocl-get-started:latest".to_owned()),
+              ..Default::default()
+            },
             ..Default::default()
-          },
-          ..Default::default()
-        })
-        .await?;
-      println!("res: {:?}", res);
-      let json = res.json::<serde_json::Value>().await?;
-      println!("json: {:?}", json);
-      assert_eq!(res.status(), 201, "Invalid Cargo create status code");
-      let response: Cargo = serde_json::from_value(json).unwrap();
-      assert_eq!(response.name, test_cargo, "Invalid cargo name");
-      assert_eq!(response.namespace_name, "global", "Invalid cargo namespace");
+          }),
+          None::<String>,
+        )
+        .await;
+      let status = res.status();
+      test_status_code!(
+        status,
+        http::StatusCode::CREATED,
+        "basic cargo create"
+      );
+      let cargo = TestClient::res_json::<Cargo>(res).await;
+      assert_eq!(cargo.name, test_cargo, "Invalid cargo name");
+      assert_eq!(cargo.namespace_name, "global", "Invalid cargo namespace");
       assert_eq!(
-        response.config.container.image,
+        cargo.config.container.image,
         Some("nexthat/nanocl-get-started:latest".to_owned())
       );
     }
-
-    println!("test_cargoes: {:?}\nfinished", test_cargoes);
-    let mut res = srv
-      .get("/v0.10/cargoes")
-      .query(&CargoListQuery {
-        name: Some(test_cargoes.get(1).unwrap().to_string()),
-        namespace: None,
-        limit: None,
-        offset: None,
-      })?
-      .send()
-      .await?;
-    assert_eq!(res.status(), 200, "Invalid Cargo list status code");
-    let cargoes = res.json::<Vec<CargoSummary>>().await?;
-    assert_eq!(
-      cargoes[0].name,
-      test_cargoes.get(1).unwrap().to_string(),
-      "Invalid cargo name while filtering"
+    let mut res = client
+      .send_get(
+        ENDPOINT,
+        Some(&CargoListQuery {
+          name: Some(test_cargoes[1].to_owned()),
+          namespace: None,
+          limit: None,
+          offset: None,
+        }),
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "basic cargo list filter name"
     );
-
-    let mut res = srv
-      .get("/v0.10/cargoes")
-      .query(&CargoListQuery {
-        name: None,
-        namespace: None,
-        limit: Some(1),
-        offset: None,
-      })?
-      .send()
-      .await?;
-    assert_eq!(res.status(), 200);
-    let cargoes = res.json::<Vec<CargoSummary>>().await?;
-    assert_eq!(cargoes.len(), 1);
-
-    let mut res = srv
-      .get(format!("/v0.10/cargoes/{main_test_cargo}/inspect"))
-      .send()
-      .await?;
-    assert_eq!(res.status(), 200);
-
-    let response = res.json::<CargoInspect>().await?;
-    assert_eq!(response.name, main_test_cargo);
-
-    let mut res = srv.get("/v0.10/cargoes").send().await?;
-    assert_eq!(res.status(), 200);
-    let cargoes = res.json::<Vec<CargoSummary>>().await?;
-    assert!(!cargoes.is_empty());
-    assert_eq!(cargoes[0].namespace_name, "global");
-
-    let res = srv
-      .post(format!("/v0.10/cargoes/{}/start", response.name))
-      .send()
-      .await?;
-    assert_eq!(res.status(), 202);
-
-    let mut res = srv
-      .put(format!("/v0.10/cargoes/{}", response.name))
-      .send_json(&CargoConfigPartial {
-        name: main_test_cargo.to_string(),
-        container: bollard_next::container::Config {
-          image: Some("nexthat/nanocl-get-started:latest".to_string()),
-          env: Some(vec!["TEST=1".to_string()]),
+    let cargoes = res.json::<Vec<CargoSummary>>().await.unwrap();
+    assert_eq!(
+      cargoes[0].name, test_cargoes[1],
+      "Expected to find cargo with name {} got {}",
+      test_cargoes[1], cargoes[0].name
+    );
+    let mut res = client
+      .send_get(
+        ENDPOINT,
+        Some(&CargoListQuery {
+          name: None,
+          namespace: None,
+          limit: Some(1),
+          offset: None,
+        }),
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "basic cargo list limit 1"
+    );
+    let cargoes = res.json::<Vec<CargoSummary>>().await.unwrap();
+    let len = cargoes.len();
+    assert_eq!(len, 1, "Expected to find 1 cargo got {len}");
+    let mut res = client
+      .send_get(
+        &format!("{ENDPOINT}/{main_test_cargo}/inspect"),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "basic cargo inspect"
+    );
+    let response = res.json::<CargoInspect>().await.unwrap();
+    assert_eq!(
+      response.name, main_test_cargo,
+      "Expected to find cargo with name {main_test_cargo} got {}",
+      response.name
+    );
+    let mut res = client.send_get(ENDPOINT, None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo list");
+    let cargoes = res.json::<Vec<CargoSummary>>().await.unwrap();
+    assert!(!cargoes.is_empty(), "Expected to find cargoes");
+    let res = client
+      .send_post(
+        &format!("{ENDPOINT}/{main_test_cargo}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "basic cargo start"
+    );
+    let mut res = client
+      .send_put(
+        &format!("{ENDPOINT}/{main_test_cargo}"),
+        Some(&CargoConfigPartial {
+          name: main_test_cargo.to_string(),
+          container: bollard_next::container::Config {
+            image: Some("nexthat/nanocl-get-started:latest".to_string()),
+            env: Some(vec!["TEST=1".to_string()]),
+            ..Default::default()
+          },
           ..Default::default()
-        },
-        ..Default::default()
-      })
-      .await?;
-    assert_eq!(res.status(), 200);
-
-    let patch_response = res.json::<Cargo>().await?;
+        }),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo patch");
+    let patch_response = res.json::<Cargo>().await.unwrap();
     assert_eq!(patch_response.name, main_test_cargo);
     assert_eq!(patch_response.namespace_name, "global");
     assert_eq!(
@@ -685,136 +713,159 @@ mod tests {
       patch_response.config.container.env,
       Some(vec!["TEST=1".to_string()])
     );
-
-    let mut res = srv
-      .get(format!("/v0.10/cargoes/{}/histories", response.name))
-      .send()
-      .await?;
-    assert_eq!(res.status(), 200);
-    let histories = res.json::<Vec<CargoConfig>>().await?;
-    assert!(histories.len() > 1);
-
+    let mut res = client
+      .send_get(
+        &format!("{ENDPOINT}/{main_test_cargo}/histories"),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "basic cargo history"
+    );
+    let histories = res.json::<Vec<CargoConfig>>().await.unwrap();
+    assert!(histories.len() > 1, "Expected to find cargo histories");
     let id = histories[0].key;
-    let res = srv
-      .patch(format!(
-        "/v0.10/cargoes/{}/histories/{id}/revert",
-        response.name
-      ))
-      .send()
-      .await?;
-
-    assert_eq!(res.status(), 200);
-
-    let res = srv
-      .post(format!("/v0.10/cargoes/{}/stop", response.name))
-      .send()
-      .await?;
-    assert_eq!(res.status(), 202);
-
-    let res = srv
-      .delete(format!("/v0.10/cargoes/{}", response.name))
-      .send()
-      .await?;
-    assert_eq!(res.status(), 202);
-
-    let res = srv
-      .delete(format!("/v0.10/cargoes/{}", test_cargoes[1]))
-      .query(&CargoDeleteQuery {
-        namespace: None,
-        force: Some(true),
-      })?
-      .send()
-      .await?;
-    assert_eq!(res.status(), 202);
-    let res = srv
-      .delete(format!("/v0.10/cargoes/{}", test_cargoes[2]))
-      .query(&CargoDeleteQuery {
-        namespace: None,
-        force: Some(true),
-      })?
-      .send()
-      .await?;
-    assert_eq!(res.status(), 202);
-    Ok(())
+    let res = client
+      .send_patch(
+        &format!("{ENDPOINT}/{main_test_cargo}/histories/{id}/revert"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo revert");
+    let res = client
+      .send_post(
+        &format!("{ENDPOINT}/{main_test_cargo}/stop"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "basic cargo stop"
+    );
+    for test_cargo in test_cargoes.iter() {
+      let res = client
+        .send_delete(
+          &format!("{ENDPOINT}/{test_cargo}"),
+          Some(CargoDeleteQuery {
+            force: Some(true),
+            ..Default::default()
+          }),
+        )
+        .await;
+      test_status_code!(
+        res.status(),
+        http::StatusCode::ACCEPTED,
+        "basic cargo delete"
+      );
+    }
   }
 
   #[ntex::test]
-  async fn scale() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-
+  async fn scale() {
     const CARGO_NAME: &str = "api-test-scale";
-    let res = srv
-      .post("/v0.10/cargoes")
-      .send_json(&CargoConfigPartial {
-        name: CARGO_NAME.to_string(),
-        container: bollard_next::container::Config {
-          image: Some("nexthat/nanocl-get-started:latest".to_string()),
+    let client = generate_test_client(ntex_config, VERSION).await;
+    let res = client
+      .send_post(
+        ENDPOINT,
+        Some(&CargoConfigPartial {
+          name: CARGO_NAME.to_string(),
+          container: bollard_next::container::Config {
+            image: Some("nexthat/nanocl-get-started:latest".to_string()),
+            ..Default::default()
+          },
           ..Default::default()
-        },
-        ..Default::default()
-      })
-      .await?;
-    assert_eq!(res.status(), 201);
-
-    let res = srv
-      .post(format!("/v0.10/cargoes/{CARGO_NAME}/start"))
-      .send()
-      .await?;
-    assert_eq!(res.status(), 202);
-
-    let res = srv
-      .patch(format!("/v0.10/cargoes/{CARGO_NAME}/scale"))
-      .send_json(&CargoScale { replicas: 2 })
-      .await?;
-
-    assert_eq!(res.status(), 200);
-
-    let res = srv
-      .patch(format!("/v0.10/cargoes/{CARGO_NAME}/scale"))
-      .send_json(&CargoScale { replicas: -1 })
-      .await?;
-    assert_eq!(res.status(), 200);
-
-    let res = srv
-      .post(format!("/v0.10/cargoes/{CARGO_NAME}/stop"))
-      .send()
-      .await?;
-    assert_eq!(res.status(), 202);
-
-    let res = srv
-      .delete(format!("/v0.10/cargoes/{CARGO_NAME}"))
-      .send()
-      .await?;
-
-    assert_eq!(res.status(), 202);
-
-    Ok(())
+        }),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::CREATED,
+      "scale cargo create"
+    );
+    let res = client
+      .send_post(
+        &format!("{ENDPOINT}/{CARGO_NAME}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "scale cargo start"
+    );
+    let res = client
+      .send_patch(
+        &format!("{ENDPOINT}/{CARGO_NAME}/scale"),
+        Some(&CargoScale { replicas: 2 }),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "scale cargo scale up"
+    );
+    let res = client
+      .send_patch(
+        &format!("{ENDPOINT}/{CARGO_NAME}/scale"),
+        Some(&CargoScale { replicas: -1 }),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "scale cargo scale down"
+    );
+    let res = client
+      .send_post(
+        &format!("{ENDPOINT}/{CARGO_NAME}/stop"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "scale cargo stop"
+    );
+    let res = client
+      .send_delete(&format!("{ENDPOINT}/{CARGO_NAME}"), None::<String>)
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "scale cargo delete"
+    );
   }
 
   #[ntex::test]
-  async fn logs() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-
+  async fn logs() {
     const CARGO_NAME: &str = "nstore";
-
-    let res = srv
-      .get(format!("/v0.10/cargoes/{CARGO_NAME}/logs"))
-      .query(&GenericNspQuery {
-        namespace: Some("system".into()),
-      })
-      .unwrap()
-      .send()
-      .await?;
-
-    assert_eq!(res.status(), http::StatusCode::OK);
+    let client = generate_test_client(ntex_config, VERSION).await;
+    let res = client
+      .send_get(
+        &format!("{ENDPOINT}/{CARGO_NAME}/logs"),
+        Some(&GenericNspQuery {
+          namespace: Some("system".into()),
+        }),
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "logs cargo logs");
     let mut stream = res.into_stream();
     let mut payload = Vec::new();
     let data = stream.next().await.unwrap().unwrap();
     payload.extend_from_slice(&data);
     if data.last() == Some(&b'\n') {
-      let _ = serde_json::from_slice::<OutputLog>(&payload)?;
+      let _ = serde_json::from_slice::<OutputLog>(&payload).unwrap();
       payload.clear();
     }
-    Ok(())
   }
 }

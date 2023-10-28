@@ -32,7 +32,6 @@ async fn inspect_exec_command(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let infos = utils::exec::inspect_exec_command(&path.1, &state).await?;
-
   Ok(web::HttpResponse::Ok().json(&infos))
 }
 
@@ -84,7 +83,6 @@ async fn create_exec_command(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let result = utils::exec::create_exec_command(&key, &payload, &state).await?;
-
   Ok(web::HttpResponse::Ok().json(&result))
 }
 
@@ -96,20 +94,20 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use crate::services::ntex_config;
-  use crate::utils::tests::*;
 
-  use bollard_next::exec::{CreateExecOptions, CreateExecResults, StartExecOptions};
-  use bollard_next::service::ExecInspectResponse;
   use ntex::http;
   use futures::{TryStreamExt, StreamExt};
+  use bollard_next::service::ExecInspectResponse;
+  use bollard_next::exec::{CreateExecOptions, CreateExecResults, StartExecOptions};
 
   use nanocl_stubs::generic::GenericNspQuery;
+
+  use crate::services::ntex_config;
+  use crate::utils::tests::*;
 
   #[ntex::test]
   async fn exec() -> TestRet {
     let srv = gen_server(ntex_config).await;
-
     const CARGO_NAME: &str = "nstore";
 
     let mut create_result = srv
