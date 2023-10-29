@@ -81,3 +81,34 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(apply_rule);
   config.service(remove_rule);
 }
+
+#[cfg(test)]
+mod tests {
+  use ntex::http;
+
+  use crate::utils::tests::*;
+
+  #[ntex::test]
+  async fn apply_rule() {
+    let client = gen_default_test_client();
+    let res = client
+      .send_put("/rules/test", None::<String>, None::<String>)
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::BAD_REQUEST,
+      "apply rule without body"
+    );
+  }
+
+  #[ntex::test]
+  async fn remove_unexisting_rule() {
+    let client = gen_default_test_client();
+    let res = client.send_delete("/rules/test", None::<String>).await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::NOT_FOUND,
+      "remove unexisting rule"
+    );
+  }
+}

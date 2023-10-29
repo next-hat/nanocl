@@ -168,8 +168,9 @@ pub(crate) async fn remove_entries(
 #[cfg(test)]
 pub mod tests {
   use nanocl_utils::logger;
+  pub use nanocl_utils::ntex::test_client::*;
 
-  use crate::services;
+  use crate::{version, services};
   use crate::dnsmasq::Dnsmasq;
 
   // Before a test
@@ -180,15 +181,16 @@ pub mod tests {
   }
 
   // Generate a test server
-  pub fn generate_server() -> ntex::web::test::TestServer {
+  pub fn gen_default_test_client() -> TestClient {
     before();
     let dnsmasq = Dnsmasq::new("/tmp/dnsmasq");
     dnsmasq.ensure().unwrap();
     // Create test server
-    ntex::web::test::server(move || {
+    let srv = ntex::web::test::server(move || {
       ntex::web::App::new()
         .state(dnsmasq.clone())
         .configure(services::ntex_config)
-    })
+    });
+    TestClient::new(srv, version::VERSION)
   }
 }
