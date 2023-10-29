@@ -251,7 +251,7 @@ pub mod tests {
 
   /// Basic test to list cargo images
   #[ntex::test]
-  pub async fn basic_list() {
+  async fn basic_list() {
     let client = generate_test_client(ntex_config, VERSION).await;
     let resp = list(&client).await;
     let status = resp.status();
@@ -262,7 +262,7 @@ pub mod tests {
   /// Fail in the CI, need to investigate
   /// It works locally though but timeout in the CI
   #[ntex::test]
-  pub async fn upload_tarball() {
+  async fn upload_tarball() {
     let client = generate_test_client(ntex_config, VERSION).await;
     let curr_path = std::env::current_dir().unwrap();
     let filepath =
@@ -284,7 +284,7 @@ pub mod tests {
 
   /// Basic test to create cargo image with wrong name
   #[ntex::test]
-  pub async fn basic_create_wrong_name() {
+  async fn basic_create_wrong_name() {
     let client = generate_test_client(ntex_config, VERSION).await;
     let payload = CargoImagePartial {
       name: "test".to_string(),

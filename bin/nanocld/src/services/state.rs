@@ -114,101 +114,56 @@ pub fn ntex_config(cfg: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
+  use ntex::http;
   use futures::{TryStreamExt, StreamExt};
 
+  use crate::version::VERSION;
   use crate::services::ntex_config;
-
   use crate::utils::tests::*;
 
+  async fn apply_state(client: &TestClient, path: &str) {
+    let data = parse_statefile(path).unwrap();
+    let res = client
+      .send_put("/state/apply", Some(&data), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "state apply");
+    let mut stream = res.into_stream();
+    while let Some(item) = stream.next().await {
+      item.expect("Correct response");
+    }
+  }
+
+  async fn revert_state(client: &TestClient, path: &str) {
+    let data = parse_statefile(path).unwrap();
+    let res = client
+      .send_put("/state/remove", Some(&data), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "state revert");
+    let mut stream = res.into_stream();
+    while let Some(item) = stream.next().await {
+      item.expect("Correct response");
+    }
+  }
+
   #[ntex::test]
-  pub(crate) async fn basic() -> TestRet {
+  async fn basic() {
     // Generate server
-    let srv = gen_server(ntex_config).await;
-
+    let client = generate_test_client(ntex_config, VERSION).await;
     // Apply examples/cargo_example.yml
-    let data = parse_statefile("../../examples/cargo_example.yml")?;
-    let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
-    assert_eq!(req.status(), 200);
-    let mut stream = req.into_stream();
-    while let Some(item) = stream.next().await {
-      item.expect("Correct response");
-    }
-
-    // Apply examples/deploy_example.yml
-    let data = parse_statefile("../../examples/cargo_example.yml")?;
-    let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
-    assert_eq!(req.status(), 200);
-    let mut stream = req.into_stream();
-    while let Some(item) = stream.next().await {
-      item.expect("Correct response");
-    }
-
+    apply_state(&client, "../../examples/cargo_example.yml").await;
+    // ReApply examples/cargo_example.yml
+    apply_state(&client, "../../examples/cargo_example.yml").await;
     // Revert examples/cargo_example.yml
-    let data = parse_statefile("../../examples/cargo_example.yml")?;
-    let req = srv
-      .put("/v0.5/state/remove")
-      .send_json(&data)
-      .await
-      .unwrap();
-    assert_eq!(req.status(), 200);
-    let mut stream = req.into_stream();
-    while let Some(item) = stream.next().await {
-      item.expect("Correct response");
-    }
-
+    revert_state(&client, "../../examples/cargo_example.yml").await;
     // Apply examples/deploy_example.yml
-    let data = parse_statefile("../../examples/deploy_example.yml")?;
-    let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
-    assert_eq!(req.status(), 200);
-    let mut stream = req.into_stream();
-    while let Some(item) = stream.next().await {
-      item.expect("Correct response");
-    }
-
+    apply_state(&client, "../../examples/deploy_example.yml").await;
     // Apply examples/resource_ssl_example.yml
-    let data = parse_statefile("../../examples/resource_ssl_example.yml")?;
-    let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
-    assert_eq!(req.status(), 200);
-    let mut stream = req.into_stream();
-    while let Some(item) = stream.next().await {
-      item.expect("Correct response");
-    }
-
-    // Apply examples/resource_ssl_example.yml
-    let data = parse_statefile("../../examples/resource_ssl_example.yml")?;
-    let req = srv.put("/v0.5/state/apply").send_json(&data).await.unwrap();
-    assert_eq!(req.status(), 200);
-    let mut stream = req.into_stream();
-    while let Some(item) = stream.next().await {
-      item.expect("Correct response");
-    }
-
+    apply_state(&client, "../../examples/resource_ssl_example.yml").await;
+    // ReApply examples/resource_ssl_example.yml
+    apply_state(&client, "../../examples/resource_ssl_example.yml").await;
     // Revert examples/resource_ssl_example.yml
-    let data = parse_statefile("../../examples/resource_ssl_example.yml")?;
-    let req = srv
-      .put("/v0.5/state/remove")
-      .send_json(&data)
-      .await
-      .unwrap();
-    assert_eq!(req.status(), 200);
-    let mut stream = req.into_stream();
-    while let Some(item) = stream.next().await {
-      item.expect("Correct response");
-    }
-
+    revert_state(&client, "../../examples/resource_ssl_example.yml").await;
     // Revert examples/deploy_example.yml
-    let data = parse_statefile("../../examples/deploy_example.yml")?;
-    let req = srv
-      .put("/v0.5/state/remove")
-      .send_json(&data)
-      .await
-      .unwrap();
-    assert_eq!(req.status(), 200);
-    let mut stream = req.into_stream();
-    while let Some(item) = stream.next().await {
-      item.expect("Correct response");
-    }
-
-    Ok(())
+    revert_state(&client, "../../examples/deploy_example.yml").await;
   }
 }
