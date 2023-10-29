@@ -387,7 +387,7 @@ mod tests {
   use crate::utils::tests::*;
 
   #[ntex::test]
-  pub(crate) async fn list_vm() {
+  async fn list_vm() {
     let client = generate_test_client(ntex_config, VERSION).await;
     let resp = client.send_get("/vms", None::<String>).await;
     test_status_code!(resp.status(), http::StatusCode::OK, "list vm");
