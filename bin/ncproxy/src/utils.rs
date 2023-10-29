@@ -729,13 +729,10 @@ pub(crate) async fn list_resource_by_secret(
 
 #[cfg(test)]
 pub(crate) mod tests {
-  use std::process::Output;
-  use ntex::web::error::BlockingError;
-
   use nanocl_utils::logger;
+  pub use nanocl_utils::ntex::test_client::*;
 
-  use crate::services;
-  use crate::nginx::Nginx;
+  use crate::{version, nginx, services};
 
   // Before a test
   pub fn before() {
@@ -744,34 +741,16 @@ pub(crate) mod tests {
     logger::enable_logger("ncproxy");
   }
 
-  pub async fn exec_nanocl(arg: &str) -> std::io::Result<Output> {
-    let arg = arg.to_owned();
-    ntex::web::block(move || {
-      let mut cmd = std::process::Command::new("cargo");
-      let mut args = vec!["make", "run-cli"];
-      args.extend(arg.split(' ').collect::<Vec<&str>>());
-      cmd.args(&args);
-      let output = cmd.output()?;
-      Ok::<_, std::io::Error>(output)
-    })
-    .await
-    .map_err(|err| match err {
-      BlockingError::Error(err) => err,
-      BlockingError::Canceled => {
-        std::io::Error::new(std::io::ErrorKind::Other, "Canceled")
-      }
-    })
-  }
-
-  pub fn generate_server() -> ntex::web::test::TestServer {
+  pub fn gen_default_test_client() -> TestClient {
     before();
-    let nginx = Nginx::new("/tmp/nginx");
+    let nginx = nginx::Nginx::new("/tmp/nginx");
     nginx.ensure().unwrap();
     // Create test server
-    ntex::web::test::server(move || {
+    let srv = ntex::web::test::server(move || {
       ntex::web::App::new()
         .state(nginx.clone())
         .configure(services::ntex_config)
-    })
+    });
+    TestClient::new(srv, version::VERSION)
   }
 }

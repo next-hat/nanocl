@@ -5,7 +5,7 @@ use nanocl_utils::http_error::HttpError;
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::dns::ResourceDnsRule;
 
-use crate::utils::{self, remove_entries};
+use crate::utils;
 use crate::dnsmasq::Dnsmasq;
 
 /// Create/Update a new DnsRule
@@ -72,7 +72,7 @@ pub(crate) async fn remove_rule(
         err
       ))
     })?;
-  remove_entries(&dns_rule, &dnsmasq, &client).await?;
+  utils::remove_entries(&dns_rule, &dnsmasq, &client).await?;
   utils::reload_service(&client).await?;
   Ok(web::HttpResponse::Ok().finish())
 }

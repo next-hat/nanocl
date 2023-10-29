@@ -48,35 +48,20 @@ mod tests {
 
   use nanocld_client::stubs::system::Version;
 
-  use crate::utils::tests;
+  use crate::utils::tests::*;
 
   #[ntex::test]
   async fn head_ping() {
-    let srv = tests::generate_server();
-
-    let res = srv
-      .head("/v0.1/_ping")
-      .send()
-      .await
-      .expect("Failed to execute request");
-
-    assert_eq!(res.status(), http::StatusCode::ACCEPTED);
+    let client = gen_default_test_client();
+    let res = client.send_head("/_ping", None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::ACCEPTED, "ping");
   }
 
   #[ntex::test]
   async fn get_version() {
-    let srv = tests::generate_server();
-
-    let mut res = srv
-      .get("/v0.1/version")
-      .send()
-      .await
-      .expect("Failed to execute request");
-
-    assert_eq!(res.status(), http::StatusCode::OK);
-    let _ = res
-      .json::<Version>()
-      .await
-      .expect("Expect to get a valid version");
+    let client = gen_default_test_client();
+    let mut res = client.send_get("/version", None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "get version");
+    let _ = res.json::<Version>().await.unwrap();
   }
 }

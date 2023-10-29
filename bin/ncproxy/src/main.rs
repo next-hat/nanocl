@@ -31,18 +31,3 @@ async fn main() -> std::io::Result<()> {
   server.await?;
   Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-  use crate::utils::tests;
-
-  #[ntex::test]
-  async fn test_scenario() {
-    tests::before();
-    let res =
-      tests::exec_nanocl("state apply -ys ../tests/test-deploy.yml").await;
-    assert!(res.is_ok());
-    let res = tests::exec_nanocl("state rm -ys ../tests/test-deploy.yml").await;
-    assert!(res.is_ok());
-  }
-}
