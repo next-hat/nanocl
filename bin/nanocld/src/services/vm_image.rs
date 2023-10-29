@@ -6,8 +6,9 @@ use futures::StreamExt;
 
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
-use crate::{utils, repositories};
 use nanocl_utils::http_error::HttpError;
+
+use crate::{utils, repositories};
 use crate::models::DaemonState;
 
 /// List virtual machine images
@@ -24,7 +25,6 @@ pub(crate) async fn list_vm_images(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let images = repositories::vm_image::list(&state.pool).await?;
-
   Ok(web::HttpResponse::Ok().json(&images))
 }
 
@@ -48,9 +48,7 @@ pub(crate) async fn import_vm_image(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
-
   utils::key::validate_name(&name)?;
-
   if repositories::vm_image::find_by_name(&name, &state.pool)
     .await
     .is_ok()
@@ -60,7 +58,6 @@ pub(crate) async fn import_vm_image(
       msg: format!("Vm image {name} already used"),
     });
   }
-
   let state_dir = state.config.state_dir.clone();
   let vm_images_dir = format!("{state_dir}/vms/images");
   let filepath = format!("{vm_images_dir}/{name}.img");
@@ -83,9 +80,7 @@ pub(crate) async fn import_vm_image(
         msg: format!("Unable to create vm image {name}: {err}"),
       })?;
   }
-
   utils::vm_image::create(&name, &filepath, &state.pool).await?;
-
   Ok(web::HttpResponse::Ok().into())
 }
 
@@ -114,7 +109,6 @@ pub(crate) async fn snapshot_vm_image(
   let image = repositories::vm_image::find_by_name(&name, &state.pool).await?;
   let vm_image =
     utils::vm_image::create_snap(&snapshot_name, 50, &image, &state).await?;
-
   Ok(web::HttpResponse::Ok().json(&vm_image))
 }
 
@@ -141,9 +135,7 @@ pub(crate) async fn clone_vm_image(
   let clone_name = path.2.to_owned();
   utils::key::validate_name(&clone_name)?;
   let image = repositories::vm_image::find_by_name(&name, &state.pool).await?;
-
   let rx = utils::vm_image::clone(&clone_name, &image, &state).await?;
-
   Ok(web::HttpResponse::Ok().streaming(rx))
 }
 
@@ -168,10 +160,8 @@ pub(crate) async fn resize_vm_image(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
-
   let rx =
     utils::vm_image::resize_by_name(&name, &payload, &state.pool).await?;
-
   Ok(web::HttpResponse::Ok().json(&rx))
 }
 
@@ -193,9 +183,7 @@ pub(crate) async fn delete_vm_image(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let name = path.1.to_owned();
-
   utils::vm_image::delete_by_name(&name, &state.pool).await?;
-
   Ok(web::HttpResponse::Ok().into())
 }
 

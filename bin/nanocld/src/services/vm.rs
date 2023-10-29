@@ -3,28 +3,23 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::time::Instant;
 
-use ntex::rt;
-use ntex::ws;
-use ntex::web;
-use ntex::http;
-use ntex::util::Bytes;
-use ntex::channel::mpsc;
-use ntex::channel::oneshot;
-use ntex::web::{HttpRequest, Error};
+use ntex::{rt, ws, web, http};
+use ntex::channel::{mpsc, oneshot};
 use ntex::{chain, fn_service, Service};
+use ntex::util::Bytes;
 use ntex::service::{fn_shutdown, map_config, fn_factory_with_config};
 use futures::StreamExt;
 use futures::future::ready;
+use tokio::io::AsyncWriteExt;
 use bollard_next::container::AttachContainerOptions;
 
 use nanocl_stubs::cargo::OutputLog;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 
-use tokio::io::AsyncWriteExt;
+use nanocl_utils::http_error::HttpError;
 
 use crate::{utils, repositories};
-use nanocl_utils::http_error::HttpError;
 use crate::models::{DaemonState, WsConState};
 
 /// List virtual machines
@@ -45,11 +40,9 @@ pub(crate) async fn list_vm(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-
   let vms =
     utils::vm::list_by_namespace(&namespace, &state.docker_api, &state.pool)
       .await?;
-
   Ok(web::HttpResponse::Ok().json(&vms))
 }
 
@@ -75,10 +68,8 @@ pub(crate) async fn inspect_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-
   let vm =
     utils::vm::inspect_by_key(&key, &state.docker_api, &state.pool).await?;
-
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
@@ -104,10 +95,8 @@ pub(crate) async fn start_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-
   repositories::vm::find_by_key(&key, &state.pool).await?;
   utils::vm::start_by_key(&key, &state).await?;
-
   Ok(web::HttpResponse::Ok().finish())
 }
 
@@ -133,10 +122,8 @@ pub(crate) async fn stop_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-
   repositories::vm::find_by_key(&key, &state.pool).await?;
   utils::vm::stop_by_key(&key, &state).await?;
-
   Ok(web::HttpResponse::Ok().finish())
 }
 
@@ -162,9 +149,7 @@ pub(crate) async fn delete_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-
   utils::vm::delete_by_key(&key, true, &state).await?;
-
   Ok(web::HttpResponse::Ok().finish())
 }
 
@@ -189,9 +174,7 @@ pub(crate) async fn create_vm(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-
   let item = utils::vm::create(&payload, &namespace, &version, &state).await?;
-
   Ok(web::HttpResponse::Ok().json(&item))
 }
 
@@ -246,9 +229,7 @@ pub(crate) async fn patch_vm(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let version = path.0.clone();
-
   let vm = utils::vm::patch(&key, &payload, &version, &state).await?;
-
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
@@ -263,7 +244,6 @@ async fn ws_attach_service(
   let (tx, rx) = oneshot::channel();
   rt::spawn(utils::ws::heartbeat(con_state.clone(), sink.clone(), rx));
   let (scmd, mut rcmd) = mpsc::channel::<Result<Bytes, web::Error>>();
-
   let stream = state
     .docker_api
     .attach_container(
@@ -282,7 +262,6 @@ async fn ws_attach_service(
       status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: err.to_string(),
     })?;
-
   rt::spawn(async move {
     let mut output = stream.output;
     while let Some(output) = output.next().await {
@@ -293,10 +272,8 @@ async fn ws_attach_service(
           break;
         }
       };
-
       let outputlog: OutputLog = output.into();
       let output = serde_json::to_vec(&outputlog);
-
       let mut output = match output {
         Ok(output) => output,
         Err(e) => {
@@ -304,16 +281,13 @@ async fn ws_attach_service(
           break;
         }
       };
-
       output.push(b'\n');
-
       let msg = ws::Message::Binary(Bytes::from(output));
       if sink.send(msg).await.is_err() {
         break;
       }
     }
   });
-
   rt::spawn(async move {
     let mut stdin = stream.input;
     while let Some(cmd) = rcmd.next().await {
@@ -329,7 +303,6 @@ async fn ws_attach_service(
       }
     }
   });
-
   // handler service for incoming websockets frames
   let service = fn_service(move |frame| {
     let item = match frame {
@@ -352,12 +325,10 @@ async fn ws_attach_service(
     };
     ready(Ok(item))
   });
-
   // handler service for shutdown notification that stop heartbeat task
   let on_shutdown = fn_shutdown(move || {
     let _ = tx.send(());
   });
-
   // pipe our service with on_shutdown callback
   Ok(chain(service).and_then(on_shutdown))
 }
@@ -377,16 +348,15 @@ async fn ws_attach_service(
 ))]
 pub(crate) async fn vm_attach(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  req: HttpRequest,
+  req: web::HttpRequest,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, Error> {
+) -> Result<web::HttpResponse, web::Error> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-
   web::ws::start(
     req,
-    // inject chat server send to a ws_service factory
+    // inject state to ws_attach_service factory
     map_config(fn_factory_with_config(ws_attach_service), move |cfg| {
       (key.clone(), cfg, state.clone())
     }),
@@ -410,24 +380,16 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use crate::services::ntex_config;
-
   use ntex::http;
 
+  use crate::version::VERSION;
+  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   #[ntex::test]
-  pub(crate) async fn list_vm() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-    let resp = srv.get("/v0.2/vms").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      http::StatusCode::OK,
-      "Expect status to be {} got {}",
-      http::StatusCode::OK,
-      status
-    );
-    Ok(())
+  pub(crate) async fn list_vm() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    let resp = client.send_get("/vms", None::<String>).await;
+    test_status_code!(resp.status(), http::StatusCode::OK, "list vm");
   }
 }
