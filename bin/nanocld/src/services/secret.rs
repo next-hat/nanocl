@@ -1,8 +1,7 @@
 /*
 * Endpoints to manipulate secrets
 */
-use ntex::rt;
-use ntex::web;
+use ntex::{rt, web};
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::proxy::ProxySslConfig;

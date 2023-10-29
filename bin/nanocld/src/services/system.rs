@@ -2,15 +2,14 @@ use std::collections::HashMap;
 
 use ntex::web;
 
-use crate::version;
-
 use bollard_next::container::ListContainersOptions;
 
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{HostInfo, ProccessQuery};
 
-use crate::repositories;
 use nanocl_utils::http_error::HttpError;
+
+use crate::{version, repositories};
 use crate::models::DaemonState;
 
 /// Get version information
@@ -83,7 +82,6 @@ pub(crate) async fn watch_event(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let stream = state.event_emitter.subscribe().await?;
-
   Ok(
     web::HttpResponse::Ok()
       .content_type("text/event-stream")
@@ -113,19 +111,15 @@ pub(crate) async fn get_processes(
   let label = "io.nanocl=enabled".into();
   let mut filters: HashMap<String, Vec<String>> = HashMap::new();
   let mut labels = vec![label];
-
   if let Some(namespace) = &qs.namespace {
     repositories::namespace::find_by_name(namespace, &state.pool).await?;
     labels.push(format!("io.nanocl.vnsp={}", namespace));
     labels.push(format!("io.nanocl.cnsp={}", namespace));
   }
-
   filters.insert("label".into(), labels);
-
   let opts = qs.clone().into();
   let options = Some(ListContainersOptions::<String> { filters, ..opts });
   let containers = state.docker_api.list_containers(options).await?;
-
   let mut process = containers
     .into_iter()
     .map(|c| {
@@ -136,11 +130,9 @@ pub(crate) async fn get_processes(
       )
     })
     .collect::<Vec<NodeContainerSummary>>();
-
   let nodes =
     repositories::node::list_unless(&state.config.hostname, &state.pool)
       .await?;
-
   if opts.all {
     for node in nodes {
       let client = node.to_http_client();
@@ -158,7 +150,6 @@ pub(crate) async fn get_processes(
       process.extend(node_containers);
     }
   }
-
   Ok(web::HttpResponse::Ok().json(&process))
 }
 
@@ -172,67 +163,69 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use crate::services::ntex_config;
 
   use ntex::http;
-  use nanocl_stubs::system::HostInfo;
 
+  use nanocl_stubs::node::NodeContainerSummary;
+  use nanocl_stubs::system::{HostInfo, ProccessQuery};
+
+  use crate::version::VERSION;
+  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   #[ntex::test]
-  async fn watch_events() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-    let resp = srv.get("/v0.2/events").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      http::StatusCode::OK,
-      "Expect status to be {} got {}",
-      http::StatusCode::OK,
-      status
-    );
-    Ok(())
+  async fn watch_events() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    let res = client.send_get("/events", None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "watch events");
   }
 
   #[ntex::test]
-  async fn system_info() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-    let mut resp = srv.get("/v0.2/info").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      http::StatusCode::OK,
-      "Expect status to be {} got {}",
-      http::StatusCode::OK,
-      status
-    );
-    let _ = resp
-      .json::<HostInfo>()
-      .await
-      .expect("To receive a valid version json payload");
-    Ok(())
+  async fn system_info() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    let mut res = client.send_get("/info", None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "system info");
+    let _ = res.json::<HostInfo>().await.unwrap();
   }
 
   #[ntex::test]
   async fn wrong_version() {
-    let srv = gen_server(ntex_config).await;
-    let resp = srv.get("/v12.44/info").send().await.unwrap();
-    let status = resp.status();
-    assert_eq!(
-      status,
+    let client = generate_test_client(ntex_config, "12.44").await;
+    let res = client.send_get("/info", None::<String>).await;
+    test_status_code!(
+      res.status(),
       http::StatusCode::NOT_FOUND,
-      "Expect status to be {} got {}",
-      http::StatusCode::NOT_FOUND,
-      status
+      "wrong version 12.44"
     );
-    let resp = srv.get("/v5.2/info").send().await.unwrap();
-    let status = resp.status();
-    assert_eq!(
-      status,
+    let client = generate_test_client(ntex_config, "5.2").await;
+    let res = client.send_get("/info", None::<String>).await;
+    test_status_code!(
+      res.status(),
       http::StatusCode::NOT_FOUND,
-      "Expect status to be {} got {}",
-      http::StatusCode::NOT_FOUND,
-      status
+      "wrong version 5.2"
     );
+  }
+
+  #[ntex::test]
+  async fn ping() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    let res = client.send_head("/_ping", None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::ACCEPTED, "ping");
+  }
+
+  #[ntex::test]
+  async fn process() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    let mut res = client
+      .send_get(
+        "/processes",
+        Some(&ProccessQuery {
+          all: false,
+          ..Default::default()
+        }),
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "processes");
+    let _ = res.json::<Vec<NodeContainerSummary>>().await.unwrap();
   }
 }
