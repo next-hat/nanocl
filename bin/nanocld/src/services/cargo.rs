@@ -563,8 +563,6 @@ mod tests {
     CargoListQuery, CargoScale,
   };
 
-  use crate::version::VERSION;
-  use crate::services::ntex_config;
   use crate::services::cargo_image::tests::ensure_test_image;
   use crate::utils::tests::*;
 
@@ -573,7 +571,7 @@ mod tests {
   /// Test to create start patch stop and delete a cargo with valid data
   #[ntex::test]
   async fn basic() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     ensure_test_image().await;
     let test_cargoes = [
       "1daemon-test-cargo",
@@ -767,7 +765,7 @@ mod tests {
   #[ntex::test]
   async fn scale() {
     const CARGO_NAME: &str = "api-test-scale";
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let res = client
       .send_post(
         ENDPOINT,
@@ -848,7 +846,7 @@ mod tests {
   #[ntex::test]
   async fn logs() {
     const CARGO_NAME: &str = "nstore";
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let res = client
       .send_get(
         &format!("{ENDPOINT}/{CARGO_NAME}/logs"),

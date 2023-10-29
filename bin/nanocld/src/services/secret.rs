@@ -178,8 +178,6 @@ mod test_secret {
   use nanocl_stubs::secret::{Secret, SecretPartial};
   use nanocl_stubs::generic::GenericDelete;
 
-  use crate::version::VERSION;
-  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   const ENDPOINT: &str = "/secrets";
@@ -249,7 +247,7 @@ mod test_secret {
 
   #[ntex::test]
   async fn basic() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     test_fail_create(&client).await;
     test_create(&client).await;
     test_inspect_by_id(&client).await;

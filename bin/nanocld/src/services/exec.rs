@@ -102,14 +102,12 @@ mod tests {
 
   use nanocl_stubs::generic::GenericNspQuery;
 
-  use crate::version::VERSION;
-  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   #[ntex::test]
   async fn exec() {
     const CARGO_NAME: &str = "nstore";
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let mut res = client
       .send_post(
         &format!("/cargoes/{CARGO_NAME}/exec"),

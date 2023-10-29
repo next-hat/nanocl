@@ -18,9 +18,7 @@ use crate::version::VERSION;
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The state dir exists
-///   * [Err](IoError) - The state dir does not exists
+/// * [IoResult](IoResult<()>) - The result of the operation
 ///
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   let vm_dir = format!("{state_dir}/vms/images");
@@ -77,10 +75,10 @@ mod tests {
 
   use crate::config;
   use crate::cli::Cli;
-  use crate::utils::tests::*;
+
   /// Test init
   #[ntex::test]
-  async fn basic_init() -> TestRet {
+  async fn basic_init() {
     // Init cli args
     let args = Cli {
       gid: 0,
@@ -97,6 +95,5 @@ mod tests {
     let config = config::init(&args).expect("Expect to init config");
     // test function init
     let _ = init(&config).await.unwrap();
-    Ok(())
   }
 }

@@ -61,8 +61,6 @@ mod tests {
   use nanocl_stubs::generic::GenericCount;
   use nanocl_stubs::http_metric::HttpMetric;
 
-  use crate::version::VERSION;
-  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   const ENDPOINT: &str = "/http_metrics";
@@ -87,7 +85,7 @@ mod tests {
 
   #[ntex::test]
   async fn basic() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     test_list(&client).await;
     test_count(&client).await;
   }

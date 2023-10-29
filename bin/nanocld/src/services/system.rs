@@ -169,20 +169,19 @@ mod tests {
   use nanocl_stubs::node::NodeContainerSummary;
   use nanocl_stubs::system::{HostInfo, ProccessQuery};
 
-  use crate::version::VERSION;
   use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   #[ntex::test]
   async fn watch_events() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let res = client.send_get("/events", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "watch events");
   }
 
   #[ntex::test]
   async fn system_info() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let mut res = client.send_get("/info", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "system info");
     let _ = res.json::<HostInfo>().await.unwrap();
@@ -190,14 +189,14 @@ mod tests {
 
   #[ntex::test]
   async fn wrong_version() {
-    let client = generate_test_client(ntex_config, "12.44").await;
+    let client = gen_test_client(ntex_config, "12.44").await;
     let res = client.send_get("/info", None::<String>).await;
     test_status_code!(
       res.status(),
       http::StatusCode::NOT_FOUND,
       "wrong version 12.44"
     );
-    let client = generate_test_client(ntex_config, "5.2").await;
+    let client = gen_test_client(ntex_config, "5.2").await;
     let res = client.send_get("/info", None::<String>).await;
     test_status_code!(
       res.status(),
@@ -208,14 +207,14 @@ mod tests {
 
   #[ntex::test]
   async fn ping() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let res = client.send_head("/_ping", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::ACCEPTED, "ping");
   }
 
   #[ntex::test]
   async fn process() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let mut res = client
       .send_get(
         "/processes",

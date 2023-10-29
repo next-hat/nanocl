@@ -105,7 +105,7 @@ mod tests {
 
   /// Test to create a server on unix socket
   #[ntex::test]
-  async fn server_on_tmp_unix_socket() -> TestRet {
+  async fn server_on_tmp_unix_socket() {
     before();
     let args = Cli::parse_from(vec![
       "nanocl",
@@ -120,12 +120,11 @@ mod tests {
       .expect("Init daemon state to be ok");
     let server = gen(daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
-    Ok(())
   }
 
   /// Test to create a server on tcp socket
   #[ntex::test]
-  async fn server_on_tcp_socket() -> TestRet {
+  async fn server_on_tcp_socket() {
     before();
     let args = Cli::parse_from(vec![
       "nanocl",
@@ -140,13 +139,12 @@ mod tests {
       .expect("Init daemon state to be ok");
     let server = gen(daemon_state).await;
     assert!(server.is_ok(), "Expect server to be ready to run");
-    Ok(())
   }
 
   ///  Test to create 2 server on same tcp socket
   /// Expect the 2nd one to fail
   #[ntex::test]
-  async fn server_on_same_tcp_socket() -> TestRet {
+  async fn server_on_same_tcp_socket() {
     before();
     let args = Cli::parse_from(vec![
       "nanocl",
@@ -167,13 +165,12 @@ mod tests {
       .expect("Init daemon state to be ok");
     let server2 = gen(daemon_state).await;
     assert!(server2.is_err(), "Expect server to fail to run");
-    Ok(())
   }
 
   /// Test to create a server on unix socket where path is not valid
   /// Expect the server to fail
   #[ntex::test]
-  async fn server_on_invalid_unix_socket() -> TestRet {
+  async fn server_on_invalid_unix_socket() {
     before();
     let args = Cli::parse_from(vec![
       "nanocl",
@@ -188,13 +185,12 @@ mod tests {
       .expect("Init daemon state to be ok");
     let server = gen(daemon_state).await;
     assert!(server.is_err(), "Expect server to fail to run");
-    Ok(())
   }
 
   /// Test with invalid host uri
   /// Expect the server to fail
   #[ntex::test]
-  async fn server_on_invalid_host() -> TestRet {
+  async fn server_on_invalid_host() {
     before();
     let args = Cli::parse_from(vec![
       "nanocl",
@@ -209,6 +205,5 @@ mod tests {
       .expect("Init daemon state to be ok");
     let server = gen(daemon_state).await;
     assert!(server.is_err(), "Expect server to fail to run");
-    Ok(())
   }
 }

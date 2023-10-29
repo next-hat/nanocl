@@ -117,8 +117,6 @@ mod tests {
   use ntex::http;
   use futures::{TryStreamExt, StreamExt};
 
-  use crate::version::VERSION;
-  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   async fn apply_state(client: &TestClient, path: &str) {
@@ -148,7 +146,7 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     // Generate server
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     // Apply examples/cargo_example.yml
     apply_state(&client, "../../examples/cargo_example.yml").await;
     // ReApply examples/cargo_example.yml

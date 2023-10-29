@@ -33,7 +33,6 @@ pub mod tests {
 
   pub use ntex::web::test::TestServer;
   pub use nanocl_utils::ntex::test_client::*;
-  pub type TestRet = Result<(), Box<dyn std::error::Error + 'static>>;
 
   type Config = fn(&mut ServiceConfig);
 
@@ -153,11 +152,13 @@ pub mod tests {
     })
   }
 
-  pub async fn generate_test_client(
-    routes: Config,
-    version: &str,
-  ) -> TestClient {
+  pub async fn gen_test_client(routes: Config, version: &str) -> TestClient {
     let srv = gen_server(routes).await;
     TestClient::new(srv, version)
+  }
+
+  pub async fn gen_default_test_client() -> TestClient {
+    let srv = gen_server(services::ntex_config).await;
+    TestClient::new(srv, VERSION)
   }
 }

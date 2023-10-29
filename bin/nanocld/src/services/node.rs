@@ -105,15 +105,13 @@ mod tests {
 
   use nanocl_stubs::node::Node;
 
-  use crate::services::ntex_config;
-  use crate::version::VERSION;
   use crate::utils::tests::*;
 
   const ENDPOINT: &str = "/nodes";
 
   #[ntex::test]
   async fn basic() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let mut res = client.send_get(ENDPOINT, None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "list nodes");
     let _ = res.json::<Vec<Node>>().await.unwrap();

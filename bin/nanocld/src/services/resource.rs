@@ -242,16 +242,14 @@ mod tests {
     Resource, ResourcePartial, ResourceUpdate, ResourceQuery,
   };
 
-  use crate::version::VERSION;
   use crate::utils::tests::*;
-  use crate::services::ntex_config;
 
   const ENDPOINT: &str = "/resources";
 
   #[ntex::test]
   async fn basic() {
     const TEST_RESOURCE: &str = "test_resource";
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let config = serde_json::json!({
       "Schema": {
         "type": "object",

@@ -5,14 +5,11 @@ use std::task::Poll;
 use std::task::Context;
 use std::time::Duration;
 
-use ntex::rt;
-use ntex::web;
-use ntex::web::Error;
+use ntex::{rt, web, http};
 use ntex::util::Bytes;
-use ntex::http;
 use ntex::time::interval;
-use futures::Stream;
 use ntex::web::error::BlockingError;
+use futures::Stream;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_stubs::system::Event;
@@ -25,7 +22,7 @@ use nanocl_utils::http_error::HttpError;
 pub struct Client(pub Receiver<Bytes>);
 
 impl Stream for Client {
-  type Item = Result<Bytes, Error>;
+  type Item = Result<Bytes, web::Error>;
 
   fn poll_next(
     mut self: Pin<&mut Self>,
@@ -177,32 +174,26 @@ impl EventEmitter {
 
 #[cfg(test)]
 mod tests {
+  use futures::StreamExt;
 
   use super::*;
 
-  use futures::StreamExt;
-  use nanocl_stubs::cargo::CargoInspect;
   use nanocl_stubs::vm::Vm;
-
-  use crate::utils::tests::*;
+  use nanocl_stubs::cargo::CargoInspect;
 
   #[ntex::test]
-  async fn basic() -> TestRet {
+  async fn basic() {
     // Create the event emitter
     let event_emitter = EventEmitter::new();
-
     // Create a client
     let mut client = event_emitter.subscribe().await.unwrap();
-
     // Send namespace created event
     event_emitter
       .emit(Event::NamespaceCreated("test".to_string()))
       .await
       .unwrap();
-
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
     // Send cargo created event
     let cargo = CargoInspect::default();
     event_emitter
@@ -211,16 +202,13 @@ mod tests {
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
     // Send cargo deleted event
     event_emitter
       .emit(Event::CargoDeleted(Box::new(cargo)))
       .await
       .unwrap();
-
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
     // Send cargo started event
     let cargo = CargoInspect::default();
     event_emitter
@@ -229,7 +217,6 @@ mod tests {
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
     // Send cargo stopped event
     let cargo = CargoInspect::default();
     event_emitter
@@ -238,7 +225,6 @@ mod tests {
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
     // Send cargo patched event
     let cargo = CargoInspect::default();
     event_emitter
@@ -247,7 +233,6 @@ mod tests {
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
     // Send vm created event
     let vm = Vm::default();
     event_emitter
@@ -256,7 +241,6 @@ mod tests {
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
     // Send vm deleted event
     let vm = Vm::default();
     event_emitter
@@ -265,7 +249,6 @@ mod tests {
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
     // Send vm patched event
     let vm = Vm::default();
     event_emitter
@@ -274,7 +257,6 @@ mod tests {
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
     // Send vm runned event
     let vm = Vm::default();
     event_emitter
@@ -283,7 +265,6 @@ mod tests {
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
     // Send vm stopped event
     let vm = Vm::default();
     event_emitter
@@ -292,7 +273,5 @@ mod tests {
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
     let _ = serde_json::from_slice::<Event>(&event).unwrap();
-
-    Ok(())
   }
 }
