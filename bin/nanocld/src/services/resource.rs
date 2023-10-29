@@ -246,9 +246,12 @@ mod tests {
   use crate::utils::tests::*;
   use crate::services::ntex_config;
 
+  const ENDPOINT: &str = "/resources";
+
   #[ntex::test]
-  async fn basic() -> TestRet {
-    let srv = gen_server(ntex_config).await;
+  async fn basic() {
+    const TEST_RESOURCE: &str = "test_resource";
+    let client = generate_test_client(ntex_config, VERSION).await;
     let config = serde_json::json!({
       "Schema": {
         "type": "object",
@@ -267,7 +270,7 @@ mod tests {
       }
     });
     let resource = ResourcePartial {
-      name: "test_resource".to_owned(),
+      name: TEST_RESOURCE.to_owned(),
       version: "v0.0.1".to_owned(),
       kind: "Kind".to_owned(),
       data: config.clone(),
@@ -275,134 +278,146 @@ mod tests {
         "Test": "gg",
       })),
     };
-    let mut resp = srv
-      .post(format!("/v{VERSION}/resources"))
-      .send_json(&resource)
-      .await
-      .unwrap();
-    assert_eq!(resp.status(), http::StatusCode::CREATED);
-    let resource = resp.json::<Resource>().await.unwrap();
-    assert_eq!(resource.name, "test_resource");
+    let mut res = client
+      .send_post(ENDPOINT, Some(&resource), None::<String>)
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::CREATED,
+      "create resource"
+    );
+    let resource = res.json::<Resource>().await.unwrap();
+    assert_eq!(resource.name, TEST_RESOURCE);
     assert_eq!(resource.kind, String::from("Kind"));
     // Basic list
-    let mut resp = srv
-      .get(format!("/v{VERSION}/resources"))
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(resp.status(), http::StatusCode::OK);
-    let _ = resp.json::<Vec<Resource>>().await.unwrap();
+    let mut res = client.send_get(ENDPOINT, None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "list resource");
+    let _ = res.json::<Vec<Resource>>().await.unwrap();
     // Using filter exists
-    let mut resp = srv
-      .get(format!("/v{VERSION}/resources"))
-      .query(&ResourceQuery {
-        exists: Some(String::from("Schema")),
-        ..Default::default()
-      })
-      .unwrap()
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(resp.status(), http::StatusCode::OK);
-    let resources = resp.json::<Vec<Resource>>().await.unwrap();
-    println!("Filter resource result:\n{resources:?}");
-    assert!(resources.len() == 1, "Unable to filter by exists");
+    let mut res = client
+      .send_get(
+        ENDPOINT,
+        Some(&ResourceQuery {
+          exists: Some(String::from("Schema")),
+          ..Default::default()
+        }),
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "filter resource by exists"
+    );
+    let resources = res.json::<Vec<Resource>>().await.unwrap();
+    assert!(
+      resources.len() == 1,
+      "Expect 1 resource when filter by exists"
+    );
     // Using filter contains
-    let mut resp = srv
-      .get(format!("/v{VERSION}/resources"))
-      .query(&ResourceQuery {
-        contains: Some(String::from("{\"Schema\": {\"type\": \"object\"}}")),
-        ..Default::default()
-      })
-      .unwrap()
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(
-      resp.status(),
+    let mut res = client
+      .send_get(
+        ENDPOINT,
+        Some(&ResourceQuery {
+          contains: Some(String::from("{\"Schema\": {\"type\": \"object\"}}")),
+          ..Default::default()
+        }),
+      )
+      .await;
+    test_status_code!(
+      res.status(),
       http::StatusCode::OK,
-      "Invalid status code when filter by contains"
+      "filter resource by contains"
     );
-    let resources = resp.json::<Vec<Resource>>().await.unwrap();
-    println!("Filter resource result:\n{resources:?}");
-    assert!(resources.len() == 1, "Unable to filter by contains");
+    let resources = res.json::<Vec<Resource>>().await.unwrap();
+    assert!(
+      resources.len() == 1,
+      "Expect 1 resource when filter by contains"
+    );
     // Using meta exists
-    let mut resp = srv
-      .get(format!("/v{VERSION}/resources"))
-      .query(&ResourceQuery {
-        meta_exists: Some(String::from("Test")),
-        ..Default::default()
-      })
-      .unwrap()
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(
-      resp.status(),
+    let mut res = client
+      .send_get(
+        ENDPOINT,
+        Some(&ResourceQuery {
+          meta_exists: Some(String::from("Test")),
+          ..Default::default()
+        }),
+      )
+      .await;
+    test_status_code!(
+      res.status(),
       http::StatusCode::OK,
-      "Invalid status code when filter by meta exists"
+      "filter resource by meta exists"
     );
-    let resources = resp.json::<Vec<Resource>>().await.unwrap();
-    println!("Filter resource result:\n{resources:?}");
-    assert!(resources.len() == 1, "Unable to filter by meta exists");
+    let resources = res.json::<Vec<Resource>>().await.unwrap();
+    assert!(
+      resources.len() == 1,
+      "Expect 1 resource when filter by meta exists"
+    );
     // Filter by meta contains
-    let mut resp = srv
-      .get(format!("/v{VERSION}/resources"))
-      .query(&ResourceQuery {
-        meta_contains: Some(String::from("{\"Test\": \"gg\"}")),
-        ..Default::default()
-      })
-      .unwrap()
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(
-      resp.status(),
+    let mut res = client
+      .send_get(
+        ENDPOINT,
+        Some(&ResourceQuery {
+          meta_contains: Some(String::from("{\"Test\": \"gg\"}")),
+          ..Default::default()
+        }),
+      )
+      .await;
+    test_status_code!(
+      res.status(),
       http::StatusCode::OK,
-      "Invalid status code when filter by meta contains"
+      "filter resource by meta contains"
     );
-    let resources = resp.json::<Vec<Resource>>().await.unwrap();
-    println!("Filter resource result:\n{resources:?}");
-    assert!(resources.len() == 1, "Unable to filter by meta contains");
+    let resources = res.json::<Vec<Resource>>().await.unwrap();
+    assert!(
+      resources.len() == 1,
+      "Expect 1 resource when filter by meta contains"
+    );
     // Inspect
-    let mut resp = srv
-      .get(format!("/v{VERSION}/resources/test_resource"))
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(resp.status(), http::StatusCode::OK);
-    let resource = resp.json::<Resource>().await.unwrap();
-    assert_eq!(resource.name, "test_resource");
+    let mut res = client
+      .send_get(&format!("{ENDPOINT}/{TEST_RESOURCE}"), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "inspect resource");
+    let resource = res.json::<Resource>().await.unwrap();
+    assert_eq!(resource.name, TEST_RESOURCE);
     assert_eq!(resource.kind, String::from("Kind"));
     assert_eq!(&resource.data, &config);
     // History
-    let _ = srv
-      .get(format!("/v{VERSION}/resources/test_resource/histories"))
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(resp.status(), http::StatusCode::OK);
+    let _ = client
+      .send_get(
+        &format!("{ENDPOINT}/{TEST_RESOURCE}/histories"),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "list resource history"
+    );
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
       data: config.clone(),
       metadata: None,
     };
-    let mut resp = srv
-      .patch(format!("/v{VERSION}/resources/test_resource"))
-      .send_json(&new_resource)
-      .await
-      .unwrap();
-    assert_eq!(resp.status(), http::StatusCode::OK);
-    let resource = resp.json::<Resource>().await.unwrap();
-    assert_eq!(resource.name, "test_resource");
+    let mut res = client
+      .send_patch(
+        &format!("{ENDPOINT}/{TEST_RESOURCE}"),
+        Some(&new_resource),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "patch resource");
+    let resource = res.json::<Resource>().await.unwrap();
+    assert_eq!(resource.name, TEST_RESOURCE);
     assert_eq!(resource.kind, String::from("Kind"));
     // Delete
-    let resp = srv
-      .delete(format!("/v{VERSION}/resources/test_resource"))
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(resp.status(), http::StatusCode::ACCEPTED);
-    Ok(())
+    let resp = client
+      .send_delete(&format!("{ENDPOINT}/{TEST_RESOURCE}"), None::<String>)
+      .await;
+    test_status_code!(
+      resp.status(),
+      http::StatusCode::ACCEPTED,
+      "delete resource"
+    );
   }
 }
