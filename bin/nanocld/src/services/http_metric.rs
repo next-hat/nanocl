@@ -61,8 +61,6 @@ mod tests {
   use nanocl_stubs::generic::GenericCount;
   use nanocl_stubs::http_metric::HttpMetric;
 
-  use nanocl_utils::ntex::test_client::{TestClient, test_status_code};
-
   use crate::version::VERSION;
   use crate::services::ntex_config;
   use crate::utils::tests::*;

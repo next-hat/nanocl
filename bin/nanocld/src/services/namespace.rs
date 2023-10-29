@@ -112,7 +112,6 @@ mod test_namespace {
 
   use nanocl_stubs::generic::GenericDelete;
   use nanocl_stubs::namespace::{Namespace, NamespacePartial};
-  use nanocl_utils::ntex::test_client::TestClient;
 
   use crate::version::VERSION;
   use crate::services::ntex_config;
