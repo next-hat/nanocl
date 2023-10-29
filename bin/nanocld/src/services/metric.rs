@@ -40,27 +40,30 @@ mod tests {
   use ntex::http;
   use nanocl_stubs::metric::{Metric, MetricKind, MetricFilterQuery};
 
+  use nanocl_utils::ntex::test_client::{TestClient, test_status_code};
+
+  use crate::version::VERSION;
   use crate::services::ntex_config;
   use crate::utils::tests::*;
 
-  async fn test_list(srv: &TestServer) -> TestRet {
-    let mut resp = srv
-      .get("/v0.5/metrics")
-      .query(&MetricFilterQuery {
-        kind: MetricKind::Cpu,
-      })
-      .unwrap()
-      .send()
-      .await?;
-    assert_eq!(resp.status(), http::StatusCode::OK);
-    let _ = resp.json::<Vec<Metric>>().await?;
-    Ok(())
+  const ENDPOINT: &str = "/metrics";
+
+  async fn test_list(client: &TestClient) {
+    let mut res = client
+      .send_get(
+        ENDPOINT,
+        Some(&MetricFilterQuery {
+          kind: MetricKind::Cpu,
+        }),
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "list metrics");
+    let _ = res.json::<Vec<Metric>>().await.unwrap();
   }
 
   #[ntex::test]
-  async fn basic() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-    test_list(&srv).await?;
-    Ok(())
+  async fn basic() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    test_list(&client).await;
   }
 }
