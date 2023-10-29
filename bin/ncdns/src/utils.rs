@@ -170,8 +170,7 @@ pub mod tests {
   use nanocl_utils::logger;
   pub use nanocl_utils::ntex::test_client::*;
 
-  use crate::{version, services};
-  use crate::dnsmasq::Dnsmasq;
+  use crate::{version, dnsmasq, services};
 
   // Before a test
   pub fn before() {
@@ -183,7 +182,7 @@ pub mod tests {
   // Generate a test server
   pub fn gen_default_test_client() -> TestClient {
     before();
-    let dnsmasq = Dnsmasq::new("/tmp/dnsmasq");
+    let dnsmasq = dnsmasq::Dnsmasq::new("/tmp/dnsmasq");
     dnsmasq.ensure().unwrap();
     // Create test server
     let srv = ntex::web::test::server(move || {

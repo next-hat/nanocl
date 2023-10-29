@@ -78,39 +78,25 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-
   use ntex::http;
-  use crate::utils::tests;
-  use crate::version::VERSION;
+
+  use crate::utils::tests::*;
 
   #[ntex::test]
   async fn rules() {
-    let test_srv = tests::generate_server();
+    let client = gen_default_test_client();
     let resource: &str = include_str!("../../tests/resource_redirect.yml");
     let yaml: serde_yaml::Value = serde_yaml::from_str(resource).unwrap();
     let resource = yaml["Resources"][0].clone();
     let name = resource["Name"].as_str().unwrap();
     let payload = resource["Config"].clone();
-    let mut res = test_srv
-      .put(format!("/v{VERSION}/rules/{name}"))
-      .send_json(&payload)
-      .await
-      .unwrap();
-    let _ = res.json::<serde_json::Value>().await.unwrap();
-    assert_eq!(
-      res.status(),
-      http::StatusCode::OK,
-      "Incorrect status code when PUT a rule"
-    );
-    let res = test_srv
-      .delete(format!("/v{VERSION}/rules/{}", name))
-      .send()
-      .await
-      .unwrap();
-    assert_eq!(
-      res.status(),
-      http::StatusCode::OK,
-      "Incorrect status code when DELETE a rule"
-    );
+    let res = client
+      .send_put(&format!("/rules/{name}"), Some(&payload), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "put a rule");
+    let res = client
+      .send_delete(&format!("/rules/{name}"), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "delete a rule");
   }
 }
