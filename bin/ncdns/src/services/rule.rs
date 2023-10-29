@@ -89,7 +89,7 @@ mod tests {
   use crate::utils::tests::*;
 
   #[ntex::test]
-  async fn apply_rule() {
+  async fn apply_empty_rule() {
     let client = gen_default_test_client();
     let res = client
       .send_put("/rules/test", None::<String>, None::<String>)
@@ -97,7 +97,7 @@ mod tests {
     test_status_code!(
       res.status(),
       http::StatusCode::BAD_REQUEST,
-      "apply rule without body"
+      "apply empty rule"
     );
   }
 
