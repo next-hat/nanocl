@@ -382,13 +382,11 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use ntex::http;
 
-  use crate::version::VERSION;
-  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   #[ntex::test]
   async fn list_vm() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let resp = client.send_get("/vms", None::<String>).await;
     test_status_code!(resp.status(), http::StatusCode::OK, "list vm");
   }

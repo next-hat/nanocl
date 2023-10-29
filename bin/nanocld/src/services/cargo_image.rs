@@ -196,8 +196,6 @@ pub mod tests {
   use nanocl_stubs::generic::GenericDelete;
   use nanocl_stubs::cargo_image::CargoImagePartial;
 
-  use crate::version::VERSION;
-  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   const ENDPOINT: &str = "/cargoes/images";
@@ -236,7 +234,7 @@ pub mod tests {
 
   /// Test utils to ensure the cargo image exists
   pub async fn ensure_test_image() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let image = CargoImagePartial {
       name: "nexthat/nanocl-get-started:latest".to_owned(),
     };
@@ -252,7 +250,7 @@ pub mod tests {
   /// Basic test to list cargo images
   #[ntex::test]
   async fn basic_list() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let resp = list(&client).await;
     let status = resp.status();
     test_status_code!(status, http::StatusCode::OK, "basic cargo image list");
@@ -263,7 +261,7 @@ pub mod tests {
   /// It works locally though but timeout in the CI
   #[ntex::test]
   async fn upload_tarball() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let curr_path = std::env::current_dir().unwrap();
     let filepath =
       std::path::Path::new(&curr_path).join("../../tests/busybox.tar.gz");
@@ -285,7 +283,7 @@ pub mod tests {
   /// Basic test to create cargo image with wrong name
   #[ntex::test]
   async fn basic_create_wrong_name() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     let payload = CargoImagePartial {
       name: "test".to_string(),
     };
@@ -302,7 +300,7 @@ pub mod tests {
   #[ntex::test]
   async fn basic() {
     const TEST_IMAGE: &str = "busybox:unstable-musl";
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     // Create
     let payload = CargoImagePartial {
       name: TEST_IMAGE.to_owned(),

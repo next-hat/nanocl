@@ -40,8 +40,6 @@ mod tests {
   use ntex::http;
   use nanocl_stubs::metric::{Metric, MetricKind, MetricFilterQuery};
 
-  use crate::version::VERSION;
-  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   const ENDPOINT: &str = "/metrics";
@@ -61,7 +59,7 @@ mod tests {
 
   #[ntex::test]
   async fn basic() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     test_list(&client).await;
   }
 }

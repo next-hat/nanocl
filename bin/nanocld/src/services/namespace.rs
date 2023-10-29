@@ -113,8 +113,6 @@ mod test_namespace {
   use nanocl_stubs::generic::GenericDelete;
   use nanocl_stubs::namespace::{Namespace, NamespacePartial};
 
-  use crate::version::VERSION;
-  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   const ENDPOINT: &str = "/namespaces";
@@ -175,7 +173,7 @@ mod test_namespace {
 
   #[ntex::test]
   async fn basic() {
-    let client = generate_test_client(ntex_config, VERSION).await;
+    let client = gen_default_test_client().await;
     test_fail_create(&client).await;
     create(&client).await;
     inspect_by_id(&client).await;

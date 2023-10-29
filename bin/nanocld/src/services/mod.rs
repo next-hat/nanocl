@@ -75,79 +75,52 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-
-  use crate::version;
   use ntex::http;
 
   use nanocl_stubs::system::Version;
 
+  use super::ntex_config;
+
+  use crate::version;
   use crate::utils::tests::*;
 
   #[ntex::test]
-  pub async fn get_version() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-    let mut resp = srv.get("/v0.5/version").send().await?;
-    let status = resp.status();
+  pub async fn get_version() {
+    let client = gen_test_client(ntex_config, version::VERSION).await;
+    let mut res = client.send_get("/version", None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "version");
+    let data = res.json::<Version>().await.unwrap();
     assert_eq!(
-      status,
-      http::StatusCode::OK,
-      "Expect status to be {} got {}",
-      http::StatusCode::OK,
-      status
-    );
-    let body: Version = resp
-      .json()
-      .await
-      .expect("To receive a valid version json payload");
-    assert_eq!(
-      body.arch,
+      data.arch,
       version::ARCH,
       "Expect arch to be {}",
       version::ARCH
     );
     assert_eq!(
-      body.version,
+      data.version,
       version::VERSION,
       "Expect version to be {}",
       version::VERSION
     );
     assert_eq!(
-      body.commit_id,
+      data.commit_id,
       version::COMMIT_ID,
       "Expect commit_id to be {}",
       version::COMMIT_ID
     );
-    Ok(())
   }
 
   #[ntex::test]
-  async fn test_ping() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-    let resp = srv.head("/v0.5/_ping").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      http::StatusCode::ACCEPTED,
-      "Expect status to be {} got {}",
-      http::StatusCode::ACCEPTED,
-      status
-    );
-    Ok(())
+  async fn ping() {
+    let client = gen_test_client(ntex_config, version::VERSION).await;
+    let res = client.send_head("/_ping", None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::ACCEPTED, "ping");
   }
 
   #[ntex::test]
-  async fn test_unhandled_route() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-    let resp = srv.get("/v0.1/unhandled").send().await?;
-    let status = resp.status();
-    assert_eq!(
-      status,
-      http::StatusCode::NOT_FOUND,
-      "Expect status to be {} got {}",
-      http::StatusCode::NOT_FOUND,
-      status
-    );
-    Ok(())
+  async fn unhandled_route() {
+    let client = gen_test_client(ntex_config, version::VERSION).await;
+    let res = client.send_get("/v0.1/unhandled", None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::NOT_FOUND, "unhandled");
   }
 }
