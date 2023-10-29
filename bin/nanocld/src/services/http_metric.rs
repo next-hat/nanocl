@@ -61,28 +61,36 @@ mod tests {
   use nanocl_stubs::generic::GenericCount;
   use nanocl_stubs::http_metric::HttpMetric;
 
+  use nanocl_utils::ntex::test_client::{TestClient, test_status_code};
+
+  use crate::version::VERSION;
   use crate::services::ntex_config;
   use crate::utils::tests::*;
 
-  async fn test_list(srv: &TestServer) -> TestRet {
-    let mut resp = srv.get("/v0.5/http_metrics").send().await?;
-    assert_eq!(resp.status(), http::StatusCode::OK);
-    let _ = resp.json::<Vec<HttpMetric>>().await?;
-    Ok(())
+  const ENDPOINT: &str = "/http_metrics";
+
+  async fn test_list(client: &TestClient) {
+    let mut resp = client.send_get(ENDPOINT, None::<String>).await;
+    test_status_code!(resp.status(), http::StatusCode::OK, "list http metrics");
+    let _ = resp.json::<Vec<HttpMetric>>().await.unwrap();
   }
 
-  async fn test_count(srv: &TestServer) -> TestRet {
-    let mut resp = srv.get("/v0.5/http_metrics/count").send().await?;
-    assert_eq!(resp.status(), http::StatusCode::OK);
-    let _ = resp.json::<GenericCount>().await?;
-    Ok(())
+  async fn test_count(client: &TestClient) {
+    let mut resp = client
+      .send_get(&format!("{ENDPOINT}/count"), None::<String>)
+      .await;
+    test_status_code!(
+      resp.status(),
+      http::StatusCode::OK,
+      "count http metrics"
+    );
+    let _ = resp.json::<GenericCount>().await.unwrap();
   }
 
   #[ntex::test]
-  async fn basic() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-    test_list(&srv).await?;
-    test_count(&srv).await?;
-    Ok(())
+  async fn basic() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    test_list(&client).await;
+    test_count(&client).await;
   }
 }
