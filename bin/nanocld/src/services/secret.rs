@@ -18,11 +18,6 @@ use nanocl_utils::http_error::HttpError;
   get,
   tag = "Secrets",
   path = "/secrets",
-  // params(
-  //   ("Name" = Option<String>, Query, description = "Filter by name"),
-  //   ("Limit" = Option<i64>, Query, description = "Limit the number of items returned"),
-  //   ("Offset" = Option<i64>, Query, description = "Offset the number of items returned"),
-  // ),
   responses(
     (status = 200, description = "List of secret", body = [Secret]),
   ),
@@ -94,7 +89,6 @@ pub(crate) async fn create_secret(
     }
     _ => {}
   }
-
   let item = repositories::secret::create(&payload, &state.pool).await?;
   let secret = item.clone().into();
   rt::spawn(async move {

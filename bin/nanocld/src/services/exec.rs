@@ -101,63 +101,48 @@ mod tests {
   use bollard_next::exec::{CreateExecOptions, CreateExecResults, StartExecOptions};
 
   use nanocl_stubs::generic::GenericNspQuery;
+  use nanocl_utils::ntex::test_client::test_status_code;
 
+  use crate::version::VERSION;
   use crate::services::ntex_config;
   use crate::utils::tests::*;
 
   #[ntex::test]
-  async fn exec() -> TestRet {
-    let srv = gen_server(ntex_config).await;
+  async fn exec() {
     const CARGO_NAME: &str = "nstore";
-
-    let mut create_result = srv
-      .post(format!("/v0.10/cargoes/{CARGO_NAME}/exec"))
-      .query(&GenericNspQuery {
-        namespace: Some("system".into()),
-      })
-      .unwrap()
-      .send_json(&CreateExecOptions {
-        cmd: Some(vec!["ls".into(), "/".into(), "-lra".into()]),
-        attach_stderr: Some(true),
-        attach_stdout: Some(true),
-        ..Default::default()
-      })
-      .await?;
-
-    assert_eq!(create_result.status(), http::StatusCode::OK);
-
-    let create_json = create_result.json::<serde_json::Value>().await?;
-    println!("json: {:?}", create_json);
-    let create_response: CreateExecResults =
-      serde_json::from_value(create_json).unwrap();
-    let exec_id = create_response.id;
-
-    let start_result = srv
-      .post(format!("/v0.10/exec/{exec_id}/cargo/start"))
-      .query(&())
-      .unwrap()
-      .send_json(&StartExecOptions::default())
-      .await?;
-    assert_eq!(start_result.status(), http::StatusCode::OK);
-    let mut stream = start_result.into_stream();
-
-    while let Some(data) = stream.next().await {
-      println!("{:?}", data);
-    }
-
-    let mut inspect_result = srv
-      .get(format!("/v0.10/exec/{exec_id}/cargo/inspect"))
-      .query(&())?
-      .send()
-      .await?;
-
-    assert_eq!(inspect_result.status(), http::StatusCode::OK);
-    let inspect_json = inspect_result.json::<serde_json::Value>().await?;
-    println!("json: {:?}", inspect_json);
-    let inspect_response: ExecInspectResponse =
-      serde_json::from_value(inspect_json).unwrap();
-    assert_eq!(inspect_response.exit_code, Some(0));
-
-    Ok(())
+    let client = generate_test_client(ntex_config, VERSION).await;
+    let mut res = client
+      .send_post(
+        &format!("/cargoes/{CARGO_NAME}/exec"),
+        Some(&CreateExecOptions {
+          cmd: Some(vec!["ls".into(), "/".into(), "-lra".into()]),
+          attach_stderr: Some(true),
+          attach_stdout: Some(true),
+          ..Default::default()
+        }),
+        Some(&GenericNspQuery {
+          namespace: Some("system".into()),
+        }),
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "cargo create exec");
+    let data = res.json::<CreateExecResults>().await.unwrap();
+    let exec_id = data.id;
+    let res = client
+      .send_post(
+        &format!("/exec/{exec_id}/cargo/start"),
+        Some(&StartExecOptions::default()),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "exec start");
+    let mut stream = res.into_stream();
+    while (stream.next().await).is_some() {}
+    let mut res = client
+      .send_get(&format!("/exec/{exec_id}/cargo/inspect"), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "exec inspect");
+    let data = res.json::<ExecInspectResponse>().await.unwrap();
+    assert_eq!(data.exit_code, Some(0), "Expect exit code to be 0");
   }
 }
