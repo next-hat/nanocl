@@ -25,7 +25,6 @@ pub mod tests {
   use ntex::web::{*, self};
 
   use nanocl_stubs::config::DaemonConfig;
-  use nanocl_utils::ntex::test_client::TestClient;
 
   use crate::version::VERSION;
   use crate::services;
@@ -33,6 +32,7 @@ pub mod tests {
   use crate::models::{Pool, DaemonState};
 
   pub use ntex::web::test::TestServer;
+  pub use nanocl_utils::ntex::test_client::*;
   pub type TestRet = Result<(), Box<dyn std::error::Error + 'static>>;
 
   type Config = fn(&mut ServiceConfig);

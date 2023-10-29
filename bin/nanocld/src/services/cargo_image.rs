@@ -195,7 +195,6 @@ pub mod tests {
 
   use nanocl_stubs::generic::GenericDelete;
   use nanocl_stubs::cargo_image::CargoImagePartial;
-  use nanocl_utils::ntex::test_client::{TestClient, test_status_code};
 
   use crate::version::VERSION;
   use crate::services::ntex_config;

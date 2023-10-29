@@ -562,7 +562,6 @@ mod tests {
     Cargo, CargoSummary, CargoInspect, OutputLog, CargoDeleteQuery,
     CargoListQuery, CargoScale,
   };
-  use nanocl_utils::ntex::test_client::{TestClient, test_status_code};
 
   use crate::version::VERSION;
   use crate::services::ntex_config;

@@ -172,23 +172,25 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod test_secret {
-  use crate::services::ntex_config;
+  use ntex::http;
 
   use serde_json::json;
 
-  use nanocl_stubs::secret::SecretPartial;
+  use nanocl_stubs::secret::{Secret, SecretPartial};
   use nanocl_stubs::generic::GenericDelete;
 
+  use crate::version::VERSION;
+  use crate::services::ntex_config;
   use crate::utils::tests::*;
 
-  async fn test_list(srv: &TestServer) -> TestRet {
-    let resp = srv.get("/v0.10/secrets").send().await?;
+  const ENDPOINT: &str = "/secrets";
 
-    assert!(resp.status().is_success());
-    Ok(())
+  async fn test_list(client: &TestClient) {
+    let res = client.send_get(ENDPOINT, None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "list secrets");
   }
 
-  async fn test_create(srv: &TestServer) -> TestRet {
+  async fn test_create(client: &TestClient) {
     let new_secret = SecretPartial {
       key: String::from("test-secret"),
       kind: String::from("test"),
@@ -198,60 +200,61 @@ mod test_secret {
       }),
       metadata: None,
     };
-
-    let resp = srv.post("/v0.10/secrets").send_json(&new_secret).await?;
-
-    assert!(resp.status().is_success());
-    Ok(())
+    let mut res = client
+      .send_post(ENDPOINT, Some(new_secret), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::CREATED, "create secret");
+    let _ = res.json::<Secret>().await.unwrap();
   }
 
-  async fn test_fail_create(srv: &TestServer) -> TestRet {
-    let resp = srv
-      .post("/v0.10/secrets")
-      .send_json(&json!({
-          "name": 1,
-      }))
-      .await?;
-
-    assert!(resp.status().is_client_error());
-
-    let resp = srv.post("/v0.10/secrets").send().await?;
-
-    assert!(resp.status().is_client_error());
-    Ok(())
+  async fn test_fail_create(client: &TestClient) {
+    let res = client
+      .send_post(
+        ENDPOINT,
+        Some(&json!({
+            "name": 1,
+        })),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::BAD_REQUEST,
+      "create secret with invalid body"
+    );
+    let res = client
+      .send_post(ENDPOINT, None::<String>, None::<String>)
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::BAD_REQUEST,
+      "create secret with no body"
+    );
   }
 
-  async fn test_inspect_by_id(srv: &TestServer) -> TestRet {
-    let resp = srv
-      .get(format!("/v0.10/secrets/{key}/inspect", key = "test-secret"))
-      .send()
-      .await?;
-
-    assert!(resp.status().is_success());
-    Ok(())
+  async fn test_inspect_by_id(client: &TestClient) {
+    let res = client
+      .send_get(&format!("{ENDPOINT}/test-secret/inspect"), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "inspect secret");
   }
 
-  async fn test_delete(srv: &TestServer) -> TestRet {
-    let mut resp = srv
-      .delete(format!("/v0.10/secrets/{key}", key = "test-secret"))
-      .send()
-      .await?;
-
-    let body = resp.json::<GenericDelete>().await?;
-    assert_eq!(body.count, 1);
-    assert!(resp.status().is_success());
-    Ok(())
+  async fn test_delete(client: &TestClient) {
+    let mut res = client
+      .send_delete(&format!("{ENDPOINT}/test-secret"), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "delete secret");
+    let body = res.json::<GenericDelete>().await.unwrap();
+    assert_eq!(body.count, 1, "Expect 1 secret deleted");
   }
 
   #[ntex::test]
-  async fn basic() -> TestRet {
-    let srv = gen_server(ntex_config).await;
-
-    test_fail_create(&srv).await?;
-    test_create(&srv).await?;
-    test_inspect_by_id(&srv).await?;
-    test_list(&srv).await?;
-    test_delete(&srv).await?;
-    Ok(())
+  async fn basic() {
+    let client = generate_test_client(ntex_config, VERSION).await;
+    test_fail_create(&client).await;
+    test_create(&client).await;
+    test_inspect_by_id(&client).await;
+    test_list(&client).await;
+    test_delete(&client).await;
   }
 }

@@ -40,8 +40,6 @@ mod tests {
   use ntex::http;
   use nanocl_stubs::metric::{Metric, MetricKind, MetricFilterQuery};
 
-  use nanocl_utils::ntex::test_client::{TestClient, test_status_code};
-
   use crate::version::VERSION;
   use crate::services::ntex_config;
   use crate::utils::tests::*;
