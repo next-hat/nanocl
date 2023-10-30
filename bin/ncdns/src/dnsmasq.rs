@@ -57,7 +57,7 @@ impl Dnsmasq {
   #[inline]
   fn gen_main_conf(&self) -> IoResult<()> {
     let contents = format!(
-      "bind-interfaces
+      "bind-dynamic
 no-resolv
 no-poll
 no-hosts
