@@ -6,7 +6,7 @@ use futures::StreamExt;
 
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 use crate::{utils, repositories};
 use crate::models::DaemonState;

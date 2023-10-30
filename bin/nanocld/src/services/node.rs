@@ -9,7 +9,7 @@ use ntex::{Service, fn_service, chain};
 use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
 use futures::future::ready;
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 use crate::{utils, repositories};
 use crate::models::{DaemonState, WsConState};

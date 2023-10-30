@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::IoResult;
+use nanocl_error::io::IoResult;
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -16,7 +16,7 @@ use crate::config::CliConfig;
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_info(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;

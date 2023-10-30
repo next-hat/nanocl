@@ -14,7 +14,7 @@ use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 use crate::models::{Pool, VmImageDbModel, DaemonState};
 
 /// ## Start by key

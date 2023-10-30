@@ -1,7 +1,7 @@
 use clap::Parser;
 
 use nanocl_utils::logger;
-use nanocl_utils::io_error::IoResult;
+use nanocl_error::io::IoResult;
 
 mod cli;
 mod utils;
@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use nanocl_utils::io_error::IoResult;
+  use nanocl_error::io::IoResult;
 
   #[ntex::test]
   async fn run_wrong_host() -> IoResult<()> {

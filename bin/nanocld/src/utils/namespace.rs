@@ -6,7 +6,7 @@ use bollard_next::models::ContainerSummary;
 use bollard_next::container::ListContainersOptions;
 use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,

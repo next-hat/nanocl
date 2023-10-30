@@ -1,4 +1,4 @@
-use nanocl_utils::http_client_error::HttpClientError;
+use nanocl_error::http_client::HttpClientError;
 
 use nanocl_stubs::node::Node;
 

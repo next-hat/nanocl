@@ -7,7 +7,7 @@ use bollard_next::container::ListContainersOptions;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{HostInfo, ProccessQuery};
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 use crate::{version, repositories};
 use crate::models::DaemonState;

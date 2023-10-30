@@ -10,7 +10,7 @@ use tokio_util::codec;
 
 use bollard_next::image::ImportImageOptions;
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 use nanocl_stubs::cargo_image::{
   CargoImagePartial, ListCargoImagesOptions, CargoImageImportOptions,
 };

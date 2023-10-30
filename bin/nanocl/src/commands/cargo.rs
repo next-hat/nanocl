@@ -7,7 +7,7 @@ use futures::{StreamExt, SinkExt};
 use futures::stream::FuturesUnordered;
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
-use nanocl_utils::io_error::{FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoResult};
 use nanocld_client::stubs::cargo::{
   OutputKind, CargoDeleteQuery, CargoLogQuery, CargoStatsQuery,
 };
@@ -37,7 +37,7 @@ use super::cargo_image::{exec_cargo_image, exec_cargo_image_pull};
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_create(
   cli_conf: &CliConfig,
@@ -65,7 +65,7 @@ async fn exec_cargo_create(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_rm(
   cli_conf: &CliConfig,
@@ -101,7 +101,7 @@ async fn exec_cargo_rm(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_ls(
   cli_conf: &CliConfig,
@@ -141,7 +141,7 @@ async fn exec_cargo_ls(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_start(
   cli_conf: &CliConfig,
@@ -169,7 +169,7 @@ async fn exec_cargo_start(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_stop(
   cli_conf: &CliConfig,
@@ -197,7 +197,7 @@ async fn exec_cargo_stop(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_restart(
   cli_conf: &CliConfig,
@@ -225,7 +225,7 @@ async fn exec_cargo_restart(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_patch(
   cli_conf: &CliConfig,
@@ -254,7 +254,7 @@ async fn exec_cargo_patch(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_inspect(
   cli_conf: &CliConfig,
@@ -287,7 +287,7 @@ async fn exec_cargo_inspect(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_exec(
   cli_conf: &CliConfig,
@@ -347,7 +347,7 @@ async fn exec_cargo_exec(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_history(
   cli_conf: &CliConfig,
@@ -376,7 +376,7 @@ async fn exec_cargo_history(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_logs(
   cli_conf: &CliConfig,
@@ -431,7 +431,7 @@ async fn exec_cargo_logs(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_stats(
   cli_conf: &CliConfig,
@@ -505,7 +505,7 @@ async fn exec_cargo_stats(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_revert(
   cli_conf: &CliConfig,
@@ -534,7 +534,7 @@ async fn exec_cargo_revert(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 async fn exec_cargo_run(
   cli_conf: &CliConfig,
@@ -568,7 +568,7 @@ async fn exec_cargo_run(
 ///
 /// * [Result](Result) Result of the operation
 ///   * [Ok](()) Operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) Operation failed
+///   * [Err](nanocl_error::io::IoError) Operation failed
 ///
 pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
   let client = &cli_conf.client;

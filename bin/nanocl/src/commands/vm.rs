@@ -11,7 +11,7 @@ use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
 use termios::{TCSANOW, tcsetattr, Termios, ICANON, ECHO};
 
-use nanocl_utils::io_error::{IoResult, FromIo};
+use nanocl_error::io::{IoResult, FromIo};
 use nanocld_client::stubs::cargo::{OutputLog, OutputKind};
 
 use crate::utils;

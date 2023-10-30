@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::IoResult;
+use nanocl_error::io::IoResult;
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -17,7 +17,7 @@ use crate::models::{Context, ContextArg, ContextCommand, ContextRow};
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 fn exec_context_list(context: &Context) -> IoResult<()> {
   let list = Context::list()?;
@@ -52,7 +52,7 @@ fn exec_context_list(context: &Context) -> IoResult<()> {
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 fn exec_context_use(name: &str) -> IoResult<()> {
   Context::r#use(name)?;
@@ -72,7 +72,7 @@ fn exec_context_use(name: &str) -> IoResult<()> {
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 fn exec_context_from(path: &str) -> IoResult<()> {
   let context = Context::read(path)?;
@@ -93,7 +93,7 @@ fn exec_context_from(path: &str) -> IoResult<()> {
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_context(
   cli_conf: &CliConfig,

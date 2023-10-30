@@ -6,7 +6,7 @@ use diesel::{
 use diesel::RunQueryDsl;
 
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_utils::io_error::{IoResult, FromIo};
+use nanocl_error::io::{IoResult, FromIo};
 
 use crate::models::Pool;
 

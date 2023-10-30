@@ -1,5 +1,5 @@
 use tokio::fs;
-use nanocl_utils::io_error::{FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoResult};
 
 use nanocl_stubs::config::DaemonConfig;
 

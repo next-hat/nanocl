@@ -4,7 +4,7 @@ use tokio_util::codec;
 use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 
-use nanocl_utils::io_error::{IoResult, FromIo};
+use nanocl_error::io::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::vm_image::VmImageCloneStream;
 
@@ -29,7 +29,7 @@ use crate::models::{
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_vm_image_create(
   client: &NanocldClient,
@@ -82,7 +82,7 @@ async fn exec_vm_image_create(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_vm_image_ls(
   client: &NanocldClient,
@@ -119,7 +119,7 @@ async fn exec_vm_image_ls(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_vm_image_rm(
   client: &NanocldClient,
@@ -145,7 +145,7 @@ async fn exec_vm_image_rm(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_vm_image_clone(
   client: &NanocldClient,
@@ -187,7 +187,7 @@ async fn exec_vm_image_clone(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_vm_resize(
   client: &NanocldClient,
@@ -211,7 +211,7 @@ async fn exec_vm_resize(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_vm_image(
   client: &NanocldClient,

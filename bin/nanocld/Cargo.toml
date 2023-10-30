@@ -37,6 +37,15 @@ serde_yaml = "0.9"
 nanocl_utils = { version = "0.3.0", features = ["ntex_test_client"] }
 
 [dependencies]
+nanocl_error = { version = "0.1.0", features = [
+  "io",
+  "http",
+  "http_client",
+  "diesel",
+  "bollard",
+  "serde_json",
+  "serde_yaml",
+] }
 bollard-next = { version = "0.15.4" }
 r2d2 = "0.8"
 log = "0.4.20"
@@ -73,18 +82,7 @@ nanocld_client = { version = "0.10.0", features = ["tokio"] }
 openssl = { version = "0.10.56", features = ["vendored"] }
 metrsd_client = "0.3.0"
 nanocl_stubs = { version = "0.10.0", features = ["serde"] }
-nanocl_utils = { version = "0.3.0", features = [
-  "unix",
-  "ntex",
-  "logger",
-  "io_error",
-  "http_error",
-  "http_client_error",
-  "serde_json",
-  "serde_yaml",
-  "diesel",
-  "bollard",
-] }
+nanocl_utils = { version = "0.3.0", features = ["unix", "ntex", "logger"] }
 utoipa = { version = "4.0", features = ["yaml"], optional = true }
 notify = "6.1.1"
 ntex-cors = "0.4.0"

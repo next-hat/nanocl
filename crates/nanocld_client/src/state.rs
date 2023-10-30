@@ -1,7 +1,7 @@
 use ntex::channel::mpsc::Receiver;
 
-use nanocl_utils::http_error::HttpError;
-use nanocl_utils::http_client_error::HttpClientError;
+use nanocl_error::http::HttpError;
+use nanocl_error::http_client::HttpClientError;
 
 use nanocl_stubs::state::StateStream;
 

@@ -2,7 +2,7 @@ use ntex::http;
 use serde_json::Value;
 use jsonschema::{JSONSchema, Draft};
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 use nanocl_stubs::resource::{Resource, ResourcePartial};
 
 use crate::repositories;

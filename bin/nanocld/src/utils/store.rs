@@ -8,7 +8,7 @@ use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
-use nanocl_utils::io_error::{IoError, IoResult};
+use nanocl_error::io::{IoError, IoResult};
 
 use crate::utils;
 use crate::models::{Pool, DBConn};

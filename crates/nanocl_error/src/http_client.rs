@@ -1,5 +1,5 @@
-use super::io_error::{IoError, FromIo};
-use super::http_error::HttpError;
+use super::io::{IoError, FromIo};
+use super::http::HttpError;
 
 #[derive(Debug)]
 pub enum HttpClientError {

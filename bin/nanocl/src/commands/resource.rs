@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::{IoResult, FromIo};
+use nanocl_error::io::{IoResult, FromIo};
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -22,7 +22,7 @@ use crate::models::{
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_resource_ls(
   cli_conf: &CliConfig,
@@ -60,7 +60,7 @@ async fn exec_resource_ls(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_resource_rm(
   cli_conf: &CliConfig,
@@ -93,7 +93,7 @@ async fn exec_resource_rm(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_resource_inspect(
   cli_conf: &CliConfig,
@@ -122,7 +122,7 @@ async fn exec_resource_inspect(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_resource_history(
   cli_conf: &CliConfig,
@@ -147,7 +147,7 @@ async fn exec_resource_history(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_resource_revert(
   cli_conf: &CliConfig,
@@ -172,7 +172,7 @@ async fn exec_resource_revert(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_resource(
   cli_conf: &CliConfig,

@@ -1,7 +1,7 @@
 use ntex::web;
 
 use nanocl_utils::ntex::middlewares;
-use nanocl_utils::io_error::{IoResult, IoError};
+use nanocl_error::io::{IoResult, IoError};
 
 use crate::services;
 use crate::dnsmasq::Dnsmasq;
@@ -50,7 +50,7 @@ pub fn generate(
 mod tests {
   use super::*;
   use crate::dnsmasq::Dnsmasq;
-  use nanocl_utils::io_error::IoResult;
+  use nanocl_error::io::IoResult;
 
   #[ntex::test]
   async fn generate_unix_and_tcp() -> IoResult<()> {

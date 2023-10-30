@@ -14,7 +14,7 @@ use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_stubs::system::Event;
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 /// ## Client
 /// Stream: Wrap Receiver in our own type, with correct error type

@@ -1,8 +1,8 @@
 use ntex::http;
 
-use nanocl_utils::io_error::{FromIo, IoResult};
-use nanocl_utils::http_error::HttpError;
-use nanocl_utils::http_client_error::HttpClientError;
+use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::http::HttpError;
+use nanocl_error::http_client::HttpClientError;
 
 use crate::version::{VERSION, CHANNEL};
 
@@ -60,7 +60,7 @@ async fn get() -> Result<String, HttpClientError> {
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](String) The template
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn get_template(template: Option<String>) -> IoResult<String> {
   match template {

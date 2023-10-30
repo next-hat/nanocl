@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::IoResult;
+use nanocl_error::io::IoResult;
 use nanocld_client::NanocldClient;
 
 use crate::config::CliConfig;
@@ -23,7 +23,7 @@ use crate::utils::print::print_table;
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_process(
   cli_conf: &CliConfig,
@@ -54,7 +54,7 @@ pub async fn exec_process(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_http(
   client: &NanocldClient,
@@ -82,7 +82,7 @@ pub async fn exec_http(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_system(
   cli_conf: &CliConfig,

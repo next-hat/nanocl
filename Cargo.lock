@@ -1797,6 +1797,7 @@ dependencies = [
  "hyper",
  "indicatif",
  "liquid",
+ "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
  "nix 0.27.1",
@@ -1811,6 +1812,18 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml 0.8.5",
+]
+
+[[package]]
+name = "nanocl_error"
+version = "0.1.0"
+dependencies = [
+ "bollard-next",
+ "diesel",
+ "ntex",
+ "serde_json",
+ "serde_urlencoded",
+ "serde_yaml",
 ]
 
 [[package]]
@@ -1829,19 +1842,16 @@ dependencies = [
 name = "nanocl_utils"
 version = "0.3.0"
 dependencies = [
- "bollard-next",
  "clap",
  "clap_mangen",
- "diesel",
  "env_logger",
  "futures",
  "libc",
  "log",
+ "nanocl_error",
  "ntex",
  "serde",
  "serde_json",
- "serde_urlencoded",
- "serde_yaml",
  "utoipa",
  "utoipa-swagger-ui",
 ]
@@ -1865,6 +1875,7 @@ dependencies = [
  "libc",
  "log",
  "metrsd_client",
+ "nanocl_error",
  "nanocl_stubs",
  "nanocl_utils",
  "nanocld_client",
@@ -1889,8 +1900,8 @@ version = "0.10.0"
 dependencies = [
  "bollard-next",
  "futures",
+ "nanocl_error",
  "nanocl_stubs",
- "nanocl_utils",
  "ntex",
  "openssl",
  "serde",
@@ -1916,6 +1927,7 @@ dependencies = [
  "clap_mangen",
  "futures",
  "log",
+ "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
  "ntex",
@@ -1935,6 +1947,7 @@ dependencies = [
  "clap_mangen",
  "futures",
  "log",
+ "nanocl_error",
  "nanocl_utils",
  "nanocld_client",
  "notify",

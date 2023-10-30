@@ -4,7 +4,10 @@ Collection of utils when working with Nanocl ecosystem.
 
 This include:
 
+- Unix
 - Logger
-- Ntex middlewares
-- Http error handling
-- Io error handling
+- Ntex
+- Build tools
+- Versioning
+- Ntex test client
+- Ntex swagger

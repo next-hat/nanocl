@@ -1,6 +1,6 @@
 use ntex::web;
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::dns::ResourceDnsRule;

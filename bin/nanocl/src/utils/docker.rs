@@ -14,7 +14,7 @@ use bollard_next::service::{
   ContainerCreateResponse,
 };
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_error::io::{IoError, FromIo, IoResult};
 
 use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 use nanocld_client::stubs::cargo_config::Config as ContainerConfig;

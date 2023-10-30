@@ -5,7 +5,7 @@ use futures::StreamExt;
 use bollard_next::service::ProgressDetail;
 use indicatif::{ProgressStyle, ProgressBar, MultiProgress};
 
-use nanocl_utils::io_error::{IoError, IoResult, FromIo};
+use nanocl_error::io::{IoError, IoResult, FromIo};
 use nanocld_client::NanocldClient;
 
 use crate::utils;
@@ -28,7 +28,7 @@ use crate::models::{
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_cargo_image_ls(
   client: &NanocldClient,
@@ -65,7 +65,7 @@ async fn exec_cargo_image_ls(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_cargo_image_rm(
   client: &NanocldClient,
@@ -142,7 +142,7 @@ fn update_progress(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub(crate) async fn exec_cargo_image_pull(
   client: &NanocldClient,
@@ -202,7 +202,7 @@ pub(crate) async fn exec_cargo_image_pull(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_cargo_image_inspect(
   client: &NanocldClient,
@@ -227,7 +227,7 @@ async fn exec_cargo_image_inspect(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_cargo_image_import(
   client: &NanocldClient,
@@ -256,7 +256,7 @@ async fn exec_cargo_image_import(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_cargo_image(
   client: &NanocldClient,

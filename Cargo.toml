@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "crates/nanocl_error",
   "crates/nanocl_stubs",
   "crates/nanocl_utils",
   "crates/nanocld_client",
@@ -21,6 +22,7 @@ strip = true
 # codegen-units = 1
 
 [patch.crates-io]
+nanocl_error = { path = "crates/nanocl_error" }
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocl_utils = { path = "crates/nanocl_utils" }
 nanocld_client = { path = "crates/nanocld_client" }

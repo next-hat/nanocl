@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::IoResult;
+use nanocl_error::io::IoResult;
 
 use crate::models::{Pool, StreamMetricDbModel};
 
@@ -15,7 +15,7 @@ use crate::models::{Pool, StreamMetricDbModel};
 ///
 /// * [Result](Result) - The result of the operation
 ///   * [Ok](StreamMetricDbModel) - The created http metric item
-///   * [Err](nanocl_utils::io_error::IoError) - Error during the operation
+///   * [Err](nanocl_error::io::IoError) - Error during the operation
 ///
 pub async fn create(
   item: &StreamMetricDbModel,
