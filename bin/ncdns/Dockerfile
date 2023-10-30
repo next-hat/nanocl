@@ -5,6 +5,7 @@ WORKDIR /app
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./crates/nanocl_stubs/Cargo.toml ./crates/nanocl_stubs/Cargo.toml
+COPY ./crates/nanocl_error/Cargo.toml ./crates/nanocl_error/Cargo.toml
 COPY ./crates/nanocl_utils/Cargo.toml ./crates/nanocl_utils/Cargo.toml
 COPY ./crates/nanocld_client/Cargo.toml ./crates/nanocld_client/Cargo.toml
 COPY ./bin/nanocl/Cargo.toml ./bin/nanocl/Cargo.toml
@@ -25,6 +26,7 @@ RUN export ARCH=$(uname -m) \
 RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base
 COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
+COPY ./crates/nanocl_error/src ./crates/nanocl_error/src
 COPY ./crates/nanocl_utils/src ./crates/nanocl_utils/src
 COPY ./crates/nanocld_client/src ./crates/nanocld_client/src
 COPY ./bin/nanocl/src ./bin/nanocl/src
