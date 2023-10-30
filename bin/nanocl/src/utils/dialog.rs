@@ -1,6 +1,6 @@
 use dialoguer::Confirm;
 use dialoguer::theme::ColorfulTheme;
-use nanocl_utils::io_error::IoResult;
+use nanocl_error::io::IoResult;
 
 /// ## Confirm
 ///

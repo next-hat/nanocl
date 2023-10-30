@@ -5,7 +5,7 @@ use ntex::channel::mpsc;
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::resource::ResourcePartial;

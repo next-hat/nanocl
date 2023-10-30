@@ -1,7 +1,7 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::vm::Vm;
 use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};

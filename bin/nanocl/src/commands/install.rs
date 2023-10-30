@@ -6,7 +6,7 @@ use bollard_next::container::StartContainerOptions;
 use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
 use nanocl_utils::unix;
-use nanocl_utils::io_error::{IoError, IoResult, FromIo};
+use nanocl_error::io::{IoError, IoResult, FromIo};
 use nanocld_client::stubs::state::StateDeployment;
 
 use crate::utils;
@@ -27,7 +27,7 @@ use crate::models::{
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   println!("Installing Nanocl components on your system");

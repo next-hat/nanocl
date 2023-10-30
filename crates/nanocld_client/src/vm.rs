@@ -3,8 +3,8 @@ use ntex::ws;
 use ntex::io::Base;
 use ntex::ws::WsConnection;
 
-use nanocl_utils::io_error::FromIo;
-use nanocl_utils::http_client_error::HttpClientError;
+use nanocl_error::io::FromIo;
+use nanocl_error::http_client::HttpClientError;
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};

@@ -93,9 +93,9 @@ impl web::WebResponseError for HttpError {
   }
 }
 
-#[cfg(feature = "io_error")]
-impl From<crate::io_error::IoError> for HttpError {
-  fn from(err: crate::io_error::IoError) -> Self {
+#[cfg(feature = "io")]
+impl From<crate::io::IoError> for HttpError {
+  fn from(err: crate::io::IoError) -> Self {
     match err.inner.kind() {
       std::io::ErrorKind::NotFound => HttpError::not_found(err.to_string()),
       std::io::ErrorKind::AlreadyExists => HttpError::conflict(err.to_string()),
@@ -113,9 +113,9 @@ impl From<crate::io_error::IoError> for HttpError {
   }
 }
 
-#[cfg(feature = "io_error")]
-impl From<Box<crate::io_error::IoError>> for HttpError {
-  fn from(err: Box<crate::io_error::IoError>) -> Self {
+#[cfg(feature = "io")]
+impl From<Box<crate::io::IoError>> for HttpError {
+  fn from(err: Box<crate::io::IoError>) -> Self {
     (*err).into()
   }
 }
@@ -140,8 +140,8 @@ impl From<bollard_next::errors::Error> for HttpError {
   }
 }
 
-#[cfg(feature = "io_error")]
-impl crate::io_error::FromIo<HttpError> for HttpError {
+#[cfg(feature = "io")]
+impl crate::io::FromIo<HttpError> for HttpError {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> HttpError
   where
     C: ToString + std::fmt::Display,

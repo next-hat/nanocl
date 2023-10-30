@@ -6,7 +6,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 use nanocld_client::stubs::state::{StateMeta, StateStream, StateStreamStatus};
 
-use nanocl_utils::io_error::{IoError, IoResult, FromIo};
+use nanocl_error::io::{IoError, IoResult, FromIo};
 
 use crate::models::{DisplayFormat, StateRef};
 

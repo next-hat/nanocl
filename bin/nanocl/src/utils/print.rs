@@ -2,7 +2,7 @@ use tabled::Table;
 use tabled::settings::object::Segment;
 use tabled::settings::{Style, Modify, Padding, Alignment};
 
-use nanocl_utils::io_error::{IoResult, FromIo, IoError};
+use nanocl_error::io::{IoResult, FromIo, IoError};
 
 use crate::models::DisplayFormat;
 

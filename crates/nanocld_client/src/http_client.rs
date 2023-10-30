@@ -8,14 +8,14 @@ use ntex::channel::mpsc::Receiver;
 use ntex::connect::openssl::SslMethod;
 use futures::{StreamExt, TryStreamExt};
 
-use nanocl_utils::io_error::FromIo;
-use nanocl_utils::http_error::HttpError;
-use nanocl_utils::http_client_error::HttpClientError;
+use nanocl_error::io::FromIo;
+use nanocl_error::http::HttpError;
+use nanocl_error::http_client::HttpClientError;
 use openssl::ssl::SslConnector;
 
 use crate::error::is_api_error;
 
-const NANOCLD_DEFAULT_VERSION: &str = "0.10.0";
+const NANOCLD_DEFAULT_VERSION: &str = "0.11.0";
 
 #[derive(Clone)]
 pub struct NanocldClient {

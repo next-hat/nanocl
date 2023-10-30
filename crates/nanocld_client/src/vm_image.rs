@@ -4,8 +4,8 @@ use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use futures::Stream;
 
-use nanocl_utils::http_error::HttpError;
-use nanocl_utils::http_client_error::HttpClientError;
+use nanocl_error::http::HttpError;
+use nanocl_error::http_client::HttpClientError;
 
 use nanocl_stubs::vm_image::{VmImage, VmImageCloneStream, VmImageResizePayload};
 

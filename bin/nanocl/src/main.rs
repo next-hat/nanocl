@@ -1,7 +1,7 @@
 use clap::Parser;
 use dotenv::dotenv;
 
-use nanocl_utils::io_error::IoResult;
+use nanocl_error::io::IoResult;
 use nanocld_client::NanocldClient;
 
 mod utils;
@@ -25,7 +25,7 @@ use models::{Cli, Command, Context};
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](CliConfig) The cli configuration
-///   * [Err](nanocl_utils::io_error::IoError) The error of the operation
+///   * [Err](nanocl_error::io::IoError) The error of the operation
 ///
 fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
   Context::ensure()?;
@@ -77,7 +77,7 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) The error of the operation
+///   * [Err](nanocl_error::io::IoError) The error of the operation
 ///
 async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
   let cli_conf = create_cli_config(cli_args)?;

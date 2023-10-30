@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::IoResult;
+use nanocl_error::io::IoResult;
 use nanocld_client::NanocldClient;
 
 use crate::{version, config::CliConfig};
@@ -15,7 +15,7 @@ use crate::{version, config::CliConfig};
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn print_version(client: &NanocldClient) -> IoResult<()> {
   println!("=== [nanocli] ===");

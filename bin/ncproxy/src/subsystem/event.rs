@@ -4,8 +4,8 @@ use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 
 use nanocl_utils::versioning;
-use nanocl_utils::io_error::{IoResult, IoError};
-use nanocl_utils::http_client_error::HttpClientError;
+use nanocl_error::io::{IoResult, IoError};
+use nanocl_error::http_client::HttpClientError;
 
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;

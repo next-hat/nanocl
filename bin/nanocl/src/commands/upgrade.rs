@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use futures::StreamExt;
 use indicatif::{ProgressBar, MultiProgress};
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 
 use crate::utils;

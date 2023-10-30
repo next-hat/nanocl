@@ -1,5 +1,5 @@
 use nanocl_stubs::http_metric::{HttpMetric, HttpMetricListQuery};
-use nanocl_utils::http_client_error::HttpClientError;
+use nanocl_error::http_client::HttpClientError;
 
 use super::http_client::NanocldClient;
 
@@ -19,7 +19,7 @@ impl NanocldClient {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use nanocl_utils::http_client_error::HttpClientError;
+  use nanocl_error::http_client::HttpClientError;
 
   #[ntex::test]
   async fn list_metric() -> Result<(), HttpClientError> {

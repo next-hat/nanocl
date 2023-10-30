@@ -4,7 +4,7 @@ use ntex::web;
 use ntex::http;
 use ntex::util::Bytes;
 
-use crate::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 pub struct SwaggerConfig<'a> {
   definition: utoipa::openapi::OpenApi,

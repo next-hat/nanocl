@@ -15,7 +15,7 @@ use bollard_next::service::{
   HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
 };
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,

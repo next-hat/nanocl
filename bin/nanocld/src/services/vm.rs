@@ -17,7 +17,7 @@ use nanocl_stubs::cargo::OutputLog;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 use crate::{utils, repositories};
 use crate::models::{DaemonState, WsConState};

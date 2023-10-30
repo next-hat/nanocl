@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::{FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoResult};
 use nanocld_client::stubs::state::StateDeployment;
 
 use bollard_next::container::{InspectContainerOptions, RemoveContainerOptions};
@@ -20,7 +20,7 @@ use crate::models::UninstallOpts;
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
   let detected_host = utils::docker::detect_docker_host()?;

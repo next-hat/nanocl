@@ -5,7 +5,7 @@
 /// The cargo key will be `get-started.global`
 use ntex::http;
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 /// ## Resolve nsp
 ///

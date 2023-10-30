@@ -4,8 +4,8 @@ use diesel::{
   Insertable, RunQueryDsl,
 };
 
+use nanocl_error::io::{IoResult, FromIo};
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_utils::io_error::{IoResult, FromIo};
 
 use crate::utils;
 use crate::models::Pool;

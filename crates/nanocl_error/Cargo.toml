@@ -1,0 +1,32 @@
+[package]
+name = "nanocl_error"
+version = "0.1.0"
+edition = "2021"
+authors = ["nanocl contributors <team@next-hat.com>"]
+description = "Nanocl error types"
+readme = "readme.md"
+license = "MIT OR Apache-2.0"
+homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
+repository = "https://github.com/nxthat/nanocl"
+
+[lib]
+bench = false
+
+[features]
+io = []
+ntex = ["dep:ntex"]
+http = ["ntex", "dep:serde_json"]
+http_client = ["io", "http", "serde_urlencoded"]
+diesel = ["dep:diesel"]
+bollard = ["dep:bollard-next"]
+serde_json = ["dep:serde_json"]
+serde_yaml = ["dep:serde_yaml"]
+serde_urlencoded = ["dep:serde_urlencoded"]
+
+[dependencies]
+ntex = { version = "0.7.7", optional = true }
+serde_json = { version = "1.0.107", optional = true }
+serde_urlencoded = { version = "0.7.1", optional = true }
+diesel = { version = "2.1.2", default-features = false, optional = true }
+bollard-next = { version = "0.15.4", optional = true }
+serde_yaml = { version = "0.9", optional = true }

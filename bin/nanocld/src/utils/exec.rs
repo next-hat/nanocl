@@ -3,7 +3,7 @@ use ntex::web;
 use bollard_next::container::LogOutput;
 use bollard_next::exec::{StartExecOptions, StartExecResults};
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 use nanocl_stubs::cargo::{OutputLog, CreateExecOptions};
 
 use crate::models::DaemonState;

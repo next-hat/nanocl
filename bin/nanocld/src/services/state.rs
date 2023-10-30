@@ -3,7 +3,7 @@ use ntex::util::Bytes;
 use ntex::channel::mpsc;
 
 use crate::utils;
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 use crate::models::{StateData, DaemonState};
 
 #[web::put("/state/apply")]

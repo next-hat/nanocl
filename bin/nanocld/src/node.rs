@@ -13,8 +13,8 @@ use futures::SinkExt;
 use futures::StreamExt;
 use futures::channel::mpsc;
 
-use nanocl_utils::io_error::IoResult;
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::io::IoResult;
+use nanocl_error::http::HttpError;
 use nanocl_stubs::config::DaemonConfig;
 
 use crate::repositories;

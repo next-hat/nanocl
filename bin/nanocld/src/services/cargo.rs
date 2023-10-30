@@ -14,7 +14,7 @@ use nanocl_stubs::cargo::{
 };
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 use crate::{utils, repositories};
 use crate::models::{DaemonState, CargoRevertPath};

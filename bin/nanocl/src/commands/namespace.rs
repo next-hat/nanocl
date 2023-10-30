@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::{IoResult, FromIo};
+use nanocl_error::io::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
 
 use crate::config::CliConfig;
@@ -21,7 +21,7 @@ use crate::models::{
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_namespace_ls(
   client: &NanocldClient,
@@ -58,7 +58,7 @@ async fn exec_namespace_ls(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_namespace_create(
   client: &NanocldClient,
@@ -82,7 +82,7 @@ async fn exec_namespace_create(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_namespace_inspect(
   client: &NanocldClient,
@@ -106,7 +106,7 @@ async fn exec_namespace_inspect(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_namespace_rm(
   client: &NanocldClient,
@@ -138,7 +138,7 @@ async fn exec_namespace_rm(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_namespace(
   cli_conf: &CliConfig,

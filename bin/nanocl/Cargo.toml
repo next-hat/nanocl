@@ -57,14 +57,8 @@ termios = "0.3.3"
 liquid = "0.26.1"
 regex = "1.10.2"
 nanocld_client = { version = "0.10.0", features = ["tokio"] }
-nanocl_utils = { version = "0.3.0", features = [
-  "unix",
-  "io_error",
-  "http_client_error",
-  "bollard",
-  "serde_json",
-  "serde_yaml",
-] }
+nanocl_error = { version = "0.1.0", features = ["io", "http_client"] }
+nanocl_utils = { version = "0.3.0", features = ["unix"] }
 ctrlc = "3.3.1"
 dotenv = "0.15.0"
 toml = "0.8.0"

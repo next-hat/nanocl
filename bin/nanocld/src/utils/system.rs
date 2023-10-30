@@ -4,7 +4,7 @@ use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
-use nanocl_utils::io_error::{FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoResult};
 
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::namespace::NamespacePartial;

@@ -12,7 +12,7 @@ use tokio::process::Command;
 use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 
 use crate::{utils, repositories};
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 use crate::models::{
   Pool, VmImageDbModel, QemuImgInfo, VmImageUpdateDbModel, DaemonState,
 };

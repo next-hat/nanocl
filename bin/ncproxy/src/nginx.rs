@@ -1,7 +1,7 @@
 use std::fs;
 use std::str::FromStr;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_error::io::{IoError, FromIo, IoResult};
 
 use nanocld_client::stubs::proxy::ProxyRule;
 

@@ -1,6 +1,6 @@
 use futures::StreamExt;
 
-use nanocl_utils::io_error::IoResult;
+use nanocl_error::io::IoResult;
 
 use crate::{utils::print::print_yml, config::CliConfig};
 
@@ -17,7 +17,7 @@ use crate::{utils::print::print_yml, config::CliConfig};
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_events(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;

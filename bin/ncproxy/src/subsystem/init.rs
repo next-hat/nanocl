@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::IoResult;
+use nanocl_error::io::IoResult;
 
 use crate::cli::Cli;
 use crate::nginx::Nginx;

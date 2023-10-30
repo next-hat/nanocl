@@ -1,7 +1,7 @@
 use ntex::web;
 use diesel::prelude::*;
 
-use nanocl_utils::io_error::{IoError, IoResult, FromIo};
+use nanocl_error::io::{IoError, IoResult, FromIo};
 
 use crate::utils;
 use crate::models::{Pool, NodeDbModel};

@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 use indicatif::{MultiProgress, ProgressBar};
 use bollard_next::service::HostConfig;
 
-use nanocl_utils::io_error::{IoError, FromIo, IoResult};
+use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::state::StateMeta;
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};

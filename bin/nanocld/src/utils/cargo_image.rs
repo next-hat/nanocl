@@ -5,7 +5,7 @@ use futures::StreamExt;
 use bollard_next::service::CreateImageInfo;
 use bollard_next::models::{ImageInspect, ImageSummary};
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 use nanocl_stubs::generic::GenericDelete;
 
 use crate::models::DaemonState;

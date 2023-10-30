@@ -8,7 +8,7 @@ use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
 use nanocl_stubs::generic::GenericNspQuery;
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 use crate::utils;
 use crate::models::DaemonState;

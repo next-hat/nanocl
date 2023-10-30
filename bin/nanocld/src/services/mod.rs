@@ -1,7 +1,7 @@
 use ntex::web;
 use ntex::http;
 use nanocl_utils::ntex::middlewares;
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 use crate::version;
 

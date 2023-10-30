@@ -1,4 +1,4 @@
-use nanocl_utils::io_error::{IoResult, FromIo};
+use nanocl_error::io::{IoResult, FromIo};
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -18,7 +18,7 @@ use crate::models::{
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_secret_ls(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;
@@ -44,7 +44,7 @@ async fn exec_secret_ls(cli_conf: &CliConfig) -> IoResult<()> {
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_secret_rm(
   cli_conf: &CliConfig,
@@ -74,7 +74,7 @@ async fn exec_secret_rm(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_secret_inspect(
   cli_conf: &CliConfig,
@@ -102,7 +102,7 @@ async fn exec_secret_inspect(
 ///
 /// * [Result](Result) The result of the operation
 ///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_utils::io_error::IoError) An error occured
+///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_secret(
   cli_conf: &CliConfig,

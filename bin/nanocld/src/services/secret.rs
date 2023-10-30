@@ -10,7 +10,7 @@ use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 use crate::repositories;
 use crate::models::DaemonState;
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 /// List secrets
 #[cfg_attr(feature = "dev", utoipa::path(

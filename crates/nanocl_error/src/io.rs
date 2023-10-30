@@ -83,10 +83,6 @@ impl IoError {
   }
 
   pub fn exit(&self) -> ! {
-    #[cfg(feature = "logger")]
-    {
-      log::error!("{self}");
-    }
     std::process::exit(self.inner.raw_os_error().unwrap_or(1));
   }
 }
@@ -287,9 +283,9 @@ impl FromIo<Box<IoError>> for bollard_next::errors::Error {
   }
 }
 
-#[cfg(feature = "http_error")]
-impl From<crate::http_error::HttpError> for IoError {
-  fn from(f: crate::http_error::HttpError) -> Self {
+#[cfg(feature = "http")]
+impl From<crate::http::HttpError> for IoError {
+  fn from(f: crate::http::HttpError) -> Self {
     Self {
       context: None,
       inner: std::io::Error::new(std::io::ErrorKind::InvalidData, f),

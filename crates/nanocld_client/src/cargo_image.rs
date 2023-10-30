@@ -3,8 +3,8 @@ use std::error::Error;
 use ntex::channel::mpsc;
 use ntex::util::{Bytes, Stream};
 
-use nanocl_utils::http_error::HttpError;
-use nanocl_utils::http_client_error::HttpClientError;
+use nanocl_error::http::HttpError;
+use nanocl_error::http_client::HttpClientError;
 
 use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
 

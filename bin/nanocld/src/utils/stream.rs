@@ -3,7 +3,7 @@ use ntex::util::Bytes;
 use futures::StreamExt;
 use serde::Serialize;
 
-use nanocl_utils::http_error::HttpError;
+use nanocl_error::http::HttpError;
 
 /// ## Transform stream
 ///

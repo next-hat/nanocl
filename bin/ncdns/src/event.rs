@@ -2,7 +2,7 @@ use ntex::rt;
 use ntex::http;
 use futures::StreamExt;
 use nanocl_utils::versioning;
-use nanocl_utils::http_client_error::HttpClientError;
+use nanocl_error::http_client::HttpClientError;
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;
 use nanocld_client::stubs::dns::ResourceDnsRule;
