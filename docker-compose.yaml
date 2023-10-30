@@ -55,6 +55,7 @@ services:
       - //run/guest-services/nanocl:/run/nanocl
 
   ncvpnkit:
+    profiles: ['vpnkit']
     container_name: ncvpnkit.system.c
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
