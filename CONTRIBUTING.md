@@ -115,13 +115,19 @@ Before running `Nanocl` we will need to download and build some docker images:
 ./scripts/install_dev_image.sh
 ```
 
-Then spin up `Nanocl` services using `docker compose`:
+Then spin up `Nanocl` services using `docker compose` (note that you need use vpnkit profile for docker desktop [see below](#docker-desktop)):
 
 ```sh
 docker compose up
 ```
 
 ### 🐋 Docker Desktop
+
+With Docker Desktop you'll need an additional container, to enable it run docker compose with profile `vpnkit`
+
+```sh
+docker compose --profile vpnkit up
+```
 
 If you can have Docker installed normally with his default socket on `/var/run/docker.sock` you can also change the context:
 
