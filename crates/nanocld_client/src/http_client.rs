@@ -15,7 +15,7 @@ use openssl::ssl::SslConnector;
 
 use crate::error::is_api_error;
 
-const NANOCLD_DEFAULT_VERSION: &str = "0.11.0";
+const NANOCLD_DEFAULT_VERSION: &str = "0.10.0";
 
 #[derive(Clone)]
 pub struct NanocldClient {
