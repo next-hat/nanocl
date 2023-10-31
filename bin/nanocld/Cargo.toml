@@ -25,7 +25,7 @@ dev = [
   "nanocl_utils/ntex_swagger",
   "nanocl_utils/ntex_test_client",
 ]
-test = []
+test = ["nanocl_utils/ntex_test_client"]
 release = []
 
 [build-dependencies]

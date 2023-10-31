@@ -16,8 +16,9 @@ dev = [
   "nanocld_client/utoipa",
   "nanocl_utils/dev",
   "nanocl_utils/ntex_swagger",
+  "nanocl_utils/ntex_test_client",
 ]
-test = []
+test = ["nanocl_utils/ntex_test_client"]
 
 [build-dependencies]
 clap = { version = "4.4.5", features = ["derive"] }
