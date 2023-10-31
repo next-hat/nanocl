@@ -11,7 +11,6 @@ impl NanocldClient {
     let res = self
       .send_get(format!("/{}/http_metrics", &self.version), query)
       .await?;
-
     Self::res_json(res).await
   }
 }

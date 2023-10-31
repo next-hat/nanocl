@@ -27,7 +27,6 @@ impl NanocldClient {
     let res = self
       .send_get(format!("/{}/namespaces", &self.version), None::<String>)
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -55,7 +54,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -92,7 +90,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -129,7 +126,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Ok(())
   }
 }
@@ -142,15 +138,11 @@ mod tests {
   async fn basic() {
     const NAMESPACE: &str = "clientnt";
     let client = NanocldClient::connect_to("http://localhost:8585", None);
-
     client.list_namespace().await.unwrap();
-
     let namespace = client.create_namespace(NAMESPACE).await.unwrap();
     assert_eq!(namespace.name, NAMESPACE);
-
     let namespace = client.inspect_namespace(NAMESPACE).await.unwrap();
     assert_eq!(namespace.name, NAMESPACE);
-
     client.delete_namespace(NAMESPACE).await.unwrap();
   }
 }
