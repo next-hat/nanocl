@@ -1,0 +1,35 @@
+version: '3.9'
+
+x-definitions:
+  bind: &bind
+    type: bind
+    source: .
+    target: /project
+  volume-mount: &volume-mount-volumes
+    volumes:
+      - <<: *bind
+      - nanocl_target:/project/target
+      - nanocl_registry:/usr/local/cargo/registry
+      - nanocl_rustup:/usr/local/rustup
+  host-mount: &host-mount-volumes
+    volumes:
+      - <<: *bind
+      - /project/target
+  target-mount: &target-mount-volumes
+      <<: *host-mount-volumes
+      # <<: *volume-mount-volumes
+
+volumes:
+  nanocl_target:
+  nanocl_registry:
+  nanocl_rustup:
+
+services:
+  ncvpnkit:
+    <<: *target-mount-volumes
+  ncproxy:
+    <<: *target-mount-volumes
+  ncdns:
+    <<: *target-mount-volumes
+  nanocld:
+    <<: *target-mount-volumes
