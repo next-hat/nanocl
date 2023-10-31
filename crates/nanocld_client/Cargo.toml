@@ -25,7 +25,7 @@ tokio = { version = "1.33.0", features = ["fs"] }
 
 [dependencies]
 futures = "0.3.25"
-serde_json = "1.0.107"
+serde_json = "1.0.108"
 ntex = { version = "0.7.7", features = ["openssl"] }
 serde = { version = "1.0.189", features = ["derive"] }
 bollard-next = { version = "0.15.4" }
