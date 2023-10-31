@@ -471,11 +471,6 @@ server {{
   listen {listen_http};
   {http_host}{ssl}{includes}
   {locations}
-  error_page 502 /502.html;
-  location = /502.html {{
-    root /usr/share/nginx/html;
-    internal;
-  }}
 }}\n",
   );
   Ok(conf)
