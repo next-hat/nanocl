@@ -94,7 +94,28 @@ services:
       - /project/bin/ncvpnkit/src
       - -x
       - run --no-default-features --features dev --bin ncvpnkit
-
+  ncertmanager:
+    container_name: ncertmanager.system.c
+    image: ghcr.io/nxthat/nanocl-dev:dev
+    tty: true
+    networks:
+      - system
+    environment:
+      - TZ=Europe/Paris
+    command:
+      - watch
+      - -w
+      - /project/bin/ncertmanager/src
+      - -x
+      - run --no-default-features --features dev --bin ncertmanager
+    labels:
+      - io.nanocl=enabled
+      - io.nanocl.c=ncertmanager.system
+      - io.nanocl.n=system
+      - io.nanocl.cnsp=system
+    volumes:
+      - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/certmanager:/var/certmanager
   nproxy:
     container_name: nproxy.system.c
     image: nproxy:dev

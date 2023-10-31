@@ -24,7 +24,7 @@ async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   match client.inspect_resource(&dns_rule_kind.name).await {
     Ok(_) => {
       if let Err(err) = client
-        .put_resource(&dns_rule_kind.name, &dns_rule_kind.clone().into())
+        .put_resource(&dns_rule_kind.name.clone(), &dns_rule_kind.into())
         .await
       {
         match err {

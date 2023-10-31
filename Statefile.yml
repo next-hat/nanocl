@@ -1,0 +1,389 @@
+Kind: Deployment
+ApiVersion: v0.10
+Namespace: global
+
+Args:
+- Name: puid
+  Kind: String
+- Name: pgid
+  Kind: String
+- Name: mediaPath
+  Kind: String
+- Name: captchaLogLevel
+  Kind: String
+  Default: info
+- Name: captchaLogHtml
+  Kind: String
+  Default: 'false'
+- Name: captchaSolver
+  Kind: String
+  Default: none
+
+Resources:
+- Name: music
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 8686
+      Protocol: Tcp
+      Target:
+        Key: music.global
+        Port: 8686
+- Name: dns
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 53
+      Protocol: Tcp
+      Target:
+        Key: dns.global
+        Port: 53
+    - Network: Public
+      Port: 53
+      Protocol: Udp
+      Target:
+        Key: dns.global
+        Port: 53
+    - Network: Public
+      Port: 67
+      Protocol: Udp
+      Target:
+        Key: dns.global
+        Port: 67
+    - Network: Public
+      Port: 80
+      Protocol: Tcp
+      Target:
+        Key: dns.global
+        Port: 80
+- Name: money
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 8000
+      Protocol: Tcp
+      Target:
+        Key: money.global
+        Port: 8000
+- Name: youtube
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 8081
+      Protocol: Tcp
+      Target:
+        Key: youtube.global
+        Port: 8081
+- Name: altair.wtf
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 80
+      Protocol: Tcp
+      Target:
+        Key: altair.wtf.global
+        Port: 80
+    - Network: Public
+      Port: 8080
+      Protocol: Tcp
+      Target:
+        Key: altair.wtf.global
+        Port: 8080
+    - Network: Public
+      Port: 443
+      Protocol: Tcp
+      Target:
+        Key: altair.wtf.global
+        Port: 443
+- Name: flaresolverr
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 8191
+      Protocol: Tcp
+      Target:
+        Key: flaresolverr.global
+        Port: 8191
+- Name: aggregator
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 9117
+      Protocol: Tcp
+      Target:
+        Key: aggregator.global
+        Port: 9117
+- Name: torrent
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 9091
+      Protocol: Tcp
+      Target:
+        Key: torrent.global
+        Port: 9091
+    - Network: Public
+      Port: 51413
+      Protocol: Tcp
+      Target:
+        Key: torrent.global
+        Port: 51413
+    - Network: Public
+      Port: 51413
+      Protocol: Udp
+      Target:
+        Key: torrent.global
+        Port: 51413
+- Name: plex
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 32400
+      Protocol: Tcp
+      Target:
+        Key: plex.global
+        Port: 32400
+- Name: movies
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 7878
+      Protocol: Tcp
+      Target:
+        Key: movies.global
+        Port: 7878
+- Name: tv
+  Kind: ProxyRule
+  Version: v0.7
+  Data:
+    Rules:
+    - Network: Public
+      Port: 8989
+      Protocol: Tcp
+      Target:
+        Key: tv.global
+        Port: 8989
+Cargoes:
+- Name: music
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Env:
+    - PUID=${{Args.puid}}
+    - PGID=${{Args.pgid}}
+    - TZ=Europe/Paris
+    Image: linuxserver/lidarr:latest
+    Labels:
+      traefik.http.routers.lidarr.rule: Host(`music.altair.wtf`)
+      traefik.enable: 'true'
+      traefik.http.services.lidarr.loadbalancer.server.port: '8686'
+      traefik.http.routers.lidarr.entrypoints: http
+    HostConfig:
+      Binds:
+      - /home/media/lidarr/config:/config
+      - ${{Args.mediaPath}}:/data
+- Name: dns
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Env:
+    - PUID=${{Args.puid}}
+    - PGID=${{Args.pgid}}
+    - TZ=Europe/Paris
+    - WEBPASSWORD=Ipod1907.
+    - SERVERIP=10.8.0.1
+    - PIHOLE_DOMAIN=dns.altair.wtf
+    - VIRTUAL_HOST=dns.altair.wtf
+    Image: pihole/pihole:latest
+    Labels:
+      traefik.enable: 'true'
+      traefik.http.routers.pihole.entrypoints: http
+      traefik.http.routers.pihole.rule: Host(`dns.altair.wtf`)
+      traefik.http.services.pihole.loadbalancer.server.port: '80'
+    HostConfig:
+      Binds:
+      - ../pihole/etc:/etc/pihole
+      - ../pihole/dnsmasq.d:/etc/dnsmasq.d
+      - ../pihole/log:/var/log/pihole
+- Name: money
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Env:
+    - PORT=8000
+    - PUID=${{Args.puid}}
+    - PGID=${{Args.pgid}}
+    Image: ihatemoney/ihatemoney:latest
+    Labels:
+      traefik.http.routers.ihatemoney.entrypoints: http
+      traefik.http.routers.ihatemoney.rule: Host(`money.altair.wtf`)
+      traefik.http.services.ihatemoney.loadbalancer.server.port: '8000'
+      traefik.enable: 'true'
+    HostConfig:
+      Binds:
+      - ../ihatemoney/database:/database
+- Name: youtube
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Env:
+    - DOWNLOAD_DIR=/downloads/tv
+    - AUDIO_DOWNLOAD_DIR=/downloads/music
+    Image: alexta69/metube
+    Labels:
+      traefik.http.routers.metube.rule: Host(`youtube.altair.wtf`)
+      traefik.enable: 'true'
+      traefik.http.routers.metube.entrypoints: http
+      traefik.http.services.metube.loadbalancer.server.port: '8081'
+    HostConfig:
+      Binds:
+      - ${{Args.mediaPath}}/complete:/downloads
+- Name: altair.wtf
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Image: traefik:latest
+    Labels:
+      traefik.http.routers.traefik.entrypoints: http
+      traefik.docker.network: default
+      traefik.http.middlewares.auth-traefik.basicauth.users: admin:123546
+      traefik.enable: 'true'
+      traefik.http.routers.traefik.rule: Host(`traefik.altair.wtf`)
+      traefik.http.routers.traefik.service: api@internal
+    HostConfig:
+      Binds:
+      - ../traefik/etc:/etc/traefik:ro
+      - ../traefik/log:/var/log/traefik
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+- Name: flaresolverr
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Env:
+    - LOG_LEVEL=${{Args.captchaLogLevel}}
+    - LOG_HTML=${{Args.captchaLogHtml}}
+    - CAPTCHA_SOLVER=${{Args.captchaSolver}}
+    - TZ=Europe/London
+    Image: ghcr.io/flaresolverr/flaresolverr:latest
+    Labels:
+      traefik.http.services.flaresolverr.loadbalancer.server.port: '8191'
+      traefik.http.routers.flaresolverr.rule: Host(`flaresolverr.altair.wtf`)
+      traefik.http.routers.flaresolverr.entrypoints: http
+      traefik.enable: 'true'
+    HostConfig: {}
+- Name: aggregator
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Env:
+    - PUID=${{Args.puid}}
+    - PGID=${{Args.pgid}}
+    - TZ=Europe/Paris
+    Image: linuxserver/jackett:latest
+    Labels:
+      traefik.enable: 'true'
+      traefik.http.routers.jackett.rule: Host(`aggregator.altair.wtf`)
+      traefik.http.routers.jackett.entrypoints: http
+      traefik.http.services.jackett.loadbalancer.server.port: '9117'
+    HostConfig:
+      Binds:
+      - /home/media/jackett/config:/config
+      - /etc/localtime:/etc/localtime:ro
+- Name: torrent
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Env:
+    - PUID=${{Args.puid}}
+    - PGID=${{Args.pgid}}
+    - TZ=Europe/London
+    - USER=transmission
+    - PASS=tr3nsmission:Ipod1907.
+    Image: lscr.io/linuxserver/transmission
+    Labels:
+      traefik.http.routers.transmission.rule: Host(`torrent.altair.wtf`)
+      traefik.http.services.transmission.loadbalancer.server.port: '9091'
+      traefik.enable: 'true'
+      traefik.http.routers.transmission.entrypoints: http
+    HostConfig:
+      Binds:
+      - /home/media/transmission/config:/config
+      - /home/media/data:/downloads
+      - /home/media/transmission/watch:/watch
+- Name: plex
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Env:
+    - VERSION=latest
+    - PUID=${{Args.puid}}
+    - PGID=${{Args.pgid}}
+    - TZ=Europe/Paris
+    Image: linuxserver/plex:latest
+    Labels:
+      traefik.http.routers.plex.entrypoints: http
+      traefik.http.routers.plex.rule: Host(`plex.altair.wtf`)
+      traefik.enable: 'true'
+      traefik.http.services.plex.loadbalancer.server.port: '32400'
+    HostConfig:
+      Binds:
+      - /home/media/config:/config
+      - ${{Args.mediaPath}}/complete:/home/media/data
+- Name: movies
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Env:
+    - PUID=${{Args.puid}}
+    - PGID=${{Args.pgid}}
+    - TZ=Europe/Paris
+    Image: linuxserver/radarr:latest
+    Labels:
+      traefik.enable: 'true'
+      traefik.http.routers.radarr.entrypoints: http
+      traefik.http.routers.radarr.rule: Host(`movies.altair.wtf`)
+      traefik.http.services.radarr.loadbalancer.server.port: '7878'
+    HostConfig:
+      Binds:
+      - /home/media/radarr/config:/config
+      - ${{Args.mediaPath}}:/data
+- Name: tv
+  Container:
+    ExposedPorts: {}
+    OpenStdin: false
+    Env:
+    - PUID=${{Args.puid}}
+    - PGID=${{Args.pgid}}
+    - TZ=Europe/Paris
+    Image: linuxserver/sonarr:latest
+    Labels:
+      traefik.enable: 'true'
+      traefik.http.services.sonarr.loadbalancer.server.port: '8989'
+      traefik.http.routers.sonarr.rule: Host(`tv.altair.wtf`)
+      traefik.http.routers.sonarr.entrypoints: http
+    HostConfig:
+      Binds:
+      - /home/media/sonarr/config:/config
+      - ${{Args.mediaPath}}:/data

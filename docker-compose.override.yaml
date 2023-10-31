@@ -16,8 +16,8 @@ x-definitions:
       - <<: *bind
       - /project/target
   target-mount: &target-mount-volumes
-      <<: *host-mount-volumes
-      # <<: *volume-mount-volumes
+      # <<: *host-mount-volumes
+      <<: *volume-mount-volumes
 
 volumes:
   nanocl_target:
@@ -26,6 +26,8 @@ volumes:
 
 services:
   ncvpnkit:
+    <<: *target-mount-volumes
+  ncertmanager:
     <<: *target-mount-volumes
   ncproxy:
     <<: *target-mount-volumes

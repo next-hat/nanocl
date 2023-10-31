@@ -82,6 +82,16 @@ If you need docker:
 ./scripts/install_docker.ubuntu.sh
 ```
 
+### MacOS or aarch64 linux
+
+You'll need to manual build dev-image
+```
+ docker build -t ghcr.io/nxthat/nanocl-dev:dev -f dev.Dockerfile .
+ // TODO: WHERE IS THE FUCKING DOCKERFILE
+ docker build -t nexthat/nanocl-get-started:latest .
+```
+
+
 ### 🦀 Rust
 
 To install rust

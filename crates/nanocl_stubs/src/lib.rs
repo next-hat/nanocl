@@ -2,6 +2,7 @@ pub mod system;
 pub mod generic;
 
 pub mod node;
+pub mod cert_manager;
 pub mod dns;
 pub mod proxy;
 pub mod config;

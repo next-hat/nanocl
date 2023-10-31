@@ -1,0 +1,37 @@
+[config]
+default_to_workspace = false
+
+[tasks.format]
+install_crate = "rustfmt"
+command = "cargo"
+args = ["fmt"]
+
+# Clean dependencies and build cache
+[tasks.clean]
+command = "cargo"
+args = ["clean"]
+
+# Run daemon
+[tasks.run]
+command = "cargo"
+args = ["run", "${@}"]
+
+# Test all
+[tasks.test]
+command = "cargo"
+args = ["nextest", "run", "-j", "1"]
+
+# Test all with debug output
+[tasks.test-debug]
+command = "cargo"
+args = ["test", "--", "--nocapture"]
+
+# Test coverage
+[tasks.cov]
+command = "cargo"
+args = ["llvm-cov", "nextest", "-j", "1"]
+
+# Test all with coverage for codecov
+[tasks.covgen]
+command = "cargo"
+args = ["llvm-cov", "nextest", "--output-path", "./lcov.info", "--lcov"]

@@ -177,7 +177,7 @@ async fn ensure_self_config(client: &NanocldClient) {
   match client.inspect_resource(&proxy_rule_kind.name).await {
     Ok(_) => {
       if let Err(err) = client
-        .put_resource(&proxy_rule_kind.name, &proxy_rule_kind.clone().into())
+        .put_resource(&proxy_rule_kind.name.clone(), &proxy_rule_kind.into())
         .await
       {
         match err {

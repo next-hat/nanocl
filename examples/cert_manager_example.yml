@@ -1,0 +1,32 @@
+Kind: Deployment
+ApiVersion: v0.10
+
+Namespace: global
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
+Resources:
+  - Name: deploy-example.com
+    Kind: ProxyRule
+    Version: v0.7
+    Metadata:
+      CertManagerIssuer: letsencrypt
+    Data:
+      Rules:
+        - Domain: deploy-example.com
+          Network: All
+          Ssl: cert.deploy-example.com
+          Locations:
+            - Path: /
+              Target:
+                Key: deploy-example2.global.c
+                Port: 9000
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
+# Cargoes:
+#   - Name: deploy-example
+#     Container:
+#       Image: nexthat/nanocl-get-started:latest
+#       Env:
+#         - APP=GET_STARTED
