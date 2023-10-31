@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Nanocl Controller Daemon Proxy
+  title: Nanocl Controller Proxy
   description: |
     The `Nanocl Controller Daemon Proxy` is an `HTTP REST API`.<br />
     It is the `API` the `Nanocl Daemon` uses, to create / update and delete `ProxyRule`
@@ -25,9 +25,12 @@ servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.4
+      default: v0.7
       description: API version
       enum:
+      - v0.7
+      - v0.6
+      - v0.5
       - v0.4
       - v0.3
       - v0.2

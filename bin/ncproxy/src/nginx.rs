@@ -1,6 +1,7 @@
-use std::fs;
 use std::str::FromStr;
 
+use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 use nanocl_error::io::{IoError, FromIo, IoResult};
 
 use nanocld_client::stubs::proxy::ProxyRule;
@@ -61,49 +62,58 @@ impl Nginx {
     }
   }
 
-  #[inline]
-  fn gen_conf_path(&self, name: &str, kind: &NginxConfKind) -> String {
+  fn gen_conf_path(
+    &self,
+    name: &str,
+    kind: &NginxConfKind,
+  ) -> (String, String) {
     match kind {
-      NginxConfKind::Site => {
-        format!("{}/sites-enabled/{name}.conf", &self.conf_dir)
-      }
-      NginxConfKind::Stream => {
-        format!("{}/streams-enabled/{name}.conf", &self.conf_dir)
-      }
+      NginxConfKind::Site => (
+        format!("{}/sites-available/{name}.conf", &self.conf_dir),
+        format!("{}/sites-enabled/{name}.conf", &self.conf_dir),
+      ),
+      NginxConfKind::Stream => (
+        format!("{}/streams-available/{name}.conf", &self.conf_dir),
+        format!("{}/streams-enabled/{name}.conf", &self.conf_dir),
+      ),
     }
   }
 
-  #[inline]
-  pub fn ensure(&self) -> IoResult<()> {
-    // Ensure sites-enabled directory exists
-    let sites_enabled_dir = format!("{}/sites-enabled", self.conf_dir);
-    fs::create_dir_all(&sites_enabled_dir).map_err(|err| {
-      err.map_err_context(|| {
-        format!("Unable to create directory {sites_enabled_dir}")
-      })
-    })?;
-    // Ensure streams-enabled directory exists
-    let streams_enabled_dir = format!("{}/streams-enabled", self.conf_dir);
-    fs::create_dir_all(&streams_enabled_dir).map_err(|err| {
-      err.map_err_context(|| {
-        format!("Cannot create directory {streams_enabled_dir}")
-      })
-    })?;
-    // Ensure conf.d directory exists
-    let conf_d = format!("{}/conf.d", self.conf_dir);
-    fs::create_dir_all(conf_d).map_err(|err| {
-      err.map_err_context(|| {
-        format!("Cannot create directory {streams_enabled_dir}")
-      })
+  async fn ensure_dir(&self, name: &str) -> IoResult<()> {
+    let path = format!("{}/{name}", &self.conf_dir);
+    tokio::fs::create_dir_all(&path).await.map_err(|err| {
+      err.map_err_context(|| format!("Unable to create {path} directory"))
     })?;
     Ok(())
   }
 
-  pub fn write_default_conf(&self) -> IoResult<()> {
+  /// ## Ensure
+  ///
+  /// Ensure default configuration files and directories
+  ///
+  pub async fn ensure(&self) -> IoResult<()> {
+    [
+      "sites-available",
+      "sites-enabled",
+      "streams-available",
+      "streams-enabled",
+    ]
+    .into_iter()
+    .map(|name| self.ensure_dir(name))
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<IoResult<()>>>()
+    .await
+    .into_iter()
+    .collect::<IoResult<()>>()?;
+    self.ensure_default_conf().await?;
+    Ok(())
+  }
+
+  async fn ensure_default_conf(&self) -> IoResult<()> {
     let default_conf = "server {
   listen 80 default_server;
-  listen [::]:80 default_server ipv6only=on;
-  server_name _ default_server;
+  listen [::]:80 ipv6only=on default_server;
+  server_name _;
 
   root /usr/share/nginx/html;
   try_files $uri $uri/ /index.html;
@@ -111,42 +121,45 @@ impl Nginx {
   error_page 403 /403.html;
 }"
     .to_string();
-
-    let path = format!("{}/conf.d/default.conf", self.conf_dir);
-
-    fs::write(&path, &default_conf).map_err(|err| {
-      err.map_err_context(|| format!("Unable to create {path} file"))
-    })?;
-
+    let path = format!("{}/sites-available/default", self.conf_dir);
+    tokio::fs::write(&path, &default_conf)
+      .await
+      .map_err(|err| {
+        err.map_err_context(|| format!("Unable to create {path} file"))
+      })?;
+    let _ = tokio::fs::symlink(
+      &path,
+      format!("{}/sites-enabled/default", self.conf_dir),
+    )
+    .await;
     log::debug!("Writing default file conf:\n {default_conf}");
-
     Ok(())
   }
 
-  #[inline]
-  pub fn write_conf_file(
+  pub async fn write_conf_file(
     &self,
     name: &str,
     data: &str,
     kind: &NginxConfKind,
   ) -> IoResult<()> {
     let path = self.gen_conf_path(name, kind);
-    fs::write(&path, data).map_err(|err| {
-      err.map_err_context(|| format!("Unable to create {path} file"))
+    tokio::fs::write(&path.0, data).await.map_err(|err| {
+      err.map_err_context(|| format!("Unable to create {} file", path.0))
     })?;
+    let _ = tokio::fs::symlink(&path.0, &path.1).await.map_err(|err| {
+      err.map_err_context(|| format!("Unable to create {} symlink", path.1))
+    });
     Ok(())
   }
 
-  #[inline]
   pub async fn delete_conf_file(&self, name: &str) {
     let path = self.gen_conf_path(name, &NginxConfKind::Site);
-    let _ = tokio::fs::remove_file(&path).await;
+    let _ = tokio::fs::remove_file(&path.1).await;
     let path = self.gen_conf_path(name, &NginxConfKind::Stream);
-    let _ = tokio::fs::remove_file(&path).await;
+    let _ = tokio::fs::remove_file(&path.1).await;
   }
 
   // TODO: Uncommand to enable sync resources
-  // #[inline]
   // pub fn clear_conf(&self) -> IoResult<()> {
   //   let sites_enabled_dir = format!("{}/sites-enabled", self.conf_dir);
   //   fs::remove_dir_all(&sites_enabled_dir).map_err(|err| {

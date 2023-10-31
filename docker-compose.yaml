@@ -54,36 +54,6 @@ services:
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
 
-  ncvpnkit:
-    profiles: ['vpnkit']
-    container_name: ncvpnkit.system.c
-    image: ghcr.io/nxthat/nanocl-dev:dev
-    tty: true
-    hostname: ncvpnkit.nanocl.internal
-    networks:
-      - system
-    environment:
-      - TZ=Europe/Paris
-      - USER_HOME=${HOME}
-    labels:
-      - io.nanocl=enabled
-      - io.nanocl.c=ndaemon.system
-      - io.nanocl.n=system
-      - io.nanocl.cnsp=system
-    volumes:
-      - type: bind
-        source: .
-        target: /project
-      - /project/target
-      - //run/guest-services/nanocl:/run/nanocl
-      - //run/host-services/backend.sock:/run/host-services/backend.sock
-    command:
-      - watch
-      - -w
-      - /project/bin/ncvpnkit/src
-      - -x
-      - run --no-default-features --features dev --bin ncvpnkit
-
   nproxy:
     container_name: nproxy.system.c
     image: nproxy:dev
@@ -105,7 +75,9 @@ services:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/logs:/var/log/nginx/access
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/html:/usr/share/nginx/html
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/conf.d:/etc/nginx/conf.d
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/sites-available:/etc/nginx/sites-available
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/sites-enabled:/etc/nginx/sites-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/streams-available:/etc/nginx/streams-available
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
   ncproxy:
@@ -138,7 +110,9 @@ services:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/secrets:/opt/secrets
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/logs:/var/log/nginx/access
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/conf.d:/etc/nginx/conf.d
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/sites-available:/etc/nginx/sites-available
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/sites-enabled:/etc/nginx/sites-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/streams-available:/etc/nginx/streams-available
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
   ndns:
@@ -215,3 +189,33 @@ services:
       - /project/bin/nanocld/src
       - -x
       - run --no-default-features --features dev --bin nanocld -- --gid 1001 --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
+
+  ncvpnkit:
+    profiles: ['vpnkit']
+    container_name: ncvpnkit.system.c
+    image: ghcr.io/nxthat/nanocl-dev:dev
+    tty: true
+    hostname: ncvpnkit.nanocl.internal
+    networks:
+      - system
+    environment:
+      - TZ=Europe/Paris
+      - USER_HOME=${HOME}
+    labels:
+      - io.nanocl=enabled
+      - io.nanocl.c=ndaemon.system
+      - io.nanocl.n=system
+      - io.nanocl.cnsp=system
+    volumes:
+      - type: bind
+        source: .
+        target: /project
+      - /project/target
+      - //run/guest-services/nanocl:/run/nanocl
+      - //run/host-services/backend.sock:/run/host-services/backend.sock
+    command:
+      - watch
+      - -w
+      - /project/bin/ncvpnkit/src
+      - -x
+      - run --no-default-features --features dev --bin ncvpnkit

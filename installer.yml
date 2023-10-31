@@ -29,7 +29,11 @@ Cargoes:
 
   - Name: nproxy
     Container:
+      # {% if channel == "nightly" %}
+      Image: ghcr.io/nxthat/nproxy:1.25.0.1-nightly
+      # {% else %}
       Image: ghcr.io/nxthat/nproxy:1.25.0.1
+      # {% endif %}
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -52,7 +56,11 @@ Cargoes:
 
   - Name: ncproxy
     Container:
+      # {% if channel == "nightly" %}
+      Image: ghcr.io/nxthat/ncproxy:0.7.0-nightly
+      # {% else %}
       Image: ghcr.io/nxthat/ncproxy:0.7.0
+      # {% endif %}
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -74,7 +82,11 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
+      # {% if channel == "nightly" %}
+      Image: ghcr.io/nxthat/ndns:2.89.0.0-nightly
+      # {% else %}
       Image: ghcr.io/nxthat/ndns:2.89.0.0
+      # {% endif %}
       HostConfig:
         NetworkMode: host
         Binds:
@@ -84,7 +96,11 @@ Cargoes:
     Container:
       Env:
         - TZ=Europe/Paris
+      # {% if channel == "nightly" %}
+      Image: ghcr.io/nxthat/ncdns:0.3.1-nightly
+      # {% else %}
       Image: ghcr.io/nxthat/ncdns:0.3.1
+      # {% endif %}
       Tty: true
       Cmd:
         - --conf-dir
@@ -124,7 +140,11 @@ Cargoes:
 
   - Name: ndaemon
     Container:
+      # {% if channel == "nightly" %}
+      Image: ghcr.io/nxthat/nanocld:0.10.0-nightly
+      # {% else %}
       Image: ghcr.io/nxthat/nanocld:0.10.0
+      # {% endif %}
       Tty: true
       Hostname: ndaemon.nanocl.internal
       Cmd:
@@ -161,7 +181,11 @@ Cargoes:
   # {% if is_docker_desktop %}
   - Name: ncvpnkit
     Container:
+      # {% if channel == "nightly" %}
+      Image: ghcr.io/nxthat/ncvpnkit:0.1.0-nightly
+      # {% else %}
       Image: ghcr.io/nxthat/ncvpnkit:0.1.0
+      # {% endif %}
       Tty: true
       Hostname: ncvpnkit.nanocl.internal
       Env:

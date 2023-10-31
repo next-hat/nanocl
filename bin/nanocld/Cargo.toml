@@ -21,6 +21,7 @@ dev = [
   "dep:utoipa",
   "bollard-next/utoipa",
   "nanocl_stubs/utoipa",
+  "nanocl_utils/dev",
   "nanocl_utils/ntex_swagger",
   "nanocl_utils/ntex_test_client",
 ]
@@ -34,7 +35,6 @@ nanocl_utils = { version = "0.3.0", features = ["build_tools"] }
 
 [dev-dependencies]
 serde_yaml = "0.9"
-nanocl_utils = { version = "0.3.0", features = ["ntex_test_client"] }
 
 [dependencies]
 nanocl_error = { version = "0.1.0", features = [
