@@ -84,5 +84,7 @@ services:
       - /var/lib/nanocl/proxy/logs:/var/log/nginx/access
       - /var/lib/nanocl/proxy/html:/usr/share/nginx/html
       - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
+      - /var/lib/nanocl/proxy/sites-available:/etc/nginx/sites-available
       - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
+      - /var/lib/nanocl/proxy/sites-available:/etc/nginx/streams-available
       - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled
