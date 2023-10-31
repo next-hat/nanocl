@@ -101,8 +101,8 @@ To install `Nanocl`, please refer to our online [installation guide](https://doc
 
 ## 🔧 Usage
 
-`Nanocl` is designed to be easy to operate by mostly using **state files**.<br />
-**State Files** are `yaml` files that define the state you want.<br />
+`Nanocl` is designed to be easy to operate by mostly using **Statefiles**.<br />
+**Statefiles** are `yaml` files that define the state you want.<br />
 There is an example used to deploy our [documentation](https://docs.next-hat.com):
 
 ```yaml
