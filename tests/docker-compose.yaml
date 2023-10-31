@@ -81,8 +81,10 @@ services:
       - io.nanocl.cnsp=system
     volumes:
       - /run:/run
-      - /var/lib/nanocl/proxy/logs:/var/log/nginx/access
-      - /var/lib/nanocl/proxy/html:/usr/share/nginx/html
-      - /var/lib/nanocl/proxy/conf.d:/etc/nginx/conf.d
-      - /var/lib/nanocl/proxy/sites-enabled:/etc/nginx/sites-enabled
-      - /var/lib/nanocl/proxy/streams-enabled:/etc/nginx/streams-enabled
+      - /etc/nginx/logs:/var/log/nginx/access
+      - /etc/nginx/html:/usr/share/nginx/html
+      - /etc/nginx/conf.d:/etc/nginx/conf.d
+      - /etc/nginx/sites-available:/etc/nginx/sites-available
+      - /etc/nginx/sites-enabled:/etc/nginx/sites-enabled
+      - /etc/nginx/streams-available:/etc/nginx/streams-available
+      - /etc/nginx/streams-enabled:/etc/nginx/streams-enabled

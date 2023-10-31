@@ -65,6 +65,8 @@ pub struct NanocldArg {
   /// Specify if the docker host is docker desktop
   /// detected if docker context is desktop-linux
   pub(crate) is_docker_desktop: bool,
+  /// Build channel used
+  pub(crate) channel: String,
 }
 
 /// Convert Nanocld to liquid::Object
@@ -81,6 +83,7 @@ impl From<NanocldArg> for liquid::Object {
       "advertise_addr": arg.advertise_addr,
       "is_docker_desktop": arg.is_docker_desktop,
       "home_dir": arg.home_dir,
+      "channel": arg.channel,
     })
   }
 }

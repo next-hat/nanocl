@@ -21,11 +21,14 @@ impl NanocldClient {
   ///
   /// ## Example
   ///
-  /// ```no_run,ignore
+  /// ```
   /// use nanocld_client::NanocldClient;
   ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let images = client.list_cargo_image().await;
+  /// #[ntex::main]
+  /// async fn main() {
+  ///   let client = NanocldClient::connect_to("http://localhost:8585", None);
+  ///   let images = client.list_cargo_image(None).await;
+  /// }
   /// ```
   ///
   pub async fn list_cargo_image(
@@ -185,21 +188,16 @@ mod tests {
   async fn basic() {
     const IMAGE: &str = "busybox:1.26.1";
     let client = NanocldClient::connect_to("http://localhost:8585", None);
-
     let mut stream = client.create_cargo_image(IMAGE).await.unwrap();
     while let Some(_info) = stream.next().await {}
-
     client.list_cargo_image(None).await.unwrap();
     client.inspect_cargo_image(IMAGE).await.unwrap();
     client.delete_cargo_image(IMAGE).await.unwrap();
-
     use tokio_util::codec;
     let curr_path = std::env::current_dir().unwrap();
     let filepath =
       std::path::Path::new(&curr_path).join("../../tests/busybox.tar.gz");
-
     let file = tokio::fs::File::open(&filepath).await.unwrap();
-
     let byte_stream = codec::FramedRead::new(file, codec::BytesCodec::new())
       .map(|r| {
         let bytes = ntex::util::Bytes::from_iter(r?.to_vec());

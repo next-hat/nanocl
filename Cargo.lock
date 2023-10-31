@@ -1814,7 +1814,6 @@ dependencies = [
  "dialoguer",
  "dotenv",
  "futures",
- "hyper",
  "indicatif",
  "liquid",
  "nanocl_error",

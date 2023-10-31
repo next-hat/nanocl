@@ -55,7 +55,6 @@ impl NanocldClient {
 
   pub fn connect_to(url: &'static str, version: Option<String>) -> Self {
     let builder = SslConnector::builder(SslMethod::tls()).unwrap().build();
-
     match url {
       url if url.starts_with("http://") || url.starts_with("https://") => {
         let client = http::client::Client::build()
@@ -128,7 +127,6 @@ impl NanocldClient {
       )
       .timeout(ntex::time::Millis::from_secs(100))
       .finish();
-
     NanocldClient {
       client,
       unix_socket: Some(String::from("/run/nanocl/nanocl.sock")),
@@ -226,7 +224,6 @@ impl NanocldClient {
         .await
         .map_err(|err| self.send_error(err))?,
     };
-
     let status = res.status();
     is_api_error(&mut res, &status).await?;
     Ok(res)
@@ -253,10 +250,8 @@ impl NanocldClient {
       .send_stream(stream)
       .await
       .map_err(|err| self.send_error(err))?;
-
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-
     Ok(res)
   }
 
@@ -275,10 +270,8 @@ impl NanocldClient {
         .map_err(|err| err.map_err_context(|| "Query"))?;
     }
     let mut res = req.send().await.map_err(|err| self.send_error(err))?;
-
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-
     Ok(res)
   }
 
@@ -305,10 +298,8 @@ impl NanocldClient {
         .await
         .map_err(|err| self.send_error(err))?,
     };
-
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-
     Ok(res)
   }
 
@@ -326,12 +317,9 @@ impl NanocldClient {
         .query(&query)
         .map_err(|err| err.map_err_context(|| "Query"))?;
     }
-
     let mut res = req.send().await.map_err(|err| self.send_error(err))?;
-
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-
     Ok(res)
   }
 
@@ -358,10 +346,8 @@ impl NanocldClient {
         .await
         .map_err(|err| self.send_error(err))?,
     };
-
     let status = res.status();
     is_api_error(&mut res, &status).await?;
-
     Ok(res)
   }
 

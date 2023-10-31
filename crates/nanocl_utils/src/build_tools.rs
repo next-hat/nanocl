@@ -35,7 +35,7 @@ pub fn set_env_target_arch() -> Result<()> {
 pub fn set_channel() -> Result<()> {
   #[allow(unused)]
   let mut default_channel = "stable";
-  #[cfg(any(feature = "dev", feature = "test"))]
+  #[cfg(feature = "dev")]
   {
     default_channel = "nightly";
   }

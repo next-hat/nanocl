@@ -84,7 +84,7 @@ mod tests {
 
   #[ntex::test]
   async fn rules() {
-    let client = gen_default_test_client();
+    let client = gen_default_test_client().await;
     let resource: &str = include_str!("../../tests/resource_redirect.yml");
     let yaml: serde_yaml::Value = serde_yaml::from_str(resource).unwrap();
     let resource = yaml["Resources"][0].clone();

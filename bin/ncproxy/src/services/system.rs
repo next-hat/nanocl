@@ -52,14 +52,14 @@ mod tests {
 
   #[ntex::test]
   async fn head_ping() {
-    let client = gen_default_test_client();
+    let client = gen_default_test_client().await;
     let res = client.send_head("/_ping", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::ACCEPTED, "ping");
   }
 
   #[ntex::test]
   async fn get_version() {
-    let client = gen_default_test_client();
+    let client = gen_default_test_client().await;
     let mut res = client.send_get("/version", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "get version");
     let _ = res.json::<Version>().await.unwrap();

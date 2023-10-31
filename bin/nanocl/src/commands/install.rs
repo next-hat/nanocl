@@ -101,10 +101,14 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     is_docker_desktop,
     gid: group.gid.into(),
     home_dir: home_dir.clone(),
+    channel: crate::version::CHANNEL.to_owned(),
   };
   let installer = utils::installer::get_template(args.template.clone()).await?;
   let data: liquid::Object = nanocld_args.clone().into();
   let installer = utils::state::compile(&installer, &data)?;
+
+  println!("{installer}");
+
   let deployment = serde_yaml::from_str::<StateDeployment>(&installer)
     .map_err(|err| {
       err.map_err_context(|| "Unable to extract deployment from installer")

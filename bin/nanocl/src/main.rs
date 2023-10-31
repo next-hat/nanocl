@@ -52,7 +52,7 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
       host = cli_args
         .host
         .clone()
-        .unwrap_or("http://localhost:8585".into());
+        .unwrap_or("http://ndaemon.nanocl.internal:8585".into());
     }
   }
   let url = Box::leak(host.clone().into_boxed_str());
@@ -223,7 +223,8 @@ mod tests {
 
     let args = Cli::parse_from(["nanocl", "cargo", "history", CARGO_NAME]);
     assert!(execute_arg(&args).await.is_ok());
-    let client = NanocldClient::connect_to("http://localhost:8585", None);
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     let history = client
       .list_history_cargo(CARGO_NAME, None)
       .await
@@ -275,7 +276,8 @@ mod tests {
     let args =
       Cli::parse_from(["nanocl", "resource", "history", "deploy-example.com"]);
     assert!(execute_arg(&args).await.is_ok());
-    let client = NanocldClient::connect_to("http://localhost:8585", None);
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     let history = client
       .list_history_resource("deploy-example.com")
       .await

@@ -13,6 +13,7 @@ repository = "https://github.com/nxthat/nanocl"
 bench = false
 
 [features]
+dev = []
 logger = ["dep:log", "dep:env_logger"]
 ntex = ["dep:ntex", "dep:futures", "dep:serde_json"]
 ntex_swagger = [

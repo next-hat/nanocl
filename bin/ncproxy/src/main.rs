@@ -21,8 +21,9 @@ async fn main() -> std::io::Result<()> {
     version::VERSION,
     version::COMMIT_ID
   );
-  let nginx = match subsystem::init(&cli) {
+  let nginx = match subsystem::init(&cli).await {
     Err(err) => {
+      log::error!("{err}");
       err.exit();
     }
     Ok(nginx) => nginx,

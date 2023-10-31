@@ -82,7 +82,7 @@ async fn get_listen(
   }
 }
 
-fn create_cargo_upstream(
+async fn create_cargo_upstream(
   kind: &NginxConfKind,
   port: u16,
   cargo: &CargoInspect,
@@ -138,11 +138,13 @@ upstream {upstream_key} {{
       .collect::<Vec<String>>()
       .join("\n")
   );
-  nginx.write_conf_file(&upstream_key, &upstream, kind)?;
+  nginx
+    .write_conf_file(&upstream_key, &upstream, kind)
+    .await?;
   Ok(upstream_key)
 }
 
-fn create_vm_upstream(
+async fn create_vm_upstream(
   kind: &NginxConfKind,
   port: u16,
   vm: &VmInspect,
@@ -192,7 +194,9 @@ upstream {upstream_key} {{
       .collect::<Vec<String>>()
       .join("\n")
   );
-  nginx.write_conf_file(&upstream_key, &upstream, kind)?;
+  nginx
+    .write_conf_file(&upstream_key, &upstream, kind)
+    .await?;
   Ok(upstream_key)
 }
 
@@ -216,7 +220,7 @@ async fn gen_upstream(
             format!("Unable to inspect cargo {target_name}")
           })
         })?;
-      create_cargo_upstream(kind, port, &cargo, nginx)
+      create_cargo_upstream(kind, port, &cargo, nginx).await
     }
     "v" => {
       let vm = client
@@ -225,7 +229,7 @@ async fn gen_upstream(
         .map_err(|err| {
           err.map_err_context(|| format!("Unable to inspect vm {target_name}"))
         })?;
-      create_vm_upstream(kind, port, &vm, nginx)
+      create_vm_upstream(kind, port, &vm, nginx).await
     }
     _ => Err(IoError::invalid_data(
       "UpstreamTarget",
@@ -257,7 +261,9 @@ async fn gen_unix_stream(path: &str, nginx: &Nginx) -> IoResult<String> {
 ",
     path = path
   );
-  nginx.write_conf_file(&upstream_key, &upstream, &NginxConfKind::Site)?;
+  nginx
+    .write_conf_file(&upstream_key, &upstream, &NginxConfKind::Site)
+    .await?;
   Ok(upstream_key)
 }
 
@@ -402,7 +408,7 @@ async fn gen_http_server_block(
     .join("\n");
   let http_host = match &rule.domain {
     Some(domain) => format!(
-      "  server_name {domain};\n  if ($host != {domain}) {{ return 404; }}\n",
+      "  server_name {domain};\n  if ($host != {domain}) {{ return 502; }}\n",
       domain = domain
     ),
     None => String::default(),
@@ -463,8 +469,8 @@ async fn gen_http_server_block(
     "
 server {{
   listen {listen_http};
-{http_host}{ssl}{includes}
-{locations}
+  {http_host}{ssl}{includes}
+  {locations}
 }}\n",
   );
   Ok(conf)
@@ -562,11 +568,15 @@ async fn resource_to_nginx_conf(
   }
   log::info!("Generation conf for {name}");
   if !http_conf.is_empty() {
-    nginx.write_conf_file(name, &http_conf, &NginxConfKind::Site)?;
+    nginx
+      .write_conf_file(name, &http_conf, &NginxConfKind::Site)
+      .await?;
     log::info!("HTTP config generated:\n{http_conf}");
   }
   if !stream_conf.is_empty() {
-    nginx.write_conf_file(name, &stream_conf, &NginxConfKind::Stream)?;
+    nginx
+      .write_conf_file(name, &stream_conf, &NginxConfKind::Stream)
+      .await?;
     log::info!("Stream config generated:\n{stream_conf}");
   }
   Ok(())
@@ -741,10 +751,10 @@ pub(crate) mod tests {
     logger::enable_logger("ncproxy");
   }
 
-  pub fn gen_default_test_client() -> TestClient {
+  pub async fn gen_default_test_client() -> TestClient {
     before();
     let nginx = nginx::Nginx::new("/tmp/nginx");
-    nginx.ensure().unwrap();
+    nginx.ensure().await.unwrap();
     // Create test server
     let srv = ntex::web::test::server(move || {
       ntex::web::App::new()

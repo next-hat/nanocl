@@ -11,7 +11,7 @@ struct Inner {
 
 /// Versioning middleware creator
 ///
-/// ```rust,norun
+/// ```no_run,ignore
 /// use ntex::web;
 /// use ntex::middleware::Versioning;
 ///
