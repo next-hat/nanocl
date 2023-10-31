@@ -51,7 +51,9 @@ Cargoes:
           - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
           - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
           - ${{ state_dir }}/proxy/html:/usr/share/nginx/html
+          - ${{ state_dir }}/proxy/sites-available:/etc/nginx/sites-available
           - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
+          - ${{ state_dir }}/proxy/streams-available:/etc/nginx/streams-available
           - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
   - Name: ncproxy
@@ -75,7 +77,9 @@ Cargoes:
           - ${{ state_dir }}/proxy/secrets:/opt/secrets
           - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
           - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
+          - ${{ state_dir }}/proxy/sites-available:/etc/nginx/sites-available
           - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
+          - ${{ state_dir }}/proxy/streams-available:/etc/nginx/streams-available
           - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
   - Name: ndns
