@@ -206,7 +206,7 @@ async fn execute_before(
   cargo: &Cargo,
   docker_api: &bollard_next::Docker,
 ) -> Result<(), HttpError> {
-  match cargo.config.before.clone() {
+  match cargo.config.init_container.clone() {
     Some(mut before) => {
       let image = before
         .image
@@ -1056,10 +1056,10 @@ pub async fn patch(
   let config = CargoConfigPartial {
     name: cargo.name.clone(),
     container,
-    before: if payload.before.is_some() {
-      payload.before.clone()
+    init_container: if payload.init_container.is_some() {
+      payload.init_container.clone()
     } else {
-      cargo.config.before
+      cargo.config.init_container
     },
     replication: payload.replication.clone(),
     secrets: if payload.secrets.is_some() {

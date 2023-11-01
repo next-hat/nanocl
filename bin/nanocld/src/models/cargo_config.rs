@@ -44,7 +44,7 @@ impl CargoConfigDbModel {
       name: config.name,
       version: self.version,
       cargo_key: self.cargo_key,
-      before: config.before,
+      init_container: config.init_container,
       replication: config.replication,
       container: config.container,
       metadata: config.metadata,

@@ -64,7 +64,7 @@ pub struct CargoConfigPartial {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub before: Option<Config>,
+  pub init_container: Option<Config>,
   /// List of secrets to use as environment variables
   #[cfg_attr(
     feature = "serde",
@@ -106,7 +106,7 @@ pub struct CargoConfigUpdate {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub before: Option<Config>,
+  pub init_container: Option<Config>,
   /// List of secrets to use as environment variables
   #[cfg_attr(
     feature = "serde",
@@ -131,7 +131,7 @@ impl From<CargoConfigPartial> for CargoConfigUpdate {
   fn from(cargo_config: CargoConfigPartial) -> Self {
     Self {
       name: Some(cargo_config.name),
-      before: cargo_config.before,
+      init_container: cargo_config.init_container,
       container: Some(cargo_config.container),
       replication: cargo_config.replication,
       metadata: cargo_config.metadata,
@@ -169,7 +169,7 @@ pub struct CargoConfig {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub before: Option<Config>,
+  pub init_container: Option<Config>,
   /// List of secrets to use as environment variables
   #[cfg_attr(
     feature = "serde",
@@ -189,7 +189,7 @@ pub struct CargoConfig {
 impl From<CargoConfig> for CargoConfigPartial {
   fn from(cargo_config: CargoConfig) -> Self {
     Self {
-      before: cargo_config.before,
+      init_container: cargo_config.init_container,
       name: cargo_config.name,
       replication: cargo_config.replication,
       container: cargo_config.container,
@@ -203,7 +203,7 @@ impl From<CargoInspect> for CargoConfigPartial {
   fn from(cargo_inspect: CargoInspect) -> Self {
     Self {
       name: cargo_inspect.name,
-      before: cargo_inspect.config.before,
+      init_container: cargo_inspect.config.init_container,
       replication: cargo_inspect.config.replication,
       container: cargo_inspect.config.container,
       metadata: cargo_inspect.config.metadata,

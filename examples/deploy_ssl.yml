@@ -1,5 +1,5 @@
 Kind: Deployment
-ApiVersion: v0.10
+ApiVersion: v0.11
 
 Namespace: global
 
@@ -62,7 +62,7 @@ Secrets:
 Resources:
   - Name: secret-tls.com
     Kind: ProxyRule
-    Version: v0.7
+    Version: v0.8
     Metadata:
       Cert: certbot
     Data:

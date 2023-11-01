@@ -1,10 +1,10 @@
 Kind: Resource
-ApiVersion: v0.10
+ApiVersion: v0.11
 
 Resources:
 - Name: proxy-get-started
   Kind: ProxyRule
-  Version: v0.7
+  Version: v0.8
   Config:
     Rules:
     - Domain: get-started.com

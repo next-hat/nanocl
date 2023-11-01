@@ -1,6 +1,6 @@
 [package]
 name = "nanocld_client"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Nanocl daemon api client"
@@ -30,5 +30,5 @@ ntex = { version = "0.7.7", features = ["openssl"] }
 serde = { version = "1.0.189", features = ["derive"] }
 bollard-next = { version = "0.15.4" }
 openssl = { version = "0.10.56", features = ["vendored"] }
-nanocl_stubs = { version = "0.10.0", features = ["serde"] }
+nanocl_stubs = { version = "0.11.0", features = ["serde"] }
 nanocl_error = { version = "0.1.0", features = ["io", "http_client"] }

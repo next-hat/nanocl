@@ -3,7 +3,7 @@
 # It will take over a physical interface from the host
 ###
 Kind: Deployment
-ApiVersion: v0.10
+ApiVersion: v0.11
 
 Namespace: global
 

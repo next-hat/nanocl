@@ -1,5 +1,5 @@
 Kind: Deployment
-ApiVersion: v0.10
+ApiVersion: v0.11
 
 Namespace: global
 
@@ -8,7 +8,7 @@ Namespace: global
 Resources:
   - Name: crash-example.com
     Kind: ProxyRule
-    Version: v0.7
+    Version: v0.8
     Data:
       Rules:
         - Domain: crash-example.com
