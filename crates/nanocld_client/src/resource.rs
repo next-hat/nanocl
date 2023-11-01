@@ -11,6 +11,10 @@ impl NanocldClient {
   ///
   /// List all existing resources
   ///
+  /// ## Arguments
+  ///
+  /// * [query](ResourceQuery) - Query to filter resources
+  ///
   /// ## Returns
   ///
   /// * [Result](Result) - The result of the operation

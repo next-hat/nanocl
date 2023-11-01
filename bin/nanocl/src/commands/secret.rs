@@ -22,7 +22,7 @@ use crate::models::{
 ///
 async fn exec_secret_ls(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;
-  let secrets = client.list_secret().await?;
+  let secrets = client.list_secret(None).await?;
   let rows = secrets
     .iter()
     .map(|s| SecretRow::from(s.clone()))

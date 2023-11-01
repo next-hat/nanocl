@@ -3,7 +3,7 @@ use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
+use nanocl_stubs::secret::{SecretPartial, SecretUpdate, SecretQuery};
 
 use crate::utils;
 use crate::models::{Pool, SecretDbModel, SecretUpdateDbModel};
@@ -45,16 +45,46 @@ pub async fn create(
 ///   * [Ok](Vec<SecretDbModel>) - List of secrets
 ///   * [Err](IoError) - Error during the operation
 ///
-pub async fn list(pool: &Pool) -> IoResult<Vec<SecretDbModel>> {
-  use crate::schema::secrets::dsl;
+pub async fn list(
+  query: Option<SecretQuery>,
+  pool: &Pool,
+) -> IoResult<Vec<SecretDbModel>> {
+  use crate::schema::secrets;
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let sql = dsl::secrets.into_boxed();
-    let items = sql
-      .load(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Secret"))?;
-    Ok::<_, IoError>(items)
+    let req = match query {
+      Some(qs) => {
+        let mut req = secrets::table.into_boxed();
+        if let Some(kind) = &qs.kind {
+          req = req.filter(secrets::kind.eq(kind.to_string()));
+        }
+        if let Some(exists) = &qs.exists {
+          req = req.filter(secrets::data.has_key(exists));
+        }
+        if let Some(contains) = &qs.contains {
+          let contains = serde_json::from_str::<serde_json::Value>(contains)
+            .map_err(|err| err.map_err_context(|| "Contains"))?;
+          req = req.filter(secrets::data.contains(contains));
+        }
+        if let Some(meta_exists) = &qs.meta_exists {
+          req = req.filter(secrets::metadata.has_key(meta_exists));
+        }
+        if let Some(meta_contains) = &qs.meta_contains {
+          let meta_contains =
+            serde_json::from_str::<serde_json::Value>(meta_contains)
+              .map_err(|err| err.map_err_context(|| "Meta contains"))?;
+          req = req.filter(secrets::metadata.contains(meta_contains));
+        }
+        req = req.order(secrets::created_at.desc());
+        req.load(&mut conn)
+      }
+      None => secrets::table
+        .order(secrets::created_at.desc())
+        .load(&mut conn),
+    };
+    let res = req.map_err(|err| err.map_err_context(|| "Resource"))?;
+    Ok::<_, IoError>(res)
   })
   .await?;
   Ok(items)

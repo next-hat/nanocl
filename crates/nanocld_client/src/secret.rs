@@ -1,10 +1,14 @@
 use nanocl_error::http_client::HttpClientError;
-use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
+use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate, SecretQuery};
 
 use super::http_client::NanocldClient;
 
 impl NanocldClient {
   /// ## List all secrets
+  ///
+  /// ## Arguments
+  ///
+  /// * [query](SecretQuery) - Query to filter secrets
   ///
   /// ## Returns
   ///
@@ -18,12 +22,15 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let secrets = client.list_secret().await;
+  /// let secrets = client.list_secret(None).await;
   /// ```
   ///
-  pub async fn list_secret(&self) -> Result<Vec<Secret>, HttpClientError> {
+  pub async fn list_secret(
+    &self,
+    query: Option<SecretQuery>,
+  ) -> Result<Vec<Secret>, HttpClientError> {
     let res = self
-      .send_get(format!("/{}/secrets", &self.version), None::<String>)
+      .send_get(format!("/{}/secrets", &self.version), query)
       .await?;
     Self::res_json(res).await
   }
@@ -155,7 +162,7 @@ mod tests {
   async fn basic() {
     const SECRET_KEY: &str = "secret-test";
     let client = NanocldClient::connect_to("http://localhost:8585", None);
-    client.list_secret().await.unwrap();
+    client.list_secret(None).await.unwrap();
     let secret = SecretPartial {
       key: SECRET_KEY.to_string(),
       kind: "generic".to_string(),
