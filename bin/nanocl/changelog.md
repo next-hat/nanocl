@@ -5,13 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.11.0]
+## [0.11.0] - 2023-11-01
 
 ### Added
 
-- Download cargo before image when running state apply
+- Download InitContainer image when running state apply
+- Use of nanocld_client v0.11.0
 
-## [0.10.0] - 2023-10-1
+## [0.10.0] - 2023-10-01
 
 ### Added
 
@@ -25,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Use of nanocld-client v0.10.0 (exec_cargo becomes create_exec and start_exec) [@anonkey](https://github.com/anonkey)
+- Use of nanocld_client v0.10.0 (exec_cargo becomes create_exec and start_exec) [@anonkey](https://github.com/anonkey)
 
 ## [0.9.0] - 2023-07-04
 
