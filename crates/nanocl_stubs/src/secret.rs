@@ -77,3 +77,22 @@ pub struct SecretUpdate {
   )]
   pub metadata: Option<serde_json::Value>,
 }
+
+/// SecretQuery
+///
+/// Query filter when listing secret
+#[derive(Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct SecretQuery {
+  /// The kind of secret to target
+  pub kind: Option<String>,
+  /// Match what contains the secret data
+  pub contains: Option<String>,
+  /// Test if key exist in the secret data
+  pub exists: Option<String>,
+  /// Match what contains the metadata of the secret
+  pub meta_contains: Option<String>,
+  /// Test if key exist in the metadata of the secret
+  pub meta_exists: Option<String>,
+}

@@ -5,7 +5,7 @@ use ntex::{rt, web};
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::proxy::ProxySslConfig;
-use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
+use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate, SecretQuery};
 
 use crate::repositories;
 use crate::models::DaemonState;
@@ -24,8 +24,9 @@ use nanocl_error::http::HttpError;
 #[web::get("/secrets")]
 pub(crate) async fn list_secret(
   state: web::types::State<DaemonState>,
+  web::types::Query(query): web::types::Query<SecretQuery>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let items = repositories::secret::list(&state.pool).await?;
+  let items = repositories::secret::list(Some(query), &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -175,7 +176,7 @@ mod test_secret {
 
   use serde_json::json;
 
-  use nanocl_stubs::secret::{Secret, SecretPartial};
+  use nanocl_stubs::secret::{Secret, SecretPartial, SecretQuery};
   use nanocl_stubs::generic::GenericDelete;
 
   use crate::utils::tests::*;
@@ -184,6 +185,21 @@ mod test_secret {
 
   async fn test_list(client: &TestClient) {
     let res = client.send_get(ENDPOINT, None::<String>).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "list secrets");
+    let res = client
+      .send_get(
+        ENDPOINT,
+        Some(SecretQuery {
+          kind: Some("Tls".to_owned()),
+          contains: Some(serde_json::json!({"VerifyClient": true}).to_string()),
+          exists: Some("CertificateClient".to_owned()),
+          meta_contains: Some(
+            serde_json::json!({"CertManagerIssuer": "letsencrypt"}).to_string(),
+          ),
+          meta_exists: Some("cert_manager_domain".to_owned()),
+        }),
+      )
+      .await;
     test_status_code!(res.status(), http::StatusCode::OK, "list secrets");
   }
 
