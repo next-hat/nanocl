@@ -87,7 +87,7 @@ Cargoes:
       Env:
         - TZ=Europe/Paris
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/ndns:2.89.0.2-nightly
+      Image: ghcr.io/nxthat/ndns:2.89.0.1-nightly
       # {% else %}
       Image: ghcr.io/nxthat/ndns:2.89.0.0
       # {% endif %}
