@@ -86,7 +86,6 @@ impl NanocldClient {
     self
       .send_delete(format!("/{}/cargoes/{name}", &self.version), Some(query))
       .await?;
-
     Ok(())
   }
 
@@ -121,7 +120,6 @@ impl NanocldClient {
         Some(GenericNspQuery { namespace }),
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -157,7 +155,6 @@ impl NanocldClient {
         Some(GenericNspQuery { namespace }),
       )
       .await?;
-
     Ok(())
   }
 
@@ -193,7 +190,6 @@ impl NanocldClient {
         Some(GenericNspQuery { namespace }),
       )
       .await?;
-
     Ok(())
   }
 
@@ -229,7 +225,6 @@ impl NanocldClient {
         Some(GenericNspQuery { namespace }),
       )
       .await?;
-
     Ok(())
   }
 
@@ -262,7 +257,6 @@ impl NanocldClient {
         Some(GenericNspQuery { namespace }),
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -304,7 +298,6 @@ impl NanocldClient {
         Some(GenericNspQuery { namespace }),
       )
       .await?;
-
     Ok(())
   }
 
@@ -382,7 +375,6 @@ impl NanocldClient {
         Some(GenericNspQuery { namespace }),
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -422,7 +414,6 @@ impl NanocldClient {
         Some(GenericNspQuery { namespace }),
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -445,7 +436,6 @@ impl NanocldClient {
         Some(query),
       )
       .await?;
-
     Ok(Self::res_stream(res).await)
   }
 
@@ -468,7 +458,6 @@ impl NanocldClient {
         Some(query),
       )
       .await?;
-
     Ok(Self::res_stream(res).await)
   }
 
@@ -495,7 +484,6 @@ impl NanocldClient {
         Some(GenericNspQuery { namespace }),
       )
       .await?;
-
     Ok(())
   }
 
@@ -510,7 +498,6 @@ impl NanocldClient {
         Some(GenericNspQuery { namespace }),
       )
       .await?;
-
     Self::res_json(res).await
   }
 }
@@ -527,9 +514,7 @@ mod tests {
   async fn basic() {
     const CARGO_NAME: &str = "client-test-cargo";
     let client = NanocldClient::connect_to("http://localhost:8585", None);
-
     client.list_cargo(None).await.unwrap();
-
     let new_cargo = CargoConfigPartial {
       name: CARGO_NAME.into(),
       container: bollard_next::container::Config {
@@ -539,10 +524,8 @@ mod tests {
       ..Default::default()
     };
     client.create_cargo(&new_cargo, None).await.unwrap();
-
     client.start_cargo(CARGO_NAME, None).await.unwrap();
     client.inspect_cargo(CARGO_NAME, None).await.unwrap();
-
     let cargo_update = CargoConfigUpdate {
       container: Some(bollard_next::container::Config {
         image: Some("nexthat/nanocl-get-started:latest".into()),
@@ -551,23 +534,18 @@ mod tests {
       }),
       ..Default::default()
     };
-
     client
       .patch_cargo(CARGO_NAME, cargo_update, None)
       .await
       .unwrap();
-
     client.put_cargo(CARGO_NAME, new_cargo, None).await.unwrap();
-
     let histories = client.list_history_cargo(CARGO_NAME, None).await.unwrap();
     assert!(histories.len() > 1);
-
     let history = histories.first().unwrap();
     client
       .revert_cargo(CARGO_NAME, &history.key.to_string(), None)
       .await
       .unwrap();
-
     client.stop_cargo(CARGO_NAME, None).await.unwrap();
     client
       .delete_cargo(CARGO_NAME, &CargoDeleteQuery::default())
@@ -578,7 +556,6 @@ mod tests {
   #[ntex::test]
   async fn create_cargo_wrong_image() {
     let client = NanocldClient::connect_to("http://localhost:8585", None);
-
     let new_cargo = CargoConfigPartial {
       name: "client-test-cargowi".into(),
       container: bollard_next::container::Config {
@@ -599,7 +576,6 @@ mod tests {
   #[ntex::test]
   async fn create_cargo_duplicate_name() {
     let client = NanocldClient::connect_to("http://localhost:8585", None);
-
     let new_cargo = CargoConfigPartial {
       name: "client-test-cargodup".into(),
       container: bollard_next::container::Config {
@@ -609,7 +585,6 @@ mod tests {
       ..Default::default()
     };
     client.create_cargo(&new_cargo, None).await.unwrap();
-
     let err = client.create_cargo(&new_cargo, None).await.unwrap_err();
     match err {
       HttpClientError::HttpError(err) => {
@@ -626,7 +601,6 @@ mod tests {
   #[ntex::test]
   async fn logs_cargo() {
     let client = NanocldClient::connect_to("http://localhost:8585", None);
-
     let mut rx = client
       .logs_cargo("nstore", &CargoLogQuery::of_namespace("system".into()))
       .await

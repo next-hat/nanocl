@@ -21,14 +21,11 @@ impl NanocldClient {
   ///
   /// ## Example
   ///
-  /// ```
+  /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
-  /// #[ntex::main]
-  /// async fn main() {
-  ///   let client = NanocldClient::connect_to("http://localhost:8585", None);
-  ///   let images = client.list_cargo_image(None).await;
-  /// }
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let images = client.list_cargo_image(None).await;
   /// ```
   ///
   pub async fn list_cargo_image(

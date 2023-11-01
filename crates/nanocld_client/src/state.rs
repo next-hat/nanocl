@@ -19,7 +19,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Ok(Self::res_stream(res).await)
   }
 
@@ -34,7 +33,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Ok(Self::res_stream(res).await)
   }
 }

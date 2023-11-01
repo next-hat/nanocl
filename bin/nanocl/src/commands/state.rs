@@ -114,26 +114,26 @@ where
   Ok(state_ref)
 }
 
-/// ## Download cargo image
+/// ## Download container image
 ///
-/// Download cargo image if it's not already downloaded and if the force pull flag is set
+/// Download container image if it's not already downloaded and if the force pull flag is set
 ///
 /// ## Arguments
 ///
 /// * [client](NanocldClient) The client to the daemon
-/// * [cargo](CargoConfigPartial) The cargo config
+/// * [container](ContainerConfig) The container config
 ///
 /// ## Return
 ///
 /// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
+///   * [Ok](Ok<()>) The operation was successful
 ///   * [Err](IoError) An error occured
 ///
-async fn download_cargo_image(
+async fn download_container_image(
   client: &NanocldClient,
-  cargo: &CargoConfigPartial,
+  container: &ContainerConfig,
 ) -> IoResult<()> {
-  match &cargo.container.image {
+  match &container.image {
     Some(image) => {
       exec_cargo_image_pull(client, image).await?;
     }
@@ -695,13 +695,29 @@ async fn exec_state_apply(
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
   for cargo in &cargoes {
+    if let Some(before) = &cargo.before {
+      let is_missing = client
+        .inspect_cargo_image(&before.image.clone().unwrap_or_default())
+        .await
+        .is_err();
+      if is_missing || opts.force_pull {
+        if let Err(err) = download_container_image(&client, before).await {
+          eprintln!("{err}");
+          if is_missing {
+            return Err(err);
+          }
+        }
+      }
+    }
     let is_missing = client
       .inspect_cargo_image(&cargo.container.image.clone().unwrap_or_default())
       .await
       .is_err();
     // Download cargoes images
     if is_missing || opts.force_pull {
-      if let Err(err) = download_cargo_image(&client, cargo).await {
+      if let Err(err) =
+        download_container_image(&client, &cargo.container).await
+      {
         eprintln!("{err}");
         if is_missing {
           return Err(err);

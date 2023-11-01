@@ -19,10 +19,10 @@ const NANOCLD_DEFAULT_VERSION: &str = "0.10.0";
 
 #[derive(Clone)]
 pub struct NanocldClient {
-  pub client: http::client::Client,
   pub url: String,
   pub version: String,
   pub unix_socket: Option<String>,
+  pub client: http::client::Client,
 }
 
 impl std::fmt::Display for NanocldClient {
@@ -195,7 +195,6 @@ impl NanocldClient {
         .map_err(|err| err.map_err_context(|| "Query"))?;
     }
     let mut res = req.send().await.map_err(|err| self.send_error(err))?;
-
     let status = res.status();
     is_api_error(&mut res, &status).await?;
     Ok(res)

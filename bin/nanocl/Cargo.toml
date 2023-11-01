@@ -53,7 +53,7 @@ chrono = { version = "0.4.31", default-features = false, features = [
 ] }
 dialoguer = "0.11.0"
 termios = "0.3.3"
-liquid = "0.26.1"
+liquid = { version = "0.26.1", features = ["stdlib"] }
 regex = "1.10.2"
 nanocld_client = { version = "0.10.0", features = ["tokio"] }
 nanocl_error = { version = "0.1.0", features = ["io", "http_client"] }
