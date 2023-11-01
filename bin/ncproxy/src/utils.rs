@@ -49,12 +49,10 @@ async fn get_namespace_addr(
   let ipam_config = ipam_config
     .get(0)
     .ok_or(IoError::invalid_data("IpamConfig", "Unable to get index 0"))?;
-
   let ip_address = ipam_config
     .gateway
     .clone()
     .ok_or(IoError::invalid_data("IpamConfig", "Unable to get gateway"))?;
-
   Ok(ip_address)
 }
 
@@ -89,7 +87,6 @@ async fn create_cargo_upstream(
   nginx: &Nginx,
 ) -> IoResult<String> {
   let mut ip_addresses = Vec::new();
-
   for node_container in cargo.instances.iter() {
     let container = node_container.container.clone();
     let networks = container
@@ -97,9 +94,7 @@ async fn create_cargo_upstream(
       .unwrap_or_default()
       .networks
       .unwrap_or_default();
-
     let network = networks.get(&cargo.namespace_name);
-
     let Some(network) = network else {
       log::warn!("empty ip address for cargo {}", &cargo.name);
       log::warn!("Instance is unhealthy, skipping");
@@ -151,7 +146,6 @@ async fn create_vm_upstream(
   nginx: &Nginx,
 ) -> IoResult<String> {
   let mut ip_addresses = Vec::new();
-
   for node_container in vm.instances.iter() {
     let networks = node_container
       .network_settings
@@ -159,9 +153,7 @@ async fn create_vm_upstream(
       .unwrap_or_default()
       .networks
       .unwrap_or_default();
-
     let network = networks.get(&vm.namespace_name);
-
     let Some(network) = network else {
       log::warn!("empty ip address for vm {}", &vm.name);
       log::warn!("Instance is unhealthy, skipping");
@@ -209,7 +201,6 @@ async fn gen_upstream(
   let port = target.port;
   let (target_name, target_namespace, target_kind) =
     extract_upstream_target(&target.key)?;
-
   match target_kind.as_str() {
     "c" => {
       let cargo = client
@@ -275,12 +266,10 @@ async fn gen_locations(
   let mut locations = Vec::new();
   for rule in location_rules {
     let path = &rule.path;
-
     let version = match &rule.version {
       None => String::default(),
       Some(version) => format!("\n    proxy_http_version {};", version),
     };
-
     let headers = rule.headers.clone().unwrap_or_default().into_iter().fold(
       String::new(),
       |mut acc, elem| {
@@ -288,7 +277,6 @@ async fn gen_locations(
         acc
       },
     );
-
     match &rule.target {
       LocationTarget::Upstream(upstream_target) => {
         let Ok(upstream_key) =
@@ -402,10 +390,8 @@ async fn gen_http_server_block(
   client: &NanocldClient,
   nginx: &Nginx,
 ) -> IoResult<String> {
+  let mut disable_target = false;
   let listen_http = get_listen(&rule.network, 80, client).await?;
-  let locations = gen_locations(&rule.locations, client, nginx)
-    .await?
-    .join("\n");
   let http_host = match &rule.domain {
     Some(domain) => format!(
       "  server_name {domain};\n  if ($host != {domain}) {{ return 502; }}\n",
@@ -413,7 +399,6 @@ async fn gen_http_server_block(
     ),
     None => String::default(),
   };
-
   let ssl = if let Some(ssl) = &rule.ssl {
     if let Ok(ssl) = get_ssl_config(ssl, client).await {
       let certificate = &ssl.certificate;
@@ -437,11 +422,9 @@ async fn gen_http_server_block(
     ssl_certificate_key  {certificate_key};{ssl_dh_param}
   "
       );
-
       if let Some(certificate_client) = &ssl.certificate_client {
         base += &format!("  ssl_client_certificate {certificate_client};\n");
       }
-
       if let Some(client_verification) = &ssl.verify_client {
         base += &format!(
           "  ssl_verify_client {};\n",
@@ -450,12 +433,19 @@ async fn gen_http_server_block(
       }
       base
     } else {
+      disable_target = true;
       String::default()
     }
   } else {
     String::default()
   };
-
+  let locations = if disable_target {
+    String::default()
+  } else {
+    gen_locations(&rule.locations, client, nginx)
+      .await?
+      .join("\n")
+  };
   let includes = match &rule.includes {
     Some(includes) => includes
       .iter()
@@ -464,7 +454,6 @@ async fn gen_http_server_block(
       .join("\n"),
     None => String::default(),
   };
-
   let conf = format!(
     "
 server {{
@@ -483,7 +472,6 @@ async fn gen_stream_server_block(
 ) -> IoResult<String> {
   let port = rule.port;
   let mut listen = get_listen(&rule.network, port, client).await?;
-
   let upstream_key = match &rule.target {
     StreamTarget::Upstream(cargo_target) => {
       gen_upstream(&NginxConfKind::Stream, cargo_target, client, nginx).await?
@@ -496,7 +484,6 @@ async fn gen_stream_server_block(
       ))
     }
   };
-
   let ssl = if let Some(ssl) = &rule.ssl {
     let ssl = get_ssl_config(ssl, client).await?;
     let certificate = &ssl.certificate;
@@ -513,18 +500,15 @@ async fn gen_stream_server_block(
     ssl_certificate_key  {certificate_key};{ssl_dh_param}
 "
     );
-
     if let Some(certificate_client) = &ssl.certificate_client {
       base += &format!("  ssl_client_certificate {certificate_client};\n");
     }
-
     if let Some(client_verification) = &ssl.verify_client {
       base += &format!(
         "  ssl_verify_client {};\n",
         if *client_verification { "on" } else { "off" }
       );
     }
-
     base
   } else {
     String::default()
