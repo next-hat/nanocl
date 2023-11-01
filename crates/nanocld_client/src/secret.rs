@@ -25,7 +25,6 @@ impl NanocldClient {
     let res = self
       .send_get(format!("/{}/secrets", &self.version), None::<String>)
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -52,7 +51,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -79,7 +77,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -116,7 +113,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -147,7 +143,6 @@ impl NanocldClient {
     self
       .send_delete(format!("/{}/secrets/{key}", &self.version), None::<String>)
       .await?;
-
     Ok(())
   }
 }
@@ -160,9 +155,7 @@ mod tests {
   async fn basic() {
     const SECRET_KEY: &str = "secret-test";
     let client = NanocldClient::connect_to("http://localhost:8585", None);
-
     client.list_secret().await.unwrap();
-
     let secret = SecretPartial {
       key: SECRET_KEY.to_string(),
       kind: "generic".to_string(),
@@ -170,13 +163,10 @@ mod tests {
       metadata: None,
       immutable: None,
     };
-
     let secret = client.create_secret(&secret).await.unwrap();
     assert_eq!(secret.key, SECRET_KEY);
-
     let secret = client.inspect_secret(SECRET_KEY).await.unwrap();
     assert_eq!(secret.key, SECRET_KEY);
-
     client.delete_secret(SECRET_KEY).await.unwrap();
   }
 }

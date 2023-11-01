@@ -30,7 +30,6 @@ impl NanocldClient {
     let res = self
       .send_get(format!("/{}/version", &self.version), None::<String>)
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -63,7 +62,6 @@ impl NanocldClient {
     let res = self
       .send_get(format!("/{}/events", &self.version), None::<String>)
       .await?;
-
     Ok(Self::res_stream(res).await)
   }
 
@@ -90,7 +88,6 @@ impl NanocldClient {
     self
       .send_head(format!("/{}/_ping", &self.version), None::<String>)
       .await?;
-
     Ok(())
   }
 
@@ -117,7 +114,6 @@ impl NanocldClient {
     let res = self
       .send_get(format!("/{}/info", &self.version), None::<String>)
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -128,7 +124,6 @@ impl NanocldClient {
     let res = self
       .send_get(format!("/{}/processes", &self.version), opts)
       .await?;
-
     Self::res_json(res).await
   }
 }
@@ -141,7 +136,6 @@ mod tests {
   async fn get_version() {
     let client = NanocldClient::connect_to("http://localhost:8585", None);
     let version = client.get_version().await;
-
     assert!(version.is_ok());
   }
 
@@ -157,7 +151,6 @@ mod tests {
   async fn info() {
     let client = NanocldClient::connect_to("http://localhost:8585", None);
     let info = client.info().await.unwrap();
-
     assert!(info.docker.containers.unwrap() > 0);
   }
 }

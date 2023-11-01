@@ -33,7 +33,6 @@ impl NanocldClient {
     let res = self
       .send_get(format!("/{}/resources", &self.version), query)
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -77,7 +76,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -114,7 +112,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -154,7 +151,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -191,7 +187,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Ok(())
   }
 
@@ -205,7 +200,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -221,7 +215,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 }
@@ -235,10 +228,8 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     let client = NanocldClient::connect_to("http://localhost:8585", None);
-
     // list
     client.list_resource(None).await.unwrap();
-
     let config = serde_json::json!({
       "Schema": {
         "type": "object",
@@ -256,7 +247,6 @@ mod tests {
         }
       }
     });
-
     let resource = ResourcePartial {
       name: "test_resource2".to_owned(),
       version: "v0.0.1".to_owned(),
@@ -264,40 +254,32 @@ mod tests {
       data: config.clone(),
       metadata: None,
     };
-
     // create
     let resource = client.create_resource(&resource).await.unwrap();
-
     assert_eq!(resource.name, "test_resource2");
     assert_eq!(resource.kind, String::from("Kind"));
-
     // inspect
     let resource = client.inspect_resource("test_resource2").await.unwrap();
     assert_eq!(resource.name, "test_resource2");
     assert_eq!(resource.kind, String::from("Kind"));
-
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
       data: config.clone(),
       metadata: None,
     };
-
     // patch
     let resource = client
       .put_resource("test_resource2", &new_resource)
       .await
       .unwrap();
-
     assert_eq!(resource.name, "test_resource2");
     assert_eq!(resource.kind, String::from("Kind"));
-
     // history
     let history = client
       .list_history_resource("test_resource2")
       .await
       .unwrap();
     assert!(history.len() > 1);
-
     // delete
     client.delete_resource("test_resource2").await.unwrap();
   }

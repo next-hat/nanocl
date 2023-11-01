@@ -35,7 +35,6 @@ where
       let data: T = serde_yaml::from_str(raw).map_err(|err| {
         err.map_err_context(|| "Unable to parse Statefile in yaml format")
       })?;
-
       let state_ref = serde_yaml::from_str::<StateMeta>(raw)
         .map_err(|err| {
           err.map_err_context(|| {
@@ -54,7 +53,6 @@ where
       let data: T = serde_json::from_str(raw).map_err(|err| {
         err.map_err_context(|| "Unable to parse Statefile in json format")
       })?;
-
       let state_ref = serde_json::from_str::<StateMeta>(raw)
         .map_err(|err| {
           err.map_err_context(|| {
@@ -67,7 +65,6 @@ where
           meta,
           data,
         })?;
-
       Ok(state_ref)
     }
     "toml" => {
@@ -77,7 +74,6 @@ where
           &err.to_string(),
         )
       })?;
-
       let state_ref = toml::from_str::<StateMeta>(raw)
         .map_err(|err| {
           IoError::invalid_data(
@@ -91,7 +87,6 @@ where
           meta,
           data,
         })?;
-
       Ok(state_ref)
     }
     _ => Err(IoError::invalid_data(
@@ -195,11 +190,9 @@ pub fn update_progress(
       "{:#?}:{}",
       &state_stream.status, &state_stream.kind
     ));
-
     if let Some(ctx) = &state_stream.context {
       pg.set_message(format!("{}: {}", state_stream.key, ctx));
     }
-
     if state_stream.status != StateStreamStatus::Pending {
       pg.finish();
     }

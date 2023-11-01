@@ -35,7 +35,6 @@ impl NanocldClient {
     let res = self
       .send_get(format!("/{}/vms/images", self.version), None::<String>)
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -49,7 +48,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Ok(())
   }
 
@@ -68,7 +66,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Ok(Self::res_stream(res).await)
   }
 
@@ -84,7 +81,6 @@ impl NanocldClient {
         None::<String>,
       )
       .await?;
-
     Self::res_json(res).await
   }
 }

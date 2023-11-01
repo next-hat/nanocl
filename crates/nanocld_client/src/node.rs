@@ -9,7 +9,6 @@ impl NanocldClient {
     let res = self
       .send_get(format!("/{}/nodes", &self.version), None::<String>)
       .await?;
-
     Self::res_json(res).await
   }
 }

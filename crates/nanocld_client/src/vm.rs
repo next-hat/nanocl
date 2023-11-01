@@ -25,7 +25,6 @@ impl NanocldClient {
         Some(&GenericNspQuery { namespace }),
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -39,7 +38,6 @@ impl NanocldClient {
         Some(&GenericNspQuery { namespace }),
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -54,7 +52,6 @@ impl NanocldClient {
         Some(&GenericNspQuery { namespace }),
       )
       .await?;
-
     Ok(())
   }
 
@@ -69,7 +66,6 @@ impl NanocldClient {
         Some(&GenericNspQuery { namespace }),
       )
       .await?;
-
     Self::res_json(res).await
   }
 
@@ -85,7 +81,6 @@ impl NanocldClient {
         Some(&GenericNspQuery { namespace }),
       )
       .await?;
-
     Ok(())
   }
 
@@ -101,7 +96,6 @@ impl NanocldClient {
         Some(&GenericNspQuery { namespace }),
       )
       .await?;
-
     Ok(())
   }
 
@@ -118,7 +112,6 @@ impl NanocldClient {
         Some(&GenericNspQuery { namespace }),
       )
       .await?;
-
     Ok(())
   }
 
@@ -130,7 +123,7 @@ impl NanocldClient {
     let qs = if let Some(namespace) = namespace {
       format!("?namespace={}", namespace)
     } else {
-      "".to_string()
+      "".to_owned()
     };
     let url = format!("{}/{}/vms/{name}/attach{qs}", self.url, &self.version);
     // open websockets connection over http transport

@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Filter by existing key and contains for data and metadata of a resource
-- before cargo, to run a command before creating the cargo.
+- Filter by existing key and contains for data and metadata of a resource.
+- Before cargo, to run a command before creating the cargo.
 
 ## [0.10.0] - 2023-10-04
 
