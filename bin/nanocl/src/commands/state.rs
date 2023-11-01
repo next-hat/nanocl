@@ -114,19 +114,19 @@ where
   Ok(state_ref)
 }
 
-/// ## Download cargo image
+/// ## Download container image
 ///
 /// Download container image if it's not already downloaded and if the force pull flag is set
 ///
 /// ## Arguments
 ///
 /// * [client](NanocldClient) The client to the daemon
-/// * [container](ContainerConfig) The cargo config
+/// * [container](ContainerConfig) The container config
 ///
 /// ## Return
 ///
 /// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
+///   * [Ok](Ok<()>) The operation was successful
 ///   * [Err](IoError) An error occured
 ///
 async fn download_container_image(
