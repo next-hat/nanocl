@@ -423,7 +423,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
- "utoipa",
+ "utoipa 4.1.0",
  "winapi",
 ]
 
@@ -436,7 +436,7 @@ dependencies = [
  "serde",
  "serde_repr",
  "serde_with",
- "utoipa",
+ "utoipa 4.1.0",
 ]
 
 [[package]]
@@ -993,6 +993,21 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
+
+[[package]]
+name = "foreign-types"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"
+dependencies = [
+ "foreign-types-shared",
+]
+
+[[package]]
+name = "foreign-types-shared"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 
 [[package]]
 name = "form_urlencoded"
@@ -1866,8 +1881,8 @@ dependencies = [
  "indicatif",
  "liquid",
  "nanocl_error",
- "nanocl_utils 0.3.0",
- "nanocld_client",
+ "nanocl_utils 0.3.1",
+ "nanocld_client 0.12.0",
  "nix 0.27.1",
  "ntex",
  "regex",
@@ -1897,14 +1912,42 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4274c7f4a3e525085b97a5fcfb2dcfb59c8e9e63f5c7c734d4ed7df48be0a10"
+dependencies = [
+ "bollard-next",
+ "chrono",
+ "serde",
+ "serde_json",
+ "utoipa 3.5.0",
+ "uuid",
+]
+
+[[package]]
+name = "nanocl_stubs"
 version = "0.12.0"
 dependencies = [
  "bollard-next",
  "chrono",
  "serde",
  "serde_json",
- "utoipa",
+ "utoipa 4.1.0",
  "uuid",
+]
+
+[[package]]
+name = "nanocl_utils"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7f4dccedb836efd5486d474c05293bcd4f6c163c9929fa5cd792d546e2f65b4"
+dependencies = [
+ "env_logger",
+ "futures",
+ "log",
+ "ntex",
+ "serde_json",
+ "serde_urlencoded",
 ]
 
 [[package]]
@@ -1921,7 +1964,7 @@ dependencies = [
  "ntex",
  "serde",
  "serde_json",
- "utoipa",
+ "utoipa 4.1.0",
  "utoipa-swagger-ui",
 ]
 
@@ -1944,9 +1987,9 @@ dependencies = [
  "log",
  "metrsd_client",
  "nanocl_error",
- "nanocl_stubs",
- "nanocl_utils 0.3.0",
- "nanocld_client",
+ "nanocl_stubs 0.12.0",
+ "nanocl_utils 0.3.1",
+ "nanocld_client 0.12.0",
  "notify",
  "ntex",
  "ntex-cors",
@@ -1957,8 +2000,24 @@ dependencies = [
  "tokio",
  "tokio-util",
  "url",
- "utoipa",
+ "utoipa 4.1.0",
  "uuid",
+]
+
+[[package]]
+name = "nanocld_client"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27a9ae76a04cd44250420becebabcf2fd21e9071b21497399d247f467940007f"
+dependencies = [
+ "bollard-next",
+ "futures",
+ "nanocl_stubs 0.10.0",
+ "nanocl_utils 0.2.3",
+ "ntex",
+ "openssl",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1968,7 +2027,7 @@ dependencies = [
  "bollard-next",
  "futures",
  "nanocl_error",
- "nanocl_stubs",
+ "nanocl_stubs 0.12.0",
  "ntex",
  "serde",
  "serde_json",
@@ -1994,14 +2053,14 @@ dependencies = [
  "futures",
  "log",
  "nanocl_error",
- "nanocl_utils 0.3.0",
- "nanocld_client",
+ "nanocl_utils 0.3.1",
+ "nanocld_client 0.12.0",
  "ntex",
  "serde",
  "serde_json",
  "serde_yaml",
  "tokio",
- "utoipa",
+ "utoipa 4.1.0",
 ]
 
 [[package]]
@@ -2012,19 +2071,19 @@ dependencies = [
  "clap",
  "clap_mangen",
  "futures",
- "indexmap 2.0.2",
+ "indexmap 2.1.0",
  "log",
  "nanocl_error",
- "nanocl_stubs",
+ "nanocl_stubs 0.10.0",
  "nanocl_utils 0.2.3",
- "nanocld_client",
+ "nanocld_client 0.10.0",
  "notify",
  "ntex",
  "serde",
  "serde_json",
  "serde_yaml",
  "tokio",
- "utoipa",
+ "utoipa 4.1.0",
 ]
 
 [[package]]
@@ -2037,15 +2096,15 @@ dependencies = [
  "futures",
  "log",
  "nanocl_error",
- "nanocl_utils 0.3.0",
- "nanocld_client",
+ "nanocl_utils 0.3.1",
+ "nanocld_client 0.12.0",
  "notify",
  "ntex",
  "serde",
  "serde_json",
  "serde_yaml",
  "tokio",
- "utoipa",
+ "utoipa 4.1.0",
 ]
 
 [[package]]
@@ -2055,8 +2114,8 @@ dependencies = [
  "futures-util",
  "log",
  "nanocl_error",
- "nanocl_utils",
- "nanocld_client",
+ "nanocl_utils 0.3.1",
+ "nanocld_client 0.12.0",
  "ntex",
  "serde_json",
  "vpnkitrc",
@@ -2146,6 +2205,7 @@ dependencies = [
  "ntex-tokio",
  "ntex-util",
  "oneshot",
+ "openssl",
  "percent-encoding",
  "pin-project-lite",
  "polling 3.3.1",
@@ -2213,6 +2273,7 @@ dependencies = [
  "ntex-tls",
  "ntex-tokio",
  "ntex-util",
+ "openssl",
  "rustls",
  "thiserror",
  "webpki-roots",
@@ -2356,6 +2417,7 @@ dependencies = [
  "ntex-io",
  "ntex-service",
  "ntex-util",
+ "openssl",
  "pin-project-lite",
  "rustls",
 ]
@@ -2525,6 +2587,54 @@ dependencies = [
 ]
 
 [[package]]
+name = "openssl"
+version = "0.10.61"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b8419dc8cc6d866deb801274bba2e6f8f6108c1bb7fcc10ee5ab864931dbb45"
+dependencies = [
+ "bitflags 2.4.1",
+ "cfg-if",
+ "foreign-types",
+ "libc",
+ "once_cell",
+ "openssl-macros",
+ "openssl-sys",
+]
+
+[[package]]
+name = "openssl-macros"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.41",
+]
+
+[[package]]
+name = "openssl-src"
+version = "300.2.1+3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fe476c29791a5ca0d1273c697e96085bbabbbea2ef7afd5617e78a4b40332d3"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "openssl-sys"
+version = "0.9.97"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3eaad34cdd97d81de97964fc7f29e2d104f483840d906ef56daa1912338460b"
+dependencies = [
+ "cc",
+ "libc",
+ "openssl-src",
+ "pkg-config",
+ "vcpkg",
+]
+
+[[package]]
 name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2675,6 +2785,12 @@ dependencies = [
  "fastrand 2.0.1",
  "futures-io",
 ]
+
+[[package]]
+name = "pkg-config"
+version = "0.3.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26072860ba924cbfa98ea39c8c19b4dd6a4a25423dbdf219c1eca91aa0cf6964"
 
 [[package]]
 name = "polling"
@@ -3685,6 +3801,18 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "utoipa"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d82b1bc5417102a73e8464c686eef947bdfb99fcdfc0a4f228e81afa9526470a"
+dependencies = [
+ "indexmap 2.1.0",
+ "serde",
+ "serde_json",
+ "utoipa-gen 3.5.0",
+]
+
+[[package]]
+name = "utoipa"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ff05e3bac2c9428f57ade702667753ca3f5cf085e2011fe697de5bfd49aa72d"
@@ -3693,7 +3821,20 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "utoipa-gen",
+ "utoipa-gen 4.1.0",
+]
+
+[[package]]
+name = "utoipa-gen"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05d96dcd6fc96f3df9b3280ef480770af1b7c5d14bc55192baa9b067976d920c"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.41",
+ "uuid",
 ]
 
 [[package]]
@@ -3720,7 +3861,7 @@ dependencies = [
  "rust-embed",
  "serde",
  "serde_json",
- "utoipa",
+ "utoipa 4.1.0",
  "zip",
 ]
 
