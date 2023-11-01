@@ -30,7 +30,7 @@ Cargoes:
   - Name: nproxy
     Container:
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/nproxy:1.25.0.1-nightly
+      Image: ghcr.io/nxthat/nproxy:1.25.0.2-nightly
       # {% else %}
       Image: ghcr.io/nxthat/nproxy:1.25.0.1
       # {% endif %}
@@ -59,7 +59,7 @@ Cargoes:
   - Name: ncproxy
     Container:
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/ncproxy:0.7.0-nightly
+      Image: ghcr.io/nxthat/ncproxy:0.8.0-nightly
       # {% else %}
       Image: ghcr.io/nxthat/ncproxy:0.7.0
       # {% endif %}
@@ -87,7 +87,7 @@ Cargoes:
       Env:
         - TZ=Europe/Paris
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/ndns:2.89.0.0-nightly
+      Image: ghcr.io/nxthat/ndns:2.89.0.2-nightly
       # {% else %}
       Image: ghcr.io/nxthat/ndns:2.89.0.0
       # {% endif %}
@@ -101,7 +101,7 @@ Cargoes:
       Env:
         - TZ=Europe/Paris
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/ncdns:0.3.1-nightly
+      Image: ghcr.io/nxthat/ncdns:0.3.2-nightly
       # {% else %}
       Image: ghcr.io/nxthat/ncdns:0.3.1
       # {% endif %}
@@ -145,7 +145,7 @@ Cargoes:
   - Name: ndaemon
     Container:
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/nanocld:0.10.0-nightly
+      Image: ghcr.io/nxthat/nanocld:0.11.0-nightly
       # {% else %}
       Image: ghcr.io/nxthat/nanocld:0.10.0
       # {% endif %}
@@ -186,7 +186,7 @@ Cargoes:
   - Name: ncvpnkit
     Container:
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/ncvpnkit:0.1.0-nightly
+      Image: ghcr.io/nxthat/ncvpnkit:0.1.1-nightly
       # {% else %}
       Image: ghcr.io/nxthat/ncvpnkit:0.1.0
       # {% endif %}
