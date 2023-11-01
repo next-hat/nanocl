@@ -6,7 +6,7 @@ ApiVersion: v0.10
 Resources:
   - Name: ProxyRule
     Kind: Kind
-    Version: v0.7
+    Version: v0.8
     Data:
       Url: unix:///run/nanocl/proxy.sock
   - Name: DnsRule

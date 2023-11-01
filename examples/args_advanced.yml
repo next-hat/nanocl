@@ -27,7 +27,7 @@ Cargoes:
 Resources:
   - Name: ${{ Args.domain }}
     Kind: ProxyRule
-    Version: v0.7
+    Version: v0.8
     Data:
       Rules:
         - Domain: ${{ Args.domain }}
