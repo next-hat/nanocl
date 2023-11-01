@@ -1,5 +1,5 @@
 Kind: Resource
-ApiVersion: v0.10
+ApiVersion: v0.11
 
 Resources:
   - Name: proxy-get-started
