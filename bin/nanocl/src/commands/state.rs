@@ -695,7 +695,7 @@ async fn exec_state_apply(
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
   for cargo in &cargoes {
-    if let Some(before) = &cargo.before {
+    if let Some(before) = &cargo.init_container {
       let is_missing = client
         .inspect_cargo_image(&before.image.clone().unwrap_or_default())
         .await

@@ -2058,7 +2058,7 @@ components:
         Metadata:
           description: Metadata of the cargo (user defined)
           nullable: true
-        Before:
+        InitContainer:
           allOf:
           - $ref: '#/components/schemas/Config'
           nullable: true
@@ -2087,7 +2087,7 @@ components:
         Metadata:
           description: Metadata of the cargo (user defined)
           nullable: true
-        Before:
+        InitContainer:
           allOf:
           - $ref: '#/components/schemas/Config'
           nullable: true
@@ -2117,7 +2117,7 @@ components:
         Metadata:
           description: New metadata of the cargo (user defined)
           nullable: true
-        Before:
+        InitContainer:
           allOf:
           - $ref: '#/components/schemas/Config'
           nullable: true

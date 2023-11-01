@@ -31,7 +31,7 @@ Resources:
 # https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
   - Name: deploy-example
-    Before:
+    InitContainer:
       Image: alpine:latest
       Cmd: ["sleep", "5"]
     Container:
