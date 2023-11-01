@@ -1803,7 +1803,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -1847,7 +1847,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -1915,7 +1915,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld_client"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "bollard-next",
  "futures",
@@ -1959,7 +1959,7 @@ dependencies = [
 
 [[package]]
 name = "ncproxy"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "bollard-next",
  "clap",
@@ -1980,7 +1980,7 @@ dependencies = [
 
 [[package]]
 name = "ncvpnkit"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "futures-util",
  "log",

@@ -78,10 +78,10 @@ chrono = { version = "0.4.31", default-features = false, features = [
   "serde",
 ] }
 jsonschema = { version = "0.17.0", default-features = false }
-nanocld_client = { version = "0.10.0", features = ["tokio"] }
+nanocld_client = { version = "0.11.0", features = ["tokio"] }
 openssl = { version = "0.10.56", features = ["vendored"] }
 metrsd_client = "0.3.0"
-nanocl_stubs = { version = "0.10.0", features = ["serde"] }
+nanocl_stubs = { version = "0.11.0", features = ["serde"] }
 nanocl_utils = { version = "0.3.0", features = ["unix", "ntex", "logger"] }
 utoipa = { version = "4.0", features = ["yaml"], optional = true }
 notify = "6.1.1"
