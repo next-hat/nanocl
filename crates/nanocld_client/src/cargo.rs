@@ -271,7 +271,7 @@ impl NanocldClient {
   ///
   /// ## Returns
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The cargo was patched
+  ///   * [Ok](Ok<()>) - The cargo was patched
   ///   * [Err](HttpClientError) - The cargo could not be patched
   ///
   /// ## Example
@@ -306,13 +306,15 @@ impl NanocldClient {
   /// It will create a new cargo config and store old one in history
   ///
   /// ## Arguments
+  ///
   /// * [name](str) - The name of the cargo to put
-  /// * [cargo](CargoConfigPatch) - The config to put the cargo with
+  /// * [cargo](CargoConfigPartial) - The config to put the cargo with
   /// * [namespace](Option<String>) - The namespace to put the cargo from
   ///
   /// ## Returns
+  ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The cargo was put
+  ///   * [Ok](Ok<()>) - The cargo was put
   ///   * [Err](HttpClientError) - The cargo could not be put
   ///
   /// ## Example
@@ -320,16 +322,16 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let cargo_config = CargoConfigPatch {
+  /// let cargo_config = CargoConfigPartial {
   ///   name: "my-cargo-renamed".into(),
   /// };
-  /// client.put_cargo("my-cargo", cargo, None).await.unwrap();
+  /// client.put_cargo("my-cargo", &cargo, None).await.unwrap();
   /// ```
   ///
   pub async fn put_cargo(
     &self,
     name: &str,
-    config: CargoConfigPartial,
+    config: &CargoConfigPartial,
     namespace: Option<String>,
   ) -> Result<(), HttpClientError> {
     self
@@ -538,7 +540,10 @@ mod tests {
       .patch_cargo(CARGO_NAME, cargo_update, None)
       .await
       .unwrap();
-    client.put_cargo(CARGO_NAME, new_cargo, None).await.unwrap();
+    client
+      .put_cargo(CARGO_NAME, &new_cargo, None)
+      .await
+      .unwrap();
     let histories = client.list_history_cargo(CARGO_NAME, None).await.unwrap();
     assert!(histories.len() > 1);
     let history = histories.first().unwrap();
