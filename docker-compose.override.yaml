@@ -9,6 +9,7 @@ x-definitions:
     volumes:
       - <<: *bind
       - nanocl_target:/project/target
+      - ../ntex:/ntex
       - nanocl_registry:/usr/local/cargo/registry
       - nanocl_rustup:/usr/local/rustup
   host-mount: &host-mount-volumes

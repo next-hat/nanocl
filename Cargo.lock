@@ -2079,6 +2079,8 @@ dependencies = [
  "nanocld_client 0.10.0",
  "notify",
  "ntex",
+ "ntex-util",
+ "openssl",
  "serde",
  "serde_json",
  "serde_yaml",

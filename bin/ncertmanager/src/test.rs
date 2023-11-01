@@ -1,18 +1,3 @@
-use futures::StreamExt;
-use nanocld_client::bollard_next;
-use nanocld_client::NanocldClient;
-use nanocl_utils::io_error::{IoResult, FromIo, IoError};
-
-use nanocld_client::stubs::cargo::{CargoInspect, CreateExecOptions};
-use nanocld_client::stubs::proxy::ProxySsl;
-use nanocld_client::stubs::proxy::ProxySslConfig;
-use nanocld_client::stubs::resource::{ResourceQuery, ResourcePartial};
-use nanocld_client::stubs::proxy::{
-  ProxyRule, StreamTarget, ProxyStreamProtocol, ProxyRuleHttp, UpstreamTarget,
-  ProxyHttpLocation, ProxyRuleStream, LocationTarget, ResourceProxyRule,
-};
-use nanocld_client::stubs::vm::VmInspect;
-
 #[cfg(test)]
 pub(crate) mod tests {
   use std::process::Output;

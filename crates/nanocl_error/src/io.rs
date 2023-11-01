@@ -222,6 +222,18 @@ impl FromIo<Box<IoError>> for std::string::FromUtf8Error {
   }
 }
 
+impl FromIo<Box<IoError>> for std::time::SystemTimeError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
+    })
+  }
+}
+
 impl From<Box<IoError>> for IoError {
   fn from(f: Box<IoError>) -> Self {
     *f
