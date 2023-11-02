@@ -62,9 +62,12 @@ jobs:
           PKG_TARGET_ARCH: ${{ matrix.target_arch }}
         run: |
           if [ "$PKG_ARCH" = "arm64" ]; then
-            export RUSTFLAGS="-C target-feature=+crt-static"
-            export CC=aarch64-none-elf-gcc
-            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-none-elf-gcc
+            export CC_aarch64_unknown_linux_musl=aarch64-linux-musl-gcc
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-musl-gcc
+            export RUSTFLAGS="-C target-feature=+crt-static -C link-arg=-lgcc"
+            # export RUSTFLAGS="-C target-feature=+crt-static"
+            # export CC=aarch64-none-elf-gcc
+            # export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-none-elf-gcc
           else
             export RUSTFLAGS="-C target-feature=+crt-static"
           fi
