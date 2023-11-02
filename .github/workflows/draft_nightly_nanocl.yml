@@ -48,7 +48,7 @@ jobs:
         run: |
           apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base dpkg pandoc github-cli
           if [ "$PKG_ARCH" = "arm64" ]; then
-            apk add --update gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+            apk add --update gcc-aarch64-linux-gnu binutils-aarch64-none-elf
             # apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
           fi
           rustup target add $TARGET_ARCH
