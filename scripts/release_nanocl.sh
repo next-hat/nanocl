@@ -26,7 +26,6 @@ mkdir -p "${release_path}"/usr/share/man/man1
 rustup target add ${target_arch}
 
 # Build binary
-export RUSTFLAGS="-C target-feature=+crt-static"
 cargo build --release --target=${target_arch} --features release --bin nanocl
 
 # Generate man pages
