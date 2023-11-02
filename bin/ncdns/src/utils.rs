@@ -59,7 +59,7 @@ async fn get_network_addr(
 /// Reload the dns service
 /// TODO: use a better way to reload the service, we may have to move from dnsmasq to something else
 pub(crate) async fn reload_service(client: &NanocldClient) -> IoResult<()> {
-  client.restart_cargo("ndns", Some("system".into())).await?;
+  client.restart_cargo("ndns", Some("system")).await?;
   Ok(())
 }
 
@@ -99,7 +99,7 @@ pub(crate) async fn update_entries(
     kind: Some("DnsRule".into()),
     ..Default::default()
   };
-  let resources = client.list_resource(Some(query)).await.map_err(|err| {
+  let resources = client.list_resource(Some(&query)).await.map_err(|err| {
     err.map_err_context(|| "Unable to list resources from nanocl daemon")
   })?;
   let mut entries = Vec::new();
@@ -169,6 +169,7 @@ pub(crate) async fn remove_entries(
 pub mod tests {
   use nanocl_utils::logger;
   pub use nanocl_utils::ntex::test_client::*;
+  use nanocld_client::NanocldClient;
 
   use crate::{version, dnsmasq, services};
 
@@ -184,10 +185,13 @@ pub mod tests {
     before();
     let dnsmasq = dnsmasq::Dnsmasq::new("/tmp/dnsmasq");
     dnsmasq.ensure().unwrap();
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     // Create test server
     let srv = ntex::web::test::server(move || {
       ntex::web::App::new()
         .state(dnsmasq.clone())
+        .state(client.clone())
         .configure(services::ntex_config)
     });
     TestClient::new(srv, version::VERSION)

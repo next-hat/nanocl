@@ -1,12 +1,7 @@
-use std::collections::HashMap;
-
-use futures::StreamExt;
-use indicatif::{ProgressBar, MultiProgress};
-
 use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 
-use crate::utils;
+use crate::{utils, version};
 use crate::config::CliConfig;
 use crate::models::UpgradeOpts;
 use super::cargo_image::exec_cargo_image_pull;
@@ -23,23 +18,35 @@ use super::cargo_image::exec_cargo_image_pull;
 /// ## Return
 ///
 /// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
+///   * [Ok](Ok<()>) The operation was successful
 ///   * [Err](IoError) An error occured
 ///
 pub async fn exec_upgrade(
   cli_conf: &CliConfig,
   args: &UpgradeOpts,
 ) -> IoResult<()> {
+  let detected_host = utils::docker::detect_docker_host()?;
+  let (docker_host, is_docker_desktop) = match &args.docker_host {
+    Some(docker_host) => (docker_host.to_owned(), args.is_docker_desktop),
+    None => detected_host,
+  };
+  let home_dir = std::env::var("HOME").map_err(|err| {
+    IoError::interupted("Unable to get $HOME env variable", &err.to_string())
+  })?;
   let client = &cli_conf.client;
   let config = client.info().await?.config;
   let data = liquid::object!({
     "advertise_addr": config.advertise_addr,
     "state_dir": config.state_dir,
-    "docker_host": config.docker_host,
+    "docker_host": docker_host,
+    "is_docker_desktop": is_docker_desktop,
     "gateway": config.gateway,
     "conf_dir": config.conf_dir,
     "hostname": config.hostname,
+    "hosts": config.hosts.join(" "),
     "gid": config.gid,
+    "home_dir": home_dir,
+    "channel": version::CHANNEL,
   });
   let installer = utils::installer::get_template(args.template.clone()).await?;
   let installer = utils::state::compile(&installer, &data)?;
@@ -60,18 +67,12 @@ pub async fn exec_upgrade(
       "is not specified".into(),
     ))?;
     exec_cargo_image_pull(client, &image).await?;
-  }
-  let data =
-    serde_json::from_value::<serde_json::Value>(data).map_err(|err| {
-      err.map_err_context(|| "Unable to convert upgrade to json")
-    })?;
-  let mut stream = client.apply_state(&data).await?;
-  let multiprogress = MultiProgress::new();
-  multiprogress.set_move_cursor(false);
-  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
-  while let Some(res) = stream.next().await {
-    let res = res?;
-    utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
+    print!("Upgrading {}", cargo.name);
+    let _ = client
+      .put_cargo(&cargo.name.clone(), &cargo, Some("system"))
+      .await;
+    ntex::time::sleep(std::time::Duration::from_secs(2)).await;
+    println!(" {} has been upgraded successfully!", cargo.name);
   }
   Ok(())
 }

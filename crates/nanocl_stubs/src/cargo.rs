@@ -264,9 +264,9 @@ impl From<CargoStatsQuery> for StatsOptions {
 }
 
 impl CargoLogQuery {
-  pub fn of_namespace(nsp: String) -> CargoLogQuery {
+  pub fn of_namespace(nsp: &str) -> CargoLogQuery {
     CargoLogQuery {
-      namespace: Some(nsp),
+      namespace: Some(nsp.to_owned()),
       since: None,
       until: None,
       timestamps: None,
