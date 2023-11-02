@@ -20,7 +20,6 @@ jobs:
         target_arch: ["amd64:x86_64-unknown-linux-musl", "arm64:aarch64-unknown-linux-musl"]
 
     runs-on: ubuntu-latest
-    container: rust:1.73.0-alpine3.18
 
     steps:
       # Checkout the repository
@@ -43,10 +42,17 @@ jobs:
           echo $VERSION
           echo $PKG_ARCH
           echo $TARGET_ARCH
+      # Install rust
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: llvm-tools-preview
       # Install required dependencies
       - name: Install dependencies
         run: |
-          apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base dpkg pandoc github-cli
+          sudo dpkg --add-architecture $PKG_ARCH
+          sudo apt install -y pkg-config:$PKG_ARCH gcc:$PKG_ARCH musl-dev:$PKG_ARCH libpq-dev:$PKG_ARCH libssl-dev:$PKG_ARCH musl-tools:$PKG_ARCH libc-dev:$PKG_ARCH g++:$PKG_ARCH make:$PKG_ARCH
           rustup target add $TARGET_ARCH
       # Fix git permission
       - name: Fix git permission
