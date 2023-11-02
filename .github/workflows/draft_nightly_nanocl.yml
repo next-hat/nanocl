@@ -49,9 +49,9 @@ jobs:
           apt-get update -y
           dpkg --add-architecture $PKG_ARCH
           apt-get update -y
-          apt-get install -y pkg-config musl-dev libpq-dev libssl-dev musl-tools libc-dev make git dpkg pandoc curl
+          apt-get install -y pkg-config musl-dev binutils libpq-dev libssl-dev musl-tools libc-dev make git dpkg pandoc curl
           if [ "$PKG_ARCH" = "arm64" ]; then
-            apt-get install -y gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+            apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
           fi
           type -p curl >/dev/null || (apt-get update && apt-get install curl -y)
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
@@ -70,7 +70,7 @@ jobs:
           PKG_TARGET_ARCH: ${{ matrix.target_arch }}
         run: |
           if [ "$PKG_ARCH" = "arm64" ]; then
-            export RUSTFLAGS="-C target-feature=+crt-static -C linker=aarch64-linux-gnu-gcc -C link-arg=-lgcc"
+            export RUSTFLAGS="-C target-feature=+crt-static"
           else
             export RUSTFLAGS="-C target-feature=+crt-static"
           fi
