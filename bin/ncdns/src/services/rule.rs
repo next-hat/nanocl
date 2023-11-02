@@ -27,14 +27,8 @@ pub(crate) async fn apply_rule(
   _path: web::types::Path<(String, String)>,
   dnsmasq: web::types::State<Dnsmasq>,
   web::types::Json(payload): web::types::Json<ResourceDnsRule>,
+  client: web::types::State<NanocldClient>,
 ) -> Result<web::HttpResponse, HttpError> {
-  #[allow(unused)]
-  let mut client = NanocldClient::connect_with_unix_default();
-  #[cfg(any(feature = "dev", feature = "test"))]
-  {
-    client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-  }
   utils::write_entries(&payload, &dnsmasq, &client).await?;
   utils::reload_service(&client).await?;
   Ok(web::HttpResponse::Ok().json(&payload))
@@ -56,14 +50,8 @@ pub(crate) async fn apply_rule(
 pub(crate) async fn remove_rule(
   path: web::types::Path<(String, String)>,
   dnsmasq: web::types::State<Dnsmasq>,
+  client: web::types::State<NanocldClient>,
 ) -> Result<web::HttpResponse, HttpError> {
-  #[allow(unused)]
-  let mut client = NanocldClient::connect_with_unix_default();
-  #[cfg(any(feature = "dev", feature = "test"))]
-  {
-    client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-  }
   let rule = client.inspect_resource(&path.1).await?;
   let dns_rule =
     serde_json::from_value::<ResourceDnsRule>(rule.data).map_err(|err| {

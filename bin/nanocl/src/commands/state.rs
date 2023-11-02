@@ -223,7 +223,7 @@ pub async fn log_cargo(
   let cargo = match client
     .inspect_cargo(
       &cargo.name,
-      Some(opts.namespace.to_owned().unwrap_or("global".to_string())),
+      Some(opts.namespace.as_deref().unwrap_or("global")),
     )
     .await
   {
@@ -260,7 +260,7 @@ pub async fn log_cargo(
         timestamps,
         ..Default::default()
       };
-      match client.logs_cargo(&name, &query).await {
+      match client.logs_cargo(&name, Some(&query)).await {
         Err(err) => {
           eprintln!("Cannot attach to cargo {name}: {err}");
         }
@@ -378,12 +378,10 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
         .ok_or(IoError::not_found("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
-      let url = Box::leak(url.into_boxed_str());
-      NanocldClient::connect_to(url, Some(version.into()))
+      NanocldClient::connect_to(&url, Some(version.into()))
     }
     api_version if meta.api_version.starts_with('v') => {
-      let url = Box::leak(host.to_owned().into_boxed_str());
-      NanocldClient::connect_to(url, Some(api_version))
+      NanocldClient::connect_to(host, Some(api_version))
     }
     _ => {
       let mut paths = meta
@@ -399,8 +397,7 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
       let url = format!("https://{url}");
-      let url = Box::leak(url.into_boxed_str());
-      NanocldClient::connect_to(url, Some(version.into()))
+      NanocldClient::connect_to(&url, Some(version.into()))
     }
   };
   Ok(client)

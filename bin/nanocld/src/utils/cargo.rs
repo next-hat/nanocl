@@ -784,7 +784,7 @@ pub async fn list(
     for node in &nodes {
       let client = node.to_http_client();
       let node_containers = match client
-        .list_cargo_instance(&cargo.name, Some(cargo.namespace_name.clone()))
+        .list_cargo_instance(&cargo.name, Some(&cargo.namespace_name))
         .await
       {
         Ok(containers) => containers,
@@ -857,7 +857,7 @@ pub async fn inspect_by_key(
   for node in &nodes {
     let client = node.to_http_client();
     let node_containers = match client
-      .list_cargo_instance(&cargo.name, Some(cargo.namespace_name.clone()))
+      .list_cargo_instance(&cargo.name, Some(&cargo.namespace_name))
       .await
     {
       Ok(containers) => containers,

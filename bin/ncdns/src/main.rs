@@ -11,6 +11,8 @@ mod version;
 mod dnsmasq;
 mod services;
 
+use nanocld_client::NanocldClient;
+
 use cli::Cli;
 use dnsmasq::Dnsmasq;
 
@@ -26,8 +28,15 @@ async fn run(cli: &Cli) -> IoResult<()> {
   // Spawn a new thread to listen events from nanocld
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
   let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns.clone()).ensure()?;
-  event::spawn(&dnsmasq);
-  let server = server::generate(&cli.host, &dnsmasq)?;
+  #[allow(unused)]
+  let mut client = NanocldClient::connect_with_unix_default();
+  #[cfg(any(feature = "dev", feature = "test"))]
+  {
+    client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+  }
+  event::spawn(&dnsmasq, &client);
+  let server = server::generate(&cli.host, &dnsmasq, &client)?;
   server.await?;
   Ok(())
 }
