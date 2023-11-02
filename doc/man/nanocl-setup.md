@@ -1,19 +1,27 @@
-# NAME
+NAME
+====
 
-nanocl
+nanocl - \#\# InstallOpts
 
-# SYNOPSIS
+SYNOPSIS
+========
 
 **nanocl** \[**\--docker-host**\] \[**\--docker-desktop**\]
 \[**\--state-dir**\] \[**\--conf-dir**\] \[**\--gateway**\]
 \[**\--advertise-addr**\] \[**\--deamon-hosts**\] \[**\--group**\]
 \[**\--hostname**\] \[**-t**\|**\--template**\] \[**-h**\|**\--help**\]
 
-# DESCRIPTION
+DESCRIPTION
+===========
 
-# OPTIONS
+\#\# InstallOpts
 
-**\--docker-host**=*DOCKER_HOST*
+\`nanocl install\` available options
+
+OPTIONS
+=======
+
+**\--docker-host**=*DOCKER\_HOST*
 
 :   The docker host to install nanocl default is
     unix:///var/run/docker.sock
@@ -23,12 +31,12 @@ nanocl
 :   Specify if the docker host is docker desktop detected if docker
     context is desktop-linux
 
-**\--state-dir**=*STATE_DIR*
+**\--state-dir**=*STATE\_DIR*
 
 :   The state directory to store the state of the nanocl daemon default
     is /var/lib/nanocl
 
-**\--conf-dir**=*CONF_DIR*
+**\--conf-dir**=*CONF\_DIR*
 
 :   The configuration directory to store the configuration of the nanocl
     daemon default is /etc/nanocl
@@ -37,11 +45,11 @@ nanocl
 
 :   The gateway address to use for the nanocl daemon default is detected
 
-**\--advertise-addr**=*ADVERTISE_ADDR*
+**\--advertise-addr**=*ADVERTISE\_ADDR*
 
 :   The hosts to use for the nanocl daemon default is detected
 
-**\--deamon-hosts**=*DEAMON_HOSTS*
+**\--deamon-hosts**=*DEAMON\_HOSTS*
 
 :   The hosts to use for the nanocl daemon default is detected
 
@@ -59,4 +67,4 @@ nanocl
 
 **-h**, **\--help**
 
-:   Print help
+:   Print help (see a summary with -h)

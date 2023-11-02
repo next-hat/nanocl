@@ -1,17 +1,25 @@
-# NAME
+NAME
+====
 
-nanocl
+nanocl - \#\# StateRemoveOpts
 
-# SYNOPSIS
+SYNOPSIS
+========
 
 **nanocl** \[**-s**\|**\--state-location**\] \[**-y**\|**\--yes**\]
 \[**-h**\|**\--help**\] \[*ARGS*\]
 
-# DESCRIPTION
+DESCRIPTION
+===========
 
-# OPTIONS
+\#\# StateRemoveOpts
 
-**-s**, **\--state-location**=*STATE_LOCATION*
+\`nanocl state rm\` available options
+
+OPTIONS
+=======
+
+**-s**, **\--state-location**=*STATE\_LOCATION*
 
 :   Path or Url to the Statefile
 
@@ -21,7 +29,7 @@ nanocl
 
 **-h**, **\--help**
 
-:   Print help
+:   Print help (see a summary with -h)
 
 \[*ARGS*\]
 
