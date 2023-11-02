@@ -60,8 +60,6 @@ mod tests {
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     let server = generate("unix:///tmp/ncdns.sock", &dnsmasq, &client)?;
     server.stop(true).await;
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     let server = generate("tcp://0.0.0.0:9987", &dnsmasq, &client)?;
     server.stop(true).await;
     Ok(())
