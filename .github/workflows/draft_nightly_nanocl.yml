@@ -63,6 +63,7 @@ jobs:
         run: |
           if [ "$PKG_ARCH" = "arm64" ]; then
             export RUSTFLAGS="-C target-feature=+crt-static"
+            export CC=aarch64-none-elf-gcc
           else
             export RUSTFLAGS="-C target-feature=+crt-static"
           fi
