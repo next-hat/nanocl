@@ -70,7 +70,7 @@ jobs:
           PKG_TARGET_ARCH: ${{ matrix.target_arch }}
         run: |
           if [ "$PKG_ARCH" = "arm64" ]; then
-            export RUSTFLAGS="-C target-feature=+crt-static"
+            export RUSTFLAGS="-C target-feature=+crt-static -C linker=gcc-aarch64-linux-gnu"
           else
             export RUSTFLAGS="-C target-feature=+crt-static"
           fi
