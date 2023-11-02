@@ -14,35 +14,48 @@ env:
 
 jobs:
   release_image:
+    strategy:
+      fail-fast: true
+      matrix:
+        target_arch: ["amd64:x86_64-unknown-linux-musl", "arm64:aarch64-unknown-linux-musl"]
+
     runs-on: ubuntu-latest
-    container: rust:1.72.0-alpine3.18
+    container: rust:1.73.0-alpine3.18
 
     steps:
-      # Install required dependencies
-      - name: Install dependencies
-        run: |
-          apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base dpkg pandoc github-cli
-          rustup target add x86_64-unknown-linux-musl
+      # Checkout the repository
       - uses: actions/checkout@v3
-      # Extract branch info
-      - name: Set info
+      # Fix git permission
+      - name: Fix git permission
         run: |
+          git config --global --add safe.directory /__w/nanocl/nanocl
+      # Set env vars
+      - name: Set env vars
+        run: |
+          echo "PKG_ARCH=$(echo ${pkg_target_arg} | awk -F: '{print $1}')" >> $GITHUB_ENV
+          echo "TARGET_ARCH=$(echo ${pkg_target_arg} | awk -F: '{print $2}')" >> $GITHUB_ENV
           echo "CHANNEL=$(echo ${GITHUB_REF} | awk -F/ '{print $4}')" >> $GITHUB_ENV
           echo "NANOCL_CHANNEL=$(echo ${GITHUB_REF} | awk -F/ '{print $4}')" >> $GITHUB_ENV
           echo "BINARY_NAME=$(echo ${GITHUB_REF} | awk -F/ '{print $6}')" >> $GITHUB_ENV
           echo "VERSION=$(echo ${GITHUB_REF} | awk -F/ '{print $7}')" >> $GITHUB_ENV
-      # Print info for debug
-      - name: Fix git permission
-        run: |
-          git config --global --add safe.directory /__w/nanocl/nanocl
-      - name: Print Info
+      # Debug env vars
+      - name: Debug env vars
         run: |
           echo $BRANCH_NAME
           echo $BINARY_NAME
           echo $CHANNEL
           echo $VERSION
-      # Package nanocl into a .deb
+          echo $PKG_ARCH
+          echo $TARGET_ARCH
+      # Install required dependencies
+      - name: Install dependencies
+        run: |
+          apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base dpkg pandoc github-cli
+          rustup target add $TARGET_ARCH
+      # Package nanocl
       - name: Package
+        env:
+          PKG_TARGET_ARCH: ${{ matrix.target_arch }}
         run: ./scripts/release_nanocl.sh
       - name: Test if release already exists
         id: release-exists
@@ -52,13 +65,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
       - name: Create new draft release
         if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
-        run: gh release create -d $BINARY_NAME-$VERSION-$CHANNEL -t $BINARY_NAME-$VERSION-$CHANNEL -F ./bin/$BINARY_NAME/changelog.md target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+        run: gh release create -d $BINARY_NAME-$VERSION-$CHANNEL -t $BINARY_NAME-$VERSION-$CHANNEL -F ./bin/$BINARY_NAME/changelog.md target/debian/${BINARY_NAME}_${VERSION}_${PKG_ARCH}.deb#nanocl_${PKG_ARCH}.deb target/linux/${BINARY_NAME}_${VERSION}_${PKG_ARCH}.tar.gz#nanocl_${PKG_ARCH}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
       - name: Update draft release
         if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
         run: |
-          gh release delete-asset -y $BINARY_NAME-$VERSION-$CHANNEL ${BINARY_NAME}_${VERSION}_amd64.deb || true
-          gh release upload $BINARY_NAME-$VERSION-$CHANNEL target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+          gh release delete-asset -y $BINARY_NAME-$VERSION-$CHANNEL ${BINARY_NAME}_${VERSION}_${PKG_ARCH}.deb ${BINARY_NAME}_${VERSION}_${PKG_ARCH}.tar.gz || true
+          gh release upload $BINARY_NAME-$VERSION-$CHANNEL target/debian/${BINARY_NAME}_${VERSION}_${PKG_ARCH}.deb#nanocl_${PKG_ARCH}.deb target/linux/${BINARY_NAME}_${VERSION}_${PKG_ARCH}.tar.gz#nanocl_${PKG_ARCH}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
