@@ -43,19 +43,16 @@ jobs:
           echo $VERSION
           echo $PKG_ARCH
           echo $TARGET_ARCH
-      # Install rust
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          components: llvm-tools-preview
       # Install required dependencies
       - name: Install dependencies
         run: |
           apt-get update -y
           dpkg --add-architecture $PKG_ARCH
           apt-get update -y
-          apt-get install -y pkg-config musl-dev:$PKG_ARCH libpq-dev:$PKG_ARCH libssl-dev:$PKG_ARCH musl-tools:$PKG_ARCH libc-dev:$PKG_ARCH make git dpkg pandoc curl gcc-aarch64-linux-gnu
+          apt-get install -y pkg-config musl-dev:$PKG_ARCH libpq-dev:$PKG_ARCH libssl-dev:$PKG_ARCH musl-tools:$PKG_ARCH libc-dev:$PKG_ARCH make git dpkg pandoc curl
+          if [ "$PKG_ARCH" = "arm64" ]; then
+            apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu:arm64
+          fi
           type -p curl >/dev/null || (apt-get update && apt-get install curl -y)
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
           chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
