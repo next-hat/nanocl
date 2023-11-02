@@ -28,8 +28,8 @@ jobs:
       # Set env vars
       - name: Set env vars
         run: |
-          echo "PKG_ARCH=$(echo ${pkg_target_arg} | awk -F: '{print $1}')" >> $GITHUB_ENV
-          echo "TARGET_ARCH=$(echo ${pkg_target_arg} | awk -F: '{print $2}')" >> $GITHUB_ENV
+          echo "PKG_ARCH=$(echo ${{ matrix.target_arch }} | awk -F: '{print $1}')" >> $GITHUB_ENV
+          echo "TARGET_ARCH=$(echo ${{ matrix.target_arch }} | awk -F: '{print $2}')" >> $GITHUB_ENV
           echo "CHANNEL=$(echo ${GITHUB_REF} | awk -F/ '{print $4}')" >> $GITHUB_ENV
           echo "NANOCL_CHANNEL=$(echo ${GITHUB_REF} | awk -F/ '{print $4}')" >> $GITHUB_ENV
           echo "BINARY_NAME=$(echo ${GITHUB_REF} | awk -F/ '{print $6}')" >> $GITHUB_ENV
