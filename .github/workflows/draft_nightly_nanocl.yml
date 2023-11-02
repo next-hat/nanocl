@@ -25,10 +25,6 @@ jobs:
     steps:
       # Checkout the repository
       - uses: actions/checkout@v3
-      # Fix git permission
-      - name: Fix git permission
-        run: |
-          git config --global --add safe.directory /__w/nanocl/nanocl
       # Set env vars
       - name: Set env vars
         run: |
@@ -52,6 +48,10 @@ jobs:
         run: |
           apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base dpkg pandoc github-cli
           rustup target add $TARGET_ARCH
+      # Fix git permission
+      - name: Fix git permission
+        run: |
+          git config --global --add safe.directory /__w/nanocl/nanocl
       # Package nanocl
       - name: Package
         env:
