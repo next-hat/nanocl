@@ -20,6 +20,7 @@ jobs:
         target_arch: ["amd64:x86_64-unknown-linux-musl", "arm64:aarch64-unknown-linux-musl"]
 
     runs-on: ubuntu-latest
+    container: rust:1.73.0
 
     steps:
       # Checkout the repository
