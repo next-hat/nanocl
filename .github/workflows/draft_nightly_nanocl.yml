@@ -64,6 +64,7 @@ jobs:
           if [ "$PKG_ARCH" = "arm64" ]; then
             export RUSTFLAGS="-C target-feature=+crt-static"
             export CC=aarch64-none-elf-gcc
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-none-elf-gcc
           else
             export RUSTFLAGS="-C target-feature=+crt-static"
           fi
