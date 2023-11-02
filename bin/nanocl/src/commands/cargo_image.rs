@@ -34,7 +34,7 @@ async fn exec_cargo_image_ls(
   client: &NanocldClient,
   opts: &CargoImageListOpts,
 ) -> IoResult<()> {
-  let items = client.list_cargo_image(Some(opts.clone().into())).await?;
+  let items = client.list_cargo_image(Some(&opts.clone().into())).await?;
   let rows = items
     .into_iter()
     .map(CargoImageRow::from)

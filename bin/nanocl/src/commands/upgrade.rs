@@ -69,7 +69,7 @@ pub async fn exec_upgrade(
     exec_cargo_image_pull(client, &image).await?;
     print!("Upgrading {}", cargo.name);
     let _ = client
-      .put_cargo(&cargo.name.clone(), &cargo, Some("system".to_owned()))
+      .put_cargo(&cargo.name.clone(), &cargo, Some("system"))
       .await;
     ntex::time::sleep(std::time::Duration::from_secs(2)).await;
     println!(" {} has been upgraded successfully!", cargo.name);

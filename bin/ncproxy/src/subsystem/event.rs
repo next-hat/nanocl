@@ -11,15 +11,13 @@ use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;
 use nanocld_client::stubs::resource::ResourcePartial;
 
-use crate::utils;
-use crate::version;
-use crate::nginx::Nginx;
+use crate::{utils, version, nginx};
 
 /// Update the nginx configuration when a cargo is started, patched
 async fn update_cargo_rule(
   name: &str,
   namespace: &str,
-  nginx: &Nginx,
+  nginx: &nginx::Nginx,
   client: &NanocldClient,
 ) -> IoResult<()> {
   let resources =
@@ -51,7 +49,7 @@ async fn update_cargo_rule(
 async fn delete_cargo_rule(
   name: &str,
   namespace: &str,
-  nginx: &Nginx,
+  nginx: &nginx::Nginx,
   client: &NanocldClient,
 ) -> IoResult<()> {
   let resources =
@@ -76,7 +74,7 @@ async fn delete_cargo_rule(
 /// Update the nginx configuration when a resource is created, patched
 async fn update_resource_rule(
   resource: &ResourcePartial,
-  nginx: &Nginx,
+  nginx: &nginx::Nginx,
   client: &NanocldClient,
 ) -> IoResult<()> {
   let proxy_rule = utils::serialize_proxy_rule(resource)?;
@@ -91,15 +89,15 @@ async fn update_resource_rule(
 }
 
 async fn on_event(
-  event: Event,
-  nginx: Nginx,
-  client: NanocldClient,
+  event: &Event,
+  nginx: &nginx::Nginx,
+  client: &NanocldClient,
 ) -> IoResult<()> {
   match event {
     Event::CargoStarted(ev) => {
       log::debug!("received cargo started event: {ev:#?}");
       if let Err(err) =
-        update_cargo_rule(&ev.name, &ev.namespace_name, &nginx, &client).await
+        update_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
       {
         log::warn!("{err}");
       }
@@ -107,7 +105,7 @@ async fn on_event(
     Event::CargoPatched(ev) => {
       log::debug!("received cargo patched event: {ev:#?}");
       if let Err(err) =
-        update_cargo_rule(&ev.name, &ev.namespace_name, &nginx, &client).await
+        update_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
       {
         log::warn!("{err}");
       }
@@ -115,7 +113,7 @@ async fn on_event(
     Event::CargoStopped(ev) => {
       log::debug!("received cargo stopped event: {ev:#?}");
       if let Err(err) =
-        delete_cargo_rule(&ev.name, &ev.namespace_name, &nginx, &client).await
+        delete_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
       {
         log::warn!("{err}");
       }
@@ -123,7 +121,7 @@ async fn on_event(
     Event::CargoDeleted(ev) => {
       log::debug!("received cargo deleted event: {ev:#?}");
       if let Err(err) =
-        delete_cargo_rule(&ev.name, &ev.namespace_name, &nginx, &client).await
+        delete_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
       {
         log::warn!("{err}");
       }
@@ -134,7 +132,7 @@ async fn on_event(
       }
       log::debug!("received resource created event: {ev:#?}");
       let resource: ResourcePartial = ev.as_ref().clone().into();
-      if let Err(err) = update_resource_rule(&resource, &nginx, &client).await {
+      if let Err(err) = update_resource_rule(&resource, nginx, client).await {
         log::warn!("{err}");
       }
     }
@@ -144,7 +142,7 @@ async fn on_event(
       }
       log::debug!("received resource patched event: {ev:#?}");
       let resource: ResourcePartial = ev.as_ref().clone().into();
-      if let Err(err) = update_resource_rule(&resource, &nginx, &client).await {
+      if let Err(err) = update_resource_rule(&resource, nginx, client).await {
         log::warn!("{err}");
       }
     }
@@ -154,26 +152,24 @@ async fn on_event(
       }
       log::debug!("received resource deleted event: {ev:#?}");
       nginx.delete_conf_file(&ev.name).await;
-      utils::reload_config(&client).await?;
+      utils::reload_config(client).await?;
     }
     Event::SecretPatched(secret) => {
       let resources =
-        utils::list_resource_by_secret(&secret.key, &client).await?;
+        utils::list_resource_by_secret(&secret.key, client).await?;
       for resource in resources {
         let resource: ResourcePartial = resource.into();
-        if let Err(err) = update_resource_rule(&resource, &nginx, &client).await
-        {
+        if let Err(err) = update_resource_rule(&resource, nginx, client).await {
           log::warn!("{err}");
         }
       }
     }
     Event::SecretCreated(secret) => {
       let resources =
-        utils::list_resource_by_secret(&secret.key, &client).await?;
+        utils::list_resource_by_secret(&secret.key, client).await?;
       for resource in resources {
         let resource: ResourcePartial = resource.into();
-        if let Err(err) = update_resource_rule(&resource, &nginx, &client).await
-        {
+        if let Err(err) = update_resource_rule(&resource, nginx, client).await {
           log::warn!("{err}");
         }
       }
@@ -231,7 +227,7 @@ async fn ensure_resource_config(client: &NanocldClient) {
   }
 }
 
-async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
+async fn r#loop(nginx: &nginx::Nginx, client: &NanocldClient) {
   loop {
     log::info!("Subscribing to nanocl daemon events..");
     match client.watch_events().await {
@@ -240,15 +236,12 @@ async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
       }
       Ok(mut stream) => {
         log::info!("Subscribed to nanocl daemon events");
-
         ensure_resource_config(client).await;
-
         while let Some(event) = stream.next().await {
           let Ok(event) = event else {
             break;
           };
-          if let Err(err) = on_event(event, nginx.clone(), client.clone()).await
-          {
+          if let Err(err) = on_event(&event, nginx, client).await {
             log::warn!("{err}");
           }
         }
@@ -260,18 +253,12 @@ async fn r#loop(client: &NanocldClient, nginx: &Nginx) {
 }
 
 /// Spawn new thread with event loop to watch for nanocld events
-pub(crate) fn spawn(nginx: &Nginx) {
+pub(crate) fn spawn(nginx: &nginx::Nginx, client: &NanocldClient) {
   let nginx = nginx.clone();
+  let client = client.clone();
   rt::Arbiter::new().exec_fn(move || {
-    #[allow(unused)]
-    let mut client = NanocldClient::connect_with_unix_default();
-    #[cfg(any(feature = "dev", feature = "test"))]
-    {
-      client =
-        NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-    }
     ntex::rt::spawn(async move {
-      r#loop(&client, &nginx).await;
+      r#loop(&nginx, &client).await;
     });
   });
 }

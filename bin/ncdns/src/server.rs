@@ -1,7 +1,8 @@
 use ntex::web;
 
-use nanocl_utils::ntex::middlewares;
 use nanocl_error::io::{IoResult, IoError};
+use nanocl_utils::ntex::middlewares;
+use nanocld_client::NanocldClient;
 
 use crate::services;
 use crate::dnsmasq::Dnsmasq;
@@ -9,16 +10,18 @@ use crate::dnsmasq::Dnsmasq;
 pub fn generate(
   host: &str,
   dnsmasq: &Dnsmasq,
+  client: &NanocldClient,
 ) -> IoResult<ntex::server::Server> {
   let dnsmasq = dnsmasq.clone();
+  let client = client.clone();
   let mut server = web::HttpServer::new(move || {
     web::App::new()
       .state(dnsmasq.clone())
+      .state(client.clone())
       .wrap(middlewares::SerializeError)
       .configure(services::ntex_config)
       .default_service(web::route().to(services::unhandled))
   });
-
   match host {
     host if host.starts_with("unix://") => {
       let path = host.trim_start_matches("unix://");
@@ -35,14 +38,12 @@ pub fn generate(
       ))
     }
   }
-
   #[cfg(feature = "dev")]
   {
     server = server.bind("0.0.0.0:8787")?;
     log::debug!("Running in dev mode, binding to: http://0.0.0.0:8787");
     log::debug!("OpenAPI explorer available at: http://0.0.0.0:8787/explorer/");
   }
-
   Ok(server.run())
 }
 
@@ -55,9 +56,13 @@ mod tests {
   #[ntex::test]
   async fn generate_unix_and_tcp() -> IoResult<()> {
     let dnsmasq = Dnsmasq::new("/tmp/ncdns");
-    let server = generate("unix:///tmp/ncdns.sock", &dnsmasq)?;
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let server = generate("unix:///tmp/ncdns.sock", &dnsmasq, &client)?;
     server.stop(true).await;
-    let server = generate("tcp://0.0.0.0:9987", &dnsmasq)?;
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let server = generate("tcp://0.0.0.0:9987", &dnsmasq, &client)?;
     server.stop(true).await;
     Ok(())
   }
@@ -65,7 +70,9 @@ mod tests {
   #[test]
   fn generate_wrong_host() -> IoResult<()> {
     let dnsmasq = Dnsmasq::new("/tmp/ncdns");
-    let server = generate("wrong://dsadsa", &dnsmasq);
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let server = generate("wrong://dsadsa", &dnsmasq, &client);
     assert!(server.is_err());
     Ok(())
   }

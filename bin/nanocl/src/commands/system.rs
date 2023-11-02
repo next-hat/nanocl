@@ -31,7 +31,7 @@ pub async fn exec_process(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let opts = args.clone().into();
-  let items = client.process(Some(opts)).await?;
+  let items = client.process(Some(&opts)).await?;
   let rows = items
     .into_iter()
     .map(ProcessRow::from)
@@ -62,7 +62,7 @@ pub async fn exec_http(
 ) -> IoResult<()> {
   match &opts.command {
     SystemHttpCommand::Logs(opts) => {
-      let logs = client.list_http_metric(Some(opts.clone().into())).await?;
+      let logs = client.list_http_metric(Some(&opts.clone().into())).await?;
       utils::print::print_yml(logs)?;
     }
   }
