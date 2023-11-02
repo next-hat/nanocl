@@ -75,7 +75,7 @@ pub enum Command {
   Install(InstallOpts),
   /// Uninstall nanocl components
   Uninstall(UninstallOpts),
-  /// Upgrade nanocl components
+  // TODO: Upgrade nanocl components
   Upgrade(UpgradeOpts),
   /// Show all processes managed by nanocl
   Ps(ProcessOpts),
