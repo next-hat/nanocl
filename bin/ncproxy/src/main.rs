@@ -21,14 +21,14 @@ async fn main() -> std::io::Result<()> {
     version::VERSION,
     version::COMMIT_ID
   );
-  let nginx = match subsystem::init(&cli).await {
+  let (nginx, client) = match subsystem::init(&cli).await {
     Err(err) => {
       log::error!("{err}");
       err.exit();
     }
     Ok(nginx) => nginx,
   };
-  let server = server::generate(&nginx)?;
+  let server = server::generate(&nginx, &client)?;
   server.await?;
   Ok(())
 }
