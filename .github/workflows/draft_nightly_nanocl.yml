@@ -68,7 +68,12 @@ jobs:
       - name: Package
         env:
           PKG_TARGET_ARCH: ${{ matrix.target_arch }}
-        run: ./scripts/release_nanocl.sh
+        run: |
+          if [ "$PKG_ARCH" = "arm64" ]; then
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc
+            export CC=aarch64-linux-gnu-gcc
+          fi
+          ./scripts/release_nanocl.sh
       - name: Test if release already exists
         id: release-exists
         continue-on-error: true
@@ -83,7 +88,8 @@ jobs:
       - name: Update draft release
         if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
         run: |
-          gh release delete-asset -y $BINARY_NAME-$VERSION-$CHANNEL ${BINARY_NAME}_${VERSION}_${PKG_ARCH}.deb ${BINARY_NAME}_${VERSION}_${PKG_ARCH}.tar.gz || true
+          gh release delete-asset -y $BINARY_NAME-$VERSION-$CHANNEL ${BINARY_NAME}_${VERSION}_${PKG_ARCH}.deb || true
+          gh release delete-asset -y $BINARY_NAME-$VERSION-$CHANNEL ${BINARY_NAME}_${VERSION}_${PKG_ARCH}.tar.gz || true
           gh release upload $BINARY_NAME-$VERSION-$CHANNEL target/debian/${BINARY_NAME}_${VERSION}_${PKG_ARCH}.deb#nanocl_${PKG_ARCH}.deb target/linux/${BINARY_NAME}_${VERSION}_${PKG_ARCH}.tar.gz#nanocl_${PKG_ARCH}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
