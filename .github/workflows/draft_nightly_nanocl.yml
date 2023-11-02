@@ -69,10 +69,10 @@ jobs:
         env:
           PKG_TARGET_ARCH: ${{ matrix.target_arch }}
         run: |
-          if [ "$PKG_ARCH" = "arm64" ]; then
-            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc
-            export CC=aarch64-linux-gnu-gcc
-          fi
+          # if [ "$PKG_ARCH" = "arm64" ]; then
+          #   export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc
+          #   export CC=aarch64-linux-gnu-gcc
+          # fi
           ./scripts/release_nanocl.sh
       - name: Test if release already exists
         id: release-exists
