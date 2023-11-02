@@ -47,7 +47,7 @@ pub async fn exec_vm_create(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let vm = options.clone().into();
-  let vm = client.create_vm(&vm, args.namespace.clone()).await?;
+  let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
   println!("{}", &vm.key);
   Ok(())
 }
@@ -75,7 +75,7 @@ pub async fn exec_vm_ls(
   opts: &VmListOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let items = client.list_vm(args.namespace.clone()).await?;
+  let items = client.list_vm(args.namespace.as_deref()).await?;
   let rows = items.into_iter().map(VmRow::from).collect::<Vec<VmRow>>();
   match opts.quiet {
     true => {
@@ -114,7 +114,7 @@ pub async fn exec_vm_rm(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in names {
-    client.delete_vm(name, args.namespace.clone()).await?;
+    client.delete_vm(name, args.namespace.as_deref()).await?;
   }
   Ok(())
 }
@@ -145,7 +145,7 @@ pub async fn exec_vm_inspect(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let vm = client
-    .inspect_vm(&opts.name, args.namespace.clone())
+    .inspect_vm(&opts.name, args.namespace.as_deref())
     .await?;
   let display = opts
     .display
@@ -179,7 +179,7 @@ pub async fn exec_vm_start(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in names {
-    if let Err(err) = client.start_vm(name, args.namespace.clone()).await {
+    if let Err(err) = client.start_vm(name, args.namespace.as_deref()).await {
       eprintln!("Failed to start vm {}: {}", name, err);
     }
   }
@@ -210,7 +210,7 @@ pub async fn exec_vm_stop(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in names {
-    if let Err(err) = client.stop_vm(name, args.namespace.clone()).await {
+    if let Err(err) = client.stop_vm(name, args.namespace.as_deref()).await {
       eprintln!("Failed to stop vm {}: {}", name, err);
     }
   }
@@ -242,8 +242,8 @@ pub async fn exec_vm_run(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let vm = options.clone().into();
-  let vm = client.create_vm(&vm, args.namespace.clone()).await?;
-  client.start_vm(&vm.name, args.namespace.clone()).await?;
+  let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
+  client.start_vm(&vm.name, args.namespace.as_deref()).await?;
   if options.attach {
     exec_vm_attach(cli_conf, args, &options.name).await?;
   }
@@ -275,7 +275,7 @@ pub async fn exec_vm_patch(
   let client = &cli_conf.client;
   let vm = options.clone().into();
   client
-    .patch_vm(&options.name, &vm, args.namespace.clone())
+    .patch_vm(&options.name, &vm, args.namespace.as_deref())
     .await?;
   Ok(())
 }
@@ -305,7 +305,7 @@ pub async fn exec_vm_attach(
   let client = &cli_conf.client;
   /// How often heartbeat pings are sent
   const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
-  let conn = client.attach_vm(name, args.namespace.clone()).await?;
+  let conn = client.attach_vm(name, args.namespace.as_deref()).await?;
   let (mut tx, mut rx) = mpsc::unbounded();
   // start heartbeat task
   let sink = conn.sink();

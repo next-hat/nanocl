@@ -4,13 +4,18 @@ use nanocl_stubs::namespace::{Namespace, NamespaceSummary, NamespaceInspect};
 use super::http_client::NanocldClient;
 
 impl NanocldClient {
-  /// ## List all namespaces
+  /// ## Default path for namespaces
+  const NAMESPACE_PATH: &str = "/namespaces";
+
+  /// ## List namespace
+  ///
+  /// List all namespaces from the system
   ///
   /// ## Returns
   ///
-  /// * [Result](Result)
-  ///   * [Ok](Ok) - A [Vec](Vec) of [namespaces](NamespaceSummary)
-  ///   * [Err](HttpClientError) - The namespaces could not be listed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok) - [Vector](Vec) of [namespace summary](NamespaceSummary) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -18,19 +23,19 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let namespaces = client.list_namespace().await;
+  /// let res = client.list_namespace().await;
   /// ```
   ///
   pub async fn list_namespace(
     &self,
   ) -> Result<Vec<NamespaceSummary>, HttpClientError> {
-    let res = self
-      .send_get(format!("/{}/namespaces", &self.version), None::<String>)
-      .await?;
+    let res = self.send_get(Self::NAMESPACE_PATH, None::<String>).await?;
     Self::res_json(res).await
   }
 
-  /// ## Create a new namespace
+  /// ## Create namespace
+  ///
+  /// Create a namespace by it's name
   ///
   /// ## Arguments
   ///
@@ -38,9 +43,9 @@ impl NanocldClient {
   ///
   /// ## Returns
   ///
-  /// * [Result](Result)
-  ///   * [Ok](Ok) - The created [namespace](Namespace)
-  ///   * [Err](HttpClientError) - The namespace could not be created
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok) - [Namespace](Namespace) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   pub async fn create_namespace(
     &self,
@@ -48,18 +53,14 @@ impl NanocldClient {
   ) -> Result<Namespace, HttpClientError> {
     let new_item = Namespace { name: name.into() };
     let res = self
-      .send_post(
-        format!("/{}/namespaces", &self.version),
-        Some(new_item),
-        None::<String>,
-      )
+      .send_post(Self::NAMESPACE_PATH, Some(new_item), None::<String>)
       .await?;
     Self::res_json(res).await
   }
 
-  /// ## Inspect a namespace
+  /// ## Inspect namespace
   ///
-  /// Inspect a namespace by it's name to get more information about it
+  /// Inspect a namespace by it's name to get detailed information about it.
   ///
   /// ## Arguments
   ///
@@ -68,8 +69,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The desired [namespace](NamespaceInspect)
-  ///   * [Err](HttpClientError) - The namespace could not be inspected
+  ///   * [Ok](Ok) - [Namespace inspect](NamespaceInspect) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -77,7 +78,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let namespace = client.inspect_namespace("my-namespace").await?;
+  /// let res = client.inspect_namespace("my-namespace").await;
   /// ```
   ///
   pub async fn inspect_namespace(
@@ -86,7 +87,7 @@ impl NanocldClient {
   ) -> Result<NamespaceInspect, HttpClientError> {
     let res = self
       .send_get(
-        format!("/{}/namespaces/{name}/inspect", &self.version),
+        &format!("{}/{name}/inspect", Self::NAMESPACE_PATH),
         None::<String>,
       )
       .await?;
@@ -104,8 +105,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The namespace was deleted
-  ///   * [Err](HttpClientError) - The namespace could not be deleted
+  ///   * [Ok](Ok) - The namespace was deleted if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -113,7 +114,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// client.delete_namespace("my-namespace").await?;
+  /// let res = client.delete_namespace("my-namespace").await;
   /// ```
   ///
   pub async fn delete_namespace(
@@ -121,10 +122,7 @@ impl NanocldClient {
     name: &str,
   ) -> Result<(), HttpClientError> {
     self
-      .send_delete(
-        format!("/{}/namespaces/{name}", &self.version),
-        None::<String>,
-      )
+      .send_delete(&format!("{}/{name}", Self::NAMESPACE_PATH), None::<String>)
       .await?;
     Ok(())
   }
@@ -137,7 +135,8 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const NAMESPACE: &str = "clientnt";
-    let client = NanocldClient::connect_to("http://localhost:8585", None);
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     client.list_namespace().await.unwrap();
     let namespace = client.create_namespace(NAMESPACE).await.unwrap();
     assert_eq!(namespace.name, NAMESPACE);

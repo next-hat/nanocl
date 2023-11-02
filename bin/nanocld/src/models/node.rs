@@ -31,9 +31,7 @@ impl NodeDbModel {
   /// * [client](NanocldClient) - The client for the node
   ///
   pub fn to_http_client(&self) -> NanocldClient {
-    let url =
-      Box::leak(format!("http://{}:8081", self.ip_address).into_boxed_str());
-
-    NanocldClient::connect_to(url, None)
+    let url = format!("http://{}:8081", self.ip_address);
+    NanocldClient::connect_to(&url, None)
   }
 }
