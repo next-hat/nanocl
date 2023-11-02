@@ -20,7 +20,7 @@ jobs:
         target_arch: ["amd64:x86_64-unknown-linux-musl", "arm64:aarch64-unknown-linux-musl"]
 
     runs-on: ubuntu-latest
-    container: rust:1.73.0-bullseye
+    container: rust:1.73.0-alpine3.18
 
     steps:
       # Checkout the repository
@@ -46,19 +46,11 @@ jobs:
       # Install required dependencies
       - name: Install dependencies
         run: |
-          apt-get update -y
-          dpkg --add-architecture $PKG_ARCH
-          apt-get update -y
-          apt-get install -y pkg-config musl-dev binutils libpq-dev libssl-dev musl-tools libc-dev make git dpkg pandoc curl
+          apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base dpkg pandoc github-cli
           if [ "$PKG_ARCH" = "arm64" ]; then
-            apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+            apk add --update gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+            # apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
           fi
-          type -p curl >/dev/null || (apt-get update && apt-get install curl -y)
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          apt-get update -y
-          apt-get install gh -y
           rustup target add $TARGET_ARCH
       # Fix git permission
       - name: Fix git permission
@@ -70,7 +62,7 @@ jobs:
           PKG_TARGET_ARCH: ${{ matrix.target_arch }}
         run: |
           if [ "$PKG_ARCH" = "arm64" ]; then
-            export RUSTFLAGS="-C target-feature=+crt-static -C linker=gcc-aarch64-linux-gnu"
+            export RUSTFLAGS="-C target-feature=+crt-static"
           else
             export RUSTFLAGS="-C target-feature=+crt-static"
           fi
