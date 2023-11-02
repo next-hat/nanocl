@@ -1,3 +1,0 @@
-[target.aarch64-unknown-linux-musl]
-linker = "gcc-aarch64-none-elf"
-rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-lgcc"]
