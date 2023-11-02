@@ -7,19 +7,22 @@ use nanocl_stubs::resource::{
 use super::http_client::NanocldClient;
 
 impl NanocldClient {
+  /// ## Default path for resources
+  const RESOURCE_PATH: &str = "/resources";
+
   /// ## List resources
   ///
-  /// List all existing resources
+  /// List existing resources in the system.
   ///
   /// ## Arguments
   ///
-  /// * [query](ResourceQuery) - Query to filter resources
+  /// * [query](Option) - The optional [query](ResourceQuery)
   ///
   /// ## Returns
   ///
   /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Vec<Resource>) - The resources
-  ///   * [Err](HttpClientError) - An error if the operation failed
+  ///   * [Ok](Ok) - [Vector](Vec) of [resource](Resource) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -27,32 +30,30 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let namespaces = client.list_resource().await;
+  /// let res = client.list_resource().await;
   /// ```
   ///
   pub async fn list_resource(
     &self,
-    query: Option<ResourceQuery>,
+    query: Option<&ResourceQuery>,
   ) -> Result<Vec<Resource>, HttpClientError> {
-    let res = self
-      .send_get(format!("/{}/resources", &self.version), query)
-      .await?;
+    let res = self.send_get(Self::RESOURCE_PATH, query).await?;
     Self::res_json(res).await
   }
 
   /// ## Create resource
   ///
-  /// Create a new resource
+  /// Create a new resource from a partial resource in the system.
   ///
   /// ## Arguments
   ///
-  /// * [data](ResourcePartial) - The data of the resource to create
+  /// * [data](ResourcePartial) - The partial
   ///
   /// ## Returns
   ///
   /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Resource) - The created resource
-  ///   * [Err](HttpClientError) - An error if the operation failed
+  ///   * [Ok](Ok) - [Resource] if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -61,7 +62,7 @@ impl NanocldClient {
   /// use nanocl_stubs::resource::ResourceKind;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let resource = client.create_resource(&ResourcePartial {
+  /// let res = client.create_resource(&ResourcePartial {
   ///   name: "my-resource".into(),
   ///   kind: String::from("Custom")s,
   ///   // Your config
@@ -74,11 +75,7 @@ impl NanocldClient {
     data: &ResourcePartial,
   ) -> Result<Resource, HttpClientError> {
     let res = self
-      .send_post(
-        format!("/{}/resources", &self.version),
-        Some(data),
-        None::<String>,
-      )
+      .send_post(Self::RESOURCE_PATH, Some(data), None::<String>)
       .await?;
     Self::res_json(res).await
   }
@@ -94,8 +91,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Resource) - The inspected resource
-  ///   * [Err](HttpClientError) - An error if the operation failed
+  ///   * [Ok](Ok) - [Resource](Resource) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -103,7 +100,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let resource = client.inspect_resource("my-resource").await;
+  /// let res = client.inspect_resource("my-resource").await;
   /// ```
   ///
   pub async fn inspect_resource(
@@ -111,10 +108,7 @@ impl NanocldClient {
     key: &str,
   ) -> Result<Resource, HttpClientError> {
     let res = self
-      .send_get(
-        format!("/{}/resources/{key}", &self.version),
-        None::<String>,
-      )
+      .send_get(&format!("{}/{key}", Self::RESOURCE_PATH), None::<String>)
       .await?;
     Self::res_json(res).await
   }
@@ -131,8 +125,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Resource) - The patched resource
-  ///   * [Err](HttpClientError) - An error if the operation failed
+  ///   * [Ok](Ok) - [Resource](Resource) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -140,7 +134,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let resource = client.patch_resource("my-resource", serde_json::json!({})).await;
+  /// let res = client.patch_resource("my-resource", serde_json::json!({})).await;
   /// ```
   ///
   pub async fn put_resource(
@@ -150,7 +144,7 @@ impl NanocldClient {
   ) -> Result<Resource, HttpClientError> {
     let res = self
       .send_patch(
-        format!("/{}/resources/{key}", &self.version),
+        &format!("{}/{key}", Self::RESOURCE_PATH),
         Some(config),
         None::<String>,
       )
@@ -169,8 +163,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok(())) - The operation succeeded
-  ///   * [Err](HttpClientError) - An error if the operation failed
+  ///   * [Ok](Ok) - If operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -178,7 +172,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let resource = client.delete_resource("my-resource").await;
+  /// let res = client.delete_resource("my-resource").await;
   /// ```
   ///
   pub async fn delete_resource(
@@ -186,27 +180,72 @@ impl NanocldClient {
     key: &str,
   ) -> Result<(), HttpClientError> {
     self
-      .send_delete(
-        format!("/{}/resources/{key}", &self.version),
-        None::<String>,
-      )
+      .send_delete(&format!("{}/{key}", Self::RESOURCE_PATH), None::<String>)
       .await?;
     Ok(())
   }
 
+  /// ## List history resource
+  ///
+  /// List history of an existing resource
+  ///
+  /// ## Arguments
+  ///
+  /// * [key](str) - The key of the resource to list history
+  ///
+  /// ## Returns
+  ///
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok) - [Vector](Vec) of [ResourceConfig](ResourceConfig) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let res = client.list_history_resource("my-resource").await;
+  /// ```
+  ///
   pub async fn list_history_resource(
     &self,
     key: &str,
   ) -> Result<Vec<ResourceConfig>, HttpClientError> {
     let res = self
       .send_get(
-        format!("/{}/resources/{key}/histories", &self.version),
+        &format!("{}/{key}/histories", Self::RESOURCE_PATH),
         None::<String>,
       )
       .await?;
     Self::res_json(res).await
   }
 
+  /// ## Revert resource
+  ///
+  /// Revert a resource to a previous version
+  ///
+  /// ## Arguments
+  ///
+  /// * [name](str) - The name of the resource to revert
+  /// * [key](str) - The key of the resource to revert
+  ///
+  /// ## Returns
+  ///
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok) - [Resource](Resource) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let history = client.list_history_resource("my-resource").await.unwrap().first().unwrap();
+  /// let res = client.revert_resource("my-resource", history.key).await;
+  /// ```
+  ///
   pub async fn revert_resource(
     &self,
     name: &str,
@@ -214,7 +253,7 @@ impl NanocldClient {
   ) -> Result<Resource, HttpClientError> {
     let res = self
       .send_patch(
-        format!("/{}/resources/{name}/histories/{key}/revert", &self.version),
+        &format!("{}/{name}/histories/{key}/revert", Self::RESOURCE_PATH),
         None::<String>,
         None::<String>,
       )
@@ -231,7 +270,8 @@ mod tests {
 
   #[ntex::test]
   async fn basic() {
-    let client = NanocldClient::connect_to("http://localhost:8585", None);
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     // list
     client.list_resource(None).await.unwrap();
     let config = serde_json::json!({
