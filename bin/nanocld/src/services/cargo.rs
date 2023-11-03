@@ -136,6 +136,162 @@ pub(crate) async fn delete_cargo(
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("service::delete_cargo: {key}");
   utils::cargo::delete_by_key(&key, qs.force, &state).await?;
+<<<<<<< HEAD
+||||||| parent of 03afd9ff (p)
+  rt::spawn(async move {
+    let _ = state
+      .event_emitter
+      .emit(Event::CargoDeleted(Box::new(cargo)))
+      .await;
+  });
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Start a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/start",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 202, description = "Cargo started"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
+#[web::post("/cargoes/{name}/start")]
+pub(crate) async fn start_cargo(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  utils::cargo::start_by_key(&key, &state).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
+    let _ = state
+      .event_emitter
+      .emit(Event::CargoStarted(Box::new(cargo)))
+      .await;
+  });
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Stop a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/stop",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 202, description = "Cargo stopped"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
+#[web::post("/cargoes/{name}/stop")]
+pub(crate) async fn stop_cargo(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  utils::cargo::inspect_by_key(&key, &state).await?;
+  utils::cargo::stop_by_key(&key, &state.docker_api).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
+    let _ = state
+      .event_emitter
+      .emit(Event::CargoStopped(Box::new(cargo)))
+      .await;
+  });
+=======
+  rt::spawn(async move {
+    let _ = state
+      .event_emitter
+      .emit(Event::CargoDeleted(Box::new(cargo)))
+      .await;
+  });
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Start a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/start",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 202, description = "Cargo started"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
+#[web::post("/cargoes/{name}/start")]
+pub(crate) async fn start_cargo(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  print!("START CARGO {key}");
+  print!("START CARGO {key}");
+  print!("START CARGO {key}");
+  print!("START CARGO {key}");
+  print!("START CARGO {key}");
+  print!("START CARGO {key}");
+  utils::cargo::start_by_key(&key, &state).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
+    let _ = state
+      .event_emitter
+      .emit(Event::CargoStarted(Box::new(cargo)))
+      .await;
+  });
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Stop a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Cargoes",
+  path = "/cargoes/{Name}/stop",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+  ),
+  responses(
+    (status = 202, description = "Cargo stopped"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
+#[web::post("/cargoes/{name}/stop")]
+pub(crate) async fn stop_cargo(
+  web::types::Query(qs): web::types::Query<GenericNspQuery>,
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let namespace = utils::key::resolve_nsp(&qs.namespace);
+  let key = utils::key::gen_key(&namespace, &path.1);
+  utils::cargo::inspect_by_key(&key, &state).await?;
+  utils::cargo::stop_by_key(&key, &state.docker_api).await?;
+  rt::spawn(async move {
+    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
+    let _ = state
+      .event_emitter
+      .emit(Event::CargoStopped(Box::new(cargo)))
+      .await;
+  });
+>>>>>>> 03afd9ff (p)
   Ok(web::HttpResponse::Accepted().finish())
 }
 

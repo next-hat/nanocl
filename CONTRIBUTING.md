@@ -175,6 +175,8 @@ Now you can run the CLI:
 To run tests, make sure all `Nanocl` services are running with `docker compose up`.<br/>
 You also need theses entries in your `/etc/hosts`
 
+To avoid `http://ndaemon.nanocl.internal:8585: Failed resolving hostname: failed to lookup address information: Name or service not known` error
+
 ```
 127.0.0.1 store.nanocl.internal
 127.0.0.1 nanocl.internal

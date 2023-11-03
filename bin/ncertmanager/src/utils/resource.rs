@@ -1,19 +1,19 @@
 use nanocl_error::io::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::cargo_config::CargoConfigPartial;
 use nanocld_client::stubs::proxy::{ResourceProxyRule, ProxyRule, ProxySsl};
 
 use nanocld_client::stubs::resource::Resource;
 
 use crate::manager::NCertManager;
-use crate::utils::proxy_rule::update_proxy_rule_cert;
-use crate::utils::cargo_config::get_cargo_config;
+
+use super::secret::{SecretMetadata, generate_certs};
 
 async fn handle_proxy_rule_update(
   proxy_rule: ProxyRule,
   client: &NanocldClient,
-  cargo_config: CargoConfigPartial,
+  cert_dir: String,
   state_dir: String,
+  issuer_key: &String,
 ) -> IoResult<()> {
   let ssl = match &proxy_rule {
     ProxyRule::Http(proxy_rule) => proxy_rule.ssl.to_owned(),
@@ -27,45 +27,43 @@ async fn handle_proxy_rule_update(
       return Ok(());
     }
 
-    let domain_option = if let ProxyRule::Http(proxy_rule) = proxy_rule {
+    let domain = if let ProxyRule::Http(proxy_rule) = proxy_rule {
       proxy_rule.domain.to_owned()
     } else {
       None
     };
 
-    let domain = domain_option.to_owned().unwrap_or("self_signed".to_owned());
+    let metadata = SecretMetadata {
+      cert_manager_issuer: issuer_key.to_string(),
+      cert_manager_domain: domain.unwrap_or("localhost".to_string()),
+    };
 
-    update_proxy_rule_cert(&client, cargo_config, state_dir, secret_key, domain)
-      .await?
+    generate_certs(client, state_dir, cert_dir, secret_key, metadata).await?
   }
   Ok(())
 }
 
-pub async fn update_resource_certs(
-  client: &NanocldClient,
+pub async fn update_resource_certs<'a>(
+  manager: &NCertManager<'a>,
   resource: Resource,
-  issuer_key: String,
+  issuer_key: &String,
 ) -> IoResult<()> {
   let proxy_rules =
     serde_json::from_value::<ResourceProxyRule>(resource.data.to_owned())
       .map_err(|err| err.map_err_context(|| "ProxyRule data"))?;
 
-  let cargo_config = get_cargo_config(client, issuer_key).await?;
-
-  //TODO dont fetch everytime
-  let infos = client
-    .info()
-    .await
-    .map_err(|err| err.map_err_context(|| "Infos"))?;
-
   for proxy_rule in proxy_rules.rules.into_iter() {
-    handle_proxy_rule_update(
+    if let Err(err) = handle_proxy_rule_update(
       proxy_rule,
-      client,
-      cargo_config.to_owned(),
-      infos.config.state_dir.to_owned(),
+      manager.client,
+      manager.cert_dir.to_owned(),
+      manager.state_dir.to_owned(),
+      issuer_key,
     )
-    .await?
+    .await
+    {
+      log::error!("Can't update resource {}: {}", resource.name, err)
+    }
   }
 
   Ok(())

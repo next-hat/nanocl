@@ -1,233 +1,103 @@
-use nanocl_error::http_client::HttpClientError;
-use nanocld_client::stubs::proxy::ProxySslConfig;
-use nanocld_client::stubs::secret::{Secret, SecretQuery};
-use ntex::{http, rt, channel};
-use futures::{StreamExt, FutureExt, stream, select};
-use ntex_util::future::{Either};
-use openssl::asn1::Asn1Time;
-use serde::{Serialize, Deserialize};
-
-use nanocl_utils::versioning;
-use nanocl_error::io::{IoResult, FromIo};
-
+use nanocl_error::http::HttpError;
+use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;
-use nanocld_client::stubs::resource::{ResourcePartial, Resource, ResourceQuery};
+use ntex::{rt, channel};
+use futures::{StreamExt, select};
+
+use nanocl_error::io::IoResult;
+use ntex_util::channel::mpsc::{Receiver, Sender};
 
 use crate::manager::NCertManager;
-use crate::utils::resource::update_resource_certs;
-use crate::utils::secret::{SecretMetadata, get_expiry_time};
-use crate::version;
+use crate::utils::event::handle_event;
+use crate::utils::init::init_cert_manager;
 
-const CHECK_RENEW_DELAY: u64 = 2;
-// const CHECK_RENEW_DELAY: u64 = 60 * 60 * 24;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct ProxyRuleCertManagerMetadata {
-  pub cert_manager_issuer: String,
+fn get_renew_handle(
+  sx: Sender<bool>,
+  renew_interval: u64,
+) -> ntex::rt::JoinHandle<()> {
+  rt::spawn(async move {
+    loop {
+      ntex::time::sleep(std::time::Duration::from_secs(renew_interval)).await;
+      if let Err(err) = sx.send(true) {
+        log::warn!("Sx error {err}");
+        sx.close();
+        break;
+      }
+    }
+  })
 }
 
-pub async fn handle_resource_update(
-  manager: &NCertManager,
-  resource: Resource,
+pub async fn event_loop<'a>(
+  manager: &mut NCertManager<'a>,
+  renew_interval: u64,
+  stream: &mut Receiver<Result<Event, HttpError>>,
+) {
+  let (sx, mut rx) = channel::mpsc::channel::<bool>();
+
+  let renew_handle = get_renew_handle(sx, renew_interval);
+
+  loop {
+    select! {
+      event = stream.next() => {
+        if handle_event(manager, event).await {
+            break;
+          }
+      }
+      option = rx.next() => {
+        match option {
+          Some(_) => {
+            log::info!("Renew");
+            manager.renew_secrets().await;
+            manager.debug();
+          }
+          None => {
+            log::error!("Renew stream end");
+            break;
+          }
+        }
+      }
+      complete => {
+        log::error!("Streams end");
+        break
+      },
+      default => {
+        if stream.is_closed() {
+          log::error!("Event stream closed");
+          renew_handle.abort();
+          break;
+        }
+        if rx.is_closed() {
+          stream.close();
+          log::error!("Renew stream closed");
+          break;
+        }
+        ntex::time::sleep(std::time::Duration::from_millis(100)).await;
+      }
+
+    }
+  }
+}
+
+pub async fn init_loop(
+  client: &NanocldClient,
+  cert_dir: String,
+  renew_interval: u64,
 ) -> IoResult<()> {
-  if resource.kind.as_str() != "ProxyRule" {
-    return Ok(());
-  }
-
-  match &resource.metadata {
-    Some(metadata) => {
-      let metadata = serde_json::from_value::<ProxyRuleCertManagerMetadata>(
-        metadata.clone(),
-      )
-      .map_err(|err| err.map_err_context(|| "ProxyRule metadata parsing"))?;
-
-      let issuer_key = metadata.cert_manager_issuer;
-
-      log::info!("Resource handling {resource:#?}");
-
-      update_resource_certs(&manager.client, resource, issuer_key).await
-    }
-    None => Ok(()),
-  }
-}
-
-pub async fn handle_secret_update(
-  manager: &mut NCertManager,
-  secret: Secret,
-) -> IoResult<()> {
-  if secret.kind.as_str() != "Tls" {
-    return Ok(());
-  }
-  match &secret.metadata {
-    Some(metadata) => {
-      serde_json::from_value::<SecretMetadata>(metadata.clone())
-        .map_err(|err| err.map_err_context(|| "ProxyRule metadata parsing"))?;
-
-      let expiry = get_expiry_time(&secret)?;
-
-      if NCertManager::is_renew_date_past(&expiry).unwrap() {
-        log::warn!("Expiration date to soon");
-      }
-
-      manager.add_secret(secret.key, expiry);
-      log::info!("cert added to tasks");
-
-      manager.debug();
-
-      Ok(())
-    }
-    None => Ok(()),
-  }
-}
-
-async fn on_event(event: Event, manager: &mut NCertManager) -> IoResult<()> {
-  match event {
-    Event::ResourceCreated(ev) => handle_resource_update(manager, *ev).await,
-    Event::ResourcePatched(ev) => handle_resource_update(manager, *ev).await,
-    Event::SecretCreated(ev) => handle_secret_update(manager, *ev).await,
-    Event::SecretPatched(ev) => handle_secret_update(manager, *ev).await,
-    _ => Ok(()),
-  }
-}
-
-fn display_resource_kind_error(err: HttpClientError) -> IoResult<()> {
-  match err {
-    HttpClientError::HttpError(err)
-      if err.status == http::StatusCode::CONFLICT =>
-    {
-      log::info!("CertManagerIssuer already exists. Skipping.");
-      Ok(())
-    }
-    _ => {
-      log::warn!("Unable to update CertManagerIssuer: {err}");
-      Err(err.map_err_context(|| "Resource kind creation").into())
-    }
-  }
-}
-
-async fn create_resource_kind(manager: &NCertManager) -> IoResult<()> {
-  let cargo_config_schema_bytes = include_bytes!("../cargo_config.json");
-
-  let formated_version = versioning::format_version(version::VERSION);
-
-  let data =
-    serde_json::from_slice::<serde_json::Value>(cargo_config_schema_bytes)
-      .map_err(|err| err.map_err_context(|| "Infos"))?;
-
-  let proxy_rule_kind = ResourcePartial {
-    kind: "Kind".to_owned(),
-    name: "CertManagerIssuer".to_owned(),
-    data,
-    version: format!("v{formated_version}"),
-    metadata: None,
-  };
-
-  match manager.client.inspect_resource(&proxy_rule_kind.name).await {
-    Ok(_) => {
-      if let Err(err) = manager
-        .client
-        .put_resource(&proxy_rule_kind.name.clone(), &proxy_rule_kind.into())
-        .await
-      {
-        display_resource_kind_error(err)?
-      }
-    }
-    Err(_) => {
-      if let Err(err) = manager.client.create_resource(&proxy_rule_kind).await {
-        display_resource_kind_error(err)?
-      }
-    }
-  }
-
-  Ok(())
-}
-
-async fn handle_current_resources(manager: &NCertManager) -> IoResult<()> {
-  let managed_resources = manager
-    .client
-    .list_resource(Some(ResourceQuery {
-      meta_exists: Some("cert_manager_issuer".to_owned()),
-      ..Default::default()
-    }))
-    .await?
-    .into_iter();
-
-  for resource in managed_resources {
-    handle_resource_update(manager, resource).await?
-  }
-
-  Ok(())
-}
-
-async fn handle_current_secrets(manager: &NCertManager) -> IoResult<()> {
-  let managed_resources = manager
-    .client
-    .list_secret(Some(SecretQuery {
-      meta_exists: Some("cert_manager_issuer".to_owned()),
-      ..Default::default()
-    }))
-    .await?
-    .into_iter();
-
-  for resource in managed_resources {
-    handle_resource_update(manager, resource).await?
-  }
-
-  Ok(())
-}
-
-async fn ensure_resource_config(manager: &NCertManager) -> IoResult<()> {
-  create_resource_kind(manager).await?;
-  handle_current_resources(manager).await?;
-  handle_current_secrets(manager).await?;
-  Ok(())
-}
-
-async fn get_renew_timer() {
-  ntex::time::sleep(std::time::Duration::from_secs(CHECK_RENEW_DELAY)).await;
-}
-
-pub async fn event_loop(manager: &mut NCertManager) -> IoResult<()> {
   loop {
     log::info!("Subscribing to nanocl daemon events..");
 
-    match manager.client.watch_events().await {
+    match client.watch_events().await {
       Err(err) => {
         log::warn!("Unable to Subscribe to nanocl daemon events: {err}");
       }
-      Ok(stream) => {
+      Ok(mut stream) => {
         log::info!("Subscribed to nanocl daemon events");
-
-        let (sx, rx) = channel::mpsc::channel::<Option<bool>>();
-
-        rt::spawn(async move {
-          loop {
-            get_renew_timer().await;
-            if let Err(err) = sx.send(Some(true)) {
-              log::warn!("Sx error {err}");
-            }
+        match init_cert_manager(client, cert_dir.to_owned()).await {
+          Ok(mut manager) => {
+            event_loop(&mut manager, renew_interval, &mut stream).await;
           }
-        });
-
-        ensure_resource_config(manager).await?;
-
-        let mut selected_streams = futures::stream::select(
-          stream.map(Either::Left),
-          rx.map(Either::Right),
-        );
-
-        while let Some(res) = selected_streams.next().await {
-          match res {
-            Either::Right(_) => {
-              log::info!("Renew");
-            }
-            Either::Left(Ok(event)) => {
-              if let Err(err) = on_event(event, manager).await {
-                log::warn!("{err}");
-              }
-            }
-            Either::Left(Err(_)) => break,
+          Err(err) => {
+            log::error!("Can't init CertManager: {err}");
           }
         }
       }

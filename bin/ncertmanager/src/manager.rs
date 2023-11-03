@@ -6,16 +6,26 @@ use nanocl_error::io::{IoResult, FromIo};
 
 use nanocld_client::NanocldClient;
 
+use crate::utils::secret::update_secret_cert;
+
 const RENEW_BEFORE_EXPIRY_DURATION: u64 = 60 * 60 * 24 * 2;
 
-pub struct NCertManager {
+pub struct NCertManager<'a> {
   secrets_map: HashMap<String, u64>,
-  pub client: NanocldClient,
+  pub state_dir: String,
+  pub cert_dir: String,
+  pub client: &'a NanocldClient,
 }
 
-impl NCertManager {
-  pub fn new(client: NanocldClient) -> NCertManager {
+impl<'a> NCertManager<'a> {
+  pub fn new(
+    client: &'a NanocldClient,
+    state_dir: String,
+    cert_dir: String,
+  ) -> NCertManager<'a> {
     NCertManager {
+      cert_dir,
+      state_dir,
       client,
       secrets_map: HashMap::new(),
     }
@@ -32,12 +42,6 @@ impl NCertManager {
     )
   }
 
-  pub fn should_renew(&self, key: &String) -> IoResult<bool> {
-    let expiry = self.secrets_map.get(key).unwrap_or(&0);
-
-    NCertManager::is_renew_date_past(expiry)
-  }
-
   pub fn add_secret(&mut self, key: String, expiry: u64) {
     self.secrets_map.insert(key, expiry);
   }
@@ -46,16 +50,40 @@ impl NCertManager {
     self.secrets_map.remove(key);
   }
 
-  pub fn get_renewable_secrets(&self) -> Vec<String> {
+  fn get_renewable_secrets(&self) -> Vec<String> {
     let mut renewables_secrets = Vec::new();
 
     for (key, expiry) in &self.secrets_map {
-      if NCertManager::is_renew_date_past(expiry).unwrap() {
-        renewables_secrets.push(key.to_owned());
+      match NCertManager::is_renew_date_past(expiry) {
+        Err(err) => {
+          log::error!("Can't compute expiry date: {err}");
+        }
+        Ok(should_renew) => {
+          if should_renew {
+            renewables_secrets.push(key.to_owned());
+          }
+        }
       }
     }
 
     renewables_secrets
+  }
+
+  pub async fn renew_secrets(&self) {
+    let secrets = self.get_renewable_secrets();
+
+    for secret_key in secrets {
+      if let Err(err) = update_secret_cert(
+        self.client,
+        secret_key.to_owned(),
+        self.cert_dir.to_owned(),
+        self.state_dir.to_owned(),
+      )
+      .await
+      {
+        log::error!("Can't update secret {}: {}", secret_key, err);
+      };
+    }
   }
 
   pub fn debug(&self) {

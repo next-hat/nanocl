@@ -4,11 +4,19 @@ ApiVersion: v0.10
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
+  - Name: mock-certs-issuer
+    Kind: CertManagerIssuer
+    Version: v0.1
+    Data:
+      Generate:
+        Name: mock-certs
+        Container:
+          Image: mock-certs-issuer:latest
   - Name: deploy-example.com
     Kind: ProxyRule
     Version: v0.7
     Metadata:
-      CertManagerIssuer: letsencrypt-issuer
+      CertManagerIssuer: mock-certs-issuer
     Data:
       Rules:
         - Domain: deploy-example.com
@@ -19,12 +27,9 @@ Resources:
               Target:
                 Key: deploy-example.global.c
                 Port: 9000
-
-# See all options:
-# https://docs.next-hat.com/references/nanocl/cargo
-# Cargoes:
-#   - Name: deploy-example
-#     Container:
-#       Image: nexthat/nanocl-get-started:latest
-#       Env:
-#         - APP=GET_STARTED
+Cargoes:
+  - Name: deploy-example
+    Container:
+      Image: nexthat/nanocl-get-started:latest
+      Env:
+        - APP=GET_STARTED

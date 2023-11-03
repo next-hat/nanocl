@@ -9,8 +9,8 @@ pub(crate) fn transform_stream<I, T>(
   stream: impl StreamExt<Item = Result<I, impl std::error::Error>>,
 ) -> impl StreamExt<Item = HttpResult<Bytes>>
 where
-  I: Into<T>,
-  T: Serialize + From<I>,
+  I: Into<T> + std::fmt::Debug,
+  T: Serialize + From<I> + std::fmt::Debug,
 {
   stream.map(|item| {
     let item = item.map_err(|err| {

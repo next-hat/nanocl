@@ -222,6 +222,18 @@ impl FromIo<Box<IoError>> for std::string::FromUtf8Error {
   }
 }
 
+impl FromIo<Box<IoError>> for std::num::ParseIntError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
+    })
+  }
+}
+
 impl FromIo<Box<IoError>> for std::time::SystemTimeError {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
   where
@@ -265,6 +277,16 @@ impl FromIo<Box<IoError>> for serde_json::Error {
       context: Some((context)().to_string()),
       inner: std::io::Error::new(std::io::ErrorKind::InvalidData, self),
     })
+  }
+}
+
+#[cfg(feature = "serde_json")]
+impl From<ntex::web::error::JsonError> for IoError {
+  fn from(value: ntex::web::error::JsonError) -> Self {
+    IoError {
+      context: Some("".to_string()),
+      inner: std::io::Error::new(std::io::ErrorKind::Other, value.to_string()),
+    }
   }
 }
 
@@ -480,5 +502,21 @@ impl From<tokio::task::JoinError> for IoError {
       context: None,
       inner: f.into(),
     }
+  }
+}
+
+#[cfg(feature = "openssl")]
+impl FromIo<Box<IoError>> for openssl::error::ErrorStack {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("{self}"),
+      ),
+    })
   }
 }

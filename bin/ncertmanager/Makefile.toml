@@ -16,10 +16,21 @@ args = ["clean"]
 command = "cargo"
 args = ["run", "${@}"]
 
+# Build basic test image
+[tasks.build-basic]
+command = "docker"
+args = ["build", "-t", "mock-certs-issuer:latest", "./tests/basic/"]
+
+# Build openssl test image
+[tasks.build-openssl]
+command = "docker"
+args = ["build", "-t", "openssl-issuer:latest", "./tests/openssl/"]
+
 # Test all
 [tasks.test]
 command = "cargo"
 args = ["nextest", "run", "-j", "1"]
+dependencies = ["build-basic", "build-openssl"]
 
 # Test all with debug output
 [tasks.test-debug]

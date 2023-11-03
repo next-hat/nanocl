@@ -54,7 +54,7 @@ impl NanocldClient {
   ) -> HttpClientResult<Secret> {
     let res = self
       .send_patch(
-        format!("/{}/secrets/{}", &self.version, key).as_str(),
+        &format!("/{}/{}/{}", &self.version, Self::SECRET_PATH, key),
         Some(item),
         None::<String>,
       )

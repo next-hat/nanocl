@@ -71,7 +71,7 @@ pub fn resolve_ref(
         panic!("Schema {schema_key} doesn't exists")
       }
       let component_schema = component_schema.unwrap().1;
-      if (currently_parsed_refs.contains(&schema_key.to_owned())) {
+      if currently_parsed_refs.contains(&schema_key.to_owned()) {
         panic!("Circular schema reference");
       }
       currently_parsed_refs.push(schema_key.to_owned());

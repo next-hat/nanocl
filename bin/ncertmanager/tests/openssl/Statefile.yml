@@ -1,0 +1,38 @@
+Kind: Deployment
+ApiVersion: v0.10
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
+Resources:
+  - Name: openssl-issuer
+    Kind: CertManagerIssuer
+    Version: v0.1
+    Data:
+      Generate:
+        Name: openssl
+        Container:
+          Image: openssl-issuer:latest
+  - Name: deploy-example-2.com
+    Kind: ProxyRule
+    Version: v0.7
+    Metadata:
+      CertManagerIssuer: openssl-issuer
+    Data:
+      Rules:
+        - Domain: deploy-example-2.com
+          Network: All
+          Ssl: deploy-example-2.com@cert-manager
+          Locations:
+            - Path: /
+              Target:
+                Key: deploy-example-2.global.c
+                Port: 9000
+Cargoes:
+  - Name: deploy-example-2
+    Container:
+      Image: alpine:latest
+      Cmd:
+        - sleep
+        - infinity
+      Env:
+        - APP=GET_STARTED
