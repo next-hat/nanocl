@@ -1,16 +1,24 @@
-# NAME
+NAME
+====
 
-nanocl
+nanocl - \#\# CargoRunOpts
 
-# SYNOPSIS
+SYNOPSIS
+========
 
 **nanocl** \[**-v**\|**\--volume**\] \[**-e**\|**\--env**\]
 \[**\--rm**\] \[**-h**\|**\--help**\] \<*NAME*\> \<*IMAGE*\>
 \[*COMMAND*\]
 
-# DESCRIPTION
+DESCRIPTION
+===========
 
-# OPTIONS
+\#\# CargoRunOpts
+
+\`nanocl cargo run\` available options
+
+OPTIONS
+=======
 
 **-v**, **\--volume**=*VOLUMES*
 
@@ -24,9 +32,13 @@ nanocl
 
 :   
 
+```{=html}
+<!-- -->
+```
+
 **-h**, **\--help**
 
-:   Print help
+:   Print help (see a summary with -h)
 
 \<*NAME*\>
 
