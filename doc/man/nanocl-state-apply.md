@@ -1,18 +1,26 @@
-# NAME
+NAME
+====
 
-nanocl
+nanocl - \#\# StateApplyOpts
 
-# SYNOPSIS
+SYNOPSIS
+========
 
 **nanocl** \[**-s**\|**\--state-location**\]
 \[**-p**\|**\--force-pull**\] \[**-f**\|**\--follow**\]
 \[**-y**\|**\--yes**\] \[**-h**\|**\--help**\] \[*ARGS*\]
 
-# DESCRIPTION
+DESCRIPTION
+===========
 
-# OPTIONS
+\#\# StateApplyOpts
 
-**-s**, **\--state-location**=*STATE_LOCATION*
+\`nanocl state apply\` available options
+
+OPTIONS
+=======
+
+**-s**, **\--state-location**=*STATE\_LOCATION*
 
 :   Path or Url to the Statefile
 
@@ -30,7 +38,7 @@ nanocl
 
 **-h**, **\--help**
 
-:   Print help
+:   Print help (see a summary with -h)
 
 \[*ARGS*\]
 

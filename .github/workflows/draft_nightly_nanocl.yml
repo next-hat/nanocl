@@ -43,7 +43,9 @@ jobs:
           echo $VERSION
       # Package nanocl into a .deb
       - name: Package
-        run: ./scripts/release_nanocl.sh
+        run: |
+          export RUSTFLAGS="-C target-feature=+crt-static"
+          ./scripts/release_nanocl.sh
       - name: Test if release already exists
         id: release-exists
         continue-on-error: true
