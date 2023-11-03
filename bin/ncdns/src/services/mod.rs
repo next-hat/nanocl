@@ -10,7 +10,6 @@ use crate::version;
 mod openapi;
 
 mod rule;
-mod system;
 
 pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
   Err(HttpError {
@@ -34,7 +33,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
     .expect("Unable to write swagger.yaml");
     let swagger_conf =
       swagger::SwaggerConfig::new(api_doc, "/explorer/swagger.json");
-
     config.service(
       web::scope("/explorer/")
         .state(swagger_conf)
@@ -47,7 +45,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(
     web::scope("/{version}")
       .wrap(versioning)
-      .configure(rule::ntex_config)
-      .configure(system::ntex_config),
+      .configure(rule::ntex_config),
   );
 }

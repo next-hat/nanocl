@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Nanocl Controller Daemon Dns
+  title: Nanocl Controller Dns
   description: |
     The `Nanocl Controller Daemon Dns` is an `HTTP REST API`.<br />
     It is the `API` the `Nanocl Daemon` uses, to create / update and delete `DnsRule`
@@ -22,21 +22,13 @@ servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.1
+      default: v0.3
       description: API version
       enum:
+      - v0.3
+      - v0.2
       - v0.1
 paths:
-  /_ping:
-    head:
-      tags:
-      - System
-      summary: Get version information
-      description: Get version information
-      operationId: head_ping
-      responses:
-        '202':
-          description: Server is up
   /rules/{Name}:
     put:
       tags:
@@ -80,20 +72,6 @@ paths:
       responses:
         '200':
           description: Rule has been deleted
-  /version:
-    get:
-      tags:
-      - System
-      summary: Get version information
-      description: Get version information
-      operationId: get_version
-      responses:
-        '200':
-          description: Version information
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Version'
 components:
   schemas:
     DnsEntry:
@@ -118,25 +96,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DnsEntry'
-    Version:
-      type: object
-      description: Version contain details about the current version nanocl
-      required:
-      - Arch
-      - Channel
-      - Version
-      - CommitId
-      properties:
-        Arch:
-          type: string
-        Channel:
-          type: string
-        Version:
-          type: string
-        CommitId:
-          type: string
 tags:
 - name: Rules
   description: Rules management endpoints.
-- name: System
-  description: System management endpoints.

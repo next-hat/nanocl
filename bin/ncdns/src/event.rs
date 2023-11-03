@@ -74,6 +74,9 @@ async fn r#loop(dnsmasq: &dnsmasq::Dnsmasq, client: &NanocldClient) {
           };
           match e {
             Event::ResourceCreated(resource) => {
+              if resource.kind != "DnsRule" {
+                continue;
+              }
               let dns_rule =
                 serde_json::from_value::<ResourceDnsRule>(resource.data);
               let Ok(dns_rule) = dns_rule else {
@@ -87,6 +90,9 @@ async fn r#loop(dnsmasq: &dnsmasq::Dnsmasq, client: &NanocldClient) {
               }
             }
             Event::ResourcePatched(resource) => {
+              if resource.kind != "DnsRule" {
+                continue;
+              }
               let dns_rule =
                 serde_json::from_value::<ResourceDnsRule>(resource.data);
               let Ok(dns_rule) = dns_rule else {
