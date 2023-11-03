@@ -1,22 +1,29 @@
-# NAME
+NAME
+====
 
-nanocl namespace - Manage namespaces
+nanocl namespace - \#\# NamespaceArg
 
-# SYNOPSIS
+SYNOPSIS
+========
 
 **nanocl namespace** \[**-h**\|**\--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+DESCRIPTION
+===========
 
-Manage namespaces
+\#\# NamespaceArg
 
-# OPTIONS
+\`nanocl namespace\` available arguments
+
+OPTIONS
+=======
 
 **-h**, **\--help**
 
-:   Print help
+:   Print help (see a summary with -h)
 
-# SUBCOMMANDS
+SUBCOMMANDS
+===========
 
 nanocl namespace-create(1)
 
