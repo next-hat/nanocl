@@ -18,10 +18,10 @@ impl utoipa::Modify for VersionModifier {
       .url("/{Version}")
       .parameter("Version", variable)
       .build();
-    openapi.info.title = "Nanocl Controller Dns".to_string();
+    openapi.info.title = "Nanocl Controller Dns".to_owned();
     openapi.info.version = format!("v{}", env!("CARGO_PKG_VERSION"));
     openapi.info.description =
-      Some(include_str!("../../specs/readme.md").to_string());
+      Some(include_str!("../../specs/readme.md").to_owned());
     openapi.servers = Some(vec![server]);
   }
 }
