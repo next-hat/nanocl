@@ -1,7 +1,7 @@
-use nanocld_client::stubs::dns::ResourceDnsRule;
-use nanocld_client::{NanocldClient, stubs::resource::ResourceQuery};
-
 use nanocl_error::io::{FromIo, IoResult, IoError};
+
+use nanocld_client::NanocldClient;
+use nanocld_client::stubs::dns::ResourceDnsRule;
 
 use crate::dnsmasq::Dnsmasq;
 
