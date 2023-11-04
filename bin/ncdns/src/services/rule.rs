@@ -55,10 +55,7 @@ pub(crate) async fn remove_rule(
   let rule = client.inspect_resource(&path.1).await?;
   let dns_rule =
     serde_json::from_value::<ResourceDnsRule>(rule.data).map_err(|err| {
-      HttpError::bad_request(format!(
-        "Unable to serialize the DnsRule: {}",
-        err
-      ))
+      HttpError::bad_request(format!("Unable to serialize the DnsRule: {err}"))
     })?;
   utils::remove_entries(&dns_rule, &dnsmasq, &client).await?;
   utils::reload_service(&client).await?;

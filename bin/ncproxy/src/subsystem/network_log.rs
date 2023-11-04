@@ -23,7 +23,6 @@ pub fn print_last_line(path: &Path) {
     }
   };
   let mut buf_reader = BufReader::new(file);
-
   let mut pos = match buf_reader.seek(SeekFrom::End(-2)) {
     Ok(pos) => pos,
     Err(e) => {
@@ -32,7 +31,6 @@ pub fn print_last_line(path: &Path) {
     }
   };
   let mut last_line = String::new();
-
   while pos > 0 {
     match buf_reader.seek(SeekFrom::Start(pos)) {
       Ok(_) => {}
@@ -49,14 +47,12 @@ pub fn print_last_line(path: &Path) {
     last_line.insert(0, buffer[0] as char);
     pos -= 1;
   }
-
   let file_name = path
     .file_name()
     .unwrap_or_default()
     .to_str()
     .unwrap_or_default();
-
-  log::debug!("{}", file_name);
+  log::debug!("{file_name}");
   match file_name {
     "http.log" => {
       println!("#HTTP {last_line}");
@@ -79,7 +75,6 @@ pub(crate) fn spawn() {
       return;
     }
     let (tx, rx) = std::sync::mpsc::channel();
-
     // Automatically select the best implementation for your platform.
     // You can also access each implementation directly e.g. INotifyWatcher.
     let mut watcher = match RecommendedWatcher::new(
@@ -94,11 +89,9 @@ pub(crate) fn spawn() {
         return;
       }
     };
-
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
     watcher.watch(path, RecursiveMode::Recursive).unwrap();
-
     log::debug!("watching change of: {}", path.display());
     for res in rx {
       match res {
@@ -119,7 +112,7 @@ pub(crate) fn spawn() {
           }
           _ => {}
         },
-        Err(e) => log::warn!("watch error: {:?}", e),
+        Err(e) => log::warn!("watch error: {e:?}"),
       }
     }
   });
