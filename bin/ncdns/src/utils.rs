@@ -1,7 +1,8 @@
-use nanocld_client::stubs::dns::ResourceDnsRule;
-use nanocld_client::{NanocldClient, stubs::resource::ResourceQuery};
-
 use nanocl_error::io::{FromIo, IoResult, IoError};
+
+use nanocld_client::NanocldClient;
+use nanocld_client::stubs::resource::ResourceQuery;
+use nanocld_client::stubs::dns::ResourceDnsRule;
 
 use crate::dnsmasq::Dnsmasq;
 
@@ -60,30 +61,6 @@ async fn get_network_addr(
 /// TODO: use a better way to reload the service, we may have to move from dnsmasq to something else
 pub(crate) async fn reload_service(client: &NanocldClient) -> IoResult<()> {
   client.restart_cargo("ndns", Some("system")).await?;
-  Ok(())
-}
-
-/// Convert a ResourceDnsRule into a dnsmasq config and write it to a file
-pub(crate) async fn write_entries(
-  dns_rule: &ResourceDnsRule,
-  dnsmasq: &Dnsmasq,
-  client: &NanocldClient,
-) -> IoResult<()> {
-  let listen_address = get_network_addr(&dns_rule.network, client).await?;
-  let mut file_content = format!("listen-address={listen_address}\n");
-  for entry in &dns_rule.entries {
-    let ip_address = match entry.ip_address.as_str() {
-      namespace if namespace.ends_with(".nsp") => {
-        let namespace = namespace.trim_end_matches(".nsp");
-        get_namespace_addr(namespace, client).await?
-      }
-      _ => entry.ip_address.clone(),
-    };
-    file_content += &format!("address=/{}/{}\n", entry.name, ip_address);
-  }
-  dnsmasq
-    .write_config(&dns_rule.network, &file_content)
-    .await?;
   Ok(())
 }
 

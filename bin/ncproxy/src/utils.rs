@@ -394,7 +394,7 @@ async fn gen_http_server_block(
   let listen_http = get_listen(&rule.network, 80, client).await?;
   let http_host = match &rule.domain {
     Some(domain) => format!(
-      "  server_name {domain};\n  if ($host != {domain}) {{ return 502; }}\n",
+      "server_name {domain};\n  if ($host != {domain}) {{ return 502; }}\n",
       domain = domain
     ),
     None => String::default(),

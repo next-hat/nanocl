@@ -126,34 +126,6 @@ async fn on_event(
         log::warn!("{err}");
       }
     }
-    Event::ResourceCreated(ev) => {
-      if ev.kind.as_str() != "ProxyRule" {
-        return Ok(());
-      }
-      log::debug!("received resource created event: {ev:#?}");
-      let resource: ResourcePartial = ev.as_ref().clone().into();
-      if let Err(err) = update_resource_rule(&resource, nginx, client).await {
-        log::warn!("{err}");
-      }
-    }
-    Event::ResourcePatched(ev) => {
-      if ev.kind.as_str() != "ProxyRule" {
-        return Ok(());
-      }
-      log::debug!("received resource patched event: {ev:#?}");
-      let resource: ResourcePartial = ev.as_ref().clone().into();
-      if let Err(err) = update_resource_rule(&resource, nginx, client).await {
-        log::warn!("{err}");
-      }
-    }
-    Event::ResourceDeleted(ev) => {
-      if ev.kind.as_str() != "ProxyRule" {
-        return Ok(());
-      }
-      log::debug!("received resource deleted event: {ev:#?}");
-      nginx.delete_conf_file(&ev.name).await;
-      utils::reload_config(client).await?;
-    }
     Event::SecretPatched(secret) => {
       let resources =
         utils::list_resource_by_secret(&secret.key, client).await?;
