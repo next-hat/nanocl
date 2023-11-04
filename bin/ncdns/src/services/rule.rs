@@ -5,8 +5,7 @@ use nanocl_error::http::HttpError;
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::dns::ResourceDnsRule;
 
-use crate::utils;
-use crate::dnsmasq::Dnsmasq;
+use crate::{utils, dnsmasq};
 
 /// Create/Update a new DnsRule
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -25,11 +24,11 @@ use crate::dnsmasq::Dnsmasq;
 pub(crate) async fn apply_rule(
   // To follow the ressource service convention, we have to use a tuple
   _path: web::types::Path<(String, String)>,
-  dnsmasq: web::types::State<Dnsmasq>,
+  dnsmasq: web::types::State<dnsmasq::Dnsmasq>,
   web::types::Json(payload): web::types::Json<ResourceDnsRule>,
   client: web::types::State<NanocldClient>,
 ) -> Result<web::HttpResponse, HttpError> {
-  utils::write_entries(&payload, &dnsmasq, &client).await?;
+  utils::update_entries(&payload, &dnsmasq, &client).await?;
   utils::reload_service(&client).await?;
   Ok(web::HttpResponse::Ok().json(&payload))
 }
@@ -49,7 +48,7 @@ pub(crate) async fn apply_rule(
 #[web::delete("/rules/{name}")]
 pub(crate) async fn remove_rule(
   path: web::types::Path<(String, String)>,
-  dnsmasq: web::types::State<Dnsmasq>,
+  dnsmasq: web::types::State<dnsmasq::Dnsmasq>,
   client: web::types::State<NanocldClient>,
 ) -> Result<web::HttpResponse, HttpError> {
   let rule = client.inspect_resource(&path.1).await?;

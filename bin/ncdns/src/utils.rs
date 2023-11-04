@@ -1,6 +1,7 @@
 use nanocl_error::io::{FromIo, IoResult, IoError};
 
 use nanocld_client::NanocldClient;
+use nanocld_client::stubs::resource::ResourceQuery;
 use nanocld_client::stubs::dns::ResourceDnsRule;
 
 use crate::dnsmasq::Dnsmasq;
@@ -63,15 +64,33 @@ pub(crate) async fn reload_service(client: &NanocldClient) -> IoResult<()> {
   Ok(())
 }
 
-/// Convert a ResourceDnsRule into a dnsmasq config and write it to a file
-pub(crate) async fn write_entries(
+pub(crate) async fn update_entries(
   dns_rule: &ResourceDnsRule,
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
+  let query = ResourceQuery {
+    contains: Some(
+      serde_json::json!({ "Network": dns_rule.network }).to_string(),
+    ),
+    kind: Some("DnsRule".into()),
+    ..Default::default()
+  };
+  let resources = client.list_resource(Some(&query)).await.map_err(|err| {
+    err.map_err_context(|| "Unable to list resources from nanocl daemon")
+  })?;
+  let mut entries = Vec::new();
+  for resource in resources {
+    let mut dns_rule = serde_json::from_value::<ResourceDnsRule>(resource.data)
+      .map_err(|err| {
+        err.map_err_context(|| "Unable to serialize the DnsRule")
+      })?;
+    entries.append(&mut dns_rule.entries);
+  }
   let listen_address = get_network_addr(&dns_rule.network, client).await?;
-  let mut file_content = format!("listen-address={listen_address}\n");
-  for entry in &dns_rule.entries {
+  let mut file_content =
+    format!("bind-dynamic\nlisten-address={listen_address}\n");
+  for entry in &entries {
     let ip_address = match entry.ip_address.as_str() {
       namespace if namespace.ends_with(".nsp") => {
         let namespace = namespace.trim_end_matches(".nsp");
@@ -84,6 +103,7 @@ pub(crate) async fn write_entries(
   dnsmasq
     .write_config(&dns_rule.network, &file_content)
     .await?;
+  reload_service(client).await?;
   Ok(())
 }
 
