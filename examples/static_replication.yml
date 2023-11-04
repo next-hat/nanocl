@@ -1,0 +1,18 @@
+Kind: Deployment
+ApiVersion: v0.11
+
+Namespace: global
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
+Cargoes:
+  - Name: static-replicated
+    Replication:
+      Mode: Static
+      Number: 4
+    Container:
+      Image: alpine:latest
+      Cmd: ["sleep", "1"]
+      HostConfig:
+        RestartPolicy:
+          Name: "no"

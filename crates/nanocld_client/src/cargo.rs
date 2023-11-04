@@ -7,7 +7,8 @@ use bollard_next::service::ContainerSummary;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoKillOptions,
-  CargoDeleteQuery, CargoLogQuery, CargoStatsQuery, CargoStats,
+  CargoDeleteQuery, CargoLogQuery, CargoStatsQuery, CargoStats, CargoWaitQuery,
+  CargoWaitResponse,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigUpdate, CargoConfigPartial, CargoConfig,
@@ -452,6 +453,28 @@ impl NanocldClient {
       )
       .await?;
     Self::res_json(res).await
+  }
+
+  /// ## Wait a cargo
+  ///
+  /// A [Receiver](Receiver) stream of [ContainerWaitResponse](ContainerWaitResponse) is
+  /// returned, data are sent when container end
+  ///
+  /// ## Arguments
+  ///
+  /// * [name](str) - The name of the cargo to get the logs
+  /// * [query](Option<&CargoWaitQuery>) - The namespace where belong the cargo
+  ///
+  pub async fn wait_cargo(
+    &self,
+    name: &str,
+    query: Option<&CargoWaitQuery>,
+  ) -> Result<Receiver<Result<CargoWaitResponse, HttpError>>, HttpClientError>
+  {
+    let res = self
+      .send_get(&format!("{}/{name}/wait", Self::CARGO_PATH), query)
+      .await?;
+    Ok(Self::res_stream(res).await)
   }
 
   /// ## Logs a cargo

@@ -468,6 +468,49 @@ mod tests {
   }
 
   #[ntex::test]
+  async fn cargo_wait() {
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/static_replication.yml",
+    ]);
+    assert!(execute_arg(&args).await.is_ok());
+    let args =
+      Cli::parse_from(["nanocl", "cargo", "wait", "static-replicated"]);
+    assert!(execute_arg(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "rm",
+      "-ys",
+      "../../examples/static_replication.yml",
+    ]);
+    assert!(execute_arg(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "cargo",
+      "wait",
+      "-c",
+      "not-running",
+      "static-replicated",
+    ]);
+    assert!(execute_arg(&args).await.is_ok());
+
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "rm",
+      "-ys",
+      "../../examples/static_replication.yml",
+    ]);
+    assert!(execute_arg(&args).await.is_ok());
+  }
+
+  #[ntex::test]
   async fn node_list() {
     let args = Cli::parse_from(["nanocl", "node", "ls"]);
     assert!(execute_arg(&args).await.is_ok());
