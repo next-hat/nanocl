@@ -120,7 +120,7 @@ impl Nginx {
   error_page 502 /502.html;
   error_page 403 /403.html;
 }"
-    .to_string();
+    .to_owned();
     let path = format!("{}/sites-available/default", self.conf_dir);
     tokio::fs::write(&path, &default_conf)
       .await

@@ -155,15 +155,14 @@ async fn on_event(
 async fn ensure_resource_config(client: &NanocldClient) {
   let formated_version = versioning::format_version(version::VERSION);
   let proxy_rule_kind = ResourcePartial {
-    kind: "Kind".to_string(),
-    name: "ProxyRule".to_string(),
+    kind: "Kind".to_owned(),
+    name: "ProxyRule".to_owned(),
     data: serde_json::json!({
       "Url": "unix:///run/nanocl/proxy.sock"
     }),
     version: format!("v{formated_version}"),
     metadata: None,
   };
-
   match client.inspect_resource(&proxy_rule_kind.name).await {
     Ok(_) => {
       if let Err(err) = client

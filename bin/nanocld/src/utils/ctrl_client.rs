@@ -21,12 +21,12 @@ impl CtrlClient {
   pub(crate) fn new(name: &str, url: &str) -> Self {
     let (client, url) = match url {
       url if url.starts_with("unix://") => {
-        let url = url.to_string();
+        let url = url.to_owned();
         let client = Client::build()
           .connector(
             Connector::default()
               .connector(ntex::service::fn_service(move |_| {
-                let path = url.trim_start_matches("unix://").to_string();
+                let path = url.trim_start_matches("unix://").to_owned();
                 async move { Ok(rt::unix_connect(path).await?) }
               }))
               .timeout(ntex::time::Millis::from_secs(20))
@@ -34,7 +34,6 @@ impl CtrlClient {
           )
           .timeout(ntex::time::Millis::from_secs(20))
           .finish();
-
         (client, "http://localhost")
       }
       url if url.starts_with("http://") || url.starts_with("https://") => {
@@ -43,11 +42,10 @@ impl CtrlClient {
       }
       _ => panic!("Invalid url: {}", url),
     };
-
     Self {
       client,
-      name: name.to_string(),
-      base_url: url.to_string(),
+      name: name.to_owned(),
+      base_url: url.to_owned(),
     }
   }
 
@@ -66,7 +64,7 @@ impl CtrlClient {
       let body = res
         .json::<serde_json::Value>()
         .await
-        .map_err(|err| err.map_err_context(|| self.name.to_string()))?;
+        .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;
       let msg = body["msg"].as_str().ok_or(HttpError {
         status: *status,
         msg: String::default(),
@@ -90,7 +88,7 @@ impl CtrlClient {
     let body = res
       .json::<T>()
       .await
-      .map_err(|err| err.map_err_context(|| self.name.to_string()))?;
+      .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;
     Ok(body)
   }
 
@@ -106,7 +104,7 @@ impl CtrlClient {
       .put(self.format_url(&format!("/{version}/rules/{name}")))
       .send_json(data)
       .await
-      .map_err(|err| err.map_err_context(|| self.name.to_string()))?;
+      .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;
     let status = res.status();
     self.is_api_error(&mut res, &status).await?;
 
@@ -124,7 +122,7 @@ impl CtrlClient {
       .delete(self.format_url(&format!("/{version}/rules/{name}")))
       .send()
       .await
-      .map_err(|err| err.map_err_context(|| self.name.to_string()))?;
+      .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;
     let status = res.status();
     self.is_api_error(&mut res, &status).await?;
 

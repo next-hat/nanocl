@@ -189,7 +189,7 @@ mod tests {
     let mut client = event_emitter.subscribe().await.unwrap();
     // Send namespace created event
     event_emitter
-      .emit(Event::NamespaceCreated("test".to_string()))
+      .emit(Event::NamespaceCreated("test".to_owned()))
       .await
       .unwrap();
     let event = client.next().await.unwrap().unwrap();
