@@ -13,8 +13,8 @@ use crate::version;
 async fn ensure_resource_config(client: &NanocldClient) -> IoResult<()> {
   let formated_version = versioning::format_version(version::VERSION);
   let dns_rule_kind = ResourcePartial {
-    kind: "Kind".to_string(),
-    name: "DnsRule".to_string(),
+    kind: "Kind".to_owned(),
+    name: "DnsRule".to_owned(),
     data: serde_json::json!({
       "Url": "unix:///run/nanocl/dns.sock"
     }),

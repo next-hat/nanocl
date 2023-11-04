@@ -51,7 +51,7 @@ where
     format!("http://{url}")
   };
   let reqwest = ntex::http::Client::default();
-  let mut res = reqwest.get(url.to_string()).send().await.map_err(|err| {
+  let mut res = reqwest.get(&url).send().await.map_err(|err| {
     err.map_err_context(|| "Unable to get Statefile from url")
   })?;
   if res.status().is_redirection() {
@@ -243,7 +243,7 @@ pub async fn log_cargo(
     } else {
       format!("{index}-{}", cargo.name)
     };
-    let namespace = opts.namespace.to_owned().unwrap_or("global".to_string());
+    let namespace = opts.namespace.to_owned().unwrap_or("global".to_owned());
     let client = client.to_owned();
     let since = opts.since;
     let until = opts.until;
@@ -797,7 +797,7 @@ async fn exec_state_logs(
       let context = opts.state_location.as_ref().unwrap_or(&namespace);
       Err(IoError::invalid_input(
         context,
-        &("Only Cargo or Deployment  statefile kind can be logged".to_string()),
+        &("Only Cargo or Deployment  statefile kind can be logged".to_owned()),
       ))
     }
   }?;
@@ -809,7 +809,7 @@ async fn exec_state_logs(
     tail: if tail.is_empty() {
       None
     } else {
-      Some(tail.to_string())
+      Some(tail.to_owned())
     },
     timestamps: Some(opts.timestamps),
     follow: Some(opts.follow),

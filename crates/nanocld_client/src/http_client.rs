@@ -96,7 +96,7 @@ impl NanocldClient {
     } else {
       &self.url
     };
-    HttpClientError::IoError(*err.map_err_context(|| url.to_string()))
+    HttpClientError::IoError(*err.map_err_context(|| url.to_owned()))
   }
 
   fn gen_url(&self, url: &str) -> String {

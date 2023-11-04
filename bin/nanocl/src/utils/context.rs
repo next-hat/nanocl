@@ -162,7 +162,7 @@ impl Context {
     }
     let path = format!("{home}/.nanocl/conf.yml");
     let mut config = UserConfig::new();
-    config.current_context = name.to_string();
+    config.current_context = name.to_owned();
     let s = serde_yaml::to_string(&config).map_err(|err| {
       std::io::Error::new(
         std::io::ErrorKind::InvalidData,
