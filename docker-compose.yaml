@@ -67,7 +67,7 @@ services:
       - io.nanocl.n=system
       - io.nanocl.cnsp=system
     volumes:
-      - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
+      - //run/guest-services/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/run:/run
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/letsencrypt:/etc/letsencrypt
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/certs:/etc/nginx/certs
@@ -106,7 +106,7 @@ services:
         source: .
         target: /project
       - /project/target
-      - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
+      - //run/guest-services/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/secrets:/opt/secrets
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/logs:/var/log/nginx/access
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/conf.d:/etc/nginx/conf.d
@@ -157,7 +157,7 @@ services:
         target: /project
       - /project/target
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:/opt/dns
-      - //run/guest-services/nanocl:/run/nanocl:/run/nanocl
+      - //run/guest-services/nanocl:/run/nanocl
 
   nanocld:
     container_name: ndaemon.system.c
@@ -191,11 +191,12 @@ services:
       - run --no-default-features --features dev --bin nanocld -- --gid 1001 --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
 
   ncvpnkit:
-    profiles: ['vpnkit']
     container_name: ncvpnkit.system.c
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
     hostname: ncvpnkit.nanocl.internal
+    profiles:
+      - vpnkit
     networks:
       - system
     environment:

@@ -94,39 +94,21 @@ async fn on_event(
   client: &NanocldClient,
 ) -> IoResult<()> {
   match event {
-    Event::CargoStarted(ev) => {
-      log::debug!("received cargo started event: {ev:#?}");
+    Event::CargoStarted(ev) | Event::CargoPatched(ev) => {
       if let Err(err) =
         update_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
       {
         log::warn!("{err}");
       }
     }
-    Event::CargoPatched(ev) => {
-      log::debug!("received cargo patched event: {ev:#?}");
-      if let Err(err) =
-        update_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
-      {
-        log::warn!("{err}");
-      }
-    }
-    Event::CargoStopped(ev) => {
-      log::debug!("received cargo stopped event: {ev:#?}");
+    Event::CargoStopped(ev) | Event::CargoDeleted(ev) => {
       if let Err(err) =
         delete_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
       {
         log::warn!("{err}");
       }
     }
-    Event::CargoDeleted(ev) => {
-      log::debug!("received cargo deleted event: {ev:#?}");
-      if let Err(err) =
-        delete_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
-      {
-        log::warn!("{err}");
-      }
-    }
-    Event::SecretPatched(secret) => {
+    Event::SecretCreated(secret) | Event::SecretPatched(secret) => {
       let resources =
         utils::list_resource_by_secret(&secret.key, client).await?;
       for resource in resources {
@@ -136,17 +118,6 @@ async fn on_event(
         }
       }
     }
-    Event::SecretCreated(secret) => {
-      let resources =
-        utils::list_resource_by_secret(&secret.key, client).await?;
-      for resource in resources {
-        let resource: ResourcePartial = resource.into();
-        if let Err(err) = update_resource_rule(&resource, nginx, client).await {
-          log::warn!("{err}");
-        }
-      }
-    }
-    // Ignore other events
     _ => {}
   }
   Ok(())

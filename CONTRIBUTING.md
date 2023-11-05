@@ -46,11 +46,15 @@ bin # Binaries (executable)
 ├── ndns # Source to build custom dnsmasq container image
 └── nproxy # Source to build custom nginx container image
 crates # Shared Libraries
+├── nanocl_error # Error utils used in the porject
+│   └── src # The rust source code
+├── nanocl_stubs # Shared data structure mostly used as input and output of the DAEMON
+│   └── src # The rust source code
 ├── nanocld_client # A nanocld client
 │   └── src # The rust source code
 ├── nanocl_utils # A collection of utils used in the project
 │   └── src # The rust source code
-└── nanocl_stubs # Shared data structure mostly used as input and output of out DAEMON
+└── nanocld_client # A nanocld client
     └── src # The rust source code
 ```
 
@@ -115,7 +119,10 @@ Before running `Nanocl` we will need to download and build some docker images:
 ./scripts/install_dev_image.sh
 ```
 
-Then spin up `Nanocl` services using `docker compose` (note that you need use vpnkit profile for docker desktop [see below](#docker-desktop)):
+Then spin up `Nanocl` services using `docker compose`.
+
+> [!NOTE]
+> You need use `vpnkit` profile for docker desktop [see below](#docker-desktop)
 
 ```sh
 docker compose up
@@ -123,11 +130,11 @@ docker compose up
 
 ### 🐋 Docker Desktop
 
-With Docker Desktop you'll need an additional container, to enable it run docker compose with profile `vpnkit`
-
-```sh
-docker compose --profile vpnkit up
-```
+> [!IMPORTANT]
+> With Docker Desktop you'll need an additional container, to enable it run docker compose with `vpnkit` profile
+> ```sh
+> docker compose --profile vpnkit up
+> ```
 
 If you can have Docker installed normally with his default socket on `/var/run/docker.sock` you can also change the context:
 
@@ -146,12 +153,6 @@ Once started, a swagger should be available on [http://localhost:8585/explorer](
 
 Note that a _env variable_ could be passed to change the port, it is hardcoded for now.<br />
 It could be a nice and easy first issue and pull request if you would like to help :).
-
-To use the CLI you need correct permission on `/run/nanocl`
-
-```sh
-sudo chmod -R /run/nanocl
-```
 
 Now you can run the CLI:
 
