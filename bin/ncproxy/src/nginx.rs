@@ -35,10 +35,8 @@ impl FromStr for NginxConfKind {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
-      "Site" => Ok(Self::Site),
-      "Stream" => Ok(Self::Stream),
-      "site" => Ok(Self::Site),
-      "stream" => Ok(Self::Stream),
+      "Site" | "site" => Ok(Self::Site),
+      "Stream" | "stream" => Ok(Self::Stream),
       _ => Err(IoError::new(
         format!("Invalid NginxConfKind: {s}"),
         std::io::Error::new(
@@ -112,7 +110,7 @@ impl Nginx {
   async fn ensure_default_conf(&self) -> IoResult<()> {
     let default_conf = "server {
   listen 80 default_server;
-  listen [::]:80 ipv6only=on default_server;
+  listen [::]:80 ipv6only=on;
   server_name _;
 
   root /usr/share/nginx/html;
