@@ -1,3 +1,7 @@
+use std::path::Path;
+use std::os::unix::prelude::PermissionsExt;
+
+use ntex::rt;
 use tokio::fs;
 use nanocl_error::io::{FromIo, IoResult};
 
@@ -7,6 +11,77 @@ use crate::{event, utils};
 use crate::models::DaemonState;
 
 use crate::version::VERSION;
+
+use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
+
+/// ## Set unix permission
+///
+/// Watch for change in the run directory and set the permission of the unix socket
+///
+fn set_unix_sock_perm() {
+  rt::Arbiter::new().exec_fn(|| {
+    rt::spawn(async {
+      log::debug!("set_unix_permission");
+      let path = Path::new("/run/nanocl");
+      if !path.exists() {
+        log::debug!(
+          "{} doesn't exists cannot change unix socket permission",
+          path.display()
+        );
+        return;
+      }
+      let (tx, rx) = std::sync::mpsc::channel();
+      // Automatically select the best implementation for your platform.
+      // You can also access each implementation directly e.g. INotifyWatcher.
+      let mut watcher = match RecommendedWatcher::new(tx, Config::default()) {
+        Ok(watcher) => watcher,
+        Err(e) => {
+          log::warn!("watcher error: {:?}", e);
+          return;
+        }
+      };
+      // Add a path to be watched. All files and directories at that path and
+      // below will be monitored for changes.
+      watcher.watch(path, RecursiveMode::Recursive).unwrap();
+      log::debug!("watching change of: {}", path.display());
+      for res in rx {
+        match res {
+          Ok(event) => {
+            log::debug!("event: {:?}", event);
+            if event.kind.is_modify()
+              || event.kind.is_create()
+              || event.kind.is_access()
+              || event.kind.is_other()
+            {
+              log::debug!(
+                "change detected, change permission of /run/nanocl/nanocl.sock",
+              );
+              let mut perms =
+                match fs::metadata("/run/nanocl/nanocl.sock").await {
+                  Err(_) => {
+                    continue;
+                  }
+                  Ok(perms) => perms.permissions(),
+                };
+              perms.set_mode(0o770);
+              if let Err(err) =
+                fs::set_permissions("/run/nanocl/nanocl.sock", perms).await
+              {
+                log::warn!("set_unix_permission error: {err:?}");
+              }
+              break;
+            }
+          }
+          Err(err) => {
+            log::warn!("watch error: {err:?}");
+            break;
+          }
+        }
+      }
+      log::debug!("set_unix_permission done");
+    });
+  });
+}
 
 /// ## Ensure state dir
 ///
@@ -44,6 +119,7 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
 ///   * [Err](IoError) - The daemon state has not been initialized
 ///
 pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
+  set_unix_sock_perm();
   let docker = bollard_next::Docker::connect_with_unix(
     &daemon_conf.docker_host,
     120,
@@ -53,7 +129,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     err.map_err_context(|| "Unable to connect to docker daemon")
   })?;
   ensure_state_dir(&daemon_conf.state_dir).await?;
-  let pool = utils::store::init().await?;
+  let pool = utils::store::init(daemon_conf).await?;
   let daemon_state = DaemonState {
     pool: pool.clone(),
     docker_api: docker.clone(),
@@ -73,6 +149,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
 mod tests {
   use super::*;
 
+  use crate::utils::tests::*;
   use crate::config;
   use crate::cli::Cli;
 
@@ -80,19 +157,22 @@ mod tests {
   #[ntex::test]
   async fn basic_init() {
     // Init cli args
+    before();
+    let home = std::env::var("HOME").expect("Failed to get home dir");
     let args = Cli {
       gid: 0,
-      init: false,
       hosts: None,
       docker_host: None,
-      state_dir: Some(String::from("/tmp/nanocl")),
+      state_dir: Some(format!("{home}/.nanocl_dev/state")),
       conf_dir: String::from("/etc/nanocl"),
       gateway: None,
       nodes: Vec::default(),
       hostname: None,
       advertise_addr: None,
     };
+    log::debug!("args: {args:?}");
     let config = config::init(&args).expect("Expect to init config");
+    log::debug!("config: {config:?}");
     // test function init
     let _ = init(&config).await.unwrap();
   }

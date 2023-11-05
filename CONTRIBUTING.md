@@ -171,12 +171,17 @@ Now you can run the CLI:
 ## 🧪 Testing
 
 To run tests, make sure all `Nanocl` services are running with `docker compose up`.<br/>
-Then be sure to have correct permission set on `/run/nanocl`<br />
 You also need theses entries in your `/etc/hosts`
 
 ```
 127.0.0.1 nstore.nanocl.internal
 127.0.0.1 ndaemon.nanocl.internal
+```
+
+Then you need to chown the state directory to be able to read SSL/TLS certificate to connect to the database
+
+```sh
+sudo chown $USER:$USER -R ~/.nanocl_dev
 ```
 
 - Run all tests
