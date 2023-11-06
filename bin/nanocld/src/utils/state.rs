@@ -680,7 +680,12 @@ pub async fn apply_cargo(
   qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = utils::key::resolve_nsp(&data.namespace);
+  let namespace = if let Some(namespace) = &data.namespace {
+    utils::namespace::create_if_not_exists(namespace, state).await?;
+    namespace.to_owned()
+  } else {
+    "global".to_owned()
+  };
   apply_cargoes(&namespace, &data.cargoes, version, state, qs, &sx).await;
   Ok(())
 }
@@ -710,7 +715,12 @@ pub async fn apply_vm(
   qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = utils::key::resolve_nsp(&data.namespace);
+  let namespace = if let Some(namespace) = &data.namespace {
+    utils::namespace::create_if_not_exists(namespace, state).await?;
+    namespace.to_owned()
+  } else {
+    "global".to_owned()
+  };
   apply_vms(&namespace, &data.virtual_machines, version, state, qs, &sx).await;
   Ok(())
 }
