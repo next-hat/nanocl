@@ -100,7 +100,7 @@ pub async fn find(
             .inner_join(resource_configs::table)
             .into_boxed();
           if let Some(kind) = &qs.kind {
-            req = req.filter(resources::kind.eq(kind.to_string()));
+            req = req.filter(resources::kind.eq(kind.to_owned()));
           }
           if let Some(exists) = &qs.exists {
             req = req.filter(resource_configs::data.has_key(exists));

@@ -1,105 +1,20 @@
 #[macro_use]
 extern crate diesel;
 
-use std::fs;
-use std::path::Path;
-use std::os::unix::prelude::PermissionsExt;
-
-use ntex::rt;
 use clap::Parser;
 
 mod cli;
+mod schema;
+mod models;
 mod version;
 mod node;
 mod boot;
 mod utils;
 mod event;
-mod schema;
-mod models;
 mod config;
 mod server;
 mod services;
 mod repositories;
-
-use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
-
-/// ## Set unix permission
-///
-/// Watch for change in the run directory and set the permission of the unix socket
-///
-async fn set_unix_permission() {
-  rt::Arbiter::new().exec_fn(|| {
-    log::debug!("set_unix_permission");
-    let path = Path::new("/run/nanocl");
-    if !path.exists() {
-      log::debug!(
-        "{} doesn't exists cannot change unix socket permission",
-        path.display()
-      );
-      return;
-    }
-    let (tx, rx) = std::sync::mpsc::channel();
-    // Automatically select the best implementation for your platform.
-    // You can also access each implementation directly e.g. INotifyWatcher.
-    let mut watcher = match RecommendedWatcher::new(tx, Config::default()) {
-      Ok(watcher) => watcher,
-      Err(e) => {
-        log::warn!("watcher error: {:?}", e);
-        return;
-      }
-    };
-    // Add a path to be watched. All files and directories at that path and
-    // below will be monitored for changes.
-    watcher.watch(path, RecursiveMode::Recursive).unwrap();
-    log::debug!("watching change of: {}", path.display());
-    for res in rx {
-      match res {
-        Ok(event) => {
-          log::debug!("event: {:?}", event);
-          if event.kind.is_modify()
-            || event.kind.is_create()
-            || event.kind.is_access()
-            || event.kind.is_other()
-          {
-            log::debug!(
-              "change detected, change permission of /run/nanocl/nanocl.sock",
-            );
-            let mut perms = match fs::metadata("/run/nanocl/nanocl.sock") {
-              Err(_) => {
-                continue;
-              }
-              Ok(perms) => perms.permissions(),
-            };
-            #[cfg(feature = "dev")]
-            {
-              perms.set_mode(0o777);
-              if let Err(err) =
-                fs::set_permissions("/run/nanocl/nanocl.sock", perms)
-              {
-                log::warn!("set_unix_permission error: {err:?}");
-              }
-            }
-            #[cfg(not(feature = "dev"))]
-            {
-              perms.set_mode(0o770);
-              if let Err(err) =
-                fs::set_permissions("/run/nanocl/nanocl.sock", perms)
-              {
-                log::warn!("set_unix_permission error: {err:?}");
-              }
-            }
-            break;
-          }
-        }
-        Err(err) => {
-          log::warn!("watch error: {err:?}");
-          break;
-        }
-      }
-    }
-    log::debug!("set_unix_permission done");
-  });
-}
 
 /// ## The Nanocl daemon
 ///
@@ -137,15 +52,10 @@ async fn main() -> std::io::Result<()> {
   };
   // Boot and init internal dependencies
   let daemon_state = boot::init(&config).await?;
-  // If init is true we don't start the server
-  if args.init {
-    return Ok(());
-  }
   if let Err(err) = node::join_cluster(&daemon_state).await {
     log::error!("{err}");
     std::process::exit(1);
   }
-  set_unix_permission().await;
   node::register(&daemon_state).await?;
   utils::proxy::spawn_logger(&daemon_state);
   utils::metric::spawn_logger(&daemon_state);

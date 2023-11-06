@@ -1,17 +1,23 @@
-# NAME
+NAME
+====
 
-nanocl cargo - Manage cargoes
+nanocl cargo - \#\# CargoArg
 
-# SYNOPSIS
+SYNOPSIS
+========
 
 **nanocl cargo** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
 \[**-V**\|**\--version**\] \<*subcommands*\>
 
-# DESCRIPTION
+DESCRIPTION
+===========
 
-Manage cargoes
+\#\# CargoArg
 
-# OPTIONS
+\`nanocl cargo\` available arguments
+
+OPTIONS
+=======
 
 **-n**, **\--namespace**=*NAMESPACE*
 
@@ -19,13 +25,14 @@ Manage cargoes
 
 **-h**, **\--help**
 
-:   Print help
+:   Print help (see a summary with -h)
 
 **-V**, **\--version**
 
 :   Print version
 
-# SUBCOMMANDS
+SUBCOMMANDS
+===========
 
 nanocl cargo-list(1)
 
@@ -83,10 +90,15 @@ nanocl cargo-run(1)
 
 :   Run a cargo
 
+nanocl cargo-stats(1)
+
+:   Show stats of cargo
+
 nanocl cargo-help(1)
 
 :   Print this message or the help of the given subcommand(s)
 
-# VERSION
+VERSION
+=======
 
-v0.9.0
+v0.11.0

@@ -204,7 +204,7 @@ async fn gen_upstream(
   match target_kind.as_str() {
     "c" => {
       let cargo = client
-        .inspect_cargo(&target_name, Some(target_namespace.clone()))
+        .inspect_cargo(&target_name, Some(&target_namespace))
         .await
         .map_err(|err| {
           err.map_err_context(|| {
@@ -215,7 +215,7 @@ async fn gen_upstream(
     }
     "v" => {
       let vm = client
-        .inspect_vm(&target_name, Some(target_namespace.clone()))
+        .inspect_vm(&target_name, Some(&target_namespace))
         .await
         .map_err(|err| {
           err.map_err_context(|| format!("Unable to inspect vm {target_name}"))
@@ -394,8 +394,7 @@ async fn gen_http_server_block(
   let listen_http = get_listen(&rule.network, 80, client).await?;
   let http_host = match &rule.domain {
     Some(domain) => format!(
-      "  server_name {domain};\n  if ($host != {domain}) {{ return 502; }}\n",
-      domain = domain
+      "server_name {domain};\n  if ($host != {domain}) {{ return 502; }}\n",
     ),
     None => String::default(),
   };
@@ -578,13 +577,13 @@ pub(crate) async fn reload_config(client: &NanocldClient) -> IoResult<()> {
     ..Default::default()
   };
   let start_res = client
-    .create_exec("nproxy", exec_options, Some("system".into()))
+    .create_exec("nproxy", &exec_options, Some("system"))
     .await
     .map_err(|err| err.map_err_context(|| "Unable to reload proxy configs"))?;
   let mut start_stream = client
     .start_exec(
       &start_res.id,
-      bollard_next::exec::StartExecOptions::default(),
+      &bollard_next::exec::StartExecOptions::default(),
     )
     .await
     .map_err(|err| err.map_err_context(|| "Unable to reload proxy configs"))?;
@@ -664,6 +663,7 @@ pub(crate) async fn list_resource_by_cargo(
 ) -> IoResult<Vec<nanocld_client::stubs::resource::Resource>> {
   let namespace = namespace.unwrap_or("global".into());
   let target_key = format!("{name}.{namespace}.c");
+  log::debug!("matching resources for target: {target_key}");
   let query = ResourceQuery {
     contains: Some(
       serde_json::json!({ "Rules": [ { "Locations": [ { "Target": { "Key": target_key } } ] }  ] }).to_string(),
@@ -672,7 +672,7 @@ pub(crate) async fn list_resource_by_cargo(
     ..Default::default()
   };
   let http_ressources =
-    client.list_resource(Some(query)).await.map_err(|err| {
+    client.list_resource(Some(&query)).await.map_err(|err| {
       err.map_err_context(|| "Unable to list resources from nanocl daemon")
     })?;
   let query = ResourceQuery {
@@ -684,17 +684,19 @@ pub(crate) async fn list_resource_by_cargo(
     ..Default::default()
   };
   let stream_resources =
-    client.list_resource(Some(query)).await.map_err(|err| {
+    client.list_resource(Some(&query)).await.map_err(|err| {
       err.map_err_context(|| "Unable to list resources from nanocl daemon")
     })?;
   let resources = http_ressources
     .into_iter()
     .chain(stream_resources.into_iter())
     .collect::<Vec<nanocld_client::stubs::resource::Resource>>();
-  log::debug!(
-    "matching resources for target: {target_key}:\n{:?}",
-    resources
-  );
+  if resources.is_empty() {
+    return Err(IoError::not_found(
+      "Resource",
+      &format!("No resources found matching cargo {target_key}"),
+    ));
+  }
   Ok(resources)
 }
 
@@ -714,16 +716,22 @@ pub(crate) async fn list_resource_by_secret(
     kind: Some("ProxyRule".into()),
     ..Default::default()
   };
-  let resources = client.list_resource(Some(query)).await.map_err(|err| {
+  let resources = client.list_resource(Some(&query)).await.map_err(|err| {
     err.map_err_context(|| "Unable to list resources from nanocl daemon")
   })?;
-  log::debug!("matching resources for secret: {secret}:\n{:?}", resources);
+  if resources.is_empty() {
+    return Err(IoError::not_found(
+      "Resource",
+      &format!("No resources found matching secret {secret}"),
+    ));
+  }
   Ok(resources)
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
   use nanocl_utils::logger;
+  use nanocld_client::NanocldClient;
   pub use nanocl_utils::ntex::test_client::*;
 
   use crate::{version, nginx, services};
@@ -739,9 +747,12 @@ pub(crate) mod tests {
     before();
     let nginx = nginx::Nginx::new("/tmp/nginx");
     nginx.ensure().await.unwrap();
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     // Create test server
     let srv = ntex::web::test::server(move || {
       ntex::web::App::new()
+        .state(client.clone())
         .state(nginx.clone())
         .configure(services::ntex_config)
     });

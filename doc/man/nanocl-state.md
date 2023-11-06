@@ -1,27 +1,37 @@
-# NAME
+NAME
+====
 
-nanocl - Define, Run, or Remove Cargo or Virtual Machines from a
-Statefile
+nanocl - \#\# StateArg
 
-# SYNOPSIS
+SYNOPSIS
+========
 
 **nanocl** \[**-h**\|**\--help**\] \<*subcommands*\>
 
-# DESCRIPTION
+DESCRIPTION
+===========
 
-Define, Run, or Remove Cargo or Virtual Machines from a Statefile
+\#\# StateArg
 
-# OPTIONS
+\`nanocl state\` available arguments
+
+OPTIONS
+=======
 
 **-h**, **\--help**
 
-:   Print help
+:   Print help (see a summary with -h)
 
-# SUBCOMMANDS
+SUBCOMMANDS
+===========
 
 nanocl-apply(1)
 
 :   Create or Update elements from a Statefile
+
+nanocl-logs(1)
+
+:   Logs elements from a Statefile
 
 nanocl-remove(1)
 

@@ -1,29 +1,26 @@
 use ntex::rt;
 use ntex::http;
-use futures::StreamExt;
-use nanocl_utils::versioning;
+
+use nanocl_error::io::IoResult;
 use nanocl_error::http_client::HttpClientError;
+use nanocl_utils::versioning;
+
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::system::Event;
-use nanocld_client::stubs::dns::ResourceDnsRule;
 use nanocld_client::stubs::resource::ResourcePartial;
 
-use crate::dnsmasq::Dnsmasq;
-use crate::utils::update_entries;
 use crate::version;
 
-async fn ensure_resource_config(client: &NanocldClient) {
+async fn ensure_resource_config(client: &NanocldClient) -> IoResult<()> {
   let formated_version = versioning::format_version(version::VERSION);
   let dns_rule_kind = ResourcePartial {
-    kind: "Kind".to_string(),
-    name: "DnsRule".to_string(),
+    kind: "Kind".to_owned(),
+    name: "DnsRule".to_owned(),
     data: serde_json::json!({
       "Url": "unix:///run/nanocl/dns.sock"
     }),
     version: format!("v{formated_version}"),
     metadata: None,
   };
-
   match client.inspect_resource(&dns_rule_kind.name).await {
     Ok(_) => {
       if let Err(err) = client
@@ -34,13 +31,16 @@ async fn ensure_resource_config(client: &NanocldClient) {
           HttpClientError::HttpError(err)
             if err.status == http::StatusCode::CONFLICT =>
           {
-            log::info!("DnsRule already exists. Skipping.")
+            log::info!("DnsRule already exists. Skipping.");
+            return Ok(());
           }
           _ => {
-            log::warn!("Unable to update DnsRule: {err}");
+            log::warn!("Unable to create DnsRule: {err}");
+            return Err(err.into());
           }
         }
       }
+      Ok(())
     }
     Err(_) => {
       if let Err(err) = client.create_resource(&dns_rule_kind).await {
@@ -48,63 +48,31 @@ async fn ensure_resource_config(client: &NanocldClient) {
           HttpClientError::HttpError(err)
             if err.status == http::StatusCode::CONFLICT =>
           {
-            log::info!("DnsRule already exists. Skipping.")
+            log::info!("DnsRule already exists. Skipping.");
+            return Ok(());
           }
           _ => {
             log::warn!("Unable to create DnsRule: {err}");
+            return Err(err.into());
           }
         }
       }
+      Ok(())
     }
   }
 }
 
-async fn r#loop(dnsmasq: &Dnsmasq, client: &NanocldClient) {
+async fn r#loop(client: &NanocldClient) {
   loop {
     log::info!("Subscribing to nanocl daemon events..");
     match client.watch_events().await {
       Err(err) => {
         log::warn!("Unable to Subscribe to nanocl daemon events: {err}");
       }
-      Ok(mut stream) => {
+      Ok(_) => {
         log::info!("Subscribed to nanocl daemon events");
-        ensure_resource_config(client).await;
-        while let Some(event) = stream.next().await {
-          let Ok(e) = event else {
-            break;
-          };
-          match e {
-            Event::ResourceCreated(resource) => {
-              let dns_rule =
-                serde_json::from_value::<ResourceDnsRule>(resource.data);
-              let Ok(dns_rule) = dns_rule else {
-                log::warn!("Unable to serialize the DnsRule");
-                continue;
-              };
-              if let Err(err) = update_entries(&dns_rule, dnsmasq, client).await
-              {
-                log::error!("Unable to update the DnsRule: {err}");
-              }
-            }
-            Event::ResourcePatched(resource) => {
-              let dns_rule =
-                serde_json::from_value::<ResourceDnsRule>(resource.data);
-              let Ok(dns_rule) = dns_rule else {
-                log::warn!("Unable to serialize the DnsRule");
-                continue;
-              };
-              if let Err(err) = update_entries(&dns_rule, dnsmasq, client).await
-              {
-                log::error!("Unable to update the DnsRule: {err}");
-              }
-            }
-            Event::ResourceDeleted(resource) => {
-              log::info!("Resource deleted: {resource:#?}");
-            }
-            _ => {
-              log::info!("Ignoring event: {e}");
-            }
-          }
+        if ensure_resource_config(client).await.is_ok() {
+          break;
         }
       }
     }
@@ -114,18 +82,11 @@ async fn r#loop(dnsmasq: &Dnsmasq, client: &NanocldClient) {
 }
 
 /// Spawn new thread with event loop to watch for nanocld events
-pub(crate) fn spawn(dnsmasq: &Dnsmasq) {
-  let dnsmasq = dnsmasq.clone();
+pub(crate) fn spawn(client: &NanocldClient) {
+  let client = client.clone();
   rt::Arbiter::new().exec_fn(move || {
-    #[allow(unused)]
-    let mut client = NanocldClient::connect_with_unix_default();
-    #[cfg(any(feature = "dev", feature = "test"))]
-    {
-      client =
-        NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-    }
     ntex::rt::spawn(async move {
-      r#loop(&dnsmasq, &client).await;
+      r#loop(&client).await;
     });
   });
 }

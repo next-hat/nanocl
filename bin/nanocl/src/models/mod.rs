@@ -26,7 +26,6 @@ pub use namespace::*;
 pub use cargo::*;
 pub use cargo_image::*;
 pub use resource::*;
-pub use version::*;
 pub use state::*;
 pub use install::*;
 pub use uninstall::*;
@@ -75,7 +74,7 @@ pub enum Command {
   Install(InstallOpts),
   /// Uninstall nanocl components
   Uninstall(UninstallOpts),
-  /// Upgrade nanocl components
+  // TODO: Upgrade nanocl components
   Upgrade(UpgradeOpts),
   /// Show all processes managed by nanocl
   Ps(ProcessOpts),
@@ -112,6 +111,6 @@ impl ToString for DisplayFormat {
       Self::Toml => "toml",
       Self::Json => "json",
     }
-    .to_string()
+    .to_owned()
   }
 }

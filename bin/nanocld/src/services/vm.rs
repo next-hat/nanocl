@@ -254,7 +254,7 @@ async fn ws_attach_service(
         stderr: Some(true),
         stream: Some(true),
         logs: Some(false),
-        detach_keys: Some("ctrl-c".to_string()),
+        detach_keys: Some("ctrl-c".to_owned()),
       }),
     )
     .await

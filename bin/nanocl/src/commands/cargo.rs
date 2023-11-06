@@ -46,7 +46,9 @@ async fn exec_cargo_create(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let cargo = opts.clone().into();
-  let item = client.create_cargo(&cargo, args.namespace.clone()).await?;
+  let item = client
+    .create_cargo(&cargo, args.namespace.as_deref())
+    .await?;
   println!("{}", &item.key);
   Ok(())
 }
@@ -82,7 +84,7 @@ async fn exec_cargo_rm(
     force: Some(opts.force),
   };
   for name in &opts.names {
-    client.delete_cargo(name, &query).await?;
+    client.delete_cargo(name, Some(&query)).await?;
   }
   Ok(())
 }
@@ -109,7 +111,7 @@ async fn exec_cargo_ls(
   opts: &CargoListOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let items = client.list_cargo(args.namespace.clone()).await?;
+  let items = client.list_cargo(args.namespace.as_deref()).await?;
   let rows = items
     .into_iter()
     .map(CargoRow::from)
@@ -150,7 +152,7 @@ async fn exec_cargo_start(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   client
-    .start_cargo(&opts.name, args.namespace.clone())
+    .start_cargo(&opts.name, args.namespace.as_deref())
     .await?;
   Ok(())
 }
@@ -178,7 +180,7 @@ async fn exec_cargo_stop(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in &opts.names {
-    client.stop_cargo(name, args.namespace.clone()).await?;
+    client.stop_cargo(name, args.namespace.as_deref()).await?;
   }
   Ok(())
 }
@@ -206,7 +208,9 @@ async fn exec_cargo_restart(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in &opts.names {
-    client.restart_cargo(name, args.namespace.clone()).await?;
+    client
+      .restart_cargo(name, args.namespace.as_deref())
+      .await?;
   }
   Ok(())
 }
@@ -233,9 +237,8 @@ async fn exec_cargo_patch(
   opts: &CargoPatchOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let cargo = opts.clone().into();
   client
-    .patch_cargo(&opts.name, cargo, args.namespace.clone())
+    .patch_cargo(&opts.name, &opts.clone().into(), args.namespace.as_deref())
     .await?;
   Ok(())
 }
@@ -263,7 +266,7 @@ async fn exec_cargo_inspect(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let cargo = client
-    .inspect_cargo(&opts.name, args.namespace.clone())
+    .inspect_cargo(&opts.name, args.namespace.as_deref())
     .await?;
   let display = opts
     .display
@@ -297,12 +300,12 @@ async fn exec_cargo_exec(
   let client = &cli_conf.client;
   let exec: CreateExecOptions = opts.clone().into();
   let result = client
-    .create_exec(&opts.name, exec, args.namespace.clone())
+    .create_exec(&opts.name, &exec, args.namespace.as_deref())
     .await?;
   let mut stream = client
     .start_exec(
       &result.id,
-      StartExecOptions {
+      &StartExecOptions {
         tty: opts.tty,
         ..Default::default()
       },
@@ -356,7 +359,7 @@ async fn exec_cargo_history(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let histories = client
-    .list_history_cargo(&opts.name, args.namespace.clone())
+    .list_history_cargo(&opts.name, args.namespace.as_deref())
     .await?;
   utils::print::print_yml(histories)?;
   Ok(())
@@ -394,7 +397,7 @@ async fn exec_cargo_logs(
     stderr: None,
     stdout: None,
   };
-  let mut stream = client.logs_cargo(&opts.name, &query).await?;
+  let mut stream = client.logs_cargo(&opts.name, Some(&query)).await?;
   while let Some(log) = stream.next().await {
     let log = match log {
       Ok(log) => log,
@@ -455,7 +458,8 @@ async fn exec_cargo_stats(
       let mut tx = tx.clone();
       let client = client.clone();
       async move {
-        let Ok(mut stream) = client.stats_cargo(&name, &query).await else {
+        let Ok(mut stream) = client.stats_cargo(&name, Some(&query)).await
+        else {
           return;
         };
         while let Some(stats) = stream.next().await {
@@ -514,7 +518,7 @@ async fn exec_cargo_revert(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let cargo = client
-    .revert_cargo(&opts.name, &opts.history_id, args.namespace.clone())
+    .revert_cargo(&opts.name, &opts.history_id, args.namespace.as_deref())
     .await?;
   utils::print::print_yml(cargo)?;
   Ok(())
@@ -547,10 +551,10 @@ async fn exec_cargo_run(
     exec_cargo_image_pull(client, &opts.image).await?;
   }
   let cargo = client
-    .create_cargo(&opts.clone().into(), args.namespace.clone())
+    .create_cargo(&opts.clone().into(), args.namespace.as_deref())
     .await?;
   client
-    .start_cargo(&cargo.name, Some(cargo.namespace_name))
+    .start_cargo(&cargo.name, Some(&cargo.namespace_name))
     .await?;
   Ok(())
 }

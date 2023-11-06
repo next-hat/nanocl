@@ -51,7 +51,7 @@ where
     format!("http://{url}")
   };
   let reqwest = ntex::http::Client::default();
-  let mut res = reqwest.get(url.to_string()).send().await.map_err(|err| {
+  let mut res = reqwest.get(&url).send().await.map_err(|err| {
     err.map_err_context(|| "Unable to get Statefile from url")
   })?;
   if res.status().is_redirection() {
@@ -223,7 +223,7 @@ pub async fn log_cargo(
   let cargo = match client
     .inspect_cargo(
       &cargo.name,
-      Some(opts.namespace.to_owned().unwrap_or("global".to_string())),
+      Some(opts.namespace.as_deref().unwrap_or("global")),
     )
     .await
   {
@@ -243,7 +243,7 @@ pub async fn log_cargo(
     } else {
       format!("{index}-{}", cargo.name)
     };
-    let namespace = opts.namespace.to_owned().unwrap_or("global".to_string());
+    let namespace = opts.namespace.to_owned().unwrap_or("global".to_owned());
     let client = client.to_owned();
     let since = opts.since;
     let until = opts.until;
@@ -260,7 +260,7 @@ pub async fn log_cargo(
         timestamps,
         ..Default::default()
       };
-      match client.logs_cargo(&name, &query).await {
+      match client.logs_cargo(&name, Some(&query)).await {
         Err(err) => {
           eprintln!("Cannot attach to cargo {name}: {err}");
         }
@@ -378,12 +378,10 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
         .ok_or(IoError::not_found("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
-      let url = Box::leak(url.into_boxed_str());
-      NanocldClient::connect_to(url, Some(version.into()))
+      NanocldClient::connect_to(&url, Some(version.into()))
     }
     api_version if meta.api_version.starts_with('v') => {
-      let url = Box::leak(host.to_owned().into_boxed_str());
-      NanocldClient::connect_to(url, Some(api_version))
+      NanocldClient::connect_to(host, Some(api_version))
     }
     _ => {
       let mut paths = meta
@@ -399,8 +397,7 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
       let url = format!("https://{url}");
-      let url = Box::leak(url.into_boxed_str());
-      NanocldClient::connect_to(url, Some(version.into()))
+      NanocldClient::connect_to(&url, Some(version.into()))
     }
   };
   Ok(client)
@@ -800,7 +797,7 @@ async fn exec_state_logs(
       let context = opts.state_location.as_ref().unwrap_or(&namespace);
       Err(IoError::invalid_input(
         context,
-        &("Only Cargo or Deployment  statefile kind can be logged".to_string()),
+        &("Only Cargo or Deployment  statefile kind can be logged".to_owned()),
       ))
     }
   }?;
@@ -812,7 +809,7 @@ async fn exec_state_logs(
     tail: if tail.is_empty() {
       None
     } else {
-      Some(tail.to_string())
+      Some(tail.to_owned())
     },
     timestamps: Some(opts.timestamps),
     follow: Some(opts.follow),

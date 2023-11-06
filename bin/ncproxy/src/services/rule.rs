@@ -25,14 +25,8 @@ pub async fn apply_rule(
   path: web::types::Path<(String, String)>,
   nginx: web::types::State<Nginx>,
   web::types::Json(payload): web::types::Json<ResourceProxyRule>,
+  client: web::types::State<NanocldClient>,
 ) -> Result<web::HttpResponse, HttpError> {
-  #[allow(unused)]
-  let mut client = NanocldClient::connect_with_unix_default();
-  #[cfg(any(feature = "dev", feature = "test"))]
-  {
-    client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-  }
   utils::create_resource_conf(&path.1, &payload, &client, &nginx).await?;
   if let Err(err) = utils::reload_config(&client).await {
     nginx.delete_conf_file(&path.1).await;
@@ -58,14 +52,8 @@ pub async fn apply_rule(
 pub async fn remove_rule(
   path: web::types::Path<(String, String)>,
   nginx: web::types::State<Nginx>,
+  client: web::types::State<NanocldClient>,
 ) -> Result<web::HttpResponse, HttpError> {
-  #[allow(unused)]
-  let mut client = NanocldClient::connect_with_unix_default();
-  #[cfg(any(feature = "dev", feature = "test"))]
-  {
-    client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-  }
   nginx.delete_conf_file(&path.1).await;
   utils::reload_config(&client).await?;
   Ok(web::HttpResponse::Ok().finish())
