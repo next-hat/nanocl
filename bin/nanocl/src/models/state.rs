@@ -47,6 +47,9 @@ pub struct StateApplyOpts {
   /// Skip the confirmation prompt
   #[clap(long = "yes", short = 'y')]
   pub skip_confirm: bool,
+  /// Perform an apply even if state didn't changed
+  #[clap(long, short = 'r')]
+  pub reload: bool,
   /// Additional arguments to pass to the file
   #[clap(last = true, raw = true)]
   pub args: Vec<String>,
