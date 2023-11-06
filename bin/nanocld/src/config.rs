@@ -50,10 +50,9 @@ fn gen_daemon_conf(
   } else if let Some(ref gateway) = config.gateway {
     gateway.to_owned()
   } else {
-    // TODO: reenable error handling
-    unix::network::get_default_ip().unwrap().to_string()
-    // .map_err(|err| err.map_err_context(|| "Gateway"))?
-    // .to_string()
+    unix::network::get_default_ip()
+      .map_err(|err| err.map_err_context(|| "Gateway"))?
+      .to_string()
   };
   let hostname = if let Some(ref hostname) = args.hostname {
     hostname.to_owned()
@@ -150,7 +149,6 @@ mod tests {
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/var/run/docker.sock")),
       conf_dir: String::from("/etc/nanocl"),
-      init: false,
       gateway: None,
       hostname: None,
       advertise_addr: None,
@@ -224,7 +222,6 @@ mod tests {
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/var/run/docker.sock")),
       conf_dir: String::from("/etc/nanocl"),
-      init: false,
       gateway: None,
       advertise_addr: None,
       hostname: None,

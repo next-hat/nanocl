@@ -6,7 +6,7 @@ use super::http_client::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for nodes
-  const NODE_PATH: &str = "/nodes";
+  const NODE_PATH: &'static str = "/nodes";
 
   /// ## List node
   ///

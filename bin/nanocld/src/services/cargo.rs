@@ -687,10 +687,10 @@ mod tests {
       .send_put(
         &format!("{ENDPOINT}/{main_test_cargo}"),
         Some(&CargoConfigPartial {
-          name: main_test_cargo.to_string(),
+          name: main_test_cargo.to_owned(),
           container: bollard_next::container::Config {
-            image: Some("nexthat/nanocl-get-started:latest".to_string()),
-            env: Some(vec!["TEST=1".to_string()]),
+            image: Some("nexthat/nanocl-get-started:latest".to_owned()),
+            env: Some(vec!["TEST=1".to_owned()]),
             ..Default::default()
           },
           ..Default::default()
@@ -704,11 +704,11 @@ mod tests {
     assert_eq!(patch_response.namespace_name, "global");
     assert_eq!(
       patch_response.config.container.image,
-      Some("nexthat/nanocl-get-started:latest".to_string())
+      Some("nexthat/nanocl-get-started:latest".to_owned())
     );
     assert_eq!(
       patch_response.config.container.env,
-      Some(vec!["TEST=1".to_string()])
+      Some(vec!["TEST=1".to_owned()])
     );
     let mut res = client
       .send_get(
@@ -770,9 +770,9 @@ mod tests {
       .send_post(
         ENDPOINT,
         Some(&CargoConfigPartial {
-          name: CARGO_NAME.to_string(),
+          name: CARGO_NAME.to_owned(),
           container: bollard_next::container::Config {
-            image: Some("nexthat/nanocl-get-started:latest".to_string()),
+            image: Some("nexthat/nanocl-get-started:latest".to_owned()),
             ..Default::default()
           },
           ..Default::default()

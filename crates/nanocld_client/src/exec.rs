@@ -12,7 +12,7 @@ use super::http_client::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for exec commands
-  const EXEC_PATH: &str = "/exec";
+  const EXEC_PATH: &'static str = "/exec";
 
   /// ## Create exec command inside a cargo
   ///
