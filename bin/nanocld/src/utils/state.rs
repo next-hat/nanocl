@@ -19,6 +19,32 @@ use nanocl_stubs::state::{
 use crate::{utils, repositories};
 use crate::models::{StateData, DaemonState};
 
+/// ## Ensure namespace existence
+///
+/// Ensure that the namespace exists in the system
+///
+/// ## Arguments
+///
+/// * [namespace](Option) - The optional [namespace name](String)
+/// * [state](DaemonState) - The system state
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Ok) - [Namespace name](String) if successful
+///   * [Err](Err) - [Http error](HttpError) if something went wrong
+///
+async fn ensure_namespace_existence(
+  namespace: &Option<String>,
+  state: &DaemonState,
+) -> Result<String, HttpError> {
+  if let Some(namespace) = namespace {
+    utils::namespace::create_if_not_exists(namespace, state).await?;
+    return Ok(namespace.to_owned());
+  }
+  Ok("global".to_owned())
+}
+
 /// ## Stream to bytes
 ///
 /// Local utility to convert a state stream to bytes to send to the client
@@ -634,12 +660,7 @@ pub async fn apply_deployment(
   qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    utils::namespace::create_if_not_exists(namespace, state).await?;
-    namespace.to_owned()
-  } else {
-    "global".to_owned()
-  };
+  let namespace = ensure_namespace_existence(&data.namespace, state).await?;
   if let Some(secrets) = &data.secrets {
     apply_secrets(secrets, state, qs, &sx).await;
   }
@@ -680,12 +701,7 @@ pub async fn apply_cargo(
   qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    utils::namespace::create_if_not_exists(namespace, state).await?;
-    namespace.to_owned()
-  } else {
-    "global".to_owned()
-  };
+  let namespace = ensure_namespace_existence(&data.namespace, state).await?;
   apply_cargoes(&namespace, &data.cargoes, version, state, qs, &sx).await;
   Ok(())
 }
@@ -715,12 +731,7 @@ pub async fn apply_vm(
   qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    utils::namespace::create_if_not_exists(namespace, state).await?;
-    namespace.to_owned()
-  } else {
-    "global".to_owned()
-  };
+  let namespace = ensure_namespace_existence(&data.namespace, state).await?;
   apply_vms(&namespace, &data.virtual_machines, version, state, qs, &sx).await;
   Ok(())
 }

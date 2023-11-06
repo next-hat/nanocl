@@ -148,5 +148,15 @@ mod tests {
     revert_state(&client, "../../examples/resource_ssl_example.yml").await;
     // Revert examples/deploy_example.yml
     revert_state(&client, "../../examples/deploy_example.yml").await;
+    // Apply examples/secret_env.yml
+    apply_state(&client, "../../examples/secret_env.yml", None).await;
+    // ReApply examples/secret_env.yml
+    apply_state(&client, "../../examples/secret_env.yml", None).await;
+    // ReApply examples/secret_env.yml with reload
+    apply_state(
+      &client,
+      "../../examples/secret_env.yml",
+      Some(&StateApplyQuery { reload: Some(true) }),
+    )
   }
 }

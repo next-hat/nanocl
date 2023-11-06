@@ -169,8 +169,6 @@ mod tests {
     // Try to list cargo images
     let args = Cli::parse_from(["nanocl", "cargo", "image", "ls"]);
     let res = execute_arg(&args).await;
-
-    println!("{:?}", res);
     assert!(res.is_ok());
     // Try to inspect cargo image
     let args =
@@ -216,10 +214,7 @@ mod tests {
       "TEST=1",
     ]);
     let ret = execute_arg(&args).await;
-
-    println!("{:?}", ret);
     assert!(ret.is_ok());
-
     let args = Cli::parse_from(["nanocl", "cargo", "history", CARGO_NAME]);
     assert!(execute_arg(&args).await.is_ok());
     let client =
@@ -231,7 +226,6 @@ mod tests {
       .first()
       .unwrap()
       .clone();
-
     let args = Cli::parse_from([
       "nanocl",
       "cargo",
@@ -240,7 +234,6 @@ mod tests {
       &history.key.to_string(),
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     // Try to stop a cargo
     let args = Cli::parse_from(["nanocl", "cargo", "stop", CARGO_NAME]);
     assert!(execute_arg(&args).await.is_ok());
@@ -261,7 +254,6 @@ mod tests {
     ]);
     // ensure that ProxyRule and DnsRule are available
     _ = execute_arg(&args).await;
-
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -270,7 +262,6 @@ mod tests {
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     // History
     let args =
       Cli::parse_from(["nanocl", "resource", "history", "deploy-example.com"]);
@@ -321,7 +312,6 @@ mod tests {
       "hello",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     args = Cli::parse_from([
       "nanocl",
       "cargo",
@@ -335,7 +325,6 @@ mod tests {
       "env",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     args = Cli::parse_from([
       "nanocl",
       "cargo",
@@ -348,7 +337,6 @@ mod tests {
       "whoami",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     args = Cli::parse_from([
       "nanocl",
       "cargo",
@@ -361,7 +349,6 @@ mod tests {
       "ls",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     args = Cli::parse_from([
       "nanocl",
       "cargo",
@@ -387,7 +374,6 @@ mod tests {
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -396,7 +382,14 @@ mod tests {
       "../../examples/deploy_example.toml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
+    let args = Cli::parse_from([
+      "nanocl",
+      "state",
+      "apply",
+      "-rys",
+      "../../examples/deploy_example.toml",
+    ]);
+    assert!(execute_arg(&args).await.is_ok());
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -405,7 +398,6 @@ mod tests {
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -417,7 +409,6 @@ mod tests {
       "../../examples/deploy_example.yml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -426,7 +417,6 @@ mod tests {
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -435,7 +425,6 @@ mod tests {
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -444,7 +433,6 @@ mod tests {
       "../../examples/cargo_example.yml",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     let args = Cli::parse_from([
       "nanocl",
       "state",
@@ -473,10 +461,8 @@ mod tests {
       "MESSAGE=GREETING",
     ]);
     assert!(execute_arg(&args).await.is_ok());
-
     let args = Cli::parse_from(["nanocl", "cargo", "stop", "cli-test-run"]);
     assert!(execute_arg(&args).await.is_ok());
-
     let args = Cli::parse_from(["nanocl", "cargo", "rm", "-y", "cli-test-run"]);
     assert!(execute_arg(&args).await.is_ok());
   }
