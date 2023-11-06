@@ -2,9 +2,7 @@
 * Endpoints to manipulate cargoes
 */
 
-use ntex::rt;
-use ntex::web;
-use ntex::http;
+use ntex::{rt, web, http};
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;

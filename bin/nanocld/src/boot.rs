@@ -7,10 +7,8 @@ use nanocl_error::io::{FromIo, IoResult};
 
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::{event, utils};
+use crate::{event, utils, version};
 use crate::models::DaemonState;
-
-use crate::version::VERSION;
 
 use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
 
@@ -135,7 +133,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     docker_api: docker.clone(),
     config: daemon_conf.to_owned(),
     event_emitter: event::EventEmitter::new(),
-    version: VERSION.to_owned(),
+    version: version::VERSION.to_owned(),
   };
   utils::system::register_namespace("system", false, &daemon_state).await?;
   utils::system::register_namespace("global", true, &daemon_state).await?;

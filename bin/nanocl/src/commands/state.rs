@@ -12,7 +12,7 @@ use bollard_next::service::HostConfig;
 
 use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::state::StateMeta;
+use nanocld_client::stubs::state::{StateMeta, StateApplyQuery};
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
@@ -725,7 +725,14 @@ async fn exec_state_apply(
   let data = serde_json::to_value(&data).map_err(|err| {
     err.map_err_context(|| "Unable to create json payload for the daemon")
   })?;
-  let mut stream = client.apply_state(&data).await?;
+  let mut stream = client
+    .apply_state(
+      &data,
+      Some(&StateApplyQuery {
+        reload: Some(opts.reload),
+      }),
+    )
+    .await?;
   let multiprogress = MultiProgress::new();
   multiprogress.set_move_cursor(false);
   let mut layers: HashMap<String, ProgressBar> = HashMap::new();

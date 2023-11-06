@@ -1,8 +1,10 @@
 use futures::StreamExt;
-use nanocld_client::bollard_next;
-use nanocld_client::NanocldClient;
+
 use nanocl_error::io::{IoResult, FromIo, IoError};
 
+use nanocld_client::bollard_next;
+use nanocld_client::NanocldClient;
+use nanocld_client::stubs::vm::VmInspect;
 use nanocld_client::stubs::cargo::{CargoInspect, CreateExecOptions};
 use nanocld_client::stubs::proxy::ProxySsl;
 use nanocld_client::stubs::proxy::ProxySslConfig;
@@ -11,7 +13,6 @@ use nanocld_client::stubs::proxy::{
   ProxyRule, StreamTarget, ProxyStreamProtocol, ProxyRuleHttp, UpstreamTarget,
   ProxyHttpLocation, ProxyRuleStream, LocationTarget, ResourceProxyRule,
 };
-use nanocld_client::stubs::vm::VmInspect;
 
 use crate::nginx::{Nginx, NginxConfKind};
 
@@ -43,7 +44,6 @@ async fn get_namespace_addr(
   let namespace = client.inspect_namespace(name).await.map_err(|err| {
     err.map_err_context(|| format!("Unable to inspect namespace {name}"))
   })?;
-
   let ipam = namespace.network.ipam.unwrap_or_default();
   let ipam_config = ipam.config.unwrap_or_default();
   let ipam_config = ipam_config
@@ -75,7 +75,7 @@ async fn get_listen(
     }
     _ => Err(IoError::invalid_data(
       "Network",
-      &format!("network {}", network),
+      &format!("invalid network {network}"),
     )),
   }
 }
