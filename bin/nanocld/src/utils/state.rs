@@ -634,7 +634,12 @@ pub async fn apply_deployment(
   qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = utils::key::resolve_nsp(&data.namespace);
+  let namespace = if let Some(namespace) = &data.namespace {
+    utils::namespace::create_if_not_exists(namespace, state).await?;
+    namespace.to_owned()
+  } else {
+    "global".to_owned()
+  };
   if let Some(secrets) = &data.secrets {
     apply_secrets(secrets, state, qs, &sx).await;
   }
