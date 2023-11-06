@@ -5,7 +5,7 @@ macro_rules! exprs_as_bracket {
     " {}"
   };
   ($expr: expr, $($other_exprs: tt),+) => {
-    concat!(" {}", crate::exprs_as_bracket!($($other_exprs),+))
+    concat!(" {}", exprs_as_bracket!($($other_exprs),+))
   };
 }
 
@@ -15,7 +15,7 @@ macro_rules! format_command {
     format!(
       concat!(
         "Command {}",
-        crate::exprs_as_bracket!($($other_exprs)+),
+        exprs_as_bracket!($($other_exprs)+),
         " failed"
       ),
       $start,
@@ -36,10 +36,10 @@ macro_rules! exec_cli {
 #[macro_export]
 macro_rules! assert_cli_ok {
   ($cmd :expr $(, $args:expr)* $(,)?) => {
-    let res = crate::exec_cli!(
+    let res = exec_cli!(
       [$cmd $(, $args)*],
     );
-    assert!(res.is_ok(), "{}", crate::format_command!($cmd $(, $args)*));
+    assert!(res.is_ok(), "{}", format_command!($cmd $(, $args)*));
   };
 }
 

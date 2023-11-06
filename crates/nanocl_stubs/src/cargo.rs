@@ -156,7 +156,7 @@ pub struct CargoKillOptions {
 impl Default for CargoKillOptions {
   fn default() -> Self {
     Self {
-      signal: "SIGKILL".into(),
+      signal: "SIGKILL".to_owned(),
     }
   }
 }

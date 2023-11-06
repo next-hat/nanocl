@@ -551,7 +551,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::container::KillContainerOptions;
   use ntex::http;
   use futures::{TryStreamExt, StreamExt};
 
@@ -559,11 +558,11 @@ mod tests {
   use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
   use nanocl_stubs::cargo::{
     Cargo, CargoSummary, CargoInspect, OutputLog, CargoDeleteQuery,
-    CargoListQuery, CargoScale,
+    CargoListQuery, CargoScale, CargoKillOptions,
   };
 
-  use crate::services::cargo_image::tests::ensure_test_image;
   use crate::utils::tests::*;
+  use crate::services::cargo_image::tests::ensure_test_image;
 
   const ENDPOINT: &str = "/cargoes";
 
@@ -685,7 +684,9 @@ mod tests {
     let res = client
       .send_post(
         &format!("{ENDPOINT}/{main_test_cargo}/kill"),
-        Some(&KillContainerOptions { signal: "SIGINT" }),
+        Some(&CargoKillOptions {
+          signal: "SIGINT".to_owned(),
+        }),
         None::<String>,
       )
       .await;

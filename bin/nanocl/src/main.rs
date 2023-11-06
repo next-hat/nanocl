@@ -128,7 +128,6 @@ async fn main() -> std::io::Result<()> {
 mod tests {
   use super::*;
 
-  use crate::utils::test::*;
   use nanocld_client::NanocldClient;
 
   /// Test version command
