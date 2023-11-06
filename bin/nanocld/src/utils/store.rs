@@ -31,7 +31,7 @@ pub async fn create_pool(
   daemon_conf: &DaemonConfig,
 ) -> IoResult<Pool> {
   let state_dir = daemon_conf.state_dir.clone();
-  let options = format!("/defaultdb");
+  let options = format!("/defaultdb?sslmode=verify-full&sslcert={state_dir}/store/certs/client.root.crt&sslkey={state_dir}/store/certs/client.root.key&sslrootcert={state_dir}/store/certs/ca.crt");
   let db_url = format!("postgresql://root:root@{host}{options}");
   web::block(move || {
     let manager = ConnectionManager::<PgConnection>::new(db_url);
