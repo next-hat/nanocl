@@ -2,9 +2,7 @@
 * Endpoints to manipulate cargoes
 */
 
-use ntex::rt;
-use ntex::web;
-use ntex::http;
+use ntex::{rt, web, http};
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
@@ -397,7 +395,7 @@ async fn list_cargo_history(
     (status = 404, description = "Cargo does not exist", body = ApiError),
   ),
 ))]
-#[web::patch("/cargoes/{name}/histories/{id}/revert")]
+#[web::patch("/{kind}/{name}/histories/{id}/revert")]
 async fn revert_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<CargoRevertPath>,

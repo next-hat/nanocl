@@ -22,6 +22,14 @@ pub struct StateMeta {
   pub kind: String,
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct StateApplyQuery {
+  pub reload: Option<bool>,
+}
+
 /// ## StateResource
 ///
 /// Statefile that represent the `Resource` kind

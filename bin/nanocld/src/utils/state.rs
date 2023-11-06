@@ -1,5 +1,4 @@
-use ntex::rt;
-use ntex::http;
+use ntex::{rt, http};
 use ntex::util::Bytes;
 use ntex::channel::mpsc;
 use futures_util::StreamExt;
@@ -14,7 +13,7 @@ use nanocl_stubs::cargo_config::CargoConfigPartial;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmDiskConfig};
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateVirtualMachine, StateResource, StateMeta,
-  StateStream, StateSecret,
+  StateStream, StateSecret, StateApplyQuery,
 };
 
 use crate::{utils, repositories};
@@ -144,6 +143,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
 async fn apply_secrets(
   data: &[SecretPartial],
   state: &DaemonState,
+  qs: &StateApplyQuery,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {
   data
@@ -154,7 +154,7 @@ async fn apply_secrets(
       match repositories::secret::find_by_key(&key, &state.pool).await {
         Ok(existing) => {
           let existing: SecretPartial = existing.clone().into();
-          if existing == *secret {
+          if existing == *secret && !qs.reload.unwrap_or(false) {
             send(StateStream::new_secret_unchanged(&key), sx);
             return;
           }
@@ -219,6 +219,7 @@ async fn apply_cargoes(
   data: &[CargoConfigPartial],
   version: &str,
   state: &DaemonState,
+  qs: &StateApplyQuery,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {
   data
@@ -229,7 +230,7 @@ async fn apply_cargoes(
       match utils::cargo::inspect_by_key(&key, state).await {
         Ok(existing) => {
           let existing: CargoConfigPartial = existing.into();
-          if existing == *cargo {
+          if existing == *cargo && !qs.reload.unwrap_or(false) {
             send(StateStream::new_cargo_unchanged(&key), sx);
             return;
           }
@@ -289,6 +290,7 @@ pub async fn apply_vms(
   data: &[VmConfigPartial],
   version: &str,
   state: &DaemonState,
+  qs: &StateApplyQuery,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {
   data
@@ -309,7 +311,7 @@ pub async fn apply_vms(
             host_config: Some(vm.host_config.clone().unwrap_or_default()),
             ..vm.clone()
           };
-          if existing == vm {
+          if existing == vm && !qs.reload.unwrap_or(false) {
             send(StateStream::new_vm_unchanged(&key), sx);
             return;
           }
@@ -359,6 +361,7 @@ pub async fn apply_vms(
 async fn apply_resources(
   data: &[ResourcePartial],
   state: &DaemonState,
+  qs: &StateApplyQuery,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {
   data
@@ -371,7 +374,7 @@ async fn apply_resources(
           Err(_) => utils::resource::create(resource, &state.pool).await,
           Ok(cur_resource) => {
             let casted: ResourcePartial = cur_resource.into();
-            if *resource == casted {
+            if *resource == casted && !qs.reload.unwrap_or(false) {
               send(StateStream::new_resource_unchanged(&key), sx);
               return;
             }
@@ -628,25 +631,21 @@ pub async fn apply_deployment(
   data: &StateDeployment,
   version: &str,
   state: &DaemonState,
+  qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    utils::namespace::create_if_not_exists(namespace, state).await?;
-    namespace.to_owned()
-  } else {
-    "global".into()
-  };
+  let namespace = utils::key::resolve_nsp(&data.namespace);
   if let Some(secrets) = &data.secrets {
-    apply_secrets(secrets, state, &sx).await;
+    apply_secrets(secrets, state, qs, &sx).await;
   }
   if let Some(cargoes) = &data.cargoes {
-    apply_cargoes(&namespace, cargoes, version, state, &sx).await;
+    apply_cargoes(&namespace, cargoes, version, state, qs, &sx).await;
   }
   if let Some(vms) = &data.virtual_machines {
-    apply_vms(&namespace, vms, version, state, &sx).await;
+    apply_vms(&namespace, vms, version, state, qs, &sx).await;
   }
   if let Some(resources) = &data.resources {
-    apply_resources(resources, state, &sx).await;
+    apply_resources(resources, state, qs, &sx).await;
   }
   Ok(())
 }
@@ -673,15 +672,11 @@ pub async fn apply_cargo(
   data: &StateCargo,
   version: &str,
   state: &DaemonState,
+  qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    utils::namespace::create_if_not_exists(namespace, state).await?;
-    namespace.to_owned()
-  } else {
-    "global".into()
-  };
-  apply_cargoes(&namespace, &data.cargoes, version, state, &sx).await;
+  let namespace = utils::key::resolve_nsp(&data.namespace);
+  apply_cargoes(&namespace, &data.cargoes, version, state, qs, &sx).await;
   Ok(())
 }
 
@@ -707,15 +702,11 @@ pub async fn apply_vm(
   data: &StateVirtualMachine,
   version: &str,
   state: &DaemonState,
+  qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    utils::namespace::create_if_not_exists(namespace, state).await?;
-    namespace.to_owned()
-  } else {
-    "global".into()
-  };
-  apply_vms(&namespace, &data.virtual_machines, version, state, &sx).await;
+  let namespace = utils::key::resolve_nsp(&data.namespace);
+  apply_vms(&namespace, &data.virtual_machines, version, state, qs, &sx).await;
   Ok(())
 }
 
@@ -739,9 +730,10 @@ pub async fn apply_vm(
 pub async fn apply_resource(
   data: &StateResource,
   state: &DaemonState,
+  qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  apply_resources(&data.resources, state, &sx).await;
+  apply_resources(&data.resources, state, qs, &sx).await;
   Ok(())
 }
 
@@ -765,9 +757,10 @@ pub async fn apply_resource(
 pub async fn apply_secret(
   data: &StateSecret,
   state: &DaemonState,
+  qs: &StateApplyQuery,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  apply_secrets(&data.secrets, state, &sx).await;
+  apply_secrets(&data.secrets, state, qs, &sx).await;
   Ok(())
 }
 
@@ -792,11 +785,7 @@ pub async fn remove_deployment(
   state: &DaemonState,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    namespace.to_owned()
-  } else {
-    "global".into()
-  };
+  let namespace = utils::key::resolve_nsp(&data.namespace);
   if let Some(cargoes) = &data.cargoes {
     remove_cargoes(&namespace, cargoes, state, &sx).await;
   }
@@ -833,11 +822,7 @@ pub async fn remove_cargo(
   state: &DaemonState,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    namespace.to_owned()
-  } else {
-    "global".into()
-  };
+  let namespace = utils::key::resolve_nsp(&data.namespace);
   remove_cargoes(&namespace, &data.cargoes, state, &sx).await;
   Ok(())
 }
@@ -863,11 +848,7 @@ pub async fn remove_vm(
   state: &DaemonState,
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
-  let namespace = if let Some(namespace) = &data.namespace {
-    namespace.to_owned()
-  } else {
-    "global".into()
-  };
+  let namespace = utils::key::resolve_nsp(&data.namespace);
   remove_vms(&namespace, &data.virtual_machines, state, &sx).await;
   Ok(())
 }

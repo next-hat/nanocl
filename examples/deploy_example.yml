@@ -12,7 +12,7 @@ Resources:
     Data:
       Rules:
         - Domain: deploy-example.com
-          Network: All
+          Network: XDSXXD
           Locations:
             - Path: /
               Target:
@@ -24,7 +24,7 @@ Resources:
                 Port: 9000
             - Path: /v2
               Target:
-                Key: deploy-example2.global.c
+                Key: tototoxdlolz
                 Port: 9000
 
 # See all options:
