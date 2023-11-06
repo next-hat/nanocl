@@ -12,7 +12,7 @@ pub(crate) async fn is_api_error(
     let err = res.json::<serde_json::Value>().await.map_err(|err| {
       err.map_err_context(|| "Unable to serialize error response")
     })?;
-    let default = serde_json::Value::String("".to_string());
+    let default = serde_json::Value::String("".to_owned());
     let msg = err
       .get("msg")
       .unwrap_or(&default)

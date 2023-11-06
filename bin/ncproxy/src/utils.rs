@@ -394,8 +394,7 @@ async fn gen_http_server_block(
   let listen_http = get_listen(&rule.network, 80, client).await?;
   let http_host = match &rule.domain {
     Some(domain) => format!(
-      "  server_name {domain};\n  if ($host != {domain}) {{ return 502; }}\n",
-      domain = domain
+      "server_name {domain};\n  if ($host != {domain}) {{ return 502; }}\n",
     ),
     None => String::default(),
   };
@@ -664,6 +663,7 @@ pub(crate) async fn list_resource_by_cargo(
 ) -> IoResult<Vec<nanocld_client::stubs::resource::Resource>> {
   let namespace = namespace.unwrap_or("global".into());
   let target_key = format!("{name}.{namespace}.c");
+  log::debug!("matching resources for target: {target_key}");
   let query = ResourceQuery {
     contains: Some(
       serde_json::json!({ "Rules": [ { "Locations": [ { "Target": { "Key": target_key } } ] }  ] }).to_string(),
@@ -691,10 +691,12 @@ pub(crate) async fn list_resource_by_cargo(
     .into_iter()
     .chain(stream_resources.into_iter())
     .collect::<Vec<nanocld_client::stubs::resource::Resource>>();
-  log::debug!(
-    "matching resources for target: {target_key}:\n{:?}",
-    resources
-  );
+  if resources.is_empty() {
+    return Err(IoError::not_found(
+      "Resource",
+      &format!("No resources found matching cargo {target_key}"),
+    ));
+  }
   Ok(resources)
 }
 
@@ -717,7 +719,12 @@ pub(crate) async fn list_resource_by_secret(
   let resources = client.list_resource(Some(&query)).await.map_err(|err| {
     err.map_err_context(|| "Unable to list resources from nanocl daemon")
   })?;
-  log::debug!("matching resources for secret: {secret}:\n{:?}", resources);
+  if resources.is_empty() {
+    return Err(IoError::not_found(
+      "Resource",
+      &format!("No resources found matching secret {secret}"),
+    ));
+  }
   Ok(resources)
 }
 

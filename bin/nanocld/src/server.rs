@@ -107,12 +107,13 @@ mod tests {
   #[ntex::test]
   async fn server_on_tmp_unix_socket() {
     before();
+    let home = std::env::var("HOME").expect("Failed to get home dir");
     let args = Cli::parse_from(vec![
       "nanocl",
       "-H",
       "unix:///tmp/nanocl_test.sock",
       "--state-dir",
-      "/tmp/nanocl",
+      &format!("{home}/.nanocl_dev/state"),
     ]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)
@@ -126,12 +127,13 @@ mod tests {
   #[ntex::test]
   async fn server_on_tcp_socket() {
     before();
+    let home = std::env::var("HOME").expect("Failed to get home dir");
     let args = Cli::parse_from(vec![
       "nanocl",
       "-H",
       "tcp://127.0.0.1:9999",
       "--state-dir",
-      "/tmp/nanocl",
+      &format!("{home}/.nanocl_dev/state"),
     ]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)
@@ -146,12 +148,13 @@ mod tests {
   #[ntex::test]
   async fn server_on_same_tcp_socket() {
     before();
+    let home = std::env::var("HOME").expect("Failed to get home dir");
     let args = Cli::parse_from(vec![
       "nanocl",
       "-H",
       "tcp://127.0.0.1:9888",
       "--state-dir",
-      "/tmp/nanocl",
+      &format!("{home}/.nanocl_dev/state"),
     ]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)
@@ -172,12 +175,13 @@ mod tests {
   #[ntex::test]
   async fn server_on_invalid_unix_socket() {
     before();
+    let home = std::env::var("HOME").expect("Failed to get home dir");
     let args = Cli::parse_from(vec![
       "nanocl",
       "-H",
       "unix:///root/test.sock",
       "--state-dir",
-      "/tmp/nanocl",
+      &format!("{home}/.nanocl_dev/state"),
     ]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)
@@ -192,12 +196,13 @@ mod tests {
   #[ntex::test]
   async fn server_on_invalid_host() {
     before();
+    let home = std::env::var("HOME").expect("Failed to get home dir");
     let args = Cli::parse_from(vec![
       "nanocl",
       "-H",
       "not_valid",
       "--state-dir",
-      "/tmp/nanocl",
+      &format!("{home}/.nanocl_dev/state"),
     ]);
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)

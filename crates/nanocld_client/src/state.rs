@@ -9,7 +9,7 @@ use crate::http_client::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for state
-  const STATE_PATH: &str = "/state";
+  const STATE_PATH: &'static str = "/state";
 
   /// ## Apply state
   ///

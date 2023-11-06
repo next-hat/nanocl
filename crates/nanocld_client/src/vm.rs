@@ -14,7 +14,7 @@ use crate::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for vms
-  const VM_PATH: &str = "/vms";
+  const VM_PATH: &'static str = "/vms";
 
   /// ## Create vm
   ///

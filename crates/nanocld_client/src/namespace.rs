@@ -5,7 +5,7 @@ use super::http_client::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for namespaces
-  const NAMESPACE_PATH: &str = "/namespaces";
+  const NAMESPACE_PATH: &'static str = "/namespaces";
 
   /// ## List namespace
   ///

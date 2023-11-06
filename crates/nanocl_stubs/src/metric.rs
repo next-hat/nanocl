@@ -15,11 +15,12 @@ pub enum MetricKind {
 impl ToString for MetricKind {
   fn to_string(&self) -> String {
     match self {
-      MetricKind::Cpu => "CPU".to_string(),
-      MetricKind::Memory => "MEMORY".to_string(),
-      MetricKind::Network => "NETWORK".to_string(),
-      MetricKind::Disk => "DISK".to_string(),
+      MetricKind::Cpu => "CPU",
+      MetricKind::Memory => "MEMORY",
+      MetricKind::Network => "NETWORK",
+      MetricKind::Disk => "DISK",
     }
+    .to_owned()
   }
 }
 

@@ -169,9 +169,10 @@ pub enum ProxyStreamProtocol {
 impl ToString for ProxyStreamProtocol {
   fn to_string(&self) -> String {
     match self {
-      ProxyStreamProtocol::Tcp => "tcp".into(),
-      ProxyStreamProtocol::Udp => "udp".into(),
+      ProxyStreamProtocol::Tcp => "tcp",
+      ProxyStreamProtocol::Udp => "udp",
     }
+    .to_owned()
   }
 }
 

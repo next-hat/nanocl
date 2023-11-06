@@ -94,67 +94,21 @@ async fn on_event(
   client: &NanocldClient,
 ) -> IoResult<()> {
   match event {
-    Event::CargoStarted(ev) => {
-      log::debug!("received cargo started event: {ev:#?}");
+    Event::CargoStarted(ev) | Event::CargoPatched(ev) => {
       if let Err(err) =
         update_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
       {
         log::warn!("{err}");
       }
     }
-    Event::CargoPatched(ev) => {
-      log::debug!("received cargo patched event: {ev:#?}");
-      if let Err(err) =
-        update_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
-      {
-        log::warn!("{err}");
-      }
-    }
-    Event::CargoStopped(ev) => {
-      log::debug!("received cargo stopped event: {ev:#?}");
+    Event::CargoStopped(ev) | Event::CargoDeleted(ev) => {
       if let Err(err) =
         delete_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
       {
         log::warn!("{err}");
       }
     }
-    Event::CargoDeleted(ev) => {
-      log::debug!("received cargo deleted event: {ev:#?}");
-      if let Err(err) =
-        delete_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
-      {
-        log::warn!("{err}");
-      }
-    }
-    Event::ResourceCreated(ev) => {
-      if ev.kind.as_str() != "ProxyRule" {
-        return Ok(());
-      }
-      log::debug!("received resource created event: {ev:#?}");
-      let resource: ResourcePartial = ev.as_ref().clone().into();
-      if let Err(err) = update_resource_rule(&resource, nginx, client).await {
-        log::warn!("{err}");
-      }
-    }
-    Event::ResourcePatched(ev) => {
-      if ev.kind.as_str() != "ProxyRule" {
-        return Ok(());
-      }
-      log::debug!("received resource patched event: {ev:#?}");
-      let resource: ResourcePartial = ev.as_ref().clone().into();
-      if let Err(err) = update_resource_rule(&resource, nginx, client).await {
-        log::warn!("{err}");
-      }
-    }
-    Event::ResourceDeleted(ev) => {
-      if ev.kind.as_str() != "ProxyRule" {
-        return Ok(());
-      }
-      log::debug!("received resource deleted event: {ev:#?}");
-      nginx.delete_conf_file(&ev.name).await;
-      utils::reload_config(client).await?;
-    }
-    Event::SecretPatched(secret) => {
+    Event::SecretCreated(secret) | Event::SecretPatched(secret) => {
       let resources =
         utils::list_resource_by_secret(&secret.key, client).await?;
       for resource in resources {
@@ -164,17 +118,6 @@ async fn on_event(
         }
       }
     }
-    Event::SecretCreated(secret) => {
-      let resources =
-        utils::list_resource_by_secret(&secret.key, client).await?;
-      for resource in resources {
-        let resource: ResourcePartial = resource.into();
-        if let Err(err) = update_resource_rule(&resource, nginx, client).await {
-          log::warn!("{err}");
-        }
-      }
-    }
-    // Ignore other events
     _ => {}
   }
   Ok(())
@@ -183,15 +126,14 @@ async fn on_event(
 async fn ensure_resource_config(client: &NanocldClient) {
   let formated_version = versioning::format_version(version::VERSION);
   let proxy_rule_kind = ResourcePartial {
-    kind: "Kind".to_string(),
-    name: "ProxyRule".to_string(),
+    kind: "Kind".to_owned(),
+    name: "ProxyRule".to_owned(),
     data: serde_json::json!({
       "Url": "unix:///run/nanocl/proxy.sock"
     }),
     version: format!("v{formated_version}"),
     metadata: None,
   };
-
   match client.inspect_resource(&proxy_rule_kind.name).await {
     Ok(_) => {
       if let Err(err) = client

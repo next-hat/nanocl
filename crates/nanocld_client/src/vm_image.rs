@@ -13,7 +13,7 @@ use crate::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for vm images
-  const VM_IMAGE_PATH: &str = "/vms/images";
+  const VM_IMAGE_PATH: &'static str = "/vms/images";
 
   /// ## Import a vm image
   ///
