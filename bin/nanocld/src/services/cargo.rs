@@ -395,7 +395,7 @@ async fn list_cargo_history(
     (status = 404, description = "Cargo does not exist", body = ApiError),
   ),
 ))]
-#[web::patch("/{kind}/{name}/histories/{id}/revert")]
+#[web::patch("/cargoes/{name}/histories/{id}/revert")]
 async fn revert_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<CargoRevertPath>,
