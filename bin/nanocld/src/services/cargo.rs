@@ -691,11 +691,9 @@ mod tests {
       )
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo kill");
-
     let res = client
-      .send_post(
+      .send_get(
         &format!("{ENDPOINT}/{main_test_cargo}/stats"),
-        None::<String>,
         None::<String>,
       )
       .await;
