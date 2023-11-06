@@ -26,7 +26,6 @@ pub use namespace::*;
 pub use cargo::*;
 pub use cargo_image::*;
 pub use resource::*;
-pub use version::*;
 pub use state::*;
 pub use install::*;
 pub use uninstall::*;
@@ -112,6 +111,6 @@ impl ToString for DisplayFormat {
       Self::Toml => "toml",
       Self::Json => "json",
     }
-    .to_string()
+    .to_owned()
   }
 }
