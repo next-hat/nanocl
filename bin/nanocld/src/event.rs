@@ -1,13 +1,10 @@
 use std::pin::Pin;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::task::Poll;
-use std::task::Context;
 use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::task::{Poll, Context};
 
-use ntex::{rt, web, http};
+use ntex::{rt, web, http, time};
 use ntex::util::Bytes;
-use ntex::time::interval;
 use ntex::web::error::BlockingError;
 use futures::Stream;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
@@ -107,7 +104,7 @@ impl EventEmitter {
   fn spawn_check_connection(mut self) {
     rt::spawn(async move {
       loop {
-        let task = interval(Duration::from_secs(10));
+        let task = time::interval(Duration::from_secs(10));
         task.tick().await;
         if let Err(err) = self.check_connection() {
           log::error!("{err}");

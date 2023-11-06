@@ -707,7 +707,7 @@ mod tests {
       .await;
     test_status_code!(
       res.status(),
-      http::StatusCode::OK,
+      http::StatusCode::ACCEPTED,
       "basic cargo restart"
     );
     let mut res = client
