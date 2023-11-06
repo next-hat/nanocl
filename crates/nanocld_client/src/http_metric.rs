@@ -5,7 +5,7 @@ use super::http_client::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for http metrics
-  const HTTP_METRIC_PATH: &str = "/http_metrics";
+  const HTTP_METRIC_PATH: &'static str = "/http_metrics";
 
   /// ## List http metrics
   ///

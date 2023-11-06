@@ -50,7 +50,7 @@ pub async fn hook_create_resource(
       };
       if resource_kind.schema.is_none() && resource_kind.url.is_none() {
         return Err(HttpError {
-          msg: "Neither schema nor url provided".to_string(),
+          msg: "Neither schema nor url provided".to_owned(),
           status: http::StatusCode::BAD_REQUEST,
         });
       }

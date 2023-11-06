@@ -38,15 +38,15 @@ async fn exec_vm_image_create(
   let file_path = options.file_path.clone();
   let fp = Path::new(&file_path)
     .canonicalize()
-    .map_err(|err| err.map_err_context(|| file_path.to_string()))?;
+    .map_err(|err| err.map_err_context(|| file_path.to_owned()))?;
   let file = tokio::fs::File::open(&fp)
     .await
-    .map_err(|err| err.map_err_context(|| file_path.to_string()))?;
+    .map_err(|err| err.map_err_context(|| file_path.to_owned()))?;
   // Get file size
   let file_size = file
     .metadata()
     .await
-    .map_err(|err| err.map_err_context(|| file_path.to_string()))?
+    .map_err(|err| err.map_err_context(|| file_path.to_owned()))?
     .len();
   let mut sent: u64 = 0;
   let pg = ProgressBar::new(100);

@@ -12,20 +12,29 @@ services:
   nstore:
     container_name: nstore.system.c
     image: cockroachdb/cockroach:v23.1.11
+    entrypoint: /bin/sh
     tty: true
     ports:
       - 26257:26257
+      - 26258:26258
     networks:
       - system
     volumes:
-      - /var/lib/nanocl/store/data:/cockroach/cockroach-data
-      - /var/lib/nanocl/store/certs:/certs
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store/ca:/ca
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store/certs:/certs
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store/data:/cockroach/cockroach-data
     environment:
       - TZ=Europe/Paris
     command:
-      - start-single-node
-      - --insecure
-      - --listen-addr=:26257
+      - -c
+      - |
+        if [[ ! -f "/ca/ca.key" ]]; then
+          echo "generating certs"
+          cockroach cert create-ca --certs-dir=/certs --ca-key=/ca/ca.key
+          cockroach cert create-node 127.0.0.1 nstore.nanocl.internal --certs-dir=/certs --ca-key=/ca/ca.key
+          cockroach cert create-client root --certs-dir=/certs --ca-key=/ca/ca.key
+        fi
+        cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
     labels:
       - io.nanocl=enabled
       - io.nanocl.c=nstore.system
@@ -81,10 +90,14 @@ services:
       - io.nanocl.cnsp=system
     volumes:
       - /run:/run
-      - /etc/nginx/logs:/var/log/nginx/access
-      - /etc/nginx/html:/usr/share/nginx/html
-      - /etc/nginx/conf.d:/etc/nginx/conf.d
-      - /etc/nginx/sites-available:/etc/nginx/sites-available
-      - /etc/nginx/sites-enabled:/etc/nginx/sites-enabled
-      - /etc/nginx/streams-available:/etc/nginx/streams-available
-      - /etc/nginx/streams-enabled:/etc/nginx/streams-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/run:/run
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/letsencrypt:/etc/letsencrypt
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/certs:/etc/nginx/certs
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/secrets:/opt/secrets
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/logs:/var/log/nginx/access
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/html:/usr/share/nginx/html
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/conf.d:/etc/nginx/conf.d
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/sites-available:/etc/nginx/sites-available
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/sites-enabled:/etc/nginx/sites-enabled
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/streams-available:/etc/nginx/streams-available
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/streams-enabled:/etc/nginx/streams-enabled

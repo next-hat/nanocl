@@ -10,22 +10,20 @@ use crate::version;
 mod openapi;
 
 mod rule;
-mod system;
 
 pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
   Err(HttpError {
     status: http::StatusCode::NOT_FOUND,
-    msg: "Route or method unhandled".into(),
+    msg: "Route or Method unhandled".to_owned(),
   })
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   #[cfg(feature = "dev")]
   {
+    use openapi::ApiDoc;
     use utoipa::OpenApi;
     use nanocl_utils::ntex::swagger;
-    use openapi::ApiDoc;
-
     let api_doc = ApiDoc::openapi();
     std::fs::write(
       "./bin/ncproxy/specs/swagger.yaml",
@@ -34,20 +32,16 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
     .expect("Unable to write swagger.yaml");
     let swagger_conf =
       swagger::SwaggerConfig::new(api_doc, "/explorer/swagger.json");
-
     config.service(
       web::scope("/explorer/")
         .state(swagger_conf)
         .configure(swagger::register),
     );
   }
-
   let versioning = middlewares::Versioning::new(version::VERSION).finish();
-
   config.service(
     web::scope("/{version}")
       .wrap(versioning)
-      .configure(rule::ntex_config)
-      .configure(system::ntex_config),
+      .configure(rule::ntex_config),
   );
 }

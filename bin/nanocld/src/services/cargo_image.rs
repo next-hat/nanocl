@@ -285,7 +285,7 @@ pub mod tests {
   async fn basic_create_wrong_name() {
     let client = gen_default_test_client().await;
     let payload = CargoImagePartial {
-      name: "test".to_string(),
+      name: "test".to_owned(),
     };
     let resp = create(&client, &payload).await;
     let status = resp.status();

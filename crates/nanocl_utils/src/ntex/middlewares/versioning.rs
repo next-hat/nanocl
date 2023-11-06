@@ -29,7 +29,7 @@ impl Versioning {
   pub fn new(version: &str) -> Self {
     Self {
       config: Inner {
-        version: version.to_string(),
+        version: version.to_owned(),
       },
     }
   }

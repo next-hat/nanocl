@@ -12,7 +12,7 @@ use super::http_client::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for cargo images
-  const CARGO_IMAGE_PATH: &str = "/cargoes/images";
+  const CARGO_IMAGE_PATH: &'static str = "/cargoes/images";
 
   /// ## List cargo image
   ///

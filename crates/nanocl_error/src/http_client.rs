@@ -10,8 +10,8 @@ pub enum HttpClientError {
 impl std::fmt::Display for HttpClientError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      HttpClientError::IoError(err) => write!(f, "{}", err),
-      HttpClientError::HttpError(err) => write!(f, "{}", err),
+      HttpClientError::IoError(err) => write!(f, "{err}"),
+      HttpClientError::HttpError(err) => write!(f, "{err}"),
     }
   }
 }
