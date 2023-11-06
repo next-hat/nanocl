@@ -158,5 +158,6 @@ mod tests {
       "../../examples/secret_env.yml",
       Some(&StateApplyQuery { reload: Some(true) }),
     )
+    .await;
   }
 }
