@@ -6,9 +6,6 @@ use clap::Parser;
 #[command(author = "nexthat team <team@next-hat.com>")]
 #[command(version)]
 pub struct Cli {
-  /// Ensure state is inited
-  #[clap(long)]
-  pub(crate) init: bool,
   /// Hosts to listen to use tcp:// and unix:// [default: unix:///run/nanocl.sock]
   #[clap(short = 'H', long = "hosts")]
   pub(crate) hosts: Option<Vec<String>>,
@@ -49,7 +46,6 @@ mod tests {
   fn cli_with_default() {
     let args = Cli::parse_from(["nanocl"]);
     assert_eq!(args.hosts, None);
-    assert!(!args.init);
     assert_eq!(args.docker_host, None);
     assert_eq!(args.state_dir, None);
     assert_eq!(args.conf_dir, String::from("/etc/nanocl"));
@@ -73,7 +69,6 @@ mod tests {
       args.hosts,
       Some(vec![String::from("unix:///run/nanocl.sock")])
     );
-    assert!(!args.init);
     assert_eq!(args.docker_host, Some(String::from("/var/run/docker.sock")));
     assert_eq!(args.state_dir, Some(String::from("/var/lib/nanocl")));
     assert_eq!(args.conf_dir, String::from("/etc/nanocl"));

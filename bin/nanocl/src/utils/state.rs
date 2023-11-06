@@ -154,7 +154,7 @@ pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
   // replace "${{ }}" with "{{ }}" syntax for liquid
   let reg = Regex::new(r"\$\{\{(.+?)\}\}")
     .map_err(|err| IoError::invalid_data("Regex", &format!("{err}")))?;
-  let template = reg.replace_all(raw, "{{ $1 }}").to_string();
+  let template = reg.replace_all(raw, "{{ $1 }}");
   let template = liquid::ParserBuilder::with_stdlib()
     .build()
     .unwrap()
@@ -204,7 +204,7 @@ pub fn update_progress(
     let pg = multiprogress.add(ProgressBar::new(1));
     pg.enable_steady_tick(std::time::Duration::from_millis(50));
     pg.set_style(spinner_style);
-    pg.set_message(state_stream.key.to_string());
+    pg.set_message(state_stream.key.to_owned());
     pg.set_prefix(format!(
       "{:#?}:{}",
       &state_stream.status, &state_stream.kind

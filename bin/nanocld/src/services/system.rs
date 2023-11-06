@@ -137,7 +137,7 @@ pub(crate) async fn get_processes(
     for node in nodes {
       let client = node.to_http_client();
       let node_containers = match client
-        .process(Some(ProccessQuery {
+        .process(Some(&ProccessQuery {
           all: false,
           namespace: qs.namespace.clone(),
           ..Default::default()

@@ -11,19 +11,22 @@ use nanocl_stubs::cargo::{CreateExecOptions, OutputLog};
 use super::http_client::NanocldClient;
 
 impl NanocldClient {
+  /// ## Default path for exec commands
+  const EXEC_PATH: &'static str = "/exec";
+
   /// ## Create exec command inside a cargo
   ///
   /// ## Arguments
   ///
   /// * [name](str) - The name of the cargo to exec the command in
   /// * [exec](CreateExecOptions) - The config for the exec command
-  /// * [namespace](Option<String>) - The namespace where belong the cargo
+  /// * [namespace](Option) - The [namespace](str) where belong the cargo
   ///
   /// ## Returns
   ///
-  /// * [Result](Result)
-  ///  * [Ok](Ok) - The created exec command
-  /// * [Err](HttpClientError) - The command could not be executed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok) - [Created exec](CreateExecResults) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -43,20 +46,22 @@ impl NanocldClient {
   pub async fn create_exec(
     &self,
     name: &str,
-    exec: CreateExecOptions,
-    namespace: Option<String>,
+    exec: &CreateExecOptions,
+    namespace: Option<&str>,
   ) -> Result<CreateExecResults, HttpClientError> {
     let res = self
       .send_post(
-        format!("/{}/cargoes/{name}/exec", &self.version),
+        &format!("/cargoes/{name}/exec"),
         Some(exec),
-        Some(GenericNspQuery { namespace }),
+        Some(GenericNspQuery::new(namespace)),
       )
       .await?;
     Self::res_json(res).await
   }
 
-  /// ## Inspect an exec command inside a cargo
+  /// ## Inspect exec
+  ///
+  /// Inspect an exec command inside a cargo instance.
   ///
   /// ## Arguments
   ///
@@ -65,8 +70,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///  * [Ok](Ok) - Infos of the inspected command
-  /// * [Err](HttpClientError) - The command could not be executed
+  ///   * [Ok](Ok) - [Info](ExecInspectResponse) of the exec command if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -96,10 +101,7 @@ impl NanocldClient {
     id: &str,
   ) -> Result<ExecInspectResponse, HttpClientError> {
     let res = self
-      .send_get(
-        format!("/{}/exec/{id}/cargo/inspect", &self.version),
-        Some(()),
-      )
+      .send_get(&format!("{}/{id}/cargo/inspect", Self::EXEC_PATH), Some(()))
       .await?;
     Self::res_json(res).await
   }
@@ -110,13 +112,12 @@ impl NanocldClient {
   ///
   /// * [id](str) - Id of command to run
   /// * [exec](CreateExecOptions) - The config for the exec command
-  /// * [namespace](Option<String>) - The namespace where belong the cargo
   ///
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///  * [Ok](Ok) - A [mpsc::Receiver](mpsc::Receiver) of [ExecOutput](ExecOutput)
-  /// * [Err](HttpClientError) - The command could not be executed
+  ///   * [Ok](Ok) - [Receiver](mpsc::Receiver) of [output log](OutputLog) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -140,11 +141,11 @@ impl NanocldClient {
   pub async fn start_exec(
     &self,
     id: &str,
-    exec: StartExecOptions,
+    exec: &StartExecOptions,
   ) -> Result<mpsc::Receiver<Result<OutputLog, HttpError>>, HttpClientError> {
     let res = self
       .send_post(
-        format!("/{}/exec/{id}/cargo/start", &self.version),
+        &format!("{}/{id}/cargo/start", &Self::EXEC_PATH),
         Some(exec),
         Some(()),
       )
@@ -162,17 +163,18 @@ mod tests {
 
   #[ntex::test]
   async fn exec_cargo() {
-    let client = NanocldClient::connect_to("http://localhost:8585", None);
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     let exec = CreateExecOptions {
       cmd: Some(vec!["echo".into(), "hello".into()]),
       ..Default::default()
     };
     let result = client
-      .create_exec("nstore", exec, Some("system".into()))
+      .create_exec("nstore", &exec, Some("system"))
       .await
       .unwrap();
     let mut rx = client
-      .start_exec(&result.id, StartExecOptions::default())
+      .start_exec(&result.id, &StartExecOptions::default())
       .await
       .unwrap();
     while let Some(_out) = rx.next().await {}

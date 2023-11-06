@@ -11,13 +11,22 @@ use nanocl_stubs::cargo_image::{CargoImagePartial, ListCargoImagesOptions};
 use super::http_client::NanocldClient;
 
 impl NanocldClient {
-  /// ## List all cargo images
+  /// ## Default path for cargo images
+  const CARGO_IMAGE_PATH: &'static str = "/cargoes/images";
+
+  /// ## List cargo image
+  ///
+  /// List cargo images from the system
+  ///
+  /// ## Arguments
+  ///
+  /// * [opts](Option) - The optional [query](ListCargoImagesOptions)
   ///
   /// ## Returns
   ///
-  /// * [Result](Result)
-  ///   * [Ok](Ok) * [Vec](Vec) of [ImageSummary](bollard_next::models::ImageSummary)
-  ///   * [Err](Err) * [HttpClientError](HttpClientError) if the request failed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok) - [Vector](Vec) of [image summary](bollard_next::models::ImageSummary) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -25,20 +34,18 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let images = client.list_cargo_image(None).await;
+  /// let res = client.list_cargo_image(None).await;
   /// ```
   ///
   pub async fn list_cargo_image(
     &self,
-    opts: Option<ListCargoImagesOptions>,
+    opts: Option<&ListCargoImagesOptions>,
   ) -> Result<Vec<bollard_next::models::ImageSummary>, HttpClientError> {
-    let res = self
-      .send_get(format!("/{}/cargoes/images", &self.version), opts)
-      .await?;
+    let res = self.send_get(Self::CARGO_IMAGE_PATH, opts).await?;
     Self::res_json(res).await
   }
 
-  /// ## Create a cargo image
+  /// ## Create cargo image
   ///
   /// This method will create a cargo image and return a stream of [CreateImageInfo](bollard_next::models::CreateImageInfo)
   /// that can be used to follow the progress of the image creation.
@@ -50,9 +57,9 @@ impl NanocldClient {
   ///
   /// ## Returns
   ///
-  /// * [Result](Result)
-  ///   * [Ok](Ok) * [mpsc::Receiver](mpsc::Receiver) of [CreateImageInfo](bollard_next::models::CreateImageInfo) as Stream
-  ///   * [Err](Err) * [HttpClientError](HttpClientError) if the request failed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok) - [Receiver](mpsc::Receiver) of [CreateImageInfo](bollard_next::models::CreateImageInfo) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -62,7 +69,7 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let mut stream = client.create_cargo_image("my-image").await;
   /// while let Some(info) = stream.try_next().await {
-  ///  println!("{:?}", info);
+  ///  println!("{info:?}");
   /// }
   /// ```
   ///
@@ -75,7 +82,7 @@ impl NanocldClient {
   > {
     let res = self
       .send_post(
-        format!("/{}/cargoes/images", self.version),
+        Self::CARGO_IMAGE_PATH,
         Some(CargoImagePartial {
           name: name.to_owned(),
         }),
@@ -85,9 +92,9 @@ impl NanocldClient {
     Ok(Self::res_stream(res).await)
   }
 
-  /// ## Delete a cargo image
+  /// ## Delete cargo image
   ///
-  /// This method will delete a cargo image by it's name.
+  /// Delete a cargo image by it's name.
   ///
   /// ## Arguments
   ///
@@ -96,8 +103,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The image was successfully deleted
-  ///   * [Err](Err) * [HttpClientError](HttpClientError) if the request failed
+  ///   * [Ok](Ok) - The image was successfully deleted if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -114,16 +121,16 @@ impl NanocldClient {
   ) -> Result<(), HttpClientError> {
     self
       .send_delete(
-        format!("/{}/cargoes/images/{name}", self.version),
+        &format!("{}/{name}", Self::CARGO_IMAGE_PATH),
         None::<String>,
       )
       .await?;
     Ok(())
   }
 
-  /// ## Inspect a cargo image
+  /// ## Inspect cargo image
   ///
-  /// This method will inspect a cargo image by it's name.
+  /// Return detailed information about a cargo image.
   ///
   /// ## Arguments
   ///
@@ -131,9 +138,9 @@ impl NanocldClient {
   ///
   /// ## Returns
   ///
-  /// * [Result](Result)
-  ///   * [Ok](Ok) * [ImageInspect](bollard_next::models::ImageInspect) of the image
-  ///   * [Err](Err) * [HttpClientError](HttpClientError) if the request failed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok) - [Image inspect](bollard_next::models::ImageInspect) of the image if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -150,7 +157,7 @@ impl NanocldClient {
   ) -> Result<bollard_next::models::ImageInspect, HttpClientError> {
     let res = self
       .send_get(
-        format!("/{}/cargoes/images/{name}", self.version),
+        &format!("{}/{name}", Self::CARGO_IMAGE_PATH),
         None::<String>,
       )
       .await?;
@@ -167,7 +174,7 @@ impl NanocldClient {
   {
     self
       .send_post_stream(
-        format!("/{}/cargoes/images/import", self.version),
+        &format!("{}/import", Self::CARGO_IMAGE_PATH),
         stream,
         None::<String>,
       )
@@ -184,7 +191,8 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const IMAGE: &str = "busybox:1.26.1";
-    let client = NanocldClient::connect_to("http://localhost:8585", None);
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     let mut stream = client.create_cargo_image(IMAGE).await.unwrap();
     while let Some(_info) = stream.next().await {}
     client.list_cargo_image(None).await.unwrap();

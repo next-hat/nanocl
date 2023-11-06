@@ -10,6 +10,15 @@ pub struct GenericNspQuery {
   pub namespace: Option<String>,
 }
 
+impl GenericNspQuery {
+  /// Create a new query with an optional namespace
+  pub fn new(namespace: Option<&str>) -> Self {
+    Self {
+      namespace: namespace.map(|s| s.to_owned()),
+    }
+  }
+}
+
 /// Generic delete response
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]

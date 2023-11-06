@@ -1,17 +1,21 @@
-# NAME
+NAME
+====
 
 nanocl - The Self-Sufficient Hybrid-Cloud Orchestrator CLI
 
-# SYNOPSIS
+SYNOPSIS
+========
 
 **nanocl** \[**-H**\|**\--host**\] \[**-h**\|**\--help**\]
 \[**-V**\|**\--version**\] \<*subcommands*\>
 
-# DESCRIPTION
+DESCRIPTION
+===========
 
 The Self-Sufficient Hybrid-Cloud Orchestrator CLI
 
-# OPTIONS
+OPTIONS
+=======
 
 **-H**, **\--host**=*HOST*
 
@@ -25,7 +29,8 @@ The Self-Sufficient Hybrid-Cloud Orchestrator CLI
 
 :   Print version
 
-# SUBCOMMANDS
+SUBCOMMANDS
+===========
 
 nanocl-namespace(1)
 
@@ -77,7 +82,7 @@ nanocl-uninstall(1)
 
 nanocl-upgrade(1)
 
-:   Upgrade nanocl components
+:   \#\# UpgradeOpts
 
 nanocl-ps(1)
 
@@ -87,10 +92,15 @@ nanocl-system(1)
 
 :   Manage system
 
+nanocl-secret(1)
+
+:   Manage secrets
+
 nanocl-help(1)
 
 :   Print this message or the help of the given subcommand(s)
 
-# VERSION
+VERSION
+=======
 
-v0.9.0
+v0.11.0

@@ -9,6 +9,25 @@ ApiVersion: v0.11
 Namespace: system
 
 Cargoes:
+  - Name: nstore
+    Container:
+      Image: cockroachdb/cockroach:v23.1.11
+      Tty: true
+      Hostname: nstore.nanocl.internal
+      Env:
+        - TZ=Europe/Paris
+      Cmd:
+        - start-single-node
+        - --insecure
+        - --listen-addr=:26257
+        - --advertise-addr=${{ advertise_addr }}:26257
+      HostConfig:
+        NetworkMode: system
+        Binds:
+          - ${{ state_dir }}/store/ca:/ca
+          - ${{ state_dir }}/store/certs:/certs
+          - ${{ state_dir }}/store/data:/cockroach/cockroach-data
+
   - Name: nmetrics
     Container:
       Image: ghcr.io/nxthat/metrsd:0.3.1
@@ -122,25 +141,6 @@ Cargoes:
           - /run/nanocl:/run/nanocl
           # {% endif %}
           - ${{ state_dir }}/dns:/opt/dns
-
-  - Name: nstore
-    Container:
-      Image: cockroachdb/cockroach:v23.1.11
-      Tty: true
-      Hostname: nstore.nanocl.internal
-      Env:
-        - TZ=Europe/Paris
-      Cmd:
-        - start-single-node
-        - --insecure
-        - --listen-addr=:26257
-        - --advertise-addr=${{ advertise_addr }}:26257
-      HostConfig:
-        NetworkMode: system
-        Binds:
-          - ${{ state_dir }}/store/ca:/ca
-          - ${{ state_dir }}/store/certs:/certs
-          - ${{ state_dir }}/store/data:/cockroach/cockroach-data
 
   - Name: ndaemon
     Container:

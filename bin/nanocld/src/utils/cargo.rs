@@ -784,7 +784,7 @@ pub async fn list(
     for node in &nodes {
       let client = node.to_http_client();
       let node_containers = match client
-        .list_cargo_instance(&cargo.name, Some(cargo.namespace_name.clone()))
+        .list_cargo_instance(&cargo.name, Some(&cargo.namespace_name))
         .await
       {
         Ok(containers) => containers,
@@ -857,7 +857,7 @@ pub async fn inspect_by_key(
   for node in &nodes {
     let client = node.to_http_client();
     let node_containers = match client
-      .list_cargo_instance(&cargo.name, Some(cargo.namespace_name.clone()))
+      .list_cargo_instance(&cargo.name, Some(&cargo.namespace_name))
       .await
     {
       Ok(containers) => containers,
@@ -994,10 +994,10 @@ pub async fn patch(
       if parts.len() != 2 {
         continue;
       }
-      let name = parts[0].to_string();
-      let value = parts[1].to_string();
+      let name = parts[0].to_owned();
+      let value = parts[1].to_owned();
       if let Some(pos) = env_vars.iter().position(|x| x.starts_with(&name)) {
-        let old_value = env_vars[pos].split('=').nth(1).unwrap().to_string();
+        let old_value = env_vars[pos].split('=').nth(1).unwrap().to_owned();
         if old_value != value && !value.is_empty() {
           // Update the value if it has changed
           env_vars[pos] = format!("{}={}", name, value);
@@ -1007,7 +1007,7 @@ pub async fn patch(
         }
       } else {
         // Add new environment variables
-        env_vars.push(env_var.to_string());
+        env_vars.push(env_var);
       }
     }
     // merge volumes and ensure no duplication

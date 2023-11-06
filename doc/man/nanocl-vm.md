@@ -1,17 +1,23 @@
-# NAME
+NAME
+====
 
-nanocl - Manage configuration states
+nanocl - \#\# VmArg
 
-# SYNOPSIS
+SYNOPSIS
+========
 
 **nanocl** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
 \<*subcommands*\>
 
-# DESCRIPTION
+DESCRIPTION
+===========
 
-Manage configuration states
+\#\# VmArg
 
-# OPTIONS
+\`nanocl vm\` available arguments
+
+OPTIONS
+=======
 
 **-n**, **\--namespace**=*NAMESPACE*
 
@@ -19,9 +25,10 @@ Manage configuration states
 
 **-h**, **\--help**
 
-:   Print help
+:   Print help (see a summary with -h)
 
-# SUBCOMMANDS
+SUBCOMMANDS
+===========
 
 nanocl-run(1)
 

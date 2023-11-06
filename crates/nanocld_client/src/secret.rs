@@ -4,17 +4,22 @@ use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate, SecretQuery};
 use super::http_client::NanocldClient;
 
 impl NanocldClient {
-  /// ## List all secrets
+  /// ## Default path for secrets
+  const SECRET_PATH: &'static str = "/secrets";
+
+  /// ## List secrets
+  ///
+  /// List existing secrets in the system.
   ///
   /// ## Arguments
   ///
-  /// * [query](SecretQuery) - Query to filter secrets
+  /// * [query](Option) - The optional [query](SecretQuery)
   ///
   /// ## Returns
   ///
-  /// * [Result](Result)
-  ///   * [Ok](Ok) - A [Vec](Vec) of [secrets](SecretSummary)
-  ///   * [Err](HttpClientError) - The secrets could not be listed
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok) - [Vector](Vec) of [secrets](Secret) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -22,46 +27,42 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let secrets = client.list_secret(None).await;
+  /// let res = client.list_secret(None).await;
   /// ```
   ///
   pub async fn list_secret(
     &self,
-    query: Option<SecretQuery>,
+    query: Option<&SecretQuery>,
   ) -> Result<Vec<Secret>, HttpClientError> {
-    let res = self
-      .send_get(format!("/{}/secrets", &self.version), query)
-      .await?;
+    let res = self.send_get(Self::SECRET_PATH, query).await?;
     Self::res_json(res).await
   }
 
-  /// ## Create a new secret
+  /// ## Create secret
   ///
   /// ## Arguments
   ///
-  /// * [secret](SecretPartial) - The key of the secret to create
+  /// * [secret](SecretPartial) - The secret to create
   ///
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The created [secret](Secret)
-  ///   * [Err](HttpClientError) - The secret could not be created
+  ///   * [Ok](Ok) - [Secret](Secret) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   pub async fn create_secret(
     &self,
     item: &SecretPartial,
   ) -> Result<Secret, HttpClientError> {
     let res = self
-      .send_post(
-        format!("/{}/secrets", &self.version),
-        Some(item),
-        None::<String>,
-      )
+      .send_post(Self::SECRET_PATH, Some(item), None::<String>)
       .await?;
     Self::res_json(res).await
   }
 
-  /// ## Patch a secret
+  /// ## Patch secret
+  ///
+  /// Patch a secret by it's key to update it with new data
   ///
   /// ## Arguments
   ///
@@ -70,24 +71,20 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The created [secret](Secret)
-  ///   * [Err](HttpClientError) - The secret could not be created
+  ///   * [Ok](Ok) - [Secret](Secret) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   pub async fn patch_secret(
     &self,
     item: &SecretUpdate,
   ) -> Result<Secret, HttpClientError> {
     let res = self
-      .send_patch(
-        format!("/{}/secrets", &self.version),
-        Some(item),
-        None::<String>,
-      )
+      .send_patch(Self::SECRET_PATH, Some(item), None::<String>)
       .await?;
     Self::res_json(res).await
   }
 
-  /// ## Inspect a secret
+  /// ## Inspect secret
   ///
   /// Inspect a secret by it's key to get more information about it
   ///
@@ -98,8 +95,8 @@ impl NanocldClient {
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The desired [secret](SecretInspect)
-  ///   * [Err](HttpClientError) - The secret could not be inspected
+  ///   * [Ok](Ok) - [Secret](Secret) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -116,7 +113,7 @@ impl NanocldClient {
   ) -> Result<Secret, HttpClientError> {
     let res = self
       .send_get(
-        format!("/{}/secrets/{key}/inspect", &self.version),
+        &format!("{}/{key}/inspect", Self::SECRET_PATH),
         None::<String>,
       )
       .await?;
@@ -125,17 +122,17 @@ impl NanocldClient {
 
   /// ## Delete a secret
   ///
-  /// Delete a secret by it's key
+  /// Delete a [secret](Secret) by it's key
   ///
   /// ## Arguments
   ///
-  /// * [key](str) - The key of the secret to delete
+  /// * [key](str) - The key of the [secret](Secret) to delete
   ///
   /// ## Returns
   ///
   /// * [Result](Result)
-  ///   * [Ok](Ok) - The secret was deleted
-  ///   * [Err](HttpClientError) - The secret could not be deleted
+  ///   * [Ok](Ok) - If operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
   ///
   /// ## Example
   ///
@@ -148,7 +145,7 @@ impl NanocldClient {
   ///
   pub async fn delete_secret(&self, key: &str) -> Result<(), HttpClientError> {
     self
-      .send_delete(format!("/{}/secrets/{key}", &self.version), None::<String>)
+      .send_delete(&format!("{}/{key}", Self::SECRET_PATH), None::<String>)
       .await?;
     Ok(())
   }
@@ -161,11 +158,12 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const SECRET_KEY: &str = "secret-test";
-    let client = NanocldClient::connect_to("http://localhost:8585", None);
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     client.list_secret(None).await.unwrap();
     let secret = SecretPartial {
-      key: SECRET_KEY.to_string(),
-      kind: "generic".to_string(),
+      key: SECRET_KEY.to_owned(),
+      kind: "generic".to_owned(),
       data: serde_json::json!({"key": "value"}),
       metadata: None,
       immutable: None,
