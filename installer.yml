@@ -19,7 +19,8 @@ Cargoes:
       Cmd:
         - start-single-node
         - --insecure
-        - --listen-addr=:26258
+        - --listen-addr=:26257
+        - --sql-addr=:26258
         - --advertise-addr=${{ advertise_addr }}:26258
       HostConfig:
         NetworkMode: system
