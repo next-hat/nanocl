@@ -102,113 +102,80 @@ mod tests {
   use crate::config;
   use crate::cli::Cli;
   use crate::utils::tests::*;
-
-  /// Test to create a server on unix socket
-  #[ntex::test]
-  async fn server_on_tmp_unix_socket() {
+  fn init_test_config(cmd: Vec<&str>) -> Cli {
     before();
+    let mut cmd = cmd.clone();
     let home = std::env::var("HOME").expect("Failed to get home dir");
-    let args = Cli::parse_from(vec![
-      "nanocl",
-      "-H",
-      "unix:///tmp/nanocl_test.sock",
-      "--state-dir",
-      &format!("{home}/.nanocl_dev/state"),
-    ]);
+    let state_dir = format!("{home}/.nanocl_dev/state");
+
+    cmd.push("--state-dir");
+    cmd.push(&state_dir);
+
+    Cli::parse_from(cmd)
+  }
+
+  async fn test_config(
+    args: Cli,
+  ) -> Result<ntex::server::Server, std::io::Error> {
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
     let daemon_state = boot::init(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
-    let server = gen(daemon_state).await;
-    assert!(server.is_ok(), "Expect server to be ready to run");
+    gen(daemon_state).await
+  }
+
+  async fn assert_config_ok(args: Cli) {
+    assert!(
+      test_config(args.clone()).await.is_ok(),
+      "Expected succcess for {:#?}",
+      args
+    );
+  }
+  async fn assert_config_err(args: Cli) {
+    assert!(
+      test_config(args.clone()).await.is_err(),
+      "Expected error for {:#?}",
+      args
+    );
+  }
+  /// Test to create a server on unix socket
+  #[ntex::test]
+  async fn server_on_tmp_unix_socket() {
+    let args =
+      init_test_config(vec!["nanocl", "-H", "unix:///tmp/nanocl_test.sock"]);
+
+    assert_config_ok(args).await;
   }
 
   /// Test to create a server on tcp socket
   #[ntex::test]
   async fn server_on_tcp_socket() {
-    before();
-    let home = std::env::var("HOME").expect("Failed to get home dir");
-    let args = Cli::parse_from(vec![
-      "nanocl",
-      "-H",
-      "tcp://127.0.0.1:9999",
-      "--state-dir",
-      &format!("{home}/.nanocl_dev/state"),
-    ]);
-    let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = boot::init(&daemon_conf)
-      .await
-      .expect("Init daemon state to be ok");
-    let server = gen(daemon_state).await;
-    assert!(server.is_ok(), "Expect server to be ready to run");
+    let args = init_test_config(vec!["nanocl", "-H", "tcp://127.0.0.1:9999"]);
+    assert_config_ok(args).await;
   }
 
   ///  Test to create 2 server on same tcp socket
   /// Expect the 2nd one to fail
   #[ntex::test]
   async fn server_on_same_tcp_socket() {
-    before();
-    let home = std::env::var("HOME").expect("Failed to get home dir");
-    let args = Cli::parse_from(vec![
-      "nanocl",
-      "-H",
-      "tcp://127.0.0.1:9888",
-      "--state-dir",
-      &format!("{home}/.nanocl_dev/state"),
-    ]);
-    let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = boot::init(&daemon_conf)
-      .await
-      .expect("Init daemon state to be ok");
-    let server = gen(daemon_state).await;
-    assert!(server.is_ok(), "Expect server to be ready to run");
-    let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = boot::init(&daemon_conf)
-      .await
-      .expect("Init daemon state to be ok");
-    let server2 = gen(daemon_state).await;
-    assert!(server2.is_err(), "Expect server to fail to run");
+    let args = init_test_config(vec!["nanocl", "-H", "tcp://127.0.0.1:9888"]);
+    assert_config_ok(args.clone()).await;
+    assert_config_err(args).await;
   }
 
   /// Test to create a server on unix socket where path is not valid
   /// Expect the server to fail
   #[ntex::test]
   async fn server_on_invalid_unix_socket() {
-    before();
-    let home = std::env::var("HOME").expect("Failed to get home dir");
-    let args = Cli::parse_from(vec![
-      "nanocl",
-      "-H",
-      "unix:///root/test.sock",
-      "--state-dir",
-      &format!("{home}/.nanocl_dev/state"),
-    ]);
-    let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = boot::init(&daemon_conf)
-      .await
-      .expect("Init daemon state to be ok");
-    let server = gen(daemon_state).await;
-    assert!(server.is_err(), "Expect server to fail to run");
+    let args = init_test_config(vec!["nanocl", "-H", "unix:///root/test.sock"]);
+    assert_config_err(args).await;
   }
 
   /// Test with invalid host uri
   /// Expect the server to fail
   #[ntex::test]
   async fn server_on_invalid_host() {
-    before();
-    let home = std::env::var("HOME").expect("Failed to get home dir");
-    let args = Cli::parse_from(vec![
-      "nanocl",
-      "-H",
-      "not_valid",
-      "--state-dir",
-      &format!("{home}/.nanocl_dev/state"),
-    ]);
-    let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = boot::init(&daemon_conf)
-      .await
-      .expect("Init daemon state to be ok");
-    let server = gen(daemon_state).await;
-    assert!(server.is_err(), "Expect server to fail to run");
+    let args = init_test_config(vec!["nanocl", "-H", "not_valid"]);
+    assert_config_err(args).await;
   }
 }

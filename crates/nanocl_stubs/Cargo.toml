@@ -16,6 +16,7 @@ bench = false
 default = ["serde"]
 serde = ["dep:serde", "uuid/serde", "chrono/serde"]
 utoipa = ["dep:utoipa"]
+test = []
 
 [dependencies]
 bollard-next = { version = "0.15.4" }

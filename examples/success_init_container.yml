@@ -1,0 +1,19 @@
+Kind: Deployment
+ApiVersion: v0.11
+
+Namespace: global
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
+Cargoes:
+  - Name: deploy-example
+    InitContainer:
+      Image: alpine:latest
+      Cmd: ["ls"]
+    Container:
+      Replication:
+        Name: Auto
+      Hostname: deploy-example
+      Image: nexthat/nanocl-get-started:latest
+      Env:
+        - APP=GET_STARTED

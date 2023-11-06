@@ -37,6 +37,7 @@ pub struct SecretPartial {
 /// sensitive data. It is stored as a json object in the database.
 ///
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]

@@ -13,6 +13,7 @@
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.cargo.noDefaultFeatures": true,
   "rust-analyzer.cargo.features": [
-    "dev"
+    "dev",
+    "test"
   ],
 }

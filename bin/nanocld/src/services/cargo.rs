@@ -551,6 +551,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
+  use bollard_next::container::KillContainerOptions;
   use ntex::http;
   use futures::{TryStreamExt, StreamExt};
 
@@ -680,6 +681,35 @@ mod tests {
       res.status(),
       http::StatusCode::ACCEPTED,
       "basic cargo start"
+    );
+    let res = client
+      .send_post(
+        &format!("{ENDPOINT}/{main_test_cargo}/kill"),
+        Some(&KillContainerOptions { signal: "SIGINT" }),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo kill");
+
+    let res = client
+      .send_post(
+        &format!("{ENDPOINT}/{main_test_cargo}/stats"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo stats");
+    let res = client
+      .send_post(
+        &format!("{ENDPOINT}/{main_test_cargo}/restart"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "basic cargo restart"
     );
     let mut res = client
       .send_put(

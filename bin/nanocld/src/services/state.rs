@@ -146,6 +146,23 @@ mod tests {
     apply_state(&client, "../../examples/resource_ssl_example.yml", None).await;
     // Revert examples/resource_ssl_example.yml
     revert_state(&client, "../../examples/resource_ssl_example.yml").await;
+    // ReApply examples/deploy_secrets.yml
+    apply_state(&client, "../../examples/deploy_secrets.yml", None).await;
+    // Revert examples/deploy_secrets.yml
+    revert_state(&client, "../../examples/deploy_secrets.yml").await;
+    // ReApply examples/cargo_autoremove.yml
+    apply_state(&client, "../../examples/cargo_autoremove.yml", None).await;
+    // Revert examples/cargo_autoremove.yml
+    revert_state(&client, "../../examples/cargo_autoremove.yml").await;
+    // ReApply examples/success_init_container.yml
+    apply_state(&client, "../../examples/success_init_container.yml", None)
+      .await;
+    // Revert examples/success_init_container.yml
+    revert_state(&client, "../../examples/success_init_container.yml").await;
+    // ReApply examples/fail_init_container.yml
+    apply_state(&client, "../../examples/fail_init_container.yml", None).await;
+    // Revert examples/fail_init_container.yml
+    revert_state(&client, "../../examples/fail_init_container.yml").await;
     // Revert examples/deploy_example.yml
     revert_state(&client, "../../examples/deploy_example.yml").await;
     // Apply examples/secret_env.yml
