@@ -1,4 +1,4 @@
-use ntex::{web, rt};
+use ntex::{rt, web};
 use ntex::util::Bytes;
 use ntex::channel::mpsc;
 
@@ -89,16 +89,19 @@ pub fn ntex_config(cfg: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
+  use nanocl_stubs::state::StateApplyQuery;
   use ntex::http;
   use futures::{TryStreamExt, StreamExt};
 
   use crate::utils::tests::*;
 
-  async fn apply_state(client: &TestClient, path: &str) {
+  async fn apply_state(
+    client: &TestClient,
+    path: &str,
+    options: Option<&StateApplyQuery>,
+  ) {
     let data = parse_statefile(path).unwrap();
-    let res = client
-      .send_put("/state/apply", Some(&data), None::<String>)
-      .await;
+    let res = client.send_put("/state/apply", Some(&data), options).await;
     test_status_code!(res.status(), http::StatusCode::OK, "state apply");
     let mut stream = res.into_stream();
     while let Some(item) = stream.next().await {
@@ -123,17 +126,24 @@ mod tests {
     // Generate server
     let client = gen_default_test_client().await;
     // Apply examples/cargo_example.yml
-    apply_state(&client, "../../examples/cargo_example.yml").await;
+    apply_state(&client, "../../examples/cargo_example.yml", None).await;
     // ReApply examples/cargo_example.yml
-    apply_state(&client, "../../examples/cargo_example.yml").await;
+    apply_state(&client, "../../examples/cargo_example.yml", None).await;
+    // ReApply examples/cargo_example.yml with reload
+    apply_state(
+      &client,
+      "../../examples/cargo_example.yml",
+      Some(&StateApplyQuery { reload: Some(true) }),
+    )
+    .await;
     // Revert examples/cargo_example.yml
     revert_state(&client, "../../examples/cargo_example.yml").await;
     // Apply examples/deploy_example.yml
-    apply_state(&client, "../../examples/deploy_example.yml").await;
+    apply_state(&client, "../../examples/deploy_example.yml", None).await;
     // Apply examples/resource_ssl_example.yml
-    apply_state(&client, "../../examples/resource_ssl_example.yml").await;
+    apply_state(&client, "../../examples/resource_ssl_example.yml", None).await;
     // ReApply examples/resource_ssl_example.yml
-    apply_state(&client, "../../examples/resource_ssl_example.yml").await;
+    apply_state(&client, "../../examples/resource_ssl_example.yml", None).await;
     // Revert examples/resource_ssl_example.yml
     revert_state(&client, "../../examples/resource_ssl_example.yml").await;
     // Revert examples/deploy_example.yml
