@@ -103,7 +103,12 @@ pub mod tests {
   /// * [Pool](Pool) - The postgre pool
   ///
   pub async fn gen_postgre_pool() -> Pool {
-    store::create_pool("nstore.nanocl.internal:26257")
+    let home = std::env::var("HOME").expect("Failed to get home dir");
+    let daemon_conf = DaemonConfig {
+      state_dir: format!("{home}/.nanocl_dev/state"),
+      ..Default::default()
+    };
+    store::create_pool("nstore.nanocl.internal:26258", &daemon_conf)
       .await
       .expect("Failed to connect to store at: {ip_addr}")
   }

@@ -17,7 +17,7 @@ use super::http_client::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for cargoes
-  const CARGO_PATH: &str = "/cargoes";
+  const CARGO_PATH: &'static str = "/cargoes";
 
   /// ## Create cargo
   ///

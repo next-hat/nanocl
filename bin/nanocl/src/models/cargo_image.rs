@@ -166,7 +166,6 @@ impl From<ImageSummary> for CargoImageRow {
     let id = id[0..12].to_owned();
     let created = NaiveDateTime::from_timestamp_opt(value.created, 0).unwrap();
     let created = created.format("%Y-%m-%d %H:%M:%S").to_string();
-
     Self {
       id,
       repository: vals.first().unwrap_or(&"<none>").to_string(),

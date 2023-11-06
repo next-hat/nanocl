@@ -35,7 +35,7 @@ async fn run(cli: &Cli) -> IoResult<()> {
     client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
   }
-  event::spawn(&dnsmasq, &client);
+  event::spawn(&client);
   let server = server::generate(&cli.host, &dnsmasq, &client)?;
   server.await?;
   Ok(())

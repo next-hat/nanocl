@@ -8,7 +8,7 @@ use super::http_client::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for resources
-  const RESOURCE_PATH: &str = "/resources";
+  const RESOURCE_PATH: &'static str = "/resources";
 
   /// ## List resources
   ///

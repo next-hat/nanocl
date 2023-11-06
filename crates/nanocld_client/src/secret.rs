@@ -5,7 +5,7 @@ use super::http_client::NanocldClient;
 
 impl NanocldClient {
   /// ## Default path for secrets
-  const SECRET_PATH: &str = "/secrets";
+  const SECRET_PATH: &'static str = "/secrets";
 
   /// ## List secrets
   ///
@@ -162,8 +162,8 @@ mod tests {
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     client.list_secret(None).await.unwrap();
     let secret = SecretPartial {
-      key: SECRET_KEY.to_string(),
-      kind: "generic".to_string(),
+      key: SECRET_KEY.to_owned(),
+      kind: "generic".to_owned(),
       data: serde_json::json!({"key": "value"}),
       metadata: None,
       immutable: None,

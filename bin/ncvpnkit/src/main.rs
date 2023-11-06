@@ -116,22 +116,7 @@ async fn on_event(
   vpnkit_client: &VpnKitRc,
 ) -> std::io::Result<()> {
   match event {
-    Event::ResourceCreated(resource) => {
-      if resource.kind.as_str() != "ProxyRule" {
-        return Ok(());
-      }
-      let r_proxy_rule = resource_to_proxy_rule(resource)?;
-      for rule in r_proxy_rule.rules.into_iter() {
-        if let ProxyRule::Stream(stream) = rule {
-          if stream.network != "Public" {
-            continue;
-          }
-          let port = rule_stream_to_vpnkit_port(&stream);
-          apply_rule(&port, vpnkit_client).await;
-        }
-      }
-    }
-    Event::ResourcePatched(resource) => {
+    Event::ResourceCreated(resource) | Event::ResourcePatched(resource) => {
       if resource.kind.as_str() != "ProxyRule" {
         return Ok(());
       }

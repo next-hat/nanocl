@@ -1,16 +1,15 @@
 use std::time::Duration;
 use std::net::ToSocketAddrs;
 
-use ntex::rt;
-use ntex::web;
-use ntex::time;
+use ntex::{rt, web, time};
 use diesel::PgConnection;
 use diesel::r2d2::ConnectionManager;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
+use nanocl_stubs::config::DaemonConfig;
+
 use nanocl_error::io::{IoError, IoResult};
 
-use crate::utils;
 use crate::models::{Pool, DBConn};
 
 /// ## Create pool
@@ -27,10 +26,13 @@ use crate::models::{Pool, DBConn};
 ///   * [Ok](Pool) - The pool has been created
 ///   * [Err](IoError) - The pool has not been created
 ///
-pub async fn create_pool(host: &str) -> IoResult<Pool> {
-  // let options = format!("/defaultdb?sslmode=verify-full&sslrootcert=/var/lib/nanocl/store/certs/ca.crt");
-  let options = "/defaultdb";
-  let db_url = format!("postgres://root:root@{host}{options}");
+pub async fn create_pool(
+  host: &str,
+  daemon_conf: &DaemonConfig,
+) -> IoResult<Pool> {
+  let state_dir = daemon_conf.state_dir.clone();
+  let options = format!("/defaultdb?sslmode=verify-full&sslcert={state_dir}/store/certs/client.root.crt&sslkey={state_dir}/store/certs/client.root.key&sslrootcert={state_dir}/store/certs/ca.crt");
+  let db_url = format!("postgresql://root:root@{host}{options}");
   web::block(move || {
     let manager = ConnectionManager::<PgConnection>::new(db_url);
     r2d2::Pool::builder().build(manager)
@@ -94,12 +96,12 @@ async fn wait_store(addr: &str) -> IoResult<()> {
       )
     })?
     .next()
-    .unwrap();
+    .expect("Unable to resolve store address");
   while let Err(_err) = rt::tcp_connect(addr).await {
     log::warn!("Waiting for store");
     time::sleep(Duration::from_secs(2)).await;
   }
-  time::sleep(Duration::from_secs(4)).await;
+  time::sleep(Duration::from_secs(2)).await;
   Ok(())
 }
 
@@ -116,23 +118,18 @@ async fn wait_store(addr: &str) -> IoResult<()> {
 ///   * [Ok](Pool) - The pool has been created
 ///   * [Err](IoError) - The pool has not been created
 ///
-pub(crate) async fn init() -> IoResult<Pool> {
+pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
-  let store_addr = "nstore.nanocl.internal:26257";
-  // let store_addr = utils::store::get_store_addr(docker_api).await?;
+  let store_addr = std::env::var("STORE_URL")
+    .unwrap_or("nstore.nanocl.internal:26258".to_owned());
   log::info!("Connecting to store at: {store_addr}");
-  wait_store(store_addr).await?;
-  // Connect to postgresql
-  let pool = utils::store::create_pool(store_addr).await?;
-  let mut conn = utils::store::get_pool_conn(&pool)?;
-  log::info!("Store connected");
-  // This will run the necessary migrations.
-  // See the documentation for `MigrationHarness` for
-  // all available methods.
-  log::info!("Running migrations");
+  wait_store(&store_addr).await?;
+  let pool = create_pool(&store_addr, daemon_conf).await?;
+  let mut conn = get_pool_conn(&pool)?;
+  log::info!("Store connected, running migrations");
   conn.run_pending_migrations(MIGRATIONS).map_err(|err| {
     IoError::interupted("CockroachDB migration", &format!("{err}"))
   })?;
-  log::info!("Migrations done");
+  log::info!("Migrations successfully applied");
   Ok(pool)
 }

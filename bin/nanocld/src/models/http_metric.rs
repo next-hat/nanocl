@@ -127,7 +127,7 @@ impl ToDbModel for HttpMetricPartial {
       uri: self.uri.clone(),
       host: self.host.clone(),
       remote_addr: self.remote_addr.clone(),
-      node_name: node_name.to_string(),
+      node_name: node_name.to_owned(),
       realip_remote_addr: self.realip_remote_addr.clone(),
       server_protocol: self.server_protocol.clone(),
       request_method: self.request_method.clone(),
@@ -289,7 +289,7 @@ impl ToDbModel for StreamMetricPartial {
       upstream_bytes_sent: self.upstream_bytes_sent,
       upstream_bytes_received: self.upstream_bytes_received,
       upstream_connect_time: self.upstream_connect_time.clone(),
-      node_name: node_name.to_string(),
+      node_name: node_name.to_owned(),
     }
   }
 }

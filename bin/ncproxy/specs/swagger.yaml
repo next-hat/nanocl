@@ -25,9 +25,10 @@ servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.7
+      default: v0.8
       description: API version
       enum:
+      - v0.8
       - v0.7
       - v0.6
       - v0.5
@@ -36,16 +37,6 @@ servers:
       - v0.2
       - v0.1
 paths:
-  /_ping:
-    head:
-      tags:
-      - System
-      summary: Get version information
-      description: Get version information
-      operationId: head_ping
-      responses:
-        '202':
-          description: Server is up
   /rules/{Name}:
     put:
       tags:
@@ -89,20 +80,6 @@ paths:
       responses:
         '200':
           description: Rule has been deleted
-  /version:
-    get:
-      tags:
-      - System
-      summary: Get version information
-      description: Get version information
-      operationId: get_version
-      responses:
-        '200':
-          description: Version information
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Version'
 components:
   schemas:
     HttpTarget:
@@ -294,25 +271,6 @@ components:
       - MovedPermanently
       - Permanent
       - Temporary
-    Version:
-      type: object
-      description: Version contain details about the current version nanocl
-      required:
-      - Arch
-      - Channel
-      - Version
-      - CommitId
-      properties:
-        Arch:
-          type: string
-        Channel:
-          type: string
-        Version:
-          type: string
-        CommitId:
-          type: string
 tags:
 - name: Rules
   description: Rules management endpoints.
-- name: System
-  description: System management endpoints.
