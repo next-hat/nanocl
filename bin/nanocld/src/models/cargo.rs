@@ -27,6 +27,7 @@ pub struct CargoDbModel {
   /// The namespace name
   pub(crate) namespace_name: String,
 }
+
 impl CargoDbModel {
   pub fn into_cargo(self, config: cargo_config::CargoConfig) -> cargo::Cargo {
     cargo::Cargo {
@@ -38,6 +39,7 @@ impl CargoDbModel {
     }
   }
 }
+
 /// ## CargoUpdateDbModel
 ///
 /// This structure is used to update a cargo in the database.

@@ -4,12 +4,12 @@ use diesel::prelude::*;
 use nanocl_error::io::{IoResult, FromIo, IoError};
 
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::job::{JobPartial, JobUpdate};
+use nanocl_stubs::job::{Job, JobPartial, JobUpdate};
 
 use crate::utils;
 use crate::models::{Pool, JobDbModel, JobUpdateDbModel};
 
-pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<JobDbModel> {
+pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
   let dbmodel = JobDbModel {
     key: item.name.clone(),
     created_at: chrono::Local::now().naive_local(),
@@ -18,9 +18,14 @@ pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<JobDbModel> {
       .map_err(|err| err.map_err_context(|| "Job"))?,
     metadata: item.metadata.clone(),
   };
-  let dbmodel =
-    super::generic::insert_with_res::<_, _, JobDbModel>(dbmodel, pool).await?;
-  Ok(dbmodel)
+  super::generic::insert_with_res::<_, _, JobDbModel>(dbmodel, pool).await?;
+  let job = Job {
+    name: item.name.clone(),
+    secrets: item.secrets.clone(),
+    metadata: item.metadata.clone(),
+    containers: item.containers.clone(),
+  };
+  Ok(job)
 }
 
 pub async fn delete_by_name(

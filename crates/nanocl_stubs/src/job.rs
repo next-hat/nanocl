@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize};
-use bollard_next::service::ContainerConfig;
+use bollard_next::container::Config;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -21,7 +21,7 @@ pub struct Job {
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
   /// Containers to run
-  pub containers: Vec<ContainerConfig>,
+  pub containers: Vec<Config>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -48,7 +48,7 @@ pub struct JobPartial {
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
   /// List of container to run
-  pub containers: Vec<ContainerConfig>,
+  pub containers: Vec<Config>,
 }
 
 /// ## JobUpdate
@@ -83,5 +83,5 @@ pub struct JobUpdate {
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
   /// New containers to run
-  pub containers: Option<Vec<ContainerConfig>>,
+  pub containers: Option<Vec<Config>>,
 }

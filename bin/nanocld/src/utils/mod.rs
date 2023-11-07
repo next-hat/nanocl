@@ -3,18 +3,19 @@ pub mod key;
 pub mod stream;
 
 pub mod store;
+pub mod system;
+pub mod namespace;
+pub mod cargo;
+pub mod cargo_image;
+pub mod vm;
+pub mod vm_image;
+pub mod job;
+pub mod exec;
 pub mod state;
 pub mod proxy;
 pub mod resource;
-pub mod namespace;
-pub mod vm;
-pub mod exec;
-pub mod vm_image;
-pub mod cargo;
-pub mod cargo_image;
 pub mod metric;
 pub mod ctrl_client;
-pub mod system;
 
 #[cfg(test)]
 pub mod tests {
