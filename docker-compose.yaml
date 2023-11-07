@@ -1,5 +1,11 @@
 version: '3.9'
 
+volumes:
+  rust-cache:
+    name: "rust-cache"
+  nanocl-deps:
+    name: "nanocl-deps"
+
 networks:
   system:
     name: system
@@ -113,7 +119,8 @@ services:
       - type: bind
         source: .
         target: /project
-      - /project/target
+      - nanocl-deps:/project/target
+      - rust-cache:/usr/local/cargo/registry
       - //run/guest-services/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/secrets:/opt/secrets
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/logs:/var/log/nginx/access
@@ -163,7 +170,8 @@ services:
       - type: bind
         source: .
         target: /project
-      - /project/target
+      - nanocl-deps:/project/target
+      - rust-cache:/usr/local/cargo/registry
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:/opt/dns
       - //run/guest-services/nanocl:/run/nanocl
 
@@ -187,7 +195,8 @@ services:
       - type: bind
         source: .
         target: /project
-      - /project/target
+      - nanocl-deps:/project/target
+      - rust-cache:/usr/local/cargo/registry
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}:${STATE_DIR:-${HOME}/.nanocl_dev/state}
       - //run/guest-services/nanocl:/run/nanocl
       - /var/run/docker.sock:/run/docker.sock
@@ -219,7 +228,8 @@ services:
       - type: bind
         source: .
         target: /project
-      - /project/target
+      - nanocl-deps:/project/target
+      - rust-cache:/usr/local/cargo/registry
       - //run/guest-services/nanocl:/run/nanocl
       - //run/host-services/backend.sock:/run/host-services/backend.sock
     command:
