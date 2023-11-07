@@ -1,6 +1,6 @@
 /// Functions helper to manipulate database models.
 ///
-/// Generic functions
+/// Generic functions to manipulate database models.
 pub mod generic;
 /// Manage nodes table
 pub mod node;
@@ -30,3 +30,5 @@ pub mod resource_kind;
 pub mod resource_config;
 /// Manage secrets table
 pub mod secret;
+/// Manage job table
+pub mod job;

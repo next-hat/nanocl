@@ -1,4 +1,4 @@
-use nanocl_stubs::{cargo_config, cargo};
+use nanocl_stubs::{cargo, cargo_config};
 
 use crate::schema::cargoes;
 
