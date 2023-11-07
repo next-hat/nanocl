@@ -133,8 +133,7 @@ mod tests {
   /// Test version command
   #[ntex::test]
   async fn version() {
-    let args = Cli::parse_from(["nanocl", "version"]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "version");
   }
 
   /// Test Namespace commands
@@ -142,20 +141,13 @@ mod tests {
   async fn namespace() {
     const NAMESPACE_NAME: &str = "cli-namespace";
     // Try to create namespace
-    let args =
-      Cli::parse_from(["nanocl", "namespace", "create", NAMESPACE_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "namespace", "create", NAMESPACE_NAME);
     // Try to list namespaces
-    let args = Cli::parse_from(["nanocl", "namespace", "ls"]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "namespace", "ls");
     // Try to inspect namespace
-    let args =
-      Cli::parse_from(["nanocl", "namespace", "inspect", NAMESPACE_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "namespace", "inspect", NAMESPACE_NAME);
     // Try to remove namespace
-    let args =
-      Cli::parse_from(["nanocl", "namespace", "rm", "-y", NAMESPACE_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "namespace", "rm", "-y", NAMESPACE_NAME);
   }
 
   /// Test Cargo image commands
@@ -163,31 +155,22 @@ mod tests {
   async fn cargo_image() {
     const IMAGE_NAME: &str = "busybox:1.26.0";
     // Try to create cargo image
-    let args =
-      Cli::parse_from(["nanocl", "cargo", "image", "pull", IMAGE_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "cargo", "image", "pull", IMAGE_NAME);
     // Try to list cargo images
-    let args = Cli::parse_from(["nanocl", "cargo", "image", "ls"]);
-    let res = execute_arg(&args).await;
-    assert!(res.is_ok());
+    assert_cli_ok!("nanocl", "cargo", "image", "ls");
     // Try to inspect cargo image
-    let args =
-      Cli::parse_from(["nanocl", "cargo", "image", "inspect", IMAGE_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "cargo", "image", "inspect", IMAGE_NAME);
     // Try to remove cargo image
-    let args =
-      Cli::parse_from(["nanocl", "cargo", "image", "rm", "-y", IMAGE_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from([
+    assert_cli_ok!("nanocl", "cargo", "image", "rm", "-y", IMAGE_NAME);
+
+    assert_cli_ok!(
       "nanocl",
       "cargo",
       "image",
       "import",
       "-f",
       "../../tests/busybox.tar.gz",
-    ]);
-    let res = execute_arg(&args).await;
-    assert!(res.is_ok());
+    );
   }
 
   /// Test Cargo commands
@@ -196,27 +179,20 @@ mod tests {
     const CARGO_NAME: &str = "cli-test";
     const IMAGE_NAME: &str = "nexthat/nanocl-get-started:latest";
     // Try to create cargo
-    let args =
-      Cli::parse_from(["nanocl", "cargo", "create", CARGO_NAME, IMAGE_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "cargo", "create", CARGO_NAME, IMAGE_NAME);
     // Try to list cargoes
-    let args = Cli::parse_from(["nanocl", "cargo", "ls"]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "cargo", "ls");
     // Try to start a cargo
-    let args = Cli::parse_from(["nanocl", "cargo", "start", CARGO_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "cargo", "start", CARGO_NAME);
     // Try to inspect a cargo
-    let args = Cli::parse_from(["nanocl", "cargo", "inspect", CARGO_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "cargo", "inspect", CARGO_NAME);
     // Try to patch a cargo
-    let args = Cli::parse_from([
+    assert_cli_ok!(
       "nanocl", "cargo", "patch", CARGO_NAME, "--image", IMAGE_NAME, "--env",
       "TEST=1",
-    ]);
-    let ret = execute_arg(&args).await;
-    assert!(ret.is_ok());
-    let args = Cli::parse_from(["nanocl", "cargo", "history", CARGO_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    );
+
+    assert_cli_ok!("nanocl", "cargo", "history", CARGO_NAME);
     let client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     let history = client
@@ -226,46 +202,42 @@ mod tests {
       .first()
       .unwrap()
       .clone();
-    let args = Cli::parse_from([
+
+    assert_cli_ok!(
       "nanocl",
       "cargo",
       "revert",
       CARGO_NAME,
       &history.key.to_string(),
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
+    );
+
     // Try to stop a cargo
-    let args = Cli::parse_from(["nanocl", "cargo", "stop", CARGO_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "cargo", "stop", CARGO_NAME);
     // Try to remove cargo
-    let args = Cli::parse_from(["nanocl", "cargo", "rm", "-y", CARGO_NAME]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "cargo", "rm", "-y", CARGO_NAME);
   }
 
   /// Test Resource commands
   #[ntex::test]
   async fn resource() {
-    let args = Cli::parse_from([
+    assert_cli_ok!(
       "nanocl",
       "state",
       "apply",
       "-ys",
       "../../examples/basic_resources.yml",
-    ]);
-    // ensure that ProxyRule and DnsRule are available
-    _ = execute_arg(&args).await;
-    let args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "state",
       "apply",
       "-ys",
       "../../examples/deploy_example.yml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
+    );
+
     // History
-    let args =
-      Cli::parse_from(["nanocl", "resource", "history", "deploy-example.com"]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "resource", "history", "deploy-example.com");
     let client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     let history = client
@@ -275,32 +247,28 @@ mod tests {
       .first()
       .unwrap()
       .clone();
-    let args = Cli::parse_from([
+    assert_cli_ok!(
       "nanocl",
       "resource",
       "revert",
       "deploy-example.com",
       &history.key.to_string(),
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
+    );
     // Remove resource
-    let args =
-      Cli::parse_from(["nanocl", "resource", "rm", "-y", "deploy-example.com"]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from([
+    assert_cli_ok!("nanocl", "resource", "rm", "-y", "deploy-example.com");
+    assert_cli_ok!(
       "nanocl",
       "state",
       "rm",
       "-ys",
       "../../examples/deploy_example.yml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
+    );
   }
 
   /// Test cargo exec command
   #[ntex::test]
   async fn cargo_exec() {
-    let mut args = Cli::parse_from([
+    assert_cli_ok!(
       "nanocl",
       "cargo",
       "--namespace",
@@ -310,9 +278,9 @@ mod tests {
       "--",
       "echo",
       "hello",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "cargo",
       "--namespace",
@@ -323,9 +291,9 @@ mod tests {
       "A=test",
       "--",
       "env",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "cargo",
       "--namespace",
@@ -335,9 +303,9 @@ mod tests {
       "--privileged",
       "--",
       "whoami",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "cargo",
       "--namespace",
@@ -347,9 +315,9 @@ mod tests {
       "-t",
       "--",
       "ls",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "cargo",
       "--namespace",
@@ -360,45 +328,44 @@ mod tests {
       "0",
       "--",
       "whoami",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
+    );
   }
 
   #[ntex::test]
   async fn state() {
-    let args = Cli::parse_from([
+    assert_cli_ok!(
       "nanocl",
       "state",
       "apply",
       "-ys",
       "../../examples/deploy_example.yml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "state",
       "apply",
       "-ys",
       "../../examples/deploy_example.toml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "state",
       "apply",
       "-rys",
-      "../../examples/deploy_example.toml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from([
+      "../../examples/deploy_example.toml"
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "state",
       "apply",
       "-pys",
       "../../examples/deploy_example.yml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "state",
       "logs",
@@ -407,51 +374,49 @@ mod tests {
       "--timestamps",
       "-s",
       "../../examples/deploy_example.yml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "state",
       "apply",
       "-ys",
       "../../examples/cargo_example.yml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "state",
       "apply",
       "-ys",
       "../../examples/cargo_example.yml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "state",
       "rm",
       "-ys",
       "../../examples/cargo_example.yml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from([
+    );
+
+    assert_cli_ok!(
       "nanocl",
       "state",
       "rm",
       "-ys",
       "../../examples/deploy_example.yml",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
+    );
   }
 
   #[ntex::test]
   async fn info() {
-    let args = Cli::parse_from(["nanocl", "info"]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "info");
   }
 
   #[ntex::test]
   async fn cargo_run() {
-    let args = Cli::parse_from([
+    assert_cli_ok!(
       "nanocl",
       "cargo",
       "run",
@@ -459,17 +424,14 @@ mod tests {
       "nexthat/nanocl-get-started",
       "-e",
       "MESSAGE=GREETING",
-    ]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from(["nanocl", "cargo", "stop", "cli-test-run"]);
-    assert!(execute_arg(&args).await.is_ok());
-    let args = Cli::parse_from(["nanocl", "cargo", "rm", "-y", "cli-test-run"]);
-    assert!(execute_arg(&args).await.is_ok());
+    );
+
+    assert_cli_ok!("nanocl", "cargo", "stop", "cli-test-run");
+    assert_cli_ok!("nanocl", "cargo", "rm", "-y", "cli-test-run");
   }
 
   #[ntex::test]
   async fn node_list() {
-    let args = Cli::parse_from(["nanocl", "node", "ls"]);
-    assert!(execute_arg(&args).await.is_ok());
+    assert_cli_ok!("nanocl", "node", "ls");
   }
 }

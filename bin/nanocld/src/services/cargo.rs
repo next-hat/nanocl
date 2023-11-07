@@ -558,11 +558,11 @@ mod tests {
   use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
   use nanocl_stubs::cargo::{
     Cargo, CargoSummary, CargoInspect, OutputLog, CargoDeleteQuery,
-    CargoListQuery, CargoScale,
+    CargoListQuery, CargoScale, CargoKillOptions,
   };
 
-  use crate::services::cargo_image::tests::ensure_test_image;
   use crate::utils::tests::*;
+  use crate::services::cargo_image::tests::ensure_test_image;
 
   const ENDPOINT: &str = "/cargoes";
 
@@ -680,6 +680,35 @@ mod tests {
       res.status(),
       http::StatusCode::ACCEPTED,
       "basic cargo start"
+    );
+    let res = client
+      .send_post(
+        &format!("{ENDPOINT}/{main_test_cargo}/kill"),
+        Some(&CargoKillOptions {
+          signal: "SIGINT".to_owned(),
+        }),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo kill");
+    let res = client
+      .send_get(
+        &format!("{ENDPOINT}/{main_test_cargo}/stats"),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo stats");
+    let res = client
+      .send_post(
+        &format!("{ENDPOINT}/{main_test_cargo}/restart"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "basic cargo restart"
     );
     let mut res = client
       .send_put(

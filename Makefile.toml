@@ -32,7 +32,18 @@ args = [
 # Test daemon
 [tasks.tests-daemon]
 command = "cargo"
-args = ["nextest", "run", "-p", "nanocld"]
+args = [
+  "nextest",
+  "run",
+  "--no-default-features",
+  "--features",
+  "test",
+  "${@}",
+  "-j",
+  "1",
+  "--bin",
+  "nanocld",
+]
 
 # Test daemon
 [tasks.tests-client]
@@ -42,7 +53,18 @@ args = ["nextest", "run", "-p", "nanocld_client"]
 # Test Cli
 [tasks.tests-cli]
 command = "cargo"
-args = ["nextest", "run", "-p", "nanocl"]
+args = [
+  "nextest",
+  "run",
+  "--no-default-features",
+  "--features",
+  "test",
+  "${@}",
+  "-j",
+  "1",
+  "--bin",
+  "nanocl",
+]
 
 # Test all
 [tasks.tests]

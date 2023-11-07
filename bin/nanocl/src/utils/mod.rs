@@ -6,3 +6,5 @@ pub mod installer;
 pub mod dialog;
 pub mod context;
 pub mod hash;
+#[cfg(test)]
+pub mod test;

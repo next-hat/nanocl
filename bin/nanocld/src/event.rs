@@ -1,13 +1,10 @@
 use std::pin::Pin;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::task::Poll;
-use std::task::Context;
 use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::task::{Poll, Context};
 
-use ntex::{rt, web, http};
+use ntex::{rt, web, http, time};
 use ntex::util::Bytes;
-use ntex::time::interval;
 use ntex::web::error::BlockingError;
 use futures::Stream;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
@@ -107,7 +104,7 @@ impl EventEmitter {
   fn spawn_check_connection(mut self) {
     rt::spawn(async move {
       loop {
-        let task = interval(Duration::from_secs(10));
+        let task = time::interval(Duration::from_secs(10));
         task.tick().await;
         if let Err(err) = self.check_connection() {
           log::error!("{err}");
@@ -175,103 +172,66 @@ impl EventEmitter {
 #[cfg(test)]
 mod tests {
   use futures::StreamExt;
+  use nanocl_stubs::resource::Resource;
+  use nanocl_stubs::secret::Secret;
 
   use super::*;
 
   use nanocl_stubs::vm::Vm;
   use nanocl_stubs::cargo::CargoInspect;
 
+  pub async fn send_and_parse_events(
+    client: &mut Client,
+    event_emitter: &EventEmitter,
+    events: Vec<Event>,
+  ) {
+    for event in events {
+      event_emitter
+        .emit(event.clone())
+        .await
+        .unwrap_or_else(|err| panic!("Event emit failed {event:#?} {err}"));
+      let event = client
+        .next()
+        .await
+        .unwrap_or_else(|| panic!("No event received"))
+        .unwrap_or_else(|err| panic!("Event error {err}"));
+      let _ = serde_json::from_slice::<Event>(&event)
+        .unwrap_or_else(|err| panic!("Parse event error {err}"));
+    }
+  }
+
   #[ntex::test]
   async fn basic() {
-    // Create the event emitter
     let event_emitter = EventEmitter::new();
-    // Create a client
     let mut client = event_emitter.subscribe().await.unwrap();
-    // Send namespace created event
-    event_emitter
-      .emit(Event::NamespaceCreated("test".to_owned()))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
-    // Send cargo created event
     let cargo = CargoInspect::default();
-    event_emitter
-      .emit(Event::CargoCreated(Box::new(cargo.to_owned())))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
-    // Send cargo deleted event
-    event_emitter
-      .emit(Event::CargoDeleted(Box::new(cargo)))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
-    // Send cargo started event
-    let cargo = CargoInspect::default();
-    event_emitter
-      .emit(Event::CargoStarted(Box::new(cargo)))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
-    // Send cargo stopped event
-    let cargo = CargoInspect::default();
-    event_emitter
-      .emit(Event::CargoStopped(Box::new(cargo)))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
-    // Send cargo patched event
-    let cargo = CargoInspect::default();
-    event_emitter
-      .emit(Event::CargoPatched(Box::new(cargo)))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
-    // Send vm created event
     let vm = Vm::default();
-    event_emitter
-      .emit(Event::VmCreated(Box::new(vm)))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
-    // Send vm deleted event
-    let vm = Vm::default();
-    event_emitter
-      .emit(Event::VmDeleted(Box::new(vm)))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
-    // Send vm patched event
-    let vm = Vm::default();
-    event_emitter
-      .emit(Event::VmPatched(Box::new(vm)))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
-    // Send vm runned event
-    let vm = Vm::default();
-    event_emitter
-      .emit(Event::VmRunned(Box::new(vm)))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
-    // Send vm stopped event
-    let vm = Vm::default();
-    event_emitter
-      .emit(Event::VmStopped(Box::new(vm)))
-      .await
-      .unwrap();
-    let event = client.next().await.unwrap().unwrap();
-    let _ = serde_json::from_slice::<Event>(&event).unwrap();
+    let resource = Resource::default();
+    let secret = Secret::default();
+
+    send_and_parse_events(
+      &mut client,
+      &event_emitter,
+      vec![
+        Event::NamespaceCreated("test".to_owned()),
+        Event::CargoCreated(Box::new(cargo.clone())),
+        Event::CargoDeleted(Box::new(cargo.clone())),
+        Event::CargoStarted(Box::new(cargo.clone())),
+        Event::CargoStopped(Box::new(cargo.clone())),
+        Event::CargoPatched(Box::new(cargo.clone())),
+        Event::VmCreated(Box::new(vm.clone())),
+        Event::VmDeleted(Box::new(vm.clone())),
+        Event::VmPatched(Box::new(vm.clone())),
+        Event::VmRunned(Box::new(vm.clone())),
+        Event::VmStopped(Box::new(vm.clone())),
+        Event::ResourceCreated(Box::new(resource.clone())),
+        Event::ResourceDeleted(Box::new(resource.clone())),
+        Event::ResourcePatched(Box::new(resource.clone())),
+        Event::SecretCreated(Box::new(secret.clone())),
+        Event::SecretDeleted(Box::new(secret.clone())),
+        Event::SecretPatched(Box::new(secret.clone())),
+      ],
+    )
+    .await;
   }
 }

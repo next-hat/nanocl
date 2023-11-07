@@ -38,7 +38,7 @@ bollard-next = "0.15.4"
 [dependencies]
 log = "0.4.20"
 clap = { version = "4.4.5", features = ["derive"] }
-ntex = { version = "0.7.7", features = ["tokio"] }
+ntex = { version = "0.7.8", features = ["tokio"] }
 tokio = { version = "1.33.0", features = ["fs"] }
 serde = "1.0.191"
 serde_json = "1.0.108"

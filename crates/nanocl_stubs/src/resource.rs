@@ -57,6 +57,7 @@ impl From<ResourcePartial> for ResourceUpdate {
 /// Resource is a configuration with a name and a kind
 /// It is used to define [proxy rules](ProxyRule) and other kind of config
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]

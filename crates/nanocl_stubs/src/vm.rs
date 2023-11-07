@@ -5,7 +5,8 @@ use serde::{Serialize, Deserialize};
 use crate::vm_config::VmConfig;
 
 /// A virtual machine instance
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]

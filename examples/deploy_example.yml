@@ -33,7 +33,7 @@ Cargoes:
   - Name: deploy-example
     InitContainer:
       Image: alpine:latest
-      Cmd: ["sleep", "5"]
+      Cmd: ["sleep", "1"]
     Container:
       Image: nexthat/nanocl-get-started:latest
       Env:
@@ -41,6 +41,9 @@ Cargoes:
 
   - Name: deploy-example2
     Container:
+      Replication:
+        Name: Static
+        Number: 3
       Image: nexthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED2
