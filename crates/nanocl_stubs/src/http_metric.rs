@@ -72,7 +72,10 @@ pub struct HttpMetric {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct HttpMetricListQuery {
   pub limit: Option<i64>,
   pub offset: Option<i64>,
@@ -96,17 +99,18 @@ where
     .split(',')
     .map(|s| s.parse::<i64>().unwrap_or_default())
     .collect();
-
   let status_min = *res.first().unwrap_or(&0);
   let status_max = res.get(1).copied();
-
   Ok(Some((status_min, status_max)))
 }
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct HttpMetricCountQuery {
   #[cfg_attr(
     feature = "serde",
