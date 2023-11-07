@@ -27,7 +27,7 @@ tokio = { version = "1.33.0", features = ["fs"] }
 futures = "0.3.25"
 serde_json = "1.0.108"
 ntex = { version = "0.7.8", features = ["openssl"] }
-serde = { version = "1.0.189", features = ["derive"] }
+serde = { version = "1.0.191", features = ["derive"] }
 bollard-next = { version = "0.15.4" }
 openssl = { version = "0.10.56", features = ["vendored"] }
 nanocl_stubs = { version = "0.11.0", features = ["serde"] }
