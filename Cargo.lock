@@ -2057,11 +2057,11 @@ dependencies = [
 
 [[package]]
 name = "ntex"
-version = "0.7.7"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02be6ef30c477e04b1b01ef6e04001ea1f0762338ece35444afc8b28f892e1e9"
+checksum = "14792b3ccb9e53d4274a1b23a1c5acc0bc5bb24cd969db99765c08f2ae6ca0f6"
 dependencies = [
- "async-channel 1.9.0",
+ "async-channel 2.0.0",
  "async-oneshot",
  "base64",
  "bitflags 2.4.1",
@@ -2086,7 +2086,6 @@ dependencies = [
  "ntex-tls",
  "ntex-tokio",
  "ntex-util",
- "num_cpus",
  "openssl",
  "percent-encoding",
  "pin-project-lite",
