@@ -19,7 +19,10 @@ pub struct Namespace {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct NamespacePartial {
   /// Name of the namespace
   pub name: String,
@@ -63,7 +66,10 @@ pub struct NamespaceInspect {
 /// Namespace List Query is a query used to list namespaces
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct NamespaceListQuery {
   /// Filter by name
   pub name: Option<String>,

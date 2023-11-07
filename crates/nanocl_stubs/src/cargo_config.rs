@@ -13,7 +13,10 @@ use crate::cargo::CargoInspect;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(tag = "Mode", rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, tag = "Mode", rename_all = "PascalCase")
+)]
 pub enum ReplicationMode {
   /// Auto is used to automatically define that the number of replicas in the cluster
   /// This will ensure at least 1 replica exists in the cluster
@@ -40,7 +43,10 @@ pub enum ReplicationMode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct ReplicationStatic {
   pub number: usize,
 }
@@ -49,7 +55,10 @@ pub struct ReplicationStatic {
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct CargoConfigPartial {
   /// Name of the cargo
   pub name: String,
@@ -87,7 +96,10 @@ pub struct CargoConfigPartial {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct CargoConfigUpdate {
   /// New name of the cargo
   #[cfg_attr(

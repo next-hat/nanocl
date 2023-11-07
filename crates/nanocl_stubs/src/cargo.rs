@@ -147,7 +147,10 @@ impl From<LogOutput> for OutputLog {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct CargoKillOptions {
   /// Signal to send to the container default: SIGKILL
   pub signal: String,
@@ -172,7 +175,10 @@ impl From<CargoKillOptions> for KillContainerOptions<String> {
 /// Delete cargo query
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct CargoDeleteQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
@@ -183,7 +189,10 @@ pub struct CargoDeleteQuery {
 /// To use this structure for database access it needs to be able to hold a NamespaceDbModel
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct GenericCargoListQuery<NS> {
   /// Name of the namespace
   pub namespace: NS,
@@ -222,7 +231,10 @@ pub type CargoListQuery = GenericCargoListQuery<Option<String>>;
 /// Log cargo query
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct CargoLogQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
@@ -245,7 +257,10 @@ pub struct CargoLogQuery {
 /// Stats cargo query
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct CargoStatsQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
@@ -296,7 +311,10 @@ impl From<CargoLogQuery> for LogsOptions<String> {
 /// Payload for the cargo scale endpoint
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct CargoScale {
   /// Number of replicas to scale up or down can be negative value

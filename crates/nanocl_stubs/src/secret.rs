@@ -10,7 +10,10 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct SecretPartial {
   /// The key of the secret
   pub key: String,
@@ -65,7 +68,10 @@ pub struct Secret {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct SecretUpdate {
   /// The data of the secret as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
@@ -84,7 +90,10 @@ pub struct SecretUpdate {
 /// Query filter when listing secret
 #[derive(Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
 pub struct SecretQuery {
   /// The kind of secret to target
   pub kind: Option<String>,
