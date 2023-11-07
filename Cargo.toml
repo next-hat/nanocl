@@ -5,9 +5,6 @@ members = [
   "crates/nanocl_stubs",
   "crates/nanocl_utils",
   "crates/nanocld_client",
-  # "crates/nanocl_macro_impl",
-  # "crates/nanocl_macros",
-  # "crates/nanocl_macro_tests",
   "bin/ncproxy",
   "bin/ncdns",
   "bin/ncvpnkit",
@@ -20,6 +17,7 @@ opt-level = 0
 
 [profile.release]
 strip = true
+# Todo test settings for release (segfault on macosx)
 # opt-level = "z"
 # lto = true
 # codegen-units = 1
@@ -29,15 +27,3 @@ nanocl_error = { path = "crates/nanocl_error" }
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocl_utils = { path = "crates/nanocl_utils" }
 nanocld_client = { path = "crates/nanocld_client" }
-# nanocl_macro_impl = { path = "crates/nanocl_macro_impl" }
-# nanocl_macros = { path = "crates/nanocl_macros" }
-# nanocl_macro_tests = { path = "crates/nanocl_macro_tests" }
-# vpnkitrc = { path = "../vpnkitrc" }
-# ntex-cors = { git = "https://github.com/ntex-rs/ntex-extras.git" }
-# ntex-files = { git = "https://github.com/leon3s/ntex-extras", branch = "upgrade-ntex-version" }
-# ntex-multipart = { git = "https://github.com/leon3s/ntex-extras" }
-# bollard-next = { path = "../bollard" }
-# ntex-util = { path = "../ntex/ntex-util" }
-# ntex_util = { git = "https://github.com/anonkey/ntex", branch = "unwind-safe-receiver" }
-# ntex = { git = "https://github.com/ntex-rs/ntex" }
-# ntex-tokio = { git = "https://github.com/ntex-rs/ntex" }

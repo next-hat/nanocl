@@ -107,10 +107,8 @@ mod tests {
     let mut cmd = cmd.clone();
     let home = std::env::var("HOME").expect("Failed to get home dir");
     let state_dir = format!("{home}/.nanocl_dev/state");
-
     cmd.push("--state-dir");
     cmd.push(&state_dir);
-
     Cli::parse_from(cmd)
   }
 
@@ -131,6 +129,7 @@ mod tests {
       args
     );
   }
+
   async fn assert_config_err(args: Cli) {
     assert!(
       test_config(args.clone()).await.is_err(),
@@ -138,12 +137,12 @@ mod tests {
       args
     );
   }
+
   /// Test to create a server on unix socket
   #[ntex::test]
   async fn server_on_tmp_unix_socket() {
     let args =
       init_test_config(vec!["nanocl", "-H", "unix:///tmp/nanocl_test.sock"]);
-
     assert_config_ok(args).await;
   }
 
