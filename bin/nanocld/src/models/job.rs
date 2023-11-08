@@ -5,7 +5,7 @@ use crate::schema::jobs;
 /// This structure represent a job to run.
 /// It will create and run a list of containers.
 ///
-#[derive(Queryable, Identifiable, Insertable)]
+#[derive(Clone, Queryable, Identifiable, Insertable)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = jobs)]
 pub struct JobDbModel {

@@ -18,9 +18,12 @@ pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
       .map_err(|err| err.map_err_context(|| "Job"))?,
     metadata: item.metadata.clone(),
   };
-  super::generic::insert_with_res::<_, _, JobDbModel>(dbmodel, pool).await?;
+  super::generic::insert_with_res::<_, _, JobDbModel>(dbmodel.clone(), pool)
+    .await?;
   let job = Job {
     name: item.name.clone(),
+    created_at: dbmodel.created_at,
+    updated_at: dbmodel.updated_at,
     secrets: item.secrets.clone(),
     metadata: item.metadata.clone(),
     containers: item.containers.clone(),

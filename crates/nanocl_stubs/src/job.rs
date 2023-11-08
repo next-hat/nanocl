@@ -7,11 +7,15 @@ use bollard_next::container::Config;
 pub struct Job {
   /// Name of the job
   pub name: String,
+  /// When the job have been created
+  pub created_at: chrono::NaiveDateTime,
+  /// When the job have been updated
+  pub updated_at: chrono::NaiveDateTime,
+  /// Secrets to load as environment variables
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  /// Secrets to load as environment variables
   pub secrets: Option<Vec<String>>,
   #[cfg_attr(
     feature = "serde",
