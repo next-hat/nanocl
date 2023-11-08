@@ -10,12 +10,16 @@ use crate::utils;
 use crate::models::{Pool, JobDbModel, JobUpdateDbModel};
 
 pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
+  let mut data = serde_json::to_value(&item)
+    .map_err(|err| err.map_err_context(|| "JobPartial"))?;
+  if let Some(meta) = data.as_object_mut() {
+    meta.remove("Metadata");
+  }
   let dbmodel = JobDbModel {
     key: item.name.clone(),
     created_at: chrono::Local::now().naive_local(),
     updated_at: chrono::Local::now().naive_local(),
-    data: serde_json::to_value(item)
-      .map_err(|err| err.map_err_context(|| "Job"))?,
+    data,
     metadata: item.metadata.clone(),
   };
   super::generic::insert_with_res::<_, _, JobDbModel>(dbmodel.clone(), pool)

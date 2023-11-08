@@ -3,12 +3,25 @@ ApiVersion: v0.11
 
 Namespace: global
 
+Secrets:
+  - Key: env.deploy-example.com
+    Kind: Env
+    Metadata:
+      Selector:
+        App: deploy-example
+    Data:
+      - MY_VALUE=MY_KEY
+
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
   - Name: deploy-example.com
     Kind: ProxyRule
     Version: v0.8
+    Metadata:
+      CertManager: certbot
+      Selector:
+        App: deploy-example
     Data:
       Rules:
         - Domain: deploy-example.com
@@ -31,6 +44,11 @@ Resources:
 # https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
   - Name: deploy-example
+    Metadata:
+      Selector:
+        App: deploy-example
+    Secrets:
+      - env.deploy-example.com
     InitContainer:
       Image: alpine:latest
       Cmd: ["sleep", "1"]

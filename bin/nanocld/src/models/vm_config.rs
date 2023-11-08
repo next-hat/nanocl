@@ -27,7 +27,7 @@ pub struct VmConfigDbModel {
   /// The version of the vm config
   pub(crate) version: String,
   /// The config of the vm
-  pub(crate) config: serde_json::Value,
+  pub(crate) data: serde_json::Value,
   /// The metadata (user defined)
   pub(crate) metadata: Option<serde_json::Value>,
 }

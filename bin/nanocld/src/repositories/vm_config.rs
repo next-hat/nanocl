@@ -32,9 +32,9 @@ pub async fn create(
   version: &str,
   pool: &Pool,
 ) -> IoResult<VmConfig> {
-  let mut config = serde_json::to_value(item.to_owned())
+  let mut data = serde_json::to_value(item.to_owned())
     .map_err(|err| err.map_err_context(|| "VmConfig"))?;
-  if let Some(meta) = config.as_object_mut() {
+  if let Some(meta) = data.as_object_mut() {
     meta.remove("Metadata");
   }
   let dbmodel = VmConfigDbModel {
@@ -42,7 +42,7 @@ pub async fn create(
     vm_key: vm_key.to_owned(),
     version: version.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
-    config,
+    data,
     metadata: item.metadata.clone(),
   };
   let dbmodel: VmConfigDbModel =
@@ -73,9 +73,8 @@ pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
       key, pool,
     )
     .await?;
-  let config =
-    serde_json::from_value::<VmConfigPartial>(dbmodel.config.clone())
-      .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
+  let config = serde_json::from_value::<VmConfigPartial>(dbmodel.data.clone())
+    .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
   Ok(dbmodel.into_vm_config(&config))
 }
 
@@ -145,7 +144,7 @@ pub async fn list_by_vm_key(key: &str, pool: &Pool) -> IoResult<Vec<VmConfig>> {
     .into_iter()
     .map(|dbmodel: VmConfigDbModel| {
       let config =
-        serde_json::from_value::<VmConfigPartial>(dbmodel.config.clone())
+        serde_json::from_value::<VmConfigPartial>(dbmodel.data.clone())
           .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
       Ok(dbmodel.into_vm_config(&config))
     })

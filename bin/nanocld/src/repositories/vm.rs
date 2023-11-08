@@ -199,7 +199,7 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
     Ok::<_, IoError>(item)
   })
   .await?;
-  let config = serde_json::from_value::<VmConfigPartial>(item.1.config)
+  let config = serde_json::from_value::<VmConfigPartial>(item.1.data)
     .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
   let config = VmConfig {
     key: item.1.key,

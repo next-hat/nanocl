@@ -184,7 +184,7 @@ diesel::table! {
         created_at -> Timestamptz,
         vm_key -> Varchar,
         version -> Varchar,
-        config -> Jsonb,
+        data -> Jsonb,
         metadata -> Nullable<Jsonb>,
     }
 }

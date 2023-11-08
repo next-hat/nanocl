@@ -207,6 +207,30 @@ services:
       - -x
       - run --no-default-features --features dev --bin nanocld -- --gid 1001 --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
 
+  dbeaver:
+    container_name: dbeaver.system.c
+    image: dbeaver/cloudbeaver:23.2.4
+    tty: true
+    user: root
+    hostname: dbeaver.nanocl.internal
+    profiles:
+      - debug
+    networks:
+      - system
+    ports:
+      - 9090:8978
+    environment:
+      - TZ=Europe/Paris
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    labels:
+      - io.nanocl=enabled
+      - io.nanocl.c=dbeaver.system
+      - io.nanocl.n=system
+      - io.nanocl.cnsp=system
+    volumes:
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dbeaver:/opt/cloudbeaver/workspace
+
   ncvpnkit:
     container_name: ncvpnkit.system.c
     image: ghcr.io/nxthat/nanocl-dev:dev

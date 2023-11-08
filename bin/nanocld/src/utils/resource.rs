@@ -165,7 +165,6 @@ pub async fn create(
       msg: format!("Resource {} already exists", &resource.name),
     });
   }
-
   let resource = hook_create_resource(resource, pool).await?;
   let res = repositories::resource::create(&resource, pool).await?;
   Ok(res)
