@@ -1,0 +1,67 @@
+{
+  "ApiVersion": "v0.11",
+  "Kind": "Deployment",
+  "Namespace": "global",
+  "Cargoes": [
+    {
+      "Name": "deploy-example",
+      "Container": {
+        "Env": [
+          "APP=GET_STARTED1"
+        ],
+        "Image": "nexthat/nanocl-get-started:latest"
+      }
+    },
+    {
+      "Name": "deploy-example2",
+      "Container": {
+        "Env": [
+          "APP=GET_STARTED2"
+        ],
+        "Image": "nexthat/nanocl-get-started:latest"
+      }
+    }
+  ],
+  "Resources": [
+    {
+      "Kind": "ProxyRule",
+      "Name": "deploy-example.com",
+      "Version": "v0.8",
+      "Data": {
+        "Watch": [
+          "deploy-example.global.c",
+          "deploy-example2.global.c"
+        ],
+        "Rules": [
+          {
+            "Domain": "deploy-example.com",
+            "Network": "Public",
+            "Locations": [
+              {
+                "Path": "/",
+                "Target": {
+                  "Key": "deploy-example2.global.c",
+                  "Port": 9000
+                }
+              },
+              {
+                "Path": "/v1",
+                "Target": {
+                  "Key": "deploy-example.global.c",
+                  "Port": 9000
+                }
+              },
+              {
+                "Path": "/v2",
+                "Target": {
+                  "Key": "deploy-example2.global.c",
+                  "Port": 9000
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

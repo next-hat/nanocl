@@ -160,6 +160,26 @@ mod tests {
     assert_cli_ok!("nanocl", "cargo", "image", "ls");
     // Try to inspect cargo image
     assert_cli_ok!("nanocl", "cargo", "image", "inspect", IMAGE_NAME);
+    // Try to inspect cargo image json
+    assert_cli_ok!(
+      "nanocl",
+      "cargo",
+      "image",
+      "inspect",
+      "--display",
+      "toml",
+      IMAGE_NAME
+    );
+    // Try to inspect cargo image toml
+    assert_cli_ok!(
+      "nanocl",
+      "cargo",
+      "image",
+      "inspect",
+      "--display",
+      "json",
+      IMAGE_NAME
+    );
     // Try to remove cargo image
     assert_cli_ok!("nanocl", "cargo", "image", "rm", "-y", IMAGE_NAME);
 
@@ -333,12 +353,48 @@ mod tests {
 
   #[ntex::test]
   async fn state() {
-    assert_cli_ok!(
+    assert_cli_err!(
       "nanocl",
       "state",
       "apply",
       "-ys",
-      "../../examples/deploy_example.yml",
+      "../../tests/invalid_yaml.yaml",
+    );
+    assert_cli_err!(
+      "nanocl",
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/invalid_json.json",
+    );
+    assert_cli_err!(
+      "nanocl",
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/invalid_toml.toml",
+    );
+    assert_cli_err!(
+      "nanocl",
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/invalid_statefile.yaml",
+    );
+    assert_cli_err!(
+      "nanocl",
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/invalid_statefile.toml",
+    );
+
+    assert_cli_err!(
+      "nanocl",
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/invalid_statefile.json",
     );
 
     assert_cli_ok!(
@@ -347,6 +403,14 @@ mod tests {
       "apply",
       "-ys",
       "../../examples/deploy_example.toml",
+    );
+
+    assert_cli_ok!(
+      "nanocl",
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/deploy_example.json",
     );
 
     assert_cli_ok!(

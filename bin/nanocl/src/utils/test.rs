@@ -43,4 +43,14 @@ macro_rules! assert_cli_ok {
   };
 }
 
+#[macro_export]
+macro_rules! assert_cli_err {
+  ($cmd :expr $(, $args:expr)* $(,)?) => {
+    let res = crate::exec_cli!(
+      [$cmd $(, $args)*],
+    );
+    assert!(res.is_err(), "{}", crate::format_command!($cmd $(, $args)*));
+  };
+}
+
 pub use assert_cli_ok;
