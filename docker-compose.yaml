@@ -5,6 +5,8 @@ volumes:
     name: "rust-cache"
   nanocl-deps:
     name: "nanocl-deps"
+  nanocl-rustup:
+    name: "nanocl-rustup"
 
 networks:
   system:
@@ -120,6 +122,7 @@ services:
         source: .
         target: /project
       - nanocl-deps:/project/target
+      - nanocl-rustup:/usr/local/rustup
       - rust-cache:/usr/local/cargo/registry
       - //run/guest-services/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/secrets:/opt/secrets
@@ -171,6 +174,7 @@ services:
         source: .
         target: /project
       - nanocl-deps:/project/target
+      - nanocl-rustup:/usr/local/rustup
       - rust-cache:/usr/local/cargo/registry
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:/opt/dns
       - //run/guest-services/nanocl:/run/nanocl
@@ -196,6 +200,7 @@ services:
         source: .
         target: /project
       - nanocl-deps:/project/target
+      - nanocl-rustup:/usr/local/rustup
       - rust-cache:/usr/local/cargo/registry
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}:${STATE_DIR:-${HOME}/.nanocl_dev/state}
       - //run/guest-services/nanocl:/run/nanocl
@@ -229,6 +234,7 @@ services:
         source: .
         target: /project
       - nanocl-deps:/project/target
+      - nanocl-rustup:/usr/local/rustup
       - rust-cache:/usr/local/cargo/registry
       - //run/guest-services/nanocl:/run/nanocl
       - //run/host-services/backend.sock:/run/host-services/backend.sock

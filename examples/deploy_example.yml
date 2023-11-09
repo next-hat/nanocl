@@ -41,9 +41,6 @@ Cargoes:
 
   - Name: deploy-example2
     Container:
-      Replication:
-        Name: Static
-        Number: 3
       Image: ghcr.io/nxthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED2
