@@ -592,7 +592,7 @@ mod tests {
     let new_cargo = CargoConfigPartial {
       name: CARGO_NAME.into(),
       container: bollard_next::container::Config {
-        image: Some("nexthat/nanocl-get-started:latest".into()),
+        image: Some("ghcr.io/nxthat/nanocl-get-started:latest:latest".into()),
         ..Default::default()
       },
       ..Default::default()
@@ -602,7 +602,7 @@ mod tests {
     client.inspect_cargo(CARGO_NAME, None).await.unwrap();
     let cargo_update = CargoConfigUpdate {
       container: Some(bollard_next::container::Config {
-        image: Some("nexthat/nanocl-get-started:latest".into()),
+        image: Some("ghcr.io/nxthat/nanocl-get-started:latest:latest".into()),
         env: Some(vec!["TEST=1".into()]),
         ..Default::default()
       }),
@@ -655,7 +655,7 @@ mod tests {
     let new_cargo = CargoConfigPartial {
       name: "client-test-cargodup".into(),
       container: bollard_next::container::Config {
-        image: Some("nexthat/nanocl-get-started:latest".into()),
+        image: Some("ghcr.io/nxthat/nanocl-get-started:latest:latest".into()),
         ..Default::default()
       },
       ..Default::default()

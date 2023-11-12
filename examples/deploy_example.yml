@@ -47,3 +47,4 @@ Cargoes:
       Image: nexthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED2
+ghcr.io/nxthat/nanocl-get-started:latestghcr.io/nxthat/nanocl-get-started:latest

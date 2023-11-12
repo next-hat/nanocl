@@ -29,12 +29,12 @@ Resources:
 Cargoes:
   - Name: deploy-example
     Container:
-      Image: nexthat/nanocl-get-started:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest:latest
       Env:
         - APP=GET_STARTED1
 
   - Name: deploy-example2
     Container:
-      Image: nexthat/nanocl-get-started:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest:latest
       Env:
         - APP=GET_STARTED2
