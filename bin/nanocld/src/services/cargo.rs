@@ -585,7 +585,9 @@ mod tests {
           Some(&CargoConfigPartial {
             name: test_cargo.to_owned(),
             container: bollard_next::container::Config {
-              image: Some("nexthat/nanocl-get-started:latest".to_owned()),
+              image: Some(
+                "ghcr.io/nxthat/nanocl-get-started:latest".to_owned(),
+              ),
               ..Default::default()
             },
             ..Default::default()
@@ -604,7 +606,7 @@ mod tests {
       assert_eq!(cargo.namespace_name, "global", "Invalid cargo namespace");
       assert_eq!(
         cargo.config.container.image,
-        Some("nexthat/nanocl-get-started:latest".to_owned())
+        Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned())
       );
     }
     let mut res = client
@@ -716,7 +718,7 @@ mod tests {
         Some(&CargoConfigPartial {
           name: main_test_cargo.to_owned(),
           container: bollard_next::container::Config {
-            image: Some("nexthat/nanocl-get-started:latest".to_owned()),
+            image: Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned()),
             env: Some(vec!["TEST=1".to_owned()]),
             ..Default::default()
           },
@@ -731,7 +733,7 @@ mod tests {
     assert_eq!(patch_response.namespace_name, "global");
     assert_eq!(
       patch_response.config.container.image,
-      Some("nexthat/nanocl-get-started:latest".to_owned())
+      Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned())
     );
     assert_eq!(
       patch_response.config.container.env,
@@ -799,7 +801,7 @@ mod tests {
         Some(&CargoConfigPartial {
           name: CARGO_NAME.to_owned(),
           container: bollard_next::container::Config {
-            image: Some("nexthat/nanocl-get-started:latest".to_owned()),
+            image: Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned()),
             ..Default::default()
           },
           ..Default::default()

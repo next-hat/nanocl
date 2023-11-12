@@ -35,7 +35,7 @@ Cargoes:
       Image: alpine:latest
       Cmd: ["sleep", "1"]
     Container:
-      Image: nexthat/nanocl-get-started:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED
 
@@ -44,6 +44,6 @@ Cargoes:
       Replication:
         Name: Static
         Number: 3
-      Image: nexthat/nanocl-get-started:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED2
