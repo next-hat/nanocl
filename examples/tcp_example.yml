@@ -26,6 +26,6 @@ Resources:
 Cargoes:
   - Name: tcp-example
     Container:
-      Image: ghcr.io/nxthat/nanocl-get-started:latest:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED1

@@ -31,6 +31,6 @@ Resources:
 Cargoes:
   - Name: deploy-example
     Container:
-      Image: ghcr.io/nxthat/nanocl-get-started:latest:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest
       Env:
         - APP=DISABLE_LOGGING

@@ -177,7 +177,7 @@ mod tests {
   #[ntex::test]
   async fn cargo() {
     const CARGO_NAME: &str = "cli-test";
-    const IMAGE_NAME: &str = "ghcr.io/nxthat/nanocl-get-started:latest:latest";
+    const IMAGE_NAME: &str = "ghcr.io/nxthat/nanocl-get-started:latest";
     // Try to create cargo
     assert_cli_ok!("nanocl", "cargo", "create", CARGO_NAME, IMAGE_NAME);
     // Try to list cargoes

@@ -9,7 +9,7 @@ Namespace: global
 Cargoes:
   - Name: templating-if
     Container:
-      Image: ghcr.io/nxthat/nanocl-get-started:latest:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest
       HostConfig:
         Binds:
           # {% if freestyle %}

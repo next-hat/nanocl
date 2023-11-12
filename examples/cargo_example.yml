@@ -8,4 +8,4 @@ Namespace: cargo-example
 Cargoes:
   - Name: cargo-example
     Container:
-      Image: ghcr.io/nxthat/nanocl-get-started:latest:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest

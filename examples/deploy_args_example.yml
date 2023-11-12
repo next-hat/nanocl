@@ -28,7 +28,7 @@ Resources:
 Cargoes:
   - Name: get-started
     Container:
-      Image: ghcr.io/nxthat/nanocl-get-started:latest:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest
       HostConfig:
         Binds:
           - ./test_local:/test

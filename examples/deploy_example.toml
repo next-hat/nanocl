@@ -6,14 +6,14 @@ Namespace = "global"
 Name = "deploy-example"
 
 [Cargoes.Container]
-Image = "ghcr.io/nxthat/nanocl-get-started:latest:latest"
+Image = "ghcr.io/nxthat/nanocl-get-started:latest"
 Env = ["APP=GET_STARTED1"]
 
 [[Cargoes]]
 Name = "deploy-example2"
 
 [Cargoes.Container]
-Image = "ghcr.io/nxthat/nanocl-get-started:latest:latest"
+Image = "ghcr.io/nxthat/nanocl-get-started:latest"
 Env = ["APP=GET_STARTED2"]
 
 

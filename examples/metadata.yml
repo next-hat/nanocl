@@ -38,12 +38,12 @@ Cargoes:
     Metadata:
       SomeKey: SomeValue
     Container:
-      Image: ghcr.io/nxthat/nanocl-get-started:latest:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED1
 
   - Name: deploy-example2
     Container:
-      Image: ghcr.io/nxthat/nanocl-get-started:latest:latest
+      Image: ghcr.io/nxthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED2
