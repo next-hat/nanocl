@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::collections::HashMap;
 
 use tokio_util::codec;
@@ -233,10 +234,34 @@ async fn exec_cargo_image_import(
   client: &NanocldClient,
   opts: &CargoImageImportOpts,
 ) -> IoResult<()> {
-  let file = tokio::fs::File::open(&opts.file_path).await.unwrap();
+  let file_path = opts.file_path.clone();
+  let fp = Path::new(&file_path)
+    .canonicalize()
+    .map_err(|err| err.map_err_context(|| file_path.to_owned()))?;
+  let file = tokio::fs::File::open(&fp)
+    .await
+    .map_err(|err| err.map_err_context(|| file_path.to_owned()))?;
+  // Get file size
+  let file_size = file
+    .metadata()
+    .await
+    .map_err(|err| err.map_err_context(|| file_path.to_owned()))?
+    .len();
+  let mut sent: u64 = 0;
+  let pg = ProgressBar::new(100);
+  let style = ProgressStyle::with_template(
+    "[{elapsed_precise}] [{bar:20.cyan/blue}] {pos:>7}% {msg}",
+  )
+  .unwrap()
+  .progress_chars("=> ");
+  pg.set_style(style);
   let byte_stream =
-    codec::FramedRead::new(file, codec::BytesCodec::new()).map(|r| {
-      let bytes = ntex::util::Bytes::from_iter(r?.freeze().to_vec());
+    codec::FramedRead::new(file, codec::BytesCodec::new()).map(move |r| {
+      let r = r?;
+      sent += r.len() as u64;
+      let percent = utils::math::calculate_percentage(sent, file_size);
+      pg.set_position(percent);
+      let bytes = ntex::util::Bytes::from_iter(r.freeze().to_vec());
       Ok::<ntex::util::Bytes, std::io::Error>(bytes)
     });
   client.import_cargo_image_from_tar(byte_stream).await?;
