@@ -8,8 +8,7 @@ use nanocl_error::io::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::vm_image::VmImageCloneStream;
 
-use crate::utils::print::print_table;
-use crate::utils::math::calculate_percentage;
+use crate::utils;
 
 use crate::models::{
   VmImageArg, VmImageCreateOpts, VmImageCommand, VmImageRow, VmImageResizeOpts,
@@ -60,7 +59,7 @@ async fn exec_vm_image_create(
     codec::FramedRead::new(file, codec::BytesCodec::new()).map(move |r| {
       let r = r?;
       sent += r.len() as u64;
-      let percent = calculate_percentage(sent, file_size);
+      let percent = utils::math::calculate_percentage(sent, file_size);
       pg.set_position(percent);
       let bytes = ntex::util::Bytes::from_iter(r.freeze().to_vec());
       Ok::<ntex::util::Bytes, std::io::Error>(bytes)
@@ -100,7 +99,7 @@ async fn exec_vm_image_ls(
       }
     }
     false => {
-      print_table(rows);
+      utils::print::print_table(rows);
     }
   }
   Ok(())
