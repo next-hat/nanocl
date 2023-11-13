@@ -103,7 +103,7 @@ async fn inspect_cargo(
     ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
   ),
   responses(
-    (status = 201, description = "Cargo created", body = CargoInspect),
+    (status = 201, description = "Cargo created", body = Cargo),
   ),
 ))]
 #[web::post("/cargoes")]

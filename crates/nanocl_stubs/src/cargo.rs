@@ -20,6 +20,7 @@ use super::cargo_config::CargoConfig;
 /// Cargo contain a configuration which is used to create the container
 /// The configuration can be updated and the old configuration will be kept in the history
 /// That way you can rollback to a previous configuration quickly
+///
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -37,8 +38,9 @@ pub struct Cargo {
   pub config: CargoConfig,
 }
 
-/// A Cargo Summary is a summary of a cargo
+/// A CargoSummary is a summary of a cargo
 /// It's the datastructure returned by the list operation
+///
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -67,6 +69,7 @@ pub struct CargoSummary {
 /// Cargo Inspect is a detailed view of a cargo
 /// It contains all the information about the cargo
 /// It also contains the list of containers
+///
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -92,6 +95,7 @@ pub struct CargoInspect {
 }
 
 /// Kind of ExecOutput
+///
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -109,6 +113,7 @@ pub enum OutputKind {
 
 /// ExecOutput is the output of an exec command
 /// It contains the kind of the output and the data
+///
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -144,6 +149,7 @@ impl From<LogOutput> for OutputLog {
 }
 
 /// Options for the kill command
+///
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -173,6 +179,7 @@ impl From<CargoKillOptions> for KillContainerOptions<String> {
 }
 
 /// Delete cargo query
+///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
@@ -187,6 +194,7 @@ pub struct CargoDeleteQuery {
 }
 
 /// To use this structure for database access it needs to be able to hold a NamespaceDbModel
+///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
@@ -229,6 +237,7 @@ impl<NS> GenericCargoListQuery<NS> {
 pub type CargoListQuery = GenericCargoListQuery<Option<String>>;
 
 /// Log cargo query
+///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
@@ -255,6 +264,7 @@ pub struct CargoLogQuery {
 }
 
 /// Stats cargo query
+///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
@@ -309,6 +319,7 @@ impl From<CargoLogQuery> for LogsOptions<String> {
 }
 
 /// Payload for the cargo scale endpoint
+///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(

@@ -10,7 +10,7 @@ use crate::utils;
 use crate::models::{Pool, JobDbModel, JobUpdateDbModel};
 
 pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
-  let mut data = serde_json::to_value(&item)
+  let mut data = serde_json::to_value(item)
     .map_err(|err| err.map_err_context(|| "JobPartial"))?;
   if let Some(meta) = data.as_object_mut() {
     meta.remove("Metadata");
@@ -22,16 +22,10 @@ pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
     data,
     metadata: item.metadata.clone(),
   };
-  super::generic::insert_with_res::<_, _, JobDbModel>(dbmodel.clone(), pool)
-    .await?;
-  let job = Job {
-    name: item.name.clone(),
-    created_at: dbmodel.created_at,
-    updated_at: dbmodel.updated_at,
-    secrets: item.secrets.clone(),
-    metadata: item.metadata.clone(),
-    containers: item.containers.clone(),
-  };
+  let db_model =
+    super::generic::insert_with_res::<_, _, JobDbModel>(dbmodel.clone(), pool)
+      .await?;
+  let job = db_model.into_job(item);
   Ok(job)
 }
 
@@ -48,7 +42,7 @@ pub async fn update_by_name(
   name: &str,
   item: &JobUpdate,
   pool: &Pool,
-) -> IoResult<JobDbModel> {
+) -> IoResult<Job> {
   use crate::schema::jobs;
   let name = name.to_owned();
   let dbmodel = JobUpdateDbModel {
@@ -66,26 +60,39 @@ pub async fn update_by_name(
       name, dbmodel, pool,
     )
     .await?;
-  Ok(dbmodel)
+  let item = dbmodel.serialize_data()?;
+  let job = dbmodel.into_job(&item);
+  Ok(job)
 }
 
-pub async fn list(pool: &Pool) -> IoResult<Vec<JobDbModel>> {
+pub async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
   use crate::schema::jobs;
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = jobs::dsl::jobs
+    let items: Vec<JobDbModel> = jobs::dsl::jobs
       .order(jobs::dsl::created_at.desc())
       .get_results(&mut conn)
-      .map_err(|err| err.map_err_context(|| "Cargo"))?;
+      .map_err(|err| err.map_err_context(|| "Job"))?;
     Ok::<_, IoError>(items)
   })
   .await?;
+  let items = items
+    .into_iter()
+    .map(|item| {
+      let data = item.serialize_data()?;
+      Ok::<_, IoError>(item.into_job(&data))
+    })
+    .collect::<Result<Vec<_>, IoError>>()?;
   Ok(items)
 }
 
-pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<JobDbModel> {
+pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
   use crate::schema::jobs;
   let name = name.to_owned();
-  super::generic::find_by_id::<jobs::table, _, _>(name, pool).await
+  let db_model: JobDbModel =
+    super::generic::find_by_id::<jobs::table, _, _>(name, pool).await?;
+  let item = db_model.serialize_data()?;
+  let job = db_model.into_job(&item);
+  Ok(job)
 }

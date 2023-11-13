@@ -1,3 +1,6 @@
+use nanocl_error::io::{IoResult, FromIo};
+use nanocl_stubs::job::{Job, JobPartial};
+
 use crate::schema::jobs;
 
 /// ## JobDbModel
@@ -19,6 +22,26 @@ pub struct JobDbModel {
   pub data: serde_json::Value,
   /// The metadata
   pub metadata: Option<serde_json::Value>,
+}
+
+impl JobDbModel {
+  pub fn into_job(self, config: &JobPartial) -> Job {
+    Job {
+      name: self.key.clone(),
+      created_at: self.created_at,
+      updated_at: self.updated_at,
+      secrets: config.secrets.clone(),
+      metadata: self.metadata.clone(),
+      containers: config.containers.clone(),
+    }
+  }
+
+  pub fn serialize_data(&self) -> IoResult<JobPartial> {
+    Ok(
+      serde_json::from_value(self.data.clone())
+        .map_err(|err| err.map_err_context(|| "Job"))?,
+    )
+  }
 }
 
 /// ## JobDbModelUpdate

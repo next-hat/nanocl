@@ -29,6 +29,7 @@ use bollard_next::service::{
   Network, GenericResourcesInner, GenericResourcesInnerNamedResourceSpec,
   NetworkContainer, Ipam, IpamConfig, ExecInspectResponse, ProcessConfig,
 };
+
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 use nanocl_stubs::generic::GenericCount;
@@ -41,6 +42,7 @@ use nanocl_stubs::node::{Node, NodeContainerSummary};
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespacePartial, NamespaceInspect,
 };
+use nanocl_stubs::job::Job;
 use nanocl_stubs::cargo::{
   Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
   CargoScale, CargoStats,
@@ -70,7 +72,7 @@ use nanocl_stubs::state::{
 
 use super::{
   node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
-  metric, http_metric, secret,
+  metric, http_metric, secret, job,
 };
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -231,6 +233,8 @@ impl Modify for VersionModifier {
     secret::create_secret,
     secret::delete_secret,
     secret::patch_secret,
+    // Job
+    job::list_job,
     // Cargo
     cargo::list_cargo,
     cargo::list_cargo_instance,
@@ -334,6 +338,8 @@ impl Modify for VersionModifier {
     NamespacePartial,
     NamespaceInspect,
     NamespaceSummary,
+    // Job
+    Job,
     // Cargo
     Cargo,
     CreateExecOptions,

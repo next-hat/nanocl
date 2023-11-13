@@ -115,7 +115,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CargoInspect'
+                $ref: '#/components/schemas/Cargo'
   /cargoes/images:
     get:
       tags:
@@ -877,6 +877,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HostInfo'
+  /jobs:
+    get:
+      tags:
+      - Jobs
+      summary: List jobs
+      description: List jobs
+      operationId: list_job
+      responses:
+        '200':
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Job'
   /metrics:
     get:
       tags:
@@ -1993,7 +2009,7 @@ components:
           minimum: 0
     Cargo:
       type: object
-      description: |-
+      description: |
         A Cargo is a replicable container
         It is used to run one or multiple instances of the same container
         You can define the number of replicas you want to run
@@ -2147,7 +2163,7 @@ components:
           example: nginx:latest
     CargoInspect:
       type: object
-      description: |-
+      description: |
         Cargo Inspect is a detailed view of a cargo
         It contains all the information about the cargo
         It also contains the list of containers
@@ -2191,7 +2207,8 @@ components:
           description: List of containers
     CargoKillOptions:
       type: object
-      description: Options for the kill command
+      description: |
+        Options for the kill command
       required:
       - Signal
       properties:
@@ -2200,7 +2217,8 @@ components:
           description: 'Signal to send to the container default: SIGKILL'
     CargoScale:
       type: object
-      description: Payload for the cargo scale endpoint
+      description: |
+        Payload for the cargo scale endpoint
       required:
       - Replicas
       properties:
@@ -2209,8 +2227,8 @@ components:
           description: Number of replicas to scale up or down can be negative value
     CargoSummary:
       type: object
-      description: |-
-        A Cargo Summary is a summary of a cargo
+      description: |
+        A CargoSummary is a summary of a cargo
         It's the datastructure returned by the list operation
       required:
       - Key
@@ -3780,6 +3798,41 @@ components:
           additionalProperties:
             type: string
           nullable: true
+    Job:
+      type: object
+      required:
+      - name
+      - created_at
+      - updated_at
+      - containers
+      properties:
+        name:
+          type: string
+          description: Name of the job
+        created_at:
+          type: string
+          format: date-time
+          description: When the job have been created
+        updated_at:
+          type: string
+          format: date-time
+          description: When the job have been updated
+        secrets:
+          type: array
+          items:
+            type: string
+          description: Secrets to load as environment variables
+          nullable: true
+        metadata:
+          type: object
+          description: Metadata (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        containers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Config'
+          description: Containers to run
     LocalNodeState:
       type: string
       description: |-
