@@ -15,7 +15,7 @@ nanocl_utils = { version = "0.3.0", features = ["build_tools"] }
 [dependencies]
 log = "0.4.20"
 futures-util = "0.3.28"
-ntex = { version = "0.7.8", features = ["tokio"] }
+ntex = { version = "0.7.10", features = ["tokio"] }
 vpnkitrc = { version = "0.1.1", features = ["tokio"] }
 nanocld_client = { version = "0.11.0" }
 nanocl_utils = { version = "0.3.0", features = ["logger"] }
