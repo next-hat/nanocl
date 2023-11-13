@@ -54,38 +54,3 @@ pub struct JobPartial {
   /// List of container to run
   pub containers: Vec<Config>,
 }
-
-/// ## JobUpdate
-///
-/// Payload used to update a job
-///
-#[derive(Debug, Default, Clone)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
-pub struct JobUpdate {
-  /// New name of the job
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub name: Option<String>,
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  /// New secrets to load as environment variables
-  pub secrets: Option<Vec<String>>,
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  /// New metadata (user defined)
-  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub metadata: Option<serde_json::Value>,
-  /// New containers to run
-  pub containers: Option<Vec<Config>>,
-}

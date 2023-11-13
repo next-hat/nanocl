@@ -4,10 +4,10 @@ use diesel::prelude::*;
 use nanocl_error::io::{IoResult, FromIo, IoError};
 
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::job::{Job, JobPartial, JobUpdate};
+use nanocl_stubs::job::{Job, JobPartial};
 
 use crate::utils;
-use crate::models::{Pool, JobDbModel, JobUpdateDbModel};
+use crate::models::{Pool, JobDbModel};
 
 pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
   let mut data = serde_json::to_value(item)
@@ -36,33 +36,6 @@ pub async fn delete_by_name(
   use crate::schema::jobs;
   let name = name.to_owned();
   super::generic::delete_by_id::<jobs::table, _>(name, pool).await
-}
-
-pub async fn update_by_name(
-  name: &str,
-  item: &JobUpdate,
-  pool: &Pool,
-) -> IoResult<Job> {
-  use crate::schema::jobs;
-  let name = name.to_owned();
-  let dbmodel = JobUpdateDbModel {
-    key: item.name.clone(),
-    created_at: None,
-    updated_at: Some(chrono::Local::now().naive_local()),
-    data: Some(
-      serde_json::to_value(item)
-        .map_err(|err| err.map_err_context(|| "Job"))?,
-    ),
-    metadata: item.metadata.clone(),
-  };
-  let dbmodel =
-    super::generic::update_by_id_with_res::<jobs::table, _, _, JobDbModel>(
-      name, dbmodel, pool,
-    )
-    .await?;
-  let item = dbmodel.serialize_data()?;
-  let job = dbmodel.into_job(&item);
-  Ok(job)
 }
 
 pub async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
