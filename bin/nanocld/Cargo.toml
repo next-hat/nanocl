@@ -82,6 +82,6 @@ openssl = { version = "0.10.56", features = ["vendored"] }
 metrsd_client = "0.3.0"
 nanocl_stubs = { version = "0.11.0", features = ["serde"] }
 nanocl_utils = { version = "0.3.0", features = ["unix", "ntex", "logger"] }
-utoipa = { version = "4.0", features = ["yaml"], optional = true }
+utoipa = { version = "4.1", features = ["yaml"], optional = true }
 notify = "6.1.1"
 ntex-cors = "0.4.0"
