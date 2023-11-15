@@ -838,6 +838,12 @@ async fn exec_state_apply(
       "couldn't apply correctly",
     ));
   }
+  if has_error {
+    return Err(IoError::invalid_data(
+      "Statefile",
+      "couldn't apply correctly",
+    ));
+  }
   Ok(())
 }
 

@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- State apply --reload to skip diff check.
+- nanocl state apply return exit code on errors
+- nanocl state apply --reload to skip diff check.
 - Cargo image import with progress bar.
 
 
