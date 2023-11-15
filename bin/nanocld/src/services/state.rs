@@ -182,5 +182,11 @@ mod tests {
     .await;
     // Revert examples/secret_env.yml
     revert_state(&client, "../../examples/secret_env.yml").await;
+    // Apply examples/job_example.yml
+    apply_state(&client, "../../examples/job_example.yml", None).await;
+    // ReApply examples/job_example.yml
+    apply_state(&client, "../../examples/job_example.yml", None).await;
+    // Revert examples/job_example.yml
+    revert_state(&client, "../../examples/job_example.yml").await;
   }
 }
