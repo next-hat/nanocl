@@ -1,6 +1,3 @@
-use std::io;
-
-use bollard_next::service::{ContainerWaitExitError, ContainerWaitResponse};
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
@@ -126,83 +123,6 @@ pub struct OutputLog {
   pub kind: OutputKind,
   /// Data of the output
   pub data: String,
-}
-
-/// WaitCondition choose wich state of container to wait
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
-pub enum WaitCondition {
-  NotRunning,
-  #[default]
-  NextExit,
-  Removed,
-}
-
-impl From<WaitCondition> for std::string::String {
-  fn from(value: WaitCondition) -> Self {
-    match value {
-      WaitCondition::NextExit => "next-exit".to_string(),
-      WaitCondition::NotRunning => "not-running".to_string(),
-      WaitCondition::Removed => "removed".to_string(),
-    }
-  }
-}
-
-impl std::str::FromStr for WaitCondition {
-  type Err = io::Error;
-
-  fn from_str(s: &str) -> Result<Self, Self::Err> {
-    match s.to_ascii_lowercase().as_str() {
-      "next-exit" => Ok(WaitCondition::NextExit),
-      "not-running" => Ok(WaitCondition::NotRunning),
-      "removed" => Ok(WaitCondition::Removed),
-      _ => Err(io::Error::new(
-        io::ErrorKind::InvalidData,
-        "Can't parse wait condition",
-      )),
-    }
-  }
-}
-
-/// Wait cargo query
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoWaitQuery {
-  /// Name of the namespace
-  pub namespace: Option<String>,
-  // Wait condition
-  pub condition: Option<WaitCondition>,
-}
-
-/// WaitResponse is the output of a wait command
-#[derive(Debug)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoWaitResponse {
-  /// Container id
-  pub container_id: String,
-  /// Exit code of the container
-  pub status_code: i64,
-  /// Wait error
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub error: Option<ContainerWaitExitError>,
-}
-
-impl CargoWaitResponse {
-  pub fn from_container_wait_response(
-    response: ContainerWaitResponse,
-    container_id: String,
-  ) -> CargoWaitResponse {
-    CargoWaitResponse {
-      container_id,
-      status_code: response.status_code,
-      error: response.error,
-    }
-  }
 }
 
 impl From<LogOutput> for OutputLog {

@@ -3,9 +3,7 @@
 */
 
 use ntex::{rt, web, http};
-use bollard_next::container::WaitContainerOptions;
 
-use nanocl_stubs::cargo::CargoWaitQuery;
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
@@ -429,43 +427,6 @@ async fn revert_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-/// Wait for a cargo to finish
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  tag = "Cargoes",
-  path = "/cargoes/{Name}/wait",
-  params(
-    ("Name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
-  ),
-  responses(
-    (status = 200, description = "Cargo wait", content_type = "application/vdn.nanocl.raw-stream"),
-    (status = 404, description = "Cargo does not exist"),
-  ),
-))]
-#[web::get("/cargoes/{name}/wait")]
-async fn wait_cargo(
-  web::types::Query(qs): web::types::Query<CargoWaitQuery>,
-  path: web::types::Path<(String, String)>,
-  state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  let stream = utils::cargo::wait(
-    &key,
-    WaitContainerOptions {
-      condition: qs.condition.unwrap_or_default(),
-    },
-    &state,
-  )
-  .await?;
-  Ok(
-    web::HttpResponse::Ok()
-      .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(stream),
-  )
-}
-
 /// Get logs of a cargo instance
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
@@ -582,7 +543,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(inspect_cargo);
   config.service(list_cargo_history);
   config.service(revert_cargo);
-  config.service(wait_cargo);
   config.service(logs_cargo);
   config.service(list_cargo_instance);
   config.service(scale_cargo);
@@ -598,7 +558,7 @@ mod tests {
   use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
   use nanocl_stubs::cargo::{
     Cargo, CargoSummary, CargoInspect, OutputLog, CargoDeleteQuery,
-    CargoListQuery, CargoScale, CargoKillOptions, CargoWaitResponse,
+    CargoListQuery, CargoScale, CargoKillOptions,
   };
 
   use crate::utils::tests::*;
@@ -933,70 +893,5 @@ mod tests {
       let _ = serde_json::from_slice::<OutputLog>(&payload).unwrap();
       payload.clear();
     }
-  }
-  #[ntex::test]
-  async fn wait_cargo() {
-    let client = gen_default_test_client().await;
-    let state: &str =
-      include_str!("../../../../examples/static_replication.yml");
-    let yaml: serde_yaml::Value = serde_yaml::from_str(state).unwrap();
-    let cargo_config = &yaml["Cargoes"][0];
-    let instance_number =
-      cargo_config["Replication"]["Number"].as_i64().unwrap();
-    let cargo_name = cargo_config["Name"].as_str().unwrap();
-    let res = client
-      .send_post(
-        ENDPOINT,
-        Some(cargo_config.clone()),
-        Some(&GenericNspQuery {
-          namespace: Some("global".into()),
-        }),
-      )
-      .await;
-    test_status_code!(http::StatusCode::CREATED, res.status(), "create cargo");
-    let wait_res = client
-      .send_get(
-        &format!("{ENDPOINT}/{cargo_name}/wait"),
-        Some(&GenericNspQuery {
-          namespace: Some("global".into()),
-        }),
-      )
-      .await;
-    test_status_code!(
-      http::StatusCode::OK,
-      wait_res.status(),
-      format!("wait cargo {cargo_name}")
-    );
-    let res = client
-      .send_post(
-        &format!("{ENDPOINT}/{cargo_name}/start"),
-        Some(cargo_config),
-        Some(&GenericNspQuery {
-          namespace: Some("global".into()),
-        }),
-      )
-      .await;
-    test_status_code!(
-      http::StatusCode::ACCEPTED,
-      res.status(),
-      format!("start cargo {cargo_name}")
-    );
-    let mut stream = wait_res.into_stream();
-    let mut response_number = 0;
-    while let Some(Ok(wait_response)) = stream.next().await {
-      let response =
-        serde_json::from_slice::<CargoWaitResponse>(&wait_response).unwrap();
-      assert_eq!(response.status_code, 0);
-      response_number += 1;
-    }
-    assert_eq!(response_number, instance_number);
-    let _ = client
-      .send_delete(
-        &format!("{ENDPOINT}/{cargo_name}"),
-        Some(&GenericNspQuery {
-          namespace: Some("global".into()),
-        }),
-      )
-      .await;
   }
 }

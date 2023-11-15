@@ -25,7 +25,7 @@ Resources:
     Data:
       Rules:
         - Domain: deploy-example.com
-          Network: All
+          Network: Public
           Locations:
             - Path: /
               Target:

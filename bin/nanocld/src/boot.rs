@@ -3,7 +3,7 @@ use std::os::unix::prelude::PermissionsExt;
 
 use ntex::rt;
 use tokio::fs;
-use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoResult, IoError};
 
 use nanocl_stubs::config::DaemonConfig;
 
@@ -135,10 +135,15 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     event_emitter: event::EventEmitter::new(),
     version: version::VERSION.to_owned(),
   };
-  utils::system::register_namespace("system", false, &daemon_state).await?;
-  utils::system::register_namespace("global", true, &daemon_state).await?;
-  utils::system::sync_containers(&docker, &pool).await?;
-  utils::system::sync_vm_images(daemon_conf, &pool).await?;
+  let daemon_ptr = daemon_state.clone();
+  rt::spawn(async move {
+    utils::system::register_namespace("system", false, &daemon_ptr).await?;
+    utils::system::register_namespace("global", true, &daemon_ptr).await?;
+    utils::system::sync_containers(&daemon_ptr.docker_api, &daemon_ptr.pool)
+      .await?;
+    utils::system::sync_vm_images(&daemon_ptr.config, &daemon_ptr.pool).await?;
+    Ok::<_, IoError>(())
+  });
   Ok(daemon_state)
 }
 

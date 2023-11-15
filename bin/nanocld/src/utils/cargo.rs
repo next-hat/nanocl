@@ -4,7 +4,7 @@ use ntex::rt;
 use ntex::util::Bytes;
 use futures::{StreamExt, TryStreamExt};
 use futures_util::TryFutureExt;
-use futures_util::stream::{FuturesUnordered, select_all};
+use futures_util::stream::FuturesUnordered;
 use bollard_next::service::ContainerCreateResponse;
 
 use bollard_next::container::{
@@ -20,7 +20,7 @@ use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,
   CargoKillOptions, GenericCargoListQuery, CargoScale, CargoStats,
-  CargoStatsQuery, CargoWaitResponse, WaitCondition,
+  CargoStatsQuery,
 };
 use nanocl_stubs::cargo_config::{
   CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
@@ -284,54 +284,6 @@ pub async fn list_instances(
   });
   let containers = docker_api.list_containers(options).await?;
   Ok(containers)
-}
-
-/// ## Wait
-///
-/// Wait a cargo to finish
-/// And create his instances (containers).
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Stream) - The stream of wait
-///   * [Err](HttpError) - The cargo cannot be waited
-///
-pub async fn wait(
-  key: &str,
-  wait_options: WaitContainerOptions<WaitCondition>,
-  state: &DaemonState,
-) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
-  let cargo_key = key.to_owned();
-  let docker_api = state.docker_api.clone();
-  let containers = list_instances(&cargo_key, &docker_api).await?;
-  let mut streams = Vec::new();
-  for container in containers {
-    let id = container.id.unwrap_or_default();
-    let options = Some(wait_options.clone());
-    let stream =
-      docker_api
-        .wait_container(&id, options)
-        .map(move |wait_result| match wait_result {
-          Err(err) => Err(err),
-          Ok(wait_response) => {
-            Ok(CargoWaitResponse::from_container_wait_response(
-              wait_response,
-              id.to_owned(),
-            ))
-          }
-        });
-    streams.push(stream);
-  }
-  let stream = select_all(streams).into_stream();
-  Ok(transform_stream::<CargoWaitResponse, CargoWaitResponse>(
-    stream,
-  ))
 }
 
 /// ## Create

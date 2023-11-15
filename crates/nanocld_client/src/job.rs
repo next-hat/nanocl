@@ -1,6 +1,6 @@
 use ntex::channel::mpsc::Receiver;
 
-use nanocl_stubs::job::{Job, JobLogOutput};
+use nanocl_stubs::job::{Job, JobLogOutput, JobWaitQuery, JobWaitResponse};
 use nanocl_error::http::HttpError;
 use nanocl_error::http_client::HttpClientError;
 
@@ -56,6 +56,27 @@ impl NanocldClient {
   ) -> Result<Receiver<Result<JobLogOutput, HttpError>>, HttpClientError> {
     let res = self
       .send_get(&format!("{}/{name}/logs", Self::JOB_PATH), None::<String>)
+      .await?;
+    Ok(Self::res_stream(res).await)
+  }
+
+  /// ## Wait a job
+  ///
+  /// A [Receiver](Receiver) stream of [ContainerWaitResponse](ContainerWaitResponse) is
+  /// returned, data are sent when container end
+  ///
+  /// ## Arguments
+  ///
+  /// * [name](str) - The name of the job to get the logs
+  /// * [query](Option) - Optional [query](JobWaitQuery)
+  ///
+  pub async fn wait_job(
+    &self,
+    name: &str,
+    query: Option<&JobWaitQuery>,
+  ) -> Result<Receiver<Result<JobWaitResponse, HttpError>>, HttpClientError> {
+    let res = self
+      .send_get(&format!("{}/{name}/wait", Self::JOB_PATH), query)
       .await?;
     Ok(Self::res_stream(res).await)
   }

@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 use bollard_next::exec::CreateExecOptions;
 use bollard_next::container::MemoryStatsStats;
-use nanocld_client::stubs::cargo::{CargoStats, CargoSummary, WaitCondition};
+use nanocld_client::stubs::cargo::{CargoStats, CargoSummary};
 use nanocld_client::stubs::cargo_config::{
   CargoConfigUpdate, Config as ContainerConfig, CargoConfigPartial, HostConfig,
 };
@@ -262,19 +262,6 @@ pub struct CargoRevertOpts {
   pub history_id: String,
 }
 
-/// ## CargoWaitOpts
-///
-/// `nanocl cargo wait` available options
-///
-#[derive(Debug, Parser)]
-pub struct CargoWaitOpts {
-  /// Name of cargo to wait
-  pub name: String,
-  /// State to wait
-  #[clap(short = 'c')]
-  pub condition: Option<WaitCondition>,
-}
-
 /// ## CargoLogsOpts
 ///
 /// `nanocl cargo logs` available options
@@ -361,8 +348,6 @@ pub enum CargoCommand {
   Revert(CargoRevertOpts),
   /// Show logs
   Logs(CargoLogsOpts),
-  /// Wait cargo
-  Wait(CargoWaitOpts),
   /// Run a cargo
   Run(CargoRunOpts),
   /// Show stats of cargo

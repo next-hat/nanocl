@@ -101,7 +101,7 @@ args = ["compose", "up"]
 command = "cargo"
 args = [
   "llvm-cov",
-  "nextest",
+  "test",
   "--no-default-features",
   "--features",
   "test",

@@ -4,13 +4,8 @@ ApiVersion: v0.11
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
-  - Name: ProxyRule
+  - Name: TestResource
     Kind: Kind
-    Version: v0.8
+    Version: v0.1
     Data:
-      Url: unix:///run/nanocl/proxy.sock
-  - Name: DnsRule
-    Kind: Kind
-    Version: v0.3
-    Data:
-      Url: unix:///run/nanocl/proxy.sock
+      Url: unix:///run/nanocl/test.sock

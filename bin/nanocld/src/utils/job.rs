@@ -6,12 +6,14 @@ use futures_util::stream::{FuturesUnordered, select_all};
 use bollard_next::service::{ContainerSummary, ContainerInspectResponse};
 use bollard_next::container::{
   CreateContainerOptions, StartContainerOptions, ListContainersOptions,
-  RemoveContainerOptions, LogsOptions,
+  RemoveContainerOptions, LogsOptions, WaitContainerOptions,
 };
 
 use nanocl_error::http::HttpError;
 use nanocl_stubs::node::NodeContainerSummary;
-use nanocl_stubs::job::{Job, JobPartial, JobInspect, JobLogOutput};
+use nanocl_stubs::job::{
+  Job, JobPartial, JobInspect, JobLogOutput, JobWaitResponse, WaitCondition,
+};
 
 use crate::repositories;
 use crate::models::DaemonState;
@@ -293,4 +295,50 @@ pub async fn logs_by_name(
     .collect::<Vec<_>>();
   let stream = select_all(futures).into_stream();
   Ok(transform_stream::<JobLogOutput, JobLogOutput>(stream))
+}
+
+/// ## Wait
+///
+/// Wait a job to finish
+/// And create his instances (containers).
+///
+/// ## Arguments
+///
+/// * [key](str) - The job key
+/// * [state](DaemonState) - The daemon state
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Stream) - The stream of wait
+///   * [Err](HttpError) - The job cannot be waited
+///
+pub async fn wait(
+  name: &str,
+  wait_options: WaitContainerOptions<WaitCondition>,
+  state: &DaemonState,
+) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
+  let job = repositories::job::find_by_name(name, &state.pool).await?;
+  let docker_api = state.docker_api.clone();
+  let containers = list_instances(&job.name, &docker_api).await?;
+  let mut streams = Vec::new();
+  for container in containers {
+    let id = container.id.unwrap_or_default();
+    let options = Some(wait_options.clone());
+    let stream =
+      docker_api
+        .wait_container(&id, options)
+        .map(move |wait_result| match wait_result {
+          Err(err) => Err(err),
+          Ok(wait_response) => {
+            Ok(JobWaitResponse::from_container_wait_response(
+              wait_response,
+              id.to_owned(),
+            ))
+          }
+        });
+    streams.push(stream);
+  }
+  let stream = select_all(streams).into_stream();
+  Ok(transform_stream::<JobWaitResponse, JobWaitResponse>(stream))
 }
