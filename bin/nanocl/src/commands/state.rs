@@ -12,7 +12,7 @@ use bollard_next::service::HostConfig;
 
 use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::state::{StateMeta, StateApplyQuery};
+use nanocld_client::stubs::state::{StateMeta, StateApplyQuery, StateStreamStatus};
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
@@ -735,9 +735,13 @@ async fn exec_state_apply(
     .await?;
   let multiprogress = MultiProgress::new();
   multiprogress.set_move_cursor(false);
+  let mut has_error = false;
   let mut layers: HashMap<String, ProgressBar> = HashMap::new();
   while let Some(res) = stream.next().await {
     let res = res?;
+    if res.status == StateStreamStatus::Failed {
+      has_error = true;
+    }
     utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
   if opts.follow {
@@ -747,6 +751,12 @@ async fn exec_state_apply(
       ..Default::default()
     };
     log_cargoes(&client, cargoes, &query).await?;
+  }
+  if has_error {
+    return Err(IoError::invalid_data(
+      "Statefile",
+      "couldn't apply correctly",
+    ));
   }
   Ok(())
 }
