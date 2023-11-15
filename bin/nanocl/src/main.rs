@@ -1,7 +1,7 @@
 use clap::Parser;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoResult, IoError};
 use nanocld_client::NanocldClient;
 
 mod utils;
@@ -116,10 +116,11 @@ async fn main() -> std::io::Result<()> {
     let _ = term.clear_last_lines(0);
     std::process::exit(0);
   })
-  .expect("Error setting Ctrl-C handler");
+  .map_err(|err| {
+    IoError::interupted("Signal", &format!("Unable to register ctrl-c: {err}"))
+  })?;
   if let Err(err) = execute_arg(&args).await {
-    eprintln!("{err}");
-    err.exit();
+    err.print_and_exit();
   }
   Ok(())
 }
