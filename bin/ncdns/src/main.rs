@@ -45,7 +45,7 @@ async fn run(cli: &Cli) -> IoResult<()> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
   let cli = Cli::parse();
   if let Err(err) = run(&cli).await {
-    err.exit();
+    err.print_and_exit();
   }
   Ok(())
 }

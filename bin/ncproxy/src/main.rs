@@ -23,8 +23,7 @@ async fn main() -> std::io::Result<()> {
   );
   let (nginx, client) = match subsystem::init(&cli).await {
     Err(err) => {
-      log::error!("{err}");
-      err.exit();
+      err.print_and_exit();
     }
     Ok(nginx) => nginx,
   };
