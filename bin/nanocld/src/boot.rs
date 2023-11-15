@@ -136,12 +136,19 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     version: version::VERSION.to_owned(),
   };
   let daemon_ptr = daemon_state.clone();
+  utils::system::register_namespace("global", true, &daemon_state).await?;
+  utils::system::register_namespace("system", false, &daemon_state).await?;
   rt::spawn(async move {
-    utils::system::register_namespace("system", false, &daemon_ptr).await?;
-    utils::system::register_namespace("global", true, &daemon_ptr).await?;
-    utils::system::sync_containers(&daemon_ptr.docker_api, &daemon_ptr.pool)
-      .await?;
-    utils::system::sync_vm_images(&daemon_ptr.config, &daemon_ptr.pool).await?;
+    let fut = async move {
+      utils::system::sync_containers(&daemon_ptr.docker_api, &daemon_ptr.pool)
+        .await?;
+      utils::system::sync_vm_images(&daemon_ptr.config, &daemon_ptr.pool)
+        .await?;
+      Ok::<_, IoError>(())
+    };
+    if let Err(err) = fut.await {
+      log::warn!("sync error: {err:?}");
+    }
     Ok::<_, IoError>(())
   });
   Ok(daemon_state)
