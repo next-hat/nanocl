@@ -320,13 +320,13 @@ pub async fn log_jobs(
             let data = output.log.data;
             match output.log.kind {
               OutputKind::StdOut => {
-                print!("[{name}]: {data}");
+                print!("[{}@{name}]: {data}", &job.name);
               }
               OutputKind::StdErr => {
-                eprint!("[{name}]: {data}");
+                eprint!("[{}{name}]: {data}", &job.name);
               }
               OutputKind::Console => {
-                print!("[{name}]: {data}");
+                print!("[{}{name}]: {data}", &job.name);
               }
               _ => {}
             }

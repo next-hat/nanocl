@@ -262,9 +262,17 @@ async fn apply_jobs(
             send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
             return;
           }
+          if let Err(err) = utils::job::start_by_name(&job.name, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
         }
         Err(_err) => {
           if let Err(err) = utils::job::create(job, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+          if let Err(err) = utils::job::start_by_name(&job.name, state).await {
             send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
             return;
           }
