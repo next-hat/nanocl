@@ -4,8 +4,8 @@ use serde::{Serialize, Deserialize};
 use bollard_next::container::Config;
 use bollard_next::service::{ContainerWaitExitError, ContainerWaitResponse};
 
-use crate::node::NodeContainerSummary;
 use crate::cargo::OutputLog;
+use crate::node::NodeContainerSummary;
 
 /// ## Job
 ///
@@ -177,8 +177,6 @@ impl std::str::FromStr for WaitCondition {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct JobWaitQuery {
-  /// Name of the namespace
-  pub namespace: Option<String>,
   // Wait condition
   pub condition: Option<WaitCondition>,
 }

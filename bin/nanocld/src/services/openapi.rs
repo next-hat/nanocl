@@ -42,7 +42,7 @@ use nanocl_stubs::node::{Node, NodeContainerSummary};
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespacePartial, NamespaceInspect,
 };
-use nanocl_stubs::job::Job;
+use nanocl_stubs::job::{Job, JobPartial};
 use nanocl_stubs::cargo::{
   Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
   CargoScale, CargoStats,
@@ -235,6 +235,12 @@ impl Modify for VersionModifier {
     secret::patch_secret,
     // Job
     job::list_job,
+    job::delete_job,
+    job::inspect_job,
+    job::logs_job,
+    job::create_job,
+    job::wait_job,
+    job::start_job,
     // Cargo
     cargo::list_cargo,
     cargo::list_cargo_instance,
@@ -340,6 +346,7 @@ impl Modify for VersionModifier {
     NamespaceSummary,
     // Job
     Job,
+    JobPartial,
     // Cargo
     Cargo,
     CreateExecOptions,

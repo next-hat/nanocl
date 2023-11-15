@@ -46,6 +46,28 @@ pub(crate) async fn create_job(
   Ok(web::HttpResponse::Created().json(&job))
 }
 
+/// Start a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Jobs",
+  path = "/jobs/{Name}/start",
+  params(
+    ("Name" = String, Path, description = "Name of the cargo"),
+  ),
+  responses(
+    (status = 202, description = "Cargo started"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
+#[web::post("/jobs/{name}/start")]
+pub(crate) async fn start_job(
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  utils::job::start_by_name(&path.1, &state).await?;
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
 /// Delete a job
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
@@ -53,8 +75,6 @@ pub(crate) async fn create_job(
   path = "/jobs/{Name}",
   params(
     ("Name" = String, Path, description = "Name of the job"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the job"),
-    ("Force" = bool, Query, description = "If true forces the delete operation"),
   ),
   responses(
     (status = 202, description = "Cargo deleted"),
@@ -135,10 +155,8 @@ async fn wait_job(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
   let stream = utils::job::wait(
-    &key,
+    &path.1,
     WaitContainerOptions {
       condition: qs.condition.unwrap_or_default(),
     },
@@ -159,6 +177,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(inspect_job);
   config.service(logs_job);
   config.service(wait_job);
+  config.service(start_job);
 }
 
 #[cfg(test)]
@@ -197,6 +216,18 @@ mod tests {
       wait_res.status(),
       http::StatusCode::OK,
       format!("wait job {}", &job.name)
+    );
+    client
+      .send_post(
+        &format!("{ENDPOINT}/{}/start", &job.name),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      wait_res.status(),
+      http::StatusCode::OK,
+      format!("start job {}", &job.name)
     );
     let mut stream = wait_res.into_stream();
     while let Some(Ok(wait_response)) = stream.next().await {

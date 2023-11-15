@@ -110,6 +110,29 @@ pub async fn create(
   state: &DaemonState,
 ) -> Result<Job, HttpError> {
   let job = repositories::job::create(item, &state.pool).await?;
+  Ok(job)
+}
+
+/// ## Start by name
+///
+/// Start a job by name
+///
+/// ## Arguments
+///
+/// * [name](str) - The job name
+/// * [state](DaemonState) - The daemon state
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Ok) - [Job](Job) has been started
+///   * [Err](Err) - [Http error](HttpError) Something went wrong
+///
+pub async fn start_by_name(
+  name: &str,
+  state: &DaemonState,
+) -> Result<Job, HttpError> {
+  let job = repositories::job::find_by_name(name, &state.pool).await?;
   run_job(&job, state).await?;
   Ok(job)
 }

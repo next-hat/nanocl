@@ -893,6 +893,129 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Job'
+    post:
+      tags:
+      - Jobs
+      summary: Create a job
+      description: Create a job
+      operationId: create_job
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobPartial'
+        required: true
+      responses:
+        '201':
+          description: Cargo created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+  /jobs/{Name}:
+    delete:
+      tags:
+      - Jobs
+      summary: Delete a job
+      description: Delete a job
+      operationId: delete_job
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the job
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: Cargo deleted
+        '404':
+          description: Cargo does not exist
+  /jobs/{Name}/inspect:
+    get:
+      tags:
+      - Jobs
+      summary: Inspect a job
+      description: Inspect a job
+      operationId: inspect_job
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the job
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the job
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: Cargo details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CargoInspect'
+  /jobs/{Name}/logs:
+    get:
+      tags:
+      - Jobs
+      summary: Get logs of a job
+      description: Get logs of a job
+      operationId: logs_job
+      responses:
+        '200':
+          description: Job logs
+        '404':
+          description: Job does not exist
+  /jobs/{Name}/start:
+    post:
+      tags:
+      - Jobs
+      summary: Start a cargo
+      description: Start a cargo
+      operationId: start_job
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: Cargo started
+        '404':
+          description: Cargo does not exist
+  /jobs/{Name}/wait:
+    get:
+      tags:
+      - Jobs
+      summary: Wait for a job to finish
+      description: Wait for a job to finish
+      operationId: wait_job
+      parameters:
+      - name: Name
+        in: path
+        description: Name of the job instance usually `name` or `name-number`
+        required: true
+        schema:
+          type: string
+      - name: Namespace
+        in: query
+        description: Namespace of the job
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: Cargo wait
+        '404':
+          description: Cargo does not exist
   /metrics:
     get:
       tags:
@@ -3837,6 +3960,35 @@ components:
           items:
             $ref: '#/components/schemas/Config'
           description: Containers to run
+    JobPartial:
+      type: object
+      description: |
+        ## Job partial
+
+        Job partial is used to create a new job
+      required:
+      - Name
+      - Containers
+      properties:
+        Name:
+          type: string
+          description: Name of the job
+        Secrets:
+          type: array
+          items:
+            type: string
+          description: Secrets to load as environment variables
+          nullable: true
+        Metadata:
+          type: object
+          description: Metadata (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Containers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Config'
+          description: List of container to run
     LocalNodeState:
       type: string
       description: |-
