@@ -1,0 +1,2 @@
+ignore: # ignore codecoverage on following paths
+  - "bin/cli/utils/test.rs"

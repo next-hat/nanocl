@@ -1,0 +1,13 @@
+Kind: Deployment
+ApiVersion: v0.11
+
+Namespace: global
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
+Cargoes:
+  - Name: invalid_init_container_image
+    InitContainer:
+      Image: doesntexists:latest
+    Container:
+      Image: ghcr.io/nxthat/nanocl-get-started:latest

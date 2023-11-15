@@ -22,9 +22,6 @@ Name = "deploy-example.com"
 Kind = "ProxyRule"
 Version = "v0.8"
 
-[Resources.Data]
-Watch = ["deploy-example.global.c", "deploy-example2.global.c"]
-
 [[Resources.Data.Rules]]
 Domain = "deploy-example.com"
 Network = "Public"
