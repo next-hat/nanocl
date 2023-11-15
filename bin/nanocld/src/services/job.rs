@@ -1,7 +1,7 @@
-use nanocl_stubs::job::JobPartial;
 use ntex::web;
 
 use nanocl_error::http::HttpError;
+use nanocl_stubs::job::JobPartial;
 
 use crate::utils;
 use crate::models::DaemonState;
@@ -35,7 +35,7 @@ pub(crate) async fn list_job(
   ),
 ))]
 #[web::post("/jobs")]
-pub(crate) async fn create_jobs(
+pub(crate) async fn create_job(
   web::types::Json(payload): web::types::Json<JobPartial>,
   state: web::types::State<DaemonState>,
   _version: web::types::Path<String>,
@@ -47,8 +47,8 @@ pub(crate) async fn create_jobs(
 /// Delete a job
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
-  tag = "Cargoes",
-  path = "/jobes/{Name}",
+  tag = "Jobs",
+  path = "/jobs/{Name}",
   params(
     ("Name" = String, Path, description = "Name of the job"),
     ("Namespace" = Option<String>, Query, description = "Namespace of the job"),
@@ -59,7 +59,7 @@ pub(crate) async fn create_jobs(
     (status = 404, description = "Cargo does not exist"),
   ),
 ))]
-#[web::delete("/jobes/{name}")]
+#[web::delete("/jobs/{name}")]
 pub(crate) async fn delete_job(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -68,8 +68,73 @@ pub(crate) async fn delete_job(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
+/// Inspect a job
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Jobs",
+  path = "/jobs/{Name}/inspect",
+  params(
+    ("Name" = String, Path, description = "Name of the job"),
+    ("Namespace" = Option<String>, Query, description = "Namespace of the job"),
+  ),
+  responses(
+    (status = 200, description = "Cargo details", body = CargoInspect),
+  ),
+))]
+#[web::get("/jobs/{name}/inspect")]
+async fn inspect_job(
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let job = utils::job::inspect_by_name(&path.1, &state).await?;
+  Ok(web::HttpResponse::Ok().json(&job))
+}
+
+/// Get logs of a job
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Jobs",
+  path = "/jobs/{Name}/logs",
+  responses(
+    (status = 200, description = "Job logs", content_type = "application/vdn.nanocl.raw-stream"),
+    (status = 404, description = "Job does not exist"),
+  ),
+))]
+#[web::get("/jobs/{name}/logs")]
+async fn logs_job(
+  path: web::types::Path<(String, String)>,
+  state: web::types::State<DaemonState>,
+) -> Result<web::HttpResponse, HttpError> {
+  let stream = utils::job::logs_by_name(&path.1, &state).await?;
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("application/vdn.nanocl.raw-stream")
+      .streaming(stream),
+  )
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_job);
-  config.service(create_jobs);
+  config.service(create_job);
   config.service(delete_job);
+  config.service(inspect_job);
+  config.service(logs_job);
+}
+
+#[cfg(test)]
+mod tests {
+  use ntex::http;
+  use nanocl_stubs::job::Job;
+
+  use crate::utils::tests::*;
+
+  const ENDPOINT: &str = "/jobs";
+
+  #[ntex::test]
+  async fn test_list_jobs() {
+    let client = gen_default_test_client().await;
+    let mut response = client.get(ENDPOINT).send().await.unwrap();
+    test_status_code!(response.status(), http::StatusCode::OK, "list jobs");
+    let _ = response.json::<Vec<Job>>().await.unwrap();
+  }
 }

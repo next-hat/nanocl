@@ -50,7 +50,7 @@ Cargoes:
     Secrets:
       - env.deploy-example.com
     InitContainer:
-      Image: alpine:latest
+      Image: dasdasdsa:Dasdsa
       Cmd: ["sleep", "1"]
     Container:
       Image: ghcr.io/nxthat/nanocl-get-started:latest

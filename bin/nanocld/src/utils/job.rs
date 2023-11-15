@@ -1,18 +1,22 @@
 use std::collections::HashMap;
 
-use bollard_next::service::ContainerSummary;
+use ntex::util::Bytes;
+use futures_util::{StreamExt, TryStreamExt};
+use futures_util::stream::{FuturesUnordered, select_all};
+use bollard_next::service::{ContainerSummary, ContainerInspectResponse};
 use bollard_next::container::{
   CreateContainerOptions, StartContainerOptions, ListContainersOptions,
-  RemoveContainerOptions,
+  RemoveContainerOptions, LogsOptions,
 };
 
-use futures_util::StreamExt;
-use futures_util::stream::FuturesUnordered;
 use nanocl_error::http::HttpError;
-use nanocl_stubs::job::{Job, JobPartial};
+use nanocl_stubs::node::NodeContainerSummary;
+use nanocl_stubs::job::{Job, JobPartial, JobInspect, JobLogOutput};
 
 use crate::repositories;
 use crate::models::DaemonState;
+
+use super::stream::transform_stream;
 
 /// ## List instances
 ///
@@ -45,6 +49,21 @@ pub async fn list_instances(
   Ok(containers)
 }
 
+/// ## Run job
+///
+/// Run a job in sequence based on the job definition
+///
+/// ## Arguments
+///
+/// * [job](Job) - The job
+/// * [state](DaemonState) - The daemon state
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Ok) - The job is running
+///   * [Err](Err) - [Http error](HttpError) Something went wrong
+///
 async fn run_job(job: &Job, state: &DaemonState) -> Result<(), HttpError> {
   let containers = job.containers.clone();
   for mut container in containers {
@@ -69,6 +88,21 @@ async fn run_job(job: &Job, state: &DaemonState) -> Result<(), HttpError> {
   Ok(())
 }
 
+/// ## Create
+///
+/// Create a job and run it
+///
+/// ## Arguments
+///
+/// * [item](JobPartial) - The job partial
+/// * [state](DaemonState) - The daemon state
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Ok) - [Job](Job) has been created
+///   * [Err](Err) - [Http error](HttpError) Something went wrong
+///
 pub async fn create(
   item: &JobPartial,
   state: &DaemonState,
@@ -78,26 +112,39 @@ pub async fn create(
   Ok(job)
 }
 
-pub async fn list(state: &DaemonState) -> Result<Vec<Job>, HttpError> {
-  let jobs = repositories::job::list(&state.pool).await?;
-  Ok(jobs)
-}
-
-/// ## Delete by key
+/// ## List
 ///
-/// Delete a cargo by key with his given instances (containers).
+/// List all jobs
 ///
 /// ## Arguments
 ///
-/// * [key](str) - The cargo key
-/// * [force](Option<bool>) - Force the deletion of the cargo
 /// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
 /// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The cargo has been deleted
-///   * [Err](HttpError) - The cargo has not been deleted
+///   * [Ok](Ok) - [Vector](Vec) of [Job](Job)
+///   * [Err](Err) - [Http error](HttpError) Something went wrong
+///
+pub async fn list(state: &DaemonState) -> Result<Vec<Job>, HttpError> {
+  let jobs = repositories::job::list(&state.pool).await?;
+  Ok(jobs)
+}
+
+/// ## Delete by name
+///
+/// Delete a job by key with his given instances (containers).
+///
+/// ## Arguments
+///
+/// * [key](str) - The job key
+/// * [state](DaemonState) - The daemon state
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Ok) - The job has been deleted
+///   * [Err](Err) - [Http error](HttpError) Something went wrong
 ///
 pub async fn delete_by_name(
   name: &str,
@@ -127,4 +174,123 @@ pub async fn delete_by_name(
     .collect::<Result<Vec<_>, _>>()?;
   repositories::job::delete_by_name(&job.name, &state.pool).await?;
   Ok(())
+}
+
+/// ## Inspect by name
+///
+/// Inspect a job by name and return a detailed view of the job
+///
+/// ## Arguments
+///
+/// * [name](str) - The job name
+/// * [state](DaemonState) - The daemon state
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Ok) - [JobInspect](JobInspect) has been returned
+///   * [Err](Err) - [Http error](HttpError) Something went wrong
+///
+pub async fn inspect_by_name(
+  name: &str,
+  state: &DaemonState,
+) -> Result<JobInspect, HttpError> {
+  let job = repositories::job::find_by_name(name, &state.pool).await?;
+  let node =
+    repositories::node::find_by_name(&state.config.hostname, &state.pool)
+      .await?;
+  let mut instance_success = 0;
+  let container_inspects = list_instances(name, &state.docker_api)
+    .await?
+    .into_iter()
+    .map(|container| async {
+      let container_inspect = state
+        .docker_api
+        .inspect_container(&container.id.clone().unwrap_or_default(), None)
+        .await?;
+      Ok::<_, HttpError>((
+        container_inspect,
+        NodeContainerSummary {
+          node: node.name.clone(),
+          ip_address: node.ip_address.clone(),
+          container,
+        },
+      ))
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(ContainerInspectResponse, NodeContainerSummary), _>>>()
+    .await.into_iter().collect::<Result<Vec<(ContainerInspectResponse, NodeContainerSummary)>, _>>()?;
+  let mut containers = Vec::new();
+  for (container_inspect, node_container_summary) in container_inspects {
+    let state = container_inspect.state.unwrap_or_default();
+    if let Some(exit_code) = state.exit_code {
+      if exit_code == 0 {
+        instance_success += 1;
+      }
+    }
+    containers.push(node_container_summary);
+  }
+  let job_inspect = JobInspect {
+    name: job.name,
+    created_at: job.created_at,
+    updated_at: job.updated_at,
+    secrets: job.secrets,
+    metadata: job.metadata,
+    containers: job.containers,
+    instance_total: containers.len(),
+    instance_success,
+    instances: containers,
+  };
+  Ok(job_inspect)
+}
+
+/// ## Logs by name
+///
+/// Get the logs of a job by name
+///
+/// ## Arguments
+///
+/// * [name](str) - The job name
+/// * [state](DaemonState) - The daemon state
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Ok) - [Stream](StreamExt) of [JobLogOutput](JobLogOutput)
+///   * [Err](Err) - [Http error](HttpError) Something went wrong
+///
+pub async fn logs_by_name(
+  name: &str,
+  state: &DaemonState,
+) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
+  let _ = repositories::job::find_by_name(name, &state.pool).await?;
+  let instances = list_instances(name, &state.docker_api).await?;
+  let futures = instances
+    .into_iter()
+    .map(|instance| {
+      state
+        .docker_api
+        .logs(
+          &instance.id.unwrap_or_default(),
+          Some(LogsOptions::<String> {
+            stdout: true,
+            ..Default::default()
+          }),
+        )
+        .map(move |elem| match elem {
+          Err(err) => Err(err),
+          Ok(elem) => Ok(JobLogOutput {
+            container_name: instance
+              .names
+              .clone()
+              .unwrap_or_default()
+              .join("")
+              .replace('/', ""),
+            log: elem.into(),
+          }),
+        })
+    })
+    .collect::<Vec<_>>();
+  let stream = select_all(futures).into_stream();
+  Ok(transform_stream::<JobLogOutput, JobLogOutput>(stream))
 }

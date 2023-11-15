@@ -1,6 +1,7 @@
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateResource, StateVirtualMachine, StateSecret,
+  StateJob,
 };
 
 use crate::event::EventEmitter;
@@ -39,4 +40,5 @@ pub enum StateData {
   VirtualMachine(StateVirtualMachine),
   Resource(StateResource),
   Secret(StateSecret),
+  Job(StateJob),
 }

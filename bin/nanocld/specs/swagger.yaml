@@ -3800,6 +3800,10 @@ components:
           nullable: true
     Job:
       type: object
+      description: |
+        ## Job
+
+        A job is a collection of containers to run in sequence as a single unit to act like a command
       required:
       - name
       - created_at

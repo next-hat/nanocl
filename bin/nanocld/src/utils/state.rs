@@ -1,3 +1,4 @@
+use nanocl_stubs::job::{Job, JobPartial};
 use ntex::{rt, http};
 use ntex::util::Bytes;
 use ntex::channel::mpsc;
@@ -13,7 +14,7 @@ use nanocl_stubs::cargo_config::CargoConfigPartial;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmDiskConfig};
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateVirtualMachine, StateResource, StateMeta,
-  StateStream, StateSecret, StateApplyQuery,
+  StateStream, StateSecret, StateApplyQuery, StateJob,
 };
 
 use crate::{utils, repositories};
@@ -139,6 +140,16 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
         })?;
       Ok(StateData::Resource(data))
     }
+    "Job" => {
+      let data =
+        serde_json::from_value::<StateJob>(data.to_owned()).map_err(|err| {
+          HttpError {
+            status: http::StatusCode::BAD_REQUEST,
+            msg: format!("unable to serialize payload {err}"),
+          }
+        })?;
+      Ok(StateData::Job(data))
+    }
     "Secret" => {
       let data = serde_json::from_value::<StateSecret>(data.to_owned())
         .map_err(|err| HttpError {
@@ -220,6 +231,46 @@ async fn apply_secrets(
           .await;
       });
       send(StateStream::new_secret_success(&key), sx);
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
+}
+
+async fn apply_jobs(
+  data: &[JobPartial],
+  state: &DaemonState,
+  qs: &StateApplyQuery,
+  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  data
+    .iter()
+    .map(|job| async move {
+      send(StateStream::new_job_pending(&job.name), sx);
+      match utils::job::inspect_by_name(&job.name, state).await {
+        Ok(existing) => {
+          let existing: JobPartial = existing.into();
+          if existing == *job && !qs.reload.unwrap_or(false) {
+            send(StateStream::new_job_unchanged(&job.name), sx);
+            return;
+          }
+          if let Err(err) = utils::job::delete_by_name(&job.name, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+          if let Err(err) = utils::job::create(job, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+        }
+        Err(_err) => {
+          if let Err(err) = utils::job::create(job, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+        }
+      };
+      send(StateStream::new_job_success(&job.name), sx);
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
@@ -787,6 +838,16 @@ pub async fn apply_secret(
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
   apply_secrets(&data.secrets, state, qs, &sx).await;
+  Ok(())
+}
+
+pub async fn apply_job(
+  data: &StateJob,
+  state: &DaemonState,
+  qs: &StateApplyQuery,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
+  apply_jobs(&data.jobs, state, qs, &sx).await;
   Ok(())
 }
 

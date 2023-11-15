@@ -22,16 +22,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    cron_jobs (key) {
-        key -> Varchar,
-        created_at -> Timestamptz,
-        updated_at -> Timestamptz,
-        data -> Jsonb,
-        metadata -> Nullable<Jsonb>,
-    }
-}
-
-diesel::table! {
     http_metrics (key) {
         key -> Uuid,
         created_at -> Timestamptz,
@@ -224,7 +214,6 @@ diesel::joinable!(vms -> vm_configs (config_key));
 diesel::allow_tables_to_appear_in_same_query!(
   cargo_configs,
   cargoes,
-  cron_jobs,
   http_metrics,
   jobs,
   metrics,

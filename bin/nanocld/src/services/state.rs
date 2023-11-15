@@ -34,6 +34,9 @@ pub(crate) async fn apply(
       StateData::Secret(data) => {
         utils::state::apply_secret(&data, &state, &qs, sx).await
       }
+      StateData::Job(data) => {
+        utils::state::apply_job(&data, &state, &qs, sx).await
+      }
     };
     if let Err(err) = res {
       log::warn!("{err}");
@@ -70,6 +73,7 @@ pub(crate) async fn remove(
       StateData::Secret(data) => {
         utils::state::remove_secret(&data, &state, sx).await
       }
+      _ => Ok(()), // StateData::Job(data) => utils::state::remove_job(&data, &state, sx).await,
     };
     if let Err(err) = res {
       log::warn!("{err}");

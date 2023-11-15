@@ -1,6 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
+use crate::job::JobPartial;
 use crate::secret::SecretPartial;
 use crate::vm_config::VmConfigPartial;
 use crate::cargo_config::CargoConfigPartial;
@@ -84,6 +85,18 @@ pub struct StateVirtualMachine {
   pub namespace: Option<String>,
   /// List of virtual machines to create and run
   pub virtual_machines: Vec<VmConfigPartial>,
+}
+
+/// ## StateJob
+///
+/// Statefile that represent the `Job` kind
+///
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct StateJob {
+  pub jobs: Vec<JobPartial>,
 }
 
 /// ## StateDeployment
@@ -203,6 +216,51 @@ impl StateStream {
     StateStream {
       key: key.to_owned(),
       kind: "Cargo".to_owned(),
+      context: None,
+      status: StateStreamStatus::Success,
+    }
+  }
+
+  pub fn new_job_pending(key: &str) -> Self {
+    StateStream {
+      key: key.to_owned(),
+      kind: "Job".to_owned(),
+      context: None,
+      status: StateStreamStatus::Pending,
+    }
+  }
+
+  pub fn new_job_not_found(key: &str) -> Self {
+    StateStream {
+      key: key.to_owned(),
+      kind: "Job".to_owned(),
+      context: None,
+      status: StateStreamStatus::NotFound,
+    }
+  }
+
+  pub fn new_job_unchanged(key: &str) -> Self {
+    StateStream {
+      key: key.to_owned(),
+      kind: "Job".to_owned(),
+      context: None,
+      status: StateStreamStatus::UnChanged,
+    }
+  }
+
+  pub fn new_job_error(key: &str, err: &str) -> Self {
+    StateStream {
+      key: key.to_owned(),
+      kind: "Job".to_owned(),
+      context: Some(err.to_owned()),
+      status: StateStreamStatus::Failed,
+    }
+  }
+
+  pub fn new_job_success(key: &str) -> Self {
+    StateStream {
+      key: key.to_owned(),
+      kind: "Job".to_owned(),
       context: None,
       status: StateStreamStatus::Success,
     }
