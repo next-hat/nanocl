@@ -1,7 +1,6 @@
 use std::fs;
 use std::collections::HashMap;
 
-use nanocld_client::stubs::job::JobPartial;
 use ntex::rt;
 use futures::StreamExt;
 use clap::{Arg, Command, ArgAction};
@@ -13,9 +12,8 @@ use bollard_next::service::HostConfig;
 
 use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::state::{
-  StateMeta, StateApplyQuery, StateJob, StateStreamStatus,
-};
+use nanocld_client::stubs::job::JobPartial;
+use nanocld_client::stubs::state::{StateMeta, StateApplyQuery, StateStreamStatus};
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
   CargoConfigPartial, Config as ContainerConfig,
@@ -787,9 +785,22 @@ async fn exec_state_apply(
       }
     }
   }
-  // for job in jobs {
-
-  // }
+  for job in &jobs {
+    for container in &job.containers {
+      let is_missing = client
+        .inspect_cargo_image(&container.image.clone().unwrap_or_default())
+        .await
+        .is_err();
+      if is_missing || opts.force_pull {
+        if let Err(err) = download_container_image(&client, container).await {
+          eprintln!("{err}");
+          if is_missing {
+            return Err(err);
+          }
+        }
+      }
+    }
+  }
   let data = serde_json::to_value(&data).map_err(|err| {
     err.map_err_context(|| "Unable to create json payload for the daemon")
   })?;
