@@ -46,7 +46,7 @@ async fn main() -> std::io::Result<()> {
   let config = match config::init(&args) {
     Err(err) => {
       log::error!("{err}");
-      std::process::exit(1);
+      err.exit();
     }
     Ok(config) => config,
   };
@@ -54,7 +54,7 @@ async fn main() -> std::io::Result<()> {
   let daemon_state = boot::init(&config).await?;
   if let Err(err) = node::join_cluster(&daemon_state).await {
     log::error!("{err}");
-    std::process::exit(1);
+    err.exit();
   }
   node::register(&daemon_state).await?;
   utils::proxy::spawn_logger(&daemon_state);
