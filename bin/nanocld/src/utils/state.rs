@@ -1,4 +1,3 @@
-use nanocl_stubs::job::{Job, JobPartial};
 use ntex::{rt, http};
 use ntex::util::Bytes;
 use ntex::channel::mpsc;
@@ -8,6 +7,7 @@ use futures_util::stream::FuturesUnordered;
 use nanocl_error::http::HttpError;
 
 use nanocl_stubs::system::Event;
+use nanocl_stubs::job::JobPartial;
 use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
 use nanocl_stubs::cargo_config::CargoConfigPartial;
@@ -475,6 +475,34 @@ async fn apply_resources(
           .await;
       });
       send(StateStream::new_resource_success(&key), sx);
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
+}
+
+async fn remove_jobs(
+  data: &[JobPartial],
+  state: &DaemonState,
+  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  data
+    .iter()
+    .map(|job| async {
+      send(StateStream::new_job_pending(&job.name), sx);
+      match utils::job::inspect_by_name(&job.name, state).await {
+        Ok(_) => {
+          if let Err(err) = utils::job::delete_by_name(&job.name, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+        }
+        Err(_err) => {
+          send(StateStream::new_job_not_found(&job.name), sx);
+          return;
+        }
+      };
+      send(StateStream::new_job_success(&job.name), sx);
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
@@ -987,5 +1015,14 @@ pub async fn remove_secret(
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
   remove_secrets(&data.secrets, state, &sx).await;
+  Ok(())
+}
+
+pub async fn remove_job(
+  data: &StateJob,
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
+  remove_jobs(&data.jobs, state, &sx).await;
   Ok(())
 }
