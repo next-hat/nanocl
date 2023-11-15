@@ -75,7 +75,7 @@ pub(crate) async fn create_cargo_image(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let (from_image, tag) = utils::cargo_image::parse_image_info(&payload.name)?;
-  let rx_body = utils::cargo_image::pull(&from_image, &tag, &state).await?;
+  let mut rx_body = utils::cargo_image::pull(&from_image, &tag, &state).await?;
   Ok(
     web::HttpResponse::Ok()
       .keep_alive()

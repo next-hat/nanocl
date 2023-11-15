@@ -1,0 +1,4 @@
+Kind: Cargo
+ApiVersion: v0.11
+
+Namespace: cargo-example

@@ -741,6 +741,7 @@ async fn exec_state_apply(
     let res = res?;
     if res.status == StateStreamStatus::Failed {
       has_error = true;
+      eprintln!("{res:#?}");
     }
     utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
