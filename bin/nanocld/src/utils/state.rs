@@ -499,14 +499,15 @@ async fn apply_resources(
     .await;
 }
 
-/// ## Apply
+/// ## Remove jobs
 ///
-/// Apply a state payload to the system
+/// Remove jobs from the system based on a list of jobs
 ///
 /// ## Arguments
 ///
 /// * [data](serde_json::Value) - The state payload
 /// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 async fn remove_jobs(
   data: &[JobPartial],
