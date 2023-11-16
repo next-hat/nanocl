@@ -199,6 +199,24 @@ mod tests {
   }
 
   #[ntex::test]
+  async fn wait_not_found() {
+    let client = gen_default_test_client().await;
+    let wait_res = client
+      .send_get(
+        &format!("{ENDPOINT}/test/wait"),
+        Some(&serde_json::json!({
+          "condition": "yoloh"
+        })),
+      )
+      .await;
+    test_status_code!(
+      wait_res.status(),
+      http::StatusCode::NOT_FOUND,
+      "wait job not found"
+    );
+  }
+
+  #[ntex::test]
   async fn basic() {
     let client = gen_default_test_client().await;
     let state: &str = include_str!("../../../../examples/job_example.yml");
@@ -231,8 +249,20 @@ mod tests {
       format!("start job {}", &job.name)
     );
     let mut res = client.get(ENDPOINT).send().await.unwrap();
-    test_status_code!(res.status(), http::StatusCode::OK, "list jobs");
     let _ = res.json::<Vec<JobSummary>>().await.unwrap();
+    let res = client
+      .send_get(
+        &format!("{job_endpoint}/wait"),
+        Some(&serde_json::json!({
+          "Condition": "yoloh"
+        })),
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::BAD_REQUEST,
+      "wait job bad condition"
+    );
     let mut stream = wait_res.into_stream();
     while let Some(Ok(wait_response)) = stream.next().await {
       let response =
