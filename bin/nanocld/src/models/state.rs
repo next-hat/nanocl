@@ -33,8 +33,8 @@ pub struct DaemonState {
 ///
 /// This enum represent the different `Statefile` format that can be parsed.
 ///
-#[derive(Debug)]
-pub enum StateData {
+#[derive(Clone, Debug)]
+pub enum StateFileData {
   Deployment(StateDeployment),
   Cargo(StateCargo),
   VirtualMachine(StateVirtualMachine),

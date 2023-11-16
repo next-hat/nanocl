@@ -18,7 +18,7 @@ use nanocl_stubs::state::{
 };
 
 use crate::{utils, repositories};
-use crate::models::{StateData, DaemonState};
+use crate::models::{StateFileData, DaemonState};
 
 /// ## Ensure namespace existence
 ///
@@ -99,7 +99,9 @@ fn send(
 ///   * [Ok](StateData) - The state data
 ///   * [Err](HttpError) - An http response error if something went wrong
 ///
-pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
+pub fn parse_state(
+  data: &serde_json::Value,
+) -> Result<StateFileData, HttpError> {
   let meta =
     serde_json::from_value::<StateMeta>(data.to_owned()).map_err(|err| {
       HttpError {
@@ -114,7 +116,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
           status: http::StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
-      Ok(StateData::Deployment(data))
+      Ok(StateFileData::Deployment(data))
     }
     "Cargo" => {
       let data = serde_json::from_value::<StateCargo>(data.to_owned())
@@ -122,7 +124,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
           status: http::StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
-      Ok(StateData::Cargo(data))
+      Ok(StateFileData::Cargo(data))
     }
     "VirtualMachine" => {
       let data = serde_json::from_value::<StateVirtualMachine>(data.to_owned())
@@ -130,7 +132,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
           status: http::StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
-      Ok(StateData::VirtualMachine(data))
+      Ok(StateFileData::VirtualMachine(data))
     }
     "Resource" => {
       let data = serde_json::from_value::<StateResource>(data.to_owned())
@@ -138,7 +140,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
           status: http::StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
-      Ok(StateData::Resource(data))
+      Ok(StateFileData::Resource(data))
     }
     "Job" => {
       let data =
@@ -148,7 +150,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
             msg: format!("unable to serialize payload {err}"),
           }
         })?;
-      Ok(StateData::Job(data))
+      Ok(StateFileData::Job(data))
     }
     "Secret" => {
       let data = serde_json::from_value::<StateSecret>(data.to_owned())
@@ -156,7 +158,7 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
           status: http::StatusCode::BAD_REQUEST,
           msg: format!("unable to serialize payload {err}"),
         })?;
-      Ok(StateData::Secret(data))
+      Ok(StateFileData::Secret(data))
     }
     _ => Err(HttpError {
       status: http::StatusCode::BAD_REQUEST,
@@ -736,331 +738,139 @@ async fn remove_resources(
     .await;
 }
 
-/// ## Apply Deployment
+/// ## Apply statefile
 ///
-/// Apply a Statefile Kind Deployment to the system.
-/// It will create cargoes, vms and ressources or update them if they are not up to date.
+/// Apply a Statefile in the system
 ///
-/// ## Arguments
+/// /// ## Arguments
 ///
-/// * [data](StateDeployment) - The deployment statefile
-/// * [version](str) - The version of the deployment
+/// * [data](StateFileData) - The Statefile data
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - The operation was successful
-///   * [Err](Err) - [Http error](HttpError) if something went wrong
+/// A Stream of [Result](Result) of [Bytes](Bytes) or [HttpError](HttpError)
 ///
-pub async fn apply_deployment(
-  data: &StateDeployment,
+pub fn apply_statefile(
+  data: &StateFileData,
   version: &str,
-  state: &DaemonState,
   qs: &StateApplyQuery,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  let namespace = ensure_namespace_existence(&data.namespace, state).await?;
-  if let Some(secrets) = &data.secrets {
-    apply_secrets(secrets, state, qs, &sx).await;
-  }
-  if let Some(cargoes) = &data.cargoes {
-    apply_cargoes(&namespace, cargoes, version, state, qs, &sx).await;
-  }
-  if let Some(vms) = &data.virtual_machines {
-    apply_vms(&namespace, vms, version, state, qs, &sx).await;
-  }
-  if let Some(resources) = &data.resources {
-    apply_resources(resources, state, qs, &sx).await;
-  }
-  Ok(())
+  state: &DaemonState,
+) -> mpsc::Receiver<Result<Bytes, HttpError>> {
+  let state = state.clone();
+  let version = version.to_owned();
+  let data = data.clone();
+  let qs = qs.clone();
+  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
+  rt::spawn(async move {
+    match data {
+      StateFileData::Deployment(data) => {
+        let _ = ensure_namespace_existence(&data.namespace, &state).await;
+        let namespace = data.namespace.unwrap_or("global".to_owned());
+        if let Some(secrets) = &data.secrets {
+          apply_secrets(secrets, &state, &qs, &sx).await;
+        }
+        if let Some(cargoes) = &data.cargoes {
+          apply_cargoes(&namespace, cargoes, &version, &state, &qs, &sx).await;
+        }
+        if let Some(vms) = &data.virtual_machines {
+          apply_vms(&namespace, vms, &version, &state, &qs, &sx).await;
+        }
+        if let Some(resources) = &data.resources {
+          apply_resources(resources, &state, &qs, &sx).await;
+        }
+      }
+      StateFileData::Cargo(data) => {
+        let _ = ensure_namespace_existence(&data.namespace, &state).await;
+        apply_cargoes(
+          &data.namespace.unwrap_or("global".to_owned()),
+          &data.cargoes,
+          &version,
+          &state,
+          &qs,
+          &sx,
+        )
+        .await;
+      }
+      StateFileData::VirtualMachine(data) => {
+        let _ = ensure_namespace_existence(&data.namespace, &state).await;
+        apply_vms(
+          &data.namespace.unwrap_or("global".to_owned()),
+          &data.virtual_machines,
+          &version,
+          &state,
+          &qs,
+          &sx,
+        )
+        .await;
+      }
+      StateFileData::Resource(data) => {
+        apply_resources(&data.resources, &state, &qs, &sx).await;
+      }
+      StateFileData::Secret(data) => {
+        apply_secrets(&data.secrets, &state, &qs, &sx).await;
+      }
+      StateFileData::Job(data) => {
+        apply_jobs(&data.jobs, &state, &qs, &sx).await;
+      }
+    };
+  });
+  rx
 }
 
-/// ## Apply Cargo
+/// ## Remove statefile
 ///
-/// Apply a Statefile Kind Cargo to the system.
-/// It will create cargoes or update them if they are not up to date.
+/// Remove a Statefile from the system and return a stream of the result for
 ///
 /// ## Arguments
 ///
-/// * [data](StateCargo) - The cargo statefile
-/// * [version](str) - The version of the cargo
+/// * [data](StateFileData) - The Statefile data
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - The operation was successful
-///   * [Err](Err) - [Http error](HttpError) if something went wrong
+/// A Stream of [Result](Result) of [Bytes](Bytes) or [HttpError](HttpError)
 ///
-pub async fn apply_cargo(
-  data: &StateCargo,
-  version: &str,
+pub fn remove_statefile(
+  data: &StateFileData,
   state: &DaemonState,
-  qs: &StateApplyQuery,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  let namespace = ensure_namespace_existence(&data.namespace, state).await?;
-  apply_cargoes(&namespace, &data.cargoes, version, state, qs, &sx).await;
-  Ok(())
-}
-
-/// ## Apply VM
-///
-/// This will apply a VM statefile to the system.
-/// It will create or update VMs as needed.
-///
-/// ## Arguments
-///
-/// * [data](StateVirtualMachine) - The VM statefile data
-/// * [version](str) - The version of the VMs
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
-///
-pub async fn apply_vm(
-  data: &StateVirtualMachine,
-  version: &str,
-  state: &DaemonState,
-  qs: &StateApplyQuery,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  let namespace = ensure_namespace_existence(&data.namespace, state).await?;
-  apply_vms(&namespace, &data.virtual_machines, version, state, qs, &sx).await;
-  Ok(())
-}
-
-/// ## Apply Resource
-///
-/// Apply a Statefile Kind Resource to the system.
-/// It will create resources or update them if they are not up to date.
-///
-/// ## Arguments
-///
-/// * [data](StateResource) - The resource statefile
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
-///
-pub async fn apply_resource(
-  data: &StateResource,
-  state: &DaemonState,
-  qs: &StateApplyQuery,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  apply_resources(&data.resources, state, qs, &sx).await;
-  Ok(())
-}
-
-/// ## Apply Secret
-///
-/// Apply a Statefile Kind Secret to the system.
-/// It will create secrets or update them if they are not up to date.
-///
-/// ## Arguments
-///
-/// * [data](StateSecret) - The secret Statefile
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
-///
-pub async fn apply_secret(
-  data: &StateSecret,
-  state: &DaemonState,
-  qs: &StateApplyQuery,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  apply_secrets(&data.secrets, state, qs, &sx).await;
-  Ok(())
-}
-
-pub async fn apply_job(
-  data: &StateJob,
-  state: &DaemonState,
-  qs: &StateApplyQuery,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  apply_jobs(&data.jobs, state, qs, &sx).await;
-  Ok(())
-}
-
-/// ## Remove Deployment
-///
-/// This will remove all content of a Kind Deployment Statefile from the system.
-///
-/// ## Arguments
-///
-/// * [data](StateDeployment) - The deployment statefile data
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
-///
-pub async fn remove_deployment(
-  data: &StateDeployment,
-  state: &DaemonState,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  let namespace = utils::key::resolve_nsp(&data.namespace);
-  if let Some(cargoes) = &data.cargoes {
-    remove_cargoes(&namespace, cargoes, state, &sx).await;
-  }
-  if let Some(vms) = &data.virtual_machines {
-    remove_vms(&namespace, vms, state, &sx).await;
-  }
-  if let Some(resources) = &data.resources {
-    remove_resources(resources, state, &sx).await;
-  }
-  if let Some(secrets) = &data.secrets {
-    remove_secrets(secrets, state, &sx).await;
-  }
-  Ok(())
-}
-
-/// ## Remove Cargo
-///
-/// This will remove all content of a Kind Cargo Statefile from the system.
-///
-/// ## Arguments
-///
-/// * [data](StateCargo) - The cargo statefile data
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
-///
-pub async fn remove_cargo(
-  data: &StateCargo,
-  state: &DaemonState,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  let namespace = utils::key::resolve_nsp(&data.namespace);
-  remove_cargoes(&namespace, &data.cargoes, state, &sx).await;
-  Ok(())
-}
-
-/// ## Remove VM
-///
-/// This will remove all content of a Kind VirtualMachine Statefile from the system.
-///
-/// ## Arguments
-///
-/// * [data](StateVirtualMachine) - The VM statefile data
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
-///
-pub async fn remove_vm(
-  data: &StateVirtualMachine,
-  state: &DaemonState,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  let namespace = utils::key::resolve_nsp(&data.namespace);
-  remove_vms(&namespace, &data.virtual_machines, state, &sx).await;
-  Ok(())
-}
-
-/// ## Remove Resource
-///
-/// This will remove all content of a Kind Resource Statefile from the system.
-///
-/// ## Arguments
-///
-/// * [data](StateResource) - The resource statefile data
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
-///
-pub async fn remove_resource(
-  data: &StateResource,
-  state: &DaemonState,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  remove_resources(&data.resources, state, &sx).await;
-  Ok(())
-}
-
-/// ## Remove secret
-///
-/// This will remove all content of a Kind Secret Statefile from the system.
-///
-/// ## Arguments
-///
-/// * [data](StateSecret) - The secret statefile data
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
-///
-pub async fn remove_secret(
-  data: &StateSecret,
-  state: &DaemonState,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  remove_secrets(&data.secrets, state, &sx).await;
-  Ok(())
-}
-
-/// ## Remove Job
-///
-/// This will remove all content of a Kind Job Statefile from the system.
-///
-/// ## Arguments
-///
-/// * [data](StateJob) - The job statefile data
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - The operation was successful
-///   * [Err](Err) - [Http error](HttpError) if something went wrong
-///
-pub async fn remove_job(
-  data: &StateJob,
-  state: &DaemonState,
-  sx: mpsc::Sender<Result<Bytes, HttpError>>,
-) -> Result<(), HttpError> {
-  remove_jobs(&data.jobs, state, &sx).await;
-  Ok(())
+) -> mpsc::Receiver<Result<Bytes, HttpError>> {
+  let data = data.clone();
+  let state = state.clone();
+  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
+  rt::spawn(async move {
+    match data {
+      StateFileData::Deployment(data) => {
+        let namespace = utils::key::resolve_nsp(&data.namespace);
+        if let Some(cargoes) = &data.cargoes {
+          remove_cargoes(&namespace, cargoes, &state, &sx).await;
+        }
+        if let Some(vms) = &data.virtual_machines {
+          remove_vms(&namespace, vms, &state, &sx).await;
+        }
+        if let Some(resources) = &data.resources {
+          remove_resources(resources, &state, &sx).await;
+        }
+        if let Some(secrets) = &data.secrets {
+          remove_secrets(secrets, &state, &sx).await;
+        }
+      }
+      StateFileData::Cargo(data) => {
+        let namespace = utils::key::resolve_nsp(&data.namespace);
+        remove_cargoes(&namespace, &data.cargoes, &state, &sx).await;
+      }
+      StateFileData::VirtualMachine(data) => {
+        let namespace = utils::key::resolve_nsp(&data.namespace);
+        remove_vms(&namespace, &data.virtual_machines, &state, &sx).await;
+      }
+      StateFileData::Resource(data) => {
+        remove_resources(&data.resources, &state, &sx).await
+      }
+      StateFileData::Secret(data) => {
+        remove_secrets(&data.secrets, &state, &sx).await
+      }
+      StateFileData::Job(data) => remove_jobs(&data.jobs, &state, &sx).await,
+    };
+  });
+  rx
 }
