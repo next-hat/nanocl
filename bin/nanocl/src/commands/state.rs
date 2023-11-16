@@ -115,36 +115,6 @@ where
   Ok(state_ref)
 }
 
-/// ## Download container image
-///
-/// Download container image if it's not already downloaded and if the force pull flag is set
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The client to the daemon
-/// * [container](ContainerConfig) The container config
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok<()>) The operation was successful
-///   * [Err](IoError) An error occured
-///
-async fn download_container_image(
-  client: &NanocldClient,
-  container: &ContainerConfig,
-) -> IoResult<()> {
-  match &container.image {
-    Some(image) => {
-      exec_cargo_image_pull(client, image).await?;
-    }
-    None => {
-      return Err(IoError::invalid_data("Cargo image", "is not specified"))
-    }
-  }
-  Ok(())
-}
-
 /// ## Hook binds
 ///
 /// Hook cargoes binds to replace relative path with absolute path
@@ -682,6 +652,97 @@ where
   read_from_file(&path, format)
 }
 
+async fn execute_template(
+  state_ref: &StateRef<serde_yaml::Value>,
+  args: &serde_json::Value,
+  client: &NanocldClient,
+  cli_conf: &CliConfig,
+) -> IoResult<(
+  serde_yaml::Value,
+  String,
+  Vec<JobPartial>,
+  Vec<CargoConfigPartial>,
+)> {
+  let mut namespace = String::default();
+  let state_ref = state_ref.clone();
+  let mut jobs = Vec::new();
+  let mut cargoes = Vec::new();
+  let data = match state_ref.meta.kind.as_str() {
+    "Deployment" | "Cargo" => {
+      namespace = match state_ref.data.get("Namespace") {
+        Some(namespace) => serde_yaml::from_value::<String>(namespace.clone())
+          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
+        None => "global".to_owned(),
+      };
+      namespace = inject_namespace(&namespace, args)?;
+      let mut yaml: serde_yaml::Value = inject_data(
+        &state_ref.format,
+        &state_ref.raw,
+        args,
+        &cli_conf.context,
+        client,
+      )
+      .await?;
+      let current_cargoes: Vec<CargoConfigPartial> = match yaml.get("Cargoes") {
+        Some(cargoes) => serde_yaml::from_value(cargoes.clone())
+          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
+        None => Vec::new(),
+      };
+      let hooked_cargoes = hook_cargoes(current_cargoes)?;
+      cargoes = hooked_cargoes.clone();
+      yaml["Cargoes"] = serde_yaml::to_value(&hooked_cargoes)
+        .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
+      yaml
+    }
+    "Job" => {
+      let yaml: serde_yaml::Value = inject_data(
+        &state_ref.format,
+        &state_ref.raw,
+        args,
+        &cli_conf.context,
+        client,
+      )
+      .await?;
+      jobs = match yaml.get("Jobs") {
+        Some(jobs) => serde_yaml::from_value::<Vec<JobPartial>>(jobs.clone())
+          .map_err(|err| {
+          err.map_err_context(|| "Unable to convert to yaml")
+        })?,
+        None => Vec::new(),
+      };
+      yaml
+    }
+    _ => {
+      inject_data(
+        &state_ref.format,
+        &state_ref.raw,
+        args,
+        &cli_conf.context,
+        client,
+      )
+      .await?
+    }
+  };
+  Ok((data, namespace, jobs, cargoes))
+}
+
+async fn pull_image(
+  image: &str,
+  force_pull: bool,
+  client: &NanocldClient,
+) -> IoResult<()> {
+  let is_missing = client.inspect_cargo_image(image).await.is_err();
+  if is_missing || force_pull {
+    if let Err(err) = exec_cargo_image_pull(client, image).await {
+      eprintln!("{err}");
+      if is_missing {
+        return Err(err);
+      }
+    }
+  }
+  Ok(())
+}
+
 /// ## Exec state apply
 ///
 /// Function called when running `nanocl state apply`
@@ -706,64 +767,8 @@ async fn exec_state_apply(
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
   let client = gen_client(host, &state_ref.meta)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
-  let mut namespace = String::from("global");
-  let mut cargoes = Vec::new();
-  let mut jobs: Vec<JobPartial> = Vec::new();
-  let data = match state_ref.meta.kind.as_str() {
-    "Deployment" | "Cargo" => {
-      namespace = match state_ref.data.get("Namespace") {
-        Some(namespace) => serde_yaml::from_value(namespace.clone())
-          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
-        None => "global".to_owned(),
-      };
-      namespace = inject_namespace(&namespace, &args)?;
-      let _ = client.create_namespace(&namespace).await;
-      let mut yaml: serde_yaml::Value = inject_data(
-        &state_ref.format,
-        &state_ref.raw,
-        &args,
-        &cli_conf.context,
-        &client,
-      )
-      .await?;
-      let current_cargoes: Vec<CargoConfigPartial> = match yaml.get("Cargoes") {
-        Some(cargoes) => serde_yaml::from_value(cargoes.clone())
-          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
-        None => Vec::new(),
-      };
-      let hooked_cargoes = hook_cargoes(current_cargoes)?;
-      cargoes = hooked_cargoes.clone();
-      yaml["Cargoes"] = serde_yaml::to_value(&hooked_cargoes)
-        .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
-      yaml
-    }
-    "Job" => {
-      let yaml: serde_yaml::Value = inject_data(
-        &state_ref.format,
-        &state_ref.raw,
-        &args,
-        &cli_conf.context,
-        &client,
-      )
-      .await?;
-      jobs = match yaml.get("Jobs") {
-        Some(jobs) => serde_yaml::from_value(jobs.clone())
-          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
-        None => Vec::new(),
-      };
-      yaml
-    }
-    _ => {
-      inject_data(
-        &state_ref.format,
-        &state_ref.raw,
-        &args,
-        &cli_conf.context,
-        &client,
-      )
-      .await?
-    }
-  };
+  let (data, namespace, jobs, cargoes) =
+    execute_template(&state_ref, &args, &client, cli_conf).await?;
   if !opts.skip_confirm {
     utils::print::display_format(&state_ref.format, &data)?;
     utils::dialog::confirm("Are you sure to apply this state ?")
@@ -771,49 +776,16 @@ async fn exec_state_apply(
   }
   for cargo in &cargoes {
     if let Some(before) = &cargo.init_container {
-      let is_missing = client
-        .inspect_cargo_image(&before.image.clone().unwrap_or_default())
-        .await
-        .is_err();
-      if is_missing || opts.force_pull {
-        if let Err(err) = download_container_image(&client, before).await {
-          eprintln!("{err}");
-          if is_missing {
-            return Err(err);
-          }
-        }
-      }
+      let image = before.image.clone().unwrap_or_default();
+      pull_image(&image, opts.force_pull, &client).await?;
     }
-    let is_missing = client
-      .inspect_cargo_image(&cargo.container.image.clone().unwrap_or_default())
-      .await
-      .is_err();
-    // Download cargoes images
-    if is_missing || opts.force_pull {
-      if let Err(err) =
-        download_container_image(&client, &cargo.container).await
-      {
-        eprintln!("{err}");
-        if is_missing {
-          return Err(err);
-        }
-      }
-    }
+    let image = cargo.container.image.clone().unwrap_or_default();
+    pull_image(&image, opts.force_pull, &client).await?;
   }
   for job in &jobs {
     for container in &job.containers {
-      let is_missing = client
-        .inspect_cargo_image(&container.image.clone().unwrap_or_default())
-        .await
-        .is_err();
-      if is_missing || opts.force_pull {
-        if let Err(err) = download_container_image(&client, container).await {
-          eprintln!("{err}");
-          if is_missing {
-            return Err(err);
-          }
-        }
-      }
+      let image = container.image.clone().unwrap_or_default();
+      pull_image(&image, opts.force_pull, &client).await?;
     }
   }
   let data = serde_json::to_value(&data).map_err(|err| {
@@ -853,12 +825,6 @@ async fn exec_state_apply(
       "couldn't apply correctly",
     ));
   }
-  if has_error {
-    return Err(IoError::invalid_data(
-      "Statefile",
-      "couldn't apply correctly",
-    ));
-  }
   Ok(())
 }
 
@@ -886,39 +852,8 @@ async fn exec_state_logs(
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
   let client = gen_client(host, &state_ref.meta)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
-  let mut namespace = String::from("global");
-  let cargoes = match state_ref.meta.kind.as_str() {
-    "Deployment" | "Cargo" => {
-      namespace = match state_ref.data.get("Namespace") {
-        Some(namespace) => serde_yaml::from_value(namespace.clone())
-          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
-        None => "global".to_owned(),
-      };
-      namespace = inject_namespace(&namespace, &args)?;
-      let _ = client.create_namespace(&namespace).await;
-      let yaml: serde_yaml::Value = inject_data(
-        &state_ref.format,
-        &state_ref.raw,
-        &args,
-        &cli_conf.context,
-        &client,
-      )
-      .await?;
-      let cargoes: Vec<CargoConfigPartial> = match yaml.get("Cargoes") {
-        Some(cargoes) => serde_yaml::from_value(cargoes.clone())
-          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
-        None => Vec::new(),
-      };
-      Ok(cargoes)
-    }
-    _ => {
-      let context = opts.state_location.as_ref().unwrap_or(&namespace);
-      Err(IoError::invalid_input(
-        context,
-        &("Only Cargo or Deployment  statefile kind can be logged".to_owned()),
-      ))
-    }
-  }?;
+  let (_, namespace, jobs, cargoes) =
+    execute_template(&state_ref, &args, &client, cli_conf).await?;
   let tail_string = opts.tail.clone().unwrap_or_default();
   let tail = tail_string.as_str();
   let log_opts = CargoLogQuery {
@@ -935,6 +870,7 @@ async fn exec_state_logs(
     ..Default::default()
   };
   log_cargoes(&client, cargoes, &log_opts).await?;
+  log_jobs(&client, jobs).await?;
   Ok(())
 }
 

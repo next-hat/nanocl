@@ -359,6 +359,62 @@ mod tests {
   }
 
   #[ntex::test]
+  async fn state_apply_remote_http() {
+    assert_cli_ok!("state", "apply", "-ys", "../../tests/remote_http.yml");
+    assert_cli_ok!("state", "apply", "-ys", "../../tests/remote_http.yml");
+    assert_cli_ok!("state", "rm", "-ys", "../../tests/remote_http.yml");
+  }
+
+  #[ntex::test]
+  async fn state_apply_args_advenced() {
+    assert_cli_ok!(
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/args_advanced.yml",
+      "--",
+      "--name",
+      "test-args-advanced",
+      "--domain",
+      "test.args.advanced.com",
+      "--image",
+      "ghcr.io/nxthat/nanocl-get-started:latest",
+      "--port",
+      "9000",
+    );
+    assert_cli_ok!(
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/args_advanced.yml",
+      "--",
+      "--name",
+      "test-args-advanced",
+      "--domain",
+      "test.args.advanced.com",
+      "--image",
+      "ghcr.io/nxthat/nanocl-get-started:latest",
+      "--port",
+      "9000",
+    );
+    assert_cli_ok!(
+      "state",
+      "rm",
+      "-ys",
+      "../../examples/args_advanced.yml",
+      "--",
+      "--name",
+      "test-args-advanced",
+      "--domain",
+      "test.args.advanced.com",
+      "--image",
+      "ghcr.io/nxthat/nanocl-get-started:latest",
+      "--port",
+      "9000",
+    );
+  }
+
+  #[ntex::test]
   async fn state_apply_url_statefile() {
     assert_cli_ok!(
       "state",
@@ -486,11 +542,6 @@ mod tests {
     assert_cli_ok!("state", "rm", "-ys", "../../examples/deploy_example.json");
     assert_cargo_not_exists!(client, DEPLOY_CARGO_NAME, DEPLOY_NAMESPACE_NAME);
     assert_cargo_not_exists!(client, DEPLOY_CARGO2_NAME, DEPLOY_NAMESPACE_NAME);
-  }
-
-  #[ntex::test]
-  async fn state_logs_invalide_statefile_kind() {
-    assert_cli_err!("state", "logs", "-s", "../../examples/secret_env.yml");
   }
 
   #[ntex::test]
