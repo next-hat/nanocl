@@ -199,7 +199,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn wait_job() {
+  async fn basic() {
     let client = gen_default_test_client().await;
     let state: &str = include_str!("../../../../examples/job_example.yml");
     let yaml: serde_yaml::Value = serde_yaml::from_str(state).unwrap();
@@ -209,8 +209,9 @@ mod tests {
       .await;
     test_status_code!(res.status(), http::StatusCode::CREATED, "create job");
     let job = res.json::<Job>().await.unwrap();
+    let job_endpoint = format!("{ENDPOINT}/{}", &job.name);
     let wait_res = client
-      .send_get(&format!("{ENDPOINT}/{}/wait", &job.name), None::<String>)
+      .send_get(&format!("{job_endpoint}/wait"), None::<String>)
       .await;
     test_status_code!(
       wait_res.status(),
@@ -219,7 +220,7 @@ mod tests {
     );
     client
       .send_post(
-        &format!("{ENDPOINT}/{}/start", &job.name),
+        &format!("{job_endpoint}/start"),
         None::<String>,
         None::<String>,
       )
@@ -235,8 +236,26 @@ mod tests {
         serde_json::from_slice::<JobWaitResponse>(&wait_response).unwrap();
       assert_eq!(response.status_code, 0);
     }
-    let _ = client
-      .send_delete(&format!("{ENDPOINT}/{}", &job.name), None::<String>)
+    let res = client
+      .send_get(&format!("{job_endpoint}/logs"), None::<String>)
       .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      &format!("logs job {}", &job.name)
+    );
+    let mut stream = res.into_stream();
+    while let Some(Ok(log)) = stream.next().await {
+      assert!(!log.is_empty());
+    }
+    // let res = client
+    //   .send_get(&format!("{job_endpoint}/inspect"), None::<String>)
+    //   .await;
+    // test_status_code!(
+    //   res.status(),
+    //   http::StatusCode::OK,
+    //   format!("inspect job {}", &job.name)
+    // );
+    let _ = client.send_delete(&job_endpoint, None::<String>).await;
   }
 }

@@ -3928,34 +3928,34 @@ components:
 
         A job is a collection of containers to run in sequence as a single unit to act like a command
       required:
-      - name
-      - created_at
-      - updated_at
-      - containers
+      - Name
+      - CreatedAt
+      - UpdatedAt
+      - Containers
       properties:
-        name:
+        Name:
           type: string
           description: Name of the job
-        created_at:
+        CreatedAt:
           type: string
           format: date-time
           description: When the job have been created
-        updated_at:
+        UpdatedAt:
           type: string
           format: date-time
           description: When the job have been updated
-        secrets:
+        Secrets:
           type: array
           items:
             type: string
           description: Secrets to load as environment variables
           nullable: true
-        metadata:
+        Metadata:
           type: object
           description: Metadata (user defined)
           additionalProperties:
             $ref: '#/components/schemas/Any'
-        containers:
+        Containers:
           type: array
           items:
             $ref: '#/components/schemas/Config'

@@ -1,7 +1,7 @@
 use ntex::channel::mpsc::Receiver;
 
 use nanocl_stubs::job::{
-  Job, JobLogOutput, JobWaitQuery, JobWaitResponse, JobPartial,
+  Job, JobLogOutput, JobWaitQuery, JobWaitResponse, JobPartial, JobInspect,
 };
 use nanocl_error::http::HttpError;
 use nanocl_error::http_client::HttpClientError;
@@ -34,6 +34,42 @@ impl NanocldClient {
   ///
   pub async fn list_job(&self) -> Result<Vec<Job>, HttpClientError> {
     let res = self.send_get(Self::JOB_PATH, None::<String>).await?;
+    Self::res_json(res).await
+  }
+
+  /// ## Inspect a job
+  ///
+  /// Get information about a job by it's name
+  ///
+  /// ## Arguments
+  ///
+  /// * [name](str) - The name of the job to inspect
+  ///
+  /// ## Returns
+  ///
+  /// * [Result](Result) - The result of the operation
+  ///   * [Ok](Ok) - [Job inspect](JobInspect) if operation was successful
+  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let res = client.inspect_job("my_job").await;
+  /// ```
+  ///
+  pub async fn inspect_job(
+    &self,
+    name: &str,
+  ) -> Result<JobInspect, HttpClientError> {
+    let res = self
+      .send_get(
+        &format!("{}/{name}/inspect", Self::JOB_PATH),
+        None::<String>,
+      )
+      .await?;
     Self::res_json(res).await
   }
 
@@ -216,8 +252,8 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
-  use bollard_next::container::Config;
   use futures::StreamExt;
+  use bollard_next::container::Config;
 
   use super::*;
 
@@ -225,8 +261,7 @@ mod tests {
   async fn list_job() {
     let client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-    let res = client.list_job().await;
-    assert!(res.is_ok());
+    client.list_job().await.unwrap();
   }
 
   #[ntex::test]
@@ -252,6 +287,7 @@ mod tests {
     while let Some(Ok(_)) = stream.next().await {}
     let mut stream = client.logs_job(&job.name).await.unwrap();
     while let Some(Ok(_)) = stream.next().await {}
+    let job = client.inspect_job(&job.name).await.unwrap();
     client.delete_job(&job.name).await.unwrap();
   }
 }
