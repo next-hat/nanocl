@@ -295,6 +295,21 @@ pub async fn log_cargo(
   Ok(futures)
 }
 
+/// ## Log jobs
+///
+/// Logs existing jobs in the Statefile
+///
+/// ## Arguments
+///
+/// * [client](NanocldClient) The client to the daemon
+/// * [jobs](Vec) [Vector](Vec) of [job partial](JobPartial)
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Ok) The operation was successful
+///   * [Err](Err) [Io error](IoError) an error occured
+///
 pub async fn log_jobs(
   client: &NanocldClient,
   jobs: Vec<JobPartial>,
@@ -920,7 +935,6 @@ async fn exec_state_logs(
     ..Default::default()
   };
   log_cargoes(&client, cargoes, &log_opts).await?;
-
   Ok(())
 }
 

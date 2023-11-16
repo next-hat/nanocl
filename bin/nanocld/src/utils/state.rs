@@ -489,6 +489,15 @@ async fn apply_resources(
     .await;
 }
 
+/// ## Apply
+///
+/// Apply a state payload to the system
+///
+/// ## Arguments
+///
+/// * [data](serde_json::Value) - The state payload
+/// * [state](DaemonState) - The system state
+///
 async fn remove_jobs(
   data: &[JobPartial],
   state: &DaemonState,
@@ -674,12 +683,6 @@ pub async fn remove_vms(
 /// * [state](DaemonState) - The system state
 /// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
-///
 async fn remove_resources(
   data: &[ResourcePartial],
   state: &DaemonState,
@@ -737,8 +740,8 @@ async fn remove_resources(
 /// ## Returns
 ///
 /// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
+///   * [Ok](Ok) - The operation was successful
+///   * [Err](Err) - [Http error](HttpError) if something went wrong
 ///
 pub async fn apply_deployment(
   data: &StateDeployment,
@@ -778,8 +781,8 @@ pub async fn apply_deployment(
 /// ## Returns
 ///
 /// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
+///   * [Ok](Ok) - The operation was successful
+///   * [Err](Err) - [Http error](HttpError) if something went wrong
 ///
 pub async fn apply_cargo(
   data: &StateCargo,
@@ -1026,6 +1029,22 @@ pub async fn remove_secret(
   Ok(())
 }
 
+/// ## Remove Job
+///
+/// This will remove all content of a Kind Job Statefile from the system.
+///
+/// ## Arguments
+///
+/// * [data](StateJob) - The job statefile data
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Ok) - The operation was successful
+///   * [Err](Err) - [Http error](HttpError) if something went wrong
+///
 pub async fn remove_job(
   data: &StateJob,
   state: &DaemonState,

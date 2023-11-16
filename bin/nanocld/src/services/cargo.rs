@@ -668,7 +668,7 @@ mod tests {
       response.name
     );
     let mut res = client.send_get(ENDPOINT, None::<String>).await;
-    test_status_code!(http::StatusCode::OK, res.status(), "basic cargo list");
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo list");
     let cargoes = res.json::<Vec<CargoSummary>>().await.unwrap();
     assert!(!cargoes.is_empty(), "Expected to find cargoes");
     let res = client
@@ -727,7 +727,7 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status_code!(http::StatusCode::OK, res.status(), "basic cargo patch");
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo patch");
     let patch_response = res.json::<Cargo>().await.unwrap();
     assert_eq!(patch_response.name, main_test_cargo);
     assert_eq!(patch_response.namespace_name, "global");
@@ -760,7 +760,7 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status_code!(http::StatusCode::OK, res.status(), "basic cargo revert");
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo revert");
     let res = client
       .send_post(
         &format!("{ENDPOINT}/{main_test_cargo}/stop"),
@@ -884,7 +884,7 @@ mod tests {
         }),
       )
       .await;
-    test_status_code!(http::StatusCode::OK, res.status(), "logs cargo logs");
+    test_status_code!(res.status(), http::StatusCode::OK, "logs cargo logs");
     let mut stream = res.into_stream();
     let mut payload = Vec::new();
     let data = stream.next().await.unwrap().unwrap();

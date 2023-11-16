@@ -9,6 +9,21 @@ use nanocl_stubs::job::{Job, JobPartial};
 use crate::utils;
 use crate::models::{Pool, JobDbModel};
 
+/// ## Create
+///
+/// Create a job [job](Job) from a [job partial](JobPartial)
+///
+/// ## Arguments
+///
+/// * [item](JobPartial) The job partial
+/// * [pool](Pool) The database pool
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Ok) [Job](Job) The operation was successful
+///   * [Err](Err) [Io error](IoError) an error occured
+///
 pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
   let mut data = serde_json::to_value(item)
     .map_err(|err| err.map_err_context(|| "JobPartial"))?;
@@ -29,6 +44,21 @@ pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
   Ok(job)
 }
 
+/// ## Delete by name
+///
+/// Delete a job by it's name
+///
+/// ## Arguments
+///
+/// * [name](str) The name of the job to delete
+/// * [pool](Pool) The database pool
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Ok) [GenericDelete](GenericDelete) The operation was successful
+///   * [Err](Err) [Io error](IoError) an error occured
+///
 pub async fn delete_by_name(
   name: &str,
   pool: &Pool,
@@ -38,6 +68,20 @@ pub async fn delete_by_name(
   super::generic::delete_by_id::<jobs::table, _>(name, pool).await
 }
 
+/// ## List
+///
+/// List all jobs
+///
+/// ## Arguments
+///
+/// * [pool](Pool) The database pool
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Ok) [Vec](Vec) The operation was successful
+///   * [Err](Err) [Io error](IoError) an error occured
+///
 pub async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
   use crate::schema::jobs;
   let pool = pool.clone();
@@ -60,6 +104,21 @@ pub async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
   Ok(items)
 }
 
+/// ## Find by name
+///
+/// Find a job by it's name
+///
+/// ## Arguments
+///
+/// * [name](str) The name of the job to find
+/// * [pool](Pool) The database pool
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Ok) [Job](Job) The operation was successful
+///   * [Err](Err) [Io error](IoError) an error occured
+///
 pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
   use crate::schema::jobs;
   let name = name.to_owned();

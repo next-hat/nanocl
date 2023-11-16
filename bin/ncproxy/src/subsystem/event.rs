@@ -82,7 +82,7 @@ async fn update_resource_rule(
     utils::create_resource_conf(&resource.name, &proxy_rule, client, nginx)
       .await
   {
-    log::trace!("{err}");
+    log::debug!("{err}");
   }
   utils::reload_config(client).await?;
   Ok(())
@@ -98,14 +98,14 @@ async fn on_event(
       if let Err(err) =
         update_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
       {
-        log::trace!("{err}");
+        log::debug!("{err}");
       }
     }
     Event::CargoStopped(ev) | Event::CargoDeleted(ev) => {
       if let Err(err) =
         delete_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
       {
-        log::trace!("{err}");
+        log::debug!("{err}");
       }
     }
     Event::SecretCreated(secret) | Event::SecretPatched(secret) => {
@@ -114,7 +114,7 @@ async fn on_event(
       for resource in resources {
         let resource: ResourcePartial = resource.into();
         if let Err(err) = update_resource_rule(&resource, nginx, client).await {
-          log::trace!("{err}");
+          log::debug!("{err}");
         }
       }
     }
