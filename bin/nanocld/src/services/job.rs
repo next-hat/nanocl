@@ -14,7 +14,7 @@ use crate::models::DaemonState;
   tag = "Jobs",
   path = "/jobs",
   responses(
-    (status = 200, description = "List of jobs", body = [Job]),
+    (status = 200, description = "List of jobs", body = [JobSummary]),
   ),
 ))]
 #[web::get("/jobs")]
@@ -33,7 +33,7 @@ pub(crate) async fn list_job(
   path = "/jobs",
   request_body = JobPartial,
   responses(
-    (status = 201, description = "Cargo created", body = Job),
+    (status = 201, description = "Job created", body = Job),
   ),
 ))]
 #[web::post("/jobs")]
@@ -46,17 +46,17 @@ pub(crate) async fn create_job(
   Ok(web::HttpResponse::Created().json(&job))
 }
 
-/// Start a cargo
+/// Start a job
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Jobs",
   path = "/jobs/{Name}/start",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
+    ("Name" = String, Path, description = "Name of the job"),
   ),
   responses(
-    (status = 202, description = "Cargo started"),
-    (status = 404, description = "Cargo does not exist"),
+    (status = 202, description = "Job started"),
+    (status = 404, description = "Job does not exist"),
   ),
 ))]
 #[web::post("/jobs/{name}/start")]
@@ -77,8 +77,8 @@ pub(crate) async fn start_job(
     ("Name" = String, Path, description = "Name of the job"),
   ),
   responses(
-    (status = 202, description = "Cargo deleted"),
-    (status = 404, description = "Cargo does not exist"),
+    (status = 202, description = "Job deleted"),
+    (status = 404, description = "Job does not exist"),
   ),
 ))]
 #[web::delete("/jobs/{name}")]
@@ -100,7 +100,7 @@ pub(crate) async fn delete_job(
     ("Namespace" = Option<String>, Query, description = "Namespace of the job"),
   ),
   responses(
-    (status = 200, description = "Cargo details", body = CargoInspect),
+    (status = 200, description = "Job details", body = JobInspect),
   ),
 ))]
 #[web::get("/jobs/{name}/inspect")]
@@ -145,8 +145,8 @@ async fn logs_job(
     ("Namespace" = Option<String>, Query, description = "Namespace of the job"),
   ),
   responses(
-    (status = 200, description = "Cargo wait", content_type = "application/vdn.nanocl.raw-stream"),
-    (status = 404, description = "Cargo does not exist"),
+    (status = 200, description = "Job wait", content_type = "application/vdn.nanocl.raw-stream"),
+    (status = 404, description = "Job does not exist"),
   ),
 ))]
 #[web::get("/jobs/{name}/wait")]
@@ -230,6 +230,9 @@ mod tests {
       http::StatusCode::OK,
       format!("start job {}", &job.name)
     );
+    let mut res = client.get(ENDPOINT).send().await.unwrap();
+    test_status_code!(res.status(), http::StatusCode::OK, "list jobs");
+    let _ = res.json::<Vec<Job>>().await.unwrap();
     let mut stream = wait_res.into_stream();
     while let Some(Ok(wait_response)) = stream.next().await {
       let response =

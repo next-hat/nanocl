@@ -892,7 +892,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Job'
+                  $ref: '#/components/schemas/JobSummary'
     post:
       tags:
       - Jobs
@@ -907,7 +907,7 @@ paths:
         required: true
       responses:
         '201':
-          description: Cargo created
+          description: Job created
           content:
             application/json:
               schema:
@@ -928,9 +928,9 @@ paths:
           type: string
       responses:
         '202':
-          description: Cargo deleted
+          description: Job deleted
         '404':
-          description: Cargo does not exist
+          description: Job does not exist
   /jobs/{Name}/inspect:
     get:
       tags:
@@ -954,11 +954,11 @@ paths:
           nullable: true
       responses:
         '200':
-          description: Cargo details
+          description: Job details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CargoInspect'
+                $ref: '#/components/schemas/JobInspect'
   /jobs/{Name}/logs:
     get:
       tags:
@@ -975,21 +975,21 @@ paths:
     post:
       tags:
       - Jobs
-      summary: Start a cargo
-      description: Start a cargo
+      summary: Start a job
+      description: Start a job
       operationId: start_job
       parameters:
       - name: Name
         in: path
-        description: Name of the cargo
+        description: Name of the job
         required: true
         schema:
           type: string
       responses:
         '202':
-          description: Cargo started
+          description: Job started
         '404':
-          description: Cargo does not exist
+          description: Job does not exist
   /jobs/{Name}/wait:
     get:
       tags:
@@ -1013,9 +1013,9 @@ paths:
           nullable: true
       responses:
         '200':
-          description: Cargo wait
+          description: Job wait
         '404':
-          description: Cargo does not exist
+          description: Job does not exist
   /metrics:
     get:
       tags:
@@ -3960,6 +3960,72 @@ components:
           items:
             $ref: '#/components/schemas/Config'
           description: Containers to run
+    JobInspect:
+      type: object
+      description: |
+        ## Job inspect
+
+        Is a detailed view of a job
+        It also contains the list of instances
+      required:
+      - Name
+      - CreatedAt
+      - UpdatedAt
+      - Containers
+      - InstanceTotal
+      - InstanceSuccess
+      - InstanceRunning
+      - InstanceFailed
+      - Instances
+      properties:
+        Name:
+          type: string
+          description: Name of the job
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the job have been created
+        UpdatedAt:
+          type: string
+          format: date-time
+          description: When the job have been updated
+        Secrets:
+          type: array
+          items:
+            type: string
+          description: Secrets to load as environment variables
+          nullable: true
+        Metadata:
+          type: object
+          description: Metadata (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Containers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Config'
+          description: Containers to run
+        InstanceTotal:
+          type: integer
+          description: Number of instances
+          minimum: 0
+        InstanceSuccess:
+          type: integer
+          description: Number of instance that succeeded
+          minimum: 0
+        InstanceRunning:
+          type: integer
+          description: Number of instance running
+          minimum: 0
+        InstanceFailed:
+          type: integer
+          description: Number of instance failed
+          minimum: 0
+        Instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeContainerSummary'
+          description: List of containers
     JobPartial:
       type: object
       description: |
@@ -3989,6 +4055,51 @@ components:
           items:
             $ref: '#/components/schemas/Config'
           description: List of container to run
+    JobSummary:
+      type: object
+      description: |
+        ## Job summary
+
+        It's the datastructure returned by the list endpoint
+      required:
+      - Name
+      - CreatedAt
+      - UpdatedAt
+      - Config
+      - InstanceTotal
+      - InstanceSuccess
+      - InstanceRunning
+      - InstanceFailed
+      properties:
+        Name:
+          type: string
+          description: Name of the job
+        CreatedAt:
+          type: string
+          format: date-time
+          description: Creation date of the job
+        UpdatedAt:
+          type: string
+          format: date-time
+          description: Last update of the job
+        Config:
+          $ref: '#/components/schemas/Job'
+        InstanceTotal:
+          type: integer
+          description: Number of instances
+          minimum: 0
+        InstanceSuccess:
+          type: integer
+          description: Number of instance that succeeded
+          minimum: 0
+        InstanceRunning:
+          type: integer
+          description: Number of instance running
+          minimum: 0
+        InstanceFailed:
+          type: integer
+          description: Number of instance failed
+          minimum: 0
     LocalNodeState:
       type: string
       description: |-

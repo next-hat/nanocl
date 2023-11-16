@@ -237,6 +237,16 @@ async fn apply_secrets(
     .await;
 }
 
+/// ## Apply jobs
+///
+/// Apply the list of jobs to the system.
+///
+/// ## Arguments
+///
+/// * [data](Vec<JobPartial>) - The list of jobs to apply
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
 async fn apply_jobs(
   data: &[JobPartial],
   state: &DaemonState,
