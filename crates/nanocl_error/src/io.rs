@@ -85,6 +85,11 @@ impl IoError {
   pub fn exit(&self) -> ! {
     std::process::exit(self.inner.raw_os_error().unwrap_or(1));
   }
+
+  pub fn print_and_exit(&self) -> ! {
+    eprintln!("{}", self);
+    self.exit();
+  }
 }
 
 impl std::fmt::Display for IoError {

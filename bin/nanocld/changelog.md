@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - SSL/TLS connection to the store (db).
 - StateApplyQuery with reload option to skip diff.
+- Job to run a command as container.
 
 ## [0.11.0] 2023-11-06
 

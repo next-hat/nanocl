@@ -1,3 +1,6 @@
+use nanocl_error::io::{IoResult, FromIo};
+use nanocl_stubs::job::{Job, JobPartial};
+
 use crate::schema::jobs;
 
 /// ## JobDbModel
@@ -5,7 +8,7 @@ use crate::schema::jobs;
 /// This structure represent a job to run.
 /// It will create and run a list of containers.
 ///
-#[derive(Queryable, Identifiable, Insertable)]
+#[derive(Clone, Queryable, Identifiable, Insertable)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = jobs)]
 pub struct JobDbModel {
@@ -21,21 +24,22 @@ pub struct JobDbModel {
   pub metadata: Option<serde_json::Value>,
 }
 
-/// ## JobDbModelUpdate
-///
-/// This structure is used to update a job in the database.
-///
-#[derive(Debug, Default, AsChangeset)]
-#[diesel(table_name = jobs)]
-pub struct JobUpdateDbModel {
-  /// The key of the job generated with the name
-  pub key: Option<String>,
-  /// The created at date
-  pub created_at: Option<chrono::NaiveDateTime>,
-  /// The updated at data
-  pub updated_at: Option<chrono::NaiveDateTime>,
-  /// The config
-  pub data: Option<serde_json::Value>,
-  /// The metadata
-  pub metadata: Option<serde_json::Value>,
+impl JobDbModel {
+  pub fn into_job(self, config: &JobPartial) -> Job {
+    Job {
+      name: self.key.clone(),
+      created_at: self.created_at,
+      updated_at: self.updated_at,
+      secrets: config.secrets.clone(),
+      metadata: self.metadata.clone(),
+      containers: config.containers.clone(),
+    }
+  }
+
+  pub fn serialize_data(&self) -> IoResult<JobPartial> {
+    Ok(
+      serde_json::from_value(self.data.clone())
+        .map_err(|err| err.map_err_context(|| "Job"))?,
+    )
+  }
 }

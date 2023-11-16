@@ -32,13 +32,17 @@ pub async fn create(
 ) -> IoResult<CargoConfig> {
   let cargo_key = cargo_key.to_owned();
   let version = version.to_owned();
+  let mut data = serde_json::to_value(item.to_owned())
+    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
+  if let Some(meta) = data.as_object_mut() {
+    meta.remove("Metadata");
+  }
   let dbmodel = CargoConfigDbModel {
     key: uuid::Uuid::new_v4(),
     cargo_key,
     version,
     created_at: chrono::Utc::now().naive_utc(),
-    data: serde_json::to_value(item.clone())
-      .map_err(|e| e.map_err_context(|| "Invalid Config"))?,
+    data,
     metadata: item.metadata.clone(),
   };
   let dbmodel =

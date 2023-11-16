@@ -7,13 +7,14 @@ use futures_util::stream::FuturesUnordered;
 use nanocl_error::http::HttpError;
 
 use nanocl_stubs::system::Event;
+use nanocl_stubs::job::JobPartial;
 use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
 use nanocl_stubs::cargo_config::CargoConfigPartial;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmDiskConfig};
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateVirtualMachine, StateResource, StateMeta,
-  StateStream, StateSecret, StateApplyQuery,
+  StateStream, StateSecret, StateApplyQuery, StateJob,
 };
 
 use crate::{utils, repositories};
@@ -139,6 +140,16 @@ pub fn parse_state(data: &serde_json::Value) -> Result<StateData, HttpError> {
         })?;
       Ok(StateData::Resource(data))
     }
+    "Job" => {
+      let data =
+        serde_json::from_value::<StateJob>(data.to_owned()).map_err(|err| {
+          HttpError {
+            status: http::StatusCode::BAD_REQUEST,
+            msg: format!("unable to serialize payload {err}"),
+          }
+        })?;
+      Ok(StateData::Job(data))
+    }
     "Secret" => {
       let data = serde_json::from_value::<StateSecret>(data.to_owned())
         .map_err(|err| HttpError {
@@ -220,6 +231,64 @@ async fn apply_secrets(
           .await;
       });
       send(StateStream::new_secret_success(&key), sx);
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
+}
+
+/// ## Apply jobs
+///
+/// Apply the list of jobs to the system.
+///
+/// ## Arguments
+///
+/// * [data](Vec<JobPartial>) - The list of jobs to apply
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
+async fn apply_jobs(
+  data: &[JobPartial],
+  state: &DaemonState,
+  qs: &StateApplyQuery,
+  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  data
+    .iter()
+    .map(|job| async move {
+      send(StateStream::new_job_pending(&job.name), sx);
+      match utils::job::inspect_by_name(&job.name, state).await {
+        Ok(existing) => {
+          let existing: JobPartial = existing.into();
+          if existing == *job && !qs.reload.unwrap_or(false) {
+            send(StateStream::new_job_unchanged(&job.name), sx);
+            return;
+          }
+          if let Err(err) = utils::job::delete_by_name(&job.name, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+          if let Err(err) = utils::job::create(job, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+          if let Err(err) = utils::job::start_by_name(&job.name, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+        }
+        Err(_err) => {
+          if let Err(err) = utils::job::create(job, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+          if let Err(err) = utils::job::start_by_name(&job.name, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+        }
+      };
+      send(StateStream::new_job_success(&job.name), sx);
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
@@ -430,6 +499,44 @@ async fn apply_resources(
     .await;
 }
 
+/// ## Remove jobs
+///
+/// Remove jobs from the system based on a list of jobs
+///
+/// ## Arguments
+///
+/// * [data](serde_json::Value) - The state payload
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
+async fn remove_jobs(
+  data: &[JobPartial],
+  state: &DaemonState,
+  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+) {
+  data
+    .iter()
+    .map(|job| async {
+      send(StateStream::new_job_pending(&job.name), sx);
+      match utils::job::inspect_by_name(&job.name, state).await {
+        Ok(_) => {
+          if let Err(err) = utils::job::delete_by_name(&job.name, state).await {
+            send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
+            return;
+          }
+        }
+        Err(_err) => {
+          send(StateStream::new_job_not_found(&job.name), sx);
+          return;
+        }
+      };
+      send(StateStream::new_job_success(&job.name), sx);
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
+}
+
 /// ## Remove secrets
 ///
 /// Delete secrets from the system based on a list of secrets
@@ -587,12 +694,6 @@ pub async fn remove_vms(
 /// * [state](DaemonState) - The system state
 /// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
-///
 async fn remove_resources(
   data: &[ResourcePartial],
   state: &DaemonState,
@@ -650,8 +751,8 @@ async fn remove_resources(
 /// ## Returns
 ///
 /// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
+///   * [Ok](Ok) - The operation was successful
+///   * [Err](Err) - [Http error](HttpError) if something went wrong
 ///
 pub async fn apply_deployment(
   data: &StateDeployment,
@@ -691,8 +792,8 @@ pub async fn apply_deployment(
 /// ## Returns
 ///
 /// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
+///   * [Ok](Ok) - The operation was successful
+///   * [Err](Err) - [Http error](HttpError) if something went wrong
 ///
 pub async fn apply_cargo(
   data: &StateCargo,
@@ -787,6 +888,16 @@ pub async fn apply_secret(
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
   apply_secrets(&data.secrets, state, qs, &sx).await;
+  Ok(())
+}
+
+pub async fn apply_job(
+  data: &StateJob,
+  state: &DaemonState,
+  qs: &StateApplyQuery,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
+  apply_jobs(&data.jobs, state, qs, &sx).await;
   Ok(())
 }
 
@@ -926,5 +1037,30 @@ pub async fn remove_secret(
   sx: mpsc::Sender<Result<Bytes, HttpError>>,
 ) -> Result<(), HttpError> {
   remove_secrets(&data.secrets, state, &sx).await;
+  Ok(())
+}
+
+/// ## Remove Job
+///
+/// This will remove all content of a Kind Job Statefile from the system.
+///
+/// ## Arguments
+///
+/// * [data](StateJob) - The job statefile data
+/// * [state](DaemonState) - The system state
+/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Ok) - The operation was successful
+///   * [Err](Err) - [Http error](HttpError) if something went wrong
+///
+pub async fn remove_job(
+  data: &StateJob,
+  state: &DaemonState,
+  sx: mpsc::Sender<Result<Bytes, HttpError>>,
+) -> Result<(), HttpError> {
+  remove_jobs(&data.jobs, state, &sx).await;
   Ok(())
 }

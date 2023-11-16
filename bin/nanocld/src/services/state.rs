@@ -34,6 +34,9 @@ pub(crate) async fn apply(
       StateData::Secret(data) => {
         utils::state::apply_secret(&data, &state, &qs, sx).await
       }
+      StateData::Job(data) => {
+        utils::state::apply_job(&data, &state, &qs, sx).await
+      }
     };
     if let Err(err) = res {
       log::warn!("{err}");
@@ -70,6 +73,7 @@ pub(crate) async fn remove(
       StateData::Secret(data) => {
         utils::state::remove_secret(&data, &state, sx).await
       }
+      StateData::Job(data) => utils::state::remove_job(&data, &state, sx).await,
     };
     if let Err(err) = res {
       log::warn!("{err}");
@@ -178,5 +182,11 @@ mod tests {
     .await;
     // Revert examples/secret_env.yml
     revert_state(&client, "../../examples/secret_env.yml").await;
+    // Apply examples/job_example.yml
+    apply_state(&client, "../../examples/job_example.yml", None).await;
+    // ReApply examples/job_example.yml
+    apply_state(&client, "../../examples/job_example.yml", None).await;
+    // Revert examples/job_example.yml
+    revert_state(&client, "../../examples/job_example.yml").await;
   }
 }

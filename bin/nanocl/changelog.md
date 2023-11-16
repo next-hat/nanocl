@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - nanocl state apply return exit code on errors
 - nanocl state apply --reload to skip diff check.
+- Cargo image import with progress bar.
+
 
 ## [0.11.0] - 2023-11-06
 

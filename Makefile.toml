@@ -45,7 +45,7 @@ args = [
   "nanocld",
 ]
 
-# Test daemon
+# Test nanocld_client
 [tasks.tests-client]
 command = "cargo"
 args = ["nextest", "run", "-p", "nanocld_client"]

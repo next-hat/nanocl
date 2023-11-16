@@ -45,16 +45,14 @@ async fn main() -> std::io::Result<()> {
   );
   let config = match config::init(&args) {
     Err(err) => {
-      log::error!("{err}");
-      std::process::exit(1);
+      err.print_and_exit();
     }
     Ok(config) => config,
   };
   // Boot and init internal dependencies
   let daemon_state = boot::init(&config).await?;
   if let Err(err) = node::join_cluster(&daemon_state).await {
-    log::error!("{err}");
-    std::process::exit(1);
+    err.print_and_exit();
   }
   node::register(&daemon_state).await?;
   utils::proxy::spawn_logger(&daemon_state);

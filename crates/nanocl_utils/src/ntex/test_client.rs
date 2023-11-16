@@ -5,7 +5,7 @@ use ntex::http::client::{ClientRequest, ClientResponse};
 macro_rules! test_status_code {
   ($current:expr,$expected:expr,$context:expr) => {{
     assert_eq!(
-      $expected, $current,
+      $current, $expected,
       "Expect {} to return status {} got: {}",
       $context, $expected, $current,
     );

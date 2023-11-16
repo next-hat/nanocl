@@ -12,6 +12,7 @@ use bollard_next::service::HostConfig;
 
 use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
+use nanocld_client::stubs::job::JobPartial;
 use nanocld_client::stubs::state::{StateMeta, StateApplyQuery, StateStreamStatus};
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_config::{
@@ -292,6 +293,66 @@ pub async fn log_cargo(
     futures.push(fut);
   }
   Ok(futures)
+}
+
+/// ## Log jobs
+///
+/// Logs existing jobs in the Statefile
+///
+/// ## Arguments
+///
+/// * [client](NanocldClient) The client to the daemon
+/// * [jobs](Vec) [Vector](Vec) of [job partial](JobPartial)
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Ok) The operation was successful
+///   * [Err](Err) [Io error](IoError) an error occured
+///
+pub async fn log_jobs(
+  client: &NanocldClient,
+  jobs: Vec<JobPartial>,
+) -> IoResult<()> {
+  let mut futures = Vec::new();
+  for job in jobs {
+    let client = client.clone();
+    let fut = async move {
+      match client.logs_job(&job.name).await {
+        Err(err) => {
+          eprintln!("Cannot attach to job {}: {err}", &job.name);
+        }
+        Ok(mut stream) => {
+          while let Some(output) = stream.next().await {
+            let output = match output {
+              Ok(output) => output,
+              Err(e) => {
+                eprintln!("Error: {e}");
+                break;
+              }
+            };
+            let name = output.container_name;
+            let data = output.log.data;
+            match output.log.kind {
+              OutputKind::StdOut => {
+                print!("[{}@{name}]: {data}", &job.name);
+              }
+              OutputKind::StdErr => {
+                eprint!("[{}{name}]: {data}", &job.name);
+              }
+              OutputKind::Console => {
+                print!("[{}{name}]: {data}", &job.name);
+              }
+              _ => {}
+            }
+          }
+        }
+      }
+    };
+    futures.push(fut);
+  }
+  futures::future::join_all(futures).await;
+  Ok(())
 }
 
 /// ## Attach to cargoes
@@ -647,6 +708,7 @@ async fn exec_state_apply(
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let mut namespace = String::from("global");
   let mut cargoes = Vec::new();
+  let mut jobs: Vec<JobPartial> = Vec::new();
   let data = match state_ref.meta.kind.as_str() {
     "Deployment" | "Cargo" => {
       namespace = match state_ref.data.get("Namespace") {
@@ -673,6 +735,22 @@ async fn exec_state_apply(
       cargoes = hooked_cargoes.clone();
       yaml["Cargoes"] = serde_yaml::to_value(&hooked_cargoes)
         .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
+      yaml
+    }
+    "Job" => {
+      let yaml: serde_yaml::Value = inject_data(
+        &state_ref.format,
+        &state_ref.raw,
+        &args,
+        &cli_conf.context,
+        &client,
+      )
+      .await?;
+      jobs = match yaml.get("Jobs") {
+        Some(jobs) => serde_yaml::from_value(jobs.clone())
+          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
+        None => Vec::new(),
+      };
       yaml
     }
     _ => {
@@ -722,6 +800,22 @@ async fn exec_state_apply(
       }
     }
   }
+  for job in &jobs {
+    for container in &job.containers {
+      let is_missing = client
+        .inspect_cargo_image(&container.image.clone().unwrap_or_default())
+        .await
+        .is_err();
+      if is_missing || opts.force_pull {
+        if let Err(err) = download_container_image(&client, container).await {
+          eprintln!("{err}");
+          if is_missing {
+            return Err(err);
+          }
+        }
+      }
+    }
+  }
   let data = serde_json::to_value(&data).map_err(|err| {
     err.map_err_context(|| "Unable to create json payload for the daemon")
   })?;
@@ -741,7 +835,6 @@ async fn exec_state_apply(
     let res = res?;
     if res.status == StateStreamStatus::Failed {
       has_error = true;
-      eprintln!("{res:#?}");
     }
     utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
@@ -752,6 +845,13 @@ async fn exec_state_apply(
       ..Default::default()
     };
     log_cargoes(&client, cargoes, &query).await?;
+    log_jobs(&client, jobs).await?;
+  }
+  if has_error {
+    return Err(IoError::invalid_data(
+      "Statefile",
+      "couldn't apply correctly",
+    ));
   }
   if has_error {
     return Err(IoError::invalid_data(
@@ -835,7 +935,6 @@ async fn exec_state_logs(
     ..Default::default()
   };
   log_cargoes(&client, cargoes, &log_opts).await?;
-
   Ok(())
 }
 

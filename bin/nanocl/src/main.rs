@@ -1,7 +1,7 @@
 use clap::Parser;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoResult, IoError};
 use nanocld_client::NanocldClient;
 
 mod utils;
@@ -116,10 +116,11 @@ async fn main() -> std::io::Result<()> {
     let _ = term.clear_last_lines(0);
     std::process::exit(0);
   })
-  .expect("Error setting Ctrl-C handler");
+  .map_err(|err| {
+    IoError::interupted("Signal", &format!("Unable to register ctrl-c: {err}"))
+  })?;
   if let Err(err) = execute_arg(&args).await {
-    eprintln!("{err}");
-    err.exit();
+    err.print_and_exit();
   }
   Ok(())
 }
@@ -128,7 +129,7 @@ async fn main() -> std::io::Result<()> {
 mod tests {
   use std::{path::Path, env};
 
-  use crate::utils::test::get_test_client;
+  use crate::utils::tests::*;
 
   use super::*;
 
@@ -142,7 +143,6 @@ mod tests {
   #[ntex::test]
   async fn namespace() {
     const NAMESPACE_NAME: &str = "cli-namespace";
-
     // Try to create namespace
     assert_cli_ok!("namespace", "create", NAMESPACE_NAME);
     // Try to list namespaces
@@ -165,7 +165,6 @@ mod tests {
     assert_cli_ok!("cargo", "image", "inspect", IMAGE_NAME);
     // Try to remove cargo image
     assert_cli_ok!("cargo", "image", "rm", "-y", IMAGE_NAME);
-
     assert_cli_ok!(
       "cargo",
       "image",
@@ -185,7 +184,6 @@ mod tests {
     // Try to create cargo
     assert_cli_ok!("cargo", "create", CARGO_NAME, IMAGE_NAME);
     assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "created");
-
     // Try to list cargoes
     assert_cli_ok!("cargo", "ls");
     // Try to start a cargo
@@ -201,7 +199,6 @@ mod tests {
     assert_cli_ok!(
       "cargo", "patch", CARGO_NAME, "--image", IMAGE_NAME, "--env", "TEST=1",
     );
-
     assert_cli_ok!("cargo", "history", CARGO_NAME);
     let client = get_test_client();
     let history = client
@@ -211,9 +208,7 @@ mod tests {
       .first()
       .unwrap()
       .clone();
-
     assert_cli_ok!("cargo", "revert", CARGO_NAME, &history.key.to_string());
-
     // Try to stop a cargo
     assert_cli_ok!("cargo", "stop", CARGO_NAME);
     assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "exited");
@@ -223,7 +218,6 @@ mod tests {
     // Try to run cargo
     assert_cli_ok!("cargo", "run", CARGO_NAME, IMAGE_NAME);
     assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "running");
-
     // Try to remove cargo
     assert_cli_ok!("cargo", "rm", "-yf", CARGO_NAME);
     assert_cargo_not_exists!(client, CARGO_NAME, NAMESPACE_NAME);
@@ -238,14 +232,12 @@ mod tests {
       "-ys",
       "../../examples/basic_resources.yml",
     );
-
     assert_cli_ok!(
       "state",
       "apply",
       "-ys",
       "../../examples/deploy_example.yml",
     );
-
     // History
     assert_cli_ok!("resource", "history", "deploy-example.com");
     let client = get_test_client();
@@ -280,7 +272,6 @@ mod tests {
       "echo",
       "hello",
     );
-
     assert_cli_ok!(
       "cargo",
       "--namespace",
@@ -292,7 +283,6 @@ mod tests {
       "--",
       "env",
     );
-
     assert_cli_ok!(
       "cargo",
       "--namespace",
@@ -303,7 +293,6 @@ mod tests {
       "--",
       "whoami",
     );
-
     assert_cli_ok!(
       "cargo",
       "--namespace",
@@ -314,7 +303,6 @@ mod tests {
       "--",
       "ls",
     );
-
     assert_cli_ok!(
       "cargo",
       "--namespace",
@@ -335,26 +323,22 @@ mod tests {
       .expect("Can't cannonicalize tests folder path");
     env::set_current_dir(tests_path).expect("Can't move in tests folder");
     assert_cli_ok!("state", "apply", "-y");
-
     let tests_path = Path::new("./without_s_option")
       .canonicalize()
       .expect("Can't cannonicalize without_s_option folder path");
     env::set_current_dir(tests_path)
       .expect("Can't move in without_s_option folder");
     assert_cli_ok!("state", "apply", "-y");
-
     let tests_path = Path::new("../without_s_option_yml")
       .canonicalize()
       .expect("Can't cannonicalize without_s_option_yml folder path");
     env::set_current_dir(tests_path)
       .expect("Can't move in without_s_option_yml folder");
     assert_cli_ok!("state", "apply", "-y");
-
     let tests_path = Path::new("../../bin/nanocl")
       .canonicalize()
       .expect("Can't cannonicalize tests folder path");
     env::set_current_dir(tests_path).expect("Can't move back in nanocl folder");
-
     assert_cli_err!("state", "apply", "-y");
   }
 
@@ -382,16 +366,13 @@ mod tests {
       "-ys",
       "https://raw.githubusercontent.com/nxthat/nanocl/nightly/examples/deploy_example.yml",
     );
-
     assert_cli_ok!(
       "state",
       "rm",
       "-ys",
       "https://raw.githubusercontent.com/nxthat/nanocl/nightly/examples/deploy_example.yml",
     );
-
     assert_cli_err!("state", "rm", "-ys", "https://google.com");
-
     assert_cli_err!(
       "state",
       "rm",
@@ -429,7 +410,6 @@ mod tests {
       "-ys",
       "../../examples/invalid_json.json",
     );
-
     assert_cli_err!(
       "state",
       "apply",
@@ -456,7 +436,6 @@ mod tests {
     const DEPLOY_CARGO_NAME: &str = "deploy-example";
     const DEPLOY_CARGO2_NAME: &str = "deploy-example2";
     const DEPLOY_NAMESPACE_NAME: Option<&str> = None;
-
     assert_cli_ok!(
       "state",
       "apply",
@@ -475,7 +454,6 @@ mod tests {
       DEPLOY_NAMESPACE_NAME,
       "running"
     );
-
     assert_cli_ok!("state", "rm", "-ys", "../../examples/deploy_example.toml");
     assert_cargo_not_exists!(client, DEPLOY_CARGO_NAME, DEPLOY_NAMESPACE_NAME);
     assert_cargo_not_exists!(client, DEPLOY_CARGO2_NAME, DEPLOY_NAMESPACE_NAME);
@@ -487,7 +465,6 @@ mod tests {
     const DEPLOY_CARGO_NAME: &str = "deploy-example";
     const DEPLOY_CARGO2_NAME: &str = "deploy-example2";
     const DEPLOY_NAMESPACE_NAME: Option<&str> = None;
-
     assert_cli_ok!(
       "state",
       "apply",
@@ -506,9 +483,7 @@ mod tests {
       DEPLOY_NAMESPACE_NAME,
       "running"
     );
-
     assert_cli_ok!("state", "rm", "-ys", "../../examples/deploy_example.json");
-
     assert_cargo_not_exists!(client, DEPLOY_CARGO_NAME, DEPLOY_NAMESPACE_NAME);
     assert_cargo_not_exists!(client, DEPLOY_CARGO2_NAME, DEPLOY_NAMESPACE_NAME);
   }
@@ -526,7 +501,6 @@ mod tests {
     const DEPLOY_NAMESPACE_NAME: Option<&str> = None;
     const CARGO_NAME: &str = "cargo-example";
     const CARGO_NAMESPACE_NAME: Option<&str> = Some("cargo-example");
-
     assert_cli_ok!(
       "state",
       "apply",
@@ -564,7 +538,6 @@ mod tests {
       DEPLOY_NAMESPACE_NAME,
       "running"
     );
-
     assert_cli_ok!(
       "state",
       "logs",
@@ -574,21 +547,19 @@ mod tests {
       "-s",
       "../../examples/deploy_example.yml",
     );
-
     assert_cli_ok!("state", "logs", "-s", "../../examples/deploy_example.yml");
-
     assert_cli_ok!("state", "rm", "-ys", "../../examples/deploy_example.yml");
     assert_cargo_not_exists!(client, DEPLOY_CARGO_NAME, DEPLOY_NAMESPACE_NAME);
     assert_cargo_not_exists!(client, DEPLOY_CARGO2_NAME, DEPLOY_NAMESPACE_NAME);
-
     assert_cli_ok!("state", "apply", "-ys", "../../examples/cargo_example.yml");
     assert_cargo_state!(client, CARGO_NAME, CARGO_NAMESPACE_NAME, "running");
-
     assert_cli_ok!("state", "apply", "-ys", "../../examples/cargo_example.yml");
     assert_cargo_state!(client, CARGO_NAME, CARGO_NAMESPACE_NAME, "running");
-
     assert_cli_ok!("state", "rm", "-ys", "../../examples/cargo_example.yml");
     assert_cargo_not_exists!(client, CARGO_NAME, CARGO_NAMESPACE_NAME);
+    assert_cli_ok!("state", "apply", "-fys", "../../examples/job_example.yml");
+    assert_cli_ok!("state", "apply", "-fys", "../../examples/job_example.yml");
+    assert_cli_ok!("state", "rm", "-ys", "../../examples/job_example.yml");
   }
 
   #[ntex::test]
@@ -628,6 +599,49 @@ mod tests {
   async fn cargo_logs() {
     assert_cli_ok!("cargo", "-n", "system", "logs", "nanocld");
   }
+
+  // #[ntex::test]
+  // async fn cargo_wait() {
+  //   let args = Cli::parse_from([
+  //     "nanocl",
+  //     "state",
+  //     "apply",
+  //     "-ys",
+  //     "../../examples/static_replication.yml",
+  //   ]);
+  //   assert!(execute_arg(&args).await.is_ok());
+  //   let args =
+  //     Cli::parse_from(["nanocl", "cargo", "wait", "static-replicated"]);
+  //   assert!(execute_arg(&args).await.is_ok());
+
+  //   let args = Cli::parse_from([
+  //     "nanocl",
+  //     "state",
+  //     "rm",
+  //     "-ys",
+  //     "../../examples/static_replication.yml",
+  //   ]);
+  //   assert!(execute_arg(&args).await.is_ok());
+
+  //   let args = Cli::parse_from([
+  //     "nanocl",
+  //     "cargo",
+  //     "wait",
+  //     "-c",
+  //     "not-running",
+  //     "static-replicated",
+  //   ]);
+  //   assert!(execute_arg(&args).await.is_ok());
+
+  //   let args = Cli::parse_from([
+  //     "nanocl",
+  //     "state",
+  //     "rm",
+  //     "-ys",
+  //     "../../examples/static_replication.yml",
+  //   ]);
+  //   assert!(execute_arg(&args).await.is_ok());
+  // }
 
   #[ntex::test]
   async fn node_list() {
