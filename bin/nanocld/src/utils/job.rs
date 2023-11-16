@@ -13,6 +13,7 @@ use nanocl_error::http::HttpError;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::job::{
   Job, JobPartial, JobInspect, JobLogOutput, JobWaitResponse, WaitCondition,
+  JobSummary,
 };
 
 use crate::repositories;
@@ -49,6 +50,91 @@ pub async fn list_instances(
   });
   let containers = docker_api.list_containers(options).await?;
   Ok(containers)
+}
+
+/// ## Inspect instances
+///
+/// Return detailed informations about each instances of a job
+///
+/// ## Arguments
+///
+/// [name](str) The job name
+/// [state](DaemonState) The daemon state
+///
+/// ## Returns
+///
+/// * [Result](Result) - The result of the operation
+///   * [Ok](Ok) - [Vector](Vec) of [ContainerInspectResponse](ContainerInspectResponse) and [NodeContainerSummary](NodeContainerSummary)
+///   * [Err](Err) - [Http error](HttpError) Something went wrong
+///
+async fn inspect_instances(
+  name: &str,
+  state: &DaemonState,
+) -> Result<Vec<(ContainerInspectResponse, NodeContainerSummary)>, HttpError> {
+  list_instances(name, &state.docker_api).await?
+  .into_iter()
+  .map(|container| async {
+    let container_inspect = state
+      .docker_api
+      .inspect_container(&container.id.clone().unwrap_or_default(), None)
+      .await?;
+    Ok::<_, HttpError>((
+      container_inspect,
+      NodeContainerSummary {
+        node: state.config.hostname.clone(),
+        ip_address: state.config.advertise_addr.clone(),
+        container,
+      },
+    ))
+  })
+  .collect::<FuturesUnordered<_>>()
+  .collect::<Vec<Result<(ContainerInspectResponse, NodeContainerSummary), _>>>()
+  .await.into_iter().collect::<Result<Vec<(ContainerInspectResponse, NodeContainerSummary)>, _>>()
+}
+
+/// ## Count instances
+///
+/// Count the number of instances (containers) of a job
+///
+/// ## Arguments
+///
+/// * [instances](Vec) - Instances of [ContainerInspectResponse](ContainerInspectResponse) and [NodeContainerSummary](NodeContainerSummary)
+/// * [state](DaemonState) - The daemon state
+///
+/// ## Return
+///
+/// * [Tuple](Tuple) - The tuple of the number of instances
+///   * [usize] - The total number of instances
+///   * [usize] - The number of failed instances
+///   * [usize] - The number of success instances
+///   * [usize] - The number of running instances
+///
+fn count_instances(
+  instances: &[(ContainerInspectResponse, NodeContainerSummary)],
+) -> (usize, usize, usize, usize) {
+  let mut instance_failed = 0;
+  let mut instance_success = 0;
+  let mut instance_running = 0;
+  for (container_inspect, _) in instances {
+    let state = container_inspect.state.clone().unwrap_or_default();
+    if let Some(exit_code) = state.exit_code {
+      if exit_code == 0 {
+        instance_success += 1;
+      }
+    }
+    if state.running.unwrap_or_default() {
+      instance_running += 1;
+    }
+    if state.error.is_some() {
+      instance_failed += 1;
+    }
+  }
+  (
+    instances.len(),
+    instance_failed,
+    instance_success,
+    instance_running,
+  )
 }
 
 /// ## Run job
@@ -148,12 +234,39 @@ pub async fn start_by_name(
 /// ## Returns
 ///
 /// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - [Vector](Vec) of [Job](Job)
+///   * [Ok](Ok) - [Vector](Vec) of [Job](JobSummary)
 ///   * [Err](Err) - [Http error](HttpError) Something went wrong
 ///
-pub async fn list(state: &DaemonState) -> Result<Vec<Job>, HttpError> {
+pub async fn list(state: &DaemonState) -> Result<Vec<JobSummary>, HttpError> {
   let jobs = repositories::job::list(&state.pool).await?;
-  Ok(jobs)
+  let job_summaries =
+    jobs
+      .iter()
+      .map(|job| async {
+        let instances = inspect_instances(&job.name, state).await?;
+        let (
+          instance_total,
+          instance_failed,
+          instance_success,
+          instance_running,
+        ) = count_instances(&instances);
+        Ok::<_, HttpError>(JobSummary {
+          name: job.name.clone(),
+          created_at: job.created_at,
+          updated_at: job.updated_at,
+          config: job.clone(),
+          instance_total,
+          instance_success,
+          instance_running,
+          instance_failed,
+        })
+      })
+      .collect::<FuturesUnordered<_>>()
+      .collect::<Vec<Result<JobSummary, HttpError>>>()
+      .await
+      .into_iter()
+      .collect::<Result<Vec<JobSummary>, HttpError>>()?;
+  Ok(job_summaries)
 }
 
 /// ## Delete by name
@@ -221,37 +334,9 @@ pub async fn inspect_by_name(
   state: &DaemonState,
 ) -> Result<JobInspect, HttpError> {
   let job = repositories::job::find_by_name(name, &state.pool).await?;
-  let mut instance_success = 0;
-  let container_inspects = list_instances(name, &state.docker_api)
-    .await?
-    .into_iter()
-    .map(|container| async {
-      let container_inspect = state
-        .docker_api
-        .inspect_container(&container.id.clone().unwrap_or_default(), None)
-        .await?;
-      Ok::<_, HttpError>((
-        container_inspect,
-        NodeContainerSummary {
-          node: state.config.hostname.clone(),
-          ip_address: state.config.advertise_addr.clone(),
-          container,
-        },
-      ))
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(ContainerInspectResponse, NodeContainerSummary), _>>>()
-    .await.into_iter().collect::<Result<Vec<(ContainerInspectResponse, NodeContainerSummary)>, _>>()?;
-  let mut containers = Vec::new();
-  for (container_inspect, node_container_summary) in container_inspects {
-    let state = container_inspect.state.unwrap_or_default();
-    if let Some(exit_code) = state.exit_code {
-      if exit_code == 0 {
-        instance_success += 1;
-      }
-    }
-    containers.push(node_container_summary);
-  }
+  let instances = inspect_instances(name, state).await?;
+  let (instance_total, instance_failed, instance_success, instance_running) =
+    count_instances(&instances);
   let job_inspect = JobInspect {
     name: job.name,
     created_at: job.created_at,
@@ -259,9 +344,15 @@ pub async fn inspect_by_name(
     secrets: job.secrets,
     metadata: job.metadata,
     containers: job.containers,
-    instance_total: containers.len(),
+    instance_total,
     instance_success,
-    instances: containers,
+    instance_running,
+    instance_failed,
+    instances: instances
+      .clone()
+      .into_iter()
+      .map(|(_, container)| container)
+      .collect(),
   };
   Ok(job_inspect)
 }

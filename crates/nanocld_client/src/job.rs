@@ -2,6 +2,7 @@ use ntex::channel::mpsc::Receiver;
 
 use nanocl_stubs::job::{
   Job, JobLogOutput, JobWaitQuery, JobWaitResponse, JobPartial, JobInspect,
+  JobSummary,
 };
 use nanocl_error::http::HttpError;
 use nanocl_error::http_client::HttpClientError;
@@ -32,7 +33,7 @@ impl NanocldClient {
   /// let res = client.list_job().await;
   /// ```
   ///
-  pub async fn list_job(&self) -> Result<Vec<Job>, HttpClientError> {
+  pub async fn list_job(&self) -> Result<Vec<JobSummary>, HttpClientError> {
     let res = self.send_get(Self::JOB_PATH, None::<String>).await?;
     Self::res_json(res).await
   }

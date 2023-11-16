@@ -39,6 +39,33 @@ pub struct Job {
   pub containers: Vec<Config>,
 }
 
+/// ## Job summary
+///
+/// It's the datastructure returned by the list endpoint
+///
+#[derive(Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct JobSummary {
+  /// Name of the job
+  pub name: String,
+  /// Creation date of the job
+  pub created_at: chrono::NaiveDateTime,
+  /// Last update of the job
+  pub updated_at: chrono::NaiveDateTime,
+  /// Configuration of the job
+  pub config: Job,
+  /// Number of instances
+  pub instance_total: usize,
+  /// Number of instance that succeeded
+  pub instance_success: usize,
+  /// Number of instance running
+  pub instance_running: usize,
+  /// Number of instance failed
+  pub instance_failed: usize,
+}
+
 /// ## Job partial
 ///
 /// Job partial is used to create a new job
@@ -71,9 +98,9 @@ pub struct JobPartial {
 }
 
 /// ## Job inspect
+///
 /// Is a detailed view of a job
-/// It contains all the information about the job
-/// It also contains the list of containers
+/// It also contains the list of instances
 ///
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "test", derive(Default))]
@@ -106,6 +133,10 @@ pub struct JobInspect {
   pub instance_total: usize,
   /// Number of instance that succeeded
   pub instance_success: usize,
+  /// Number of instance running
+  pub instance_running: usize,
+  /// Number of instance failed
+  pub instance_failed: usize,
   /// List of containers
   pub instances: Vec<NodeContainerSummary>,
 }
@@ -134,7 +165,10 @@ pub struct JobLogOutput {
   pub log: OutputLog,
 }
 
-/// WaitCondition choose wich state of container to wait
+/// # Wait condition
+///
+/// Wait condition is used to wait for a job to finish or to be removed
+///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -173,7 +207,10 @@ impl std::str::FromStr for WaitCondition {
   }
 }
 
-/// Wait cargo query
+/// Job wait
+///
+/// Query for the wait endpoint
+///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -182,7 +219,10 @@ pub struct JobWaitQuery {
   pub condition: Option<WaitCondition>,
 }
 
-/// WaitResponse is the output of a wait command
+/// ## Job wait response
+///
+/// Response of the wait stream
+///
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
