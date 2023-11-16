@@ -359,6 +359,13 @@ mod tests {
   }
 
   #[ntex::test]
+  async fn state_apply_remote_http() {
+    assert_cli_ok!("state", "apply", "-ys", "../../tests/remote_http.yml");
+    assert_cli_ok!("state", "apply", "-ys", "../../tests/remote_http.yml");
+    assert_cli_ok!("state", "rm", "-ys", "../../tests/remote_http.yml");
+  }
+
+  #[ntex::test]
   async fn state_apply_url_statefile() {
     assert_cli_ok!(
       "state",

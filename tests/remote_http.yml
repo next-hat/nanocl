@@ -1,0 +1,13 @@
+Kind: Deployment
+ApiVersion: http://ndaemon.nanocl.internal:8585/v0.11
+
+Namespace: global
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
+Cargoes:
+  - Name: remote-example
+    Container:
+      Image: ghcr.io/nxthat/nanocl-get-started:latest
+      Env:
+        - APP=GET_STARTED
