@@ -184,7 +184,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use ntex::http;
   use futures_util::{StreamExt, TryStreamExt};
-  use nanocl_stubs::job::{Job, JobWaitResponse};
+  use nanocl_stubs::job::{Job, JobWaitResponse, JobSummary};
 
   use crate::utils::tests::*;
 
@@ -195,7 +195,7 @@ mod tests {
     let client = gen_default_test_client().await;
     let mut response = client.get(ENDPOINT).send().await.unwrap();
     test_status_code!(response.status(), http::StatusCode::OK, "list jobs");
-    let _ = response.json::<Vec<Job>>().await.unwrap();
+    let _ = response.json::<Vec<JobSummary>>().await.unwrap();
   }
 
   #[ntex::test]
@@ -232,7 +232,7 @@ mod tests {
     );
     let mut res = client.get(ENDPOINT).send().await.unwrap();
     test_status_code!(res.status(), http::StatusCode::OK, "list jobs");
-    let _ = res.json::<Vec<Job>>().await.unwrap();
+    let _ = res.json::<Vec<JobSummary>>().await.unwrap();
     let mut stream = wait_res.into_stream();
     while let Some(Ok(wait_response)) = stream.next().await {
       let response =
