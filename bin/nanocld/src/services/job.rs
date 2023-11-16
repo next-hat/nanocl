@@ -248,14 +248,14 @@ mod tests {
     while let Some(Ok(log)) = stream.next().await {
       assert!(!log.is_empty());
     }
-    // let res = client
-    //   .send_get(&format!("{job_endpoint}/inspect"), None::<String>)
-    //   .await;
-    // test_status_code!(
-    //   res.status(),
-    //   http::StatusCode::OK,
-    //   format!("inspect job {}", &job.name)
-    // );
+    let res = client
+      .send_get(&format!("{job_endpoint}/inspect"), None::<String>)
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      format!("inspect job {}", &job.name)
+    );
     let _ = client.send_delete(&job_endpoint, None::<String>).await;
   }
 }

@@ -221,9 +221,6 @@ pub async fn inspect_by_name(
   state: &DaemonState,
 ) -> Result<JobInspect, HttpError> {
   let job = repositories::job::find_by_name(name, &state.pool).await?;
-  let node =
-    repositories::node::find_by_name(&state.config.hostname, &state.pool)
-      .await?;
   let mut instance_success = 0;
   let container_inspects = list_instances(name, &state.docker_api)
     .await?
@@ -236,8 +233,8 @@ pub async fn inspect_by_name(
       Ok::<_, HttpError>((
         container_inspect,
         NodeContainerSummary {
-          node: node.name.clone(),
-          ip_address: node.ip_address.clone(),
+          node: state.config.hostname.clone(),
+          ip_address: state.config.advertise_addr.clone(),
           container,
         },
       ))
