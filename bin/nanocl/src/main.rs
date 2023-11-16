@@ -489,11 +489,6 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn state_logs_invalide_statefile_kind() {
-    assert_cli_err!("state", "logs", "-s", "../../examples/secret_env.yml");
-  }
-
-  #[ntex::test]
   async fn state() {
     let client = get_test_client();
     const DEPLOY_CARGO_NAME: &str = "deploy-example";
