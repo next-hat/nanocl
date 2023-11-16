@@ -1,12 +1,10 @@
-use ntex::{rt, web};
-use ntex::util::Bytes;
-use ntex::channel::mpsc;
+use ntex::web;
 
 use nanocl_error::http::HttpError;
 use nanocl_stubs::state::StateApplyQuery;
 
 use crate::utils;
-use crate::models::{StateData, DaemonState};
+use crate::models::DaemonState;
 
 #[web::put("/state/apply")]
 pub(crate) async fn apply(
@@ -15,33 +13,8 @@ pub(crate) async fn apply(
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let state_file = utils::state::parse_state(&payload)?;
-  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
-  rt::spawn(async move {
-    let res = match state_file {
-      StateData::Deployment(data) => {
-        utils::state::apply_deployment(&data, &version, &state, &qs, sx).await
-      }
-      StateData::Cargo(data) => {
-        utils::state::apply_cargo(&data, &version, &state, &qs, sx).await
-      }
-      StateData::VirtualMachine(data) => {
-        utils::state::apply_vm(&data, &version, &state, &qs, sx).await
-      }
-      StateData::Resource(data) => {
-        utils::state::apply_resource(&data, &state, &qs, sx).await
-      }
-      StateData::Secret(data) => {
-        utils::state::apply_secret(&data, &state, &qs, sx).await
-      }
-      StateData::Job(data) => {
-        utils::state::apply_job(&data, &state, &qs, sx).await
-      }
-    };
-    if let Err(err) = res {
-      log::warn!("{err}");
-    }
-  });
+  let data = utils::state::parse_state(&payload)?;
+  let rx = utils::state::apply_statefile(&data, &version, &qs, &state);
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
@@ -54,31 +27,8 @@ pub(crate) async fn remove(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let state_file = utils::state::parse_state(&payload)?;
-  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
-  rt::spawn(async move {
-    let res = match state_file {
-      StateData::Deployment(data) => {
-        utils::state::remove_deployment(&data, &state, sx).await
-      }
-      StateData::Cargo(data) => {
-        utils::state::remove_cargo(&data, &state, sx).await
-      }
-      StateData::VirtualMachine(data) => {
-        utils::state::remove_vm(&data, &state, sx).await
-      }
-      StateData::Resource(data) => {
-        utils::state::remove_resource(&data, &state, sx).await
-      }
-      StateData::Secret(data) => {
-        utils::state::remove_secret(&data, &state, sx).await
-      }
-      StateData::Job(data) => utils::state::remove_job(&data, &state, sx).await,
-    };
-    if let Err(err) = res {
-      log::warn!("{err}");
-    }
-  });
+  let data = utils::state::parse_state(&payload)?;
+  let rx = utils::state::remove_statefile(&data, &state);
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
