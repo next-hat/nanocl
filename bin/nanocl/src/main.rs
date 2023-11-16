@@ -366,6 +366,55 @@ mod tests {
   }
 
   #[ntex::test]
+  async fn state_apply_args_advenced() {
+    assert_cli_ok!(
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/args_advanced.yml",
+      "--",
+      "--name",
+      "test-args-advanced",
+      "--domain",
+      "test.args.advanced.com",
+      "--image",
+      "ghcr.io/nxthat/nanocl-get-started:latest",
+      "--port",
+      "9000",
+    );
+    assert_cli_ok!(
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/args_advanced.yml",
+      "--",
+      "--name",
+      "test-args-advanced",
+      "--domain",
+      "test.args.advanced.com",
+      "--image",
+      "ghcr.io/nxthat/nanocl-get-started:latest",
+      "--port",
+      "9000",
+    );
+    assert_cli_ok!(
+      "state",
+      "rm",
+      "-ys",
+      "../../examples/args_advanced.yml",
+      "--",
+      "--name",
+      "test-args-advanced",
+      "--domain",
+      "test.args.advanced.com",
+      "--image",
+      "ghcr.io/nxthat/nanocl-get-started:latest",
+      "--port",
+      "9000",
+    );
+  }
+
+  #[ntex::test]
   async fn state_apply_url_statefile() {
     assert_cli_ok!(
       "state",
