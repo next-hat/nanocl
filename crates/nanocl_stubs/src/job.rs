@@ -180,6 +180,16 @@ pub enum WaitCondition {
   Removed,
 }
 
+impl std::fmt::Display for WaitCondition {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      WaitCondition::NextExit => write!(f, "next-exit"),
+      WaitCondition::NotRunning => write!(f, "not-running"),
+      WaitCondition::Removed => write!(f, "removed"),
+    }
+  }
+}
+
 impl From<WaitCondition> for std::string::String {
   fn from(value: WaitCondition) -> Self {
     match value {

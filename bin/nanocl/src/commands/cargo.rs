@@ -77,7 +77,7 @@ async fn exec_cargo_rm(
   let client = &cli_conf.client;
   if !opts.skip_confirm {
     utils::dialog::confirm(&format!("Delete cargo  {}?", opts.names.join(",")))
-      .map_err(|err| err.map_err_context(|| "Delete cargo images"))?;
+      .map_err(|err| err.map_err_context(|| "Delete cargo"))?;
   }
   let query = CargoDeleteQuery {
     namespace: args.namespace.clone(),
