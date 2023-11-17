@@ -17,12 +17,6 @@ use crate::models::{
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [options](NamespaceListOpts) The namespace list options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_namespace_ls(
   client: &NanocldClient,
   options: &NamespaceListOpts,
@@ -54,12 +48,6 @@ async fn exec_namespace_ls(
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [options](NamespaceOpts) The namespace options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_namespace_create(
   client: &NanocldClient,
   options: &NamespaceOpts,
@@ -78,12 +66,6 @@ async fn exec_namespace_create(
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [options](NamespaceOpts) The namespace options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_namespace_inspect(
   client: &NanocldClient,
   options: &NamespaceOpts,
@@ -101,12 +83,6 @@ async fn exec_namespace_inspect(
 ///
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [options](NamespaceDeleteOpts) The namespace delete options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_namespace_rm(
   client: &NanocldClient,
@@ -133,12 +109,6 @@ async fn exec_namespace_rm(
 ///
 /// * [cli_conf](CliConfig) The cli config
 /// * [args](NamespaceArg) The namespace options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_namespace(
   cli_conf: &CliConfig,

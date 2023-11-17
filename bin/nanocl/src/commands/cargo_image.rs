@@ -23,15 +23,9 @@ use crate::models::{
 /// ## Arguments
 ///
 /// * [client](NanocldClient) The nanocl daemon client
-/// * [opts](CargoImageListOpts) The cargo image list options
+/// * [opts](CargoImageListOpts) Cli options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
-async fn exec_cargo_image_ls(
+pub(crate) async fn exec_cargo_ls(
   client: &NanocldClient,
   opts: &CargoImageListOpts,
 ) -> IoResult<()> {
@@ -61,12 +55,6 @@ async fn exec_cargo_image_ls(
 ///
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [options](CargoImageRemoveOpts) The cargo image remove options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_cargo_image_rm(
   client: &NanocldClient,
@@ -139,12 +127,6 @@ fn update_progress(
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [name](str) The name of the image to pull
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 pub(crate) async fn exec_cargo_image_pull(
   client: &NanocldClient,
   name: &str,
@@ -199,12 +181,6 @@ pub(crate) async fn exec_cargo_image_pull(
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [opts](CargoImageInspectOpts) The cargo image inspect options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_cargo_image_inspect(
   client: &NanocldClient,
   opts: &CargoImageInspectOpts,
@@ -223,12 +199,6 @@ async fn exec_cargo_image_inspect(
 ///
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [opts](CargoImageImportOpts) The cargo image import options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_cargo_image_import(
   client: &NanocldClient,
@@ -277,18 +247,12 @@ async fn exec_cargo_image_import(
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [opts](CargoImageArg) The cargo image options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
-pub async fn exec_cargo_image(
+pub(crate) async fn exec_cargo_image(
   client: &NanocldClient,
   opts: &CargoImageArg,
 ) -> IoResult<()> {
   match &opts.command {
-    CargoImageCommand::List(opts) => exec_cargo_image_ls(client, opts).await,
+    CargoImageCommand::List(opts) => exec_cargo_ls(client, opts).await,
     CargoImageCommand::Inspect(opts) => {
       exec_cargo_image_inspect(client, opts).await
     }

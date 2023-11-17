@@ -19,12 +19,6 @@ use crate::utils::print::print_table;
 /// * [cli_conf](CliConfig) The cli config
 /// * [args](ProcessOpts) The process options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 pub async fn exec_process(
   cli_conf: &CliConfig,
   args: &ProcessOpts,
@@ -50,12 +44,6 @@ pub async fn exec_process(
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [opts](SystemHttpArg) The system http options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 pub async fn exec_http(
   client: &NanocldClient,
   opts: &SystemHttpArg,
@@ -77,12 +65,6 @@ pub async fn exec_http(
 ///
 /// * [cli_conf](CliConfig) The cli config
 /// * [args](SystemArg) The system options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_system(
   cli_conf: &CliConfig,

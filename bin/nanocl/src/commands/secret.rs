@@ -14,12 +14,6 @@ use crate::models::{
 ///
 /// * [cli_conf](CliConfig) The cli config
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_secret_ls(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;
   let secrets = client.list_secret(None).await?;
@@ -39,12 +33,6 @@ async fn exec_secret_ls(cli_conf: &CliConfig) -> IoResult<()> {
 ///
 /// * [cli_conf](CliConfig) The cli config
 /// * [opts](SecretRemoveOpts) The secret remove options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_secret_rm(
   cli_conf: &CliConfig,
@@ -70,12 +58,6 @@ async fn exec_secret_rm(
 /// * [cli_conf](CliConfig) The cli config
 /// * [opts](SecretInspectOpts) The secret inspect options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_secret_inspect(
   cli_conf: &CliConfig,
   opts: &SecretInspectOpts,
@@ -97,12 +79,6 @@ async fn exec_secret_inspect(
 ///
 /// * [cli_conf](CliConfig) The cli config
 /// * [args](SecretArg) The secret options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_secret(
   cli_conf: &CliConfig,

@@ -11,12 +11,6 @@ use crate::{version, config::CliConfig};
 ///
 /// * [client](NanocldClient) The nanocl daemon client
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn print_version(client: &NanocldClient) -> IoResult<()> {
   println!("=== [nanocli] ===");
   version::print_version();
@@ -39,12 +33,6 @@ async fn print_version(client: &NanocldClient) -> IoResult<()> {
 /// ## Arguments
 ///
 /// * [cli_conf](CliConfig) The cli config
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
 ///
 pub async fn exec_version(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;

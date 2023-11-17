@@ -13,12 +13,6 @@ use crate::models::{Context, ContextArg, ContextCommand, ContextRow};
 ///
 /// * [context](Context) The context
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 fn exec_context_list(context: &Context) -> IoResult<()> {
   let list = Context::list()?;
   let list = list
@@ -48,12 +42,6 @@ fn exec_context_list(context: &Context) -> IoResult<()> {
 ///
 /// * [name](str) The name of the context to use
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 fn exec_context_use(name: &str) -> IoResult<()> {
   Context::r#use(name)?;
   Ok(())
@@ -67,12 +55,6 @@ fn exec_context_use(name: &str) -> IoResult<()> {
 /// ## Arguments
 ///
 /// * [path](str) The path to the file
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 fn exec_context_from(path: &str) -> IoResult<()> {
   let context = Context::read(path)?;
@@ -88,12 +70,6 @@ fn exec_context_from(path: &str) -> IoResult<()> {
 ///
 /// * [cli_conf](CliConfig) The cli config
 /// * [args](ContextArg) The context options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_context(
   cli_conf: &CliConfig,

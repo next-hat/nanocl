@@ -24,12 +24,6 @@ use crate::models::{
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [options](VmImageCreateOpts) The vm image create options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_vm_image_create(
   client: &NanocldClient,
   options: &VmImageCreateOpts,
@@ -77,12 +71,6 @@ async fn exec_vm_image_create(
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [opts](VmImageListOpts) The vm image list options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_vm_image_ls(
   client: &NanocldClient,
   opts: &VmImageListOpts,
@@ -114,12 +102,6 @@ async fn exec_vm_image_ls(
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [names](Vec<String>) The list of vm image names
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_vm_image_rm(
   client: &NanocldClient,
   names: &[String],
@@ -139,12 +121,6 @@ async fn exec_vm_image_rm(
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [name](str) The name of the vm image
 /// * [clone_name](str) The name of the clone
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 async fn exec_vm_image_clone(
   client: &NanocldClient,
@@ -182,12 +158,6 @@ async fn exec_vm_image_clone(
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [options](VmImageResizeOpts) The vm image resize options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_vm_resize(
   client: &NanocldClient,
   options: &VmImageResizeOpts,
@@ -205,12 +175,6 @@ async fn exec_vm_resize(
 ///
 /// * [client](NanocldClient) The nanocl daemon client
 /// * [args](VmImageArg) The vm image arguments
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_vm_image(
   client: &NanocldClient,

@@ -13,12 +13,6 @@ use crate::{utils::print::print_yml, config::CliConfig};
 ///
 /// * [cli_conf](CliConfig) The cli config
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 pub async fn exec_events(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;
   let mut stream = client.watch_events().await?;

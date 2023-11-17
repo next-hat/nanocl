@@ -20,10 +20,6 @@ use crate::models::{
 /// * [cli_conf](CliConfig) Cli configuration
 /// * [opts](JobListOpts) Cli options
 ///
-/// ## Return
-///
-/// [IoResult](nanocl_error::io::IoResult)
-///
 async fn exec_job_ls(cli_conf: &CliConfig, opts: &JobListOpts) -> IoResult<()> {
   let client = &cli_conf.client;
   let items = client.list_job().await?;
@@ -50,10 +46,6 @@ async fn exec_job_ls(cli_conf: &CliConfig, opts: &JobListOpts) -> IoResult<()> {
 /// * [cli_conf](CliConfig) Cli configuration
 /// * [args](JobRemoveOpts) Cli options
 ///
-/// ## Return
-///
-/// [IoResult](nanocl_error::io::IoResult)
-///
 async fn exec_job_rm(
   cli_conf: &CliConfig,
   opts: &JobRemoveOpts,
@@ -78,10 +70,6 @@ async fn exec_job_rm(
 /// * [cli_conf](CliConfig) Cli configuration
 /// * [args](JobInspectOpts) Cli options
 ///
-/// ## Return
-///
-/// [IoResult](nanocl_error::io::IoResult)
-///
 async fn exec_job_inspect(
   cli_conf: &CliConfig,
   opts: &JobInspectOpts,
@@ -104,10 +92,6 @@ async fn exec_job_inspect(
 ///
 /// * [cli_conf](CliConfig) Cli configuration
 /// * [args](JobLogsOpts) Cli options
-///
-/// ## Return
-///
-/// [IoResult](nanocl_error::io::IoResult)
 ///
 async fn exec_job_logs(
   cli_conf: &CliConfig,
@@ -143,10 +127,6 @@ async fn exec_job_logs(
 ///
 /// * [cli_conf](CliConfig) Cli configuration
 /// * [opts](JobWaitOpts) Cli options
-///
-/// ## Return
-///
-/// [IoResult](nanocl_error::io::IoResult)
 ///
 async fn exec_job_wait(
   cli_conf: &CliConfig,
@@ -190,10 +170,6 @@ async fn exec_job_wait(
 /// * [cli_conf](CliConfig) Cli configuration
 /// * [opts](JobStartOpts) Cli options
 ///
-/// ## Return
-///
-/// [IoResult](nanocl_error::io::IoResult)
-///
 async fn exec_job_start(
   cli_conf: &CliConfig,
   opts: &JobStartOpts,
@@ -211,10 +187,6 @@ async fn exec_job_start(
 ///
 /// * [cli_conf](CliConfig) Cli configuration
 /// * [args](JobArg) Cli subcommand
-///
-/// ## Return
-///
-/// [IoResult](nanocl_error::io::IoResult)
 ///
 pub async fn exec_job(cli_conf: &CliConfig, args: &JobArg) -> IoResult<()> {
   match &args.command {
