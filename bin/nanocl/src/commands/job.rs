@@ -164,7 +164,7 @@ async fn exec_job_wait(
   let mut has_error = false;
   while let Some(chunk) = stream.next().await {
     let resp = match chunk {
-      Ok(chunk) => chunk,
+      Ok(ref chunk) => chunk,
       Err(e) => return Err(e.map_err_context(|| "Stream logs").into()),
     };
     if resp.status_code != 0 {

@@ -1,0 +1,10 @@
+Kind: Job
+ApiVersion: v0.11
+
+Jobs:
+- Name: job-example-error
+  Containers:
+  - Image: alpine:latest
+    Cmd:
+    - ls
+    - /not/existing/path

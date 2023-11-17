@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use ntex::util::Bytes;
 use futures_util::{StreamExt, TryStreamExt};
 use futures_util::stream::{FuturesUnordered, select_all, FuturesOrdered};
-use bollard_next::service::{ContainerSummary, ContainerInspectResponse};
+use bollard_next::service::{
+  ContainerSummary, ContainerInspectResponse, ContainerWaitExitError,
+};
 use bollard_next::container::{
   CreateContainerOptions, StartContainerOptions, ListContainersOptions,
   RemoveContainerOptions, LogsOptions, WaitContainerOptions,
@@ -452,20 +454,36 @@ pub async fn wait(
   for container in containers {
     let id = container.id.unwrap_or_default();
     let options = Some(wait_options.clone());
+    let container_name = container
+      .names
+      .clone()
+      .unwrap_or_default()
+      .join("")
+      .replace('/', "");
     let stream =
       docker_api
         .wait_container(&id, options)
         .map(move |wait_result| match wait_result {
-          Err(err) => Err(err),
+          Err(err) => {
+            if let bollard_next::errors::Error::DockerContainerWaitError {
+              error,
+              code,
+            } = &err
+            {
+              return Ok(JobWaitResponse {
+                container_name: container_name.clone(),
+                status_code: *code,
+                error: Some(ContainerWaitExitError {
+                  message: Some(error.to_owned()),
+                }),
+              });
+            }
+            Err(err)
+          }
           Ok(wait_response) => {
             Ok(JobWaitResponse::from_container_wait_response(
               wait_response,
-              container
-                .names
-                .clone()
-                .unwrap_or_default()
-                .join("")
-                .replace('/', ""),
+              container_name.clone(),
             ))
           }
         });
