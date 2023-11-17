@@ -12,11 +12,11 @@ use super::DisplayFormat;
 ///
 #[derive(Parser)]
 pub struct JobWaitOpts {
-  /// Name of job to wait
-  pub name: String,
   /// State to wait
   #[clap(short = 'c')]
   pub condition: Option<WaitCondition>,
+  /// Name of job to wait
+  pub name: String,
 }
 
 /// ## Job list options
@@ -38,11 +38,15 @@ pub struct JobListOpts {
 pub struct JobRemoveOpts {
   /// Name of job to remove
   pub names: Vec<String>,
-  #[clap(short = 'y')]
   /// Skip confirmation
+  #[clap(short = 'y')]
   pub skip_confirm: bool,
 }
 
+/// ## Job inspect options
+///
+/// `nanocl job inspect` available options
+///
 #[derive(Parser)]
 pub struct JobInspectOpts {
   /// Display format
@@ -58,7 +62,7 @@ pub struct JobLogsOpts {
   pub name: String,
 }
 
-/// ## JobCommand
+/// ## Job command
 ///
 /// `nanocl job` available commands
 ///
@@ -100,6 +104,10 @@ pub struct JobArg {
   pub command: JobCommand,
 }
 
+/// Job row
+///
+/// Used to display job information in a table
+///
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct JobRow {
@@ -121,7 +129,8 @@ pub struct JobRow {
   pub updated_at: String,
 }
 
-/// Convert CargoSummary to CargoRow
+/// Convert [JobSummary](JobSummary) to [JobRow](JobRow)
+///
 impl From<JobSummary> for JobRow {
   fn from(job: JobSummary) -> Self {
     let binding = chrono::Local::now();

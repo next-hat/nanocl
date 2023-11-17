@@ -1,7 +1,7 @@
 use clap::Parser;
 use dotenvy::dotenv;
 
-use nanocl_error::io::{IoResult, IoError};
+use nanocl_error::io::{IoError, IoResult};
 use nanocld_client::NanocldClient;
 
 mod utils;
@@ -642,7 +642,10 @@ mod tests {
   async fn job_basic() {
     assert_cli_ok!("state", "apply", "-ys", "../../examples/job_example.yml");
     assert_cli_ok!("job", "ls");
+    assert_cli_ok!("job", "ls", "-q");
     assert_cli_ok!("job", "inspect", "job-example");
+    assert_cli_ok!("job", "inspect", "job-example", "--display", "toml");
+    assert_cli_ok!("job", "inspect", "job-example", "--display", "json");
     assert_cli_ok!("job", "logs", "job-example");
     assert_cli_ok!("job", "rm", "-y", "job-example");
     assert_cli_ok!("state", "rm", "-ys", "../../examples/job_example.yml");
@@ -658,7 +661,12 @@ mod tests {
     });
     assert_cli_ok!("job", "start", "job-example");
     assert!(fut.await.is_ok());
+    assert_cli_ok!("job", "wait", "job-example", "-c", "not-running");
+    let fut = ntex::rt::spawn(async {
+      assert_cli_ok!("job", "wait", "job-example", "-c", "removed");
+    });
     assert_cli_ok!("job", "rm", "-y", "job-example");
+    assert!(fut.await.is_ok());
     assert_cli_ok!("state", "rm", "-ys", "../../examples/job_example.yml");
   }
 
@@ -671,49 +679,6 @@ mod tests {
   async fn cargo_logs() {
     assert_cli_ok!("cargo", "-n", "system", "logs", "nanocld");
   }
-
-  // #[ntex::test]
-  // async fn cargo_wait() {
-  //   let args = Cli::parse_from([
-  //     "nanocl",
-  //     "state",
-  //     "apply",
-  //     "-ys",
-  //     "../../examples/static_replication.yml",
-  //   ]);
-  //   assert!(execute_arg(&args).await.is_ok());
-  //   let args =
-  //     Cli::parse_from(["nanocl", "cargo", "wait", "static-replicated"]);
-  //   assert!(execute_arg(&args).await.is_ok());
-
-  //   let args = Cli::parse_from([
-  //     "nanocl",
-  //     "state",
-  //     "rm",
-  //     "-ys",
-  //     "../../examples/static_replication.yml",
-  //   ]);
-  //   assert!(execute_arg(&args).await.is_ok());
-
-  //   let args = Cli::parse_from([
-  //     "nanocl",
-  //     "cargo",
-  //     "wait",
-  //     "-c",
-  //     "not-running",
-  //     "static-replicated",
-  //   ]);
-  //   assert!(execute_arg(&args).await.is_ok());
-
-  //   let args = Cli::parse_from([
-  //     "nanocl",
-  //     "state",
-  //     "rm",
-  //     "-ys",
-  //     "../../examples/static_replication.yml",
-  //   ]);
-  //   assert!(execute_arg(&args).await.is_ok());
-  // }
 
   #[ntex::test]
   async fn node_list() {
