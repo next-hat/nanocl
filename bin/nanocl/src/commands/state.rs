@@ -183,8 +183,8 @@ fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
 /// ## Return
 ///
 /// * [Result](Result) The result of the operation
-///   * [Ok](Vec<rt::JoinHandle<()>>) The list of futures
-///   * [Err](IoError) An error occured
+///   * [Ok](Ok) [Vector](Vec) of [JoinHandle](rt::JoinHandle)
+///   * [Err](Err) [Io error](IoError) if an error occured
 ///
 pub async fn log_cargo(
   client: &NanocldClient,
@@ -752,12 +752,6 @@ async fn pull_image(
 /// * [cli_conf](CliConfig) The cli config
 /// * [opts](StateApplyOpts) The state apply options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
-///
 async fn exec_state_apply(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
@@ -883,12 +877,6 @@ async fn exec_state_logs(
 /// * [cli_conf](CliConfig) The cli config
 /// * [opts](StateRemoveOpts) The state remove options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
-///
 async fn exec_state_remove(
   cli_conf: &CliConfig,
   opts: &StateRemoveOpts,
@@ -930,12 +918,6 @@ async fn exec_state_remove(
 ///
 /// * [cli_conf](CliConfig) The cli config
 /// * [args](StateArg) The state arguments
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
 ///
 pub async fn exec_state(cli_conf: &CliConfig, args: &StateArg) -> IoResult<()> {
   match &args.command {

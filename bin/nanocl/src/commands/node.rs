@@ -13,12 +13,6 @@ use crate::models::{NodeArg, NodeCommand, NodeRow};
 /// * [cli_conf](CliConfig) The cli config
 /// * [args](NodeArg) The node options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 pub async fn exec_node(cli_conf: &CliConfig, args: &NodeArg) -> IoResult<()> {
   let client = &cli_conf.client;
   match args.command {

@@ -34,12 +34,6 @@ use super::vm_image::exec_vm_image;
 /// * [args](VmArg) The command arguments
 /// * [options](VmCreateOpts) The command options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
-///
 pub async fn exec_vm_create(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -62,12 +56,6 @@ pub async fn exec_vm_create(
 /// * [cli_conf](CliConfig) The cli configuration
 /// * [args](VmArg) The command arguments
 /// * [opts](VmListOpts) The command options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
 ///
 pub async fn exec_vm_ls(
   cli_conf: &CliConfig,
@@ -101,12 +89,6 @@ pub async fn exec_vm_ls(
 /// * [args](VmArg) The command arguments
 /// * [names](Vec<String>) The list of virtual machine names to remove
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
-///
 pub async fn exec_vm_rm(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -131,12 +113,6 @@ pub async fn exec_vm_rm(
 /// * [cli_conf](CliConfig) The cli configuration
 /// * [args](VmArg) The command arguments
 /// * [opts](VmInspectOpts) The command options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
 ///
 pub async fn exec_vm_inspect(
   cli_conf: &CliConfig,
@@ -166,12 +142,6 @@ pub async fn exec_vm_inspect(
 /// * [args](VmArg) The command arguments
 /// * [names](Vec<String>) The list of virtual machine names to start
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
-///
 pub async fn exec_vm_start(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -196,12 +166,6 @@ pub async fn exec_vm_start(
 /// * [cli_conf](CliConfig) The cli configuration
 /// * [args](VmArg) The command arguments
 /// * [names](Vec<String>) The list of virtual machine names to stop
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
 ///
 pub async fn exec_vm_stop(
   cli_conf: &CliConfig,
@@ -229,12 +193,6 @@ pub async fn exec_vm_stop(
 /// * [args](VmArg) The command arguments
 /// * [options](VmRunOpts) The command options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
-///
 pub async fn exec_vm_run(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -261,12 +219,6 @@ pub async fn exec_vm_run(
 /// * [args](VmArg) The command arguments
 /// * [options](VmPatchOpts) The command options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
-///
 pub async fn exec_vm_patch(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -290,12 +242,6 @@ pub async fn exec_vm_patch(
 /// * [cli_conf](CliConfig) The cli configuration
 /// * [args](VmArg) The command arguments
 /// * [name](&str) The name of the virtual machine to attach to
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
 ///
 pub async fn exec_vm_attach(
   cli_conf: &CliConfig,
@@ -404,12 +350,6 @@ pub async fn exec_vm_attach(
 ///
 /// * [cli_conf](CliConfig) The cli configuration
 /// * [args](VmArg) The command arguments
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
 ///
 pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
   let client = &cli_conf.client;

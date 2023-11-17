@@ -18,12 +18,6 @@ use crate::models::{
 /// * [cli_conf](CliConfig) The cli config
 /// * [opts](ResourceListOpts) The resource list options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_resource_ls(
   cli_conf: &CliConfig,
   opts: &ResourceListOpts,
@@ -56,12 +50,6 @@ async fn exec_resource_ls(
 /// * [cli_conf](CliConfig) The cli config
 /// * [options](ResourceRemoveOpts) The resource remove options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_resource_rm(
   cli_conf: &CliConfig,
   options: &ResourceRemoveOpts,
@@ -89,12 +77,6 @@ async fn exec_resource_rm(
 /// * [cli_conf](CliConfig) The cli config
 /// * [opts](ResourceInspectOpts) The resource inspect options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_resource_inspect(
   cli_conf: &CliConfig,
   opts: &ResourceInspectOpts,
@@ -118,12 +100,6 @@ async fn exec_resource_inspect(
 /// * [cli_conf](CliConfig) The cli config
 /// * [opts](ResourceHistoryOpts) The resource history options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_resource_history(
   cli_conf: &CliConfig,
   opts: &ResourceHistoryOpts,
@@ -143,12 +119,6 @@ async fn exec_resource_history(
 /// * [cli_conf](CliConfig) The cli config
 /// * [opts](ResourceRevertOpts) The resource revert options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 async fn exec_resource_revert(
   cli_conf: &CliConfig,
   opts: &ResourceRevertOpts,
@@ -167,12 +137,6 @@ async fn exec_resource_revert(
 ///
 /// * [cli_conf](CliConfig) The cli config
 /// * [args](ResourceArg) The resource options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
 ///
 pub async fn exec_resource(
   cli_conf: &CliConfig,

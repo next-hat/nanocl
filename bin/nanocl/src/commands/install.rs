@@ -23,12 +23,6 @@ use crate::models::{
 ///
 /// * [args](InstallOpts) The command arguments
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok<()>) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   println!("Installing Nanocl components on your system");
   let home_dir = std::env::var("HOME").map_err(|err| {

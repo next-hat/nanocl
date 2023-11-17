@@ -16,12 +16,6 @@ use crate::models::UninstallOpts;
 ///
 /// * [args](UninstallOpts) The command arguments
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok<()>) The operation was successful
-///   * [Err](nanocl_error::io::IoError) An error occured
-///
 pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
   let detected_host = utils::docker::detect_docker_host()?;
   let (docker_host, is_docker_desktop) = match &args.docker_host {

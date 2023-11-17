@@ -15,12 +15,6 @@ use super::cargo_image::exec_cargo_image_pull;
 /// * [cli_conf](CliConfig) The cli config
 /// * [args](UpgradeOpts) The upgrade options
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok<()>) The operation was successful
-///   * [Err](IoError) An error occured
-///
 pub async fn exec_upgrade(
   cli_conf: &CliConfig,
   args: &UpgradeOpts,
