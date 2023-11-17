@@ -697,6 +697,8 @@ mod tests {
   #[ntex::test]
   async fn cargo_logs() {
     assert_cli_ok!("cargo", "-n", "system", "logs", "nanocld");
+    assert_cli_ok!("cargo", "-n", "system", "logs", "nstore");
+    assert_cli_ok!("cargo", "-n", "system", "logs", "nstore", "-t", "10");
   }
 
   #[ntex::test]
