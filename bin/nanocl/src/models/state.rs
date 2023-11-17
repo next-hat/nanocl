@@ -8,7 +8,7 @@ use super::DisplayFormat;
 ///
 /// Statefile argument definition to build the Statefile
 ///
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct BuildArg {
   /// Name of the build arg
@@ -23,7 +23,7 @@ pub struct BuildArg {
 ///
 /// Statefile arguments definition to build the Statefile
 ///
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct StateBuildArg {
   pub args: Option<Vec<BuildArg>>,
@@ -33,7 +33,7 @@ pub struct StateBuildArg {
 ///
 /// `nanocl state apply` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct StateApplyOpts {
   /// Path or Url to the Statefile
   #[clap(long, short = 's')]
@@ -59,7 +59,7 @@ pub struct StateApplyOpts {
 ///
 /// `nanocl state logs` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct StateLogsOpts {
   /// Path or Url to the Statefile
   #[clap(long, short = 's')]
@@ -88,7 +88,7 @@ pub struct StateLogsOpts {
 ///
 /// `nanocl state rm` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct StateRemoveOpts {
   /// Path or Url to the Statefile
   #[clap(long, short = 's')]
@@ -105,7 +105,7 @@ pub struct StateRemoveOpts {
 ///
 /// `nanocl state` available commands
 ///
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum StateCommand {
   /// Create or Update elements from a Statefile
   Apply(StateApplyOpts),
@@ -120,7 +120,7 @@ pub enum StateCommand {
 ///
 /// `nanocl state` available arguments
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct StateArg {
   #[clap(subcommand)]
   pub command: StateCommand,
@@ -130,7 +130,7 @@ pub struct StateArg {
 ///
 /// Reference to a Statefile with his metadata once serialized
 ///
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct StateRef<T>
 where
   T: serde::Serialize + serde::de::DeserializeOwned,

@@ -10,7 +10,7 @@ use super::DisplayFormat;
 ///
 /// `nanocl resource` available commands
 ///
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum SecretCommand {
   /// Remove existing secret
   #[clap(alias("rm"))]
@@ -26,7 +26,7 @@ pub enum SecretCommand {
 ///
 /// `nanocl secret` available arguments
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct SecretArg {
   /// Secret command
   #[clap(subcommand)]
@@ -37,7 +37,7 @@ pub struct SecretArg {
 ///
 /// `nanocl secret list` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct SecretRemoveOpts {
   /// Skip confirmation
   #[clap(short = 'y')]
@@ -50,7 +50,7 @@ pub struct SecretRemoveOpts {
 ///
 /// `nanocl secret inspect` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct SecretInspectOpts {
   /// Name of secret to inspect
   pub key: String,

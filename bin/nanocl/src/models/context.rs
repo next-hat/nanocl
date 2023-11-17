@@ -8,7 +8,7 @@ use serde::{Serialize, Deserialize};
 ///
 /// `nanocl context` available arguments
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct ContextArg {
   #[clap(subcommand)]
   pub command: ContextCommand,
@@ -18,7 +18,7 @@ pub struct ContextArg {
 ///
 /// `nanocl context` available commands
 ///
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum ContextCommand {
   /// List contexts
   #[clap(alias = "ls")]
@@ -39,7 +39,7 @@ pub enum ContextCommand {
 ///
 /// A context endpoint definition
 ///
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ContextEndpoint {
   pub host: String,
@@ -49,7 +49,7 @@ pub struct ContextEndpoint {
 ///
 /// A context metadata definition
 ///
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ContextMetaData {
   pub description: String,
@@ -59,7 +59,7 @@ pub struct ContextMetaData {
 ///
 /// A context definition is a user defined set of endpoints to manage remote nanocl clusters
 ///
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Context {
   pub name: String,
@@ -94,7 +94,7 @@ impl std::default::Default for Context {
 ///
 /// A row of the context table
 ///
-#[derive(Clone, Debug, Tabled)]
+#[derive(Clone, Tabled)]
 pub struct ContextRow {
   /// Name of the context
   pub name: String,
@@ -126,7 +126,7 @@ impl From<Context> for ContextRow {
 ///
 /// A docker context endpoint definition used to parse the docker context metadata endpoint
 ///
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DockerContextMetaEndpoint {
   pub host: String,
@@ -136,7 +136,7 @@ pub struct DockerContextMetaEndpoint {
 ///
 /// A docker context metadata definition used to parse the docker context metadata
 ///
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DockerContextMeta {
   pub endpoints: HashMap<String, DockerContextMetaEndpoint>,

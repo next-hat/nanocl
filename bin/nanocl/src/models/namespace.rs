@@ -7,7 +7,7 @@ use nanocld_client::stubs::namespace::NamespaceSummary;
 ///
 /// `nanocl namespace` available commands
 ///
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum NamespaceCommand {
   /// Create new namespace
   Create(NamespaceOpts),
@@ -25,7 +25,7 @@ pub enum NamespaceCommand {
 ///
 /// `nanocl namespace list` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct NamespaceListOpts {
   /// Show only namespace names
   #[clap(long, short)]
@@ -36,7 +36,7 @@ pub struct NamespaceListOpts {
 ///
 /// `nanocl namespace delete` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct NamespaceDeleteOpts {
   /// skip confirmation
   #[clap(short = 'y')]
@@ -49,7 +49,7 @@ pub struct NamespaceDeleteOpts {
 ///
 /// `nanocl namespace` available arguments
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 #[clap(name = "nanocl namespace")]
 pub struct NamespaceArg {
   #[clap(subcommand)]
@@ -60,7 +60,7 @@ pub struct NamespaceArg {
 ///
 /// `nanocl namespace create` and `nanocl namespace inspect` generic name option
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct NamespaceOpts {
   /// name of the namespace to create
   pub name: String,

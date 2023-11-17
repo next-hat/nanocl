@@ -8,7 +8,7 @@ use bollard_next::models::ImageSummary;
 ///
 /// `nanocl cargo image remove` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoImageRemoveOpts {
   /// Skip confirmation
   #[clap(short = 'y')]
@@ -21,7 +21,7 @@ pub struct CargoImageRemoveOpts {
 ///
 /// `nanocl cargo image pull` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoImagePullOpts {
   /// Name of the image to pull
   pub(crate) name: String,
@@ -31,7 +31,7 @@ pub struct CargoImagePullOpts {
 ///
 /// `nanocl cargo image inspect` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoImageInspectOpts {
   /// Name of the image to inspect
   pub(crate) name: String,
@@ -41,7 +41,7 @@ pub struct CargoImageInspectOpts {
 ///
 /// `nanocl cargo image` available commands
 ///
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum CargoImageCommand {
   /// List cargo images
   #[clap(alias("ls"))]
@@ -61,7 +61,7 @@ pub enum CargoImageCommand {
 ///
 /// `nanocl cargo image list` available options
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoImageListOpts {
   /// Show all images. Only images from a final layer (no children) are shown by default.
   #[clap(long, short)]
@@ -95,7 +95,7 @@ impl From<CargoImageListOpts> for ListCargoImagesOptions {
 ///
 /// `nanocl cargo image import` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoImageImportOpts {
   /// path to tar archive
   #[clap(short = 'f')]
@@ -106,7 +106,7 @@ pub struct CargoImageImportOpts {
 ///
 /// `nanocl cargo image` available arguments
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 #[clap(name = "nanocl cargo image")]
 pub struct CargoImageArg {
   #[clap(subcommand)]
