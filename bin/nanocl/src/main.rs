@@ -619,7 +619,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn cargo_run() {
+  async fn cargo_basic() {
     let client = get_test_client();
     const CARGO_NAME: &str = "cli-test-run";
     const NAMESPACE_NAME: Option<&str> = None;
@@ -631,10 +631,17 @@ mod tests {
       "-e",
       "MESSAGE=GREETING",
     );
+    ntex::rt::spawn(async {
+      assert_cli_ok!("cargo", "stats", CARGO_NAME);
+    });
     assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "running");
-    assert_cli_ok!("cargo", "stop", "cli-test-run");
+    assert_cli_ok!("cargo", "restart", CARGO_NAME);
+    assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "running");
+    assert_cli_ok!("cargo", "stop", CARGO_NAME);
     assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "exited");
-    assert_cli_ok!("cargo", "rm", "-y", "cli-test-run");
+    assert_cli_ok!("cargo", "ls");
+    assert_cli_ok!("cargo", "ls", "-q");
+    assert_cli_ok!("cargo", "rm", "-fy", CARGO_NAME);
     assert_cargo_not_exists!(client, CARGO_NAME, NAMESPACE_NAME);
   }
 
