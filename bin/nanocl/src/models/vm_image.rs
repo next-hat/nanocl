@@ -8,7 +8,7 @@ use nanocld_client::stubs::vm_image::{VmImage, VmImageResizePayload};
 ///
 /// `nanocl vm image` available commands
 ///
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum VmImageCommand {
   /// Create a base VM image
   Create(VmImageCreateOpts),
@@ -36,7 +36,7 @@ pub enum VmImageCommand {
 ///
 /// `nanocl vm image create` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct VmImageCreateOpts {
   /// Name of the VM image
   pub name: String,
@@ -48,7 +48,7 @@ pub struct VmImageCreateOpts {
 ///
 /// `nanocl vm image list` available options
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct VmImageListOpts {
   /// Show only images name
   #[clap(long, short)]
@@ -59,7 +59,7 @@ pub struct VmImageListOpts {
 ///
 /// `nanocl vm image resize` available options
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct VmImageResizeOpts {
   /// Shrink the image
   #[clap(long)]
@@ -84,7 +84,7 @@ impl From<VmImageResizeOpts> for VmImageResizePayload {
 ///
 /// `nanocl vm image` available arguments
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct VmImageArg {
   /// Command to run
   #[clap(subcommand)]

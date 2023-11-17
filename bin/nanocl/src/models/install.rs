@@ -4,7 +4,7 @@ use clap::Parser;
 ///
 /// `nanocl install` available options
 ///
-#[derive(Debug, Clone, Parser)]
+#[derive(Clone, Parser)]
 pub struct InstallOpts {
   /// The docker host to install nanocl default is unix:///var/run/docker.sock
   #[clap(long)]
@@ -42,7 +42,7 @@ pub struct InstallOpts {
 ///
 /// Arguments for the nanocl daemon used by the install template
 ///
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct NanocldArg {
   /// Docker host to use
   pub(crate) docker_host: String,

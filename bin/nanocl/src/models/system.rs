@@ -10,7 +10,7 @@ use nanocld_client::stubs::http_metric::HttpMetricListQuery;
 ///
 /// `nanocl system` available arguments
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct SystemArg {
   /// Command to run
   #[clap(subcommand)]
@@ -21,7 +21,7 @@ pub struct SystemArg {
 ///
 /// `nanocl system` available commands
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub enum SystemCommand {
   /// System HTTP metrics information
   Http(SystemHttpArg),
@@ -31,7 +31,7 @@ pub enum SystemCommand {
 ///
 /// `nanocl system http` available arguments
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct SystemHttpArg {
   /// Command to run
   #[clap(subcommand)]
@@ -42,7 +42,7 @@ pub struct SystemHttpArg {
 ///
 /// `nanocl system http` available commands
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub enum SystemHttpCommand {
   /// Show HTTP metrics information
   Logs(SystemHttpLogsOpts),
@@ -52,7 +52,7 @@ pub enum SystemHttpCommand {
 ///
 /// `nanocl system http logs` available options
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct SystemHttpLogsOpts {
   // #[clap(long, short)]
   // pub follow: bool,
@@ -78,7 +78,7 @@ impl From<SystemHttpLogsOpts> for HttpMetricListQuery {
 ///
 /// `nanocl ps` available options
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct ProcessOpts {
   /// Return containers for all nodes by default only the current node
   #[clap(long, short)]

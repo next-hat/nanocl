@@ -1,22 +1,53 @@
-// /// ## JobWaitOpts
+// use clap::{Parser, Subcommand};
+// use nanocld_client::stubs::job::WaitCondition;
+
+// /// ## Job wait options
 // ///
-// /// `nanocl cargo wait` available options
+// /// `nanocl job wait` available options
 // ///
-// #[derive(Debug, Parser)]
+// #[derive(Parser)]
 // pub struct JobWaitOpts {
-//   /// Name of cargo to wait
+//   /// Name of job to wait
 //   pub name: String,
 //   /// State to wait
 //   #[clap(short = 'c')]
 //   pub condition: Option<WaitCondition>,
 // }
 
+// /// ## Job list options
+// ///
+// /// `nanocl job ls` available options
+// ///
+// #[derive(Parser)]
+// pub struct JobListOpts {}
+
+// /// ## Job remove options
+// ///
+// /// `nanocl job rm` available options
+// ///
+// #[derive(Parser)]
+// pub struct JobRemoveOpts {
+//   /// Name of job to remove
+//   pub names: Vec<String>,
+// }
+
+// #[derive(Parser)]
+// pub struct JobInspectOpts {
+//   /// Name of job to inspect
+//   pub name: String,
+// }
+
+// #[derive(Parser)]
+// pub struct JobLogsOpts {
+//   /// Name of job to inspect
+//   pub name: String,
+// }
+
 // /// ## JobCommand
 // ///
 // /// `nanocl cargo` available commands
 // ///
-// #[derive(Debug, Subcommand)]
-// #[clap(about, version)]
+// #[derive(Subcommand)]
 // pub enum JobCommand {
 //   /// List existing cargo
 //   #[clap(alias("ls"))]

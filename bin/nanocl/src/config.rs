@@ -1,15 +1,16 @@
 use std::fs;
-use nanocld_client::NanocldClient;
 use serde::{Serialize, Deserialize};
 
-use crate::models::{DisplayFormat, Context};
+use nanocld_client::NanocldClient;
+
+use crate::models::{Context, DisplayFormat};
 
 /// ## CliConfig
 ///
 /// This struct is used to store the user configuration
 /// It is stored in the user's home directory in a file located at `.nanocl/conf.yml`
 ///
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct UserConfig {
   #[serde(default = "default_current_context")]

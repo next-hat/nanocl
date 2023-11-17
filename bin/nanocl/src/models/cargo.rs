@@ -15,7 +15,7 @@ use super::{cargo_image::CargoImageArg, DisplayFormat};
 ///
 /// `nanocl cargo remove` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoRemoveOpts {
   /// Skip confirmation
   #[clap(short = 'y')]
@@ -31,7 +31,7 @@ pub struct CargoRemoveOpts {
 ///
 /// `nanocl cargo create` available options
 ///
-#[derive(Debug, Clone, Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoCreateOpts {
   /// Name of the cargo
   pub name: String,
@@ -70,7 +70,7 @@ impl From<CargoCreateOpts> for CargoConfigPartial {
 ///
 /// `nanocl cargo run` available options
 ///
-#[derive(Debug, Clone, Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoRunOpts {
   /// Name of the cargo
   pub name: String,
@@ -115,7 +115,7 @@ impl From<CargoRunOpts> for CargoConfigPartial {
 ///
 /// `nanocl cargo start` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoStartOpts {
   // Name of cargo to start
   pub name: String,
@@ -125,7 +125,7 @@ pub struct CargoStartOpts {
 ///
 /// `nanocl cargo stop` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoStopOpts {
   // List of cargo to stop
   pub names: Vec<String>,
@@ -135,7 +135,7 @@ pub struct CargoStopOpts {
 ///
 /// `nanocl cargo restart` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoRestartOpts {
   // List of cargo to stop
   pub names: Vec<String>,
@@ -145,7 +145,7 @@ pub struct CargoRestartOpts {
 ///
 /// `nanocl cargo inspect` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoInspectOpts {
   /// Display format
   #[clap(long)]
@@ -158,7 +158,7 @@ pub struct CargoInspectOpts {
 ///
 /// `nanocl cargo patch` available options
 ///
-#[derive(Debug, Clone, Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoPatchOpts {
   /// Name of cargo to update
   pub(crate) name: String,
@@ -195,7 +195,7 @@ impl From<CargoPatchOpts> for CargoConfigUpdate {
 ///
 /// `nanocl cargo exec` available options
 ///
-#[derive(Debug, Clone, Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoExecOpts {
   /// Allocate a pseudo-TTY.
   #[clap(short = 't', long = "tty")]
@@ -244,7 +244,7 @@ impl From<CargoExecOpts> for CreateExecOptions {
 ///
 /// `nanocl cargo history` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoHistoryOpts {
   /// Name of cargo to browse history
   pub name: String,
@@ -254,7 +254,7 @@ pub struct CargoHistoryOpts {
 ///
 /// `nanocl cargo revert` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoRevertOpts {
   /// Name of cargo to revert
   pub name: String,
@@ -266,7 +266,7 @@ pub struct CargoRevertOpts {
 ///
 /// `nanocl cargo logs` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoLogsOpts {
   /// Name of cargo to show logs
   pub name: String,
@@ -291,7 +291,7 @@ pub struct CargoLogsOpts {
 ///
 /// `nanocl cargo stats` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoStatsOpts {
   /// Names of cargo to show stats
   pub names: Vec<String>,
@@ -306,7 +306,7 @@ pub struct CargoStatsOpts {
 ///
 /// `nanocl cargo list` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct CargoListOpts {
   /// Only show cargo names
   #[clap(long, short)]
@@ -317,8 +317,7 @@ pub struct CargoListOpts {
 ///
 /// `nanocl cargo` available commands
 ///
-#[derive(Debug, Subcommand)]
-#[clap(about, version)]
+#[derive(Subcommand)]
 pub enum CargoCommand {
   /// List existing cargo
   #[clap(alias("ls"))]
@@ -358,7 +357,7 @@ pub enum CargoCommand {
 ///
 /// `nanocl cargo` available arguments
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 #[clap(name = "nanocl cargo")]
 pub struct CargoArg {
   /// namespace to target by default global is used

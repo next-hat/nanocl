@@ -6,7 +6,7 @@ use nanocld_client::stubs::node::Node;
 ///
 /// `nanocl node` available arguments
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 #[clap(name = "nanocl-resource")]
 pub struct NodeArg {
   #[clap(subcommand)]
@@ -17,7 +17,7 @@ pub struct NodeArg {
 ///
 /// `nanocl node` available commands
 ///
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum NodeCommand {
   /// List nodes
   #[clap(alias = "ls")]
@@ -28,7 +28,7 @@ pub enum NodeCommand {
 ///
 /// A row of the node table
 ///
-#[derive(Debug, Tabled)]
+#[derive(Tabled)]
 pub struct NodeRow {
   pub name: String,
   pub ip_address: String,

@@ -16,6 +16,7 @@ mod upgrade;
 mod node;
 mod context;
 mod secret;
+mod job;
 
 pub use system::*;
 pub use secret::*;
@@ -31,9 +32,10 @@ pub use install::*;
 pub use uninstall::*;
 pub use upgrade::*;
 pub use node::*;
+pub use job::*;
 
 /// A self-sufficient hybrid-cloud manager
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 #[clap(about, version, name = "nanocl")]
 pub struct Cli {
   /// Nanocld host default: unix://run/nanocl/nanocl.sock
@@ -48,7 +50,7 @@ pub struct Cli {
 ///
 /// `nanocl` available commands
 ///
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum Command {
   /// Manage namespaces
   Namespace(NamespaceArg),
@@ -94,7 +96,7 @@ pub enum Command {
 ///
 /// `nanocl` available display formats `yaml` by default
 ///
-#[derive(Default, Clone, Debug, Serialize, Deserialize, ValueEnum)]
+#[derive(Default, Clone, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "PascalCase")]
 pub enum DisplayFormat {
   #[default]

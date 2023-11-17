@@ -13,7 +13,7 @@ use super::{VmImageArg, DisplayFormat};
 ///
 /// `nanocl vm` available commands
 ///
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum VmCommand {
   /// Run a vm
   Run(VmRunOpts),
@@ -46,7 +46,7 @@ pub enum VmCommand {
 ///
 /// Generic names options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct VmNamesOpts {
   /// Names of the vm
   pub names: Vec<String>,
@@ -56,7 +56,7 @@ pub struct VmNamesOpts {
 ///
 /// `nanocl vm inspect` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct VmInspectOpts {
   /// Display format
   #[clap(long)]
@@ -69,7 +69,7 @@ pub struct VmInspectOpts {
 ///
 /// `nanocl vm list` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct VmListOpts {
   /// Show only vms name
   #[clap(long, short)]
@@ -80,7 +80,7 @@ pub struct VmListOpts {
 ///
 /// `nanocl vm patch` available options
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct VmPatchOpts {
   /// Name of the vm
   pub name: String,
@@ -135,7 +135,7 @@ impl From<VmPatchOpts> for VmConfigUpdate {
 ///
 /// `nanocl vm run` available options
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct VmRunOpts {
   /// hostname of the vm
   #[clap(long)]
@@ -202,7 +202,7 @@ impl From<VmRunOpts> for VmConfigPartial {
 ///
 /// `nanocl vm create` available options
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct VmCreateOpts {
   /// hostname of the vm
   #[clap(long)]
@@ -315,7 +315,7 @@ impl From<VmSummary> for VmRow {
 ///
 /// `nanocl vm` available arguments
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct VmArg {
   /// namespace to target by default global is used
   #[clap(long, short)]

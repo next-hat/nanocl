@@ -4,7 +4,7 @@ use clap::Parser;
 ///
 /// `nanocl upgrade` available options
 ///
-#[derive(Debug, Clone, Parser)]
+#[derive(Clone, Parser)]
 pub struct UpgradeOpts {
   /// The docker host where nanocl is installed default is unix:///var/run/docker.sock
   #[clap(long)]

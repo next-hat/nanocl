@@ -10,7 +10,7 @@ use super::DisplayFormat;
 ///
 /// `nanocl resource` available commands
 ///
-#[derive(Debug, Subcommand)]
+#[derive(Subcommand)]
 pub enum ResourceCommand {
   /// Remove existing resource
   #[clap(alias("rm"))]
@@ -30,7 +30,7 @@ pub enum ResourceCommand {
 ///
 /// `nanocl resource list` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct ResourceListOpts {
   /// Show only resource names
   #[clap(long, short)]
@@ -41,7 +41,7 @@ pub struct ResourceListOpts {
 ///
 /// `nanocl resource` available arguments
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 #[clap(name = "nanocl-resource")]
 pub struct ResourceArg {
   #[clap(subcommand)]
@@ -52,7 +52,7 @@ pub struct ResourceArg {
 ///
 /// A row of the resource table
 ///
-#[derive(Debug, Tabled)]
+#[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct ResourceRow {
   /// Name of the resource
@@ -98,7 +98,7 @@ impl From<Resource> for ResourceRow {
 ///
 /// `nanocl resource remove` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct ResourceRemoveOpts {
   /// Skip confirmation
   #[clap(short = 'y')]
@@ -111,7 +111,7 @@ pub struct ResourceRemoveOpts {
 ///
 /// `nanocl resource inspect` available options
 ///
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Parser)]
 pub struct ResourceInspectOpts {
   /// Display format
   #[clap(long)]
@@ -124,7 +124,7 @@ pub struct ResourceInspectOpts {
 ///
 /// `nanocl resource history` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct ResourceHistoryOpts {
   /// The name of the resource to browse history
   pub name: String,
@@ -134,7 +134,7 @@ pub struct ResourceHistoryOpts {
 ///
 /// `nanocl resource revert` available options
 ///
-#[derive(Debug, Parser)]
+#[derive(Parser)]
 pub struct ResourceRevertOpts {
   /// The name of the resource to revert
   pub name: String,
