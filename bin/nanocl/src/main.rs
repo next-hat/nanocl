@@ -82,6 +82,7 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
   let cli_conf = create_cli_config(cli_args)?;
   match &cli_args.command {
     Command::Namespace(args) => commands::exec_namespace(&cli_conf, args).await,
+    Command::Job(args) => commands::exec_job(&cli_conf, args).await,
     Command::Resource(args) => commands::exec_resource(&cli_conf, args).await,
     Command::Cargo(args) => commands::exec_cargo(&cli_conf, args).await,
     Command::Secret(args) => commands::exec_secret(&cli_conf, args).await,
@@ -570,7 +571,6 @@ mod tests {
       DEPLOY_NAMESPACE_NAME,
       "running"
     );
-
     assert_cli_ok!(
       "state",
       "apply",
@@ -623,7 +623,6 @@ mod tests {
     let client = get_test_client();
     const CARGO_NAME: &str = "cli-test-run";
     const NAMESPACE_NAME: Option<&str> = None;
-
     assert_cli_ok!(
       "cargo",
       "run",
@@ -633,12 +632,34 @@ mod tests {
       "MESSAGE=GREETING",
     );
     assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "running");
-
     assert_cli_ok!("cargo", "stop", "cli-test-run");
     assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "exited");
-
     assert_cli_ok!("cargo", "rm", "-y", "cli-test-run");
     assert_cargo_not_exists!(client, CARGO_NAME, NAMESPACE_NAME);
+  }
+
+  #[ntex::test]
+  async fn job_basic() {
+    assert_cli_ok!("state", "apply", "-ys", "../../examples/job_example.yml");
+    assert_cli_ok!("job", "ls");
+    assert_cli_ok!("job", "inspect", "job-example");
+    assert_cli_ok!("job", "logs", "job-example");
+    assert_cli_ok!("job", "rm", "-y", "job-example");
+    assert_cli_ok!("state", "rm", "-ys", "../../examples/job_example.yml");
+    assert_cli_err!("job", "inspect", "job-example");
+    assert_cli_err!("job", "logs", "job-example");
+  }
+
+  #[ntex::test]
+  async fn job_wait() {
+    assert_cli_ok!("state", "apply", "-ys", "../../examples/job_example.yml");
+    let fut = ntex::rt::spawn(async {
+      assert_cli_ok!("job", "wait", "job-example");
+    });
+    assert_cli_ok!("job", "start", "job-example");
+    assert!(fut.await.is_ok());
+    assert_cli_ok!("job", "rm", "-y", "job-example");
+    assert_cli_ok!("state", "rm", "-ys", "../../examples/job_example.yml");
   }
 
   #[ntex::test]

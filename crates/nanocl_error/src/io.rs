@@ -41,6 +41,16 @@ impl IoError {
     )
   }
 
+  pub fn other<M>(context: M, message: M) -> Self
+  where
+    M: ToString + std::fmt::Display,
+  {
+    Self::new(
+      context.to_string(),
+      std::io::Error::new(std::io::ErrorKind::Other, message.to_string()),
+    )
+  }
+
   pub fn invalid_input<M>(context: M, message: M) -> Self
   where
     M: ToString + std::fmt::Display,

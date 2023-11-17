@@ -15,7 +15,9 @@ mod upgrade;
 mod node;
 mod context;
 mod secret;
+mod job;
 
+pub use job::exec_job;
 pub use context::exec_context;
 pub use version::exec_version;
 pub use namespace::exec_namespace;

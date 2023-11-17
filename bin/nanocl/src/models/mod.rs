@@ -54,6 +54,8 @@ pub struct Cli {
 pub enum Command {
   /// Manage namespaces
   Namespace(NamespaceArg),
+  /// Manage jobs
+  Job(JobArg),
   /// Manage cargoes
   Cargo(CargoArg),
   /// Manage virtual machines

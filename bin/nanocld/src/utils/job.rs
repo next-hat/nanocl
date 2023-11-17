@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ntex::util::Bytes;
 use futures_util::{StreamExt, TryStreamExt};
-use futures_util::stream::{FuturesUnordered, select_all};
+use futures_util::stream::{FuturesUnordered, select_all, FuturesOrdered};
 use bollard_next::service::{ContainerSummary, ContainerInspectResponse};
 use bollard_next::container::{
   CreateContainerOptions, StartContainerOptions, ListContainersOptions,
@@ -33,8 +33,8 @@ use super::stream::transform_stream;
 /// ## Returns
 ///
 /// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<ContainerSummary>) - The containers have been listed
-///   * [Err](HttpError) - The containers have not been listed
+///   * [Ok](Ok) - [Vector](Vec) of [ContainerSummary](ContainerSummary)
+///   * [Err](Err) - [Http error](HttpError) Something went wrong
 ///
 pub async fn list_instances(
   name: &str,
@@ -117,16 +117,21 @@ fn count_instances(
   let mut instance_running = 0;
   for (container_inspect, _) in instances {
     let state = container_inspect.state.clone().unwrap_or_default();
+    if state.running.unwrap_or_default() {
+      instance_running += 1;
+      continue;
+    }
     if let Some(exit_code) = state.exit_code {
       if exit_code == 0 {
         instance_success += 1;
+      } else {
+        instance_failed += 1;
       }
     }
-    if state.running.unwrap_or_default() {
-      instance_running += 1;
-    }
-    if state.error.is_some() {
-      instance_failed += 1;
+    if let Some(error) = state.error {
+      if !error.is_empty() {
+        instance_failed += 1;
+      }
     }
   }
   (
@@ -135,45 +140,6 @@ fn count_instances(
     instance_success,
     instance_running,
   )
-}
-
-/// ## Run job
-///
-/// Run a job in sequence based on the job definition
-///
-/// ## Arguments
-///
-/// * [job](Job) - The job
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - The job is running
-///   * [Err](Err) - [Http error](HttpError) Something went wrong
-///
-async fn run_job(job: &Job, state: &DaemonState) -> Result<(), HttpError> {
-  let containers = job.containers.clone();
-  for mut container in containers {
-    let mut labels = container.labels.clone().unwrap_or_default();
-    labels.insert("io.nanocl.job".to_owned(), job.name.to_owned());
-    container.labels = Some(labels);
-    let container_instance = state
-      .docker_api
-      .create_container(
-        None::<CreateContainerOptions<String>>,
-        container.clone(),
-      )
-      .await?;
-    state
-      .docker_api
-      .start_container(
-        &container_instance.id,
-        None::<StartContainerOptions<String>>,
-      )
-      .await?;
-  }
-  Ok(())
 }
 
 /// ## Create
@@ -196,6 +162,31 @@ pub async fn create(
   state: &DaemonState,
 ) -> Result<Job, HttpError> {
   let job = repositories::job::create(item, &state.pool).await?;
+  job
+    .containers
+    .iter()
+    .map(|container| {
+      let job_name = job.name.clone();
+      async move {
+        let mut container = container.clone();
+        let mut labels = container.labels.clone().unwrap_or_default();
+        labels.insert("io.nanocl.job".to_owned(), job_name.clone());
+        container.labels = Some(labels);
+        state
+          .docker_api
+          .create_container(
+            None::<CreateContainerOptions<String>>,
+            container.clone(),
+          )
+          .await?;
+        Ok::<_, HttpError>(())
+      }
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()?;
   Ok(job)
 }
 
@@ -211,16 +202,41 @@ pub async fn create(
 /// ## Returns
 ///
 /// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - [Job](Job) has been started
+///   * [Ok](Ok) - The job has been started
 ///   * [Err](Err) - [Http error](HttpError) Something went wrong
 ///
 pub async fn start_by_name(
   name: &str,
   state: &DaemonState,
-) -> Result<Job, HttpError> {
-  let job = repositories::job::find_by_name(name, &state.pool).await?;
-  run_job(&job, state).await?;
-  Ok(job)
+) -> Result<(), HttpError> {
+  repositories::job::find_by_name(name, &state.pool).await?;
+  let containers = inspect_instances(name, state).await?;
+  containers
+    .into_iter()
+    .map(|(inspect, _)| async {
+      if inspect
+        .state
+        .unwrap_or_default()
+        .running
+        .unwrap_or_default()
+      {
+        return Ok(());
+      }
+      state
+        .docker_api
+        .start_container(
+          &inspect.id.unwrap_or_default(),
+          None::<StartContainerOptions<String>>,
+        )
+        .await?;
+      Ok::<_, HttpError>(())
+    })
+    .collect::<FuturesOrdered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()?;
+  Ok(())
 }
 
 /// ## List
@@ -444,7 +460,12 @@ pub async fn wait(
           Ok(wait_response) => {
             Ok(JobWaitResponse::from_container_wait_response(
               wait_response,
-              id.to_owned(),
+              container
+                .names
+                .clone()
+                .unwrap_or_default()
+                .join("")
+                .replace('/', ""),
             ))
           }
         });
