@@ -28,13 +28,19 @@ pub struct Job {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
+  /// Metadata (user defined)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  /// Metadata (user defined)
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
+  /// Schedule of the job (cron)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub schedule: Option<String>,
   /// Containers to run
   pub containers: Vec<Config>,
 }
@@ -93,6 +99,12 @@ pub struct JobPartial {
   /// Metadata (user defined)
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
+  /// Schedule of the job (cron)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub schedule: Option<String>,
   /// List of container to run
   pub containers: Vec<Config>,
 }
@@ -127,6 +139,12 @@ pub struct JobInspect {
   /// Metadata (user defined)
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
+  /// Schedule of the job (cron)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub schedule: Option<String>,
   /// Containers to run
   pub containers: Vec<Config>,
   /// Number of instances
@@ -148,6 +166,7 @@ impl From<JobInspect> for JobPartial {
       secrets: job.secrets,
       metadata: job.metadata,
       containers: job.containers,
+      schedule: job.schedule,
     }
   }
 }

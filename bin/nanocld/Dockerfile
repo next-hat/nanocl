@@ -49,7 +49,7 @@ RUN cargo build --release --features release --bin nanocld
 RUN upx --lzma --best /app/target/release/nanocld && cp /app/target/release/nanocld /bin/nanocld
 
 # stage 3 - Create runtime image
-FROM --platform=$BUILDPLATFORM alpine:3.17.3
+FROM --platform=$BUILDPLATFORM alpine:3.18.4
 
 ## Install dependencies
 RUN apk --update add libgcc \
@@ -57,6 +57,7 @@ RUN apk --update add libgcc \
   libpq \
   util-linux \
   bash \
+  curl \
   cloud-utils \
   cdrkit \
   && rm -rf /var/cache/apk/* \
@@ -69,7 +70,6 @@ COPY --from=builder /bin/nanocld /bin/nanocld
 COPY ./bin/nanocld/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
-
 
 LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
 LABEL org.opencontainers.image.description Nanocl Daemon

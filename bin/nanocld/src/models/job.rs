@@ -33,6 +33,7 @@ impl JobDbModel {
       secrets: config.secrets.clone(),
       metadata: self.metadata.clone(),
       containers: config.containers.clone(),
+      schedule: config.schedule.clone(),
     }
   }
 
