@@ -43,3 +43,14 @@ impl JobDbModel {
     )
   }
 }
+
+/// ## JobUpdateDbModel
+///
+/// This structure represent the update of a job.
+/// It will update the job with the new data.
+///
+#[derive(Clone, AsChangeset)]
+#[diesel(table_name = jobs)]
+pub struct JobUpdateDbModel {
+  pub updated_at: Option<chrono::NaiveDateTime>,
+}

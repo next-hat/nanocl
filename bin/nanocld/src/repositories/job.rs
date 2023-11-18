@@ -7,7 +7,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::job::{Job, JobPartial};
 
 use crate::utils;
-use crate::models::{Pool, JobDbModel};
+use crate::models::{Pool, JobDbModel, JobUpdateDbModel};
 
 /// ## Create
 ///
@@ -32,8 +32,8 @@ pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
   }
   let dbmodel = JobDbModel {
     key: item.name.clone(),
-    created_at: chrono::Local::now().naive_local(),
-    updated_at: chrono::Local::now().naive_local(),
+    created_at: chrono::Local::now().naive_utc(),
+    updated_at: chrono::Local::now().naive_utc(),
     data,
     metadata: item.metadata.clone(),
   };
@@ -126,5 +126,41 @@ pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
     super::generic::find_by_id::<jobs::table, _, _>(name, pool).await?;
   let item = db_model.serialize_data()?;
   let job = db_model.into_job(&item);
+  Ok(job)
+}
+
+/// ## Update by name
+///
+/// Update a job by it's name
+///
+/// ## Arguments
+///
+/// * [name](str) The name of the job to update
+/// * [data](JobUpdateDbModel) The data to update
+/// * [pool](Pool) The database pool
+///
+/// ## Return
+///
+/// * [Result](Result) The result of the operation
+///   * [Ok](Ok) [()] The operation was successful
+///   * [Err](Err) [Io error](IoError) an error occured
+///
+pub async fn update_by_name(
+  name: &str,
+  data: &JobUpdateDbModel,
+  pool: &Pool,
+) -> IoResult<Job> {
+  use crate::schema::jobs;
+  let name = name.to_owned();
+  super::generic::update_by_id::<jobs::table, _, _>(
+    name.clone(),
+    data.clone(),
+    pool,
+  )
+  .await?;
+  let db_model: JobDbModel =
+    super::generic::find_by_id::<jobs::table, _, _>(name, pool).await?;
+  let job = db_model.serialize_data()?;
+  let job = db_model.into_job(&job);
   Ok(job)
 }

@@ -125,7 +125,7 @@ pub struct JobRow {
   #[tabled(rename = "CREATED AT")]
   pub created_at: String,
   /// When the job was last updated
-  #[tabled(rename = "CREATED AT")]
+  #[tabled(rename = "UPDATED AT")]
   pub updated_at: String,
 }
 
