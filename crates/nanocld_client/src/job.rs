@@ -277,6 +277,7 @@ mod tests {
           cmd: Some(vec!["echo".to_owned(), "Hello world".to_owned()]),
           ..Default::default()
         }],
+        schedule: None,
         secrets: None,
         metadata: None,
       })

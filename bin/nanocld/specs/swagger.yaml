@@ -3955,6 +3955,10 @@ components:
           description: Metadata (user defined)
           additionalProperties:
             $ref: '#/components/schemas/Any'
+        Schedule:
+          type: string
+          description: Schedule of the job (cron)
+          nullable: true
         Containers:
           type: array
           items:
@@ -4000,6 +4004,10 @@ components:
           description: Metadata (user defined)
           additionalProperties:
             $ref: '#/components/schemas/Any'
+        Schedule:
+          type: string
+          description: Schedule of the job (cron)
+          nullable: true
         Containers:
           type: array
           items:
@@ -4050,6 +4058,10 @@ components:
           description: Metadata (user defined)
           additionalProperties:
             $ref: '#/components/schemas/Any'
+        Schedule:
+          type: string
+          description: Schedule of the job (cron)
+          nullable: true
         Containers:
           type: array
           items:

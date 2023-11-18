@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::process::Command;
 use std::os::unix::prelude::PermissionsExt;
 
 use ntex::rt;
@@ -81,6 +82,27 @@ fn set_unix_sock_perm() {
   });
 }
 
+/// ## Spawn crond
+///
+/// Spawn and manage a crond instance to run cron jobs
+///
+pub fn spawn_crond() {
+  rt::Arbiter::new().exec_fn(|| {
+    rt::spawn(async {
+      match Command::new("crond").args(["-f"]).spawn() {
+        Ok(mut child) => {
+          if let Err(err) = child.wait() {
+            log::error!("Failed to wait for crond: {}", err);
+          }
+        }
+        Err(err) => {
+          log::error!("Failed to spawn crond: {}", err);
+        }
+      }
+    });
+  });
+}
+
 /// ## Ensure state dir
 ///
 /// Ensure that the state dir exists and is ready to use
@@ -117,6 +139,7 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
 ///   * [Err](IoError) - The daemon state has not been initialized
 ///
 pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
+  spawn_crond();
   set_unix_sock_perm();
   let docker = bollard_next::Docker::connect_with_unix(
     &daemon_conf.docker_host,
@@ -159,9 +182,8 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
 mod tests {
   use super::*;
 
+  use crate::{cli, config};
   use crate::utils::tests::*;
-  use crate::config;
-  use crate::cli::Cli;
 
   /// Test init
   #[ntex::test]
@@ -169,7 +191,7 @@ mod tests {
     // Init cli args
     before();
     let home = std::env::var("HOME").expect("Failed to get home dir");
-    let args = Cli {
+    let args = cli::Cli {
       gid: 0,
       hosts: None,
       docker_host: None,

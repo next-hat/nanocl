@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use ntex::web;
+use tokio::fs;
 use ntex::util::Bytes;
 use futures_util::{StreamExt, TryStreamExt};
 use futures_util::stream::{FuturesUnordered, select_all, FuturesOrdered};
@@ -11,14 +13,16 @@ use bollard_next::container::{
   RemoveContainerOptions, LogsOptions, WaitContainerOptions,
 };
 
+use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_error::http::HttpError;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::job::{
   Job, JobPartial, JobInspect, JobLogOutput, JobWaitResponse, WaitCondition,
   JobSummary,
 };
+use tokio::io::AsyncWriteExt;
 
-use crate::repositories;
+use crate::{version, repositories};
 use crate::models::{DaemonState, JobUpdateDbModel};
 
 use super::stream::transform_stream;
@@ -144,6 +148,112 @@ fn count_instances(
   )
 }
 
+/// ## Exec crontab
+///
+/// Execute the crontab command to update the cron jobs
+///
+async fn exec_crontab() -> IoResult<()> {
+  web::block(|| {
+    std::process::Command::new("crontab")
+      .arg("/tmp/crontab")
+      .output()
+      .map_err(|err| err.map_err_context(|| "Cron job"))?;
+    Ok::<_, IoError>(())
+  })
+  .await?;
+  Ok(())
+}
+
+/// ## Format cron job command
+///
+/// Format the cron job command to start a job at a given time
+///
+/// ## Arguments
+///
+/// * [job](Job) - The job
+/// * [state](DaemonState) - The daemon state
+///
+/// ## Returns
+///
+/// [String](String) - The cron job command
+///
+fn format_cron_job_command(job: &Job, state: &DaemonState) -> String {
+  let host = state
+    .config
+    .hosts
+    .get(0)
+    .cloned()
+    .unwrap_or("unix:///run/nanocl/nanocl.sock".to_owned())
+    .replace("unix://", "");
+  format!(
+    "curl -X POST --unix {host} http://localhost/v{}/jobs/{}/start",
+    version::VERSION,
+    &job.name
+  )
+}
+
+/// ## Add cron rule
+///
+/// Add a cron rule to the crontab to start a job at a given time
+///
+/// ## Arguments
+///
+/// * [item](Job) - The job
+/// * [repeat_policy](str) - The repeat policy
+/// * [state](DaemonState) - The daemon state
+///
+async fn add_cron_rule(
+  item: &Job,
+  repeat_policy: &str,
+  state: &DaemonState,
+) -> IoResult<()> {
+  let cmd = format_cron_job_command(item, state);
+  let cron_rule = format!("{} {cmd}", repeat_policy);
+  log::debug!("Creating cron rule: {cron_rule}");
+  fs::copy("/var/spool/cron/crontabs/root", "/tmp/crontab")
+    .await
+    .map_err(|err| err.map_err_context(|| "Cron job"))?;
+  let mut file = fs::OpenOptions::new()
+    .write(true)
+    .append(true)
+    .open("/tmp/crontab")
+    .await
+    .map_err(|err| err.map_err_context(|| "Cron job"))?;
+  file
+    .write_all(format!("{cron_rule}\n").as_bytes())
+    .await
+    .map_err(|err| err.map_err_context(|| "Cron job"))?;
+  exec_crontab().await?;
+  Ok(())
+}
+
+/// ## Remove cron rule
+///
+/// Remove a cron rule from the crontab for the given job
+///
+/// ## Arguments
+///
+/// * [item](Job) - The job
+/// * [state](DaemonState) - The daemon state
+///
+async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
+  let mut content = fs::read_to_string("/var/spool/cron/crontabs/root")
+    .await
+    .map_err(|err| err.map_err_context(|| "Cron job"))?;
+  let cmd = format_cron_job_command(item, state);
+  log::debug!("Removing cron rule: {cmd}");
+  content = content
+    .lines()
+    .filter(|line| !line.contains(&cmd))
+    .collect::<Vec<_>>()
+    .join("\n");
+  fs::write("/tmp/crontab", format!("{content}\n"))
+    .await
+    .map_err(|err| err.map_err_context(|| "Cron job"))?;
+  exec_crontab().await?;
+  Ok(())
+}
+
 /// ## Create
 ///
 /// Create a job and run it
@@ -189,6 +299,9 @@ pub async fn create(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
+  if let Some(repeat_policy) = &job.schedule {
+    add_cron_rule(&job, repeat_policy, state).await?;
+  }
   Ok(job)
 }
 
@@ -337,6 +450,9 @@ pub async fn delete_by_name(
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
   repositories::job::delete_by_name(&job.name, &state.pool).await?;
+  if job.schedule.is_some() {
+    remove_cron_rule(&job, state).await?;
+  }
   Ok(())
 }
 
@@ -369,6 +485,7 @@ pub async fn inspect_by_name(
     updated_at: job.updated_at,
     secrets: job.secrets,
     metadata: job.metadata,
+    schedule: job.schedule,
     containers: job.containers,
     instance_total,
     instance_success,
