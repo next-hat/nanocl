@@ -2,7 +2,7 @@ use bollard_next::service::ContainerSummary;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use crate::vm_config::VmConfig;
+use crate::vm_spec::VmConfig;
 
 /// A virtual machine instance
 #[derive(Debug, Clone)]

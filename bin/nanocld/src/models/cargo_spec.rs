@@ -1,6 +1,7 @@
-use nanocl_stubs::cargo_config;
+use nanocl_error::io::{IoResult, FromIo};
+use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
 
-use crate::schema::cargo_configs;
+use crate::schema::cargo_specs;
 
 use super::cargo::CargoDbModel;
 
@@ -15,9 +16,9 @@ use super::cargo::CargoDbModel;
 ///
 #[derive(Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = cargo_configs)]
+#[diesel(table_name = cargo_specs)]
 #[diesel(belongs_to(CargoDbModel, foreign_key = cargo_key))]
-pub struct CargoConfigDbModel {
+pub struct CargoSpecDbModel {
   /// The key of the cargo config
   pub(crate) key: uuid::Uuid,
   /// The created at date
@@ -32,23 +33,30 @@ pub struct CargoConfigDbModel {
   pub(crate) metadata: Option<serde_json::Value>,
 }
 
-impl CargoConfigDbModel {
-  pub fn into_cargo_config(
-    self,
-    config: &cargo_config::CargoConfigPartial,
-  ) -> cargo_config::CargoConfig {
-    let config = config.clone();
-    cargo_config::CargoConfig {
+impl CargoSpecDbModel {
+  pub fn to_spec_with_partial(&self, spec: &CargoSpecPartial) -> CargoSpec {
+    let spec = spec.clone();
+    CargoSpec {
       key: self.key,
       created_at: self.created_at,
-      name: config.name,
-      version: self.version,
-      cargo_key: self.cargo_key,
-      init_container: config.init_container,
-      replication: config.replication,
-      container: config.container,
-      metadata: config.metadata,
-      secrets: config.secrets,
+      version: self.version.clone(),
+      cargo_key: self.cargo_key.clone(),
+      init_container: spec.init_container,
+      replication: spec.replication,
+      container: spec.container,
+      metadata: self.metadata.clone(),
+      secrets: spec.secrets,
     }
+  }
+
+  pub fn deserialize_data(&self) -> IoResult<CargoSpecPartial> {
+    let spec = serde_json::from_value::<CargoSpecPartial>(self.data.clone())
+      .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
+    Ok(spec)
+  }
+
+  pub fn dezerialize_to_spec(&self) -> IoResult<CargoSpec> {
+    let spec = self.deserialize_data()?;
+    Ok(self.to_spec_with_partial(&spec))
   }
 }

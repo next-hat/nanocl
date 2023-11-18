@@ -1,4 +1,4 @@
-use nanocl_stubs::{cargo, cargo_config};
+use nanocl_stubs::{cargo, cargo_spec};
 
 use crate::schema::cargoes;
 
@@ -22,20 +22,23 @@ pub struct CargoDbModel {
   pub(crate) created_at: chrono::NaiveDateTime,
   /// The name of the cargo
   pub(crate) name: String,
-  /// The config key reference
-  pub(crate) config_key: uuid::Uuid,
+  /// The spec key reference
+  pub(crate) spec_key: uuid::Uuid,
   /// The namespace name
   pub(crate) namespace_name: String,
 }
 
 impl CargoDbModel {
-  pub fn into_cargo(self, config: cargo_config::CargoConfig) -> cargo::Cargo {
+  pub fn to_cargo_with_spec(
+    &self,
+    spec: cargo_spec::CargoSpec,
+  ) -> cargo::Cargo {
     cargo::Cargo {
-      key: self.key,
-      name: self.name,
-      config_key: config.key,
-      namespace_name: self.namespace_name,
-      config,
+      key: self.key.clone(),
+      name: self.name.clone(),
+      spec_key: spec.key,
+      namespace_name: self.namespace_name.clone(),
+      spec,
     }
   }
 }
@@ -53,20 +56,6 @@ pub struct CargoUpdateDbModel {
   pub(crate) name: Option<String>,
   /// The namespace name
   pub(crate) namespace_name: Option<String>,
-  /// The config key reference
-  pub(crate) config_key: Option<uuid::Uuid>,
-}
-
-/// ## CargoRevertPath
-///
-/// Structure used to serialize the endpoint cargo revert path
-///
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct CargoRevertPath {
-  /// The version
-  pub version: String,
-  /// The name
-  pub name: String,
-  /// The history id
-  pub id: String,
+  /// The spec key reference
+  pub(crate) spec_key: Option<uuid::Uuid>,
 }

@@ -3,12 +3,12 @@ use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::cargo::{Cargo, GenericCargoListQuery};
-use nanocl_stubs::cargo_config::CargoConfigPartial;
+use nanocl_stubs::cargo::{Cargo, GenericCargoListQuery, CargoPartial};
+use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
 use crate::utils;
 use crate::models::{
-  Pool, CargoDbModel, CargoUpdateDbModel, CargoConfigDbModel, NamespaceDbModel,
+  Pool, CargoDbModel, CargoUpdateDbModel, CargoSpecDbModel, NamespaceDbModel,
 };
 
 /// ## Find by namespace
@@ -96,7 +96,7 @@ pub async fn list_by_query(
 ///
 pub async fn create(
   nsp: &str,
-  item: &CargoConfigPartial,
+  item: &CargoPartial,
   version: &str,
   pool: &Pool,
 ) -> IoResult<Cargo> {
@@ -106,22 +106,23 @@ pub async fn create(
   // test if the name of the cargo include a . in the name and throw error if true
   if item.name.contains('.') {
     return Err(IoError::invalid_input(
-      "CargoConfigPartial",
+      "CargoPartial",
       "Name cannot contain a dot.",
     ));
   }
   let key = utils::key::gen_key(&nsp, &item.name);
-  let config = super::cargo_config::create(&key, &item, &version, pool).await?;
+  let config =
+    super::cargo_spec::create(&key, &item.spec, &version, pool).await?;
   let new_item = CargoDbModel {
     key,
     name: item.name,
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
-    config_key: config.key,
+    spec_key: config.key,
   };
   let item: CargoDbModel =
     super::generic::insert_with_res(new_item, pool).await?;
-  let cargo = item.into_cargo(config);
+  let cargo = item.to_cargo_with_spec(config);
   Ok(cargo)
 }
 
@@ -174,7 +175,7 @@ pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDbModel> {
 /// ## Arguments
 ///
 /// * [key](str) - Cargo key
-/// * [item](CargoConfigPartial) - Cargo config
+/// * [item](CargoPartial) - Cargo partial item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Returns
@@ -185,17 +186,17 @@ pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDbModel> {
 ///
 pub async fn update_by_key(
   key: &str,
-  item: &CargoConfigPartial,
+  item: &CargoPartial,
   version: &str,
   pool: &Pool,
 ) -> IoResult<Cargo> {
   use crate::schema::cargoes;
   let version = version.to_owned();
   let cargodb = find_by_key(key, pool).await?;
-  let config = super::cargo_config::create(key, item, &version, pool).await?;
+  let spec = super::cargo_spec::create(key, &item.spec, &version, pool).await?;
   let new_item = CargoUpdateDbModel {
     name: Some(item.name.to_owned()),
-    config_key: Some(config.key),
+    spec_key: Some(spec.key),
     ..Default::default()
   };
   let key = key.to_owned();
@@ -203,7 +204,7 @@ pub async fn update_by_key(
     key, new_item, pool,
   )
   .await?;
-  let cargo = cargodb.into_cargo(config);
+  let cargo = cargodb.to_cargo_with_spec(spec);
   Ok(cargo)
 }
 
@@ -256,23 +257,20 @@ pub async fn count_by_namespace(nsp: &str, pool: &Pool) -> IoResult<i64> {
 ///
 pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
   use crate::schema::cargoes;
-  use crate::schema::cargo_configs;
+  use crate::schema::cargo_specs;
   let key = key.to_owned();
   let pool = pool.clone();
-  let item: (CargoDbModel, CargoConfigDbModel) = web::block(move || {
+  let item: (CargoDbModel, CargoSpecDbModel) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = cargoes::table
-      .inner_join(cargo_configs::table)
+      .inner_join(cargo_specs::table)
       .filter(cargoes::key.eq(key))
       .get_result(&mut conn)
       .map_err(|err| err.map_err_context(|| "Cargo"))?;
     Ok::<_, IoError>(item)
   })
   .await?;
-  let config =
-    serde_json::from_value::<CargoConfigPartial>(item.1.data.clone())
-      .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
-  let config = item.1.into_cargo_config(&config);
-  let item = item.0.into_cargo(config);
+  let spec = item.1.dezerialize_to_spec()?;
+  let item = item.0.to_cargo_with_spec(spec);
   Ok(item)
 }

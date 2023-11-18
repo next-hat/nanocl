@@ -127,10 +127,16 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       .map_err(|err| err.map_err_context(|| "Nanocl system network"))?;
   }
   for cargo in cargoes {
-    let image = cargo.container.image.clone().ok_or(IoError::invalid_data(
-      format!("Cargo {} image", cargo.name),
-      "is not specified".into(),
-    ))?;
+    let image =
+      cargo
+        .spec
+        .container
+        .image
+        .clone()
+        .ok_or(IoError::invalid_data(
+          format!("Cargo {} image", cargo.name),
+          "is not specified".into(),
+        ))?;
     let mut image_detail = image.split(':');
     let from_image = image_detail.next().ok_or(IoError::invalid_data(
       format!("Cargo {} image", cargo.name),

@@ -14,9 +14,9 @@ use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::job::JobPartial;
 use nanocld_client::stubs::state::{StateMeta, StateApplyQuery, StateStreamStatus};
-use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
-use nanocld_client::stubs::cargo_config::{
-  CargoConfigPartial, Config as ContainerConfig,
+use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery, CargoPartial};
+use nanocld_client::stubs::cargo_spec::{
+  CargoSpecPartial, Config as ContainerConfig,
 };
 
 use crate::utils;
@@ -129,8 +129,8 @@ where
 ///   * [Ok](CargoConfigPartial) The cargo config
 ///   * [Err](IoError) An error occured
 ///
-fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
-  let new_cargo = match &cargo.container.host_config {
+fn hook_binds(cargo: &CargoPartial) -> IoResult<CargoPartial> {
+  let new_cargo = match &cargo.spec.container.host_config {
     None => cargo.clone(),
     Some(host_config) => match &host_config.binds {
       None => cargo.clone(),
@@ -154,15 +154,18 @@ fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
           };
           new_binds.push(new_bind);
         }
-        CargoConfigPartial {
-          container: ContainerConfig {
-            host_config: Some(HostConfig {
-              binds: Some(new_binds),
-              ..host_config.clone()
-            }),
-            ..cargo.container.clone()
+        CargoPartial {
+          name: cargo.name.clone(),
+          spec: CargoSpecPartial {
+            container: ContainerConfig {
+              host_config: Some(HostConfig {
+                binds: Some(new_binds),
+                ..host_config.clone()
+              }),
+              ..cargo.spec.container.clone()
+            },
+            ..cargo.spec.clone()
           },
-          ..cargo.clone()
         }
       }
     },
@@ -188,7 +191,7 @@ fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
 ///
 pub async fn log_cargo(
   client: &NanocldClient,
-  cargo: CargoConfigPartial,
+  cargo: CargoPartial,
   opts: &CargoLogQuery,
 ) -> IoResult<Vec<rt::JoinHandle<()>>> {
   let cargo = match client
@@ -343,7 +346,7 @@ pub async fn log_jobs(
 ///
 pub async fn log_cargoes(
   client: &NanocldClient,
-  cargoes: Vec<CargoConfigPartial>,
+  cargoes: Vec<CargoPartial>,
   opts: &CargoLogQuery,
 ) -> IoResult<()> {
   let mut futures = Vec::new();
@@ -369,9 +372,7 @@ pub async fn log_cargoes(
 ///   * [Ok](Vec<CargoConfigPartial>) The cargoes config
 ///   * [Err](IoError) An error occured
 ///
-fn hook_cargoes(
-  cargoes: Vec<CargoConfigPartial>,
-) -> IoResult<Vec<CargoConfigPartial>> {
+fn hook_cargoes(cargoes: Vec<CargoPartial>) -> IoResult<Vec<CargoPartial>> {
   let mut new_cargoes = Vec::new();
   for cargo in cargoes {
     let new_cargo = hook_binds(&cargo)?;
@@ -661,7 +662,7 @@ async fn execute_template(
   serde_yaml::Value,
   String,
   Vec<JobPartial>,
-  Vec<CargoConfigPartial>,
+  Vec<CargoPartial>,
 )> {
   let mut namespace = String::default();
   let state_ref = state_ref.clone();
@@ -683,7 +684,7 @@ async fn execute_template(
         client,
       )
       .await?;
-      let current_cargoes: Vec<CargoConfigPartial> = match yaml.get("Cargoes") {
+      let current_cargoes: Vec<CargoPartial> = match yaml.get("Cargoes") {
         Some(cargoes) => serde_yaml::from_value(cargoes.clone())
           .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
         None => Vec::new(),
@@ -769,11 +770,11 @@ async fn exec_state_apply(
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
   for cargo in &cargoes {
-    if let Some(before) = &cargo.init_container {
+    if let Some(before) = &cargo.spec.init_container {
       let image = before.image.clone().unwrap_or_default();
       pull_image(&image, opts.force_pull, &client).await?;
     }
-    let image = cargo.container.image.clone().unwrap_or_default();
+    let image = cargo.spec.container.image.clone().unwrap_or_default();
     pull_image(&image, opts.force_pull, &client).await?;
   }
   for job in &jobs {

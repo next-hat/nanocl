@@ -22,7 +22,7 @@ Resources:
       CertManager: certbot
       Selector:
         App: deploy-example
-    Data:
+    Spec:
       Rules:
         - Domain: deploy-example.com
           Network: Public

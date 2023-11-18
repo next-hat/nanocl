@@ -128,7 +128,7 @@ async fn ensure_resource_config(client: &NanocldClient) {
   let proxy_rule_kind = ResourcePartial {
     kind: "Kind".to_owned(),
     name: "ProxyRule".to_owned(),
-    data: serde_json::json!({
+    spec: serde_json::json!({
       "Url": "unix:///run/nanocl/proxy.sock"
     }),
     version: format!("v{formated_version}"),

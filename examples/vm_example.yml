@@ -9,7 +9,7 @@ Resources:
   - Name: vm-test
     Kind: ProxyRule
     Version: v0.8
-    Data:
+    Spec:
       Watch:
         - vm-test.global.v
       Rules:

@@ -8,9 +8,10 @@ use bollard_next::container::{
 pub use bollard_next::exec::CreateExecOptions;
 pub use bollard_next::container::Stats as CargoStats;
 
+use crate::cargo_spec::{CargoSpecPartial, CargoSpecUpdate};
 use crate::node::NodeContainerSummary;
 
-use super::cargo_config::CargoConfig;
+use super::cargo_spec::CargoSpec;
 
 /// A Cargo is a replicable container
 /// It is used to run one or multiple instances of the same container
@@ -33,9 +34,50 @@ pub struct Cargo {
   /// Name of the cargo
   pub name: String,
   /// Unique identifier of the cargo config
-  pub config_key: uuid::Uuid,
-  /// Configuration of the cargo
-  pub config: CargoConfig,
+  pub spec_key: uuid::Uuid,
+  /// Spec of the cargo
+  pub spec: CargoSpec,
+}
+
+/// A CargoPartial is used to create a cargo
+#[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct CargoPartial {
+  /// Name of the cargo
+  pub name: String,
+  /// Spec of the cargo
+  pub spec: CargoSpecPartial,
+}
+
+impl From<CargoInspect> for CargoPartial {
+  fn from(inspect: CargoInspect) -> Self {
+    Self {
+      name: inspect.name,
+      spec: inspect.spec.into(),
+    }
+  }
+}
+
+impl From<Cargo> for CargoPartial {
+  fn from(cargo: Cargo) -> Self {
+    Self {
+      name: cargo.name,
+      spec: cargo.spec.into(),
+    }
+  }
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct CargoUpdate {
+  /// Name of the cargo
+  pub name: Option<String>,
+  /// Spec of the cargo
+  pub spec: Option<CargoSpecUpdate>,
 }
 
 /// A CargoSummary is a summary of a cargo
@@ -58,8 +100,8 @@ pub struct CargoSummary {
   pub config_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Configuration of the cargo
-  pub config: CargoConfig,
+  /// Spec of the cargo
+  pub spec: CargoSpec,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances
@@ -84,8 +126,8 @@ pub struct CargoInspect {
   pub config_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Configuration of the cargo
-  pub config: CargoConfig,
+  /// Spec of the cargo
+  pub spec: CargoSpec,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances

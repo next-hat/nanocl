@@ -40,8 +40,8 @@ pub async fn hook_create_resource(
       let resource_kind = ResourceKindPartial {
         name: resource.name.to_owned(),
         version: resource.version.to_owned(),
-        schema: resource.data.get("Schema").cloned(),
-        url: resource.data.get("Url").map(|item| match item {
+        schema: resource.spec.get("Schema").cloned(),
+        url: resource.spec.get("Url").map(|item| match item {
           Value::String(value) => value.clone(),
           // Wtf ? so if it's not a string, we just convert it to a string ?
           // Meaning that if it's a number an array or whatever, it will be converted to a string ?
@@ -77,7 +77,7 @@ pub async fn hook_create_resource(
             status: http::StatusCode::BAD_REQUEST,
             msg: format!("Invalid schema {}", err),
           })?;
-        schema.validate(&resource.data).map_err(|err| {
+        schema.validate(&resource.spec).map_err(|err| {
           let mut msg = String::from("Invalid config ");
           for error in err {
             msg += &format!("{} ", error);
@@ -91,9 +91,9 @@ pub async fn hook_create_resource(
       if let Some(url) = kind.url {
         let ctrl_client = CtrlClient::new(&kind.resource_kind_name, &url);
         let config = ctrl_client
-          .apply_rule(&resource.version, &resource.name, &resource.data)
+          .apply_rule(&resource.version, &resource.name, &resource.spec)
           .await?;
-        resource.data = config;
+        resource.spec = config;
       }
     }
   }
@@ -220,7 +220,7 @@ pub async fn delete(resource: &Resource, pool: &Pool) -> Result<(), HttpError> {
     repositories::resource_kind::delete(&resource.name, pool).await?;
   }
   repositories::resource::delete_by_key(&resource.name, pool).await?;
-  repositories::resource_config::delete_by_resource_key(&resource.name, pool)
+  repositories::resource_spec::delete_by_resource_key(&resource.name, pool)
     .await?;
   Ok(())
 }

@@ -10,7 +10,7 @@ use bollard_next::container::{
 };
 
 use nanocl_stubs::system::Event;
-use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
+use nanocl_stubs::vm_spec::{VmConfigPartial, VmConfigUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
@@ -214,7 +214,7 @@ pub async fn delete_by_key(
     .remove_container(&container_name, Some(options))
     .await;
   repositories::vm::delete_by_key(vm_key, &state.pool).await?;
-  repositories::vm_config::delete_by_vm_key(&vm.key, &state.pool).await?;
+  repositories::vm_spec::delete_by_vm_key(&vm.key, &state.pool).await?;
   utils::vm_image::delete_by_name(&vm.config.disk.image, &state.pool).await?;
   let event_emitter = state.event_emitter.clone();
   let vm_ptr = vm.clone();
@@ -249,8 +249,7 @@ pub async fn list_by_namespace(
   let vmes = repositories::vm::find_by_namespace(&namespace, pool).await?;
   let mut vm_summaries = Vec::new();
   for vm in vmes {
-    let config =
-      repositories::vm_config::find_by_key(&vm.config_key, pool).await?;
+    let config = repositories::vm_spec::find_by_key(&vm.spec_key, pool).await?;
     let containers = list_instances_by_key(&vm.key, docker_api).await?;
     let mut running_instances = 0;
     for container in containers.clone() {
@@ -490,7 +489,7 @@ pub async fn patch(
 ) -> Result<Vm, HttpError> {
   let vm = repositories::vm::find_by_key(vm_key, &state.pool).await?;
   let old_config =
-    repositories::vm_config::find_by_key(&vm.config_key, &state.pool).await?;
+    repositories::vm_spec::find_by_key(&vm.spec_key, &state.pool).await?;
   let vm_partial = VmConfigPartial {
     name: config.name.to_owned().unwrap_or(vm.name.clone()),
     disk: old_config.disk,

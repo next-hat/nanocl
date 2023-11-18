@@ -144,7 +144,7 @@ pub(crate) async fn put_resource(
     name: path.1.clone(),
     version: payload.version,
     kind: resource.kind,
-    data: payload.data,
+    spec: payload.spec,
     metadata: payload.metadata,
   };
   let resource = utils::resource::patch(&new_resource, &state.pool).await?;
@@ -177,7 +177,7 @@ pub(crate) async fn list_resource_history(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let items =
-    repositories::resource_config::list_by_resource_key(&path.1, &state.pool)
+    repositories::resource_spec::list_by_resource_key(&path.1, &state.pool)
       .await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
@@ -202,7 +202,7 @@ pub(crate) async fn revert_resource(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let history =
-    repositories::resource_config::find_by_key(&path.id, &state.pool).await?;
+    repositories::resource_spec::find_by_key(&path.id, &state.pool).await?;
 
   let resource =
     repositories::resource::inspect_by_key(&path.name, &state.pool).await?;
@@ -211,7 +211,7 @@ pub(crate) async fn revert_resource(
     name: resource.name,
     version: history.version,
     kind: resource.kind,
-    data: history.data,
+    spec: history.spec,
     metadata: history.metadata,
   };
   let resource = utils::resource::patch(&new_resource, &state.pool).await?;
@@ -271,7 +271,7 @@ mod tests {
       name: TEST_RESOURCE.to_owned(),
       version: "v0.0.1".to_owned(),
       kind: "Kind".to_owned(),
-      data: config.clone(),
+      spec: config.clone(),
       metadata: Some(serde_json::json!({
         "Test": "gg",
       })),
@@ -379,7 +379,7 @@ mod tests {
     let resource = res.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, TEST_RESOURCE);
     assert_eq!(resource.kind, String::from("Kind"));
-    assert_eq!(&resource.data, &config);
+    assert_eq!(&resource.spec, &config);
     // History
     let _ = client
       .send_get(
@@ -394,7 +394,7 @@ mod tests {
     );
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
-      data: config.clone(),
+      spec: config.clone(),
       metadata: None,
     };
     let mut res = client

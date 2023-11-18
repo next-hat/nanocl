@@ -8,14 +8,14 @@ use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery,
-  CargoStatsQuery, CargoScale,
+  CargoStatsQuery, CargoScale, CargoPartial,
 };
-use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
+use nanocl_stubs::cargo_spec::CargoSpecUpdate;
 
 use nanocl_error::http::HttpError;
 
 use crate::{utils, repositories};
-use crate::models::{DaemonState, CargoRevertPath};
+use crate::models::DaemonState;
 
 /// List cargoes
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -109,7 +109,7 @@ async fn inspect_cargo(
 #[web::post("/cargoes")]
 pub(crate) async fn create_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<CargoConfigPartial>,
+  web::types::Json(payload): web::types::Json<CargoPartial>,
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -273,7 +273,7 @@ pub(crate) async fn restart_cargo(
 #[web::put("/cargoes/{name}")]
 pub(crate) async fn put_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  payload: web::types::Json<CargoConfigPartial>,
+  payload: web::types::Json<CargoPartial>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -308,7 +308,7 @@ pub(crate) async fn put_cargo(
 #[web::patch("/cargoes/{name}")]
 pub(crate) async fn patch_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  payload: web::types::Json<CargoConfigUpdate>,
+  payload: web::types::Json<CargoSpecUpdate>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -376,7 +376,7 @@ async fn list_cargo_history(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let histories =
-    repositories::cargo_config::list_by_cargo_key(&key, &state.pool).await?;
+    repositories::cargo_spec::list_by_cargo_key(&key, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
@@ -398,21 +398,24 @@ async fn list_cargo_history(
 #[web::patch("/cargoes/{name}/histories/{id}/revert")]
 async fn revert_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<CargoRevertPath>,
+  path: web::types::Path<(String, String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let cargo_key = utils::key::gen_key(&namespace, &path.name);
-  let config_id = uuid::Uuid::parse_str(&path.id).map_err(|err| HttpError {
+  let cargo_key = utils::key::gen_key(&namespace, &path.1);
+  let spec_key = uuid::Uuid::parse_str(&path.2).map_err(|err| HttpError {
     status: http::StatusCode::BAD_REQUEST,
     msg: format!("Invalid config id : {err}"),
   })?;
-  let config =
-    repositories::cargo_config::find_by_key(&config_id, &state.pool).await?;
+  let spec =
+    repositories::cargo_spec::find_by_key(&spec_key, &state.pool).await?;
   let cargo = utils::cargo::put(
     &cargo_key,
-    &config.clone().into(),
-    &path.version,
+    &CargoPartial {
+      name: path.1.clone(),
+      spec: spec.into(),
+    },
+    &path.0,
     &state,
   )
   .await?;
@@ -555,10 +558,10 @@ mod tests {
   use futures::{TryStreamExt, StreamExt};
 
   use nanocl_stubs::generic::GenericNspQuery;
-  use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
+  use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
   use nanocl_stubs::cargo::{
     Cargo, CargoSummary, CargoInspect, OutputLog, CargoDeleteQuery,
-    CargoListQuery, CargoScale, CargoKillOptions,
+    CargoListQuery, CargoScale, CargoKillOptions, CargoPartial,
   };
 
   use crate::utils::tests::*;
@@ -582,15 +585,17 @@ mod tests {
       let res = client
         .send_post(
           ENDPOINT,
-          Some(&CargoConfigPartial {
+          Some(&CargoPartial {
             name: test_cargo.to_owned(),
-            container: bollard_next::container::Config {
-              image: Some(
-                "ghcr.io/nxthat/nanocl-get-started:latest".to_owned(),
-              ),
+            spec: CargoSpecPartial {
+              container: bollard_next::container::Config {
+                image: Some(
+                  "ghcr.io/nxthat/nanocl-get-started:latest".to_owned(),
+                ),
+                ..Default::default()
+              },
               ..Default::default()
             },
-            ..Default::default()
           }),
           None::<String>,
         )
@@ -605,7 +610,7 @@ mod tests {
       assert_eq!(cargo.name, test_cargo, "Invalid cargo name");
       assert_eq!(cargo.namespace_name, "global", "Invalid cargo namespace");
       assert_eq!(
-        cargo.config.container.image,
+        cargo.spec.container.image,
         Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned())
       );
     }
@@ -715,14 +720,18 @@ mod tests {
     let mut res = client
       .send_put(
         &format!("{ENDPOINT}/{main_test_cargo}"),
-        Some(&CargoConfigPartial {
+        Some(&CargoPartial {
           name: main_test_cargo.to_owned(),
-          container: bollard_next::container::Config {
-            image: Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned()),
-            env: Some(vec!["TEST=1".to_owned()]),
+          spec: CargoSpecPartial {
+            container: bollard_next::container::Config {
+              image: Some(
+                "ghcr.io/nxthat/nanocl-get-started:latest".to_owned(),
+              ),
+              env: Some(vec!["TEST=1".to_owned()]),
+              ..Default::default()
+            },
             ..Default::default()
           },
-          ..Default::default()
         }),
         None::<String>,
       )
@@ -732,11 +741,11 @@ mod tests {
     assert_eq!(patch_response.name, main_test_cargo);
     assert_eq!(patch_response.namespace_name, "global");
     assert_eq!(
-      patch_response.config.container.image,
+      patch_response.spec.container.image,
       Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned())
     );
     assert_eq!(
-      patch_response.config.container.env,
+      patch_response.spec.container.env,
       Some(vec!["TEST=1".to_owned()])
     );
     let mut res = client
@@ -750,7 +759,7 @@ mod tests {
       res.status(),
       "basic cargo history"
     );
-    let histories = res.json::<Vec<CargoConfig>>().await.unwrap();
+    let histories = res.json::<Vec<CargoSpec>>().await.unwrap();
     assert!(histories.len() > 1, "Expected to find cargo histories");
     let id = histories[0].key;
     let res = client
@@ -798,13 +807,17 @@ mod tests {
     let res = client
       .send_post(
         ENDPOINT,
-        Some(&CargoConfigPartial {
+        Some(&CargoPartial {
           name: CARGO_NAME.to_owned(),
-          container: bollard_next::container::Config {
-            image: Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned()),
+          spec: CargoSpecPartial {
+            container: bollard_next::container::Config {
+              image: Some(
+                "ghcr.io/nxthat/nanocl-get-started:latest".to_owned(),
+              ),
+              ..Default::default()
+            },
             ..Default::default()
           },
-          ..Default::default()
         }),
         None::<String>,
       )

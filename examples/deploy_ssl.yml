@@ -6,7 +6,7 @@ Namespace: global
 Secrets:
   - Key: secret-tls
     Kind: Tls
-    Data:
+    Spec:
       Certificate: |
         -----BEGIN CERTIFICATE-----
         MIIDETCCAfkCFFOJVQs8PxWlcJQDn/AQpSopkhISMA0GCSqGSIb3DQEBCwUAMEUx
@@ -65,7 +65,7 @@ Resources:
     Version: v0.8
     Metadata:
       Cert: certbot
-    Data:
+    Spec:
       Rules:
         - Domain: secret-tls.com
           Network: All

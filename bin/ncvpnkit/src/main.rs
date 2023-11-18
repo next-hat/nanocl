@@ -18,7 +18,7 @@ mod version;
 fn resource_to_proxy_rule(
   resource: &Resource,
 ) -> std::io::Result<ResourceProxyRule> {
-  serde_json::from_value::<ResourceProxyRule>(resource.data.clone()).map_err(
+  serde_json::from_value::<ResourceProxyRule>(resource.spec.clone()).map_err(
     |err| {
       std::io::Error::new(
         std::io::ErrorKind::InvalidData,

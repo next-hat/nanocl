@@ -16,8 +16,8 @@ use bollard_next::service::{
 
 use nanocl_error::io::{IoError, FromIo, IoResult};
 
-use nanocld_client::stubs::cargo_config::CargoConfigPartial;
-use nanocld_client::stubs::cargo_config::Config as ContainerConfig;
+use nanocld_client::stubs::cargo::CargoPartial;
+use nanocld_client::stubs::cargo_spec::Config as ContainerConfig;
 
 use crate::utils::hash;
 use crate::utils::math::calculate_percentage;
@@ -238,12 +238,12 @@ pub fn hook_labels(
 ///   * [Err](IoError) An error occured
 ///
 pub async fn create_cargo_container(
-  cargo: &CargoConfigPartial,
+  cargo: &CargoPartial,
   namespace: &str,
   docker: &Docker,
 ) -> IoResult<ContainerCreateResponse> {
   let name = &cargo.name;
-  let config = &cargo.container;
+  let config = &cargo.spec.container;
   let key = format!("{name}.{namespace}");
 
   let hooked_config = ContainerConfig {

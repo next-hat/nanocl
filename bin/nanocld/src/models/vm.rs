@@ -1,4 +1,4 @@
-use nanocl_stubs::{vm_config, vm};
+use nanocl_stubs::{vm_spec, vm};
 
 use crate::schema::vms;
 
@@ -23,14 +23,14 @@ pub struct VmDbModel {
   pub(crate) created_at: chrono::NaiveDateTime,
   /// The name of the vm
   pub(crate) name: String,
-  /// The config key reference
-  pub(crate) config_key: uuid::Uuid,
+  /// The spec key reference
+  pub(crate) spec_key: uuid::Uuid,
   /// The namespace name reference
   pub(crate) namespace_name: String,
 }
 
 impl VmDbModel {
-  pub fn into_vm(self, config: vm_config::VmConfig) -> vm::Vm {
+  pub fn into_vm(self, config: vm_spec::VmConfig) -> vm::Vm {
     vm::Vm {
       key: self.key,
       name: self.name,
@@ -55,5 +55,5 @@ pub struct VmUpdateDbModel {
   /// The name of the vm
   pub(crate) name: Option<String>,
   /// The config key reference
-  pub(crate) config_key: Option<uuid::Uuid>,
+  pub(crate) spec_key: Option<uuid::Uuid>,
 }

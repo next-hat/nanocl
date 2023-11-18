@@ -15,7 +15,7 @@ use bollard_next::container::AttachContainerOptions;
 
 use nanocl_stubs::cargo::OutputLog;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
+use nanocl_stubs::vm_spec::{VmConfigPartial, VmConfigUpdate};
 
 use nanocl_error::http::HttpError;
 
@@ -200,7 +200,7 @@ pub(crate) async fn list_vm_history(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let histories =
-    repositories::vm_config::list_by_vm_key(&key, &state.pool).await?;
+    repositories::vm_spec::list_by_vm_key(&key, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 

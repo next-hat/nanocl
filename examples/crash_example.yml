@@ -9,7 +9,7 @@ Resources:
   - Name: crash-example.com
     Kind: ProxyRule
     Version: v0.8
-    Data:
+    Spec:
       Rules:
         - Domain: crash-example.com
           Network: Public

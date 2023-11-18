@@ -47,13 +47,13 @@ use nanocl_stubs::cargo::{
   Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
   CargoScale, CargoStats,
 };
-use nanocl_stubs::cargo_config::{
-  CargoConfig, CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
+use nanocl_stubs::cargo_spec::{
+  CargoSpec, CargoSpecPartial, CargoSpecUpdate, ReplicationMode,
   ReplicationStatic,
 };
 use nanocl_stubs::cargo_image::CargoImagePartial;
 use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
-use nanocl_stubs::vm_config::{
+use nanocl_stubs::vm_spec::{
   VmConfig, VmConfigPartial, VmConfigUpdate, VmDiskConfig, VmHostConfig,
 };
 use nanocl_stubs::resource::{
@@ -354,11 +354,11 @@ impl Modify for VersionModifier {
     CreateExecOptions,
     CargoKillOptions,
     CargoInspect,
-    CargoConfig,
+    CargoSpec,
     ReplicationMode,
     CargoSummary,
-    CargoConfigPartial,
-    CargoConfigUpdate,
+    CargoSpecPartial,
+    CargoSpecUpdate,
     ReplicationStatic,
     CargoScale,
     CargoStats,

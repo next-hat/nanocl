@@ -2145,8 +2145,8 @@ components:
       - Key
       - NamespaceName
       - Name
-      - ConfigKey
-      - Config
+      - SpecKey
+      - Spec
       properties:
         Key:
           type: string
@@ -2157,123 +2157,12 @@ components:
         Name:
           type: string
           description: Name of the cargo
-        ConfigKey:
+        SpecKey:
           type: string
           format: uuid
           description: Unique identifier of the cargo config
-        Config:
-          $ref: '#/components/schemas/CargoConfig'
-    CargoConfig:
-      type: object
-      description: |-
-        A cargo config is the configuration of a cargo
-        It used to know the state of the cargo
-        It keep tracking of an history when you patch an existing cargo
-      required:
-      - Key
-      - CargoKey
-      - Version
-      - CreatedAt
-      - Name
-      - Container
-      properties:
-        Key:
-          type: string
-          format: uuid
-          description: Unique identifier of the cargo config
-        CargoKey:
-          type: string
-          description: The key of the cargo
-        Version:
-          type: string
-          description: Version of the config
-        CreatedAt:
-          type: string
-          format: date-time
-          description: Creation date of the cargo config
-        Name:
-          type: string
-          description: Name of the cargo
-        Metadata:
-          description: Metadata of the cargo (user defined)
-          nullable: true
-        InitContainer:
-          allOf:
-          - $ref: '#/components/schemas/Config'
-          nullable: true
-        Secrets:
-          type: array
-          items:
-            type: string
-          description: List of secrets to use as environment variables
-          nullable: true
-        Container:
-          $ref: '#/components/schemas/Config'
-        Replication:
-          allOf:
-          - $ref: '#/components/schemas/ReplicationMode'
-          nullable: true
-    CargoConfigPartial:
-      type: object
-      description: A cargo config partial is used to create a Cargo
-      required:
-      - Name
-      - Container
-      properties:
-        Name:
-          type: string
-          description: Name of the cargo
-        Metadata:
-          description: Metadata of the cargo (user defined)
-          nullable: true
-        InitContainer:
-          allOf:
-          - $ref: '#/components/schemas/Config'
-          nullable: true
-        Secrets:
-          type: array
-          items:
-            type: string
-          description: List of secrets to use as environment variables
-          nullable: true
-        Container:
-          $ref: '#/components/schemas/Config'
-        Replication:
-          allOf:
-          - $ref: '#/components/schemas/ReplicationMode'
-          nullable: true
-    CargoConfigUpdate:
-      type: object
-      description: |-
-        Payload used to patch a cargo
-        It will create a new [CargoConfig](CargoConfig) with the new values
-        It will keep the old values in the history
-      properties:
-        Name:
-          type: string
-          description: New name of the cargo
-          nullable: true
-        Metadata:
-          description: New metadata of the cargo (user defined)
-          nullable: true
-        InitContainer:
-          allOf:
-          - $ref: '#/components/schemas/Config'
-          nullable: true
-        Secrets:
-          type: array
-          items:
-            type: string
-          description: List of secrets to use as environment variables
-          nullable: true
-        Container:
-          allOf:
-          - $ref: '#/components/schemas/Config'
-          nullable: true
-        Replication:
-          allOf:
-          - $ref: '#/components/schemas/ReplicationMode'
-          nullable: true
+        Spec:
+          $ref: '#/components/schemas/CargoSpec'
     CargoImagePartial:
       type: object
       description: Cargo Image Partial is used to pull a new container image
@@ -2295,7 +2184,7 @@ components:
       - Name
       - ConfigKey
       - NamespaceName
-      - Config
+      - Spec
       - InstanceTotal
       - InstanceRunning
       - Instances
@@ -2313,8 +2202,8 @@ components:
         NamespaceName:
           type: string
           description: Name of the namespace
-        Config:
-          $ref: '#/components/schemas/CargoConfig'
+        Spec:
+          $ref: '#/components/schemas/CargoSpec'
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -2348,6 +2237,103 @@ components:
         Replicas:
           type: integer
           description: Number of replicas to scale up or down can be negative value
+    CargoSpec:
+      type: object
+      description: |-
+        A cargo config is the configuration of a cargo
+        It used to know the state of the cargo
+        It keep tracking of an history when you patch an existing cargo
+      required:
+      - Key
+      - CargoKey
+      - Version
+      - CreatedAt
+      - Container
+      properties:
+        Key:
+          type: string
+          format: uuid
+          description: Unique identifier of the cargo config
+        CargoKey:
+          type: string
+          description: The key of the cargo
+        Version:
+          type: string
+          description: Version of the config
+        CreatedAt:
+          type: string
+          format: date-time
+          description: Creation date of the cargo config
+        Metadata:
+          description: Metadata of the cargo (user defined)
+          nullable: true
+        InitContainer:
+          allOf:
+          - $ref: '#/components/schemas/Config'
+          nullable: true
+        Secrets:
+          type: array
+          items:
+            type: string
+          description: List of secrets to use as environment variables
+          nullable: true
+        Container:
+          $ref: '#/components/schemas/Config'
+        Replication:
+          allOf:
+          - $ref: '#/components/schemas/ReplicationMode'
+          nullable: true
+    CargoSpecPartial:
+      type: object
+      description: A cargo config partial is used to create a Cargo
+      required:
+      - Container
+      properties:
+        Metadata:
+          nullable: true
+        InitContainer:
+          allOf:
+          - $ref: '#/components/schemas/Config'
+          nullable: true
+        Secrets:
+          type: array
+          items:
+            type: string
+          description: List of secrets to use as environment variables
+          nullable: true
+        Replication:
+          allOf:
+          - $ref: '#/components/schemas/ReplicationMode'
+          nullable: true
+        Container:
+          $ref: '#/components/schemas/Config'
+    CargoSpecUpdate:
+      type: object
+      description: |-
+        Payload used to patch a cargo
+        It will create a new [CargoConfig](CargoConfig) with the new values
+        It will keep the old values in the history
+      properties:
+        Metadata:
+          nullable: true
+        InitContainer:
+          allOf:
+          - $ref: '#/components/schemas/Config'
+          nullable: true
+        Secrets:
+          type: array
+          items:
+            type: string
+          description: List of secrets to use as environment variables
+          nullable: true
+        Container:
+          allOf:
+          - $ref: '#/components/schemas/Config'
+          nullable: true
+        Replication:
+          allOf:
+          - $ref: '#/components/schemas/ReplicationMode'
+          nullable: true
     CargoSummary:
       type: object
       description: |
@@ -2360,7 +2346,7 @@ components:
       - Name
       - ConfigKey
       - NamespaceName
-      - Config
+      - Spec
       - InstanceTotal
       - InstanceRunning
       properties:
@@ -2385,8 +2371,8 @@ components:
         NamespaceName:
           type: string
           description: Name of the namespace
-        Config:
-          $ref: '#/components/schemas/CargoConfig'
+        Spec:
+          $ref: '#/components/schemas/CargoSpec'
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -5364,7 +5350,7 @@ components:
       - Version
       - Kind
       - ConfigKey
-      - Data
+      - Spec
       properties:
         Name:
           type: string
@@ -5387,7 +5373,7 @@ components:
           type: string
           format: uuid
           description: The config of the resource
-        Data:
+        Spec:
           type: object
           description: The config of the resource as a json object
           additionalProperties:
@@ -5408,7 +5394,7 @@ components:
       - Version
       - CreatedAt
       - ResourceKey
-      - Data
+      - Spec
       properties:
         Key:
           type: string
@@ -5424,9 +5410,9 @@ components:
         ResourceKey:
           type: string
           description: Resource key associated with the data
-        Data:
+        Spec:
           type: object
-          description: The data of the resource as a json object
+          description: The spec of the resource as a json object user
           additionalProperties:
             $ref: '#/components/schemas/Any'
         Metadata:
@@ -5453,7 +5439,7 @@ components:
       - Name
       - Kind
       - Version
-      - Data
+      - Spec
       properties:
         Name:
           type: string
@@ -5464,9 +5450,9 @@ components:
         Version:
           type: string
           description: Version of the data
-        Data:
+        Spec:
           type: object
-          description: The data of the resource (json object)
+          description: The spec of the resource (json object) user defined
           additionalProperties:
             $ref: '#/components/schemas/Any'
         Metadata:
@@ -5489,12 +5475,12 @@ components:
       type: object
       required:
       - Version
-      - Data
+      - Spec
       properties:
         Version:
           type: string
           description: Version of the config
-        Data:
+        Spec:
           type: object
           description: The config of the resource as a json object
           additionalProperties:
@@ -5685,7 +5671,7 @@ components:
         Cargoes:
           type: array
           items:
-            $ref: '#/components/schemas/CargoConfigPartial'
+            $ref: '#/components/schemas/CargoPartial'
           description: List of cargoes to create and run
     StateDeployment:
       type: object
@@ -5713,7 +5699,7 @@ components:
         Cargoes:
           type: array
           items:
-            $ref: '#/components/schemas/CargoConfigPartial'
+            $ref: '#/components/schemas/CargoPartial'
           description: List of cargoes to create and run
           nullable: true
         VirtualMachines:

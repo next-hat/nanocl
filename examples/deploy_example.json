@@ -27,7 +27,7 @@
       "Kind": "ProxyRule",
       "Name": "deploy-example.com",
       "Version": "v0.8",
-      "Data": {
+      "Spec": {
         "Rules": [
           {
             "Domain": "deploy-example.com",

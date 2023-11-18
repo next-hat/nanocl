@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::vm::Vm;
-use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};
+use nanocl_stubs::vm_spec::{VmConfig, VmConfigPartial};
 
 use crate::utils;
 use crate::models::{
@@ -74,13 +74,13 @@ pub async fn create(
     ));
   }
   let key = utils::key::gen_key(&nsp, &item.name);
-  let config = super::vm_config::create(&key, item, version, pool).await?;
+  let config = super::vm_spec::create(&key, item, version, pool).await?;
   let new_item = VmDbModel {
     key,
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
-    config_key: config.key,
+    spec_key: config.key,
   };
   let item: VmDbModel = super::generic::insert_with_res(new_item, pool).await?;
   let vm = item.into_vm(config);
@@ -155,10 +155,10 @@ pub async fn update_by_key(
   use crate::schema::vms;
   let key = key.to_owned();
   let vmdb = find_by_key(&key, pool).await?;
-  let config = super::vm_config::create(&key, item, version, pool).await?;
+  let config = super::vm_spec::create(&key, item, version, pool).await?;
   let new_item = VmUpdateDbModel {
     name: Some(item.name.clone()),
-    config_key: Some(config.key),
+    spec_key: Some(config.key),
     ..Default::default()
   };
   super::generic::update_by_id::<vms::table, VmUpdateDbModel, _>(
@@ -186,13 +186,13 @@ pub async fn update_by_key(
 ///
 pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
   use crate::schema::vms;
-  use crate::schema::vm_configs;
+  use crate::schema::vm_specs;
   let key = key.to_owned();
   let pool = pool.clone();
   let item: (VmDbModel, VmConfigDbModel) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = vms::table
-      .inner_join(vm_configs::table)
+      .inner_join(vm_specs::table)
       .filter(vms::key.eq(key))
       .get_result(&mut conn)
       .map_err(|err| err.map_err_context(|| "Vm"))?;

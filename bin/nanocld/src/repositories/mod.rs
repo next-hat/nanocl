@@ -15,11 +15,11 @@ pub mod namespace;
 /// Manage cargoes table
 pub mod cargo;
 /// Manage cargo_configs table
-pub mod cargo_config;
+pub mod cargo_spec;
 /// Manage vms table
 pub mod vm;
 /// Manage vm_configs table
-pub mod vm_config;
+pub mod vm_spec;
 /// Manage vm_images table
 pub mod vm_image;
 /// Manage resources table
@@ -27,7 +27,7 @@ pub mod resource;
 /// Manage resource_kinds table
 pub mod resource_kind;
 /// Manage resource_configs table
-pub mod resource_config;
+pub mod resource_spec;
 /// Manage secrets table
 pub mod secret;
 /// Manage job table

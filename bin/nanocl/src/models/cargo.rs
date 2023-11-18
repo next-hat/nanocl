@@ -4,9 +4,11 @@ use clap::{Parser, Subcommand};
 
 use bollard_next::exec::CreateExecOptions;
 use bollard_next::container::MemoryStatsStats;
-use nanocld_client::stubs::cargo::{CargoStats, CargoSummary};
-use nanocld_client::stubs::cargo_config::{
-  CargoConfigUpdate, Config as ContainerConfig, CargoConfigPartial, HostConfig,
+use nanocld_client::stubs::cargo::{
+  CargoPartial, CargoStats, CargoSummary, CargoUpdate,
+};
+use nanocld_client::stubs::cargo_spec::{
+  CargoSpecUpdate, Config as ContainerConfig, CargoSpecPartial, HostConfig,
 };
 
 use super::{cargo_image::CargoImageArg, DisplayFormat};
@@ -46,22 +48,24 @@ pub struct CargoCreateOpts {
 }
 
 /// Convert CargoCreateOpts to CargoConfigPartial
-impl From<CargoCreateOpts> for CargoConfigPartial {
+impl From<CargoCreateOpts> for CargoPartial {
   fn from(val: CargoCreateOpts) -> Self {
     Self {
       name: val.name,
-      container: ContainerConfig {
-        image: Some(val.image),
-        // network: val.network,
-        // volumes: val.volumes,
-        env: val.env,
-        host_config: Some(HostConfig {
-          binds: val.volumes,
+      spec: CargoSpecPartial {
+        container: ContainerConfig {
+          image: Some(val.image),
+          // network: val.network,
+          // volumes: val.volumes,
+          env: val.env,
+          host_config: Some(HostConfig {
+            binds: val.volumes,
+            ..Default::default()
+          }),
           ..Default::default()
-        }),
+        },
         ..Default::default()
       },
-      ..Default::default()
     }
   }
 }
@@ -89,24 +93,26 @@ pub struct CargoRunOpts {
 }
 
 /// Convert CargoRunOpts to CargoConfigPartial
-impl From<CargoRunOpts> for CargoConfigPartial {
+impl From<CargoRunOpts> for CargoPartial {
   fn from(val: CargoRunOpts) -> Self {
     Self {
       name: val.name,
-      container: ContainerConfig {
-        image: Some(val.image),
-        // network: val.network,
-        // volumes: val.volumes,
-        env: val.env,
-        cmd: Some(val.command),
-        host_config: Some(HostConfig {
-          binds: val.volumes,
-          auto_remove: Some(val.auto_remove),
+      spec: CargoSpecPartial {
+        container: ContainerConfig {
+          image: Some(val.image),
+          // network: val.network,
+          // volumes: val.volumes,
+          env: val.env,
+          cmd: Some(val.command),
+          host_config: Some(HostConfig {
+            binds: val.volumes,
+            auto_remove: Some(val.auto_remove),
+            ..Default::default()
+          }),
           ..Default::default()
-        }),
+        },
         ..Default::default()
       },
-      ..Default::default()
     }
   }
 }
@@ -177,16 +183,18 @@ pub struct CargoPatchOpts {
 }
 
 /// Convert CargoPatchOpts to CargoConfigUpdate
-impl From<CargoPatchOpts> for CargoConfigUpdate {
+impl From<CargoPatchOpts> for CargoUpdate {
   fn from(val: CargoPatchOpts) -> Self {
-    CargoConfigUpdate {
+    CargoUpdate {
       name: val.new_name,
-      container: Some(ContainerConfig {
-        image: val.image,
-        env: val.env,
+      spec: Some(CargoSpecUpdate {
+        container: Some(ContainerConfig {
+          image: val.image,
+          env: val.env,
+          ..Default::default()
+        }),
         ..Default::default()
       }),
-      ..Default::default()
     }
   }
 }
@@ -409,8 +417,8 @@ impl From<CargoSummary> for CargoRow {
     Self {
       name: cargo.name,
       namespace: cargo.namespace_name,
-      image: cargo.config.container.image.unwrap_or_default(),
-      version: cargo.config.version,
+      image: cargo.spec.container.image.unwrap_or_default(),
+      version: cargo.spec.version,
       instances: format!("{}/{}", cargo.instance_running, cargo.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

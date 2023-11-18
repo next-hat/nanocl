@@ -6,9 +6,10 @@ use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
 use nanocl_error::io::{FromIo, IoResult};
 
+use nanocl_stubs::cargo::CargoPartial;
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::namespace::NamespacePartial;
-use nanocl_stubs::cargo_config::CargoConfigPartial;
+use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
 use crate::version::VERSION;
 use crate::{utils, repositories};
@@ -121,16 +122,18 @@ pub async fn sync_containers(
     // if let Some(_endpoints_config) = network_settings.networks {
     //   // config.networking_config = Some(NetworkingConfig { endpoints_config });
     // }
-    let new_cargo = CargoConfigPartial {
+    let new_cargo = CargoPartial {
       name: metadata[0].to_owned(),
-      container: config.to_owned(),
-      ..Default::default()
+      spec: CargoSpecPartial {
+        container: config.to_owned(),
+        ..Default::default()
+      },
     };
     cargo_inspected.insert(metadata[0].to_owned(), true);
     match repositories::cargo::inspect_by_key(cargo_key, pool).await {
       // If the cargo is already in our store and the config is different we update it
       Ok(cargo) => {
-        if cargo.config.container != config {
+        if cargo.spec.container != config {
           log::debug!(
             "updating cargo {} in namespace {}",
             metadata[0],

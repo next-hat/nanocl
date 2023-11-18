@@ -27,8 +27,8 @@ pub struct ResourceDbModel {
   pub(crate) created_at: chrono::NaiveDateTime,
   /// The kind of the resource
   pub(crate) kind: String,
-  /// The config key reference
-  pub(crate) config_key: uuid::Uuid,
+  /// The spec key reference
+  pub(crate) spec_key: uuid::Uuid,
 }
 
 impl ResourceDbModel {
@@ -43,7 +43,7 @@ impl ResourceDbModel {
       kind: self.kind,
       version: config.version,
       config_key: config.key,
-      data: config.data,
+      spec: config.data,
       metadata: config.metadata,
     }
   }
@@ -59,7 +59,7 @@ pub struct ResourceUpdateModel {
   /// The key of the resource
   pub(crate) key: Option<String>,
   /// The config key reference
-  pub(crate) config_key: Option<uuid::Uuid>,
+  pub(crate) spec_key: Option<uuid::Uuid>,
 }
 
 /// ## ResourceRevertPath

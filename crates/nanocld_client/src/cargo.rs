@@ -7,11 +7,10 @@ use bollard_next::service::ContainerSummary;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoKillOptions,
-  CargoDeleteQuery, CargoLogQuery, CargoStatsQuery, CargoStats,
+  CargoDeleteQuery, CargoLogQuery, CargoStatsQuery, CargoStats, CargoPartial,
+  CargoUpdate,
 };
-use nanocl_stubs::cargo_config::{
-  CargoConfigUpdate, CargoConfigPartial, CargoConfig,
-};
+use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecUpdate};
 
 use super::http_client::NanocldClient;
 
@@ -53,7 +52,7 @@ impl NanocldClient {
   ///
   pub async fn create_cargo(
     &self,
-    item: &CargoConfigPartial,
+    item: &CargoPartial,
     namespace: Option<&str>,
   ) -> Result<Cargo, HttpClientError> {
     let res = self
@@ -321,7 +320,7 @@ impl NanocldClient {
   pub async fn patch_cargo(
     &self,
     name: &str,
-    config: &CargoConfigUpdate,
+    config: &CargoUpdate,
     namespace: Option<&str>,
   ) -> Result<(), HttpClientError> {
     self
@@ -366,7 +365,7 @@ impl NanocldClient {
   pub async fn put_cargo(
     &self,
     name: &str,
-    config: &CargoConfigPartial,
+    config: &CargoPartial,
     namespace: Option<&str>,
   ) -> Result<(), HttpClientError> {
     self
@@ -405,7 +404,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<&str>,
-  ) -> Result<Vec<CargoConfig>, HttpClientError> {
+  ) -> Result<Vec<CargoSpec>, HttpClientError> {
     let res = self
       .send_get(
         &format!("{}/{name}/histories", Self::CARGO_PATH),
@@ -580,7 +579,7 @@ mod tests {
   use super::*;
 
   use futures::StreamExt;
-  use nanocl_stubs::cargo_config::CargoConfigPartial;
+  use nanocl_stubs::{cargo_spec::CargoSpecPartial, cargo::CargoPartial};
   use ntex::http;
 
   #[ntex::test]
@@ -589,24 +588,29 @@ mod tests {
     let client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
     client.list_cargo(None).await.unwrap();
-    let new_cargo = CargoConfigPartial {
+    let new_cargo = CargoPartial {
       name: CARGO_NAME.into(),
-      container: bollard_next::container::Config {
-        image: Some("ghcr.io/nxthat/nanocl-get-started:latest".into()),
+      spec: CargoSpecPartial {
+        container: bollard_next::container::Config {
+          image: Some("ghcr.io/nxthat/nanocl-get-started:latest".into()),
+          ..Default::default()
+        },
         ..Default::default()
       },
-      ..Default::default()
     };
     client.create_cargo(&new_cargo, None).await.unwrap();
     client.start_cargo(CARGO_NAME, None).await.unwrap();
     client.inspect_cargo(CARGO_NAME, None).await.unwrap();
-    let cargo_update = CargoConfigUpdate {
-      container: Some(bollard_next::container::Config {
-        image: Some("ghcr.io/nxthat/nanocl-get-started:latest".into()),
-        env: Some(vec!["TEST=1".into()]),
+    let cargo_update = CargoUpdate {
+      name: None,
+      spec: Some(CargoSpecUpdate {
+        container: Some(bollard_next::container::Config {
+          image: Some("ghcr.io/nxthat/nanocl-get-started:latest".into()),
+          env: Some(vec!["TEST=1".into()]),
+          ..Default::default()
+        }),
         ..Default::default()
       }),
-      ..Default::default()
     };
     client
       .patch_cargo(CARGO_NAME, &cargo_update, None)
@@ -631,13 +635,15 @@ mod tests {
   async fn create_cargo_wrong_image() {
     let client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-    let new_cargo = CargoConfigPartial {
+    let new_cargo = CargoPartial {
       name: "client-test-cargowi".into(),
-      container: bollard_next::container::Config {
-        image: Some("random_image:ggwp".into()),
+      spec: CargoSpecPartial {
+        container: bollard_next::container::Config {
+          image: Some("random_image:ggwp".into()),
+          ..Default::default()
+        },
         ..Default::default()
       },
-      ..Default::default()
     };
     let err = client.create_cargo(&new_cargo, None).await.unwrap_err();
     match err {
@@ -652,13 +658,15 @@ mod tests {
   async fn create_cargo_duplicate_name() {
     let client =
       NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-    let new_cargo = CargoConfigPartial {
+    let new_cargo = CargoPartial {
       name: "client-test-cargodup".into(),
-      container: bollard_next::container::Config {
-        image: Some("ghcr.io/nxthat/nanocl-get-started:latest".into()),
+      spec: CargoSpecPartial {
+        container: bollard_next::container::Config {
+          image: Some("ghcr.io/nxthat/nanocl-get-started:latest".into()),
+          ..Default::default()
+        },
         ..Default::default()
       },
-      ..Default::default()
     };
     client.create_cargo(&new_cargo, None).await.unwrap();
     let err = client.create_cargo(&new_cargo, None).await.unwrap_err();

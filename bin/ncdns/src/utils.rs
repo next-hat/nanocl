@@ -81,7 +81,7 @@ pub(crate) async fn update_entries(
   })?;
   let mut entries = Vec::new();
   for resource in resources {
-    let mut dns_rule = serde_json::from_value::<ResourceDnsRule>(resource.data)
+    let mut dns_rule = serde_json::from_value::<ResourceDnsRule>(resource.spec)
       .map_err(|err| {
         err.map_err_context(|| "Unable to serialize the DnsRule")
       })?;

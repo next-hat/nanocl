@@ -59,10 +59,8 @@ pub struct ReplicationStatic {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct CargoConfigPartial {
-  /// Name of the cargo
-  pub name: String,
-  /// Metadata of the cargo (user defined)
+pub struct CargoSpecPartial {
+  // The metadata (user defined)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -80,34 +78,28 @@ pub struct CargoConfigPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
-  /// Container configuration of the cargo
-  pub container: Config,
   /// Replication configuration of the cargo
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub replication: Option<ReplicationMode>,
+  /// Container configuration of the container
+  pub container: Config,
 }
 
 /// Payload used to patch a cargo
 /// It will create a new [CargoConfig](CargoConfig) with the new values
 /// It will keep the old values in the history
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct CargoConfigUpdate {
-  /// New name of the cargo
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub name: Option<String>,
-  /// New metadata of the cargo (user defined)
+pub struct CargoSpecUpdate {
+  // The metadata (user defined)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -139,14 +131,13 @@ pub struct CargoConfigUpdate {
   pub replication: Option<ReplicationMode>,
 }
 
-impl From<CargoConfigPartial> for CargoConfigUpdate {
-  fn from(cargo_config: CargoConfigPartial) -> Self {
+impl From<CargoSpecPartial> for CargoSpecUpdate {
+  fn from(cargo_config: CargoSpecPartial) -> Self {
     Self {
-      name: Some(cargo_config.name),
+      metadata: cargo_config.metadata,
       init_container: cargo_config.init_container,
       container: Some(cargo_config.container),
       replication: cargo_config.replication,
-      metadata: cargo_config.metadata,
       secrets: cargo_config.secrets,
     }
   }
@@ -159,7 +150,7 @@ impl From<CargoConfigPartial> for CargoConfigUpdate {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoConfig {
+pub struct CargoSpec {
   /// Unique identifier of the cargo config
   pub key: uuid::Uuid,
   /// The key of the cargo
@@ -168,8 +159,6 @@ pub struct CargoConfig {
   pub version: String,
   /// Creation date of the cargo config
   pub created_at: chrono::NaiveDateTime,
-  /// Name of the cargo
-  pub name: String,
   /// Metadata of the cargo (user defined)
   #[cfg_attr(
     feature = "serde",
@@ -198,28 +187,26 @@ pub struct CargoConfig {
   pub replication: Option<ReplicationMode>,
 }
 
-impl From<CargoConfig> for CargoConfigPartial {
-  fn from(cargo_config: CargoConfig) -> Self {
+impl From<CargoSpec> for CargoSpecPartial {
+  fn from(cargo_config: CargoSpec) -> Self {
     Self {
+      metadata: cargo_config.metadata,
       init_container: cargo_config.init_container,
-      name: cargo_config.name,
       replication: cargo_config.replication,
       container: cargo_config.container,
-      metadata: cargo_config.metadata,
       secrets: cargo_config.secrets,
     }
   }
 }
 
-impl From<CargoInspect> for CargoConfigPartial {
+impl From<CargoInspect> for CargoSpecPartial {
   fn from(cargo_inspect: CargoInspect) -> Self {
     Self {
-      name: cargo_inspect.name,
-      init_container: cargo_inspect.config.init_container,
-      replication: cargo_inspect.config.replication,
-      container: cargo_inspect.config.container,
-      metadata: cargo_inspect.config.metadata,
-      secrets: cargo_inspect.config.secrets,
+      metadata: cargo_inspect.spec.metadata,
+      init_container: cargo_inspect.spec.init_container,
+      replication: cargo_inspect.spec.replication,
+      container: cargo_inspect.spec.container,
+      secrets: cargo_inspect.spec.secrets,
     }
   }
 }

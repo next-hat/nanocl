@@ -8,10 +8,10 @@ use nanocl_error::http::HttpError;
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::job::JobPartial;
+use nanocl_stubs::cargo::CargoPartial;
 use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
-use nanocl_stubs::cargo_config::CargoConfigPartial;
-use nanocl_stubs::vm_config::{VmConfigPartial, VmDiskConfig};
+use nanocl_stubs::vm_spec::{VmConfigPartial, VmDiskConfig};
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateVirtualMachine, StateResource, StateMeta,
   StateStream, StateSecret, StateApplyQuery, StateJob,
@@ -313,7 +313,7 @@ async fn apply_jobs(
 ///
 async fn apply_cargoes(
   namespace: &str,
-  data: &[CargoConfigPartial],
+  data: &[CargoPartial],
   version: &str,
   state: &DaemonState,
   qs: &StateApplyQuery,
@@ -326,7 +326,7 @@ async fn apply_cargoes(
       send(StateStream::new_cargo_pending(&key), sx);
       match utils::cargo::inspect_by_key(&key, state).await {
         Ok(existing) => {
-          let existing: CargoConfigPartial = existing.into();
+          let existing: CargoPartial = existing.into();
           if existing == *cargo && !qs.reload.unwrap_or(false) {
             send(StateStream::new_cargo_unchanged(&key), sx);
             return;
@@ -612,7 +612,7 @@ async fn remove_secrets(
 ///
 async fn remove_cargoes(
   namespace: &str,
-  data: &[CargoConfigPartial],
+  data: &[CargoPartial],
   state: &DaemonState,
   sx: &mpsc::Sender<Result<Bytes, HttpError>>,
 ) {

@@ -22,27 +22,27 @@ Name = "deploy-example.com"
 Kind = "ProxyRule"
 Version = "v0.8"
 
-[[Resources.Data.Rules]]
+[[Resources.Spec.Rules]]
 Domain = "deploy-example.com"
 Network = "Public"
 
-[[Resources.Data.Rules.Locations]]
+[[Resources.Spec.Rules.Locations]]
 Path = "/"
 
-[Resources.Data.Rules.Locations.Target]
+[Resources.Spec.Rules.Locations.Target]
 Key = "deploy-example2.global.c"
 Port = 9_000
 
-[[Resources.Data.Rules.Locations]]
+[[Resources.Spec.Rules.Locations]]
 Path = "/v1"
 
-[Resources.Data.Rules.Locations.Target]
+[Resources.Spec.Rules.Locations.Target]
 Key = "deploy-example.global.c"
 Port = 9_000
 
-[[Resources.Data.Rules.Locations]]
+[[Resources.Spec.Rules.Locations]]
 Path = "/v2"
 
-[Resources.Data.Rules.Locations.Target]
+[Resources.Spec.Rules.Locations.Target]
 Key = "deploy-example2.global.c"
 Port = 9_000

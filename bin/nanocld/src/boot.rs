@@ -174,6 +174,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     }
     Ok::<_, IoError>(())
   });
+  event::watch_docker_event(&daemon_state);
   Ok(daemon_state)
 }
 

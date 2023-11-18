@@ -1,5 +1,5 @@
 Name: desktop-linux
-MetaData:
+MetaSpec:
   Description: Docker desktop
 Endpoints:
   Nanocl:

@@ -1,6 +1,6 @@
-use nanocl_stubs::vm_config;
+use nanocl_stubs::vm_spec;
 
-use crate::schema::vm_configs;
+use crate::schema::vm_specs;
 
 use super::vm;
 
@@ -15,7 +15,7 @@ use super::vm;
 ///
 #[derive(Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = vm_configs)]
+#[diesel(table_name = vm_specs)]
 #[diesel(belongs_to(vm::VmDbModel, foreign_key = vm_key))]
 pub struct VmConfigDbModel {
   /// The key of the vm config
@@ -35,9 +35,9 @@ pub struct VmConfigDbModel {
 impl VmConfigDbModel {
   pub fn into_vm_config(
     self,
-    config: &vm_config::VmConfigPartial,
-  ) -> vm_config::VmConfig {
-    vm_config::VmConfig {
+    config: &vm_spec::VmConfigPartial,
+  ) -> vm_spec::VmConfig {
+    vm_spec::VmConfig {
       key: self.key,
       created_at: self.created_at,
       name: config.name.clone(),

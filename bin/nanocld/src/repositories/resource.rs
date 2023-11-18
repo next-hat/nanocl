@@ -32,15 +32,15 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: item.name.to_owned(),
     version: item.version.to_owned(),
-    data: item.data.clone(),
+    data: item.spec.clone(),
     metadata: item.metadata.clone(),
   };
-  let config = repositories::resource_config::create(&config, pool).await?;
+  let config = repositories::resource_spec::create(&config, pool).await?;
   let new_item = ResourceDbModel {
     key: item.name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: item.kind.clone(),
-    config_key: config.key.to_owned(),
+    spec_key: config.key.to_owned(),
   };
   let dbmodel: ResourceDbModel =
     super::generic::insert_with_res(new_item, pool).await?;
@@ -89,7 +89,7 @@ pub async fn find(
   pool: &Pool,
 ) -> IoResult<Vec<Resource>> {
   use crate::schema::resources;
-  use crate::schema::resource_configs;
+  use crate::schema::resource_specs;
   let pool = pool.clone();
   let res: Vec<(ResourceDbModel, ResourceConfigDbModel)> =
     web::block(move || {
@@ -97,35 +97,34 @@ pub async fn find(
       let req = match query {
         Some(qs) => {
           let mut req = resources::table
-            .inner_join(resource_configs::table)
+            .inner_join(resource_specs::table)
             .into_boxed();
           if let Some(kind) = &qs.kind {
             req = req.filter(resources::kind.eq(kind.to_owned()));
           }
           if let Some(exists) = &qs.exists {
-            req = req.filter(resource_configs::data.has_key(exists));
+            req = req.filter(resource_specs::data.has_key(exists));
           }
           if let Some(contains) = &qs.contains {
             let contains = serde_json::from_str::<serde_json::Value>(contains)
               .map_err(|err| err.map_err_context(|| "Contains"))?;
-            req = req.filter(resource_configs::data.contains(contains));
+            req = req.filter(resource_specs::data.contains(contains));
           }
           if let Some(meta_exists) = &qs.meta_exists {
-            req = req.filter(resource_configs::metadata.has_key(meta_exists));
+            req = req.filter(resource_specs::metadata.has_key(meta_exists));
           }
           if let Some(meta_contains) = &qs.meta_contains {
             let meta_contains =
               serde_json::from_str::<serde_json::Value>(meta_contains)
                 .map_err(|err| err.map_err_context(|| "Meta contains"))?;
-            req =
-              req.filter(resource_configs::metadata.contains(meta_contains));
+            req = req.filter(resource_specs::metadata.contains(meta_contains));
           }
           req = req.order(resources::created_at.desc());
           req.load(&mut conn)
         }
         None => resources::table
           .order(resources::created_at.desc())
-          .inner_join(resource_configs::table)
+          .inner_join(resource_specs::table)
           .load(&mut conn),
       };
       let res = req.map_err(|err| err.map_err_context(|| "Resource"))?;
@@ -160,13 +159,13 @@ pub async fn find(
 ///
 pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Resource> {
   use crate::schema::resources;
-  use crate::schema::resource_configs;
+  use crate::schema::resource_specs;
   let key = key.to_owned();
   let pool = pool.clone();
   let res: (ResourceDbModel, ResourceConfigDbModel) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = resources::table
-      .inner_join(resource_configs::table)
+      .inner_join(resource_specs::table)
       .filter(resources::key.eq(key))
       .get_result(&mut conn)
       .map_err(|err| err.map_err_context(|| "Resource"))?;
@@ -178,11 +177,10 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Resource> {
 }
 
 /// ## Put
-///
-/// Set given `ResourcePartial` as the current config for the resource
+///:/// Set given `ResourcePartial` as the current config for the resource
 /// and return a `Resource` with the new config
 ///
-/// ## Arguments
+///## Arguments
 ///
 /// * [item](ResourcePartial) - Resource item to put
 /// * [pool](Pool) - Database connection pool
@@ -204,13 +202,13 @@ pub async fn put(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: resource.name.to_owned(),
     version: item.version.clone(),
-    data: item.data.clone(),
+    data: item.spec.clone(),
     metadata: item.metadata.clone(),
   };
-  let config = repositories::resource_config::create(&config, pool).await?;
+  let config = repositories::resource_spec::create(&config, pool).await?;
   let resource_update = ResourceUpdateModel {
     key: None,
-    config_key: Some(config.key.to_owned()),
+    spec_key: Some(config.key.to_owned()),
   };
   let dbmodel = super::generic::update_by_id_with_res::<
     resources::table,

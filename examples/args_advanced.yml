@@ -28,7 +28,7 @@ Resources:
   - Name: ${{ Args.domain }}
     Kind: ProxyRule
     Version: v0.8
-    Data:
+    Spec:
       Rules:
         - Domain: ${{ Args.domain }}
           Network: Public

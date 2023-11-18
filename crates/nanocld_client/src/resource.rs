@@ -295,7 +295,7 @@ mod tests {
       name: "test_resource2".to_owned(),
       version: "v0.0.1".to_owned(),
       kind: "Kind".to_owned(),
-      data: config.clone(),
+      spec: config.clone(),
       metadata: None,
     };
     // create
@@ -308,7 +308,7 @@ mod tests {
     assert_eq!(resource.kind, String::from("Kind"));
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
-      data: config.clone(),
+      spec: config.clone(),
       metadata: None,
     };
     // patch

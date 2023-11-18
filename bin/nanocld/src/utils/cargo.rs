@@ -20,11 +20,10 @@ use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,
   CargoKillOptions, GenericCargoListQuery, CargoScale, CargoStats,
-  CargoStatsQuery,
+  CargoStatsQuery, CargoPartial,
 };
-use nanocl_stubs::cargo_config::{
-  CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
-  Config as ContainerConfig,
+use nanocl_stubs::cargo_spec::{
+  CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config as ContainerConfig,
 };
 
 use crate::{utils, repositories};
@@ -63,7 +62,7 @@ async fn create_instances(
 ) -> Result<Vec<ContainerCreateResponse>, HttpError> {
   execute_before(cargo, &state.docker_api).await?;
   let mut secret_envs: Vec<String> = Vec::new();
-  if let Some(secrets) = &cargo.config.secrets {
+  if let Some(secrets) = &cargo.spec.secrets {
     let fetched_secrets = secrets
       .iter()
       .map(|secret| async move {
@@ -107,7 +106,7 @@ async fn create_instances(
         };
         // Add cargo label to the container to track it
         let mut labels =
-          cargo.config.container.labels.to_owned().unwrap_or_default();
+          cargo.spec.container.labels.to_owned().unwrap_or_default();
         labels.insert("io.nanocl".into(), "enabled".into());
         labels.insert("io.nanocl.c".into(), cargo.key.to_owned());
         labels.insert("io.nanocl.n".into(), cargo.namespace_name.to_owned());
@@ -117,7 +116,7 @@ async fn create_instances(
           format!("nanocl_{}", cargo.namespace_name),
         );
         let auto_remove = cargo
-          .config
+          .spec
           .to_owned()
           .container
           .host_config
@@ -129,7 +128,7 @@ async fn create_instances(
         } else {
           Some(
             cargo
-              .config
+              .spec
               .to_owned()
               .container
               .host_config
@@ -141,10 +140,10 @@ async fn create_instances(
               }),
           )
         };
-        let mut env = cargo.config.container.env.clone().unwrap_or_default();
+        let mut env = cargo.spec.container.env.clone().unwrap_or_default();
         // add secret_envs to env
         env.extend(secret_envs.clone());
-        let hostname = match cargo.config.container.hostname {
+        let hostname = match cargo.spec.container.hostname {
           Some(ref hostname) => {
             if current > 0 {
               format!("{current}-{hostname}")
@@ -170,7 +169,7 @@ async fn create_instances(
             restart_policy,
             network_mode: Some(
               cargo
-                .config
+                .spec
                 .to_owned()
                 .container
                 .host_config
@@ -179,13 +178,13 @@ async fn create_instances(
                 .unwrap_or(cargo.namespace_name.to_owned()),
             ),
             ..cargo
-              .config
+              .spec
               .to_owned()
               .container
               .host_config
               .unwrap_or_default()
           }),
-          ..cargo.config.container.to_owned()
+          ..cargo.spec.container.to_owned()
         };
         let res = state
           .docker_api
@@ -206,12 +205,12 @@ async fn execute_before(
   cargo: &Cargo,
   docker_api: &bollard_next::Docker,
 ) -> Result<(), HttpError> {
-  match cargo.config.init_container.clone() {
+  match cargo.spec.init_container.clone() {
     Some(mut before) => {
       let image = before
         .image
         .clone()
-        .unwrap_or(cargo.config.container.image.clone().unwrap());
+        .unwrap_or(cargo.spec.container.image.clone().unwrap());
       before.image = Some(image);
       before.host_config = Some(HostConfig {
         network_mode: Some(cargo.namespace_name.clone()),
@@ -306,14 +305,13 @@ pub async fn list_instances(
 ///
 pub async fn create(
   namespace: &str,
-  config: &CargoConfigPartial,
+  cargo: &CargoPartial,
   version: &str,
   state: &DaemonState,
 ) -> Result<Cargo, HttpError> {
   let cargo =
-    repositories::cargo::create(namespace, config, version, &state.pool)
-      .await?;
-  let number = if let Some(mode) = &cargo.config.replication {
+    repositories::cargo::create(namespace, cargo, version, &state.pool).await?;
+  let number = if let Some(mode) = &cargo.spec.replication {
     match mode {
       ReplicationMode::Static(replication_static) => replication_static.number,
       ReplicationMode::Auto => 1,
@@ -356,7 +354,7 @@ pub async fn start_by_key(
   let cargo =
     repositories::cargo::inspect_by_key(&cargo_key, &state.pool).await?;
   let auto_remove = cargo
-    .config
+    .spec
     .container
     .host_config
     .unwrap_or_default()
@@ -620,7 +618,7 @@ pub async fn delete_by_key(
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
   repositories::cargo::delete_by_key(key, &state.pool).await?;
-  repositories::cargo_config::delete_by_cargo_key(key, &state.pool).await?;
+  repositories::cargo_spec::delete_by_cargo_key(key, &state.pool).await?;
   Ok(())
 }
 
@@ -684,19 +682,15 @@ async fn delete_instances(
 ///
 pub async fn put(
   cargo_key: &str,
-  cargo_partial: &CargoConfigPartial,
+  cargo: &CargoPartial,
   version: &str,
   state: &DaemonState,
 ) -> Result<Cargo, HttpError> {
-  let cargo = repositories::cargo::update_by_key(
-    cargo_key,
-    cargo_partial,
-    version,
-    &state.pool,
-  )
-  .await?;
+  let cargo =
+    repositories::cargo::update_by_key(cargo_key, cargo, version, &state.pool)
+      .await?;
   // Get the number of instance to create
-  let number = if let Some(mode) = &cargo.config.replication {
+  let number = if let Some(mode) = &cargo.spec.replication {
     match mode {
       ReplicationMode::Static(replication_static) => replication_static.number,
       ReplicationMode::Auto => 1,
@@ -778,7 +772,7 @@ pub async fn list(
       .await?;
   for cargo in cargoes {
     let config =
-      repositories::cargo_config::find_by_key(&cargo.config_key, &state.pool)
+      repositories::cargo_spec::find_by_key(&cargo.spec_key, &state.pool)
         .await?;
     let mut containers = list_instances(&cargo.key, &state.docker_api).await?;
     for node in &nodes {
@@ -811,7 +805,7 @@ pub async fn list(
       updated_at: config.created_at,
       name: cargo.name,
       namespace_name: cargo.namespace_name,
-      config: config.to_owned(),
+      spec: config.to_owned(),
       instance_total: containers.len(),
       instance_running: running_instances,
       config_key: config.key,
@@ -887,9 +881,9 @@ pub async fn inspect_by_key(
   Ok(CargoInspect {
     key: cargo.key,
     name: cargo.name,
-    config_key: cargo.config_key,
+    config_key: cargo.spec_key,
     namespace_name: cargo.namespace_name,
-    config: cargo.config,
+    spec: cargo.spec,
     instance_total: containers.len(),
     instance_running: running_instances,
     instances: containers,
@@ -978,7 +972,7 @@ pub async fn kill_by_name(
 ///
 pub async fn patch(
   key: &str,
-  payload: &CargoConfigUpdate,
+  payload: &CargoSpecUpdate,
   version: &str,
   state: &DaemonState,
 ) -> Result<Cargo, HttpError> {
@@ -987,7 +981,7 @@ pub async fn patch(
     // merge env and ensure no duplicate key
     let new_env = container.env.unwrap_or_default();
     let mut env_vars: Vec<String> =
-      cargo.config.container.env.unwrap_or_default();
+      cargo.spec.container.env.unwrap_or_default();
     // Merge environment variables from new_env into the merged array
     for env_var in new_env {
       let parts: Vec<&str> = env_var.split('=').collect();
@@ -1018,7 +1012,7 @@ pub async fn patch(
       .binds
       .unwrap_or_default();
     let mut volumes: Vec<String> = cargo
-      .config
+      .spec
       .container
       .host_config
       .clone()
@@ -1033,12 +1027,12 @@ pub async fn patch(
     let image = if let Some(image) = container.image.clone() {
       Some(image)
     } else {
-      cargo.config.container.image
+      cargo.spec.container.image
     };
     let cmd = if let Some(cmd) = container.cmd {
       Some(cmd)
     } else {
-      cargo.config.container.cmd
+      cargo.spec.container.cmd
     };
     ContainerConfig {
       cmd,
@@ -1046,34 +1040,36 @@ pub async fn patch(
       env: Some(env_vars),
       host_config: Some(HostConfig {
         binds: Some(volumes),
-        ..cargo.config.container.host_config.unwrap_or_default()
+        ..cargo.spec.container.host_config.unwrap_or_default()
       }),
-      ..cargo.config.container
+      ..cargo.spec.container
     }
   } else {
-    cargo.config.container
+    cargo.spec.container
   };
-  let config = CargoConfigPartial {
+  let cargo = CargoPartial {
     name: cargo.name.clone(),
-    container,
-    init_container: if payload.init_container.is_some() {
-      payload.init_container.clone()
-    } else {
-      cargo.config.init_container
-    },
-    replication: payload.replication.clone(),
-    secrets: if payload.secrets.is_some() {
-      payload.secrets.clone()
-    } else {
-      cargo.config.secrets
-    },
-    metadata: if payload.metadata.is_some() {
-      payload.metadata.clone()
-    } else {
-      cargo.config.metadata
+    spec: CargoSpecPartial {
+      container,
+      init_container: if payload.init_container.is_some() {
+        payload.init_container.clone()
+      } else {
+        cargo.spec.init_container
+      },
+      replication: payload.replication.clone(),
+      secrets: if payload.secrets.is_some() {
+        payload.secrets.clone()
+      } else {
+        cargo.spec.secrets
+      },
+      metadata: if payload.metadata.is_some() {
+        payload.metadata.clone()
+      } else {
+        cargo.spec.metadata
+      },
     },
   };
-  utils::cargo::put(key, &config, version, state).await
+  utils::cargo::put(key, &cargo, version, state).await
 }
 
 /// ## Get logs

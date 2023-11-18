@@ -16,9 +16,9 @@ pub struct ResourcePartial {
   pub kind: String,
   /// Version of the data
   pub version: String,
-  /// The data of the resource (json object)
+  /// The spec of the resource (json object) user defined
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub data: serde_json::Value,
+  pub spec: serde_json::Value,
   /// The metadata of the resource (user defined)
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   #[cfg_attr(
@@ -40,7 +40,7 @@ pub struct ResourceUpdate {
   pub version: String,
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub data: serde_json::Value,
+  pub spec: serde_json::Value,
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   #[cfg_attr(
@@ -54,7 +54,7 @@ impl From<ResourcePartial> for ResourceUpdate {
   fn from(resource: ResourcePartial) -> Self {
     Self {
       version: resource.version,
-      data: resource.data,
+      spec: resource.spec,
       metadata: resource.metadata,
     }
   }
@@ -82,7 +82,7 @@ pub struct Resource {
   pub config_key: uuid::Uuid,
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub data: serde_json::Value,
+  pub spec: serde_json::Value,
   /// The metadata of the resource (user defined)
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   #[cfg_attr(
@@ -98,7 +98,7 @@ impl From<Resource> for ResourcePartial {
       name: resource.name,
       kind: resource.kind,
       version: resource.version,
-      data: resource.data,
+      spec: resource.spec,
       metadata: resource.metadata,
     }
   }
@@ -124,9 +124,9 @@ pub struct ResourceConfig {
   pub created_at: chrono::NaiveDateTime,
   /// Resource key associated with the data
   pub resource_key: String,
-  /// The data of the resource as a json object
+  /// The spec of the resource as a json object user
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub data: serde_json::Value,
+  pub spec: serde_json::Value,
   /// The metadata of the resource (user defined)
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   #[cfg_attr(

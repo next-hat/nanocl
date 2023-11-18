@@ -3,7 +3,7 @@ use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::vm::VmSummary;
-use nanocld_client::stubs::vm_config::{
+use nanocld_client::stubs::vm_spec::{
   VmConfigPartial, VmDiskConfig, VmHostConfig, VmConfigUpdate,
 };
 

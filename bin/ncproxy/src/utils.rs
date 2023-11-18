@@ -21,7 +21,7 @@ pub(crate) fn serialize_proxy_rule(
   resource: &ResourcePartial,
 ) -> IoResult<ResourceProxyRule> {
   let proxy_rule =
-    serde_json::from_value::<ResourceProxyRule>(resource.data.to_owned())
+    serde_json::from_value::<ResourceProxyRule>(resource.spec.to_owned())
       .map_err(|err| {
         err.map_err_context(|| "Unable to serialize ResourceProxyRule")
       })?;

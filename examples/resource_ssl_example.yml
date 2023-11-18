@@ -7,7 +7,7 @@ Resources:
   - Name: resource-example
     Kind: ProxyRule
     Version: v0.8
-    Data:
+    Spec:
       Watch:
         - deploy-example.global.c
       Rules:

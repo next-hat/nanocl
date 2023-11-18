@@ -7,11 +7,17 @@ use ntex::{rt, web, http, time};
 use ntex::util::Bytes;
 use ntex::web::error::BlockingError;
 use futures::Stream;
+use futures_util::StreamExt;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
+
+use bollard_next::system::EventsOptions;
+use bollard_next::service::EventMessageTypeEnum;
 
 use nanocl_stubs::system::Event;
 
 use nanocl_error::http::HttpError;
+
+use crate::models::DaemonState;
 
 /// ## Client
 /// Stream: Wrap Receiver in our own type, with correct error type
@@ -167,6 +173,37 @@ impl EventEmitter {
     })?;
     Ok(Client(rx))
   }
+}
+
+pub fn watch_docker_event(state: &DaemonState) {
+  let _ = state.docker_api.clone();
+  // rt::Arbiter::new().exec_fn(move || {
+  //   rt::spawn(async move {
+  //     loop {
+  //       let mut stream = docker_api.events(None::<EventsOptions<String>>);
+  //       while let Some(event) = stream.next().await {
+  //         match event {
+  //           Err(err) => {
+  //             log::error!("Docker event error: {err}");
+  //             break;
+  //           }
+  //           Ok(event) => {
+  //             log::debug!("Docker event: {event:#?}");
+  //             let default = EventMessageTypeEnum::EMPTY;
+  //             let kind = event.typ.unwrap_or(default);
+  //             match kind {
+  //               EventMessageTypeEnum::CONTAINER => {
+  //                 let actor = event.actor.unwrap_or_default();
+  //               }
+  //               _ => {}
+  //             };
+  //           }
+  //         }
+  //       }
+  //       ntex::time::sleep(Duration::from_secs(2)).await;
+  //     }
+  //   });
+  // })
 }
 
 #[cfg(test)]

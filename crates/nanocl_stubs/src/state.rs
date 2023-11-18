@@ -1,10 +1,11 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
+use crate::cargo::CargoPartial;
 use crate::job::JobPartial;
 use crate::secret::SecretPartial;
-use crate::vm_config::VmConfigPartial;
-use crate::cargo_config::CargoConfigPartial;
+use crate::vm_spec::VmConfigPartial;
+use crate::cargo_spec::CargoSpecPartial;
 
 use super::resource::ResourcePartial;
 
@@ -69,7 +70,7 @@ pub struct StateCargo {
   /// Namespace where the cargoes are deployed
   pub namespace: Option<String>,
   /// List of cargoes to create and run
-  pub cargoes: Vec<CargoConfigPartial>,
+  pub cargoes: Vec<CargoPartial>,
 }
 
 /// ## StateVirtualMachine
@@ -115,7 +116,7 @@ pub struct StateDeployment {
   /// List of secrets to create
   pub secrets: Option<Vec<SecretPartial>>,
   /// List of cargoes to create and run
-  pub cargoes: Option<Vec<CargoConfigPartial>>,
+  pub cargoes: Option<Vec<CargoPartial>>,
   /// List of virtual machines to create and run
   pub virtual_machines: Option<Vec<VmConfigPartial>>,
 }

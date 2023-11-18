@@ -9,7 +9,7 @@ Resources:
   - Name: deploy-example.internal
     Kind: ProxyRule
     Version: v0.8
-    Data:
+    Spec:
       Rules:
         - Domain: deploy-example.internal
           Network: Public

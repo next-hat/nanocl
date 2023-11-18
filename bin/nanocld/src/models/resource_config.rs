@@ -1,6 +1,6 @@
 use nanocl_stubs::resource::ResourceConfig;
 
-use crate::schema::resource_configs;
+use crate::schema::resource_specs;
 use super::resource::ResourceDbModel;
 
 /// ## ResourceConfigDbModel
@@ -12,7 +12,7 @@ use super::resource::ResourceDbModel;
 ///
 #[derive(Clone, Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = resource_configs)]
+#[diesel(table_name = resource_specs)]
 #[diesel(belongs_to(ResourceDbModel, foreign_key = resource_key))]
 pub struct ResourceConfigDbModel {
   /// The key of the resource config
@@ -37,7 +37,7 @@ impl From<ResourceConfigDbModel> for ResourceConfig {
       version: item.version,
       created_at: item.created_at,
       resource_key: item.resource_key,
-      data: item.data,
+      spec: item.data,
       metadata: item.metadata,
     }
   }

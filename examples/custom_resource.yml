@@ -7,7 +7,7 @@ Resources:
 - Name: VpnUser
   Kind: Kind
   Version: v0.1
-  Data:
+  Spec:
     Url: vpn.nanocl.internal
     Schema:
       title: VpnUser

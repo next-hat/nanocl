@@ -9,7 +9,7 @@ Resources:
   - Name: replication-example.com
     Kind: ProxyRule
     Version: v0.8
-    Data:
+    Spec:
       Watch:
         - replication-example.global.c
       Rules:

@@ -9,7 +9,7 @@ Resources:
   - Name: deploy-example.com
     Kind: ProxyRule
     Version: v0.8
-    Data:
+    Spec:
       Rules:
         - Network: Public
           Port: 8181

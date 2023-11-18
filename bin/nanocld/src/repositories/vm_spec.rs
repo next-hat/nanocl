@@ -3,7 +3,7 @@ use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};
+use nanocl_stubs::vm_spec::{VmConfig, VmConfigPartial};
 
 use crate::utils;
 use crate::models::{Pool, VmConfigDbModel};
@@ -66,10 +66,10 @@ pub async fn create(
 ///   * [Err](IoError) - Error during the operation
 ///
 pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
-  use crate::schema::vm_configs;
+  use crate::schema::vm_specs;
   let key = *key;
   let dbmodel =
-    super::generic::find_by_id::<vm_configs::table, _, VmConfigDbModel>(
+    super::generic::find_by_id::<vm_specs::table, _, VmConfigDbModel>(
       key, pool,
     )
     .await?;
@@ -97,13 +97,13 @@ pub async fn delete_by_vm_key(
   key: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
-  use crate::schema::vm_configs;
+  use crate::schema::vm_specs;
   let key = key.to_owned();
   let pool = pool.clone();
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let res = diesel::delete(vm_configs::dsl::vm_configs)
-      .filter(vm_configs::dsl::vm_key.eq(key))
+    let res = diesel::delete(vm_specs::dsl::vm_specs)
+      .filter(vm_specs::dsl::vm_key.eq(key))
       .execute(&mut conn)
       .map_err(|err| err.map_err_context(|| "VmConfig"))?;
     Ok::<_, IoError>(res)
@@ -128,13 +128,13 @@ pub async fn delete_by_vm_key(
 ///   * [Err](IoError) - Error during the operation
 ///
 pub async fn list_by_vm_key(key: &str, pool: &Pool) -> IoResult<Vec<VmConfig>> {
-  use crate::schema::vm_configs;
+  use crate::schema::vm_specs;
   let key = key.to_owned();
   let pool = pool.clone();
   let dbmodels = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let configs = vm_configs::dsl::vm_configs
-      .filter(vm_configs::dsl::vm_key.eq(key))
+    let configs = vm_specs::dsl::vm_specs
+      .filter(vm_specs::dsl::vm_key.eq(key))
       .get_results::<VmConfigDbModel>(&mut conn)
       .map_err(|err| err.map_err_context(|| "VmConfig"))?;
     Ok::<_, IoError>(configs)

@@ -11,7 +11,7 @@ Resources:
     Version: v0.8
     Metadata:
       CertManager: certbot
-    Data:
+    Spec:
       Rules:
         - Domain: deploy-example.com
           Network: Public

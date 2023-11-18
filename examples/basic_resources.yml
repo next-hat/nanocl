@@ -7,5 +7,5 @@ Resources:
   - Name: TestResource
     Kind: Kind
     Version: v0.1
-    Data:
+    Spec:
       Url: unix:///run/nanocl/test.sock
