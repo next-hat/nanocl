@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ntex::{http, rt};
+use ntex::{rt, http};
 
 use bollard_next::Docker;
 use bollard_next::service::{HostConfig, DeviceMapping, ContainerSummary};
@@ -242,7 +242,6 @@ pub async fn delete_by_key(
 ///
 pub async fn list_by_namespace(
   nsp: &str,
-  docker_api: &Docker,
   pool: &Pool,
 ) -> Result<Vec<VmSummary>, HttpError> {
   let namespace = repositories::namespace::find_by_name(nsp, pool).await?;
@@ -251,10 +250,19 @@ pub async fn list_by_namespace(
   for vm in vmes {
     let config =
       repositories::vm_config::find_by_key(&vm.config_key, pool).await?;
-    let containers = list_instances_by_key(&vm.key, docker_api).await?;
+    let instances =
+      repositories::container_instance::list_by_kind("Vm", &vm.key, pool)
+        .await?;
     let mut running_instances = 0;
-    for container in containers.clone() {
-      if container.state == Some("running".into()) {
+    for instance in &instances {
+      if instance
+        .data
+        .state
+        .clone()
+        .unwrap_or_default()
+        .running
+        .unwrap_or_default()
+      {
         running_instances += 1;
       }
     }
@@ -265,7 +273,7 @@ pub async fn list_by_namespace(
       name: vm.name,
       namespace_name: vm.namespace_name,
       config: config.to_owned(),
-      instances: containers.len(),
+      instances: instances.len(),
       running_instances,
       config_key: config.key,
     });
@@ -298,9 +306,10 @@ pub async fn create_instance(
 ) -> Result<(), HttpError> {
   let mut labels: HashMap<String, String> = HashMap::new();
   let vmimagespath = format!("{}/vms/images", state.config.state_dir);
-  labels.insert("io.nanocl".into(), "enabled".into());
-  labels.insert("io.nanocl.v".into(), vm.key.clone());
-  labels.insert("io.nanocl.vnsp".into(), vm.namespace_name.clone());
+  labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
+  labels.insert("io.nanocl.kind".to_owned(), "Vm".to_owned());
+  labels.insert("io.nanocl.v".to_owned(), vm.key.clone());
+  labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   let mut args: Vec<String> =
     vec!["-hda".into(), image.path.clone(), "--nographic".into()];
   let host_config = vm.config.host_config.clone();

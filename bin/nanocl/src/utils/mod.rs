@@ -9,6 +9,7 @@ pub mod hash;
 
 #[cfg(test)]
 pub mod tests {
+
   pub fn get_test_client() -> NanocldClient {
     NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None)
   }
@@ -87,8 +88,13 @@ pub mod tests {
             $cargo_name, $namespace_option
           ))
           .container
-          .state,
-        Some($state_str.to_owned())
+          .state
+          .clone()
+          .unwrap_or_default()
+          .status
+          .unwrap_or(bollard_next::models::ContainerStateStatusEnum::EMPTY)
+          .to_string(),
+        $state_str.to_owned()
       );
     };
   }

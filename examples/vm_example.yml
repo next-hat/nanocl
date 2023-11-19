@@ -10,11 +10,8 @@ Resources:
     Kind: ProxyRule
     Version: v0.8
     Data:
-      Watch:
-        - vm-test.global.v
       Rules:
-        - Domain: deploy-example.com
-          Network: Public
+        - Network: Internal
           Protocol: Tcp
           Port: 5555
           Target:

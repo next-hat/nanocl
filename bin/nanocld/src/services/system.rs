@@ -1,8 +1,4 @@
-use std::collections::HashMap;
-
 use ntex::web;
-
-use bollard_next::container::ListContainersOptions;
 
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{HostInfo, ProccessQuery};
@@ -105,52 +101,27 @@ pub(crate) async fn watch_event(
 ))]
 #[web::get("/processes")]
 pub(crate) async fn get_processes(
-  web::types::Query(qs): web::types::Query<ProccessQuery>,
+  web::types::Query(_): web::types::Query<ProccessQuery>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let label = "io.nanocl=enabled".into();
-  let mut filters: HashMap<String, Vec<String>> = HashMap::new();
-  let mut labels = vec![label];
-  if let Some(namespace) = &qs.namespace {
-    repositories::namespace::find_by_name(namespace, &state.pool).await?;
-    labels.push(format!("io.nanocl.vnsp={}", namespace));
-    labels.push(format!("io.nanocl.cnsp={}", namespace));
-  }
-  filters.insert("label".into(), labels);
-  let opts = qs.clone().into();
-  let options = Some(ListContainersOptions::<String> { filters, ..opts });
-  let containers = state.docker_api.list_containers(options).await?;
-  let mut process = containers
+  let nodes = repositories::node::list(&state.pool).await?;
+  let nodes = nodes
     .into_iter()
-    .map(|c| {
-      NodeContainerSummary::new(
-        state.config.hostname.clone(),
-        state.config.advertise_addr.clone(),
-        c,
-      )
+    .map(|node| (node.name.clone(), node))
+    .collect::<std::collections::HashMap<String, _>>();
+  let instances = repositories::container_instance::list_all(&state.pool)
+    .await?
+    .into_iter()
+    .map(|instance| NodeContainerSummary {
+      node: instance.node_id.clone(),
+      ip_address: match nodes.get(&instance.node_id) {
+        Some(node) => node.ip_address.clone(),
+        None => "Unknow".to_owned(),
+      },
+      container: instance.data,
     })
     .collect::<Vec<NodeContainerSummary>>();
-  let nodes =
-    repositories::node::list_unless(&state.config.hostname, &state.pool)
-      .await?;
-  if opts.all {
-    for node in nodes {
-      let client = node.to_http_client();
-      let node_containers = match client
-        .process(Some(&ProccessQuery {
-          all: false,
-          namespace: qs.namespace.clone(),
-          ..Default::default()
-        }))
-        .await
-      {
-        Ok(containers) => containers,
-        Err(_) => continue,
-      };
-      process.extend(node_containers);
-    }
-  }
-  Ok(web::HttpResponse::Ok().json(&process))
+  Ok(web::HttpResponse::Ok().json(&instances))
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {

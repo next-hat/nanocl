@@ -1,12 +1,9 @@
 use std::collections::HashMap;
 
 use futures::StreamExt;
-use indicatif::MultiProgress;
-use indicatif::ProgressBar;
-use indicatif::ProgressStyle;
+use indicatif::{ProgressBar, MultiProgress, ProgressStyle};
 
-use bollard_next::Docker;
-use bollard_next::API_DEFAULT_VERSION;
+use bollard_next::{Docker, API_DEFAULT_VERSION};
 use bollard_next::image::CreateImageOptions;
 use bollard_next::container::CreateContainerOptions;
 use bollard_next::service::{
@@ -209,15 +206,14 @@ pub fn hook_labels(
   labels: &HashMap<String, String>,
 ) -> HashMap<String, String> {
   let mut hooked_labels = labels.clone();
-  hooked_labels.insert("io.nanocl".into(), "enabled".into());
-  hooked_labels.insert("io.nanocl.c".into(), key.to_owned());
-  hooked_labels.insert("io.nanocl.n".into(), namespace.to_owned());
-  hooked_labels.insert("io.nanocl.cnsp".into(), namespace.to_owned());
+  hooked_labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
+  hooked_labels.insert("io.nanocl.kind".to_owned(), "Cargo".to_owned());
+  hooked_labels.insert("io.nanocl.c".to_owned(), key.to_owned());
+  hooked_labels.insert("io.nanocl.n".to_owned(), namespace.to_owned());
   hooked_labels.insert(
-    "com.docker.compose.project".into(),
+    "com.docker.compose.project".to_owned(),
     format!("nanocl_{namespace}"),
   );
-
   hooked_labels
 }
 
@@ -245,7 +241,6 @@ pub async fn create_cargo_container(
   let name = &cargo.name;
   let config = &cargo.container;
   let key = format!("{name}.{namespace}");
-
   let hooked_config = ContainerConfig {
     labels: Some(hook_labels(
       &key,
@@ -261,7 +256,6 @@ pub async fn create_cargo_container(
     }),
     ..config.clone()
   };
-
   let container = docker
     .create_container(
       Some(CreateContainerOptions {

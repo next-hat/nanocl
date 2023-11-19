@@ -5,9 +5,7 @@ use tokio::fs;
 use ntex::util::Bytes;
 use futures_util::{StreamExt, TryStreamExt};
 use futures_util::stream::{FuturesUnordered, select_all, FuturesOrdered};
-use bollard_next::service::{
-  ContainerSummary, ContainerInspectResponse, ContainerWaitExitError,
-};
+use bollard_next::service::{ContainerSummary, ContainerWaitExitError};
 use bollard_next::container::{
   CreateContainerOptions, StartContainerOptions, ListContainersOptions,
   RemoveContainerOptions, LogsOptions, WaitContainerOptions,
@@ -46,7 +44,7 @@ pub async fn list_instances(
   name: &str,
   docker_api: &bollard_next::Docker,
 ) -> Result<Vec<ContainerSummary>, HttpError> {
-  let label = format!("io.nanocl.job={name}");
+  let label = format!("io.nanocl.j={name}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
   let options = Some(ListContainersOptions {
@@ -76,26 +74,27 @@ pub async fn list_instances(
 async fn inspect_instances(
   name: &str,
   state: &DaemonState,
-) -> Result<Vec<(ContainerInspectResponse, NodeContainerSummary)>, HttpError> {
-  list_instances(name, &state.docker_api).await?
-  .into_iter()
-  .map(|container| async {
-    let container_inspect = state
-      .docker_api
-      .inspect_container(&container.id.clone().unwrap_or_default(), None)
-      .await?;
-    Ok::<_, HttpError>((
-      container_inspect,
-      NodeContainerSummary {
-        node: state.config.hostname.clone(),
-        ip_address: state.config.advertise_addr.clone(),
-        container,
-      },
-    ))
-  })
-  .collect::<FuturesUnordered<_>>()
-  .collect::<Vec<Result<(ContainerInspectResponse, NodeContainerSummary), _>>>()
-  .await.into_iter().collect::<Result<Vec<(ContainerInspectResponse, NodeContainerSummary)>, _>>()
+) -> Result<Vec<NodeContainerSummary>, HttpError> {
+  // Convert into a hashmap for faster lookup
+  let nodes = repositories::node::list(&state.pool).await?;
+  let nodes = nodes
+    .into_iter()
+    .map(|node| (node.name.clone(), node))
+    .collect::<std::collections::HashMap<String, _>>();
+  repositories::container_instance::list_by_kind("Job", name, &state.pool)
+    .await?
+    .into_iter()
+    .map(|instance| {
+      Ok::<_, HttpError>(NodeContainerSummary {
+        node: instance.node_id.clone(),
+        ip_address: match nodes.get(&instance.node_id) {
+          Some(node) => node.ip_address.clone(),
+          None => "Unknow".to_owned(),
+        },
+        container: instance.data,
+      })
+    })
+    .collect::<Result<Vec<NodeContainerSummary>, _>>()
 }
 
 /// ## Count instances
@@ -116,13 +115,14 @@ async fn inspect_instances(
 ///   * [usize] - The number of running instances
 ///
 fn count_instances(
-  instances: &[(ContainerInspectResponse, NodeContainerSummary)],
+  instances: &[NodeContainerSummary],
 ) -> (usize, usize, usize, usize) {
   let mut instance_failed = 0;
   let mut instance_success = 0;
   let mut instance_running = 0;
-  for (container_inspect, _) in instances {
-    let state = container_inspect.state.clone().unwrap_or_default();
+  for instance in instances {
+    let container = &instance.container;
+    let state = container.state.clone().unwrap_or_default();
     if state.running.unwrap_or_default() {
       instance_running += 1;
       continue;
@@ -282,7 +282,9 @@ pub async fn create(
       async move {
         let mut container = container.clone();
         let mut labels = container.labels.clone().unwrap_or_default();
-        labels.insert("io.nanocl.job".to_owned(), job_name.clone());
+        labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
+        labels.insert("io.nanocl.kind".to_owned(), "Job".to_owned());
+        labels.insert("io.nanocl.j".to_owned(), job_name.clone());
         container.labels = Some(labels);
         state
           .docker_api
@@ -328,8 +330,9 @@ pub async fn start_by_name(
   let containers = inspect_instances(name, state).await?;
   containers
     .into_iter()
-    .map(|(inspect, _)| async {
+    .map(|inspect| async {
       if inspect
+        .container
         .state
         .unwrap_or_default()
         .running
@@ -340,7 +343,7 @@ pub async fn start_by_name(
       state
         .docker_api
         .start_container(
-          &inspect.id.unwrap_or_default(),
+          &inspect.container.id.unwrap_or_default(),
           None::<StartContainerOptions<String>>,
         )
         .await?;
@@ -491,11 +494,7 @@ pub async fn inspect_by_name(
     instance_success,
     instance_running,
     instance_failed,
-    instances: instances
-      .clone()
-      .into_iter()
-      .map(|(_, container)| container)
-      .collect(),
+    instances,
   };
   Ok(job_inspect)
 }

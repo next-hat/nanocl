@@ -638,6 +638,7 @@ mod tests {
     assert_cli_ok!("cargo", "restart", CARGO_NAME);
     assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "running");
     assert_cli_ok!("cargo", "stop", CARGO_NAME);
+    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
     assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "exited");
     assert_cli_ok!("cargo", "ls");
     assert_cli_ok!("cargo", "ls", "-q");

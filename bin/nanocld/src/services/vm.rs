@@ -40,9 +40,7 @@ pub(crate) async fn list_vm(
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let vms =
-    utils::vm::list_by_namespace(&namespace, &state.docker_api, &state.pool)
-      .await?;
+  let vms = utils::vm::list_by_namespace(&namespace, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&vms))
 }
 

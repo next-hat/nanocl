@@ -32,3 +32,5 @@ pub mod resource_config;
 pub mod secret;
 /// Manage job table
 pub mod job;
+/// Manage container_instances table
+pub mod container_instance;

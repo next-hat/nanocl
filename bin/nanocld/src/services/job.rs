@@ -236,18 +236,6 @@ mod tests {
       http::StatusCode::OK,
       format!("wait job {}", &job.name)
     );
-    client
-      .send_post(
-        &format!("{job_endpoint}/start"),
-        None::<String>,
-        None::<String>,
-      )
-      .await;
-    test_status_code!(
-      wait_res.status(),
-      http::StatusCode::OK,
-      format!("start job {}", &job.name)
-    );
     let mut res = client.get(ENDPOINT).send().await.unwrap();
     let _ = res.json::<Vec<JobSummary>>().await.unwrap();
     let res = client
@@ -262,6 +250,18 @@ mod tests {
       res.status(),
       http::StatusCode::BAD_REQUEST,
       "wait job bad condition"
+    );
+    client
+      .send_post(
+        &format!("{job_endpoint}/start"),
+        None::<String>,
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      wait_res.status(),
+      http::StatusCode::OK,
+      format!("start job {}", &job.name)
     );
     let mut stream = wait_res.into_stream();
     while let Some(Ok(wait_response)) = stream.next().await {

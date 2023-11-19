@@ -132,8 +132,6 @@ pub struct ProccessQuery {
   pub all: bool,
   /// Return this number of most recently created containers
   pub last: Option<isize>,
-  /// Return the size of container as fields `SizeRw` and `SizeRootFs`
-  pub size: bool,
   /// Show all containers running for the given namespace
   pub namespace: Option<String>,
 }
@@ -143,7 +141,6 @@ impl From<ProccessQuery> for ListContainersOptions<String> {
     ListContainersOptions {
       all: query.all,
       limit: query.last,
-      size: query.size,
       ..Default::default()
     }
   }

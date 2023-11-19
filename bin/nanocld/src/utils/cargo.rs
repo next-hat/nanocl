@@ -108,10 +108,11 @@ async fn create_instances(
         // Add cargo label to the container to track it
         let mut labels =
           cargo.config.container.labels.to_owned().unwrap_or_default();
-        labels.insert("io.nanocl".into(), "enabled".into());
-        labels.insert("io.nanocl.c".into(), cargo.key.to_owned());
-        labels.insert("io.nanocl.n".into(), cargo.namespace_name.to_owned());
-        labels.insert("io.nanocl.cnsp".into(), cargo.namespace_name.to_owned());
+        labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
+        labels.insert("io.nanocl.kind".to_owned(), "Cargo".to_owned());
+        labels.insert("io.nanocl.c".to_owned(), cargo.key.to_owned());
+        labels
+          .insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
         labels.insert(
           "com.docker.compose.project".into(),
           format!("nanocl_{}", cargo.namespace_name),
@@ -773,35 +774,26 @@ pub async fn list(
   let query = query.merge(namespace);
   let cargoes = repositories::cargo::list_by_query(&query, &state.pool).await?;
   let mut cargo_summaries = Vec::new();
-  let nodes =
-    repositories::node::list_unless(&state.config.hostname, &state.pool)
-      .await?;
   for cargo in cargoes {
     let config =
       repositories::cargo_config::find_by_key(&cargo.config_key, &state.pool)
         .await?;
-    let mut containers = list_instances(&cargo.key, &state.docker_api).await?;
-    for node in &nodes {
-      let client = node.to_http_client();
-      let node_containers = match client
-        .list_cargo_instance(&cargo.name, Some(&cargo.namespace_name))
-        .await
-      {
-        Ok(containers) => containers,
-        Err(err) => {
-          log::error!(
-            "Unable to list cargo instance on node {} : {}",
-            node.name,
-            err
-          );
-          continue;
-        }
-      };
-      containers.extend(node_containers);
-    }
+    let instances = repositories::container_instance::list_by_kind(
+      "Cargo",
+      &cargo.key,
+      &state.pool,
+    )
+    .await?;
     let mut running_instances = 0;
-    for container in containers.clone() {
-      if container.state == Some("running".into()) {
+    for instance in &instances {
+      let is_running = instance
+        .data
+        .state
+        .clone()
+        .unwrap_or_default()
+        .running
+        .unwrap_or_default();
+      if is_running {
         running_instances += 1;
       }
     }
@@ -812,7 +804,7 @@ pub async fn list(
       name: cargo.name,
       namespace_name: cargo.namespace_name,
       config: config.to_owned(),
-      instance_total: containers.len(),
+      instance_total: instances.len(),
       instance_running: running_instances,
       config_key: config.key,
     });
@@ -840,59 +832,48 @@ pub async fn inspect_by_key(
   state: &DaemonState,
 ) -> Result<CargoInspect, HttpError> {
   let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
-  let containers = list_instances(&cargo.key, &state.docker_api).await?;
-  let mut containers = containers
-    .into_iter()
-    .map(|c| {
-      NodeContainerSummary::new(
-        state.config.hostname.clone(),
-        state.config.advertise_addr.clone(),
-        c,
-      )
-    })
-    .collect::<Vec<NodeContainerSummary>>();
-  let nodes =
-    repositories::node::list_unless(&state.config.hostname, &state.pool)
-      .await?;
-  for node in &nodes {
-    let client = node.to_http_client();
-    let node_containers = match client
-      .list_cargo_instance(&cargo.name, Some(&cargo.namespace_name))
-      .await
-    {
-      Ok(containers) => containers,
-      Err(err) => {
-        log::error!(
-          "Unable to list cargo instance on node {} : {}",
-          node.name,
-          err
-        );
-        continue;
-      }
-    };
-    let node_containers = node_containers
-      .into_iter()
-      .map(|c| {
-        NodeContainerSummary::new(node.name.clone(), node.ip_address.clone(), c)
-      })
-      .collect::<Vec<NodeContainerSummary>>();
-    containers.extend(node_containers);
-  }
   let mut running_instances = 0;
-  for nc in &containers {
-    if nc.container.state == Some("running".into()) {
-      running_instances += 1;
-    }
-  }
+  let instances =
+    repositories::container_instance::list_by_kind("Cargo", key, &state.pool)
+      .await?;
+  let nodes = repositories::node::list(&state.pool).await?;
+  // Convert into a hashmap for faster lookup
+  let nodes = nodes
+    .into_iter()
+    .map(|node| (node.name.clone(), node))
+    .collect::<std::collections::HashMap<String, _>>();
+  let instances = instances
+    .into_iter()
+    .map(|instance| {
+      let node_instance = NodeContainerSummary {
+        node: instance.node_id.clone(),
+        ip_address: match nodes.get(&instance.node_id) {
+          Some(node) => node.ip_address.clone(),
+          None => "Unknow".to_owned(),
+        },
+        container: instance.data.clone(),
+      };
+      if instance
+        .data
+        .state
+        .unwrap_or_default()
+        .running
+        .unwrap_or_default()
+      {
+        running_instances += 1;
+      }
+      node_instance
+    })
+    .collect::<Vec<_>>();
   Ok(CargoInspect {
     key: cargo.key,
     name: cargo.name,
     config_key: cargo.config_key,
     namespace_name: cargo.namespace_name,
     config: cargo.config,
-    instance_total: containers.len(),
+    instance_total: instances.len(),
     instance_running: running_instances,
-    instances: containers,
+    instances,
   })
 }
 

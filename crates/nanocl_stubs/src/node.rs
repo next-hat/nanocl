@@ -1,4 +1,4 @@
-use bollard_next::service::ContainerSummary;
+use bollard_next::service::ContainerInspectResponse;
 
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
@@ -19,14 +19,14 @@ pub struct Node {
 pub struct NodeContainerSummary {
   pub node: String,
   pub ip_address: String,
-  pub container: ContainerSummary,
+  pub container: ContainerInspectResponse,
 }
 
 impl NodeContainerSummary {
   pub fn new(
     node: String,
     ip_address: String,
-    container: ContainerSummary,
+    container: ContainerInspectResponse,
   ) -> Self {
     Self {
       node,
