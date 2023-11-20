@@ -4,7 +4,7 @@ use ntex::channel::mpsc;
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 
 use nanocl_stubs::system::Event;
 use nanocl_stubs::job::JobPartial;
@@ -29,16 +29,14 @@ use crate::models::{StateFileData, DaemonState};
 /// * [namespace](Option) - The optional [namespace name](String)
 /// * [state](DaemonState) - The system state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - [Namespace name](String) if successful
-///   * [Err](Err) - [Http error](HttpError) if something went wrong
+/// [HttpResult](HttpResult) containing a [String](String)
 ///
 async fn ensure_namespace_existence(
   namespace: &Option<String>,
   state: &DaemonState,
-) -> Result<String, HttpError> {
+) -> HttpResult<String> {
   if let Some(namespace) = namespace {
     utils::namespace::create_if_not_exists(namespace, state).await?;
     return Ok(namespace.to_owned());
@@ -54,13 +52,11 @@ async fn ensure_namespace_existence(
 ///
 /// * [state_stream](StateStream) - The state stream to convert
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Bytes) - The bytes to send to the client
-///   * [Err](HttpError) - An http response error if something went wrong
+/// [HttpResult](HttpResult) containing a [Bytes](Bytes)
 ///
-fn stream_to_bytes(state_stream: StateStream) -> Result<Bytes, HttpError> {
+fn stream_to_bytes(state_stream: StateStream) -> HttpResult<Bytes> {
   let bytes =
     serde_json::to_string(&state_stream).map_err(|err| HttpError {
       status: http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -76,12 +72,9 @@ fn stream_to_bytes(state_stream: StateStream) -> Result<Bytes, HttpError> {
 /// ## Arguments
 ///
 /// * [state_stream](StateStream) - The state stream to send
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [sx](mpsc::Sender) - The response sender
 ///
-fn send(
-  state_stream: StateStream,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
-) {
+fn send(state_stream: StateStream, sx: &mpsc::Sender<HttpResult<Bytes>>) {
   let _ = sx.send(stream_to_bytes(state_stream));
 }
 
@@ -93,15 +86,13 @@ fn send(
 ///
 /// * [data](serde_json::Value) - The state payload
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](StateData) - The state data
-///   * [Err](HttpError) - An http response error if something went wrong
+/// [HttpResult](HttpResult) containing a [StateFileData](StateFileData)
 ///
-pub fn parse_state(
+pub(crate) fn parse_state(
   data: &serde_json::Value,
-) -> Result<StateFileData, HttpError> {
+) -> HttpResult<StateFileData> {
   let meta =
     serde_json::from_value::<StateMeta>(data.to_owned()).map_err(|err| {
       HttpError {
@@ -177,13 +168,13 @@ pub fn parse_state(
 ///
 /// * [data](Vec<SecretPartial>) - The list of secrets to apply
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [sx](mpsc::Sender) - The response sender
 ///
 async fn apply_secrets(
   data: &[SecretPartial],
   state: &DaemonState,
   qs: &StateApplyQuery,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+  sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
   data
     .iter()
@@ -247,13 +238,13 @@ async fn apply_secrets(
 ///
 /// * [data](Vec<JobPartial>) - The list of jobs to apply
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [sx](mpsc::Sender) - The response sender
 ///
 async fn apply_jobs(
   data: &[JobPartial],
   state: &DaemonState,
   qs: &StateApplyQuery,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+  sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
   data
     .iter()
@@ -309,7 +300,7 @@ async fn apply_jobs(
 /// * [data](Vec<CargoConfigPartial>) - The list of cargoes to apply
 /// * [version](str) - The version of the cargoes
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [sx](mpsc::Sender) - The response sender
 ///
 async fn apply_cargoes(
   namespace: &str,
@@ -317,7 +308,7 @@ async fn apply_cargoes(
   version: &str,
   state: &DaemonState,
   qs: &StateApplyQuery,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+  sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
   data
     .iter()
@@ -380,15 +371,15 @@ async fn apply_cargoes(
 /// * [data](Vec<VmConfigPartial>) - The VMs to apply
 /// * [version](str) - The version of the VMs
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [sx](mpsc::Sender) - The response sender
 ///
-pub async fn apply_vms(
+pub(crate) async fn apply_vms(
   namespace: &str,
   data: &[VmConfigPartial],
   version: &str,
   state: &DaemonState,
   qs: &StateApplyQuery,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+  sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
   data
     .iter()
@@ -447,19 +438,13 @@ pub async fn apply_vms(
 ///
 /// * [data](Vec<ResourcePartial>) - The list of resources to apply
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
+/// * [sx](mpsc::Sender) - The response sender
 ///
 async fn apply_resources(
   data: &[ResourcePartial],
   state: &DaemonState,
   qs: &StateApplyQuery,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+  sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
   data
     .iter()
@@ -549,7 +534,7 @@ async fn remove_jobs(
 /// * [state](DaemonState) - The system state
 /// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
-/// ## Returns
+/// ## Return
 ///
 /// * [Result](Result) - The result of the operation
 ///   * [Ok](()) - The operation was successful
@@ -604,7 +589,7 @@ async fn remove_secrets(
 /// * [state](DaemonState) - The system state
 /// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
-/// ## Returns
+/// ## Return
 ///
 /// * [Result](Result) - The result of the operation
 ///   * [Ok](()) - The operation was successful
@@ -658,7 +643,7 @@ async fn remove_cargoes(
 /// * [state](DaemonState) - The system state
 /// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
 ///
-pub async fn remove_vms(
+pub(crate) async fn remove_vms(
   namespace: &str,
   data: &[VmConfigPartial],
   state: &DaemonState,
@@ -747,16 +732,16 @@ async fn remove_resources(
 /// * [data](StateFileData) - The Statefile data
 /// * [state](DaemonState) - The system state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// A Stream of [Result](Result) of [Bytes](Bytes) or [HttpError](HttpError)
+/// [Receiver](mpsc::Receiver) of [HttpResult](HttpResult) of [Bytes](Bytes)
 ///
-pub fn apply_statefile(
+pub(crate) fn apply_statefile(
   data: &StateFileData,
   version: &str,
   qs: &StateApplyQuery,
   state: &DaemonState,
-) -> mpsc::Receiver<Result<Bytes, HttpError>> {
+) -> mpsc::Receiver<HttpResult<Bytes>> {
   let state = state.clone();
   let version = version.to_owned();
   let data = data.clone();
@@ -827,14 +812,14 @@ pub fn apply_statefile(
 /// * [data](StateFileData) - The Statefile data
 /// * [state](DaemonState) - The system state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// A Stream of [Result](Result) of [Bytes](Bytes) or [HttpError](HttpError)
+/// [Receiver](mpsc::Receiver) of [HttpResult](HttpResult) of [Bytes](Bytes)
 ///
-pub fn remove_statefile(
+pub(crate) fn remove_statefile(
   data: &StateFileData,
   state: &DaemonState,
-) -> mpsc::Receiver<Result<Bytes, HttpError>> {
+) -> mpsc::Receiver<HttpResult<Bytes>> {
   let data = data.clone();
   let state = state.clone();
   let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();

@@ -20,13 +20,11 @@ use crate::models::{
 /// * [nsp](NamespaceDbModel) - Namespace item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///  * [Ok](Vec<VmDbModel>) - List a vm found
-///  * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [VmDbModel](VmDbModel)
 ///
-pub async fn find_by_namespace(
+pub(crate) async fn find_by_namespace(
   nsp: &NamespaceDbModel,
   pool: &Pool,
 ) -> IoResult<Vec<VmDbModel>> {
@@ -54,13 +52,11 @@ pub async fn find_by_namespace(
 /// * [item](VmConfigPartial) - Vm item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vm) - The vm created
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vm](Vm)
 ///
-pub async fn create(
+pub(crate) async fn create(
   nsp: &str,
   item: &VmConfigPartial,
   version: &str,
@@ -96,13 +92,14 @@ pub async fn create(
 /// * [key](str) - Vm key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - The number of deleted items
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
+pub(crate) async fn delete_by_key(
+  key: &str,
+  pool: &Pool,
+) -> IoResult<GenericDelete> {
   use crate::schema::vms;
   let key = key.to_owned();
   super::generic::delete_by_id::<vms::table, _>(key, pool).await
@@ -117,13 +114,11 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 /// * [key](str) - Vm key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmDbModel) - The vm found
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [VmDbModel](VmDbModel)
 ///
-pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
+pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
   use crate::schema::vms;
   let key = key.to_owned();
   super::generic::find_by_id::<vms::table, _, _>(key, pool).await
@@ -140,13 +135,11 @@ pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
 /// * [version](str) - Vm version
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vm) - The vm updated
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vm](Vm)
 ///
-pub async fn update_by_key(
+pub(crate) async fn update_by_key(
   key: &str,
   item: &VmConfigPartial,
   version: &str,
@@ -178,13 +171,11 @@ pub async fn update_by_key(
 /// * [key](str) - Vm key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vm) - The vm found
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vm](Vm)
 ///
-pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
+pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
   use crate::schema::vms;
   use crate::schema::vm_configs;
   let key = key.to_owned();

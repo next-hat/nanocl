@@ -4,9 +4,8 @@ use ntex::web;
 use ntex::http;
 use futures::StreamExt;
 
-use nanocl_stubs::vm_image::VmImageResizePayload;
-
 use nanocl_error::http::HttpError;
+use nanocl_stubs::vm_image::VmImageResizePayload;
 
 use crate::{utils, repositories};
 use crate::models::DaemonState;
@@ -187,7 +186,7 @@ pub(crate) async fn delete_vm_image(
   Ok(web::HttpResponse::Ok().into())
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(import_vm_image);
   config.service(list_vm_images);
   config.service(delete_vm_image);

@@ -15,7 +15,7 @@ impl NanocldClient {
   ///
   /// * [query](Option) - The optional [query](HttpMetricListQuery)
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [http metrics](HttpMetric) if operation was successful

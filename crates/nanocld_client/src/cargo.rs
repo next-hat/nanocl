@@ -29,7 +29,7 @@ impl NanocldClient {
   /// * [item](CargoConfigPartial) - A reference of a [cargo config partial](CargoConfigPartial)
   /// * [namespace](Option) - The [namespace](str) to create the cargo in
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The created [cargo](Cargo) if the operation succeeded
@@ -75,7 +75,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the cargo to delete
   /// * [query](CargoDeleteQuery) - The [namespace](str) where the cargo belongs
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The [cargo](Cargo) was deleted if the operation succeeded
@@ -110,7 +110,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the cargo to inspect
   /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The desired [cargo](Cargo) if the operation succeeded
@@ -148,7 +148,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the cargo to start
   /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The [cargo](Cargo) was started if the operation succeeded
@@ -187,7 +187,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the cargo to stop
   /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The [cargo](Cargo) was stopped if the operation succeeded
@@ -226,7 +226,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the cargo to restart
   /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The [cargo](Cargo) was restarted if the operation succeeded
@@ -264,7 +264,7 @@ impl NanocldClient {
   ///
   /// * [namespace](Option) - The [namespace](str) where the cargoes belongs
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [cargo summary](CargoSummary) if the operation succeeded
@@ -300,7 +300,7 @@ impl NanocldClient {
   /// * [cargo](CargoConfigUpdate) - The config to patch the cargo with
   /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The [cargo](Cargo) was patched if the operation succeeded
@@ -345,7 +345,7 @@ impl NanocldClient {
   /// * [cargo](CargoConfigPartial) - The config to update the cargo with
   /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The cargo was put if the operation succeeded
@@ -386,7 +386,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the cargo to list the histories
   /// * [namespace](Option) - The [namespace](str) where belong the cargo
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [cargo config](CargoConfig) if the operation succeeded
@@ -423,7 +423,7 @@ impl NanocldClient {
   /// * [id](str) - The id of the history to revert to
   /// * [namespace](Option) - The [namespace](str) where belong the cargo
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The [cargo](Cargo) reverted if the operation succeeded
@@ -505,7 +505,7 @@ impl NanocldClient {
   /// * [query](Option) - The optional [query](CargoKillOptions)
   /// * [namespace](Option) - The [namespace](str) where belong the cargo
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The [cargo](Cargo) was killed if the operation succeeded
@@ -545,7 +545,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the cargo to list the instances
   /// * [namespace](Option) - The [namespace](str) where belong the cargo
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [container summary](ContainerSummary) if the operation succeeded

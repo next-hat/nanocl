@@ -1,21 +1,21 @@
-pub mod ws;
-pub mod key;
-pub mod stream;
+pub(crate) mod ws;
+pub(crate) mod key;
+pub(crate) mod stream;
 
-pub mod store;
-pub mod system;
-pub mod namespace;
-pub mod cargo;
-pub mod cargo_image;
-pub mod vm;
-pub mod vm_image;
-pub mod job;
-pub mod exec;
-pub mod state;
-pub mod proxy;
-pub mod resource;
-pub mod metric;
-pub mod ctrl_client;
+pub(crate) mod store;
+pub(crate) mod system;
+pub(crate) mod namespace;
+pub(crate) mod cargo;
+pub(crate) mod cargo_image;
+pub(crate) mod vm;
+pub(crate) mod vm_image;
+pub(crate) mod job;
+pub(crate) mod exec;
+pub(crate) mod state;
+pub(crate) mod proxy;
+pub(crate) mod resource;
+pub(crate) mod metric;
+pub(crate) mod ctrl_client;
 
 #[cfg(test)]
 pub mod tests {
@@ -56,7 +56,7 @@ pub mod tests {
   ///
   /// Generate a docker client for tests purpose
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [bollard_next::Docker](bollard_next::Docker) - The docker client
   ///
@@ -80,7 +80,7 @@ pub mod tests {
   ///
   /// * [path](str) Path to the state file
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) Result of the operation
   ///   * [Ok](serde_json::Value) - The state file parsed
@@ -99,7 +99,7 @@ pub mod tests {
   ///
   /// Generate a postgre pool for tests purpose
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Pool](Pool) - The postgre pool
   ///
@@ -122,7 +122,7 @@ pub mod tests {
   ///
   /// * [routes](Config) Routes to configure
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [TestServer](TestServer) - The test server
   ///

@@ -17,13 +17,11 @@ use crate::models::{Pool, NamespaceDbModel};
 /// * [item](NamespacePartial) - Namespace to create
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](NamespaceDbModel) - Namespace created
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [NamespaceDbModel](NamespaceDbModel)
 ///
-pub async fn create(
+pub(crate) async fn create(
   item: &NamespacePartial,
   pool: &Pool,
 ) -> IoResult<NamespaceDbModel> {
@@ -43,13 +41,11 @@ pub async fn create(
 /// * [query](NamespaceListQuery) - Namespace list query
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<NamespaceDbModel>) - List of namespaces
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [NamespaceDbModel](NamespaceDbModel)
 ///
-pub async fn list(
+pub(crate) async fn list(
   query: &NamespaceListQuery,
   pool: &Pool,
 ) -> IoResult<Vec<NamespaceDbModel>> {
@@ -86,13 +82,11 @@ pub async fn list(
 /// * [name](str) - Name of the namespace to delete
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - Number of deleted namespaces
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_name(
+pub(crate) async fn delete_by_name(
   name: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
@@ -110,13 +104,11 @@ pub async fn delete_by_name(
 /// * [name](str) - Name of the namespace to find
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](NamespaceDbModel) - Namespace found
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [NamespaceDbModel](NamespaceDbModel)
 ///
-pub async fn find_by_name(
+pub(crate) async fn find_by_name(
   name: &str,
   pool: &Pool,
 ) -> IoResult<NamespaceDbModel> {
@@ -134,13 +126,11 @@ pub async fn find_by_name(
 /// * [name](str) - Name of the namespace to check
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](bool) - Existence of the namespace
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [bool](bool)
 ///
-pub async fn exist_by_name(name: &str, pool: &Pool) -> IoResult<bool> {
+pub(crate) async fn exist_by_name(name: &str, pool: &Pool) -> IoResult<bool> {
   use crate::schema::namespaces;
   let name = name.to_owned();
   let pool = pool.clone();

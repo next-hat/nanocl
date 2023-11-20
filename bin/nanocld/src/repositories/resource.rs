@@ -20,13 +20,14 @@ use crate::models::{
 /// * [item](ResourcePartial) - Resource item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Resource) - Resource created
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Resource](Resource)
 ///
-pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
+pub(crate) async fn create(
+  item: &ResourcePartial,
+  pool: &Pool,
+) -> IoResult<Resource> {
   let config = ResourceConfigDbModel {
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
@@ -57,13 +58,14 @@ pub async fn create(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
 /// * [key](str) - Resource key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - Number of deleted items
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
+pub(crate) async fn delete_by_key(
+  key: &str,
+  pool: &Pool,
+) -> IoResult<GenericDelete> {
   use crate::schema::resources;
   let key = key.to_owned();
   super::generic::delete_by_id::<resources::table, _>(key, pool).await
@@ -78,13 +80,11 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 /// * [query](ResourceQuery) - Query to filter resources
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<Resource>) - List of resources
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [Resource](Resource)
 ///
-pub async fn find(
+pub(crate) async fn find(
   query: Option<ResourceQuery>,
   pool: &Pool,
 ) -> IoResult<Vec<Resource>> {
@@ -152,13 +152,14 @@ pub async fn find(
 /// * [key](str) - Resource key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Resource) - Resource item
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Resource](Resource)
 ///
-pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Resource> {
+pub(crate) async fn inspect_by_key(
+  key: &str,
+  pool: &Pool,
+) -> IoResult<Resource> {
   use crate::schema::resources;
   use crate::schema::resource_configs;
   let key = key.to_owned();
@@ -187,14 +188,14 @@ pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Resource> {
 /// * [item](ResourcePartial) - Resource item to put
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Resource) - Resource item
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Resource](Resource)
 ///
-///
-pub async fn put(item: &ResourcePartial, pool: &Pool) -> IoResult<Resource> {
+pub(crate) async fn put(
+  item: &ResourcePartial,
+  pool: &Pool,
+) -> IoResult<Resource> {
   use crate::schema::resources;
   let key = item.name.clone();
   let resource =

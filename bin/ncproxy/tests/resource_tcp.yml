@@ -11,7 +11,7 @@ Resources:
       Rules:
         - Protocol: Tcp
           Port: 9999
-          Network: Public
+          Network: Internal
           Target:
             Key: get-started.global.c
             Port: 9000

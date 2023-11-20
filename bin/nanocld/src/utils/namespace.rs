@@ -6,7 +6,7 @@ use bollard_next::models::ContainerSummary;
 use bollard_next::container::ListContainersOptions;
 use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
@@ -25,44 +25,39 @@ use super::cargo;
 ///
 /// ## Arguments
 ///
-/// * [namespace](NamespacePartial) - The namespace name
-/// * [docker_api](bollard_next::Docker) - The docker api
-/// * [pool](Pool) - The database pool
+/// * [item](NamespacePartial) - The namespace to create
+/// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Namespace) - The namespace has been created
-///   * [Err](HttpError) - The namespace has not been created
+/// [HttpResult](HttpResult) containing a [Namespace](Namespace)
 ///
-pub async fn create(
-  namespace: &NamespacePartial,
+pub(crate) async fn create(
+  item: &NamespacePartial,
   state: &DaemonState,
-) -> Result<Namespace, HttpError> {
-  if repositories::namespace::exist_by_name(&namespace.name, &state.pool)
-    .await?
-  {
+) -> HttpResult<Namespace> {
+  if repositories::namespace::exist_by_name(&item.name, &state.pool).await? {
     return Err(HttpError {
-      msg: format!("namespace {} error: already exist", &namespace.name),
+      msg: format!("namespace {} error: already exist", &item.name),
       status: http::StatusCode::CONFLICT,
     });
   }
   if state
     .docker_api
-    .inspect_network(&namespace.name, None::<InspectNetworkOptions<String>>)
+    .inspect_network(&item.name, None::<InspectNetworkOptions<String>>)
     .await
     .is_ok()
   {
-    let res = repositories::namespace::create(namespace, &state.pool).await?;
+    let res = repositories::namespace::create(item, &state.pool).await?;
     return Ok(Namespace { name: res.name });
   }
   let config = CreateNetworkOptions {
-    name: namespace.name.to_owned(),
+    name: item.name.to_owned(),
     driver: String::from("bridge"),
     ..Default::default()
   };
   state.docker_api.create_network(config).await?;
-  let res = repositories::namespace::create(namespace, &state.pool).await?;
+  let res = repositories::namespace::create(item, &state.pool).await?;
   Ok(Namespace { name: res.name })
 }
 
@@ -73,19 +68,16 @@ pub async fn create(
 /// ## Arguments
 ///
 /// * [name](str) - The namespace name
-/// * [docker_api](bollard_next::Docker) - The docker api
-/// * [pool](Pool) - The database pool
+/// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - The namespace has been removed
-///   * [Err](HttpError) - The namespace has not been removed
+/// [HttpResult](HttpResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_name(
+pub(crate) async fn delete_by_name(
   name: &str,
   state: &DaemonState,
-) -> Result<GenericDelete, HttpError> {
+) -> HttpResult<GenericDelete> {
   utils::cargo::delete_by_namespace(name, state).await?;
   if let Err(err) = state.docker_api.remove_network(name).await {
     log::error!("Unable to remove network {} got error: {}", name, err);
@@ -103,16 +95,14 @@ pub async fn delete_by_name(
 /// * [namespace](str) - The namespace
 /// * [docker_api](bollard_next::Docker) - The docker api
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<ContainerSummary>) - The containers have been listed
-///   * [Err](HttpError) - The containers have not been listed
+/// [HttpResult](HttpResult) containing a [Vec](Vec) of [ContainerSummary](ContainerSummary)
 ///
-pub async fn list_instances(
+pub(crate) async fn list_instances(
   namespace: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<Vec<ContainerSummary>, HttpError> {
+) -> HttpResult<Vec<ContainerSummary>> {
   let label = format!("io.nanocl.n={namespace}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
@@ -134,17 +124,15 @@ pub async fn list_instances(
 /// * [docker_api](bollard_next::Docker) - The docker api
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<NamespaceSummary>) - The namespaces have been listed
-///   * [Err](HttpError) - The namespaces have not been listed
+/// [HttpResult](HttpResult) containing a [Vec](Vec) of [NamespaceSummary](NamespaceSummary)
 ///
-pub async fn list(
+pub(crate) async fn list(
   query: &NamespaceListQuery,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
-) -> Result<Vec<NamespaceSummary>, HttpError> {
+) -> HttpResult<Vec<NamespaceSummary>> {
   let items = repositories::namespace::list(query, pool).await?;
   let mut new_items = Vec::new();
   for item in items {
@@ -184,16 +172,14 @@ pub async fn list(
 /// * [name](str) - The namespace name
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](NamespaceInspect) - The namespace has been inspected
-///   * [Err](HttpError) - The namespace has not been inspected
+/// [HttpResult](HttpResult) containing a [NamespaceInspect](NamespaceInspect)
 ///
-pub async fn inspect_by_name(
+pub(crate) async fn inspect_by_name(
   name: &str,
   state: &DaemonState,
-) -> Result<NamespaceInspect, HttpError> {
+) -> HttpResult<NamespaceInspect> {
   let namespace =
     repositories::namespace::find_by_name(name, &state.pool).await?;
   log::debug!("Found namespace to inspect {:?}", &namespace);
@@ -225,16 +211,10 @@ pub async fn inspect_by_name(
 /// * [name](str) - The namespace name
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///  * [Ok](()) - The namespace will exists
-///  * [Err](HttpError) - An error occured
-///
-pub async fn create_if_not_exists(
+pub(crate) async fn create_if_not_exists(
   name: &str,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   if repositories::namespace::find_by_name(name, &state.pool)
     .await
     .is_err()

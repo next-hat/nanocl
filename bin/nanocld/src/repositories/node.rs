@@ -15,13 +15,14 @@ use crate::models::{Pool, NodeDbModel};
 /// * [node](NodeDbModel) - Node item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](NodeDbModel) - The created node item
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [NodeDbModel](NodeDbModel)
 ///
-pub async fn create(node: &NodeDbModel, pool: &Pool) -> IoResult<NodeDbModel> {
+pub(crate) async fn create(
+  node: &NodeDbModel,
+  pool: &Pool,
+) -> IoResult<NodeDbModel> {
   use crate::schema::nodes;
   let node: NodeDbModel = node.clone();
   super::generic::insert_with_res::<nodes::table, NodeDbModel, NodeDbModel>(
@@ -39,13 +40,14 @@ pub async fn create(node: &NodeDbModel, pool: &Pool) -> IoResult<NodeDbModel> {
 /// * [name](str) - Node name
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](NodeDbModel) - The node item
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [NodeDbModel](NodeDbModel)
 ///
-pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<NodeDbModel> {
+pub(crate) async fn find_by_name(
+  name: &str,
+  pool: &Pool,
+) -> IoResult<NodeDbModel> {
   use crate::schema::nodes;
   let name = name.to_owned();
   super::generic::find_by_id::<nodes::table, _, _>(name, pool).await
@@ -60,13 +62,11 @@ pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<NodeDbModel> {
 /// * [node](NodeDbModel) - Node item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](NodeDbModel) - The created node item
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [NodeDbModel](NodeDbModel)
 ///
-pub async fn create_if_not_exists(
+pub(crate) async fn create_if_not_exists(
   node: &NodeDbModel,
   pool: &Pool,
 ) -> IoResult<NodeDbModel> {
@@ -84,13 +84,11 @@ pub async fn create_if_not_exists(
 ///
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<NodeDbModel>) - The list of node items
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [NodeDbModel](NodeDbModel)
 ///
-pub async fn list(pool: &Pool) -> IoResult<Vec<NodeDbModel>> {
+pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<NodeDbModel>> {
   use crate::schema::nodes;
   let pool = pool.clone();
   let items = web::block(move || {
@@ -113,13 +111,11 @@ pub async fn list(pool: &Pool) -> IoResult<Vec<NodeDbModel>> {
 /// * [name](str) - Node name
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<NodeDbModel>) - The list of node items
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [NodeDbModel](NodeDbModel)
 ///
-pub async fn list_unless(
+pub(crate) async fn list_unless(
   name: &str,
   pool: &Pool,
 ) -> IoResult<Vec<NodeDbModel>> {

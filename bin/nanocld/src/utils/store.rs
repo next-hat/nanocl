@@ -20,13 +20,11 @@ use crate::models::{Pool, DBConn};
 ///
 /// * [host](str) Host to connect to
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) Result of the operation
-///   * [Ok](Pool) - The pool has been created
-///   * [Err](IoError) - The pool has not been created
+/// [IoResult](IoResult) containing a [Pool](Pool)
 ///
-pub async fn create_pool(
+pub(crate) async fn create_pool(
   host: &str,
   daemon_conf: &DaemonConfig,
 ) -> IoResult<Pool> {
@@ -51,13 +49,11 @@ pub async fn create_pool(
 ///
 /// [pool](Pool) a pool wrapped in ntex State
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) Result of the operation
-///   * [Ok](DBConn) - The connection has been retrieved
-///   * [Err](IoError) - The connection has not been retrieved
+/// [IoResult](IoResult) containing a [DBConn](DBConn)
 ///
-pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
+pub(crate) fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
   let conn = match pool.get() {
     Ok(conn) => conn,
     Err(err) => {
@@ -79,11 +75,9 @@ pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
 ///
 /// * [addr](str) Address of the store
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) Result of the operation
-///   * [Ok](()) - The store is ready
-///   * [Err](IoError) - The store is not ready
+/// [IoResult](IoResult) containing a [DBConn](DBConn)
 ///
 async fn wait_store(addr: &str) -> IoResult<()> {
   // Open tcp connection to check if store is ready
@@ -112,11 +106,9 @@ async fn wait_store(addr: &str) -> IoResult<()> {
 /// We also run latest migration on our database to have the latest schema.
 /// It will return a connection Pool that will be use in our State.
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) Result of the operation
-///   * [Ok](Pool) - The pool has been created
-///   * [Err](IoError) - The pool has not been created
+/// [IoResult](IoResult) containing a [Pool](Pool)
 ///
 pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");

@@ -3,12 +3,11 @@
 */
 use ntex::web;
 
+use nanocl_error::http::HttpError;
 use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
 
 use crate::{utils, repositories};
 use crate::models::DaemonState;
-
-use nanocl_error::http::HttpError;
 
 /// List namespaces
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -99,7 +98,7 @@ pub(crate) async fn delete_namespace(
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_namespace);
   config.service(create_namespace);
   config.service(inspect_namespace);

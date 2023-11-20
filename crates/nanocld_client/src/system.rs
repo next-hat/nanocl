@@ -11,7 +11,7 @@ use super::http_client::NanocldClient;
 impl NanocldClient {
   /// ## Get the version of the daemon
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Version](Version) if operation was successful
@@ -36,7 +36,7 @@ impl NanocldClient {
   /// Watch daemon events
   /// It will emit an event when the daemon state change
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - A [Receiver](mpsc::Receiver) of [events](Event) if operation was successful
@@ -65,7 +65,7 @@ impl NanocldClient {
   ///
   /// Check if the daemon is running
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - If operation was successful
@@ -89,7 +89,7 @@ impl NanocldClient {
   ///
   /// Get details about the host and docker daemon
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [HostInfo](HostInfo) if operation was successful
@@ -117,7 +117,7 @@ impl NanocldClient {
   ///
   /// * [opts](Option) - The optional [query](ProccessQuery)
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [node container summary](NodeContainerSummary) if operation succeeded

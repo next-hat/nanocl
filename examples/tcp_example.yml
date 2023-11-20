@@ -14,7 +14,7 @@ Resources:
         - tcp-example.global.c
       Rules:
         - Domain: tcp-example.com
-          Network: Public
+          Network: Internal
           Protocol: Tcp
           Port: 9000
           Target:

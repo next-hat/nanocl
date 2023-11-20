@@ -10,7 +10,7 @@ Resources:
         - get-started.global.c
       Rules:
         - Domain: get-started.com
-          Network: Public
+          Network: Internal
           Locations:
             - Path: /
               Target:

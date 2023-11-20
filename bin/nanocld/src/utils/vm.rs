@@ -101,7 +101,7 @@ pub(crate) async fn stop_by_key(
 /// * [docker_api](bollard_next::Docker) - The docker api
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [VmInspect](VmInspect)
 ///
@@ -139,9 +139,9 @@ pub(crate) async fn inspect_by_key(
 /// * [vm_key](str) - The vm key
 /// * [docker_api](Docker) - The docker api
 ///
-/// ## Returns
+/// ## Return
 ///
-/// [HttpResult](HttpResult) containing a [vector](Vec) of [ContainerSummary](ContainerSummary)
+/// [HttpResult](HttpResult) containing a [Vec](Vec) of [ContainerSummary](ContainerSummary)
 ///
 pub(crate) async fn list_instances_by_key(
   vm_key: &str,
@@ -205,9 +205,9 @@ pub(crate) async fn delete_by_key(
 /// * [docker_api](bollard_next::Docker) - The docker api
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// [HttpResult](HttpResult) containing a [vector](Vec) of [VmSummary](VmSummary)
+/// [HttpResult](HttpResult) containing a [Vec](Vec) of [VmSummary](VmSummary)
 ///
 pub(crate) async fn list_by_namespace(
   nsp: &str,
@@ -384,7 +384,7 @@ pub(crate) async fn create_instance(
 /// * [version](str) - The version
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [Vm](Vm)
 ///
@@ -446,7 +446,7 @@ pub(crate) async fn create(
 /// * [version](str) - The version
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [Vm](Vm)
 ///
@@ -515,7 +515,7 @@ pub(crate) async fn patch(
 /// * [version](str) - The version
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [Vm](Vm)
 ///

@@ -25,7 +25,7 @@ impl NanocldClient {
   /// * [vm](VmConfigPartial) - The config for the vm
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vm](Vm) if operation was successful
@@ -54,7 +54,7 @@ impl NanocldClient {
   ///
   /// * [namespace](Option) - The [namespace](str) where belong the vms
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [vm summary](VmSummary) if operation was successful
@@ -88,7 +88,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the vm to delete
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - The operation succeeded
@@ -127,7 +127,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the vm to inspect
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vm inspect](VmInspect) if operation was successful
@@ -165,7 +165,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the vm to start
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - If the operation succeeded
@@ -195,7 +195,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the vm to stop
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - If the operation succeeded
@@ -235,7 +235,7 @@ impl NanocldClient {
   /// * [vm](VmConfigUpdate) - The config to update the vm
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - If the operation succeeded
@@ -267,7 +267,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the vm to attach
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Websocket connection](WsConnection) to the vm tty if operation was successful

@@ -1,9 +1,8 @@
 use ntex::web;
 
+use nanocl_error::http::HttpError;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{HostInfo, ProccessQuery};
-
-use nanocl_error::http::HttpError;
 
 use crate::{version, repositories};
 use crate::models::DaemonState;
@@ -124,7 +123,7 @@ pub(crate) async fn get_processes(
   Ok(web::HttpResponse::Ok().json(&instances))
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(watch_event);
   config.service(get_info);
   config.service(get_processes);

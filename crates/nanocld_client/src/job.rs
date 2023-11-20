@@ -18,7 +18,7 @@ impl NanocldClient {
   /// List existing jobs in the system
   ///
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [job](Job) if operation was successful
@@ -46,7 +46,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the job to inspect
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Job inspect](JobInspect) if operation was successful
@@ -83,7 +83,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the job to get the logs
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Receiver](Receiver) of [Result](Result) of [JobLogOutput](JobLogOutput) if operation was successful
@@ -116,7 +116,7 @@ impl NanocldClient {
   ///
   /// * [job](JobPartial) - The job to create
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Job](Job) if operation was successful
@@ -158,7 +158,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the job to start
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [()] if operation was successful
@@ -194,7 +194,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the job to get the logs
   /// * [query](Option) - Optional [query](JobWaitQuery)
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Receiver](Receiver) of [Result](Result) of [JobWaitResponse](JobWaitResponse) if operation was successful
@@ -228,7 +228,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the job to delete
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - If operation was successful

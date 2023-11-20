@@ -104,7 +104,7 @@ pub(crate) async fn delete_job(
   ),
 ))]
 #[web::get("/jobs/{name}/inspect")]
-async fn inspect_job(
+pub(crate) async fn inspect_job(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -123,7 +123,7 @@ async fn inspect_job(
   ),
 ))]
 #[web::get("/jobs/{name}/logs")]
-async fn logs_job(
+pub(crate) async fn logs_job(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -150,7 +150,7 @@ async fn logs_job(
   ),
 ))]
 #[web::get("/jobs/{name}/wait")]
-async fn wait_job(
+pub(crate) async fn wait_job(
   web::types::Query(qs): web::types::Query<JobWaitQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -170,7 +170,7 @@ async fn wait_job(
   )
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_job);
   config.service(create_job);
   config.service(delete_job);

@@ -112,9 +112,9 @@ async fn execute_before(
 /// * [number](usize) - The number of containers to create
 /// * [docker_api](bollard_next::Docker) - The docker api
 ///
-/// ## Returns
+/// ## Return
 ///
-/// [HttpResult][HttpResult] containing a [vector](Vec) of [ContainerCreateResponse][ContainerCreateResponse]
+/// [HttpResult][HttpResult] containing a [Vec](Vec) of [ContainerCreateResponse][ContainerCreateResponse]
 ///
 async fn create_instances(
   cargo: &Cargo,
@@ -390,9 +390,9 @@ async fn delete_instances(
 /// * [key](str) - The cargo key
 /// * [docker_api](bollard_next::Docker) - The docker api
 ///
-/// ## Returns
+/// ## Return
 ///
-/// [HttpResult][HttpResult] containing a [vector](Vec) of [ContainerSummary][ContainerSummary]
+/// [HttpResult][HttpResult] containing a [Vec](Vec) of [ContainerSummary][ContainerSummary]
 ///
 pub(crate) async fn list_instances(
   key: &str,
@@ -422,7 +422,7 @@ pub(crate) async fn list_instances(
 /// * [version](str) - The cargo version
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [cargo](Cargo)
 ///
@@ -640,7 +640,7 @@ pub(crate) async fn delete_by_key(
 /// * [version](str) - The version of the api to use
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [cargo](Cargo)
 ///
@@ -720,9 +720,9 @@ pub(crate) async fn put(
 /// * [query](GenericCargoListQuery) - The filter query
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// [HttpResult](HttpResult) containing a [vector](Vec) of [CargoSummary][CargoSummary
+/// [HttpResult](HttpResult) containing a [Vec](Vec) of [CargoSummary][CargoSummary
 ///
 pub(crate) async fn list(
   query: GenericCargoListQuery<&str>,
@@ -780,7 +780,7 @@ pub(crate) async fn list(
 /// * [key](str) - The cargo key
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [cargo](CargoInspect)
 ///
@@ -896,7 +896,7 @@ pub(crate) async fn kill_by_name(
 /// * [version](str) - The cargo version
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [cargo](Cargo)
 ///
@@ -1012,7 +1012,7 @@ pub async fn patch(
 /// * [query](CargoLogQuery): The query parameters
 /// * [docker_api](bollard_next::Docker): The docker api
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [stream](StreamExt) of [LogOutput](LogOutput)
 ///
@@ -1038,7 +1038,7 @@ pub(crate) fn get_logs(
 /// * [query](CargoStatsQuery): The query parameters
 /// * [docker_api](bollard_next::Docker): The docker api
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [stream](StreamExt) of [CargoStats](CargoStats)
 ///

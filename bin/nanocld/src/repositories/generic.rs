@@ -16,14 +16,14 @@ use crate::models::Pool;
 ///
 /// ## Arguments
 ///
-/// * [pk](Pk) - The primary key of the row to find
+/// * [pk](Send) - The primary key of the row to find
 /// * [pool](Pool) - The database pool
 ///
 /// ## Return
 ///
-/// * [IoResult<R>](IoResult) - The found item
+/// [IoResult](IoResult) containing a [R](Send)
 ///
-pub async fn find_by_id<T, Pk, R>(pk: Pk, pool: &Pool) -> IoResult<R>
+pub(crate) async fn find_by_id<T, Pk, R>(pk: Pk, pool: &Pool) -> IoResult<R>
 where
   T: query_dsl::methods::FindDsl<Pk> + associations::HasTable<Table = T>,
   diesel::dsl::Find<T, Pk>:
@@ -50,14 +50,14 @@ where
 ///
 /// ## Arguments
 ///
-/// * [predicate](P) - The predicate to filter the row to delete
+/// * [predicate](Send) - The predicate to filter the row to delete
 /// * [pool](Pool) - The database pool
 ///
 /// ## Return
 ///
-/// * [IoResult<GenericDelete>](IoResult) - The number of rows deleted
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete<T, P>(
+pub(crate) async fn delete<T, P>(
   predicate: P,
   pool: &Pool,
 ) -> IoResult<GenericDelete>
@@ -89,14 +89,17 @@ where
 ///
 /// ## Arguments
 ///
-/// * [pk](Pk) - The primary key of the row to delete
+/// * [pk](Send) - The primary key of the row to delete
 /// * [pool](Pool) - The database pool
 ///
 /// ## Return
 ///
-/// * [IoResult<GenericDelete>](IoResult) - The number of rows deleted
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_id<T, Pk>(pk: Pk, pool: &Pool) -> IoResult<GenericDelete>
+pub(crate) async fn delete_by_id<T, Pk>(
+  pk: Pk,
+  pool: &Pool,
+) -> IoResult<GenericDelete>
 where
   T: query_dsl::methods::FindDsl<Pk> + associations::HasTable<Table = T>,
   helper_types::Find<T, Pk>: query_builder::IntoUpdateTarget,
@@ -124,15 +127,15 @@ where
 ///
 /// ## Arguments
 ///
-/// * [pk](Pk) - The primary key of the row to update
-/// * [values](V) - The values to update
+/// * [pk](Send) - The primary key of the row to update
+/// * [values](AsChangeset) - The values to update
 /// * [pool](Pool) - The database pool
 ///
 /// ## Return
 ///
-/// * [IoResult<usize>](IoResult) - The number of rows updated
+/// [IoResult](IoResult) containing a [usize](usize)
 ///
-pub async fn update_by_id<T, V, Pk>(
+pub(crate) async fn update_by_id<T, V, Pk>(
   pk: Pk,
   values: V,
   pool: &Pool,
@@ -171,15 +174,15 @@ where
 ///
 /// ## Arguments
 ///
-/// * [pk](Pk) - The primary key of the row to update
-/// * [values](V) - The values to update
+/// * [pk](Send) - The primary key of the row to update
+/// * [values](AsChangeset) - The values to update
 /// * [pool](Pool) - The database pool
 ///
 /// ## Return
 ///
-/// * [IoResult<R>](IoResult) - The updated item
+/// [IoResult](IoResult) containing a [R](Send)
 ///
-pub async fn update_by_id_with_res<T, V, Pk, R>(
+pub(crate) async fn update_by_id_with_res<T, V, Pk, R>(
   pk: Pk,
   values: V,
   pool: &Pool,
@@ -219,14 +222,17 @@ where
 ///
 /// ## Arguments
 ///
-/// * [value](diesel::insertable::Insertable) - The value to insert
+/// * [value](Insertable) - The value to insert
 /// * [pool](Pool) - The database pool
 ///
 /// ## Return
 ///
-/// * [IoResult<R>](IoResult) - The inserted item
+/// [IoResult](IoResult) containing a [R](Send)
 ///
-pub async fn insert_with_res<T, V, R>(values: V, pool: &Pool) -> IoResult<R>
+pub(crate) async fn insert_with_res<T, V, R>(
+  values: V,
+  pool: &Pool,
+) -> IoResult<R>
 where
   T: associations::HasTable<Table = T> + Table,
   V: Insertable<T>,

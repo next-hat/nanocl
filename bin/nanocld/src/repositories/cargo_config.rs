@@ -18,13 +18,11 @@ use crate::models::{Pool, CargoConfigDbModel};
 /// * [item](CargoConfigPartial) - Cargo config item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](CargoConfig) - The created cargo config
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [CargoConfig](CargoConfig)
 ///
-pub async fn create(
+pub(crate) async fn create(
   cargo_key: &str,
   item: &CargoConfigPartial,
   version: &str,
@@ -61,13 +59,11 @@ pub async fn create(
 /// * [key](uuid::Uuid) - Cargo config key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](CargoConfig) - The found cargo config
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [CargoConfig](CargoConfig)
 ///
-pub async fn find_by_key(
+pub(crate) async fn find_by_key(
   key: &uuid::Uuid,
   pool: &Pool,
 ) -> IoResult<CargoConfig> {
@@ -90,13 +86,11 @@ pub async fn find_by_key(
 /// * [key](str) - Cargo key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - The number of deleted items
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_cargo_key(
+pub(crate) async fn delete_by_cargo_key(
   key: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
@@ -118,13 +112,11 @@ pub async fn delete_by_cargo_key(
 /// * [key](str) - Cargo key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<CargoConfig>) - The list of cargo configs
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoConfig](CargoConfig)
 ///
-pub async fn list_by_cargo_key(
+pub(crate) async fn list_by_cargo_key(
   key: &str,
   pool: &Pool,
 ) -> IoResult<Vec<CargoConfig>> {

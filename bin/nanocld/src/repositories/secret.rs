@@ -17,13 +17,11 @@ use crate::models::{Pool, SecretDbModel, SecretUpdateDbModel};
 /// * [item](SecretPartial) - Secret to create
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](SecretDbModel) - Secret created
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [SecretDbModel](SecretDbModel)
 ///
-pub async fn create(
+pub(crate) async fn create(
   item: &SecretPartial,
   pool: &Pool,
 ) -> IoResult<SecretDbModel> {
@@ -39,13 +37,11 @@ pub async fn create(
 ///
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<SecretDbModel>) - List of secrets
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [SecretDbModel](SecretDbModel)
 ///
-pub async fn list(
+pub(crate) async fn list(
   query: Option<SecretQuery>,
   pool: &Pool,
 ) -> IoResult<Vec<SecretDbModel>> {
@@ -99,13 +95,14 @@ pub async fn list(
 /// * [key](str) - Key of the secret to delete
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - Number of deleted secrets
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
+pub(crate) async fn delete_by_key(
+  key: &str,
+  pool: &Pool,
+) -> IoResult<GenericDelete> {
   use crate::schema::secrets;
   let key = key.to_owned();
   super::generic::delete_by_id::<secrets::table, _>(key, pool).await
@@ -120,13 +117,14 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 /// * [key](str) - Name of the secret to find
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](SecretDbModel) - Secret found
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [SecretDbModel](SecretDbModel)
 ///
-pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<SecretDbModel> {
+pub(crate) async fn find_by_key(
+  key: &str,
+  pool: &Pool,
+) -> IoResult<SecretDbModel> {
   use crate::schema::secrets;
   let key = key.to_owned();
   super::generic::find_by_id::<secrets::table, _, _>(key, pool).await
@@ -142,13 +140,11 @@ pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<SecretDbModel> {
 /// * [item](SecretUpdate) - New secret data
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](SecretDbModel) - The secret updated
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [SecretDbModel](SecretDbModel)
 ///
-pub async fn update_by_key(
+pub(crate) async fn update_by_key(
   key: &str,
   item: &SecretUpdate,
   pool: &Pool,

@@ -9,10 +9,10 @@ use tokio::fs;
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 
 use crate::{utils, repositories};
-use nanocl_error::http::HttpError;
 use crate::models::{
   Pool, VmImageDbModel, QemuImgInfo, VmImageUpdateDbModel, DaemonState,
 };
@@ -26,13 +26,7 @@ use crate::models::{
 /// * [name](str) - The name of the vm image to delete
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The vm image has been deleted
-///   * [Err](HttpError) - The vm image has not been deleted
-///
-pub async fn delete_by_name(name: &str, pool: &Pool) -> Result<(), HttpError> {
+pub(crate) async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
   let vm_image = repositories::vm_image::find_by_name(name, pool).await?;
   let children = repositories::vm_image::find_by_parent(name, pool).await?;
   if !children.is_empty() {
@@ -59,13 +53,11 @@ pub async fn delete_by_name(name: &str, pool: &Pool) -> Result<(), HttpError> {
 ///
 /// * [path](str) - The path of the vm image
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](QemuImgInfo) - The info of the vm image
-///   * [Err](HttpError) - The info of the vm image has not been retrieved
+/// [HttpResult](HttpResult) containing a [QemuImgInfo](QemuImgInfo)
 ///
-pub async fn get_info(path: &str) -> Result<QemuImgInfo, HttpError> {
+pub(crate) async fn get_info(path: &str) -> HttpResult<QemuImgInfo> {
   let ouput = Command::new("qemu-img")
     .args(["info", "--output=json", path])
     .output()
@@ -105,18 +97,16 @@ pub async fn get_info(path: &str) -> Result<QemuImgInfo, HttpError> {
 /// * [image](VmImageDbModel) - The base vm image
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmImageDbModel) - The created vm image
-///   * [Err](HttpError) - The vm image has not been created
+/// [HttpResult](HttpResult) containing a [VmImageDbModel](VmImageDbModel)
 ///
-pub async fn create_snap(
+pub(crate) async fn create_snap(
   name: &str,
   size: u64,
   image: &VmImageDbModel,
   state: &DaemonState,
-) -> Result<VmImageDbModel, HttpError> {
+) -> HttpResult<VmImageDbModel> {
   if repositories::vm_image::find_by_name(name, &state.pool)
     .await
     .is_ok()
@@ -192,17 +182,15 @@ pub async fn create_snap(
 /// * [image](VmImageDbModel) - The snapshot vm image
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmImageDbModel) - The created vm image
-///   * [Err](HttpError) - The vm image has not been created
+/// [HttpResult](HttpResult) containing a [Receiver](Receiver) of [HttpResult](HttpResult) of [Bytes](Bytes)
 ///
-pub async fn clone(
+pub(crate) async fn clone(
   name: &str,
   image: &VmImageDbModel,
   state: &DaemonState,
-) -> Result<Receiver<Result<Bytes, HttpError>>, HttpError> {
+) -> HttpResult<Receiver<HttpResult<Bytes>>> {
   if image.kind != "Snapshot" {
     return Err(HttpError {
       status: http::StatusCode::BAD_REQUEST,
@@ -344,17 +332,15 @@ pub async fn clone(
 /// * [payload](VmImageResizePayload) - The payload containing the new size
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmImageDbModel) - The resized image
-///   * [Err](HttpError) - The error
+/// [HttpResult](HttpResult) containing a [VmImageDbModel](VmImageDbModel)
 ///
-pub async fn resize(
+pub(crate) async fn resize(
   image: &VmImageDbModel,
   payload: &VmImageResizePayload,
   pool: &Pool,
-) -> Result<VmImageDbModel, HttpError> {
+) -> HttpResult<VmImageDbModel> {
   let imagepath = image.path.clone();
   let size = format!("{}G", payload.size);
   let mut args = vec!["resize"];
@@ -402,17 +388,15 @@ pub async fn resize(
 /// * [payload](VmImageResizePayload) - The payload containing the new size
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmImageDbModel) - The resized image
-///   * [Err](HttpError) - The error
+/// [HttpResult](HttpResult) containing a [VmImageDbModel](VmImageDbModel)
 ///
-pub async fn resize_by_name(
+pub(crate) async fn resize_by_name(
   name: &str,
   payload: &VmImageResizePayload,
   pool: &Pool,
-) -> Result<VmImageDbModel, HttpError> {
+) -> HttpResult<VmImageDbModel> {
   let image = repositories::vm_image::find_by_name(name, pool).await?;
   resize(&image, payload, pool).await
 }
@@ -427,17 +411,15 @@ pub async fn resize_by_name(
 /// * [filepath](str) - The path to the image file
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmImageDbModel) - The created image
-///   * [Err](HttpError) - The error
+/// [HttpResult](HttpResult) containing a [VmImageDbModel](VmImageDbModel)
 ///
-pub async fn create(
+pub(crate) async fn create(
   name: &str,
   filepath: &str,
   pool: &Pool,
-) -> Result<VmImageDbModel, HttpError> {
+) -> HttpResult<VmImageDbModel> {
   // Get image info
   let image_info = match utils::vm_image::get_info(filepath).await {
     Err(err) => {

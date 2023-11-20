@@ -85,7 +85,7 @@ fn count_instances(
 /// * [job](Job) - The job
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [String](String) - The cron job command
 ///
@@ -191,9 +191,9 @@ async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
 /// [name](str) The job name
 /// [state](DaemonState) The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// [HttpResult](HttpResult) containing a [vector](Vec) of [NodeContainerSummary](NodeContainerSummary)
+/// [HttpResult](HttpResult) containing a [Vec](Vec) of [NodeContainerSummary](NodeContainerSummary)
 ///
 async fn inspect_instances(
   name: &str,
@@ -230,9 +230,9 @@ async fn inspect_instances(
 /// * [name](str) - The job name
 /// * [docker_api](bollard_next::Docker) - The docker api
 ///
-/// ## Returns
+/// ## Return
 ///
-/// [HttpResult](HttpResult) containing a [vector](Vec) of [ContainerSummary](ContainerSummary)
+/// [HttpResult](HttpResult) containing a [Vec](Vec) of [ContainerSummary](ContainerSummary)
 ///
 pub(crate) async fn list_instances(
   name: &str,
@@ -259,7 +259,7 @@ pub(crate) async fn list_instances(
 /// * [item](JobPartial) - The job partial
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) the created [job](Job)
 ///
@@ -361,9 +361,9 @@ pub(crate) async fn start_by_name(
 ///
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// [HttpResult](HttpResult) containing a [vector](Vec) of [JobSummary](JobSummary)
+/// [HttpResult](HttpResult) containing a [Vec](Vec) of [JobSummary](JobSummary)
 ///
 pub(crate) async fn list(state: &DaemonState) -> HttpResult<Vec<JobSummary>> {
   let jobs = repositories::job::list(&state.pool).await?;
@@ -448,7 +448,7 @@ pub(crate) async fn delete_by_name(
 /// * [name](str) - The job name
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [JobInspect](JobInspect)
 ///
@@ -486,7 +486,7 @@ pub(crate) async fn inspect_by_name(
 /// * [name](str) - The job name
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [Stream](StreamExt) of [JobLogOutput](JobLogOutput)
 ///
@@ -537,7 +537,7 @@ pub(crate) async fn logs_by_name(
 /// * [wait_options](WaitContainerOptions) - The wait options
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
 /// [HttpResult](HttpResult) containing a [Stream](StreamExt) of [JobWaitResponse](JobWaitResponse)
 ///

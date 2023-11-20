@@ -18,7 +18,7 @@ impl NanocldClient {
   ///
   /// * [query](Option) - The optional [query](ResourceQuery)
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [resource](Resource) if operation was successful
@@ -49,7 +49,7 @@ impl NanocldClient {
   ///
   /// * [data](ResourcePartial) - The partial
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Resource] if operation was successful
@@ -88,7 +88,7 @@ impl NanocldClient {
   ///
   /// * [key](str) - The key of the resource to inspect
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Resource](Resource) if operation was successful
@@ -122,7 +122,7 @@ impl NanocldClient {
   /// * [key](str) - The key of the resource to patch
   /// * [data](ResourcePartial) - The data to patch
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Resource](Resource) if operation was successful
@@ -160,7 +160,7 @@ impl NanocldClient {
   ///
   /// * [key](str) - The key of the resource to delete
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - If operation was successful
@@ -193,7 +193,7 @@ impl NanocldClient {
   ///
   /// * [key](str) - The key of the resource to list history
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [ResourceConfig](ResourceConfig) if operation was successful
@@ -230,7 +230,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the resource to revert
   /// * [key](str) - The key of the resource to revert
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Resource](Resource) if operation was successful

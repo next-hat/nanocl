@@ -74,7 +74,7 @@ pub(crate) async fn create_cargo_image(
   web::types::Json(payload): web::types::Json<CargoImagePartial>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
-  let (from_image, tag) = utils::cargo_image::parse_image_info(&payload.name)?;
+  let (from_image, tag) = utils::cargo_image::parse_image_name(&payload.name)?;
   let rx_body = utils::cargo_image::pull(&from_image, &tag, &state).await?;
   Ok(
     web::HttpResponse::Ok()
@@ -175,7 +175,7 @@ pub(crate) async fn import_cargo_image(
   Ok(web::HttpResponse::Ok().into())
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_cargo_image);
   config.service(create_cargo_image);
   config.service(delete_cargo_image);

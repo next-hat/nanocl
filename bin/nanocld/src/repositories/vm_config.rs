@@ -20,13 +20,11 @@ use crate::models::{Pool, VmConfigDbModel};
 /// * [version](str) - Vm config version
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmConfig) - The created vm config
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [VmConfig](VmConfig)
 ///
-pub async fn create(
+pub(crate) async fn create(
   vm_key: &str,
   item: &VmConfigPartial,
   version: &str,
@@ -59,13 +57,14 @@ pub async fn create(
 /// * [key](uuid::Uuid) - Vm config key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmConfig) - The found vm config
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [VmConfig](VmConfig)
 ///
-pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
+pub(crate) async fn find_by_key(
+  key: &uuid::Uuid,
+  pool: &Pool,
+) -> IoResult<VmConfig> {
   use crate::schema::vm_configs;
   let key = *key;
   let dbmodel =
@@ -87,13 +86,11 @@ pub async fn find_by_key(key: &uuid::Uuid, pool: &Pool) -> IoResult<VmConfig> {
 /// * [key](str) - Vm key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - The number of deleted items
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_vm_key(
+pub(crate) async fn delete_by_vm_key(
   key: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
@@ -121,13 +118,14 @@ pub async fn delete_by_vm_key(
 /// * [key](str) - Vm key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<VmConfig>) - The list of vm configs
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [VmConfig](VmConfig)
 ///
-pub async fn list_by_vm_key(key: &str, pool: &Pool) -> IoResult<Vec<VmConfig>> {
+pub(crate) async fn list_by_vm_key(
+  key: &str,
+  pool: &Pool,
+) -> IoResult<Vec<VmConfig>> {
   use crate::schema::vm_configs;
   let key = key.to_owned();
   let pool = pool.clone();

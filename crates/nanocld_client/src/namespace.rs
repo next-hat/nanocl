@@ -11,7 +11,7 @@ impl NanocldClient {
   ///
   /// List all namespaces from the system
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [namespace summary](NamespaceSummary) if operation was successful
@@ -41,7 +41,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the namespace to create
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Namespace](Namespace) if operation was successful
@@ -66,7 +66,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the namespace to inspect
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [Namespace inspect](NamespaceInspect) if operation was successful
@@ -102,7 +102,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the namespace to delete
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The namespace was deleted if operation was successful

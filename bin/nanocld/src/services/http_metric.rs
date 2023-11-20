@@ -1,9 +1,9 @@
 use ntex::web;
 
+use nanocl_error::http::HttpError;
 use nanocl_stubs::http_metric::{HttpMetricListQuery, HttpMetricCountQuery};
 
 use crate::repositories;
-use nanocl_error::http::HttpError;
 use crate::models::DaemonState;
 
 /// Get http metrics of all peer nodes
@@ -49,7 +49,7 @@ pub(crate) async fn count_http_metric(
   Ok(web::HttpResponse::Ok().json(&count))
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_http_metric);
   config.service(count_http_metric);
 }
