@@ -10,7 +10,7 @@ use ring::digest;
 ///
 /// ## Return
 ///
-/// * [String](String) The hash
+/// [String](String) The hash
 ///
 #[allow(non_snake_case)]
 pub fn calculate_SHA256(name: &str) -> String {

@@ -23,9 +23,7 @@ use models::{Cli, Command, Context};
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](CliConfig) The cli configuration
-///   * [Err](nanocl_error::io::IoError) The error of the operation
+/// [IoResult](IoResult) containing a [CliConfig](CliConfig)
 ///
 fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
   Context::ensure()?;
@@ -71,12 +69,6 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
 /// ## Arguments
 ///
 /// * [cli_args](Cli) The cli arguments
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](nanocl_error::io::IoError) The error of the operation
 ///
 async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
   let cli_conf = create_cli_config(cli_args)?;

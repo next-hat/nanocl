@@ -38,9 +38,7 @@ use super::cargo_image::exec_cargo_image_pull;
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](StateRef) The StateRef
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [StateRef](StateRef)
 ///
 async fn get_from_url<T>(url: &str) -> IoResult<StateRef<T>>
 where
@@ -93,9 +91,7 @@ where
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](StateRef) The StateRef
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [StateRef](StateRef)
 ///
 fn read_from_file<T>(
   path: &std::path::Path,
@@ -125,9 +121,7 @@ where
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](CargoConfigPartial) The cargo config
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [CargoConfigPartial](CargoConfigPartial)
 ///
 fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
   let new_cargo = match &cargo.container.host_config {
@@ -182,9 +176,7 @@ fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok) [Vector](Vec) of [JoinHandle](rt::JoinHandle)
-///   * [Err](Err) [Io error](IoError) if an error occured
+/// [IoResult](IoResult) containing a [Vec](Vec) of [JoinHandle](rt::JoinHandle)
 ///
 pub async fn log_cargo(
   client: &NanocldClient,
@@ -274,12 +266,6 @@ pub async fn log_cargo(
 /// * [client](NanocldClient) The client to the daemon
 /// * [jobs](Vec) [Vector](Vec) of [job partial](JobPartial)
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok) The operation was successful
-///   * [Err](Err) [Io error](IoError) an error occured
-///
 pub async fn log_jobs(
   client: &NanocldClient,
   jobs: Vec<JobPartial>,
@@ -365,9 +351,7 @@ pub async fn log_cargoes(
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Vec<CargoConfigPartial>) The cargoes config
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoConfigPartial](CargoConfigPartial)
 ///
 fn hook_cargoes(
   cargoes: Vec<CargoConfigPartial>,
@@ -391,9 +375,7 @@ fn hook_cargoes(
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](NanocldClient) The nanocl daemon client
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [NanocldClient](NanocldClient)
 ///
 fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
   let client = match meta.api_version.clone() {
@@ -445,9 +427,7 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](HashMap) The list of arguments
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [serde_json::Value](serde_json::Value)
 ///
 fn parse_build_args(
   yaml: &serde_yaml::Value,
@@ -538,9 +518,7 @@ fn parse_build_args(
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](String) The namespace value
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [String](String)
 ///
 fn inject_namespace(
   namespace: &str,
@@ -566,9 +544,7 @@ fn inject_namespace(
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Serialize) The data of the Statefile
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [Serialize](Serialize)
 ///
 async fn inject_data<T>(
   ext: &DisplayFormat,
@@ -620,9 +596,7 @@ where
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](StateRef) The StateRef
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [StateRef](StateRef)
 ///
 async fn parse_state_file<T>(
   path: &Option<String>,
@@ -830,12 +804,6 @@ async fn exec_state_apply(
 ///
 /// * [cli_conf](CliConfig) The cli config
 /// * [opts](StateLogsOpts) The state logs options
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
 ///
 async fn exec_state_logs(
   cli_conf: &CliConfig,

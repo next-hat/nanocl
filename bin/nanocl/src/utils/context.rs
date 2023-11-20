@@ -1,3 +1,5 @@
+use nanocl_error::io::IoResult;
+
 use crate::config::UserConfig;
 use crate::models::{Context, ContextRow};
 
@@ -15,13 +17,7 @@ impl Context {
   ///
   /// Ensure that the contexts directory exists in $HOME/.nanocl/contexts
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) The result of the operation
-  ///   * [Ok](()) The operation was successful
-  ///   * [Err](Err) An error occured
-  ///
-  pub fn ensure() -> std::io::Result<()> {
+  pub fn ensure() -> IoResult<()> {
     let home = std::env::var("HOME").map_err(|_| {
       std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
     })?;
@@ -40,11 +36,9 @@ impl Context {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) The result of the operation
-  ///   * [Ok](Context) The context
-  ///   * [Err](Err) An error occured
+  /// [IoResult](IoResult) containing a [Context](Context)
   ///
-  pub fn read(path: &str) -> std::io::Result<Context> {
+  pub fn read(path: &str) -> IoResult<Context> {
     let s = std::fs::read_to_string(path)?;
     let context = serde_yaml::from_str::<Context>(&s).map_err(|err| {
       std::io::Error::new(
@@ -65,11 +59,9 @@ impl Context {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) The result of the operation
-  ///   * [Ok](Context) The context
-  ///   * [Err](Err) An error occured
+  /// [IoResult](IoResult) containing a [Context](Context)
   ///
-  pub fn read_by_name(name: &str) -> std::io::Result<Context> {
+  pub fn read_by_name(name: &str) -> IoResult<Context> {
     let home = std::env::var("HOME").map_err(|_| {
       std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
     })?;
@@ -86,13 +78,7 @@ impl Context {
   ///
   /// * [context](Context) The context to write
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) The result of the operation
-  ///   * [Ok](()) The operation was successful
-  ///   * [Err](Err) An error occured
-  ///
-  pub fn write(context: &Context) -> std::io::Result<()> {
+  pub fn write(context: &Context) -> IoResult<()> {
     let home = std::env::var("HOME").map_err(|_| {
       std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
     })?;
@@ -113,11 +99,9 @@ impl Context {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) The result of the operation
-  ///   * [Ok](Vec<ContextRow>) The list of contexts
-  ///   * [Err](Err) An error occured
+  /// [IoResult](IoResult) containing a [Vec](Vec) of [ContextRow](ContextRow)
   ///
-  pub fn list() -> std::io::Result<Vec<ContextRow>> {
+  pub fn list() -> IoResult<Vec<ContextRow>> {
     let home = std::env::var("HOME").map_err(|_| {
       std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
     })?;
@@ -142,13 +126,7 @@ impl Context {
   ///
   /// * [name](str) The name of the context
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) The result of the operation
-  ///   * [Ok](()) The operation was successful
-  ///   * [Err](Err) An error occured
-  ///
-  pub fn r#use(name: &str) -> std::io::Result<()> {
+  pub fn r#use(name: &str) -> IoResult<()> {
     let home = std::env::var("HOME").map_err(|_| {
       std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
     })?;
