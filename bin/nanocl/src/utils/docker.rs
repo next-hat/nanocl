@@ -75,12 +75,6 @@ fn update_image_progress(
 /// * [tag](str) The tag of the image
 /// * [docker_api](Docker) The docker client
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The image has been installed
-///   * [Err](IoError) An error occured
-///
 pub async fn install_image(
   from_image: &str,
   tag: &str,
@@ -141,9 +135,7 @@ pub async fn install_image(
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Docker) The docker client
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [Docker](Docker)
 ///
 pub fn connect(docker_host: &str) -> IoResult<Docker> {
   let docker = match &docker_host {
@@ -198,7 +190,7 @@ pub fn connect(docker_host: &str) -> IoResult<Docker> {
 ///
 /// ## Return
 ///
-/// * [HashMap<String, String>](HashMap<String, String>) The hooked labels
+/// [HashMap](HashMap) of [String](String) to [String](String)
 ///
 pub fn hook_labels(
   key: &str,
@@ -229,9 +221,7 @@ pub fn hook_labels(
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](ContainerCreateResponse) The container
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [ContainerCreateResponse](ContainerCreateResponse)
 ///
 pub async fn create_cargo_container(
   cargo: &CargoConfigPartial,
@@ -276,11 +266,9 @@ pub async fn create_cargo_container(
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok]((String, bool)) The docker host
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a tuple of [String](String) and a [bool](bool)
 ///
-pub fn detect_docker_host() -> std::io::Result<(String, bool)> {
+pub fn detect_docker_host() -> IoResult<(String, bool)> {
   let home = std::env::var("HOME").map_err(|_| {
     std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
   })?;
@@ -313,10 +301,13 @@ pub fn detect_docker_host() -> std::io::Result<(String, bool)> {
     return Ok(("unix:///var/run/docker.sock".into(), false));
   };
   if !endpoint.host.starts_with("unix://") {
-    return Err(std::io::Error::new(
-      std::io::ErrorKind::InvalidData,
-      format!("No unix docker endpoint unsupported yet: {}", endpoint.host),
-    ));
+    return Err(
+      std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("No unix docker endpoint unsupported yet: {}", endpoint.host),
+      )
+      .into(),
+    );
   }
   if context == "desktop-linux" {
     return Ok((endpoint.host.to_owned(), true));

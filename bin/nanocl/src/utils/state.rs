@@ -22,9 +22,7 @@ use crate::models::{DisplayFormat, StateRef};
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](StateRef) The StateRef
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [StateRef](StateRef)
 ///
 pub fn get_state_ref<T>(ext: &str, raw: &str) -> IoResult<StateRef<T>>
 where
@@ -105,11 +103,7 @@ where
 /// * [format](DisplayFormat) The format to serialize into
 /// * [data](str) The data to serialize
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](T) The serialized data
-///   * [Err](IoError) An error occured
+/// [IoResult](IoResult) containing a [Serialize](serde::Serialize)
 ///
 pub fn serialize_ext<T>(format: &DisplayFormat, data: &str) -> IoResult<T>
 where

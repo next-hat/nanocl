@@ -37,12 +37,6 @@ where
 ///
 /// * [data](serde::Serialize) The serializable data
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
-///
 pub fn print_yml<T>(data: T) -> IoResult<()>
 where
   T: serde::Serialize,
@@ -61,12 +55,6 @@ where
 ///
 /// * [data](serde::Serialize) The serializable data
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
-///
 pub fn print_json<T>(data: T) -> IoResult<()>
 where
   T: serde::Serialize,
@@ -84,12 +72,6 @@ where
 /// ## Arguments
 ///
 /// * [data](serde::Serialize) The serializable data
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
 ///
 pub fn print_toml<T>(data: T) -> IoResult<()>
 where
@@ -113,12 +95,6 @@ where
 ///
 /// * [format](DisplayFormat) The format to display the data
 /// * [data](serde::Serialize) The serializable data
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
 ///
 pub fn display_format<T>(format: &DisplayFormat, data: T) -> IoResult<()>
 where

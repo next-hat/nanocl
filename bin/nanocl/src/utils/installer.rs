@@ -2,7 +2,7 @@ use ntex::http;
 
 use nanocl_error::io::{FromIo, IoResult};
 use nanocl_error::http::HttpError;
-use nanocl_error::http_client::HttpClientError;
+use nanocl_error::http_client::{HttpClientResult, HttpClientError};
 
 use crate::version::{VERSION, CHANNEL};
 
@@ -12,11 +12,9 @@ use crate::version::{VERSION, CHANNEL};
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](String) The template
-///   * [Err](HttpClientError) An error occured
+/// [HttpClientResult](HttpClientResult) containing a [String](String)
 ///
-async fn get() -> Result<String, HttpClientError> {
+async fn get() -> HttpClientResult<String> {
   let client = http::client::Client::new();
   let url = format!("https://raw.githubusercontent.com/nxthat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.yml");
   let mut res = client.get(url).send().await.map_err(|err| {
@@ -48,9 +46,7 @@ async fn get() -> Result<String, HttpClientError> {
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](String) The template
-///   * [Err](nanocl_error::io::IoError) An error occured
+/// [IoResult](IoResult) containing a [String](String)
 ///
 pub async fn get_template(template: Option<String>) -> IoResult<String> {
   match template {
