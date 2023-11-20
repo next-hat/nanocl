@@ -10,7 +10,7 @@ Resources:
         - get-started.global.c
       Rules:
         - Domain: get-started.com
-          Network: Public
+          Network: Internal
           Ssl:
             Certificate: /random/path/to/cert
             CertificateKey: /random/path/to/key

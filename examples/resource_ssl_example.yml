@@ -12,7 +12,7 @@ Resources:
         - deploy-example.global.c
       Rules:
         - Domain: deploy-example.com
-          Network: Public
+          Network: Internal
           Ssl:
             Certificate: /random/path/to/cert
             CertificateKey: /random/path/to/key

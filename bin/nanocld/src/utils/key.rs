@@ -5,7 +5,7 @@
 /// The cargo key will be `get-started.global`
 use ntex::http;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpError, HttpResult};
 
 /// ## Resolve nsp
 ///
@@ -14,13 +14,13 @@ use nanocl_error::http::HttpError;
 ///
 /// ## Arguments
 ///
-/// * [nsp](Option<String>) The namespace to resolve
+/// * [nsp](Option) - Optional [namespace](String) to resolve
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [namespace](String) The resolved namespace
+/// [Namespace](String) the resolved namespace
 ///
-pub fn resolve_nsp(nsp: &Option<String>) -> String {
+pub(crate) fn resolve_nsp(nsp: &Option<String>) -> String {
   match nsp {
     None => String::from("global"),
     Some(nsp) => nsp.to_owned(),
@@ -36,11 +36,11 @@ pub fn resolve_nsp(nsp: &Option<String>) -> String {
 /// * [m1](str)  The key of the first model
 /// * [m2](str) The name of the second model
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [key](String) The generated key based on params
+/// [Key](String) the generated key based on params
 ///
-pub fn gen_key(nsp: &str, name: &str) -> String {
+pub(crate) fn gen_key(nsp: &str, name: &str) -> String {
   name.to_owned() + "." + nsp
 }
 
@@ -53,13 +53,7 @@ pub fn gen_key(nsp: &str, name: &str) -> String {
 ///
 /// * [name](str) The name to validate
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The name is valid
-///   * [Err](HttpError) - The name is invalid
-///
-pub fn validate_name(name: &str) -> Result<(), HttpError> {
+pub(crate) fn validate_name(name: &str) -> HttpResult<()> {
   // Ensure name only contain a-z, A-Z, 0-9, - and _
   if !name
     .chars()

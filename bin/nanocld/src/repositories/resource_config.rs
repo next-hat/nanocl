@@ -17,13 +17,11 @@ use crate::models::{Pool, ResourceConfigDbModel};
 /// * [item](ResourceConfigDbModel) - Resource config item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](ResourceConfigDbModel) - Resource config created
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [ResourceConfigDbModel](ResourceConfigDbModel)
 ///
-pub async fn create(
+pub(crate) async fn create(
   item: &ResourceConfigDbModel,
   pool: &Pool,
 ) -> IoResult<ResourceConfigDbModel> {
@@ -40,13 +38,11 @@ pub async fn create(
 /// * [key](str) - Resource key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - Resource config deleted
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_resource_key(
+pub(crate) async fn delete_by_resource_key(
   key: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
@@ -68,13 +64,11 @@ pub async fn delete_by_resource_key(
 /// * [key](str) - Resource key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<ResourceConfig>) - Resource config list
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [ResourceConfig](ResourceConfig)
 ///
-pub async fn list_by_resource_key(
+pub(crate) async fn list_by_resource_key(
   key: &str,
   pool: &Pool,
 ) -> IoResult<Vec<ResourceConfig>> {
@@ -107,13 +101,11 @@ pub async fn list_by_resource_key(
 /// * [key](uuid::Uuid) - Resource config key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](ResourceConfig) - Resource config found
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [ResourceConfig](ResourceConfig)
 ///
-pub async fn find_by_key(
+pub(crate) async fn find_by_key(
   key: &uuid::Uuid,
   pool: &Pool,
 ) -> IoResult<ResourceConfig> {

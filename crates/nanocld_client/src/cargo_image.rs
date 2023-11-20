@@ -22,7 +22,7 @@ impl NanocldClient {
   ///
   /// * [opts](Option) - The optional [query](ListCargoImagesOptions)
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [image summary](bollard_next::models::ImageSummary) if operation was successful
@@ -55,7 +55,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the image to create
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Receiver](mpsc::Receiver) of [CreateImageInfo](bollard_next::models::CreateImageInfo) if operation was successful
@@ -100,7 +100,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the image to delete
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - The image was successfully deleted if operation was successful
@@ -136,7 +136,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the image to inspect
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Image inspect](bollard_next::models::ImageInspect) of the image if operation was successful

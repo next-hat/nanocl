@@ -19,13 +19,11 @@ use crate::models::{
 /// * [item](ResourceKindPartial) - Resource kind item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](ResourceKindDbModel) - Resource kind created
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [ResourceKindVersionDbModel](ResourceKindVersionDbModel)
 ///
-pub async fn create_version(
+pub(crate) async fn create_version(
   item: &ResourceKindPartial,
   pool: &Pool,
 ) -> IoResult<ResourceKindVersionDbModel> {
@@ -49,13 +47,11 @@ pub async fn create_version(
 /// * [version](str) - Resource kind version
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](ResourceKindVersionDbModel) - Resource kind version
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [ResourceKindVersionDbModel](ResourceKindVersionDbModel)
 ///
-pub async fn get_version(
+pub(crate) async fn get_version(
   name: &str,
   version: &str,
   pool: &Pool,
@@ -88,13 +84,11 @@ pub async fn get_version(
 /// * [name](str) - Resource kind name
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](ResourceKindDbModel) - Resource kind
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [ResourceKindDbModel](ResourceKindDbModel)
 ///
-pub async fn find_by_name(
+pub(crate) async fn find_by_name(
   name: &str,
   pool: &Pool,
 ) -> IoResult<ResourceKindDbModel> {
@@ -112,13 +106,11 @@ pub async fn find_by_name(
 /// * [item](ResourceKindPartial) - Resource kind item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](ResourceKindDbModel) - Resource kind created
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [ResourceKindDbModel](ResourceKindDbModel)
 ///
-pub async fn create(
+pub(crate) async fn create(
   item: &ResourceKindPartial,
   pool: &Pool,
 ) -> IoResult<ResourceKindDbModel> {
@@ -139,13 +131,11 @@ pub async fn create(
 /// * [name](str) - Resource kind name
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - Resource kind version deleted
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_version(
+pub(crate) async fn delete_version(
   name: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
@@ -167,13 +157,11 @@ pub async fn delete_version(
 /// * [name](str) - Resource kind name
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - Resource kind deleted
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete(name: &str, pool: &Pool) -> IoResult<GenericDelete> {
+pub(crate) async fn delete(name: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::resource_kinds;
   let name = name.to_owned();
   super::generic::delete_by_id::<resource_kinds::table, _>(name, pool).await

@@ -18,11 +18,9 @@ use crate::models::DaemonState;
 ///
 /// * [daemon_state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](ntex::server::Server) - The HTTP server
-///   * [Err](std::io::Error) - Error during the operation
+/// [Result](std::io::Result) containing [Server](ntex::server::Server)
 ///
 pub async fn gen(
   daemon_state: DaemonState,

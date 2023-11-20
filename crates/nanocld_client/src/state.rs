@@ -20,7 +20,7 @@ impl NanocldClient {
   /// * [data](serde_json::Value) - The state to apply
   /// * [qs](Option) - Optional [options](StateApplyQuery)
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [stream](Receiver) of result of [state stream](StateStream) if operation was successful
@@ -45,7 +45,7 @@ impl NanocldClient {
   ///
   /// * [data](serde_json::Value) - The state to remove
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [stream](Receiver) of result of [state stream](StateStream) if operation was successful

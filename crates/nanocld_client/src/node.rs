@@ -12,7 +12,7 @@ impl NanocldClient {
   ///
   /// List existing nodes in the system
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [node](Node) if operation was successful

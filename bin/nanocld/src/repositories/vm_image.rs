@@ -16,13 +16,11 @@ use crate::models::{Pool, VmImageDbModel, VmImageUpdateDbModel};
 /// * [item](VmImageDbModel) - Vm image item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmImageDbModel) - Vm image created
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [VmImageDbModel](VmImageDbModel)
 ///
-pub async fn create(
+pub(crate) async fn create(
   item: &VmImageDbModel,
   pool: &Pool,
 ) -> IoResult<VmImageDbModel> {
@@ -39,13 +37,14 @@ pub async fn create(
 /// * [name](str) - Vm image name
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmImageDbModel) - Vm image found
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [VmImageDbModel](VmImageDbModel)
 ///
-pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<VmImageDbModel> {
+pub(crate) async fn find_by_name(
+  name: &str,
+  pool: &Pool,
+) -> IoResult<VmImageDbModel> {
   use crate::schema::vm_images;
   let name = name.to_owned();
   super::generic::find_by_id::<vm_images::table, _, _>(name, pool).await
@@ -60,13 +59,11 @@ pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<VmImageDbModel> {
 /// * [parent](str) - Vm image parent
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<VmImageDbModel>) - Vm images found
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [VmImageDbModel](VmImageDbModel)
 ///
-pub async fn find_by_parent(
+pub(crate) async fn find_by_parent(
   parent: &str,
   pool: &Pool,
 ) -> IoResult<Vec<VmImageDbModel>> {
@@ -94,13 +91,11 @@ pub async fn find_by_parent(
 /// * [name](str) - Vm image name
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - Vm image deleted
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_name(
+pub(crate) async fn delete_by_name(
   name: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
@@ -117,13 +112,11 @@ pub async fn delete_by_name(
 ///
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<VmImageDbModel>) - Vm images found
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [VmImageDbModel](VmImageDbModel)
 ///
-pub async fn list(pool: &Pool) -> IoResult<Vec<VmImageDbModel>> {
+pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<VmImageDbModel>> {
   use crate::schema::vm_images;
   let pool = pool.clone();
   let items = web::block(move || {
@@ -147,13 +140,11 @@ pub async fn list(pool: &Pool) -> IoResult<Vec<VmImageDbModel>> {
 /// * [item](VmImageUpdateDbModel) - Vm image to update
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmImageDbModel) - Vm image updated
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [VmImageDbModel](VmImageDbModel)
 ///
-pub async fn update_by_name(
+pub(crate) async fn update_by_name(
   name: &str,
   item: &VmImageUpdateDbModel,
   pool: &Pool,

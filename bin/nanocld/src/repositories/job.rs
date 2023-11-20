@@ -20,11 +20,9 @@ use crate::models::{Pool, JobDbModel, JobUpdateDbModel};
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok) [Job](Job) The operation was successful
-///   * [Err](Err) [Io error](IoError) an error occured
+/// [IoResult](IoResult) containing a [Job](Job)
 ///
-pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
+pub(crate) async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
   let mut data = serde_json::to_value(item)
     .map_err(|err| err.map_err_context(|| "JobPartial"))?;
   if let Some(meta) = data.as_object_mut() {
@@ -55,11 +53,9 @@ pub async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok) [GenericDelete](GenericDelete) The operation was successful
-///   * [Err](Err) [Io error](IoError) an error occured
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_name(
+pub(crate) async fn delete_by_name(
   name: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
@@ -78,11 +74,9 @@ pub async fn delete_by_name(
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok) [Vec](Vec) The operation was successful
-///   * [Err](Err) [Io error](IoError) an error occured
+/// [IoResult](IoResult) containing a [Vec](Vec) of [Job](Job)
 ///
-pub async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
+pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
   use crate::schema::jobs;
   let pool = pool.clone();
   let items = web::block(move || {
@@ -115,11 +109,9 @@ pub async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok) [Job](Job) The operation was successful
-///   * [Err](Err) [Io error](IoError) an error occured
+/// [IoResult](IoResult) containing a [Job](Job)
 ///
-pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
+pub(crate) async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
   use crate::schema::jobs;
   let name = name.to_owned();
   let db_model: JobDbModel =
@@ -141,11 +133,9 @@ pub async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
 ///
 /// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok) [()] The operation was successful
-///   * [Err](Err) [Io error](IoError) an error occured
+/// [IoResult](IoResult) containing a [Job](Job)
 ///
-pub async fn update_by_name(
+pub(crate) async fn update_by_name(
   name: &str,
   data: &JobUpdateDbModel,
   pool: &Pool,

@@ -5,7 +5,7 @@ use futures::StreamExt;
 use bollard_next::service::CreateImageInfo;
 use bollard_next::models::{ImageInspect, ImageSummary};
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::generic::GenericDelete;
 
 use crate::models::DaemonState;
@@ -18,26 +18,20 @@ use super::stream;
 ///
 /// ## Arguments
 ///
-/// * [image_info](str) The string to parse
+/// * [image](str) The string to parse
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok]((String, String)) - The image name and tag
-///   * [Err](HttpError) - An http response error if something went wrong
+/// [HttpResult](HttpResult) containing a tuple of ([String](String), [image_tag](String))
 ///
-pub fn parse_image_info(
-  image_info: &str,
-) -> Result<(String, String), HttpError> {
-  let image_info: Vec<&str> = image_info.split(':').collect();
-
+pub(crate) fn parse_image_name(name: &str) -> HttpResult<(String, String)> {
+  let image_info: Vec<&str> = name.split(':').collect();
   if image_info.len() != 2 {
     return Err(HttpError {
       msg: String::from("missing tag in image name"),
       status: http::StatusCode::BAD_REQUEST,
     });
   }
-
   let image_name = image_info[0].to_ascii_lowercase();
   let image_tag = image_info[1].to_ascii_lowercase();
   Ok((image_name, image_tag))
@@ -48,19 +42,19 @@ pub fn parse_image_info(
 /// List all cargo images installed
 ///
 /// ## Arguments
-/// * [docker_api](bollard_next::Docker) docker api client
 ///
-/// ## Returns
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<ImageSummary>) - A list of image summary
-///   * [Err](HttpError) - An http response error if something went wrong
+/// * [opts](bollard_next::image::ListImagesOptions) - The list options
+/// * [state](DaemonState) - The daemon state
 ///
-pub async fn list(
+/// ## Return
+///
+/// [HttpResult](HttpResult) containing a [Vec](Vec) of [ImageSummary](ImageSummary)
+///
+pub(crate) async fn list(
   opts: &bollard_next::image::ListImagesOptions<String>,
   state: &DaemonState,
-) -> Result<Vec<ImageSummary>, HttpError> {
+) -> HttpResult<Vec<ImageSummary>> {
   let items = state.docker_api.list_images(Some(opts.clone())).await?;
-
   Ok(items)
 }
 
@@ -73,18 +67,15 @@ pub async fn list(
 /// * [image_name](str) name of the image to inspect
 /// * [docker_api](bollard_next::Docker) docker api client
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](ImageInspect) - Image inspect
-///   * [Err](HttpError) - An http response error if something went wrong
+/// [HttpResult](HttpResult) containing a [ImageInspect](ImageInspect)
 ///
-pub async fn inspect_by_name(
+pub(crate) async fn inspect_by_name(
   image_name: &str,
   state: &DaemonState,
-) -> Result<ImageInspect, HttpError> {
+) -> HttpResult<ImageInspect> {
   let image = state.docker_api.inspect_image(image_name).await?;
-
   Ok(image)
 }
 
@@ -98,21 +89,18 @@ pub async fn inspect_by_name(
 /// * [tag](str) tag of the image to download
 /// * [docker_api](bollard_next::Docker) docker api client
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Receiver<Result<Bytes, web::error::Error>>) - A stream of bytes
-///   * [Err](HttpError) - An http response error if something went wrong
+/// [HttpResult](HttpResult) containing a [StreamExt](StreamExt) of [CreateImageInfo](CreateImageInfo)
 ///
-pub async fn pull(
+pub(crate) async fn pull(
   image_name: &str,
   tag: &str,
   state: &DaemonState,
-) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
+) -> HttpResult<impl StreamExt<Item = HttpResult<Bytes>>> {
   let from_image = image_name.to_owned();
   let tag = tag.to_owned();
   let docker_api = state.docker_api.clone();
-
   let stream = docker_api.create_image(
     Some(bollard_next::image::CreateImageOptions {
       from_image,
@@ -136,13 +124,11 @@ pub async fn pull(
 /// * [image_name](str) name of the image to delete
 /// * [docker_api](bollard_next::Docker) docker api client
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) The result of the operation
-///   * [Ok](GenericDelete) - A generic delete response
-///   * [Err](HttpError) - An http response error if something went wrong
+/// [HttpResult](HttpResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete(
+pub(crate) async fn delete(
   id_or_name: &str,
   state: &DaemonState,
 ) -> Result<GenericDelete, HttpError> {

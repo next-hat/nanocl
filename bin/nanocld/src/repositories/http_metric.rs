@@ -17,13 +17,11 @@ use crate::models::{Pool, HttpMetricDbModel};
 /// * [item](HttpMetricDbModel) - Http metric item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](HttpMetricDbModel) - The created http metric item
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [HttpMetricDbModel](HttpMetricDbModel)
 ///
-pub async fn create(
+pub(crate) async fn create(
   item: &HttpMetricDbModel,
   pool: &Pool,
 ) -> IoResult<HttpMetricDbModel> {
@@ -40,13 +38,11 @@ pub async fn create(
 /// * [filter](HttpMetricListQuery) - Http metric filter
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<HttpMetricDbModel>) - The list of http metrics
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [HttpMetricDbModel](HttpMetricDbModel)
 ///
-pub async fn list(
+pub(crate) async fn list(
   filter: &HttpMetricListQuery,
   pool: &Pool,
 ) -> IoResult<Vec<HttpMetricDbModel>> {
@@ -83,13 +79,11 @@ pub async fn list(
 /// * [filter](HttpMetricCountQuery) - Http metric filter
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericCount) - The count of http metrics
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericCount](GenericCount)
 ///
-pub async fn count(
+pub(crate) async fn count(
   filter: &HttpMetricCountQuery,
   pool: &Pool,
 ) -> IoResult<GenericCount> {

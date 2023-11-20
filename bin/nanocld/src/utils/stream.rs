@@ -3,7 +3,7 @@ use ntex::util::Bytes;
 use futures::StreamExt;
 use serde::Serialize;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 
 /// ## Transform stream
 ///
@@ -15,15 +15,13 @@ use nanocl_error::http::HttpError;
 ///   * [I](I) - The type of the stream items
 ///   * [T](T) - The type to transform the stream items into
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [impl StreamExt<Item = Result<Bytes, HttpError>>](impl StreamExt<Item = Result<Bytes, HttpError>>) - The transformed stream
-///   * [Bytes](Bytes) - The transformed stream items
-///   * [HttpError](HttpError) - An http response error if something went wrong
+/// [Stream](StreamExt) of [HttpResult](HttpResult) of [Bytes](Bytes)
 ///
 pub(crate) fn transform_stream<I, T>(
   stream: impl StreamExt<Item = Result<I, impl std::error::Error>>,
-) -> impl StreamExt<Item = Result<Bytes, HttpError>>
+) -> impl StreamExt<Item = HttpResult<Bytes>>
 where
   I: Into<T>,
   T: Serialize + From<I>,

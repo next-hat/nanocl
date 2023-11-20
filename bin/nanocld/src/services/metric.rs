@@ -1,11 +1,11 @@
 use ntex::web;
 
+use nanocl_error::http::HttpError;
 use nanocl_stubs::metric::MetricFilterQuery;
 
 use crate::models::DaemonState;
 
 use crate::repositories;
-use nanocl_error::http::HttpError;
 
 /// Get specific metric of all peer nodes
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -30,7 +30,7 @@ pub(crate) async fn list_metric(
   Ok(web::HttpResponse::Ok().json(&metrics))
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_metric);
 }
 

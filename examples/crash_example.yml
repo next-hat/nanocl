@@ -12,7 +12,7 @@ Resources:
     Data:
       Rules:
         - Domain: crash-example.com
-          Network: Public
+          Network: Internal
           Locations:
             - Path: /
               Target:

@@ -20,13 +20,11 @@ use crate::models::{
 /// * [nsp](NamespaceDbModel) - Namespace item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///  * [Ok](Vec<CargoDbModel>) - List a cargo found
-///  * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoDbModel](CargoDbModel)
 ///
-pub async fn find_by_namespace(
+pub(crate) async fn find_by_namespace(
   nsp: &NamespaceDbModel,
   pool: &Pool,
 ) -> IoResult<Vec<CargoDbModel>> {
@@ -43,13 +41,11 @@ pub async fn find_by_namespace(
 /// * [query](GenericCargoListQuery) - Query containing namespace, name filter and pagination info
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///  * [Ok](Vec<CargoDbModel>) - List a cargo found
-///  * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoDbModel](CargoDbModel)
 ///
-pub async fn list_by_query(
+pub(crate) async fn list_by_query(
   query: &GenericCargoListQuery<NamespaceDbModel>,
   pool: &Pool,
 ) -> IoResult<Vec<CargoDbModel>> {
@@ -88,13 +84,11 @@ pub async fn list_by_query(
 /// * [item](Cargo) - Cargo item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Cargo) - The cargo created
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Cargo](Cargo)
 ///
-pub async fn create(
+pub(crate) async fn create(
   nsp: &str,
   item: &CargoConfigPartial,
   version: &str,
@@ -134,13 +128,14 @@ pub async fn create(
 /// * [key](str) - Cargo key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](GenericDelete) - The number of deleted items
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
+pub(crate) async fn delete_by_key(
+  key: &str,
+  pool: &Pool,
+) -> IoResult<GenericDelete> {
   use crate::schema::cargoes;
   let key = key.to_owned();
   super::generic::delete_by_id::<cargoes::table, _>(key, pool).await
@@ -155,13 +150,14 @@ pub async fn delete_by_key(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 /// * [key](str) - Cargo key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](CargoDbModel) - The cargo found
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [CargoDbModel](CargoDbModel)
 ///
-pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDbModel> {
+pub(crate) async fn find_by_key(
+  key: &str,
+  pool: &Pool,
+) -> IoResult<CargoDbModel> {
   use crate::schema::cargoes;
   let key = key.to_owned();
   super::generic::find_by_id::<cargoes::table, _, _>(key, pool).await
@@ -177,13 +173,11 @@ pub async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDbModel> {
 /// * [item](CargoConfigPartial) - Cargo config
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Cargo) - The cargo updated
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Cargo](Cargo)
 ///
-pub async fn update_by_key(
+pub(crate) async fn update_by_key(
   key: &str,
   item: &CargoConfigPartial,
   version: &str,
@@ -216,13 +210,14 @@ pub async fn update_by_key(
 /// * [namespace](str) - Namespace name
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](i64) - The number of cargo items
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [i64](i64)
 ///
-pub async fn count_by_namespace(nsp: &str, pool: &Pool) -> IoResult<i64> {
+pub(crate) async fn count_by_namespace(
+  nsp: &str,
+  pool: &Pool,
+) -> IoResult<i64> {
   use crate::schema::cargoes;
   let nsp = nsp.to_owned();
   let pool = pool.clone();
@@ -248,13 +243,11 @@ pub async fn count_by_namespace(nsp: &str, pool: &Pool) -> IoResult<i64> {
 /// * [key](str) - Cargo key
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Cargo) - The cargo found
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Cargo](Cargo)
 ///
-pub async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
+pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
   use crate::schema::cargoes;
   use crate::schema::cargo_configs;
   let key = key.to_owned();

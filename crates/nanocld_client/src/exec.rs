@@ -22,7 +22,7 @@ impl NanocldClient {
   /// * [exec](CreateExecOptions) - The config for the exec command
   /// * [namespace](Option) - The [namespace](str) where belong the cargo
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Created exec](CreateExecResults) if operation was successful
@@ -67,7 +67,7 @@ impl NanocldClient {
   ///
   /// * [id](str) - Id of command to inspect
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [Info](ExecInspectResponse) of the exec command if operation was successful
@@ -113,7 +113,7 @@ impl NanocldClient {
   /// * [id](str) - Id of command to run
   /// * [exec](CreateExecOptions) - The config for the exec command
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [Receiver](mpsc::Receiver) of [output log](OutputLog) if operation was successful

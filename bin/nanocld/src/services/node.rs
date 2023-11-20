@@ -79,7 +79,7 @@ async fn node_ws_service(
     (status = 101, description = "Websocket connection"),
   ),
 ))]
-async fn node_ws(
+pub(crate) async fn node_ws(
   req: web::HttpRequest,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, web::Error> {
@@ -93,7 +93,7 @@ async fn node_ws(
   .await
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_node);
   config.service(web::resource("/nodes/ws").route(web::get().to(node_ws)));
 }

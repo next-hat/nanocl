@@ -11,13 +11,13 @@ Resources:
     Version: v0.8
     Data:
       Rules:
-        - Network: Public
+        - Network: Internal
           Port: 8181
           Protocol: Tcp
           Target:
             Key: deploy-example2.global.c
             Port: 9000
-        - Network: Public
+        - Network: Internal
           Port: 8181
           Protocol: Tcp
           Target:

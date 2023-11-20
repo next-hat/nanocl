@@ -6,9 +6,8 @@ use ntex::web;
 
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
-use nanocl_stubs::generic::GenericNspQuery;
-
 use nanocl_error::http::HttpError;
+use nanocl_stubs::generic::GenericNspQuery;
 
 use crate::utils;
 use crate::models::DaemonState;
@@ -27,7 +26,7 @@ use crate::models::DaemonState;
   ),
 ))]
 #[web::get("/exec/{Id}/cargo/inspect")]
-async fn inspect_exec_command(
+pub(crate) async fn inspect_exec_command(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> Result<web::HttpResponse, HttpError> {
@@ -50,7 +49,7 @@ async fn inspect_exec_command(
   ),
 ))]
 #[web::post("/exec/{Id}/cargo/start")]
-async fn start_exec_command(
+pub(crate) async fn start_exec_command(
   web::types::Json(payload): web::types::Json<StartExecOptions>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -74,7 +73,7 @@ async fn start_exec_command(
   ),
 ))]
 #[web::post("/cargoes/{CargoName}/exec")]
-async fn create_exec_command(
+pub(crate) async fn create_exec_command(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<CreateExecOptions>,
   path: web::types::Path<(String, String)>,
@@ -86,7 +85,7 @@ async fn create_exec_command(
   Ok(web::HttpResponse::Ok().json(&result))
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_exec_command);
   config.service(start_exec_command);
   config.service(inspect_exec_command);

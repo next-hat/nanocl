@@ -36,7 +36,7 @@ pub(crate) async fn remove(
   )
 }
 
-pub fn ntex_config(cfg: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(cfg: &mut web::ServiceConfig) {
   cfg.service(apply);
   cfg.service(remove);
 }

@@ -3,14 +3,13 @@
 */
 use ntex::{rt, web};
 
+use nanocl_error::http::HttpError;
 use nanocl_stubs::system::Event;
 use nanocl_stubs::proxy::ProxySslConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate, SecretQuery};
 
 use crate::repositories;
 use crate::models::DaemonState;
-
-use nanocl_error::http::HttpError;
 
 /// List secrets
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -162,7 +161,7 @@ async fn patch_secret(
   Ok(web::HttpResponse::Ok().json(&item))
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_secret);
   config.service(create_secret);
   config.service(inspect_secret);

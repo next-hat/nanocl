@@ -7,7 +7,7 @@ use nanocl_error::http::HttpError;
 use nanocl_error::http_client::HttpClientError;
 
 /// Controller client
-pub struct CtrlClient {
+pub(crate) struct CtrlClient {
   /// Name of the controller eg: (ProxyRule)
   pub(crate) name: String,
   /// HTTP client
@@ -107,7 +107,6 @@ impl CtrlClient {
       .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;
     let status = res.status();
     self.is_api_error(&mut res, &status).await?;
-
     self.res_json(&mut res).await
   }
 
@@ -125,7 +124,6 @@ impl CtrlClient {
       .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;
     let status = res.status();
     self.is_api_error(&mut res, &status).await?;
-
     Ok(())
   }
 }

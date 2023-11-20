@@ -24,7 +24,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the image to import
   /// * [stream](Stream) - The stream of bytes to import
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - If the operation was successful
@@ -53,7 +53,7 @@ impl NanocldClient {
   ///
   /// List existing vm images in the system.
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [vm images](VmImage) if operation was successful
@@ -81,7 +81,7 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the vm image to delete
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - If the operation was successful
@@ -115,7 +115,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the vm image to clone
   /// * [clone_name](str) - The name of the clone
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Stream](mpsc::Receiver) of vm image clone [status](VmImageCloneStream) if operation was successful
@@ -157,7 +157,7 @@ impl NanocldClient {
   /// * [name](str) - The name of the vm image to resize
   /// * [opts](VmImageResizePayload) - The options to resize the vm image
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vm image](VmImage) if operation was successful

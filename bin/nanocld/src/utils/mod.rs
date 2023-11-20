@@ -56,7 +56,7 @@ pub mod tests {
   ///
   /// Generate a docker client for tests purpose
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [bollard_next::Docker](bollard_next::Docker) - The docker client
   ///
@@ -80,7 +80,7 @@ pub mod tests {
   ///
   /// * [path](str) Path to the state file
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) Result of the operation
   ///   * [Ok](serde_json::Value) - The state file parsed
@@ -99,7 +99,7 @@ pub mod tests {
   ///
   /// Generate a postgre pool for tests purpose
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Pool](Pool) - The postgre pool
   ///
@@ -122,7 +122,7 @@ pub mod tests {
   ///
   /// * [routes](Config) Routes to configure
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [TestServer](TestServer) - The test server
   ///

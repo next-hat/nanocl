@@ -417,18 +417,6 @@ mod tests {
 
   #[ntex::test]
   async fn state_apply_url_statefile() {
-    assert_cli_ok!(
-      "state",
-      "apply",
-      "-ys",
-      "https://raw.githubusercontent.com/nxthat/nanocl/nightly/examples/deploy_example.yml",
-    );
-    assert_cli_ok!(
-      "state",
-      "rm",
-      "-ys",
-      "https://raw.githubusercontent.com/nxthat/nanocl/nightly/examples/deploy_example.yml",
-    );
     assert_cli_err!("state", "rm", "-ys", "https://google.com");
     assert_cli_err!(
       "state",

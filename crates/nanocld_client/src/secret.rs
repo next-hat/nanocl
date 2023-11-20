@@ -15,7 +15,7 @@ impl NanocldClient {
   ///
   /// * [query](Option) - The optional [query](SecretQuery)
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result) - The result of the operation
   ///   * [Ok](Ok) - [Vector](Vec) of [secrets](Secret) if operation was successful
@@ -44,7 +44,7 @@ impl NanocldClient {
   ///
   /// * [secret](SecretPartial) - The secret to create
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [Secret](Secret) if operation was successful
@@ -68,7 +68,7 @@ impl NanocldClient {
   ///
   /// * [secret](SecretUpdate) - The key of the secret to create
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [Secret](Secret) if operation was successful
@@ -92,7 +92,7 @@ impl NanocldClient {
   ///
   /// * [key](str) - The key of the secret to inspect
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - [Secret](Secret) if operation was successful
@@ -128,7 +128,7 @@ impl NanocldClient {
   ///
   /// * [key](str) - The key of the [secret](Secret) to delete
   ///
-  /// ## Returns
+  /// ## Return
   ///
   /// * [Result](Result)
   ///   * [Ok](Ok) - If operation was successful

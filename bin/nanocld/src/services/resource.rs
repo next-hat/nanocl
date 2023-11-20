@@ -5,12 +5,12 @@
 use ntex::rt;
 use ntex::web;
 
+use nanocl_error::http::HttpError;
 use nanocl_stubs::system::Event;
 use nanocl_stubs::resource::ResourceUpdate;
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
 use crate::{utils, repositories};
-use nanocl_error::http::HttpError;
 use crate::models::{DaemonState, ResourceRevertPath};
 
 /// List resources
@@ -139,7 +139,6 @@ pub(crate) async fn put_resource(
 ) -> Result<web::HttpResponse, HttpError> {
   let resource =
     repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
-
   let new_resource = ResourcePartial {
     name: path.1.clone(),
     version: payload.version,
@@ -203,10 +202,8 @@ pub(crate) async fn revert_resource(
 ) -> Result<web::HttpResponse, HttpError> {
   let history =
     repositories::resource_config::find_by_key(&path.id, &state.pool).await?;
-
   let resource =
     repositories::resource::inspect_by_key(&path.name, &state.pool).await?;
-
   let new_resource = ResourcePartial {
     name: resource.name,
     version: history.version,
@@ -225,7 +222,7 @@ pub(crate) async fn revert_resource(
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_resource);
   config.service(delete_resource);
   config.service(list_resource);

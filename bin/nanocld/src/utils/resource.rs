@@ -1,8 +1,8 @@
 use ntex::http;
 use serde_json::Value;
-use jsonschema::{JSONSchema, Draft};
+use jsonschema::{Draft, JSONSchema};
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::resource::{Resource, ResourcePartial};
 
 use crate::repositories;
@@ -23,16 +23,14 @@ use super::ctrl_client::CtrlClient;
 /// * [resource](ResourcePartial) - The resource to create
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](ResourcePartial) - The resource has been hooked
-///   * [Err](HttpError) - The resource has not been hooked
+/// [HttpResult](HttpResult) containing a [ResourcePartial](ResourcePartial)
 ///
-pub async fn hook_create_resource(
+async fn hook_create_resource(
   resource: &ResourcePartial,
   pool: &Pool,
-) -> Result<ResourcePartial, HttpError> {
+) -> HttpResult<ResourcePartial> {
   let mut resource = resource.clone();
   match resource.kind.as_str() {
     "Kind" => {
@@ -111,16 +109,10 @@ pub async fn hook_create_resource(
 /// * [resource](Resource) - The resource to delete
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The resource has been hooked
-///   * [Err](HttpError) - The resource has not been hooked
-///
 async fn hook_delete_resource(
   resource: &Resource,
   pool: &Pool,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let kind = repositories::resource_kind::get_version(
     &resource.kind,
     &resource.version,
@@ -146,16 +138,14 @@ async fn hook_delete_resource(
 /// * [resource](ResourcePartial) - The resource to create
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Resource) - The resource has been created
-///   * [Err](HttpError) - The resource has not been created
+/// [HttpResult](HttpResult) containing a [Resource](Resource)
 ///
-pub async fn create(
+pub(crate) async fn create(
   resource: &ResourcePartial,
   pool: &Pool,
-) -> Result<Resource, HttpError> {
+) -> HttpResult<Resource> {
   if repositories::resource::inspect_by_key(&resource.name, pool)
     .await
     .is_ok()
@@ -180,16 +170,14 @@ pub async fn create(
 /// * [resource](ResourcePartial) - The resource to patch
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Resource) - The resource has been patched
-///   * [Err](HttpError) - The resource has not been patched
+/// [HttpResult](HttpResult) containing a [Resource](Resource)
 ///
-pub async fn patch(
+pub(crate) async fn patch(
   resource: &ResourcePartial,
   pool: &Pool,
-) -> Result<Resource, HttpError> {
+) -> HttpResult<Resource> {
   let resource = hook_create_resource(resource, pool).await?;
   let res = repositories::resource::put(&resource, pool).await?;
   Ok(res)
@@ -205,13 +193,7 @@ pub async fn patch(
 /// * [resource](Resource) - The resource to delete
 /// * [pool](Pool) - The database pool
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The resource has been deleted
-///   * [Err](HttpError) - The resource has not been deleted
-///
-pub async fn delete(resource: &Resource, pool: &Pool) -> Result<(), HttpError> {
+pub(crate) async fn delete(resource: &Resource, pool: &Pool) -> HttpResult<()> {
   if let Err(err) = hook_delete_resource(resource, pool).await {
     log::warn!("{err}");
   }

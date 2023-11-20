@@ -15,13 +15,11 @@ use crate::models::{Pool, MetricDbModel, MetricInsertDbModel};
 /// * [item](MetricInsertDbModel) - Metric item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](MetricDbModel) - The created metric item
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [MetricDbModel](MetricDbModel)
 ///
-pub async fn create(
+pub(crate) async fn create(
   item: &MetricInsertDbModel,
   pool: &Pool,
 ) -> IoResult<MetricDbModel> {
@@ -43,13 +41,11 @@ pub async fn create(
 /// * [kind](str) - Metric kind
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<MetricDbModel>) - The list of metrics
-///   * [Err](IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [Vec](Vec) of [MetricDbModel](MetricDbModel)
 ///
-pub async fn list_by_kind(
+pub(crate) async fn list_by_kind(
   kind: &str,
   pool: &Pool,
 ) -> IoResult<Vec<MetricDbModel>> {

@@ -112,10 +112,6 @@ fn spawn_crond() {
 ///
 /// * [state_dir](str) - The state dir path
 ///
-/// ## Returns
-///
-/// [IoResult](IoResult) the result of the operation
-///
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   let vm_dir = format!("{state_dir}/vms/images");
   fs::create_dir_all(vm_dir).await.map_err(|err| {
@@ -133,9 +129,9 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
 ///
 /// * [daemon_conf](DaemonConfig) - The daemon configuration
 ///
-/// ## Returns
+/// ## Return
 ///
-/// [IoResult](IoResult) the [daemon state](DaemonState)
+/// [IoResult](IoResult) containing a [DaemonState](DaemonState)
 ///
 pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   spawn_crond();

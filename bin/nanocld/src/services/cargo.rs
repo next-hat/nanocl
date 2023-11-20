@@ -4,6 +4,7 @@
 
 use ntex::{rt, web, http};
 
+use nanocl_error::http::HttpError;
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
@@ -11,8 +12,6 @@ use nanocl_stubs::cargo::{
   CargoStatsQuery, CargoScale,
 };
 use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
-
-use nanocl_error::http::HttpError;
 
 use crate::{utils, repositories};
 use crate::models::{DaemonState, CargoRevertPath};
@@ -82,7 +81,7 @@ pub(crate) async fn list_cargo_instance(
   ),
 ))]
 #[web::get("/cargoes/{name}/inspect")]
-async fn inspect_cargo(
+pub(crate) async fn inspect_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -341,7 +340,7 @@ pub(crate) async fn patch_cargo(
   ),
 ))]
 #[web::post("/cargoes/{name}/kill")]
-async fn kill_cargo(
+pub(crate) async fn kill_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<CargoKillOptions>,
   path: web::types::Path<(String, String)>,
@@ -368,7 +367,7 @@ async fn kill_cargo(
   ),
 ))]
 #[web::get("/cargoes/{name}/histories")]
-async fn list_cargo_history(
+pub(crate) async fn list_cargo_history(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -396,7 +395,7 @@ async fn list_cargo_history(
   ),
 ))]
 #[web::patch("/cargoes/{name}/histories/{id}/revert")]
-async fn revert_cargo(
+pub(crate) async fn revert_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<CargoRevertPath>,
   state: web::types::State<DaemonState>,
@@ -447,7 +446,7 @@ async fn revert_cargo(
   ),
 ))]
 #[web::get("/cargoes/{name}/logs")]
-async fn logs_cargo(
+pub(crate) async fn logs_cargo(
   web::types::Query(qs): web::types::Query<CargoLogQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -479,7 +478,7 @@ async fn logs_cargo(
   ),
 ))]
 #[web::get("/cargoes/{name}/stats")]
-async fn stats_cargo(
+pub(crate) async fn stats_cargo(
   web::types::Query(qs): web::types::Query<CargoStatsQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
@@ -510,7 +509,7 @@ async fn stats_cargo(
   ),
 ))]
 #[web::patch("/cargoes/{name}/scale")]
-async fn scale_cargo(
+pub(crate) async fn scale_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   web::types::Json(payload): web::types::Json<CargoScale>,
   path: web::types::Path<(String, String)>,
@@ -530,7 +529,7 @@ async fn scale_cargo(
   Ok(web::HttpResponse::Ok().into())
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
   config.service(start_cargo);

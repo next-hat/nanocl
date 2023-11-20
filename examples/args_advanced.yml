@@ -31,7 +31,7 @@ Resources:
     Data:
       Rules:
         - Domain: ${{ Args.domain }}
-          Network: Public
+          Network: All
           # {% if Args.ssl_enabled %}
           Ssl:
             Certificate: /etc/letsencrypt/live/${{ Args.domain }}/fullchain.pem

@@ -11,13 +11,11 @@ use crate::models::{Pool, StreamMetricDbModel};
 /// * [item](StreamMetricDbModel) - Http metric item
 /// * [pool](Pool) - Database connection pool
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](StreamMetricDbModel) - The created http metric item
-///   * [Err](nanocl_error::io::IoError) - Error during the operation
+/// [IoResult](IoResult) containing a [StreamMetricDbModel](StreamMetricDbModel)
 ///
-pub async fn create(
+pub(crate) async fn create(
   item: &StreamMetricDbModel,
   pool: &Pool,
 ) -> IoResult<StreamMetricDbModel> {

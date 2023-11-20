@@ -3,21 +3,19 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::time::Instant;
 
-use ntex::{rt, ws, web, http};
+use ntex::{rt, ws, web, http, chain, fn_service, Service};
 use ntex::channel::{mpsc, oneshot};
-use ntex::{chain, fn_service, Service};
 use ntex::util::Bytes;
-use ntex::service::{fn_shutdown, map_config, fn_factory_with_config};
+use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
 use futures::StreamExt;
 use futures::future::ready;
 use tokio::io::AsyncWriteExt;
 use bollard_next::container::AttachContainerOptions;
 
+use nanocl_error::http::HttpError;
 use nanocl_stubs::cargo::OutputLog;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
-
-use nanocl_error::http::HttpError;
 
 use crate::{utils, repositories};
 use crate::models::{DaemonState, WsConState};
@@ -362,7 +360,7 @@ pub(crate) async fn vm_attach(
   .await
 }
 
-pub fn ntex_config(config: &mut web::ServiceConfig) {
+pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_vm);
   config.service(create_vm);
   config.service(delete_vm);

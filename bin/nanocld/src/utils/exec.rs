@@ -1,9 +1,10 @@
+use bollard_next::service::ExecInspectResponse;
 use ntex::web;
 
 use bollard_next::container::LogOutput;
-use bollard_next::exec::{StartExecOptions, StartExecResults};
+use bollard_next::exec::{StartExecOptions, StartExecResults, CreateExecResults};
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::cargo::{OutputLog, CreateExecOptions};
 
 use crate::models::DaemonState;
@@ -20,20 +21,17 @@ use super::stream::transform_stream;
 /// * [args](CreateExecOptions) - The exec options
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///  * [Ok](bollard_next::exec::CreateExecResults) - The output stream
-///  * [Err](HttpError) - The command has not been executed
+/// [HttpResult](HttpResult) containing a [CreateExecResults](CreateExecResults)
 ///
-pub async fn create_exec_command(
+pub(crate) async fn create_exec_command(
   name: &str,
   args: &CreateExecOptions,
   state: &DaemonState,
-) -> Result<bollard_next::exec::CreateExecResults, HttpError> {
+) -> HttpResult<CreateExecResults> {
   let name = format!("{name}.c");
   let result = state.docker_api.create_exec(&name, args.to_owned()).await?;
-
   Ok(result)
 }
 
@@ -48,17 +46,15 @@ pub async fn create_exec_command(
 /// * [args](StartExecOptions) - The exec options
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///  * [Ok](web::HttpResponse) - The output stream
-///  * [Err](HttpError) - The command has not been executed
+/// [HttpResult](HttpResult) containing a [web::HttpResponse](web::HttpResponse)
 ///
-pub async fn start_exec_command(
+pub(crate) async fn start_exec_command(
   exec_id: &str,
   args: &StartExecOptions,
   state: &DaemonState,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let res = state
     .docker_api
     .start_exec(exec_id, Some(args.to_owned()))
@@ -85,17 +81,14 @@ pub async fn start_exec_command(
 /// * [exec_id](String) - Exec command id to inspect
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
+/// ## Return
 ///
-/// * [Result](Result) - The result of the operation
-///  * [Ok](bollard_next::models::ExecInspectResponse) - The output stream
-///  * [Err](HttpError) - The command has not been found
+/// [HttpResult](HttpResult) containing a [ExecInspectResponse](ExecInspectResponse)
 ///
-pub async fn inspect_exec_command(
+pub(crate) async fn inspect_exec_command(
   exec_id: &str,
   state: &DaemonState,
-) -> Result<bollard_next::models::ExecInspectResponse, HttpError> {
+) -> HttpResult<ExecInspectResponse> {
   let result = state.docker_api.inspect_exec(exec_id).await?;
-
   Ok(result)
 }

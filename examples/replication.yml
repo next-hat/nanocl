@@ -14,7 +14,7 @@ Resources:
         - replication-example.global.c
       Rules:
         - Domain: replication-example.com
-          Network: Public
+          Network: Internal
           Locations:
             - Path: /
               Target:

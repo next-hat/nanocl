@@ -21,9 +21,9 @@ use crate::models::{
 ///
 /// ## Return
 ///
-/// [IoResult][IoResult] the created [item](ContainerInstanceDbModel)
+/// [IoResult][IoResult] containing a [ContainerInstanceDbModel](ContainerInstanceDbModel)
 ///
-pub async fn create(
+pub(crate) async fn create(
   item: &ContainerInstancePartial,
   pool: &Pool,
 ) -> IoResult<ContainerInstanceDbModel> {
@@ -43,9 +43,9 @@ pub async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult][IoResult] the updated [item](ContainerInstanceDbModel)
+/// [IoResult][IoResult] containing a [ContainerInstanceUpdateDbModel](ContainerInstanceDbModel)
 ///
-pub async fn update(
+pub(crate) async fn update(
   id: &str,
   item: &ContainerInstanceUpdateDbModel,
   pool: &Pool,
@@ -71,9 +71,12 @@ pub async fn update(
 ///
 /// ## Return
 ///
-/// [IoResult][IoResult] the found [item](ContainerInstance)
+/// [IoResult][IoResult] containing a [ContainerInstance](ContainerInstance)
 ///
-pub async fn find_by_id(key: &str, pool: &Pool) -> IoResult<ContainerInstance> {
+pub(crate) async fn find_by_id(
+  key: &str,
+  pool: &Pool,
+) -> IoResult<ContainerInstance> {
   use crate::schema::container_instances;
   let key = key.to_owned();
   let item = super::generic::find_by_id::<
@@ -97,9 +100,12 @@ pub async fn find_by_id(key: &str, pool: &Pool) -> IoResult<ContainerInstance> {
 ///
 /// ## Return
 ///
-/// [IoResult][IoResult] the deleted [item](GenericDelete)
+/// [IoResult][IoResult] containing a [GenericDelete](GenericDelete)
 ///
-pub async fn delete_by_id(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
+pub(crate) async fn delete_by_id(
+  key: &str,
+  pool: &Pool,
+) -> IoResult<GenericDelete> {
   use crate::schema::container_instances;
   let key = key.to_owned();
   super::generic::delete_by_id::<container_instances::table, _>(key, pool).await
@@ -116,9 +122,9 @@ pub async fn delete_by_id(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
 ///
 /// ## Return
 ///
-/// [IoResult][IoResult] the list of [items](ContainerInstance)
+/// [IoResult][IoResult] containing a [Vec](Vec) of [ContainerInstance](ContainerInstance)
 ///
-pub async fn list_for_kind(
+pub(crate) async fn list_for_kind(
   kind: &str,
   kind_id: &str,
   pool: &Pool,
@@ -154,9 +160,9 @@ pub async fn list_for_kind(
 ///
 /// ## Return
 ///
-/// [IoResult][IoResult] the list of [items](ContainerInstance)
+/// [IoResult][IoResult] containing a [Vec](Vec) of [ContainerInstance](ContainerInstance)
 ///
-pub async fn list_all(pool: &Pool) -> IoResult<Vec<ContainerInstance>> {
+pub(crate) async fn list_all(pool: &Pool) -> IoResult<Vec<ContainerInstance>> {
   use crate::schema::container_instances;
   let pool = pool.clone();
   let items = web::block(move || {
