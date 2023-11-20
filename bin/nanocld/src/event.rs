@@ -11,7 +11,7 @@ use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_stubs::system::Event;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpError, HttpResult};
 
 /// ## Client
 /// Stream: Wrap Receiver in our own type, with correct error type
@@ -72,7 +72,7 @@ impl EventEmitter {
   }
 
   /// Check if clients are still connected
-  fn check_connection(&mut self) -> Result<(), HttpError> {
+  fn check_connection(&mut self) -> HttpResult<()> {
     let mut alive_clients = Vec::new();
     let clients = self
       .inner
@@ -114,7 +114,7 @@ impl EventEmitter {
   }
 
   /// Send an event to all clients
-  pub async fn emit(&self, ev: Event) -> Result<(), HttpError> {
+  pub async fn emit(&self, ev: Event) -> HttpResult<()> {
     let this = self.clone();
     rt::spawn(async move {
       let clients = this
@@ -141,7 +141,7 @@ impl EventEmitter {
   }
 
   /// Subscribe to events
-  pub async fn subscribe(&self) -> Result<Client, HttpError> {
+  pub async fn subscribe(&self) -> HttpResult<Client> {
     let this = self.clone();
     let (tx, rx) = channel(100);
     web::block(move || {

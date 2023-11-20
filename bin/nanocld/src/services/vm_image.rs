@@ -1,10 +1,9 @@
 use std::io::Write;
 
-use ntex::web;
-use ntex::http;
+use ntex::{web, http};
 use futures::StreamExt;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
 use crate::{utils, repositories};
@@ -22,7 +21,7 @@ use crate::models::DaemonState;
 #[web::get("/vms/images")]
 pub(crate) async fn list_vm_images(
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let images = repositories::vm_image::list(&state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&images))
 }
@@ -45,7 +44,7 @@ pub(crate) async fn import_vm_image(
   mut payload: web::types::Payload,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   utils::key::validate_name(&name)?;
   if repositories::vm_image::find_by_name(&name, &state.pool)
@@ -101,7 +100,7 @@ pub(crate) async fn import_vm_image(
 pub(crate) async fn snapshot_vm_image(
   path: web::types::Path<(String, String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let snapshot_name = path.2.to_owned();
   utils::key::validate_name(&snapshot_name)?;
@@ -129,7 +128,7 @@ pub(crate) async fn snapshot_vm_image(
 pub(crate) async fn clone_vm_image(
   path: web::types::Path<(String, String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let clone_name = path.2.to_owned();
   utils::key::validate_name(&clone_name)?;
@@ -157,7 +156,7 @@ pub(crate) async fn resize_vm_image(
   web::types::Json(payload): web::types::Json<VmImageResizePayload>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let rx =
     utils::vm_image::resize_by_name(&name, &payload, &state.pool).await?;
@@ -180,7 +179,7 @@ pub(crate) async fn resize_vm_image(
 pub(crate) async fn delete_vm_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   utils::vm_image::delete_by_name(&name, &state.pool).await?;
   Ok(web::HttpResponse::Ok().into())

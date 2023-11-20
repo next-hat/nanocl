@@ -4,7 +4,8 @@
 
 use ntex::{rt, web, http};
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
+
 use nanocl_stubs::system::Event;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
@@ -35,7 +36,7 @@ use crate::models::{DaemonState, CargoRevertPath};
 pub(crate) async fn list_cargo(
   web::types::Query(qs): web::types::Query<CargoListQuery>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let query = qs.merge(namespace.as_str());
   let cargoes = utils::cargo::list(query, &state).await?;
@@ -60,7 +61,7 @@ pub(crate) async fn list_cargo_instance(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let instances = utils::cargo::list_instances(&key, &state.docker_api).await?;
@@ -85,7 +86,7 @@ pub(crate) async fn inspect_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::inspect_by_key(&key, &state).await?;
@@ -111,7 +112,7 @@ pub(crate) async fn create_cargo(
   web::types::Json(payload): web::types::Json<CargoConfigPartial>,
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo =
     utils::cargo::create(&namespace, &payload, &version, &state).await?;
@@ -146,7 +147,7 @@ pub(crate) async fn delete_cargo(
   web::types::Query(qs): web::types::Query<CargoDeleteQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::inspect_by_key(&key, &state).await?;
@@ -179,7 +180,7 @@ pub(crate) async fn start_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   utils::cargo::start_by_key(&key, &state).await?;
@@ -212,7 +213,7 @@ pub(crate) async fn stop_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   utils::cargo::inspect_by_key(&key, &state).await?;
@@ -246,7 +247,7 @@ pub(crate) async fn restart_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   utils::cargo::inspect_by_key(&key, &state).await?;
@@ -275,7 +276,7 @@ pub(crate) async fn put_cargo(
   payload: web::types::Json<CargoConfigPartial>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::put(&key, &payload, &path.0, &state).await?;
@@ -310,7 +311,7 @@ pub(crate) async fn patch_cargo(
   payload: web::types::Json<CargoConfigUpdate>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::patch(&key, &payload, &path.0, &state).await?;
@@ -345,7 +346,7 @@ pub(crate) async fn kill_cargo(
   web::types::Json(payload): web::types::Json<CargoKillOptions>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   utils::cargo::kill_by_name(&key, &payload, &state.docker_api).await?;
@@ -371,7 +372,7 @@ pub(crate) async fn list_cargo_history(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let histories =
@@ -399,7 +400,7 @@ pub(crate) async fn revert_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<CargoRevertPath>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo_key = utils::key::gen_key(&namespace, &path.name);
   let config_id = uuid::Uuid::parse_str(&path.id).map_err(|err| HttpError {
@@ -450,7 +451,7 @@ pub(crate) async fn logs_cargo(
   web::types::Query(qs): web::types::Query<CargoLogQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let stream = utils::cargo::get_logs(&key, &qs, &state.docker_api)?;
@@ -482,7 +483,7 @@ pub(crate) async fn stats_cargo(
   web::types::Query(qs): web::types::Query<CargoStatsQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let stream = utils::cargo::get_stats(&key, &qs, &state.docker_api)?;
@@ -514,7 +515,7 @@ pub(crate) async fn scale_cargo(
   web::types::Json(payload): web::types::Json<CargoScale>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   utils::cargo::scale(&key, &payload, &state).await?;

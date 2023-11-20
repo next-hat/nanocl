@@ -3,7 +3,8 @@
 */
 use ntex::web;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::HttpResult;
+
 use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
 
 use crate::{utils, repositories};
@@ -27,7 +28,7 @@ use crate::models::DaemonState;
 pub(crate) async fn list_namespace(
   state: web::types::State<DaemonState>,
   web::types::Query(query): web::types::Query<NamespaceListQuery>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let items =
     utils::namespace::list(&query, &state.docker_api, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
@@ -50,7 +51,7 @@ pub(crate) async fn list_namespace(
 pub(crate) async fn inspect_namespace(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::namespace::inspect_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&namespace))
 }
@@ -70,7 +71,7 @@ pub(crate) async fn inspect_namespace(
 pub(crate) async fn create_namespace(
   web::types::Json(payload): web::types::Json<NamespacePartial>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let item = utils::namespace::create(&payload, &state).await?;
   Ok(web::HttpResponse::Created().json(&item))
 }
@@ -92,7 +93,7 @@ pub(crate) async fn create_namespace(
 pub(crate) async fn delete_namespace(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   repositories::namespace::find_by_name(&path.1, &state.pool).await?;
   let res = utils::namespace::delete_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&res))

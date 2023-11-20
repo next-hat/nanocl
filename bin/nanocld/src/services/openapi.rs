@@ -1,7 +1,8 @@
-use bollard_next::exec::StartExecOptions;
 use ntex::util::HashMap;
 use serde::{Serialize, Deserialize};
 use utoipa::{OpenApi, Modify, ToSchema};
+
+use bollard_next::exec::StartExecOptions;
 use bollard_next::container::{
   Config, ThrottlingData, CPUUsage, BlkioStatsEntry, MemoryStats,
   MemoryStatsStats, PidsStats, NetworkStats, BlkioStats, CPUStats,

@@ -1,16 +1,15 @@
 /*
 * Endpoints to manipulate cargo images
 */
-use ntex::web;
-use ntex::http;
+use ntex::{web, http};
 use futures::StreamExt;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio_util::codec;
 
-use bollard_next::image::ImportImageOptions;
+use nanocl_error::http::{HttpResult, HttpError};
 
-use nanocl_error::http::HttpError;
+use bollard_next::image::ImportImageOptions;
 use nanocl_stubs::cargo_image::{
   CargoImagePartial, ListCargoImagesOptions, CargoImageImportOptions,
 };
@@ -31,7 +30,7 @@ use crate::models::DaemonState;
 pub(crate) async fn list_cargo_image(
   web::types::Query(query): web::types::Query<ListCargoImagesOptions>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let images = utils::cargo_image::list(&query.into(), &state).await?;
   Ok(web::HttpResponse::Ok().json(&images))
 }
@@ -53,7 +52,7 @@ pub(crate) async fn list_cargo_image(
 pub(crate) async fn inspect_cargo_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let image = utils::cargo_image::inspect_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&image))
 }
@@ -73,7 +72,7 @@ pub(crate) async fn inspect_cargo_image(
 pub(crate) async fn create_cargo_image(
   web::types::Json(payload): web::types::Json<CargoImagePartial>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let (from_image, tag) = utils::cargo_image::parse_image_name(&payload.name)?;
   let rx_body = utils::cargo_image::pull(&from_image, &tag, &state).await?;
   Ok(
@@ -101,7 +100,7 @@ pub(crate) async fn create_cargo_image(
 pub(crate) async fn delete_cargo_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let res = utils::cargo_image::delete(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&res))
 }
@@ -122,7 +121,7 @@ pub(crate) async fn import_cargo_image(
   web::types::Query(query): web::types::Query<CargoImageImportOptions>,
   mut payload: web::types::Payload,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   // generate a random filename
   let filename = uuid::Uuid::new_v4().to_string();
   let filepath = format!("/tmp/{filename}");

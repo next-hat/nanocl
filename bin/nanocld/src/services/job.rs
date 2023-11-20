@@ -1,8 +1,8 @@
 use ntex::web;
 
-use bollard_next::container::WaitContainerOptions;
+use nanocl_error::http::HttpResult;
 
-use nanocl_error::http::HttpError;
+use bollard_next::container::WaitContainerOptions;
 use nanocl_stubs::job::{JobPartial, JobWaitQuery};
 
 use crate::utils;
@@ -21,7 +21,7 @@ use crate::models::DaemonState;
 pub(crate) async fn list_job(
   state: web::types::State<DaemonState>,
   _version: web::types::Path<String>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let jobs = utils::job::list(&state).await?;
   Ok(web::HttpResponse::Ok().json(&jobs))
 }
@@ -41,7 +41,7 @@ pub(crate) async fn create_job(
   web::types::Json(payload): web::types::Json<JobPartial>,
   state: web::types::State<DaemonState>,
   _version: web::types::Path<String>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let job = utils::job::create(&payload, &state).await?;
   Ok(web::HttpResponse::Created().json(&job))
 }
@@ -63,7 +63,7 @@ pub(crate) async fn create_job(
 pub(crate) async fn start_job(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   utils::job::start_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
@@ -85,7 +85,7 @@ pub(crate) async fn start_job(
 pub(crate) async fn delete_job(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   utils::job::delete_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
@@ -107,7 +107,7 @@ pub(crate) async fn delete_job(
 pub(crate) async fn inspect_job(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let job = utils::job::inspect_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&job))
 }
@@ -126,7 +126,7 @@ pub(crate) async fn inspect_job(
 pub(crate) async fn logs_job(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let stream = utils::job::logs_by_name(&path.1, &state).await?;
   Ok(
     web::HttpResponse::Ok()
@@ -154,7 +154,7 @@ pub(crate) async fn wait_job(
   web::types::Query(qs): web::types::Query<JobWaitQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let stream = utils::job::wait(
     &path.1,
     WaitContainerOptions {

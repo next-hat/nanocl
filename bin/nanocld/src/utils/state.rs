@@ -494,12 +494,12 @@ async fn apply_resources(
 ///
 /// * [data](serde_json::Value) - The state payload
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [sx](mpsc::Sender) - The response sender
 ///
 async fn remove_jobs(
   data: &[JobPartial],
   state: &DaemonState,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+  sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
   data
     .iter()
@@ -532,18 +532,12 @@ async fn remove_jobs(
 ///
 /// * [data](Vec<SecretPartial>) - The list of secrets to delete
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Return
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
+/// * [sx](mpsc::Sender) - The response sender
 ///
 async fn remove_secrets(
   data: &[SecretPartial],
   state: &DaemonState,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+  sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
   data
     .iter()
@@ -587,19 +581,13 @@ async fn remove_secrets(
 /// * [namespace](str) - The namespace of the cargoes
 /// * [data](Vec<CargoConfigPartial>) - The list of cargoes to delete
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
-///
-/// ## Return
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The operation was successful
-///   * [Err](HttpError) - An http response error if something went wrong
+/// * [sx](mpsc::Sender) - The response sender
 ///
 async fn remove_cargoes(
   namespace: &str,
   data: &[CargoConfigPartial],
   state: &DaemonState,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+  sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
   data
     .iter()
@@ -641,13 +629,13 @@ async fn remove_cargoes(
 /// * [namespace](str) - The namespace to delete the VMs from
 /// * [data](Vec<VmConfigPartial>) - The VMs to delete
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [sx](mpsc::Sender) - The response sender
 ///
 pub(crate) async fn remove_vms(
   namespace: &str,
   data: &[VmConfigPartial],
   state: &DaemonState,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+  sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
   data
     .iter()
@@ -679,12 +667,12 @@ pub(crate) async fn remove_vms(
 ///
 /// * [data](Vec<ResourcePartial>) - The list of resources to delete
 /// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender<Result<Bytes, HttpError>>) - The response sender
+/// * [sx](mpsc::Sender) - The response sender
 ///
 async fn remove_resources(
   data: &[ResourcePartial],
   state: &DaemonState,
-  sx: &mpsc::Sender<Result<Bytes, HttpError>>,
+  sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
   data
     .iter()
@@ -746,7 +734,7 @@ pub(crate) fn apply_statefile(
   let version = version.to_owned();
   let data = data.clone();
   let qs = qs.clone();
-  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
+  let (sx, rx) = mpsc::channel::<HttpResult<Bytes>>();
   rt::spawn(async move {
     match data {
       StateFileData::Deployment(data) => {
@@ -822,7 +810,7 @@ pub(crate) fn remove_statefile(
 ) -> mpsc::Receiver<HttpResult<Bytes>> {
   let data = data.clone();
   let state = state.clone();
-  let (sx, rx) = mpsc::channel::<Result<Bytes, HttpError>>();
+  let (sx, rx) = mpsc::channel::<HttpResult<Bytes>>();
   rt::spawn(async move {
     match data {
       StateFileData::Deployment(data) => {

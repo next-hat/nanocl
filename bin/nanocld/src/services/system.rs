@@ -1,6 +1,7 @@
 use ntex::web;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::HttpResult;
+
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{HostInfo, ProccessQuery};
 
@@ -17,7 +18,7 @@ use crate::models::DaemonState;
   ),
 ))]
 #[web::head("/_ping")]
-pub(crate) async fn get_ping() -> Result<web::HttpResponse, HttpError> {
+pub(crate) async fn get_ping() -> HttpResult<web::HttpResponse> {
   Ok(web::HttpResponse::Accepted().into())
 }
 
@@ -52,7 +53,7 @@ pub(crate) async fn get_version() -> web::HttpResponse {
 #[web::get("/info")]
 pub(crate) async fn get_info(
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let docker = state.docker_api.info().await?;
   let host_gateway = state.config.gateway.clone();
   let info = HostInfo {
@@ -75,7 +76,7 @@ pub(crate) async fn get_info(
 #[web::get("/events")]
 pub(crate) async fn watch_event(
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let stream = state.event_emitter.subscribe().await?;
   Ok(
     web::HttpResponse::Ok()
@@ -102,7 +103,7 @@ pub(crate) async fn watch_event(
 pub(crate) async fn get_processes(
   web::types::Query(_): web::types::Query<ProccessQuery>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let nodes = repositories::node::list(&state.pool).await?;
   let nodes = nodes
     .into_iter()

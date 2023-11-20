@@ -1,7 +1,7 @@
 use ntex::web;
 use ntex::http;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_utils::ntex::middlewares;
 
 use crate::version;
@@ -24,7 +24,7 @@ mod vm_image;
 mod secret;
 mod job;
 
-pub(crate) async fn unhandled() -> Result<web::HttpResponse, HttpError> {
+pub(crate) async fn unhandled() -> HttpResult<web::HttpResponse> {
   Err(HttpError {
     status: http::StatusCode::NOT_FOUND,
     msg: "Route or method unhandled".into(),

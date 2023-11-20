@@ -4,9 +4,9 @@
 
 use ntex::web;
 
-use bollard_next::exec::{CreateExecOptions, StartExecOptions};
+use nanocl_error::http::HttpResult;
 
-use nanocl_error::http::HttpError;
+use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 use nanocl_stubs::generic::GenericNspQuery;
 
 use crate::utils;
@@ -29,7 +29,7 @@ use crate::models::DaemonState;
 pub(crate) async fn inspect_exec_command(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let infos = utils::exec::inspect_exec_command(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&infos))
 }
@@ -53,7 +53,7 @@ pub(crate) async fn start_exec_command(
   web::types::Json(payload): web::types::Json<StartExecOptions>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   utils::exec::start_exec_command(&path.1, &payload, &state).await
 }
 
@@ -78,7 +78,7 @@ pub(crate) async fn create_exec_command(
   web::types::Json(payload): web::types::Json<CreateExecOptions>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let result = utils::exec::create_exec_command(&key, &payload, &state).await?;
