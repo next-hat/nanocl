@@ -1,4 +1,4 @@
-use nanocl_error::http_client::HttpClientError;
+use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::node::Node;
 
@@ -14,9 +14,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Vector](Vec) of [node](Node) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [Node](Node)
   ///
   /// ## Example
   ///
@@ -27,7 +25,7 @@ impl NanocldClient {
   /// let res = client.list_node().await;
   /// ```
   ///
-  pub async fn list_node(&self) -> Result<Vec<Node>, HttpClientError> {
+  pub async fn list_node(&self) -> HttpClientResult<Vec<Node>> {
     let res = self.send_get(Self::NODE_PATH, None::<String>).await?;
     Self::res_json(res).await
   }

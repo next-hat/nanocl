@@ -1,4 +1,4 @@
-use nanocl_error::http_client::HttpClientError;
+use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::resource::{
   Resource, ResourcePartial, ResourceConfig, ResourceQuery, ResourceUpdate,
@@ -20,9 +20,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Vector](Vec) of [resource](Resource) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [Resource](Resource)
   ///
   /// ## Example
   ///
@@ -36,7 +34,7 @@ impl NanocldClient {
   pub async fn list_resource(
     &self,
     query: Option<&ResourceQuery>,
-  ) -> Result<Vec<Resource>, HttpClientError> {
+  ) -> HttpClientResult<Vec<Resource>> {
     let res = self.send_get(Self::RESOURCE_PATH, query).await?;
     Self::res_json(res).await
   }
@@ -51,9 +49,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Resource] if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Resource](Resource)
   ///
   /// ## Example
   ///
@@ -73,7 +69,7 @@ impl NanocldClient {
   pub async fn create_resource(
     &self,
     data: &ResourcePartial,
-  ) -> Result<Resource, HttpClientError> {
+  ) -> HttpClientResult<Resource> {
     let res = self
       .send_post(Self::RESOURCE_PATH, Some(data), None::<String>)
       .await?;
@@ -90,9 +86,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Resource](Resource) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Resource](Resource)
   ///
   /// ## Example
   ///
@@ -106,7 +100,7 @@ impl NanocldClient {
   pub async fn inspect_resource(
     &self,
     key: &str,
-  ) -> Result<Resource, HttpClientError> {
+  ) -> HttpClientResult<Resource> {
     let res = self
       .send_get(&format!("{}/{key}", Self::RESOURCE_PATH), None::<String>)
       .await?;
@@ -124,9 +118,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Resource](Resource) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Resource](Resource)
   ///
   /// ## Example
   ///
@@ -141,7 +133,7 @@ impl NanocldClient {
     &self,
     key: &str,
     config: &ResourceUpdate,
-  ) -> Result<Resource, HttpClientError> {
+  ) -> HttpClientResult<Resource> {
     let res = self
       .send_patch(
         &format!("{}/{key}", Self::RESOURCE_PATH),
@@ -160,12 +152,6 @@ impl NanocldClient {
   ///
   /// * [key](str) - The key of the resource to delete
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - If operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
-  ///
   /// ## Example
   ///
   /// ```no_run,ignore
@@ -175,10 +161,7 @@ impl NanocldClient {
   /// let res = client.delete_resource("my-resource").await;
   /// ```
   ///
-  pub async fn delete_resource(
-    &self,
-    key: &str,
-  ) -> Result<(), HttpClientError> {
+  pub async fn delete_resource(&self, key: &str) -> HttpClientResult<()> {
     self
       .send_delete(&format!("{}/{key}", Self::RESOURCE_PATH), None::<String>)
       .await?;
@@ -195,9 +178,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Vector](Vec) of [ResourceConfig](ResourceConfig) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [ResourceConfig](ResourceConfig)
   ///
   /// ## Example
   ///
@@ -211,7 +192,7 @@ impl NanocldClient {
   pub async fn list_history_resource(
     &self,
     key: &str,
-  ) -> Result<Vec<ResourceConfig>, HttpClientError> {
+  ) -> HttpClientResult<Vec<ResourceConfig>> {
     let res = self
       .send_get(
         &format!("{}/{key}/histories", Self::RESOURCE_PATH),
@@ -232,9 +213,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Resource](Resource) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Resource](Resource)
   ///
   /// ## Example
   ///
@@ -250,7 +229,7 @@ impl NanocldClient {
     &self,
     name: &str,
     key: &str,
-  ) -> Result<Resource, HttpClientError> {
+  ) -> HttpClientResult<Resource> {
     let res = self
       .send_patch(
         &format!("{}/{name}/histories/{key}/revert", Self::RESOURCE_PATH),

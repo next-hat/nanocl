@@ -1,7 +1,7 @@
-use ntex::channel::mpsc;
+use ntex::channel::mpsc::Receiver;
 
-use nanocl_error::http::HttpError;
-use nanocl_error::http_client::HttpClientError;
+use nanocl_error::http::HttpResult;
+use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{Event, Version, HostInfo, ProccessQuery};
@@ -9,13 +9,13 @@ use nanocl_stubs::system::{Event, Version, HostInfo, ProccessQuery};
 use super::http_client::NanocldClient;
 
 impl NanocldClient {
-  /// ## Get the version of the daemon
+  /// ## Get version
+  ///
+  /// Get the version of the daemon
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Version](Version) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Version](Version)
   ///
   /// ## Example
   ///
@@ -23,10 +23,10 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let version = client.get_version().await;
+  /// let res = client.get_version().await;
   /// ```
   ///
-  pub async fn get_version(&self) -> Result<Version, HttpClientError> {
+  pub async fn get_version(&self) -> HttpClientResult<Version> {
     let res = self.send_get("/version", None::<String>).await?;
     Self::res_json(res).await
   }
@@ -38,9 +38,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - A [Receiver](mpsc::Receiver) of [events](Event) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Receiver](Receiver) of [Event](Event)
   ///
   /// ## Example
   ///
@@ -56,7 +54,7 @@ impl NanocldClient {
   ///
   pub async fn watch_events(
     &self,
-  ) -> Result<mpsc::Receiver<Result<Event, HttpError>>, HttpClientError> {
+  ) -> HttpClientResult<Receiver<HttpResult<Event>>> {
     let res = self.send_get("/events", None::<String>).await?;
     Ok(Self::res_stream(res).await)
   }
@@ -65,22 +63,16 @@ impl NanocldClient {
   ///
   /// Check if the daemon is running
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - If operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
-  ///
   /// ## Example
   ///
   /// ```no_run,ignore
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let version = client.ping().await.unwrap();
+  /// let res = client.ping().await;
   /// ```
   ///
-  pub async fn ping(&self) -> Result<(), HttpClientError> {
+  pub async fn ping(&self) -> HttpClientResult<()> {
     self.send_head("/_ping", None::<String>).await?;
     Ok(())
   }
@@ -91,9 +83,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [HostInfo](HostInfo) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [HostInfo](HostInfo)
   ///
   /// ## Example
   ///
@@ -104,7 +94,7 @@ impl NanocldClient {
   /// let info = client.info().await.unwrap();
   /// ```
   ///
-  pub async fn info(&self) -> Result<HostInfo, HttpClientError> {
+  pub async fn info(&self) -> HttpClientResult<HostInfo> {
     let res = self.send_get("/info", None::<String>).await?;
     Self::res_json(res).await
   }
@@ -119,9 +109,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Vector](Vec) of [node container summary](NodeContainerSummary) if operation succeeded
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [NodeContainerSummary](NodeContainerSummary)
   ///
   /// ## Example
   ///
@@ -129,13 +117,13 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let processes = client.process(None).await;
+  /// let res = client.process(None).await;
   /// ```
   ///
   pub async fn process(
     &self,
     opts: Option<&ProccessQuery>,
-  ) -> Result<Vec<NodeContainerSummary>, HttpClientError> {
+  ) -> HttpClientResult<Vec<NodeContainerSummary>> {
     let res = self.send_get("/processes", opts).await?;
     Self::res_json(res).await
   }

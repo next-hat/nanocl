@@ -1,10 +1,7 @@
-use ntex::rt;
-use ntex::ws;
-use ntex::io::Base;
-use ntex::ws::WsConnection;
+use ntex::{rt, ws, io};
 
 use nanocl_error::io::FromIo;
-use nanocl_error::http_client::HttpClientError;
+use nanocl_error::http_client::{HttpClientResult, HttpClientError};
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
@@ -27,15 +24,13 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Vm](Vm) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if the operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Vm](Vm)
   ///
   pub async fn create_vm(
     &self,
     vm: &VmConfigPartial,
     namespace: Option<&str>,
-  ) -> Result<Vm, HttpClientError> {
+  ) -> HttpClientResult<Vm> {
     let res = self
       .send_post(
         Self::VM_PATH,
@@ -56,9 +51,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Vector](Vec) of [vm summary](VmSummary) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if the operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [VmSummary](VmSummary)
   ///
   /// ## Example
   ///
@@ -72,7 +65,7 @@ impl NanocldClient {
   pub async fn list_vm(
     &self,
     namespace: Option<&str>,
-  ) -> Result<Vec<VmSummary>, HttpClientError> {
+  ) -> HttpClientResult<Vec<VmSummary>> {
     let res = self
       .send_get(Self::VM_PATH, Some(&GenericNspQuery::new(namespace)))
       .await?;
@@ -88,12 +81,6 @@ impl NanocldClient {
   /// * [name](str) - The name of the vm to delete
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - The operation succeeded
-  ///   * [Err](Err) - [Http client error](HttpClientError) if the operation failed
-  ///
   /// ## Example
   ///
   /// ```no_run,ignore
@@ -107,7 +94,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<&str>,
-  ) -> Result<(), HttpClientError> {
+  ) -> HttpClientResult<()> {
     self
       .send_delete(
         &format!("{}/{name}", Self::VM_PATH),
@@ -129,9 +116,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Vm inspect](VmInspect) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if the operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [VmInspect](VmInspect)
   ///
   /// ## Example
   ///
@@ -146,7 +131,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<&str>,
-  ) -> Result<VmInspect, HttpClientError> {
+  ) -> HttpClientResult<VmInspect> {
     let res = self
       .send_get(
         &format!("{}/{name}/inspect", Self::VM_PATH),
@@ -165,17 +150,11 @@ impl NanocldClient {
   /// * [name](str) - The name of the vm to start
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - If the operation succeeded
-  ///   * [Err](Err) - [Http client error](HttpClientError) if the operation failed
-  ///
   pub async fn start_vm(
     &self,
     name: &str,
     namespace: Option<&str>,
-  ) -> Result<(), HttpClientError> {
+  ) -> HttpClientResult<()> {
     self
       .send_post(
         &format!("{}/{name}/start", Self::VM_PATH),
@@ -195,12 +174,6 @@ impl NanocldClient {
   /// * [name](str) - The name of the vm to stop
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - If the operation succeeded
-  ///   * [Err](Err) - [Http client error](HttpClientError) if the operation failed
-  ///
   /// ## Example
   ///
   /// ```no_run,ignore
@@ -214,7 +187,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<&str>,
-  ) -> Result<(), HttpClientError> {
+  ) -> HttpClientResult<()> {
     self
       .send_post(
         &format!("{}/{name}/stop", Self::VM_PATH),
@@ -235,18 +208,12 @@ impl NanocldClient {
   /// * [vm](VmConfigUpdate) - The config to update the vm
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - If the operation succeeded
-  ///   * [Err](Err) - [Http client error](HttpClientError) if the operation failed
-  ///
   pub async fn patch_vm(
     &self,
     name: &str,
     vm: &VmConfigUpdate,
     namespace: Option<&str>,
-  ) -> Result<(), HttpClientError> {
+  ) -> HttpClientResult<()> {
     self
       .send_patch(
         &format!("{}/{name}", Self::VM_PATH),
@@ -269,9 +236,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Websocket connection](WsConnection) to the vm tty if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if the operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [WsConnection](ws::WsConnection) of [Base](io::Base)
   ///
   /// ## Example
   ///
@@ -286,7 +251,7 @@ impl NanocldClient {
     &self,
     name: &str,
     namespace: Option<&str>,
-  ) -> Result<WsConnection<Base>, HttpClientError> {
+  ) -> HttpClientResult<ws::WsConnection<io::Base>> {
     let qs = if let Some(namespace) = namespace {
       format!("?Namespace={}", namespace)
     } else {
