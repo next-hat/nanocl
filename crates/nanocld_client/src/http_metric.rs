@@ -1,5 +1,6 @@
+use nanocl_error::http_client::HttpClientResult;
+
 use nanocl_stubs::http_metric::{HttpMetric, HttpMetricListQuery};
-use nanocl_error::http_client::HttpClientError;
 
 use super::http_client::NanocldClient;
 
@@ -33,7 +34,7 @@ impl NanocldClient {
   pub async fn list_http_metric(
     &self,
     query: Option<&HttpMetricListQuery>,
-  ) -> Result<Vec<HttpMetric>, HttpClientError> {
+  ) -> HttpClientResult<Vec<HttpMetric>> {
     let res = self.send_get(Self::HTTP_METRIC_PATH, query).await?;
     Self::res_json(res).await
   }

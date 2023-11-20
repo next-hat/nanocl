@@ -2,8 +2,8 @@
 use std::rc::Rc;
 
 use ntex::{Service, ServiceCtx, Middleware};
-use futures::future::{ok, Either, Ready, LocalBoxFuture};
 use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
+use futures::future::{ok, Either, Ready, LocalBoxFuture};
 
 struct Inner {
   version: String,

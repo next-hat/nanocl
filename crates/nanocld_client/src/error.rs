@@ -2,12 +2,12 @@ use ntex::http;
 
 use nanocl_error::io::FromIo;
 use nanocl_error::http::HttpError;
-use nanocl_error::http_client::HttpClientError;
+use nanocl_error::http_client::{HttpClientResult, HttpClientError};
 
 pub(crate) async fn is_api_error(
   res: &mut http::client::ClientResponse,
   status: &http::StatusCode,
-) -> Result<(), HttpClientError> {
+) -> HttpClientResult<()> {
   if status.is_server_error() || status.is_client_error() {
     let err = res.json::<serde_json::Value>().await.map_err(|err| {
       err.map_err_context(|| "Unable to serialize error response")

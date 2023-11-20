@@ -1,10 +1,10 @@
-use ntex::channel::mpsc;
+use ntex::channel::mpsc::Receiver;
+
+use nanocl_error::http::HttpResult;
+use nanocl_error::http_client::HttpClientResult;
+
 use bollard_next::service::ExecInspectResponse;
 use bollard_next::exec::{CreateExecResults, StartExecOptions};
-
-use nanocl_error::http::HttpError;
-use nanocl_error::http_client::HttpClientError;
-
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{CreateExecOptions, OutputLog};
 
@@ -24,9 +24,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Created exec](CreateExecResults) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [CreateExecResults](CreateExecResults)
   ///
   /// ## Example
   ///
@@ -48,7 +46,7 @@ impl NanocldClient {
     name: &str,
     exec: &CreateExecOptions,
     namespace: Option<&str>,
-  ) -> Result<CreateExecResults, HttpClientError> {
+  ) -> HttpClientResult<CreateExecResults> {
     let res = self
       .send_post(
         &format!("/cargoes/{name}/exec"),
@@ -69,9 +67,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result)
-  ///   * [Ok](Ok) - [Info](ExecInspectResponse) of the exec command if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [ExecInspectResponse](ExecInspectResponse)
   ///
   /// ## Example
   ///
@@ -99,7 +95,7 @@ impl NanocldClient {
   pub async fn inspect_exec(
     &self,
     id: &str,
-  ) -> Result<ExecInspectResponse, HttpClientError> {
+  ) -> HttpClientResult<ExecInspectResponse> {
     let res = self
       .send_get(&format!("{}/{id}/cargo/inspect", Self::EXEC_PATH), Some(()))
       .await?;
@@ -115,9 +111,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result)
-  ///   * [Ok](Ok) - [Receiver](mpsc::Receiver) of [output log](OutputLog) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Receiver](Receiver) of [OutputLog](OutputLog)
   ///
   /// ## Example
   ///
@@ -142,7 +136,7 @@ impl NanocldClient {
     &self,
     id: &str,
     exec: &StartExecOptions,
-  ) -> Result<mpsc::Receiver<Result<OutputLog, HttpError>>, HttpClientError> {
+  ) -> HttpClientResult<Receiver<HttpResult<OutputLog>>> {
     let res = self
       .send_post(
         &format!("{}/{id}/cargo/start", &Self::EXEC_PATH),

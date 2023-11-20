@@ -1,11 +1,12 @@
 use ntex::channel::mpsc::Receiver;
 
+use nanocl_error::http::HttpResult;
+use nanocl_error::http_client::HttpClientResult;
+
 use nanocl_stubs::job::{
   Job, JobLogOutput, JobWaitQuery, JobWaitResponse, JobPartial, JobInspect,
   JobSummary,
 };
-use nanocl_error::http::HttpError;
-use nanocl_error::http_client::HttpClientError;
 
 use super::http_client::NanocldClient;
 
@@ -20,9 +21,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Vector](Vec) of [job](Job) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [JobSummary](JobSummary)
   ///
   /// ## Example
   ///
@@ -33,7 +32,7 @@ impl NanocldClient {
   /// let res = client.list_job().await;
   /// ```
   ///
-  pub async fn list_job(&self) -> Result<Vec<JobSummary>, HttpClientError> {
+  pub async fn list_job(&self) -> HttpClientResult<Vec<JobSummary>> {
     let res = self.send_get(Self::JOB_PATH, None::<String>).await?;
     Self::res_json(res).await
   }
@@ -48,9 +47,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Job inspect](JobInspect) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [JobInspect](JobInspect)
   ///
   /// ## Example
   ///
@@ -61,10 +58,7 @@ impl NanocldClient {
   /// let res = client.inspect_job("my_job").await;
   /// ```
   ///
-  pub async fn inspect_job(
-    &self,
-    name: &str,
-  ) -> Result<JobInspect, HttpClientError> {
+  pub async fn inspect_job(&self, name: &str) -> HttpClientResult<JobInspect> {
     let res = self
       .send_get(
         &format!("{}/{name}/inspect", Self::JOB_PATH),
@@ -85,9 +79,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Receiver](Receiver) of [Result](Result) of [JobLogOutput](JobLogOutput) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Receiver](Receiver) of [JobLogOutput](JobLogOutput)
   ///
   /// ## Example
   ///
@@ -101,7 +93,7 @@ impl NanocldClient {
   pub async fn logs_job(
     &self,
     name: &str,
-  ) -> Result<Receiver<Result<JobLogOutput, HttpError>>, HttpClientError> {
+  ) -> HttpClientResult<Receiver<HttpResult<JobLogOutput>>> {
     let res = self
       .send_get(&format!("{}/{name}/logs", Self::JOB_PATH), None::<String>)
       .await?;
@@ -118,9 +110,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Job](Job) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Job](Job)
   ///
   /// ## Example
   ///
@@ -140,10 +130,7 @@ impl NanocldClient {
   /// }).await;
   /// ```
   ///
-  pub async fn create_job(
-    &self,
-    job: &JobPartial,
-  ) -> Result<Job, HttpClientError> {
+  pub async fn create_job(&self, job: &JobPartial) -> HttpClientResult<Job> {
     let res = self
       .send_post(Self::JOB_PATH, Some(job.clone()), None::<String>)
       .await?;
@@ -158,12 +145,6 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the job to start
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [()] if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
-  ///
   /// ## Example
   ///
   /// ```no_run,ignore
@@ -173,7 +154,7 @@ impl NanocldClient {
   /// let res = client.start_job("my_job").await;
   /// ```
   ///
-  pub async fn start_job(&self, name: &str) -> Result<(), HttpClientError> {
+  pub async fn start_job(&self, name: &str) -> HttpClientResult<()> {
     self
       .send_post(
         &format!("{}/{name}/start", Self::JOB_PATH),
@@ -196,9 +177,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - [Receiver](Receiver) of [Result](Result) of [JobWaitResponse](JobWaitResponse) if operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
+  /// [HttpClientResult](HttpClientResult) containing a [Receiver](Receiver) of [JobWaitResponse](JobWaitResponse)
   ///
   /// ## Example
   ///
@@ -213,7 +192,7 @@ impl NanocldClient {
     &self,
     name: &str,
     query: Option<&JobWaitQuery>,
-  ) -> Result<Receiver<Result<JobWaitResponse, HttpError>>, HttpClientError> {
+  ) -> HttpClientResult<Receiver<HttpResult<JobWaitResponse>>> {
     let res = self
       .send_get(&format!("{}/{name}/wait", Self::JOB_PATH), query)
       .await?;
@@ -228,12 +207,6 @@ impl NanocldClient {
   ///
   /// * [name](str) - The name of the job to delete
   ///
-  /// ## Return
-  ///
-  /// * [Result](Result) - The result of the operation
-  ///   * [Ok](Ok) - If operation was successful
-  ///   * [Err](Err) - [Http client error](HttpClientError) if operation failed
-  ///
   /// ## Example
   ///
   /// ```no_run,ignore
@@ -243,7 +216,7 @@ impl NanocldClient {
   /// let res = client.delete_job("my_job").await;
   /// ```
   ///
-  pub async fn delete_job(&self, name: &str) -> Result<(), HttpClientError> {
+  pub async fn delete_job(&self, name: &str) -> HttpClientResult<()> {
     self
       .send_delete(&format!("{}/{name}", Self::JOB_PATH), None::<String>)
       .await?;
