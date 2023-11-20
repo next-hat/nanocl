@@ -1,102 +1,29 @@
 use std::collections::HashMap;
 
 use ntex::web;
-use tokio::fs;
 use ntex::util::Bytes;
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
 use futures_util::{StreamExt, TryStreamExt};
 use futures_util::stream::{FuturesUnordered, select_all, FuturesOrdered};
-use bollard_next::service::{
-  ContainerSummary, ContainerInspectResponse, ContainerWaitExitError,
-};
+use bollard_next::service::{ContainerSummary, ContainerWaitExitError};
 use bollard_next::container::{
   CreateContainerOptions, StartContainerOptions, ListContainersOptions,
   RemoveContainerOptions, LogsOptions, WaitContainerOptions,
 };
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::job::{
   Job, JobPartial, JobInspect, JobLogOutput, JobWaitResponse, WaitCondition,
   JobSummary,
 };
-use tokio::io::AsyncWriteExt;
 
 use crate::{version, repositories};
 use crate::models::{DaemonState, JobUpdateDbModel};
 
 use super::stream::transform_stream;
-
-/// ## List instances
-///
-/// List the job instances (containers) based on the job name
-///
-/// ## Arguments
-///
-/// * [name](str) - The job name
-/// * [docker_api](bollard_next::Docker) - The docker api
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - [Vector](Vec) of [ContainerSummary](ContainerSummary)
-///   * [Err](Err) - [Http error](HttpError) Something went wrong
-///
-pub async fn list_instances(
-  name: &str,
-  docker_api: &bollard_next::Docker,
-) -> Result<Vec<ContainerSummary>, HttpError> {
-  let label = format!("io.nanocl.job={name}");
-  let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
-  filters.insert("label", vec![&label]);
-  let options = Some(ListContainersOptions {
-    all: true,
-    filters,
-    ..Default::default()
-  });
-  let containers = docker_api.list_containers(options).await?;
-  Ok(containers)
-}
-
-/// ## Inspect instances
-///
-/// Return detailed informations about each instances of a job
-///
-/// ## Arguments
-///
-/// [name](str) The job name
-/// [state](DaemonState) The daemon state
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - [Vector](Vec) of [ContainerInspectResponse](ContainerInspectResponse) and [NodeContainerSummary](NodeContainerSummary)
-///   * [Err](Err) - [Http error](HttpError) Something went wrong
-///
-async fn inspect_instances(
-  name: &str,
-  state: &DaemonState,
-) -> Result<Vec<(ContainerInspectResponse, NodeContainerSummary)>, HttpError> {
-  list_instances(name, &state.docker_api).await?
-  .into_iter()
-  .map(|container| async {
-    let container_inspect = state
-      .docker_api
-      .inspect_container(&container.id.clone().unwrap_or_default(), None)
-      .await?;
-    Ok::<_, HttpError>((
-      container_inspect,
-      NodeContainerSummary {
-        node: state.config.hostname.clone(),
-        ip_address: state.config.advertise_addr.clone(),
-        container,
-      },
-    ))
-  })
-  .collect::<FuturesUnordered<_>>()
-  .collect::<Vec<Result<(ContainerInspectResponse, NodeContainerSummary), _>>>()
-  .await.into_iter().collect::<Result<Vec<(ContainerInspectResponse, NodeContainerSummary)>, _>>()
-}
 
 /// ## Count instances
 ///
@@ -109,20 +36,21 @@ async fn inspect_instances(
 ///
 /// ## Return
 ///
-/// * [Tuple](Tuple) - The tuple of the number of instances
+/// The tuple of the number of instances
 ///   * [usize] - The total number of instances
 ///   * [usize] - The number of failed instances
 ///   * [usize] - The number of success instances
 ///   * [usize] - The number of running instances
 ///
 fn count_instances(
-  instances: &[(ContainerInspectResponse, NodeContainerSummary)],
+  instances: &[NodeContainerSummary],
 ) -> (usize, usize, usize, usize) {
   let mut instance_failed = 0;
   let mut instance_success = 0;
   let mut instance_running = 0;
-  for (container_inspect, _) in instances {
-    let state = container_inspect.state.clone().unwrap_or_default();
+  for instance in instances {
+    let container = &instance.container;
+    let state = container.state.clone().unwrap_or_default();
     if state.running.unwrap_or_default() {
       instance_running += 1;
       continue;
@@ -146,22 +74,6 @@ fn count_instances(
     instance_success,
     instance_running,
   )
-}
-
-/// ## Exec crontab
-///
-/// Execute the crontab command to update the cron jobs
-///
-async fn exec_crontab() -> IoResult<()> {
-  web::block(|| {
-    std::process::Command::new("crontab")
-      .arg("/tmp/crontab")
-      .output()
-      .map_err(|err| err.map_err_context(|| "Cron job"))?;
-    Ok::<_, IoError>(())
-  })
-  .await?;
-  Ok(())
 }
 
 /// ## Format cron job command
@@ -190,6 +102,22 @@ fn format_cron_job_command(job: &Job, state: &DaemonState) -> String {
     version::VERSION,
     &job.name
   )
+}
+
+/// ## Exec crontab
+///
+/// Execute the crontab command to update the cron jobs
+///
+async fn exec_crontab() -> IoResult<()> {
+  web::block(|| {
+    std::process::Command::new("crontab")
+      .arg("/tmp/crontab")
+      .output()
+      .map_err(|err| err.map_err_context(|| "Cron job"))?;
+    Ok::<_, IoError>(())
+  })
+  .await?;
+  Ok(())
 }
 
 /// ## Add cron rule
@@ -254,6 +182,74 @@ async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
   Ok(())
 }
 
+/// ## Inspect instances
+///
+/// Return detailed informations about each instances of a job
+///
+/// ## Arguments
+///
+/// [name](str) The job name
+/// [state](DaemonState) The daemon state
+///
+/// ## Returns
+///
+/// [HttpResult](HttpResult) containing a [vector](Vec) of [NodeContainerSummary](NodeContainerSummary)
+///
+async fn inspect_instances(
+  name: &str,
+  state: &DaemonState,
+) -> HttpResult<Vec<NodeContainerSummary>> {
+  // Convert into a hashmap for faster lookup
+  let nodes = repositories::node::list(&state.pool).await?;
+  let nodes = nodes
+    .into_iter()
+    .map(|node| (node.name.clone(), node))
+    .collect::<std::collections::HashMap<String, _>>();
+  repositories::container_instance::list_for_kind("Job", name, &state.pool)
+    .await?
+    .into_iter()
+    .map(|instance| {
+      Ok::<_, HttpError>(NodeContainerSummary {
+        node: instance.node_id.clone(),
+        ip_address: match nodes.get(&instance.node_id) {
+          Some(node) => node.ip_address.clone(),
+          None => "Unknow".to_owned(),
+        },
+        container: instance.data,
+      })
+    })
+    .collect::<Result<Vec<NodeContainerSummary>, _>>()
+}
+
+/// ## List instances
+///
+/// List the job instances (containers) based on the job name
+///
+/// ## Arguments
+///
+/// * [name](str) - The job name
+/// * [docker_api](bollard_next::Docker) - The docker api
+///
+/// ## Returns
+///
+/// [HttpResult](HttpResult) containing a [vector](Vec) of [ContainerSummary](ContainerSummary)
+///
+pub(crate) async fn list_instances(
+  name: &str,
+  docker_api: &bollard_next::Docker,
+) -> HttpResult<Vec<ContainerSummary>> {
+  let label = format!("io.nanocl.j={name}");
+  let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
+  filters.insert("label", vec![&label]);
+  let options = Some(ListContainersOptions {
+    all: true,
+    filters,
+    ..Default::default()
+  });
+  let containers = docker_api.list_containers(options).await?;
+  Ok(containers)
+}
+
 /// ## Create
 ///
 /// Create a job and run it
@@ -265,14 +261,12 @@ async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - [Job](Job) has been created
-///   * [Err](Err) - [Http error](HttpError) Something went wrong
+/// [HttpResult](HttpResult) the created [job](Job)
 ///
-pub async fn create(
+pub(crate) async fn create(
   item: &JobPartial,
   state: &DaemonState,
-) -> Result<Job, HttpError> {
+) -> HttpResult<Job> {
   let job = repositories::job::create(item, &state.pool).await?;
   job
     .containers
@@ -282,7 +276,9 @@ pub async fn create(
       async move {
         let mut container = container.clone();
         let mut labels = container.labels.clone().unwrap_or_default();
-        labels.insert("io.nanocl.job".to_owned(), job_name.clone());
+        labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
+        labels.insert("io.nanocl.kind".to_owned(), "Job".to_owned());
+        labels.insert("io.nanocl.j".to_owned(), job_name.clone());
         container.labels = Some(labels);
         state
           .docker_api
@@ -314,22 +310,17 @@ pub async fn create(
 /// * [name](str) - The job name
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - The job has been started
-///   * [Err](Err) - [Http error](HttpError) Something went wrong
-///
-pub async fn start_by_name(
+pub(crate) async fn start_by_name(
   name: &str,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   repositories::job::find_by_name(name, &state.pool).await?;
   let containers = inspect_instances(name, state).await?;
   containers
     .into_iter()
-    .map(|(inspect, _)| async {
+    .map(|inspect| async {
       if inspect
+        .container
         .state
         .unwrap_or_default()
         .running
@@ -340,7 +331,7 @@ pub async fn start_by_name(
       state
         .docker_api
         .start_container(
-          &inspect.id.unwrap_or_default(),
+          &inspect.container.id.unwrap_or_default(),
           None::<StartContainerOptions<String>>,
         )
         .await?;
@@ -372,11 +363,9 @@ pub async fn start_by_name(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - [Vector](Vec) of [Job](JobSummary)
-///   * [Err](Err) - [Http error](HttpError) Something went wrong
+/// [HttpResult](HttpResult) containing a [vector](Vec) of [JobSummary](JobSummary)
 ///
-pub async fn list(state: &DaemonState) -> Result<Vec<JobSummary>, HttpError> {
+pub(crate) async fn list(state: &DaemonState) -> HttpResult<Vec<JobSummary>> {
   let jobs = repositories::job::list(&state.pool).await?;
   let job_summaries =
     jobs
@@ -410,23 +399,17 @@ pub async fn list(state: &DaemonState) -> Result<Vec<JobSummary>, HttpError> {
 
 /// ## Delete by name
 ///
-/// Delete a job by key with his given instances (containers).
+/// Delete a job by name with his given instances (containers).
 ///
 /// ## Arguments
 ///
-/// * [key](str) - The job key
+/// * [name](str) - The job name
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - The job has been deleted
-///   * [Err](Err) - [Http error](HttpError) Something went wrong
-///
-pub async fn delete_by_name(
+pub(crate) async fn delete_by_name(
   name: &str,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let job = repositories::job::find_by_name(name, &state.pool).await?;
   let containers = list_instances(name, &state.docker_api).await?;
   containers
@@ -467,14 +450,12 @@ pub async fn delete_by_name(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - [JobInspect](JobInspect) has been returned
-///   * [Err](Err) - [Http error](HttpError) Something went wrong
+/// [HttpResult](HttpResult) containing a [JobInspect](JobInspect)
 ///
-pub async fn inspect_by_name(
+pub(crate) async fn inspect_by_name(
   name: &str,
   state: &DaemonState,
-) -> Result<JobInspect, HttpError> {
+) -> HttpResult<JobInspect> {
   let job = repositories::job::find_by_name(name, &state.pool).await?;
   let instances = inspect_instances(name, state).await?;
   let (instance_total, instance_failed, instance_success, instance_running) =
@@ -491,11 +472,7 @@ pub async fn inspect_by_name(
     instance_success,
     instance_running,
     instance_failed,
-    instances: instances
-      .clone()
-      .into_iter()
-      .map(|(_, container)| container)
-      .collect(),
+    instances,
   };
   Ok(job_inspect)
 }
@@ -511,14 +488,12 @@ pub async fn inspect_by_name(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Ok) - [Stream](StreamExt) of [JobLogOutput](JobLogOutput)
-///   * [Err](Err) - [Http error](HttpError) Something went wrong
+/// [HttpResult](HttpResult) containing a [Stream](StreamExt) of [JobLogOutput](JobLogOutput)
 ///
-pub async fn logs_by_name(
+pub(crate) async fn logs_by_name(
   name: &str,
   state: &DaemonState,
-) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
+) -> HttpResult<impl StreamExt<Item = Result<Bytes, HttpError>>> {
   let _ = repositories::job::find_by_name(name, &state.pool).await?;
   let instances = list_instances(name, &state.docker_api).await?;
   let futures = instances
@@ -558,20 +533,19 @@ pub async fn logs_by_name(
 ///
 /// ## Arguments
 ///
-/// * [key](str) - The job key
+/// * [name](str) - The job name
+/// * [wait_options](WaitContainerOptions) - The wait options
 /// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Stream) - The stream of wait
-///   * [Err](HttpError) - The job cannot be waited
+/// [HttpResult](HttpResult) containing a [Stream](StreamExt) of [JobWaitResponse](JobWaitResponse)
 ///
-pub async fn wait(
+pub(crate) async fn wait(
   name: &str,
   wait_options: WaitContainerOptions<WaitCondition>,
   state: &DaemonState,
-) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
+) -> HttpResult<impl StreamExt<Item = Result<Bytes, HttpError>>> {
   let job = repositories::job::find_by_name(name, &state.pool).await?;
   let docker_api = state.docker_api.clone();
   let containers = list_instances(&job.name, &docker_api).await?;

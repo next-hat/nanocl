@@ -4,18 +4,19 @@ use std::os::unix::prelude::PermissionsExt;
 
 use ntex::rt;
 use tokio::fs;
-use nanocl_error::io::{FromIo, IoResult, IoError};
+use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
 
+use nanocl_error::io::{FromIo, IoResult, IoError};
 use nanocl_stubs::config::DaemonConfig;
 
 use crate::{event, utils, version};
 use crate::models::DaemonState;
 
-use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
-
 /// ## Set unix permission
 ///
-/// Watch for change in the run directory and set the permission of the unix socket
+/// Create a new thread and watch for change in the run directory
+/// and set the permission of the unix socket
+/// Then close the thread
 ///
 fn set_unix_sock_perm() {
   rt::Arbiter::new().exec_fn(|| {
@@ -84,9 +85,9 @@ fn set_unix_sock_perm() {
 
 /// ## Spawn crond
 ///
-/// Spawn and manage a crond instance to run cron jobs
+/// Create a new thread and spawn and manage a crond instance to run cron jobs
 ///
-pub fn spawn_crond() {
+fn spawn_crond() {
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async {
       match Command::new("crond").args(["-f"]).spawn() {
@@ -113,7 +114,7 @@ pub fn spawn_crond() {
 ///
 /// ## Returns
 ///
-/// * [IoResult](IoResult<()>) - The result of the operation
+/// [IoResult](IoResult) the result of the operation
 ///
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   let vm_dir = format!("{state_dir}/vms/images");
@@ -134,11 +135,9 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](DaemonState) - The daemon state
-///   * [Err](IoError) - The daemon state has not been initialized
+/// [IoResult](IoResult) the [daemon state](DaemonState)
 ///
-pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
+pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   spawn_crond();
   set_unix_sock_perm();
   let docker = bollard_next::Docker::connect_with_unix(
@@ -146,9 +145,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     120,
     bollard_next::API_DEFAULT_VERSION,
   )
-  .map_err(|err| {
-    err.map_err_context(|| "Unable to connect to docker daemon")
-  })?;
+  .map_err(|err| err.map_err_context(|| "Docker"))?;
   ensure_state_dir(&daemon_conf.state_dir).await?;
   let pool = utils::store::init(daemon_conf).await?;
   let daemon_state = DaemonState {
@@ -163,10 +160,8 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   utils::system::register_namespace("system", false, &daemon_state).await?;
   rt::spawn(async move {
     let fut = async move {
-      utils::system::sync_containers(&daemon_ptr.docker_api, &daemon_ptr.pool)
-        .await?;
-      utils::system::sync_vm_images(&daemon_ptr.config, &daemon_ptr.pool)
-        .await?;
+      utils::system::sync_instances(&daemon_ptr).await?;
+      utils::system::sync_vm_images(&daemon_ptr).await?;
       Ok::<_, IoError>(())
     };
     if let Err(err) = fut.await {
@@ -174,6 +169,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     }
     Ok::<_, IoError>(())
   });
+  utils::system::watch_docker(&daemon_state);
   Ok(daemon_state)
 }
 

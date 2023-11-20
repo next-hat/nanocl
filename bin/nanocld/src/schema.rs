@@ -22,6 +22,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    container_instances (key) {
+        key -> Varchar,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+        name -> Varchar,
+        kind -> Varchar,
+        data -> Jsonb,
+        node_id -> Varchar,
+        kind_id -> Varchar,
+    }
+}
+
+diesel::table! {
     http_metrics (key) {
         key -> Uuid,
         created_at -> Timestamptz,
@@ -214,6 +227,7 @@ diesel::joinable!(vms -> vm_configs (config_key));
 diesel::allow_tables_to_appear_in_same_query!(
   cargo_configs,
   cargoes,
+  container_instances,
   http_metrics,
   jobs,
   metrics,

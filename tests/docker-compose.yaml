@@ -37,9 +37,9 @@ services:
         cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=nstore.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
 
   ndns:
     container_name: ndns.system.c
@@ -52,9 +52,9 @@ services:
       - /var/lib/nanocl/dns:/opt/dns
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=ndns.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
 
   nmetrics:
     container_name: nmetrics.system.c
@@ -70,9 +70,9 @@ services:
       - unix:///run/nanocl/metrics.sock
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=nmetrics.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
     volumes:
       - /run/nanocl:/run/nanocl
 
@@ -85,9 +85,9 @@ services:
       - TZ=Europe/Paris
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=nproxy.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
     volumes:
       - /run:/run
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/run:/run

@@ -44,9 +44,9 @@ services:
         cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=nstore.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
 
   nmetrics:
     container_name: nmetrics.system.c
@@ -62,9 +62,9 @@ services:
       - unix:///run/nanocl/metrics.sock
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=nmetrics.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
 
@@ -77,9 +77,9 @@ services:
       - TZ=Europe/Paris
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=nproxy.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/run:/run
@@ -112,9 +112,9 @@ services:
       - run --no-default-features --features dev --bin ncproxy
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=ncproxy.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
     volumes:
       - type: bind
         source: .
@@ -139,9 +139,9 @@ services:
       - TZ=Europe/Paris
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=ndns.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
     volumes:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:/opt/dns
 
@@ -163,9 +163,9 @@ services:
       - run --no-default-features --features dev --bin ncdns -- --conf-dir /opt/dns
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=ncdns.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
     volumes:
       - type: bind
         source: .
@@ -188,9 +188,9 @@ services:
       - TZ=Europe/Paris
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=ndaemon.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
     volumes:
       - type: bind
         source: .
@@ -225,9 +225,9 @@ services:
       - PGADMIN_DEFAULT_PASSWORD=admin
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=dbeaver.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
     volumes:
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dbeaver:/opt/cloudbeaver/workspace
 
@@ -245,9 +245,9 @@ services:
       - USER_HOME=${HOME}
     labels:
       - io.nanocl=enabled
+      - io.nanocl.kind=Cargo
       - io.nanocl.c=ndaemon.system
       - io.nanocl.n=system
-      - io.nanocl.cnsp=system
     volumes:
       - type: bind
         source: .

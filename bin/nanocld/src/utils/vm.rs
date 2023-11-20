@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ntex::{http, rt};
+use ntex::{rt, http};
 
 use bollard_next::Docker;
 use bollard_next::service::{HostConfig, DeviceMapping, ContainerSummary};
@@ -9,12 +9,12 @@ use bollard_next::container::{
   StopContainerOptions, RemoveContainerOptions,
 };
 
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::system::Event;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
-use nanocl_error::http::HttpError;
 use crate::models::{Pool, VmImageDbModel, DaemonState};
 
 /// ## Start by key
@@ -26,16 +26,10 @@ use crate::models::{Pool, VmImageDbModel, DaemonState};
 /// * [vm_key](str) - The vm key
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The vm has been started
-///   * [Err](HttpError) - The vm has not been started
-///
-pub async fn start_by_key(
+pub(crate) async fn start_by_key(
   vm_key: &str,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let container_name = format!("{}.v", vm_key);
   state
     .docker_api
@@ -59,16 +53,10 @@ pub async fn start_by_key(
 ///
 /// ## Arguments
 ///
-/// * [vm](VmDbModel) - The vm model
+/// * [vm](Vm) - The vm
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The vm has been stopped
-///   * [Err](HttpError) - The vm has not been stopped
-///
-pub async fn stop(vm: &Vm, state: &DaemonState) -> Result<(), HttpError> {
+pub(crate) async fn stop(vm: &Vm, state: &DaemonState) -> HttpResult<()> {
   let container_name = format!("{}.v", vm.key);
   state
     .docker_api
@@ -95,24 +83,17 @@ pub async fn stop(vm: &Vm, state: &DaemonState) -> Result<(), HttpError> {
 /// * [vm_key](str) - The vm key
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The vm has been stopped
-///   * [Err](HttpError) - The vm has not been stopped
-///
-pub async fn stop_by_key(
+pub(crate) async fn stop_by_key(
   vm_key: &str,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
-
   stop(&vm, state).await
 }
 
 /// ## Inspect by key
 ///
-/// Inspect a VM by his key
+/// Get detailed information about a VM by his key
 ///
 /// ## Arguments
 ///
@@ -122,15 +103,13 @@ pub async fn stop_by_key(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](VmInspect) - The vm has been inspected
-///   * [Err](HttpError) - The vm has not been inspected
+/// [HttpResult](HttpResult) containing a [VmInspect](VmInspect)
 ///
-pub async fn inspect_by_key(
+pub(crate) async fn inspect_by_key(
   vm_key: &str,
   docker_api: &Docker,
   pool: &Pool,
-) -> Result<VmInspect, HttpError> {
+) -> HttpResult<VmInspect> {
   let vm = repositories::vm::inspect_by_key(vm_key, pool).await?;
   let containers = list_instances_by_key(&vm.key, docker_api).await?;
   let mut running_instances = 0;
@@ -158,18 +137,16 @@ pub async fn inspect_by_key(
 /// ## Arguments
 ///
 /// * [vm_key](str) - The vm key
-/// * [docker_api](bollard_next::Docker) - The docker api
+/// * [docker_api](Docker) - The docker api
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<ContainerSummary>) - The list of instances
-///   * [Err](HttpError) - The list of instances has not been retrieved
+/// [HttpResult](HttpResult) containing a [vector](Vec) of [ContainerSummary](ContainerSummary)
 ///
-pub async fn list_instances_by_key(
+pub(crate) async fn list_instances_by_key(
   vm_key: &str,
   docker_api: &Docker,
-) -> Result<Vec<ContainerSummary>, HttpError> {
+) -> HttpResult<Vec<ContainerSummary>> {
   let label = format!("io.nanocl.v={vm_key}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
@@ -192,17 +169,11 @@ pub async fn list_instances_by_key(
 /// * [force](bool) - Force the deletion
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The vm has been deleted
-///   * [Err](HttpError) - The vm has not been deleted
-///
-pub async fn delete_by_key(
+pub(crate) async fn delete_by_key(
   vm_key: &str,
   force: bool,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
   let options = bollard_next::container::RemoveContainerOptions {
     force,
@@ -236,25 +207,31 @@ pub async fn delete_by_key(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<VmSummary>) - The list of VMs
-///   * [Err](HttpError) - The list of VMs has not been retrieved
+/// [HttpResult](HttpResult) containing a [vector](Vec) of [VmSummary](VmSummary)
 ///
-pub async fn list_by_namespace(
+pub(crate) async fn list_by_namespace(
   nsp: &str,
-  docker_api: &Docker,
   pool: &Pool,
-) -> Result<Vec<VmSummary>, HttpError> {
+) -> HttpResult<Vec<VmSummary>> {
   let namespace = repositories::namespace::find_by_name(nsp, pool).await?;
   let vmes = repositories::vm::find_by_namespace(&namespace, pool).await?;
   let mut vm_summaries = Vec::new();
   for vm in vmes {
     let config =
       repositories::vm_config::find_by_key(&vm.config_key, pool).await?;
-    let containers = list_instances_by_key(&vm.key, docker_api).await?;
+    let instances =
+      repositories::container_instance::list_for_kind("Vm", &vm.key, pool)
+        .await?;
     let mut running_instances = 0;
-    for container in containers.clone() {
-      if container.state == Some("running".into()) {
+    for instance in &instances {
+      if instance
+        .data
+        .state
+        .clone()
+        .unwrap_or_default()
+        .running
+        .unwrap_or_default()
+      {
         running_instances += 1;
       }
     }
@@ -265,7 +242,7 @@ pub async fn list_by_namespace(
       name: vm.name,
       namespace_name: vm.namespace_name,
       config: config.to_owned(),
-      instances: containers.len(),
+      instances: instances.len(),
       running_instances,
       config_key: config.key,
     });
@@ -284,23 +261,18 @@ pub async fn list_by_namespace(
 /// * [disable_keygen](bool) - Disable SSH key generation
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The VM instance has been created
-///   * [Err](HttpError) - The VM instance has not been created
-///
-pub async fn create_instance(
+pub(crate) async fn create_instance(
   vm: &Vm,
   image: &VmImageDbModel,
   disable_keygen: bool,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let mut labels: HashMap<String, String> = HashMap::new();
   let vmimagespath = format!("{}/vms/images", state.config.state_dir);
-  labels.insert("io.nanocl".into(), "enabled".into());
-  labels.insert("io.nanocl.v".into(), vm.key.clone());
-  labels.insert("io.nanocl.vnsp".into(), vm.namespace_name.clone());
+  labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
+  labels.insert("io.nanocl.kind".to_owned(), "Vm".to_owned());
+  labels.insert("io.nanocl.v".to_owned(), vm.key.clone());
+  labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   let mut args: Vec<String> =
     vec!["-hda".into(), image.path.clone(), "--nographic".into()];
   let host_config = vm.config.host_config.clone();
@@ -414,16 +386,14 @@ pub async fn create_instance(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vm) - The VM has been created
-///   * [Err](HttpError) - The VM has not been created
+/// [HttpResult](HttpResult) containing a [Vm](Vm)
 ///
-pub async fn create(
+pub(crate) async fn create(
   vm: &VmConfigPartial,
   namespace: &str,
   version: &str,
   state: &DaemonState,
-) -> Result<Vm, HttpError> {
+) -> HttpResult<Vm> {
   log::debug!(
     "Creating VM {} in namespace {} with version: {version}",
     vm.name,
@@ -478,16 +448,14 @@ pub async fn create(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vm) - The VM has been patched
-///   * [Err](HttpError) - The VM has not been patched
+/// [HttpResult](HttpResult) containing a [Vm](Vm)
 ///
-pub async fn patch(
+pub(crate) async fn patch(
   vm_key: &str,
   config: &VmConfigUpdate,
   version: &str,
   state: &DaemonState,
-) -> Result<Vm, HttpError> {
+) -> HttpResult<Vm> {
   let vm = repositories::vm::find_by_key(vm_key, &state.pool).await?;
   let old_config =
     repositories::vm_config::find_by_key(&vm.config_key, &state.pool).await?;
@@ -549,16 +517,14 @@ pub async fn patch(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vm) - The VM has been put
-///   * [Err](HttpError) - The VM has not been put
+/// [HttpResult](HttpResult) containing a [Vm](Vm)
 ///
-pub async fn put(
+pub(crate) async fn put(
   vm_key: &str,
   vm_partial: &VmConfigPartial,
   version: &str,
   state: &DaemonState,
-) -> Result<Vm, HttpError> {
+) -> HttpResult<Vm> {
   let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
   let container_name = format!("{}.v", &vm.key);
   stop(&vm, state).await?;
