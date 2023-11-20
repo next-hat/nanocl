@@ -1,7 +1,7 @@
 use ntex::{rt, ws, io};
 
 use nanocl_error::io::FromIo;
-use nanocl_error::http_client::{HttpClientResult, HttpClientError};
+use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};

@@ -55,12 +55,6 @@ pub fn set_channel() -> Result<()> {
 /// * [app](clap::Command) Command to generate
 /// * [dir](str) Directory to generate page in
 ///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](Ok) Operation was successful
-///   * [Err](Err) Operation failed
-///
 pub fn generate_man_page<'a>(
   name: &'a str,
   app: &'a clap::Command,

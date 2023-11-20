@@ -3,6 +3,7 @@ use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::net::{IpAddr, Ipv4Addr};
 use libc::{sockaddr_in, gethostname, c_char};
+
 use nanocl_error::io::{FromIo, IoResult};
 
 /// Get the default IP address of the system.
@@ -32,7 +33,6 @@ pub fn get_default_ip() -> IoResult<IpAddr> {
     std::io::ErrorKind::NotFound,
     "No default route found",
   ))?;
-
   // Get the IP address of the default interface.
   // Using getifaddrs call from libc
   let mut ip = None;
@@ -64,7 +64,6 @@ pub fn get_default_ip() -> IoResult<IpAddr> {
     std::io::ErrorKind::NotFound,
     "No IP address found for the default interface",
   ))?;
-
   Ok(ip)
 }
 

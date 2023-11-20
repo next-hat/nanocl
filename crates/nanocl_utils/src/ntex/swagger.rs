@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use ntex::web;
-use ntex::http;
+use ntex::{web, http};
 use ntex::util::Bytes;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 
 pub struct SwaggerConfig<'a> {
   definition: utoipa::openapi::OpenApi,
@@ -30,7 +29,7 @@ impl<'a> SwaggerConfig<'a> {
 #[web::get("/swagger.json")]
 async fn get_specs(
   openapi_conf: web::types::State<SwaggerConfig<'static>>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let spec = openapi_conf.definition.to_json().map_err(|err| HttpError {
     status: http::StatusCode::INTERNAL_SERVER_ERROR,
     msg: format!("Error generating OpenAPI spec: {}", err),
@@ -46,7 +45,7 @@ async fn get_specs(
 async fn get_swagger(
   tail: web::types::Path<String>,
   openapi_conf: web::types::State<SwaggerConfig<'static>>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   match utoipa_swagger_ui::serve(&tail, openapi_conf.config.clone())
     .map_err(|err| HttpError::internal_server_error(err.to_string()))?
   {

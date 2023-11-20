@@ -1,5 +1,4 @@
-use ntex::web;
-use ntex::http;
+use ntex::{web, http};
 use ntex::util::BytesMut;
 use ntex::{Service, Middleware, util::BoxFuture, ServiceCtx};
 use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer};
