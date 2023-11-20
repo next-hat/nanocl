@@ -10,6 +10,19 @@ use crate::models::{
   ContainerInstanceUpdateDbModel, ContainerInstance,
 };
 
+/// ## Create
+///
+/// Create a new container instance
+///
+/// ## Arguments
+///
+/// * [item](ContainerInstancePartial) - The item to create
+/// * [pool](Pool) - The database pool
+///
+/// ## Return
+///
+/// [IoResult][IoResult] the created [item](ContainerInstanceDbModel)
+///
 pub async fn create(
   item: &ContainerInstancePartial,
   pool: &Pool,
@@ -18,6 +31,20 @@ pub async fn create(
   super::generic::insert_with_res(item, pool).await
 }
 
+/// ## Update
+///
+/// Update a container instance
+///
+/// ## Arguments
+///
+/// * [id](str) - The id of the container instance to update
+/// * [item](ContainerInstanceUpdateDbModel) - The item to update
+/// * [pool](Pool) - The database pool
+///
+/// ## Return
+///
+/// [IoResult][IoResult] the updated [item](ContainerInstanceDbModel)
+///
 pub async fn update(
   id: &str,
   item: &ContainerInstanceUpdateDbModel,
@@ -33,6 +60,19 @@ pub async fn update(
   Ok(())
 }
 
+/// ## Find by id
+///
+/// Find a container instance by id
+///
+/// ## Arguments
+///
+/// * [key](str) - The id of the container instance to find
+/// * [pool](Pool) - The database pool
+///
+/// ## Return
+///
+/// [IoResult][IoResult] the found [item](ContainerInstance)
+///
 pub async fn find_by_id(key: &str, pool: &Pool) -> IoResult<ContainerInstance> {
   use crate::schema::container_instances;
   let key = key.to_owned();
@@ -46,13 +86,39 @@ pub async fn find_by_id(key: &str, pool: &Pool) -> IoResult<ContainerInstance> {
   Ok(item)
 }
 
+/// ## Delete by id
+///
+/// Delete a container instance by id
+///
+/// ## Arguments
+///
+/// * [key](str) - The id of the container instance to delete
+/// * [pool](Pool) - The database pool
+///
+/// ## Return
+///
+/// [IoResult][IoResult] the deleted [item](GenericDelete)
+///
 pub async fn delete_by_id(key: &str, pool: &Pool) -> IoResult<GenericDelete> {
   use crate::schema::container_instances;
   let key = key.to_owned();
   super::generic::delete_by_id::<container_instances::table, _>(key, pool).await
 }
 
-pub async fn list_by_kind(
+/// ## List for kind
+///
+/// List container instances for kind and kind id
+///
+/// ## Arguments
+///
+/// * [kind](str) - The kind of the container instance to list
+/// * [kind_id](str) - The kind id of the container instance to list
+///
+/// ## Return
+///
+/// [IoResult][IoResult] the list of [items](ContainerInstance)
+///
+pub async fn list_for_kind(
   kind: &str,
   kind_id: &str,
   pool: &Pool,
@@ -78,6 +144,18 @@ pub async fn list_by_kind(
   Ok(items)
 }
 
+/// ## List all
+///
+/// List all container instances
+///
+/// ## Arguments
+///
+/// * [pool](Pool) - The database pool
+///
+/// ## Return
+///
+/// [IoResult][IoResult] the list of [items](ContainerInstance)
+///
 pub async fn list_all(pool: &Pool) -> IoResult<Vec<ContainerInstance>> {
   use crate::schema::container_instances;
   let pool = pool.clone();

@@ -8,6 +8,8 @@ pub struct HttpError {
   pub status: http::StatusCode,
 }
 
+pub type HttpResult<T, E = HttpError> = Result<T, E>;
+
 impl HttpError {
   /// Create a new HttpError
   pub fn new<T>(status: http::StatusCode, msg: T) -> Self

@@ -15,7 +15,7 @@ use bollard_next::service::{
   HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
 };
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,
@@ -32,6 +32,68 @@ use crate::models::DaemonState;
 
 use super::stream::transform_stream;
 
+/// ## Execute before
+///
+/// Container to execute before the cargo instances
+///
+/// ## Arguments
+///
+/// * [cargo](Cargo) - The cargo
+/// * [docker_api](bollard_next::Docker) - The docker api
+///
+async fn execute_before(
+  cargo: &Cargo,
+  docker_api: &bollard_next::Docker,
+) -> HttpResult<()> {
+  match cargo.config.init_container.clone() {
+    Some(mut before) => {
+      let image = before
+        .image
+        .clone()
+        .unwrap_or(cargo.config.container.image.clone().unwrap());
+      before.image = Some(image);
+      before.host_config = Some(HostConfig {
+        network_mode: Some(cargo.namespace_name.clone()),
+        auto_remove: Some(true),
+        ..before.host_config.unwrap_or_default()
+      });
+      let container = docker_api
+        .create_container(None::<CreateContainerOptions<String>>, before)
+        .await?;
+      docker_api
+        .start_container(&container.id, None::<StartContainerOptions<String>>)
+        .await?;
+      let options = Some(WaitContainerOptions {
+        condition: "removed",
+      });
+      let mut stream = docker_api.wait_container(&container.id, options);
+      while let Some(wait_status) = stream.next().await {
+        match wait_status {
+          Ok(wait_status) => {
+            log::debug!("Wait status: {wait_status:?}");
+            if wait_status.status_code != 0 {
+              let error = match wait_status.error {
+                Some(error) => error.message.unwrap_or("Unknown error".into()),
+                None => "Unknown error".into(),
+              };
+              return Err(HttpError::internal_server_error(format!(
+                "Error while waiting for before container: {error}"
+              )));
+            }
+          }
+          Err(err) => {
+            return Err(HttpError::internal_server_error(format!(
+              "Error while waiting for before container: {err}"
+            )));
+          }
+        }
+      }
+      Ok(())
+    }
+    None => Ok(()),
+  }
+}
+
 /// ## Create instances
 ///
 /// Create instances (containers) based on the cargo config
@@ -46,21 +108,20 @@ use super::stream::transform_stream;
 /// ## Arguments
 ///
 /// * [cargo](Cargo) - The cargo
-/// * [number](i64) - The number of containers to create
+/// * [start](usize) - The number of already created containers
+/// * [number](usize) - The number of containers to create
 /// * [docker_api](bollard_next::Docker) - The docker api
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The containers has been created
-///   * [Err](HttpError) - The containers has not been created
+/// [HttpResult][HttpResult] containing a [vector](Vec) of [ContainerCreateResponse][ContainerCreateResponse]
 ///
 async fn create_instances(
   cargo: &Cargo,
   start: usize,
   number: usize,
   state: &DaemonState,
-) -> Result<Vec<ContainerCreateResponse>, HttpError> {
+) -> HttpResult<Vec<ContainerCreateResponse>> {
   execute_before(cargo, &state.docker_api).await?;
   let mut secret_envs: Vec<String> = Vec::new();
   if let Some(secrets) = &cargo.config.secrets {
@@ -203,57 +264,121 @@ async fn create_instances(
     .collect::<Result<Vec<ContainerCreateResponse>, HttpError>>()
 }
 
-async fn execute_before(
-  cargo: &Cargo,
-  docker_api: &bollard_next::Docker,
-) -> Result<(), HttpError> {
-  match cargo.config.init_container.clone() {
-    Some(mut before) => {
-      let image = before
-        .image
-        .clone()
-        .unwrap_or(cargo.config.container.image.clone().unwrap());
-      before.image = Some(image);
-      before.host_config = Some(HostConfig {
-        network_mode: Some(cargo.namespace_name.clone()),
-        auto_remove: Some(true),
-        ..before.host_config.unwrap_or_default()
-      });
-      let container = docker_api
-        .create_container(None::<CreateContainerOptions<String>>, before)
-        .await?;
-      docker_api
-        .start_container(&container.id, None::<StartContainerOptions<String>>)
-        .await?;
-      let options = Some(WaitContainerOptions {
-        condition: "removed",
-      });
-      let mut stream = docker_api.wait_container(&container.id, options);
-      while let Some(wait_status) = stream.next().await {
-        match wait_status {
-          Ok(wait_status) => {
-            log::debug!("Wait status: {wait_status:?}");
-            if wait_status.status_code != 0 {
-              let error = match wait_status.error {
-                Some(error) => error.message.unwrap_or("Unknown error".into()),
-                None => "Unknown error".into(),
-              };
-              return Err(HttpError::internal_server_error(format!(
-                "Error while waiting for before container: {error}"
-              )));
-            }
-          }
-          Err(err) => {
-            return Err(HttpError::internal_server_error(format!(
-              "Error while waiting for before container: {err}"
-            )));
-          }
-        }
+/// ## Restore instances backup
+///
+/// Restore the instances backup. The instances are restored in parallel.
+/// It's happenning if when a cargo fail to updates.
+///
+/// ## Arguments
+///
+/// * [instances](Vec<ContainerSummary>) - The instances to restore
+/// * [state](DaemonState) - The daemon state
+///
+async fn restore_instances_backup(
+  instances: &[ContainerSummary],
+  state: &DaemonState,
+) -> HttpResult<()> {
+  instances
+    .iter()
+    .map(|container| async {
+      let id = container.id.clone().unwrap_or_default();
+      let container_state = container.state.clone().unwrap_or_default();
+      if container_state == "restarting" {
+        state.docker_api.stop_container(&id, None).await?;
       }
-      Ok(())
-    }
-    None => Ok(()),
-  }
+      let names = container.names.clone().unwrap_or_default();
+      let name = format!("{}-backup", names[0]);
+      state
+        .docker_api
+        .rename_container(
+          &id,
+          bollard_next::container::RenameContainerOptions { name },
+        )
+        .await
+        .map_err(HttpError::from)
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<(), _>>()
+}
+
+/// ## Rename instances original
+///
+/// Rename the containers of the given cargo by adding `-backup` to the name
+/// of the container to mark them as backup.
+/// In case of failure, the backup containers are restored.
+///
+/// ## Arguments
+///
+/// * [instances](Vec<ContainerSummary>) - The instances to rename
+/// * [state](DaemonState) - The daemon state
+///
+async fn rename_instances_original(
+  instances: &[ContainerSummary],
+  state: &DaemonState,
+) -> HttpResult<()> {
+  instances
+    .iter()
+    .map(|container| async {
+      let id = container.id.clone().unwrap_or_default();
+      let container_state = container.state.clone().unwrap_or_default();
+      if container_state == "restarting" {
+        state.docker_api.stop_container(&id, None).await?;
+      }
+      let names = container.names.clone().unwrap_or_default();
+      let name = names[0].replace("-backup", "");
+      state
+        .docker_api
+        .rename_container(
+          &id,
+          bollard_next::container::RenameContainerOptions { name },
+        )
+        .await
+        .map_err(HttpError::from)
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<(), _>>()
+}
+
+/// ## Delete instances
+///
+/// The instances (containers) are deleted but the cargo is not.
+/// The cargo is not deleted because it can be used to restore the containers.
+///
+/// ## Arguments
+///
+/// * [instances](Vec<ContainerSummary>) - The instances to delete
+/// * [state](DaemonState) - The daemon state
+///
+async fn delete_instances(
+  instances: &[String],
+  state: &DaemonState,
+) -> HttpResult<()> {
+  instances
+    .iter()
+    .map(|id| async {
+      state
+        .docker_api
+        .remove_container(
+          &id.clone(),
+          Some(RemoveContainerOptions {
+            force: true,
+            ..Default::default()
+          }),
+        )
+        .await
+        .map_err(HttpError::from)
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
+    .await
+    .into_iter()
+    .collect::<Result<(), _>>()
 }
 
 /// ## List instances
@@ -267,14 +392,12 @@ async fn execute_before(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<ContainerSummary>) - The containers have been listed
-///   * [Err](HttpError) - The containers have not been listed
+/// [HttpResult][HttpResult] containing a [vector](Vec) of [ContainerSummary][ContainerSummary]
 ///
-pub async fn list_instances(
+pub(crate) async fn list_instances(
   key: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<Vec<ContainerSummary>, HttpError> {
+) -> HttpResult<Vec<ContainerSummary>> {
   let label = format!("io.nanocl.c={key}");
   let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
   filters.insert("label", vec![&label]);
@@ -301,16 +424,14 @@ pub async fn list_instances(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Cargo) - The cargo has been created
-///   * [Err](HttpError) - The cargo has not been created
+/// [HttpResult](HttpResult) containing a [cargo](Cargo)
 ///
-pub async fn create(
+pub(crate) async fn create(
   namespace: &str,
   config: &CargoConfigPartial,
   version: &str,
   state: &DaemonState,
-) -> Result<Cargo, HttpError> {
+) -> HttpResult<Cargo> {
   let cargo =
     repositories::cargo::create(namespace, config, version, &state.pool)
       .await?;
@@ -342,16 +463,10 @@ pub async fn create(
 /// * [key](str) - The cargo key
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The containers has been started
-///   * [Err](HttpError) - The containers has not been started
-///
-pub async fn start_by_key(
+pub(crate) async fn start_by_key(
   key: &str,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let cargo_key = key.to_owned();
   let docker_api = state.docker_api.clone();
   let cargo =
@@ -418,16 +533,10 @@ pub async fn start_by_key(
 /// * [key](str) - The cargo key
 /// * [docker_api](bollard_next::Docker) - The docker api
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The containers has been stopped
-///   * [Err](HttpError) - The containers has not been stopped
-///
-pub async fn stop_by_key(
+pub(crate) async fn stop_by_key(
   key: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let containers = list_instances(key, docker_api).await?;
   containers
     .into_iter()
@@ -456,16 +565,10 @@ pub async fn stop_by_key(
 /// * [key](str) - The cargo key
 /// * [docker_api](bollard_next::Docker) - The docker api
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The containers has been restarted
-///   * [Err](HttpError) - The containers has not been restarted
-///
-pub async fn restart(
+pub(crate) async fn restart(
   key: &str,
   docker_api: &bollard_next::Docker,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let containers = list_instances(key, docker_api).await?;
   containers
     .into_iter()
@@ -485,99 +588,6 @@ pub async fn restart(
   Ok(())
 }
 
-/// ## Restore instances backup
-///
-/// Restore the instances backup. The instances are restored in parallel.
-/// It's happenning if when a cargo fail to updates.
-///
-/// ## Arguments
-///
-/// * [instances](Vec<ContainerSummary>) - The instances to restore
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The instances has been restored
-///   * [Err](HttpError) - The instances has not been restored
-///
-async fn restore_instances_backup(
-  instances: &[ContainerSummary],
-  state: &DaemonState,
-) -> Result<(), HttpError> {
-  instances
-    .iter()
-    .map(|container| async {
-      let id = container.id.clone().unwrap_or_default();
-      let container_state = container.state.clone().unwrap_or_default();
-      if container_state == "restarting" {
-        state.docker_api.stop_container(&id, None).await?;
-      }
-      let names = container.names.clone().unwrap_or_default();
-      let name = format!("{}-backup", names[0]);
-      state
-        .docker_api
-        .rename_container(
-          &id,
-          bollard_next::container::RenameContainerOptions { name },
-        )
-        .await
-        .map_err(HttpError::from)
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<(), _>>()
-}
-
-/// ## Rename instances original
-///
-/// Rename the containers of the given cargo by adding `-backup` to the name
-/// of the container to mark them as backup.
-/// In case of failure, the backup containers are restored.
-///
-/// ## Arguments
-///
-/// * [instances](Vec<ContainerSummary>) - The instances to rename
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The containers has been renamed
-///   * [Err](HttpError) - The containers has not been renamed
-///
-async fn rename_instances_original(
-  instances: &[ContainerSummary],
-  state: &DaemonState,
-) -> Result<(), HttpError> {
-  instances
-    .iter()
-    .map(|container| async {
-      let id = container.id.clone().unwrap_or_default();
-      let container_state = container.state.clone().unwrap_or_default();
-      if container_state == "restarting" {
-        state.docker_api.stop_container(&id, None).await?;
-      }
-      let names = container.names.clone().unwrap_or_default();
-      let name = names[0].replace("-backup", "");
-      state
-        .docker_api
-        .rename_container(
-          &id,
-          bollard_next::container::RenameContainerOptions { name },
-        )
-        .await
-        .map_err(HttpError::from)
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<(), _>>()
-}
-
 /// ## Delete by key
 ///
 /// Delete a cargo by key with his given instances (containers).
@@ -588,17 +598,11 @@ async fn rename_instances_original(
 /// * [force](Option<bool>) - Force the deletion of the cargo
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The cargo has been deleted
-///   * [Err](HttpError) - The cargo has not been deleted
-///
-pub async fn delete_by_key(
+pub(crate) async fn delete_by_key(
   key: &str,
   force: Option<bool>,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let containers = list_instances(key, &state.docker_api).await?;
   containers
     .into_iter()
@@ -625,48 +629,6 @@ pub async fn delete_by_key(
   Ok(())
 }
 
-/// ## Delete instances
-///
-/// The instances (containers) are deleted but the cargo is not.
-/// The cargo is not deleted because it can be used to restore the containers.
-///
-/// ## Arguments
-///
-/// * [instances](Vec<ContainerSummary>) - The instances to delete
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The containers has been deleted
-///   * [Err](HttpError) - The containers has not been deleted
-///
-async fn delete_instances(
-  instances: &[String],
-  state: &DaemonState,
-) -> Result<(), HttpError> {
-  instances
-    .iter()
-    .map(|id| async {
-      state
-        .docker_api
-        .remove_container(
-          &id.clone(),
-          Some(RemoveContainerOptions {
-            force: true,
-            ..Default::default()
-          }),
-        )
-        .await
-        .map_err(HttpError::from)
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<(), _>>()
-}
-
 /// ## Put
 ///
 /// A new history entry is added and the containers are updated
@@ -679,16 +641,15 @@ async fn delete_instances(
 /// * [state](DaemonState) - The daemon state
 ///
 /// ## Returns
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Cargo) - The cargo has been patched
-///   * [Err](HttpError) - The cargo has not been patched
 ///
-pub async fn put(
+/// [HttpResult](HttpResult) containing a [cargo](Cargo)
+///
+pub(crate) async fn put(
   cargo_key: &str,
   cargo_partial: &CargoConfigPartial,
   version: &str,
   state: &DaemonState,
-) -> Result<Cargo, HttpError> {
+) -> HttpResult<Cargo> {
   let cargo = repositories::cargo::update_by_key(
     cargo_key,
     cargo_partial,
@@ -761,14 +722,12 @@ pub async fn put(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Vec<ContainerSummary>) - The containers of the cargo
-///   * [Err](HttpError) - The containers of the cargo has not been listed
+/// [HttpResult](HttpResult) containing a [vector](Vec) of [CargoSummary][CargoSummary
 ///
-pub async fn list(
+pub(crate) async fn list(
   query: GenericCargoListQuery<&str>,
   state: &DaemonState,
-) -> Result<Vec<CargoSummary>, HttpError> {
+) -> HttpResult<Vec<CargoSummary>> {
   let namespace =
     repositories::namespace::find_by_name(query.namespace, &state.pool).await?;
   let query = query.merge(namespace);
@@ -778,7 +737,7 @@ pub async fn list(
     let config =
       repositories::cargo_config::find_by_key(&cargo.config_key, &state.pool)
         .await?;
-    let instances = repositories::container_instance::list_by_kind(
+    let instances = repositories::container_instance::list_for_kind(
       "Cargo",
       &cargo.key,
       &state.pool,
@@ -823,18 +782,16 @@ pub async fn list(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](CargoInspect) - The cargo information
-///   * [Err](HttpError) - The cargo has not been inspected
+/// [HttpResult](HttpResult) containing a [cargo](CargoInspect)
 ///
-pub async fn inspect_by_key(
+pub(crate) async fn inspect_by_key(
   key: &str,
   state: &DaemonState,
-) -> Result<CargoInspect, HttpError> {
+) -> HttpResult<CargoInspect> {
   let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
   let mut running_instances = 0;
   let instances =
-    repositories::container_instance::list_by_kind("Cargo", key, &state.pool)
+    repositories::container_instance::list_for_kind("Cargo", key, &state.pool)
       .await?;
   let nodes = repositories::node::list(&state.pool).await?;
   // Convert into a hashmap for faster lookup
@@ -887,16 +844,10 @@ pub async fn inspect_by_key(
 /// * [namespace](str) - The namespace name
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The cargoes has been deleted
-///   * [Err](HttpError) - The cargo has not been deleted
-///
-pub async fn delete_by_namespace(
+pub(crate) async fn delete_by_namespace(
   namespace: &str,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let namespace =
     repositories::namespace::find_by_name(namespace, &state.pool).await?;
   let cargoes =
@@ -923,17 +874,11 @@ pub async fn delete_by_namespace(
 /// * [options](CargoKillOptions) - The kill options
 /// * [docker_api](bollard_next::Docker) - The docker api
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///  * [Ok](()) - The signal has been sent
-///  * [Err](HttpError) - The signal has not been sent
-///
-pub async fn kill_by_name(
+pub(crate) async fn kill_by_name(
   name: &str,
   options: &CargoKillOptions,
   docker_api: &bollard_next::Docker,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let name = format!("{name}.c");
   let options = options.clone().into();
   docker_api.kill_container(&name, Some(options)).await?;
@@ -953,16 +898,14 @@ pub async fn kill_by_name(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///  * [Ok](Cargo) - The cargo has been patched
-///  * [Err](HttpError) - The cargo has not been patched
+/// [HttpResult](HttpResult) containing a [cargo](Cargo)
 ///
 pub async fn patch(
   key: &str,
   payload: &CargoConfigUpdate,
   version: &str,
   state: &DaemonState,
-) -> Result<Cargo, HttpError> {
+) -> HttpResult<Cargo> {
   let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
   let container = if let Some(container) = payload.container.clone() {
     // merge env and ensure no duplicate key
@@ -1071,15 +1014,13 @@ pub async fn patch(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Stream) - The stream of logs
-///   * [Err](HttpError) - The logs could not be retrieved
+/// [HttpResult](HttpResult) containing a [stream](StreamExt) of [LogOutput](LogOutput)
 ///
-pub fn get_logs(
+pub(crate) fn get_logs(
   name: &str,
   query: &CargoLogQuery,
   docker_api: &bollard_next::Docker,
-) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
+) -> HttpResult<impl StreamExt<Item = HttpResult<Bytes>>> {
   let stream =
     docker_api.logs(&format!("{name}.c"), Some(query.clone().into()));
   let stream = transform_stream::<LogOutput, OutputLog>(stream);
@@ -1099,15 +1040,13 @@ pub fn get_logs(
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](Stream) - The stream of logs
-///   * [Err](HttpError) - The logs could not be retrieved
+/// [HttpResult](HttpResult) containing a [stream](StreamExt) of [CargoStats](CargoStats)
 ///
-pub fn get_stats(
+pub(crate) fn get_stats(
   name: &str,
   query: &CargoStatsQuery,
   docker_api: &bollard_next::Docker,
-) -> Result<impl StreamExt<Item = Result<Bytes, HttpError>>, HttpError> {
+) -> HttpResult<impl StreamExt<Item = HttpResult<Bytes>>> {
   let stream =
     docker_api.stats(&format!("{name}.c"), Some(query.clone().into()));
   let stream = transform_stream::<Stats, CargoStats>(stream);
@@ -1124,17 +1063,11 @@ pub fn get_stats(
 /// * [options](CargoScale) - The scale options
 /// * [state](DaemonState) - The daemon state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The cargo has been scaled
-///   * [Err](HttpError) - The cargo has not been scaled
-///
 pub async fn scale(
   key: &str,
   options: &CargoScale,
   state: &DaemonState,
-) -> Result<(), HttpError> {
+) -> HttpResult<()> {
   let instances = list_instances(key, &state.docker_api).await?;
   let is_equal = usize::try_from(options.replicas)
     .map(|replica| instances.len() == replica)

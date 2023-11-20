@@ -4,7 +4,9 @@ use ntex::rt;
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
 use bollard_next::system::EventsOptions;
-use bollard_next::service::{EventMessageTypeEnum, ContainerInspectResponse};
+use bollard_next::service::{
+  EventMessageTypeEnum, ContainerInspectResponse, EventMessage,
+};
 use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 
 use nanocl_error::io::{FromIo, IoResult};
@@ -16,6 +18,126 @@ use crate::{version, utils, repositories};
 use crate::models::{
   DaemonState, ContainerInstancePartial, ContainerInstanceUpdateDbModel,
 };
+
+/// Sync instance
+///
+/// Will determine if the instance is registered by nanocl
+/// and sync his data with our store accordinly
+///
+///
+/// ## Arguments
+///
+/// * [instance](ContainerInspectResponse) - The instance to sync
+/// * [state](DaemonState) - The state
+///
+async fn sync_instance(
+  instance: &ContainerInspectResponse,
+  state: &DaemonState,
+) -> IoResult<()> {
+  let name = instance.name.clone().unwrap_or_default().replace('/', "");
+  let id = instance.id.clone().unwrap_or_default();
+  let container_instance_data = serde_json::to_value(instance)
+    .map_err(|err| err.map_err_context(|| "ContainerInstance"))?;
+  let current_res =
+    repositories::container_instance::find_by_id(&id, &state.pool).await;
+  let labels = instance
+    .config
+    .clone()
+    .unwrap_or_default()
+    .labels
+    .unwrap_or_default();
+  let mut kind = "unknow";
+  let mut kind_id = "";
+  if let Some(job_name) = labels.get("io.nanocl.j") {
+    kind = "Job";
+    kind_id = job_name;
+  }
+  if let Some(cargo_key) = labels.get("io.nanocl.c") {
+    kind = "Cargo";
+    kind_id = cargo_key;
+  }
+  if let Some(vm_key) = labels.get("io.nanocl.v") {
+    kind = "Vm";
+    kind_id = vm_key;
+  }
+  if kind == "unknow" {
+    return Ok(());
+  }
+  match current_res {
+    Ok(current_instance) => {
+      if current_instance.data == *instance {
+        log::debug!("container instance already synced");
+        return Ok(());
+      }
+      let new_instance = ContainerInstanceUpdateDbModel {
+        updated_at: Some(chrono::Utc::now().naive_utc()),
+        data: Some(container_instance_data),
+      };
+      let _ = repositories::container_instance::update(
+        &id,
+        &new_instance,
+        &state.pool,
+      )
+      .await
+      .map_err(|err| log::error!("{err}"));
+    }
+    Err(_) => {
+      let new_instance = ContainerInstancePartial {
+        key: id,
+        name,
+        kind: kind.to_owned(),
+        data: container_instance_data.clone(),
+        node_id: state.config.hostname.clone(),
+        kind_id: kind_id.to_owned(),
+      };
+      let _ =
+        repositories::container_instance::create(&new_instance, &state.pool)
+          .await
+          .map_err(|err| log::error!("{err}"));
+    }
+  }
+  Ok(())
+}
+
+/// ## Exec docker event
+///
+/// Take corresponding action depending on the docker event
+/// eg: update/create/destroy a container instance
+///
+/// ## Arguments
+///
+/// * [event](EventMessage) - The docker event
+/// * [state](DaemonState) - The state
+///
+async fn exec_docker_event(
+  event: &EventMessage,
+  state: &DaemonState,
+) -> IoResult<()> {
+  let kind = event.typ.unwrap_or(EventMessageTypeEnum::EMPTY);
+  if kind != EventMessageTypeEnum::CONTAINER {
+    return Ok(());
+  }
+  let actor = event.actor.clone().unwrap_or_default();
+  let attributes = actor.attributes.unwrap_or_default();
+  if attributes.get("io.nanocl").is_none() {
+    return Ok(());
+  }
+  let action = event.action.clone().unwrap_or_default();
+  let id = actor.id.unwrap_or_default();
+  log::debug!("docker event: {action}");
+  if action.as_str() == "destroy" {
+    log::debug!("docker event destroy container: {id}");
+    repositories::container_instance::delete_by_id(&id, &state.pool).await?;
+    return Ok(());
+  }
+  let instance = state
+    .docker_api
+    .inspect_container(&id, None::<InspectContainerOptions>)
+    .await
+    .map_err(|err| err.map_err_context(|| "Docker event"))?;
+  sync_instance(&instance, state).await?;
+  Ok(())
+}
 
 /// ## Register namespace
 ///
@@ -30,12 +152,6 @@ use crate::models::{
 /// * [name](str) Name of the namespace to register
 /// * [create_network](bool) If true we create the network for the namespace
 /// * [state](DaemonState) The daemon state
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The namespace has been registered
-///   * [Err](IoError) - The namespace has not been registered
 ///
 pub(crate) async fn register_namespace(
   name: &str,
@@ -56,21 +172,14 @@ pub(crate) async fn register_namespace(
   Ok(())
 }
 
-/// ## Sync containers
+/// ## Sync instances
 ///
-/// Convert existing containers with our labels to cargo.
+/// Convert existing container instances with our labels to cargo.
 /// We use it to be sure that all existing containers are registered as cargo.
 ///
 /// ## Arguments
 ///
-/// * [docker_api](bollard_next::Docker) - The docker api
-/// * [pool](Pool) - The database pool
-///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The containers has been synced
-///   * [Err](IoError) - The containers has not been synced
+/// * [state](DaemonState) - The state
 ///
 pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
   log::info!("Syncing existing container");
@@ -189,16 +298,9 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
 ///
 /// ## Arguments
 ///
-/// * [daemon_conf](DaemonConfig) - The daemon configuration
-/// * [pool](Pool) - The database pool
+/// * [state](DaemonState) - The state
 ///
-/// ## Returns
-///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](()) - The vm images has been synced
-///   * [Err](IoError) - The vm images has not been synced
-///
-pub async fn sync_vm_images(state: &DaemonState) -> IoResult<()> {
+pub(crate) async fn sync_vm_images(state: &DaemonState) -> IoResult<()> {
   log::info!("Syncing existing VM images");
   let files =
     std::fs::read_dir(format!("{}/vms/images", &state.config.state_dir))?;
@@ -230,132 +332,32 @@ pub async fn sync_vm_images(state: &DaemonState) -> IoResult<()> {
   Ok(())
 }
 
-async fn sync_instance(
-  instance: &ContainerInspectResponse,
-  state: &DaemonState,
-) -> IoResult<()> {
-  let name = instance.name.clone().unwrap_or_default().replace('/', "");
-  let id = instance.id.clone().unwrap_or_default();
-  let container_instance_data = serde_json::to_value(instance)
-    .map_err(|err| err.map_err_context(|| "ContainerInstance"))?;
-  let current_res =
-    repositories::container_instance::find_by_id(&id, &state.pool).await;
-  let labels = instance
-    .config
-    .clone()
-    .unwrap_or_default()
-    .labels
-    .unwrap_or_default();
-  let mut kind = "unknow";
-  let mut kind_id = "";
-  if let Some(job_name) = labels.get("io.nanocl.j") {
-    kind = "Job";
-    kind_id = job_name;
-  }
-  if let Some(cargo_key) = labels.get("io.nanocl.c") {
-    kind = "Cargo";
-    kind_id = cargo_key;
-  }
-  if let Some(vm_key) = labels.get("io.nanocl.v") {
-    kind = "Vm";
-    kind_id = vm_key;
-  }
-  if kind == "unknow" {
-    return Ok(());
-  }
-  match current_res {
-    Ok(current_instance) => {
-      if current_instance.data == *instance {
-        log::debug!("container instance already synced");
-        return Ok(());
-      }
-      let new_instance = ContainerInstanceUpdateDbModel {
-        updated_at: Some(chrono::Utc::now().naive_utc()),
-        data: Some(container_instance_data),
-      };
-      let _ = repositories::container_instance::update(
-        &id,
-        &new_instance,
-        &state.pool,
-      )
-      .await
-      .map_err(|err| log::error!("{err}"));
-    }
-    Err(_) => {
-      let new_instance = ContainerInstancePartial {
-        key: id,
-        name,
-        kind: kind.to_owned(),
-        data: container_instance_data.clone(),
-        node_id: state.config.hostname.clone(),
-        kind_id: kind_id.to_owned(),
-      };
-      let _ =
-        repositories::container_instance::create(&new_instance, &state.pool)
-          .await
-          .map_err(|err| log::error!("{err}"));
-    }
-  }
-  Ok(())
-}
-
 /// ## Watch docker events
 ///
-/// Watch docker events and update a container instance accordingly
+/// Create a new thread with his own loop to watch docker events and update
+/// container instance accordingly
 ///
-pub(crate) fn watch_docker_events(state: &DaemonState) {
+pub(crate) fn watch_docker(state: &DaemonState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(move || {
     rt::spawn(async move {
-      let mut streams = state.docker_api.events(None::<EventsOptions<String>>);
-      while let Some(event) = streams.next().await {
-        match event {
-          Ok(event) => {
-            let kind = event.typ.unwrap_or(EventMessageTypeEnum::EMPTY);
-            if kind != EventMessageTypeEnum::CONTAINER {
-              continue;
-            }
-            let actor = event.actor.clone().unwrap_or_default();
-            let attributes = actor.attributes.unwrap_or_default();
-            if attributes.get("io.nanocl").is_none() {
-              continue;
-            }
-            let action = event.action.unwrap_or_default();
-            let id = actor.id.unwrap_or_default();
-            log::debug!("docker event: {action}");
-            if action.as_str() == "destroy" {
-              log::debug!("docker event destroy container: {id}");
-              let _ = repositories::container_instance::delete_by_id(
-                &id,
-                &state.pool,
-              )
-              .await
-              .map_err(|err| {
-                log::warn!(
-                  "docker event delete container instance error: {err:?}"
-                );
-              });
-              continue;
-            }
-            match state
-              .docker_api
-              .inspect_container(&id, None::<InspectContainerOptions>)
-              .await
-            {
-              Err(err) => {
-                log::warn!("docker event inspect container error: {:?}", err);
-              }
-              Ok(ref instance) => {
-                let _ = sync_instance(instance, &state).await.map_err(|err| {
-                  log::warn!("docker event sync container error: {:?}", err);
-                });
+      loop {
+        let mut streams =
+          state.docker_api.events(None::<EventsOptions<String>>);
+        while let Some(event) = streams.next().await {
+          match event {
+            Ok(event) => {
+              if let Err(err) = exec_docker_event(&event, &state).await {
+                log::warn!("docker event error: {err:?}")
               }
             }
-          }
-          Err(err) => {
-            log::warn!("docker event error: {:?}", err);
+            Err(err) => {
+              log::warn!("docker event error: {:?}", err);
+            }
           }
         }
+        log::warn!("disconnected from docker trying to reconnect");
+        ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       }
     });
   });

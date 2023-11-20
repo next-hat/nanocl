@@ -14,7 +14,9 @@ use crate::models::DaemonState;
 
 /// ## Set unix permission
 ///
-/// Watch for change in the run directory and set the permission of the unix socket
+/// Create a new thread and watch for change in the run directory
+/// and set the permission of the unix socket
+/// Then close the thread
 ///
 fn set_unix_sock_perm() {
   rt::Arbiter::new().exec_fn(|| {
@@ -83,9 +85,9 @@ fn set_unix_sock_perm() {
 
 /// ## Spawn crond
 ///
-/// Spawn and manage a crond instance to run cron jobs
+/// Create a new thread and spawn and manage a crond instance to run cron jobs
 ///
-pub fn spawn_crond() {
+fn spawn_crond() {
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async {
       match Command::new("crond").args(["-f"]).spawn() {
@@ -112,7 +114,7 @@ pub fn spawn_crond() {
 ///
 /// ## Returns
 ///
-/// [IoResult](IoResult) - The result of the operation
+/// [IoResult](IoResult) the result of the operation
 ///
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   let vm_dir = format!("{state_dir}/vms/images");
@@ -133,11 +135,9 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
 ///
 /// ## Returns
 ///
-/// * [Result](Result) - The result of the operation
-///   * [Ok](DaemonState) - The daemon state
-///   * [Err](IoError) - The daemon state has not been initialized
+/// [IoResult](IoResult) the [daemon state](DaemonState)
 ///
-pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
+pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   spawn_crond();
   set_unix_sock_perm();
   let docker = bollard_next::Docker::connect_with_unix(
@@ -169,7 +169,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     }
     Ok::<_, IoError>(())
   });
-  utils::system::watch_docker_events(&daemon_state);
+  utils::system::watch_docker(&daemon_state);
   Ok(daemon_state)
 }
 
