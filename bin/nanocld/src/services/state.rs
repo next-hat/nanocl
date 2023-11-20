@@ -1,6 +1,6 @@
 use ntex::web;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::state::StateApplyQuery;
 
 use crate::utils;
@@ -12,7 +12,7 @@ pub(crate) async fn apply(
   qs: web::types::Query<StateApplyQuery>,
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let data = utils::state::parse_state(&payload)?;
   let rx = utils::state::apply_statefile(&data, &version, &qs, &state);
   Ok(
@@ -26,7 +26,7 @@ pub(crate) async fn apply(
 pub(crate) async fn remove(
   web::types::Json(payload): web::types::Json<serde_json::Value>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let data = utils::state::parse_state(&payload)?;
   let rx = utils::state::remove_statefile(&data, &state);
   Ok(

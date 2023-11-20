@@ -14,7 +14,7 @@ use futures::StreamExt;
 use futures::channel::mpsc;
 
 use nanocl_error::io::IoResult;
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::config::DaemonConfig;
 
 use crate::repositories;
@@ -38,7 +38,7 @@ impl NodeClient {
     }
   }
 
-  pub async fn connect(&self) -> Result<WsConnection<Base>, HttpError> {
+  pub async fn connect(&self) -> HttpResult<WsConnection<Base>> {
     let url = format!("http://{}/{VERSION}/nodes/ws", self.ip_addr);
     let con = ws::WsClient::build(url)
       .finish()

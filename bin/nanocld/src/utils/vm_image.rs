@@ -206,7 +206,7 @@ pub(crate) async fn clone(
       msg: format!("Vm image {name} already used"),
     });
   }
-  let (tx, rx) = ntex::channel::mpsc::channel::<Result<Bytes, HttpError>>();
+  let (tx, rx) = ntex::channel::mpsc::channel::<HttpResult<Bytes>>();
   let name = name.to_owned();
   let image = image.clone();
   let daemon_conf = state.config.clone();

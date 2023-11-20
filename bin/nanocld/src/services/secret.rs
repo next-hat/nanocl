@@ -3,7 +3,8 @@
 */
 use ntex::{rt, web};
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
+
 use nanocl_stubs::system::Event;
 use nanocl_stubs::proxy::ProxySslConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate, SecretQuery};
@@ -24,7 +25,7 @@ use crate::models::DaemonState;
 pub(crate) async fn list_secret(
   state: web::types::State<DaemonState>,
   web::types::Query(query): web::types::Query<SecretQuery>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let items = repositories::secret::list(Some(query), &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
@@ -46,7 +47,7 @@ pub(crate) async fn list_secret(
 pub(crate) async fn inspect_secret(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let secret = repositories::secret::find_by_key(&path.1, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&secret))
 }
@@ -66,7 +67,7 @@ pub(crate) async fn inspect_secret(
 pub(crate) async fn create_secret(
   web::types::Json(payload): web::types::Json<SecretPartial>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   match payload.kind.as_str() {
     "Tls" => {
       serde_json::from_value::<ProxySslConfig>(payload.data.clone()).map_err(
@@ -116,7 +117,7 @@ pub(crate) async fn create_secret(
 pub(crate) async fn delete_secret(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let secret = repositories::secret::find_by_key(&path.1, &state.pool).await?;
   let res = repositories::secret::delete_by_key(&path.1, &state.pool).await?;
   rt::spawn(async move {
@@ -148,7 +149,7 @@ async fn patch_secret(
   web::types::Json(payload): web::types::Json<SecretUpdate>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let item =
     repositories::secret::update_by_key(&path.1, &payload, &state.pool).await?;
   let secret: Secret = item.clone().into();

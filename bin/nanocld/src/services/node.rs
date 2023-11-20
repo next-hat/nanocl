@@ -9,7 +9,7 @@ use ntex::{Service, fn_service, chain};
 use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
 use futures::future::ready;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::HttpResult;
 
 use crate::{utils, repositories};
 use crate::models::{DaemonState, WsConState};
@@ -26,7 +26,7 @@ use crate::models::{DaemonState, WsConState};
 #[web::get("/nodes")]
 pub(crate) async fn list_node(
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let items = repositories::node::list(&state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }

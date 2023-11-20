@@ -2,10 +2,10 @@
 * Endpoints to manipulate resources
 */
 
-use ntex::rt;
-use ntex::web;
+use ntex::{rt, web};
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::HttpResult;
+
 use nanocl_stubs::system::Event;
 use nanocl_stubs::resource::ResourceUpdate;
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
@@ -33,7 +33,7 @@ use crate::models::{DaemonState, ResourceRevertPath};
 pub(crate) async fn list_resource(
   web::types::Query(query): web::types::Query<ResourceQuery>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let items = repositories::resource::find(Some(query), &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
@@ -55,7 +55,7 @@ pub(crate) async fn list_resource(
 pub(crate) async fn inspect_resource(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let resource =
     repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&resource))
@@ -75,7 +75,7 @@ pub(crate) async fn inspect_resource(
 pub(crate) async fn create_resource(
   web::types::Json(payload): web::types::Json<ResourcePartial>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let resource = utils::resource::create(&payload, &state.pool).await?;
   let resource_ptr = resource.clone();
   rt::spawn(async move {
@@ -104,7 +104,7 @@ pub(crate) async fn create_resource(
 pub(crate) async fn delete_resource(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let resource =
     repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
   utils::resource::delete(&resource, &state.pool).await?;
@@ -136,7 +136,7 @@ pub(crate) async fn put_resource(
   web::types::Json(payload): web::types::Json<ResourceUpdate>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let resource =
     repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
@@ -174,7 +174,7 @@ pub(crate) async fn put_resource(
 pub(crate) async fn list_resource_history(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let items =
     repositories::resource_config::list_by_resource_key(&path.1, &state.pool)
       .await?;
@@ -199,7 +199,7 @@ pub(crate) async fn list_resource_history(
 pub(crate) async fn revert_resource(
   path: web::types::Path<ResourceRevertPath>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let history =
     repositories::resource_config::find_by_key(&path.id, &state.pool).await?;
   let resource =

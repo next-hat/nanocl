@@ -10,9 +10,10 @@ use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
 use futures::StreamExt;
 use futures::future::ready;
 use tokio::io::AsyncWriteExt;
-use bollard_next::container::AttachContainerOptions;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::{HttpResult, HttpError};
+
+use bollard_next::container::AttachContainerOptions;
 use nanocl_stubs::cargo::OutputLog;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
@@ -36,7 +37,7 @@ use crate::models::{DaemonState, WsConState};
 pub(crate) async fn list_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let vms = utils::vm::list_by_namespace(&namespace, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&vms))
@@ -60,7 +61,7 @@ pub(crate) async fn inspect_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
@@ -87,7 +88,7 @@ pub(crate) async fn start_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
@@ -114,7 +115,7 @@ pub(crate) async fn stop_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
@@ -141,7 +142,7 @@ pub(crate) async fn delete_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
@@ -168,7 +169,7 @@ pub(crate) async fn create_vm(
   web::types::Json(payload): web::types::Json<VmConfigPartial>,
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let item = utils::vm::create(&payload, &namespace, &version, &state).await?;
   Ok(web::HttpResponse::Ok().json(&item))
@@ -192,7 +193,7 @@ pub(crate) async fn list_vm_history(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let histories =
@@ -221,7 +222,7 @@ pub(crate) async fn patch_vm(
   web::types::Json(payload): web::types::Json<VmConfigUpdate>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let version = path.0.clone();

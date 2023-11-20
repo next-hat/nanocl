@@ -1,6 +1,7 @@
 use ntex::web;
 
-use nanocl_error::http::HttpError;
+use nanocl_error::http::HttpResult;
+
 use nanocl_stubs::http_metric::{HttpMetricListQuery, HttpMetricCountQuery};
 
 use crate::repositories;
@@ -23,7 +24,7 @@ use crate::models::DaemonState;
 pub(crate) async fn list_http_metric(
   qs: web::types::Query<HttpMetricListQuery>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let metrics = repositories::http_metric::list(&qs, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&metrics))
 }
@@ -44,7 +45,7 @@ pub(crate) async fn list_http_metric(
 pub(crate) async fn count_http_metric(
   qs: web::types::Query<HttpMetricCountQuery>,
   state: web::types::State<DaemonState>,
-) -> Result<web::HttpResponse, HttpError> {
+) -> HttpResult<web::HttpResponse> {
   let count = repositories::http_metric::count(&qs, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&count))
 }
