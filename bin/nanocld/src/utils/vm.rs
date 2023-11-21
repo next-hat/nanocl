@@ -101,11 +101,10 @@ pub(crate) async fn stop_by_key(
 ///
 pub(crate) async fn inspect_by_key(
   vm_key: &str,
-  docker_api: &Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> HttpResult<VmInspect> {
-  let vm = repositories::vm::inspect_by_key(vm_key, pool).await?;
-  let containers = list_instances_by_key(&vm.key, docker_api).await?;
+  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
+  let containers = list_instances_by_key(&vm.key, &state.docker_api).await?;
   let mut running_instances = 0;
   for container in &containers {
     if container.state == Some("running".into()) {

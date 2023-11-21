@@ -362,9 +362,7 @@ pub(crate) async fn apply_vms(
     .map(|vm| async {
       let key = utils::key::gen_key(namespace, &vm.name);
       send(StateStream::new_vm_pending(&key), sx);
-      match utils::vm::inspect_by_key(&key, &state.docker_api, &state.pool)
-        .await
-      {
+      match utils::vm::inspect_by_key(&key, state).await {
         Ok(existing) => {
           let existing: VmConfigPartial = existing.into();
           let vm = VmConfigPartial {
@@ -597,8 +595,7 @@ pub(crate) async fn remove_vms(
     .map(|vm| async {
       let key = utils::key::gen_key(namespace, &vm.name);
       send(StateStream::new_vm_pending(&key), sx);
-      let res =
-        utils::vm::inspect_by_key(&key, &state.docker_api, &state.pool).await;
+      let res = utils::vm::inspect_by_key(&key, state).await;
       if res.is_err() {
         send(StateStream::new_vm_not_found(&key), sx);
         return;

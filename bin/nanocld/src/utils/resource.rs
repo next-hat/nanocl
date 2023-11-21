@@ -1,9 +1,10 @@
-use nanocl_stubs::system::EventAction;
 use ntex::http;
 use serde_json::Value;
 use jsonschema::{Draft, JSONSchema};
 
 use nanocl_error::http::{HttpError, HttpResult};
+
+use nanocl_stubs::system::EventAction;
 use nanocl_stubs::resource::{Resource, ResourcePartial};
 
 use crate::repositories;
@@ -194,7 +195,7 @@ pub(crate) async fn patch(
 /// ## Arguments
 ///
 /// * [resource](Resource) - The resource to delete
-/// * [pool](Pool) - The database pool
+/// * [state](DaemonState) - The daemon state
 ///
 pub(crate) async fn delete(
   resource: &Resource,
@@ -220,12 +221,22 @@ pub(crate) async fn delete(
   Ok(())
 }
 
+/// ## Delete by key
+///
+/// This function delete a resource by key.
+/// It will call the hook_delete_resource function to hook the resource.
+///
+/// ## Arguments
+///
+/// * [key](str) - The resource key
+/// * [state](DaemonState) - The daemon state
+///
 pub(crate) async fn delete_by_key(
   key: &str,
   state: &DaemonState,
-) -> HttpResult<Resource> {
+) -> HttpResult<()> {
   let resource =
     repositories::resource::inspect_by_key(key, &state.pool).await?;
   delete(&resource, state).await?;
-  Ok(resource)
+  Ok(())
 }

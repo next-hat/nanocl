@@ -65,8 +65,7 @@ pub(crate) async fn inspect_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-  let vm =
-    utils::vm::inspect_by_key(&key, &state.docker_api, &state.pool).await?;
+  let vm = utils::vm::inspect_by_key(&key, &state).await?;
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
