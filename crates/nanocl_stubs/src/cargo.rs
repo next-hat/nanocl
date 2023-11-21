@@ -23,6 +23,7 @@ use super::cargo_config::CargoConfig;
 /// That way you can rollback to a previous configuration quickly
 ///
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -97,7 +98,6 @@ pub struct CargoSummary {
 /// It also contains the list of containers
 ///
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]

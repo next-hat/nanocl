@@ -2,11 +2,10 @@
 * Endpoints to manipulate cargoes
 */
 
-use ntex::{rt, web, http};
+use ntex::{web, http};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::system::{Event, EventAction, ToEvent};
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery,

@@ -429,14 +429,14 @@ async fn apply_resources(
       send(StateStream::new_resource_pending(&key), sx);
       let res =
         match repositories::resource::inspect_by_key(&key, &state.pool).await {
-          Err(_) => utils::resource::create(resource, &state).await,
+          Err(_) => utils::resource::create(resource, state).await,
           Ok(cur_resource) => {
             let casted: ResourcePartial = cur_resource.into();
             if *resource == casted && !qs.reload.unwrap_or(false) {
               send(StateStream::new_resource_unchanged(&key), sx);
               return;
             }
-            utils::resource::patch(&resource.clone(), &state).await
+            utils::resource::patch(&resource.clone(), state).await
           }
         };
       if let Err(err) = res {
@@ -645,7 +645,7 @@ async fn remove_resources(
           return;
         }
       };
-      if let Err(err) = utils::resource::delete(&resource, &state).await {
+      if let Err(err) = utils::resource::delete(&resource, state).await {
         send(
           StateStream::new_resource_error(&resource.name, &err.to_string()),
           sx,

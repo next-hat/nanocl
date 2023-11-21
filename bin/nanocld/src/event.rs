@@ -3,12 +3,12 @@ use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use std::task::{Poll, Context};
 
-use futures_util::StreamExt;
-use futures_util::stream::FuturesUnordered;
 use ntex::{rt, web, http, time};
 use ntex::util::Bytes;
 use ntex::web::error::BlockingError;
 use futures::Stream;
+use futures_util::StreamExt;
+use futures_util::stream::FuturesUnordered;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_stubs::system::{Event, ToEvent, EventAction};
@@ -105,7 +105,14 @@ impl EventEmitter {
   }
 
   /// Send an event to all clients
-  pub async fn emit(&self, ev: Event) -> HttpResult<()> {
+  pub(crate) async fn emit<T>(
+    &self,
+    e: T,
+    action: EventAction,
+  ) -> HttpResult<()>
+  where
+    T: ToEvent,
+  {
     let self_ptr = self.clone();
     let inner = web::block(move || {
       let inner = self_ptr
@@ -132,7 +139,7 @@ impl EventEmitter {
       .clients
       .into_iter()
       .map(|client| {
-        let ev = ev.clone();
+        let ev = e.to_event(action.clone());
         async move {
           let msg = ev.to_bytes()?;
           let _ = client.send(msg).await;
@@ -146,21 +153,22 @@ impl EventEmitter {
     Ok(())
   }
 
-  pub fn spawn_emit<T>(&self, e: &T, action: EventAction)
+  /// Call emit in the background
+  pub(crate) fn spawn_emit<T>(&self, e: &T, action: EventAction)
   where
-    T: ToEvent,
+    T: ToEvent + Clone + 'static,
   {
-    let ev = e.to_event(action);
     let self_ptr = self.clone();
+    let e = e.clone();
     rt::spawn(async move {
-      if let Err(err) = self_ptr.emit(ev).await {
+      if let Err(err) = self_ptr.emit(e, action).await {
         log::error!("{err}");
       }
     });
   }
 
   /// Subscribe to events
-  pub async fn subscribe(&self) -> HttpResult<Client> {
+  pub(crate) async fn subscribe(&self) -> HttpResult<Client> {
     let self_ptr = self.clone();
     let (tx, rx) = channel(100);
     web::block(move || {
@@ -191,24 +199,26 @@ impl EventEmitter {
 #[cfg(test)]
 mod tests {
   use futures::StreamExt;
-  use nanocl_stubs::resource::Resource;
-  use nanocl_stubs::secret::Secret;
 
   use super::*;
 
   use nanocl_stubs::vm::Vm;
-  use nanocl_stubs::cargo::CargoInspect;
+  use nanocl_stubs::cargo::Cargo;
+  use nanocl_stubs::secret::Secret;
+  use nanocl_stubs::resource::Resource;
 
-  pub async fn send_and_parse_events(
+  pub async fn send_and_parse_events<T>(
     client: &mut Client,
     event_emitter: &EventEmitter,
-    events: Vec<Event>,
-  ) {
+    events: Vec<(&T, EventAction)>,
+  ) where
+    T: ToEvent + Clone,
+  {
     for event in events {
       event_emitter
-        .emit(event.clone())
+        .emit(event.0.clone(), event.1)
         .await
-        .unwrap_or_else(|err| panic!("Event emit failed {event:#?} {err}"));
+        .expect("Emit event");
       let event = client
         .next()
         .await
@@ -219,38 +229,61 @@ mod tests {
     }
   }
 
-  // #[ntex::test]
-  // async fn basic() {
-  //   let event_emitter = EventEmitter::new();
-  //   let mut client = event_emitter.subscribe().await.unwrap();
-  //   let cargo = CargoInspect::default();
-  //   let vm = Vm::default();
-  //   let resource = Resource::default();
-  //   let secret = Secret::default();
-
-  //   send_and_parse_events(
-  //     &mut client,
-  //     &event_emitter,
-  //     vec![
-  //       Event::NamespaceCreated("test".to_owned()),
-  //       Event::CargoCreated(Box::new(cargo.clone())),
-  //       Event::CargoDeleted(Box::new(cargo.clone())),
-  //       Event::CargoStarted(Box::new(cargo.clone())),
-  //       Event::CargoStopped(Box::new(cargo.clone())),
-  //       Event::CargoPatched(Box::new(cargo.clone())),
-  //       Event::VmCreated(Box::new(vm.clone())),
-  //       Event::VmDeleted(Box::new(vm.clone())),
-  //       Event::VmPatched(Box::new(vm.clone())),
-  //       Event::VmRunned(Box::new(vm.clone())),
-  //       Event::VmStopped(Box::new(vm.clone())),
-  //       Event::ResourceCreated(Box::new(resource.clone())),
-  //       Event::ResourceDeleted(Box::new(resource.clone())),
-  //       Event::ResourcePatched(Box::new(resource.clone())),
-  //       Event::SecretCreated(Box::new(secret.clone())),
-  //       Event::SecretDeleted(Box::new(secret.clone())),
-  //       Event::SecretPatched(Box::new(secret.clone())),
-  //     ],
-  //   )
-  //   .await;
-  // }
+  #[ntex::test]
+  async fn basic() {
+    let event_emitter = EventEmitter::new();
+    let mut client = event_emitter.subscribe().await.unwrap();
+    let cargo = Cargo::default();
+    let vm = Vm::default();
+    let resource = Resource::default();
+    let secret = Secret::default();
+    // test with cargo
+    send_and_parse_events(
+      &mut client,
+      &event_emitter,
+      vec![
+        (&cargo, EventAction::Created),
+        (&cargo, EventAction::Started),
+        (&cargo, EventAction::Stopped),
+        (&cargo, EventAction::Patched),
+        (&cargo, EventAction::Deleted),
+      ],
+    )
+    .await;
+    // test with vm
+    send_and_parse_events(
+      &mut client,
+      &event_emitter,
+      vec![
+        (&vm, EventAction::Created),
+        (&vm, EventAction::Started),
+        (&vm, EventAction::Stopped),
+        (&vm, EventAction::Patched),
+        (&vm, EventAction::Deleted),
+      ],
+    )
+    .await;
+    // test with resource
+    send_and_parse_events(
+      &mut client,
+      &event_emitter,
+      vec![
+        (&resource, EventAction::Created),
+        (&resource, EventAction::Patched),
+        (&resource, EventAction::Deleted),
+      ],
+    )
+    .await;
+    // test with secret
+    send_and_parse_events(
+      &mut client,
+      &event_emitter,
+      vec![
+        (&secret, EventAction::Created),
+        (&secret, EventAction::Patched),
+        (&secret, EventAction::Deleted),
+      ],
+    )
+    .await;
+  }
 }
