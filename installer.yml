@@ -30,7 +30,7 @@ Cargoes:
 
   - Name: nmetrics
     Container:
-      Image: ghcr.io/nxthat/metrsd:0.3.1
+      Image: ghcr.io/nxthat/metrsd:0.3.2
       Tty: true
       Env:
         - TZ=Europe/Paris

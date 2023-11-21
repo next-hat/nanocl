@@ -58,7 +58,7 @@ services:
 
   nmetrics:
     container_name: nmetrics.system.c
-    image: ghcr.io/nxthat/metrsd:0.3.1
+    image: ghcr.io/nxthat/metrsd:0.3.2
     tty: true
     networks:
       - system
