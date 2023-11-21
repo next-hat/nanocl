@@ -103,6 +103,7 @@ impl From<Resource> for EventActor {
         "Kind": resource.kind,
         "Version": resource.version,
         "Metadata": resource.metadata,
+        "Spec": resource.data,
       })),
     }
   }

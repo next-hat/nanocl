@@ -39,6 +39,12 @@ Resources:
               Target:
                 Key: deploy-example2.global.c
                 Port: 9000
+        - Protocol: Tcp
+          Port: 9000
+          Network: All
+          Target:
+            Key: deploy-example.global.c
+            Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo

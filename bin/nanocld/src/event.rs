@@ -87,7 +87,6 @@ impl EventEmitter {
       }
     }
     inner.clients = alive_clients;
-    log::debug!("Event emitter available clients: {}", inner.clients.len());
     Ok(())
   }
 
@@ -134,12 +133,18 @@ impl EventEmitter {
           .into(),
       },
     })?;
-    log::debug!("Event emitting to {} client(s)", inner.clients.len());
+    let ev = e.to_event(action.clone());
+    log::debug!(
+      "Emitting {} {} to {} client(s)",
+      ev.kind,
+      ev.action,
+      inner.clients.len()
+    );
     inner
       .clients
       .into_iter()
       .map(|client| {
-        let ev = e.to_event(action.clone());
+        let ev = ev.clone();
         async move {
           let msg = ev.to_bytes()?;
           let _ = client.send(msg).await;
@@ -149,7 +154,7 @@ impl EventEmitter {
       .collect::<FuturesUnordered<_>>()
       .collect::<Vec<_>>()
       .await;
-    log::debug!("Event emitted");
+    log::debug!("Emitted");
     Ok(())
   }
 

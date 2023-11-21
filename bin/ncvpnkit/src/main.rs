@@ -1,6 +1,6 @@
 use futures_util::StreamExt;
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use vpnkitrc::stubs::*;
 
@@ -121,67 +121,47 @@ async fn on_event(
 ) -> IoResult<()> {
   let kind = &event.kind;
   let action = &event.action;
+  let actor = event.actor.clone().unwrap_or_default();
   if kind != &EventKind::Resource {
     return Ok(());
   }
   match action {
     EventAction::Created | EventAction::Patched => {
-      let key = event
-        .actor
-        .clone()
-        .unwrap_or_default()
-        .key
-        .unwrap_or_default();
+      let key = actor.key.unwrap_or_default();
       let resource = nanocl_client.inspect_resource(&key).await?;
       let r_proxy_rule = resource_to_proxy_rule(&resource)?;
       for rule in r_proxy_rule.rules.into_iter() {
         if let ProxyRule::Stream(stream) = rule {
-          if stream.network != "Public" {
-            continue;
+          match stream.network.as_str() {
+            "Public" | "All" => {}
+            _ => continue,
           }
           let port = rule_stream_to_vpnkit_port(&stream);
           apply_rule(&port, vpnkit_client).await;
         }
       }
     }
+    EventAction::Deleted => {
+      let attributes = actor.attributes.unwrap_or_default();
+      let spec = attributes.get("Spec").cloned().ok_or_else(|| {
+        IoError::invalid_data("Resource spec", "attribute not found")
+      })?;
+      let resource = serde_json::from_value::<ResourceProxyRule>(spec)
+        .map_err(|err| err.map_err_context(|| "ProxyRule"))?;
+      for rule in resource.rules.into_iter() {
+        if let ProxyRule::Stream(stream) = rule {
+          match stream.network.as_str() {
+            "Public" | "All" => {}
+            _ => continue,
+          }
+          let port = rule_stream_to_vpnkit_port(&stream);
+          remove_rule(&port, vpnkit_client).await;
+        }
+      }
+    }
     // Ignore other events
     _ => {}
   }
-
-  // match event {
-  //   Event::ResourceCreated(resource) | Event::ResourcePatched(resource) => {
-  //     if resource.kind.as_str() != "ProxyRule" {
-  //       return Ok(());
-  //     }
-  //     let r_proxy_rule = resource_to_proxy_rule(resource)?;
-  //     for rule in r_proxy_rule.rules.into_iter() {
-  //       if let ProxyRule::Stream(stream) = rule {
-  //         if stream.network != "Public" {
-  //           continue;
-  //         }
-  //         let port = rule_stream_to_vpnkit_port(&stream);
-  //         apply_rule(&port, vpnkit_client).await;
-  //       }
-  //     }
-  //   }
-  //   Event::ResourceDeleted(resource) => {
-  //     if resource.kind.as_str() != "ProxyRule" {
-  //       return Ok(());
-  //     }
-  //     let r_proxy_rule = resource_to_proxy_rule(resource)?;
-  //     for rule in r_proxy_rule.rules.into_iter() {
-  //       if let ProxyRule::Stream(stream) = rule {
-  //         if stream.network != "Public" {
-  //           continue;
-  //         }
-  //         let port = rule_stream_to_vpnkit_port(&stream);
-  //         remove_rule(&port, vpnkit_client).await;
-  //       }
-  //     }
-  //   }
-  //   // Ignore other events
-  //   _ => {}
-  // }
   Ok(())
 }
 
