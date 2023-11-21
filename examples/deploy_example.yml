@@ -29,7 +29,7 @@ Resources:
           Locations:
             - Path: /
               Target:
-                Key: deploy-example2.global.c
+                Key: deploy-example-v2.global.c
                 Port: 9000
             - Path: /v1
               Target:
@@ -37,14 +37,8 @@ Resources:
                 Port: 9000
             - Path: /v2
               Target:
-                Key: deploy-example2.global.c
+                Key: deploy-example-v2.global.c
                 Port: 9000
-        - Protocol: Tcp
-          Port: 9000
-          Network: All
-          Target:
-            Key: deploy-example.global.c
-            Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo
@@ -55,15 +49,12 @@ Cargoes:
         App: deploy-example
     Secrets:
       - env.deploy-example.com
-    InitContainer:
-      Image: alpine:latest
-      Cmd: ["sleep", "1"]
     Container:
       Image: ghcr.io/nxthat/nanocl-get-started:latest
       Env:
         - APP=GET_STARTED
 
-  - Name: deploy-example2
+  - Name: deploy-example-v2
     Container:
       Image: ghcr.io/nxthat/nanocl-get-started:latest
       Env:

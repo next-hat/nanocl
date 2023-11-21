@@ -302,7 +302,7 @@ async fn apply_cargoes(
     .map(|cargo| async {
       let key = utils::key::gen_key(namespace, &cargo.name);
       send(StateStream::new_cargo_pending(&key), sx);
-      match utils::cargo::inspect_by_key(&key, state).await {
+      match repositories::cargo::inspect_by_key(&key, &state.pool).await {
         Ok(existing) => {
           let existing: CargoConfigPartial = existing.into();
           if existing == *cargo && !qs.reload.unwrap_or(false) {
@@ -362,7 +362,7 @@ pub(crate) async fn apply_vms(
     .map(|vm| async {
       let key = utils::key::gen_key(namespace, &vm.name);
       send(StateStream::new_vm_pending(&key), sx);
-      match utils::vm::inspect_by_key(&key, state).await {
+      match repositories::vm::inspect_by_key(&key, &state.pool).await {
         Ok(existing) => {
           let existing: VmConfigPartial = existing.into();
           let vm = VmConfigPartial {
@@ -595,7 +595,7 @@ pub(crate) async fn remove_vms(
     .map(|vm| async {
       let key = utils::key::gen_key(namespace, &vm.name);
       send(StateStream::new_vm_pending(&key), sx);
-      let res = utils::vm::inspect_by_key(&key, state).await;
+      let res = repositories::vm::inspect_by_key(&key, &state.pool).await;
       if res.is_err() {
         send(StateStream::new_vm_not_found(&key), sx);
         return;

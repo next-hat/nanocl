@@ -3,8 +3,6 @@ use std::collections::HashMap;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use crate::vm::VmInspect;
-
 /// Disk representation of a VM
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -309,19 +307,19 @@ impl From<VmConfig> for VmConfigUpdate {
   }
 }
 
-impl From<VmInspect> for VmConfigPartial {
-  fn from(vm_inspect: VmInspect) -> Self {
+impl From<VmConfig> for VmConfigPartial {
+  fn from(vm_config: VmConfig) -> Self {
     Self {
-      name: vm_inspect.name,
-      hostname: vm_inspect.config.hostname,
-      user: vm_inspect.config.user,
-      password: vm_inspect.config.password,
-      ssh_key: vm_inspect.config.ssh_key,
-      disk: vm_inspect.config.disk,
-      mac_address: vm_inspect.config.mac_address,
-      labels: vm_inspect.config.labels,
-      host_config: Some(vm_inspect.config.host_config),
-      metadata: vm_inspect.config.metadata,
+      name: vm_config.name,
+      hostname: vm_config.hostname,
+      user: vm_config.user,
+      labels: vm_config.labels,
+      host_config: Some(vm_config.host_config),
+      password: vm_config.password,
+      ssh_key: vm_config.ssh_key,
+      metadata: vm_config.metadata,
+      disk: vm_config.disk,
+      mac_address: vm_config.mac_address,
     }
   }
 }

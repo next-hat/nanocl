@@ -4,11 +4,11 @@ use serde::{Serialize, Deserialize};
 use bollard_next::container::{
   LogOutput, KillContainerOptions, LogsOptions, StatsOptions,
 };
-
 pub use bollard_next::exec::CreateExecOptions;
 pub use bollard_next::container::Stats as CargoStats;
 
 use crate::node::NodeContainerSummary;
+use crate::cargo_config::CargoConfigPartial;
 use crate::system::{Event, EventKind, ToEvent, EventAction, EventActor};
 
 use super::cargo_config::CargoConfig;
@@ -38,6 +38,12 @@ pub struct Cargo {
   pub config_key: uuid::Uuid,
   /// Configuration of the cargo
   pub config: CargoConfig,
+}
+
+impl From<Cargo> for CargoConfigPartial {
+  fn from(cargo: Cargo) -> Self {
+    cargo.config.into()
+  }
 }
 
 /// Convert a Cargo into an EventActor

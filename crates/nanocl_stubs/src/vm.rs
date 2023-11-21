@@ -3,7 +3,7 @@ use bollard_next::service::ContainerSummary;
 use serde::{Serialize, Deserialize};
 
 use crate::{
-  vm_config::VmConfig,
+  vm_config::{VmConfig, VmConfigPartial},
   system::{EventActor, ToEvent, EventAction, Event, EventKind},
 };
 
@@ -24,6 +24,12 @@ pub struct Vm {
   pub config_key: uuid::Uuid,
   /// Configuration of the vm
   pub config: VmConfig,
+}
+
+impl From<Vm> for VmConfigPartial {
+  fn from(vm: Vm) -> Self {
+    vm.config.into()
+  }
 }
 
 /// Convert a Cargo into an EventActor
