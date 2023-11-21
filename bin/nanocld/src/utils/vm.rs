@@ -92,8 +92,7 @@ pub(crate) async fn stop_by_key(
 /// ## Arguments
 ///
 /// * [vm_key](str) - The vm key
-/// * [docker_api](bollard_next::Docker) - The docker api
-/// * [pool](Pool) - The database pool
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Return
 ///
