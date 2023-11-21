@@ -11,7 +11,7 @@ use futures::StreamExt;
 use futures::future::ready;
 use tokio::io::AsyncWriteExt;
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 
 use bollard_next::container::AttachContainerOptions;
 use nanocl_stubs::cargo::OutputLog;

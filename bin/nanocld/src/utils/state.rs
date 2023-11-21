@@ -4,9 +4,8 @@ use ntex::channel::mpsc;
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::system::Event;
 use nanocl_stubs::job::JobPartial;
 use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
@@ -211,18 +210,6 @@ async fn apply_secrets(
           }
         }
       };
-      let key_ptr = key.clone();
-      let state_ptr = state.clone();
-      rt::spawn(async move {
-        let secret =
-          repositories::secret::find_by_key(&key_ptr, &state_ptr.pool)
-            .await
-            .unwrap();
-        let _ = state_ptr
-          .event_emitter
-          .emit(Event::SecretPatched(Box::new(secret.into())))
-          .await;
-      });
       send(StateStream::new_secret_success(&key), sx);
     })
     .collect::<FuturesUnordered<_>>()
@@ -342,17 +329,6 @@ async fn apply_cargoes(
           }
         }
       };
-      let key_ptr = key.clone();
-      let state_ptr = state.clone();
-      rt::spawn(async move {
-        let cargo = utils::cargo::inspect_by_key(&key_ptr, &state_ptr)
-          .await
-          .unwrap();
-        let _ = state_ptr
-          .event_emitter
-          .emit(Event::CargoPatched(Box::new(cargo)))
-          .await;
-      });
       send(StateStream::new_cargo_success(&key), sx);
     })
     .collect::<FuturesUnordered<_>>()
@@ -453,32 +429,20 @@ async fn apply_resources(
       send(StateStream::new_resource_pending(&key), sx);
       let res =
         match repositories::resource::inspect_by_key(&key, &state.pool).await {
-          Err(_) => utils::resource::create(resource, &state.pool).await,
+          Err(_) => utils::resource::create(resource, &state).await,
           Ok(cur_resource) => {
             let casted: ResourcePartial = cur_resource.into();
             if *resource == casted && !qs.reload.unwrap_or(false) {
               send(StateStream::new_resource_unchanged(&key), sx);
               return;
             }
-            utils::resource::patch(&resource.clone(), &state.pool).await
+            utils::resource::patch(&resource.clone(), &state).await
           }
         };
       if let Err(err) = res {
         send(StateStream::new_resource_error(&key, &err.to_string()), sx);
         return;
       }
-      let key_ptr = key.to_owned();
-      let pool_ptr = state.pool.clone();
-      let event_emitter = state.event_emitter.clone();
-      rt::spawn(async move {
-        let resource =
-          repositories::resource::inspect_by_key(&key_ptr, &pool_ptr)
-            .await
-            .unwrap();
-        let _ = event_emitter
-          .emit(Event::ResourcePatched(Box::new(resource)))
-          .await;
-      });
       send(StateStream::new_resource_success(&key), sx);
     })
     .collect::<FuturesUnordered<_>>()
@@ -558,13 +522,6 @@ async fn remove_secrets(
         send(StateStream::new_secret_error(&key, &err.to_string()), sx);
         return;
       }
-      let secret_ptr = secret.clone();
-      let event_emitter = state.event_emitter.clone();
-      rt::spawn(async move {
-        let _ = event_emitter
-          .emit(Event::SecretDeleted(Box::new(secret_ptr.into())))
-          .await;
-      });
       send(StateStream::new_secret_success(&key), sx);
     })
     .collect::<FuturesUnordered<_>>()
@@ -594,26 +551,24 @@ async fn remove_cargoes(
     .map(|cargo| async {
       let key = utils::key::gen_key(namespace, &cargo.name);
       send(StateStream::new_cargo_pending(&key), sx);
-      let cargo = match utils::cargo::inspect_by_key(&key, state).await {
-        Ok(cargo) => cargo,
-        Err(_) => {
-          send(StateStream::new_cargo_not_found(&key), sx);
-          return;
-        }
-      };
+      let cargo =
+        match repositories::cargo::inspect_by_key(&key, &state.pool).await {
+          Ok(cargo) => cargo,
+          Err(_) => {
+            send(StateStream::new_cargo_not_found(&key), sx);
+            return;
+          }
+        };
       if let Err(err) =
-        utils::cargo::delete_by_key(&key, Some(true), state).await
+        utils::cargo::delete_by_key(&cargo.key, Some(true), state).await
       {
-        send(StateStream::new_cargo_error(&key, &err.to_string()), sx);
+        send(
+          StateStream::new_cargo_error(&cargo.key, &err.to_string()),
+          sx,
+        );
         return;
       }
-      send(StateStream::new_cargo_success(&key), sx);
-      let event_emitter = state.event_emitter.clone();
-      rt::spawn(async move {
-        let _ = event_emitter
-          .emit(Event::CargoDeleted(Box::new(cargo)))
-          .await;
-      });
+      send(StateStream::new_cargo_success(&cargo.key), sx);
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
@@ -690,20 +645,13 @@ async fn remove_resources(
           return;
         }
       };
-      if let Err(err) = utils::resource::delete(&resource, &state.pool).await {
+      if let Err(err) = utils::resource::delete(&resource, &state).await {
         send(
           StateStream::new_resource_error(&resource.name, &err.to_string()),
           sx,
         );
         return;
       }
-      let resource_ptr = resource.clone();
-      let event_emitter = state.event_emitter.clone();
-      rt::spawn(async move {
-        let _ = event_emitter
-          .emit(Event::ResourceDeleted(Box::new(resource_ptr)))
-          .await;
-      });
       send(StateStream::new_resource_success(&resource.name), sx);
     })
     .collect::<FuturesUnordered<_>>()

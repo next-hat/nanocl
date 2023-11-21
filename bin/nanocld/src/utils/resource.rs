@@ -1,12 +1,13 @@
+use nanocl_stubs::system::EventAction;
 use ntex::http;
 use serde_json::Value;
 use jsonschema::{Draft, JSONSchema};
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::resource::{Resource, ResourcePartial};
 
 use crate::repositories;
-use crate::models::{Pool, ResourceKindPartial};
+use crate::models::{Pool, ResourceKindPartial, DaemonState};
 
 use super::ctrl_client::CtrlClient;
 
@@ -136,7 +137,7 @@ async fn hook_delete_resource(
 /// ## Arguments
 ///
 /// * [resource](ResourcePartial) - The resource to create
-/// * [pool](Pool) - The database pool
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Return
 ///
@@ -144,9 +145,9 @@ async fn hook_delete_resource(
 ///
 pub(crate) async fn create(
   resource: &ResourcePartial,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> HttpResult<Resource> {
-  if repositories::resource::inspect_by_key(&resource.name, pool)
+  if repositories::resource::inspect_by_key(&resource.name, &state.pool)
     .await
     .is_ok()
   {
@@ -155,8 +156,9 @@ pub(crate) async fn create(
       msg: format!("Resource {} already exists", &resource.name),
     });
   }
-  let resource = hook_create_resource(resource, pool).await?;
-  let res = repositories::resource::create(&resource, pool).await?;
+  let resource = hook_create_resource(resource, &state.pool).await?;
+  let res = repositories::resource::create(&resource, &state.pool).await?;
+  state.event_emitter.spawn_emit(&res, EventAction::Created);
   Ok(res)
 }
 
@@ -168,7 +170,7 @@ pub(crate) async fn create(
 /// ## Arguments
 ///
 /// * [resource](ResourcePartial) - The resource to patch
-/// * [pool](Pool) - The database pool
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Return
 ///
@@ -176,10 +178,11 @@ pub(crate) async fn create(
 ///
 pub(crate) async fn patch(
   resource: &ResourcePartial,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> HttpResult<Resource> {
-  let resource = hook_create_resource(resource, pool).await?;
-  let res = repositories::resource::put(&resource, pool).await?;
+  let resource = hook_create_resource(resource, &state.pool).await?;
+  let res = repositories::resource::put(&resource, &state.pool).await?;
+  state.event_emitter.spawn_emit(&res, EventAction::Patched);
   Ok(res)
 }
 
@@ -193,16 +196,36 @@ pub(crate) async fn patch(
 /// * [resource](Resource) - The resource to delete
 /// * [pool](Pool) - The database pool
 ///
-pub(crate) async fn delete(resource: &Resource, pool: &Pool) -> HttpResult<()> {
-  if let Err(err) = hook_delete_resource(resource, pool).await {
+pub(crate) async fn delete(
+  resource: &Resource,
+  state: &DaemonState,
+) -> HttpResult<()> {
+  if let Err(err) = hook_delete_resource(resource, &state.pool).await {
     log::warn!("{err}");
   }
   if resource.kind.as_str() == "Kind" {
-    repositories::resource_kind::delete_version(&resource.name, pool).await?;
-    repositories::resource_kind::delete(&resource.name, pool).await?;
+    repositories::resource_kind::delete_version(&resource.name, &state.pool)
+      .await?;
+    repositories::resource_kind::delete(&resource.name, &state.pool).await?;
   }
-  repositories::resource::delete_by_key(&resource.name, pool).await?;
-  repositories::resource_config::delete_by_resource_key(&resource.name, pool)
-    .await?;
+  repositories::resource::delete_by_key(&resource.name, &state.pool).await?;
+  repositories::resource_config::delete_by_resource_key(
+    &resource.name,
+    &state.pool,
+  )
+  .await?;
+  state
+    .event_emitter
+    .spawn_emit(resource, EventAction::Deleted);
   Ok(())
+}
+
+pub(crate) async fn delete_by_key(
+  key: &str,
+  state: &DaemonState,
+) -> HttpResult<Resource> {
+  let resource =
+    repositories::resource::inspect_by_key(key, &state.pool).await?;
+  delete(&resource, state).await?;
+  Ok(resource)
 }

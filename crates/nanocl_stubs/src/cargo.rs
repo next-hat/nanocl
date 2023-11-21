@@ -9,6 +9,7 @@ pub use bollard_next::exec::CreateExecOptions;
 pub use bollard_next::container::Stats as CargoStats;
 
 use crate::node::NodeContainerSummary;
+use crate::system::{Event, EventKind, ToEvent, EventAction, EventActor};
 
 use super::cargo_config::CargoConfig;
 
@@ -36,6 +37,31 @@ pub struct Cargo {
   pub config_key: uuid::Uuid,
   /// Configuration of the cargo
   pub config: CargoConfig,
+}
+
+/// Convert a Cargo into an EventActor
+impl From<Cargo> for EventActor {
+  fn from(cargo: Cargo) -> Self {
+    Self {
+      key: Some(cargo.key),
+      attributes: Some(serde_json::json!({
+        "Name": cargo.name,
+        "Namespace": cargo.namespace_name,
+        "Version": cargo.config.version,
+        "Metadata": cargo.config.metadata,
+      })),
+    }
+  }
+}
+
+impl ToEvent for Cargo {
+  fn to_event(&self, action: EventAction) -> Event {
+    Event {
+      kind: EventKind::Cargo,
+      action,
+      actor: Some(self.clone().into()),
+    }
+  }
 }
 
 /// A CargoSummary is a summary of a cargo

@@ -4,9 +4,9 @@
 
 use ntex::{rt, web, http};
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::system::Event;
+use nanocl_stubs::system::{Event, EventAction, ToEvent};
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery,
@@ -116,14 +116,6 @@ pub(crate) async fn create_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo =
     utils::cargo::create(&namespace, &payload, &version, &state).await?;
-  let key = cargo.key.to_owned();
-  rt::spawn(async move {
-    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
-    let _ = state
-      .event_emitter
-      .emit(Event::CargoCreated(Box::new(cargo)))
-      .await;
-  });
   Ok(web::HttpResponse::Created().json(&cargo))
 }
 
@@ -150,14 +142,7 @@ pub(crate) async fn delete_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let cargo = utils::cargo::inspect_by_key(&key, &state).await?;
   utils::cargo::delete_by_key(&key, qs.force, &state).await?;
-  rt::spawn(async move {
-    let _ = state
-      .event_emitter
-      .emit(Event::CargoDeleted(Box::new(cargo)))
-      .await;
-  });
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -184,13 +169,6 @@ pub(crate) async fn start_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   utils::cargo::start_by_key(&key, &state).await?;
-  rt::spawn(async move {
-    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
-    let _ = state
-      .event_emitter
-      .emit(Event::CargoStarted(Box::new(cargo)))
-      .await;
-  });
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -216,15 +194,7 @@ pub(crate) async fn stop_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::inspect_by_key(&key, &state).await?;
-  utils::cargo::stop_by_key(&key, &state.docker_api).await?;
-  rt::spawn(async move {
-    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
-    let _ = state
-      .event_emitter
-      .emit(Event::CargoStopped(Box::new(cargo)))
-      .await;
-  });
+  utils::cargo::stop_by_key(&key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -280,13 +250,6 @@ pub(crate) async fn put_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::put(&key, &payload, &path.0, &state).await?;
-  rt::spawn(async move {
-    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
-    let _ = state
-      .event_emitter
-      .emit(Event::CargoPatched(Box::new(cargo)))
-      .await;
-  });
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -315,13 +278,6 @@ pub(crate) async fn patch_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let cargo = utils::cargo::patch(&key, &payload, &path.0, &state).await?;
-  rt::spawn(async move {
-    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
-    let _ = state
-      .event_emitter
-      .emit(Event::CargoPatched(Box::new(cargo)))
-      .await;
-  });
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -416,14 +372,6 @@ pub(crate) async fn revert_cargo(
     &state,
   )
   .await?;
-  let key = cargo_key.clone();
-  rt::spawn(async move {
-    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
-    let _ = state
-      .event_emitter
-      .emit(Event::CargoPatched(Box::new(cargo)))
-      .await;
-  });
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -519,14 +467,6 @@ pub(crate) async fn scale_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   utils::cargo::scale(&key, &payload, &state).await?;
-  let key = key.clone();
-  rt::spawn(async move {
-    let cargo = utils::cargo::inspect_by_key(&key, &state).await.unwrap();
-    let _ = state
-      .event_emitter
-      .emit(Event::CargoPatched(Box::new(cargo)))
-      .await;
-  });
   Ok(web::HttpResponse::Ok().into())
 }
 

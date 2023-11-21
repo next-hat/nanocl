@@ -2,11 +2,10 @@
 * Endpoints to manipulate resources
 */
 
-use ntex::{rt, web};
+use ntex::web;
 
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::system::Event;
 use nanocl_stubs::resource::ResourceUpdate;
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
@@ -76,14 +75,7 @@ pub(crate) async fn create_resource(
   web::types::Json(payload): web::types::Json<ResourcePartial>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let resource = utils::resource::create(&payload, &state.pool).await?;
-  let resource_ptr = resource.clone();
-  rt::spawn(async move {
-    let _ = state
-      .event_emitter
-      .emit(Event::ResourceCreated(Box::new(resource_ptr)))
-      .await;
-  });
+  let resource = utils::resource::create(&payload, &state).await?;
   Ok(web::HttpResponse::Created().json(&resource))
 }
 
@@ -105,15 +97,7 @@ pub(crate) async fn delete_resource(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let resource =
-    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
-  utils::resource::delete(&resource, &state.pool).await?;
-  rt::spawn(async move {
-    let _ = state
-      .event_emitter
-      .emit(Event::ResourceDeleted(Box::new(resource)))
-      .await;
-  });
+  utils::resource::delete_by_key(&path.1, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -146,14 +130,7 @@ pub(crate) async fn put_resource(
     data: payload.data,
     metadata: payload.metadata,
   };
-  let resource = utils::resource::patch(&new_resource, &state.pool).await?;
-  let resource_ptr = resource.clone();
-  rt::spawn(async move {
-    let _ = state
-      .event_emitter
-      .emit(Event::ResourcePatched(Box::new(resource_ptr)))
-      .await;
-  });
+  let resource = utils::resource::patch(&new_resource, &state).await?;
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
@@ -211,14 +188,7 @@ pub(crate) async fn revert_resource(
     data: history.data,
     metadata: history.metadata,
   };
-  let resource = utils::resource::patch(&new_resource, &state.pool).await?;
-  let resource_ptr = resource.clone();
-  rt::spawn(async move {
-    let _ = state
-      .event_emitter
-      .emit(Event::ResourcePatched(Box::new(resource_ptr)))
-      .await;
-  });
+  let resource = utils::resource::patch(&new_resource, &state).await?;
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 

@@ -3,7 +3,7 @@ use std::io::Write;
 use ntex::{web, http};
 use futures::StreamExt;
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
 use crate::{utils, repositories};

@@ -1,9 +1,12 @@
 use futures_util::StreamExt;
 
+use nanocl_error::io::IoResult;
+
 use vpnkitrc::stubs::*;
+
 use nanocl_utils::logger;
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::system::Event;
+use nanocld_client::stubs::system::{Event, EventKind, EventAction};
 use nanocld_client::stubs::resource::Resource;
 use nanocld_client::stubs::proxy::{
   ResourceProxyRule, ProxyRule, ProxyStreamProtocol, ProxyRuleStream,
@@ -113,14 +116,24 @@ fn rule_stream_to_vpnkit_port(rule_stream: &ProxyRuleStream) -> VpnKitPort {
 ///
 async fn on_event(
   event: &Event,
+  nanocl_client: &NanocldClient,
   vpnkit_client: &VpnKitRc,
-) -> std::io::Result<()> {
-  match event {
-    Event::ResourceCreated(resource) | Event::ResourcePatched(resource) => {
-      if resource.kind.as_str() != "ProxyRule" {
-        return Ok(());
-      }
-      let r_proxy_rule = resource_to_proxy_rule(resource)?;
+) -> IoResult<()> {
+  let kind = &event.kind;
+  let action = &event.action;
+  if kind != &EventKind::Resource {
+    return Ok(());
+  }
+  match action {
+    EventAction::Created | EventAction::Patched => {
+      let key = event
+        .actor
+        .clone()
+        .unwrap_or_default()
+        .key
+        .unwrap_or_default();
+      let resource = nanocl_client.inspect_resource(&key).await?;
+      let r_proxy_rule = resource_to_proxy_rule(&resource)?;
       for rule in r_proxy_rule.rules.into_iter() {
         if let ProxyRule::Stream(stream) = rule {
           if stream.network != "Public" {
@@ -131,24 +144,44 @@ async fn on_event(
         }
       }
     }
-    Event::ResourceDeleted(resource) => {
-      if resource.kind.as_str() != "ProxyRule" {
-        return Ok(());
-      }
-      let r_proxy_rule = resource_to_proxy_rule(resource)?;
-      for rule in r_proxy_rule.rules.into_iter() {
-        if let ProxyRule::Stream(stream) = rule {
-          if stream.network != "Public" {
-            continue;
-          }
-          let port = rule_stream_to_vpnkit_port(&stream);
-          remove_rule(&port, vpnkit_client).await;
-        }
-      }
-    }
     // Ignore other events
     _ => {}
   }
+
+  // match event {
+  //   Event::ResourceCreated(resource) | Event::ResourcePatched(resource) => {
+  //     if resource.kind.as_str() != "ProxyRule" {
+  //       return Ok(());
+  //     }
+  //     let r_proxy_rule = resource_to_proxy_rule(resource)?;
+  //     for rule in r_proxy_rule.rules.into_iter() {
+  //       if let ProxyRule::Stream(stream) = rule {
+  //         if stream.network != "Public" {
+  //           continue;
+  //         }
+  //         let port = rule_stream_to_vpnkit_port(&stream);
+  //         apply_rule(&port, vpnkit_client).await;
+  //       }
+  //     }
+  //   }
+  //   Event::ResourceDeleted(resource) => {
+  //     if resource.kind.as_str() != "ProxyRule" {
+  //       return Ok(());
+  //     }
+  //     let r_proxy_rule = resource_to_proxy_rule(resource)?;
+  //     for rule in r_proxy_rule.rules.into_iter() {
+  //       if let ProxyRule::Stream(stream) = rule {
+  //         if stream.network != "Public" {
+  //           continue;
+  //         }
+  //         let port = rule_stream_to_vpnkit_port(&stream);
+  //         remove_rule(&port, vpnkit_client).await;
+  //       }
+  //     }
+  //   }
+  //   // Ignore other events
+  //   _ => {}
+  // }
   Ok(())
 }
 
@@ -211,7 +244,9 @@ async fn main() -> std::io::Result<()> {
           let Ok(event) = event else {
             break;
           };
-          if let Err(err) = on_event(&event, &vpnkit_client).await {
+          if let Err(err) =
+            on_event(&event, &nanocl_client, &vpnkit_client).await
+          {
             log::error!("{err}");
           }
         }

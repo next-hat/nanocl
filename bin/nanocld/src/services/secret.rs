@@ -1,15 +1,14 @@
 /*
 * Endpoints to manipulate secrets
 */
-use ntex::{rt, web};
+use ntex::web;
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::system::Event;
 use nanocl_stubs::proxy::ProxySslConfig;
-use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate, SecretQuery};
+use nanocl_stubs::secret::{SecretPartial, SecretUpdate, SecretQuery};
 
-use crate::repositories;
+use crate::{utils, repositories};
 use crate::models::DaemonState;
 
 /// List secrets
@@ -89,14 +88,7 @@ pub(crate) async fn create_secret(
     }
     _ => {}
   }
-  let item = repositories::secret::create(&payload, &state.pool).await?;
-  let secret = item.clone().into();
-  rt::spawn(async move {
-    let _ = state
-      .event_emitter
-      .emit(Event::SecretCreated(Box::new(secret)))
-      .await;
-  });
+  let item = utils::secret::create(&payload, &state).await?;
   Ok(web::HttpResponse::Created().json(&item))
 }
 
@@ -118,14 +110,7 @@ pub(crate) async fn delete_secret(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let secret = repositories::secret::find_by_key(&path.1, &state.pool).await?;
-  let res = repositories::secret::delete_by_key(&path.1, &state.pool).await?;
-  rt::spawn(async move {
-    let _ = state
-      .event_emitter
-      .emit(Event::SecretDeleted(Box::new(secret.into())))
-      .await;
-  });
+  let res = utils::secret::delete_by_key(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&res))
 }
 
@@ -150,15 +135,7 @@ async fn patch_secret(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let item =
-    repositories::secret::update_by_key(&path.1, &payload, &state.pool).await?;
-  let secret: Secret = item.clone().into();
-  rt::spawn(async move {
-    let _ = state
-      .event_emitter
-      .emit(Event::SecretPatched(Box::new(secret)))
-      .await;
-  });
+  let item = utils::secret::patch_by_key(&path.1, &payload, &state).await?;
   Ok(web::HttpResponse::Ok().json(&item))
 }
 

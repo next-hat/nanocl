@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use nanocl_stubs::system::EventAction;
 use ntex::rt;
 use ntex::util::Bytes;
 use futures::{StreamExt, TryStreamExt};
@@ -15,7 +16,7 @@ use bollard_next::service::{
   HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
 };
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,
@@ -450,6 +451,7 @@ pub(crate) async fn create(
     repositories::cargo::delete_by_key(&cargo.key, &state.pool).await?;
     return Err(err);
   }
+  state.event_emitter.spawn_emit(&cargo, EventAction::Created);
   Ok(cargo)
 }
 
@@ -475,6 +477,7 @@ pub(crate) async fn start_by_key(
     .config
     .container
     .host_config
+    .clone()
     .unwrap_or_default()
     .auto_remove
     .unwrap_or(false);
@@ -520,6 +523,7 @@ pub(crate) async fn start_by_key(
       }
     });
   }
+  state.event_emitter.spawn_emit(&cargo, EventAction::Started);
   Ok(())
 }
 
@@ -531,19 +535,20 @@ pub(crate) async fn start_by_key(
 /// ## Arguments
 ///
 /// * [key](str) - The cargo key
-/// * [docker_api](bollard_next::Docker) - The docker api
+/// * [state](DaemonState) - The daemon state
 ///
 pub(crate) async fn stop_by_key(
   key: &str,
-  docker_api: &bollard_next::Docker,
+  state: &DaemonState,
 ) -> HttpResult<()> {
-  let containers = list_instances(key, docker_api).await?;
+  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let containers = list_instances(key, &state.docker_api).await?;
   containers
     .into_iter()
     .map(|container| async {
       let id = container.id.unwrap_or_default();
-      let docker_api = docker_api.clone();
-      docker_api
+      state
+        .docker_api
         .stop_container(&id, None)
         .await
         .map_err(HttpError::from)
@@ -553,6 +558,7 @@ pub(crate) async fn stop_by_key(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
+  state.event_emitter.spawn_emit(&cargo, EventAction::Stopped);
   Ok(())
 }
 
@@ -603,6 +609,7 @@ pub(crate) async fn delete_by_key(
   force: Option<bool>,
   state: &DaemonState,
 ) -> HttpResult<()> {
+  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
   let containers = list_instances(key, &state.docker_api).await?;
   containers
     .into_iter()
@@ -626,6 +633,7 @@ pub(crate) async fn delete_by_key(
     .collect::<Result<Vec<_>, _>>()?;
   repositories::cargo::delete_by_key(key, &state.pool).await?;
   repositories::cargo_config::delete_by_cargo_key(key, &state.pool).await?;
+  state.event_emitter.spawn_emit(&cargo, EventAction::Deleted);
   Ok(())
 }
 
@@ -708,6 +716,7 @@ pub(crate) async fn put(
       .await?;
     }
   }
+  state.event_emitter.spawn_emit(&cargo, EventAction::Patched);
   Ok(cargo)
 }
 
@@ -1068,6 +1077,7 @@ pub async fn scale(
   options: &CargoScale,
   state: &DaemonState,
 ) -> HttpResult<()> {
+  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
   let instances = list_instances(key, &state.docker_api).await?;
   let is_equal = usize::try_from(options.replicas)
     .map(|replica| instances.len() == replica)
@@ -1118,5 +1128,6 @@ pub async fn scale(
       .into_iter()
       .collect::<Result<Vec<_>, HttpError>>()?;
   }
+  state.event_emitter.spawn_emit(&cargo, EventAction::Patched);
   Ok(())
 }

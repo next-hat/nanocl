@@ -14,7 +14,7 @@ use futures::StreamExt;
 use futures::channel::mpsc;
 
 use nanocl_error::io::IoResult;
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::config::DaemonConfig;
 
 use crate::repositories;

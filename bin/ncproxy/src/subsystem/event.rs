@@ -3,13 +3,14 @@ use ntex::http;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 
-use nanocl_utils::versioning;
 use nanocl_error::io::{IoResult, IoError};
 use nanocl_error::http_client::HttpClientError;
 
+use nanocl_utils::versioning;
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::system::Event;
 use nanocld_client::stubs::resource::ResourcePartial;
+use nanocld_client::stubs::system::{EventKind, EventAction};
 
 use crate::{utils, version, nginx};
 
@@ -88,37 +89,60 @@ async fn update_resource_rule(
   Ok(())
 }
 
+fn get_cargo_attributes(
+  attributes: &Option<serde_json::Value>,
+) -> IoResult<(String, String)> {
+  let attributes = attributes.clone().unwrap_or_default();
+  let name = attributes
+    .get("Name")
+    .map(|e| e.to_string())
+    .ok_or_else(|| IoError::invalid_data("Attribute Name", "Missing value"))?;
+  let namespace_name = attributes
+    .get("Namespace")
+    .map(|e| e.to_string())
+    .ok_or_else(|| {
+      IoError::invalid_data("Attribute Namespace", "Missing value")
+    })?;
+  Ok((name, namespace_name))
+}
+
 async fn on_event(
   event: &Event,
   nginx: &nginx::Nginx,
   client: &NanocldClient,
 ) -> IoResult<()> {
-  match event {
-    Event::CargoStarted(ev) | Event::CargoPatched(ev) => {
-      if let Err(err) =
-        update_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
-      {
-        log::debug!("{err}");
-      }
+  let kind = &event.kind;
+  let action = &event.action;
+  let actor = event.actor.clone().unwrap_or_default();
+  log::debug!("Event {kind} {action}");
+  let res = match (kind, action) {
+    (EventKind::Cargo, EventAction::Started)
+    | (EventKind::Cargo, EventAction::Patched) => {
+      let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
+      update_cargo_rule(&name, &namespace, nginx, client).await?;
+      Ok::<_, IoError>(())
     }
-    Event::CargoStopped(ev) | Event::CargoDeleted(ev) => {
-      if let Err(err) =
-        delete_cargo_rule(&ev.name, &ev.namespace_name, nginx, client).await
-      {
-        log::debug!("{err}");
-      }
+    (EventKind::Cargo, EventAction::Stopped)
+    | (EventKind::Cargo, EventAction::Deleted) => {
+      let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
+      delete_cargo_rule(&name, &namespace, nginx, client).await?;
+      Ok::<_, IoError>(())
     }
-    Event::SecretCreated(secret) | Event::SecretPatched(secret) => {
+    (EventKind::Secret, EventAction::Created)
+    | (EventKind::Secret, EventAction::Patched) => {
       let resources =
-        utils::list_resource_by_secret(&secret.key, client).await?;
+        utils::list_resource_by_secret(&actor.key.unwrap_or_default(), client)
+          .await?;
       for resource in resources {
         let resource: ResourcePartial = resource.into();
-        if let Err(err) = update_resource_rule(&resource, nginx, client).await {
-          log::debug!("{err}");
-        }
+        update_resource_rule(&resource, nginx, client).await?;
       }
+      Ok::<_, IoError>(())
     }
-    _ => {}
+    _ => Ok(()),
+  };
+  if let Err(err) = res {
+    log::debug!("{err}");
   }
   Ok(())
 }
