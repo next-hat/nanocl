@@ -503,13 +503,16 @@ pub(crate) async fn start_by_key(
     let id = id.clone();
     let docker_api = docker_api.clone();
     let fut = async move {
-      if let Err(err) = docker_api.start_container::<String>(&id, None).await {
-        log::warn!("Error while starting container {id} {err}");
-      }
+      docker_api.start_container::<String>(&id, None).await?;
+      Ok::<_, HttpError>(())
     };
     futs.push(fut);
   }
-  let _ = FuturesUnordered::from_iter(futs).collect::<Vec<_>>().await;
+  FuturesUnordered::from_iter(futs)
+    .collect::<Vec<_>>()
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, HttpError>>()?;
   if auto_remove {
     let pool = state.pool.clone();
     rt::spawn(async move {
