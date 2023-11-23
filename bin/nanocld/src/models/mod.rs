@@ -23,8 +23,8 @@ pub use namespace::*;
 mod cargo;
 pub use cargo::*;
 
-mod cargo_config;
-pub use cargo_config::*;
+mod cargo_spec;
+pub use cargo_spec::*;
 
 pub mod vm;
 pub use vm::*;
@@ -41,8 +41,8 @@ pub use resource::*;
 mod resource_kind;
 pub use resource_kind::*;
 
-mod resource_config;
-pub use resource_config::*;
+mod resource_spec;
+pub use resource_spec::*;
 
 mod secret;
 pub use secret::*;

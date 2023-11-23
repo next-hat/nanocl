@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct VmDiskConfig {
+pub struct VmDisk {
   /// Name of the image to use
   pub image: String,
   /// Virtual size allowed for the disk in GB (default: 20)
@@ -30,7 +30,7 @@ pub struct VmDiskConfig {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct VmHostConfig {
+pub struct VmHost {
   /// Number of cpu of the vm (default: 1)
   pub cpu: u64,
   /// Memory of the vm in MB (default: 512)
@@ -71,7 +71,7 @@ pub struct VmHostConfig {
   pub host_tun: Option<bool>,
 }
 
-impl Default for VmHostConfig {
+impl Default for VmHost {
   fn default() -> Self {
     Self {
       cpu: 1,
@@ -95,7 +95,7 @@ impl Default for VmHostConfig {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct VmConfigPartial {
+pub struct VmSpecPartial {
   /// Name of the vm
   pub name: String,
   /// The metadata (user defined)
@@ -129,7 +129,7 @@ pub struct VmConfigPartial {
   )]
   pub ssh_key: Option<String>,
   /// Disk config of the vm (image, size) required
-  pub disk: VmDiskConfig,
+  pub disk: VmDisk,
   /// Mac address of the vm (default: generated)
   #[cfg_attr(
     feature = "serde",
@@ -147,12 +147,15 @@ pub struct VmConfigPartial {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub host_config: Option<VmHostConfig>,
+  pub host_config: Option<VmHost>,
 }
 
+/// ## VmSpecUpdate
+///
 /// Payload used to patch a vm
-/// It will create a new [VmConfig](VmConfig) with the new values
-/// It will keep the old values in the history
+/// It will create a new [VmSpec](VmSpec) with the new values
+/// and keep the old values in the history
+///
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -160,7 +163,7 @@ pub struct VmConfigPartial {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct VmConfigUpdate {
+pub struct VmSpecUpdate {
   /// Name of the vm
   #[cfg_attr(
     feature = "serde",
@@ -208,11 +211,11 @@ pub struct VmConfigUpdate {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub host_config: Option<VmHostConfig>,
+  pub host_config: Option<VmHost>,
 }
 
-impl From<VmConfigPartial> for VmConfigUpdate {
-  fn from(vm_config: VmConfigPartial) -> Self {
+impl From<VmSpecPartial> for VmSpecUpdate {
+  fn from(vm_config: VmSpecPartial) -> Self {
     Self {
       name: Some(vm_config.name),
       hostname: vm_config.hostname,
@@ -233,7 +236,7 @@ impl From<VmConfigPartial> for VmConfigUpdate {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct VmConfig {
+pub struct VmSpec {
   /// Unique identifier of the vm config
   pub key: uuid::Uuid,
   /// Creation date of the vm config
@@ -275,7 +278,7 @@ pub struct VmConfig {
   )]
   pub user: Option<String>,
   /// Disk config of the vm
-  pub disk: VmDiskConfig,
+  pub disk: VmDisk,
   /// Mac address of the vm
   #[cfg_attr(
     feature = "serde",
@@ -289,11 +292,11 @@ pub struct VmConfig {
   )]
   pub labels: Option<HashMap<String, String>>,
   /// A vm's resources (cpu, memory, network)
-  pub host_config: VmHostConfig,
+  pub host_config: VmHost,
 }
 
-impl From<VmConfig> for VmConfigUpdate {
-  fn from(vm_config: VmConfig) -> Self {
+impl From<VmSpec> for VmSpecUpdate {
+  fn from(vm_config: VmSpec) -> Self {
     Self {
       name: Some(vm_config.name),
       hostname: vm_config.hostname,
@@ -307,8 +310,8 @@ impl From<VmConfig> for VmConfigUpdate {
   }
 }
 
-impl From<VmConfig> for VmConfigPartial {
-  fn from(vm_config: VmConfig) -> Self {
+impl From<VmSpec> for VmSpecPartial {
+  fn from(vm_config: VmSpec) -> Self {
     Self {
       name: vm_config.name,
       hostname: vm_config.hostname,

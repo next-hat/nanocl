@@ -1,9 +1,10 @@
 use serde::{Serialize, Deserialize};
+
 use nanocl_stubs::secret::{Secret, SecretPartial};
 
 use crate::schema::secrets;
 
-/// ## SecretDbModel
+/// ## SecretDb
 ///
 /// This structure represent the secret in the database.
 /// A secret is a key/value pair that can be used by the user to store
@@ -15,25 +16,25 @@ use crate::schema::secrets;
 #[serde(rename_all = "PascalCase")]
 #[diesel(primary_key(key))]
 #[diesel(table_name = secrets)]
-pub struct SecretDbModel {
-  /// The key of the cargo config
-  pub(crate) key: String,
+pub struct SecretDb {
+  /// The key of the secret
+  pub key: String,
   /// The creation date
-  pub(crate) created_at: chrono::NaiveDateTime,
+  pub created_at: chrono::NaiveDateTime,
   /// The last update date
-  pub(crate) updated_at: chrono::NaiveDateTime,
+  pub updated_at: chrono::NaiveDateTime,
   /// The kind of secret
-  pub(crate) kind: String,
+  pub kind: String,
   /// The secret cannot be updated
-  pub(crate) immutable: bool,
+  pub immutable: bool,
   /// The secret data
-  pub(crate) data: serde_json::Value,
+  pub data: serde_json::Value,
   // The metadata (user defined)
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub(crate) metadata: Option<serde_json::Value>,
+  pub metadata: Option<serde_json::Value>,
 }
 
-impl From<SecretPartial> for SecretDbModel {
+impl From<SecretPartial> for SecretDb {
   fn from(secret: SecretPartial) -> Self {
     Self {
       key: secret.key,
@@ -47,8 +48,8 @@ impl From<SecretPartial> for SecretDbModel {
   }
 }
 
-impl From<SecretDbModel> for SecretPartial {
-  fn from(val: SecretDbModel) -> Self {
+impl From<SecretDb> for SecretPartial {
+  fn from(val: SecretDb) -> Self {
     SecretPartial {
       key: val.key,
       kind: val.kind,
@@ -59,8 +60,8 @@ impl From<SecretDbModel> for SecretPartial {
   }
 }
 
-impl From<SecretDbModel> for Secret {
-  fn from(val: SecretDbModel) -> Self {
+impl From<SecretDb> for Secret {
+  fn from(val: SecretDb) -> Self {
     Secret {
       key: val.key,
       created_at: val.created_at,
@@ -73,13 +74,13 @@ impl From<SecretDbModel> for Secret {
   }
 }
 
-/// ## SecretUpdateDbModel
+/// ## SecretUpdateDb
 ///
 /// This structure is used to update a secret in the database.
 ///
 #[derive(Debug, Default, AsChangeset)]
 #[diesel(table_name = secrets)]
-pub struct SecretUpdateDbModel {
+pub struct SecretUpdateDb {
   /// The secret data
   pub(crate) data: Option<serde_json::Value>,
   // The metadata (user defined)

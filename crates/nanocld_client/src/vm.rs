@@ -5,7 +5,7 @@ use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
-use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
+use nanocl_stubs::vm_config::{VmSpecPartial, VmSpecUpdate};
 
 use crate::NanocldClient;
 
@@ -28,7 +28,7 @@ impl NanocldClient {
   ///
   pub async fn create_vm(
     &self,
-    vm: &VmConfigPartial,
+    vm: &VmSpecPartial,
     namespace: Option<&str>,
   ) -> HttpClientResult<Vm> {
     let res = self
@@ -211,7 +211,7 @@ impl NanocldClient {
   pub async fn patch_vm(
     &self,
     name: &str,
-    vm: &VmConfigUpdate,
+    vm: &VmSpecUpdate,
     namespace: Option<&str>,
   ) -> HttpClientResult<()> {
     self

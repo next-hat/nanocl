@@ -10,7 +10,7 @@ use nanocl_stubs::resource::ResourceUpdate;
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
 use crate::{utils, repositories};
-use crate::models::{DaemonState, ResourceRevertPath};
+use crate::models::DaemonState;
 
 /// List resources
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -174,13 +174,13 @@ pub(crate) async fn list_resource_history(
 ))]
 #[web::patch("/resources/{name}/histories/{id}/revert")]
 pub(crate) async fn revert_resource(
-  path: web::types::Path<ResourceRevertPath>,
+  path: web::types::Path<(String, String, uuid::Uuid)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
   let history =
-    repositories::resource_config::find_by_key(&path.id, &state.pool).await?;
+    repositories::resource_config::find_by_key(&path.2, &state.pool).await?;
   let resource =
-    repositories::resource::inspect_by_key(&path.name, &state.pool).await?;
+    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
     name: resource.name,
     version: history.version,

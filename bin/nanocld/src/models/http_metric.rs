@@ -116,9 +116,9 @@ pub trait ToDbModel {
 }
 
 impl ToDbModel for HttpMetricPartial {
-  type DbModel = HttpMetricDbModel;
+  type DbModel = HttpMetricDb;
   fn to_db_model(&self, node_name: &str) -> Self::DbModel {
-    HttpMetricDbModel {
+    HttpMetricDb {
       key: Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       expire_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30),
@@ -147,7 +147,7 @@ impl ToDbModel for HttpMetricPartial {
   }
 }
 
-/// ## HttpMetricDbModel
+/// ## HttpMetricDb
 ///
 /// This structure represent a http metric in the database.
 /// A http metric is a data point that can be used to monitor the health of a service.
@@ -159,7 +159,7 @@ impl ToDbModel for HttpMetricPartial {
 #[diesel(primary_key(key))]
 #[diesel(table_name = http_metrics)]
 #[serde(rename_all = "PascalCase")]
-pub struct HttpMetricDbModel {
+pub struct HttpMetricDb {
   /// The key of the metric in the database `UUID`
   pub key: Uuid,
   /// When the metric was created
@@ -237,7 +237,7 @@ pub struct StreamMetricPartial {
 #[diesel(primary_key(key))]
 #[diesel(table_name = stream_metrics)]
 #[serde(rename_all = "PascalCase")]
-pub struct StreamMetricDbModel {
+pub struct StreamMetricDb {
   /// The key of the metric in the database `UUID`
   pub key: Uuid,
   /// When the metric was created
@@ -271,7 +271,7 @@ pub struct StreamMetricDbModel {
 }
 
 impl ToDbModel for StreamMetricPartial {
-  type DbModel = StreamMetricDbModel;
+  type DbModel = StreamMetricDb;
 
   fn to_db_model(&self, node_name: &str) -> Self::DbModel {
     Self::DbModel {

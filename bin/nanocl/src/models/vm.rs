@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::vm::VmSummary;
 use nanocld_client::stubs::vm_config::{
-  VmConfigPartial, VmDiskConfig, VmHostConfig, VmConfigUpdate,
+  VmSpecPartial, VmDisk, VmHost, VmSpecUpdate,
 };
 
 use super::{VmImageArg, DisplayFormat};
@@ -111,7 +111,7 @@ pub struct VmPatchOpts {
 }
 
 /// Convert VmPatchOpts to VmConfigUpdate
-impl From<VmPatchOpts> for VmConfigUpdate {
+impl From<VmPatchOpts> for VmSpecUpdate {
   fn from(val: VmPatchOpts) -> Self {
     Self {
       name: Some(val.name),
@@ -119,7 +119,7 @@ impl From<VmPatchOpts> for VmConfigUpdate {
       password: val.password,
       ssh_key: val.ssh_key,
       hostname: val.hostname,
-      host_config: Some(VmHostConfig {
+      host_config: Some(VmHost {
         kvm: Some(val.kvm),
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
@@ -174,7 +174,7 @@ pub struct VmRunOpts {
 }
 
 /// Convert VmRunOpts to VmConfigPartial
-impl From<VmRunOpts> for VmConfigPartial {
+impl From<VmRunOpts> for VmSpecPartial {
   fn from(val: VmRunOpts) -> Self {
     Self {
       name: val.name,
@@ -182,11 +182,11 @@ impl From<VmRunOpts> for VmConfigPartial {
       user: val.user,
       password: val.password,
       ssh_key: val.ssh_key,
-      disk: VmDiskConfig {
+      disk: VmDisk {
         image: val.image,
         size: val.image_size,
       },
-      host_config: Some(VmHostConfig {
+      host_config: Some(VmHost {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
@@ -235,7 +235,7 @@ pub struct VmCreateOpts {
 }
 
 /// Convert VmCreateOpts to VmConfigPartial
-impl From<VmCreateOpts> for VmConfigPartial {
+impl From<VmCreateOpts> for VmSpecPartial {
   fn from(val: VmCreateOpts) -> Self {
     Self {
       name: val.name,
@@ -243,14 +243,14 @@ impl From<VmCreateOpts> for VmConfigPartial {
       user: val.user,
       password: val.password,
       ssh_key: val.ssh_key,
-      host_config: Some(VmHostConfig {
+      host_config: Some(VmHost {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
         kvm: Some(val.kvm),
         ..Default::default()
       }),
-      disk: VmDiskConfig {
+      disk: VmDisk {
         image: val.image,
         ..Default::default()
       },

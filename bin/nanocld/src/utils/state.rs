@@ -9,8 +9,8 @@ use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::job::JobPartial;
 use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
-use nanocl_stubs::cargo_config::CargoConfigPartial;
-use nanocl_stubs::vm_config::{VmConfigPartial, VmDiskConfig};
+use nanocl_stubs::cargo_spec::CargoSpecPartial;
+use nanocl_stubs::vm_config::{VmSpecPartial, VmDisk};
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateVirtualMachine, StateResource, StateMeta,
   StateStream, StateSecret, StateApplyQuery, StateJob,
@@ -291,7 +291,7 @@ async fn apply_jobs(
 ///
 async fn apply_cargoes(
   namespace: &str,
-  data: &[CargoConfigPartial],
+  data: &[CargoSpecPartial],
   version: &str,
   state: &DaemonState,
   qs: &StateApplyQuery,
@@ -304,7 +304,7 @@ async fn apply_cargoes(
       send(StateStream::new_cargo_pending(&key), sx);
       match repositories::cargo::inspect_by_key(&key, &state.pool).await {
         Ok(existing) => {
-          let existing: CargoConfigPartial = existing.into();
+          let existing: CargoSpecPartial = existing.into();
           if existing == *cargo && !qs.reload.unwrap_or(false) {
             send(StateStream::new_cargo_unchanged(&key), sx);
             return;
@@ -351,7 +351,7 @@ async fn apply_cargoes(
 ///
 pub(crate) async fn apply_vms(
   namespace: &str,
-  data: &[VmConfigPartial],
+  data: &[VmSpecPartial],
   version: &str,
   state: &DaemonState,
   qs: &StateApplyQuery,
@@ -364,9 +364,9 @@ pub(crate) async fn apply_vms(
       send(StateStream::new_vm_pending(&key), sx);
       match repositories::vm::inspect_by_key(&key, &state.pool).await {
         Ok(existing) => {
-          let existing: VmConfigPartial = existing.into();
-          let vm = VmConfigPartial {
-            disk: VmDiskConfig {
+          let existing: VmSpecPartial = existing.into();
+          let vm = VmSpecPartial {
+            disk: VmDisk {
               image: format!("{}.{}", vm.disk.image, &key),
               size: Some(vm.disk.size.unwrap_or(20)),
             },
@@ -540,7 +540,7 @@ async fn remove_secrets(
 ///
 async fn remove_cargoes(
   namespace: &str,
-  data: &[CargoConfigPartial],
+  data: &[CargoSpecPartial],
   state: &DaemonState,
   sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {
@@ -586,7 +586,7 @@ async fn remove_cargoes(
 ///
 pub(crate) async fn remove_vms(
   namespace: &str,
-  data: &[VmConfigPartial],
+  data: &[VmSpecPartial],
   state: &DaemonState,
   sx: &mpsc::Sender<HttpResult<Bytes>>,
 ) {

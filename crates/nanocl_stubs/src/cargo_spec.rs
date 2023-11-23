@@ -57,7 +57,7 @@ pub struct ReplicationStatic {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct CargoConfigPartial {
+pub struct CargoSpecPartial {
   /// Name of the cargo
   pub name: String,
   /// Metadata of the cargo (user defined)
@@ -98,7 +98,7 @@ pub struct CargoConfigPartial {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct CargoConfigUpdate {
+pub struct CargoSpecUpdate {
   /// New name of the cargo
   #[cfg_attr(
     feature = "serde",
@@ -137,8 +137,8 @@ pub struct CargoConfigUpdate {
   pub replication: Option<ReplicationMode>,
 }
 
-impl From<CargoConfigPartial> for CargoConfigUpdate {
-  fn from(cargo_config: CargoConfigPartial) -> Self {
+impl From<CargoSpecPartial> for CargoSpecUpdate {
+  fn from(cargo_config: CargoSpecPartial) -> Self {
     Self {
       name: Some(cargo_config.name),
       init_container: cargo_config.init_container,
@@ -157,7 +157,7 @@ impl From<CargoConfigPartial> for CargoConfigUpdate {
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoConfig {
+pub struct CargoSpec {
   /// Unique identifier of the cargo config
   pub key: uuid::Uuid,
   /// The key of the cargo
@@ -196,8 +196,8 @@ pub struct CargoConfig {
   pub replication: Option<ReplicationMode>,
 }
 
-impl From<CargoConfig> for CargoConfigPartial {
-  fn from(cargo_config: CargoConfig) -> Self {
+impl From<CargoSpec> for CargoSpecPartial {
+  fn from(cargo_config: CargoSpec) -> Self {
     Self {
       init_container: cargo_config.init_container,
       name: cargo_config.name,

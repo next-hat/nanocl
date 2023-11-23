@@ -1,12 +1,13 @@
 use diesel::prelude::*;
+use serde::{Serialize, Deserialize};
 
-use serde::{Deserialize, Serialize};
-
-use nanocl_stubs::resource;
+use nanocl_stubs::resource::Resource;
 
 use crate::schema::resources;
 
-/// ## ResourceDbModel
+use crate::models::resource_spec::ResourceSpecDb;
+
+/// ## ResourceDb
 ///
 /// This structure represent a resource in the database.
 /// A resource is a representation of a configuration for internal nanocl services (controllers).
@@ -20,7 +21,7 @@ use crate::schema::resources;
 )]
 #[diesel(primary_key(key))]
 #[diesel(table_name = resources)]
-pub struct ResourceDbModel {
+pub struct ResourceDb {
   /// The key of the resource
   pub(crate) key: String,
   /// The created at date
@@ -31,12 +32,9 @@ pub struct ResourceDbModel {
   pub(crate) config_key: uuid::Uuid,
 }
 
-impl ResourceDbModel {
-  pub fn into_resource(
-    self,
-    config: super::ResourceConfigDbModel,
-  ) -> resource::Resource {
-    resource::Resource {
+impl ResourceDb {
+  pub fn into_resource(self, config: ResourceSpecDb) -> Resource {
+    Resource {
       name: self.key,
       created_at: self.created_at,
       updated_at: config.created_at,
@@ -49,29 +47,15 @@ impl ResourceDbModel {
   }
 }
 
-/// ## ResourceUpdateModel
+/// ## ResourceUpdateDb
 ///
 /// This structure represent the update of a resource in the database.
 ///
 #[derive(AsChangeset)]
 #[diesel(table_name = resources)]
-pub struct ResourceUpdateModel {
+pub struct ResourceUpdateDb {
   /// The key of the resource
   pub(crate) key: Option<String>,
   /// The config key reference
   pub(crate) config_key: Option<uuid::Uuid>,
-}
-
-/// ## ResourceRevertPath
-///
-/// This structure is used to parse the path of the url of the revert endpoint.
-///
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ResourceRevertPath {
-  /// The version
-  pub version: String,
-  /// The name
-  pub name: String,
-  /// The history id
-  pub id: uuid::Uuid,
 }

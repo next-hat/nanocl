@@ -12,7 +12,7 @@ use bollard_next::container::{
 use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::system::EventAction;
-use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
+use nanocl_stubs::vm_config::{VmSpecPartial, VmSpecUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
@@ -372,7 +372,7 @@ pub(crate) async fn create_instance(
 /// [HttpResult](HttpResult) containing a [Vm](Vm)
 ///
 pub(crate) async fn create(
-  vm: &VmConfigPartial,
+  vm: &VmSpecPartial,
   namespace: &str,
   version: &str,
   state: &DaemonState,
@@ -436,14 +436,14 @@ pub(crate) async fn create(
 ///
 pub(crate) async fn patch(
   vm_key: &str,
-  config: &VmConfigUpdate,
+  config: &VmSpecUpdate,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
   let vm = repositories::vm::find_by_key(vm_key, &state.pool).await?;
   let old_config =
     repositories::vm_config::find_by_key(&vm.config_key, &state.pool).await?;
-  let vm_partial = VmConfigPartial {
+  let vm_partial = VmSpecPartial {
     name: config.name.to_owned().unwrap_or(vm.name.clone()),
     disk: old_config.disk,
     host_config: Some(
@@ -505,7 +505,7 @@ pub(crate) async fn patch(
 ///
 pub(crate) async fn put(
   vm_key: &str,
-  vm_partial: &VmConfigPartial,
+  vm_partial: &VmSpecPartial,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {

@@ -6,7 +6,7 @@ use nanocl_stubs::generic::GenericCount;
 use nanocl_stubs::http_metric::{HttpMetricListQuery, HttpMetricCountQuery};
 
 use crate::utils;
-use crate::models::{Pool, HttpMetricDbModel};
+use crate::models::{Pool, HttpMetricDb};
 
 /// ## Create
 ///
@@ -22,9 +22,9 @@ use crate::models::{Pool, HttpMetricDbModel};
 /// [IoResult](IoResult) containing a [HttpMetricDbModel](HttpMetricDbModel)
 ///
 pub(crate) async fn create(
-  item: &HttpMetricDbModel,
+  item: &HttpMetricDb,
   pool: &Pool,
-) -> IoResult<HttpMetricDbModel> {
+) -> IoResult<HttpMetricDb> {
   let item = item.clone();
   super::generic::insert_with_res(item, pool).await
 }
@@ -45,7 +45,7 @@ pub(crate) async fn create(
 pub(crate) async fn list(
   filter: &HttpMetricListQuery,
   pool: &Pool,
-) -> IoResult<Vec<HttpMetricDbModel>> {
+) -> IoResult<Vec<HttpMetricDb>> {
   use crate::schema::http_metrics;
   let filter = filter.clone();
   let pool = pool.clone();

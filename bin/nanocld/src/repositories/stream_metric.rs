@@ -1,6 +1,6 @@
 use nanocl_error::io::IoResult;
 
-use crate::models::{Pool, StreamMetricDbModel};
+use crate::models::{Pool, StreamMetricDb};
 
 /// ## Create
 ///
@@ -16,9 +16,9 @@ use crate::models::{Pool, StreamMetricDbModel};
 /// [IoResult](IoResult) containing a [StreamMetricDbModel](StreamMetricDbModel)
 ///
 pub(crate) async fn create(
-  item: &StreamMetricDbModel,
+  item: &StreamMetricDb,
   pool: &Pool,
-) -> IoResult<StreamMetricDbModel> {
+) -> IoResult<StreamMetricDb> {
   let item = item.clone();
   super::generic::insert_with_res(item, pool).await
 }

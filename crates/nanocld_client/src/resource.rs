@@ -1,7 +1,7 @@
 use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::resource::{
-  Resource, ResourcePartial, ResourceConfig, ResourceQuery, ResourceUpdate,
+  Resource, ResourcePartial, ResourceSpec, ResourceQuery, ResourceUpdate,
 };
 
 use super::http_client::NanocldClient;
@@ -192,7 +192,7 @@ impl NanocldClient {
   pub async fn list_history_resource(
     &self,
     key: &str,
-  ) -> HttpClientResult<Vec<ResourceConfig>> {
+  ) -> HttpClientResult<Vec<ResourceSpec>> {
     let res = self
       .send_get(
         &format!("{}/{key}/histories", Self::RESOURCE_PATH),

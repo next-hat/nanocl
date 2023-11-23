@@ -6,7 +6,7 @@ use nanocl_stubs::generic::GenericDelete;
 
 use crate::utils;
 use crate::models::{
-  Pool, ResourceKindPartial, ResourceKindDbModel, ResourceKindVersionDbModel,
+  Pool, ResourceKindPartial, ResourceKindDb, ResourceKindVersionDb,
 };
 
 /// ## Create version
@@ -26,8 +26,8 @@ use crate::models::{
 pub(crate) async fn create_version(
   item: &ResourceKindPartial,
   pool: &Pool,
-) -> IoResult<ResourceKindVersionDbModel> {
-  let kind_version = ResourceKindVersionDbModel {
+) -> IoResult<ResourceKindVersionDb> {
+  let kind_version = ResourceKindVersionDb {
     resource_kind_name: item.name.clone(),
     version: item.version.clone(),
     schema: item.schema.clone(),
@@ -55,7 +55,7 @@ pub(crate) async fn get_version(
   name: &str,
   version: &str,
   pool: &Pool,
-) -> IoResult<ResourceKindVersionDbModel> {
+) -> IoResult<ResourceKindVersionDb> {
   use crate::schema::resource_kind_versions::dsl;
   let pool = pool.clone();
   let name = name.to_owned();
@@ -91,7 +91,7 @@ pub(crate) async fn get_version(
 pub(crate) async fn find_by_name(
   name: &str,
   pool: &Pool,
-) -> IoResult<ResourceKindDbModel> {
+) -> IoResult<ResourceKindDb> {
   use crate::schema::resource_kinds;
   let name = name.to_owned();
   super::generic::find_by_id::<resource_kinds::table, _, _>(name, pool).await
@@ -113,8 +113,8 @@ pub(crate) async fn find_by_name(
 pub(crate) async fn create(
   item: &ResourceKindPartial,
   pool: &Pool,
-) -> IoResult<ResourceKindDbModel> {
-  let kind = ResourceKindDbModel {
+) -> IoResult<ResourceKindDb> {
+  let kind = ResourceKindDb {
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };

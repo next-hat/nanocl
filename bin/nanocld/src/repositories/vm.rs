@@ -4,12 +4,10 @@ use diesel::prelude::*;
 use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::vm::Vm;
-use nanocl_stubs::vm_config::{VmConfig, VmConfigPartial};
+use nanocl_stubs::vm_config::{VmSpec, VmSpecPartial};
 
 use crate::utils;
-use crate::models::{
-  Pool, VmDbModel, VmUpdateDbModel, VmConfigDbModel, NamespaceDbModel,
-};
+use crate::models::{Pool, VmDbModel, VmUpdateDbModel, VmSpecDb, NamespaceDb};
 
 /// ## Find by namespace
 ///
@@ -25,7 +23,7 @@ use crate::models::{
 /// [IoResult](IoResult) containing a [Vec](Vec) of [VmDbModel](VmDbModel)
 ///
 pub(crate) async fn find_by_namespace(
-  nsp: &NamespaceDbModel,
+  nsp: &NamespaceDb,
   pool: &Pool,
 ) -> IoResult<Vec<VmDbModel>> {
   let nsp = nsp.clone();
@@ -58,7 +56,7 @@ pub(crate) async fn find_by_namespace(
 ///
 pub(crate) async fn create(
   nsp: &str,
-  item: &VmConfigPartial,
+  item: &VmSpecPartial,
   version: &str,
   pool: &Pool,
 ) -> IoResult<Vm> {
@@ -141,7 +139,7 @@ pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
 ///
 pub(crate) async fn update_by_key(
   key: &str,
-  item: &VmConfigPartial,
+  item: &VmSpecPartial,
   version: &str,
   pool: &Pool,
 ) -> IoResult<Vm> {
@@ -177,22 +175,22 @@ pub(crate) async fn update_by_key(
 ///
 pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
   use crate::schema::vms;
-  use crate::schema::vm_configs;
+  use crate::schema::vm_specs;
   let key = key.to_owned();
   let pool = pool.clone();
-  let item: (VmDbModel, VmConfigDbModel) = web::block(move || {
+  let item: (VmDbModel, VmSpecDb) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = vms::table
-      .inner_join(vm_configs::table)
+      .inner_join(vm_specs::table)
       .filter(vms::key.eq(key))
       .get_result(&mut conn)
       .map_err(|err| err.map_err_context(|| "Vm"))?;
     Ok::<_, IoError>(item)
   })
   .await?;
-  let config = serde_json::from_value::<VmConfigPartial>(item.1.data)
+  let config = serde_json::from_value::<VmSpecPartial>(item.1.data)
     .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
-  let config = VmConfig {
+  let config = VmSpec {
     key: item.1.key,
     created_at: item.0.created_at,
     name: config.name,

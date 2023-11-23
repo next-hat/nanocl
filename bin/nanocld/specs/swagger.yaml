@@ -2162,8 +2162,82 @@ components:
           format: uuid
           description: Unique identifier of the cargo config
         Config:
-          $ref: '#/components/schemas/CargoConfig'
-    CargoConfig:
+          $ref: '#/components/schemas/CargoSpec'
+    CargoImagePartial:
+      type: object
+      description: Cargo Image Partial is used to pull a new container image
+      required:
+      - Name
+      properties:
+        Name:
+          type: string
+          description: Name of the image
+          example: nginx:latest
+    CargoInspect:
+      type: object
+      description: |
+        Cargo Inspect is a detailed view of a cargo
+        It contains all the information about the cargo
+        It also contains the list of containers
+      required:
+      - Key
+      - Name
+      - ConfigKey
+      - NamespaceName
+      - Config
+      - InstanceTotal
+      - InstanceRunning
+      - Instances
+      properties:
+        Key:
+          type: string
+          description: Key of the cargo
+        Name:
+          type: string
+          description: Name of the cargo
+        ConfigKey:
+          type: string
+          format: uuid
+          description: Unique identifier of the cargo config
+        NamespaceName:
+          type: string
+          description: Name of the namespace
+        Config:
+          $ref: '#/components/schemas/CargoSpec'
+        InstanceTotal:
+          type: integer
+          description: Number of instances
+          minimum: 0
+        InstanceRunning:
+          type: integer
+          description: Number of running instances
+          minimum: 0
+        Instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeContainerSummary'
+          description: List of containers
+    CargoKillOptions:
+      type: object
+      description: |
+        Options for the kill command
+      required:
+      - Signal
+      properties:
+        Signal:
+          type: string
+          description: 'Signal to send to the container default: SIGKILL'
+    CargoScale:
+      type: object
+      description: |
+        Payload for the cargo scale endpoint
+      required:
+      - Replicas
+      properties:
+        Replicas:
+          type: integer
+          description: Number of replicas to scale up or down can be negative value
+    CargoSpec:
       type: object
       description: |-
         A cargo config is the configuration of a cargo
@@ -2213,7 +2287,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
           nullable: true
-    CargoConfigPartial:
+    CargoSpecPartial:
       type: object
       description: A cargo config partial is used to create a Cargo
       required:
@@ -2242,7 +2316,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
           nullable: true
-    CargoConfigUpdate:
+    CargoSpecUpdate:
       type: object
       description: |-
         Payload used to patch a cargo
@@ -2274,80 +2348,6 @@ components:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
           nullable: true
-    CargoImagePartial:
-      type: object
-      description: Cargo Image Partial is used to pull a new container image
-      required:
-      - Name
-      properties:
-        Name:
-          type: string
-          description: Name of the image
-          example: nginx:latest
-    CargoInspect:
-      type: object
-      description: |
-        Cargo Inspect is a detailed view of a cargo
-        It contains all the information about the cargo
-        It also contains the list of containers
-      required:
-      - Key
-      - Name
-      - ConfigKey
-      - NamespaceName
-      - Config
-      - InstanceTotal
-      - InstanceRunning
-      - Instances
-      properties:
-        Key:
-          type: string
-          description: Key of the cargo
-        Name:
-          type: string
-          description: Name of the cargo
-        ConfigKey:
-          type: string
-          format: uuid
-          description: Unique identifier of the cargo config
-        NamespaceName:
-          type: string
-          description: Name of the namespace
-        Config:
-          $ref: '#/components/schemas/CargoConfig'
-        InstanceTotal:
-          type: integer
-          description: Number of instances
-          minimum: 0
-        InstanceRunning:
-          type: integer
-          description: Number of running instances
-          minimum: 0
-        Instances:
-          type: array
-          items:
-            $ref: '#/components/schemas/NodeContainerSummary'
-          description: List of containers
-    CargoKillOptions:
-      type: object
-      description: |
-        Options for the kill command
-      required:
-      - Signal
-      properties:
-        Signal:
-          type: string
-          description: 'Signal to send to the container default: SIGKILL'
-    CargoScale:
-      type: object
-      description: |
-        Payload for the cargo scale endpoint
-      required:
-      - Replicas
-      properties:
-        Replicas:
-          type: integer
-          description: Number of replicas to scale up or down can be negative value
     CargoSummary:
       type: object
       description: |
@@ -2386,7 +2386,7 @@ components:
           type: string
           description: Name of the namespace
         Config:
-          $ref: '#/components/schemas/CargoConfig'
+          $ref: '#/components/schemas/CargoSpec'
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -5400,43 +5400,6 @@ components:
           description: The metadata of the resource (user defined)
           additionalProperties:
             $ref: '#/components/schemas/Any'
-    ResourceConfig:
-      type: object
-      description: |
-        ## ResourceConfig
-
-        The config of the resource
-      required:
-      - Key
-      - Version
-      - CreatedAt
-      - ResourceKey
-      - Data
-      properties:
-        Key:
-          type: string
-          format: uuid
-          description: Key of the resource
-        Version:
-          type: string
-          description: Version of the resource
-        CreatedAt:
-          type: string
-          format: date-time
-          description: The creation date of the resource
-        ResourceKey:
-          type: string
-          description: Resource key associated with the data
-        Data:
-          type: object
-          description: The data of the resource as a json object
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
-        Metadata:
-          type: object
-          description: The metadata of the resource (user defined)
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
     ResourceDnsRule:
       type: object
       required:
@@ -5488,6 +5451,43 @@ components:
           items:
             $ref: '#/components/schemas/ProxyRule'
           description: The rules to apply
+    ResourceSpec:
+      type: object
+      description: |
+        ## ResourceConfig
+
+        The config of the resource
+      required:
+      - Key
+      - Version
+      - CreatedAt
+      - ResourceKey
+      - Data
+      properties:
+        Key:
+          type: string
+          format: uuid
+          description: Key of the resource
+        Version:
+          type: string
+          description: Version of the resource
+        CreatedAt:
+          type: string
+          format: date-time
+          description: The creation date of the resource
+        ResourceKey:
+          type: string
+          description: Resource key associated with the data
+        Data:
+          type: object
+          description: The data of the resource as a json object
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Metadata:
+          type: object
+          description: The metadata of the resource (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
     ResourceUpdate:
       type: object
       required:
@@ -5688,7 +5688,7 @@ components:
         Cargoes:
           type: array
           items:
-            $ref: '#/components/schemas/CargoConfigPartial'
+            $ref: '#/components/schemas/CargoSpecPartial'
           description: List of cargoes to create and run
     StateDeployment:
       type: object
@@ -5716,13 +5716,13 @@ components:
         Cargoes:
           type: array
           items:
-            $ref: '#/components/schemas/CargoConfigPartial'
+            $ref: '#/components/schemas/CargoSpecPartial'
           description: List of cargoes to create and run
           nullable: true
         VirtualMachines:
           type: array
           items:
-            $ref: '#/components/schemas/VmConfigPartial'
+            $ref: '#/components/schemas/VmSpecPartial'
           description: List of virtual machines to create and run
           nullable: true
     StateMeta:
@@ -5771,7 +5771,7 @@ components:
         VirtualMachines:
           type: array
           items:
-            $ref: '#/components/schemas/VmConfigPartial'
+            $ref: '#/components/schemas/VmSpecPartial'
           description: List of virtual machines to create and run
     Stats:
       type: object
@@ -6509,158 +6509,8 @@ components:
           format: uuid
           description: Unique identifier of the vm config
         Config:
-          $ref: '#/components/schemas/VmConfig'
-    VmConfig:
-      type: object
-      description: |-
-        A vm config is the configuration of a vm
-        It used to know the state of the vm
-        It keep tracking of an history when you patch an existing vm
-      required:
-      - Key
-      - CreatedAt
-      - Name
-      - Version
-      - VmKey
-      - Disk
-      - HostConfig
-      properties:
-        Key:
-          type: string
-          format: uuid
-          description: Unique identifier of the vm config
-        CreatedAt:
-          type: string
-          format: date-time
-          description: Creation date of the vm config
-        Name:
-          type: string
-          description: Name of the vm
-        Version:
-          type: string
-          description: Version of the config
-        VmKey:
-          type: string
-          description: The key of the vm
-        Metadata:
-          description: The metadata (user defined)
-          nullable: true
-        Hostname:
-          type: string
-          description: Hostname of the vm
-          nullable: true
-        Password:
-          type: string
-          description: Default password of the vm (cloud)
-          nullable: true
-        SshKey:
-          type: string
-          description: Default ssh key for the user
-          nullable: true
-        User:
-          type: string
-          description: Default user of the vm (cloud)
-          nullable: true
-        Disk:
-          $ref: '#/components/schemas/VmDiskConfig'
-        MacAddress:
-          type: string
-          description: Mac address of the vm
-          nullable: true
-        Labels:
-          type: object
-          description: User-defined key/value metadata.
-          additionalProperties:
-            type: string
-          nullable: true
-        HostConfig:
-          $ref: '#/components/schemas/VmHostConfig'
-    VmConfigPartial:
-      type: object
-      description: A vm config partial is used to create a vm
-      required:
-      - Name
-      - Disk
-      properties:
-        Name:
-          type: string
-          description: Name of the vm
-        Metadata:
-          description: The metadata (user defined)
-          nullable: true
-        Hostname:
-          type: string
-          description: 'Hostname of the vm (default: generated from name)'
-          nullable: true
-        User:
-          type: string
-          description: 'Default user of the vm (default: cloud)'
-          nullable: true
-        Password:
-          type: string
-          description: 'Default password of the vm (default: cloud)'
-          nullable: true
-        SshKey:
-          type: string
-          description: Default ssh pub key for the user (recommended)
-          nullable: true
-        Disk:
-          $ref: '#/components/schemas/VmDiskConfig'
-        MacAddress:
-          type: string
-          description: 'Mac address of the vm (default: generated)'
-          nullable: true
-        Labels:
-          type: object
-          description: User-defined key/value metadata.
-          additionalProperties:
-            type: string
-          nullable: true
-        HostConfig:
-          allOf:
-          - $ref: '#/components/schemas/VmHostConfig'
-          nullable: true
-    VmConfigUpdate:
-      type: object
-      description: |-
-        Payload used to patch a vm
-        It will create a new [VmConfig](VmConfig) with the new values
-        It will keep the old values in the history
-      properties:
-        Name:
-          type: string
-          description: Name of the vm
-          nullable: true
-        Metadata:
-          description: The metadata (user defined)
-          nullable: true
-        Hostname:
-          type: string
-          description: Hostname of the vm
-          nullable: true
-        User:
-          type: string
-          description: Default user of the vm (cloud)
-          nullable: true
-        Password:
-          type: string
-          description: Default password of the vm (cloud)
-          nullable: true
-        SshKey:
-          type: string
-          description: Default ssh key for the user
-          nullable: true
-        Labels:
-          type: object
-          description: User-defined key/value metadata.
-          additionalProperties:
-            type: string
-          nullable: true
-        HostConfig:
-          allOf:
-          - $ref: '#/components/schemas/VmHostConfig'
-          nullable: true
-    VmDiskConfig:
+          $ref: '#/components/schemas/VmSpec'
+    VmDisk:
       type: object
       description: Disk representation of a VM
       required:
@@ -6675,7 +6525,7 @@ components:
           description: 'Virtual size allowed for the disk in GB (default: 20)'
           nullable: true
           minimum: 0
-    VmHostConfig:
+    VmHost:
       type: object
       description: A vm's resources (cpu, memory, network)
       required:
@@ -6801,7 +6651,7 @@ components:
           type: string
           description: Name of the namespace
         Config:
-          $ref: '#/components/schemas/VmConfig'
+          $ref: '#/components/schemas/VmSpec'
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -6815,6 +6665,158 @@ components:
           items:
             $ref: '#/components/schemas/ContainerSummary'
           description: List of containers
+    VmSpec:
+      type: object
+      description: |-
+        A vm config is the configuration of a vm
+        It used to know the state of the vm
+        It keep tracking of an history when you patch an existing vm
+      required:
+      - Key
+      - CreatedAt
+      - Name
+      - Version
+      - VmKey
+      - Disk
+      - HostConfig
+      properties:
+        Key:
+          type: string
+          format: uuid
+          description: Unique identifier of the vm config
+        CreatedAt:
+          type: string
+          format: date-time
+          description: Creation date of the vm config
+        Name:
+          type: string
+          description: Name of the vm
+        Version:
+          type: string
+          description: Version of the config
+        VmKey:
+          type: string
+          description: The key of the vm
+        Metadata:
+          description: The metadata (user defined)
+          nullable: true
+        Hostname:
+          type: string
+          description: Hostname of the vm
+          nullable: true
+        Password:
+          type: string
+          description: Default password of the vm (cloud)
+          nullable: true
+        SshKey:
+          type: string
+          description: Default ssh key for the user
+          nullable: true
+        User:
+          type: string
+          description: Default user of the vm (cloud)
+          nullable: true
+        Disk:
+          $ref: '#/components/schemas/VmDisk'
+        MacAddress:
+          type: string
+          description: Mac address of the vm
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        HostConfig:
+          $ref: '#/components/schemas/VmHost'
+    VmSpecPartial:
+      type: object
+      description: A vm config partial is used to create a vm
+      required:
+      - Name
+      - Disk
+      properties:
+        Name:
+          type: string
+          description: Name of the vm
+        Metadata:
+          description: The metadata (user defined)
+          nullable: true
+        Hostname:
+          type: string
+          description: 'Hostname of the vm (default: generated from name)'
+          nullable: true
+        User:
+          type: string
+          description: 'Default user of the vm (default: cloud)'
+          nullable: true
+        Password:
+          type: string
+          description: 'Default password of the vm (default: cloud)'
+          nullable: true
+        SshKey:
+          type: string
+          description: Default ssh pub key for the user (recommended)
+          nullable: true
+        Disk:
+          $ref: '#/components/schemas/VmDisk'
+        MacAddress:
+          type: string
+          description: 'Mac address of the vm (default: generated)'
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        HostConfig:
+          allOf:
+          - $ref: '#/components/schemas/VmHost'
+          nullable: true
+    VmSpecUpdate:
+      type: object
+      description: |
+        ## VmSpecUpdate
+
+        Payload used to patch a vm
+        It will create a new [VmSpec](VmSpec) with the new values
+        and keep the old values in the history
+      properties:
+        Name:
+          type: string
+          description: Name of the vm
+          nullable: true
+        Metadata:
+          description: The metadata (user defined)
+          nullable: true
+        Hostname:
+          type: string
+          description: Hostname of the vm
+          nullable: true
+        User:
+          type: string
+          description: Default user of the vm (cloud)
+          nullable: true
+        Password:
+          type: string
+          description: Default password of the vm (cloud)
+          nullable: true
+        SshKey:
+          type: string
+          description: Default ssh key for the user
+          nullable: true
+        Labels:
+          type: object
+          description: User-defined key/value metadata.
+          additionalProperties:
+            type: string
+          nullable: true
+        HostConfig:
+          allOf:
+          - $ref: '#/components/schemas/VmHost'
+          nullable: true
     VmSummary:
       type: object
       description: |-
@@ -6853,7 +6855,7 @@ components:
           type: string
           description: Name of the namespace
         Config:
-          $ref: '#/components/schemas/VmConfig'
+          $ref: '#/components/schemas/VmSpec'
         Instances:
           type: integer
           description: Number of instances

@@ -8,7 +8,7 @@ pub mod config;
 pub mod namespace;
 pub mod cargo;
 pub mod cargo_image;
-pub mod cargo_config;
+pub mod cargo_spec;
 pub mod resource;
 pub mod state;
 pub mod vm;

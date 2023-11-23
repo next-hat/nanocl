@@ -23,9 +23,8 @@ use nanocl_stubs::cargo::{
   CargoKillOptions, GenericCargoListQuery, CargoScale, CargoStats,
   CargoStatsQuery,
 };
-use nanocl_stubs::cargo_config::{
-  CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
-  Config as ContainerConfig,
+use nanocl_stubs::cargo_spec::{
+  CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config as ContainerConfig,
 };
 
 use crate::{utils, repositories};
@@ -429,7 +428,7 @@ pub(crate) async fn list_instances(
 ///
 pub(crate) async fn create(
   namespace: &str,
-  config: &CargoConfigPartial,
+  config: &CargoSpecPartial,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
@@ -657,7 +656,7 @@ pub(crate) async fn delete_by_key(
 ///
 pub(crate) async fn put(
   cargo_key: &str,
-  cargo_partial: &CargoConfigPartial,
+  cargo_partial: &CargoSpecPartial,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
@@ -914,7 +913,7 @@ pub(crate) async fn kill_by_name(
 ///
 pub async fn patch(
   key: &str,
-  payload: &CargoConfigUpdate,
+  payload: &CargoSpecUpdate,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
@@ -989,7 +988,7 @@ pub async fn patch(
   } else {
     cargo.config.container
   };
-  let config = CargoConfigPartial {
+  let config = CargoSpecPartial {
     name: cargo.name.clone(),
     container,
     init_container: if payload.init_container.is_some() {

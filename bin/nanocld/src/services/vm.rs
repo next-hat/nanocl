@@ -16,7 +16,7 @@ use nanocl_error::http::{HttpError, HttpResult};
 use bollard_next::container::AttachContainerOptions;
 use nanocl_stubs::cargo::OutputLog;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
+use nanocl_stubs::vm_config::{VmSpecPartial, VmSpecUpdate};
 
 use crate::{utils, repositories};
 use crate::models::{DaemonState, WsConState};
@@ -165,7 +165,7 @@ pub(crate) async fn delete_vm(
 #[web::post("/vms")]
 pub(crate) async fn create_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<VmConfigPartial>,
+  web::types::Json(payload): web::types::Json<VmSpecPartial>,
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
@@ -218,7 +218,7 @@ pub(crate) async fn list_vm_history(
 #[web::patch("/vms/{name}")]
 pub(crate) async fn patch_vm(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<VmConfigUpdate>,
+  web::types::Json(payload): web::types::Json<VmSpecUpdate>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {

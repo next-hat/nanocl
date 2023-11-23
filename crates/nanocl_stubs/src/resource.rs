@@ -143,7 +143,7 @@ impl From<Resource> for ResourcePartial {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct ResourceConfig {
+pub struct ResourceSpec {
   /// Key of the resource
   pub key: uuid::Uuid,
   /// Version of the resource

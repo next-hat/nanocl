@@ -2,19 +2,19 @@
 * Endpoints to manipulate cargoes
 */
 
-use ntex::{web, http};
+use ntex::web;
 
-use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
   CargoListQuery, CargoDeleteQuery, CargoKillOptions, CargoLogQuery,
   CargoStatsQuery, CargoScale,
 };
-use nanocl_stubs::cargo_config::{CargoConfigPartial, CargoConfigUpdate};
+use nanocl_stubs::cargo_spec::{CargoSpecPartial, CargoSpecUpdate};
 
 use crate::{utils, repositories};
-use crate::models::{DaemonState, CargoRevertPath};
+use crate::models::DaemonState;
 
 /// List cargoes
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -108,7 +108,7 @@ pub(crate) async fn inspect_cargo(
 #[web::post("/cargoes")]
 pub(crate) async fn create_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<CargoConfigPartial>,
+  web::types::Json(payload): web::types::Json<CargoSpecPartial>,
   version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
@@ -242,7 +242,7 @@ pub(crate) async fn restart_cargo(
 #[web::put("/cargoes/{name}")]
 pub(crate) async fn put_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  payload: web::types::Json<CargoConfigPartial>,
+  payload: web::types::Json<CargoSpecPartial>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
@@ -270,7 +270,7 @@ pub(crate) async fn put_cargo(
 #[web::patch("/cargoes/{name}")]
 pub(crate) async fn patch_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  payload: web::types::Json<CargoConfigUpdate>,
+  payload: web::types::Json<CargoSpecUpdate>,
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
@@ -353,24 +353,16 @@ pub(crate) async fn list_cargo_history(
 #[web::patch("/cargoes/{name}/histories/{id}/revert")]
 pub(crate) async fn revert_cargo(
   web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<CargoRevertPath>,
+  path: web::types::Path<(String, String, uuid::Uuid)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let cargo_key = utils::key::gen_key(&namespace, &path.name);
-  let config_id = uuid::Uuid::parse_str(&path.id).map_err(|err| HttpError {
-    status: http::StatusCode::BAD_REQUEST,
-    msg: format!("Invalid config id : {err}"),
-  })?;
+  let cargo_key = utils::key::gen_key(&namespace, &path.1);
   let config =
-    repositories::cargo_config::find_by_key(&config_id, &state.pool).await?;
-  let cargo = utils::cargo::put(
-    &cargo_key,
-    &config.clone().into(),
-    &path.version,
-    &state,
-  )
-  .await?;
+    repositories::cargo_config::find_by_key(&path.2, &state.pool).await?;
+  let cargo =
+    utils::cargo::put(&cargo_key, &config.clone().into(), &path.0, &state)
+      .await?;
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -494,7 +486,7 @@ mod tests {
   use futures::{TryStreamExt, StreamExt};
 
   use nanocl_stubs::generic::GenericNspQuery;
-  use nanocl_stubs::cargo_config::{CargoConfig, CargoConfigPartial};
+  use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
   use nanocl_stubs::cargo::{
     Cargo, CargoSummary, CargoInspect, OutputLog, CargoDeleteQuery,
     CargoListQuery, CargoScale, CargoKillOptions,
@@ -521,7 +513,7 @@ mod tests {
       let res = client
         .send_post(
           ENDPOINT,
-          Some(&CargoConfigPartial {
+          Some(&CargoSpecPartial {
             name: test_cargo.to_owned(),
             container: bollard_next::container::Config {
               image: Some(
@@ -654,7 +646,7 @@ mod tests {
     let mut res = client
       .send_put(
         &format!("{ENDPOINT}/{main_test_cargo}"),
-        Some(&CargoConfigPartial {
+        Some(&CargoSpecPartial {
           name: main_test_cargo.to_owned(),
           container: bollard_next::container::Config {
             image: Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned()),
@@ -689,7 +681,7 @@ mod tests {
       res.status(),
       "basic cargo history"
     );
-    let histories = res.json::<Vec<CargoConfig>>().await.unwrap();
+    let histories = res.json::<Vec<CargoSpec>>().await.unwrap();
     assert!(histories.len() > 1, "Expected to find cargo histories");
     let id = histories[0].key;
     let res = client
@@ -737,7 +729,7 @@ mod tests {
     let res = client
       .send_post(
         ENDPOINT,
-        Some(&CargoConfigPartial {
+        Some(&CargoSpecPartial {
           name: CARGO_NAME.to_owned(),
           container: bollard_next::container::Config {
             image: Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned()),

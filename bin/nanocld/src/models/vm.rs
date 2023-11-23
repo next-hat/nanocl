@@ -2,7 +2,7 @@ use nanocl_stubs::{vm_config, vm};
 
 use crate::schema::vms;
 
-use super::namespace::NamespaceDbModel;
+use super::namespace::NamespaceDb;
 
 /// ## VmDbModel
 ///
@@ -15,7 +15,7 @@ use super::namespace::NamespaceDbModel;
 #[derive(Clone, Debug, Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = vms)]
-#[diesel(belongs_to(NamespaceDbModel, foreign_key = namespace_name))]
+#[diesel(belongs_to(NamespaceDb, foreign_key = namespace_name))]
 pub struct VmDbModel {
   /// The key of the vm
   pub(crate) key: String,
@@ -30,7 +30,7 @@ pub struct VmDbModel {
 }
 
 impl VmDbModel {
-  pub fn into_vm(self, config: vm_config::VmConfig) -> vm::Vm {
+  pub fn into_vm(self, config: vm_config::VmSpec) -> vm::Vm {
     vm::Vm {
       key: self.key,
       name: self.name,

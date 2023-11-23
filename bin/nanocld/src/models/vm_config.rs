@@ -1,10 +1,10 @@
 use nanocl_stubs::vm_config;
 
-use crate::schema::vm_configs;
+use crate::schema::vm_specs;
 
 use super::vm;
 
-/// ## VmConfigDbModel
+/// ## VmSpecDb
 ///
 /// This structure represent the vm config in the database.
 /// A vm config represent the configuration of a virtual machine.
@@ -15,9 +15,9 @@ use super::vm;
 ///
 #[derive(Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = vm_configs)]
+#[diesel(table_name = vm_specs)]
 #[diesel(belongs_to(vm::VmDbModel, foreign_key = vm_key))]
-pub struct VmConfigDbModel {
+pub struct VmSpecDb {
   /// The key of the vm config
   pub(crate) key: uuid::Uuid,
   /// The created at date
@@ -32,12 +32,12 @@ pub struct VmConfigDbModel {
   pub(crate) metadata: Option<serde_json::Value>,
 }
 
-impl VmConfigDbModel {
-  pub fn into_vm_config(
+impl VmSpecDb {
+  pub fn into_vm_spec(
     self,
-    config: &vm_config::VmConfigPartial,
-  ) -> vm_config::VmConfig {
-    vm_config::VmConfig {
+    config: &vm_config::VmSpecPartial,
+  ) -> vm_config::VmSpec {
+    vm_config::VmSpec {
       key: self.key,
       created_at: self.created_at,
       name: config.name.clone(),

@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::schema::metrics;
 
-/// ## MetricDbModel
+/// ## MetricDb
 ///
 /// This structure represent a metric in the database.
 /// A metric is a data point that can be used to monitor the system.
@@ -14,7 +14,7 @@ use crate::schema::metrics;
 #[serde(rename_all = "PascalCase")]
 #[diesel(primary_key(key))]
 #[diesel(table_name = metrics)]
-pub struct MetricDbModel {
+pub struct MetricDb {
   /// The key of the metric in the database `UUID`
   pub key: Uuid,
   /// When the metric was created
@@ -29,13 +29,13 @@ pub struct MetricDbModel {
   pub data: serde_json::Value,
 }
 
-/// ## MetricInsertDbModel
+/// ## MetricInsertDb
 ///
 /// This structure is used to insert a metric in the database.
 ///
 #[derive(Clone, Debug, Default, Insertable)]
 #[diesel(table_name = metrics)]
-pub struct MetricInsertDbModel {
+pub struct MetricInsertDb {
   /// The kind of the metric (CPU, MEMORY, DISK, NETWORK)
   pub kind: String,
   /// The node where the metric come from

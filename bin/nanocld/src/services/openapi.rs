@@ -48,17 +48,15 @@ use nanocl_stubs::cargo::{
   Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
   CargoScale, CargoStats,
 };
-use nanocl_stubs::cargo_config::{
-  CargoConfig, CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
+use nanocl_stubs::cargo_spec::{
+  CargoSpec, CargoSpecPartial, CargoSpecUpdate, ReplicationMode,
   ReplicationStatic,
 };
 use nanocl_stubs::cargo_image::CargoImagePartial;
 use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
-use nanocl_stubs::vm_config::{
-  VmConfig, VmConfigPartial, VmConfigUpdate, VmDiskConfig, VmHostConfig,
-};
+use nanocl_stubs::vm_config::{VmSpec, VmSpecPartial, VmSpecUpdate, VmDisk, VmHost};
 use nanocl_stubs::resource::{
-  Resource, ResourceUpdate, ResourceConfig, ResourcePartial,
+  Resource, ResourceUpdate, ResourceSpec, ResourcePartial,
 };
 use nanocl_stubs::dns::{ResourceDnsRule, DnsEntry};
 use nanocl_stubs::proxy::{
@@ -355,11 +353,11 @@ impl Modify for VersionModifier {
     CreateExecOptions,
     CargoKillOptions,
     CargoInspect,
-    CargoConfig,
+    CargoSpec,
     ReplicationMode,
     CargoSummary,
-    CargoConfigPartial,
-    CargoConfigUpdate,
+    CargoSpecPartial,
+    CargoSpecUpdate,
     ReplicationStatic,
     CargoScale,
     CargoStats,
@@ -433,15 +431,15 @@ impl Modify for VersionModifier {
     VmSummary,
     VmInspect,
     // Vm Config
-    VmConfig,
-    VmConfigPartial,
-    VmConfigUpdate,
-    VmDiskConfig,
-    VmHostConfig,
+    VmSpec,
+    VmSpecPartial,
+    VmSpecUpdate,
+    VmDisk,
+    VmHost,
     // Resource
     Resource,
     ResourceUpdate,
-    ResourceConfig,
+    ResourceSpec,
     ResourcePartial,
     // State
     StateMeta,

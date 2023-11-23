@@ -1,10 +1,10 @@
-use nanocl_stubs::{cargo, cargo_config};
+use nanocl_stubs::{cargo, cargo_spec};
 
 use crate::schema::cargoes;
 
-use super::namespace::NamespaceDbModel;
+use super::namespace::NamespaceDb;
 
-/// ## CargoDbModel
+/// ## CargoDb
 ///
 /// This structure represent the cargo in the database.
 /// A cargo is a replicable container that can be used to deploy a service.
@@ -14,8 +14,8 @@ use super::namespace::NamespaceDbModel;
 #[derive(Debug, Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = cargoes)]
-#[diesel(belongs_to(NamespaceDbModel, foreign_key = namespace_name))]
-pub struct CargoDbModel {
+#[diesel(belongs_to(NamespaceDb, foreign_key = namespace_name))]
+pub struct CargoDb {
   /// The key of the cargo generated with `namespace_name` and `name`
   pub(crate) key: String,
   /// The created at date
@@ -28,8 +28,8 @@ pub struct CargoDbModel {
   pub(crate) namespace_name: String,
 }
 
-impl CargoDbModel {
-  pub fn into_cargo(self, config: cargo_config::CargoConfig) -> cargo::Cargo {
+impl CargoDb {
+  pub fn into_cargo(self, config: cargo_spec::CargoSpec) -> cargo::Cargo {
     cargo::Cargo {
       key: self.key,
       name: self.name,
@@ -40,13 +40,13 @@ impl CargoDbModel {
   }
 }
 
-/// ## CargoUpdateDbModel
+/// ## CargoUpdateModel
 ///
 /// This structure is used to update a cargo in the database.
 ///
 #[derive(Debug, Default, AsChangeset)]
 #[diesel(table_name = cargoes)]
-pub struct CargoUpdateDbModel {
+pub struct CargoUpdateDb {
   /// The key of the cargo generated with `namespace_name` and `name`
   pub(crate) key: Option<String>,
   /// The name of the cargo
@@ -55,18 +55,4 @@ pub struct CargoUpdateDbModel {
   pub(crate) namespace_name: Option<String>,
   /// The config key reference
   pub(crate) config_key: Option<uuid::Uuid>,
-}
-
-/// ## CargoRevertPath
-///
-/// Structure used to serialize the endpoint cargo revert path
-///
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct CargoRevertPath {
-  /// The version
-  pub version: String,
-  /// The name
-  pub name: String,
-  /// The history id
-  pub id: String,
 }

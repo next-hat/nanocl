@@ -6,7 +6,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
 
 use crate::utils;
-use crate::models::{Pool, NamespaceDbModel};
+use crate::models::{Pool, NamespaceDb};
 
 /// ## Create
 ///
@@ -24,8 +24,8 @@ use crate::models::{Pool, NamespaceDbModel};
 pub(crate) async fn create(
   item: &NamespacePartial,
   pool: &Pool,
-) -> IoResult<NamespaceDbModel> {
-  let item = NamespaceDbModel {
+) -> IoResult<NamespaceDb> {
+  let item = NamespaceDb {
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
@@ -48,7 +48,7 @@ pub(crate) async fn create(
 pub(crate) async fn list(
   query: &NamespaceListQuery,
   pool: &Pool,
-) -> IoResult<Vec<NamespaceDbModel>> {
+) -> IoResult<Vec<NamespaceDb>> {
   use crate::schema::namespaces::dsl;
   let query = query.clone();
   let pool = pool.clone();
@@ -111,7 +111,7 @@ pub(crate) async fn delete_by_name(
 pub(crate) async fn find_by_name(
   name: &str,
   pool: &Pool,
-) -> IoResult<NamespaceDbModel> {
+) -> IoResult<NamespaceDb> {
   use crate::schema::namespaces;
   let name = name.to_owned();
   super::generic::find_by_id::<namespaces::table, _, _>(name, pool).await
@@ -138,7 +138,7 @@ pub(crate) async fn exist_by_name(name: &str, pool: &Pool) -> IoResult<bool> {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let exist = namespaces::dsl::namespaces
       .filter(namespaces::dsl::name.eq(name))
-      .get_result::<NamespaceDbModel>(&mut conn)
+      .get_result::<NamespaceDb>(&mut conn)
       .optional()
       .map_err(|err| err.map_err_context(|| "Namespace"))?;
     Ok::<_, IoError>(exist)

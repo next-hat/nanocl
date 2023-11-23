@@ -3,7 +3,7 @@ use bollard_next::service::ContainerSummary;
 use serde::{Serialize, Deserialize};
 
 use crate::{
-  vm_config::{VmConfig, VmConfigPartial},
+  vm_config::{VmSpec, VmSpecPartial},
   system::{EventActor, ToEvent, EventAction, Event, EventKind},
 };
 
@@ -23,10 +23,10 @@ pub struct Vm {
   /// Unique identifier of the vm config
   pub config_key: uuid::Uuid,
   /// Configuration of the vm
-  pub config: VmConfig,
+  pub config: VmSpec,
 }
 
-impl From<Vm> for VmConfigPartial {
+impl From<Vm> for VmSpecPartial {
   fn from(vm: Vm) -> Self {
     vm.config.into()
   }
@@ -78,7 +78,7 @@ pub struct VmSummary {
   /// Name of the namespace
   pub namespace_name: String,
   /// Configuration of the vm
-  pub config: VmConfig,
+  pub config: VmSpec,
   /// Number of instances
   pub instances: usize,
   /// Number of running instances
@@ -103,7 +103,7 @@ pub struct VmInspect {
   /// Name of the namespace
   pub namespace_name: String,
   /// Configuration of the cargo
-  pub config: VmConfig,
+  pub config: VmSpec,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances

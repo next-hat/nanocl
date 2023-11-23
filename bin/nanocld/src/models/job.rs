@@ -1,9 +1,10 @@
 use nanocl_error::io::{IoResult, FromIo};
+
 use nanocl_stubs::job::{Job, JobPartial};
 
 use crate::schema::jobs;
 
-/// ## JobDbModel
+/// ## JobDb
 ///
 /// This structure represent a job to run.
 /// It will create and run a list of containers.
@@ -11,7 +12,7 @@ use crate::schema::jobs;
 #[derive(Clone, Queryable, Identifiable, Insertable)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = jobs)]
-pub struct JobDbModel {
+pub struct JobDb {
   /// The key of the job generated with the name
   pub key: String,
   /// The created at date
@@ -24,7 +25,7 @@ pub struct JobDbModel {
   pub metadata: Option<serde_json::Value>,
 }
 
-impl JobDbModel {
+impl JobDb {
   pub fn into_job(self, config: &JobPartial) -> Job {
     Job {
       name: self.key.clone(),
@@ -45,13 +46,13 @@ impl JobDbModel {
   }
 }
 
-/// ## JobUpdateDbModel
+/// ## JobUpdateDb
 ///
 /// This structure represent the update of a job.
 /// It will update the job with the new data.
 ///
 #[derive(Clone, AsChangeset)]
 #[diesel(table_name = jobs)]
-pub struct JobUpdateDbModel {
+pub struct JobUpdateDb {
   pub updated_at: Option<chrono::NaiveDateTime>,
 }

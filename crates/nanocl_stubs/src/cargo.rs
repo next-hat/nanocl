@@ -8,10 +8,10 @@ pub use bollard_next::exec::CreateExecOptions;
 pub use bollard_next::container::Stats as CargoStats;
 
 use crate::node::NodeContainerSummary;
-use crate::cargo_config::CargoConfigPartial;
+use crate::cargo_spec::CargoSpecPartial;
 use crate::system::{Event, EventKind, ToEvent, EventAction, EventActor};
 
-use super::cargo_config::CargoConfig;
+use super::cargo_spec::CargoSpec;
 
 /// A Cargo is a replicable container
 /// It is used to run one or multiple instances of the same container
@@ -37,10 +37,10 @@ pub struct Cargo {
   /// Unique identifier of the cargo config
   pub config_key: uuid::Uuid,
   /// Configuration of the cargo
-  pub config: CargoConfig,
+  pub config: CargoSpec,
 }
 
-impl From<Cargo> for CargoConfigPartial {
+impl From<Cargo> for CargoSpecPartial {
   fn from(cargo: Cargo) -> Self {
     cargo.config.into()
   }
@@ -92,7 +92,7 @@ pub struct CargoSummary {
   /// Name of the namespace
   pub namespace_name: String,
   /// Configuration of the cargo
-  pub config: CargoConfig,
+  pub config: CargoSpec,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances
@@ -117,7 +117,7 @@ pub struct CargoInspect {
   /// Name of the namespace
   pub namespace_name: String,
   /// Configuration of the cargo
-  pub config: CargoConfig,
+  pub config: CargoSpec,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances

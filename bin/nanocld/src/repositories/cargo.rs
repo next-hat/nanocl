@@ -4,12 +4,10 @@ use diesel::prelude::*;
 use nanocl_error::io::{IoError, IoResult, FromIo};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::cargo::{Cargo, GenericCargoListQuery};
-use nanocl_stubs::cargo_config::CargoConfigPartial;
+use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
 use crate::utils;
-use crate::models::{
-  Pool, CargoDbModel, CargoUpdateDbModel, CargoConfigDbModel, NamespaceDbModel,
-};
+use crate::models::{Pool, CargoDb, CargoUpdateDb, CargoSpecDb, NamespaceDb};
 
 /// ## Find by namespace
 ///
@@ -25,9 +23,9 @@ use crate::models::{
 /// [IoResult](IoResult) containing a [Vec](Vec) of [CargoDbModel](CargoDbModel)
 ///
 pub(crate) async fn find_by_namespace(
-  nsp: &NamespaceDbModel,
+  nsp: &NamespaceDb,
   pool: &Pool,
-) -> IoResult<Vec<CargoDbModel>> {
+) -> IoResult<Vec<CargoDb>> {
   let query = GenericCargoListQuery::of_namespace(nsp.clone());
   list_by_query(&query, pool).await
 }
@@ -46,15 +44,15 @@ pub(crate) async fn find_by_namespace(
 /// [IoResult](IoResult) containing a [Vec](Vec) of [CargoDbModel](CargoDbModel)
 ///
 pub(crate) async fn list_by_query(
-  query: &GenericCargoListQuery<NamespaceDbModel>,
+  query: &GenericCargoListQuery<NamespaceDb>,
   pool: &Pool,
-) -> IoResult<Vec<CargoDbModel>> {
+) -> IoResult<Vec<CargoDb>> {
   use crate::schema::cargoes;
   let query = query.clone();
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let mut sql = CargoDbModel::belonging_to(&query.namespace).into_boxed();
+    let mut sql = CargoDb::belonging_to(&query.namespace).into_boxed();
     if let Some(name) = &query.name {
       sql = sql.filter(cargoes::dsl::name.ilike(format!("%{name}%")));
     }
@@ -90,7 +88,7 @@ pub(crate) async fn list_by_query(
 ///
 pub(crate) async fn create(
   nsp: &str,
-  item: &CargoConfigPartial,
+  item: &CargoSpecPartial,
   version: &str,
   pool: &Pool,
 ) -> IoResult<Cargo> {
@@ -106,15 +104,14 @@ pub(crate) async fn create(
   }
   let key = utils::key::gen_key(&nsp, &item.name);
   let config = super::cargo_config::create(&key, &item, &version, pool).await?;
-  let new_item = CargoDbModel {
+  let new_item = CargoDb {
     key,
     name: item.name,
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
     config_key: config.key,
   };
-  let item: CargoDbModel =
-    super::generic::insert_with_res(new_item, pool).await?;
+  let item: CargoDb = super::generic::insert_with_res(new_item, pool).await?;
   let cargo = item.into_cargo(config);
   Ok(cargo)
 }
@@ -154,10 +151,7 @@ pub(crate) async fn delete_by_key(
 ///
 /// [IoResult](IoResult) containing a [CargoDbModel](CargoDbModel)
 ///
-pub(crate) async fn find_by_key(
-  key: &str,
-  pool: &Pool,
-) -> IoResult<CargoDbModel> {
+pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDb> {
   use crate::schema::cargoes;
   let key = key.to_owned();
   super::generic::find_by_id::<cargoes::table, _, _>(key, pool).await
@@ -179,7 +173,7 @@ pub(crate) async fn find_by_key(
 ///
 pub(crate) async fn update_by_key(
   key: &str,
-  item: &CargoConfigPartial,
+  item: &CargoSpecPartial,
   version: &str,
   pool: &Pool,
 ) -> IoResult<Cargo> {
@@ -187,13 +181,13 @@ pub(crate) async fn update_by_key(
   let version = version.to_owned();
   let cargodb = find_by_key(key, pool).await?;
   let config = super::cargo_config::create(key, item, &version, pool).await?;
-  let new_item = CargoUpdateDbModel {
+  let new_item = CargoUpdateDb {
     name: Some(item.name.to_owned()),
     config_key: Some(config.key),
     ..Default::default()
   };
   let key = key.to_owned();
-  super::generic::update_by_id::<cargoes::table, CargoUpdateDbModel, _>(
+  super::generic::update_by_id::<cargoes::table, CargoUpdateDb, _>(
     key, new_item, pool,
   )
   .await?;
@@ -249,23 +243,22 @@ pub(crate) async fn count_by_namespace(
 ///
 pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
   use crate::schema::cargoes;
-  use crate::schema::cargo_configs;
+  use crate::schema::cargo_specs;
   let key = key.to_owned();
   let pool = pool.clone();
-  let item: (CargoDbModel, CargoConfigDbModel) = web::block(move || {
+  let item: (CargoDb, CargoSpecDb) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = cargoes::table
-      .inner_join(cargo_configs::table)
+      .inner_join(cargo_specs::table)
       .filter(cargoes::key.eq(key))
       .get_result(&mut conn)
       .map_err(|err| err.map_err_context(|| "Cargo"))?;
     Ok::<_, IoError>(item)
   })
   .await?;
-  let config =
-    serde_json::from_value::<CargoConfigPartial>(item.1.data.clone())
-      .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
-  let config = item.1.into_cargo_config(&config);
+  let config = serde_json::from_value::<CargoSpecPartial>(item.1.data.clone())
+    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
+  let config = item.1.into_cargo_spec(&config);
   let item = item.0.into_cargo(config);
   Ok(item)
 }

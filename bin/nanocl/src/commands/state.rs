@@ -15,8 +15,8 @@ use nanocld_client::NanocldClient;
 use nanocld_client::stubs::job::JobPartial;
 use nanocld_client::stubs::state::{StateMeta, StateApplyQuery, StateStreamStatus};
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
-use nanocld_client::stubs::cargo_config::{
-  CargoConfigPartial, Config as ContainerConfig,
+use nanocld_client::stubs::cargo_spec::{
+  CargoSpecPartial, Config as ContainerConfig,
 };
 
 use crate::utils;
@@ -123,7 +123,7 @@ where
 ///
 /// [IoResult](IoResult) containing a [CargoConfigPartial](CargoConfigPartial)
 ///
-fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
+fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
   let new_cargo = match &cargo.container.host_config {
     None => cargo.clone(),
     Some(host_config) => match &host_config.binds {
@@ -148,7 +148,7 @@ fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
           };
           new_binds.push(new_bind);
         }
-        CargoConfigPartial {
+        CargoSpecPartial {
           container: ContainerConfig {
             host_config: Some(HostConfig {
               binds: Some(new_binds),
@@ -180,7 +180,7 @@ fn hook_binds(cargo: &CargoConfigPartial) -> IoResult<CargoConfigPartial> {
 ///
 pub async fn log_cargo(
   client: &NanocldClient,
-  cargo: CargoConfigPartial,
+  cargo: CargoSpecPartial,
   opts: &CargoLogQuery,
 ) -> IoResult<Vec<rt::JoinHandle<()>>> {
   let cargo = match client
@@ -329,7 +329,7 @@ pub async fn log_jobs(
 ///
 pub async fn log_cargoes(
   client: &NanocldClient,
-  cargoes: Vec<CargoConfigPartial>,
+  cargoes: Vec<CargoSpecPartial>,
   opts: &CargoLogQuery,
 ) -> IoResult<()> {
   let mut futures = Vec::new();
@@ -354,8 +354,8 @@ pub async fn log_cargoes(
 /// [IoResult](IoResult) containing a [Vec](Vec) of [CargoConfigPartial](CargoConfigPartial)
 ///
 fn hook_cargoes(
-  cargoes: Vec<CargoConfigPartial>,
-) -> IoResult<Vec<CargoConfigPartial>> {
+  cargoes: Vec<CargoSpecPartial>,
+) -> IoResult<Vec<CargoSpecPartial>> {
   let mut new_cargoes = Vec::new();
   for cargo in cargoes {
     let new_cargo = hook_binds(&cargo)?;
@@ -635,7 +635,7 @@ async fn execute_template(
   serde_yaml::Value,
   String,
   Vec<JobPartial>,
-  Vec<CargoConfigPartial>,
+  Vec<CargoSpecPartial>,
 )> {
   let mut namespace = String::default();
   let state_ref = state_ref.clone();
@@ -657,7 +657,7 @@ async fn execute_template(
         client,
       )
       .await?;
-      let current_cargoes: Vec<CargoConfigPartial> = match yaml.get("Cargoes") {
+      let current_cargoes: Vec<CargoSpecPartial> = match yaml.get("Cargoes") {
         Some(cargoes) => serde_yaml::from_value(cargoes.clone())
           .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
         None => Vec::new(),

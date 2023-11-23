@@ -1,7 +1,7 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    cargo_configs (key) {
+    cargo_specs (key) {
         key -> Uuid,
         created_at -> Timestamptz,
         cargo_key -> Varchar,
@@ -113,7 +113,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    resource_configs (key) {
+    resource_specs (key) {
         key -> Uuid,
         created_at -> Timestamptz,
         resource_key -> Varchar,
@@ -182,7 +182,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    vm_configs (key) {
+    vm_specs (key) {
         key -> Uuid,
         created_at -> Timestamptz,
         vm_key -> Varchar,
@@ -215,17 +215,17 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(cargoes -> cargo_configs (config_key));
+diesel::joinable!(cargoes -> cargo_specs (config_key));
 diesel::joinable!(cargoes -> namespaces (namespace_name));
 diesel::joinable!(node_group_links -> node_groups (node_group_name));
 diesel::joinable!(node_group_links -> nodes (node_name));
 diesel::joinable!(resource_kind_versions -> resource_kinds (resource_kind_name));
-diesel::joinable!(resources -> resource_configs (config_key));
+diesel::joinable!(resources -> resource_specs (config_key));
 diesel::joinable!(vms -> namespaces (namespace_name));
-diesel::joinable!(vms -> vm_configs (config_key));
+diesel::joinable!(vms -> vm_specs (config_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
-  cargo_configs,
+  cargo_specs,
   cargoes,
   container_instances,
   http_metrics,
@@ -235,13 +235,13 @@ diesel::allow_tables_to_appear_in_same_query!(
   node_group_links,
   node_groups,
   nodes,
-  resource_configs,
+  resource_specs,
   resource_kind_versions,
   resource_kinds,
   resources,
   secrets,
   stream_metrics,
-  vm_configs,
+  vm_specs,
   vm_images,
   vms,
 );

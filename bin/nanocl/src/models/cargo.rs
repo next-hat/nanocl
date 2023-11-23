@@ -5,8 +5,8 @@ use clap::{Parser, Subcommand};
 use bollard_next::exec::CreateExecOptions;
 use bollard_next::container::MemoryStatsStats;
 use nanocld_client::stubs::cargo::{CargoStats, CargoSummary};
-use nanocld_client::stubs::cargo_config::{
-  CargoConfigUpdate, Config as ContainerConfig, CargoConfigPartial, HostConfig,
+use nanocld_client::stubs::cargo_spec::{
+  CargoSpecUpdate, Config as ContainerConfig, CargoSpecPartial, HostConfig,
 };
 
 use super::{cargo_image::CargoImageArg, DisplayFormat};
@@ -46,7 +46,7 @@ pub struct CargoCreateOpts {
 }
 
 /// Convert CargoCreateOpts to CargoConfigPartial
-impl From<CargoCreateOpts> for CargoConfigPartial {
+impl From<CargoCreateOpts> for CargoSpecPartial {
   fn from(val: CargoCreateOpts) -> Self {
     Self {
       name: val.name,
@@ -89,7 +89,7 @@ pub struct CargoRunOpts {
 }
 
 /// Convert CargoRunOpts to CargoConfigPartial
-impl From<CargoRunOpts> for CargoConfigPartial {
+impl From<CargoRunOpts> for CargoSpecPartial {
   fn from(val: CargoRunOpts) -> Self {
     Self {
       name: val.name,
@@ -177,9 +177,9 @@ pub struct CargoPatchOpts {
 }
 
 /// Convert CargoPatchOpts to CargoConfigUpdate
-impl From<CargoPatchOpts> for CargoConfigUpdate {
+impl From<CargoPatchOpts> for CargoSpecUpdate {
   fn from(val: CargoPatchOpts) -> Self {
-    CargoConfigUpdate {
+    CargoSpecUpdate {
       name: val.new_name,
       container: Some(ContainerConfig {
         image: val.image,

@@ -21,7 +21,7 @@ use nanocl_stubs::job::{
 };
 
 use crate::{version, repositories};
-use crate::models::{DaemonState, JobUpdateDbModel};
+use crate::models::{DaemonState, JobUpdateDb};
 
 use super::stream::transform_stream;
 
@@ -344,7 +344,7 @@ pub(crate) async fn start_by_name(
     .collect::<Result<Vec<_>, _>>()?;
   repositories::job::update_by_name(
     name,
-    &JobUpdateDbModel {
+    &JobUpdateDb {
       updated_at: Some(chrono::Utc::now().naive_utc()),
     },
     &state.pool,
