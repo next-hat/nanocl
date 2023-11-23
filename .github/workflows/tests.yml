@@ -48,7 +48,7 @@ jobs:
       - name: Setup
         run: |
           sudo sh -c "echo '\n127.0.0.1 nstore.nanocl.internal\n127.0.0.1 ndaemon.nanocl.internal' >> /etc/hosts"
-          docker pull cockroachdb/cockroach:v23.1.11
+          docker pull cockroachdb/cockroach:v23.1.12
           docker pull ghcr.io/nxthat/metrsd:0.3.2
           docker pull ghcr.io/nxthat/nanocl-get-started:latest
           docker buildx build --load --cache-from type=local,src=.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .

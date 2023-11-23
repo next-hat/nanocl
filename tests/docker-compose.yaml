@@ -11,7 +11,7 @@ networks:
 services:
   nstore:
     container_name: nstore.system.c
-    image: cockroachdb/cockroach:v23.1.11
+    image: cockroachdb/cockroach:v23.1.12
     entrypoint: /bin/sh
     tty: true
     ports:
