@@ -58,7 +58,7 @@ clap = { version = "4.4.8", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
 serde = { version = "1.0.192", features = ["derive"] }
 uuid = { version = "1.6", features = ["serde", "v4"] }
-ntex = { version = "0.7.11", features = ["openssl", "tokio"] }
+ntex = { version = "0.7.12", features = ["openssl", "tokio"] }
 diesel = { version = "2.1.2", features = [
   "postgres",
   "r2d2",
