@@ -4,7 +4,7 @@ use nanocld_client::NanocldClient;
 
 use crate::schema::nodes;
 
-/// ## NodeModel
+/// ## NodeDb
 ///
 /// This structure represent a node in the database.
 /// A node is a machine that is connected to nanocl network.

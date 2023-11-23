@@ -4,7 +4,7 @@ use crate::schema::resource_specs;
 
 use super::resource::ResourceDb;
 
-/// ## ResourceSpecModel
+/// ## ResourceSpecDb
 ///
 /// This structure represent the resource spec in the database.
 /// A resource spec represent the specification of a resource.
@@ -30,7 +30,7 @@ pub struct ResourceSpecDb {
   pub(crate) metadata: Option<serde_json::Value>,
 }
 
-/// Helper to convert a `ResourceSpecDbModel` to a `ResourceSpec`
+/// Helper to convert a `ResourceSpecDb` to a `ResourceSpec`
 impl From<ResourceSpecDb> for ResourceSpec {
   fn from(item: ResourceSpecDb) -> Self {
     ResourceSpec {

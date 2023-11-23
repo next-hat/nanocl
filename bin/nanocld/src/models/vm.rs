@@ -1,59 +1,60 @@
-use nanocl_stubs::{vm_spec, vm};
+use nanocl_stubs::vm::Vm;
+use nanocl_stubs::vm_spec::VmSpec;
 
 use crate::schema::vms;
 
 use super::namespace::NamespaceDb;
 
-/// ## VmDbModel
+/// ## VmDb
 ///
 /// This structure represent the vm in the database.
 /// A vm is a virtual machine that is running on the server.
 /// The vm is linked to a namespace.
-/// We use the `spec_key` to link to the vm config.
+/// We use the `spec_key` to link to the vm spec.
 /// The `key` is used to identify the vm and is generated as follow: `namespace_name-vm_name`.
 ///
 #[derive(Clone, Debug, Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = vms)]
 #[diesel(belongs_to(NamespaceDb, foreign_key = namespace_name))]
-pub struct VmDbModel {
+pub struct VmDb {
   /// The key of the vm
   pub(crate) key: String,
   /// The created at date
   pub(crate) created_at: chrono::NaiveDateTime,
   /// The name of the vm
   pub(crate) name: String,
-  /// The config key reference
+  /// The spec key reference
   pub(crate) spec_key: uuid::Uuid,
   /// The namespace name reference
   pub(crate) namespace_name: String,
 }
 
-impl VmDbModel {
-  pub fn into_vm(self, config: vm_spec::VmSpec) -> vm::Vm {
-    vm::Vm {
+impl VmDb {
+  pub fn into_vm(self, spec: VmSpec) -> Vm {
+    Vm {
       key: self.key,
       name: self.name,
-      spec_key: config.key,
+      spec_key: spec.key,
       namespace_name: self.namespace_name,
-      spec: config,
+      spec,
     }
   }
 }
 
-/// ## VmUpdateDbModel
+/// ## VmUpdateDb
 ///
 /// This structure is used to update a vm in the database.
 ///
 #[derive(Debug, Default, AsChangeset)]
 #[diesel(table_name = vms)]
-pub struct VmUpdateDbModel {
+pub struct VmUpdateDb {
   /// The key of the vm
   pub(crate) key: Option<String>,
   /// The namespace name reference
   pub(crate) namespace_name: Option<String>,
   /// The name of the vm
   pub(crate) name: Option<String>,
-  /// The config key reference
+  /// The spec key reference
   pub(crate) spec_key: Option<uuid::Uuid>,
 }

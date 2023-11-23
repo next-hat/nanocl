@@ -110,14 +110,14 @@ pub struct HttpMetricPartial {
   pub http_accept_language: Option<String>,
 }
 
-pub trait ToDbModel {
-  type DbModel;
-  fn to_db_model(&self, _node_name: &str) -> Self::DbModel;
+pub trait ToDb {
+  type Db;
+  fn to_db_model(&self, _node_name: &str) -> Self::Db;
 }
 
-impl ToDbModel for HttpMetricPartial {
-  type DbModel = HttpMetricDb;
-  fn to_db_model(&self, node_name: &str) -> Self::DbModel {
+impl ToDb for HttpMetricPartial {
+  type Db = HttpMetricDb;
+  fn to_db_model(&self, node_name: &str) -> Self::Db {
     HttpMetricDb {
       key: Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
@@ -270,11 +270,11 @@ pub struct StreamMetricDb {
   pub node_name: String,
 }
 
-impl ToDbModel for StreamMetricPartial {
-  type DbModel = StreamMetricDb;
+impl ToDb for StreamMetricPartial {
+  type Db = StreamMetricDb;
 
-  fn to_db_model(&self, node_name: &str) -> Self::DbModel {
-    Self::DbModel {
+  fn to_db_model(&self, node_name: &str) -> Self::Db {
+    Self::Db {
       key: Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       expire_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30),

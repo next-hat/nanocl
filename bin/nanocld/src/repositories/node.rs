@@ -12,12 +12,12 @@ use crate::models::{Pool, NodeDb};
 ///
 /// ## Arguments
 ///
-/// * [node](NodeDbModel) - Node item
+/// * [node](NodeDb) - Node item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [NodeDbModel](NodeDbModel)
+/// [IoResult](IoResult) containing a [NodeDb](NodeDb)
 ///
 pub(crate) async fn create(node: &NodeDb, pool: &Pool) -> IoResult<NodeDb> {
   use crate::schema::nodes;
@@ -37,7 +37,7 @@ pub(crate) async fn create(node: &NodeDb, pool: &Pool) -> IoResult<NodeDb> {
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [NodeDbModel](NodeDbModel)
+/// [IoResult](IoResult) containing a [NodeDb](NodeDb)
 ///
 pub(crate) async fn find_by_name(name: &str, pool: &Pool) -> IoResult<NodeDb> {
   use crate::schema::nodes;
@@ -47,16 +47,16 @@ pub(crate) async fn find_by_name(name: &str, pool: &Pool) -> IoResult<NodeDb> {
 
 /// ## Create if not exists
 ///
-/// Create a node if not exists in database from a `NodeDbModel`.
+/// Create a node if not exists in database from a `NodeDb`.
 ///
 /// ## Arguments
 ///
-/// * [node](NodeDbModel) - Node item
+/// * [node](NodeDb) - Node item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [NodeDbModel](NodeDbModel)
+/// [IoResult](IoResult) containing a [NodeDb](NodeDb)
 ///
 pub(crate) async fn create_if_not_exists(
   node: &NodeDb,
@@ -78,7 +78,7 @@ pub(crate) async fn create_if_not_exists(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [NodeDbModel](NodeDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [NodeDb](NodeDb)
 ///
 pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<NodeDb>> {
   use crate::schema::nodes;
@@ -105,7 +105,7 @@ pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<NodeDb>> {
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [NodeDbModel](NodeDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [NodeDb](NodeDb)
 ///
 pub(crate) async fn list_unless(
   name: &str,

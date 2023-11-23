@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::schema::namespaces;
 
-/// ## NamespaceModel
+/// ## NamespaceDb
 ///
 /// This structure represent the namespace in the database.
 /// A namespace is a group of cargo or virtual machine that share the same network.

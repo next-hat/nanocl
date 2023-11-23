@@ -7,30 +7,30 @@ use nanocl_stubs::vm::Vm;
 use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
 use crate::utils;
-use crate::models::{Pool, VmDbModel, VmUpdateDbModel, VmSpecDb, NamespaceDb};
+use crate::models::{Pool, VmDb, VmUpdateDb, VmSpecDb, NamespaceDb};
 
 /// ## Find by namespace
 ///
-/// Find a vm by a `NamespaceDbModel` in database and return a `Vec<VmDbModel>`
+/// Find a vm by a `NamespaceDb` in database and return a `Vec<VmDb>`
 ///
 /// ## Arguments
 ///
-/// * [nsp](NamespaceDbModel) - Namespace item
+/// * [nsp](NamespaceDb) - Namespace item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [VmDbModel](VmDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [VmDb](VmDb)
 ///
 pub(crate) async fn find_by_namespace(
   nsp: &NamespaceDb,
   pool: &Pool,
-) -> IoResult<Vec<VmDbModel>> {
+) -> IoResult<Vec<VmDb>> {
   let nsp = nsp.clone();
   let pool = pool.clone();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = VmDbModel::belonging_to(&nsp)
+    let items = VmDb::belonging_to(&nsp)
       .load(&mut conn)
       .map_err(|err| err.map_err_context(|| "Vm"))?;
     Ok::<_, IoError>(items)
@@ -69,14 +69,14 @@ pub(crate) async fn create(
   }
   let key = utils::key::gen_key(&nsp, &item.name);
   let config = super::vm_spec::create(&key, item, version, pool).await?;
-  let new_item = VmDbModel {
+  let new_item = VmDb {
     key,
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
     spec_key: config.key,
   };
-  let item: VmDbModel = super::generic::insert_with_res(new_item, pool).await?;
+  let item: VmDb = super::generic::insert_with_res(new_item, pool).await?;
   let vm = item.into_vm(config);
   Ok(vm)
 }
@@ -114,9 +114,9 @@ pub(crate) async fn delete_by_key(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [VmDbModel](VmDbModel)
+/// [IoResult](IoResult) containing a [VmDb](VmDb)
 ///
-pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
+pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDb> {
   use crate::schema::vms;
   let key = key.to_owned();
   super::generic::find_by_id::<vms::table, _, _>(key, pool).await
@@ -147,12 +147,12 @@ pub(crate) async fn update_by_key(
   let key = key.to_owned();
   let vmdb = find_by_key(&key, pool).await?;
   let config = super::vm_spec::create(&key, item, version, pool).await?;
-  let new_item = VmUpdateDbModel {
+  let new_item = VmUpdateDb {
     name: Some(item.name.clone()),
     spec_key: Some(config.key),
     ..Default::default()
   };
-  super::generic::update_by_id::<vms::table, VmUpdateDbModel, _>(
+  super::generic::update_by_id::<vms::table, VmUpdateDb, _>(
     key, new_item, pool,
   )
   .await?;
@@ -178,7 +178,7 @@ pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
   use crate::schema::vm_specs;
   let key = key.to_owned();
   let pool = pool.clone();
-  let item: (VmDbModel, VmSpecDb) = web::block(move || {
+  let item: (VmDb, VmSpecDb) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = vms::table
       .inner_join(vm_specs::table)

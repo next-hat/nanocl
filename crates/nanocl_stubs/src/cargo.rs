@@ -225,7 +225,7 @@ pub struct CargoDeleteQuery {
   pub force: Option<bool>,
 }
 
-/// To use this structure for database access it needs to be able to hold a NamespaceDbModel
+/// To use this structure for database access it needs to be able to hold a NamespaceDb
 ///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

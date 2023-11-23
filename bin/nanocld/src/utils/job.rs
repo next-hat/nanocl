@@ -127,16 +127,16 @@ async fn exec_crontab() -> IoResult<()> {
 /// ## Arguments
 ///
 /// * [item](Job) - The job
-/// * [repeat_policy](str) - The repeat policy
+/// * [schedule](str) - The schedule  policy
 /// * [state](DaemonState) - The daemon state
 ///
 async fn add_cron_rule(
   item: &Job,
-  repeat_policy: &str,
+  schedule: &str,
   state: &DaemonState,
 ) -> IoResult<()> {
   let cmd = format_cron_job_command(item, state);
-  let cron_rule = format!("{} {cmd}", repeat_policy);
+  let cron_rule = format!("{} {cmd}", schedule);
   log::debug!("Creating cron rule: {cron_rule}");
   fs::copy("/var/spool/cron/crontabs/root", "/tmp/crontab")
     .await
@@ -295,8 +295,8 @@ pub(crate) async fn create(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
-  if let Some(repeat_policy) = &job.schedule {
-    add_cron_rule(&job, repeat_policy, state).await?;
+  if let Some(schedule) = &job.schedule {
+    add_cron_rule(&job, schedule, state).await?;
   }
   Ok(job)
 }

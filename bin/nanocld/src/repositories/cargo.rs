@@ -11,16 +11,16 @@ use crate::models::{Pool, CargoDb, CargoUpdateDb, CargoSpecDb, NamespaceDb};
 
 /// ## Find by namespace
 ///
-/// Find a cargo by a `NamespaceDbModel` in database and return a `Vec<CargoDbModel>`.
+/// Find a cargo by a `NamespaceDb` in database and return a `Vec<CargoDb>`.
 ///
 /// ## Arguments
 ///
-/// * [nsp](NamespaceDbModel) - Namespace item
+/// * [nsp](NamespaceDb) - Namespace item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoDbModel](CargoDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoDb](CargoDb)
 ///
 pub(crate) async fn find_by_namespace(
   nsp: &NamespaceDb,
@@ -32,7 +32,7 @@ pub(crate) async fn find_by_namespace(
 
 /// ## List by query
 ///
-/// List a cargo by a `GenericCargoListQuery` in database and return a `Vec<CargoDbModel>`.
+/// List a cargo by a `GenericCargoListQuery` in database and return a `Vec<CargoDb>`.
 ///
 /// ## Arguments
 ///
@@ -41,7 +41,7 @@ pub(crate) async fn find_by_namespace(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoDbModel](CargoDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoDb](CargoDb)
 ///
 pub(crate) async fn list_by_query(
   query: &GenericCargoListQuery<NamespaceDb>,
@@ -149,7 +149,7 @@ pub(crate) async fn delete_by_key(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [CargoDbModel](CargoDbModel)
+/// [IoResult](IoResult) containing a [CargoDb](CargoDb)
 ///
 pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDb> {
   use crate::schema::cargoes;

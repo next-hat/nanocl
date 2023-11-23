@@ -16,7 +16,7 @@ use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
-use crate::models::{Pool, VmImageDbModel, DaemonState};
+use crate::models::{Pool, VmImageDb, DaemonState};
 
 /// ## Start by key
 ///
@@ -244,13 +244,13 @@ pub(crate) async fn list_by_namespace(
 /// ## Arguments
 ///
 /// * [vm](Vm) - The VM
-/// * [image](VmImageDbModel) - The VM image
+/// * [image](VmImageDb) - The VM image
 /// * [disable_keygen](bool) - Disable SSH key generation
 /// * [state](DaemonState) - The daemon state
 ///
 pub(crate) async fn create_instance(
   vm: &Vm,
-  image: &VmImageDbModel,
+  image: &VmImageDb,
   disable_keygen: bool,
   state: &DaemonState,
 ) -> HttpResult<()> {

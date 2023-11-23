@@ -19,7 +19,7 @@ use crate::models::{Pool, NamespaceDb};
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [NamespaceDbModel](NamespaceDbModel)
+/// [IoResult](IoResult) containing a [NamespaceDb](NamespaceDb)
 ///
 pub(crate) async fn create(
   item: &NamespacePartial,
@@ -43,7 +43,7 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [NamespaceDbModel](NamespaceDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [NamespaceDb](NamespaceDb)
 ///
 pub(crate) async fn list(
   query: &NamespaceListQuery,
@@ -106,7 +106,7 @@ pub(crate) async fn delete_by_name(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [NamespaceDbModel](NamespaceDbModel)
+/// [IoResult](IoResult) containing a [NamespaceDb](NamespaceDb)
 ///
 pub(crate) async fn find_by_name(
   name: &str,

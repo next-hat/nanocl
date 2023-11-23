@@ -12,12 +12,12 @@ use crate::models::{Pool, MetricDb, MetricInsertDb};
 ///
 /// ## Arguments
 ///
-/// * [item](MetricInsertDbModel) - Metric item
+/// * [item](MetricInsertDb) - Metric item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [MetricDbModel](MetricDbModel)
+/// [IoResult](IoResult) containing a [MetricDb](MetricDb)
 ///
 pub(crate) async fn create(
   item: &MetricInsertDb,
@@ -43,7 +43,7 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [MetricDbModel](MetricDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [MetricDb](MetricDb)
 ///
 pub(crate) async fn list_by_kind(
   kind: &str,

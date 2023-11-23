@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::schema::vm_images;
 
-/// ## VmImageDbModel
+/// ## VmImageDb
 ///
 /// This structure represent a virtual machine image in the database.
 /// A virtual machine image is a file that represent a virtual machine disk.
@@ -22,7 +22,7 @@ use crate::schema::vm_images;
 #[diesel(primary_key(name))]
 #[diesel(table_name = vm_images)]
 #[serde(rename_all = "PascalCase")]
-pub struct VmImageDbModel {
+pub struct VmImageDb {
   /// The name of the virtual machine image
   pub(crate) name: String,
   /// The created at date
@@ -41,13 +41,13 @@ pub struct VmImageDbModel {
   pub(crate) parent: Option<String>,
 }
 
-/// ## VmImageUpdateDbModel
+/// ## VmImageUpdateDb
 ///
 /// This structure is used to update a virtual machine image in the database.
 ///
 #[derive(Clone, Debug, AsChangeset)]
 #[diesel(table_name = vm_images)]
-pub struct VmImageUpdateDbModel {
+pub struct VmImageUpdateDb {
   /// The actual size of the virtual machine image
   pub(crate) size_actual: i64,
   /// The virtual size of the virtual machine image
@@ -69,9 +69,9 @@ pub struct QemuImgInfo {
   pub(crate) actual_size: i64,
 }
 
-/// Helper to convert a `VmImageDbModel` to a `VmImage`
-impl From<VmImageDbModel> for VmImage {
-  fn from(db_model: VmImageDbModel) -> Self {
+/// Helper to convert a `VmImageDb` to a `VmImage`
+impl From<VmImageDb> for VmImage {
+  fn from(db_model: VmImageDb) -> Self {
     Self {
       name: db_model.name,
       created_at: db_model.created_at,

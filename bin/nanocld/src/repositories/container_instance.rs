@@ -21,7 +21,7 @@ use crate::models::{
 ///
 /// ## Return
 ///
-/// [IoResult][IoResult] containing a [ContainerInstanceDbModel](ContainerInstanceDbModel)
+/// [IoResult][IoResult] containing a [ContainerInstanceDb](ContainerInstanceDb)
 ///
 pub(crate) async fn create(
   item: &ContainerInstancePartial,
@@ -38,12 +38,12 @@ pub(crate) async fn create(
 /// ## Arguments
 ///
 /// * [id](str) - The id of the container instance to update
-/// * [item](ContainerInstanceUpdateDbModel) - The item to update
+/// * [item](ContainerInstanceUpdateDb) - The item to update
 /// * [pool](Pool) - The database pool
 ///
 /// ## Return
 ///
-/// [IoResult][IoResult] containing a [ContainerInstanceUpdateDbModel](ContainerInstanceDbModel)
+/// [IoResult][IoResult] containing a [ContainerInstanceUpdateDb](ContainerInstanceDb)
 ///
 pub(crate) async fn update(
   id: &str,

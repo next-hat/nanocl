@@ -13,9 +13,7 @@ use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 
 use crate::{utils, repositories};
-use crate::models::{
-  Pool, VmImageDbModel, QemuImgInfo, VmImageUpdateDbModel, DaemonState,
-};
+use crate::models::{Pool, VmImageDb, QemuImgInfo, VmImageUpdateDb, DaemonState};
 
 /// ## Delete by name
 ///
@@ -94,19 +92,19 @@ pub(crate) async fn get_info(path: &str) -> HttpResult<QemuImgInfo> {
 ///
 /// * [name](str) - The name of the snapshot
 /// * [size](u64) - The size of the snapshot
-/// * [image](VmImageDbModel) - The base vm image
+/// * [image](VmImageDb) - The base vm image
 /// * [state](DaemonState) - The daemon state
 ///
 /// ## Return
 ///
-/// [HttpResult](HttpResult) containing a [VmImageDbModel](VmImageDbModel)
+/// [HttpResult](HttpResult) containing a [VmImageDb](VmImageDb)
 ///
 pub(crate) async fn create_snap(
   name: &str,
   size: u64,
-  image: &VmImageDbModel,
+  image: &VmImageDb,
   state: &DaemonState,
-) -> HttpResult<VmImageDbModel> {
+) -> HttpResult<VmImageDb> {
   if repositories::vm_image::find_by_name(name, &state.pool)
     .await
     .is_ok()
@@ -154,7 +152,7 @@ pub(crate) async fn create_snap(
     msg: format!("Failed to resize snapshot of {imagepath}: {output:#?}"),
   })?;
   let image_info = get_info(&snapshotpath).await?;
-  let snap_image = VmImageDbModel {
+  let snap_image = VmImageDb {
     name: name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: "Snapshot".into(),
@@ -179,7 +177,7 @@ pub(crate) async fn create_snap(
 /// ## Arguments
 ///
 /// * [name](str) - The name of the clone
-/// * [image](VmImageDbModel) - The snapshot vm image
+/// * [image](VmImageDb) - The snapshot vm image
 /// * [state](DaemonState) - The daemon state
 ///
 /// ## Return
@@ -188,7 +186,7 @@ pub(crate) async fn create_snap(
 ///
 pub(crate) async fn clone(
   name: &str,
-  image: &VmImageDbModel,
+  image: &VmImageDb,
   state: &DaemonState,
 ) -> HttpResult<Receiver<HttpResult<Bytes>>> {
   if image.kind != "Snapshot" {
@@ -296,7 +294,7 @@ pub(crate) async fn clone(
       }
       Ok(image_info) => image_info,
     };
-    let new_base_image = VmImageDbModel {
+    let new_base_image = VmImageDb {
       name: name.to_owned(),
       created_at: chrono::Utc::now().naive_utc(),
       kind: "Base".into(),
@@ -328,19 +326,19 @@ pub(crate) async fn clone(
 ///
 /// ## Arguments
 ///
-/// * [image](VmImageDbModel) - The image to resize
+/// * [image](VmImageDb) - The image to resize
 /// * [payload](VmImageResizePayload) - The payload containing the new size
 /// * [pool](Pool) - The database pool
 ///
 /// ## Return
 ///
-/// [HttpResult](HttpResult) containing a [VmImageDbModel](VmImageDbModel)
+/// [HttpResult](HttpResult) containing a [VmImageDb](VmImageDb)
 ///
 pub(crate) async fn resize(
-  image: &VmImageDbModel,
+  image: &VmImageDb,
   payload: &VmImageResizePayload,
   pool: &Pool,
-) -> HttpResult<VmImageDbModel> {
+) -> HttpResult<VmImageDb> {
   let imagepath = image.path.clone();
   let size = format!("{}G", payload.size);
   let mut args = vec!["resize"];
@@ -368,7 +366,7 @@ pub(crate) async fn resize(
   let image_info = get_info(&imagepath).await?;
   let res = repositories::vm_image::update_by_name(
     &image.name,
-    &VmImageUpdateDbModel {
+    &VmImageUpdateDb {
       size_actual: image_info.actual_size,
       size_virtual: image_info.virtual_size,
     },
@@ -390,13 +388,13 @@ pub(crate) async fn resize(
 ///
 /// ## Return
 ///
-/// [HttpResult](HttpResult) containing a [VmImageDbModel](VmImageDbModel)
+/// [HttpResult](HttpResult) containing a [VmImageDb](VmImageDb)
 ///
 pub(crate) async fn resize_by_name(
   name: &str,
   payload: &VmImageResizePayload,
   pool: &Pool,
-) -> HttpResult<VmImageDbModel> {
+) -> HttpResult<VmImageDb> {
   let image = repositories::vm_image::find_by_name(name, pool).await?;
   resize(&image, payload, pool).await
 }
@@ -413,13 +411,13 @@ pub(crate) async fn resize_by_name(
 ///
 /// ## Return
 ///
-/// [HttpResult](HttpResult) containing a [VmImageDbModel](VmImageDbModel)
+/// [HttpResult](HttpResult) containing a [VmImageDb](VmImageDb)
 ///
 pub(crate) async fn create(
   name: &str,
   filepath: &str,
   pool: &Pool,
-) -> HttpResult<VmImageDbModel> {
+) -> HttpResult<VmImageDb> {
   // Get image info
   let image_info = match utils::vm_image::get_info(filepath).await {
     Err(err) => {
@@ -429,7 +427,7 @@ pub(crate) async fn create(
     }
     Ok(image_info) => image_info,
   };
-  let vm_image = VmImageDbModel {
+  let vm_image = VmImageDb {
     name: name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: "Base".into(),

@@ -20,7 +20,7 @@ use crate::models::{Pool, SecretDb, SecretUpdateDb};
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [SecretDbModel](SecretDbModel)
+/// [IoResult](IoResult) containing a [SecretDb](SecretDb)
 ///
 pub(crate) async fn create(
   item: &SecretPartial,
@@ -40,7 +40,7 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [SecretDbModel](SecretDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [SecretDb](SecretDb)
 ///
 pub(crate) async fn list(
   query: Option<SecretQuery>,
@@ -120,7 +120,7 @@ pub(crate) async fn delete_by_key(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [SecretDbModel](SecretDbModel)
+/// [IoResult](IoResult) containing a [SecretDb](SecretDb)
 ///
 pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<SecretDb> {
   use crate::schema::secrets;
@@ -140,7 +140,7 @@ pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<SecretDb> {
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [SecretDbModel](SecretDbModel)
+/// [IoResult](IoResult) containing a [SecretDb](SecretDb)
 ///
 pub(crate) async fn update_by_key(
   key: &str,

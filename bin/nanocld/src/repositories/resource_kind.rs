@@ -21,7 +21,7 @@ use crate::models::{
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [ResourceKindVersionDbModel](ResourceKindVersionDbModel)
+/// [IoResult](IoResult) containing a [ResourceKindVersionDb](ResourceKindVersionDb)
 ///
 pub(crate) async fn create_version(
   item: &ResourceKindPartial,
@@ -49,7 +49,7 @@ pub(crate) async fn create_version(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [ResourceKindVersionDbModel](ResourceKindVersionDbModel)
+/// [IoResult](IoResult) containing a [ResourceKindVersionDb](ResourceKindVersionDb)
 ///
 pub(crate) async fn get_version(
   name: &str,
@@ -86,7 +86,7 @@ pub(crate) async fn get_version(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [ResourceKindDbModel](ResourceKindDbModel)
+/// [IoResult](IoResult) containing a [ResourceKindDb](ResourceKindDb)
 ///
 pub(crate) async fn find_by_name(
   name: &str,
@@ -108,7 +108,7 @@ pub(crate) async fn find_by_name(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [ResourceKindDbModel](ResourceKindDbModel)
+/// [IoResult](IoResult) containing a [ResourceKindDb](ResourceKindDb)
 ///
 pub(crate) async fn create(
   item: &ResourceKindPartial,

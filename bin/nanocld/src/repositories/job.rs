@@ -128,7 +128,7 @@ pub(crate) async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
 /// ## Arguments
 ///
 /// * [name](str) The name of the job to update
-/// * [data](JobUpdateDbModel) The data to update
+/// * [data](JobUpdateDb) The data to update
 /// * [pool](Pool) The database pool
 ///
 /// ## Return

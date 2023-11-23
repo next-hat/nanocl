@@ -29,8 +29,8 @@ pub use cargo_spec::*;
 pub mod vm;
 pub use vm::*;
 
-mod vm_config;
-pub use vm_config::*;
+mod vm_spec;
+pub use vm_spec::*;
 
 pub mod vm_image;
 pub use vm_image::*;

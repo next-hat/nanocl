@@ -14,12 +14,12 @@ use crate::models::{Pool, HttpMetricDb};
 ///
 /// ## Arguments
 ///
-/// * [item](HttpMetricDbModel) - Http metric item
+/// * [item](HttpMetricDb) - Http metric item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [HttpMetricDbModel](HttpMetricDbModel)
+/// [IoResult](IoResult) containing a [HttpMetricDb](HttpMetricDb)
 ///
 pub(crate) async fn create(
   item: &HttpMetricDb,
@@ -40,7 +40,7 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [HttpMetricDbModel](HttpMetricDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [HttpMetricDb](HttpMetricDb)
 ///
 pub(crate) async fn list(
   filter: &HttpMetricListQuery,
