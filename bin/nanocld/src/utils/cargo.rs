@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use ntex::rt;
 use ntex::util::Bytes;
@@ -512,7 +513,7 @@ pub(crate) async fn start_by_key(
     .into_iter()
     .collect::<Result<Vec<_>, HttpError>>()?;
   if auto_remove {
-    let pool = state.pool.clone();
+    let pool = Arc::clone(&state.pool);
     rt::spawn(async move {
       let _ = FuturesUnordered::from_iter(autoremove_futs)
         .collect::<Vec<_>>()

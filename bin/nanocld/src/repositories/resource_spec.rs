@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
+
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::resource::ResourceSpec;
 
@@ -74,7 +77,7 @@ pub(crate) async fn list_by_resource_key(
 ) -> IoResult<Vec<ResourceSpec>> {
   use crate::schema::resource_specs;
   let key = key.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let models = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = resource_specs::dsl::resource_specs
@@ -111,7 +114,7 @@ pub(crate) async fn find_by_key(
 ) -> IoResult<ResourceSpec> {
   use crate::schema::resource_specs;
   let key = *key;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let model = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = resource_specs::dsl::resource_specs

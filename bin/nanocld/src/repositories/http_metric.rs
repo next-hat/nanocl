@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -48,7 +50,7 @@ pub(crate) async fn list(
 ) -> IoResult<Vec<HttpMetricDb>> {
   use crate::schema::http_metrics;
   let filter = filter.clone();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let mut query = http_metrics::dsl::http_metrics.into_boxed().order((
@@ -89,7 +91,7 @@ pub(crate) async fn count(
 ) -> IoResult<GenericCount> {
   use crate::schema::http_metrics;
   let filter = filter.clone();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let mut query = http_metrics::dsl::http_metrics.into_boxed();

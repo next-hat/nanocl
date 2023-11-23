@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -57,7 +59,7 @@ pub(crate) async fn get_version(
   pool: &Pool,
 ) -> IoResult<ResourceKindVersionDb> {
   use crate::schema::resource_kind_versions::dsl;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let name = name.to_owned();
   let version = version.to_owned();
   let item = web::block(move || {

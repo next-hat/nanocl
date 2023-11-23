@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -27,7 +29,7 @@ pub(crate) async fn find_by_namespace(
   pool: &Pool,
 ) -> IoResult<Vec<VmDb>> {
   let nsp = nsp.clone();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = VmDb::belonging_to(&nsp)
@@ -177,7 +179,7 @@ pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
   use crate::schema::vms;
   use crate::schema::vm_specs;
   let key = key.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let item: (VmDb, VmSpecDb) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = vms::table

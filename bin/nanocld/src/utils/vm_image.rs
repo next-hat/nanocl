@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::process::Stdio;
 
 use ntex::rt;
@@ -208,7 +209,7 @@ pub(crate) async fn clone(
   let name = name.to_owned();
   let image = image.clone();
   let daemon_conf = state.config.clone();
-  let pool = state.pool.clone();
+  let pool = Arc::clone(&state.pool);
   rt::spawn(async move {
     let imagepath = image.path.clone();
     let newbasepath =

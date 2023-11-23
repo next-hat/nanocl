@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::{
   associations, pg, query_dsl, Table, helper_types, query_builder, AsChangeset,
@@ -31,7 +33,7 @@ where
   Pk: Send + 'static,
   R: Send + 'static,
 {
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let item = web::block(move || {
     let query = <T as associations::HasTable>::table().find(pk);
     let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -70,7 +72,7 @@ where
   >: query_builder::QueryFragment<pg::Pg> + query_builder::QueryId,
   P: Send + 'static,
 {
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item =
@@ -109,7 +111,7 @@ where
     <helper_types::Find<T, Pk> as query_builder::IntoUpdateTarget>::WhereClause,
   >: query_builder::QueryFragment<pg::Pg> + query_builder::QueryId,
 {
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = diesel::delete(<T as associations::HasTable>::table().find(pk))
@@ -155,7 +157,7 @@ where
   helper_types::Find<T, Pk>: query_dsl::methods::LimitDsl,
   Pk: Send + 'static,
 {
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::update(<T as associations::HasTable>::table().find(pk))
@@ -203,7 +205,7 @@ where
   Pk: Send + 'static,
   R: Send + 'static,
 {
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::update(<T as associations::HasTable>::table().find(pk))
@@ -241,7 +243,7 @@ where
   R: Send + 'static,
   V: Send + 'static,
 {
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let item = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::insert_into(<T as associations::HasTable>::table())

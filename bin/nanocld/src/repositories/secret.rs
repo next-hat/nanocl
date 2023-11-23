@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -47,7 +49,7 @@ pub(crate) async fn list(
   pool: &Pool,
 ) -> IoResult<Vec<SecretDb>> {
   use crate::schema::secrets;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let req = match query {

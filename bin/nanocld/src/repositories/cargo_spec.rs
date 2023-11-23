@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
+
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
 
@@ -120,7 +123,7 @@ pub(crate) async fn list_by_cargo_key(
 ) -> IoResult<Vec<CargoSpec>> {
   use crate::schema::cargo_specs;
   let key = key.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let dbmodels = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let specs = cargo_specs::dsl::cargo_specs

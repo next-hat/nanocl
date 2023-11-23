@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -130,7 +132,7 @@ pub(crate) async fn list_for_kind(
   pool: &Pool,
 ) -> IoResult<Vec<ContainerInstance>> {
   use crate::schema::container_instances;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let kind = kind.to_owned();
   let kind_id = kind_id.to_owned();
   let items = web::block(move || {
@@ -164,7 +166,7 @@ pub(crate) async fn list_for_kind(
 ///
 pub(crate) async fn list_all(pool: &Pool) -> IoResult<Vec<ContainerInstance>> {
   use crate::schema::container_instances;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = container_instances::table

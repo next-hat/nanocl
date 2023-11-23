@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -82,7 +84,7 @@ pub(crate) async fn create_if_not_exists(
 ///
 pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<NodeDb>> {
   use crate::schema::nodes;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = nodes::dsl::nodes
@@ -113,7 +115,7 @@ pub(crate) async fn list_unless(
 ) -> IoResult<Vec<NodeDb>> {
   use crate::schema::nodes;
   let name = name.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = nodes::dsl::nodes

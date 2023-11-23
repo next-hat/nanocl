@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -94,7 +96,7 @@ pub(crate) async fn delete_by_vm_key(
 ) -> IoResult<GenericDelete> {
   use crate::schema::vm_specs;
   let key = key.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let res = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = diesel::delete(vm_specs::dsl::vm_specs)
@@ -126,7 +128,7 @@ pub(crate) async fn list_by_vm_key(
 ) -> IoResult<Vec<VmSpec>> {
   use crate::schema::vm_specs;
   let key = key.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let dbmodels = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let specs = vm_specs::dsl::vm_specs

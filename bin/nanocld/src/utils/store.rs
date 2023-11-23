@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 use std::net::ToSocketAddrs;
 
@@ -31,14 +32,15 @@ pub(crate) async fn create_pool(
   let state_dir = daemon_conf.state_dir.clone();
   let options = format!("/defaultdb?sslmode=verify-full&sslcert={state_dir}/store/certs/client.root.crt&sslkey={state_dir}/store/certs/client.root.key&sslrootcert={state_dir}/store/certs/ca.crt");
   let db_url = format!("postgresql://root:root@{host}{options}");
-  web::block(move || {
+  let pool = web::block(move || {
     let manager = ConnectionManager::<PgConnection>::new(db_url);
     r2d2::Pool::builder().build(manager)
   })
   .await
   .map_err(|err| {
     IoError::interupted("CockroachDB", &format!("Unable to create pool {err}"))
-  })
+  })?;
+  Ok(Arc::new(pool))
 }
 
 /// ## Get pool conn

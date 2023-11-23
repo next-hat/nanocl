@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
+
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::cargo::{Cargo, GenericCargoListQuery};
 use nanocl_stubs::cargo_spec::CargoSpecPartial;
@@ -49,7 +52,7 @@ pub(crate) async fn list_by_query(
 ) -> IoResult<Vec<CargoDb>> {
   use crate::schema::cargoes;
   let query = query.clone();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let mut sql = CargoDb::belonging_to(&query.namespace).into_boxed();
@@ -214,7 +217,7 @@ pub(crate) async fn count_by_namespace(
 ) -> IoResult<i64> {
   use crate::schema::cargoes;
   let nsp = nsp.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let count = cargoes::table
@@ -245,7 +248,7 @@ pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
   use crate::schema::cargoes;
   use crate::schema::cargo_specs;
   let key = key.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let item: (CargoDb, CargoSpecDb) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let item = cargoes::table

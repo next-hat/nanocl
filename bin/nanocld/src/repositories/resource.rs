@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -88,7 +90,7 @@ pub(crate) async fn find(
 ) -> IoResult<Vec<Resource>> {
   use crate::schema::resources;
   use crate::schema::resource_specs;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let res: Vec<(ResourceDb, ResourceSpecDb)> = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let req = match query {
@@ -159,7 +161,7 @@ pub(crate) async fn inspect_by_key(
   use crate::schema::resources;
   use crate::schema::resource_specs;
   let key = key.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let res: (ResourceDb, ResourceSpecDb) = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = resources::table

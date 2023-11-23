@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -69,7 +71,7 @@ pub(crate) async fn find_by_parent(
 ) -> IoResult<Vec<VmImageDb>> {
   use crate::schema::vm_images;
   let parent = parent.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = vm_images::dsl::vm_images
@@ -118,7 +120,7 @@ pub(crate) async fn delete_by_name(
 ///
 pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<VmImageDb>> {
   use crate::schema::vm_images;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items = vm_images::dsl::vm_images

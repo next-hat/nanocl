@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -78,7 +80,7 @@ pub(crate) async fn delete_by_name(
 ///
 pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
   use crate::schema::jobs;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let items: Vec<JobDb> = jobs::dsl::jobs

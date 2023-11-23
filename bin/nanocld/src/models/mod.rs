@@ -1,6 +1,7 @@
+use std::sync::Arc;
+
 use diesel::PgConnection;
-use r2d2::PooledConnection;
-use diesel::r2d2::ConnectionManager;
+use diesel::r2d2::{PooledConnection, ConnectionManager};
 
 mod ws;
 pub use ws::*;
@@ -53,5 +54,5 @@ pub use job::*;
 mod container_instance;
 pub use container_instance::*;
 
-pub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
+pub type Pool = Arc<r2d2::Pool<ConnectionManager<PgConnection>>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;

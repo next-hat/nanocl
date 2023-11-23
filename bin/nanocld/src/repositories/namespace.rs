@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -51,7 +53,7 @@ pub(crate) async fn list(
 ) -> IoResult<Vec<NamespaceDb>> {
   use crate::schema::namespaces::dsl;
   let query = query.clone();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let mut sql = dsl::namespaces.into_boxed();
@@ -133,7 +135,7 @@ pub(crate) async fn find_by_name(
 pub(crate) async fn exist_by_name(name: &str, pool: &Pool) -> IoResult<bool> {
   use crate::schema::namespaces;
   let name = name.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let exist = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let exist = namespaces::dsl::namespaces
