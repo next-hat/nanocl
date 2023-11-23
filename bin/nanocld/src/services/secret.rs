@@ -5,7 +5,7 @@ use ntex::web;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::proxy::ProxySslConfig;
+use nanocl_stubs::proxy::ProxySsl;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate, SecretQuery};
 
 use crate::{utils, repositories};
@@ -69,7 +69,7 @@ pub(crate) async fn create_secret(
 ) -> HttpResult<web::HttpResponse> {
   match payload.kind.as_str() {
     "Tls" => {
-      serde_json::from_value::<ProxySslConfig>(payload.data.clone()).map_err(
+      serde_json::from_value::<ProxySsl>(payload.data.clone()).map_err(
         |e| {
           HttpError::bad_request(format!(
             "Invalid data for secret of kind Tls: {e}",

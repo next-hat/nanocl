@@ -5,7 +5,7 @@ use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
-use nanocl_stubs::vm_config::{VmSpecPartial, VmSpecUpdate};
+use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 
 use crate::NanocldClient;
 

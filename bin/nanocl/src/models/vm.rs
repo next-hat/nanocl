@@ -3,9 +3,7 @@ use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::vm::VmSummary;
-use nanocld_client::stubs::vm_config::{
-  VmSpecPartial, VmDisk, VmHost, VmSpecUpdate,
-};
+use nanocld_client::stubs::vm_spec::{VmSpecPartial, VmDisk, VmHost, VmSpecUpdate};
 
 use super::{VmImageArg, DisplayFormat};
 
@@ -302,8 +300,8 @@ impl From<VmSummary> for VmRow {
     Self {
       name: vm.name,
       namespace: vm.namespace_name,
-      disk: vm.config.disk.image,
-      version: vm.config.version,
+      disk: vm.spec.disk.image,
+      version: vm.spec.version,
       instances: format!("{}/{}", vm.running_instances, vm.instances),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

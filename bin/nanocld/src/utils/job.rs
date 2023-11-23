@@ -382,7 +382,7 @@ pub(crate) async fn list(state: &DaemonState) -> HttpResult<Vec<JobSummary>> {
           name: job.name.clone(),
           created_at: job.created_at,
           updated_at: job.updated_at,
-          config: job.clone(),
+          spec: job.clone(),
           instance_total,
           instance_success,
           instance_running,

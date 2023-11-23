@@ -26,5 +26,5 @@ CREATE TABLE IF NOT EXISTS "resources" (
   "key" VARCHAR NOT NULL UNIQUE PRIMARY KEY,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "kind" VARCHAR NOT NULL,
-  "config_key" UUID NOT NULL REFERENCES resource_specs("key")
+  "spec_key" UUID NOT NULL REFERENCES resource_specs("key")
 );

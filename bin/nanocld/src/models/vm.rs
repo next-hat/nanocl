@@ -1,4 +1,4 @@
-use nanocl_stubs::{vm_config, vm};
+use nanocl_stubs::{vm_spec, vm};
 
 use crate::schema::vms;
 
@@ -9,7 +9,7 @@ use super::namespace::NamespaceDb;
 /// This structure represent the vm in the database.
 /// A vm is a virtual machine that is running on the server.
 /// The vm is linked to a namespace.
-/// We use the `config_key` to link to the vm config.
+/// We use the `spec_key` to link to the vm config.
 /// The `key` is used to identify the vm and is generated as follow: `namespace_name-vm_name`.
 ///
 #[derive(Clone, Debug, Queryable, Identifiable, Insertable, Associations)]
@@ -24,19 +24,19 @@ pub struct VmDbModel {
   /// The name of the vm
   pub(crate) name: String,
   /// The config key reference
-  pub(crate) config_key: uuid::Uuid,
+  pub(crate) spec_key: uuid::Uuid,
   /// The namespace name reference
   pub(crate) namespace_name: String,
 }
 
 impl VmDbModel {
-  pub fn into_vm(self, config: vm_config::VmSpec) -> vm::Vm {
+  pub fn into_vm(self, config: vm_spec::VmSpec) -> vm::Vm {
     vm::Vm {
       key: self.key,
       name: self.name,
-      config_key: config.key,
+      spec_key: config.key,
       namespace_name: self.namespace_name,
-      config,
+      spec: config,
     }
   }
 }
@@ -55,5 +55,5 @@ pub struct VmUpdateDbModel {
   /// The name of the vm
   pub(crate) name: Option<String>,
   /// The config key reference
-  pub(crate) config_key: Option<uuid::Uuid>,
+  pub(crate) spec_key: Option<uuid::Uuid>,
 }

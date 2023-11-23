@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::vm::Vm;
-use nanocl_stubs::vm_config::{VmSpec, VmSpecPartial};
+use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
 use crate::utils;
 use crate::models::{Pool, VmDbModel, VmUpdateDbModel, VmSpecDb, NamespaceDb};
@@ -42,12 +42,12 @@ pub(crate) async fn find_by_namespace(
 /// ## Create
 ///
 /// Create a vm item in database for given namespace
-/// from a `VmConfigPartial` and return a `Vm`.
+/// from a `VmSpecPartial` and return a `Vm`.
 ///
 /// ## Arguments
 ///
 /// * [nsp](str) - Namespace name
-/// * [item](VmConfigPartial) - Vm item
+/// * [item](VmSpecPartial) - Vm item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
@@ -63,18 +63,18 @@ pub(crate) async fn create(
   let nsp = nsp.to_owned();
   if item.name.contains('.') {
     return Err(IoError::invalid_data(
-      "VmConfigPartial",
+      "VmSpecPartial",
       "Name cannot contain a dot.",
     ));
   }
   let key = utils::key::gen_key(&nsp, &item.name);
-  let config = super::vm_config::create(&key, item, version, pool).await?;
+  let config = super::vm_spec::create(&key, item, version, pool).await?;
   let new_item = VmDbModel {
     key,
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
-    config_key: config.key,
+    spec_key: config.key,
   };
   let item: VmDbModel = super::generic::insert_with_res(new_item, pool).await?;
   let vm = item.into_vm(config);
@@ -129,7 +129,7 @@ pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDbModel> {
 /// ## Arguments
 ///
 /// * [key](str) - Vm key
-/// * [item](VmConfigPartial) - Vm config
+/// * [item](VmSpecPartial) - Vm config
 /// * [version](str) - Vm version
 /// * [pool](Pool) - Database connection pool
 ///
@@ -146,10 +146,10 @@ pub(crate) async fn update_by_key(
   use crate::schema::vms;
   let key = key.to_owned();
   let vmdb = find_by_key(&key, pool).await?;
-  let config = super::vm_config::create(&key, item, version, pool).await?;
+  let config = super::vm_spec::create(&key, item, version, pool).await?;
   let new_item = VmUpdateDbModel {
     name: Some(item.name.clone()),
-    config_key: Some(config.key),
+    spec_key: Some(config.key),
     ..Default::default()
   };
   super::generic::update_by_id::<vms::table, VmUpdateDbModel, _>(
@@ -189,7 +189,7 @@ pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
   })
   .await?;
   let config = serde_json::from_value::<VmSpecPartial>(item.1.data)
-    .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
+    .map_err(|err| err.map_err_context(|| "VmSpecPartial"))?;
   let config = VmSpec {
     key: item.1.key,
     created_at: item.0.created_at,

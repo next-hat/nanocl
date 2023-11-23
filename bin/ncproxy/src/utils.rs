@@ -7,7 +7,7 @@ use nanocld_client::NanocldClient;
 use nanocld_client::stubs::vm::VmInspect;
 use nanocld_client::stubs::cargo::{CargoInspect, CreateExecOptions};
 use nanocld_client::stubs::proxy::ProxySsl;
-use nanocld_client::stubs::proxy::ProxySslConfig;
+use nanocld_client::stubs::proxy::ProxySslSpec;
 use nanocld_client::stubs::resource::{ResourceQuery, ResourcePartial};
 use nanocld_client::stubs::proxy::{
   ProxyRule, StreamTarget, ProxyStreamProtocol, ProxyRuleHttp, UpstreamTarget,
@@ -354,15 +354,15 @@ async fn gen_locations(
 async fn get_ssl_config(
   ssl: &ProxySsl,
   client: &NanocldClient,
-) -> IoResult<ProxySslConfig> {
+) -> IoResult<ProxySslSpec> {
   match ssl {
     ProxySsl::Config(ssl_config) => Ok(ssl_config.clone()),
     ProxySsl::Secret(secret) => {
       let secret = client.inspect_secret(secret).await?;
-      let mut ssl_config =
-        serde_json::from_value::<ProxySslConfig>(secret.data).map_err(
-          |err| err.map_err_context(|| "Unable to deserialize ProxySslConfig"),
-        )?;
+      let mut ssl_config = serde_json::from_value::<ProxySslSpec>(secret.data)
+        .map_err(|err| {
+          err.map_err_context(|| "Unable to deserialize ProxySslSpec")
+        })?;
       let cert_path = format!("/opt/secrets/{}.cert", secret.key);
       tokio::fs::write(&cert_path, ssl_config.certificate.clone()).await?;
       let key_path = format!("/opt/secrets/{}.key", secret.key);

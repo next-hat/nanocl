@@ -3,7 +3,7 @@ use bollard_next::service::ContainerSummary;
 use serde::{Serialize, Deserialize};
 
 use crate::{
-  vm_config::{VmSpec, VmSpecPartial},
+  vm_spec::{VmSpec, VmSpecPartial},
   system::{EventActor, ToEvent, EventAction, Event, EventKind},
 };
 
@@ -21,14 +21,14 @@ pub struct Vm {
   /// Name of the vm
   pub name: String,
   /// Unique identifier of the vm config
-  pub config_key: uuid::Uuid,
-  /// Configuration of the vm
-  pub config: VmSpec,
+  pub spec_key: uuid::Uuid,
+  /// Specification of the vm
+  pub spec: VmSpec,
 }
 
 impl From<Vm> for VmSpecPartial {
   fn from(vm: Vm) -> Self {
-    vm.config.into()
+    vm.spec.into()
   }
 }
 
@@ -40,9 +40,9 @@ impl From<Vm> for EventActor {
       attributes: Some(serde_json::json!({
         "Name": vm.name,
         "Namespace": vm.namespace_name,
-        "Version": vm.config.version,
+        "Version": vm.spec.version,
         "Namespace": vm.namespace_name,
-        "Metadata": vm.config.metadata,
+        "Metadata": vm.spec.metadata,
       })),
     }
   }
@@ -73,12 +73,12 @@ pub struct VmSummary {
   pub updated_at: chrono::NaiveDateTime,
   /// Name of the vm
   pub name: String,
-  /// Unique identifier of the vm config
-  pub config_key: uuid::Uuid,
+  /// Unique identifier of the spec
+  pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Configuration of the vm
-  pub config: VmSpec,
+  /// Specification of the vm
+  pub spec: VmSpec,
   /// Number of instances
   pub instances: usize,
   /// Number of running instances
@@ -98,12 +98,12 @@ pub struct VmInspect {
   pub key: String,
   /// Name of the cargo
   pub name: String,
-  /// Unique identifier of the cargo config
-  pub config_key: uuid::Uuid,
+  /// Unique identifier of the spec
+  pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Configuration of the cargo
-  pub config: VmSpec,
+  /// Specification of the cargo
+  pub spec: VmSpec,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances

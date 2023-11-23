@@ -60,8 +60,8 @@ pub struct JobSummary {
   pub created_at: chrono::NaiveDateTime,
   /// Last update of the job
   pub updated_at: chrono::NaiveDateTime,
-  /// Configuration of the job
-  pub config: Job,
+  /// Specification of the job
+  pub spec: Job,
   /// Number of instances
   pub instance_total: usize,
   /// Number of instance that succeeded

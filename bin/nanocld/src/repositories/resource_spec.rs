@@ -14,12 +14,12 @@ use crate::models::{Pool, ResourceSpecDb};
 ///
 /// ## Arguments
 ///
-/// * [item](ResourceConfigDbModel) - Resource config item
+/// * [item](ResourceSpecDb) - Resource config item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [ResourceConfigDbModel](ResourceConfigDbModel)
+/// [IoResult](IoResult) containing a [ResourceSpecDb](ResourceSpecDb)
 ///
 pub(crate) async fn create(
   item: &ResourceSpecDb,
@@ -66,7 +66,7 @@ pub(crate) async fn delete_by_resource_key(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [ResourceConfig](ResourceConfig)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [ResourceSpec](ResourceSpec)
 ///
 pub(crate) async fn list_by_resource_key(
   key: &str,
@@ -81,7 +81,7 @@ pub(crate) async fn list_by_resource_key(
       .order(resource_specs::dsl::created_at.desc())
       .filter(resource_specs::dsl::resource_key.eq(key))
       .load::<ResourceSpecDb>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
+      .map_err(|err| err.map_err_context(|| "ResourceSpec"))?;
     Ok::<_, IoError>(items)
   })
   .await?;
@@ -103,7 +103,7 @@ pub(crate) async fn list_by_resource_key(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [ResourceConfig](ResourceConfig)
+/// [IoResult](IoResult) containing a [ResourceSpec](ResourceSpec)
 ///
 pub(crate) async fn find_by_key(
   key: &uuid::Uuid,
@@ -117,7 +117,7 @@ pub(crate) async fn find_by_key(
     let item = resource_specs::dsl::resource_specs
       .filter(resource_specs::dsl::key.eq(key))
       .first::<ResourceSpecDb>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
+      .map_err(|err| err.map_err_context(|| "ResourceSpec"))?;
     Ok::<_, IoError>(item)
   })
   .await?;

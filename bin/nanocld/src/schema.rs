@@ -16,7 +16,7 @@ diesel::table! {
         key -> Varchar,
         created_at -> Timestamptz,
         name -> Varchar,
-        config_key -> Uuid,
+        spec_key -> Uuid,
         namespace_name -> Varchar,
     }
 }
@@ -145,7 +145,7 @@ diesel::table! {
         key -> Varchar,
         created_at -> Timestamptz,
         kind -> Varchar,
-        config_key -> Uuid,
+        spec_key -> Uuid,
     }
 }
 
@@ -210,19 +210,19 @@ diesel::table! {
         key -> Varchar,
         created_at -> Timestamptz,
         name -> Varchar,
-        config_key -> Uuid,
+        spec_key -> Uuid,
         namespace_name -> Varchar,
     }
 }
 
-diesel::joinable!(cargoes -> cargo_specs (config_key));
+diesel::joinable!(cargoes -> cargo_specs (spec_key));
 diesel::joinable!(cargoes -> namespaces (namespace_name));
 diesel::joinable!(node_group_links -> node_groups (node_group_name));
 diesel::joinable!(node_group_links -> nodes (node_name));
 diesel::joinable!(resource_kind_versions -> resource_kinds (resource_kind_name));
-diesel::joinable!(resources -> resource_specs (config_key));
+diesel::joinable!(resources -> resource_specs (spec_key));
 diesel::joinable!(vms -> namespaces (namespace_name));
-diesel::joinable!(vms -> vm_specs (config_key));
+diesel::joinable!(vms -> vm_specs (spec_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
   cargo_specs,

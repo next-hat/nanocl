@@ -107,7 +107,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoConfigPartial'
+              $ref: '#/components/schemas/CargoSpecPartial'
         required: true
       responses:
         '201':
@@ -262,8 +262,8 @@ paths:
     put:
       tags:
       - Cargoes
-      summary: Create a new cargo config and add history entry
-      description: Create a new cargo config and add history entry
+      summary: Create a new cargo spec and add history entry
+      description: Create a new cargo spec and add history entry
       operationId: put_cargo
       parameters:
       - name: Name
@@ -283,7 +283,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoConfigPartial'
+              $ref: '#/components/schemas/CargoSpecPartial'
         required: true
       responses:
         '200':
@@ -328,8 +328,8 @@ paths:
     patch:
       tags:
       - Cargoes
-      summary: Patch a cargo config meaning merging current config with the new one and add history entry
-      description: Patch a cargo config meaning merging current config with the new one and add history entry
+      summary: Patch a cargo spec meaning merging current spec with the new one and add history entry
+      description: Patch a cargo spec meaning merging current spec with the new one and add history entry
       operationId: patch_cargo
       parameters:
       - name: Name
@@ -349,7 +349,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CargoConfigUpdate'
+              $ref: '#/components/schemas/CargoSpecUpdate'
         required: true
       responses:
         '200':
@@ -389,7 +389,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/CargoConfig'
+                  $ref: '#/components/schemas/CargoSpec'
         '404':
           description: Cargo does not exist
   /cargoes/{Name}/histories/{Id}/revert:
@@ -1398,7 +1398,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ResourceConfig'
+                  $ref: '#/components/schemas/ResourceSpec'
         '404':
           description: Resource is not existing
           content:
@@ -1630,7 +1630,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VmConfigPartial'
+              $ref: '#/components/schemas/VmSpecPartial'
         required: true
       responses:
         '200':
@@ -1842,7 +1842,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VmConfigUpdate'
+              $ref: '#/components/schemas/VmSpecUpdate'
         required: true
       responses:
         '200':
@@ -1910,7 +1910,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/VmConfig'
+                  $ref: '#/components/schemas/VmSpec'
   /vms/{Name}/inspect:
     get:
       tags:
@@ -2001,7 +2001,7 @@ components:
       - type: object
         additionalProperties:
           $ref: '#/components/schemas/Any'
-      description: Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceConfig](ResourceConfig)
+      description: Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceSpec](ResourceSpec)
     ApiError:
       type: object
       description: When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -2138,15 +2138,15 @@ components:
         You can define the number of replicas you want to run
         You can also define the minimum and maximum number of replicas
         The cluster will automatically scale the number of replicas to match the number of replicas you want
-        Cargo contain a configuration which is used to create the container
-        The configuration can be updated and the old configuration will be kept in the history
-        That way you can rollback to a previous configuration quickly
+        Cargo contain a specification which is used to create the container
+        The specification can be updated and the old specification will be kept in the history
+        That way you can rollback to a previous specification quickly
       required:
       - Key
       - NamespaceName
       - Name
-      - ConfigKey
-      - Config
+      - SpecKey
+      - Spec
       properties:
         Key:
           type: string
@@ -2157,11 +2157,11 @@ components:
         Name:
           type: string
           description: Name of the cargo
-        ConfigKey:
+        SpecKey:
           type: string
           format: uuid
-          description: Unique identifier of the cargo config
-        Config:
+          description: Unique identifier of the spec
+        Spec:
           $ref: '#/components/schemas/CargoSpec'
     CargoImagePartial:
       type: object
@@ -2182,9 +2182,9 @@ components:
       required:
       - Key
       - Name
-      - ConfigKey
+      - SpecKey
       - NamespaceName
-      - Config
+      - Spec
       - InstanceTotal
       - InstanceRunning
       - Instances
@@ -2195,14 +2195,14 @@ components:
         Name:
           type: string
           description: Name of the cargo
-        ConfigKey:
+        SpecKey:
           type: string
           format: uuid
-          description: Unique identifier of the cargo config
+          description: Unique identifier of the cargo spec
         NamespaceName:
           type: string
           description: Name of the namespace
-        Config:
+        Spec:
           $ref: '#/components/schemas/CargoSpec'
         InstanceTotal:
           type: integer
@@ -2358,9 +2358,9 @@ components:
       - CreatedAt
       - UpdatedAt
       - Name
-      - ConfigKey
+      - SpecKey
       - NamespaceName
-      - Config
+      - Spec
       - InstanceTotal
       - InstanceRunning
       properties:
@@ -2378,14 +2378,14 @@ components:
         Name:
           type: string
           description: Name of the cargo
-        ConfigKey:
+        SpecKey:
           type: string
           format: uuid
-          description: Unique identifier of the cargo config
+          description: Unique identifier of the cargo spec
         NamespaceName:
           type: string
           description: Name of the namespace
-        Config:
+        Spec:
           $ref: '#/components/schemas/CargoSpec'
         InstanceTotal:
           type: integer
@@ -4080,7 +4080,7 @@ components:
       - Name
       - CreatedAt
       - UpdatedAt
-      - Config
+      - Spec
       - InstanceTotal
       - InstanceSuccess
       - InstanceRunning
@@ -4097,7 +4097,7 @@ components:
           type: string
           format: date-time
           description: Last update of the job
-        Config:
+        Spec:
           $ref: '#/components/schemas/Job'
         InstanceTotal:
           type: integer
@@ -5166,9 +5166,9 @@ components:
           $ref: '#/components/schemas/StreamTarget'
     ProxySsl:
       oneOf:
-      - $ref: '#/components/schemas/ProxySslConfig'
+      - $ref: '#/components/schemas/ProxySslSpec'
       - type: string
-    ProxySslConfig:
+    ProxySslSpec:
       type: object
       required:
       - Certificate
@@ -5366,7 +5366,7 @@ components:
       - UpdatedAt
       - Version
       - Kind
-      - ConfigKey
+      - SpecKey
       - Data
       properties:
         Name:
@@ -5386,7 +5386,7 @@ components:
         Kind:
           type: string
           description: The kind of the resource
-        ConfigKey:
+        SpecKey:
           type: string
           format: uuid
           description: The config of the resource
@@ -6492,8 +6492,8 @@ components:
       - Key
       - NamespaceName
       - Name
-      - ConfigKey
-      - Config
+      - SpecKey
+      - Spec
       properties:
         Key:
           type: string
@@ -6504,11 +6504,11 @@ components:
         Name:
           type: string
           description: Name of the vm
-        ConfigKey:
+        SpecKey:
           type: string
           format: uuid
           description: Unique identifier of the vm config
-        Config:
+        Spec:
           $ref: '#/components/schemas/VmSpec'
     VmDisk:
       type: object
@@ -6630,9 +6630,9 @@ components:
       required:
       - Key
       - Name
-      - ConfigKey
+      - SpecKey
       - NamespaceName
-      - Config
+      - Spec
       - InstanceTotal
       - InstanceRunning
       - Instances
@@ -6643,14 +6643,14 @@ components:
         Name:
           type: string
           description: Name of the cargo
-        ConfigKey:
+        SpecKey:
           type: string
           format: uuid
-          description: Unique identifier of the cargo config
+          description: Unique identifier of the spec
         NamespaceName:
           type: string
           description: Name of the namespace
-        Config:
+        Spec:
           $ref: '#/components/schemas/VmSpec'
         InstanceTotal:
           type: integer
@@ -6827,9 +6827,9 @@ components:
       - CreatedAt
       - UpdatedAt
       - Name
-      - ConfigKey
+      - SpecKey
       - NamespaceName
-      - Config
+      - Spec
       - Instances
       - RunningInstances
       properties:
@@ -6847,14 +6847,14 @@ components:
         Name:
           type: string
           description: Name of the vm
-        ConfigKey:
+        SpecKey:
           type: string
           format: uuid
-          description: Unique identifier of the vm config
+          description: Unique identifier of the spec
         NamespaceName:
           type: string
           description: Name of the namespace
-        Config:
+        Spec:
           $ref: '#/components/schemas/VmSpec'
         Instances:
           type: integer

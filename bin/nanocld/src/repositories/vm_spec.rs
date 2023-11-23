@@ -3,26 +3,26 @@ use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::vm_config::{VmSpec, VmSpecPartial};
+use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
 use crate::utils;
 use crate::models::{Pool, VmSpecDb};
 
 /// ## Create
 ///
-/// Create a vm config item in database for given `VmConfigPartial`
-/// and return a `VmConfig` with the generated key
+/// Create a vm config item in database for given `VmSpecPartial`
+/// and return a `VmSpec` with the generated key
 ///
 /// ## Arguments
 ///
 /// * [vm_key](str) - Vm key
-/// * [item](VmConfigPartial) - Vm config item
+/// * [item](VmSpecPartial) - Vm config item
 /// * [version](str) - Vm config version
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [VmConfig](VmConfig)
+/// [IoResult](IoResult) containing a [VmSpec](VmSpec)
 ///
 pub(crate) async fn create(
   vm_key: &str,
@@ -31,7 +31,7 @@ pub(crate) async fn create(
   pool: &Pool,
 ) -> IoResult<VmSpec> {
   let mut data = serde_json::to_value(item.to_owned())
-    .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+    .map_err(|err| err.map_err_context(|| "VmSpec"))?;
   if let Some(meta) = data.as_object_mut() {
     meta.remove("Metadata");
   }
@@ -59,7 +59,7 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [VmConfig](VmConfig)
+/// [IoResult](IoResult) containing a [VmSpec](VmSpec)
 ///
 pub(crate) async fn find_by_key(
   key: &uuid::Uuid,
@@ -71,7 +71,7 @@ pub(crate) async fn find_by_key(
     super::generic::find_by_id::<vm_specs::table, _, VmSpecDb>(key, pool)
       .await?;
   let config = serde_json::from_value::<VmSpecPartial>(dbmodel.data.clone())
-    .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
+    .map_err(|err| err.map_err_context(|| "VmSpecPartial"))?;
   Ok(dbmodel.into_vm_spec(&config))
 }
 
@@ -100,7 +100,7 @@ pub(crate) async fn delete_by_vm_key(
     let res = diesel::delete(vm_specs::dsl::vm_specs)
       .filter(vm_specs::dsl::vm_key.eq(key))
       .execute(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+      .map_err(|err| err.map_err_context(|| "VmSpec"))?;
     Ok::<_, IoError>(res)
   })
   .await?;
@@ -118,7 +118,7 @@ pub(crate) async fn delete_by_vm_key(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [VmConfig](VmConfig)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [VmSpec](VmSpec)
 ///
 pub(crate) async fn list_by_vm_key(
   key: &str,
@@ -132,7 +132,7 @@ pub(crate) async fn list_by_vm_key(
     let configs = vm_specs::dsl::vm_specs
       .filter(vm_specs::dsl::vm_key.eq(key))
       .get_results::<VmSpecDb>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "VmConfig"))?;
+      .map_err(|err| err.map_err_context(|| "VmSpec"))?;
     Ok::<_, IoError>(configs)
   })
   .await?;
@@ -141,7 +141,7 @@ pub(crate) async fn list_by_vm_key(
     .map(|dbmodel: VmSpecDb| {
       let config =
         serde_json::from_value::<VmSpecPartial>(dbmodel.data.clone())
-          .map_err(|err| err.map_err_context(|| "VmConfigPartial"))?;
+          .map_err(|err| err.map_err_context(|| "VmSpecPartial"))?;
       Ok(dbmodel.into_vm_spec(&config))
     })
     .collect::<Result<Vec<VmSpec>, IoError>>()?;

@@ -15,12 +15,12 @@ use crate::models::{Pool, CargoSpecDb};
 /// ## Arguments
 ///
 /// * [cargo_key](str) - Cargo key
-/// * [item](CargoConfigPartial) - Cargo config item
+/// * [item](CargoSpecPartial) - Cargo config item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [CargoConfig](CargoConfig)
+/// [IoResult](IoResult) containing a [CargoSpec](CargoSpec)
 ///
 pub(crate) async fn create(
   cargo_key: &str,
@@ -31,7 +31,7 @@ pub(crate) async fn create(
   let cargo_key = cargo_key.to_owned();
   let version = version.to_owned();
   let mut data = serde_json::to_value(item.to_owned())
-    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
+    .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
   if let Some(meta) = data.as_object_mut() {
     meta.remove("Metadata");
   }
@@ -60,7 +60,7 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [CargoConfig](CargoConfig)
+/// [IoResult](IoResult) containing a [CargoSpec](CargoSpec)
 ///
 pub(crate) async fn find_by_key(
   key: &uuid::Uuid,
@@ -71,7 +71,7 @@ pub(crate) async fn find_by_key(
   let dbmodel: CargoSpecDb =
     super::generic::find_by_id::<cargo_specs::table, _, _>(key, pool).await?;
   let config = serde_json::from_value::<CargoSpecPartial>(dbmodel.data.clone())
-    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
+    .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
   Ok(dbmodel.into_cargo_spec(&config))
 }
 
@@ -112,7 +112,7 @@ pub(crate) async fn delete_by_cargo_key(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoConfig](CargoConfig)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoSpec](CargoSpec)
 ///
 pub(crate) async fn list_by_cargo_key(
   key: &str,
@@ -127,7 +127,7 @@ pub(crate) async fn list_by_cargo_key(
       .order(cargo_specs::dsl::created_at.desc())
       .filter(cargo_specs::dsl::cargo_key.eq(key))
       .get_results::<CargoSpecDb>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "CargoConfig"))?;
+      .map_err(|err| err.map_err_context(|| "CargoSpec"))?;
     Ok::<_, IoError>(configs)
   })
   .await?;
@@ -136,7 +136,7 @@ pub(crate) async fn list_by_cargo_key(
     .map(|dbmodel: CargoSpecDb| {
       let config =
         serde_json::from_value::<CargoSpecPartial>(dbmodel.data.clone())
-          .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
+          .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
       Ok(dbmodel.into_cargo_spec(&config))
     })
     .collect::<Result<Vec<CargoSpec>, IoError>>()?;

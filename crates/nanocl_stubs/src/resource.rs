@@ -81,7 +81,7 @@ pub struct Resource {
   /// The kind of the resource
   pub kind: String,
   /// The config of the resource
-  pub config_key: uuid::Uuid,
+  pub spec_key: uuid::Uuid,
   /// The config of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub data: serde_json::Value,

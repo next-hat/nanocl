@@ -10,7 +10,7 @@ use nanocl_stubs::job::JobPartial;
 use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
 use nanocl_stubs::cargo_spec::CargoSpecPartial;
-use nanocl_stubs::vm_config::{VmSpecPartial, VmDisk};
+use nanocl_stubs::vm_spec::{VmSpecPartial, VmDisk};
 use nanocl_stubs::state::{
   StateDeployment, StateCargo, StateVirtualMachine, StateResource, StateMeta,
   StateStream, StateSecret, StateApplyQuery, StateJob,
@@ -284,7 +284,7 @@ async fn apply_jobs(
 /// ## Arguments
 ///
 /// * [namespace](str) - The namespace name
-/// * [data](Vec<CargoConfigPartial>) - The list of cargoes to apply
+/// * [data](Vec<CargoSpecPartial>) - The list of cargoes to apply
 /// * [version](str) - The version of the cargoes
 /// * [state](DaemonState) - The system state
 /// * [sx](mpsc::Sender) - The response sender
@@ -344,7 +344,7 @@ async fn apply_cargoes(
 /// ## Arguments
 ///
 /// * [namespace](str) - The namespace to apply the VMs to
-/// * [data](Vec<VmConfigPartial>) - The VMs to apply
+/// * [data](Vec<VmSpecPartial>) - The VMs to apply
 /// * [version](str) - The version of the VMs
 /// * [state](DaemonState) - The system state
 /// * [sx](mpsc::Sender) - The response sender
@@ -534,7 +534,7 @@ async fn remove_secrets(
 /// ## Arguments
 ///
 /// * [namespace](str) - The namespace of the cargoes
-/// * [data](Vec<CargoConfigPartial>) - The list of cargoes to delete
+/// * [data](Vec<CargoSpecPartial>) - The list of cargoes to delete
 /// * [state](DaemonState) - The system state
 /// * [sx](mpsc::Sender) - The response sender
 ///
@@ -580,7 +580,7 @@ async fn remove_cargoes(
 /// ## Arguments
 ///
 /// * [namespace](str) - The namespace to delete the VMs from
-/// * [data](Vec<VmConfigPartial>) - The VMs to delete
+/// * [data](Vec<VmSpecPartial>) - The VMs to delete
 /// * [state](DaemonState) - The system state
 /// * [sx](mpsc::Sender) - The response sender
 ///

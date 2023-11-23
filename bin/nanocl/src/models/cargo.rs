@@ -9,7 +9,8 @@ use nanocld_client::stubs::cargo_spec::{
   CargoSpecUpdate, Config as ContainerConfig, CargoSpecPartial, HostConfig,
 };
 
-use super::{cargo_image::CargoImageArg, DisplayFormat};
+use super::DisplayFormat;
+use super::cargo_image::CargoImageArg;
 
 /// ## CargoRemoveOpts
 ///
@@ -409,8 +410,8 @@ impl From<CargoSummary> for CargoRow {
     Self {
       name: cargo.name,
       namespace: cargo.namespace_name,
-      image: cargo.config.container.image.unwrap_or_default(),
-      version: cargo.config.version,
+      image: cargo.spec.container.image.unwrap_or_default(),
+      version: cargo.spec.version,
       instances: format!("{}/{}", cargo.instance_running, cargo.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

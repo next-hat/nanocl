@@ -34,12 +34,12 @@ pub(crate) async fn create(
     data: item.data.clone(),
     metadata: item.metadata.clone(),
   };
-  let config = repositories::resource_config::create(&config, pool).await?;
+  let config = repositories::resource_spec::create(&config, pool).await?;
   let new_item = ResourceDb {
     key: item.name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: item.kind.clone(),
-    config_key: config.key.to_owned(),
+    spec_key: config.key.to_owned(),
   };
   let dbmodel: ResourceDb =
     super::generic::insert_with_res(new_item, pool).await?;
@@ -204,10 +204,10 @@ pub(crate) async fn put(
     data: item.data.clone(),
     metadata: item.metadata.clone(),
   };
-  let config = repositories::resource_config::create(&config, pool).await?;
+  let config = repositories::resource_spec::create(&config, pool).await?;
   let resource_update = ResourceUpdateDb {
     key: None,
-    config_key: Some(config.key.to_owned()),
+    spec_key: Some(config.key.to_owned()),
   };
   let dbmodel = super::generic::update_by_id_with_res::<
     resources::table,

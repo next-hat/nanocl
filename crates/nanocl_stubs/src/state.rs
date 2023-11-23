@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::job::JobPartial;
 use crate::secret::SecretPartial;
-use crate::vm_config::VmSpecPartial;
+use crate::vm_spec::VmSpecPartial;
 use crate::cargo_spec::CargoSpecPartial;
 
 use super::resource::ResourcePartial;

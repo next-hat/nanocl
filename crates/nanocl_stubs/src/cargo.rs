@@ -18,9 +18,9 @@ use super::cargo_spec::CargoSpec;
 /// You can define the number of replicas you want to run
 /// You can also define the minimum and maximum number of replicas
 /// The cluster will automatically scale the number of replicas to match the number of replicas you want
-/// Cargo contain a configuration which is used to create the container
-/// The configuration can be updated and the old configuration will be kept in the history
-/// That way you can rollback to a previous configuration quickly
+/// Cargo contain a specification which is used to create the container
+/// The specification can be updated and the old specification will be kept in the history
+/// That way you can rollback to a previous specification quickly
 ///
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "test", derive(Default))]
@@ -34,15 +34,15 @@ pub struct Cargo {
   pub namespace_name: String,
   /// Name of the cargo
   pub name: String,
-  /// Unique identifier of the cargo config
-  pub config_key: uuid::Uuid,
-  /// Configuration of the cargo
-  pub config: CargoSpec,
+  /// Unique identifier of the spec
+  pub spec_key: uuid::Uuid,
+  /// Specification of the cargo
+  pub spec: CargoSpec,
 }
 
 impl From<Cargo> for CargoSpecPartial {
   fn from(cargo: Cargo) -> Self {
-    cargo.config.into()
+    cargo.spec.into()
   }
 }
 
@@ -54,8 +54,8 @@ impl From<Cargo> for EventActor {
       attributes: Some(serde_json::json!({
         "Name": cargo.name,
         "Namespace": cargo.namespace_name,
-        "Version": cargo.config.version,
-        "Metadata": cargo.config.metadata,
+        "Version": cargo.spec.version,
+        "Metadata": cargo.spec.metadata,
       })),
     }
   }
@@ -87,12 +87,12 @@ pub struct CargoSummary {
   pub updated_at: chrono::NaiveDateTime,
   /// Name of the cargo
   pub name: String,
-  /// Unique identifier of the cargo config
-  pub config_key: uuid::Uuid,
+  /// Unique identifier of the cargo spec
+  pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
   /// Configuration of the cargo
-  pub config: CargoSpec,
+  pub spec: CargoSpec,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances
@@ -112,12 +112,12 @@ pub struct CargoInspect {
   pub key: String,
   /// Name of the cargo
   pub name: String,
-  /// Unique identifier of the cargo config
-  pub config_key: uuid::Uuid,
+  /// Unique identifier of the cargo spec
+  pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
   /// Configuration of the cargo
-  pub config: CargoSpec,
+  pub spec: CargoSpec,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances

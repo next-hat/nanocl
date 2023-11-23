@@ -241,7 +241,7 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
     match repositories::cargo::inspect_by_key(cargo_key, &state.pool).await {
       // If the cargo is already in our store and the config is different we update it
       Ok(cargo) => {
-        if cargo.config.container != config {
+        if cargo.spec.container != config {
           log::debug!(
             "updating cargo {} in namespace {}",
             metadata[0],

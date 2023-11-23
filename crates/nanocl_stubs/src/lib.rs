@@ -12,7 +12,7 @@ pub mod cargo_spec;
 pub mod resource;
 pub mod state;
 pub mod vm;
-pub mod vm_config;
+pub mod vm_spec;
 pub mod vm_image;
 pub mod metric;
 pub mod http_metric;

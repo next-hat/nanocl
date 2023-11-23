@@ -1,4 +1,4 @@
-use nanocl_stubs::vm_config;
+use nanocl_stubs::vm_spec;
 
 use crate::schema::vm_specs;
 
@@ -35,9 +35,9 @@ pub struct VmSpecDb {
 impl VmSpecDb {
   pub fn into_vm_spec(
     self,
-    config: &vm_config::VmSpecPartial,
-  ) -> vm_config::VmSpec {
-    vm_config::VmSpec {
+    config: &vm_spec::VmSpecPartial,
+  ) -> vm_spec::VmSpec {
+    vm_spec::VmSpec {
       key: self.key,
       created_at: self.created_at,
       name: config.name.clone(),

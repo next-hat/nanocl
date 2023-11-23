@@ -97,7 +97,7 @@ pub(crate) async fn inspect_cargo(
   post,
   tag = "Cargoes",
   path = "/cargoes",
-  request_body = CargoConfigPartial,
+  request_body = CargoSpecPartial,
   params(
     ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
   ),
@@ -224,11 +224,11 @@ pub(crate) async fn restart_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Create a new cargo config and add history entry
+/// Create a new cargo spec and add history entry
 #[cfg_attr(feature = "dev", utoipa::path(
   put,
   tag = "Cargoes",
-  request_body = CargoConfigPartial,
+  request_body = CargoSpecPartial,
   path = "/cargoes/{Name}",
   params(
     ("Name" = String, Path, description = "Name of the cargo"),
@@ -252,11 +252,11 @@ pub(crate) async fn put_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-/// Patch a cargo config meaning merging current config with the new one and add history entry
+/// Patch a cargo spec meaning merging current spec with the new one and add history entry
 #[cfg_attr(feature = "dev", utoipa::path(
   patch,
   tag = "Cargoes",
-  request_body = CargoConfigUpdate,
+  request_body = CargoSpecUpdate,
   path = "/cargoes/{Name}",
   params(
     ("Name" = String, Path, description = "Name of the cargo"),
@@ -318,7 +318,7 @@ pub(crate) async fn kill_cargo(
     ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
   ),
   responses(
-    (status = 200, description = "List of cargo histories", body = Vec<CargoConfig>),
+    (status = 200, description = "List of cargo histories", body = Vec<CargoSpec>),
     (status = 404, description = "Cargo does not exist"),
   ),
 ))]
@@ -331,7 +331,7 @@ pub(crate) async fn list_cargo_history(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let histories =
-    repositories::cargo_config::list_by_cargo_key(&key, &state.pool).await?;
+    repositories::cargo_spec::list_by_cargo_key(&key, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
@@ -359,7 +359,7 @@ pub(crate) async fn revert_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo_key = utils::key::gen_key(&namespace, &path.1);
   let config =
-    repositories::cargo_config::find_by_key(&path.2, &state.pool).await?;
+    repositories::cargo_spec::find_by_key(&path.2, &state.pool).await?;
   let cargo =
     utils::cargo::put(&cargo_key, &config.clone().into(), &path.0, &state)
       .await?;
@@ -536,7 +536,7 @@ mod tests {
       assert_eq!(cargo.name, test_cargo, "Invalid cargo name");
       assert_eq!(cargo.namespace_name, "global", "Invalid cargo namespace");
       assert_eq!(
-        cargo.config.container.image,
+        cargo.spec.container.image,
         Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned())
       );
     }
@@ -663,11 +663,11 @@ mod tests {
     assert_eq!(patch_response.name, main_test_cargo);
     assert_eq!(patch_response.namespace_name, "global");
     assert_eq!(
-      patch_response.config.container.image,
+      patch_response.spec.container.image,
       Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned())
     );
     assert_eq!(
-      patch_response.config.container.env,
+      patch_response.spec.container.env,
       Some(vec!["TEST=1".to_owned()])
     );
     let mut res = client

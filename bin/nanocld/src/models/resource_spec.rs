@@ -30,7 +30,7 @@ pub struct ResourceSpecDb {
   pub(crate) metadata: Option<serde_json::Value>,
 }
 
-/// Helper to convert a `ResourceConfigDbModel` to a `ResourceConfig`
+/// Helper to convert a `ResourceSpecDbModel` to a `ResourceSpec`
 impl From<ResourceSpecDb> for ResourceSpec {
   fn from(item: ResourceSpecDb) -> Self {
     ResourceSpec {

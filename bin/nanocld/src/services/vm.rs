@@ -16,7 +16,7 @@ use nanocl_error::http::{HttpError, HttpResult};
 use bollard_next::container::AttachContainerOptions;
 use nanocl_stubs::cargo::OutputLog;
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::vm_config::{VmSpecPartial, VmSpecUpdate};
+use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 
 use crate::{utils, repositories};
 use crate::models::{DaemonState, WsConState};
@@ -154,7 +154,7 @@ pub(crate) async fn delete_vm(
   post,
   tag = "Vms",
   path = "/vms",
-  request_body = VmConfigPartial,
+  request_body = VmSpecPartial,
   params(
     ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
   ),
@@ -184,7 +184,7 @@ pub(crate) async fn create_vm(
     ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
   ),
   responses(
-    (status = 200, description = "The virtual machine histories have been listed", body = [VmConfig]),
+    (status = 200, description = "The virtual machine histories have been listed", body = [VmSpec]),
   ),
 ))]
 #[web::get("/vms/{name}/histories")]
@@ -196,7 +196,7 @@ pub(crate) async fn list_vm_history(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let histories =
-    repositories::vm_config::list_by_vm_key(&key, &state.pool).await?;
+    repositories::vm_spec::list_by_vm_key(&key, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
@@ -204,7 +204,7 @@ pub(crate) async fn list_vm_history(
 #[cfg_attr(feature = "dev", utoipa::path(
   patch,
   tag = "Vms",
-  request_body = VmConfigUpdate,
+  request_body = VmSpecUpdate,
   path = "/vms/{Name}",
   params(
     ("Name" = String, Path, description = "Name of the virtual machine"),

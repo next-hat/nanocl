@@ -54,16 +54,16 @@ use nanocl_stubs::cargo_spec::{
 };
 use nanocl_stubs::cargo_image::CargoImagePartial;
 use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
-use nanocl_stubs::vm_config::{VmSpec, VmSpecPartial, VmSpecUpdate, VmDisk, VmHost};
+use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial, VmSpecUpdate, VmDisk, VmHost};
 use nanocl_stubs::resource::{
   Resource, ResourceUpdate, ResourceSpec, ResourcePartial,
 };
 use nanocl_stubs::dns::{ResourceDnsRule, DnsEntry};
 use nanocl_stubs::proxy::{
-  ResourceProxyRule, ProxyRuleHttp, ProxyHttpLocation, ProxySslConfig,
+  ResourceProxyRule, ProxyRuleHttp, ProxyHttpLocation, ProxySsl,
   ProxyRuleStream, StreamTarget, ProxyStreamProtocol, UriTarget,
   LocationTarget, HttpTarget, UrlRedirect, UpstreamTarget, ProxyRule,
-  UnixTarget, ProxySsl,
+  UnixTarget, ProxySslSpec,
 };
 use nanocl_stubs::state::{
   StateMeta, StateCargo, StateVirtualMachine, StateResource, StateDeployment,
@@ -81,7 +81,7 @@ struct ApiError {
   msg: String,
 }
 
-/// Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceConfig](ResourceConfig)
+/// Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceSpec](ResourceSpec)
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(untagged)]
@@ -452,7 +452,8 @@ impl Modify for VersionModifier {
     ProxyRule,
     ProxyRuleHttp,
     ProxyHttpLocation,
-    ProxySslConfig,
+    ProxySsl,
+    ProxySslSpec,
     ProxyRuleStream,
     StreamTarget,
     ProxyStreamProtocol,
@@ -462,7 +463,6 @@ impl Modify for VersionModifier {
     UpstreamTarget,
     UnixTarget,
     UriTarget,
-    ProxySsl,
     // DnsRules
     ResourceDnsRule,
     DnsEntry,

@@ -98,18 +98,18 @@ pub(crate) async fn create(
   // test if the name of the cargo include a . in the name and throw error if true
   if item.name.contains('.') {
     return Err(IoError::invalid_input(
-      "CargoConfigPartial",
+      "CargoSpecPartial",
       "Name cannot contain a dot.",
     ));
   }
   let key = utils::key::gen_key(&nsp, &item.name);
-  let config = super::cargo_config::create(&key, &item, &version, pool).await?;
+  let config = super::cargo_spec::create(&key, &item, &version, pool).await?;
   let new_item = CargoDb {
     key,
     name: item.name,
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
-    config_key: config.key,
+    spec_key: config.key,
   };
   let item: CargoDb = super::generic::insert_with_res(new_item, pool).await?;
   let cargo = item.into_cargo(config);
@@ -164,7 +164,7 @@ pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDb> {
 /// ## Arguments
 ///
 /// * [key](str) - Cargo key
-/// * [item](CargoConfigPartial) - Cargo config
+/// * [item](CargoSpecPartial) - Cargo config
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
@@ -180,10 +180,10 @@ pub(crate) async fn update_by_key(
   use crate::schema::cargoes;
   let version = version.to_owned();
   let cargodb = find_by_key(key, pool).await?;
-  let config = super::cargo_config::create(key, item, &version, pool).await?;
+  let config = super::cargo_spec::create(key, item, &version, pool).await?;
   let new_item = CargoUpdateDb {
     name: Some(item.name.to_owned()),
-    config_key: Some(config.key),
+    spec_key: Some(config.key),
     ..Default::default()
   };
   let key = key.to_owned();
@@ -257,7 +257,7 @@ pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
   })
   .await?;
   let config = serde_json::from_value::<CargoSpecPartial>(item.1.data.clone())
-    .map_err(|err| err.map_err_context(|| "CargoConfigPartial"))?;
+    .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
   let config = item.1.into_cargo_spec(&config);
   let item = item.0.into_cargo(config);
   Ok(item)

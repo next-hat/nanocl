@@ -143,7 +143,7 @@ pub(crate) async fn put_resource(
     ("Name" = String, Path, description = "The resource name to list history")
   ),
   responses(
-    (status = 200, description = "The resource history", body = [ResourceConfig]),
+    (status = 200, description = "The resource history", body = [ResourceSpec]),
     (status = 404, description = "Resource is not existing", body = ApiError),
   ),
 ))]
@@ -153,7 +153,7 @@ pub(crate) async fn list_resource_history(
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
   let items =
-    repositories::resource_config::list_by_resource_key(&path.1, &state.pool)
+    repositories::resource_spec::list_by_resource_key(&path.1, &state.pool)
       .await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
@@ -178,7 +178,7 @@ pub(crate) async fn revert_resource(
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
   let history =
-    repositories::resource_config::find_by_key(&path.2, &state.pool).await?;
+    repositories::resource_spec::find_by_key(&path.2, &state.pool).await?;
   let resource =
     repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
