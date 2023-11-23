@@ -2,7 +2,10 @@ use bollard_next::service::ContainerSummary;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use crate::vm_config::VmConfig;
+use crate::{
+  vm_config::{VmConfig, VmConfigPartial},
+  system::{EventActor, ToEvent, EventAction, Event, EventKind},
+};
 
 /// A virtual machine instance
 #[derive(Debug, Clone)]
@@ -21,6 +24,38 @@ pub struct Vm {
   pub config_key: uuid::Uuid,
   /// Configuration of the vm
   pub config: VmConfig,
+}
+
+impl From<Vm> for VmConfigPartial {
+  fn from(vm: Vm) -> Self {
+    vm.config.into()
+  }
+}
+
+/// Convert a Cargo into an EventActor
+impl From<Vm> for EventActor {
+  fn from(vm: Vm) -> Self {
+    Self {
+      key: Some(vm.key),
+      attributes: Some(serde_json::json!({
+        "Name": vm.name,
+        "Namespace": vm.namespace_name,
+        "Version": vm.config.version,
+        "Namespace": vm.namespace_name,
+        "Metadata": vm.config.metadata,
+      })),
+    }
+  }
+}
+
+impl ToEvent for Vm {
+  fn to_event(&self, action: EventAction) -> Event {
+    Event {
+      kind: EventKind::Vm,
+      action,
+      actor: Some(self.clone().into()),
+    }
+  }
 }
 
 /// A Vm Summary is a summary of a vm

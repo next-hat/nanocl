@@ -5,8 +5,6 @@ pub use bollard_next::container::Config;
 pub use bollard_next::models::HostConfig;
 pub use bollard_next::models::HealthConfig;
 
-use crate::cargo::CargoInspect;
-
 /// Auto is used to automatically define that the number of replicas in the cluster
 /// Number is used to manually set the number of replicas
 /// Note: auto will ensure at least 1 replica exists in the cluster
@@ -207,19 +205,6 @@ impl From<CargoConfig> for CargoConfigPartial {
       container: cargo_config.container,
       metadata: cargo_config.metadata,
       secrets: cargo_config.secrets,
-    }
-  }
-}
-
-impl From<CargoInspect> for CargoConfigPartial {
-  fn from(cargo_inspect: CargoInspect) -> Self {
-    Self {
-      name: cargo_inspect.name,
-      init_container: cargo_inspect.config.init_container,
-      replication: cargo_inspect.config.replication,
-      container: cargo_inspect.config.container,
-      metadata: cargo_inspect.config.metadata,
-      secrets: cargo_inspect.config.secrets,
     }
   }
 }

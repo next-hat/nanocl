@@ -11,7 +11,7 @@ use futures::StreamExt;
 use futures::future::ready;
 use tokio::io::AsyncWriteExt;
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 
 use bollard_next::container::AttachContainerOptions;
 use nanocl_stubs::cargo::OutputLog;
@@ -65,8 +65,7 @@ pub(crate) async fn inspect_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-  let vm =
-    utils::vm::inspect_by_key(&key, &state.docker_api, &state.pool).await?;
+  let vm = utils::vm::inspect_by_key(&key, &state).await?;
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 

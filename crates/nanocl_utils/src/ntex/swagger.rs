@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ntex::{web, http};
 use ntex::util::Bytes;
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 
 pub struct SwaggerConfig<'a> {
   definition: utoipa::openapi::OpenApi,

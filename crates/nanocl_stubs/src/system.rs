@@ -6,11 +6,8 @@ use serde::{Serialize, Deserialize};
 
 use crate::config::DaemonConfig;
 
-use super::cargo::CargoInspect;
-use super::resource::Resource;
-use super::secret::Secret;
-use super::vm::Vm;
-
+/// ## HostInfo
+///
 /// HostInfo contains information about the host and the docker daemon
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -26,7 +23,10 @@ pub struct HostInfo {
   pub config: DaemonConfig,
 }
 
+/// ## Version
+///
 /// Version contain details about the current version nanocl
+///
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -37,93 +37,99 @@ pub struct Version {
   pub commit_id: String,
 }
 
-/// Event is a message sent by nanocld to connected clients
-#[derive(Clone, Debug)]
+/// ## EventKind
+///
+/// Kind is the type of event related to the actor kind
+///
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub enum Event {
-  /// NamespaceCreated is sent when a namespace is created
-  NamespaceCreated(String),
-  /// NamespaceDeleted is sent when a namespace is deleted
-  CargoCreated(Box<CargoInspect>),
-  /// CargoDeleted is sent when a cargo is deleted
-  CargoDeleted(Box<CargoInspect>),
-  /// CargoStarted is sent when a cargo is started
-  CargoStarted(Box<CargoInspect>),
-  /// CargoStopped is sent when a cargo is stopped
-  CargoStopped(Box<CargoInspect>),
-  /// CargoPatched is sent when a cargo is patched
-  CargoPatched(Box<CargoInspect>),
-  /// ResourceCreated is sent when a resource is created
-  ResourceCreated(Box<Resource>),
-  /// ResourceDeleted is sent when a resource is deleted
-  ResourceDeleted(Box<Resource>),
-  /// ResourcePatched is sent when a resource is patched
-  ResourcePatched(Box<Resource>),
-  /// SecretCreated is sent when a secret is created
-  SecretCreated(Box<Secret>),
-  /// SecretDeleted is sent when a secret is deleted
-  SecretDeleted(Box<Secret>),
-  /// SecretPatched is sent when a secret is patched
-  SecretPatched(Box<Secret>),
-  /// VmCreated is sent when a vm is created
-  VmCreated(Box<Vm>),
-  /// VmDeleted is sent when a vm is deleted
-  VmDeleted(Box<Vm>),
-  /// VmPatched is sent when a vm is patched
-  VmPatched(Box<Vm>),
-  /// VmRunned is sent when a vm is runned
-  VmRunned(Box<Vm>),
-  /// VmStopped is sent when a vm is stopped
-  VmStopped(Box<Vm>),
+pub enum EventKind {
+  Namespace,
+  Cargo,
+  Vm,
+  Job,
+  Resource,
+  Secret,
 }
 
-impl std::fmt::Display for Event {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl std::fmt::Display for EventKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      Event::NamespaceCreated(key) => write!(f, "NamespaceCreated({key})"),
-      Event::CargoCreated(cargo) => write!(f, "CargoCreated({})", cargo.key),
-      Event::CargoDeleted(cargo) => write!(f, "CargoDeleted({})", cargo.key),
-      Event::CargoStarted(cargo) => write!(f, "CargoStarted({})", cargo.key),
-      Event::CargoStopped(cargo) => write!(f, "CargoStopped({})", cargo.key),
-      Event::CargoPatched(cargo) => write!(f, "CargoPatched({})", cargo.key),
-      Event::ResourceCreated(resource) => {
-        write!(f, "ResourceCreated({})", resource.name)
-      }
-      Event::ResourceDeleted(resource) => {
-        write!(f, "ResourceDeleted({})", resource.name)
-      }
-      Event::ResourcePatched(resource) => {
-        write!(f, "ResourcePatched({})", resource.name)
-      }
-      Event::SecretCreated(secret) => {
-        write!(f, "SecretCreated({})", secret.key)
-      }
-      Event::SecretDeleted(secret) => {
-        write!(f, "SecretDeleted({})", secret.key)
-      }
-      Event::SecretPatched(secret) => {
-        write!(f, "SecretPatched({})", secret.key)
-      }
-      Event::VmCreated(vm) => {
-        write!(f, "VmCreated({})", vm.name)
-      }
-      Event::VmDeleted(vm) => {
-        write!(f, "VmDeleted({})", vm.name)
-      }
-      Event::VmPatched(vm) => {
-        write!(f, "VmPatched({})", vm.name)
-      }
-      Event::VmRunned(vm) => {
-        write!(f, "VmRunned({})", vm.name)
-      }
-      Event::VmStopped(vm) => {
-        write!(f, "VmStopped({})", vm.name)
-      }
+      EventKind::Namespace => write!(f, "Namespace"),
+      EventKind::Cargo => write!(f, "Cargo"),
+      EventKind::Vm => write!(f, "Vm"),
+      EventKind::Job => write!(f, "Job"),
+      EventKind::Resource => write!(f, "Resource"),
+      EventKind::Secret => write!(f, "Secret"),
     }
   }
 }
 
+/// ## EventAction
+///
+/// Action is the action that triggered the event
+///
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum EventAction {
+  Created,
+  Patched,
+  Started,
+  Stopped,
+  Deleted,
+}
+
+impl std::fmt::Display for EventAction {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      EventAction::Created => write!(f, "Created"),
+      EventAction::Patched => write!(f, "Patched"),
+      EventAction::Started => write!(f, "Started"),
+      EventAction::Stopped => write!(f, "Stopped"),
+      EventAction::Deleted => write!(f, "Deleted"),
+    }
+  }
+}
+
+/// ## EventActor
+///
+/// Actor is the actor that triggered the event
+///
+#[derive(Default, Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct EventActor {
+  pub key: Option<String>,
+  pub attributes: Option<serde_json::Value>,
+}
+
+/// ## Event
+///
+/// Event is a generic event type that is used to notify state changes
+///
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct Event {
+  /// Kind of event
+  pub kind: EventKind,
+  /// Action of event
+  pub action: EventAction,
+  /// Actor of event
+  pub actor: Option<EventActor>,
+}
+
+/// Generic trait to convert a type to an event
+pub trait ToEvent {
+  fn to_event(&self, action: EventAction) -> Event;
+}
+
+/// ## ProcessQuery
+///
+/// Query parameters for the process list endpoint.
+///
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]

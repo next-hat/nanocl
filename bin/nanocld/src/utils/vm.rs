@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ntex::{rt, http};
+use ntex::http;
 
 use bollard_next::Docker;
 use bollard_next::service::{HostConfig, DeviceMapping, ContainerSummary};
@@ -9,8 +9,9 @@ use bollard_next::container::{
   StopContainerOptions, RemoveContainerOptions,
 };
 
-use nanocl_error::http::{HttpResult, HttpError};
-use nanocl_stubs::system::Event;
+use nanocl_error::http::{HttpError, HttpResult};
+
+use nanocl_stubs::system::EventAction;
 use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
@@ -30,6 +31,7 @@ pub(crate) async fn start_by_key(
   vm_key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
+  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
   let container_name = format!("{}.v", vm_key);
   state
     .docker_api
@@ -39,11 +41,7 @@ pub(crate) async fn start_by_key(
       msg: format!("Unable to start container got error : {e}"),
       status: http::StatusCode::INTERNAL_SERVER_ERROR,
     })?;
-  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
-  let event_emitter = state.event_emitter.clone();
-  rt::spawn(async move {
-    let _ = event_emitter.emit(Event::VmRunned(Box::new(vm))).await;
-  });
+  state.event_emitter.spawn_emit(&vm, EventAction::Started);
   Ok(())
 }
 
@@ -66,11 +64,7 @@ pub(crate) async fn stop(vm: &Vm, state: &DaemonState) -> HttpResult<()> {
       msg: format!("Unable to stop container got error : {e}"),
       status: http::StatusCode::INTERNAL_SERVER_ERROR,
     })?;
-  let vm_ptr = vm.clone();
-  let event_emitter = state.event_emitter.clone();
-  rt::spawn(async move {
-    let _ = event_emitter.emit(Event::VmStopped(Box::new(vm_ptr))).await;
-  });
+  state.event_emitter.spawn_emit(vm, EventAction::Stopped);
   Ok(())
 }
 
@@ -98,8 +92,7 @@ pub(crate) async fn stop_by_key(
 /// ## Arguments
 ///
 /// * [vm_key](str) - The vm key
-/// * [docker_api](bollard_next::Docker) - The docker api
-/// * [pool](Pool) - The database pool
+/// * [state](DaemonState) - The daemon state
 ///
 /// ## Return
 ///
@@ -107,11 +100,10 @@ pub(crate) async fn stop_by_key(
 ///
 pub(crate) async fn inspect_by_key(
   vm_key: &str,
-  docker_api: &Docker,
-  pool: &Pool,
+  state: &DaemonState,
 ) -> HttpResult<VmInspect> {
-  let vm = repositories::vm::inspect_by_key(vm_key, pool).await?;
-  let containers = list_instances_by_key(&vm.key, docker_api).await?;
+  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
+  let containers = list_instances_by_key(&vm.key, &state.docker_api).await?;
   let mut running_instances = 0;
   for container in &containers {
     if container.state == Some("running".into()) {
@@ -187,11 +179,7 @@ pub(crate) async fn delete_by_key(
   repositories::vm::delete_by_key(vm_key, &state.pool).await?;
   repositories::vm_config::delete_by_vm_key(&vm.key, &state.pool).await?;
   utils::vm_image::delete_by_name(&vm.config.disk.image, &state.pool).await?;
-  let event_emitter = state.event_emitter.clone();
-  let vm_ptr = vm.clone();
-  rt::spawn(async move {
-    let _ = event_emitter.emit(Event::VmDeleted(Box::new(vm_ptr))).await;
-  });
+  state.event_emitter.spawn_emit(&vm, EventAction::Deleted);
   Ok(())
 }
 
@@ -365,11 +353,6 @@ pub(crate) async fn create_instance(
     ..Default::default()
   });
   state.docker_api.create_container(options, config).await?;
-  let event_emitter = state.event_emitter.clone();
-  let vm_ptr = vm.clone();
-  rt::spawn(async move {
-    let _ = event_emitter.emit(Event::VmCreated(Box::new(vm_ptr))).await;
-  });
   Ok(())
 }
 
@@ -431,6 +414,7 @@ pub(crate) async fn create(
   let vm =
     repositories::vm::create(namespace, &vm, version, &state.pool).await?;
   create_instance(&vm, &image, true, state).await?;
+  state.event_emitter.spawn_emit(&vm, EventAction::Created);
   Ok(vm)
 }
 
@@ -540,10 +524,6 @@ pub(crate) async fn put(
       .await?;
   create_instance(&vm, &image, false, state).await?;
   start_by_key(&vm.key, state).await?;
-  let event_emitter = state.event_emitter.clone();
-  let vm_ptr = vm.clone();
-  rt::spawn(async move {
-    let _ = event_emitter.emit(Event::VmPatched(Box::new(vm_ptr))).await;
-  });
+  state.event_emitter.spawn_emit(&vm, EventAction::Patched);
   Ok(vm)
 }

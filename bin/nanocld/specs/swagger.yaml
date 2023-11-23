@@ -3599,7 +3599,10 @@ components:
             description: HostGateway is the gateway address of the host
           Config:
             $ref: '#/components/schemas/DaemonConfig'
-      description: HostInfo contains information about the host and the docker daemon
+      description: |-
+        ## HostInfo
+
+        HostInfo contains information about the host and the docker daemon
     HttpMetric:
       type: object
       required:
@@ -5569,7 +5572,7 @@ components:
     Secret:
       type: object
       description: |
-        ## SecretDbModel
+        ## Secret
 
         This structure represent the secret in the database.
         A secret is a key/value pair that can be used by the user to store
@@ -6464,7 +6467,10 @@ components:
       - Temporary
     Version:
       type: object
-      description: Version contain details about the current version nanocl
+      description: |
+        ## Version
+
+        Version contain details about the current version nanocl
       required:
       - Arch
       - Channel

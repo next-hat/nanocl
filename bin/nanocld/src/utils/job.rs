@@ -13,7 +13,7 @@ use bollard_next::container::{
 };
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::job::{
   Job, JobPartial, JobInspect, JobLogOutput, JobWaitResponse, WaitCondition,

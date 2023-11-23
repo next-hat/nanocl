@@ -4,11 +4,12 @@ use serde::{Serialize, Deserialize};
 use bollard_next::container::{
   LogOutput, KillContainerOptions, LogsOptions, StatsOptions,
 };
-
 pub use bollard_next::exec::CreateExecOptions;
 pub use bollard_next::container::Stats as CargoStats;
 
 use crate::node::NodeContainerSummary;
+use crate::cargo_config::CargoConfigPartial;
+use crate::system::{Event, EventKind, ToEvent, EventAction, EventActor};
 
 use super::cargo_config::CargoConfig;
 
@@ -22,6 +23,7 @@ use super::cargo_config::CargoConfig;
 /// That way you can rollback to a previous configuration quickly
 ///
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -36,6 +38,37 @@ pub struct Cargo {
   pub config_key: uuid::Uuid,
   /// Configuration of the cargo
   pub config: CargoConfig,
+}
+
+impl From<Cargo> for CargoConfigPartial {
+  fn from(cargo: Cargo) -> Self {
+    cargo.config.into()
+  }
+}
+
+/// Convert a Cargo into an EventActor
+impl From<Cargo> for EventActor {
+  fn from(cargo: Cargo) -> Self {
+    Self {
+      key: Some(cargo.key),
+      attributes: Some(serde_json::json!({
+        "Name": cargo.name,
+        "Namespace": cargo.namespace_name,
+        "Version": cargo.config.version,
+        "Metadata": cargo.config.metadata,
+      })),
+    }
+  }
+}
+
+impl ToEvent for Cargo {
+  fn to_event(&self, action: EventAction) -> Event {
+    Event {
+      kind: EventKind::Cargo,
+      action,
+      actor: Some(self.clone().into()),
+    }
+  }
 }
 
 /// A CargoSummary is a summary of a cargo
@@ -71,7 +104,6 @@ pub struct CargoSummary {
 /// It also contains the list of containers
 ///
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]

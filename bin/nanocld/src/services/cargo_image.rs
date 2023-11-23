@@ -7,7 +7,7 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio_util::codec;
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::{HttpError, HttpResult};
 
 use bollard_next::image::ImportImageOptions;
 use nanocl_stubs::cargo_image::{

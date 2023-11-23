@@ -1,6 +1,8 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
+use crate::system::{EventActor, ToEvent, EventAction, Event, EventKind};
+
 /// Resource partial is a payload used to create a new resource
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -90,6 +92,32 @@ pub struct Resource {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub metadata: Option<serde_json::Value>,
+}
+
+/// Convert a Resource into an EventActor
+impl From<Resource> for EventActor {
+  fn from(resource: Resource) -> Self {
+    Self {
+      key: Some(resource.name),
+      attributes: Some(serde_json::json!({
+        "Kind": resource.kind,
+        "Version": resource.version,
+        "Metadata": resource.metadata,
+        "Spec": resource.data,
+      })),
+    }
+  }
+}
+
+/// Implement ToEvent for Resource to generate an event
+impl ToEvent for Resource {
+  fn to_event(&self, action: EventAction) -> Event {
+    Event {
+      kind: EventKind::Resource,
+      action,
+      actor: Some(self.clone().into()),
+    }
+  }
 }
 
 impl From<Resource> for ResourcePartial {
