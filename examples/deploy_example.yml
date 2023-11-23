@@ -29,7 +29,7 @@ Resources:
           Locations:
             - Path: /
               Target:
-                Key: deploy-example-v2.global.c
+                Key: deploy-example2.global.c
                 Port: 9000
             - Path: /v1
               Target:
@@ -37,7 +37,7 @@ Resources:
                 Port: 9000
             - Path: /v2
               Target:
-                Key: deploy-example-v2.global.c
+                Key: deploy-example2.global.c
                 Port: 9000
 
 # See all options:
@@ -54,7 +54,7 @@ Cargoes:
       Env:
         - APP=GET_STARTED
 
-  - Name: deploy-example-v2
+  - Name: deploy-example2
     Container:
       Image: ghcr.io/nxthat/nanocl-get-started:latest
       Env:
