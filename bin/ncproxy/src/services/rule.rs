@@ -77,7 +77,7 @@ mod tests {
     let yaml: serde_yaml::Value = serde_yaml::from_str(resource).unwrap();
     let resource = yaml["Resources"][0].clone();
     let name = resource["Name"].as_str().unwrap();
-    let payload = resource["Config"].clone();
+    let payload = resource["Data"].clone();
     let res = client
       .send_put(&format!("/rules/{name}"), Some(&payload), None::<String>)
       .await;
