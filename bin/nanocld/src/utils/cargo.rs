@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use ntex::rt;
 use ntex::util::Bytes;
