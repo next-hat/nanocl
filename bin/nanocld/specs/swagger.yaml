@@ -2240,7 +2240,7 @@ components:
     CargoSpec:
       type: object
       description: |-
-        A cargo config is the configuration of a cargo
+        A cargo spec is the specification of a cargo
         It used to know the state of the cargo
         It keep tracking of an history when you patch an existing cargo
       required:
@@ -2254,17 +2254,17 @@ components:
         Key:
           type: string
           format: uuid
-          description: Unique identifier of the cargo config
+          description: Unique identifier of the cargo spec
         CargoKey:
           type: string
           description: The key of the cargo
         Version:
           type: string
-          description: Version of the config
+          description: Version of the spec
         CreatedAt:
           type: string
           format: date-time
-          description: Creation date of the cargo config
+          description: Creation date of the cargo spec
         Name:
           type: string
           description: Name of the cargo
@@ -2289,7 +2289,7 @@ components:
           nullable: true
     CargoSpecPartial:
       type: object
-      description: A cargo config partial is used to create a Cargo
+      description: A cargo spec partial is used to create a Cargo
       required:
       - Name
       - Container
@@ -6507,7 +6507,7 @@ components:
         SpecKey:
           type: string
           format: uuid
-          description: Unique identifier of the vm config
+          description: Unique identifier of the vm spec
         Spec:
           $ref: '#/components/schemas/VmSpec'
     VmDisk:

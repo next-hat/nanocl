@@ -20,7 +20,7 @@ pub struct Vm {
   pub namespace_name: String,
   /// Name of the vm
   pub name: String,
-  /// Unique identifier of the vm config
+  /// Unique identifier of the vm spec
   pub spec_key: uuid::Uuid,
   /// Specification of the vm
   pub spec: VmSpec,
