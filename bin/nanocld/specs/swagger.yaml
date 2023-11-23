@@ -1325,8 +1325,8 @@ paths:
     put:
       tags:
       - Resources
-      summary: Patch a resource (update its version and/or config) and create a new history
-      description: Patch a resource (update its version and/or config) and create a new history
+      summary: Patch a resource (update its version and/or spec) and create a new history
+      description: Patch a resource (update its version and/or spec) and create a new history
       operationId: put_resource
       parameters:
       - name: Name
@@ -2273,7 +2273,7 @@ components:
           nullable: true
         InitContainer:
           allOf:
-          - $ref: '#/components/schemas/Config'
+          - $ref: '#/components/schemas/ContainerSpec'
           nullable: true
         Secrets:
           type: array
@@ -2282,7 +2282,7 @@ components:
           description: List of secrets to use as environment variables
           nullable: true
         Container:
-          $ref: '#/components/schemas/Config'
+          $ref: '#/components/schemas/ContainerSpec'
         Replication:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
@@ -2302,7 +2302,7 @@ components:
           nullable: true
         InitContainer:
           allOf:
-          - $ref: '#/components/schemas/Config'
+          - $ref: '#/components/schemas/ContainerSpec'
           nullable: true
         Secrets:
           type: array
@@ -2311,7 +2311,7 @@ components:
           description: List of secrets to use as environment variables
           nullable: true
         Container:
-          $ref: '#/components/schemas/Config'
+          $ref: '#/components/schemas/ContainerSpec'
         Replication:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
@@ -2320,7 +2320,7 @@ components:
       type: object
       description: |-
         Payload used to patch a cargo
-        It will create a new [CargoConfig](CargoConfig) with the new values
+        It will create a new [CargoSpec](CargoSpec) with the new values
         It will keep the old values in the history
       properties:
         Name:
@@ -2332,7 +2332,7 @@ components:
           nullable: true
         InitContainer:
           allOf:
-          - $ref: '#/components/schemas/Config'
+          - $ref: '#/components/schemas/ContainerSpec'
           nullable: true
         Secrets:
           type: array
@@ -2342,7 +2342,7 @@ components:
           nullable: true
         Container:
           allOf:
-          - $ref: '#/components/schemas/Config'
+          - $ref: '#/components/schemas/ContainerSpec'
           nullable: true
         Replication:
           allOf:
@@ -3965,7 +3965,7 @@ components:
         Containers:
           type: array
           items:
-            $ref: '#/components/schemas/Config'
+            $ref: '#/components/schemas/ContainerSpec'
           description: Containers to run
     JobInspect:
       type: object
@@ -4014,7 +4014,7 @@ components:
         Containers:
           type: array
           items:
-            $ref: '#/components/schemas/Config'
+            $ref: '#/components/schemas/ContainerSpec'
           description: Containers to run
         InstanceTotal:
           type: integer
@@ -4068,7 +4068,7 @@ components:
         Containers:
           type: array
           items:
-            $ref: '#/components/schemas/Config'
+            $ref: '#/components/schemas/ContainerSpec'
           description: List of container to run
     JobSummary:
       type: object
@@ -5358,8 +5358,8 @@ components:
     Resource:
       type: object
       description: |-
-        Resource is a configuration with a name and a kind
-        It is used to define [proxy rules](ProxyRule) and other kind of config
+        Resource is a specification with a name and a kind
+        It is used to define [proxy rules](ProxyRule) and other kind of spec
       required:
       - Name
       - CreatedAt
@@ -5389,10 +5389,10 @@ components:
         SpecKey:
           type: string
           format: uuid
-          description: The config of the resource
+          description: The spec of the resource
         Data:
           type: object
-          description: The config of the resource as a json object
+          description: The spec of the resource as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
         Metadata:
@@ -5454,9 +5454,9 @@ components:
     ResourceSpec:
       type: object
       description: |
-        ## ResourceConfig
+        ## ResourceSpec
 
-        The config of the resource
+        The spec of the resource
       required:
       - Key
       - Version
@@ -5496,15 +5496,15 @@ components:
       properties:
         Version:
           type: string
-          description: Version of the config
+          description: Version of the spec
         Data:
           type: object
-          description: The config of the resource as a json object
+          description: The spec of the resource as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
         Metadata:
           type: object
-          description: The config of the resource as a json object
+          description: The metadata of the resource as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
     ResourcesBlkioWeightDevice:
@@ -6525,7 +6525,7 @@ components:
           description: 'Virtual size allowed for the disk in GB (default: 20)'
           nullable: true
           minimum: 0
-    VmHost:
+    VmHostConfig:
       type: object
       description: A vm's resources (cpu, memory, network)
       required:
@@ -6668,7 +6668,7 @@ components:
     VmSpec:
       type: object
       description: |-
-        A vm config is the configuration of a vm
+        A vm spec is the specification of a vm
         It used to know the state of the vm
         It keep tracking of an history when you patch an existing vm
       required:
@@ -6683,17 +6683,17 @@ components:
         Key:
           type: string
           format: uuid
-          description: Unique identifier of the vm config
+          description: Unique identifier of the vm spec
         CreatedAt:
           type: string
           format: date-time
-          description: Creation date of the vm config
+          description: Creation date of the vm spec
         Name:
           type: string
           description: Name of the vm
         Version:
           type: string
-          description: Version of the config
+          description: Version of the spec
         VmKey:
           type: string
           description: The key of the vm
@@ -6729,10 +6729,10 @@ components:
             type: string
           nullable: true
         HostConfig:
-          $ref: '#/components/schemas/VmHost'
+          $ref: '#/components/schemas/VmHostConfig'
     VmSpecPartial:
       type: object
-      description: A vm config partial is used to create a vm
+      description: A vm spec partial is used to create a vm
       required:
       - Name
       - Disk
@@ -6773,7 +6773,7 @@ components:
           nullable: true
         HostConfig:
           allOf:
-          - $ref: '#/components/schemas/VmHost'
+          - $ref: '#/components/schemas/VmHostConfig'
           nullable: true
     VmSpecUpdate:
       type: object
@@ -6815,7 +6815,7 @@ components:
           nullable: true
         HostConfig:
           allOf:
-          - $ref: '#/components/schemas/VmHost'
+          - $ref: '#/components/schemas/VmHostConfig'
           nullable: true
     VmSummary:
       type: object

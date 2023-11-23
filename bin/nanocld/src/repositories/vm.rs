@@ -68,16 +68,16 @@ pub(crate) async fn create(
     ));
   }
   let key = utils::key::gen_key(&nsp, &item.name);
-  let config = super::vm_spec::create(&key, item, version, pool).await?;
+  let spec = super::vm_spec::create(&key, item, version, pool).await?;
   let new_item = VmDb {
     key,
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
-    spec_key: config.key,
+    spec_key: spec.key,
   };
   let item: VmDb = super::generic::insert_with_res(new_item, pool).await?;
-  let vm = item.into_vm(config);
+  let vm = item.into_vm(spec);
   Ok(vm)
 }
 
@@ -129,7 +129,7 @@ pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<VmDb> {
 /// ## Arguments
 ///
 /// * [key](str) - Vm key
-/// * [item](VmSpecPartial) - Vm config
+/// * [item](VmSpecPartial) - Vm spec
 /// * [version](str) - Vm version
 /// * [pool](Pool) - Database connection pool
 ///
@@ -146,17 +146,17 @@ pub(crate) async fn update_by_key(
   use crate::schema::vms;
   let key = key.to_owned();
   let vmdb = find_by_key(&key, pool).await?;
-  let config = super::vm_spec::create(&key, item, version, pool).await?;
+  let spec = super::vm_spec::create(&key, item, version, pool).await?;
   let new_item = VmUpdateDb {
     name: Some(item.name.clone()),
-    spec_key: Some(config.key),
+    spec_key: Some(spec.key),
     ..Default::default()
   };
   super::generic::update_by_id::<vms::table, VmUpdateDb, _>(
     key, new_item, pool,
   )
   .await?;
-  let vm = vmdb.into_vm(config);
+  let vm = vmdb.into_vm(spec);
   Ok(vm)
 }
 
@@ -188,24 +188,24 @@ pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
     Ok::<_, IoError>(item)
   })
   .await?;
-  let config = serde_json::from_value::<VmSpecPartial>(item.1.data)
+  let spec = serde_json::from_value::<VmSpecPartial>(item.1.data)
     .map_err(|err| err.map_err_context(|| "VmSpecPartial"))?;
-  let config = VmSpec {
+  let spec = VmSpec {
     key: item.1.key,
     created_at: item.0.created_at,
-    name: config.name,
+    name: spec.name,
     version: item.1.version,
     vm_key: item.1.vm_key,
-    hostname: config.hostname,
-    disk: config.disk,
-    user: config.user,
-    mac_address: config.mac_address,
-    labels: config.labels,
-    host_config: config.host_config.unwrap_or_default(),
-    password: config.password,
-    ssh_key: config.ssh_key,
-    metadata: config.metadata,
+    hostname: spec.hostname,
+    disk: spec.disk,
+    user: spec.user,
+    mac_address: spec.mac_address,
+    labels: spec.labels,
+    host_config: spec.host_config.unwrap_or_default(),
+    password: spec.password,
+    ssh_key: spec.ssh_key,
+    metadata: spec.metadata,
   };
-  let item = item.0.into_vm(config);
+  let item = item.0.into_vm(spec);
   Ok(item)
 }

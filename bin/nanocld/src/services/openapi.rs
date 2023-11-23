@@ -54,7 +54,9 @@ use nanocl_stubs::cargo_spec::{
 };
 use nanocl_stubs::cargo_image::CargoImagePartial;
 use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
-use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial, VmSpecUpdate, VmDisk, VmHost};
+use nanocl_stubs::vm_spec::{
+  VmSpec, VmSpecPartial, VmSpecUpdate, VmDisk, VmHostConfig,
+};
 use nanocl_stubs::resource::{
   Resource, ResourceUpdate, ResourceSpec, ResourcePartial,
 };
@@ -435,7 +437,7 @@ impl Modify for VersionModifier {
     VmSpecPartial,
     VmSpecUpdate,
     VmDisk,
-    VmHost,
+    VmHostConfig,
     // Resource
     Resource,
     ResourceUpdate,

@@ -10,12 +10,12 @@ use crate::models::{Pool, CargoSpecDb};
 
 /// ## Create
 ///
-/// Create a cargo config item in database for given cargo
+/// Create a cargo spec item in database for given cargo
 ///
 /// ## Arguments
 ///
 /// * [cargo_key](str) - Cargo key
-/// * [item](CargoSpecPartial) - Cargo config item
+/// * [item](CargoSpecPartial) - Cargo spec item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
@@ -45,17 +45,17 @@ pub(crate) async fn create(
   };
   let dbmodel =
     super::generic::insert_with_res::<_, _, CargoSpecDb>(dbmodel, pool).await?;
-  let config = dbmodel.into_cargo_spec(item);
-  Ok(config)
+  let spec = dbmodel.into_cargo_spec(item);
+  Ok(spec)
 }
 
 /// ## Find by key
 ///
-/// Find a cargo config item in database for given key
+/// Find a cargo spec item in database for given key
 ///
 /// ## Arguments
 ///
-/// * [key](uuid::Uuid) - Cargo config key
+/// * [key](uuid::Uuid) - Cargo spec key
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
@@ -70,14 +70,14 @@ pub(crate) async fn find_by_key(
   let key = *key;
   let dbmodel: CargoSpecDb =
     super::generic::find_by_id::<cargo_specs::table, _, _>(key, pool).await?;
-  let config = serde_json::from_value::<CargoSpecPartial>(dbmodel.data.clone())
+  let spec = serde_json::from_value::<CargoSpecPartial>(dbmodel.data.clone())
     .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
-  Ok(dbmodel.into_cargo_spec(&config))
+  Ok(dbmodel.into_cargo_spec(&spec))
 }
 
 /// ## Delete by cargo key
 ///
-/// Delete all cargo config items in database for given cargo key
+/// Delete all cargo spec items in database for given cargo key
 ///
 /// ## Arguments
 ///
@@ -103,7 +103,7 @@ pub(crate) async fn delete_by_cargo_key(
 
 /// ## List by cargo key
 ///
-/// List all cargo config items in database for given cargo key.
+/// List all cargo spec items in database for given cargo key.
 ///
 /// ## Arguments
 ///
@@ -123,22 +123,22 @@ pub(crate) async fn list_by_cargo_key(
   let pool = pool.clone();
   let dbmodels = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let configs = cargo_specs::dsl::cargo_specs
+    let specs = cargo_specs::dsl::cargo_specs
       .order(cargo_specs::dsl::created_at.desc())
       .filter(cargo_specs::dsl::cargo_key.eq(key))
       .get_results::<CargoSpecDb>(&mut conn)
       .map_err(|err| err.map_err_context(|| "CargoSpec"))?;
-    Ok::<_, IoError>(configs)
+    Ok::<_, IoError>(specs)
   })
   .await?;
-  let configs = dbmodels
+  let specs = dbmodels
     .into_iter()
     .map(|dbmodel: CargoSpecDb| {
-      let config =
+      let spec =
         serde_json::from_value::<CargoSpecPartial>(dbmodel.data.clone())
           .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
-      Ok(dbmodel.into_cargo_spec(&config))
+      Ok(dbmodel.into_cargo_spec(&spec))
     })
     .collect::<Result<Vec<CargoSpec>, IoError>>()?;
-  Ok(configs)
+  Ok(specs)
 }

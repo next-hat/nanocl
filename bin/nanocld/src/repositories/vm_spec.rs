@@ -10,14 +10,14 @@ use crate::models::{Pool, VmSpecDb};
 
 /// ## Create
 ///
-/// Create a vm config item in database for given `VmSpecPartial`
+/// Create a vm spec item in database for given `VmSpecPartial`
 /// and return a `VmSpec` with the generated key
 ///
 /// ## Arguments
 ///
 /// * [vm_key](str) - Vm key
-/// * [item](VmSpecPartial) - Vm config item
-/// * [version](str) - Vm config version
+/// * [item](VmSpecPartial) - Vm spec item
+/// * [version](str) - Vm spec version
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
@@ -50,11 +50,11 @@ pub(crate) async fn create(
 
 /// ## Find by key
 ///
-/// Find a vm config item in database for given key
+/// Find a vm spec item in database for given key
 ///
 /// ## Arguments
 ///
-/// * [key](uuid::Uuid) - Vm config key
+/// * [key](uuid::Uuid) - Vm spec key
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
@@ -70,14 +70,14 @@ pub(crate) async fn find_by_key(
   let dbmodel =
     super::generic::find_by_id::<vm_specs::table, _, VmSpecDb>(key, pool)
       .await?;
-  let config = serde_json::from_value::<VmSpecPartial>(dbmodel.data.clone())
+  let spec = serde_json::from_value::<VmSpecPartial>(dbmodel.data.clone())
     .map_err(|err| err.map_err_context(|| "VmSpecPartial"))?;
-  Ok(dbmodel.into_vm_spec(&config))
+  Ok(dbmodel.into_vm_spec(&spec))
 }
 
 /// ## Delete by vm key
 ///
-/// Delete all vm config items in database for given vm key
+/// Delete all vm spec items in database for given vm key
 ///
 /// ## Arguments
 ///
@@ -109,7 +109,7 @@ pub(crate) async fn delete_by_vm_key(
 
 /// ## List by vm key
 ///
-/// List all vm config items in database for given vm key
+/// List all vm spec items in database for given vm key
 ///
 /// ## Arguments
 ///
@@ -129,21 +129,20 @@ pub(crate) async fn list_by_vm_key(
   let pool = pool.clone();
   let dbmodels = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let configs = vm_specs::dsl::vm_specs
+    let specs = vm_specs::dsl::vm_specs
       .filter(vm_specs::dsl::vm_key.eq(key))
       .get_results::<VmSpecDb>(&mut conn)
       .map_err(|err| err.map_err_context(|| "VmSpec"))?;
-    Ok::<_, IoError>(configs)
+    Ok::<_, IoError>(specs)
   })
   .await?;
-  let configs = dbmodels
+  let specs = dbmodels
     .into_iter()
     .map(|dbmodel: VmSpecDb| {
-      let config =
-        serde_json::from_value::<VmSpecPartial>(dbmodel.data.clone())
-          .map_err(|err| err.map_err_context(|| "VmSpecPartial"))?;
-      Ok(dbmodel.into_vm_spec(&config))
+      let spec = serde_json::from_value::<VmSpecPartial>(dbmodel.data.clone())
+        .map_err(|err| err.map_err_context(|| "VmSpecPartial"))?;
+      Ok(dbmodel.into_vm_spec(&spec))
     })
     .collect::<Result<Vec<VmSpec>, IoError>>()?;
-  Ok(configs)
+  Ok(specs)
 }

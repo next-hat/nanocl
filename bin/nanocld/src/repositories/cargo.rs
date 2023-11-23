@@ -103,16 +103,16 @@ pub(crate) async fn create(
     ));
   }
   let key = utils::key::gen_key(&nsp, &item.name);
-  let config = super::cargo_spec::create(&key, &item, &version, pool).await?;
+  let spec = super::cargo_spec::create(&key, &item, &version, pool).await?;
   let new_item = CargoDb {
     key,
     name: item.name,
     created_at: chrono::Utc::now().naive_utc(),
     namespace_name: nsp,
-    spec_key: config.key,
+    spec_key: spec.key,
   };
   let item: CargoDb = super::generic::insert_with_res(new_item, pool).await?;
-  let cargo = item.into_cargo(config);
+  let cargo = item.into_cargo(spec);
   Ok(cargo)
 }
 
@@ -164,7 +164,7 @@ pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<CargoDb> {
 /// ## Arguments
 ///
 /// * [key](str) - Cargo key
-/// * [item](CargoSpecPartial) - Cargo config
+/// * [item](CargoSpecPartial) - Cargo spec
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
@@ -180,10 +180,10 @@ pub(crate) async fn update_by_key(
   use crate::schema::cargoes;
   let version = version.to_owned();
   let cargodb = find_by_key(key, pool).await?;
-  let config = super::cargo_spec::create(key, item, &version, pool).await?;
+  let spec = super::cargo_spec::create(key, item, &version, pool).await?;
   let new_item = CargoUpdateDb {
     name: Some(item.name.to_owned()),
-    spec_key: Some(config.key),
+    spec_key: Some(spec.key),
     ..Default::default()
   };
   let key = key.to_owned();
@@ -191,7 +191,7 @@ pub(crate) async fn update_by_key(
     key, new_item, pool,
   )
   .await?;
-  let cargo = cargodb.into_cargo(config);
+  let cargo = cargodb.into_cargo(spec);
   Ok(cargo)
 }
 
@@ -256,9 +256,9 @@ pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
     Ok::<_, IoError>(item)
   })
   .await?;
-  let config = serde_json::from_value::<CargoSpecPartial>(item.1.data.clone())
+  let spec = serde_json::from_value::<CargoSpecPartial>(item.1.data.clone())
     .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
-  let config = item.1.into_cargo_spec(&config);
-  let item = item.0.into_cargo(config);
+  let spec = item.1.into_cargo_spec(&spec);
+  let item = item.0.into_cargo(spec);
   Ok(item)
 }

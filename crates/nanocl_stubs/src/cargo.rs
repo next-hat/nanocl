@@ -91,7 +91,7 @@ pub struct CargoSummary {
   pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Configuration of the cargo
+  /// Specification of the cargo
   pub spec: CargoSpec,
   /// Number of instances
   pub instance_total: usize,
@@ -116,7 +116,7 @@ pub struct CargoInspect {
   pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Configuration of the cargo
+  /// Specification of the cargo
   pub spec: CargoSpec,
   /// Number of instances
   pub instance_total: usize,

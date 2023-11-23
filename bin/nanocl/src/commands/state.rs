@@ -15,9 +15,7 @@ use nanocld_client::NanocldClient;
 use nanocld_client::stubs::job::JobPartial;
 use nanocld_client::stubs::state::{StateMeta, StateApplyQuery, StateStreamStatus};
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
-use nanocld_client::stubs::cargo_spec::{
-  CargoSpecPartial, Config as ContainerConfig,
-};
+use nanocld_client::stubs::cargo_spec::{CargoSpecPartial, ContainerSpec};
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -117,11 +115,11 @@ where
 ///
 /// ## Arguments
 ///
-/// * [cargo](CargoConfigPartial) The cargo config
+/// * [cargo](CargoSpecPartial) The cargo spec
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [CargoConfigPartial](CargoConfigPartial)
+/// [IoResult](IoResult) containing a [CargoSpecPartial](CargoSpecPartial)
 ///
 fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
   let new_cargo = match &cargo.container.host_config {
@@ -149,7 +147,7 @@ fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
           new_binds.push(new_bind);
         }
         CargoSpecPartial {
-          container: ContainerConfig {
+          container: ContainerSpec {
             host_config: Some(HostConfig {
               binds: Some(new_binds),
               ..host_config.clone()
@@ -171,7 +169,7 @@ fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
 /// ## Arguments
 ///
 /// * [client](NanocldClient) The client to the daemon
-/// * [cargo](CargoConfigPartial) The cargo config
+/// * [cargo](CargoSpecPartial) The cargo spec
 /// * [namespace](str) The namespace of the cargo
 ///
 /// ## Return
@@ -318,7 +316,7 @@ pub async fn log_jobs(
 /// ## Arguments
 ///
 /// * [client](NanocldClient) The client to the daemon
-/// * [cargoes](Vec<CargoConfigPartial>) The list of cargoes
+/// * [cargoes](Vec<CargoSpecPartial>) The list of cargoes
 /// * [namespace](str) The namespace of the cargoes
 ///
 /// ## Return
@@ -347,11 +345,11 @@ pub async fn log_cargoes(
 ///
 /// ## Arguments
 ///
-/// * [cargoes](Vec<CargoConfigPartial>) The cargoes config
+/// * [cargoes](Vec<CargoSpecPartial>) The cargoes spec
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoConfigPartial](CargoConfigPartial)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoSpecPartial](CargoSpecPartial)
 ///
 fn hook_cargoes(
   cargoes: Vec<CargoSpecPartial>,

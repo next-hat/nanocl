@@ -19,7 +19,7 @@ impl NanocldClient {
   ///
   /// ## Arguments
   ///
-  /// * [vm](VmConfigPartial) - The config for the vm
+  /// * [vm](VmSpecPartial) - The spec for the vm
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
   /// ## Return
@@ -200,12 +200,12 @@ impl NanocldClient {
 
   /// ## Patch vm
   ///
-  /// Patch a vm by it's name and namespace to update it's config
+  /// Patch a vm by it's name and namespace to update it's spec
   ///
   /// ## Arguments
   ///
   /// * [name](str) - The name of the vm to patch
-  /// * [vm](VmConfigUpdate) - The config to update the vm
+  /// * [vm](VmSpecUpdate) - The spec to update the vm
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
   pub async fn patch_vm(

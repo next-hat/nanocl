@@ -5,9 +5,7 @@ Resources:
   - Name: proxy-get-started
     Kind: ProxyRule
     Version: v0.8
-    Config:
-      Watch:
-        - get-started.global.c
+    Data:
       Rules:
         - Protocol: Tcp
           Port: 9999

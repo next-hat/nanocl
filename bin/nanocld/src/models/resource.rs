@@ -10,9 +10,9 @@ use crate::models::resource_spec::ResourceSpecDb;
 /// ## ResourceDb
 ///
 /// This structure represent a resource in the database.
-/// A resource is a representation of a configuration for internal nanocl services (controllers).
+/// A resource is a representation of a specification for internal nanocl services (controllers).
 /// Custom `kind` can be added to the system.
-/// We use the `spec_key` to link to the resource config.
+/// We use the `spec_key` to link to the resource spec.
 /// The `key` is used to identify the resource.
 /// The `kind` is used to know which controller to use.
 ///
@@ -28,7 +28,7 @@ pub struct ResourceDb {
   pub(crate) created_at: chrono::NaiveDateTime,
   /// The kind of the resource
   pub(crate) kind: String,
-  /// The config key reference
+  /// The spec key reference
   pub(crate) spec_key: uuid::Uuid,
 }
 
@@ -56,6 +56,6 @@ impl ResourceDb {
 pub struct ResourceUpdateDb {
   /// The key of the resource
   pub(crate) key: Option<String>,
-  /// The config key reference
+  /// The spec key reference
   pub(crate) spec_key: Option<uuid::Uuid>,
 }

@@ -26,7 +26,7 @@ pub(crate) async fn create(
   item: &ResourcePartial,
   pool: &Pool,
 ) -> IoResult<Resource> {
-  let config = ResourceSpecDb {
+  let spec = ResourceSpecDb {
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: item.name.to_owned(),
@@ -34,16 +34,16 @@ pub(crate) async fn create(
     data: item.data.clone(),
     metadata: item.metadata.clone(),
   };
-  let config = repositories::resource_spec::create(&config, pool).await?;
+  let spec = repositories::resource_spec::create(&spec, pool).await?;
   let new_item = ResourceDb {
     key: item.name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: item.kind.clone(),
-    spec_key: config.key.to_owned(),
+    spec_key: spec.key.to_owned(),
   };
   let dbmodel: ResourceDb =
     super::generic::insert_with_res(new_item, pool).await?;
-  let item = dbmodel.into_resource(config);
+  let item = dbmodel.into_resource(spec);
   Ok(item)
 }
 
@@ -132,8 +132,8 @@ pub(crate) async fn find(
     .into_iter()
     .map(|e| {
       let resource = e.0;
-      let config = e.1;
-      Ok::<_, IoError>(resource.into_resource(config))
+      let spec = e.1;
+      Ok::<_, IoError>(resource.into_resource(spec))
     })
     .collect::<Result<Vec<Resource>, IoError>>()?;
   Ok(items)
@@ -176,8 +176,8 @@ pub(crate) async fn inspect_by_key(
 
 /// ## Put
 ///
-/// Set given `ResourcePartial` as the current config for the resource
-/// and return a `Resource` with the new config
+/// Set given `ResourcePartial` as the current spec for the resource
+/// and return a `Resource` with the new spec
 ///
 /// ## Arguments
 ///
@@ -196,7 +196,7 @@ pub(crate) async fn put(
   let key = item.name.clone();
   let resource =
     repositories::resource::inspect_by_key(&item.name, pool).await?;
-  let config = ResourceSpecDb {
+  let spec = ResourceSpecDb {
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
     resource_key: resource.name.to_owned(),
@@ -204,10 +204,10 @@ pub(crate) async fn put(
     data: item.data.clone(),
     metadata: item.metadata.clone(),
   };
-  let config = repositories::resource_spec::create(&config, pool).await?;
+  let spec = repositories::resource_spec::create(&spec, pool).await?;
   let resource_update = ResourceUpdateDb {
     key: None,
-    spec_key: Some(config.key.to_owned()),
+    spec_key: Some(spec.key.to_owned()),
   };
   let dbmodel = super::generic::update_by_id_with_res::<
     resources::table,
@@ -216,6 +216,6 @@ pub(crate) async fn put(
     ResourceDb,
   >(key, resource_update, pool)
   .await?;
-  let item = dbmodel.into_resource(config);
+  let item = dbmodel.into_resource(spec);
   Ok(item)
 }

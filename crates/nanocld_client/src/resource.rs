@@ -61,8 +61,8 @@ impl NanocldClient {
   /// let res = client.create_resource(&ResourcePartial {
   ///   name: "my-resource".into(),
   ///   kind: String::from("Custom")s,
-  ///   // Your config
-  ///   config: serde_json::json!({}),
+  ///   // Your data
+  ///   data: serde_json::json!({}),
   /// }).await;
   /// ```
   ///
@@ -178,7 +178,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [ResourceConfig](ResourceConfig)
+  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [ResourceSpec](ResourceSpec)
   ///
   /// ## Example
   ///

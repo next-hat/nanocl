@@ -101,7 +101,7 @@ pub(crate) async fn delete_resource(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Patch a resource (update its version and/or config) and create a new history
+/// Patch a resource (update its version and/or spec) and create a new history
 #[cfg_attr(feature = "dev", utoipa::path(
   put,
   request_body = ResourceUpdate,
@@ -217,7 +217,7 @@ mod tests {
   async fn basic() {
     const TEST_RESOURCE: &str = "test_resource";
     let client = gen_default_test_client().await;
-    let config = serde_json::json!({
+    let spec = serde_json::json!({
       "Schema": {
         "type": "object",
         "required": [
@@ -238,7 +238,7 @@ mod tests {
       name: TEST_RESOURCE.to_owned(),
       version: "v0.0.1".to_owned(),
       kind: "Kind".to_owned(),
-      data: config.clone(),
+      data: spec.clone(),
       metadata: Some(serde_json::json!({
         "Test": "gg",
       })),
@@ -346,7 +346,7 @@ mod tests {
     let resource = res.json::<Resource>().await.unwrap();
     assert_eq!(resource.name, TEST_RESOURCE);
     assert_eq!(resource.kind, String::from("Kind"));
-    assert_eq!(&resource.data, &config);
+    assert_eq!(&resource.data, &spec);
     // History
     let _ = client
       .send_get(
@@ -361,7 +361,7 @@ mod tests {
     );
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
-      data: config.clone(),
+      data: spec.clone(),
       metadata: None,
     };
     let mut res = client

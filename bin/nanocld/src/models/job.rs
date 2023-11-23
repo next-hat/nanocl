@@ -19,22 +19,22 @@ pub struct JobDb {
   pub created_at: chrono::NaiveDateTime,
   /// The updated at data
   pub updated_at: chrono::NaiveDateTime,
-  /// The config
+  /// The spec
   pub data: serde_json::Value,
   /// The metadata
   pub metadata: Option<serde_json::Value>,
 }
 
 impl JobDb {
-  pub fn into_job(self, config: &JobPartial) -> Job {
+  pub fn into_job(self, job: &JobPartial) -> Job {
     Job {
       name: self.key.clone(),
       created_at: self.created_at,
       updated_at: self.updated_at,
-      secrets: config.secrets.clone(),
+      secrets: job.secrets.clone(),
       metadata: self.metadata.clone(),
-      containers: config.containers.clone(),
-      schedule: config.schedule.clone(),
+      containers: job.containers.clone(),
+      schedule: job.schedule.clone(),
     }
   }
 

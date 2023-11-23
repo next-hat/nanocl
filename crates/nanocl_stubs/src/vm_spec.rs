@@ -30,7 +30,7 @@ pub struct VmDisk {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct VmHost {
+pub struct VmHostConfig {
   /// Number of cpu of the vm (default: 1)
   pub cpu: u64,
   /// Memory of the vm in MB (default: 512)
@@ -71,7 +71,7 @@ pub struct VmHost {
   pub host_tun: Option<bool>,
 }
 
-impl Default for VmHost {
+impl Default for VmHostConfig {
   fn default() -> Self {
     Self {
       cpu: 1,
@@ -87,7 +87,7 @@ impl Default for VmHost {
   }
 }
 
-/// A vm config partial is used to create a vm
+/// A vm spec partial is used to create a vm
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -147,7 +147,7 @@ pub struct VmSpecPartial {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub host_config: Option<VmHost>,
+  pub host_config: Option<VmHostConfig>,
 }
 
 /// ## VmSpecUpdate
@@ -211,25 +211,25 @@ pub struct VmSpecUpdate {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub host_config: Option<VmHost>,
+  pub host_config: Option<VmHostConfig>,
 }
 
 impl From<VmSpecPartial> for VmSpecUpdate {
-  fn from(vm_config: VmSpecPartial) -> Self {
+  fn from(spec: VmSpecPartial) -> Self {
     Self {
-      name: Some(vm_config.name),
-      hostname: vm_config.hostname,
-      user: vm_config.user,
-      labels: vm_config.labels,
-      host_config: vm_config.host_config,
-      password: vm_config.password,
-      ssh_key: vm_config.ssh_key,
-      metadata: vm_config.metadata,
+      name: Some(spec.name),
+      hostname: spec.hostname,
+      user: spec.user,
+      labels: spec.labels,
+      host_config: spec.host_config,
+      password: spec.password,
+      ssh_key: spec.ssh_key,
+      metadata: spec.metadata,
     }
   }
 }
 
-/// A vm config is the configuration of a vm
+/// A vm spec is the specification of a vm
 /// It used to know the state of the vm
 /// It keep tracking of an history when you patch an existing vm
 #[derive(Debug, Default, Clone)]
@@ -237,13 +237,13 @@ impl From<VmSpecPartial> for VmSpecUpdate {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmSpec {
-  /// Unique identifier of the vm config
+  /// Unique identifier of the vm spec
   pub key: uuid::Uuid,
-  /// Creation date of the vm config
+  /// Creation date of the vm spec
   pub created_at: chrono::NaiveDateTime,
   /// Name of the vm
   pub name: String,
-  /// Version of the config
+  /// Version of the spec
   pub version: String,
   /// The key of the vm
   pub vm_key: String,
@@ -292,37 +292,37 @@ pub struct VmSpec {
   )]
   pub labels: Option<HashMap<String, String>>,
   /// A vm's resources (cpu, memory, network)
-  pub host_config: VmHost,
+  pub host_config: VmHostConfig,
 }
 
 impl From<VmSpec> for VmSpecUpdate {
-  fn from(vm_config: VmSpec) -> Self {
+  fn from(spec: VmSpec) -> Self {
     Self {
-      name: Some(vm_config.name),
-      hostname: vm_config.hostname,
-      user: vm_config.user,
-      labels: vm_config.labels,
-      host_config: Some(vm_config.host_config),
-      password: vm_config.password,
-      ssh_key: vm_config.ssh_key,
-      metadata: vm_config.metadata,
+      name: Some(spec.name),
+      hostname: spec.hostname,
+      user: spec.user,
+      labels: spec.labels,
+      host_config: Some(spec.host_config),
+      password: spec.password,
+      ssh_key: spec.ssh_key,
+      metadata: spec.metadata,
     }
   }
 }
 
 impl From<VmSpec> for VmSpecPartial {
-  fn from(vm_config: VmSpec) -> Self {
+  fn from(spec: VmSpec) -> Self {
     Self {
-      name: vm_config.name,
-      hostname: vm_config.hostname,
-      user: vm_config.user,
-      labels: vm_config.labels,
-      host_config: Some(vm_config.host_config),
-      password: vm_config.password,
-      ssh_key: vm_config.ssh_key,
-      metadata: vm_config.metadata,
-      disk: vm_config.disk,
-      mac_address: vm_config.mac_address,
+      name: spec.name,
+      hostname: spec.hostname,
+      user: spec.user,
+      labels: spec.labels,
+      host_config: Some(spec.host_config),
+      password: spec.password,
+      ssh_key: spec.ssh_key,
+      metadata: spec.metadata,
+      disk: spec.disk,
+      mac_address: spec.mac_address,
     }
   }
 }

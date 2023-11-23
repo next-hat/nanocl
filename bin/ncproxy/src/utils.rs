@@ -356,31 +356,31 @@ async fn get_ssl_config(
   client: &NanocldClient,
 ) -> IoResult<ProxySslSpec> {
   match ssl {
-    ProxySsl::Config(ssl_config) => Ok(ssl_config.clone()),
+    ProxySsl::Config(ssl_spec) => Ok(ssl_spec.clone()),
     ProxySsl::Secret(secret) => {
       let secret = client.inspect_secret(secret).await?;
-      let mut ssl_config = serde_json::from_value::<ProxySslSpec>(secret.data)
+      let mut ssl_spec = serde_json::from_value::<ProxySslSpec>(secret.data)
         .map_err(|err| {
           err.map_err_context(|| "Unable to deserialize ProxySslSpec")
         })?;
       let cert_path = format!("/opt/secrets/{}.cert", secret.key);
-      tokio::fs::write(&cert_path, ssl_config.certificate.clone()).await?;
+      tokio::fs::write(&cert_path, ssl_spec.certificate.clone()).await?;
       let key_path = format!("/opt/secrets/{}.key", secret.key);
-      tokio::fs::write(&key_path, ssl_config.certificate_key.clone()).await?;
-      if let Some(certificate_client) = ssl_config.certificate_client {
+      tokio::fs::write(&key_path, ssl_spec.certificate_key.clone()).await?;
+      if let Some(certificate_client) = ssl_spec.certificate_client {
         let certificate_client_path =
           format!("/opt/secrets/{}.client.cert", secret.key);
         tokio::fs::write(&certificate_client_path, certificate_client).await?;
-        ssl_config.certificate_client = Some(certificate_client_path);
+        ssl_spec.certificate_client = Some(certificate_client_path);
       }
-      if let Some(dh_param) = ssl_config.dh_param {
+      if let Some(dh_param) = ssl_spec.dh_param {
         let dh_param_path = format!("/opt/secrets/{}.pem", secret.key);
         tokio::fs::write(&dh_param_path, dh_param).await?;
-        ssl_config.dh_param = Some(dh_param_path);
+        ssl_spec.dh_param = Some(dh_param_path);
       }
-      ssl_config.certificate = cert_path;
-      ssl_config.certificate_key = key_path;
-      Ok(ssl_config)
+      ssl_spec.certificate = cert_path;
+      ssl_spec.certificate_key = key_path;
+      Ok(ssl_spec)
     }
   }
 }

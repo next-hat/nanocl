@@ -10,11 +10,11 @@ use crate::models::{Pool, ResourceSpecDb};
 
 /// ## Create
 ///
-/// Create a resource config in database
+/// Create a resource spec in database
 ///
 /// ## Arguments
 ///
-/// * [item](ResourceSpecDb) - Resource config item
+/// * [item](ResourceSpecDb) - Resource spec item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
@@ -31,7 +31,7 @@ pub(crate) async fn create(
 
 /// ## Delete by resource key
 ///
-/// Delete all resource config by a resource key
+/// Delete all resource spec by a resource key
 ///
 /// ## Arguments
 ///
@@ -57,7 +57,7 @@ pub(crate) async fn delete_by_resource_key(
 
 /// ## List by resource key
 ///
-/// List all resource config by resource key
+/// List all resource spec by resource key
 ///
 /// ## Arguments
 ///
@@ -94,11 +94,11 @@ pub(crate) async fn list_by_resource_key(
 
 /// ## Find by key
 ///
-/// Find resource config by key
+/// Find resource spec by key
 ///
 /// ## Arguments
 ///
-/// * [key](uuid::Uuid) - Resource config key
+/// * [key](uuid::Uuid) - Resource spec key
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return

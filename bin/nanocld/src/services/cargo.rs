@@ -358,10 +358,10 @@ pub(crate) async fn revert_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo_key = utils::key::gen_key(&namespace, &path.1);
-  let config =
+  let spec =
     repositories::cargo_spec::find_by_key(&path.2, &state.pool).await?;
   let cargo =
-    utils::cargo::put(&cargo_key, &config.clone().into(), &path.0, &state)
+    utils::cargo::put(&cargo_key, &spec.clone().into(), &path.0, &state)
       .await?;
   Ok(web::HttpResponse::Ok().json(&cargo))
 }

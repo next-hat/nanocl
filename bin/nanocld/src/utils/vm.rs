@@ -205,7 +205,7 @@ pub(crate) async fn list_by_namespace(
   let vmes = repositories::vm::find_by_namespace(&namespace, pool).await?;
   let mut vm_summaries = Vec::new();
   for vm in vmes {
-    let config = repositories::vm_spec::find_by_key(&vm.spec_key, pool).await?;
+    let spec = repositories::vm_spec::find_by_key(&vm.spec_key, pool).await?;
     let instances =
       repositories::container_instance::list_for_kind("Vm", &vm.key, pool)
         .await?;
@@ -225,13 +225,13 @@ pub(crate) async fn list_by_namespace(
     vm_summaries.push(VmSummary {
       key: vm.key,
       created_at: vm.created_at,
-      updated_at: config.created_at,
+      updated_at: spec.created_at,
       name: vm.name,
       namespace_name: vm.namespace_name,
-      spec: config.to_owned(),
+      spec: spec.to_owned(),
       instances: instances.len(),
       running_instances,
-      spec_key: config.key,
+      spec_key: spec.key,
     });
   }
   Ok(vm_summaries)
@@ -321,7 +321,7 @@ pub(crate) async fn create_instance(
     Some(runtime) => runtime.to_owned(),
     None => "ghcr.io/nxthat/nanocl-qemu:8.0.2.0".into(),
   };
-  let config = bollard_next::container::Config {
+  let spec = bollard_next::container::Config {
     image: Some(image),
     tty: Some(true),
     hostname: vm.spec.hostname.clone(),
@@ -351,7 +351,7 @@ pub(crate) async fn create_instance(
     name: format!("{}.v", &vm.key),
     ..Default::default()
   });
-  state.docker_api.create_container(options, config).await?;
+  state.docker_api.create_container(options, spec).await?;
   Ok(())
 }
 
@@ -361,7 +361,7 @@ pub(crate) async fn create_instance(
 ///
 /// ## Arguments
 ///
-/// * [vm](VmSpecPartial) - The VM configuration
+/// * [vm](VmSpecPartial) - The VM specification
 /// * [namespace](str) - The namespace
 /// * [version](str) - The version
 /// * [state](DaemonState) - The daemon state
@@ -419,13 +419,13 @@ pub(crate) async fn create(
 
 /// ## Patch
 ///
-/// Patch a VM configuration from a `VmSpecUpdate` in the given namespace.
-/// This will merge the new configuration with the old one.
+/// Patch a VM specification from a `VmSpecUpdate` in the given namespace.
+/// This will merge the new specification with the old one.
 ///
 /// ## Arguments
 ///
 /// * [vm_key](str) - The VM key
-/// * [config](VmSpecUpdate) - The VM configuration
+/// * [spec](VmSpecUpdate) - The VM specification
 /// * [version](str) - The version
 /// * [state](DaemonState) - The daemon state
 ///
@@ -435,52 +435,49 @@ pub(crate) async fn create(
 ///
 pub(crate) async fn patch(
   vm_key: &str,
-  config: &VmSpecUpdate,
+  spec: &VmSpecUpdate,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
   let vm = repositories::vm::find_by_key(vm_key, &state.pool).await?;
-  let old_config =
+  let old_spec =
     repositories::vm_spec::find_by_key(&vm.spec_key, &state.pool).await?;
   let vm_partial = VmSpecPartial {
-    name: config.name.to_owned().unwrap_or(vm.name.clone()),
-    disk: old_config.disk,
+    name: spec.name.to_owned().unwrap_or(vm.name.clone()),
+    disk: old_spec.disk,
     host_config: Some(
-      config
-        .host_config
-        .to_owned()
-        .unwrap_or(old_config.host_config),
+      spec.host_config.to_owned().unwrap_or(old_spec.host_config),
     ),
-    hostname: if config.hostname.is_some() {
-      config.hostname.clone()
+    hostname: if spec.hostname.is_some() {
+      spec.hostname.clone()
     } else {
-      old_config.hostname
+      old_spec.hostname
     },
-    user: if config.user.is_some() {
-      config.user.clone()
+    user: if spec.user.is_some() {
+      spec.user.clone()
     } else {
-      old_config.user
+      old_spec.user
     },
-    password: if config.password.is_some() {
-      config.password.clone()
+    password: if spec.password.is_some() {
+      spec.password.clone()
     } else {
-      old_config.password
+      old_spec.password
     },
-    ssh_key: if config.ssh_key.is_some() {
-      config.ssh_key.clone()
+    ssh_key: if spec.ssh_key.is_some() {
+      spec.ssh_key.clone()
     } else {
-      old_config.ssh_key
+      old_spec.ssh_key
     },
-    mac_address: old_config.mac_address,
-    labels: if config.labels.is_some() {
-      config.labels.clone()
+    mac_address: old_spec.mac_address,
+    labels: if spec.labels.is_some() {
+      spec.labels.clone()
     } else {
-      old_config.labels
+      old_spec.labels
     },
-    metadata: if config.metadata.is_some() {
-      config.metadata.clone()
+    metadata: if spec.metadata.is_some() {
+      spec.metadata.clone()
     } else {
-      old_config.metadata
+      old_spec.metadata
     },
   };
   put(vm_key, &vm_partial, version, state).await
@@ -488,13 +485,13 @@ pub(crate) async fn patch(
 
 /// ## Put
 ///
-/// Put a VM configuration from a `VmSpecPartial` in the given namespace.
-/// This will replace the old configuration with the new one.
+/// Put a VM specification from a `VmSpecPartial` in the given namespace.
+/// This will replace the old specification with the new one.
 ///
 /// ## Arguments
 ///
 /// * [vm_key](str) - The VM key
-/// * [vm_partial](VmSpecPartial) - The VM configuration
+/// * [vm_partial](VmSpecPartial) - The VM specification
 /// * [version](str) - The version
 /// * [state](DaemonState) - The daemon state
 ///

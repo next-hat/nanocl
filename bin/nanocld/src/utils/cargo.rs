@@ -24,7 +24,7 @@ use nanocl_stubs::cargo::{
   CargoStatsQuery,
 };
 use nanocl_stubs::cargo_spec::{
-  CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config as ContainerConfig,
+  CargoSpecPartial, CargoSpecUpdate, ReplicationMode, ContainerSpec,
 };
 
 use crate::{utils, repositories};
@@ -96,9 +96,9 @@ async fn execute_before(
 
 /// ## Create instances
 ///
-/// Create instances (containers) based on the cargo config
+/// Create instances (containers) based on the cargo spec
 /// The number of containers created is based on the number of instances
-/// defined in the cargo config
+/// defined in the cargo spec
 /// If the number of instances is greater than 1, the containers will be named
 /// with the cargo key and a number
 /// Example: cargo-key-1, cargo-key-2, cargo-key-3
@@ -219,9 +219,9 @@ async fn create_instances(
         env.push(format!("NANOCL_CARGO_KEY={}", cargo.key));
         env.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));
         env.push(format!("NANOCL_CARGO_INSTANCE={}", current));
-        // Merge the cargo config with the container config
+        // Merge the cargo spec with the container spec
         // And set his network mode to the cargo namespace
-        let config = bollard_next::container::Config {
+        let spec = bollard_next::container::Config {
           attach_stderr: Some(true),
           attach_stdout: Some(true),
           tty: Some(true),
@@ -251,7 +251,7 @@ async fn create_instances(
         };
         let res = state
           .docker_api
-          .create_container::<String>(Some(create_options), config)
+          .create_container::<String>(Some(create_options), spec)
           .map_err(HttpError::from)
           .await?;
         Ok::<_, HttpError>(res)
@@ -412,13 +412,13 @@ pub(crate) async fn list_instances(
 
 /// ## Create
 ///
-/// Create a cargo based on the given partial config
+/// Create a cargo based on the given partial spec
 /// And create his instances (containers).
 ///
 /// ## Arguments
 ///
 /// * [namespace](str) - The namespace
-/// * [config](CargoSpecPartial) - The cargo config partial
+/// * [spec](CargoSpecPartial) - The cargo spec partial
 /// * [version](str) - The cargo version
 /// * [state](DaemonState) - The daemon state
 ///
@@ -428,13 +428,12 @@ pub(crate) async fn list_instances(
 ///
 pub(crate) async fn create(
   namespace: &str,
-  config: &CargoSpecPartial,
+  spec: &CargoSpecPartial,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
   let cargo =
-    repositories::cargo::create(namespace, config, version, &state.pool)
-      .await?;
+    repositories::cargo::create(namespace, spec, version, &state.pool).await?;
   let number = if let Some(mode) = &cargo.spec.replication {
     match mode {
       ReplicationMode::Static(replication_static) => replication_static.number,
@@ -642,11 +641,11 @@ pub(crate) async fn delete_by_key(
 /// ## Put
 ///
 /// A new history entry is added and the containers are updated
-/// with the new cargo configuration
+/// with the new cargo specification
 ///
 /// ## Arguments
 /// * [cargo_key](str) - The cargo key
-/// * [cargo_partial](CargoSpecPartial) - The cargo config
+/// * [cargo_partial](CargoSpecPartial) - The cargo spec
 /// * [version](str) - The version of the api to use
 /// * [state](DaemonState) - The daemon state
 ///
@@ -681,7 +680,7 @@ pub(crate) async fn put(
   };
   let containers = list_instances(cargo_key, &state.docker_api).await?;
   restore_instances_backup(&containers, state).await?;
-  // Create instance with the new config
+  // Create instance with the new spec
   let new_instances = match create_instances(&cargo, 0, number, state).await {
     // If the creation of the new instance failed, we rename the old containers
     Err(err) => {
@@ -898,12 +897,12 @@ pub(crate) async fn kill_by_name(
 
 /// ## Patch
 ///
-/// Merge the given cargo config with the existing one
+/// Merge the given cargo spec with the existing one
 ///
 /// ## Arguments
 ///
 /// * [key](str) - The cargo key
-/// * [payload](CargoSpecUpdate) - The cargo config update
+/// * [payload](CargoSpecUpdate) - The cargo spec update
 /// * [version](str) - The cargo version
 /// * [state](DaemonState) - The daemon state
 ///
@@ -975,7 +974,7 @@ pub async fn patch(
     } else {
       cargo.spec.container.cmd
     };
-    ContainerConfig {
+    ContainerSpec {
       cmd,
       image,
       env: Some(env_vars),
@@ -988,7 +987,7 @@ pub async fn patch(
   } else {
     cargo.spec.container
   };
-  let config = CargoSpecPartial {
+  let spec = CargoSpecPartial {
     name: cargo.name.clone(),
     container,
     init_container: if payload.init_container.is_some() {
@@ -1008,7 +1007,7 @@ pub async fn patch(
       cargo.spec.metadata
     },
   };
-  utils::cargo::put(key, &config, version, state).await
+  utils::cargo::put(key, &spec, version, state).await
 }
 
 /// ## Get logs

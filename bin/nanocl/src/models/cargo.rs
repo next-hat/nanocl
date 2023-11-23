@@ -6,7 +6,7 @@ use bollard_next::exec::CreateExecOptions;
 use bollard_next::container::MemoryStatsStats;
 use nanocld_client::stubs::cargo::{CargoStats, CargoSummary};
 use nanocld_client::stubs::cargo_spec::{
-  CargoSpecUpdate, Config as ContainerConfig, CargoSpecPartial, HostConfig,
+  CargoSpecUpdate, ContainerSpec, CargoSpecPartial, HostConfig,
 };
 
 use super::DisplayFormat;
@@ -46,12 +46,12 @@ pub struct CargoCreateOpts {
   pub(crate) env: Option<Vec<String>>,
 }
 
-/// Convert CargoCreateOpts to CargoConfigPartial
+/// Convert CargoCreateOpts to CargoSpecPartial
 impl From<CargoCreateOpts> for CargoSpecPartial {
   fn from(val: CargoCreateOpts) -> Self {
     Self {
       name: val.name,
-      container: ContainerConfig {
+      container: ContainerSpec {
         image: Some(val.image),
         // network: val.network,
         // volumes: val.volumes,
@@ -89,12 +89,12 @@ pub struct CargoRunOpts {
   pub command: Vec<String>,
 }
 
-/// Convert CargoRunOpts to CargoConfigPartial
+/// Convert CargoRunOpts to CargoSpecPartial
 impl From<CargoRunOpts> for CargoSpecPartial {
   fn from(val: CargoRunOpts) -> Self {
     Self {
       name: val.name,
-      container: ContainerConfig {
+      container: ContainerSpec {
         image: Some(val.image),
         // network: val.network,
         // volumes: val.volumes,
@@ -177,12 +177,12 @@ pub struct CargoPatchOpts {
   pub(crate) volumes: Option<Vec<String>>,
 }
 
-/// Convert CargoPatchOpts to CargoConfigUpdate
+/// Convert CargoPatchOpts to CargoSpecUpdate
 impl From<CargoPatchOpts> for CargoSpecUpdate {
   fn from(val: CargoPatchOpts) -> Self {
     CargoSpecUpdate {
       name: val.new_name,
-      container: Some(ContainerConfig {
+      container: Some(ContainerSpec {
         image: val.image,
         env: val.env,
         ..Default::default()
@@ -383,7 +383,7 @@ pub struct CargoRow {
   pub(crate) image: String,
   /// Number of running instances
   pub(crate) instances: String,
-  /// Config version of the cargo
+  /// Spec version of the cargo
   pub(crate) version: String,
   /// When the cargo was created
   #[tabled(rename = "CREATED AT")]

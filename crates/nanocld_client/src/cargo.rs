@@ -24,7 +24,7 @@ impl NanocldClient {
   ///
   /// ## Arguments
   ///
-  /// * [item](CargoConfigPartial) - A reference of a [cargo config partial](CargoConfigPartial)
+  /// * [item](CargoSpecPartial) - The cargo to create
   /// * [namespace](Option) - The [namespace](str) to create the cargo in
   ///
   /// ## Return
@@ -37,7 +37,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let new_cargo = CargoConfigPartial {
+  /// let new_cargo = CargoSpecPartial {
   ///  name: String::from("my-cargo"),
   ///  container: bollard_next::container::Config {
   ///    image: Some(String::from("alpine"))
@@ -260,12 +260,12 @@ impl NanocldClient {
   /// ## Patch a cargo
   ///
   /// Patch a cargo by it's name
-  /// This will update the cargo's config by merging current config with new config and creating an history entry
+  /// This will update the cargo's spec by merging current spec with new spec and creating an history entry
   ///
   /// ## Arguments
   ///
   /// * [name](str) - The name of the cargo to patch
-  /// * [cargo](CargoConfigUpdate) - The config to patch the cargo with
+  /// * [cargo](CargoSpecUpdate) - The spec to patch the cargo with
   /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
   /// ## Example
@@ -274,7 +274,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let cargo_config = CargoConfigPatch {
+  /// let cargo_spec = CargoSpecPatch {
   ///   name: "my-cargo-renamed".into(),
   /// };
   /// client.patch_cargo("my-cargo", cargo, None).await.unwrap();
@@ -283,13 +283,13 @@ impl NanocldClient {
   pub async fn patch_cargo(
     &self,
     name: &str,
-    config: &CargoSpecUpdate,
+    spec: &CargoSpecUpdate,
     namespace: Option<&str>,
   ) -> HttpClientResult<()> {
     self
       .send_patch(
         &format!("{}/{name}", Self::CARGO_PATH),
-        Some(config),
+        Some(spec),
         Some(GenericNspQuery::new(namespace)),
       )
       .await?;
@@ -299,12 +299,12 @@ impl NanocldClient {
   /// ## Put a cargo
   ///
   /// Put a cargo by it's name
-  /// It will create a new cargo config and store old one in history
+  /// It will create a new cargo spec and store old one in history
   ///
   /// ## Arguments
   ///
   /// * [name](str) - The name of the cargo to update
-  /// * [cargo](CargoConfigPartial) - The config to update the cargo with
+  /// * [cargo](CargoSpecPartial) - The spec to update the cargo with
   /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
   /// ## Example
@@ -313,7 +313,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let cargo_config = CargoConfigPartial {
+  /// let cargo_spec = CargoSpecPartial {
   ///   name: "my-cargo-renamed".into(),
   /// };
   /// client.put_cargo("my-cargo", &cargo, None).await.unwrap();
@@ -322,13 +322,13 @@ impl NanocldClient {
   pub async fn put_cargo(
     &self,
     name: &str,
-    config: &CargoSpecPartial,
+    spec: &CargoSpecPartial,
     namespace: Option<&str>,
   ) -> HttpClientResult<()> {
     self
       .send_put(
         &format!("{}/{name}", Self::CARGO_PATH),
-        Some(config),
+        Some(spec),
         Some(GenericNspQuery::new(namespace)),
       )
       .await?;
@@ -344,7 +344,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [CargoConfig](CargoConfig)
+  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [CargoSpec](CargoSpec)
   ///
   /// ## Example
   ///

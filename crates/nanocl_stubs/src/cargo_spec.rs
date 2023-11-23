@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-pub use bollard_next::container::Config;
+pub use bollard_next::container::Config as ContainerSpec;
 pub use bollard_next::models::HostConfig;
 pub use bollard_next::models::HealthConfig;
 
@@ -71,7 +71,7 @@ pub struct CargoSpecPartial {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub init_container: Option<Config>,
+  pub init_container: Option<ContainerSpec>,
   /// List of secrets to use as environment variables
   #[cfg_attr(
     feature = "serde",
@@ -79,7 +79,7 @@ pub struct CargoSpecPartial {
   )]
   pub secrets: Option<Vec<String>>,
   /// Container configuration of the cargo
-  pub container: Config,
+  pub container: ContainerSpec,
   /// Replication configuration of the cargo
   #[cfg_attr(
     feature = "serde",
@@ -89,7 +89,7 @@ pub struct CargoSpecPartial {
 }
 
 /// Payload used to patch a cargo
-/// It will create a new [CargoConfig](CargoConfig) with the new values
+/// It will create a new [CargoSpec](CargoSpec) with the new values
 /// It will keep the old values in the history
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[derive(Debug, Default, Clone)]
@@ -116,7 +116,7 @@ pub struct CargoSpecUpdate {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub init_container: Option<Config>,
+  pub init_container: Option<ContainerSpec>,
   /// List of secrets to use as environment variables
   #[cfg_attr(
     feature = "serde",
@@ -128,7 +128,7 @@ pub struct CargoSpecUpdate {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub container: Option<Config>,
+  pub container: Option<ContainerSpec>,
   /// New container configuration of the cargo
   #[cfg_attr(
     feature = "serde",
@@ -179,7 +179,7 @@ pub struct CargoSpec {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub init_container: Option<Config>,
+  pub init_container: Option<ContainerSpec>,
   /// List of secrets to use as environment variables
   #[cfg_attr(
     feature = "serde",
@@ -187,7 +187,7 @@ pub struct CargoSpec {
   )]
   pub secrets: Option<Vec<String>>,
   /// Container configuration of the cargo
-  pub container: Config,
+  pub container: ContainerSpec,
   /// Replication configuration of the cargo
   #[cfg_attr(
     feature = "serde",

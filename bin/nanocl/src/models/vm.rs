@@ -3,7 +3,9 @@ use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::vm::VmSummary;
-use nanocld_client::stubs::vm_spec::{VmSpecPartial, VmDisk, VmHost, VmSpecUpdate};
+use nanocld_client::stubs::vm_spec::{
+  VmSpecPartial, VmDisk, VmHostConfig, VmSpecUpdate,
+};
 
 use super::{VmImageArg, DisplayFormat};
 
@@ -108,7 +110,7 @@ pub struct VmPatchOpts {
   pub net_iface: Option<String>,
 }
 
-/// Convert VmPatchOpts to VmConfigUpdate
+/// Convert VmPatchOpts to VmSpecUpdate
 impl From<VmPatchOpts> for VmSpecUpdate {
   fn from(val: VmPatchOpts) -> Self {
     Self {
@@ -117,7 +119,7 @@ impl From<VmPatchOpts> for VmSpecUpdate {
       password: val.password,
       ssh_key: val.ssh_key,
       hostname: val.hostname,
-      host_config: Some(VmHost {
+      host_config: Some(VmHostConfig {
         kvm: Some(val.kvm),
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
@@ -171,7 +173,7 @@ pub struct VmRunOpts {
   pub image: String,
 }
 
-/// Convert VmRunOpts to VmConfigPartial
+/// Convert VmRunOpts to VmSpecPartial
 impl From<VmRunOpts> for VmSpecPartial {
   fn from(val: VmRunOpts) -> Self {
     Self {
@@ -184,7 +186,7 @@ impl From<VmRunOpts> for VmSpecPartial {
         image: val.image,
         size: val.image_size,
       },
-      host_config: Some(VmHost {
+      host_config: Some(VmHostConfig {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
@@ -232,7 +234,7 @@ pub struct VmCreateOpts {
   pub image: String,
 }
 
-/// Convert VmCreateOpts to VmConfigPartial
+/// Convert VmCreateOpts to VmSpecPartial
 impl From<VmCreateOpts> for VmSpecPartial {
   fn from(val: VmCreateOpts) -> Self {
     Self {
@@ -241,7 +243,7 @@ impl From<VmCreateOpts> for VmSpecPartial {
       user: val.user,
       password: val.password,
       ssh_key: val.ssh_key,
-      host_config: Some(VmHost {
+      host_config: Some(VmHostConfig {
         cpu: val.cpu.unwrap_or(1),
         memory: val.memory.unwrap_or(512),
         net_iface: val.net_iface,
@@ -272,7 +274,7 @@ pub struct VmRow {
   pub(crate) disk: String,
   /// Number of instances
   pub(crate) instances: String,
-  /// Config version
+  /// Spec version
   pub(crate) version: String,
   /// When the vm was created
   #[tabled(rename = "CREATED AT")]
