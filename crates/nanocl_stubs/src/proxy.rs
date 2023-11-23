@@ -20,7 +20,7 @@ pub enum ProxyRule {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct ProxySslSpec {
+pub struct ProxySslConfig {
   /// Path to the certificate
   pub certificate: String,
   /// Path to the certificate key
@@ -50,7 +50,7 @@ pub struct ProxySslSpec {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum ProxySsl {
-  Config(ProxySslSpec),
+  Config(ProxySslConfig),
   Secret(String),
 }
 

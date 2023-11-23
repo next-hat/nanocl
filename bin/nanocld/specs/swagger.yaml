@@ -5166,9 +5166,9 @@ components:
           $ref: '#/components/schemas/StreamTarget'
     ProxySsl:
       oneOf:
-      - $ref: '#/components/schemas/ProxySslSpec'
+      - $ref: '#/components/schemas/ProxySslConfig'
       - type: string
-    ProxySslSpec:
+    ProxySslConfig:
       type: object
       required:
       - Certificate

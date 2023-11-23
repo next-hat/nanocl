@@ -183,7 +183,7 @@ components:
           $ref: '#/components/schemas/StreamTarget'
     ProxySsl:
       oneOf:
-      - $ref: '#/components/schemas/ProxySslSpec'
+      - $ref: '#/components/schemas/ProxySslConfig'
       - type: string
     ProxyStreamProtocol:
       type: string

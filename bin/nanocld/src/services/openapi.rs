@@ -65,7 +65,7 @@ use nanocl_stubs::proxy::{
   ResourceProxyRule, ProxyRuleHttp, ProxyHttpLocation, ProxySsl,
   ProxyRuleStream, StreamTarget, ProxyStreamProtocol, UriTarget,
   LocationTarget, HttpTarget, UrlRedirect, UpstreamTarget, ProxyRule,
-  UnixTarget, ProxySslSpec,
+  UnixTarget, ProxySslConfig,
 };
 use nanocl_stubs::state::{
   StateMeta, StateCargo, StateVirtualMachine, StateResource, StateDeployment,
@@ -455,7 +455,7 @@ impl Modify for VersionModifier {
     ProxyRuleHttp,
     ProxyHttpLocation,
     ProxySsl,
-    ProxySslSpec,
+    ProxySslConfig,
     ProxyRuleStream,
     StreamTarget,
     ProxyStreamProtocol,
