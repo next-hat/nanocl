@@ -460,59 +460,19 @@ pub(crate) async fn start_by_key(
   let docker_api = state.docker_api.clone();
   let cargo =
     repositories::cargo::inspect_by_key(&cargo_key, &state.pool).await?;
-  let auto_remove = cargo
-    .spec
-    .container
-    .host_config
-    .clone()
-    .unwrap_or_default()
-    .auto_remove
-    .unwrap_or(false);
   let containers = list_instances(&cargo_key, &docker_api).await?;
-  let mut autoremove_futs = Vec::new();
-  let mut futs = Vec::new();
-  for container in containers {
-    let id = container.id.unwrap_or_default();
-    if auto_remove {
-      let id = id.clone();
-      let docker_api = docker_api.clone();
-      autoremove_futs.push(async move {
-        let id = id.clone();
-        let options = Some(WaitContainerOptions {
-          condition: "removed",
-        });
-        let stream = docker_api.wait_container(&id, options);
-        if let Err(err) = stream.try_for_each(|_| async { Ok(()) }).await {
-          log::warn!("Error while waiting for container {id} {err}");
-        }
-      });
-    }
-    let id = id.clone();
-    let docker_api = docker_api.clone();
-    let fut = async move {
+  containers
+    .into_iter()
+    .map(|container| async {
+      let id = container.id.unwrap_or_default();
       docker_api.start_container::<String>(&id, None).await?;
       Ok::<_, HttpError>(())
-    };
-    futs.push(fut);
-  }
-  FuturesUnordered::from_iter(futs)
-    .collect::<Vec<_>>()
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
     .await
     .into_iter()
-    .collect::<Result<Vec<_>, HttpError>>()?;
-  if auto_remove {
-    let pool = Arc::clone(&state.pool);
-    rt::spawn(async move {
-      let _ = FuturesUnordered::from_iter(autoremove_futs)
-        .collect::<Vec<_>>()
-        .await;
-      if let Err(err) =
-        repositories::cargo::delete_by_key(&cargo_key, &pool).await
-      {
-        log::warn!("Error while deleting cargo {cargo_key} {err}");
-      }
-    });
-  }
+    .collect::<Result<Vec<_>, _>>()?;
   state.event_emitter.spawn_emit(&cargo, EventAction::Started);
   Ok(())
 }
