@@ -25,7 +25,7 @@ use nanocl_stubs::cargo::{
   CargoStatsQuery,
 };
 use nanocl_stubs::cargo_spec::{
-  CargoSpecPartial, CargoSpecUpdate, ReplicationMode, ContainerSpec,
+  CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config,
 };
 
 use crate::{utils, repositories};
@@ -975,7 +975,7 @@ pub async fn patch(
     } else {
       cargo.spec.container.cmd
     };
-    ContainerSpec {
+    Config {
       cmd,
       image,
       env: Some(env_vars),

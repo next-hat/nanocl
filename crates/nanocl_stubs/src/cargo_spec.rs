@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-pub use bollard_next::container::Config as ContainerSpec;
+pub use bollard_next::container::Config;
 pub use bollard_next::models::HostConfig;
 pub use bollard_next::models::HealthConfig;
 
@@ -71,7 +71,7 @@ pub struct CargoSpecPartial {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub init_container: Option<ContainerSpec>,
+  pub init_container: Option<Config>,
   /// List of secrets to use as environment variables
   #[cfg_attr(
     feature = "serde",
@@ -79,7 +79,7 @@ pub struct CargoSpecPartial {
   )]
   pub secrets: Option<Vec<String>>,
   /// Container specification of the cargo
-  pub container: ContainerSpec,
+  pub container: Config,
   /// Replication specification of the cargo
   #[cfg_attr(
     feature = "serde",
@@ -116,7 +116,7 @@ pub struct CargoSpecUpdate {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub init_container: Option<ContainerSpec>,
+  pub init_container: Option<Config>,
   /// List of secrets to use as environment variables
   #[cfg_attr(
     feature = "serde",
@@ -128,7 +128,7 @@ pub struct CargoSpecUpdate {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub container: Option<ContainerSpec>,
+  pub container: Option<Config>,
   /// New container specification of the cargo
   #[cfg_attr(
     feature = "serde",
@@ -179,7 +179,7 @@ pub struct CargoSpec {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub init_container: Option<ContainerSpec>,
+  pub init_container: Option<Config>,
   /// List of secrets to use as environment variables
   #[cfg_attr(
     feature = "serde",
@@ -187,7 +187,7 @@ pub struct CargoSpec {
   )]
   pub secrets: Option<Vec<String>>,
   /// Container specification of the cargo
-  pub container: ContainerSpec,
+  pub container: Config,
   /// Replication specification of the cargo
   #[cfg_attr(
     feature = "serde",

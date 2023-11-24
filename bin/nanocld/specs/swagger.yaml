@@ -1989,6 +1989,19 @@ paths:
           description: The virtual machine has been stopped
 components:
   schemas:
+    Address:
+      type: object
+      description: Address represents an IPv4 or IPv6 IP address.
+      properties:
+        Addr:
+          type: string
+          description: IP address.
+          nullable: true
+        PrefixLen:
+          type: integer
+          format: int64
+          description: Mask length of the IP address.
+          nullable: true
     Any:
       oneOf:
       - type: string
@@ -2273,7 +2286,7 @@ components:
           nullable: true
         InitContainer:
           allOf:
-          - $ref: '#/components/schemas/ContainerSpec'
+          - $ref: '#/components/schemas/Config'
           nullable: true
         Secrets:
           type: array
@@ -2282,7 +2295,7 @@ components:
           description: List of secrets to use as environment variables
           nullable: true
         Container:
-          $ref: '#/components/schemas/ContainerSpec'
+          $ref: '#/components/schemas/Config'
         Replication:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
@@ -2302,7 +2315,7 @@ components:
           nullable: true
         InitContainer:
           allOf:
-          - $ref: '#/components/schemas/ContainerSpec'
+          - $ref: '#/components/schemas/Config'
           nullable: true
         Secrets:
           type: array
@@ -2311,7 +2324,7 @@ components:
           description: List of secrets to use as environment variables
           nullable: true
         Container:
-          $ref: '#/components/schemas/ContainerSpec'
+          $ref: '#/components/schemas/Config'
         Replication:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
@@ -2332,7 +2345,7 @@ components:
           nullable: true
         InitContainer:
           allOf:
-          - $ref: '#/components/schemas/ContainerSpec'
+          - $ref: '#/components/schemas/Config'
           nullable: true
         Secrets:
           type: array
@@ -2342,7 +2355,7 @@ components:
           nullable: true
         Container:
           allOf:
-          - $ref: '#/components/schemas/ContainerSpec'
+          - $ref: '#/components/schemas/Config'
           nullable: true
         Replication:
           allOf:
@@ -2728,6 +2741,169 @@ components:
             type: string
           description: Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell.
           nullable: true
+    ContainerInspectResponse:
+      type: object
+      properties:
+        Id:
+          type: string
+          description: The ID of the container
+          nullable: true
+        Created:
+          type: string
+          description: The time the container was created
+          nullable: true
+        Path:
+          type: string
+          description: The path to the command being run
+          nullable: true
+        Args:
+          type: array
+          items:
+            type: string
+          description: The arguments to the command being run
+          nullable: true
+        State:
+          allOf:
+          - $ref: '#/components/schemas/ContainerState'
+          nullable: true
+        Image:
+          type: string
+          description: The container's image ID
+          nullable: true
+        ResolvConfPath:
+          type: string
+          nullable: true
+        HostnamePath:
+          type: string
+          nullable: true
+        HostsPath:
+          type: string
+          nullable: true
+        LogPath:
+          type: string
+          nullable: true
+        Name:
+          type: string
+          nullable: true
+        RestartCount:
+          type: integer
+          format: int64
+          nullable: true
+        Driver:
+          type: string
+          nullable: true
+        Platform:
+          type: string
+          nullable: true
+        MountLabel:
+          type: string
+          nullable: true
+        ProcessLabel:
+          type: string
+          nullable: true
+        AppArmorProfile:
+          type: string
+          nullable: true
+        ExecIDs:
+          type: array
+          items:
+            type: string
+          description: IDs of exec instances that are running in the container.
+          nullable: true
+        HostConfig:
+          allOf:
+          - $ref: '#/components/schemas/HostConfig'
+          nullable: true
+        GraphDriver:
+          allOf:
+          - $ref: '#/components/schemas/GraphDriverData'
+          nullable: true
+        SizeRw:
+          type: integer
+          format: int64
+          description: The size of files that have been created or changed by this container.
+          nullable: true
+        SizeRootFs:
+          type: integer
+          format: int64
+          description: The total size of all the files in this container.
+          nullable: true
+        Mounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/MountPoint'
+          nullable: true
+        Config:
+          allOf:
+          - $ref: '#/components/schemas/ContainerConfig'
+          nullable: true
+        NetworkSettings:
+          allOf:
+          - $ref: '#/components/schemas/NetworkSettings'
+          nullable: true
+    ContainerState:
+      type: object
+      description: ContainerState stores container's running state. It's part of ContainerJSONBase and will be returned by the \"inspect\" command.
+      properties:
+        Status:
+          allOf:
+          - $ref: '#/components/schemas/ContainerStateStatusEnum'
+          nullable: true
+        Running:
+          type: boolean
+          description: 'Whether this container is running.  Note that a running container can be _paused_. The `Running` and `Paused` booleans are not mutually exclusive:  When pausing a container (on Linux), the freezer cgroup is used to suspend all processes in the container. Freezing the process requires the process to be running. As a result, paused containers are both `Running` _and_ `Paused`.  Use the `Status` field instead to determine if a container''s state is \"running\".'
+          nullable: true
+        Paused:
+          type: boolean
+          description: Whether this container is paused.
+          nullable: true
+        Restarting:
+          type: boolean
+          description: Whether this container is restarting.
+          nullable: true
+        OOMKilled:
+          type: boolean
+          description: Whether a process within this container has been killed because it ran out of memory since the container was last started.
+          nullable: true
+        Dead:
+          type: boolean
+          nullable: true
+        Pid:
+          type: integer
+          format: int64
+          description: The process ID of this container
+          nullable: true
+        ExitCode:
+          type: integer
+          format: int64
+          description: The last exit code of this container
+          nullable: true
+        Error:
+          type: string
+          nullable: true
+        StartedAt:
+          type: string
+          description: The time when this container was last started.
+          nullable: true
+        FinishedAt:
+          type: string
+          description: The time when this container last exited.
+          nullable: true
+        Health:
+          allOf:
+          - $ref: '#/components/schemas/Health'
+          nullable: true
+    ContainerStateStatusEnum:
+      type: string
+      enum:
+      - EMPTY
+      - created
+      - running
+      - paused
+      - restarting
+      - removing
+      - exited
+      - dead
     ContainerSummary:
       type: object
       properties:
@@ -3170,6 +3346,25 @@ components:
           description: Low-level storage metadata, provided as key/value pairs.  This information is driver-specific, and depends on the storage-driver in use, and should be used for informational purposes only.
           additionalProperties:
             type: string
+    Health:
+      type: object
+      description: Health stores information about the container's healthcheck results.
+      properties:
+        Status:
+          allOf:
+          - $ref: '#/components/schemas/HealthStatusEnum'
+          nullable: true
+        FailingStreak:
+          type: integer
+          format: int64
+          description: FailingStreak is the number of consecutive failures
+          nullable: true
+        Log:
+          type: array
+          items:
+            $ref: '#/components/schemas/HealthcheckResult'
+          description: Log contains the last few results (oldest first)
+          nullable: true
     HealthConfig:
       type: object
       description: A test to perform to check that the container is healthy.
@@ -3199,6 +3394,35 @@ components:
           type: integer
           format: int64
           description: Start period for the container to initialize before starting health-retries countdown in nanoseconds. It should be 0 or at least 1000000 (1 ms). 0 means inherit.
+          nullable: true
+    HealthStatusEnum:
+      type: string
+      enum:
+      - EMPTY
+      - none
+      - starting
+      - healthy
+      - unhealthy
+    HealthcheckResult:
+      type: object
+      description: HealthcheckResult stores information about a single run of a healthcheck probe
+      properties:
+        Start:
+          allOf:
+          - $ref: '#/components/schemas/BollardDate'
+          nullable: true
+        End:
+          allOf:
+          - $ref: '#/components/schemas/BollardDate'
+          nullable: true
+        ExitCode:
+          type: integer
+          format: int64
+          description: 'ExitCode meanings:  - `0` healthy - `1` unhealthy - `2` reserved (considered unhealthy) - other values: error running probe'
+          nullable: true
+        Output:
+          type: string
+          description: Output from last check
           nullable: true
     HostConfig:
       type: object
@@ -3965,7 +4189,7 @@ components:
         Containers:
           type: array
           items:
-            $ref: '#/components/schemas/ContainerSpec'
+            $ref: '#/components/schemas/Config'
           description: Containers to run
     JobInspect:
       type: object
@@ -4014,7 +4238,7 @@ components:
         Containers:
           type: array
           items:
-            $ref: '#/components/schemas/ContainerSpec'
+            $ref: '#/components/schemas/Config'
           description: Containers to run
         InstanceTotal:
           type: integer
@@ -4068,7 +4292,7 @@ components:
         Containers:
           type: array
           items:
-            $ref: '#/components/schemas/ContainerSpec'
+            $ref: '#/components/schemas/Config'
           description: List of container to run
     JobSummary:
       type: object
@@ -4861,6 +5085,89 @@ components:
           nullable: true
         IPv6Address:
           type: string
+          nullable: true
+    NetworkSettings:
+      type: object
+      description: NetworkSettings exposes the network settings in the API
+      properties:
+        Bridge:
+          type: string
+          description: Name of the network's bridge (for example, `docker0`).
+          nullable: true
+        SandboxID:
+          type: string
+          description: SandboxID uniquely represents a container's network stack.
+          nullable: true
+        HairpinMode:
+          type: boolean
+          description: Indicates if hairpin NAT should be enabled on the virtual interface.
+          nullable: true
+        LinkLocalIPv6Address:
+          type: string
+          description: IPv6 unicast address using the link-local prefix.
+          nullable: true
+        LinkLocalIPv6PrefixLen:
+          type: integer
+          format: int64
+          description: Prefix length of the IPv6 unicast address.
+          nullable: true
+        Ports:
+          allOf:
+          - $ref: '#/components/schemas/PortMap'
+          nullable: true
+        SandboxKey:
+          type: string
+          description: SandboxKey identifies the sandbox
+          nullable: true
+        SecondaryIPAddresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+          nullable: true
+        SecondaryIPv6Addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+          nullable: true
+        EndpointID:
+          type: string
+          description: 'EndpointID uniquely represents a service endpoint in a Sandbox.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
+          nullable: true
+        Gateway:
+          type: string
+          description: 'Gateway address for the default \"bridge\" network.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
+          nullable: true
+        GlobalIPv6Address:
+          type: string
+          description: 'Global IPv6 address for the default \"bridge\" network.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
+          nullable: true
+        GlobalIPv6PrefixLen:
+          type: integer
+          format: int64
+          description: 'Mask length of the global IPv6 address.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
+          nullable: true
+        IPAddress:
+          type: string
+          description: 'IPv4 address for the default \"bridge\" network.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
+          nullable: true
+        IPPrefixLen:
+          type: integer
+          format: int64
+          description: 'Mask length of the IPv4 address.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
+          nullable: true
+        IPv6Gateway:
+          type: string
+          description: 'IPv6 gateway address for this network.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
+          nullable: true
+        MacAddress:
+          type: string
+          description: 'MAC address for the container on the default \"bridge\" network.  <p><br /></p>  > **Deprecated**: This field is only propagated when attached to the > default \"bridge\" network. Use the information from the \"bridge\" > network inside the `Networks` map instead, which contains the same > information. This field was deprecated in Docker 1.9 and is scheduled > to be removed in Docker 17.12.0'
+          nullable: true
+        Networks:
+          type: object
+          description: Information about all networks that the container is connected to.
+          additionalProperties:
+            $ref: '#/components/schemas/EndpointSettings'
           nullable: true
     NetworkStats:
       type: object

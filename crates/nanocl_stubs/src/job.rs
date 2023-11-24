@@ -1,7 +1,7 @@
 use std::io;
 use serde::{Serialize, Deserialize};
 
-use bollard_next::container::Config as ContainerSpec;
+use bollard_next::container::Config;
 use bollard_next::service::{ContainerWaitExitError, ContainerWaitResponse};
 
 use crate::cargo::OutputLog;
@@ -42,7 +42,7 @@ pub struct Job {
   )]
   pub schedule: Option<String>,
   /// Containers to run
-  pub containers: Vec<ContainerSpec>,
+  pub containers: Vec<Config>,
 }
 
 /// ## Job summary
@@ -106,7 +106,7 @@ pub struct JobPartial {
   )]
   pub schedule: Option<String>,
   /// List of container to run
-  pub containers: Vec<ContainerSpec>,
+  pub containers: Vec<Config>,
 }
 
 /// ## Job inspect
@@ -146,7 +146,7 @@ pub struct JobInspect {
   )]
   pub schedule: Option<String>,
   /// Containers to run
-  pub containers: Vec<ContainerSpec>,
+  pub containers: Vec<Config>,
   /// Number of instances
   pub instance_total: usize,
   /// Number of instance that succeeded

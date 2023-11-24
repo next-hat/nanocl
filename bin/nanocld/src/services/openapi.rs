@@ -29,6 +29,9 @@ use bollard_next::service::{
   SwarmSpecTaskDefaultsLogDriver, GenericResourcesInnerDiscreteResourceSpec,
   Network, GenericResourcesInner, GenericResourcesInnerNamedResourceSpec,
   NetworkContainer, Ipam, IpamConfig, ExecInspectResponse, ProcessConfig,
+  ContainerInspectResponse, ContainerState, NetworkSettings,
+  ContainerStateStatusEnum, Health, Address, HealthStatusEnum,
+  HealthcheckResult,
 };
 
 use nanocl_stubs::config::DaemonConfig;
@@ -423,6 +426,14 @@ impl Modify for VersionModifier {
     ExecInspectResponse,
     StartExecOptions,
     ProcessConfig,
+    ContainerInspectResponse,
+    ContainerState,
+    NetworkSettings,
+    ContainerStateStatusEnum,
+    Health,
+    Address,
+    HealthStatusEnum,
+    HealthcheckResult,
     // Network
     Network,
     // Vm Image

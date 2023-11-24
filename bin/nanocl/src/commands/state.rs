@@ -15,7 +15,7 @@ use nanocld_client::NanocldClient;
 use nanocld_client::stubs::job::JobPartial;
 use nanocld_client::stubs::state::{StateMeta, StateApplyQuery, StateStreamStatus};
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
-use nanocld_client::stubs::cargo_spec::{CargoSpecPartial, ContainerSpec};
+use nanocld_client::stubs::cargo_spec::{CargoSpecPartial, Config};
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -147,7 +147,7 @@ fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
           new_binds.push(new_bind);
         }
         CargoSpecPartial {
-          container: ContainerSpec {
+          container: Config {
             host_config: Some(HostConfig {
               binds: Some(new_binds),
               ..host_config.clone()

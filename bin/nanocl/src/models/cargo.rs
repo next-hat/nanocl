@@ -6,7 +6,7 @@ use bollard_next::exec::CreateExecOptions;
 use bollard_next::container::MemoryStatsStats;
 use nanocld_client::stubs::cargo::{CargoStats, CargoSummary};
 use nanocld_client::stubs::cargo_spec::{
-  CargoSpecUpdate, ContainerSpec, CargoSpecPartial, HostConfig,
+  CargoSpecUpdate, Config, CargoSpecPartial, HostConfig,
 };
 
 use super::DisplayFormat;
@@ -51,7 +51,7 @@ impl From<CargoCreateOpts> for CargoSpecPartial {
   fn from(val: CargoCreateOpts) -> Self {
     Self {
       name: val.name,
-      container: ContainerSpec {
+      container: Config {
         image: Some(val.image),
         // network: val.network,
         // volumes: val.volumes,
@@ -94,7 +94,7 @@ impl From<CargoRunOpts> for CargoSpecPartial {
   fn from(val: CargoRunOpts) -> Self {
     Self {
       name: val.name,
-      container: ContainerSpec {
+      container: Config {
         image: Some(val.image),
         // network: val.network,
         // volumes: val.volumes,
@@ -182,7 +182,7 @@ impl From<CargoPatchOpts> for CargoSpecUpdate {
   fn from(val: CargoPatchOpts) -> Self {
     CargoSpecUpdate {
       name: val.new_name,
-      container: Some(ContainerSpec {
+      container: Some(Config {
         image: val.image,
         env: val.env,
         ..Default::default()
