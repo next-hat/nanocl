@@ -1,9 +1,7 @@
-use std::sync::Arc;
 use std::collections::HashMap;
 
-use ntex::rt;
 use ntex::util::Bytes;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use futures_util::TryFutureExt;
 use futures_util::stream::FuturesUnordered;
 use bollard_next::service::ContainerCreateResponse;
@@ -132,7 +130,10 @@ async fn create_instances(
         let secret =
           repositories::secret::find_by_key(secret, &state.pool).await?;
         if secret.kind.as_str() != "Env" {
-          return Ok::<_, HttpError>(Vec::new());
+          return Err(HttpError::bad_request(format!(
+            "Secret {} is not an Env secret",
+            secret.key
+          )));
         }
         let envs = serde_json::from_value::<Vec<String>>(secret.data).map_err(
           |err| {
@@ -167,9 +168,11 @@ async fn create_instances(
           name: name.clone(),
           ..Default::default()
         };
+        let spec = cargo.spec.clone();
+        let container = spec.container;
+        let host_config = container.host_config.unwrap_or_default();
         // Add cargo label to the container to track it
-        let mut labels =
-          cargo.spec.container.labels.to_owned().unwrap_or_default();
+        let mut labels = container.labels.to_owned().unwrap_or_default();
         labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
         labels.insert("io.nanocl.kind".to_owned(), "Cargo".to_owned());
         labels.insert("io.nanocl.c".to_owned(), cargo.key.to_owned());
@@ -179,34 +182,25 @@ async fn create_instances(
           "com.docker.compose.project".into(),
           format!("nanocl_{}", cargo.namespace_name),
         );
-        let auto_remove = cargo
-          .spec
-          .to_owned()
-          .container
-          .host_config
-          .unwrap_or_default()
+        let auto_remove =
+          host_config
           .auto_remove
           .unwrap_or(false);
-        let restart_policy = if auto_remove {
-          None
-        } else {
+        if auto_remove {
+          return Err(HttpError::bad_request("Using autoremove for a cargo is not allowed, consider using a job instead"));
+        }
+        let restart_policy =
           Some(
-            cargo
-              .spec
-              .to_owned()
-              .container
-              .host_config
-              .unwrap_or_default()
+              host_config
               .restart_policy
               .unwrap_or(RestartPolicy {
                 name: Some(RestartPolicyNameEnum::ALWAYS),
                 maximum_retry_count: None,
               }),
-          )
-        };
-        let mut env = cargo.spec.container.env.clone().unwrap_or_default();
-        // add secret_envs to env
-        env.extend(secret_envs.clone());
+          );
+        let mut env = container.env.unwrap_or_default();
+        // merge cargo env with secret env
+        env.extend(secret_envs);
         let hostname = match cargo.spec.container.hostname {
           Some(ref hostname) => {
             if current > 0 {
@@ -217,12 +211,14 @@ async fn create_instances(
           }
           None => name.replace('.', "-"),
         };
+        env.push(format!("NANOCL_NODE={}", state.config.hostname));
+        env.push(format!("NANOCL_NODE_ADDR={}", state.config.gateway));
         env.push(format!("NANOCL_CARGO_KEY={}", cargo.key));
         env.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));
         env.push(format!("NANOCL_CARGO_INSTANCE={}", current));
         // Merge the cargo spec with the container spec
         // And set his network mode to the cargo namespace
-        let spec = bollard_next::container::Config {
+        let hook_container = bollard_next::container::Config {
           attach_stderr: Some(true),
           attach_stdout: Some(true),
           tty: Some(true),
@@ -232,27 +228,17 @@ async fn create_instances(
           host_config: Some(HostConfig {
             restart_policy,
             network_mode: Some(
-              cargo
-                .spec
-                .to_owned()
-                .container
-                .host_config
-                .unwrap_or_default()
+                host_config
                 .network_mode
-                .unwrap_or(cargo.namespace_name.to_owned()),
+                .unwrap_or(cargo.namespace_name.clone()),
             ),
-            ..cargo
-              .spec
-              .to_owned()
-              .container
-              .host_config
-              .unwrap_or_default()
+            ..host_config
           }),
-          ..cargo.spec.container.to_owned()
+          ..container
         };
         let res = state
           .docker_api
-          .create_container::<String>(Some(create_options), spec)
+          .create_container::<String>(Some(create_options), hook_container)
           .map_err(HttpError::from)
           .await?;
         Ok::<_, HttpError>(res)
@@ -472,59 +458,19 @@ pub(crate) async fn start_by_key(
   let docker_api = state.docker_api.clone();
   let cargo =
     repositories::cargo::inspect_by_key(&cargo_key, &state.pool).await?;
-  let auto_remove = cargo
-    .spec
-    .container
-    .host_config
-    .clone()
-    .unwrap_or_default()
-    .auto_remove
-    .unwrap_or(false);
   let containers = list_instances(&cargo_key, &docker_api).await?;
-  let mut autoremove_futs = Vec::new();
-  let mut futs = Vec::new();
-  for container in containers {
-    let id = container.id.unwrap_or_default();
-    if auto_remove {
-      let id = id.clone();
-      let docker_api = docker_api.clone();
-      autoremove_futs.push(async move {
-        let id = id.clone();
-        let options = Some(WaitContainerOptions {
-          condition: "removed",
-        });
-        let stream = docker_api.wait_container(&id, options);
-        if let Err(err) = stream.try_for_each(|_| async { Ok(()) }).await {
-          log::warn!("Error while waiting for container {id} {err}");
-        }
-      });
-    }
-    let id = id.clone();
-    let docker_api = docker_api.clone();
-    let fut = async move {
+  containers
+    .into_iter()
+    .map(|container| async {
+      let id = container.id.unwrap_or_default();
       docker_api.start_container::<String>(&id, None).await?;
       Ok::<_, HttpError>(())
-    };
-    futs.push(fut);
-  }
-  FuturesUnordered::from_iter(futs)
-    .collect::<Vec<_>>()
+    })
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<Result<(), HttpError>>>()
     .await
     .into_iter()
-    .collect::<Result<Vec<_>, HttpError>>()?;
-  if auto_remove {
-    let pool = Arc::clone(&state.pool);
-    rt::spawn(async move {
-      let _ = FuturesUnordered::from_iter(autoremove_futs)
-        .collect::<Vec<_>>()
-        .await;
-      if let Err(err) =
-        repositories::cargo::delete_by_key(&cargo_key, &pool).await
-      {
-        log::warn!("Error while deleting cargo {cargo_key} {err}");
-      }
-    });
-  }
+    .collect::<Result<Vec<_>, _>>()?;
   state.event_emitter.spawn_emit(&cargo, EventAction::Started);
   Ok(())
 }
