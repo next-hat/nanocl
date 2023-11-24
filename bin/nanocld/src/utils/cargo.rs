@@ -1,9 +1,7 @@
-use std::sync::Arc;
 use std::collections::HashMap;
 
-use ntex::rt;
 use ntex::util::Bytes;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use futures_util::TryFutureExt;
 use futures_util::stream::FuturesUnordered;
 use bollard_next::service::ContainerCreateResponse;
