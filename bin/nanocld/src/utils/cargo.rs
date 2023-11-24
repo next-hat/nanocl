@@ -132,7 +132,10 @@ async fn create_instances(
         let secret =
           repositories::secret::find_by_key(secret, &state.pool).await?;
         if secret.kind.as_str() != "Env" {
-          return Ok::<_, HttpError>(Vec::new());
+          return Err(HttpError::bad_request(format!(
+            "Secret {} is not an Env secret",
+            secret.key
+          )));
         }
         let envs = serde_json::from_value::<Vec<String>>(secret.data).map_err(
           |err| {
@@ -167,9 +170,11 @@ async fn create_instances(
           name: name.clone(),
           ..Default::default()
         };
+        let spec = cargo.spec.clone();
+        let container = spec.container;
+        let host_config = container.host_config.unwrap_or_default();
         // Add cargo label to the container to track it
-        let mut labels =
-          cargo.spec.container.labels.to_owned().unwrap_or_default();
+        let mut labels = container.labels.to_owned().unwrap_or_default();
         labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
         labels.insert("io.nanocl.kind".to_owned(), "Cargo".to_owned());
         labels.insert("io.nanocl.c".to_owned(), cargo.key.to_owned());
@@ -179,34 +184,25 @@ async fn create_instances(
           "com.docker.compose.project".into(),
           format!("nanocl_{}", cargo.namespace_name),
         );
-        let auto_remove = cargo
-          .spec
-          .to_owned()
-          .container
-          .host_config
-          .unwrap_or_default()
+        let auto_remove =
+          host_config
           .auto_remove
           .unwrap_or(false);
-        let restart_policy = if auto_remove {
-          None
-        } else {
+        if auto_remove {
+          return Err(HttpError::bad_request("Using autoremove for a cargo is not allowed, consider using a job instead"));
+        }
+        let restart_policy =
           Some(
-            cargo
-              .spec
-              .to_owned()
-              .container
-              .host_config
-              .unwrap_or_default()
+              host_config
               .restart_policy
               .unwrap_or(RestartPolicy {
                 name: Some(RestartPolicyNameEnum::ALWAYS),
                 maximum_retry_count: None,
               }),
-          )
-        };
-        let mut env = cargo.spec.container.env.clone().unwrap_or_default();
-        // add secret_envs to env
-        env.extend(secret_envs.clone());
+          );
+        let mut env = container.env.unwrap_or_default();
+        // merge cargo env with secret env
+        env.extend(secret_envs);
         let hostname = match cargo.spec.container.hostname {
           Some(ref hostname) => {
             if current > 0 {
@@ -217,12 +213,14 @@ async fn create_instances(
           }
           None => name.replace('.', "-"),
         };
+        env.push(format!("NANOCL_NODE={}", state.config.hostname));
+        env.push(format!("NANOCL_NODE_ADDR={}", state.config.gateway));
         env.push(format!("NANOCL_CARGO_KEY={}", cargo.key));
         env.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));
         env.push(format!("NANOCL_CARGO_INSTANCE={}", current));
         // Merge the cargo spec with the container spec
         // And set his network mode to the cargo namespace
-        let spec = bollard_next::container::Config {
+        let hook_container = bollard_next::container::Config {
           attach_stderr: Some(true),
           attach_stdout: Some(true),
           tty: Some(true),
@@ -232,27 +230,17 @@ async fn create_instances(
           host_config: Some(HostConfig {
             restart_policy,
             network_mode: Some(
-              cargo
-                .spec
-                .to_owned()
-                .container
-                .host_config
-                .unwrap_or_default()
+                host_config
                 .network_mode
-                .unwrap_or(cargo.namespace_name.to_owned()),
+                .unwrap_or(cargo.namespace_name.clone()),
             ),
-            ..cargo
-              .spec
-              .to_owned()
-              .container
-              .host_config
-              .unwrap_or_default()
+            ..host_config
           }),
-          ..cargo.spec.container.to_owned()
+          ..container
         };
         let res = state
           .docker_api
-          .create_container::<String>(Some(create_options), spec)
+          .create_container::<String>(Some(create_options), hook_container)
           .map_err(HttpError::from)
           .await?;
         Ok::<_, HttpError>(res)
