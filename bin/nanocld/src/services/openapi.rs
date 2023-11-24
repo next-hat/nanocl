@@ -29,6 +29,9 @@ use bollard_next::service::{
   SwarmSpecTaskDefaultsLogDriver, GenericResourcesInnerDiscreteResourceSpec,
   Network, GenericResourcesInner, GenericResourcesInnerNamedResourceSpec,
   NetworkContainer, Ipam, IpamConfig, ExecInspectResponse, ProcessConfig,
+  ContainerInspectResponse, ContainerState, NetworkSettings,
+  ContainerStateStatusEnum, Health, Address, HealthStatusEnum,
+  HealthcheckResult,
 };
 
 use nanocl_stubs::config::DaemonConfig;
@@ -48,24 +51,24 @@ use nanocl_stubs::cargo::{
   Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
   CargoScale, CargoStats,
 };
-use nanocl_stubs::cargo_config::{
-  CargoConfig, CargoConfigPartial, CargoConfigUpdate, ReplicationMode,
+use nanocl_stubs::cargo_spec::{
+  CargoSpec, CargoSpecPartial, CargoSpecUpdate, ReplicationMode,
   ReplicationStatic,
 };
 use nanocl_stubs::cargo_image::CargoImagePartial;
 use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
-use nanocl_stubs::vm_config::{
-  VmConfig, VmConfigPartial, VmConfigUpdate, VmDiskConfig, VmHostConfig,
+use nanocl_stubs::vm_spec::{
+  VmSpec, VmSpecPartial, VmSpecUpdate, VmDisk, VmHostConfig,
 };
 use nanocl_stubs::resource::{
-  Resource, ResourceUpdate, ResourceConfig, ResourcePartial,
+  Resource, ResourceUpdate, ResourceSpec, ResourcePartial,
 };
 use nanocl_stubs::dns::{ResourceDnsRule, DnsEntry};
 use nanocl_stubs::proxy::{
-  ResourceProxyRule, ProxyRuleHttp, ProxyHttpLocation, ProxySslConfig,
+  ResourceProxyRule, ProxyRuleHttp, ProxyHttpLocation, ProxySsl,
   ProxyRuleStream, StreamTarget, ProxyStreamProtocol, UriTarget,
   LocationTarget, HttpTarget, UrlRedirect, UpstreamTarget, ProxyRule,
-  UnixTarget, ProxySsl,
+  UnixTarget, ProxySslConfig,
 };
 use nanocl_stubs::state::{
   StateMeta, StateCargo, StateVirtualMachine, StateResource, StateDeployment,
@@ -83,7 +86,7 @@ struct ApiError {
   msg: String,
 }
 
-/// Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceConfig](ResourceConfig)
+/// Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceSpec](ResourceSpec)
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(untagged)]
@@ -355,11 +358,11 @@ impl Modify for VersionModifier {
     CreateExecOptions,
     CargoKillOptions,
     CargoInspect,
-    CargoConfig,
+    CargoSpec,
     ReplicationMode,
     CargoSummary,
-    CargoConfigPartial,
-    CargoConfigUpdate,
+    CargoSpecPartial,
+    CargoSpecUpdate,
     ReplicationStatic,
     CargoScale,
     CargoStats,
@@ -423,6 +426,14 @@ impl Modify for VersionModifier {
     ExecInspectResponse,
     StartExecOptions,
     ProcessConfig,
+    ContainerInspectResponse,
+    ContainerState,
+    NetworkSettings,
+    ContainerStateStatusEnum,
+    Health,
+    Address,
+    HealthStatusEnum,
+    HealthcheckResult,
     // Network
     Network,
     // Vm Image
@@ -433,15 +444,15 @@ impl Modify for VersionModifier {
     VmSummary,
     VmInspect,
     // Vm Config
-    VmConfig,
-    VmConfigPartial,
-    VmConfigUpdate,
-    VmDiskConfig,
+    VmSpec,
+    VmSpecPartial,
+    VmSpecUpdate,
+    VmDisk,
     VmHostConfig,
     // Resource
     Resource,
     ResourceUpdate,
-    ResourceConfig,
+    ResourceSpec,
     ResourcePartial,
     // State
     StateMeta,
@@ -454,6 +465,7 @@ impl Modify for VersionModifier {
     ProxyRule,
     ProxyRuleHttp,
     ProxyHttpLocation,
+    ProxySsl,
     ProxySslConfig,
     ProxyRuleStream,
     StreamTarget,
@@ -464,7 +476,6 @@ impl Modify for VersionModifier {
     UpstreamTarget,
     UnixTarget,
     UriTarget,
-    ProxySsl,
     // DnsRules
     ResourceDnsRule,
     DnsEntry,

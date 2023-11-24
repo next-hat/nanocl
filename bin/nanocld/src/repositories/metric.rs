@@ -1,10 +1,12 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 
 use crate::utils;
-use crate::models::{Pool, MetricDbModel, MetricInsertDbModel};
+use crate::models::{Pool, MetricDb, MetricInsertDb};
 
 /// ## Create
 ///
@@ -12,17 +14,17 @@ use crate::models::{Pool, MetricDbModel, MetricInsertDbModel};
 ///
 /// ## Arguments
 ///
-/// * [item](MetricInsertDbModel) - Metric item
+/// * [item](MetricInsertDb) - Metric item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [MetricDbModel](MetricDbModel)
+/// [IoResult](IoResult) containing a [MetricDb](MetricDb)
 ///
 pub(crate) async fn create(
-  item: &MetricInsertDbModel,
+  item: &MetricInsertDb,
   pool: &Pool,
-) -> IoResult<MetricDbModel> {
+) -> IoResult<MetricDb> {
   let item = item.clone();
   super::generic::insert_with_res(item, pool).await
 }
@@ -43,22 +45,22 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [MetricDbModel](MetricDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [MetricDb](MetricDb)
 ///
 pub(crate) async fn list_by_kind(
   kind: &str,
   pool: &Pool,
-) -> IoResult<Vec<MetricDbModel>> {
+) -> IoResult<Vec<MetricDb>> {
   use crate::schema::metrics;
   let kind = kind.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let res = metrics::dsl::metrics
       .order((metrics::dsl::node_name, metrics::dsl::created_at.desc()))
       .distinct_on(metrics::dsl::node_name)
       .filter(metrics::dsl::kind.eq(kind))
-      .load::<MetricDbModel>(&mut conn)
+      .load::<MetricDb>(&mut conn)
       .map_err(|err| err.map_err_context(|| "Metric"))?;
     Ok::<_, IoError>(res)
   })

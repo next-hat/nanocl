@@ -210,7 +210,7 @@ pub(crate) async fn delete(
     repositories::resource_kind::delete(&resource.name, &state.pool).await?;
   }
   repositories::resource::delete_by_key(&resource.name, &state.pool).await?;
-  repositories::resource_config::delete_by_resource_key(
+  repositories::resource_spec::delete_by_resource_key(
     &resource.name,
     &state.pool,
   )

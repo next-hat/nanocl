@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -7,7 +9,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::job::{Job, JobPartial};
 
 use crate::utils;
-use crate::models::{Pool, JobDbModel, JobUpdateDbModel};
+use crate::models::{Pool, JobDb, JobUpdateDb};
 
 /// ## Create
 ///
@@ -28,7 +30,7 @@ pub(crate) async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
   if let Some(meta) = data.as_object_mut() {
     meta.remove("Metadata");
   }
-  let dbmodel = JobDbModel {
+  let dbmodel = JobDb {
     key: item.name.clone(),
     created_at: chrono::Local::now().naive_utc(),
     updated_at: chrono::Local::now().naive_utc(),
@@ -36,7 +38,7 @@ pub(crate) async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
     metadata: item.metadata.clone(),
   };
   let db_model =
-    super::generic::insert_with_res::<_, _, JobDbModel>(dbmodel.clone(), pool)
+    super::generic::insert_with_res::<_, _, JobDb>(dbmodel.clone(), pool)
       .await?;
   let job = db_model.into_job(item);
   Ok(job)
@@ -78,10 +80,10 @@ pub(crate) async fn delete_by_name(
 ///
 pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
   use crate::schema::jobs;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items: Vec<JobDbModel> = jobs::dsl::jobs
+    let items: Vec<JobDb> = jobs::dsl::jobs
       .order(jobs::dsl::created_at.desc())
       .get_results(&mut conn)
       .map_err(|err| err.map_err_context(|| "Job"))?;
@@ -114,7 +116,7 @@ pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
 pub(crate) async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
   use crate::schema::jobs;
   let name = name.to_owned();
-  let db_model: JobDbModel =
+  let db_model: JobDb =
     super::generic::find_by_id::<jobs::table, _, _>(name, pool).await?;
   let item = db_model.serialize_data()?;
   let job = db_model.into_job(&item);
@@ -128,7 +130,7 @@ pub(crate) async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
 /// ## Arguments
 ///
 /// * [name](str) The name of the job to update
-/// * [data](JobUpdateDbModel) The data to update
+/// * [data](JobUpdateDb) The data to update
 /// * [pool](Pool) The database pool
 ///
 /// ## Return
@@ -137,7 +139,7 @@ pub(crate) async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
 ///
 pub(crate) async fn update_by_name(
   name: &str,
-  data: &JobUpdateDbModel,
+  data: &JobUpdateDb,
   pool: &Pool,
 ) -> IoResult<Job> {
   use crate::schema::jobs;
@@ -148,7 +150,7 @@ pub(crate) async fn update_by_name(
     pool,
   )
   .await?;
-  let db_model: JobDbModel =
+  let db_model: JobDb =
     super::generic::find_by_id::<jobs::table, _, _>(name, pool).await?;
   let job = db_model.serialize_data()?;
   let job = db_model.into_job(&job);

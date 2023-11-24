@@ -221,9 +221,9 @@ mod tests {
     let client = gen_default_test_client().await;
     let state: &str = include_str!("../../../../examples/job_example.yml");
     let yaml: serde_yaml::Value = serde_yaml::from_str(state).unwrap();
-    let job_config = &yaml["Jobs"][0];
+    let job_spec = &yaml["Jobs"][0];
     let mut res = client
-      .send_post(ENDPOINT, Some(job_config.clone()), None::<String>)
+      .send_post(ENDPOINT, Some(job_spec.clone()), None::<String>)
       .await;
     test_status_code!(res.status(), http::StatusCode::CREATED, "create job");
     let job = res.json::<Job>().await.unwrap();

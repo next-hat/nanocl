@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -7,7 +9,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::secret::{SecretUpdate, SecretPartial, SecretQuery};
 
 use crate::utils;
-use crate::models::{Pool, SecretDbModel, SecretUpdateDbModel};
+use crate::models::{Pool, SecretDb, SecretUpdateDb};
 
 /// ## Create
 ///
@@ -20,13 +22,13 @@ use crate::models::{Pool, SecretDbModel, SecretUpdateDbModel};
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [SecretDbModel](SecretDbModel)
+/// [IoResult](IoResult) containing a [SecretDb](SecretDb)
 ///
 pub(crate) async fn create(
   item: &SecretPartial,
   pool: &Pool,
-) -> IoResult<SecretDbModel> {
-  let item: SecretDbModel = item.clone().into();
+) -> IoResult<SecretDb> {
+  let item: SecretDb = item.clone().into();
   super::generic::insert_with_res(item, pool).await
 }
 
@@ -40,14 +42,14 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [SecretDbModel](SecretDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [SecretDb](SecretDb)
 ///
 pub(crate) async fn list(
   query: Option<SecretQuery>,
   pool: &Pool,
-) -> IoResult<Vec<SecretDbModel>> {
+) -> IoResult<Vec<SecretDb>> {
   use crate::schema::secrets;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let req = match query {
@@ -120,12 +122,9 @@ pub(crate) async fn delete_by_key(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [SecretDbModel](SecretDbModel)
+/// [IoResult](IoResult) containing a [SecretDb](SecretDb)
 ///
-pub(crate) async fn find_by_key(
-  key: &str,
-  pool: &Pool,
-) -> IoResult<SecretDbModel> {
+pub(crate) async fn find_by_key(key: &str, pool: &Pool) -> IoResult<SecretDb> {
   use crate::schema::secrets;
   let key = key.to_owned();
   super::generic::find_by_id::<secrets::table, _, _>(key, pool).await
@@ -143,22 +142,22 @@ pub(crate) async fn find_by_key(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [SecretDbModel](SecretDbModel)
+/// [IoResult](IoResult) containing a [SecretDb](SecretDb)
 ///
 pub(crate) async fn update_by_key(
   key: &str,
   item: &SecretUpdate,
   pool: &Pool,
-) -> IoResult<SecretDbModel> {
+) -> IoResult<SecretDb> {
   use crate::schema::secrets;
   let key = key.to_owned();
   let item = item.clone();
   let mut secret = find_by_key(&key, pool).await?;
-  let new_item = SecretUpdateDbModel {
+  let new_item = SecretUpdateDb {
     data: Some(item.data.clone()),
     metadata: item.metadata.clone(),
   };
-  super::generic::update_by_id::<secrets::table, SecretUpdateDbModel, _>(
+  super::generic::update_by_id::<secrets::table, SecretUpdateDb, _>(
     key, new_item, pool,
   )
   .await?;

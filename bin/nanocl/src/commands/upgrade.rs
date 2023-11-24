@@ -1,5 +1,5 @@
 use nanocl_error::io::{IoError, FromIo, IoResult};
-use nanocld_client::stubs::cargo_config::CargoConfigPartial;
+use nanocld_client::stubs::cargo_spec::CargoSpecPartial;
 
 use crate::{utils, version};
 use crate::config::CliConfig;
@@ -48,7 +48,7 @@ pub async fn exec_upgrade(
     serde_yaml::from_str::<serde_json::Value>(&installer).map_err(|err| {
       err.map_err_context(|| "Unable to convert upgrade to yaml")
     })?;
-  let cargoes = serde_json::from_value::<Vec<CargoConfigPartial>>(
+  let cargoes = serde_json::from_value::<Vec<CargoSpecPartial>>(
     data
       .get("Cargoes")
       .cloned()

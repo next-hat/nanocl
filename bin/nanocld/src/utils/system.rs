@@ -12,11 +12,11 @@ use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 use nanocl_error::io::{FromIo, IoResult};
 
 use nanocl_stubs::namespace::NamespacePartial;
-use nanocl_stubs::cargo_config::CargoConfigPartial;
+use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
 use crate::{version, utils, repositories};
 use crate::models::{
-  DaemonState, ContainerInstancePartial, ContainerInstanceUpdateDbModel,
+  DaemonState, ContainerInstancePartial, ContainerInstanceUpdateDb,
 };
 
 /// Sync instance
@@ -69,7 +69,7 @@ async fn sync_instance(
         log::debug!("container instance already synced");
         return Ok(());
       }
-      let new_instance = ContainerInstanceUpdateDbModel {
+      let new_instance = ContainerInstanceUpdateDb {
         updated_at: Some(chrono::Utc::now().naive_utc()),
         data: Some(container_instance_data),
       };
@@ -232,7 +232,7 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
     // if let Some(_endpoints_config) = network_settings.networks {
     //   // config.networking_config = Some(NetworkingConfig { endpoints_config });
     // }
-    let new_cargo = CargoConfigPartial {
+    let new_cargo = CargoSpecPartial {
       name: metadata[0].to_owned(),
       container: config.to_owned(),
       ..Default::default()
@@ -241,7 +241,7 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
     match repositories::cargo::inspect_by_key(cargo_key, &state.pool).await {
       // If the cargo is already in our store and the config is different we update it
       Ok(cargo) => {
-        if cargo.config.container != config {
+        if cargo.spec.container != config {
           log::debug!(
             "updating cargo {} in namespace {}",
             metadata[0],

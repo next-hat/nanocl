@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -6,7 +8,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
 
 use crate::utils;
-use crate::models::{Pool, NamespaceDbModel};
+use crate::models::{Pool, NamespaceDb};
 
 /// ## Create
 ///
@@ -19,13 +21,13 @@ use crate::models::{Pool, NamespaceDbModel};
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [NamespaceDbModel](NamespaceDbModel)
+/// [IoResult](IoResult) containing a [NamespaceDb](NamespaceDb)
 ///
 pub(crate) async fn create(
   item: &NamespacePartial,
   pool: &Pool,
-) -> IoResult<NamespaceDbModel> {
-  let item = NamespaceDbModel {
+) -> IoResult<NamespaceDb> {
+  let item = NamespaceDb {
     name: item.name.clone(),
     created_at: chrono::Utc::now().naive_utc(),
   };
@@ -43,15 +45,15 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [NamespaceDbModel](NamespaceDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [NamespaceDb](NamespaceDb)
 ///
 pub(crate) async fn list(
   query: &NamespaceListQuery,
   pool: &Pool,
-) -> IoResult<Vec<NamespaceDbModel>> {
+) -> IoResult<Vec<NamespaceDb>> {
   use crate::schema::namespaces::dsl;
   let query = query.clone();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let mut sql = dsl::namespaces.into_boxed();
@@ -106,12 +108,12 @@ pub(crate) async fn delete_by_name(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [NamespaceDbModel](NamespaceDbModel)
+/// [IoResult](IoResult) containing a [NamespaceDb](NamespaceDb)
 ///
 pub(crate) async fn find_by_name(
   name: &str,
   pool: &Pool,
-) -> IoResult<NamespaceDbModel> {
+) -> IoResult<NamespaceDb> {
   use crate::schema::namespaces;
   let name = name.to_owned();
   super::generic::find_by_id::<namespaces::table, _, _>(name, pool).await
@@ -133,12 +135,12 @@ pub(crate) async fn find_by_name(
 pub(crate) async fn exist_by_name(name: &str, pool: &Pool) -> IoResult<bool> {
   use crate::schema::namespaces;
   let name = name.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let exist = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let exist = namespaces::dsl::namespaces
       .filter(namespaces::dsl::name.eq(name))
-      .get_result::<NamespaceDbModel>(&mut conn)
+      .get_result::<NamespaceDb>(&mut conn)
       .optional()
       .map_err(|err| err.map_err_context(|| "Namespace"))?;
     Ok::<_, IoError>(exist)

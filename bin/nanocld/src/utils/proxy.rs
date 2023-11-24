@@ -3,9 +3,7 @@ use futures::StreamExt;
 use bollard_next::container::{LogsOptions, LogOutput};
 
 use crate::repositories;
-use crate::models::{
-  ToDbModel, DaemonState, HttpMetricPartial, StreamMetricPartial,
-};
+use crate::models::{ToDb, DaemonState, HttpMetricPartial, StreamMetricPartial};
 
 /// ## Spawn logger
 ///

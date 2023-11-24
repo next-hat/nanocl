@@ -3,8 +3,8 @@ use serde::{Serialize, Deserialize};
 
 use crate::job::JobPartial;
 use crate::secret::SecretPartial;
-use crate::vm_config::VmConfigPartial;
-use crate::cargo_config::CargoConfigPartial;
+use crate::vm_spec::VmSpecPartial;
+use crate::cargo_spec::CargoSpecPartial;
 
 use super::resource::ResourcePartial;
 
@@ -69,7 +69,7 @@ pub struct StateCargo {
   /// Namespace where the cargoes are deployed
   pub namespace: Option<String>,
   /// List of cargoes to create and run
-  pub cargoes: Vec<CargoConfigPartial>,
+  pub cargoes: Vec<CargoSpecPartial>,
 }
 
 /// ## StateVirtualMachine
@@ -84,7 +84,7 @@ pub struct StateVirtualMachine {
   /// Namespace where the virtual machines are deployed
   pub namespace: Option<String>,
   /// List of virtual machines to create and run
-  pub virtual_machines: Vec<VmConfigPartial>,
+  pub virtual_machines: Vec<VmSpecPartial>,
 }
 
 /// ## StateJob
@@ -115,9 +115,9 @@ pub struct StateDeployment {
   /// List of secrets to create
   pub secrets: Option<Vec<SecretPartial>>,
   /// List of cargoes to create and run
-  pub cargoes: Option<Vec<CargoConfigPartial>>,
+  pub cargoes: Option<Vec<CargoSpecPartial>>,
   /// List of virtual machines to create and run
-  pub virtual_machines: Option<Vec<VmConfigPartial>>,
+  pub virtual_machines: Option<Vec<VmSpecPartial>>,
 }
 
 /// ## StateStreamStatus

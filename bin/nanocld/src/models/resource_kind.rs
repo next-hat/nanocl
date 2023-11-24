@@ -2,7 +2,7 @@ use diesel::prelude::*;
 
 use crate::schema::{resource_kinds, resource_kind_versions};
 
-/// ## ResourceKindVersionDbModel
+/// ## ResourceKindVersionDb
 ///
 /// This structure represent the resource kind verion in the database.
 /// A resource kind version represent the version of a resource kind.
@@ -12,15 +12,15 @@ use crate::schema::{resource_kinds, resource_kind_versions};
 #[derive(Clone, Debug, Queryable, Identifiable, Insertable)]
 #[diesel(primary_key(resource_kind_name, version))]
 #[diesel(table_name = resource_kind_versions)]
-pub struct ResourceKindVersionDbModel {
-  pub(crate) resource_kind_name: String,
-  pub(crate) created_at: chrono::NaiveDateTime,
-  pub(crate) version: String,
-  pub(crate) schema: Option<serde_json::Value>,
-  pub(crate) url: Option<String>,
+pub struct ResourceKindVersionDb {
+  pub resource_kind_name: String,
+  pub created_at: chrono::NaiveDateTime,
+  pub version: String,
+  pub schema: Option<serde_json::Value>,
+  pub url: Option<String>,
 }
 
-/// ## ResourceKindDbModel
+/// ## ResourceKindDb
 ///
 /// This structure represent the resource kind in the database.
 /// A resource kind represent the kind of a resource.
@@ -29,9 +29,11 @@ pub struct ResourceKindVersionDbModel {
 #[derive(Clone, Debug, Queryable, Identifiable, Insertable)]
 #[diesel(primary_key(name))]
 #[diesel(table_name = resource_kinds)]
-pub struct ResourceKindDbModel {
-  pub(crate) name: String,
-  pub(crate) created_at: chrono::NaiveDateTime,
+pub struct ResourceKindDb {
+  /// Name of the kind
+  pub name: String,
+  /// When the kind have been created
+  pub created_at: chrono::NaiveDateTime,
 }
 
 /// ## ResourceKindPartial
@@ -42,11 +44,11 @@ pub struct ResourceKindDbModel {
 #[derive(Clone, Debug)]
 pub struct ResourceKindPartial {
   /// The name of the resource kind
-  pub(crate) name: String,
+  pub name: String,
   /// The version of the resource kind
-  pub(crate) version: String,
+  pub version: String,
   /// The JSONSchema of the resource of this kind and version
-  pub(crate) schema: Option<serde_json::Value>,
+  pub schema: Option<serde_json::Value>,
   /// The service to call when creating, updating or deleting a resource of this kind and version
-  pub(crate) url: Option<String>,
+  pub url: Option<String>,
 }

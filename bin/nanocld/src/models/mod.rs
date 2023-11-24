@@ -1,6 +1,7 @@
+use std::sync::Arc;
+
 use diesel::PgConnection;
-use r2d2::PooledConnection;
-use diesel::r2d2::ConnectionManager;
+use diesel::r2d2::{Pool as R2D2Pool, PooledConnection, ConnectionManager};
 
 mod ws;
 pub use ws::*;
@@ -23,14 +24,14 @@ pub use namespace::*;
 mod cargo;
 pub use cargo::*;
 
-mod cargo_config;
-pub use cargo_config::*;
+mod cargo_spec;
+pub use cargo_spec::*;
 
 pub mod vm;
 pub use vm::*;
 
-mod vm_config;
-pub use vm_config::*;
+mod vm_spec;
+pub use vm_spec::*;
 
 pub mod vm_image;
 pub use vm_image::*;
@@ -41,8 +42,8 @@ pub use resource::*;
 mod resource_kind;
 pub use resource_kind::*;
 
-mod resource_config;
-pub use resource_config::*;
+mod resource_spec;
+pub use resource_spec::*;
 
 mod secret;
 pub use secret::*;
@@ -53,5 +54,5 @@ pub use job::*;
 mod container_instance;
 pub use container_instance::*;
 
-pub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
+pub type Pool = Arc<R2D2Pool<ConnectionManager<PgConnection>>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;

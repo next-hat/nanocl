@@ -5,7 +5,7 @@ Resources:
 - Name: proxy-get-started
   Kind: ProxyRule
   Version: v0.8
-  Config:
+  Data:
     Rules:
     - Domain: get-started.com
       Network: All

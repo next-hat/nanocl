@@ -38,12 +38,12 @@ pub struct ResourcePartial {
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
 pub struct ResourceUpdate {
-  /// Version of the config
+  /// Version of the spec
   pub version: String,
-  /// The config of the resource as a json object
+  /// The spec of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub data: serde_json::Value,
-  /// The config of the resource as a json object
+  /// The metadata of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   #[cfg_attr(
     feature = "serde",
@@ -62,8 +62,8 @@ impl From<ResourcePartial> for ResourceUpdate {
   }
 }
 
-/// Resource is a configuration with a name and a kind
-/// It is used to define [proxy rules](ProxyRule) and other kind of config
+/// Resource is a specification with a name and a kind
+/// It is used to define [proxy rules](ProxyRule) and other kind of spec
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -80,9 +80,9 @@ pub struct Resource {
   pub version: String,
   /// The kind of the resource
   pub kind: String,
-  /// The config of the resource
-  pub config_key: uuid::Uuid,
-  /// The config of the resource as a json object
+  /// The spec of the resource
+  pub spec_key: uuid::Uuid,
+  /// The spec of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub data: serde_json::Value,
   /// The metadata of the resource (user defined)
@@ -132,9 +132,9 @@ impl From<Resource> for ResourcePartial {
   }
 }
 
-/// ## ResourceConfig
+/// ## ResourceSpec
 ///
-/// The config of the resource
+/// The spec of the resource
 ///
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -143,7 +143,7 @@ impl From<Resource> for ResourcePartial {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct ResourceConfig {
+pub struct ResourceSpec {
   /// Key of the resource
   pub key: uuid::Uuid,
   /// Version of the resource

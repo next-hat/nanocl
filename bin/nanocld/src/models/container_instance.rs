@@ -1,12 +1,12 @@
 use serde::Deserialize;
 
-use bollard_next::service::ContainerInspectResponse;
-
 use nanocl_error::io::{IoError, FromIo};
+
+use bollard_next::service::ContainerInspectResponse;
 
 use crate::schema::container_instances;
 
-/// ## ContainerInstanceDbModel
+/// ## ContainerInstanceDb
 ///
 /// This structure represent a job to run.
 /// It will create and run a list of containers.
@@ -14,7 +14,7 @@ use crate::schema::container_instances;
 #[derive(Clone, Queryable, Identifiable, Insertable)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = container_instances)]
-pub struct ContainerInstanceDbModel {
+pub struct ContainerInstanceDb {
   /// The key of the job generated with the name
   pub key: String,
   /// The created at date
@@ -48,7 +48,7 @@ pub struct ContainerInstancePartial {
   pub kind_id: String,
 }
 
-impl From<ContainerInstancePartial> for ContainerInstanceDbModel {
+impl From<ContainerInstancePartial> for ContainerInstanceDb {
   fn from(model: ContainerInstancePartial) -> Self {
     Self {
       key: model.key,
@@ -74,10 +74,10 @@ pub struct ContainerInstance {
   pub data: ContainerInspectResponse,
 }
 
-impl TryFrom<ContainerInstanceDbModel> for ContainerInstance {
+impl TryFrom<ContainerInstanceDb> for ContainerInstance {
   type Error = IoError;
 
-  fn try_from(model: ContainerInstanceDbModel) -> Result<Self, Self::Error> {
+  fn try_from(model: ContainerInstanceDb) -> Result<Self, Self::Error> {
     Ok(Self {
       key: model.key,
       name: model.name,
@@ -90,14 +90,14 @@ impl TryFrom<ContainerInstanceDbModel> for ContainerInstance {
   }
 }
 
-/// ## ContainerInstanceUpdateDbModel
+/// ## ContainerInstanceUpdateDb
 ///
 /// This structure represent the update of a container instance.
 /// It will update the container instance with the new data.
 ///
 #[derive(Clone, AsChangeset)]
 #[diesel(table_name = container_instances)]
-pub struct ContainerInstanceUpdateDbModel {
+pub struct ContainerInstanceUpdateDb {
   /// Last time the instance was updated
   pub updated_at: Option<chrono::NaiveDateTime>,
   // The updated at data

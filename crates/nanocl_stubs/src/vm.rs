@@ -3,7 +3,7 @@ use bollard_next::service::ContainerSummary;
 use serde::{Serialize, Deserialize};
 
 use crate::{
-  vm_config::{VmConfig, VmConfigPartial},
+  vm_spec::{VmSpec, VmSpecPartial},
   system::{EventActor, ToEvent, EventAction, Event, EventKind},
 };
 
@@ -20,19 +20,19 @@ pub struct Vm {
   pub namespace_name: String,
   /// Name of the vm
   pub name: String,
-  /// Unique identifier of the vm config
-  pub config_key: uuid::Uuid,
-  /// Configuration of the vm
-  pub config: VmConfig,
+  /// Unique identifier of the vm spec
+  pub spec_key: uuid::Uuid,
+  /// Specification of the vm
+  pub spec: VmSpec,
 }
 
-impl From<Vm> for VmConfigPartial {
+impl From<Vm> for VmSpecPartial {
   fn from(vm: Vm) -> Self {
-    vm.config.into()
+    vm.spec.into()
   }
 }
 
-/// Convert a Cargo into an EventActor
+/// Convert a Vm into an EventActor
 impl From<Vm> for EventActor {
   fn from(vm: Vm) -> Self {
     Self {
@@ -40,9 +40,9 @@ impl From<Vm> for EventActor {
       attributes: Some(serde_json::json!({
         "Name": vm.name,
         "Namespace": vm.namespace_name,
-        "Version": vm.config.version,
+        "Version": vm.spec.version,
         "Namespace": vm.namespace_name,
-        "Metadata": vm.config.metadata,
+        "Metadata": vm.spec.metadata,
       })),
     }
   }
@@ -73,37 +73,37 @@ pub struct VmSummary {
   pub updated_at: chrono::NaiveDateTime,
   /// Name of the vm
   pub name: String,
-  /// Unique identifier of the vm config
-  pub config_key: uuid::Uuid,
+  /// Unique identifier of the spec
+  pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Configuration of the vm
-  pub config: VmConfig,
+  /// Specification of the vm
+  pub spec: VmSpec,
   /// Number of instances
   pub instances: usize,
   /// Number of running instances
   pub running_instances: usize,
 }
 
-/// A Vm Inspect is a detailed view of a cargo
-/// It is used to inspect a cargo
-/// It contains all the information about the cargo
+/// A Vm Inspect is a detailed view of a vm
+/// It is used to inspect a vm
+/// It contains all the information about the vm
 /// It also contains the list of containers
 #[derive(Default, Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmInspect {
-  /// Key of the cargo
+  /// Key of the vm
   pub key: String,
-  /// Name of the cargo
+  /// Name of the vm
   pub name: String,
-  /// Unique identifier of the cargo config
-  pub config_key: uuid::Uuid,
+  /// Unique identifier of the spec
+  pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Configuration of the cargo
-  pub config: VmConfig,
+  /// Specification of the vm
+  pub spec: VmSpec,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances

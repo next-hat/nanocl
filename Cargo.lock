@@ -1956,7 +1956,6 @@ dependencies = [
  "ntex",
  "ntex-cors",
  "openssl",
- "r2d2",
  "serde",
  "serde_json",
  "serde_yaml",

@@ -19,7 +19,7 @@ use nanocl_stubs::config::DaemonConfig;
 
 use crate::repositories;
 use crate::version::VERSION;
-use crate::models::{DaemonState, NodeDbModel};
+use crate::models::{DaemonState, NodeDb};
 
 #[derive(Clone)]
 pub struct NodeMessage {
@@ -110,7 +110,7 @@ async fn messages(
 
 pub fn watch_node(
   daemon_conf: &DaemonConfig,
-  node: &NodeDbModel,
+  node: &NodeDb,
   mut srv: mpsc::UnboundedSender<NodeClientsMessage>,
 ) {
   let node = node.clone();
@@ -212,7 +212,7 @@ pub fn watch_node(
 }
 
 pub async fn register(daemon_state: &DaemonState) -> IoResult<()> {
-  let node = NodeDbModel {
+  let node = NodeDb {
     name: daemon_state.config.hostname.clone(),
     ip_address: daemon_state.config.gateway.clone(),
   };

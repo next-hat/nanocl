@@ -5,11 +5,12 @@ use clap::{Parser, Subcommand};
 use bollard_next::exec::CreateExecOptions;
 use bollard_next::container::MemoryStatsStats;
 use nanocld_client::stubs::cargo::{CargoStats, CargoSummary};
-use nanocld_client::stubs::cargo_config::{
-  CargoConfigUpdate, Config as ContainerConfig, CargoConfigPartial, HostConfig,
+use nanocld_client::stubs::cargo_spec::{
+  CargoSpecUpdate, Config, CargoSpecPartial, HostConfig,
 };
 
-use super::{cargo_image::CargoImageArg, DisplayFormat};
+use super::DisplayFormat;
+use super::cargo_image::CargoImageArg;
 
 /// ## CargoRemoveOpts
 ///
@@ -45,12 +46,12 @@ pub struct CargoCreateOpts {
   pub(crate) env: Option<Vec<String>>,
 }
 
-/// Convert CargoCreateOpts to CargoConfigPartial
-impl From<CargoCreateOpts> for CargoConfigPartial {
+/// Convert CargoCreateOpts to CargoSpecPartial
+impl From<CargoCreateOpts> for CargoSpecPartial {
   fn from(val: CargoCreateOpts) -> Self {
     Self {
       name: val.name,
-      container: ContainerConfig {
+      container: Config {
         image: Some(val.image),
         // network: val.network,
         // volumes: val.volumes,
@@ -88,12 +89,12 @@ pub struct CargoRunOpts {
   pub command: Vec<String>,
 }
 
-/// Convert CargoRunOpts to CargoConfigPartial
-impl From<CargoRunOpts> for CargoConfigPartial {
+/// Convert CargoRunOpts to CargoSpecPartial
+impl From<CargoRunOpts> for CargoSpecPartial {
   fn from(val: CargoRunOpts) -> Self {
     Self {
       name: val.name,
-      container: ContainerConfig {
+      container: Config {
         image: Some(val.image),
         // network: val.network,
         // volumes: val.volumes,
@@ -176,12 +177,12 @@ pub struct CargoPatchOpts {
   pub(crate) volumes: Option<Vec<String>>,
 }
 
-/// Convert CargoPatchOpts to CargoConfigUpdate
-impl From<CargoPatchOpts> for CargoConfigUpdate {
+/// Convert CargoPatchOpts to CargoSpecUpdate
+impl From<CargoPatchOpts> for CargoSpecUpdate {
   fn from(val: CargoPatchOpts) -> Self {
-    CargoConfigUpdate {
+    CargoSpecUpdate {
       name: val.new_name,
-      container: Some(ContainerConfig {
+      container: Some(Config {
         image: val.image,
         env: val.env,
         ..Default::default()
@@ -382,7 +383,7 @@ pub struct CargoRow {
   pub(crate) image: String,
   /// Number of running instances
   pub(crate) instances: String,
-  /// Config version of the cargo
+  /// Spec version of the cargo
   pub(crate) version: String,
   /// When the cargo was created
   #[tabled(rename = "CREATED AT")]
@@ -409,8 +410,8 @@ impl From<CargoSummary> for CargoRow {
     Self {
       name: cargo.name,
       namespace: cargo.namespace_name,
-      image: cargo.config.container.image.unwrap_or_default(),
-      version: cargo.config.version,
+      image: cargo.spec.container.image.unwrap_or_default(),
+      version: cargo.spec.version,
       instances: format!("{}/{}", cargo.instance_running, cargo.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

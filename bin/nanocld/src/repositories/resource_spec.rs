@@ -1,37 +1,40 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
+
 use nanocl_stubs::generic::GenericDelete;
-use nanocl_stubs::resource::ResourceConfig;
+use nanocl_stubs::resource::ResourceSpec;
 
 use crate::utils;
-use crate::models::{Pool, ResourceConfigDbModel};
+use crate::models::{Pool, ResourceSpecDb};
 
 /// ## Create
 ///
-/// Create a resource config in database
+/// Create a resource spec in database
 ///
 /// ## Arguments
 ///
-/// * [item](ResourceConfigDbModel) - Resource config item
+/// * [item](ResourceSpecDb) - Resource spec item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [ResourceConfigDbModel](ResourceConfigDbModel)
+/// [IoResult](IoResult) containing a [ResourceSpecDb](ResourceSpecDb)
 ///
 pub(crate) async fn create(
-  item: &ResourceConfigDbModel,
+  item: &ResourceSpecDb,
   pool: &Pool,
-) -> IoResult<ResourceConfigDbModel> {
+) -> IoResult<ResourceSpecDb> {
   let item = item.clone();
   super::generic::insert_with_res(item, pool).await
 }
 
 /// ## Delete by resource key
 ///
-/// Delete all resource config by a resource key
+/// Delete all resource spec by a resource key
 ///
 /// ## Arguments
 ///
@@ -46,10 +49,10 @@ pub(crate) async fn delete_by_resource_key(
   key: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
-  use crate::schema::resource_configs;
+  use crate::schema::resource_specs;
   let key = key.to_owned();
-  super::generic::delete::<resource_configs::table, _>(
-    resource_configs::dsl::resource_key.eq(key),
+  super::generic::delete::<resource_specs::table, _>(
+    resource_specs::dsl::resource_key.eq(key),
     pool,
   )
   .await
@@ -57,7 +60,7 @@ pub(crate) async fn delete_by_resource_key(
 
 /// ## List by resource key
 ///
-/// List all resource config by resource key
+/// List all resource spec by resource key
 ///
 /// ## Arguments
 ///
@@ -66,60 +69,60 @@ pub(crate) async fn delete_by_resource_key(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [ResourceConfig](ResourceConfig)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [ResourceSpec](ResourceSpec)
 ///
 pub(crate) async fn list_by_resource_key(
   key: &str,
   pool: &Pool,
-) -> IoResult<Vec<ResourceConfig>> {
-  use crate::schema::resource_configs;
+) -> IoResult<Vec<ResourceSpec>> {
+  use crate::schema::resource_specs;
   let key = key.to_owned();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let models = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = resource_configs::dsl::resource_configs
-      .order(resource_configs::dsl::created_at.desc())
-      .filter(resource_configs::dsl::resource_key.eq(key))
-      .load::<ResourceConfigDbModel>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
+    let items = resource_specs::dsl::resource_specs
+      .order(resource_specs::dsl::created_at.desc())
+      .filter(resource_specs::dsl::resource_key.eq(key))
+      .load::<ResourceSpecDb>(&mut conn)
+      .map_err(|err| err.map_err_context(|| "ResourceSpec"))?;
     Ok::<_, IoError>(items)
   })
   .await?;
   let models = models
     .into_iter()
-    .map(ResourceConfig::from)
+    .map(ResourceSpec::from)
     .collect::<Vec<_>>();
   Ok(models)
 }
 
 /// ## Find by key
 ///
-/// Find resource config by key
+/// Find resource spec by key
 ///
 /// ## Arguments
 ///
-/// * [key](uuid::Uuid) - Resource config key
+/// * [key](uuid::Uuid) - Resource spec key
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [ResourceConfig](ResourceConfig)
+/// [IoResult](IoResult) containing a [ResourceSpec](ResourceSpec)
 ///
 pub(crate) async fn find_by_key(
   key: &uuid::Uuid,
   pool: &Pool,
-) -> IoResult<ResourceConfig> {
-  use crate::schema::resource_configs;
+) -> IoResult<ResourceSpec> {
+  use crate::schema::resource_specs;
   let key = *key;
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let model = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let item = resource_configs::dsl::resource_configs
-      .filter(resource_configs::dsl::key.eq(key))
-      .first::<ResourceConfigDbModel>(&mut conn)
-      .map_err(|err| err.map_err_context(|| "ResourceConfig"))?;
+    let item = resource_specs::dsl::resource_specs
+      .filter(resource_specs::dsl::key.eq(key))
+      .first::<ResourceSpecDb>(&mut conn)
+      .map_err(|err| err.map_err_context(|| "ResourceSpec"))?;
     Ok::<_, IoError>(item)
   })
   .await?;
-  Ok(ResourceConfig::from(model))
+  Ok(ResourceSpec::from(model))
 }

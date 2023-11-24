@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct VmDiskConfig {
+pub struct VmDisk {
   /// Name of the image to use
   pub image: String,
   /// Virtual size allowed for the disk in GB (default: 20)
@@ -87,7 +87,7 @@ impl Default for VmHostConfig {
   }
 }
 
-/// A vm config partial is used to create a vm
+/// A vm spec partial is used to create a vm
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -95,7 +95,7 @@ impl Default for VmHostConfig {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct VmConfigPartial {
+pub struct VmSpecPartial {
   /// Name of the vm
   pub name: String,
   /// The metadata (user defined)
@@ -129,7 +129,7 @@ pub struct VmConfigPartial {
   )]
   pub ssh_key: Option<String>,
   /// Disk config of the vm (image, size) required
-  pub disk: VmDiskConfig,
+  pub disk: VmDisk,
   /// Mac address of the vm (default: generated)
   #[cfg_attr(
     feature = "serde",
@@ -150,9 +150,12 @@ pub struct VmConfigPartial {
   pub host_config: Option<VmHostConfig>,
 }
 
+/// ## VmSpecUpdate
+///
 /// Payload used to patch a vm
-/// It will create a new [VmConfig](VmConfig) with the new values
-/// It will keep the old values in the history
+/// It will create a new [VmSpec](VmSpec) with the new values
+/// and keep the old values in the history
+///
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -160,7 +163,7 @@ pub struct VmConfigPartial {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct VmConfigUpdate {
+pub struct VmSpecUpdate {
   /// Name of the vm
   #[cfg_attr(
     feature = "serde",
@@ -211,36 +214,36 @@ pub struct VmConfigUpdate {
   pub host_config: Option<VmHostConfig>,
 }
 
-impl From<VmConfigPartial> for VmConfigUpdate {
-  fn from(vm_config: VmConfigPartial) -> Self {
+impl From<VmSpecPartial> for VmSpecUpdate {
+  fn from(spec: VmSpecPartial) -> Self {
     Self {
-      name: Some(vm_config.name),
-      hostname: vm_config.hostname,
-      user: vm_config.user,
-      labels: vm_config.labels,
-      host_config: vm_config.host_config,
-      password: vm_config.password,
-      ssh_key: vm_config.ssh_key,
-      metadata: vm_config.metadata,
+      name: Some(spec.name),
+      hostname: spec.hostname,
+      user: spec.user,
+      labels: spec.labels,
+      host_config: spec.host_config,
+      password: spec.password,
+      ssh_key: spec.ssh_key,
+      metadata: spec.metadata,
     }
   }
 }
 
-/// A vm config is the configuration of a vm
+/// A vm spec is the specification of a vm
 /// It used to know the state of the vm
 /// It keep tracking of an history when you patch an existing vm
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct VmConfig {
-  /// Unique identifier of the vm config
+pub struct VmSpec {
+  /// Unique identifier of the vm spec
   pub key: uuid::Uuid,
-  /// Creation date of the vm config
+  /// Creation date of the vm spec
   pub created_at: chrono::NaiveDateTime,
   /// Name of the vm
   pub name: String,
-  /// Version of the config
+  /// Version of the spec
   pub version: String,
   /// The key of the vm
   pub vm_key: String,
@@ -275,7 +278,7 @@ pub struct VmConfig {
   )]
   pub user: Option<String>,
   /// Disk config of the vm
-  pub disk: VmDiskConfig,
+  pub disk: VmDisk,
   /// Mac address of the vm
   #[cfg_attr(
     feature = "serde",
@@ -292,34 +295,34 @@ pub struct VmConfig {
   pub host_config: VmHostConfig,
 }
 
-impl From<VmConfig> for VmConfigUpdate {
-  fn from(vm_config: VmConfig) -> Self {
+impl From<VmSpec> for VmSpecUpdate {
+  fn from(spec: VmSpec) -> Self {
     Self {
-      name: Some(vm_config.name),
-      hostname: vm_config.hostname,
-      user: vm_config.user,
-      labels: vm_config.labels,
-      host_config: Some(vm_config.host_config),
-      password: vm_config.password,
-      ssh_key: vm_config.ssh_key,
-      metadata: vm_config.metadata,
+      name: Some(spec.name),
+      hostname: spec.hostname,
+      user: spec.user,
+      labels: spec.labels,
+      host_config: Some(spec.host_config),
+      password: spec.password,
+      ssh_key: spec.ssh_key,
+      metadata: spec.metadata,
     }
   }
 }
 
-impl From<VmConfig> for VmConfigPartial {
-  fn from(vm_config: VmConfig) -> Self {
+impl From<VmSpec> for VmSpecPartial {
+  fn from(spec: VmSpec) -> Self {
     Self {
-      name: vm_config.name,
-      hostname: vm_config.hostname,
-      user: vm_config.user,
-      labels: vm_config.labels,
-      host_config: Some(vm_config.host_config),
-      password: vm_config.password,
-      ssh_key: vm_config.ssh_key,
-      metadata: vm_config.metadata,
-      disk: vm_config.disk,
-      mac_address: vm_config.mac_address,
+      name: spec.name,
+      hostname: spec.hostname,
+      user: spec.user,
+      labels: spec.labels,
+      host_config: Some(spec.host_config),
+      password: spec.password,
+      ssh_key: spec.ssh_key,
+      metadata: spec.metadata,
+      disk: spec.disk,
+      mac_address: spec.mac_address,
     }
   }
 }

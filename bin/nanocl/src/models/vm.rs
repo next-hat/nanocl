@@ -3,8 +3,8 @@ use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::vm::VmSummary;
-use nanocld_client::stubs::vm_config::{
-  VmConfigPartial, VmDiskConfig, VmHostConfig, VmConfigUpdate,
+use nanocld_client::stubs::vm_spec::{
+  VmSpecPartial, VmDisk, VmHostConfig, VmSpecUpdate,
 };
 
 use super::{VmImageArg, DisplayFormat};
@@ -110,8 +110,8 @@ pub struct VmPatchOpts {
   pub net_iface: Option<String>,
 }
 
-/// Convert VmPatchOpts to VmConfigUpdate
-impl From<VmPatchOpts> for VmConfigUpdate {
+/// Convert VmPatchOpts to VmSpecUpdate
+impl From<VmPatchOpts> for VmSpecUpdate {
   fn from(val: VmPatchOpts) -> Self {
     Self {
       name: Some(val.name),
@@ -173,8 +173,8 @@ pub struct VmRunOpts {
   pub image: String,
 }
 
-/// Convert VmRunOpts to VmConfigPartial
-impl From<VmRunOpts> for VmConfigPartial {
+/// Convert VmRunOpts to VmSpecPartial
+impl From<VmRunOpts> for VmSpecPartial {
   fn from(val: VmRunOpts) -> Self {
     Self {
       name: val.name,
@@ -182,7 +182,7 @@ impl From<VmRunOpts> for VmConfigPartial {
       user: val.user,
       password: val.password,
       ssh_key: val.ssh_key,
-      disk: VmDiskConfig {
+      disk: VmDisk {
         image: val.image,
         size: val.image_size,
       },
@@ -234,8 +234,8 @@ pub struct VmCreateOpts {
   pub image: String,
 }
 
-/// Convert VmCreateOpts to VmConfigPartial
-impl From<VmCreateOpts> for VmConfigPartial {
+/// Convert VmCreateOpts to VmSpecPartial
+impl From<VmCreateOpts> for VmSpecPartial {
   fn from(val: VmCreateOpts) -> Self {
     Self {
       name: val.name,
@@ -250,7 +250,7 @@ impl From<VmCreateOpts> for VmConfigPartial {
         kvm: Some(val.kvm),
         ..Default::default()
       }),
-      disk: VmDiskConfig {
+      disk: VmDisk {
         image: val.image,
         ..Default::default()
       },
@@ -274,7 +274,7 @@ pub struct VmRow {
   pub(crate) disk: String,
   /// Number of instances
   pub(crate) instances: String,
-  /// Config version
+  /// Spec version
   pub(crate) version: String,
   /// When the vm was created
   #[tabled(rename = "CREATED AT")]
@@ -302,8 +302,8 @@ impl From<VmSummary> for VmRow {
     Self {
       name: vm.name,
       namespace: vm.namespace_name,
-      disk: vm.config.disk.image,
-      version: vm.config.version,
+      disk: vm.spec.disk.image,
+      version: vm.spec.version,
       instances: format!("{}/{}", vm.running_instances, vm.instances),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

@@ -14,20 +14,20 @@ pub(crate) mod stream_metric;
 pub(crate) mod namespace;
 /// Manage cargoes table
 pub(crate) mod cargo;
-/// Manage cargo_configs table
-pub(crate) mod cargo_config;
+/// Manage cargo_specs table
+pub(crate) mod cargo_spec;
 /// Manage vms table
 pub(crate) mod vm;
-/// Manage vm_configs table
-pub(crate) mod vm_config;
+/// Manage vm_specs table
+pub(crate) mod vm_spec;
 /// Manage vm_images table
 pub(crate) mod vm_image;
 /// Manage resources table
 pub(crate) mod resource;
 /// Manage resource_kinds table
 pub(crate) mod resource_kind;
-/// Manage resource_configs table
-pub(crate) mod resource_config;
+/// Manage resource_specs table
+pub(crate) mod resource_spec;
 /// Manage secrets table
 pub(crate) mod secret;
 /// Manage job table

@@ -14,7 +14,7 @@ pub(crate) const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 #[derive(Debug, Clone)]
 pub struct WsConState {
   /// The last heartbeat
-  pub(crate) hb: Instant,
+  pub hb: Instant,
 }
 
 impl WsConState {

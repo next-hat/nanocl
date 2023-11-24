@@ -49,7 +49,7 @@ pub struct ReplicationStatic {
   pub number: usize,
 }
 
-/// A cargo config partial is used to create a Cargo
+/// A cargo spec partial is used to create a Cargo
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -57,7 +57,7 @@ pub struct ReplicationStatic {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct CargoConfigPartial {
+pub struct CargoSpecPartial {
   /// Name of the cargo
   pub name: String,
   /// Metadata of the cargo (user defined)
@@ -78,9 +78,9 @@ pub struct CargoConfigPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
-  /// Container configuration of the cargo
+  /// Container specification of the cargo
   pub container: Config,
-  /// Replication configuration of the cargo
+  /// Replication specification of the cargo
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -89,7 +89,7 @@ pub struct CargoConfigPartial {
 }
 
 /// Payload used to patch a cargo
-/// It will create a new [CargoConfig](CargoConfig) with the new values
+/// It will create a new [CargoSpec](CargoSpec) with the new values
 /// It will keep the old values in the history
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[derive(Debug, Default, Clone)]
@@ -98,7 +98,7 @@ pub struct CargoConfigPartial {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct CargoConfigUpdate {
+pub struct CargoSpecUpdate {
   /// New name of the cargo
   #[cfg_attr(
     feature = "serde",
@@ -123,13 +123,13 @@ pub struct CargoConfigUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
-  /// New replication configuration of the cargo
+  /// New replication specification of the cargo
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub container: Option<Config>,
-  /// New container configuration of the cargo
+  /// New container specification of the cargo
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -137,34 +137,34 @@ pub struct CargoConfigUpdate {
   pub replication: Option<ReplicationMode>,
 }
 
-impl From<CargoConfigPartial> for CargoConfigUpdate {
-  fn from(cargo_config: CargoConfigPartial) -> Self {
+impl From<CargoSpecPartial> for CargoSpecUpdate {
+  fn from(spec: CargoSpecPartial) -> Self {
     Self {
-      name: Some(cargo_config.name),
-      init_container: cargo_config.init_container,
-      container: Some(cargo_config.container),
-      replication: cargo_config.replication,
-      metadata: cargo_config.metadata,
-      secrets: cargo_config.secrets,
+      name: Some(spec.name),
+      init_container: spec.init_container,
+      container: Some(spec.container),
+      replication: spec.replication,
+      metadata: spec.metadata,
+      secrets: spec.secrets,
     }
   }
 }
 
-/// A cargo config is the configuration of a cargo
+/// A cargo spec is the specification of a cargo
 /// It used to know the state of the cargo
 /// It keep tracking of an history when you patch an existing cargo
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct CargoConfig {
-  /// Unique identifier of the cargo config
+pub struct CargoSpec {
+  /// Unique identifier of the cargo spec
   pub key: uuid::Uuid,
   /// The key of the cargo
   pub cargo_key: String,
-  /// Version of the config
+  /// Version of the spec
   pub version: String,
-  /// Creation date of the cargo config
+  /// Creation date of the cargo spec
   pub created_at: chrono::NaiveDateTime,
   /// Name of the cargo
   pub name: String,
@@ -186,9 +186,9 @@ pub struct CargoConfig {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
-  /// Container configuration of the cargo
+  /// Container specification of the cargo
   pub container: Config,
-  /// Replication configuration of the cargo
+  /// Replication specification of the cargo
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -196,15 +196,15 @@ pub struct CargoConfig {
   pub replication: Option<ReplicationMode>,
 }
 
-impl From<CargoConfig> for CargoConfigPartial {
-  fn from(cargo_config: CargoConfig) -> Self {
+impl From<CargoSpec> for CargoSpecPartial {
+  fn from(spec: CargoSpec) -> Self {
     Self {
-      init_container: cargo_config.init_container,
-      name: cargo_config.name,
-      replication: cargo_config.replication,
-      container: cargo_config.container,
-      metadata: cargo_config.metadata,
-      secrets: cargo_config.secrets,
+      init_container: spec.init_container,
+      name: spec.name,
+      replication: spec.replication,
+      container: spec.container,
+      metadata: spec.metadata,
+      secrets: spec.secrets,
     }
   }
 }

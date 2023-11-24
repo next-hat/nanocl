@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::web;
 use diesel::prelude::*;
 
@@ -6,7 +8,7 @@ use nanocl_stubs::generic::GenericCount;
 use nanocl_stubs::http_metric::{HttpMetricListQuery, HttpMetricCountQuery};
 
 use crate::utils;
-use crate::models::{Pool, HttpMetricDbModel};
+use crate::models::{Pool, HttpMetricDb};
 
 /// ## Create
 ///
@@ -14,17 +16,17 @@ use crate::models::{Pool, HttpMetricDbModel};
 ///
 /// ## Arguments
 ///
-/// * [item](HttpMetricDbModel) - Http metric item
+/// * [item](HttpMetricDb) - Http metric item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [HttpMetricDbModel](HttpMetricDbModel)
+/// [IoResult](IoResult) containing a [HttpMetricDb](HttpMetricDb)
 ///
 pub(crate) async fn create(
-  item: &HttpMetricDbModel,
+  item: &HttpMetricDb,
   pool: &Pool,
-) -> IoResult<HttpMetricDbModel> {
+) -> IoResult<HttpMetricDb> {
   let item = item.clone();
   super::generic::insert_with_res(item, pool).await
 }
@@ -40,15 +42,15 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [HttpMetricDbModel](HttpMetricDbModel)
+/// [IoResult](IoResult) containing a [Vec](Vec) of [HttpMetricDb](HttpMetricDb)
 ///
 pub(crate) async fn list(
   filter: &HttpMetricListQuery,
   pool: &Pool,
-) -> IoResult<Vec<HttpMetricDbModel>> {
+) -> IoResult<Vec<HttpMetricDb>> {
   use crate::schema::http_metrics;
   let filter = filter.clone();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let mut query = http_metrics::dsl::http_metrics.into_boxed().order((
@@ -89,7 +91,7 @@ pub(crate) async fn count(
 ) -> IoResult<GenericCount> {
   use crate::schema::http_metrics;
   let filter = filter.clone();
-  let pool = pool.clone();
+  let pool = Arc::clone(pool);
   let count = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
     let mut query = http_metrics::dsl::http_metrics.into_boxed();

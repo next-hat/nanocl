@@ -5,7 +5,7 @@ Resources:
   - Name: dns-get-started
     Kind: DnsRule
     Version: v0.3
-    Config:
+    Data:
       Network: system.nsp
       Entries:
         - Name: test.com

@@ -1,24 +1,24 @@
 use nanocl_error::io::IoResult;
 
-use crate::models::{Pool, StreamMetricDbModel};
+use crate::models::{Pool, StreamMetricDb};
 
 /// ## Create
 ///
-/// Create a new `StreamMetricDbModel`` item in database
+/// Create a new `StreamMetricDb`` item in database
 ///
 /// ## Arguments
 ///
-/// * [item](StreamMetricDbModel) - Http metric item
+/// * [item](StreamMetricDb) - Http metric item
 /// * [pool](Pool) - Database connection pool
 ///
 /// ## Return
 ///
-/// [IoResult](IoResult) containing a [StreamMetricDbModel](StreamMetricDbModel)
+/// [IoResult](IoResult) containing a [StreamMetricDb](StreamMetricDb)
 ///
 pub(crate) async fn create(
-  item: &StreamMetricDbModel,
+  item: &StreamMetricDb,
   pool: &Pool,
-) -> IoResult<StreamMetricDbModel> {
+) -> IoResult<StreamMetricDb> {
   let item = item.clone();
   super::generic::insert_with_res(item, pool).await
 }

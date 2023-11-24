@@ -12,11 +12,11 @@ use bollard_next::container::{
 use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::system::EventAction;
-use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
+use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{utils, repositories};
-use crate::models::{Pool, VmImageDbModel, DaemonState};
+use crate::models::{Pool, VmImageDb, DaemonState};
 
 /// ## Start by key
 ///
@@ -113,9 +113,9 @@ pub(crate) async fn inspect_by_key(
   Ok(VmInspect {
     key: vm.key,
     name: vm.name,
-    config_key: vm.config_key,
+    spec_key: vm.spec_key,
     namespace_name: vm.namespace_name,
-    config: vm.config,
+    spec: vm.spec,
     instance_total: containers.len(),
     instance_running: running_instances,
     instances: containers,
@@ -177,8 +177,8 @@ pub(crate) async fn delete_by_key(
     .remove_container(&container_name, Some(options))
     .await;
   repositories::vm::delete_by_key(vm_key, &state.pool).await?;
-  repositories::vm_config::delete_by_vm_key(&vm.key, &state.pool).await?;
-  utils::vm_image::delete_by_name(&vm.config.disk.image, &state.pool).await?;
+  repositories::vm_spec::delete_by_vm_key(&vm.key, &state.pool).await?;
+  utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
   state.event_emitter.spawn_emit(&vm, EventAction::Deleted);
   Ok(())
 }
@@ -205,8 +205,7 @@ pub(crate) async fn list_by_namespace(
   let vmes = repositories::vm::find_by_namespace(&namespace, pool).await?;
   let mut vm_summaries = Vec::new();
   for vm in vmes {
-    let config =
-      repositories::vm_config::find_by_key(&vm.config_key, pool).await?;
+    let spec = repositories::vm_spec::find_by_key(&vm.spec_key, pool).await?;
     let instances =
       repositories::container_instance::list_for_kind("Vm", &vm.key, pool)
         .await?;
@@ -226,13 +225,13 @@ pub(crate) async fn list_by_namespace(
     vm_summaries.push(VmSummary {
       key: vm.key,
       created_at: vm.created_at,
-      updated_at: config.created_at,
+      updated_at: spec.created_at,
       name: vm.name,
       namespace_name: vm.namespace_name,
-      config: config.to_owned(),
+      spec: spec.to_owned(),
       instances: instances.len(),
       running_instances,
-      config_key: config.key,
+      spec_key: spec.key,
     });
   }
   Ok(vm_summaries)
@@ -245,13 +244,13 @@ pub(crate) async fn list_by_namespace(
 /// ## Arguments
 ///
 /// * [vm](Vm) - The VM
-/// * [image](VmImageDbModel) - The VM image
+/// * [image](VmImageDb) - The VM image
 /// * [disable_keygen](bool) - Disable SSH key generation
 /// * [state](DaemonState) - The daemon state
 ///
 pub(crate) async fn create_instance(
   vm: &Vm,
-  image: &VmImageDbModel,
+  image: &VmImageDb,
   disable_keygen: bool,
   state: &DaemonState,
 ) -> HttpResult<()> {
@@ -263,7 +262,7 @@ pub(crate) async fn create_instance(
   labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   let mut args: Vec<String> =
     vec!["-hda".into(), image.path.clone(), "--nographic".into()];
-  let host_config = vm.config.host_config.clone();
+  let host_config = vm.spec.host_config.clone();
   let kvm = host_config.kvm.unwrap_or_default();
   let mut devices = vec![DeviceMapping {
     path_on_host: Some("/dev/net/tun".into()),
@@ -295,13 +294,13 @@ pub(crate) async fn create_instance(
   args.push(memory);
   let mut envs: Vec<String> = Vec::new();
   let net_iface = vm
-    .config
+    .spec
     .host_config
     .net_iface
     .clone()
     .unwrap_or("ens3".into());
   let link_net_iface = vm
-    .config
+    .spec
     .host_config
     .link_net_iface
     .clone()
@@ -309,23 +308,23 @@ pub(crate) async fn create_instance(
   envs.push(format!("DEFAULT_INTERFACE={link_net_iface}"));
   envs.push(format!("FROM_NETWORK={net_iface}"));
   envs.push(format!("DELETE_SSH_KEY={disable_keygen}"));
-  if let Some(user) = &vm.config.user {
+  if let Some(user) = &vm.spec.user {
     envs.push(format!("USER={user}"));
   }
-  if let Some(password) = &vm.config.password {
+  if let Some(password) = &vm.spec.password {
     envs.push(format!("PASSWORD={password}"));
   }
-  if let Some(ssh_key) = &vm.config.ssh_key {
+  if let Some(ssh_key) = &vm.spec.ssh_key {
     envs.push(format!("SSH_KEY={ssh_key}"));
   }
-  let image = match &vm.config.host_config.runtime {
+  let image = match &vm.spec.host_config.runtime {
     Some(runtime) => runtime.to_owned(),
     None => "ghcr.io/nxthat/nanocl-qemu:8.0.2.0".into(),
   };
-  let config = bollard_next::container::Config {
+  let spec = bollard_next::container::Config {
     image: Some(image),
     tty: Some(true),
-    hostname: vm.config.hostname.clone(),
+    hostname: vm.spec.hostname.clone(),
     env: Some(envs),
     labels: Some(labels),
     cmd: Some(args),
@@ -335,7 +334,7 @@ pub(crate) async fn create_instance(
     open_stdin: Some(true),
     host_config: Some(HostConfig {
       network_mode: Some(
-        vm.config
+        vm.spec
           .host_config
           .runtime_network
           .clone()
@@ -352,17 +351,17 @@ pub(crate) async fn create_instance(
     name: format!("{}.v", &vm.key),
     ..Default::default()
   });
-  state.docker_api.create_container(options, config).await?;
+  state.docker_api.create_container(options, spec).await?;
   Ok(())
 }
 
 /// ## Create
 ///
-/// Create a VM from a `VmConfigPartial` in the given namespace
+/// Create a VM from a `VmSpecPartial` in the given namespace
 ///
 /// ## Arguments
 ///
-/// * [vm](VmConfigPartial) - The VM configuration
+/// * [vm](VmSpecPartial) - The VM specification
 /// * [namespace](str) - The namespace
 /// * [version](str) - The version
 /// * [state](DaemonState) - The daemon state
@@ -372,7 +371,7 @@ pub(crate) async fn create_instance(
 /// [HttpResult](HttpResult) containing a [Vm](Vm)
 ///
 pub(crate) async fn create(
-  vm: &VmConfigPartial,
+  vm: &VmSpecPartial,
   namespace: &str,
   version: &str,
   state: &DaemonState,
@@ -420,13 +419,13 @@ pub(crate) async fn create(
 
 /// ## Patch
 ///
-/// Patch a VM configuration from a `VmConfigUpdate` in the given namespace.
-/// This will merge the new configuration with the old one.
+/// Patch a VM specification from a `VmSpecUpdate` in the given namespace.
+/// This will merge the new specification with the old one.
 ///
 /// ## Arguments
 ///
 /// * [vm_key](str) - The VM key
-/// * [config](VmConfigUpdate) - The VM configuration
+/// * [spec](VmSpecUpdate) - The VM specification
 /// * [version](str) - The version
 /// * [state](DaemonState) - The daemon state
 ///
@@ -436,52 +435,49 @@ pub(crate) async fn create(
 ///
 pub(crate) async fn patch(
   vm_key: &str,
-  config: &VmConfigUpdate,
+  spec: &VmSpecUpdate,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
   let vm = repositories::vm::find_by_key(vm_key, &state.pool).await?;
-  let old_config =
-    repositories::vm_config::find_by_key(&vm.config_key, &state.pool).await?;
-  let vm_partial = VmConfigPartial {
-    name: config.name.to_owned().unwrap_or(vm.name.clone()),
-    disk: old_config.disk,
+  let old_spec =
+    repositories::vm_spec::find_by_key(&vm.spec_key, &state.pool).await?;
+  let vm_partial = VmSpecPartial {
+    name: spec.name.to_owned().unwrap_or(vm.name.clone()),
+    disk: old_spec.disk,
     host_config: Some(
-      config
-        .host_config
-        .to_owned()
-        .unwrap_or(old_config.host_config),
+      spec.host_config.to_owned().unwrap_or(old_spec.host_config),
     ),
-    hostname: if config.hostname.is_some() {
-      config.hostname.clone()
+    hostname: if spec.hostname.is_some() {
+      spec.hostname.clone()
     } else {
-      old_config.hostname
+      old_spec.hostname
     },
-    user: if config.user.is_some() {
-      config.user.clone()
+    user: if spec.user.is_some() {
+      spec.user.clone()
     } else {
-      old_config.user
+      old_spec.user
     },
-    password: if config.password.is_some() {
-      config.password.clone()
+    password: if spec.password.is_some() {
+      spec.password.clone()
     } else {
-      old_config.password
+      old_spec.password
     },
-    ssh_key: if config.ssh_key.is_some() {
-      config.ssh_key.clone()
+    ssh_key: if spec.ssh_key.is_some() {
+      spec.ssh_key.clone()
     } else {
-      old_config.ssh_key
+      old_spec.ssh_key
     },
-    mac_address: old_config.mac_address,
-    labels: if config.labels.is_some() {
-      config.labels.clone()
+    mac_address: old_spec.mac_address,
+    labels: if spec.labels.is_some() {
+      spec.labels.clone()
     } else {
-      old_config.labels
+      old_spec.labels
     },
-    metadata: if config.metadata.is_some() {
-      config.metadata.clone()
+    metadata: if spec.metadata.is_some() {
+      spec.metadata.clone()
     } else {
-      old_config.metadata
+      old_spec.metadata
     },
   };
   put(vm_key, &vm_partial, version, state).await
@@ -489,13 +485,13 @@ pub(crate) async fn patch(
 
 /// ## Put
 ///
-/// Put a VM configuration from a `VmConfigPartial` in the given namespace.
-/// This will replace the old configuration with the new one.
+/// Put a VM specification from a `VmSpecPartial` in the given namespace.
+/// This will replace the old specification with the new one.
 ///
 /// ## Arguments
 ///
 /// * [vm_key](str) - The VM key
-/// * [vm_partial](VmConfigPartial) - The VM configuration
+/// * [vm_partial](VmSpecPartial) - The VM specification
 /// * [version](str) - The version
 /// * [state](DaemonState) - The daemon state
 ///
@@ -505,7 +501,7 @@ pub(crate) async fn patch(
 ///
 pub(crate) async fn put(
   vm_key: &str,
-  vm_partial: &VmConfigPartial,
+  vm_partial: &VmSpecPartial,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
@@ -520,7 +516,7 @@ pub(crate) async fn put(
     repositories::vm::update_by_key(&vm.key, vm_partial, version, &state.pool)
       .await?;
   let image =
-    repositories::vm_image::find_by_name(&vm.config.disk.image, &state.pool)
+    repositories::vm_image::find_by_name(&vm.spec.disk.image, &state.pool)
       .await?;
   create_instance(&vm, &image, false, state).await?;
   start_by_key(&vm.key, state).await?;

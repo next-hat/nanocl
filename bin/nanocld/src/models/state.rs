@@ -17,16 +17,16 @@ use super::Pool;
 #[derive(Clone)]
 pub struct DaemonState {
   /// The database connection pool
-  pub(crate) pool: Pool,
+  pub pool: Pool,
   /// The docker client
-  pub(crate) docker_api: bollard_next::Docker,
+  pub docker_api: bollard_next::Docker,
   /// The config of the daemon
-  pub(crate) config: DaemonConfig,
+  pub config: DaemonConfig,
   /// The event emitter
-  pub(crate) event_emitter: EventEmitter,
+  pub event_emitter: EventEmitter,
   /// Latest version of the daemon or version of current request
   #[allow(dead_code)]
-  pub(crate) version: String,
+  pub version: String,
 }
 
 /// ## StateData

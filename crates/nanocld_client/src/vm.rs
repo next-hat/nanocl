@@ -5,7 +5,7 @@ use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
-use nanocl_stubs::vm_config::{VmConfigPartial, VmConfigUpdate};
+use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 
 use crate::NanocldClient;
 
@@ -19,7 +19,7 @@ impl NanocldClient {
   ///
   /// ## Arguments
   ///
-  /// * [vm](VmConfigPartial) - The config for the vm
+  /// * [vm](VmSpecPartial) - The spec for the vm
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
   /// ## Return
@@ -28,7 +28,7 @@ impl NanocldClient {
   ///
   pub async fn create_vm(
     &self,
-    vm: &VmConfigPartial,
+    vm: &VmSpecPartial,
     namespace: Option<&str>,
   ) -> HttpClientResult<Vm> {
     let res = self
@@ -200,18 +200,18 @@ impl NanocldClient {
 
   /// ## Patch vm
   ///
-  /// Patch a vm by it's name and namespace to update it's config
+  /// Patch a vm by it's name and namespace to update it's spec
   ///
   /// ## Arguments
   ///
   /// * [name](str) - The name of the vm to patch
-  /// * [vm](VmConfigUpdate) - The config to update the vm
+  /// * [vm](VmSpecUpdate) - The spec to update the vm
   /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
   pub async fn patch_vm(
     &self,
     name: &str,
-    vm: &VmConfigUpdate,
+    vm: &VmSpecUpdate,
     namespace: Option<&str>,
   ) -> HttpClientResult<()> {
     self

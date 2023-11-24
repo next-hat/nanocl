@@ -1,7 +1,7 @@
 use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::resource::{
-  Resource, ResourcePartial, ResourceConfig, ResourceQuery, ResourceUpdate,
+  Resource, ResourcePartial, ResourceSpec, ResourceQuery, ResourceUpdate,
 };
 
 use super::http_client::NanocldClient;
@@ -61,8 +61,8 @@ impl NanocldClient {
   /// let res = client.create_resource(&ResourcePartial {
   ///   name: "my-resource".into(),
   ///   kind: String::from("Custom")s,
-  ///   // Your config
-  ///   config: serde_json::json!({}),
+  ///   // Your data
+  ///   data: serde_json::json!({}),
   /// }).await;
   /// ```
   ///
@@ -178,7 +178,7 @@ impl NanocldClient {
   ///
   /// ## Return
   ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [ResourceConfig](ResourceConfig)
+  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [ResourceSpec](ResourceSpec)
   ///
   /// ## Example
   ///
@@ -192,7 +192,7 @@ impl NanocldClient {
   pub async fn list_history_resource(
     &self,
     key: &str,
-  ) -> HttpClientResult<Vec<ResourceConfig>> {
+  ) -> HttpClientResult<Vec<ResourceSpec>> {
     let res = self
       .send_get(
         &format!("{}/{key}/histories", Self::RESOURCE_PATH),

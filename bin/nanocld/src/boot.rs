@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::path::Path;
 use std::process::Command;
 use std::os::unix::prelude::PermissionsExt;
@@ -145,7 +146,7 @@ pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   ensure_state_dir(&daemon_conf.state_dir).await?;
   let pool = utils::store::init(daemon_conf).await?;
   let daemon_state = DaemonState {
-    pool: pool.clone(),
+    pool: Arc::clone(&pool),
     docker_api: docker.clone(),
     config: daemon_conf.to_owned(),
     event_emitter: event::EventEmitter::new(),

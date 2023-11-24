@@ -2,4 +2,4 @@
 DROP TABLE IF EXISTS "resources";
 DROP TABLE IF EXISTS "resource_kind_versions";
 DROP TABLE IF EXISTS "resource_kinds";
-DROP TABLE IF EXISTS "resource_configs";
+DROP TABLE IF EXISTS "resource_specs";

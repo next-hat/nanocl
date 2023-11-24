@@ -1,9 +1,8 @@
-use nanocld_client::NanocldClient;
 use serde::{Serialize, Deserialize};
 
 use crate::schema::nodes;
 
-/// ## NodeDbModel
+/// ## NodeDb
 ///
 /// This structure represent a node in the database.
 /// A node is a machine that is connected to nanocl network.
@@ -14,24 +13,9 @@ use crate::schema::nodes;
 #[diesel(primary_key(name))]
 #[diesel(table_name = nodes)]
 #[serde(rename_all = "PascalCase")]
-pub struct NodeDbModel {
+pub struct NodeDb {
   /// The name of the node
-  pub(crate) name: String,
+  pub name: String,
   /// The ip address of the node
-  pub(crate) ip_address: String,
-}
-
-impl NodeDbModel {
-  /// ## To HTTP Client
-  ///
-  /// Create a nanocld client for the node from the his ip address.
-  ///
-  /// # Returns
-  ///
-  /// * [client](NanocldClient) - The client for the node
-  ///
-  pub fn to_http_client(&self) -> NanocldClient {
-    let url = format!("http://{}:8081", self.ip_address);
-    NanocldClient::connect_to(&url, None)
-  }
+  pub ip_address: String,
 }
