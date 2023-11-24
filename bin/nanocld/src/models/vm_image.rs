@@ -1,7 +1,6 @@
-use diesel::prelude::*;
+use serde::{Serialize, Deserialize};
 
 use nanocl_stubs::vm_image::VmImage;
-use serde::{Serialize, Deserialize};
 
 use crate::schema::vm_images;
 
@@ -71,15 +70,15 @@ pub struct QemuImgInfo {
 
 /// Helper to convert a `VmImageDb` to a `VmImage`
 impl From<VmImageDb> for VmImage {
-  fn from(db_model: VmImageDb) -> Self {
+  fn from(db: VmImageDb) -> Self {
     Self {
-      name: db_model.name,
-      created_at: db_model.created_at,
-      path: db_model.path,
-      kind: db_model.kind,
-      format: db_model.format,
-      size_actual: db_model.size_actual,
-      size_virtual: db_model.size_virtual,
+      name: db.name,
+      created_at: db.created_at,
+      path: db.path,
+      kind: db.kind,
+      format: db.format,
+      size_actual: db.size_actual,
+      size_virtual: db.size_virtual,
     }
   }
 }

@@ -1,4 +1,4 @@
-use nanocl_stubs::cargo_spec;
+use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
 
 use crate::schema::cargo_specs;
 
@@ -33,12 +33,9 @@ pub struct CargoSpecDb {
 }
 
 impl CargoSpecDb {
-  pub fn into_cargo_spec(
-    self,
-    spec: &cargo_spec::CargoSpecPartial,
-  ) -> cargo_spec::CargoSpec {
+  pub fn into_cargo_spec(self, spec: &CargoSpecPartial) -> CargoSpec {
     let spec = spec.clone();
-    cargo_spec::CargoSpec {
+    CargoSpec {
       key: self.key,
       created_at: self.created_at,
       name: spec.name,

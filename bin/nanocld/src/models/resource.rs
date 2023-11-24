@@ -1,4 +1,3 @@
-use diesel::prelude::*;
 use serde::{Serialize, Deserialize};
 
 use nanocl_stubs::resource::Resource;

@@ -1,8 +1,8 @@
-use nanocl_stubs::vm_spec;
+use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
 use crate::schema::vm_specs;
 
-use super::vm;
+use super::vm::VmDb;
 
 /// ## VmSpecDb
 ///
@@ -16,25 +16,25 @@ use super::vm;
 #[derive(Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = vm_specs)]
-#[diesel(belongs_to(vm::VmDb, foreign_key = vm_key))]
+#[diesel(belongs_to(VmDb, foreign_key = vm_key))]
 pub struct VmSpecDb {
   /// The key of the vm spec
-  pub(crate) key: uuid::Uuid,
+  pub key: uuid::Uuid,
   /// The created at date
-  pub(crate) created_at: chrono::NaiveDateTime,
+  pub created_at: chrono::NaiveDateTime,
   /// The vm key reference
-  pub(crate) vm_key: String,
+  pub vm_key: String,
   /// The version of the vm spec
-  pub(crate) version: String,
+  pub version: String,
   /// The spec of the vm
-  pub(crate) data: serde_json::Value,
+  pub data: serde_json::Value,
   /// The metadata (user defined)
-  pub(crate) metadata: Option<serde_json::Value>,
+  pub metadata: Option<serde_json::Value>,
 }
 
 impl VmSpecDb {
-  pub fn into_vm_spec(self, spec: &vm_spec::VmSpecPartial) -> vm_spec::VmSpec {
-    vm_spec::VmSpec {
+  pub fn into_vm_spec(self, spec: &VmSpecPartial) -> VmSpec {
+    VmSpec {
       key: self.key,
       created_at: self.created_at,
       name: spec.name.clone(),

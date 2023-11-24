@@ -4,7 +4,7 @@ use std::net::ToSocketAddrs;
 
 use ntex::{rt, web, time};
 use diesel::PgConnection;
-use diesel::r2d2::ConnectionManager;
+use diesel::r2d2::{Pool as R2D2Pool, ConnectionManager};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
 use nanocl_stubs::config::DaemonConfig;
@@ -34,7 +34,7 @@ pub(crate) async fn create_pool(
   let db_url = format!("postgresql://root:root@{host}{options}");
   let pool = web::block(move || {
     let manager = ConnectionManager::<PgConnection>::new(db_url);
-    r2d2::Pool::builder().build(manager)
+    R2D2Pool::builder().build(manager)
   })
   .await
   .map_err(|err| {
