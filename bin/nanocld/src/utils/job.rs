@@ -42,7 +42,7 @@ use super::stream::transform_stream;
 ///   * [usize] - The number of success instances
 ///   * [usize] - The number of running instances
 ///
-fn count_instances(
+pub(crate) fn count_instances(
   instances: &[NodeContainerSummary],
 ) -> (usize, usize, usize, usize) {
   let mut instance_failed = 0;
@@ -195,7 +195,7 @@ async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
 ///
 /// [HttpResult](HttpResult) containing a [Vec](Vec) of [NodeContainerSummary](NodeContainerSummary)
 ///
-async fn inspect_instances(
+pub(crate) async fn inspect_instances(
   name: &str,
   state: &DaemonState,
 ) -> HttpResult<Vec<NodeContainerSummary>> {
@@ -315,23 +315,17 @@ pub(crate) async fn start_by_name(
   state: &DaemonState,
 ) -> HttpResult<()> {
   repositories::job::find_by_name(name, &state.pool).await?;
-  let containers = inspect_instances(name, state).await?;
+  let containers = list_instances(name, &state.docker_api).await?;
   containers
     .into_iter()
     .map(|inspect| async {
-      if inspect
-        .container
-        .state
-        .unwrap_or_default()
-        .running
-        .unwrap_or_default()
-      {
+      if inspect.state.unwrap_or_default() == "running" {
         return Ok(());
       }
       state
         .docker_api
         .start_container(
-          &inspect.container.id.unwrap_or_default(),
+          &inspect.id.unwrap_or_default(),
           None::<StartContainerOptions<String>>,
         )
         .await?;
@@ -467,6 +461,7 @@ pub(crate) async fn inspect_by_name(
     secrets: job.secrets,
     metadata: job.metadata,
     schedule: job.schedule,
+    auto_remove: job.auto_remove,
     containers: job.containers,
     instance_total,
     instance_success,
@@ -496,6 +491,7 @@ pub(crate) async fn logs_by_name(
 ) -> HttpResult<impl StreamExt<Item = Result<Bytes, HttpError>>> {
   let _ = repositories::job::find_by_name(name, &state.pool).await?;
   let instances = list_instances(name, &state.docker_api).await?;
+  log::debug!("Instances: {instances:#?}");
   let futures = instances
     .into_iter()
     .map(|instance| {
@@ -510,15 +506,18 @@ pub(crate) async fn logs_by_name(
         )
         .map(move |elem| match elem {
           Err(err) => Err(err),
-          Ok(elem) => Ok(JobLogOutput {
-            container_name: instance
-              .names
-              .clone()
-              .unwrap_or_default()
-              .join("")
-              .replace('/', ""),
-            log: elem.into(),
-          }),
+          Ok(elem) => {
+            log::debug!("{:#?} {elem}", &instance.names);
+            Ok(JobLogOutput {
+              container_name: instance
+                .names
+                .clone()
+                .unwrap_or_default()
+                .join("")
+                .replace('/', ""),
+              log: elem.into(),
+            })
+          }
         })
     })
     .collect::<Vec<_>>();

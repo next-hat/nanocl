@@ -41,7 +41,9 @@ pub(crate) async fn start_by_key(
       msg: format!("Unable to start container got error : {e}"),
       status: http::StatusCode::INTERNAL_SERVER_ERROR,
     })?;
-  state.event_emitter.spawn_emit(&vm, EventAction::Started);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&vm, EventAction::Started);
   Ok(())
 }
 
@@ -64,7 +66,9 @@ pub(crate) async fn stop(vm: &Vm, state: &DaemonState) -> HttpResult<()> {
       msg: format!("Unable to stop container got error : {e}"),
       status: http::StatusCode::INTERNAL_SERVER_ERROR,
     })?;
-  state.event_emitter.spawn_emit(vm, EventAction::Stopped);
+  state
+    .event_emitter
+    .spawn_emit_to_event(vm, EventAction::Stopped);
   Ok(())
 }
 
@@ -179,7 +183,9 @@ pub(crate) async fn delete_by_key(
   repositories::vm::delete_by_key(vm_key, &state.pool).await?;
   repositories::vm_spec::delete_by_vm_key(&vm.key, &state.pool).await?;
   utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
-  state.event_emitter.spawn_emit(&vm, EventAction::Deleted);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&vm, EventAction::Deleted);
   Ok(())
 }
 
@@ -413,7 +419,9 @@ pub(crate) async fn create(
   let vm =
     repositories::vm::create(namespace, &vm, version, &state.pool).await?;
   create_instance(&vm, &image, true, state).await?;
-  state.event_emitter.spawn_emit(&vm, EventAction::Created);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&vm, EventAction::Created);
   Ok(vm)
 }
 
@@ -520,6 +528,8 @@ pub(crate) async fn put(
       .await?;
   create_instance(&vm, &image, false, state).await?;
   start_by_key(&vm.key, state).await?;
-  state.event_emitter.spawn_emit(&vm, EventAction::Patched);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&vm, EventAction::Patched);
   Ok(vm)
 }

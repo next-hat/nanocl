@@ -1,0 +1,15 @@
+Kind: Job
+ApiVersion: v0.11
+
+Jobs:
+  - Name: job-autoremove
+    AutoRemove: true
+    Containers:
+      - Image: alpine:latest
+        Cmd:
+          - echo
+          - Hello World
+      - Image: alpine:latest
+        Cmd:
+          - echo
+          - Hello World2

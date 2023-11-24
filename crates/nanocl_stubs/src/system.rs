@@ -51,6 +51,7 @@ pub enum EventKind {
   Job,
   Resource,
   Secret,
+  ContainerInstance,
 }
 
 impl std::fmt::Display for EventKind {
@@ -62,6 +63,7 @@ impl std::fmt::Display for EventKind {
       EventKind::Job => write!(f, "Job"),
       EventKind::Resource => write!(f, "Resource"),
       EventKind::Secret => write!(f, "Secret"),
+      EventKind::ContainerInstance => write!(f, "ContainerInstance"),
     }
   }
 }
@@ -70,7 +72,7 @@ impl std::fmt::Display for EventKind {
 ///
 /// Action is the action that triggered the event
 ///
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum EventAction {
@@ -79,6 +81,7 @@ pub enum EventAction {
   Started,
   Stopped,
   Deleted,
+  Restart,
 }
 
 impl std::fmt::Display for EventAction {
@@ -89,6 +92,7 @@ impl std::fmt::Display for EventAction {
       EventAction::Started => write!(f, "Started"),
       EventAction::Stopped => write!(f, "Stopped"),
       EventAction::Deleted => write!(f, "Deleted"),
+      EventAction::Restart => write!(f, "Restart"),
     }
   }
 }
