@@ -49,27 +49,27 @@ impl From<SecretPartial> for SecretDb {
 }
 
 impl From<SecretDb> for SecretPartial {
-  fn from(val: SecretDb) -> Self {
+  fn from(db: SecretDb) -> Self {
     SecretPartial {
-      key: val.key,
-      kind: val.kind,
-      immutable: Some(val.immutable),
-      data: val.data,
-      metadata: val.metadata,
+      key: db.key,
+      kind: db.kind,
+      immutable: Some(db.immutable),
+      data: db.data,
+      metadata: db.metadata,
     }
   }
 }
 
 impl From<SecretDb> for Secret {
-  fn from(val: SecretDb) -> Self {
+  fn from(db: SecretDb) -> Self {
     Secret {
-      key: val.key,
-      created_at: val.created_at,
-      updated_at: val.updated_at,
-      kind: val.kind,
-      immutable: val.immutable,
-      data: val.data,
-      metadata: val.metadata,
+      key: db.key,
+      created_at: db.created_at,
+      updated_at: db.updated_at,
+      kind: db.kind,
+      immutable: db.immutable,
+      data: db.data,
+      metadata: db.metadata,
     }
   }
 }
