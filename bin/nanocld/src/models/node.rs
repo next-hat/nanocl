@@ -1,7 +1,5 @@
 use serde::{Serialize, Deserialize};
 
-use nanocld_client::NanocldClient;
-
 use crate::schema::nodes;
 
 /// ## NodeDb
@@ -17,22 +15,7 @@ use crate::schema::nodes;
 #[serde(rename_all = "PascalCase")]
 pub struct NodeDb {
   /// The name of the node
-  pub(crate) name: String,
+  pub name: String,
   /// The ip address of the node
-  pub(crate) ip_address: String,
-}
-
-impl NodeDb {
-  /// ## To HTTP Client
-  ///
-  /// Create a nanocld client for the node from the his ip address.
-  ///
-  /// # Returns
-  ///
-  /// * [client](NanocldClient) - The client for the node
-  ///
-  pub fn to_http_client(&self) -> NanocldClient {
-    let url = format!("http://{}:8081", self.ip_address);
-    NanocldClient::connect_to(&url, None)
-  }
+  pub ip_address: String,
 }

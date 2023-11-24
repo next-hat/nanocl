@@ -22,13 +22,13 @@ use crate::models::resource_spec::ResourceSpecDb;
 #[diesel(table_name = resources)]
 pub struct ResourceDb {
   /// The key of the resource
-  pub(crate) key: String,
+  pub key: String,
   /// The created at date
-  pub(crate) created_at: chrono::NaiveDateTime,
+  pub created_at: chrono::NaiveDateTime,
   /// The kind of the resource
-  pub(crate) kind: String,
+  pub kind: String,
   /// The spec key reference
-  pub(crate) spec_key: uuid::Uuid,
+  pub spec_key: uuid::Uuid,
 }
 
 impl ResourceDb {
@@ -54,7 +54,7 @@ impl ResourceDb {
 #[diesel(table_name = resources)]
 pub struct ResourceUpdateDb {
   /// The key of the resource
-  pub(crate) key: Option<String>,
+  pub key: Option<String>,
   /// The spec key reference
-  pub(crate) spec_key: Option<uuid::Uuid>,
+  pub spec_key: Option<uuid::Uuid>,
 }

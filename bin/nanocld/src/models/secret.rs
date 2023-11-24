@@ -82,7 +82,7 @@ impl From<SecretDb> for Secret {
 #[diesel(table_name = secrets)]
 pub struct SecretUpdateDb {
   /// The secret data
-  pub(crate) data: Option<serde_json::Value>,
+  pub data: Option<serde_json::Value>,
   // The metadata (user defined)
-  pub(crate) metadata: Option<serde_json::Value>,
+  pub metadata: Option<serde_json::Value>,
 }

@@ -19,17 +19,17 @@ use super::cargo::CargoDb;
 #[diesel(belongs_to(CargoDb, foreign_key = cargo_key))]
 pub struct CargoSpecDb {
   /// The key of the cargo spec
-  pub(crate) key: uuid::Uuid,
+  pub key: uuid::Uuid,
   /// The created at date
-  pub(crate) created_at: chrono::NaiveDateTime,
+  pub created_at: chrono::NaiveDateTime,
   /// The cargo key reference
-  pub(crate) cargo_key: String,
+  pub cargo_key: String,
   /// The version of the cargo spec
-  pub(crate) version: String,
+  pub version: String,
   /// The spec
-  pub(crate) data: serde_json::Value,
+  pub data: serde_json::Value,
   // The metadata (user defined)
-  pub(crate) metadata: Option<serde_json::Value>,
+  pub metadata: Option<serde_json::Value>,
 }
 
 impl CargoSpecDb {

@@ -16,7 +16,7 @@ use crate::schema::namespaces;
 #[serde(rename_all = "PascalCase")]
 pub struct NamespaceDb {
   /// The name of the namespace
-  pub(crate) name: String,
+  pub name: String,
   /// The created at date
-  pub(crate) created_at: chrono::NaiveDateTime,
+  pub created_at: chrono::NaiveDateTime,
 }

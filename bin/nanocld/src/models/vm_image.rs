@@ -23,21 +23,21 @@ use crate::schema::vm_images;
 #[serde(rename_all = "PascalCase")]
 pub struct VmImageDb {
   /// The name of the virtual machine image
-  pub(crate) name: String,
+  pub name: String,
   /// The created at date
-  pub(crate) created_at: chrono::NaiveDateTime,
+  pub created_at: chrono::NaiveDateTime,
   /// The kind of the virtual machine image (Base, Snapshot)
-  pub(crate) kind: String,
+  pub kind: String,
   /// The path of the virtual machine image
-  pub(crate) path: String,
+  pub path: String,
   /// The format of the virtual machine image
-  pub(crate) format: String,
+  pub format: String,
   /// The actual size of the virtual machine image
-  pub(crate) size_actual: i64,
+  pub size_actual: i64,
   /// The virtual size of the virtual machine image
-  pub(crate) size_virtual: i64,
+  pub size_virtual: i64,
   /// The parent of the virtual machine image
-  pub(crate) parent: Option<String>,
+  pub parent: Option<String>,
 }
 
 /// ## VmImageUpdateDb
@@ -48,9 +48,9 @@ pub struct VmImageDb {
 #[diesel(table_name = vm_images)]
 pub struct VmImageUpdateDb {
   /// The actual size of the virtual machine image
-  pub(crate) size_actual: i64,
+  pub size_actual: i64,
   /// The virtual size of the virtual machine image
-  pub(crate) size_virtual: i64,
+  pub size_virtual: i64,
 }
 
 /// ## QemuImgInfo
@@ -61,11 +61,11 @@ pub struct VmImageUpdateDb {
 #[serde(rename_all = "kebab-case")]
 pub struct QemuImgInfo {
   /// The format of the virtual machine image
-  pub(crate) format: String,
+  pub format: String,
   /// The virtual size of the virtual machine image
-  pub(crate) virtual_size: i64,
+  pub virtual_size: i64,
   /// The actual size of the virtual machine image
-  pub(crate) actual_size: i64,
+  pub actual_size: i64,
 }
 
 /// Helper to convert a `VmImageDb` to a `VmImage`

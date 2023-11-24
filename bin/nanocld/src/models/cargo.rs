@@ -18,15 +18,15 @@ use super::namespace::NamespaceDb;
 #[diesel(belongs_to(NamespaceDb, foreign_key = namespace_name))]
 pub struct CargoDb {
   /// The key of the cargo generated with `namespace_name` and `name`
-  pub(crate) key: String,
+  pub key: String,
   /// The created at date
-  pub(crate) created_at: chrono::NaiveDateTime,
+  pub created_at: chrono::NaiveDateTime,
   /// The name of the cargo
-  pub(crate) name: String,
+  pub name: String,
   /// The spec key reference
-  pub(crate) spec_key: uuid::Uuid,
+  pub spec_key: uuid::Uuid,
   /// The namespace name
-  pub(crate) namespace_name: String,
+  pub namespace_name: String,
 }
 
 impl CargoDb {
@@ -49,11 +49,11 @@ impl CargoDb {
 #[diesel(table_name = cargoes)]
 pub struct CargoUpdateDb {
   /// The key of the cargo generated with `namespace_name` and `name`
-  pub(crate) key: Option<String>,
+  pub key: Option<String>,
   /// The name of the cargo
-  pub(crate) name: Option<String>,
+  pub name: Option<String>,
   /// The namespace name
-  pub(crate) namespace_name: Option<String>,
+  pub namespace_name: Option<String>,
   /// The spec key reference
-  pub(crate) spec_key: Option<uuid::Uuid>,
+  pub spec_key: Option<uuid::Uuid>,
 }
