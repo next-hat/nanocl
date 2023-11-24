@@ -4,7 +4,7 @@ use nanocld_client::stubs::proxy::{
   ProxyRule, ProxyRuleHttp, ProxyRuleStream, ResourceProxyRule,
   ProxyHttpLocation, ProxySsl, ProxyStreamProtocol, StreamTarget,
   LocationTarget, UpstreamTarget, HttpTarget, UriTarget, UrlRedirect,
-  UnixTarget,
+  UnixTarget, ProxySslConfig,
 };
 
 use super::rule;
@@ -47,6 +47,7 @@ impl utoipa::Modify for VersionModifier {
     ProxyRuleStream,
     ProxyHttpLocation,
     ProxySsl,
+    ProxySslConfig,
     ProxyStreamProtocol,
     StreamTarget,
     LocationTarget,

@@ -32,7 +32,7 @@ impl From<Vm> for VmSpecPartial {
   }
 }
 
-/// Convert a Cargo into an EventActor
+/// Convert a Vm into an EventActor
 impl From<Vm> for EventActor {
   fn from(vm: Vm) -> Self {
     Self {
@@ -85,24 +85,24 @@ pub struct VmSummary {
   pub running_instances: usize,
 }
 
-/// A Vm Inspect is a detailed view of a cargo
-/// It is used to inspect a cargo
-/// It contains all the information about the cargo
+/// A Vm Inspect is a detailed view of a vm
+/// It is used to inspect a vm
+/// It contains all the information about the vm
 /// It also contains the list of containers
 #[derive(Default, Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmInspect {
-  /// Key of the cargo
+  /// Key of the vm
   pub key: String,
-  /// Name of the cargo
+  /// Name of the vm
   pub name: String,
   /// Unique identifier of the spec
   pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Specification of the cargo
+  /// Specification of the vm
   pub spec: VmSpec,
   /// Number of instances
   pub instance_total: usize,

@@ -185,6 +185,30 @@ components:
       oneOf:
       - $ref: '#/components/schemas/ProxySslConfig'
       - type: string
+    ProxySslConfig:
+      type: object
+      required:
+      - Certificate
+      - CertificateKey
+      properties:
+        Certificate:
+          type: string
+          description: Path to the certificate
+        CertificateKey:
+          type: string
+          description: Path to the certificate key
+        CertificateClient:
+          type: string
+          description: Path to the certificate client
+          nullable: true
+        VerifyClient:
+          type: boolean
+          description: Enable or disable client verification
+          nullable: true
+        DhParam:
+          type: string
+          description: Path to the dhparam file
+          nullable: true
     ProxyStreamProtocol:
       type: string
       description: Proxy rules modes

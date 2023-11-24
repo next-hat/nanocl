@@ -6930,9 +6930,9 @@ components:
     VmInspect:
       type: object
       description: |-
-        A Vm Inspect is a detailed view of a cargo
-        It is used to inspect a cargo
-        It contains all the information about the cargo
+        A Vm Inspect is a detailed view of a vm
+        It is used to inspect a vm
+        It contains all the information about the vm
         It also contains the list of containers
       required:
       - Key
@@ -6946,10 +6946,10 @@ components:
       properties:
         Key:
           type: string
-          description: Key of the cargo
+          description: Key of the vm
         Name:
           type: string
-          description: Name of the cargo
+          description: Name of the vm
         SpecKey:
           type: string
           format: uuid

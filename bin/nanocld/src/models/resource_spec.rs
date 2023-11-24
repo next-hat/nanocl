@@ -32,14 +32,14 @@ pub struct ResourceSpecDb {
 
 /// Helper to convert a `ResourceSpecDb` to a `ResourceSpec`
 impl From<ResourceSpecDb> for ResourceSpec {
-  fn from(item: ResourceSpecDb) -> Self {
+  fn from(db: ResourceSpecDb) -> Self {
     ResourceSpec {
-      key: item.key,
-      version: item.version,
-      created_at: item.created_at,
-      resource_key: item.resource_key,
-      data: item.data,
-      metadata: item.metadata,
+      key: db.key,
+      version: db.version,
+      created_at: db.created_at,
+      resource_key: db.resource_key,
+      data: db.data,
+      metadata: db.metadata,
     }
   }
 }
