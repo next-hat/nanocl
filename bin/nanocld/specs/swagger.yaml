@@ -4188,7 +4188,7 @@ components:
           nullable: true
         Ttl:
           type: integer
-          description: Auto remove the job after (x) seconds when it's executed
+          description: Remove the job after (x) seconds after execution
           nullable: true
           minimum: 0
         Containers:
@@ -4242,7 +4242,7 @@ components:
           nullable: true
         Ttl:
           type: integer
-          description: Auto remove the job after (x) seconds when it's executed
+          description: Remove the job after (x) seconds after execution
           nullable: true
           minimum: 0
         Containers:
@@ -4301,7 +4301,7 @@ components:
           nullable: true
         Ttl:
           type: integer
-          description: Auto remove the job after (x) seconds when it's executed
+          description: Remove the job after (x) seconds after execution
           nullable: true
           minimum: 0
         Containers:
