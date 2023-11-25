@@ -221,8 +221,12 @@ async fn main() -> std::io::Result<()> {
         }
         apply_rule(&nanocld_unix_default, &vpnkit_client).await;
         while let Some(event) = stream.next().await {
-          let Ok(event) = event else {
-            break;
+          let event = match event {
+            Err(err) => {
+              log::warn!("Unable to get event: {err}");
+              continue;
+            }
+            Ok(event) => event,
           };
           if let Err(err) =
             on_event(&event, &nanocl_client, &vpnkit_client).await
