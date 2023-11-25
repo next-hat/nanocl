@@ -41,7 +41,7 @@ pub struct Job {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub schedule: Option<String>,
-  /// Auto remove the job after (x) seconds when it's executed
+  /// Remove the job after (x) seconds after execution
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -111,7 +111,7 @@ pub struct JobPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub schedule: Option<String>,
-  /// Auto remove the job after (x) seconds when it's executed
+  /// Remove the job after (x) seconds after execution
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -157,7 +157,7 @@ pub struct JobInspect {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub schedule: Option<String>,
-  /// Auto remove the job after (x) seconds when it's executed
+  /// Remove the job after (x) seconds after execution
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
