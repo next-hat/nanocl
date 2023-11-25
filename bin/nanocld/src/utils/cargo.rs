@@ -436,7 +436,9 @@ pub(crate) async fn create(
     repositories::cargo::delete_by_key(&cargo.key, &state.pool).await?;
     return Err(err);
   }
-  state.event_emitter.spawn_emit(&cargo, EventAction::Created);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&cargo, EventAction::Created);
   Ok(cargo)
 }
 
@@ -471,7 +473,9 @@ pub(crate) async fn start_by_key(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
-  state.event_emitter.spawn_emit(&cargo, EventAction::Started);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&cargo, EventAction::Started);
   Ok(())
 }
 
@@ -506,7 +510,9 @@ pub(crate) async fn stop_by_key(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
-  state.event_emitter.spawn_emit(&cargo, EventAction::Stopped);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&cargo, EventAction::Stopped);
   Ok(())
 }
 
@@ -581,7 +587,9 @@ pub(crate) async fn delete_by_key(
     .collect::<Result<Vec<_>, _>>()?;
   repositories::cargo::delete_by_key(key, &state.pool).await?;
   repositories::cargo_spec::delete_by_cargo_key(key, &state.pool).await?;
-  state.event_emitter.spawn_emit(&cargo, EventAction::Deleted);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&cargo, EventAction::Deleted);
   Ok(())
 }
 
@@ -664,7 +672,9 @@ pub(crate) async fn put(
       .await?;
     }
   }
-  state.event_emitter.spawn_emit(&cargo, EventAction::Patched);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&cargo, EventAction::Patched);
   Ok(cargo)
 }
 
@@ -1076,6 +1086,8 @@ pub async fn scale(
       .into_iter()
       .collect::<Result<Vec<_>, HttpError>>()?;
   }
-  state.event_emitter.spawn_emit(&cargo, EventAction::Patched);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&cargo, EventAction::Patched);
   Ok(())
 }

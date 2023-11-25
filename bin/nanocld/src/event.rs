@@ -11,9 +11,9 @@ use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 
-use nanocl_stubs::system::{Event, ToEvent, EventAction};
-
 use nanocl_error::http::{HttpError, HttpResult};
+
+use nanocl_stubs::system::{Event, ToEvent, EventAction};
 
 /// ## Client
 /// Stream: Wrap Receiver in our own type, with correct error type
@@ -35,16 +35,22 @@ impl Stream for Client {
   }
 }
 
-trait ToBytes {
-  type Error;
-
-  fn to_bytes(&self) -> Result<Bytes, Self::Error>;
+impl Client {
+  pub async fn recv(&mut self) -> Option<Bytes> {
+    self.0.recv().await
+  }
 }
 
-impl ToBytes for Event {
+trait TryToBytes {
+  type Error;
+
+  fn try_to_bytes(&self) -> Result<Bytes, Self::Error>;
+}
+
+impl TryToBytes for Event {
   type Error = HttpError;
 
-  fn to_bytes(&self) -> Result<Bytes, Self::Error> {
+  fn try_to_bytes(&self) -> Result<Bytes, Self::Error> {
     let mut data = serde_json::to_vec(&self).map_err(|err| HttpError {
       status: http::StatusCode::INTERNAL_SERVER_ERROR,
       msg: format!("Unable to serialize event: {err}"),
@@ -92,26 +98,21 @@ impl EventEmitter {
 
   /// Spawn a task that will check if clients are still connected
   fn spawn_check_connection(mut self) {
-    rt::spawn(async move {
-      let task = time::interval(Duration::from_secs(10));
-      loop {
-        task.tick().await;
-        if let Err(err) = self.check_connection() {
-          log::error!("{err}");
+    rt::Arbiter::new().exec_fn(|| {
+      rt::spawn(async move {
+        let task = time::interval(Duration::from_secs(10));
+        loop {
+          task.tick().await;
+          if let Err(err) = self.check_connection() {
+            log::error!("{err}");
+          }
         }
-      }
+      });
     });
   }
 
   /// Send an event to all clients
-  pub(crate) async fn emit<T>(
-    &self,
-    e: T,
-    action: EventAction,
-  ) -> HttpResult<()>
-  where
-    T: ToEvent,
-  {
+  pub(crate) async fn emit(&self, e: Event) -> HttpResult<()> {
     let self_ptr = self.clone();
     let inner = web::block(move || {
       let inner = self_ptr
@@ -133,20 +134,19 @@ impl EventEmitter {
           .into(),
       },
     })?;
-    let ev = e.to_event(action.clone());
     log::debug!(
       "Emitting {} {} to {} client(s)",
-      ev.kind,
-      ev.action,
+      e.kind,
+      e.action,
       inner.clients.len()
     );
     inner
       .clients
       .into_iter()
       .map(|client| {
-        let ev = ev.clone();
+        let e = e.clone();
         async move {
-          let msg = ev.to_bytes()?;
+          let msg = e.try_to_bytes()?;
           let _ = client.send(msg).await;
           Ok::<(), HttpError>(())
         }
@@ -159,14 +159,23 @@ impl EventEmitter {
   }
 
   /// Call emit in the background
-  pub(crate) fn spawn_emit<T>(&self, e: &T, action: EventAction)
+  pub(crate) fn spawn_emit_to_event<T>(&self, e: &T, action: EventAction)
   where
-    T: ToEvent + Clone + 'static,
+    T: ToEvent,
   {
     let self_ptr = self.clone();
-    let e = e.clone();
+    let e = e.to_event(action);
     rt::spawn(async move {
-      if let Err(err) = self_ptr.emit(e, action).await {
+      if let Err(err) = self_ptr.emit(e).await {
+        log::error!("{err}");
+      }
+    });
+  }
+
+  pub(crate) fn spawn_emit_event(&self, e: Event) {
+    let self_ptr = self.clone();
+    rt::spawn(async move {
+      if let Err(err) = self_ptr.emit(e).await {
         log::error!("{err}");
       }
     });
@@ -220,10 +229,8 @@ mod tests {
     T: ToEvent + Clone,
   {
     for event in events {
-      event_emitter
-        .emit(event.0.clone(), event.1)
-        .await
-        .expect("Emit event");
+      let e = event.0.to_event(event.1);
+      event_emitter.emit(e).await.expect("Emit event");
       let event = client
         .next()
         .await

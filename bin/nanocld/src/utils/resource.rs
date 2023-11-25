@@ -159,7 +159,9 @@ pub(crate) async fn create(
   }
   let resource = hook_create_resource(resource, &state.pool).await?;
   let res = repositories::resource::create(&resource, &state.pool).await?;
-  state.event_emitter.spawn_emit(&res, EventAction::Created);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&res, EventAction::Created);
   Ok(res)
 }
 
@@ -183,7 +185,9 @@ pub(crate) async fn patch(
 ) -> HttpResult<Resource> {
   let resource = hook_create_resource(resource, &state.pool).await?;
   let res = repositories::resource::put(&resource, &state.pool).await?;
-  state.event_emitter.spawn_emit(&res, EventAction::Patched);
+  state
+    .event_emitter
+    .spawn_emit_to_event(&res, EventAction::Patched);
   Ok(res)
 }
 
@@ -217,7 +221,7 @@ pub(crate) async fn delete(
   .await?;
   state
     .event_emitter
-    .spawn_emit(resource, EventAction::Deleted);
+    .spawn_emit_to_event(resource, EventAction::Deleted);
   Ok(())
 }
 

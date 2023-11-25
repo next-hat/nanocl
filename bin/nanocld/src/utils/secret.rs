@@ -15,7 +15,7 @@ pub(crate) async fn create(
   let secret: Secret = secret.into();
   state
     .event_emitter
-    .spawn_emit(&secret, EventAction::Created);
+    .spawn_emit_to_event(&secret, EventAction::Created);
   Ok(secret)
 }
 
@@ -28,7 +28,7 @@ pub(crate) async fn delete_by_key(
   let secret: Secret = secret.into();
   state
     .event_emitter
-    .spawn_emit(&secret, EventAction::Deleted);
+    .spawn_emit_to_event(&secret, EventAction::Deleted);
   Ok(res)
 }
 
@@ -42,6 +42,6 @@ pub(crate) async fn patch_by_key(
   let secret: Secret = secret.into();
   state
     .event_emitter
-    .spawn_emit(&secret, EventAction::Patched);
+    .spawn_emit_to_event(&secret, EventAction::Patched);
   Ok(secret)
 }

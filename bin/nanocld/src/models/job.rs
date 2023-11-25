@@ -28,13 +28,14 @@ pub struct JobDb {
 impl JobDb {
   pub fn into_job(self, job: &JobPartial) -> Job {
     Job {
-      name: self.key.clone(),
+      name: self.key,
       created_at: self.created_at,
       updated_at: self.updated_at,
+      metadata: self.metadata,
       secrets: job.secrets.clone(),
-      metadata: self.metadata.clone(),
-      containers: job.containers.clone(),
       schedule: job.schedule.clone(),
+      ttl: job.ttl,
+      containers: job.containers.clone(),
     }
   }
 

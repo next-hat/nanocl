@@ -4186,6 +4186,11 @@ components:
           type: string
           description: Schedule of the job (cron)
           nullable: true
+        Ttl:
+          type: integer
+          description: Remove the job after (x) seconds after execution
+          nullable: true
+          minimum: 0
         Containers:
           type: array
           items:
@@ -4235,6 +4240,11 @@ components:
           type: string
           description: Schedule of the job (cron)
           nullable: true
+        Ttl:
+          type: integer
+          description: Remove the job after (x) seconds after execution
+          nullable: true
+          minimum: 0
         Containers:
           type: array
           items:
@@ -4289,6 +4299,11 @@ components:
           type: string
           description: Schedule of the job (cron)
           nullable: true
+        Ttl:
+          type: integer
+          description: Remove the job after (x) seconds after execution
+          nullable: true
+          minimum: 0
         Containers:
           type: array
           items:

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
 use ntex::rt;
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
@@ -125,10 +126,40 @@ async fn exec_docker_event(
   let action = event.action.clone().unwrap_or_default();
   let id = actor.id.unwrap_or_default();
   log::debug!("docker event: {action}");
-  if action.as_str() == "destroy" {
-    log::debug!("docker event destroy container: {id}");
-    repositories::container_instance::delete_by_id(&id, &state.pool).await?;
-    return Ok(());
+  let action = action.as_str();
+  let mut event = Event {
+    kind: EventKind::ContainerInstance,
+    action: EventAction::Deleted,
+    actor: Some(EventActor {
+      key: Some(id.clone()),
+      attributes: Some(
+        serde_json::to_value(attributes)
+          .map_err(|err| err.map_err_context(|| "Event attributes"))?,
+      ),
+    }),
+  };
+  match action {
+    "destroy" => {
+      log::debug!("docker event destroy container: {id}");
+      repositories::container_instance::delete_by_id(&id, &state.pool).await?;
+      state.event_emitter.spawn_emit_event(event);
+      return Ok(());
+    }
+    "create" => {
+      event.action = EventAction::Created;
+    }
+    "start" => {
+      event.action = EventAction::Started;
+    }
+    "stop" => {
+      event.action = EventAction::Stopped;
+    }
+    "restart" => {
+      event.action = EventAction::Restart;
+    }
+    _ => {
+      event.action = EventAction::Patched;
+    }
   }
   let instance = state
     .docker_api
@@ -136,6 +167,7 @@ async fn exec_docker_event(
     .await
     .map_err(|err| err.map_err_context(|| "Docker event"))?;
   sync_instance(&instance, state).await?;
+  state.event_emitter.spawn_emit_event(event);
   Ok(())
 }
 

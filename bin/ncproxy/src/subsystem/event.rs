@@ -204,8 +204,12 @@ async fn r#loop(nginx: &nginx::Nginx, client: &NanocldClient) {
         log::info!("Subscribed to nanocl daemon events");
         ensure_resource_config(client).await;
         while let Some(event) = stream.next().await {
-          let Ok(event) = event else {
-            break;
+          let event = match event {
+            Err(err) => {
+              log::warn!("Unable to get event: {err}");
+              continue;
+            }
+            Ok(event) => event,
           };
           if let Err(err) = on_event(&event, nginx, client).await {
             log::warn!("{err}");

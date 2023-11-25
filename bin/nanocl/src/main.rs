@@ -643,7 +643,7 @@ mod tests {
 
   #[ntex::test]
   async fn job_wait() {
-    assert_cli_ok!("state", "apply", "-ys", "../../examples/job_example.yml");
+    assert_cli_ok!("state", "apply", "-yrfs", "../../examples/job_example.yml");
     let fut = ntex::rt::spawn(async {
       assert_cli_ok!("job", "wait", "job-example");
     });
@@ -660,7 +660,7 @@ mod tests {
 
   #[ntex::test]
   async fn job_wait_error() {
-    assert_cli_ok!("state", "apply", "-ys", "../../tests/job_with_error.yml");
+    assert_cli_ok!("state", "apply", "-yfs", "../../tests/job_with_error.yml");
     let fut = ntex::rt::spawn(async {
       assert_cli_err!("job", "wait", "job-example-error");
     });

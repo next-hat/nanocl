@@ -41,6 +41,12 @@ pub struct Job {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub schedule: Option<String>,
+  /// Remove the job after (x) seconds after execution
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub ttl: Option<usize>,
   /// Containers to run
   pub containers: Vec<Config>,
 }
@@ -105,6 +111,12 @@ pub struct JobPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub schedule: Option<String>,
+  /// Remove the job after (x) seconds after execution
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub ttl: Option<usize>,
   /// List of container to run
   pub containers: Vec<Config>,
 }
@@ -145,6 +157,12 @@ pub struct JobInspect {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub schedule: Option<String>,
+  /// Remove the job after (x) seconds after execution
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub ttl: Option<usize>,
   /// Containers to run
   pub containers: Vec<Config>,
   /// Number of instances
@@ -165,8 +183,9 @@ impl From<JobInspect> for JobPartial {
       name: job.name,
       secrets: job.secrets,
       metadata: job.metadata,
-      containers: job.containers,
       schedule: job.schedule,
+      ttl: job.ttl,
+      containers: job.containers,
     }
   }
 }

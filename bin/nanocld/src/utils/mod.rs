@@ -17,6 +17,7 @@ pub(crate) mod resource;
 pub(crate) mod metric;
 pub(crate) mod ctrl_client;
 pub(crate) mod secret;
+pub(crate) mod event;
 
 #[cfg(test)]
 pub mod tests {
