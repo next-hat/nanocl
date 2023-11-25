@@ -147,23 +147,18 @@ async fn exec_docker_event(
     }
     "create" => {
       event.action = EventAction::Created;
-      state.event_emitter.spawn_emit_event(event);
     }
     "start" => {
       event.action = EventAction::Started;
-      state.event_emitter.spawn_emit_event(event);
     }
     "stop" => {
       event.action = EventAction::Stopped;
-      state.event_emitter.spawn_emit_event(event);
     }
     "restart" => {
       event.action = EventAction::Restart;
-      state.event_emitter.spawn_emit_event(event);
     }
     _ => {
       event.action = EventAction::Patched;
-      state.event_emitter.spawn_emit_event(event);
     }
   }
   let instance = state
@@ -172,6 +167,7 @@ async fn exec_docker_event(
     .await
     .map_err(|err| err.map_err_context(|| "Docker event"))?;
   sync_instance(&instance, state).await?;
+  state.event_emitter.spawn_emit_event(event);
   Ok(())
 }
 
