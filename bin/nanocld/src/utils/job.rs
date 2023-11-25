@@ -461,7 +461,7 @@ pub(crate) async fn inspect_by_name(
     secrets: job.secrets,
     metadata: job.metadata,
     schedule: job.schedule,
-    auto_remove: job.auto_remove,
+    ttl: job.ttl,
     containers: job.containers,
     instance_total,
     instance_success,

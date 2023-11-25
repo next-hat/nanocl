@@ -4186,10 +4186,11 @@ components:
           type: string
           description: Schedule of the job (cron)
           nullable: true
-        AutoRemove:
-          type: boolean
-          description: Auto remove the job when it's executed
+        Ttl:
+          type: integer
+          description: Auto remove the job after (x) seconds when it's executed
           nullable: true
+          minimum: 0
         Containers:
           type: array
           items:
@@ -4239,10 +4240,11 @@ components:
           type: string
           description: Schedule of the job (cron)
           nullable: true
-        AutoRemove:
-          type: boolean
-          description: Auto remove the job when it's executed
+        Ttl:
+          type: integer
+          description: Auto remove the job after (x) seconds when it's executed
           nullable: true
+          minimum: 0
         Containers:
           type: array
           items:
@@ -4297,10 +4299,11 @@ components:
           type: string
           description: Schedule of the job (cron)
           nullable: true
-        AutoRemove:
-          type: boolean
-          description: Auto remove the job when it's executed
+        Ttl:
+          type: integer
+          description: Auto remove the job after (x) seconds when it's executed
           nullable: true
+          minimum: 0
         Containers:
           type: array
           items:

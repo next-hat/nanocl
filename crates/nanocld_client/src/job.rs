@@ -253,7 +253,7 @@ mod tests {
         schedule: None,
         secrets: None,
         metadata: None,
-        auto_remove: None,
+        ttl: None,
       })
       .await
       .unwrap();

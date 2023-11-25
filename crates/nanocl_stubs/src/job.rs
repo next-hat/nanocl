@@ -41,12 +41,12 @@ pub struct Job {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub schedule: Option<String>,
-  /// Auto remove the job when it's executed
+  /// Auto remove the job after (x) seconds when it's executed
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub auto_remove: Option<bool>,
+  pub ttl: Option<usize>,
   /// Containers to run
   pub containers: Vec<Config>,
 }
@@ -111,12 +111,12 @@ pub struct JobPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub schedule: Option<String>,
-  /// Auto remove the job when it's executed
+  /// Auto remove the job after (x) seconds when it's executed
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub auto_remove: Option<bool>,
+  pub ttl: Option<usize>,
   /// List of container to run
   pub containers: Vec<Config>,
 }
@@ -157,12 +157,12 @@ pub struct JobInspect {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub schedule: Option<String>,
-  /// Auto remove the job when it's executed
+  /// Auto remove the job after (x) seconds when it's executed
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub auto_remove: Option<bool>,
+  pub ttl: Option<usize>,
   /// Containers to run
   pub containers: Vec<Config>,
   /// Number of instances
@@ -184,7 +184,7 @@ impl From<JobInspect> for JobPartial {
       secrets: job.secrets,
       metadata: job.metadata,
       schedule: job.schedule,
-      auto_remove: job.auto_remove,
+      ttl: job.ttl,
       containers: job.containers,
     }
   }

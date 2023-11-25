@@ -34,7 +34,7 @@ impl JobDb {
       metadata: self.metadata,
       secrets: job.secrets.clone(),
       schedule: job.schedule.clone(),
-      auto_remove: job.auto_remove,
+      ttl: job.ttl,
       containers: job.containers.clone(),
     }
   }

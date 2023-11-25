@@ -1,6 +1,6 @@
-use nanocl_error::io::FromIo;
 use ntex::rt;
 
+use nanocl_error::io::FromIo;
 use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::system::{Event, EventKind, EventAction};
@@ -9,7 +9,7 @@ use crate::{utils, repositories};
 use crate::event::Client;
 use crate::models::DaemonState;
 
-async fn job_auto_remove(e: Event, state: &DaemonState) -> HttpResult<()> {
+async fn job_ttl(e: Event, state: &DaemonState) -> HttpResult<()> {
   if e.kind != EventKind::ContainerInstance {
     return Ok(());
   }
@@ -27,19 +27,17 @@ async fn job_auto_remove(e: Event, state: &DaemonState) -> HttpResult<()> {
     _ => {}
   }
   let job = repositories::job::find_by_name(job_id, &state.pool).await?;
-  if !job.auto_remove.unwrap_or_default() {
-    return Ok(());
-  }
+  let ttl = match job.ttl {
+    None => return Ok(()),
+    Some(ttl) => ttl,
+  };
   let instances = utils::job::inspect_instances(&job.name, state).await?;
   let (_, _, _, running) = utils::job::count_instances(&instances);
   if running == 0 && !instances.is_empty() {
     let state = state.clone();
     rt::spawn(async move {
-      log::debug!(
-        "Job {} has auto remove and will be deleted in 10s",
-        job.name
-      );
-      ntex::time::sleep(std::time::Duration::from_secs(10)).await;
+      log::debug!("Job {} will be deleted in {ttl}s", job.name);
+      ntex::time::sleep(std::time::Duration::from_secs(ttl as u64)).await;
       let _ = utils::job::delete_by_name(&job.name, &state).await;
     });
   }
@@ -47,7 +45,7 @@ async fn job_auto_remove(e: Event, state: &DaemonState) -> HttpResult<()> {
 }
 
 async fn analize_event(e: Event, state: &DaemonState) -> HttpResult<()> {
-  job_auto_remove(e, state).await?;
+  job_ttl(e, state).await?;
   Ok(())
 }
 

@@ -3,7 +3,7 @@ ApiVersion: v0.11
 
 Jobs:
   - Name: job-autoremove
-    AutoRemove: true
+    Ttl: 2
     Containers:
       - Image: alpine:latest
         Cmd:
