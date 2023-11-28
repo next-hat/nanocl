@@ -2155,25 +2155,17 @@ components:
         The specification can be updated and the old specification will be kept in the history
         That way you can rollback to a previous specification quickly
       required:
-      - Key
       - NamespaceName
-      - Name
-      - SpecKey
+      - CreatedAt
       - Spec
       properties:
-        Key:
-          type: string
-          description: Key of the cargo
         NamespaceName:
           type: string
           description: Name of the namespace
-        Name:
+        CreatedAt:
           type: string
-          description: Name of the cargo
-        SpecKey:
-          type: string
-          format: uuid
-          description: Unique identifier of the spec
+          format: date-time
+          description: When the cargo was created
         Spec:
           $ref: '#/components/schemas/CargoSpec'
     CargoImagePartial:
@@ -2193,30 +2185,20 @@ components:
         It contains all the information about the cargo
         It also contains the list of containers
       required:
-      - Key
-      - Name
-      - SpecKey
       - NamespaceName
-      - Spec
+      - CreatedAt
       - InstanceTotal
       - InstanceRunning
+      - Spec
       - Instances
       properties:
-        Key:
-          type: string
-          description: Key of the cargo
-        Name:
-          type: string
-          description: Name of the cargo
-        SpecKey:
-          type: string
-          format: uuid
-          description: Unique identifier of the cargo spec
         NamespaceName:
           type: string
           description: Name of the namespace
-        Spec:
-          $ref: '#/components/schemas/CargoSpec'
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the cargo was created
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -2225,6 +2207,8 @@ components:
           type: integer
           description: Number of running instances
           minimum: 0
+        Spec:
+          $ref: '#/components/schemas/CargoSpec'
         Instances:
           type: array
           items:
@@ -2367,39 +2351,19 @@ components:
         A CargoSummary is a summary of a cargo
         It's the datastructure returned by the list operation
       required:
-      - Key
-      - CreatedAt
-      - UpdatedAt
-      - Name
-      - SpecKey
       - NamespaceName
-      - Spec
+      - CreatedAt
       - InstanceTotal
       - InstanceRunning
+      - Spec
       properties:
-        Key:
-          type: string
-          description: Key of the cargo
-        CreatedAt:
-          type: string
-          format: date-time
-          description: Creation date of the cargo
-        UpdatedAt:
-          type: string
-          format: date-time
-          description: Last update of the cargo
-        Name:
-          type: string
-          description: Name of the cargo
-        SpecKey:
-          type: string
-          format: uuid
-          description: Unique identifier of the cargo spec
         NamespaceName:
           type: string
           description: Name of the namespace
-        Spec:
-          $ref: '#/components/schemas/CargoSpec'
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the cargo was created
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -2408,6 +2372,8 @@ components:
           type: integer
           description: Number of running instances
           minimum: 0
+        Spec:
+          $ref: '#/components/schemas/CargoSpec'
     ClusterInfo:
       type: object
       description: ClusterInfo represents information about the swarm as is returned by the \"/info\" endpoint. Join-tokens are not included.
@@ -4150,10 +4116,7 @@ components:
           nullable: true
     Job:
       type: object
-      description: |
-        ## Job
-
-        A job is a collection of containers to run in sequence as a single unit to act like a command
+      description: A job is a collection of containers to run in sequence as a single unit to act like a command
       required:
       - Name
       - CreatedAt
@@ -4198,58 +4161,15 @@ components:
           description: Containers to run
     JobInspect:
       type: object
-      description: |
-        ## Job inspect
-
-        Is a detailed view of a job
-        It also contains the list of instances
+      description: Detailed information about a job
       required:
-      - Name
-      - CreatedAt
-      - UpdatedAt
-      - Containers
       - InstanceTotal
       - InstanceSuccess
       - InstanceRunning
       - InstanceFailed
+      - Spec
       - Instances
       properties:
-        Name:
-          type: string
-          description: Name of the job
-        CreatedAt:
-          type: string
-          format: date-time
-          description: When the job have been created
-        UpdatedAt:
-          type: string
-          format: date-time
-          description: When the job have been updated
-        Secrets:
-          type: array
-          items:
-            type: string
-          description: Secrets to load as environment variables
-          nullable: true
-        Metadata:
-          type: object
-          description: Metadata (user defined)
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
-        Schedule:
-          type: string
-          description: Schedule of the job (cron)
-          nullable: true
-        Ttl:
-          type: integer
-          description: Remove the job after (x) seconds after execution
-          nullable: true
-          minimum: 0
-        Containers:
-          type: array
-          items:
-            $ref: '#/components/schemas/Config'
-          description: Containers to run
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -4266,6 +4186,8 @@ components:
           type: integer
           description: Number of instance failed
           minimum: 0
+        Spec:
+          $ref: '#/components/schemas/Job'
         Instances:
           type: array
           items:
@@ -4273,10 +4195,7 @@ components:
           description: List of containers
     JobPartial:
       type: object
-      description: |
-        ## Job partial
-
-        Job partial is used to create a new job
+      description: Job partial is used to create a new job
       required:
       - Name
       - Containers
@@ -4311,33 +4230,14 @@ components:
           description: List of container to run
     JobSummary:
       type: object
-      description: |
-        ## Job summary
-
-        It's the datastructure returned by the list endpoint
+      description: Summary of a job (used in list)
       required:
-      - Name
-      - CreatedAt
-      - UpdatedAt
-      - Spec
       - InstanceTotal
       - InstanceSuccess
       - InstanceRunning
       - InstanceFailed
+      - Spec
       properties:
-        Name:
-          type: string
-          description: Name of the job
-        CreatedAt:
-          type: string
-          format: date-time
-          description: Creation date of the job
-        UpdatedAt:
-          type: string
-          format: date-time
-          description: Last update of the job
-        Spec:
-          $ref: '#/components/schemas/Job'
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -4354,6 +4254,8 @@ components:
           type: integer
           description: Number of instance failed
           minimum: 0
+        Spec:
+          $ref: '#/components/schemas/Job'
     LocalNodeState:
       type: string
       description: |-
@@ -5683,45 +5585,19 @@ components:
         Resource is a specification with a name and a kind
         It is used to define [proxy rules](ProxyRule) and other kind of spec
       required:
-      - Name
-      - CreatedAt
-      - UpdatedAt
-      - Version
       - Kind
-      - SpecKey
-      - Data
+      - CreatedAt
+      - Spec
       properties:
-        Name:
+        Kind:
           type: string
-          description: The name of the resource
+          description: The kind of the resource
         CreatedAt:
           type: string
           format: date-time
           description: The creation date of the resource
-        UpdatedAt:
-          type: string
-          format: date-time
-          description: The update date of the resource
-        Version:
-          type: string
-          description: Version of the resource
-        Kind:
-          type: string
-          description: The kind of the resource
-        SpecKey:
-          type: string
-          format: uuid
-          description: The spec of the resource
-        Data:
-          type: object
-          description: The spec of the resource as a json object
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
-        Metadata:
-          type: object
-          description: The metadata of the resource (user defined)
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
+        Spec:
+          $ref: '#/components/schemas/ResourceSpec'
     ResourceDnsRule:
       type: object
       required:
@@ -5736,7 +5612,7 @@ components:
             $ref: '#/components/schemas/DnsEntry'
     ResourcePartial:
       type: object
-      description: Resource partial is a payload used to create a new resource
+      description: Payload used to create a new resource
       required:
       - Name
       - Kind
@@ -5775,10 +5651,7 @@ components:
           description: The rules to apply
     ResourceSpec:
       type: object
-      description: |
-        ## ResourceSpec
-
-        The spec of the resource
+      description: The spec of a resource once created in the system
       required:
       - Key
       - Version
@@ -5812,6 +5685,7 @@ components:
             $ref: '#/components/schemas/Any'
     ResourceUpdate:
       type: object
+      description: Payload used to update a resource
       required:
       - Version
       - Data
@@ -6811,25 +6685,17 @@ components:
       type: object
       description: A virtual machine instance
       required:
-      - Key
       - NamespaceName
-      - Name
-      - SpecKey
+      - CreatedAt
       - Spec
       properties:
-        Key:
-          type: string
-          description: Key of the vm
         NamespaceName:
           type: string
           description: Name of the namespace
-        Name:
+        CreatedAt:
           type: string
-          description: Name of the vm
-        SpecKey:
-          type: string
-          format: uuid
-          description: Unique identifier of the vm spec
+          format: date-time
+          description: When the vm was created
         Spec:
           $ref: '#/components/schemas/VmSpec'
     VmDisk:
@@ -6950,30 +6816,20 @@ components:
         It contains all the information about the vm
         It also contains the list of containers
       required:
-      - Key
-      - Name
-      - SpecKey
       - NamespaceName
-      - Spec
+      - CreatedAt
       - InstanceTotal
       - InstanceRunning
+      - Spec
       - Instances
       properties:
-        Key:
-          type: string
-          description: Key of the vm
-        Name:
-          type: string
-          description: Name of the vm
-        SpecKey:
-          type: string
-          format: uuid
-          description: Unique identifier of the spec
         NamespaceName:
           type: string
           description: Name of the namespace
-        Spec:
-          $ref: '#/components/schemas/VmSpec'
+        CreatedAt:
+          type: string
+          format: date-time
+          description: Creation date of the vm
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -6982,6 +6838,8 @@ components:
           type: integer
           description: Number of running instances
           minimum: 0
+        Spec:
+          $ref: '#/components/schemas/VmSpec'
         Instances:
           type: array
           items:
@@ -7145,39 +7003,19 @@ components:
         A Vm Summary is a summary of a vm
         It is used to list all the vms
       required:
-      - Key
-      - CreatedAt
-      - UpdatedAt
-      - Name
-      - SpecKey
       - NamespaceName
-      - Spec
+      - CreatedAt
       - Instances
       - RunningInstances
+      - Spec
       properties:
-        Key:
+        NamespaceName:
           type: string
-          description: Key of the vm
+          description: Name of the namespace
         CreatedAt:
           type: string
           format: date-time
           description: Creation date of the vm
-        UpdatedAt:
-          type: string
-          format: date-time
-          description: Update date of the vm
-        Name:
-          type: string
-          description: Name of the vm
-        SpecKey:
-          type: string
-          format: uuid
-          description: Unique identifier of the spec
-        NamespaceName:
-          type: string
-          description: Name of the namespace
-        Spec:
-          $ref: '#/components/schemas/VmSpec'
         Instances:
           type: integer
           description: Number of instances
@@ -7186,6 +7024,8 @@ components:
           type: integer
           description: Number of running instances
           minimum: 0
+        Spec:
+          $ref: '#/components/schemas/VmSpec'
 tags:
 - name: CargoImages
   description: Cargo images management endpoints.

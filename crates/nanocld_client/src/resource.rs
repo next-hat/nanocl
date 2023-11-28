@@ -279,11 +279,11 @@ mod tests {
     };
     // create
     let resource = client.create_resource(&resource).await.unwrap();
-    assert_eq!(resource.name, "test_resource2");
+    assert_eq!(resource.spec.resource_key, "test_resource2");
     assert_eq!(resource.kind, String::from("Kind"));
     // inspect
     let resource = client.inspect_resource("test_resource2").await.unwrap();
-    assert_eq!(resource.name, "test_resource2");
+    assert_eq!(resource.spec.resource_key, "test_resource2");
     assert_eq!(resource.kind, String::from("Kind"));
     let new_resource = ResourceUpdate {
       version: "v0.0.2".to_owned(),
@@ -295,7 +295,7 @@ mod tests {
       .put_resource("test_resource2", &new_resource)
       .await
       .unwrap();
-    assert_eq!(resource.name, "test_resource2");
+    assert_eq!(resource.spec.resource_key, "test_resource2");
     assert_eq!(resource.kind, String::from("Kind"));
     // history
     let history = client

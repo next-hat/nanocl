@@ -533,7 +533,7 @@ mod tests {
         "basic cargo create"
       );
       let cargo = TestClient::res_json::<Cargo>(res).await;
-      assert_eq!(cargo.name, test_cargo, "Invalid cargo name");
+      assert_eq!(cargo.spec.name, test_cargo, "Invalid cargo name");
       assert_eq!(cargo.namespace_name, "global", "Invalid cargo namespace");
       assert_eq!(
         cargo.spec.container.image,
@@ -558,9 +558,9 @@ mod tests {
     );
     let cargoes = res.json::<Vec<CargoSummary>>().await.unwrap();
     assert_eq!(
-      cargoes[0].name, test_cargoes[1],
+      cargoes[0].spec.name, test_cargoes[1],
       "Expected to find cargo with name {} got {}",
-      test_cargoes[1], cargoes[0].name
+      test_cargoes[1], cargoes[0].spec.name
     );
     let mut res = client
       .send_get(
@@ -594,9 +594,9 @@ mod tests {
     );
     let response = res.json::<CargoInspect>().await.unwrap();
     assert_eq!(
-      response.name, main_test_cargo,
+      response.spec.name, main_test_cargo,
       "Expected to find cargo with name {main_test_cargo} got {}",
-      response.name
+      response.spec.name
     );
     let mut res = client.send_get(ENDPOINT, None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo list");
@@ -660,7 +660,7 @@ mod tests {
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo patch");
     let patch_response = res.json::<Cargo>().await.unwrap();
-    assert_eq!(patch_response.name, main_test_cargo);
+    assert_eq!(patch_response.spec.name, main_test_cargo);
     assert_eq!(patch_response.namespace_name, "global");
     assert_eq!(
       patch_response.spec.container.image,

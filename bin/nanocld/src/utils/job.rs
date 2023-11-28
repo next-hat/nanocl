@@ -51,6 +51,10 @@ pub(crate) fn count_instances(
   for instance in instances {
     let container = &instance.container;
     let state = container.state.clone().unwrap_or_default();
+    if state.restarting.unwrap_or_default() {
+      instance_failed += 1;
+      continue;
+    }
     if state.running.unwrap_or_default() {
       instance_running += 1;
       continue;
@@ -373,14 +377,11 @@ pub(crate) async fn list(state: &DaemonState) -> HttpResult<Vec<JobSummary>> {
           instance_running,
         ) = count_instances(&instances);
         Ok::<_, HttpError>(JobSummary {
-          name: job.name.clone(),
-          created_at: job.created_at,
-          updated_at: job.updated_at,
-          spec: job.clone(),
           instance_total,
           instance_success,
           instance_running,
           instance_failed,
+          spec: job.clone(),
         })
       })
       .collect::<FuturesUnordered<_>>()
@@ -455,14 +456,7 @@ pub(crate) async fn inspect_by_name(
   let (instance_total, instance_failed, instance_success, instance_running) =
     count_instances(&instances);
   let job_inspect = JobInspect {
-    name: job.name,
-    created_at: job.created_at,
-    updated_at: job.updated_at,
-    secrets: job.secrets,
-    metadata: job.metadata,
-    schedule: job.schedule,
-    ttl: job.ttl,
-    containers: job.containers,
+    spec: job,
     instance_total,
     instance_success,
     instance_running,

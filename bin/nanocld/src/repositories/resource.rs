@@ -201,7 +201,7 @@ pub(crate) async fn put(
   let spec = ResourceSpecDb {
     key: uuid::Uuid::new_v4(),
     created_at: chrono::Utc::now().naive_utc(),
-    resource_key: resource.name.to_owned(),
+    resource_key: resource.spec.resource_key,
     version: item.version.clone(),
     data: item.data.clone(),
     metadata: item.metadata.clone(),

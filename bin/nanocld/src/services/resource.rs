@@ -182,7 +182,7 @@ pub(crate) async fn revert_resource(
   let resource =
     repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
-    name: resource.name,
+    name: resource.spec.resource_key,
     version: history.version,
     kind: resource.kind,
     data: history.data,
@@ -252,7 +252,7 @@ mod tests {
       "create resource"
     );
     let resource = res.json::<Resource>().await.unwrap();
-    assert_eq!(resource.name, TEST_RESOURCE);
+    assert_eq!(resource.spec.resource_key, TEST_RESOURCE);
     assert_eq!(resource.kind, String::from("Kind"));
     // Basic list
     let mut res = client.send_get(ENDPOINT, None::<String>).await;
@@ -344,9 +344,9 @@ mod tests {
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "inspect resource");
     let resource = res.json::<Resource>().await.unwrap();
-    assert_eq!(resource.name, TEST_RESOURCE);
+    assert_eq!(resource.spec.resource_key, TEST_RESOURCE);
     assert_eq!(resource.kind, String::from("Kind"));
-    assert_eq!(&resource.data, &spec);
+    assert_eq!(&resource.spec.data, &spec);
     // History
     let _ = client
       .send_get(
@@ -373,7 +373,7 @@ mod tests {
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "patch resource");
     let resource = res.json::<Resource>().await.unwrap();
-    assert_eq!(resource.name, TEST_RESOURCE);
+    assert_eq!(resource.spec.resource_key, TEST_RESOURCE);
     assert_eq!(resource.kind, String::from("Kind"));
     // Delete
     let resp = client

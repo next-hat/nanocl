@@ -57,7 +57,7 @@ pub(crate) async fn start_by_key(
 /// * [state](DaemonState) - The daemon state
 ///
 pub(crate) async fn stop(vm: &Vm, state: &DaemonState) -> HttpResult<()> {
-  let container_name = format!("{}.v", vm.key);
+  let container_name = format!("{}.v", vm.spec.vm_key);
   state
     .docker_api
     .stop_container(&container_name, None::<StopContainerOptions>)
@@ -107,7 +107,8 @@ pub(crate) async fn inspect_by_key(
   state: &DaemonState,
 ) -> HttpResult<VmInspect> {
   let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
-  let containers = list_instances_by_key(&vm.key, &state.docker_api).await?;
+  let containers =
+    list_instances_by_key(&vm.spec.vm_key, &state.docker_api).await?;
   let mut running_instances = 0;
   for container in &containers {
     if container.state == Some("running".into()) {
@@ -115,9 +116,7 @@ pub(crate) async fn inspect_by_key(
     }
   }
   Ok(VmInspect {
-    key: vm.key,
-    name: vm.name,
-    spec_key: vm.spec_key,
+    created_at: vm.created_at,
     namespace_name: vm.namespace_name,
     spec: vm.spec,
     instance_total: containers.len(),
@@ -181,7 +180,7 @@ pub(crate) async fn delete_by_key(
     .remove_container(&container_name, Some(options))
     .await;
   repositories::vm::delete_by_key(vm_key, &state.pool).await?;
-  repositories::vm_spec::delete_by_vm_key(&vm.key, &state.pool).await?;
+  repositories::vm_spec::delete_by_vm_key(&vm.spec.vm_key, &state.pool).await?;
   utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
   state
     .event_emitter
@@ -229,15 +228,11 @@ pub(crate) async fn list_by_namespace(
       }
     }
     vm_summaries.push(VmSummary {
-      key: vm.key,
       created_at: vm.created_at,
-      updated_at: spec.created_at,
-      name: vm.name,
       namespace_name: vm.namespace_name,
-      spec: spec.to_owned(),
       instances: instances.len(),
       running_instances,
-      spec_key: spec.key,
+      spec: spec.clone(),
     });
   }
   Ok(vm_summaries)
@@ -264,7 +259,7 @@ pub(crate) async fn create_instance(
   let vmimagespath = format!("{}/vms/images", state.config.state_dir);
   labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
   labels.insert("io.nanocl.kind".to_owned(), "Vm".to_owned());
-  labels.insert("io.nanocl.v".to_owned(), vm.key.clone());
+  labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
   labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   let mut args: Vec<String> =
     vec!["-hda".into(), image.path.clone(), "--nographic".into()];
@@ -354,7 +349,7 @@ pub(crate) async fn create_instance(
     ..Default::default()
   };
   let options = Some(CreateContainerOptions {
-    name: format!("{}.v", &vm.key),
+    name: format!("{}.v", &vm.spec.vm_key),
     ..Default::default()
   });
   state.docker_api.create_container(options, spec).await?;
@@ -514,20 +509,24 @@ pub(crate) async fn put(
   state: &DaemonState,
 ) -> HttpResult<Vm> {
   let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
-  let container_name = format!("{}.v", &vm.key);
+  let container_name = format!("{}.v", &vm.spec.vm_key);
   stop(&vm, state).await?;
   state
     .docker_api
     .remove_container(&container_name, None::<RemoveContainerOptions>)
     .await?;
-  let vm =
-    repositories::vm::update_by_key(&vm.key, vm_partial, version, &state.pool)
-      .await?;
+  let vm = repositories::vm::update_by_key(
+    &vm.spec.vm_key,
+    vm_partial,
+    version,
+    &state.pool,
+  )
+  .await?;
   let image =
     repositories::vm_image::find_by_name(&vm.spec.disk.image, &state.pool)
       .await?;
   create_instance(&vm, &image, false, state).await?;
-  start_by_key(&vm.key, state).await?;
+  start_by_key(&vm.spec.vm_key, state).await?;
   state
     .event_emitter
     .spawn_emit_to_event(&vm, EventAction::Patched);

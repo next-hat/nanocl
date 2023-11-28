@@ -43,7 +43,7 @@ async fn exec_cargo_create(
   let item = client
     .create_cargo(&cargo, args.namespace.as_deref())
     .await?;
-  println!("{}", &item.key);
+  println!("{}", &item.spec.cargo_key);
   Ok(())
 }
 
@@ -470,7 +470,7 @@ async fn exec_cargo_run(
     .create_cargo(&opts.clone().into(), args.namespace.as_deref())
     .await?;
   client
-    .start_cargo(&cargo.name, Some(&cargo.namespace_name))
+    .start_cargo(&cargo.spec.name, Some(&cargo.namespace_name))
     .await?;
   Ok(())
 }

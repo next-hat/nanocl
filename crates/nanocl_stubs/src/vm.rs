@@ -14,14 +14,10 @@ use crate::{
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Vm {
-  /// Key of the vm
-  pub key: String,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Name of the vm
-  pub name: String,
-  /// Unique identifier of the vm spec
-  pub spec_key: uuid::Uuid,
+  /// When the vm was created
+  pub created_at: chrono::NaiveDateTime,
   /// Specification of the vm
   pub spec: VmSpec,
 }
@@ -36,9 +32,9 @@ impl From<Vm> for VmSpecPartial {
 impl From<Vm> for EventActor {
   fn from(vm: Vm) -> Self {
     Self {
-      key: Some(vm.key),
+      key: Some(vm.spec.vm_key),
       attributes: Some(serde_json::json!({
-        "Name": vm.name,
+        "Name": vm.spec.name,
         "Namespace": vm.namespace_name,
         "Version": vm.spec.version,
         "Namespace": vm.namespace_name,
@@ -65,24 +61,16 @@ impl ToEvent for Vm {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmSummary {
-  /// Key of the vm
-  pub key: String,
-  /// Creation date of the vm
-  pub created_at: chrono::NaiveDateTime,
-  /// Update date of the vm
-  pub updated_at: chrono::NaiveDateTime,
-  /// Name of the vm
-  pub name: String,
-  /// Unique identifier of the spec
-  pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Specification of the vm
-  pub spec: VmSpec,
+  /// Creation date of the vm
+  pub created_at: chrono::NaiveDateTime,
   /// Number of instances
   pub instances: usize,
   /// Number of running instances
   pub running_instances: usize,
+  /// Specification of the vm
+  pub spec: VmSpec,
 }
 
 /// A Vm Inspect is a detailed view of a vm
@@ -94,20 +82,16 @@ pub struct VmSummary {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmInspect {
-  /// Key of the vm
-  pub key: String,
-  /// Name of the vm
-  pub name: String,
-  /// Unique identifier of the spec
-  pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Specification of the vm
-  pub spec: VmSpec,
+  /// Creation date of the vm
+  pub created_at: chrono::NaiveDateTime,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances
   pub instance_running: usize,
+  /// Specification of the vm
+  pub spec: VmSpec,
   /// List of containers
   pub instances: Vec<ContainerSummary>,
 }

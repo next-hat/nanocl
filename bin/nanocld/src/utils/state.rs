@@ -558,15 +558,16 @@ async fn remove_cargoes(
           }
         };
       if let Err(err) =
-        utils::cargo::delete_by_key(&cargo.key, Some(true), state).await
+        utils::cargo::delete_by_key(&cargo.spec.cargo_key, Some(true), state)
+          .await
       {
         send(
-          StateStream::new_cargo_error(&cargo.key, &err.to_string()),
+          StateStream::new_cargo_error(&cargo.spec.cargo_key, &err.to_string()),
           sx,
         );
         return;
       }
-      send(StateStream::new_cargo_success(&cargo.key), sx);
+      send(StateStream::new_cargo_success(&cargo.spec.cargo_key), sx);
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
@@ -644,12 +645,18 @@ async fn remove_resources(
       };
       if let Err(err) = utils::resource::delete(&resource, state).await {
         send(
-          StateStream::new_resource_error(&resource.name, &err.to_string()),
+          StateStream::new_resource_error(
+            &resource.spec.resource_key,
+            &err.to_string(),
+          ),
           sx,
         );
         return;
       }
-      send(StateStream::new_resource_success(&resource.name), sx);
+      send(
+        StateStream::new_resource_success(&resource.spec.resource_key),
+        sx,
+      );
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()

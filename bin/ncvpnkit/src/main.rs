@@ -21,14 +21,13 @@ mod version;
 fn resource_to_proxy_rule(
   resource: &Resource,
 ) -> std::io::Result<ResourceProxyRule> {
-  serde_json::from_value::<ResourceProxyRule>(resource.data.clone()).map_err(
-    |err| {
+  serde_json::from_value::<ResourceProxyRule>(resource.spec.data.clone())
+    .map_err(|err| {
       std::io::Error::new(
         std::io::ErrorKind::InvalidData,
         format!("Unable to deserialize proxy rule: {err}"),
       )
-    },
-  )
+    })
 }
 
 /// ## Apply rule

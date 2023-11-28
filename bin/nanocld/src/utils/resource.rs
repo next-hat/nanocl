@@ -117,14 +117,14 @@ async fn hook_delete_resource(
 ) -> HttpResult<()> {
   let kind = repositories::resource_kind::get_version(
     &resource.kind,
-    &resource.version,
+    &resource.spec.version,
     pool,
   )
   .await?;
   if let Some(url) = kind.url {
     let ctrl_client = CtrlClient::new(&kind.resource_kind_name, &url);
     ctrl_client
-      .delete_rule(&resource.version, &resource.name)
+      .delete_rule(&resource.spec.version, &resource.spec.resource_key)
       .await?;
   }
   Ok(())
@@ -209,13 +209,24 @@ pub(crate) async fn delete(
     log::warn!("{err}");
   }
   if resource.kind.as_str() == "Kind" {
-    repositories::resource_kind::delete_version(&resource.name, &state.pool)
-      .await?;
-    repositories::resource_kind::delete(&resource.name, &state.pool).await?;
+    repositories::resource_kind::delete_version(
+      &resource.spec.resource_key,
+      &state.pool,
+    )
+    .await?;
+    repositories::resource_kind::delete(
+      &resource.spec.resource_key,
+      &state.pool,
+    )
+    .await?;
   }
-  repositories::resource::delete_by_key(&resource.name, &state.pool).await?;
+  repositories::resource::delete_by_key(
+    &resource.spec.resource_key,
+    &state.pool,
+  )
+  .await?;
   repositories::resource_spec::delete_by_resource_key(
-    &resource.name,
+    &resource.spec.resource_key,
     &state.pool,
   )
   .await?;

@@ -104,10 +104,7 @@ pub struct JobArg {
   pub command: JobCommand,
 }
 
-/// Job row
-///
-/// Used to display job information in a table
-///
+/// A job row to display job information in a table
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct JobRow {
@@ -130,22 +127,21 @@ pub struct JobRow {
 }
 
 /// Convert [JobSummary](JobSummary) to [JobRow](JobRow)
-///
 impl From<JobSummary> for JobRow {
   fn from(job: JobSummary) -> Self {
     let binding = chrono::Local::now();
     let tz = binding.offset();
     // Convert the created_at and updated_at to the current timezone
     let created_at = tz
-      .timestamp_opt(job.created_at.timestamp(), 0)
+      .timestamp_opt(job.spec.created_at.timestamp(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     let updated_at = tz
-      .timestamp_opt(job.updated_at.timestamp(), 0)
+      .timestamp_opt(job.spec.updated_at.timestamp(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
-      name: job.name,
+      name: job.spec.name,
       total: job.instance_total,
       running: job.instance_running,
       succeeded: job.instance_success,

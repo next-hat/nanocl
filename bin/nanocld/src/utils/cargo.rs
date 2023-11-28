@@ -160,9 +160,9 @@ async fn create_instances(
       let secret_envs = secret_envs.clone();
       async move {
         let name = if current > 0 || start > 0 {
-          format!("{}-{}.c", current + start, cargo.key)
+          format!("{}-{}.c", current + start, cargo.spec.cargo_key)
         } else {
-          format!("{}.c", cargo.key)
+          format!("{}.c", cargo.spec.cargo_key)
         };
         let create_options = bollard_next::container::CreateContainerOptions {
           name: name.clone(),
@@ -175,7 +175,7 @@ async fn create_instances(
         let mut labels = container.labels.to_owned().unwrap_or_default();
         labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
         labels.insert("io.nanocl.kind".to_owned(), "Cargo".to_owned());
-        labels.insert("io.nanocl.c".to_owned(), cargo.key.to_owned());
+        labels.insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
         labels
           .insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
         labels.insert(
@@ -213,7 +213,7 @@ async fn create_instances(
         };
         env.push(format!("NANOCL_NODE={}", state.config.hostname));
         env.push(format!("NANOCL_NODE_ADDR={}", state.config.gateway));
-        env.push(format!("NANOCL_CARGO_KEY={}", cargo.key));
+        env.push(format!("NANOCL_CARGO_KEY={}", cargo.spec.cargo_key));
         env.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));
         env.push(format!("NANOCL_CARGO_INSTANCE={}", current));
         // Merge the cargo spec with the container spec
@@ -433,7 +433,8 @@ pub(crate) async fn create(
     1
   };
   if let Err(err) = create_instances(&cargo, 0, number, state).await {
-    repositories::cargo::delete_by_key(&cargo.key, &state.pool).await?;
+    repositories::cargo::delete_by_key(&cargo.spec.cargo_key, &state.pool)
+      .await?;
     return Err(err);
   }
   state
@@ -649,7 +650,10 @@ pub(crate) async fn put(
   // start created containers
   match start_by_key(cargo_key, state).await {
     Err(err) => {
-      log::error!("Unable to start cargo instance {} : {err}", cargo.key);
+      log::error!(
+        "Unable to start cargo instance {} : {err}",
+        cargo.spec.cargo_key
+      );
       delete_instances(
         &new_instances
           .iter()
@@ -724,15 +728,11 @@ pub(crate) async fn list(
       }
     }
     cargo_summaries.push(CargoSummary {
-      key: cargo.key,
       created_at: cargo.created_at,
-      updated_at: spec.created_at,
-      name: cargo.name,
       namespace_name: cargo.namespace_name,
-      spec: spec.to_owned(),
       instance_total: instances.len(),
       instance_running: running_instances,
-      spec_key: spec.key,
+      spec: spec.clone(),
     });
   }
   Ok(cargo_summaries)
@@ -790,13 +790,11 @@ pub(crate) async fn inspect_by_key(
     })
     .collect::<Vec<_>>();
   Ok(CargoInspect {
-    key: cargo.key,
-    name: cargo.name,
-    spec_key: cargo.spec_key,
+    created_at: cargo.created_at,
     namespace_name: cargo.namespace_name,
-    spec: cargo.spec,
     instance_total: instances.len(),
     instance_running: running_instances,
+    spec: cargo.spec,
     instances,
   })
 }
@@ -945,7 +943,7 @@ pub async fn patch(
     cargo.spec.container
   };
   let spec = CargoSpecPartial {
-    name: cargo.name.clone(),
+    name: cargo.spec.name.clone(),
     container,
     init_container: if payload.init_container.is_some() {
       payload.init_container.clone()

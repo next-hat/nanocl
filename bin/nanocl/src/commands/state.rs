@@ -200,9 +200,9 @@ pub async fn log_cargo(
   let mut futures = Vec::new();
   for (index, _) in cargo.instances.iter().enumerate() {
     let name = if index == 0 {
-      cargo.name.to_owned()
+      cargo.spec.name.to_owned()
     } else {
-      format!("{index}-{}", cargo.name)
+      format!("{index}-{}", cargo.spec.name)
     };
     let namespace = opts.namespace.to_owned().unwrap_or("global".to_owned());
     let client = client.to_owned();
