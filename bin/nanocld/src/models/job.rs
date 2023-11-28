@@ -36,11 +36,7 @@ impl FromSpec for JobDb {
     _version: &str,
     p: &Self::SpecPartial,
   ) -> IoResult<Self> {
-    let mut data =
-      serde_json::to_value(p).map_err(|err| err.map_err_context(|| "Spec"))?;
-    if let Some(meta) = data.as_object_mut() {
-      meta.remove("Metadata");
-    }
+    let data = JobDb::try_to_data(p)?;
     Ok(JobDb {
       key: id.to_owned(),
       created_at: chrono::Utc::now().naive_utc(),

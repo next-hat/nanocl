@@ -43,11 +43,7 @@ impl FromSpec for CargoSpecDb {
     version: &str,
     p: &Self::SpecPartial,
   ) -> IoResult<Self> {
-    let mut data =
-      serde_json::to_value(p).map_err(|err| err.map_err_context(|| "Spec"))?;
-    if let Some(meta) = data.as_object_mut() {
-      meta.remove("Metadata");
-    }
+    let data = CargoSpecDb::try_to_data(p)?;
     Ok(CargoSpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),

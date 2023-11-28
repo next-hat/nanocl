@@ -1,4 +1,4 @@
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoResult, FromIo};
 
 /// Generic trait to convert a metric type into a insertable database type
 pub trait ToMeticDb {
@@ -11,6 +11,18 @@ pub trait ToMeticDb {
 pub trait FromSpec {
   type Spec;
   type SpecPartial;
+
+  fn try_to_data(p: &Self::SpecPartial) -> IoResult<serde_json::Value>
+  where
+    Self::SpecPartial: serde::Serialize,
+  {
+    let mut data =
+      serde_json::to_value(p).map_err(|err| err.map_err_context(|| "Spec"))?;
+    if let Some(meta) = data.as_object_mut() {
+      meta.remove("Metadata");
+    }
+    Ok(data)
+  }
 
   fn into_spec(self, p: &Self::SpecPartial) -> Self::Spec;
 
