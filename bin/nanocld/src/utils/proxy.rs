@@ -3,7 +3,9 @@ use futures::StreamExt;
 use bollard_next::container::{LogsOptions, LogOutput};
 
 use crate::repositories;
-use crate::models::{ToDb, DaemonState, HttpMetricPartial, StreamMetricPartial};
+use crate::models::{
+  ToMeticDb, DaemonState, HttpMetricPartial, StreamMetricPartial,
+};
 
 /// ## Spawn logger
 ///
@@ -58,7 +60,7 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                 match http_metric {
                   Ok(http_metric) => {
                     let http_metric =
-                      http_metric.to_db_model(&state.config.hostname);
+                      http_metric.to_metric_db(&state.config.hostname);
                     let res = repositories::http_metric::create(
                       &http_metric,
                       &state.pool,
@@ -79,7 +81,7 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                   serde_json::from_str::<StreamMetricPartial>(trimmed_log);
 
                 match stream_metric
-                  .map(|metric| metric.to_db_model(&state.config.hostname))
+                  .map(|metric| metric.to_metric_db(&state.config.hostname))
                 {
                   Ok(stream_db_model) => {
                     let insert_result = repositories::stream_metric::create(

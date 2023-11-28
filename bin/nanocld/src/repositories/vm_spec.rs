@@ -8,7 +8,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
 use crate::utils;
-use crate::models::{Pool, VmSpecDb};
+use crate::models::{Pool, VmSpecDb, FromSpec};
 
 /// ## Create
 ///
@@ -32,22 +32,10 @@ pub(crate) async fn create(
   version: &str,
   pool: &Pool,
 ) -> IoResult<VmSpec> {
-  let mut data = serde_json::to_value(item.to_owned())
-    .map_err(|err| err.map_err_context(|| "VmSpec"))?;
-  if let Some(meta) = data.as_object_mut() {
-    meta.remove("Metadata");
-  }
-  let dbmodel = VmSpecDb {
-    key: uuid::Uuid::new_v4(),
-    vm_key: vm_key.to_owned(),
-    version: version.to_owned(),
-    created_at: chrono::Utc::now().naive_utc(),
-    data,
-    metadata: item.metadata.clone(),
-  };
-  let dbmodel: VmSpecDb =
-    super::generic::insert_with_res(dbmodel, pool).await?;
-  Ok(dbmodel.into_vm_spec(item))
+  let db_model = VmSpecDb::try_from_spec_partial(vm_key, version, item)?;
+  let db_model: VmSpecDb =
+    super::generic::insert_with_res(db_model, pool).await?;
+  Ok(db_model.into_spec(item))
 }
 
 /// ## Find by key
@@ -72,9 +60,7 @@ pub(crate) async fn find_by_key(
   let dbmodel =
     super::generic::find_by_id::<vm_specs::table, _, VmSpecDb>(key, pool)
       .await?;
-  let spec = serde_json::from_value::<VmSpecPartial>(dbmodel.data.clone())
-    .map_err(|err| err.map_err_context(|| "VmSpecPartial"))?;
-  Ok(dbmodel.into_vm_spec(&spec))
+  dbmodel.try_to_spec()
 }
 
 /// ## Delete by vm key
@@ -140,11 +126,7 @@ pub(crate) async fn list_by_vm_key(
   .await?;
   let specs = dbmodels
     .into_iter()
-    .map(|dbmodel: VmSpecDb| {
-      let spec = serde_json::from_value::<VmSpecPartial>(dbmodel.data.clone())
-        .map_err(|err| err.map_err_context(|| "VmSpecPartial"))?;
-      Ok(dbmodel.into_vm_spec(&spec))
-    })
+    .map(|dbmodel: VmSpecDb| dbmodel.try_to_spec())
     .collect::<Result<Vec<VmSpec>, IoError>>()?;
   Ok(specs)
 }

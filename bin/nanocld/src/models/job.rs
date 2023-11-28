@@ -4,6 +4,8 @@ use nanocl_stubs::job::{Job, JobPartial};
 
 use crate::schema::jobs;
 
+use super::FromSpec;
+
 /// ## JobDb
 ///
 /// This structure represent a job to run.
@@ -25,25 +27,46 @@ pub struct JobDb {
   pub metadata: Option<serde_json::Value>,
 }
 
-impl JobDb {
-  pub fn into_job(self, job: &JobPartial) -> Job {
+impl FromSpec for JobDb {
+  type Spec = Job;
+  type SpecPartial = JobPartial;
+
+  fn try_from_spec_partial(
+    id: &str,
+    _version: &str,
+    p: &Self::SpecPartial,
+  ) -> IoResult<Self> {
+    let mut data =
+      serde_json::to_value(p).map_err(|err| err.map_err_context(|| "Spec"))?;
+    if let Some(meta) = data.as_object_mut() {
+      meta.remove("Metadata");
+    }
+    Ok(JobDb {
+      key: id.to_owned(),
+      created_at: chrono::Utc::now().naive_utc(),
+      updated_at: chrono::Utc::now().naive_utc(),
+      data,
+      metadata: p.metadata.clone(),
+    })
+  }
+
+  fn into_spec(self, p: &Self::SpecPartial) -> Self::Spec {
     Job {
       name: self.key,
       created_at: self.created_at,
       updated_at: self.updated_at,
       metadata: self.metadata,
-      secrets: job.secrets.clone(),
-      schedule: job.schedule.clone(),
-      ttl: job.ttl,
-      containers: job.containers.clone(),
+      secrets: p.secrets.clone(),
+      schedule: p.schedule.clone(),
+      ttl: p.ttl,
+      containers: p.containers.clone(),
     }
   }
 
-  pub fn serialize_data(&self) -> IoResult<JobPartial> {
-    Ok(
-      serde_json::from_value(self.data.clone())
-        .map_err(|err| err.map_err_context(|| "Job"))?,
-    )
+  fn try_to_spec(self) -> IoResult<Self::Spec> {
+    let p = serde_json::from_value::<Self::SpecPartial>(self.data.clone())
+      .map_err(|err| err.map_err_context(|| "Spec"))?;
+    Ok(self.into_spec(&p))
   }
 }
 

@@ -10,7 +10,9 @@ use nanocl_stubs::cargo::{Cargo, GenericCargoListQuery};
 use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
 use crate::utils;
-use crate::models::{Pool, CargoDb, CargoUpdateDb, CargoSpecDb, NamespaceDb};
+use crate::models::{
+  Pool, CargoDb, CargoUpdateDb, CargoSpecDb, NamespaceDb, FromSpec,
+};
 
 /// ## Find by namespace
 ///
@@ -259,9 +261,7 @@ pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
     Ok::<_, IoError>(item)
   })
   .await?;
-  let spec = serde_json::from_value::<CargoSpecPartial>(item.1.data.clone())
-    .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
-  let spec = item.1.into_cargo_spec(&spec);
+  let spec = item.1.try_to_spec()?;
   let item = item.0.into_cargo(spec);
   Ok(item)
 }

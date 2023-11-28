@@ -1,8 +1,10 @@
+use nanocl_error::io::{IoResult, FromIo};
 use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
 
 use crate::schema::cargo_specs;
 
 use super::cargo::CargoDb;
+use super::generic::FromSpec;
 
 /// ## CargoSpecDb
 ///
@@ -32,20 +34,49 @@ pub struct CargoSpecDb {
   pub metadata: Option<serde_json::Value>,
 }
 
-impl CargoSpecDb {
-  pub fn into_cargo_spec(self, spec: &CargoSpecPartial) -> CargoSpec {
-    let spec = spec.clone();
+impl FromSpec for CargoSpecDb {
+  type Spec = CargoSpec;
+  type SpecPartial = CargoSpecPartial;
+
+  fn try_from_spec_partial(
+    id: &str,
+    version: &str,
+    p: &Self::SpecPartial,
+  ) -> IoResult<Self> {
+    let mut data =
+      serde_json::to_value(p).map_err(|err| err.map_err_context(|| "Spec"))?;
+    if let Some(meta) = data.as_object_mut() {
+      meta.remove("Metadata");
+    }
+    Ok(CargoSpecDb {
+      key: uuid::Uuid::new_v4(),
+      created_at: chrono::Utc::now().naive_utc(),
+      cargo_key: id.to_owned(),
+      version: version.to_owned(),
+      data,
+      metadata: p.metadata.clone(),
+    })
+  }
+
+  fn try_to_spec(self) -> IoResult<Self::Spec> {
+    let p = serde_json::from_value::<CargoSpecPartial>(self.data.clone())
+      .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
+    Ok(self.into_spec(&p))
+  }
+
+  fn into_spec(self, p: &Self::SpecPartial) -> Self::Spec {
+    let p = p.clone();
     CargoSpec {
       key: self.key,
       created_at: self.created_at,
-      name: spec.name,
+      name: p.name,
       version: self.version,
       cargo_key: self.cargo_key,
-      init_container: spec.init_container,
-      replication: spec.replication,
-      container: spec.container,
-      metadata: spec.metadata,
-      secrets: spec.secrets,
+      init_container: p.init_container,
+      replication: p.replication,
+      container: p.container,
+      metadata: p.metadata,
+      secrets: p.secrets,
     }
   }
 }

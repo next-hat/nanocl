@@ -4,6 +4,8 @@ use serde::{Serialize, Deserialize, Deserializer};
 
 use crate::schema::{http_metrics, stream_metrics};
 
+use super::generic::ToMeticDb;
+
 /// ## deserialize empty string
 ///
 /// Serde helper to deserialize string that can be empty to `Option<String>`.
@@ -110,39 +112,35 @@ pub struct HttpMetricPartial {
   pub http_accept_language: Option<String>,
 }
 
-pub trait ToDb {
-  type Db;
-  fn to_db_model(&self, _node_name: &str) -> Self::Db;
-}
+impl ToMeticDb for HttpMetricPartial {
+  type MetricDb = HttpMetricDb;
 
-impl ToDb for HttpMetricPartial {
-  type Db = HttpMetricDb;
-  fn to_db_model(&self, node_name: &str) -> Self::Db {
+  fn to_metric_db(self, node_name: &str) -> Self::MetricDb {
     HttpMetricDb {
       key: Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       expire_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30),
       bytes_sent: self.bytes_sent,
       date_gmt: self.date_gmt.naive_utc(),
-      uri: self.uri.clone(),
-      host: self.host.clone(),
-      remote_addr: self.remote_addr.clone(),
+      uri: self.uri,
+      host: self.host,
+      remote_addr: self.remote_addr,
       node_name: node_name.to_owned(),
-      realip_remote_addr: self.realip_remote_addr.clone(),
-      server_protocol: self.server_protocol.clone(),
-      request_method: self.request_method.clone(),
+      realip_remote_addr: self.realip_remote_addr,
+      server_protocol: self.server_protocol,
+      request_method: self.request_method,
       content_length: self.content_length,
       status: self.status,
       request_time: self.request_time,
       body_bytes_sent: self.body_bytes_sent,
-      proxy_host: self.proxy_host.clone(),
-      upstream_addr: self.upstream_addr.clone(),
-      query_string: self.query_string.clone(),
-      request_body: self.request_body.clone(),
-      content_type: self.content_type.clone(),
-      http_user_agent: self.http_user_agent.clone(),
-      http_referrer: self.http_referrer.clone(),
-      http_accept_language: self.http_accept_language.clone(),
+      proxy_host: self.proxy_host,
+      upstream_addr: self.upstream_addr,
+      query_string: self.query_string,
+      request_body: self.request_body,
+      content_type: self.content_type,
+      http_user_agent: self.http_user_agent,
+      http_referrer: self.http_referrer,
+      http_accept_language: self.http_accept_language,
     }
   }
 }
@@ -270,25 +268,25 @@ pub struct StreamMetricDb {
   pub node_name: String,
 }
 
-impl ToDb for StreamMetricPartial {
-  type Db = StreamMetricDb;
+impl ToMeticDb for StreamMetricPartial {
+  type MetricDb = StreamMetricDb;
 
-  fn to_db_model(&self, node_name: &str) -> Self::Db {
-    Self::Db {
+  fn to_metric_db(self, node_name: &str) -> Self::MetricDb {
+    Self::MetricDb {
       key: Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       expire_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30),
       date_gmt: self.date_gmt.naive_utc(),
-      remote_addr: self.remote_addr.clone(),
-      upstream_addr: self.upstream_addr.clone(),
-      protocol: self.protocol.clone(),
+      remote_addr: self.remote_addr,
+      upstream_addr: self.upstream_addr,
+      protocol: self.protocol,
       status: self.status,
-      session_time: self.session_time.clone(),
+      session_time: self.session_time,
       bytes_sent: self.bytes_sent,
       bytes_received: self.bytes_received,
       upstream_bytes_sent: self.upstream_bytes_sent,
       upstream_bytes_received: self.upstream_bytes_received,
-      upstream_connect_time: self.upstream_connect_time.clone(),
+      upstream_connect_time: self.upstream_connect_time,
       node_name: node_name.to_owned(),
     }
   }

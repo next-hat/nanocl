@@ -9,7 +9,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
 
 use crate::utils;
-use crate::models::{Pool, CargoSpecDb};
+use crate::models::{Pool, CargoSpecDb, FromSpec};
 
 /// ## Create
 ///
@@ -31,25 +31,11 @@ pub(crate) async fn create(
   version: &str,
   pool: &Pool,
 ) -> IoResult<CargoSpec> {
-  let cargo_key = cargo_key.to_owned();
-  let version = version.to_owned();
-  let mut data = serde_json::to_value(item.to_owned())
-    .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
-  if let Some(meta) = data.as_object_mut() {
-    meta.remove("Metadata");
-  }
-  let dbmodel = CargoSpecDb {
-    key: uuid::Uuid::new_v4(),
-    cargo_key,
-    version,
-    created_at: chrono::Utc::now().naive_utc(),
-    data,
-    metadata: item.metadata.clone(),
-  };
-  let dbmodel =
-    super::generic::insert_with_res::<_, _, CargoSpecDb>(dbmodel, pool).await?;
-  let spec = dbmodel.into_cargo_spec(item);
-  Ok(spec)
+  let db_model = CargoSpecDb::try_from_spec_partial(cargo_key, version, item)?;
+  let db_model =
+    super::generic::insert_with_res::<_, _, CargoSpecDb>(db_model, pool)
+      .await?;
+  Ok(db_model.into_spec(item))
 }
 
 /// ## Find by key
@@ -71,11 +57,9 @@ pub(crate) async fn find_by_key(
 ) -> IoResult<CargoSpec> {
   use crate::schema::cargo_specs;
   let key = *key;
-  let dbmodel: CargoSpecDb =
+  let db_model: CargoSpecDb =
     super::generic::find_by_id::<cargo_specs::table, _, _>(key, pool).await?;
-  let spec = serde_json::from_value::<CargoSpecPartial>(dbmodel.data.clone())
-    .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
-  Ok(dbmodel.into_cargo_spec(&spec))
+  db_model.try_to_spec()
 }
 
 /// ## Delete by cargo key
@@ -124,24 +108,19 @@ pub(crate) async fn list_by_cargo_key(
   use crate::schema::cargo_specs;
   let key = key.to_owned();
   let pool = Arc::clone(pool);
-  let dbmodels = web::block(move || {
+  let db_models = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let specs = cargo_specs::dsl::cargo_specs
+    let db_models = cargo_specs::dsl::cargo_specs
       .order(cargo_specs::dsl::created_at.desc())
       .filter(cargo_specs::dsl::cargo_key.eq(key))
       .get_results::<CargoSpecDb>(&mut conn)
       .map_err(|err| err.map_err_context(|| "CargoSpec"))?;
-    Ok::<_, IoError>(specs)
+    Ok::<_, IoError>(db_models)
   })
   .await?;
-  let specs = dbmodels
+  let items = db_models
     .into_iter()
-    .map(|dbmodel: CargoSpecDb| {
-      let spec =
-        serde_json::from_value::<CargoSpecPartial>(dbmodel.data.clone())
-          .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
-      Ok(dbmodel.into_cargo_spec(&spec))
-    })
+    .map(|dbmodel: CargoSpecDb| dbmodel.try_to_spec())
     .collect::<Result<Vec<CargoSpec>, IoError>>()?;
-  Ok(specs)
+  Ok(items)
 }
