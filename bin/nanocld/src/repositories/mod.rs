@@ -32,5 +32,5 @@ pub(crate) mod resource_spec;
 pub(crate) mod secret;
 /// Manage job table
 pub(crate) mod job;
-/// Manage container_instances table
-pub(crate) mod container_instance;
+/// Manage containers table
+pub(crate) mod container;

@@ -1,2 +1,2 @@
 -- This file should undo anything in `up.sql`
-DROP TABLE IF EXISTS "container_instances";
+DROP TABLE IF EXISTS "containers";

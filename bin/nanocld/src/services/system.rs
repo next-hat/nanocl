@@ -109,7 +109,7 @@ pub(crate) async fn get_processes(
     .into_iter()
     .map(|node| (node.name.clone(), node))
     .collect::<std::collections::HashMap<String, _>>();
-  let instances = repositories::container_instance::list_all(&state.pool)
+  let instances = repositories::container::list_all(&state.pool)
     .await?
     .into_iter()
     .map(|instance| NodeContainerSummary {

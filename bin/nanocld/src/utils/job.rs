@@ -209,7 +209,7 @@ pub(crate) async fn inspect_instances(
     .into_iter()
     .map(|node| (node.name.clone(), node))
     .collect::<std::collections::HashMap<String, _>>();
-  repositories::container_instance::list_for_kind("Job", name, &state.pool)
+  repositories::container::list_for_kind("Job", name, &state.pool)
     .await?
     .into_iter()
     .map(|instance| {

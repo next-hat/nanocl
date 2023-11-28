@@ -54,8 +54,8 @@ pub use secret::*;
 mod job;
 pub use job::*;
 
-mod container_instance;
-pub use container_instance::*;
+mod container;
+pub use container::*;
 
 pub type Pool = Arc<R2D2Pool<ConnectionManager<PgConnection>>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;

@@ -4,18 +4,14 @@ use nanocl_error::io::{IoError, FromIo};
 
 use bollard_next::service::ContainerInspectResponse;
 
-use crate::schema::container_instances;
+use crate::schema::containers;
 
-/// ## ContainerInstanceDb
-///
-/// This structure represent a job to run.
-/// It will create and run a list of containers.
-///
+/// Represents a container instance in the database
 #[derive(Clone, Queryable, Identifiable, Insertable)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = container_instances)]
-pub struct ContainerInstanceDb {
-  /// The key of the job generated with the name
+#[diesel(table_name = containers)]
+pub struct ContainerDb {
+  /// The key of the container instance
   pub key: String,
   /// The created at date
   pub created_at: chrono::NaiveDateTime,
@@ -33,23 +29,25 @@ pub struct ContainerInstanceDb {
   pub kind_id: String,
 }
 
-/// ## ContainerInstancePartial
-///
-/// This structure represent a partial container instance.
-/// It will create a new container instance.
-///
+/// Used to create a new container instance
 #[derive(Debug, Clone)]
-pub struct ContainerInstancePartial {
+pub struct ContainerPartial {
+  /// The key of the container instance
   pub key: String,
+  /// Name of the container instance
   pub name: String,
+  /// Kind of the container instance (job, vm, cargo)
   pub kind: String,
+  /// The data of the container instance a ContainerInspect
   pub data: serde_json::Value,
+  /// Id of the node where the container is running
   pub node_id: String,
+  /// Id of the related kind
   pub kind_id: String,
 }
 
-impl From<ContainerInstancePartial> for ContainerInstanceDb {
-  fn from(model: ContainerInstancePartial) -> Self {
+impl From<ContainerPartial> for ContainerDb {
+  fn from(model: ContainerPartial) -> Self {
     Self {
       key: model.key,
       name: model.name,
@@ -63,21 +61,28 @@ impl From<ContainerInstancePartial> for ContainerInstanceDb {
   }
 }
 
+/// Represents a container instance
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct ContainerInstance {
+pub struct Container {
+  /// The key of the container instance
   pub key: String,
+  /// Name of the container instance
   pub name: String,
+  /// Kind of the container instance (job, vm, cargo)
   pub kind: String,
+  /// Id of the node where the container is running
   pub node_id: String,
+  /// Id of the related kind
   pub kind_id: String,
+  /// The data of the container instance a ContainerInspect
   pub data: ContainerInspectResponse,
 }
 
-impl TryFrom<ContainerInstanceDb> for ContainerInstance {
+impl TryFrom<ContainerDb> for Container {
   type Error = IoError;
 
-  fn try_from(model: ContainerInstanceDb) -> Result<Self, Self::Error> {
+  fn try_from(model: ContainerDb) -> Result<Self, Self::Error> {
     Ok(Self {
       key: model.key,
       name: model.name,
@@ -90,13 +95,9 @@ impl TryFrom<ContainerInstanceDb> for ContainerInstance {
   }
 }
 
-/// ## ContainerInstanceUpdateDb
-///
-/// This structure represent the update of a container instance.
-/// It will update the container instance with the new data.
-///
+/// Used to update a container instance
 #[derive(Clone, AsChangeset)]
-#[diesel(table_name = container_instances)]
+#[diesel(table_name = containers)]
 pub struct ContainerInstanceUpdateDb {
   /// Last time the instance was updated
   pub updated_at: Option<chrono::NaiveDateTime>,

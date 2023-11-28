@@ -16,9 +16,7 @@ use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
 use crate::{version, utils, repositories};
-use crate::models::{
-  DaemonState, ContainerInstancePartial, ContainerInstanceUpdateDb,
-};
+use crate::models::{DaemonState, ContainerPartial, ContainerInstanceUpdateDb};
 
 /// Sync instance
 ///
@@ -39,8 +37,7 @@ async fn sync_instance(
   let id = instance.id.clone().unwrap_or_default();
   let container_instance_data = serde_json::to_value(instance)
     .map_err(|err| err.map_err_context(|| "ContainerInstance"))?;
-  let current_res =
-    repositories::container_instance::find_by_id(&id, &state.pool).await;
+  let current_res = repositories::container::find_by_id(&id, &state.pool).await;
   let labels = instance
     .config
     .clone()
@@ -74,16 +71,12 @@ async fn sync_instance(
         updated_at: Some(chrono::Utc::now().naive_utc()),
         data: Some(container_instance_data),
       };
-      let _ = repositories::container_instance::update(
-        &id,
-        &new_instance,
-        &state.pool,
-      )
-      .await
-      .map_err(|err| log::error!("{err}"));
+      let _ = repositories::container::update(&id, &new_instance, &state.pool)
+        .await
+        .map_err(|err| log::error!("{err}"));
     }
     Err(_) => {
-      let new_instance = ContainerInstancePartial {
+      let new_instance = ContainerPartial {
         key: id,
         name,
         kind: kind.to_owned(),
@@ -91,10 +84,9 @@ async fn sync_instance(
         node_id: state.config.hostname.clone(),
         kind_id: kind_id.to_owned(),
       };
-      let _ =
-        repositories::container_instance::create(&new_instance, &state.pool)
-          .await
-          .map_err(|err| log::error!("{err}"));
+      let _ = repositories::container::create(&new_instance, &state.pool)
+        .await
+        .map_err(|err| log::error!("{err}"));
     }
   }
   Ok(())
@@ -141,7 +133,7 @@ async fn exec_docker_event(
   match action {
     "destroy" => {
       log::debug!("docker event destroy container: {id}");
-      repositories::container_instance::delete_by_id(&id, &state.pool).await?;
+      repositories::container::delete_by_id(&id, &state.pool).await?;
       state.event_emitter.spawn_emit_event(event);
       return Ok(());
     }

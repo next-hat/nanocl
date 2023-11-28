@@ -8,8 +8,7 @@ use nanocl_stubs::generic::GenericDelete;
 
 use crate::utils;
 use crate::models::{
-  Pool, ContainerInstancePartial, ContainerInstanceDb,
-  ContainerInstanceUpdateDb, ContainerInstance,
+  Pool, ContainerPartial, ContainerDb, ContainerInstanceUpdateDb, Container,
 };
 
 /// ## Create
@@ -18,18 +17,18 @@ use crate::models::{
 ///
 /// ## Arguments
 ///
-/// * [item](ContainerInstancePartial) - The item to create
+/// * [item](ContainerPartial) - The item to create
 /// * [pool](Pool) - The database pool
 ///
 /// ## Return
 ///
-/// [IoResult][IoResult] containing a [ContainerInstanceDb](ContainerInstanceDb)
+/// [IoResult][IoResult] containing a [ContainerDb](ContainerDb)
 ///
 pub(crate) async fn create(
-  item: &ContainerInstancePartial,
+  item: &ContainerPartial,
   pool: &Pool,
-) -> IoResult<ContainerInstanceDb> {
-  let item = ContainerInstanceDb::from(item.clone());
+) -> IoResult<ContainerDb> {
+  let item = ContainerDb::from(item.clone());
   super::generic::insert_with_res(item, pool).await
 }
 
@@ -45,15 +44,15 @@ pub(crate) async fn create(
 ///
 /// ## Return
 ///
-/// [IoResult][IoResult] containing a [ContainerInstanceUpdateDb](ContainerInstanceDb)
+/// [IoResult][IoResult] containing a [ContainerInstanceUpdateDb](ContainerDb)
 ///
 pub(crate) async fn update(
   id: &str,
   item: &ContainerInstanceUpdateDb,
   pool: &Pool,
 ) -> IoResult<()> {
-  use crate::schema::container_instances;
-  super::generic::update_by_id::<container_instances::table, _, _>(
+  use crate::schema::containers;
+  super::generic::update_by_id::<containers::table, _, _>(
     id.to_owned(),
     item.clone(),
     pool,
@@ -75,19 +74,13 @@ pub(crate) async fn update(
 ///
 /// [IoResult][IoResult] containing a [ContainerInstance](ContainerInstance)
 ///
-pub(crate) async fn find_by_id(
-  key: &str,
-  pool: &Pool,
-) -> IoResult<ContainerInstance> {
-  use crate::schema::container_instances;
+pub(crate) async fn find_by_id(key: &str, pool: &Pool) -> IoResult<Container> {
+  use crate::schema::containers;
   let key = key.to_owned();
-  let item = super::generic::find_by_id::<
-    container_instances::table,
-    _,
-    ContainerInstanceDb,
-  >(key, pool)
-  .await?;
-  let item = ContainerInstance::try_from(item)?;
+  let item =
+    super::generic::find_by_id::<containers::table, _, ContainerDb>(key, pool)
+      .await?;
+  let item = Container::try_from(item)?;
   Ok(item)
 }
 
@@ -108,9 +101,9 @@ pub(crate) async fn delete_by_id(
   key: &str,
   pool: &Pool,
 ) -> IoResult<GenericDelete> {
-  use crate::schema::container_instances;
+  use crate::schema::containers;
   let key = key.to_owned();
-  super::generic::delete_by_id::<container_instances::table, _>(key, pool).await
+  super::generic::delete_by_id::<containers::table, _>(key, pool).await
 }
 
 /// ## List for kind
@@ -130,25 +123,25 @@ pub(crate) async fn list_for_kind(
   kind: &str,
   kind_id: &str,
   pool: &Pool,
-) -> IoResult<Vec<ContainerInstance>> {
-  use crate::schema::container_instances;
+) -> IoResult<Vec<Container>> {
+  use crate::schema::containers;
   let pool = Arc::clone(pool);
   let kind = kind.to_owned();
   let kind_id = kind_id.to_owned();
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = container_instances::table
-      .filter(container_instances::kind.eq(kind))
-      .filter(container_instances::kind_id.eq(kind_id))
-      .load::<ContainerInstanceDb>(&mut conn)
+    let items = containers::table
+      .filter(containers::kind.eq(kind))
+      .filter(containers::kind_id.eq(kind_id))
+      .load::<ContainerDb>(&mut conn)
       .map_err(|err| err.map_err_context(|| "ContainerInstance"))?;
     Ok::<_, IoError>(items)
   })
   .await?;
   let items = items
     .into_iter()
-    .map(ContainerInstance::try_from)
-    .collect::<Result<Vec<ContainerInstance>, IoError>>()?;
+    .map(Container::try_from)
+    .collect::<Result<Vec<Container>, IoError>>()?;
   Ok(items)
 }
 
@@ -164,20 +157,20 @@ pub(crate) async fn list_for_kind(
 ///
 /// [IoResult][IoResult] containing a [Vec](Vec) of [ContainerInstance](ContainerInstance)
 ///
-pub(crate) async fn list_all(pool: &Pool) -> IoResult<Vec<ContainerInstance>> {
-  use crate::schema::container_instances;
+pub(crate) async fn list_all(pool: &Pool) -> IoResult<Vec<Container>> {
+  use crate::schema::containers;
   let pool = Arc::clone(pool);
   let items = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items = container_instances::table
-      .load::<ContainerInstanceDb>(&mut conn)
+    let items = containers::table
+      .load::<ContainerDb>(&mut conn)
       .map_err(|err| err.map_err_context(|| "ContainerInstance"))?;
     Ok::<_, IoError>(items)
   })
   .await?;
   let items = items
     .into_iter()
-    .map(ContainerInstance::try_from)
-    .collect::<Result<Vec<ContainerInstance>, IoError>>()?;
+    .map(Container::try_from)
+    .collect::<Result<Vec<Container>, IoError>>()?;
   Ok(items)
 }
