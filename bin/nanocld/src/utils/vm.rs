@@ -212,8 +212,7 @@ pub(crate) async fn list_by_namespace(
   for vm in vmes {
     let spec = repositories::vm_spec::find_by_key(&vm.spec_key, pool).await?;
     let instances =
-      repositories::container_instance::list_for_kind("Vm", &vm.key, pool)
-        .await?;
+      repositories::container::list_for_kind("Vm", &vm.key, pool).await?;
     let mut running_instances = 0;
     for instance in &instances {
       if instance

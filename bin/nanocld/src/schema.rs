@@ -22,7 +22,7 @@ diesel::table! {
 }
 
 diesel::table! {
-    container_instances (key) {
+    containers (key) {
         key -> Varchar,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
@@ -227,7 +227,7 @@ diesel::joinable!(vms -> vm_specs (spec_key));
 diesel::allow_tables_to_appear_in_same_query!(
   cargo_specs,
   cargoes,
-  container_instances,
+  containers,
   http_metrics,
   jobs,
   metrics,

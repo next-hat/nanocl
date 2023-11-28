@@ -708,22 +708,16 @@ pub(crate) async fn list(
     let spec =
       repositories::cargo_spec::find_by_key(&cargo.spec_key, &state.pool)
         .await?;
-    let instances = repositories::container_instance::list_for_kind(
-      "Cargo",
-      &cargo.key,
-      &state.pool,
-    )
-    .await?;
+    let instances =
+      repositories::container::list_for_kind("Cargo", &cargo.key, &state.pool)
+        .await?;
     let mut running_instances = 0;
     for instance in &instances {
-      let is_running = instance
-        .data
-        .state
-        .clone()
-        .unwrap_or_default()
-        .running
-        .unwrap_or_default();
-      if is_running {
+      let state = instance.data.state.clone().unwrap_or_default();
+      if state.restarting.unwrap_or_default() {
+        continue;
+      }
+      if state.running.unwrap_or_default() {
         running_instances += 1;
       }
     }
@@ -758,8 +752,7 @@ pub(crate) async fn inspect_by_key(
   let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
   let mut running_instances = 0;
   let instances =
-    repositories::container_instance::list_for_kind("Cargo", key, &state.pool)
-      .await?;
+    repositories::container::list_for_kind("Cargo", key, &state.pool).await?;
   let nodes = repositories::node::list(&state.pool).await?;
   // Convert into a hashmap for faster lookup
   let nodes = nodes
