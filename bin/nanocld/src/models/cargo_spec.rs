@@ -3,8 +3,8 @@ use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
 
 use crate::schema::cargo_specs;
 
-use super::cargo::CargoDb;
 use super::generic::FromSpec;
+use super::cargo::CargoDb;
 
 /// ## CargoSpecDb
 ///

@@ -6,6 +6,8 @@ use crate::schema::resources;
 
 use crate::models::resource_spec::ResourceSpecDb;
 
+use super::WithSpec;
+
 /// ## ResourceDb
 ///
 /// This structure represent a resource in the database.
@@ -31,12 +33,15 @@ pub struct ResourceDb {
   pub spec_key: uuid::Uuid,
 }
 
-impl ResourceDb {
-  pub fn into_resource(self, spec: ResourceSpecDb) -> Resource {
-    Resource {
+impl WithSpec for ResourceDb {
+  type Type = Resource;
+  type Relation = ResourceSpecDb;
+
+  fn with_spec(self, r: &Self::Relation) -> Self::Type {
+    Self::Type {
       created_at: self.created_at,
       kind: self.kind,
-      spec: spec.into(),
+      spec: r.clone().into(),
     }
   }
 }

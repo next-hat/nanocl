@@ -36,3 +36,11 @@ pub trait FromSpec {
 
   fn try_to_spec(self) -> IoResult<Self::Spec>;
 }
+
+/// Trait to add relation with a spec
+pub trait WithSpec {
+  type Type;
+  type Relation;
+
+  fn with_spec(self, s: &Self::Relation) -> Self::Type;
+}

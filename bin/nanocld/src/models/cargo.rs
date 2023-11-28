@@ -3,6 +3,7 @@ use nanocl_stubs::cargo_spec::CargoSpec;
 
 use crate::schema::cargoes;
 
+use super::generic::WithSpec;
 use super::namespace::NamespaceDb;
 
 /// ## CargoDb
@@ -29,12 +30,15 @@ pub struct CargoDb {
   pub namespace_name: String,
 }
 
-impl CargoDb {
-  pub fn into_cargo(self, spec: CargoSpec) -> Cargo {
-    Cargo {
+impl WithSpec for CargoDb {
+  type Type = Cargo;
+  type Relation = CargoSpec;
+
+  fn with_spec(self, r: &Self::Relation) -> Self::Type {
+    Self::Type {
       namespace_name: self.namespace_name,
       created_at: self.created_at,
-      spec,
+      spec: r.clone(),
     }
   }
 }
