@@ -9,6 +9,9 @@ pub use ws::*;
 mod node;
 pub use node::*;
 
+mod generic;
+pub use generic::*;
+
 mod state;
 pub use state::*;
 

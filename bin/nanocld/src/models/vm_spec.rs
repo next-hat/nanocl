@@ -1,8 +1,10 @@
+use nanocl_error::io::IoResult;
 use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
 use crate::schema::vm_specs;
 
 use super::vm::VmDb;
+use super::generic::FromSpec;
 
 /// ## VmSpecDb
 ///
@@ -32,23 +34,46 @@ pub struct VmSpecDb {
   pub metadata: Option<serde_json::Value>,
 }
 
-impl VmSpecDb {
-  pub fn into_vm_spec(self, spec: &VmSpecPartial) -> VmSpec {
-    VmSpec {
+impl FromSpec for VmSpecDb {
+  type Spec = VmSpec;
+  type SpecPartial = VmSpecPartial;
+
+  fn try_from_spec_partial(
+    id: &str,
+    version: &str,
+    p: &Self::SpecPartial,
+  ) -> IoResult<Self> {
+    let data = VmSpecDb::try_to_data(p)?;
+    Ok(VmSpecDb {
+      key: uuid::Uuid::new_v4(),
+      created_at: chrono::Utc::now().naive_utc(),
+      vm_key: id.to_owned(),
+      version: version.to_owned(),
+      data,
+      metadata: p.metadata.clone(),
+    })
+  }
+
+  fn get_data(&self) -> &serde_json::Value {
+    &self.data
+  }
+
+  fn to_spec(&self, p: &Self::SpecPartial) -> Self::Spec {
+    Self::Spec {
       key: self.key,
       created_at: self.created_at,
-      name: spec.name.clone(),
-      version: self.version,
-      vm_key: self.vm_key,
-      disk: spec.disk.clone(),
-      host_config: spec.host_config.clone().unwrap_or_default(),
-      hostname: spec.hostname.clone(),
-      user: spec.user.clone(),
-      labels: spec.labels.clone(),
-      mac_address: spec.mac_address.clone(),
-      password: spec.password.clone(),
-      ssh_key: spec.ssh_key.clone(),
-      metadata: spec.metadata.clone(),
+      name: p.name.clone(),
+      version: self.version.clone(),
+      vm_key: self.vm_key.clone(),
+      disk: p.disk.clone(),
+      host_config: p.host_config.clone().unwrap_or_default(),
+      hostname: p.hostname.clone(),
+      user: p.user.clone(),
+      labels: p.labels.clone(),
+      mac_address: p.mac_address.clone(),
+      password: p.password.clone(),
+      ssh_key: p.ssh_key.clone(),
+      metadata: p.metadata.clone(),
     }
   }
 }

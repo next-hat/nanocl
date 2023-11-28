@@ -9,7 +9,7 @@ use nanocl_stubs::vm::Vm;
 use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
 use crate::utils;
-use crate::models::{Pool, VmDb, VmUpdateDb, VmSpecDb, NamespaceDb};
+use crate::models::{Pool, VmDb, VmUpdateDb, VmSpecDb, NamespaceDb, WithSpec};
 
 /// ## Find by namespace
 ///
@@ -79,7 +79,7 @@ pub(crate) async fn create(
     spec_key: spec.key,
   };
   let item: VmDb = super::generic::insert_with_res(new_item, pool).await?;
-  let vm = item.into_vm(spec);
+  let vm = item.with_spec(&spec);
   Ok(vm)
 }
 
@@ -158,7 +158,7 @@ pub(crate) async fn update_by_key(
     key, new_item, pool,
   )
   .await?;
-  let vm = vmdb.into_vm(spec);
+  let vm = vmdb.with_spec(&spec);
   Ok(vm)
 }
 
@@ -208,6 +208,6 @@ pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Vm> {
     ssh_key: spec.ssh_key,
     metadata: spec.metadata,
   };
-  let item = item.0.into_vm(spec);
+  let item = item.0.with_spec(&spec);
   Ok(item)
 }

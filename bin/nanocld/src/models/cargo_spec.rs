@@ -1,7 +1,9 @@
+use nanocl_error::io::IoResult;
 use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
 
 use crate::schema::cargo_specs;
 
+use super::generic::FromSpec;
 use super::cargo::CargoDb;
 
 /// ## CargoSpecDb
@@ -32,20 +34,43 @@ pub struct CargoSpecDb {
   pub metadata: Option<serde_json::Value>,
 }
 
-impl CargoSpecDb {
-  pub fn into_cargo_spec(self, spec: &CargoSpecPartial) -> CargoSpec {
-    let spec = spec.clone();
+impl FromSpec for CargoSpecDb {
+  type Spec = CargoSpec;
+  type SpecPartial = CargoSpecPartial;
+
+  fn try_from_spec_partial(
+    id: &str,
+    version: &str,
+    p: &Self::SpecPartial,
+  ) -> IoResult<Self> {
+    let data = CargoSpecDb::try_to_data(p)?;
+    Ok(CargoSpecDb {
+      key: uuid::Uuid::new_v4(),
+      created_at: chrono::Utc::now().naive_utc(),
+      cargo_key: id.to_owned(),
+      version: version.to_owned(),
+      data,
+      metadata: p.metadata.clone(),
+    })
+  }
+
+  fn get_data(&self) -> &serde_json::Value {
+    &self.data
+  }
+
+  fn to_spec(&self, p: &Self::SpecPartial) -> Self::Spec {
+    let p = p.clone();
     CargoSpec {
       key: self.key,
       created_at: self.created_at,
-      name: spec.name,
-      version: self.version,
-      cargo_key: self.cargo_key,
-      init_container: spec.init_container,
-      replication: spec.replication,
-      container: spec.container,
-      metadata: spec.metadata,
-      secrets: spec.secrets,
+      name: p.name,
+      version: self.version.clone(),
+      cargo_key: self.cargo_key.clone(),
+      init_container: p.init_container,
+      replication: p.replication,
+      container: p.container,
+      metadata: p.metadata,
+      secrets: p.secrets,
     }
   }
 }

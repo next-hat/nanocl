@@ -8,7 +8,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceQuery};
 
 use crate::{utils, repositories};
-use crate::models::{Pool, ResourceDb, ResourceUpdateDb, ResourceSpecDb};
+use crate::models::{Pool, ResourceDb, ResourceUpdateDb, ResourceSpecDb, WithSpec};
 
 /// ## Create
 ///
@@ -45,7 +45,7 @@ pub(crate) async fn create(
   };
   let dbmodel: ResourceDb =
     super::generic::insert_with_res(new_item, pool).await?;
-  let item = dbmodel.into_resource(spec);
+  let item = dbmodel.with_spec(&spec);
   Ok(item)
 }
 
@@ -135,7 +135,7 @@ pub(crate) async fn find(
     .map(|e| {
       let resource = e.0;
       let spec = e.1;
-      Ok::<_, IoError>(resource.into_resource(spec))
+      Ok::<_, IoError>(resource.with_spec(&spec))
     })
     .collect::<Result<Vec<Resource>, IoError>>()?;
   Ok(items)
@@ -172,7 +172,7 @@ pub(crate) async fn inspect_by_key(
     Ok::<_, IoError>(res)
   })
   .await?;
-  let item = res.0.into_resource(res.1);
+  let item = res.0.with_spec(&res.1);
   Ok(item)
 }
 
@@ -218,6 +218,6 @@ pub(crate) async fn put(
     ResourceDb,
   >(key, resource_update, pool)
   .await?;
-  let item = dbmodel.into_resource(spec);
+  let item = dbmodel.with_spec(&spec);
   Ok(item)
 }

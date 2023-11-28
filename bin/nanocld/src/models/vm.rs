@@ -3,6 +3,7 @@ use nanocl_stubs::vm_spec::VmSpec;
 
 use crate::schema::vms;
 
+use super::WithSpec;
 use super::namespace::NamespaceDb;
 
 /// ## VmDb
@@ -30,12 +31,15 @@ pub struct VmDb {
   pub namespace_name: String,
 }
 
-impl VmDb {
-  pub fn into_vm(self, spec: VmSpec) -> Vm {
-    Vm {
-      created_at: self.created_at,
+impl WithSpec for VmDb {
+  type Type = Vm;
+  type Relation = VmSpec;
+
+  fn with_spec(self, r: &Self::Relation) -> Self::Type {
+    Self::Type {
       namespace_name: self.namespace_name,
-      spec,
+      created_at: self.created_at,
+      spec: r.clone(),
     }
   }
 }

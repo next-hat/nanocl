@@ -10,7 +10,9 @@ use nanocl_stubs::cargo::{Cargo, GenericCargoListQuery};
 use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
 use crate::utils;
-use crate::models::{Pool, CargoDb, CargoUpdateDb, CargoSpecDb, NamespaceDb};
+use crate::models::{
+  Pool, CargoDb, CargoUpdateDb, CargoSpecDb, NamespaceDb, FromSpec, WithSpec,
+};
 
 /// ## Find by namespace
 ///
@@ -115,7 +117,7 @@ pub(crate) async fn create(
     spec_key: spec.key,
   };
   let item: CargoDb = super::generic::insert_with_res(new_item, pool).await?;
-  let cargo = item.into_cargo(spec);
+  let cargo = item.with_spec(&spec);
   Ok(cargo)
 }
 
@@ -182,7 +184,7 @@ pub(crate) async fn update_by_key(
 ) -> IoResult<Cargo> {
   use crate::schema::cargoes;
   let version = version.to_owned();
-  let cargodb = find_by_key(key, pool).await?;
+  let db_model = find_by_key(key, pool).await?;
   let spec = super::cargo_spec::create(key, item, &version, pool).await?;
   let new_item = CargoUpdateDb {
     name: Some(item.name.to_owned()),
@@ -194,7 +196,7 @@ pub(crate) async fn update_by_key(
     key, new_item, pool,
   )
   .await?;
-  let cargo = cargodb.into_cargo(spec);
+  let cargo = db_model.with_spec(&spec);
   Ok(cargo)
 }
 
@@ -259,9 +261,7 @@ pub(crate) async fn inspect_by_key(key: &str, pool: &Pool) -> IoResult<Cargo> {
     Ok::<_, IoError>(item)
   })
   .await?;
-  let spec = serde_json::from_value::<CargoSpecPartial>(item.1.data.clone())
-    .map_err(|err| err.map_err_context(|| "CargoSpecPartial"))?;
-  let spec = item.1.into_cargo_spec(&spec);
-  let item = item.0.into_cargo(spec);
+  let spec = item.1.try_to_spec()?;
+  let item = item.0.with_spec(&spec);
   Ok(item)
 }

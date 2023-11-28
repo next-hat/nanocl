@@ -9,7 +9,7 @@ use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::job::{Job, JobPartial};
 
 use crate::utils;
-use crate::models::{Pool, JobDb, JobUpdateDb};
+use crate::models::{Pool, JobDb, JobUpdateDb, FromSpec};
 
 /// ## Create
 ///
@@ -25,23 +25,12 @@ use crate::models::{Pool, JobDb, JobUpdateDb};
 /// [IoResult](IoResult) containing a [Job](Job)
 ///
 pub(crate) async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
-  let mut data = serde_json::to_value(item)
-    .map_err(|err| err.map_err_context(|| "JobPartial"))?;
-  if let Some(meta) = data.as_object_mut() {
-    meta.remove("Metadata");
-  }
-  let dbmodel = JobDb {
-    key: item.name.clone(),
-    created_at: chrono::Local::now().naive_utc(),
-    updated_at: chrono::Local::now().naive_utc(),
-    data,
-    metadata: item.metadata.clone(),
-  };
   let db_model =
-    super::generic::insert_with_res::<_, _, JobDb>(dbmodel.clone(), pool)
-      .await?;
-  let job = db_model.into_job(item);
-  Ok(job)
+    JobDb::try_from_spec_partial(&item.name, crate::version::VERSION, item)?;
+  let db_model =
+    super::generic::insert_with_res::<_, _, JobDb>(db_model, pool).await?;
+  let item = db_model.to_spec(item);
+  Ok(item)
 }
 
 /// ## Delete by name
@@ -81,22 +70,19 @@ pub(crate) async fn delete_by_name(
 pub(crate) async fn list(pool: &Pool) -> IoResult<Vec<Job>> {
   use crate::schema::jobs;
   let pool = Arc::clone(pool);
-  let items = web::block(move || {
+  let db_models = web::block(move || {
     let mut conn = utils::store::get_pool_conn(&pool)?;
-    let items: Vec<JobDb> = jobs::dsl::jobs
+    let db_models: Vec<JobDb> = jobs::dsl::jobs
       .order(jobs::dsl::created_at.desc())
       .get_results(&mut conn)
       .map_err(|err| err.map_err_context(|| "Job"))?;
-    Ok::<_, IoError>(items)
+    Ok::<_, IoError>(db_models)
   })
   .await?;
-  let items = items
+  let items = db_models
     .into_iter()
-    .map(|item| {
-      let data = item.serialize_data()?;
-      Ok::<_, IoError>(item.into_job(&data))
-    })
-    .collect::<Result<Vec<_>, IoError>>()?;
+    .map(|db_model| db_model.try_to_spec())
+    .collect::<IoResult<Vec<_>>>()?;
   Ok(items)
 }
 
@@ -118,9 +104,8 @@ pub(crate) async fn find_by_name(name: &str, pool: &Pool) -> IoResult<Job> {
   let name = name.to_owned();
   let db_model: JobDb =
     super::generic::find_by_id::<jobs::table, _, _>(name, pool).await?;
-  let item = db_model.serialize_data()?;
-  let job = db_model.into_job(&item);
-  Ok(job)
+  let item = db_model.try_to_spec()?;
+  Ok(item)
 }
 
 /// ## Update by name
@@ -152,7 +137,6 @@ pub(crate) async fn update_by_name(
   .await?;
   let db_model: JobDb =
     super::generic::find_by_id::<jobs::table, _, _>(name, pool).await?;
-  let job = db_model.serialize_data()?;
-  let job = db_model.into_job(&job);
-  Ok(job)
+  let item = db_model.try_to_spec()?;
+  Ok(item)
 }
