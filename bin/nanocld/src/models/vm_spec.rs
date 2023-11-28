@@ -1,4 +1,4 @@
-use nanocl_error::io::{IoResult, FromIo};
+use nanocl_error::io::IoResult;
 use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
 use crate::schema::vm_specs;
@@ -54,19 +54,17 @@ impl FromSpec for VmSpecDb {
     })
   }
 
-  fn try_to_spec(self) -> IoResult<Self::Spec> {
-    let p = serde_json::from_value::<VmSpecPartial>(self.data.clone())
-      .map_err(|err| err.map_err_context(|| "Spec"))?;
-    Ok(self.into_spec(&p))
+  fn get_data(&self) -> &serde_json::Value {
+    &self.data
   }
 
-  fn into_spec(self, p: &Self::SpecPartial) -> Self::Spec {
+  fn to_spec(&self, p: &Self::SpecPartial) -> Self::Spec {
     Self::Spec {
       key: self.key,
       created_at: self.created_at,
       name: p.name.clone(),
-      version: self.version,
-      vm_key: self.vm_key,
+      version: self.version.clone(),
+      vm_key: self.vm_key.clone(),
       disk: p.disk.clone(),
       host_config: p.host_config.clone().unwrap_or_default(),
       hostname: p.hostname.clone(),

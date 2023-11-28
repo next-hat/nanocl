@@ -35,7 +35,7 @@ pub(crate) async fn create(
   let db_model =
     super::generic::insert_with_res::<_, _, CargoSpecDb>(db_model, pool)
       .await?;
-  Ok(db_model.into_spec(item))
+  Ok(db_model.to_spec(item))
 }
 
 /// ## Find by key

@@ -29,7 +29,7 @@ pub(crate) async fn create(item: &JobPartial, pool: &Pool) -> IoResult<Job> {
     JobDb::try_from_spec_partial(&item.name, crate::version::VERSION, item)?;
   let db_model =
     super::generic::insert_with_res::<_, _, JobDb>(db_model, pool).await?;
-  let item = db_model.into_spec(item);
+  let item = db_model.to_spec(item);
   Ok(item)
 }
 

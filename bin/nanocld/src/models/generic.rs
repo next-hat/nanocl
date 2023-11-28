@@ -24,7 +24,9 @@ pub trait FromSpec {
     Ok(data)
   }
 
-  fn into_spec(self, p: &Self::SpecPartial) -> Self::Spec;
+  fn get_data(&self) -> &serde_json::Value;
+
+  fn to_spec(&self, p: &Self::SpecPartial) -> Self::Spec;
 
   fn try_from_spec_partial(
     id: &str,
@@ -34,7 +36,16 @@ pub trait FromSpec {
   where
     Self: std::marker::Sized;
 
-  fn try_to_spec(self) -> IoResult<Self::Spec>;
+  fn try_to_spec(&self) -> IoResult<Self::Spec>
+  where
+    Self::SpecPartial: serde::de::DeserializeOwned,
+    Self::Spec: std::marker::Sized,
+  {
+    let p =
+      serde_json::from_value::<Self::SpecPartial>(self.get_data().clone())
+        .map_err(|err| err.map_err_context(|| "Spec"))?;
+    Ok(self.to_spec(&p))
+  }
 }
 
 /// Trait to add relation with a spec

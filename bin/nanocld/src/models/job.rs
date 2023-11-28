@@ -1,10 +1,10 @@
-use nanocl_error::io::{IoResult, FromIo};
+use nanocl_error::io::IoResult;
 
 use nanocl_stubs::job::{Job, JobPartial};
 
 use crate::schema::jobs;
 
-use super::FromSpec;
+use super::generic::FromSpec;
 
 /// ## JobDb
 ///
@@ -46,23 +46,21 @@ impl FromSpec for JobDb {
     })
   }
 
-  fn into_spec(self, p: &Self::SpecPartial) -> Self::Spec {
+  fn get_data(&self) -> &serde_json::Value {
+    &self.data
+  }
+
+  fn to_spec(&self, p: &Self::SpecPartial) -> Self::Spec {
     Job {
-      name: self.key,
+      name: self.key.clone(),
       created_at: self.created_at,
       updated_at: self.updated_at,
-      metadata: self.metadata,
+      metadata: self.metadata.clone(),
       secrets: p.secrets.clone(),
       schedule: p.schedule.clone(),
       ttl: p.ttl,
       containers: p.containers.clone(),
     }
-  }
-
-  fn try_to_spec(self) -> IoResult<Self::Spec> {
-    let p = serde_json::from_value::<Self::SpecPartial>(self.data.clone())
-      .map_err(|err| err.map_err_context(|| "Spec"))?;
-    Ok(self.into_spec(&p))
   }
 }
 
