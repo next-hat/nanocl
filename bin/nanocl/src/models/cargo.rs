@@ -404,11 +404,11 @@ impl From<CargoSummary> for CargoRow {
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     let updated_at = tz
-      .timestamp_opt(cargo.updated_at.timestamp(), 0)
+      .timestamp_opt(cargo.spec.created_at.timestamp(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
-      name: cargo.name,
+      name: cargo.spec.name,
       namespace: cargo.namespace_name,
       image: cargo.spec.container.image.unwrap_or_default(),
       version: cargo.spec.version,

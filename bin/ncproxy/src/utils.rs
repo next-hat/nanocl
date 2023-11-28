@@ -96,17 +96,17 @@ async fn create_cargo_upstream(
       .unwrap_or_default();
     let network = networks.get(&cargo.namespace_name);
     let Some(network) = network else {
-      log::warn!("empty ip address for cargo {}", &cargo.name);
+      log::warn!("empty ip address for cargo {}", &cargo.spec.name);
       log::warn!("Instance is unhealthy, skipping");
       continue;
     };
     let Some(ip_address) = network.ip_address.clone() else {
-      log::warn!("empty ip address for cargo {}", &cargo.name);
+      log::warn!("empty ip address for cargo {}", &cargo.spec.name);
       log::warn!("Instance is unhealthy, skipping");
       continue;
     };
     if ip_address.is_empty() {
-      log::warn!("empty ip address for cargo {}", &cargo.name);
+      log::warn!("empty ip address for cargo {}", &cargo.spec.name);
       log::warn!("Instance is unhealthy, skipping");
       continue;
     }
@@ -115,11 +115,11 @@ async fn create_cargo_upstream(
   if ip_addresses.is_empty() {
     return Err(IoError::invalid_data(
       "CargoInspect",
-      &format!("Unable to get ip addresses for cargo {}", &cargo.name),
+      &format!("Unable to get ip addresses for cargo {}", &cargo.spec.name),
     ));
   }
   log::debug!("ip_addresses: {:?}", ip_addresses);
-  let upstream_key = format!("cargo-{}-{}", cargo.key, port);
+  let upstream_key = format!("cargo-{}-{}", cargo.spec.cargo_key, port);
   let upstream = format!(
     "
 upstream {upstream_key} {{
@@ -155,24 +155,24 @@ async fn create_vm_upstream(
       .unwrap_or_default();
     let network = networks.get(&vm.namespace_name);
     let Some(network) = network else {
-      log::warn!("empty ip address for vm {}", &vm.name);
+      log::warn!("empty ip address for vm {}", &vm.spec.name);
       log::warn!("Instance is unhealthy, skipping");
       continue;
     };
     let Some(ip_address) = network.ip_address.clone() else {
-      log::warn!("empty ip address for cargo {}", &vm.name);
+      log::warn!("empty ip address for cargo {}", &vm.spec.name);
       log::warn!("Instance is unhealthy, skipping");
       continue;
     };
     if ip_address.is_empty() {
-      log::warn!("empty ip address for cargo {}", &vm.name);
+      log::warn!("empty ip address for cargo {}", &vm.spec.name);
       log::warn!("Instance is unhealthy, skipping");
       continue;
     }
     ip_addresses.push(ip_address);
   }
   log::debug!("ip_addresses: {:?}", ip_addresses);
-  let upstream_key = format!("vm-{}-{}", vm.key, port);
+  let upstream_key = format!("vm-{}-{}", vm.spec.vm_key, port);
   let upstream = format!(
     "
 upstream {upstream_key} {{

@@ -264,6 +264,6 @@ mod tests {
     let mut stream = client.logs_job(&job.name).await.unwrap();
     while let Some(Ok(_)) = stream.next().await {}
     let job = client.inspect_job(&job.name).await.unwrap();
-    client.delete_job(&job.name).await.unwrap();
+    client.delete_job(&job.spec.name).await.unwrap();
   }
 }

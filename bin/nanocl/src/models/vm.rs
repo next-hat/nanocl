@@ -296,11 +296,11 @@ impl From<VmSummary> for VmRow {
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     let updated_at = tz
-      .timestamp_opt(vm.updated_at.timestamp(), 0)
+      .timestamp_opt(vm.spec.created_at.timestamp(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
-      name: vm.name,
+      name: vm.spec.name,
       namespace: vm.namespace_name,
       disk: vm.spec.disk.image,
       version: vm.spec.version,

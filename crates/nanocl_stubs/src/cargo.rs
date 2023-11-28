@@ -28,14 +28,10 @@ use super::cargo_spec::CargoSpec;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Cargo {
-  /// Key of the cargo
-  pub key: String,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Name of the cargo
-  pub name: String,
-  /// Unique identifier of the spec
-  pub spec_key: uuid::Uuid,
+  /// When the cargo was created
+  pub created_at: chrono::NaiveDateTime,
   /// Specification of the cargo
   pub spec: CargoSpec,
 }
@@ -50,9 +46,9 @@ impl From<Cargo> for CargoSpecPartial {
 impl From<Cargo> for EventActor {
   fn from(cargo: Cargo) -> Self {
     Self {
-      key: Some(cargo.key),
+      key: Some(cargo.spec.cargo_key),
       attributes: Some(serde_json::json!({
-        "Name": cargo.name,
+        "Name": cargo.spec.name,
         "Namespace": cargo.namespace_name,
         "Version": cargo.spec.version,
         "Metadata": cargo.spec.metadata,
@@ -79,24 +75,16 @@ impl ToEvent for Cargo {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoSummary {
-  /// Key of the cargo
-  pub key: String,
-  /// Creation date of the cargo
-  pub created_at: chrono::NaiveDateTime,
-  /// Last update of the cargo
-  pub updated_at: chrono::NaiveDateTime,
-  /// Name of the cargo
-  pub name: String,
-  /// Unique identifier of the cargo spec
-  pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Specification of the cargo
-  pub spec: CargoSpec,
+  /// When the cargo was created
+  pub created_at: chrono::NaiveDateTime,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances
   pub instance_running: usize,
+  /// Specification of the cargo
+  pub spec: CargoSpec,
 }
 
 /// Cargo Inspect is a detailed view of a cargo
@@ -108,20 +96,16 @@ pub struct CargoSummary {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoInspect {
-  /// Key of the cargo
-  pub key: String,
-  /// Name of the cargo
-  pub name: String,
-  /// Unique identifier of the cargo spec
-  pub spec_key: uuid::Uuid,
   /// Name of the namespace
   pub namespace_name: String,
-  /// Specification of the cargo
-  pub spec: CargoSpec,
+  /// When the cargo was created
+  pub created_at: chrono::NaiveDateTime,
   /// Number of instances
   pub instance_total: usize,
   /// Number of running instances
   pub instance_running: usize,
+  /// Specification of the cargo
+  pub spec: CargoSpec,
   /// List of containers
   pub instances: Vec<NodeContainerSummary>,
 }

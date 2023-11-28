@@ -7,10 +7,61 @@ use bollard_next::service::{ContainerWaitExitError, ContainerWaitResponse};
 use crate::cargo::OutputLog;
 use crate::node::NodeContainerSummary;
 
-/// ## Job
-///
+/// Job partial is used to create a new job
+#[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct JobPartial {
+  /// Name of the job
+  pub name: String,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  /// Secrets to load as environment variables
+  pub secrets: Option<Vec<String>>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  /// Metadata (user defined)
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
+  pub metadata: Option<serde_json::Value>,
+  /// Schedule of the job (cron)
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub schedule: Option<String>,
+  /// Remove the job after (x) seconds after execution
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub ttl: Option<usize>,
+  /// List of container to run
+  pub containers: Vec<Config>,
+}
+
+/// Convert a job into a job partial
+impl From<Job> for JobPartial {
+  fn from(job: Job) -> Self {
+    JobPartial {
+      name: job.name,
+      secrets: job.secrets,
+      metadata: job.metadata,
+      schedule: job.schedule,
+      ttl: job.ttl,
+      containers: job.containers,
+    }
+  }
+}
+
 /// A job is a collection of containers to run in sequence as a single unit to act like a command
-///
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -51,23 +102,12 @@ pub struct Job {
   pub containers: Vec<Config>,
 }
 
-/// ## Job summary
-///
-/// It's the datastructure returned by the list endpoint
-///
+/// Summary of a job (used in list)
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct JobSummary {
-  /// Name of the job
-  pub name: String,
-  /// Creation date of the job
-  pub created_at: chrono::NaiveDateTime,
-  /// Last update of the job
-  pub updated_at: chrono::NaiveDateTime,
-  /// Specification of the job
-  pub spec: Job,
   /// Number of instances
   pub instance_total: usize,
   /// Number of instance that succeeded
@@ -76,95 +116,17 @@ pub struct JobSummary {
   pub instance_running: usize,
   /// Number of instance failed
   pub instance_failed: usize,
+  /// Specification of the job
+  pub spec: Job,
 }
 
-/// ## Job partial
-///
-/// Job partial is used to create a new job
-///
-#[derive(Debug, Default, Clone, PartialEq)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
-pub struct JobPartial {
-  /// Name of the job
-  pub name: String,
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  /// Secrets to load as environment variables
-  pub secrets: Option<Vec<String>>,
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  /// Metadata (user defined)
-  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub metadata: Option<serde_json::Value>,
-  /// Schedule of the job (cron)
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub schedule: Option<String>,
-  /// Remove the job after (x) seconds after execution
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub ttl: Option<usize>,
-  /// List of container to run
-  pub containers: Vec<Config>,
-}
-
-/// ## Job inspect
-///
-/// Is a detailed view of a job
-/// It also contains the list of instances
-///
+/// Detailed information about a job
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct JobInspect {
-  /// Name of the job
-  pub name: String,
-  /// When the job have been created
-  pub created_at: chrono::NaiveDateTime,
-  /// When the job have been updated
-  pub updated_at: chrono::NaiveDateTime,
-  /// Secrets to load as environment variables
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub secrets: Option<Vec<String>>,
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  /// Metadata (user defined)
-  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub metadata: Option<serde_json::Value>,
-  /// Schedule of the job (cron)
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub schedule: Option<String>,
-  /// Remove the job after (x) seconds after execution
-  #[cfg_attr(
-    feature = "serde",
-    serde(skip_serializing_if = "Option::is_none")
-  )]
-  pub ttl: Option<usize>,
-  /// Containers to run
-  pub containers: Vec<Config>,
   /// Number of instances
   pub instance_total: usize,
   /// Number of instance that succeeded
@@ -173,27 +135,20 @@ pub struct JobInspect {
   pub instance_running: usize,
   /// Number of instance failed
   pub instance_failed: usize,
+  /// Specification of the job
+  pub spec: Job,
   /// List of containers
   pub instances: Vec<NodeContainerSummary>,
 }
 
+/// Convert a job inspect into a job partial
 impl From<JobInspect> for JobPartial {
   fn from(job: JobInspect) -> Self {
-    Self {
-      name: job.name,
-      secrets: job.secrets,
-      metadata: job.metadata,
-      schedule: job.schedule,
-      ttl: job.ttl,
-      containers: job.containers,
-    }
+    job.spec.into()
   }
 }
 
-/// ## Job log output
-///
-/// Output of a job log
-///
+/// Stream of logs of a job
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -203,10 +158,7 @@ pub struct JobLogOutput {
   pub log: OutputLog,
 }
 
-/// # Wait condition
-///
-/// Wait condition is used to wait for a job to finish or to be removed
-///
+/// Used to wait for a job to reach a certain state
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -218,6 +170,7 @@ pub enum WaitCondition {
   Removed,
 }
 
+/// Implement Display for WaitCondition
 impl std::fmt::Display for WaitCondition {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
@@ -228,6 +181,7 @@ impl std::fmt::Display for WaitCondition {
   }
 }
 
+/// Convert a WaitCondition into a String
 impl From<WaitCondition> for std::string::String {
   fn from(value: WaitCondition) -> Self {
     match value {
@@ -239,6 +193,7 @@ impl From<WaitCondition> for std::string::String {
   }
 }
 
+/// Implement FromStr for WaitCondition
 impl std::str::FromStr for WaitCondition {
   type Err = io::Error;
 
@@ -255,10 +210,7 @@ impl std::str::FromStr for WaitCondition {
   }
 }
 
-/// Job wait
-///
-/// Query for the wait endpoint
-///
+/// Query for the job wait endpoint
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -267,10 +219,7 @@ pub struct JobWaitQuery {
   pub condition: Option<WaitCondition>,
 }
 
-/// ## Job wait response
-///
-/// Response of the wait stream
-///
+/// Stream of wait response of a job
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

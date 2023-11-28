@@ -80,13 +80,12 @@ impl From<Resource> for ResourceRow {
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     let updated_at = tz
-      .timestamp_opt(resource.updated_at.timestamp(), 0)
+      .timestamp_opt(resource.spec.created_at.timestamp(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
-
     Self {
-      name: resource.name,
-      version: resource.version,
+      name: resource.spec.resource_key,
+      version: resource.spec.version,
       kind: resource.kind,
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

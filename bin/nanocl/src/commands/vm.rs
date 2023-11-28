@@ -42,7 +42,7 @@ pub async fn exec_vm_create(
   let client = &cli_conf.client;
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
-  println!("{}", &vm.key);
+  println!("{}", &vm.spec.vm_key);
   Ok(())
 }
 
@@ -201,7 +201,9 @@ pub async fn exec_vm_run(
   let client = &cli_conf.client;
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
-  client.start_vm(&vm.name, args.namespace.as_deref()).await?;
+  client
+    .start_vm(&vm.spec.name, args.namespace.as_deref())
+    .await?;
   if options.attach {
     exec_vm_attach(cli_conf, args, &options.name).await?;
   }

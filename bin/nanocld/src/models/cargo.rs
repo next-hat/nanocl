@@ -32,10 +32,8 @@ pub struct CargoDb {
 impl CargoDb {
   pub fn into_cargo(self, spec: CargoSpec) -> Cargo {
     Cargo {
-      key: self.key,
-      name: self.name,
-      spec_key: spec.key,
       namespace_name: self.namespace_name,
+      created_at: self.created_at,
       spec,
     }
   }

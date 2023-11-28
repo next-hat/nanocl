@@ -33,9 +33,7 @@ pub struct VmDb {
 impl VmDb {
   pub fn into_vm(self, spec: VmSpec) -> Vm {
     Vm {
-      key: self.key,
-      name: self.name,
-      spec_key: spec.key,
+      created_at: self.created_at,
       namespace_name: self.namespace_name,
       spec,
     }

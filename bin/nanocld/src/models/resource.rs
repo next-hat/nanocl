@@ -34,14 +34,9 @@ pub struct ResourceDb {
 impl ResourceDb {
   pub fn into_resource(self, spec: ResourceSpecDb) -> Resource {
     Resource {
-      name: self.key,
       created_at: self.created_at,
-      updated_at: spec.created_at,
       kind: self.kind,
-      version: spec.version,
-      spec_key: spec.key,
-      data: spec.data,
-      metadata: spec.metadata,
+      spec: spec.into(),
     }
   }
 }
