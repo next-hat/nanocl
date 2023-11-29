@@ -5880,7 +5880,7 @@ components:
         Args:
           type: array
           items:
-            $ref: '#/components/schemas/BuildArg'
+            $ref: '#/components/schemas/StatefileArg'
           description: Arguments to pass to the Statefile
           nullable: true
         Group:
@@ -5920,6 +5920,23 @@ components:
           items:
             $ref: '#/components/schemas/JobPartial'
           description: List of jobs to create and run
+          nullable: true
+    StatefileArg:
+      type: object
+      description: Statefile argument definition to pass to the Statefile
+      required:
+      - Name
+      - Kind
+      properties:
+        Name:
+          type: string
+          description: Name of the build arg
+        Kind:
+          type: string
+          description: Kind of the build arg
+        Default:
+          type: string
+          description: Default value of the build arg
           nullable: true
     Stats:
       type: object
