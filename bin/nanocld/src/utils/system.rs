@@ -1,13 +1,8 @@
 use std::collections::HashMap;
 
-use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
-use ntex::rt;
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
-use bollard_next::system::EventsOptions;
-use bollard_next::service::{
-  EventMessageTypeEnum, ContainerInspectResponse, EventMessage,
-};
+use bollard_next::service::ContainerInspectResponse;
 use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 
 use nanocl_error::io::{FromIo, IoResult};
@@ -29,7 +24,7 @@ use crate::models::{DaemonState, ContainerPartial, ContainerInstanceUpdateDb};
 /// * [instance](ContainerInspectResponse) - The instance to sync
 /// * [state](DaemonState) - The state
 ///
-async fn sync_instance(
+pub(crate) async fn sync_instance(
   instance: &ContainerInspectResponse,
   state: &DaemonState,
 ) -> IoResult<()> {
@@ -89,77 +84,6 @@ async fn sync_instance(
         .map_err(|err| log::error!("{err}"));
     }
   }
-  Ok(())
-}
-
-/// ## Exec docker event
-///
-/// Take corresponding action depending on the docker event
-/// eg: update/create/destroy a container instance
-///
-/// ## Arguments
-///
-/// * [event](EventMessage) - The docker event
-/// * [state](DaemonState) - The state
-///
-async fn exec_docker_event(
-  event: &EventMessage,
-  state: &DaemonState,
-) -> IoResult<()> {
-  let kind = event.typ.unwrap_or(EventMessageTypeEnum::EMPTY);
-  if kind != EventMessageTypeEnum::CONTAINER {
-    return Ok(());
-  }
-  let actor = event.actor.clone().unwrap_or_default();
-  let attributes = actor.attributes.unwrap_or_default();
-  if attributes.get("io.nanocl").is_none() {
-    return Ok(());
-  }
-  let action = event.action.clone().unwrap_or_default();
-  let id = actor.id.unwrap_or_default();
-  log::debug!("docker event: {action}");
-  let action = action.as_str();
-  let mut event = Event {
-    kind: EventKind::ContainerInstance,
-    action: EventAction::Deleted,
-    actor: Some(EventActor {
-      key: Some(id.clone()),
-      attributes: Some(
-        serde_json::to_value(attributes)
-          .map_err(|err| err.map_err_context(|| "Event attributes"))?,
-      ),
-    }),
-  };
-  match action {
-    "destroy" => {
-      log::debug!("docker event destroy container: {id}");
-      repositories::container::delete_by_id(&id, &state.pool).await?;
-      state.event_emitter.spawn_emit_event(event);
-      return Ok(());
-    }
-    "create" => {
-      event.action = EventAction::Created;
-    }
-    "start" => {
-      event.action = EventAction::Started;
-    }
-    "stop" => {
-      event.action = EventAction::Stopped;
-    }
-    "restart" => {
-      event.action = EventAction::Restart;
-    }
-    _ => {
-      event.action = EventAction::Patched;
-    }
-  }
-  let instance = state
-    .docker_api
-    .inspect_container(&id, None::<InspectContainerOptions>)
-    .await
-    .map_err(|err| err.map_err_context(|| "Docker event"))?;
-  sync_instance(&instance, state).await?;
-  state.event_emitter.spawn_emit_event(event);
   Ok(())
 }
 
@@ -354,35 +278,4 @@ pub(crate) async fn sync_vm_images(state: &DaemonState) -> IoResult<()> {
     .await;
   log::info!("Synced VM images");
   Ok(())
-}
-
-/// ## Watch docker events
-///
-/// Create a new thread with his own loop to watch docker events and update
-/// container instance accordingly
-///
-pub(crate) fn watch_docker(state: &DaemonState) {
-  let state = state.clone();
-  rt::Arbiter::new().exec_fn(move || {
-    rt::spawn(async move {
-      loop {
-        let mut streams =
-          state.docker_api.events(None::<EventsOptions<String>>);
-        while let Some(event) = streams.next().await {
-          match event {
-            Ok(event) => {
-              if let Err(err) = exec_docker_event(&event, &state).await {
-                log::warn!("docker event error: {err:?}")
-              }
-            }
-            Err(err) => {
-              log::warn!("docker event error: {:?}", err);
-            }
-          }
-        }
-        log::warn!("disconnected from docker trying to reconnect");
-        ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-      }
-    });
-  });
 }

@@ -166,8 +166,8 @@ pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     }
     Ok::<_, IoError>(())
   });
+  utils::event::analize_docker(&daemon_state);
   utils::event::analize_events(&daemon_state);
-  utils::system::watch_docker(&daemon_state);
   Ok(daemon_state)
 }
 

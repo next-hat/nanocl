@@ -1,15 +1,19 @@
 use ntex::rt;
+use futures_util::StreamExt;
 
-use nanocl_error::io::FromIo;
-use nanocl_error::http::HttpResult;
+use nanocl_error::io::{FromIo, IoResult};
 
-use nanocl_stubs::system::{Event, EventKind, EventAction};
+use bollard_next::system::EventsOptions;
+use bollard_next::container::InspectContainerOptions;
+use bollard_next::service::{EventMessageTypeEnum, EventMessage};
+use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
 
 use crate::{utils, repositories};
 use crate::event::Client;
 use crate::models::DaemonState;
 
-async fn job_ttl(e: Event, state: &DaemonState) -> HttpResult<()> {
+/// Remove a job after when finished and ttl is set
+async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
   if e.kind != EventKind::ContainerInstance {
     return Ok(());
   }
@@ -44,12 +48,14 @@ async fn job_ttl(e: Event, state: &DaemonState) -> HttpResult<()> {
   Ok(())
 }
 
-async fn analize_event(e: Event, state: &DaemonState) -> HttpResult<()> {
+/// Take action when event is received
+async fn exec_event(e: Event, state: &DaemonState) -> IoResult<()> {
   job_ttl(e, state).await?;
   Ok(())
 }
 
-async fn extract_event(stream: &mut Client) -> HttpResult<Event> {
+/// Extract an event from the stream
+async fn extract_event(stream: &mut Client) -> IoResult<Event> {
   let mut payload: Vec<u8> = Vec::new();
   while let Some(bytes) = stream.recv().await {
     payload.extend(&bytes);
@@ -62,6 +68,7 @@ async fn extract_event(stream: &mut Client) -> HttpResult<Event> {
   Ok(e)
 }
 
+/// Read events from the event stream
 async fn read_events(stream: &mut Client, state: &DaemonState) {
   loop {
     let e = extract_event(stream).await;
@@ -72,13 +79,14 @@ async fn read_events(stream: &mut Client, state: &DaemonState) {
       }
       Ok(e) => e,
     };
-    if let Err(err) = analize_event(e, state).await {
+    if let Err(err) = exec_event(e, state).await {
       log::warn!("{err}");
     }
   }
 }
 
-pub fn analize_events(state: &DaemonState) {
+/// Spawn a tread to analize events from the event stream in his own loop
+pub(crate) fn analize_events(state: &DaemonState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async move {
@@ -92,6 +100,95 @@ pub fn analize_events(state: &DaemonState) {
         };
         log::debug!("Internal event stream connected");
         read_events(&mut stream, &state).await;
+      }
+    });
+  });
+}
+
+/// Take actions when a docker event is received
+async fn exec_docker_event(
+  event: &EventMessage,
+  state: &DaemonState,
+) -> IoResult<()> {
+  let kind = event.typ.unwrap_or(EventMessageTypeEnum::EMPTY);
+  if kind != EventMessageTypeEnum::CONTAINER {
+    return Ok(());
+  }
+  let actor = event.actor.clone().unwrap_or_default();
+  let attributes = actor.attributes.unwrap_or_default();
+  if attributes.get("io.nanocl").is_none() {
+    return Ok(());
+  }
+  let action = event.action.clone().unwrap_or_default();
+  let id = actor.id.unwrap_or_default();
+  log::debug!("docker event: {action}");
+  let action = action.as_str();
+  let mut event = Event {
+    kind: EventKind::ContainerInstance,
+    action: EventAction::Deleted,
+    actor: Some(EventActor {
+      key: Some(id.clone()),
+      attributes: Some(
+        serde_json::to_value(attributes)
+          .map_err(|err| err.map_err_context(|| "Event attributes"))?,
+      ),
+    }),
+  };
+  match action {
+    "destroy" => {
+      log::debug!("docker event destroy container: {id}");
+      repositories::container::delete_by_id(&id, &state.pool).await?;
+      state.event_emitter.spawn_emit_event(event);
+      return Ok(());
+    }
+    "create" => {
+      event.action = EventAction::Created;
+    }
+    "start" => {
+      event.action = EventAction::Started;
+    }
+    "stop" => {
+      event.action = EventAction::Stopped;
+    }
+    "restart" => {
+      event.action = EventAction::Restart;
+    }
+    _ => {
+      event.action = EventAction::Patched;
+    }
+  }
+  let instance = state
+    .docker_api
+    .inspect_container(&id, None::<InspectContainerOptions>)
+    .await
+    .map_err(|err| err.map_err_context(|| "Docker event"))?;
+  utils::system::sync_instance(&instance, state).await?;
+  state.event_emitter.spawn_emit_event(event);
+  Ok(())
+}
+
+/// Create a new thread with his own loop to analize events from docker
+pub(crate) fn analize_docker(state: &DaemonState) {
+  let state = state.clone();
+  rt::Arbiter::new().exec_fn(move || {
+    rt::spawn(async move {
+      loop {
+        let mut streams =
+          state.docker_api.events(None::<EventsOptions<String>>);
+        while let Some(event) = streams.next().await {
+          match event {
+            Ok(event) => {
+              if let Err(err) = exec_docker_event(&event, &state).await {
+                log::warn!("docker event error: {err:?}")
+              }
+            }
+            Err(err) => {
+              log::warn!("docker event error: {:?}", err);
+            }
+          }
+        }
+        log::warn!("disconnected from docker trying to reconnect");
+        ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       }
     });
   });
