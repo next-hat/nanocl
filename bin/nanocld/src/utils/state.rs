@@ -11,13 +11,10 @@ use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
 use nanocl_stubs::cargo_spec::CargoSpecPartial;
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmDisk};
-use nanocl_stubs::state::{
-  StateDeployment, StateCargo, StateVirtualMachine, StateResource, StateMeta,
-  StateStream, StateSecret, StateApplyQuery, StateJob,
-};
+use nanocl_stubs::state::{Statefile, StateStream, StateApplyQuery};
 
 use crate::{utils, repositories};
-use crate::models::{StateFileData, DaemonState};
+use crate::models::DaemonState;
 
 /// ## Ensure namespace existence
 ///
@@ -89,72 +86,15 @@ fn send(state_stream: StateStream, sx: &mpsc::Sender<HttpResult<Bytes>>) {
 ///
 /// [HttpResult](HttpResult) containing a [StateFileData](StateFileData)
 ///
-pub(crate) fn parse_state(
-  data: &serde_json::Value,
-) -> HttpResult<StateFileData> {
-  let meta =
-    serde_json::from_value::<StateMeta>(data.to_owned()).map_err(|err| {
+pub(crate) fn parse_state(data: &serde_json::Value) -> HttpResult<Statefile> {
+  let data =
+    serde_json::from_value::<Statefile>(data.to_owned()).map_err(|err| {
       HttpError {
         status: http::StatusCode::BAD_REQUEST,
         msg: format!("unable to serialize payload {err}"),
       }
     })?;
-  match meta.kind.as_str() {
-    "Deployment" => {
-      let data = serde_json::from_value::<StateDeployment>(data.to_owned())
-        .map_err(|err| HttpError {
-          status: http::StatusCode::BAD_REQUEST,
-          msg: format!("unable to serialize payload {err}"),
-        })?;
-      Ok(StateFileData::Deployment(data))
-    }
-    "Cargo" => {
-      let data = serde_json::from_value::<StateCargo>(data.to_owned())
-        .map_err(|err| HttpError {
-          status: http::StatusCode::BAD_REQUEST,
-          msg: format!("unable to serialize payload {err}"),
-        })?;
-      Ok(StateFileData::Cargo(data))
-    }
-    "VirtualMachine" => {
-      let data = serde_json::from_value::<StateVirtualMachine>(data.to_owned())
-        .map_err(|err| HttpError {
-          status: http::StatusCode::BAD_REQUEST,
-          msg: format!("unable to serialize payload {err}"),
-        })?;
-      Ok(StateFileData::VirtualMachine(data))
-    }
-    "Resource" => {
-      let data = serde_json::from_value::<StateResource>(data.to_owned())
-        .map_err(|err| HttpError {
-          status: http::StatusCode::BAD_REQUEST,
-          msg: format!("unable to serialize payload {err}"),
-        })?;
-      Ok(StateFileData::Resource(data))
-    }
-    "Job" => {
-      let data =
-        serde_json::from_value::<StateJob>(data.to_owned()).map_err(|err| {
-          HttpError {
-            status: http::StatusCode::BAD_REQUEST,
-            msg: format!("unable to serialize payload {err}"),
-          }
-        })?;
-      Ok(StateFileData::Job(data))
-    }
-    "Secret" => {
-      let data = serde_json::from_value::<StateSecret>(data.to_owned())
-        .map_err(|err| HttpError {
-          status: http::StatusCode::BAD_REQUEST,
-          msg: format!("unable to serialize payload {err}"),
-        })?;
-      Ok(StateFileData::Secret(data))
-    }
-    _ => Err(HttpError {
-      status: http::StatusCode::BAD_REQUEST,
-      msg: format!("Unknown Statefile Kind: {}", meta.kind),
-    }),
-  }
+  Ok(data)
 }
 
 /// ## Apply Secret
@@ -677,7 +617,7 @@ async fn remove_resources(
 /// [Receiver](mpsc::Receiver) of [HttpResult](HttpResult) of [Bytes](Bytes)
 ///
 pub(crate) fn apply_statefile(
-  data: &StateFileData,
+  data: &Statefile,
   version: &str,
   qs: &StateApplyQuery,
   state: &DaemonState,
@@ -688,57 +628,23 @@ pub(crate) fn apply_statefile(
   let qs = qs.clone();
   let (sx, rx) = mpsc::channel::<HttpResult<Bytes>>();
   rt::spawn(async move {
-    match data {
-      StateFileData::Deployment(data) => {
-        let _ = ensure_namespace_existence(&data.namespace, &state).await;
-        let namespace = data.namespace.unwrap_or("global".to_owned());
-        if let Some(secrets) = &data.secrets {
-          apply_secrets(secrets, &state, &qs, &sx).await;
-        }
-        if let Some(cargoes) = &data.cargoes {
-          apply_cargoes(&namespace, cargoes, &version, &state, &qs, &sx).await;
-        }
-        if let Some(vms) = &data.virtual_machines {
-          apply_vms(&namespace, vms, &version, &state, &qs, &sx).await;
-        }
-        if let Some(resources) = &data.resources {
-          apply_resources(resources, &state, &qs, &sx).await;
-        }
-      }
-      StateFileData::Cargo(data) => {
-        let _ = ensure_namespace_existence(&data.namespace, &state).await;
-        apply_cargoes(
-          &data.namespace.unwrap_or("global".to_owned()),
-          &data.cargoes,
-          &version,
-          &state,
-          &qs,
-          &sx,
-        )
-        .await;
-      }
-      StateFileData::VirtualMachine(data) => {
-        let _ = ensure_namespace_existence(&data.namespace, &state).await;
-        apply_vms(
-          &data.namespace.unwrap_or("global".to_owned()),
-          &data.virtual_machines,
-          &version,
-          &state,
-          &qs,
-          &sx,
-        )
-        .await;
-      }
-      StateFileData::Resource(data) => {
-        apply_resources(&data.resources, &state, &qs, &sx).await;
-      }
-      StateFileData::Secret(data) => {
-        apply_secrets(&data.secrets, &state, &qs, &sx).await;
-      }
-      StateFileData::Job(data) => {
-        apply_jobs(&data.jobs, &state, &qs, &sx).await;
-      }
-    };
+    let _ = ensure_namespace_existence(&data.namespace, &state).await;
+    let namespace = data.namespace.unwrap_or("global".to_owned());
+    if let Some(secrets) = &data.secrets {
+      apply_secrets(secrets, &state, &qs, &sx).await;
+    }
+    if let Some(cargoes) = &data.cargoes {
+      apply_cargoes(&namespace, cargoes, &version, &state, &qs, &sx).await;
+    }
+    if let Some(vms) = &data.virtual_machines {
+      apply_vms(&namespace, vms, &version, &state, &qs, &sx).await;
+    }
+    if let Some(resources) = &data.resources {
+      apply_resources(resources, &state, &qs, &sx).await;
+    }
+    if let Some(jobs) = &data.jobs {
+      apply_jobs(jobs, &state, &qs, &sx).await;
+    }
   });
   rx
 }
@@ -757,45 +663,29 @@ pub(crate) fn apply_statefile(
 /// [Receiver](mpsc::Receiver) of [HttpResult](HttpResult) of [Bytes](Bytes)
 ///
 pub(crate) fn remove_statefile(
-  data: &StateFileData,
+  data: &Statefile,
   state: &DaemonState,
 ) -> mpsc::Receiver<HttpResult<Bytes>> {
   let data = data.clone();
   let state = state.clone();
   let (sx, rx) = mpsc::channel::<HttpResult<Bytes>>();
   rt::spawn(async move {
-    match data {
-      StateFileData::Deployment(data) => {
-        let namespace = utils::key::resolve_nsp(&data.namespace);
-        if let Some(cargoes) = &data.cargoes {
-          remove_cargoes(&namespace, cargoes, &state, &sx).await;
-        }
-        if let Some(vms) = &data.virtual_machines {
-          remove_vms(&namespace, vms, &state, &sx).await;
-        }
-        if let Some(resources) = &data.resources {
-          remove_resources(resources, &state, &sx).await;
-        }
-        if let Some(secrets) = &data.secrets {
-          remove_secrets(secrets, &state, &sx).await;
-        }
-      }
-      StateFileData::Cargo(data) => {
-        let namespace = utils::key::resolve_nsp(&data.namespace);
-        remove_cargoes(&namespace, &data.cargoes, &state, &sx).await;
-      }
-      StateFileData::VirtualMachine(data) => {
-        let namespace = utils::key::resolve_nsp(&data.namespace);
-        remove_vms(&namespace, &data.virtual_machines, &state, &sx).await;
-      }
-      StateFileData::Resource(data) => {
-        remove_resources(&data.resources, &state, &sx).await
-      }
-      StateFileData::Secret(data) => {
-        remove_secrets(&data.secrets, &state, &sx).await
-      }
-      StateFileData::Job(data) => remove_jobs(&data.jobs, &state, &sx).await,
-    };
+    let namespace = utils::key::resolve_nsp(&data.namespace);
+    if let Some(cargoes) = &data.cargoes {
+      remove_cargoes(&namespace, cargoes, &state, &sx).await;
+    }
+    if let Some(vms) = &data.virtual_machines {
+      remove_vms(&namespace, vms, &state, &sx).await;
+    }
+    if let Some(resources) = &data.resources {
+      remove_resources(resources, &state, &sx).await;
+    }
+    if let Some(secrets) = &data.secrets {
+      remove_secrets(secrets, &state, &sx).await;
+    }
+    if let Some(jobs) = &data.jobs {
+      remove_jobs(jobs, &state, &sx).await
+    }
   });
   rx
 }

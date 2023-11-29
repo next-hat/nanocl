@@ -1,6 +1,5 @@
 {
   "ApiVersion": "v0.11",
-  "Kind": "Deployment",
   "Namespace": "global",
   "Cargoes": [
     {

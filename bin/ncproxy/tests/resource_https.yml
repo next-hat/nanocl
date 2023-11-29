@@ -1,20 +1,19 @@
-Kind: Resource
 ApiVersion: v0.11
 
 Resources:
-  - Name: proxy-get-started
-    Kind: ProxyRule
-    Version: v0.8
-    Data:
-      Rules:
-        - Domain: get-started.com
-          Network: Internal
-          Ssl:
-            Certificate: /random/path/to/cert
-            CertificateKey: /random/path/to/key
-            DhParam: /random/path/to/param
-          Locations:
-            - Path: /
-              Target:
-                Key: get-started.global.c
-                Port: 9000
+- Name: proxy-get-started
+  Kind: ProxyRule
+  Version: v0.8
+  Data:
+    Rules:
+    - Domain: get-started.com
+      Network: Internal
+      Ssl:
+        Certificate: /random/path/to/cert
+        CertificateKey: /random/path/to/key
+        DhParam: /random/path/to/param
+      Locations:
+      - Path: /
+        Target:
+          Key: get-started.global.c
+          Port: 9000

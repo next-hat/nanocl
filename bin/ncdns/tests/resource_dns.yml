@@ -1,14 +1,13 @@
-Kind: Resource
 ApiVersion: v0.11
 
 Resources:
-  - Name: dns-get-started
-    Kind: DnsRule
-    Version: v0.3
-    Data:
-      Network: system.nsp
-      Entries:
-        - Name: test.com
-          IpAddress: 127.0.0.1
-        - Name: test1.com
-          IpAddress: global.nsp
+- Name: dns-get-started
+  Kind: DnsRule
+  Version: v0.3
+  Data:
+    Network: system.nsp
+    Entries:
+    - Name: test.com
+      IpAddress: 127.0.0.1
+    - Name: test1.com
+      IpAddress: global.nsp

@@ -4,8 +4,6 @@ use std::collections::HashMap;
 use ntex::rt;
 use futures::StreamExt;
 use clap::{Arg, Command, ArgAction};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 use indicatif::{MultiProgress, ProgressBar};
 use bollard_next::service::HostConfig;
@@ -13,35 +11,21 @@ use bollard_next::service::HostConfig;
 use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::job::JobPartial;
-use nanocld_client::stubs::state::{StateMeta, StateApplyQuery, StateStreamStatus};
+use nanocld_client::stubs::state::{StateApplyQuery, StateStreamStatus, Statefile};
 use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
 use nanocld_client::stubs::cargo_spec::{CargoSpecPartial, Config};
 
 use crate::utils;
 use crate::config::CliConfig;
 use crate::models::{
-  StateArg, StateCommand, StateApplyOpts, StateRemoveOpts, StateBuildArg,
-  DisplayFormat, StateRef, Context, StateLogsOpts,
+  StateArg, StateCommand, StateApplyOpts, StateRemoveOpts, DisplayFormat,
+  StateRef, Context, StateLogsOpts,
 };
 
 use super::cargo_image::exec_cargo_image_pull;
 
-/// ## Get from url
-///
 /// Get Statefile from url and return a StateRef with the raw data and the format
-///
-/// ## Arguments
-///
-/// * [url](str) The url of the Statefile
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [StateRef](StateRef)
-///
-async fn get_from_url<T>(url: &str) -> IoResult<StateRef<T>>
-where
-  T: serde::Serialize + serde::de::DeserializeOwned,
-{
+async fn get_from_url(url: &str) -> IoResult<StateRef<Statefile>> {
   let url = if url.starts_with("http") {
     url.to_owned()
   } else {
@@ -78,19 +62,7 @@ where
   Ok(state_ref)
 }
 
-/// ## Read from file
-///
 /// Read Statefile from file and return a StateRef with the raw data and the format
-///
-/// ## Arguments
-///
-/// * [path](std::path::Path) The path of the Statefile
-/// * [format](DisplayFormat) The format of the Statefile
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [StateRef](StateRef)
-///
 fn read_from_file<T>(
   path: &std::path::Path,
   format: &DisplayFormat,
@@ -109,18 +81,7 @@ where
   Ok(state_ref)
 }
 
-/// ## Hook binds
-///
 /// Hook cargoes binds to replace relative path with absolute path
-///
-/// ## Arguments
-///
-/// * [cargo](CargoSpecPartial) The cargo spec
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [CargoSpecPartial](CargoSpecPartial)
-///
 fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
   let new_cargo = match &cargo.container.host_config {
     None => cargo.clone(),
@@ -162,20 +123,7 @@ fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
   Ok(new_cargo)
 }
 
-/// ## Attach to cargo
-///
 /// Attach to a cargo and print its logs
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The client to the daemon
-/// * [cargo](CargoSpecPartial) The cargo spec
-/// * [namespace](str) The namespace of the cargo
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [JoinHandle](rt::JoinHandle)
-///
 pub async fn log_cargo(
   client: &NanocldClient,
   cargo: CargoSpecPartial,
@@ -255,15 +203,7 @@ pub async fn log_cargo(
   Ok(futures)
 }
 
-/// ## Log jobs
-///
 /// Logs existing jobs in the Statefile
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The client to the daemon
-/// * [jobs](Vec) [Vector](Vec) of [job partial](JobPartial)
-///
 pub async fn log_jobs(
   client: &NanocldClient,
   jobs: Vec<JobPartial>,
@@ -309,22 +249,7 @@ pub async fn log_jobs(
   Ok(())
 }
 
-/// ## Attach to cargoes
-///
 /// Attach to a list of cargoes and print their logs
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The client to the daemon
-/// * [cargoes](Vec<CargoSpecPartial>) The list of cargoes
-/// * [namespace](str) The namespace of the cargoes
-///
-/// ## Return
-///
-/// * [Result](Result) The result of the operation
-///   * [Ok](()) The operation was successful
-///   * [Err](IoError) An error occured
-///
 pub async fn log_cargoes(
   client: &NanocldClient,
   cargoes: Vec<CargoSpecPartial>,
@@ -339,18 +264,7 @@ pub async fn log_cargoes(
   Ok(())
 }
 
-/// ## Hook cargoes
-///
 /// Hook cargoes binds to replace relative path with absolute path
-///
-/// ## Arguments
-///
-/// * [cargoes](Vec<CargoSpecPartial>) The cargoes spec
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [CargoSpecPartial](CargoSpecPartial)
-///
 fn hook_cargoes(
   cargoes: Vec<CargoSpecPartial>,
 ) -> IoResult<Vec<CargoSpecPartial>> {
@@ -362,22 +276,13 @@ fn hook_cargoes(
   Ok(new_cargoes)
 }
 
-/// ## Gen client
-///
 /// Generate a nanocl daemon client based on the api version specified in the Statefile
-///
-/// ## Arguments
-///
-/// * [host](str) The host of the daemon
-/// * [meta](StateMeta) The meta of the Statefile
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [NanocldClient](NanocldClient)
-///
-fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
-  let client = match meta.api_version.clone() {
-    api_version if meta.api_version.starts_with("http") => {
+fn gen_client(
+  host: &str,
+  state_ref: &StateRef<Statefile>,
+) -> IoResult<NanocldClient> {
+  let client = match &state_ref.data.api_version {
+    api_version if state_ref.data.api_version.starts_with("http") => {
       let mut paths = api_version
         .split('/')
         .map(|e| e.to_owned())
@@ -391,11 +296,12 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
       let url = paths.join("/");
       NanocldClient::connect_to(&url, Some(version.into()))
     }
-    api_version if meta.api_version.starts_with('v') => {
-      NanocldClient::connect_to(host, Some(api_version))
+    api_version if state_ref.data.api_version.starts_with('v') => {
+      NanocldClient::connect_to(host, Some(api_version.clone()))
     }
     _ => {
-      let mut paths = meta
+      let mut paths = state_ref
+        .data
         .api_version
         .split('/')
         .map(|e| e.to_owned())
@@ -414,32 +320,18 @@ fn gen_client(host: &str, meta: &StateMeta) -> IoResult<NanocldClient> {
   Ok(client)
 }
 
-/// ## Parse build args
-///
 /// Parse `Args` from a Statefile and ask the user to input their values
-///
-/// ## Arguments
-///
-/// * [yaml](serde_yaml::Value) The yaml value of the Statefile
-/// * [args](Vec<String>) The list of arguments
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [serde_json::Value](serde_json::Value)
-///
 fn parse_build_args(
-  yaml: &serde_yaml::Value,
+  state_file: &Statefile,
   args: Vec<String>,
 ) -> IoResult<serde_json::Value> {
-  let build_args: StateBuildArg = serde_yaml::from_value(yaml.clone())
-    .map_err(|err| err.map_err_context(|| "Unable to extract BuildArgs"))?;
   let mut cmd = Command::new("nanocl state args")
     .about("Validate state args")
     .bin_name("nanocl state args --");
   // Add string nanocl state args as first element of args
   let mut args = args;
   args.insert(0, "nanocl state apply --".into());
-  for build_arg in build_args.args.clone().unwrap_or_default() {
+  for build_arg in state_file.args.clone().unwrap_or_default() {
     let name = build_arg.name.to_owned();
     let arg: &'static str = Box::leak(name.into_boxed_str());
     let mut cmd_arg = Arg::new(arg).long(arg);
@@ -462,7 +354,7 @@ fn parse_build_args(
   }
   let matches = cmd.get_matches_from(args);
   let mut args = Map::new();
-  for build_arg in build_args.args.unwrap_or_default() {
+  for build_arg in state_file.args.clone().unwrap_or_default() {
     let name = build_arg.name.to_owned();
     let arg: &'static str = Box::leak(name.to_owned().into_boxed_str());
     match build_arg.kind.as_str() {
@@ -505,19 +397,7 @@ fn parse_build_args(
   Ok(args)
 }
 
-/// ## Inject namespace
-///
 /// Inject `Args` to the namespace value
-///
-/// ## Arguments
-///
-/// * [namespace](str) The namespace value
-/// * [args](HashMap<String, String>) The list of arguments
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [String](String)
-///
 fn inject_namespace(
   namespace: &str,
   args: &serde_json::Value,
@@ -529,31 +409,13 @@ fn inject_namespace(
   Ok(str)
 }
 
-/// ## Inject data
-///
 /// Inject `Args`, `Envs`, `Config`, `HostGateway` and `Namespaces` to the Statefile
-///
-/// ## Arguments
-///
-/// * [ext](DisplayFormat) The format of the Statefile
-/// * [raw](str) The raw data of the Statefile
-/// * [args](HashMap<String, String>) The list of arguments
-/// * [client](NanocldClient) The client to the daemon
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [Serialize](Serialize)
-///
-async fn inject_data<T>(
-  ext: &DisplayFormat,
-  raw: &str,
+async fn inject_data(
+  state_ref: &StateRef<Statefile>,
   args: &serde_json::Value,
   context: &Context,
   client: &NanocldClient,
-) -> IoResult<T>
-where
-  T: Serialize + DeserializeOwned,
-{
+) -> IoResult<StateRef<Statefile>> {
   let mut envs = std::collections::HashMap::new();
   for (key, value) in std::env::vars_os() {
     let key = key.to_string_lossy().to_string();
@@ -578,31 +440,21 @@ where
     "HostGateway": info.host_gateway,
     "Namespaces": namespaces,
   });
-  let template = utils::state::compile(raw, &data)?;
-  let data = utils::state::serialize_ext(ext, &template)?;
-  Ok(data)
+  let raw = utils::state::compile(&state_ref.raw, &data)?;
+  let state_file =
+    utils::state::serialize_ext::<Statefile>(&state_ref.format, &raw)?;
+  Ok(StateRef {
+    raw,
+    format: state_ref.format.clone(),
+    data: state_file,
+  })
 }
 
-/// ## Parse state file
-///
 /// Parse a Statefile from a path or url and return a StateRef with the raw data and the format
-///
-/// ## Arguments
-///
-/// * [path](Option<String>) The path or url of the Statefile if empty set to current path + Statefile.yml
-/// * [format](DisplayFormat) The format of the Statefile
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [StateRef](StateRef)
-///
-async fn parse_state_file<T>(
+async fn parse_state_file(
   path: &Option<String>,
   format: &DisplayFormat,
-) -> IoResult<StateRef<T>>
-where
-  T: serde::Serialize + serde::de::DeserializeOwned,
-{
+) -> IoResult<StateRef<Statefile>> {
   if let Some(path) = path {
     if let Ok(path) = std::path::Path::new(&path)
       .canonicalize()
@@ -610,7 +462,7 @@ where
     {
       return read_from_file(&path, format);
     }
-    return get_from_url::<T>(path).await;
+    return get_from_url(path).await;
   }
   if let Ok(path) = std::path::Path::new("Statefile.yaml").canonicalize() {
     return read_from_file(&path, format);
@@ -625,77 +477,24 @@ where
 }
 
 async fn execute_template(
-  state_ref: &StateRef<serde_yaml::Value>,
+  state_ref: &StateRef<Statefile>,
   args: &serde_json::Value,
   client: &NanocldClient,
   cli_conf: &CliConfig,
-) -> IoResult<(
-  serde_yaml::Value,
-  String,
-  Vec<JobPartial>,
-  Vec<CargoSpecPartial>,
-)> {
-  let mut namespace = String::default();
-  let state_ref = state_ref.clone();
-  let mut jobs = Vec::new();
-  let mut cargoes = Vec::new();
-  let data = match state_ref.meta.kind.as_str() {
-    "Deployment" | "Cargo" => {
-      namespace = match state_ref.data.get("Namespace") {
-        Some(namespace) => serde_yaml::from_value::<String>(namespace.clone())
-          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
-        None => "global".to_owned(),
-      };
-      namespace = inject_namespace(&namespace, args)?;
-      let mut yaml: serde_yaml::Value = inject_data(
-        &state_ref.format,
-        &state_ref.raw,
-        args,
-        &cli_conf.context,
-        client,
-      )
-      .await?;
-      let current_cargoes: Vec<CargoSpecPartial> = match yaml.get("Cargoes") {
-        Some(cargoes) => serde_yaml::from_value(cargoes.clone())
-          .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?,
-        None => Vec::new(),
-      };
-      let hooked_cargoes = hook_cargoes(current_cargoes)?;
-      cargoes = hooked_cargoes.clone();
-      yaml["Cargoes"] = serde_yaml::to_value(&hooked_cargoes)
-        .map_err(|err| err.map_err_context(|| "Unable to convert to yaml"))?;
-      yaml
-    }
-    "Job" => {
-      let yaml: serde_yaml::Value = inject_data(
-        &state_ref.format,
-        &state_ref.raw,
-        args,
-        &cli_conf.context,
-        client,
-      )
-      .await?;
-      jobs = match yaml.get("Jobs") {
-        Some(jobs) => serde_yaml::from_value::<Vec<JobPartial>>(jobs.clone())
-          .map_err(|err| {
-          err.map_err_context(|| "Unable to convert to yaml")
-        })?,
-        None => Vec::new(),
-      };
-      yaml
-    }
-    _ => {
-      inject_data(
-        &state_ref.format,
-        &state_ref.raw,
-        args,
-        &cli_conf.context,
-        client,
-      )
-      .await?
-    }
+) -> IoResult<StateRef<Statefile>> {
+  let mut namespace = match &state_ref.data.namespace {
+    Some(namespace) => namespace.clone(),
+    None => "global".to_owned(),
   };
-  Ok((data, namespace, jobs, cargoes))
+  namespace = inject_namespace(&namespace, args)?;
+  let mut state_ref =
+    inject_data(state_ref, args, &cli_conf.context, client).await?;
+  state_ref.data.namespace = Some(namespace);
+  if let Some(cargoes) = state_ref.data.cargoes {
+    let hooked_cargoes = hook_cargoes(cargoes)?;
+    state_ref.data.cargoes = Some(hooked_cargoes);
+  }
+  Ok(state_ref)
 }
 
 async fn pull_image(
@@ -731,30 +530,34 @@ async fn exec_state_apply(
   let host = &cli_conf.host;
   let format = cli_conf.user_config.display_format.clone();
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
-  let client = gen_client(host, &state_ref.meta)?;
+  let client = gen_client(host, &state_ref)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
-  let (data, namespace, jobs, cargoes) =
+  let state_file =
     execute_template(&state_ref, &args, &client, cli_conf).await?;
   if !opts.skip_confirm {
-    utils::print::display_format(&state_ref.format, &data)?;
+    println!("{}", state_file.raw);
     utils::dialog::confirm("Are you sure to apply this state ?")
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
-  for cargo in &cargoes {
-    if let Some(before) = &cargo.init_container {
-      let image = before.image.clone().unwrap_or_default();
-      pull_image(&image, opts.force_pull, &client).await?;
-    }
-    let image = cargo.container.image.clone().unwrap_or_default();
-    pull_image(&image, opts.force_pull, &client).await?;
-  }
-  for job in &jobs {
-    for container in &job.containers {
-      let image = container.image.clone().unwrap_or_default();
+  if let Some(cargoes) = &state_file.data.cargoes {
+    for cargo in cargoes {
+      if let Some(before) = &cargo.init_container {
+        let image = before.image.clone().unwrap_or_default();
+        pull_image(&image, opts.force_pull, &client).await?;
+      }
+      let image = cargo.container.image.clone().unwrap_or_default();
       pull_image(&image, opts.force_pull, &client).await?;
     }
   }
-  let data = serde_json::to_value(&data).map_err(|err| {
+  if let Some(jobs) = &state_file.data.jobs {
+    for job in jobs {
+      for container in &job.containers {
+        let image = container.image.clone().unwrap_or_default();
+        pull_image(&image, opts.force_pull, &client).await?;
+      }
+    }
+  }
+  let data = serde_json::to_value(&state_file.data).map_err(|err| {
     err.map_err_context(|| "Unable to create json payload for the daemon")
   })?;
   let mut stream = client
@@ -777,13 +580,17 @@ async fn exec_state_apply(
     utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
   if opts.follow {
-    let query = CargoLogQuery {
-      namespace: Some(namespace),
-      follow: Some(true),
-      ..Default::default()
-    };
-    log_cargoes(&client, cargoes, &query).await?;
-    log_jobs(&client, jobs).await?;
+    if let Some(cargoes) = state_file.data.cargoes {
+      let query = CargoLogQuery {
+        namespace: state_file.data.namespace,
+        follow: Some(true),
+        ..Default::default()
+      };
+      log_cargoes(&client, cargoes, &query).await?;
+    }
+    if let Some(jobs) = state_file.data.jobs {
+      log_jobs(&client, jobs).await?;
+    }
   }
   if has_error {
     return Err(IoError::invalid_data(
@@ -810,9 +617,9 @@ async fn exec_state_logs(
   let host = &cli_conf.host;
   let format = cli_conf.user_config.display_format.clone();
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
-  let client = gen_client(host, &state_ref.meta)?;
+  let client = gen_client(host, &state_ref)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
-  let (_, namespace, jobs, cargoes) =
+  let state_file =
     execute_template(&state_ref, &args, &client, cli_conf).await?;
   let tail_string = opts.tail.clone().unwrap_or_default();
   let tail = tail_string.as_str();
@@ -826,11 +633,15 @@ async fn exec_state_logs(
     },
     timestamps: Some(opts.timestamps),
     follow: Some(opts.follow),
-    namespace: Some(namespace),
+    namespace: state_file.data.namespace,
     ..Default::default()
   };
-  log_cargoes(&client, cargoes, &log_opts).await?;
-  log_jobs(&client, jobs).await?;
+  if let Some(cargoes) = state_file.data.cargoes {
+    log_cargoes(&client, cargoes, &log_opts).await?;
+  }
+  if let Some(jobs) = state_file.data.jobs {
+    log_jobs(&client, jobs).await?;
+  }
   Ok(())
 }
 
@@ -850,21 +661,18 @@ async fn exec_state_remove(
   let host = &cli_conf.host;
   let format = cli_conf.user_config.display_format.clone();
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
-  let client = gen_client(host, &state_ref.meta)?;
+  let client = gen_client(host, &state_ref)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
-  let data: serde_json::Value = inject_data(
-    &state_ref.format,
-    &state_ref.raw,
-    &args,
-    &cli_conf.context,
-    &client,
-  )
-  .await?;
+  let state_file =
+    inject_data(&state_ref, &args, &cli_conf.context, &client).await?;
   if !opts.skip_confirm {
-    utils::print::display_format(&state_ref.format, &data)?;
+    println!("{}", state_file.raw);
     utils::dialog::confirm("Are you sure to remove this state ?")
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
+  let data = serde_json::to_value(&state_file.data).map_err(|err| {
+    err.map_err_context(|| "Unable to create json payload for the daemon")
+  })?;
   let mut stream = client.remove_state(&data).await?;
   let multiprogress = MultiProgress::new();
   multiprogress.set_move_cursor(false);

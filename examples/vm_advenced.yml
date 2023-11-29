@@ -2,7 +2,6 @@
 # This is an example of a virtual machine deployment
 # It will take over a physical interface from the host
 ###
-Kind: Deployment
 ApiVersion: v0.11
 
 Namespace: global
@@ -10,12 +9,12 @@ Namespace: global
 # See all options:
 # https://docs.next-hat.com/references/nanocl/virtual-machine
 VirtualMachines:
-  - Name: vm-test
-    Disk:
-      Image: ubuntu-22
-    HostConfig:
-      Cpu: 4
-      Memory: 4096
-      Kvm: true
-      RuntimeNetwork: host # use host networks
-      LinkNetIface: wlp6s0 # Use physical interface from host
+- Name: vm-test
+  Disk:
+    Image: ubuntu-22
+  HostConfig:
+    Cpu: 4
+    Memory: 4096
+    Kvm: true
+    RuntimeNetwork: host # use host networks
+    LinkNetIface: wlp6s0 # Use physical interface from host

@@ -1,16 +1,15 @@
-Kind: Resource
 ApiVersion: v0.11
 
 Resources:
-  - Name: proxy-get-started
-    Kind: ProxyRule
-    Version: v0.8
-    Data:
-      Rules:
-        - Domain: get-started.com
-          Network: Internal
-          Locations:
-            - Path: /
-              Target:
-                Key: get-started.global.c
-                Port: 9000
+- Name: proxy-get-started
+  Kind: ProxyRule
+  Version: v0.8
+  Data:
+    Rules:
+    - Domain: get-started.com
+      Network: Internal
+      Locations:
+      - Path: /
+        Target:
+          Key: get-started.global.c
+          Port: 9000

@@ -8,19 +8,82 @@ use crate::cargo_spec::CargoSpecPartial;
 
 use super::resource::ResourcePartial;
 
-/// ## StateMeta
-///
-/// Statefile metadata information that are always present
-///
+/// Statefile argument definition to pass to the Statefile
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct StateMeta {
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct StatefileArg {
+  /// Name of the build arg
+  pub name: String,
+  /// Kind of the build arg
+  pub kind: String,
+  /// Default value of the build arg
+  pub default: Option<String>,
+}
+
+/// Structure that represent a Statefile
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct Statefile {
   /// Api version to use or remote url
   pub api_version: String,
-  /// Kind of Statefile (Deployment, Cargo, VirtualMachine, Resource)
-  pub kind: String,
+  /// Arguments to pass to the Statefile
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub args: Option<Vec<StatefileArg>>,
+  /// Set the group of defined objects default to `{name_of_directory}.{name_of_file}`
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub group: Option<String>,
+  /// Namespace where the cargoes and virtual machines are deployed
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub namespace: Option<String>,
+  /// List of secrets to create
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub secrets: Option<Vec<SecretPartial>>,
+  /// List of resources to create
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub resources: Option<Vec<ResourcePartial>>,
+  /// List of cargoes to create and run
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub cargoes: Option<Vec<CargoSpecPartial>>,
+  /// List of virtual machines to create and run
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub virtual_machines: Option<Vec<VmSpecPartial>>,
+  /// List of jobs to create and run
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub jobs: Option<Vec<JobPartial>>,
 }
 
 #[derive(Debug, Clone)]
@@ -29,95 +92,6 @@ pub struct StateMeta {
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct StateApplyQuery {
   pub reload: Option<bool>,
-}
-
-/// ## StateResource
-///
-/// Statefile that represent the `Resource` kind
-///
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct StateResource {
-  /// List of resources to create
-  pub resources: Vec<ResourcePartial>,
-}
-
-/// ## StateSecret
-///
-/// Statefile that represent the `Secret` kind
-///
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct StateSecret {
-  /// List of secrets to create
-  pub secrets: Vec<SecretPartial>,
-}
-
-/// ## StateCargo
-///
-/// Statefile that represent the `Cargo` kind
-///
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct StateCargo {
-  /// Namespace where the cargoes are deployed
-  pub namespace: Option<String>,
-  /// List of cargoes to create and run
-  pub cargoes: Vec<CargoSpecPartial>,
-}
-
-/// ## StateVirtualMachine
-///
-/// Statefile that represent the `VirtualMachine` kind
-///
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct StateVirtualMachine {
-  /// Namespace where the virtual machines are deployed
-  pub namespace: Option<String>,
-  /// List of virtual machines to create and run
-  pub virtual_machines: Vec<VmSpecPartial>,
-}
-
-/// ## StateJob
-///
-/// Statefile that represent the `Job` kind
-///
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct StateJob {
-  pub jobs: Vec<JobPartial>,
-}
-
-/// ## StateDeployment
-///
-/// Statefile that represent the `Deployment` kind
-///
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct StateDeployment {
-  /// Namespace where the cargoes and virtual machines are deployed
-  pub namespace: Option<String>,
-  /// List of resources to create
-  pub resources: Option<Vec<ResourcePartial>>,
-  /// List of secrets to create
-  pub secrets: Option<Vec<SecretPartial>>,
-  /// List of cargoes to create and run
-  pub cargoes: Option<Vec<CargoSpecPartial>>,
-  /// List of virtual machines to create and run
-  pub virtual_machines: Option<Vec<VmSpecPartial>>,
 }
 
 /// ## StateStreamStatus

@@ -1,4 +1,3 @@
-Kind: Deployment
 ApiVersion: v0.11
 
 Args:
@@ -18,30 +17,30 @@ Namespace: global
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
-  - Name: ${{ Args.name }}
-    Container:
-      Image: ${{ Args.image }}
+- Name: ${{ Args.name }}
+  Container:
+    Image: ${{ Args.image }}
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
-  - Name: ${{ Args.domain }}
-    Kind: ProxyRule
-    Version: v0.8
-    Data:
-      Rules:
-        - Domain: ${{ Args.domain }}
-          Network: All
-          # {% if Args.ssl_enabled %}
-          Ssl:
-            Certificate: /etc/letsencrypt/live/${{ Args.domain }}/fullchain.pem
-            CertificateKey: /etc/letsencrypt/live/${{ Args.domain }}/privkey.pem
-            Dhparam: /etc/letsencrypt/ssl-dhparams.pem
-          Includes:
-            - /etc/letsencrypt/options-ssl-nginx.conf
-          # {% endif %}
-          Locations:
-            - Path: /
-              Target:
-                Key: ${{ Args.name }}.global.c
-                Port: ${{ Args.port }}
+- Name: ${{ Args.domain }}
+  Kind: ProxyRule
+  Version: v0.8
+  Data:
+    Rules:
+    - Domain: ${{ Args.domain }}
+      Network: All
+      # {% if Args.ssl_enabled %}
+      Ssl:
+        Certificate: /etc/letsencrypt/live/${{ Args.domain }}/fullchain.pem
+        CertificateKey: /etc/letsencrypt/live/${{ Args.domain }}/privkey.pem
+        Dhparam: /etc/letsencrypt/ssl-dhparams.pem
+      Includes:
+        - /etc/letsencrypt/options-ssl-nginx.conf
+      # {% endif %}
+      Locations:
+      - Path: /
+        Target:
+          Key: ${{ Args.name }}.global.c
+          Port: ${{ Args.port }}

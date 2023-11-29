@@ -1,33 +1,6 @@
 use clap::{Parser, Subcommand};
-use nanocld_client::stubs::state::StateMeta;
-use serde::{Serialize, Deserialize};
 
 use super::DisplayFormat;
-
-/// ## StateBuildArg
-///
-/// Statefile argument definition to build the Statefile
-///
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct BuildArg {
-  /// Name of the build arg
-  pub name: String,
-  /// Kind of the build arg
-  pub kind: String,
-  /// Default value of the build arg
-  pub default: Option<String>,
-}
-
-/// ## StateBuildArg
-///
-/// Statefile arguments definition to build the Statefile
-///
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct StateBuildArg {
-  pub args: Option<Vec<BuildArg>>,
-}
 
 /// ## StateApplyOpts
 ///
@@ -139,8 +112,6 @@ where
   pub raw: String,
   /// Format of the Statefile
   pub format: DisplayFormat,
-  /// Metadata of the Statefile
-  pub meta: StateMeta,
   /// Data of the Statefile (serialized)
   pub data: T,
 }

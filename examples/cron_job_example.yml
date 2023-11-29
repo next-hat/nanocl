@@ -1,15 +1,14 @@
-Kind: Job
 ApiVersion: v0.11
 
 Jobs:
 - Name: cron-job-example
   Schedule: "*/1 * * * *"
   Containers:
-    - Image: alpine:latest
-      Cmd:
-        - echo
-        - Hello World
-    - Image: alpine:latest
-      Cmd:
-        - echo
-        - Hello World2
+  - Image: alpine:latest
+    Cmd:
+    - echo
+    - Hello World
+  - Image: alpine:latest
+    Cmd:
+    - echo
+    - Hello World2

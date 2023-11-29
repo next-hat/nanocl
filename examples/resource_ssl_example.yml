@@ -1,24 +1,21 @@
-Kind: Resource
 ApiVersion: v0.11
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
-  - Name: resource-example
-    Kind: ProxyRule
-    Version: v0.8
-    Data:
-      Watch:
-        - deploy-example.global.c
-      Rules:
-        - Domain: deploy-example.com
-          Network: Internal
-          Ssl:
-            Certificate: /random/path/to/cert
-            CertificateKey: /random/path/to/key
-            SslDhParam: /random/path/to/param
-          Locations:
-            - Path: /
-              Target:
-                Key: deploy-example.global.c
-                Port: 9000
+- Name: resource-example
+  Kind: ProxyRule
+  Version: v0.8
+  Data:
+    Rules:
+      - Domain: deploy-example.com
+        Network: Internal
+        Ssl:
+          Certificate: /random/path/to/cert
+          CertificateKey: /random/path/to/key
+          SslDhParam: /random/path/to/param
+        Locations:
+          - Path: /
+            Target:
+              Key: deploy-example.global.c
+              Port: 9000

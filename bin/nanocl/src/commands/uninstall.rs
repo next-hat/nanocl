@@ -1,5 +1,5 @@
 use nanocl_error::io::{FromIo, IoResult};
-use nanocld_client::stubs::state::StateDeployment;
+use nanocld_client::stubs::state::Statefile;
 
 use bollard_next::container::{InspectContainerOptions, RemoveContainerOptions};
 
@@ -38,7 +38,7 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
     "channel": version::CHANNEL.to_owned(),
   });
   let installer = utils::state::compile(&installer, &data)?;
-  let installer = serde_yaml::from_str::<StateDeployment>(&installer)
+  let installer = serde_yaml::from_str::<Statefile>(&installer)
     .map_err(|err| err.map_err_context(|| "Unable to parse installer"))?;
   let cargoes = installer.cargoes.unwrap_or_default();
   for cargo in cargoes {

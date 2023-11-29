@@ -5868,40 +5868,28 @@ components:
           description: The maximum size for a line of output. The default is 8 * 1024 (roughly 1024 characters).
           nullable: true
           minimum: 0
-    StateCargo:
+    Statefile:
       type: object
-      description: |
-        ## StateCargo
-
-        Statefile that represent the `Cargo` kind
+      description: Structure that represent a Statefile
       required:
-      - Cargoes
+      - ApiVersion
       properties:
-        Namespace:
+        ApiVersion:
           type: string
-          description: Namespace where the cargoes are deployed
-          nullable: true
-        Cargoes:
+          description: Api version to use or remote url
+        Args:
           type: array
           items:
-            $ref: '#/components/schemas/CargoSpecPartial'
-          description: List of cargoes to create and run
-    StateDeployment:
-      type: object
-      description: |
-        ## StateDeployment
-
-        Statefile that represent the `Deployment` kind
-      properties:
+            $ref: '#/components/schemas/BuildArg'
+          description: Arguments to pass to the Statefile
+          nullable: true
+        Group:
+          type: string
+          description: Set the group of defined objects default to `{name_of_directory}.{name_of_file}`
+          nullable: true
         Namespace:
           type: string
           description: Namespace where the cargoes and virtual machines are deployed
-          nullable: true
-        Resources:
-          type: array
-          items:
-            $ref: '#/components/schemas/ResourcePartial'
-          description: List of resources to create
           nullable: true
         Secrets:
           type: array
@@ -5909,6 +5897,12 @@ components:
             $ref: '#/components/schemas/SecretPartial'
           description: List of secrets to create
           nullable: true
+        Resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourcePartial'
+          description: List of resources to create
+          nullable: true
         Cargoes:
           type: array
           items:
@@ -5921,54 +5915,12 @@ components:
             $ref: '#/components/schemas/VmSpecPartial'
           description: List of virtual machines to create and run
           nullable: true
-    StateMeta:
-      type: object
-      description: |
-        ## StateMeta
-
-        Statefile metadata information that are always present
-      required:
-      - ApiVersion
-      - Kind
-      properties:
-        ApiVersion:
-          type: string
-          description: Api version to use or remote url
-        Kind:
-          type: string
-          description: Kind of Statefile (Deployment, Cargo, VirtualMachine, Resource)
-    StateResource:
-      type: object
-      description: |
-        ## StateResource
-
-        Statefile that represent the `Resource` kind
-      required:
-      - Resources
-      properties:
-        Resources:
+        Jobs:
           type: array
           items:
-            $ref: '#/components/schemas/ResourcePartial'
-          description: List of resources to create
-    StateVirtualMachine:
-      type: object
-      description: |
-        ## StateVirtualMachine
-
-        Statefile that represent the `VirtualMachine` kind
-      required:
-      - VirtualMachines
-      properties:
-        Namespace:
-          type: string
-          description: Namespace where the virtual machines are deployed
+            $ref: '#/components/schemas/JobPartial'
+          description: List of jobs to create and run
           nullable: true
-        VirtualMachines:
-          type: array
-          items:
-            $ref: '#/components/schemas/VmSpecPartial'
-          description: List of virtual machines to create and run
     Stats:
       type: object
       description: Statistics for the container.
