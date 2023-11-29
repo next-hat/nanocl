@@ -1,37 +1,36 @@
-Kind: Deployment
 ApiVersion: v0.11
 
 Namespace: global
 
 Args:
-  - Name: domain
-    Kind: String
+- Name: domain
+  Kind: String
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
-  - Name: ${{ Args.domain }}
-    Kind: ProxyRule
-    Version: v0.8
-    Data:
-      Rules:
-        - Domain: ${{ Args.domain }}
-          Network: Internal
-          Locations:
-            - Path: /
-              Target:
-                Key: get-started.global.c
-                Port: 9000
+- Name: ${{ Args.domain }}
+  Kind: ProxyRule
+  Version: v0.8
+  Data:
+    Rules:
+    - Domain: ${{ Args.domain }}
+      Network: Internal
+      Locations:
+      - Path: /
+        Target:
+          Key: get-started.global.c
+          Port: 9000
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
-  - Name: get-started
-    Container:
-      Image: ghcr.io/nxthat/nanocl-get-started:latest
-      HostConfig:
-        Binds:
-          - ./test_local:/test
-      Env:
-        - TEST=GG
-        - APP=GET_STARTED
+- Name: get-started
+  Container:
+    Image: ghcr.io/nxthat/nanocl-get-started:latest
+    HostConfig:
+      Binds:
+      - ./test_local:/test
+    Env:
+    - TEST=GG
+    - APP=GET_STARTED

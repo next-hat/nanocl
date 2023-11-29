@@ -1,8 +1,4 @@
 use nanocl_stubs::config::DaemonConfig;
-use nanocl_stubs::state::{
-  StateDeployment, StateCargo, StateResource, StateVirtualMachine, StateSecret,
-  StateJob,
-};
 
 use crate::event::EventEmitter;
 
@@ -27,18 +23,4 @@ pub struct DaemonState {
   /// Latest version of the daemon or version of current request
   #[allow(dead_code)]
   pub version: String,
-}
-
-/// ## StateData
-///
-/// This enum represent the different `Statefile` format that can be parsed.
-///
-#[derive(Clone, Debug)]
-pub enum StateFileData {
-  Deployment(StateDeployment),
-  Cargo(StateCargo),
-  VirtualMachine(StateVirtualMachine),
-  Resource(StateResource),
-  Secret(StateSecret),
-  Job(StateJob),
 }

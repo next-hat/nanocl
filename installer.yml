@@ -1,4 +1,3 @@
-Kind: Deployment
 ApiVersion: v0.11
 
 # This is the required component for nanocl ecosystem.

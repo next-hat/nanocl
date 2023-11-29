@@ -91,8 +91,8 @@ pub struct CargoSpecPartial {
 /// Payload used to patch a cargo
 /// It will create a new [CargoSpec](CargoSpec) with the new values
 /// It will keep the old values in the history
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",

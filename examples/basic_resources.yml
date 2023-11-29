@@ -1,11 +1,10 @@
-Kind: Resource
 ApiVersion: v0.11
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
-  - Name: TestResource
-    Kind: Kind
-    Version: v0.1
-    Data:
-      Url: unix:///run/nanocl/test.sock
+- Name: TestResource
+  Kind: Kind
+  Version: v0.1
+  Data:
+    Url: unix:///run/nanocl/test.sock

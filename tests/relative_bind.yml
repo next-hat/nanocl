@@ -1,4 +1,3 @@
-Kind: Cargo
 ApiVersion: v0.11
 
 Namespace: cargo-bind-test
@@ -6,11 +5,11 @@ Namespace: cargo-bind-test
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
-  - Name: cargo-bind-test
-    Container:
-      Image: ghcr.io/nxthat/nanocl-get-started:latest
-      HostConfig:
-        Binds:
-          - /tmp/toto:/tata
-          - ./toto:/toto
-          - dsa:/titi
+- Name: cargo-bind-test
+  Container:
+    Image: ghcr.io/nxthat/nanocl-get-started:latest
+    HostConfig:
+      Binds:
+      - /tmp/toto:/tata
+      - ./toto:/toto
+      - dsa:/titi

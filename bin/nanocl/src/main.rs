@@ -13,18 +13,7 @@ mod commands;
 use config::{UserConfig, CliConfig};
 use models::{Cli, Command, Context};
 
-/// ## Create cli config
-///
 /// Create a CliConfig struct from the cli arguments
-///
-/// ## Arguments
-///
-/// * [cli_args](Cli) The cli arguments
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [CliConfig](CliConfig)
-///
 fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
   Context::ensure()?;
   let user_conf = UserConfig::new();
@@ -62,14 +51,7 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
   })
 }
 
-/// ## Execute arg
-///
 /// Execute the command from the cli arguments
-///
-/// ## Arguments
-///
-/// * [cli_args](Cli) The cli arguments
-///
 async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
   let cli_conf = create_cli_config(cli_args)?;
   match &cli_args.command {
@@ -93,12 +75,9 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
   }
 }
 
-/// ## Main
-///
 /// Nanocl is a command line interface for the Nanocl Daemon.
 /// It will translate the conresponding commands to the Nanocl Daemon API.
 /// You can use it to manage your cargoes and virtual machines.
-///
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
   let args = Cli::parse();

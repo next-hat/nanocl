@@ -70,9 +70,7 @@ use nanocl_stubs::proxy::{
   LocationTarget, HttpTarget, UrlRedirect, UpstreamTarget, ProxyRule,
   UnixTarget, ProxySslConfig,
 };
-use nanocl_stubs::state::{
-  StateMeta, StateCargo, StateVirtualMachine, StateResource, StateDeployment,
-};
+use nanocl_stubs::state::{Statefile, StatefileArg};
 
 use super::{
   node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
@@ -455,11 +453,8 @@ impl Modify for VersionModifier {
     ResourceSpec,
     ResourcePartial,
     // State
-    StateMeta,
-    StateCargo,
-    StateVirtualMachine,
-    StateResource,
-    StateDeployment,
+    Statefile,
+    StatefileArg,
     // ProxyRules
     ResourceProxyRule,
     ProxyRule,
