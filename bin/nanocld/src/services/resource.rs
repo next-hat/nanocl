@@ -1,16 +1,16 @@
 /*
 * Endpoints to manipulate resources
 */
-
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::resource::ResourceUpdate;
+use nanocl_stubs::generic::GenericFilter;
+use nanocl_stubs::resource::{ResourceUpdate, ResourceSpec};
 use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
-use crate::{utils, repositories};
-use crate::models::DaemonState;
+use crate::utils;
+use crate::models::{DaemonState, ResourceSpecDb, Repository, ResourceDb};
 
 /// List resources
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -33,7 +33,9 @@ pub(crate) async fn list_resource(
   web::types::Query(query): web::types::Query<ResourceQuery>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let items = repositories::resource::find(Some(query), &state.pool).await?;
+  // let items = repositories::resource::find(Some(query), &state.pool).await?;
+  let items =
+    ResourceDb::find(&GenericFilter::default(), &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -55,8 +57,7 @@ pub(crate) async fn inspect_resource(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let resource =
-    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
+  let resource = ResourceDb::inspect_by_pk(&path.1, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
@@ -121,8 +122,7 @@ pub(crate) async fn put_resource(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let resource =
-    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
+  let resource = ResourceDb::inspect_by_pk(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
     name: path.1.clone(),
     version: payload.version,
@@ -152,9 +152,11 @@ pub(crate) async fn list_resource_history(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let items =
-    repositories::resource_spec::list_by_resource_key(&path.1, &state.pool)
-      .await?;
+  let items = ResourceSpecDb::find(&GenericFilter::default(), &state.pool)
+    .await??
+    .into_iter()
+    .map(ResourceSpec::from)
+    .collect::<Vec<_>>();
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -177,10 +179,8 @@ pub(crate) async fn revert_resource(
   path: web::types::Path<(String, String, uuid::Uuid)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let history =
-    repositories::resource_spec::find_by_key(&path.2, &state.pool).await?;
-  let resource =
-    repositories::resource::inspect_by_key(&path.1, &state.pool).await?;
+  let history = ResourceSpecDb::find_by_pk(&path.2, &state.pool).await??;
+  let resource = ResourceDb::inspect_by_pk(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
     name: resource.spec.resource_key,
     version: history.version,

@@ -7,8 +7,8 @@ use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
 
-use crate::{utils, repositories};
-use crate::models::DaemonState;
+use crate::utils;
+use crate::models::{DaemonState, NamespaceDb, Repository};
 
 /// List namespaces
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -85,7 +85,7 @@ pub(crate) async fn create_namespace(
     ("Name" = String, Path, description = "The namespace name to delete")
   ),
   responses(
-    (status = 200, description = "Delete response", body = GenericDelete),
+    (status = 202, description = "Namespace have been deleted"),
     (status = 404, description = "Namespace is not existing", body = ApiError),
   ),
 ))]
@@ -94,9 +94,9 @@ pub(crate) async fn delete_namespace(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  repositories::namespace::find_by_name(&path.1, &state.pool).await?;
-  let res = utils::namespace::delete_by_name(&path.1, &state).await?;
-  Ok(web::HttpResponse::Ok().json(&res))
+  NamespaceDb::find_by_pk(&path.1, &state.pool).await??;
+  utils::namespace::delete_by_name(&path.1, &state).await?;
+  Ok(web::HttpResponse::Accepted().into())
 }
 
 pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {

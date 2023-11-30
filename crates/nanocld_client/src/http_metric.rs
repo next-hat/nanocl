@@ -8,8 +8,6 @@ impl NanocldClient {
   /// ## Default path for http metrics
   const HTTP_METRIC_PATH: &'static str = "/http_metrics";
 
-  /// ## List http metrics
-  ///
   /// List http metric from the system
   ///
   /// ## Arguments

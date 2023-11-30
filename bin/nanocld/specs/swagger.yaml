@@ -50,35 +50,20 @@ paths:
       description: List cargoes
       operationId: list_cargo
       parameters:
+      - name: Filter
+        in: query
+        description: Filter for cargoes
+        required: false
+        schema:
+          allOf:
+          - $ref: '#/components/schemas/GenericFilter'
+          nullable: true
       - name: Namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargoes are
         required: false
         schema:
           type: string
-          nullable: true
-      - name: Name
-        in: query
-        description: Filter for cargoes with similar name
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: Limit
-        in: query
-        description: Max amount of cargoes in response
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: Offset
-        in: query
-        description: Offset of the first cargo in response
-        required: false
-        schema:
-          type: integer
-          format: int64
           nullable: true
       responses:
         '200':
@@ -1120,12 +1105,8 @@ paths:
         schema:
           type: string
       responses:
-        '200':
-          description: Delete response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericDelete'
+        '202':
+          description: Namespace have been deleted
         '404':
           description: Namespace is not existing
           content:
@@ -2023,6 +2004,27 @@ components:
       properties:
         msg:
           type: string
+    BinaryInfo:
+      type: object
+      description: Details about the binary
+      required:
+      - Arch
+      - Channel
+      - Version
+      - CommitId
+      properties:
+        Arch:
+          type: string
+          description: Arch is the architecture of the current binary
+        Channel:
+          type: string
+          description: Channel is the channel of the current binary
+        Version:
+          type: string
+          description: Version is the version of the current binary
+        CommitId:
+          type: string
+          description: CommitID is the commit id of the current binary
     BlkioStats:
       type: object
       description: I/O statistics for the container.
@@ -3789,10 +3791,7 @@ components:
             description: HostGateway is the gateway address of the host
           Config:
             $ref: '#/components/schemas/DaemonConfig'
-      description: |-
-        ## HostInfo
-
-        HostInfo contains information about the host and the docker daemon
+      description: HostInfo contains information about the host and the docker daemon
     HttpMetric:
       type: object
       required:
@@ -6630,26 +6629,6 @@ components:
       - MovedPermanently
       - Permanent
       - Temporary
-    Version:
-      type: object
-      description: |
-        ## Version
-
-        Version contain details about the current version nanocl
-      required:
-      - Arch
-      - Channel
-      - Version
-      - CommitId
-      properties:
-        Arch:
-          type: string
-        Channel:
-          type: string
-        Version:
-          type: string
-        CommitId:
-          type: string
     Vm:
       type: object
       description: A virtual machine instance

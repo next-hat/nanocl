@@ -1,16 +1,15 @@
-use nanocl_stubs::resource::ResourceSpec;
+use nanocl_error::io::IoResult;
+use nanocl_stubs::{resource::ResourceSpec, generic::GenericFilter};
+use tokio::task::JoinHandle;
 
 use crate::schema::resource_specs;
 
-use super::resource::ResourceDb;
+use super::{resource::ResourceDb, Repository, Pool};
 
-/// ## ResourceSpecDb
-///
 /// This structure represent the resource spec in the database.
 /// A resource spec represent the specification of a resource.
 /// It is stored as a json object in the database.
 /// We use the `resource_key` to link to the resource.
-///
 #[derive(Clone, Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = resource_specs)]
@@ -41,5 +40,18 @@ impl From<ResourceSpecDb> for ResourceSpec {
       data: db.data,
       metadata: db.metadata,
     }
+  }
+}
+
+impl Repository for ResourceSpecDb {
+  type Table = resource_specs::table;
+  type Item = ResourceSpecDb;
+  type UpdateItem = ResourceSpecDb;
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    unimplemented!()
   }
 }

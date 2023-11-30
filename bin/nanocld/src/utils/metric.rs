@@ -5,69 +5,52 @@ use futures::StreamExt;
 use ntex::time::interval;
 use metrsd_client::{MetrsdClient, MetrsdEvent};
 
-use crate::repositories::metric;
-use crate::models::{Pool, MetricInsertDb, DaemonState};
+use crate::models::{Pool, MetricPartial, DaemonState, MetricDb, Repository};
 
-/// ## Save metric
-///
 /// Save metric event send by [metrsd](http://github.com/nxthat/metrsd) to the database
 /// The event can be a `CPU`, `MEMORY`, `DISK` or `NETWORK` event.
 /// The metric is saved for the current node.
 /// This allow us to know what node is the most used.
-///
-/// ## Arguments
-///
-/// * [node](str) - Name of the node
-/// * [ev](MetrsdEvent) - Metric event
-/// * [pool](Pool) - Database pool
-///
 async fn save_metric(node: &str, ev: &MetrsdEvent, pool: &Pool) {
   match ev {
     MetrsdEvent::Cpu(cpus) => {
-      let item = MetricInsertDb {
+      let item = MetricPartial {
         kind: "CPU".into(),
         node_name: node.to_owned(),
         data: serde_json::to_value(cpus).unwrap(),
       };
-      let _ = metric::create(&item, pool).await;
+      let _ = MetricDb::create(&item, pool).await;
     }
     MetrsdEvent::Memory(mem) => {
-      let item = MetricInsertDb {
+      let item = MetricPartial {
         kind: "MEMORY".into(),
         node_name: node.to_owned(),
         data: serde_json::to_value(mem).unwrap(),
       };
-      let _ = metric::create(&item, pool).await;
+      let _ = MetricDb::create(&item, pool).await;
     }
     MetrsdEvent::Disk(disk) => {
-      let item = MetricInsertDb {
+      let item = MetricPartial {
         kind: "DISK".into(),
         node_name: node.to_owned(),
         data: serde_json::to_value(disk).unwrap(),
       };
-      let _ = metric::create(&item, pool).await;
+      let _ = MetricDb::create(&item, pool).await;
     }
     MetrsdEvent::Network(net) => {
-      let item = MetricInsertDb {
+      let item = MetricPartial {
         kind: "NETWORK".into(),
         node_name: node.to_owned(),
         data: serde_json::to_value(net).unwrap(),
       };
-      let _ = metric::create(&item, pool).await;
+      let _ = MetricDb::create(&item, pool).await;
     }
   }
 }
 
-/// ## Spawn logger
-///
 /// Spawn a background thread that will listen to the metrics daemon
 /// and save the metrics to the database.
 /// The metrics are saved for the current node.
-///
-/// ## Arguments
-///
-/// * [state](DaemonState) - Daemon state
-///
 pub(crate) fn spawn_logger(state: &DaemonState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(move || {

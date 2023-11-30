@@ -80,6 +80,7 @@ fn set_unix_sock_perm() {
         }
       }
       log::debug!("set_unix_permission done");
+      rt::Arbiter::current().stop();
     });
   });
 }

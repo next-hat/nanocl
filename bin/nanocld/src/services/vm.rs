@@ -19,7 +19,7 @@ use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 
 use crate::{utils, repositories};
-use crate::models::{DaemonState, WsConState};
+use crate::models::{DaemonState, WsConState, VmDb, Repository, VmSpecDb};
 
 /// List virtual machines
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -91,7 +91,7 @@ pub(crate) async fn start_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-  repositories::vm::find_by_key(&key, &state.pool).await?;
+  VmDb::find_by_pk(&key, &state.pool).await??;
   utils::vm::start_by_key(&key, &state).await?;
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -118,7 +118,7 @@ pub(crate) async fn stop_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-  repositories::vm::find_by_key(&key, &state.pool).await?;
+  VmDb::find_by_pk(&key, &state.pool).await??;
   utils::vm::stop_by_key(&key, &state).await?;
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -195,8 +195,7 @@ pub(crate) async fn list_vm_history(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let histories =
-    repositories::vm_spec::list_by_vm_key(&key, &state.pool).await?;
+  let histories = VmSpecDb::find_by_vm(&key, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 

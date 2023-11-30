@@ -1,11 +1,18 @@
+use std::collections::HashMap;
+
+use nanocl_error::io::IoResult;
 use serde::{Serialize, Deserialize};
 
-use nanocl_stubs::vm_image::VmImage;
+use nanocl_stubs::{
+  vm_image::VmImage,
+  generic::{GenericFilter, GenericClause},
+};
+use tokio::task::JoinHandle;
 
 use crate::schema::vm_images;
 
-/// ## VmImageDb
-///
+use super::{Repository, Pool};
+
 /// This structure represent a virtual machine image in the database.
 /// A virtual machine image is a file that represent a virtual machine disk.
 ///
@@ -14,7 +21,6 @@ use crate::schema::vm_images;
 /// - Snapshot: A snapshot image is a virtual machine image that is based on a base image.
 ///
 /// A `Snapshot` of a `Base` image will alway be use to create a virtual machine.
-///
 #[derive(
   Clone, Debug, Queryable, Identifiable, Insertable, Serialize, Deserialize,
 )]
@@ -40,10 +46,7 @@ pub struct VmImageDb {
   pub parent: Option<String>,
 }
 
-/// ## VmImageUpdateDb
-///
 /// This structure is used to update a virtual machine image in the database.
-///
 #[derive(Clone, Debug, AsChangeset)]
 #[diesel(table_name = vm_images)]
 pub struct VmImageUpdateDb {
@@ -53,10 +56,7 @@ pub struct VmImageUpdateDb {
   pub size_virtual: i64,
 }
 
-/// ## QemuImgInfo
-///
 /// This structure is used to parse the output of the qemu-img info command.
-///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct QemuImgInfo {
@@ -80,5 +80,35 @@ impl From<VmImageDb> for VmImage {
       size_actual: db.size_actual,
       size_virtual: db.size_virtual,
     }
+  }
+}
+
+impl Repository for VmImageDb {
+  type Table = vm_images::table;
+  type Item = VmImageDb;
+  type UpdateItem = VmImageUpdateDb;
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    unimplemented!()
+  }
+}
+
+impl VmImageDb {
+  pub(crate) async fn find_by_parent(
+    name: &str,
+    pool: &Pool,
+  ) -> IoResult<Vec<VmImageDb>> {
+    let mut r#where = HashMap::new();
+    r#where.insert(
+      "NamespaceName".to_owned(),
+      GenericClause::Eq(name.to_owned()),
+    );
+    let filter = GenericFilter {
+      r#where: Some(r#where),
+    };
+    VmImageDb::find(&filter, pool).await?
   }
 }

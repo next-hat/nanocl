@@ -45,6 +45,7 @@ nanocl_error = { version = "0.1.0", features = [
   "bollard",
   "serde_json",
   "serde_yaml",
+  "tokio",
 ] }
 bollard-next = { version = "0.15.4" }
 log = "0.4.20"

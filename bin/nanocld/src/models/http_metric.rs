@@ -1,15 +1,18 @@
 use uuid::Uuid;
+use tokio::task::JoinHandle;
 use chrono::{DateTime, FixedOffset};
 use serde::{Serialize, Deserialize, Deserializer};
 
+use nanocl_error::io::IoResult;
+
+use nanocl_stubs::generic::GenericFilter;
+
 use crate::schema::{http_metrics, stream_metrics};
 
+use super::{Pool, Repository};
 use super::generic::ToMeticDb;
 
-/// ## deserialize empty string
-///
 /// Serde helper to deserialize string that can be empty to `Option<String>`.
-///
 fn deserialize_empty_string<'de, D>(
   deserializer: D,
 ) -> Result<Option<String>, D::Error>
@@ -24,10 +27,7 @@ where
   }
 }
 
-/// ## deserialize string to i64
-///
 /// Serde helper to deserialize string to `i64`.
-///
 fn deserialize_string_to_i64<'de, D>(deserializer: D) -> Result<i64, D::Error>
 where
   D: Deserializer<'de>,
@@ -37,8 +37,6 @@ where
   Ok(res)
 }
 
-/// ## deserialize string to f64
-///
 /// Serde helper to deserialize string to `f64`.
 fn deserialize_string_to_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
@@ -49,11 +47,8 @@ where
   Ok(res)
 }
 
-/// ## HttpMetricPartial
-///
 /// This structure represent a partial http metric.
 /// It is used to insert http metrics in the database.
-///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all(serialize = "PascalCase"))]
 pub struct HttpMetricPartial {
@@ -289,5 +284,31 @@ impl ToMeticDb for StreamMetricPartial {
       upstream_connect_time: self.upstream_connect_time,
       node_name: node_name.to_owned(),
     }
+  }
+}
+
+impl Repository for HttpMetricDb {
+  type Table = http_metrics::table;
+  type Item = HttpMetricDb;
+  type UpdateItem = HttpMetricDb;
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    unimplemented!()
+  }
+}
+
+impl Repository for StreamMetricDb {
+  type Table = stream_metrics::table;
+  type Item = StreamMetricDb;
+  type UpdateItem = StreamMetricDb;
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    unimplemented!()
   }
 }

@@ -1,15 +1,19 @@
+use nanocl_error::io::IoResult;
 use serde::{Serialize, Deserialize};
 
-use nanocl_stubs::secret::{Secret, SecretPartial};
+use nanocl_stubs::{
+  secret::{Secret, SecretPartial, SecretUpdate},
+  generic::GenericFilter,
+};
+use tokio::task::JoinHandle;
 
 use crate::schema::secrets;
 
-/// ## SecretDb
-///
+use super::{Repository, Pool};
+
 /// This structure represent the secret in the database.
 /// A secret is a key/value pair that can be used by the user to store
 /// sensitive data. It is stored as a json object in the database.
-///
 #[derive(
   Clone, Serialize, Deserialize, Queryable, Identifiable, Insertable,
 )]
@@ -34,16 +38,16 @@ pub struct SecretDb {
   pub metadata: Option<serde_json::Value>,
 }
 
-impl From<SecretPartial> for SecretDb {
-  fn from(secret: SecretPartial) -> Self {
+impl From<&SecretPartial> for SecretDb {
+  fn from(secret: &SecretPartial) -> Self {
     Self {
-      key: secret.key,
+      key: secret.key.clone(),
       created_at: chrono::Utc::now().naive_utc(),
       updated_at: chrono::Utc::now().naive_utc(),
-      kind: secret.kind,
+      kind: secret.kind.clone(),
       immutable: secret.immutable.unwrap_or(false),
-      data: secret.data,
-      metadata: secret.metadata,
+      data: secret.data.clone(),
+      metadata: secret.metadata.clone(),
     }
   }
 }
@@ -74,10 +78,7 @@ impl From<SecretDb> for Secret {
   }
 }
 
-/// ## SecretUpdateDb
-///
 /// This structure is used to update a secret in the database.
-///
 #[derive(Debug, Default, AsChangeset)]
 #[diesel(table_name = secrets)]
 pub struct SecretUpdateDb {
@@ -85,4 +86,26 @@ pub struct SecretUpdateDb {
   pub data: Option<serde_json::Value>,
   // The metadata (user defined)
   pub metadata: Option<serde_json::Value>,
+}
+
+impl From<&SecretUpdate> for SecretUpdateDb {
+  fn from(update: &SecretUpdate) -> Self {
+    Self {
+      data: Some(update.data.clone()),
+      metadata: update.metadata.clone(),
+    }
+  }
+}
+
+impl Repository for SecretDb {
+  type Table = secrets::table;
+  type Item = Secret;
+  type UpdateItem = SecretUpdateDb;
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    unimplemented!()
+  }
 }

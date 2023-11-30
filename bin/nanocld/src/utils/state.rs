@@ -14,7 +14,7 @@ use nanocl_stubs::vm_spec::{VmSpecPartial, VmDisk};
 use nanocl_stubs::state::{Statefile, StateStream, StateApplyQuery};
 
 use crate::{utils, repositories};
-use crate::models::DaemonState;
+use crate::models::{DaemonState, ResourceDb, SecretDb, Repository, VmDb, CargoDb};
 
 /// ## Ensure namespace existence
 ///
@@ -120,14 +120,20 @@ async fn apply_secrets(
     .map(|secret| async {
       let key = secret.key.to_owned();
       send(StateStream::new_secret_pending(&key), sx);
-      match repositories::secret::find_by_key(&key, &state.pool).await {
+      match SecretDb::find_by_pk(&key, &state.pool).await {
         Ok(existing) => {
-          let existing: SecretPartial = existing.clone().into();
+          let existing: SecretPartial = match existing {
+            Ok(existing) => existing.clone().into(),
+            Err(_) => {
+              send(StateStream::new_secret_not_found(&key), sx);
+              return;
+            }
+          };
           if existing == *secret && !qs.reload.unwrap_or(false) {
             send(StateStream::new_secret_unchanged(&key), sx);
             return;
           }
-          if let Err(err) = repositories::secret::update_by_key(
+          if let Err(err) = SecretDb::update_by_pk(
             &key,
             &SecretUpdate {
               data: secret.data.to_owned(),
@@ -142,8 +148,7 @@ async fn apply_secrets(
           }
         }
         Err(_err) => {
-          if let Err(err) =
-            repositories::secret::create(secret, &state.pool).await
+          if let Err(err) = SecretDb::create(&secret.clone(), &state.pool).await
           {
             send(StateStream::new_secret_error(&key, &err.to_string()), sx);
             return;
@@ -242,7 +247,7 @@ async fn apply_cargoes(
     .map(|cargo| async {
       let key = utils::key::gen_key(namespace, &cargo.name);
       send(StateStream::new_cargo_pending(&key), sx);
-      match repositories::cargo::inspect_by_key(&key, &state.pool).await {
+      match CargoDb::inspect_by_pk(&key, &state.pool).await {
         Ok(existing) => {
           let existing: CargoSpecPartial = existing.into();
           if existing == *cargo && !qs.reload.unwrap_or(false) {
@@ -302,7 +307,7 @@ pub(crate) async fn apply_vms(
     .map(|vm| async {
       let key = utils::key::gen_key(namespace, &vm.name);
       send(StateStream::new_vm_pending(&key), sx);
-      match repositories::vm::inspect_by_key(&key, &state.pool).await {
+      match VmDb::inspect_by_pk(&key, &state.pool).await {
         Ok(existing) => {
           let existing: VmSpecPartial = existing.into();
           let vm = VmSpecPartial {
@@ -365,18 +370,17 @@ async fn apply_resources(
     .map(|resource| async {
       let key = resource.name.to_owned();
       send(StateStream::new_resource_pending(&key), sx);
-      let res =
-        match repositories::resource::inspect_by_key(&key, &state.pool).await {
-          Err(_) => utils::resource::create(resource, state).await,
-          Ok(cur_resource) => {
-            let casted: ResourcePartial = cur_resource.into();
-            if *resource == casted && !qs.reload.unwrap_or(false) {
-              send(StateStream::new_resource_unchanged(&key), sx);
-              return;
-            }
-            utils::resource::patch(&resource.clone(), state).await
+      let res = match ResourceDb::inspect_by_pk(&key, &state.pool).await {
+        Err(_) => utils::resource::create(resource, state).await,
+        Ok(cur_resource) => {
+          let casted: ResourcePartial = cur_resource.into();
+          if *resource == casted && !qs.reload.unwrap_or(false) {
+            send(StateStream::new_resource_unchanged(&key), sx);
+            return;
           }
-        };
+          utils::resource::patch(&resource.clone(), state).await
+        }
+      };
       if let Err(err) = res {
         send(StateStream::new_resource_error(&key, &err.to_string()), sx);
         return;
@@ -446,17 +450,20 @@ async fn remove_secrets(
     .map(|secret| async {
       let key = secret.key.to_owned();
       send(StateStream::new_secret_pending(&key), sx);
-      let secret =
-        match repositories::secret::find_by_key(&key, &state.pool).await {
+      let secret = match SecretDb::find_by_pk(&key, &state.pool).await {
+        Ok(secret) => match secret {
           Ok(secret) => secret,
           Err(_) => {
             send(StateStream::new_secret_not_found(&key), sx);
             return;
           }
-        };
-      if let Err(err) =
-        repositories::secret::delete_by_key(&secret.key, &state.pool).await
-      {
+        },
+        Err(_) => {
+          send(StateStream::new_secret_not_found(&key), sx);
+          return;
+        }
+      };
+      if let Err(err) = SecretDb::delete_by_pk(&secret.key, &state.pool).await {
         send(StateStream::new_secret_error(&key, &err.to_string()), sx);
         return;
       }
@@ -489,14 +496,13 @@ async fn remove_cargoes(
     .map(|cargo| async {
       let key = utils::key::gen_key(namespace, &cargo.name);
       send(StateStream::new_cargo_pending(&key), sx);
-      let cargo =
-        match repositories::cargo::inspect_by_key(&key, &state.pool).await {
-          Ok(cargo) => cargo,
-          Err(_) => {
-            send(StateStream::new_cargo_not_found(&key), sx);
-            return;
-          }
-        };
+      let cargo = match CargoDb::inspect_by_pk(&key, &state.pool).await {
+        Ok(cargo) => cargo,
+        Err(_) => {
+          send(StateStream::new_cargo_not_found(&key), sx);
+          return;
+        }
+      };
       if let Err(err) =
         utils::cargo::delete_by_key(&cargo.spec.cargo_key, Some(true), state)
           .await
@@ -536,7 +542,7 @@ pub(crate) async fn remove_vms(
     .map(|vm| async {
       let key = utils::key::gen_key(namespace, &vm.name);
       send(StateStream::new_vm_pending(&key), sx);
-      let res = repositories::vm::inspect_by_key(&key, &state.pool).await;
+      let res = VmDb::inspect_by_pk(&key, &state.pool).await;
       if res.is_err() {
         send(StateStream::new_vm_not_found(&key), sx);
         return;
@@ -571,18 +577,14 @@ async fn remove_resources(
     .iter()
     .map(|resource| async {
       send(StateStream::new_resource_pending(&resource.name), sx);
-      let resource = match repositories::resource::inspect_by_key(
-        &resource.name,
-        &state.pool,
-      )
-      .await
-      {
-        Ok(resource) => resource,
-        Err(_) => {
-          send(StateStream::new_resource_not_found(&resource.name), sx);
-          return;
-        }
-      };
+      let resource =
+        match ResourceDb::inspect_by_pk(&resource.name, &state.pool).await {
+          Ok(resource) => resource,
+          Err(_) => {
+            send(StateStream::new_resource_not_found(&resource.name), sx);
+            return;
+          }
+        };
       if let Err(err) = utils::resource::delete(&resource, state).await {
         send(
           StateStream::new_resource_error(

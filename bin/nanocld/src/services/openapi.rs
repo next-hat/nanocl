@@ -37,7 +37,7 @@ use bollard_next::service::{
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 use nanocl_stubs::generic::GenericCount;
-use nanocl_stubs::system::{Version, HostInfo};
+use nanocl_stubs::system::{BinaryInfo, HostInfo};
 use nanocl_stubs::metric::{Metric, MetricKind};
 use nanocl_stubs::http_metric::HttpMetric;
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
@@ -310,7 +310,7 @@ impl Modify for VersionModifier {
     SecretPartial,
     SecretUpdate,
     // System
-    Version,
+    BinaryInfo,
     HostInfo,
     SystemInfo,
     Commit,

@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
+use diesel::ExpressionMethods;
 use ntex::util::Bytes;
 use futures::StreamExt;
 use futures_util::TryFutureExt;
 use futures_util::stream::FuturesUnordered;
-use bollard_next::service::ContainerCreateResponse;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
@@ -15,19 +15,23 @@ use bollard_next::container::{
 use bollard_next::service::{
   HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
 };
+use bollard_next::service::ContainerCreateResponse;
 use nanocl_stubs::system::EventAction;
 use nanocl_stubs::node::NodeContainerSummary;
+use nanocl_stubs::generic::{GenericListNspQuery, GenericClause, GenericFilter};
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,
-  CargoKillOptions, GenericCargoListQuery, CargoScale, CargoStats,
-  CargoStatsQuery,
+  CargoKillOptions, CargoScale, CargoStats, CargoStatsQuery,
 };
 use nanocl_stubs::cargo_spec::{
   CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config,
 };
 
 use crate::{utils, repositories};
-use crate::models::DaemonState;
+use crate::models::{
+  DaemonState, CargoDb, Repository, ContainerDb, NamespaceDb, NodeDb, SecretDb,
+  CargoSpecDb, FromSpec,
+};
 
 use super::stream::transform_stream;
 
@@ -127,8 +131,7 @@ async fn create_instances(
     let fetched_secrets = secrets
       .iter()
       .map(|secret| async move {
-        let secret =
-          repositories::secret::find_by_key(secret, &state.pool).await?;
+        let secret = SecretDb::find_by_pk(secret, &state.pool).await??;
         if secret.kind.as_str() != "Env" {
           return Err(HttpError::bad_request(format!(
             "Secret {} is not an Env secret",
@@ -420,7 +423,7 @@ pub(crate) async fn create(
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
   let cargo =
-    repositories::cargo::create(namespace, spec, version, &state.pool).await?;
+    CargoDb::create_from_spec(namespace, spec, version, &state.pool).await?;
   let number = if let Some(mode) = &cargo.spec.replication {
     match mode {
       ReplicationMode::Static(replication_static) => replication_static.number,
@@ -433,8 +436,7 @@ pub(crate) async fn create(
     1
   };
   if let Err(err) = create_instances(&cargo, 0, number, state).await {
-    repositories::cargo::delete_by_key(&cargo.spec.cargo_key, &state.pool)
-      .await?;
+    CargoDb::delete_by_pk(&cargo.spec.cargo_key, &state.pool).await??;
     return Err(err);
   }
   state
@@ -459,8 +461,7 @@ pub(crate) async fn start_by_key(
 ) -> HttpResult<()> {
   let cargo_key = key.to_owned();
   let docker_api = state.docker_api.clone();
-  let cargo =
-    repositories::cargo::inspect_by_key(&cargo_key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(&cargo_key, &state.pool).await?;
   let containers = list_instances(&cargo_key, &docker_api).await?;
   containers
     .into_iter()
@@ -494,7 +495,7 @@ pub(crate) async fn stop_by_key(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let containers = list_instances(key, &state.docker_api).await?;
   containers
     .into_iter()
@@ -564,7 +565,7 @@ pub(crate) async fn delete_by_key(
   force: Option<bool>,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let containers = list_instances(key, &state.docker_api).await?;
   containers
     .into_iter()
@@ -586,8 +587,12 @@ pub(crate) async fn delete_by_key(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
-  repositories::cargo::delete_by_key(key, &state.pool).await?;
-  repositories::cargo_spec::delete_by_cargo_key(key, &state.pool).await?;
+  CargoDb::delete_by_pk(key, &state.pool).await??;
+  CargoSpecDb::delete_by(
+    crate::schema::cargo_specs::dsl::cargo_key.eq(key.to_owned()),
+    &state.pool,
+  )
+  .await??;
   state
     .event_emitter
     .spawn_emit_to_event(&cargo, EventAction::Deleted);
@@ -615,13 +620,9 @@ pub(crate) async fn put(
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
-  let cargo = repositories::cargo::update_by_key(
-    cargo_key,
-    cargo_partial,
-    version,
-    &state.pool,
-  )
-  .await?;
+  let cargo =
+    CargoDb::update_from_spec(cargo_key, cargo_partial, version, &state.pool)
+      .await?;
   // Get the number of instance to create
   let number = if let Some(mode) = &cargo.spec.replication {
     match mode {
@@ -696,21 +697,24 @@ pub(crate) async fn put(
 /// [HttpResult](HttpResult) containing a [Vec](Vec) of [CargoSummary][CargoSummary
 ///
 pub(crate) async fn list(
-  query: GenericCargoListQuery<&str>,
+  query: &GenericListNspQuery,
   state: &DaemonState,
 ) -> HttpResult<Vec<CargoSummary>> {
-  let namespace =
-    repositories::namespace::find_by_name(query.namespace, &state.pool).await?;
-  let query = query.merge(namespace);
-  let cargoes = repositories::cargo::list_by_query(&query, &state.pool).await?;
+  let namespace = utils::key::resolve_nsp(&query.namespace);
+  // ensure namespace exists
+  NamespaceDb::find_by_pk(&namespace, &state.pool).await??;
+  let mut filter = query.filter.clone().unwrap_or_default();
+  let mut r#where = filter.r#where.clone().unwrap_or_default();
+  r#where.insert("NamespaceName".to_owned(), GenericClause::Eq(namespace));
+  filter.r#where = Some(r#where);
+  let cargoes = CargoDb::find(&filter, &state.pool).await??;
   let mut cargo_summaries = Vec::new();
   for cargo in cargoes {
-    let spec =
-      repositories::cargo_spec::find_by_key(&cargo.spec_key, &state.pool)
-        .await?;
+    let spec = CargoSpecDb::find_by_pk(&cargo.spec.key, &state.pool)
+      .await??
+      .try_to_spec()?;
     let instances =
-      repositories::container::list_for_kind("Cargo", &cargo.key, &state.pool)
-        .await?;
+      ContainerDb::find_by_kind_id(&cargo.spec.cargo_key, &state.pool).await?;
     let mut running_instances = 0;
     for instance in &instances {
       let state = instance.data.state.clone().unwrap_or_default();
@@ -749,11 +753,10 @@ pub(crate) async fn inspect_by_key(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<CargoInspect> {
-  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let mut running_instances = 0;
-  let instances =
-    repositories::container::list_for_kind("Cargo", key, &state.pool).await?;
-  let nodes = repositories::node::list(&state.pool).await?;
+  let instances = ContainerDb::find_by_kind_id(key, &state.pool).await?;
+  let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
   // Convert into a hashmap for faster lookup
   let nodes = nodes
     .into_iter()
@@ -792,27 +795,20 @@ pub(crate) async fn inspect_by_key(
   })
 }
 
-/// ## Delete by namespace
-///
 /// This remove all cargo in the given namespace and all their instances (containers)
 /// from the system (database and docker).
-///
-/// ## Arguments
-///
-/// * [namespace](str) - The namespace name
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn delete_by_namespace(
   namespace: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let namespace =
-    repositories::namespace::find_by_name(namespace, &state.pool).await?;
+  let namespace = NamespaceDb::find_by_pk(namespace, &state.pool).await??;
   let cargoes =
-    repositories::cargo::find_by_namespace(&namespace, &state.pool).await?;
+    CargoDb::find_by_namespace(&namespace.name, &state.pool).await?;
   cargoes
     .into_iter()
-    .map(|cargo| async move { delete_by_key(&cargo.key, None, state).await })
+    .map(|cargo| async move {
+      delete_by_key(&cargo.spec.cargo_key, None, state).await
+    })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<Result<(), HttpError>>>()
     .await
@@ -864,7 +860,7 @@ pub async fn patch(
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
-  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let container = if let Some(container) = payload.container.clone() {
     // merge env and ensure no duplicate key
     let new_env = container.env.unwrap_or_default();
@@ -1026,7 +1022,7 @@ pub async fn scale(
   options: &CargoScale,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let instances = list_instances(key, &state.docker_api).await?;
   let is_equal = usize::try_from(options.replicas)
     .map(|replica| instances.len() == replica)
@@ -1058,7 +1054,7 @@ pub async fn scale(
       .into_iter()
       .collect::<Result<Vec<_>, HttpError>>()?;
   } else {
-    let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+    let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
     let to_add = options.replicas.unsigned_abs();
     let created_instances =
       create_instances(&cargo, instances.len(), to_add, state).await?;

@@ -1,20 +1,23 @@
+use std::collections::HashMap;
+
 use nanocl_error::io::IoResult;
+use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::vm::Vm;
 use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
+use tokio::task::JoinHandle;
 
 use crate::schema::vm_specs;
 
+use super::{Repository, Pool};
 use super::vm::VmDb;
 use super::generic::FromSpec;
 
-/// ## VmSpecDb
-///
 /// This structure represent the vm spec in the database.
 /// A vm spec represent the specification of a virtual machine.
 /// It is stored as a json object in the database.
 /// We use the `vm_key` to link to the vm.
 /// And the version is used to know which version of the spec is used
 /// to ensure consistency between updates.
-///
 #[derive(Queryable, Identifiable, Insertable, Associations)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = vm_specs)]
@@ -32,6 +35,19 @@ pub struct VmSpecDb {
   pub data: serde_json::Value,
   /// The metadata (user defined)
   pub metadata: Option<serde_json::Value>,
+}
+
+impl Repository for VmSpecDb {
+  type Table = vm_specs::table;
+  type Item = VmSpec;
+  type UpdateItem = VmSpecDb;
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    unimplemented!()
+  }
 }
 
 impl FromSpec for VmSpecDb {
@@ -75,5 +91,22 @@ impl FromSpec for VmSpecDb {
       ssh_key: p.ssh_key.clone(),
       metadata: p.metadata.clone(),
     }
+  }
+}
+
+impl VmSpecDb {
+  pub(crate) async fn find_by_vm(
+    name: &str,
+    pool: &Pool,
+  ) -> IoResult<Vec<VmSpec>> {
+    let mut r#where = HashMap::new();
+    r#where.insert(
+      "NamespaceName".to_owned(),
+      GenericClause::Eq(name.to_owned()),
+    );
+    let filter = GenericFilter {
+      r#where: Some(r#where),
+    };
+    VmSpecDb::find(&filter, pool).await?
   }
 }

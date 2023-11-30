@@ -5,86 +5,12 @@ use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 use nanocl_stubs::generic::GenericCount;
-use nanocl_stubs::http_metric::{HttpMetricListQuery, HttpMetricCountQuery};
+use nanocl_stubs::http_metric::HttpMetricCountQuery;
 
 use crate::utils;
-use crate::models::{Pool, HttpMetricDb};
+use crate::models::Pool;
 
-/// ## Create
-///
-/// Create a new http metric item in database
-///
-/// ## Arguments
-///
-/// * [item](HttpMetricDb) - Http metric item
-/// * [pool](Pool) - Database connection pool
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [HttpMetricDb](HttpMetricDb)
-///
-pub(crate) async fn create(
-  item: &HttpMetricDb,
-  pool: &Pool,
-) -> IoResult<HttpMetricDb> {
-  let item = item.clone();
-  super::generic::insert_with_res(item, pool).await
-}
-
-/// ## List
-///
-/// List http metrics from database with given filter.
-///
-/// ## Arguments
-///
-/// * [filter](HttpMetricListQuery) - Http metric filter
-/// * [pool](Pool) - Database connection pool
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [Vec](Vec) of [HttpMetricDb](HttpMetricDb)
-///
-pub(crate) async fn list(
-  filter: &HttpMetricListQuery,
-  pool: &Pool,
-) -> IoResult<Vec<HttpMetricDb>> {
-  use crate::schema::http_metrics;
-  let filter = filter.clone();
-  let pool = Arc::clone(pool);
-  let items = web::block(move || {
-    let mut conn = utils::store::get_pool_conn(&pool)?;
-    let mut query = http_metrics::dsl::http_metrics.into_boxed().order((
-      http_metrics::dsl::date_gmt,
-      http_metrics::dsl::created_at.desc(),
-    ));
-    if let Some(limit) = filter.limit {
-      query = query.limit(limit);
-    }
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset);
-    }
-    let res = query
-      .get_results(&mut conn)
-      .map_err(|err| err.map_err_context(|| "HttpMetric"))?;
-    Ok::<_, IoError>(res)
-  })
-  .await?;
-  Ok(items)
-}
-
-/// ## Count
-///
 /// Count http metrics from database with given filter.
-///
-/// ## Arguments
-///
-/// * [filter](HttpMetricCountQuery) - Http metric filter
-/// * [pool](Pool) - Database connection pool
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [GenericCount](GenericCount)
-///
 pub(crate) async fn count(
   filter: &HttpMetricCountQuery,
   pool: &Pool,

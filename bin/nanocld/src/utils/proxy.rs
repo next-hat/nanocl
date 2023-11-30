@@ -2,22 +2,15 @@ use ntex::rt;
 use futures::StreamExt;
 use bollard_next::container::{LogsOptions, LogOutput};
 
-use crate::repositories;
 use crate::models::{
-  ToMeticDb, DaemonState, HttpMetricPartial, StreamMetricPartial,
+  ToMeticDb, DaemonState, HttpMetricPartial, StreamMetricPartial, HttpMetricDb,
+  Repository, StreamMetricDb,
 };
 
-/// ## Spawn logger
-///
 /// Create a background thread that will watch the logs of the `ncproxy.system.c` container
 /// The `ncproxy` is a container that run to update the proxy rules.
 /// He will print http metrics to the logs.
 /// This function will parse the logs and save the metrics to the database.
-///
-/// ## Arguments
-///
-/// * [state](DaemonState) - Daemon state
-///
 pub(crate) fn spawn_logger(state: &DaemonState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(move || {
@@ -61,11 +54,8 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                   Ok(http_metric) => {
                     let http_metric =
                       http_metric.to_metric_db(&state.config.hostname);
-                    let res = repositories::http_metric::create(
-                      &http_metric,
-                      &state.pool,
-                    )
-                    .await;
+                    let res =
+                      HttpMetricDb::create(http_metric, &state.pool).await;
                     if let Err(e) = res {
                       log::warn!("Failed to save http metric: {}", e);
                     }
@@ -84,11 +74,9 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                   .map(|metric| metric.to_metric_db(&state.config.hostname))
                 {
                   Ok(stream_db_model) => {
-                    let insert_result = repositories::stream_metric::create(
-                      &stream_db_model,
-                      &state.pool,
-                    )
-                    .await;
+                    let insert_result =
+                      StreamMetricDb::create(stream_db_model, &state.pool)
+                        .await;
                     if let Err(db_error) = insert_result {
                       log::warn!("Failed to save tcp metric: {db_error}");
                     }

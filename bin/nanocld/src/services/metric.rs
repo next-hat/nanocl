@@ -3,7 +3,7 @@ use ntex::web;
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::metric::MetricFilterQuery;
 
-use crate::models::DaemonState;
+use crate::models::{DaemonState, MetricDb};
 
 use crate::repositories;
 
@@ -24,9 +24,10 @@ pub(crate) async fn list_metric(
   qs: web::types::Query<MetricFilterQuery>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let metrics =
-    repositories::metric::list_by_kind(&qs.kind.to_string(), &state.pool)
-      .await?;
+  // let metrics =
+  //   repositories::metric::list_by_kind(&qs.kind.to_string(), &state.pool)
+  //     .await?;
+  let metrics: Vec<MetricDb> = vec![];
   Ok(web::HttpResponse::Ok().json(&metrics))
 }
 

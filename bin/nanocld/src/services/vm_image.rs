@@ -3,11 +3,12 @@ use std::io::Write;
 use ntex::{web, http};
 use futures::StreamExt;
 
+use nanocl_stubs::generic::GenericFilter;
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
-use crate::{utils, repositories};
-use crate::models::DaemonState;
+use crate::utils;
+use crate::models::{DaemonState, VmImageDb, Repository};
 
 /// List virtual machine images
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -22,7 +23,8 @@ use crate::models::DaemonState;
 pub(crate) async fn list_vm_images(
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let images = repositories::vm_image::list(&state.pool).await?;
+  let images =
+    VmImageDb::find(&GenericFilter::default(), &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&images))
 }
 
@@ -47,10 +49,7 @@ pub(crate) async fn import_vm_image(
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   utils::key::validate_name(&name)?;
-  if repositories::vm_image::find_by_name(&name, &state.pool)
-    .await
-    .is_ok()
-  {
+  if VmImageDb::find_by_pk(&name, &state.pool).await?.is_ok() {
     return Err(HttpError {
       status: http::StatusCode::BAD_REQUEST,
       msg: format!("Vm image {name} already used"),
@@ -104,7 +103,7 @@ pub(crate) async fn snapshot_vm_image(
   let name = path.1.to_owned();
   let snapshot_name = path.2.to_owned();
   utils::key::validate_name(&snapshot_name)?;
-  let image = repositories::vm_image::find_by_name(&name, &state.pool).await?;
+  let image = VmImageDb::find_by_pk(&name, &state.pool).await??;
   let vm_image =
     utils::vm_image::create_snap(&snapshot_name, 50, &image, &state).await?;
   Ok(web::HttpResponse::Ok().json(&vm_image))
@@ -132,7 +131,7 @@ pub(crate) async fn clone_vm_image(
   let name = path.1.to_owned();
   let clone_name = path.2.to_owned();
   utils::key::validate_name(&clone_name)?;
-  let image = repositories::vm_image::find_by_name(&name, &state.pool).await?;
+  let image = VmImageDb::find_by_pk(&name, &state.pool).await??;
   let rx = utils::vm_image::clone(&clone_name, &image, &state).await?;
   Ok(web::HttpResponse::Ok().streaming(rx))
 }

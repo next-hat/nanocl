@@ -1,3 +1,4 @@
+use nanocl_stubs::generic::GenericFilter;
 /*
 * Endpoints to manipulate secrets
 */
@@ -9,7 +10,7 @@ use nanocl_stubs::proxy::ProxySslConfig;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate, SecretQuery};
 
 use crate::{utils, repositories};
-use crate::models::DaemonState;
+use crate::models::{DaemonState, SecretDb, Repository};
 
 /// List secrets
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -25,7 +26,7 @@ pub(crate) async fn list_secret(
   state: web::types::State<DaemonState>,
   web::types::Query(query): web::types::Query<SecretQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let items = repositories::secret::list(Some(query), &state.pool).await?;
+  let items = SecretDb::find(&GenericFilter::default(), &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -47,7 +48,7 @@ pub(crate) async fn inspect_secret(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let secret = repositories::secret::find_by_key(&path.1, &state.pool).await?;
+  let secret = SecretDb::find_by_pk(&path.1, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&secret))
 }
 

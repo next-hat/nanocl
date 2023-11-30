@@ -59,3 +59,47 @@ pub use container::*;
 
 pub type Pool = Arc<R2D2Pool<ConnectionManager<PgConnection>>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;
+
+#[macro_export]
+macro_rules! gen_where4string {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::Eq(val) => {
+        $query = $query.filter($column.eq(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Ne(val) => {
+        $query = $query.filter($column.ne(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Gt(val) => {
+        $query = $query.filter($column.gt(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Lt(val) => {
+        $query = $query.filter($column.lt(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Ge(val) => {
+        $query = $query.filter($column.ge(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Le(val) => {
+        $query = $query.filter($column.le(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::Like(val) => {
+        $query = $query.filter($column.like(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::NotLike(val) => {
+        $query = $query.filter($column.not_like(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::In(items) => {
+        $query = $query.filter($column.eq_any(items.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::NotIn(items) => {
+        $query = $query.filter($column.ne_all(items.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        $query = $query.filter($column.is_null());
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        $query = $query.filter($column.is_not_null());
+      }
+    }
+  };
+}

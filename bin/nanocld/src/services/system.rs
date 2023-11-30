@@ -1,3 +1,4 @@
+use nanocl_stubs::generic::GenericFilter;
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
@@ -5,8 +6,8 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{HostInfo, ProccessQuery};
 
-use crate::{version, repositories};
-use crate::models::DaemonState;
+use crate::version;
+use crate::models::{DaemonState, ContainerDb, Repository, NodeDb};
 
 /// Get version information
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -104,13 +105,13 @@ pub(crate) async fn get_processes(
   web::types::Query(_): web::types::Query<ProccessQuery>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let nodes = repositories::node::list(&state.pool).await?;
+  let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
   let nodes = nodes
     .into_iter()
     .map(|node| (node.name.clone(), node))
     .collect::<std::collections::HashMap<String, _>>();
-  let instances = repositories::container::list_all(&state.pool)
-    .await?
+  let instances = ContainerDb::find(&GenericFilter::default(), &state.pool)
+    .await??
     .into_iter()
     .map(|instance| NodeContainerSummary {
       node: instance.node_id.clone(),

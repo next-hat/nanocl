@@ -151,3 +151,10 @@ impl crate::io::FromIo<HttpError> for HttpError {
     HttpError::new(self.status, format!("{}: {}", context(), self.msg))
   }
 }
+
+#[cfg(feature = "tokio")]
+impl From<tokio::task::JoinError> for HttpError {
+  fn from(f: tokio::task::JoinError) -> Self {
+    HttpError::internal_server_error(f.to_string())
+  }
+}

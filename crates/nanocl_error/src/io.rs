@@ -447,3 +447,26 @@ impl FromIo<Box<IoError>> for ntex::ws::error::WsClientError {
     })
   }
 }
+
+#[cfg(feature = "tokio")]
+impl FromIo<Box<IoError>> for tokio::task::JoinError {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
+  where
+    C: ToString + std::fmt::Display,
+  {
+    Box::new(IoError {
+      context: Some((context)().to_string()),
+      inner: self.into(),
+    })
+  }
+}
+
+#[cfg(feature = "tokio")]
+impl From<tokio::task::JoinError> for IoError {
+  fn from(f: tokio::task::JoinError) -> Self {
+    Self {
+      context: None,
+      inner: f.into(),
+    }
+  }
+}

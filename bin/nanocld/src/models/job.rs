@@ -1,16 +1,17 @@
 use nanocl_error::io::IoResult;
 
-use nanocl_stubs::job::{Job, JobPartial};
+use nanocl_stubs::{
+  job::{Job, JobPartial},
+  generic::GenericFilter,
+};
+use tokio::task::JoinHandle;
 
 use crate::schema::jobs;
 
-use super::generic::FromSpec;
+use super::{generic::FromSpec, Repository, Pool};
 
-/// ## JobDb
-///
 /// This structure represent a job to run.
 /// It will create and run a list of containers.
-///
 #[derive(Clone, Queryable, Identifiable, Insertable)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = jobs)]
@@ -25,6 +26,27 @@ pub struct JobDb {
   pub data: serde_json::Value,
   /// The metadata
   pub metadata: Option<serde_json::Value>,
+}
+
+/// This structure represent the update of a job.
+/// It will update the job with the new data.
+#[derive(Clone, AsChangeset)]
+#[diesel(table_name = jobs)]
+pub struct JobUpdateDb {
+  pub updated_at: Option<chrono::NaiveDateTime>,
+}
+
+impl Repository for JobDb {
+  type Table = jobs::table;
+  type Item = Job;
+  type UpdateItem = JobUpdateDb;
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    unimplemented!()
+  }
 }
 
 impl FromSpec for JobDb {
@@ -62,15 +84,4 @@ impl FromSpec for JobDb {
       containers: p.containers.clone(),
     }
   }
-}
-
-/// ## JobUpdateDb
-///
-/// This structure represent the update of a job.
-/// It will update the job with the new data.
-///
-#[derive(Clone, AsChangeset)]
-#[diesel(table_name = jobs)]
-pub struct JobUpdateDb {
-  pub updated_at: Option<chrono::NaiveDateTime>,
 }

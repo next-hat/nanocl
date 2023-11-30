@@ -1,3 +1,4 @@
+use diesel::ExpressionMethods;
 use ntex::http;
 use serde_json::Value;
 use jsonschema::{Draft, JSONSchema};
@@ -8,7 +9,10 @@ use nanocl_stubs::system::EventAction;
 use nanocl_stubs::resource::{Resource, ResourcePartial};
 
 use crate::repositories;
-use crate::models::{Pool, ResourceKindPartial, DaemonState};
+use crate::models::{
+  Pool, ResourceKindPartial, DaemonState, ResourceKindVersionDb, Repository,
+  ResourceKindDb, ResourceSpecDb, ResourceDb,
+};
 
 use super::ctrl_client::CtrlClient;
 
@@ -54,13 +58,13 @@ async fn hook_create_resource(
           status: http::StatusCode::BAD_REQUEST,
         });
       }
-      if repositories::resource_kind::find_by_name(&resource.name, pool)
-        .await
+      if ResourceKindDb::find_by_pk(&resource.name, pool)
+        .await?
         .is_err()
       {
-        repositories::resource_kind::create(&resource_kind, pool).await?;
+        ResourceKindDb::create(&resource_kind, pool).await??;
       }
-      repositories::resource_kind::create_version(&resource_kind, pool).await?;
+      ResourceKindVersionDb::create(&resource_kind, pool).await??;
     }
     _ => {
       let kind = repositories::resource_kind::get_version(
@@ -148,7 +152,7 @@ pub(crate) async fn create(
   resource: &ResourcePartial,
   state: &DaemonState,
 ) -> HttpResult<Resource> {
-  if repositories::resource::inspect_by_key(&resource.name, &state.pool)
+  if ResourceDb::inspect_by_pk(&resource.name, &state.pool)
     .await
     .is_ok()
   {
@@ -158,7 +162,7 @@ pub(crate) async fn create(
     });
   }
   let resource = hook_create_resource(resource, &state.pool).await?;
-  let res = repositories::resource::create(&resource, &state.pool).await?;
+  let res = ResourceDb::create_from_spec(&resource, &state.pool).await?;
   state
     .event_emitter
     .spawn_emit_to_event(&res, EventAction::Created);
@@ -184,7 +188,7 @@ pub(crate) async fn patch(
   state: &DaemonState,
 ) -> HttpResult<Resource> {
   let resource = hook_create_resource(resource, &state.pool).await?;
-  let res = repositories::resource::put(&resource, &state.pool).await?;
+  let res = ResourceDb::update_from_spec(&resource, &state.pool).await?;
   state
     .event_emitter
     .spawn_emit_to_event(&res, EventAction::Patched);
@@ -209,27 +213,17 @@ pub(crate) async fn delete(
     log::warn!("{err}");
   }
   if resource.kind.as_str() == "Kind" {
-    repositories::resource_kind::delete_version(
-      &resource.spec.resource_key,
-      &state.pool,
-    )
-    .await?;
-    repositories::resource_kind::delete(
-      &resource.spec.resource_key,
-      &state.pool,
-    )
-    .await?;
+    let pk = resource.spec.resource_key.as_str();
+    // ResourceKindVersionDb::delete_by_pk(pk, &state.pool).await??;
+    ResourceKindDb::delete_by_pk(pk, &state.pool).await??;
   }
-  repositories::resource::delete_by_key(
-    &resource.spec.resource_key,
+  ResourceDb::delete_by_pk(&resource.spec.resource_key, &state.pool).await??;
+  ResourceSpecDb::delete_by(
+    crate::schema::resource_specs::dsl::resource_key
+      .eq(resource.spec.resource_key.clone()),
     &state.pool,
   )
-  .await?;
-  repositories::resource_spec::delete_by_resource_key(
-    &resource.spec.resource_key,
-    &state.pool,
-  )
-  .await?;
+  .await??;
   state
     .event_emitter
     .spawn_emit_to_event(resource, EventAction::Deleted);
@@ -250,8 +244,7 @@ pub(crate) async fn delete_by_key(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let resource =
-    repositories::resource::inspect_by_key(key, &state.pool).await?;
+  let resource = ResourceDb::inspect_by_pk(key, &state.pool).await?;
   delete(&resource, state).await?;
   Ok(())
 }

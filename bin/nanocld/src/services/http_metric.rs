@@ -1,3 +1,4 @@
+use nanocl_stubs::generic::GenericFilter;
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
@@ -5,7 +6,7 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::http_metric::{HttpMetricListQuery, HttpMetricCountQuery};
 
 use crate::repositories;
-use crate::models::DaemonState;
+use crate::models::{DaemonState, HttpMetricDb, Repository};
 
 /// Get http metrics of all peer nodes
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -25,7 +26,8 @@ pub(crate) async fn list_http_metric(
   qs: web::types::Query<HttpMetricListQuery>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let metrics = repositories::http_metric::list(&qs, &state.pool).await?;
+  let metrics =
+    HttpMetricDb::find(&GenericFilter::default(), &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&metrics))
 }
 
