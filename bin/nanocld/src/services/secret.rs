@@ -12,7 +12,7 @@ use nanocl_stubs::secret::{SecretPartial, SecretUpdate, SecretQuery};
 use crate::utils;
 use crate::models::{DaemonState, SecretDb, Repository};
 
-/// List secrets
+/// List secret
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Secrets",
@@ -102,8 +102,8 @@ pub(crate) async fn create_secret(
     ("Name" = String, Path, description = "The secret name to delete")
   ),
   responses(
-    (status = 200, description = "Delete response", body = GenericDelete),
-    (status = 404, description = "Namespace is not existing", body = ApiError),
+    (status = 202, description = "Secret have been deleted"),
+    (status = 404, description = "Secret don't exists", body = ApiError),
   ),
 ))]
 #[web::delete("/secrets/{key}")]
@@ -111,11 +111,11 @@ pub(crate) async fn delete_secret(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let res = utils::secret::delete_by_key(&path.1, &state).await?;
-  Ok(web::HttpResponse::Ok().json(&res))
+  utils::secret::delete_by_key(&path.1, &state).await?;
+  Ok(web::HttpResponse::Accepted().into())
 }
 
-/// Scale or Downscale number of instances
+/// Update a secret
 #[cfg_attr(feature = "dev", utoipa::path(
   patch,
   tag = "Secrets",
@@ -155,7 +155,6 @@ mod test_secret {
   use serde_json::json;
 
   use nanocl_stubs::secret::{Secret, SecretPartial, SecretQuery};
-  use nanocl_stubs::generic::GenericDelete;
 
   use crate::utils::tests::*;
 
@@ -234,7 +233,11 @@ mod test_secret {
     let res = client
       .send_delete(&format!("{ENDPOINT}/test-secret"), None::<String>)
       .await;
-    test_status_code!(res.status(), http::StatusCode::OK, "delete secret");
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "delete secret"
+    );
   }
 
   #[ntex::test]

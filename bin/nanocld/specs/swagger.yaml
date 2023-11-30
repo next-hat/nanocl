@@ -1423,8 +1423,8 @@ paths:
     get:
       tags:
       - Secrets
-      summary: List secrets
-      description: List secrets
+      summary: List secret
+      description: List secret
       operationId: list_secret
       responses:
         '200':
@@ -1475,14 +1475,10 @@ paths:
         schema:
           type: string
       responses:
-        '200':
-          description: Delete response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericDelete'
+        '202':
+          description: Secret have been deleted
         '404':
-          description: Namespace is not existing
+          description: Secret don't exists
           content:
             application/json:
               schema:
@@ -1490,8 +1486,8 @@ paths:
     patch:
       tags:
       - Secrets
-      summary: Scale or Downscale number of instances
-      description: Scale or Downscale number of instances
+      summary: Update a secret
+      description: Update a secret
       operationId: patch_secret
       parameters:
       - name: Name
@@ -3354,16 +3350,6 @@ components:
           type: integer
           format: int64
           description: Number of items
-    GenericDelete:
-      type: object
-      description: Generic delete response
-      required:
-      - Count
-      properties:
-        Count:
-          type: integer
-          description: Number of deleted items
-          minimum: 0
     GenericFilter:
       type: object
       properties:

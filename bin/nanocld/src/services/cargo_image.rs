@@ -192,7 +192,6 @@ pub mod tests {
   use futures::{StreamExt, TryStreamExt};
   use bollard_next::service::ImageInspect;
 
-  use nanocl_stubs::generic::GenericDelete;
   use nanocl_stubs::cargo_image::CargoImagePartial;
 
   use crate::utils::tests::*;
@@ -334,14 +333,5 @@ pub mod tests {
     let mut res = delete(&client, TEST_IMAGE).await;
     let status = res.status();
     test_status_code!(status, http::StatusCode::OK, "basic delete image");
-    let body: GenericDelete = res
-      .json()
-      .await
-      .expect("Expect delete to return GenericDelete json data");
-    assert_eq!(
-      body.count, 1,
-      "Expect delete to return count 1 got {}",
-      body.count
-    );
   }
 }

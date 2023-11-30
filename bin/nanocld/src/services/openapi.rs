@@ -36,9 +36,7 @@ use bollard_next::service::{
 
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
-use nanocl_stubs::generic::{
-  GenericCount, GenericDelete, GenericClause, GenericFilter,
-};
+use nanocl_stubs::generic::{GenericCount, GenericClause, GenericFilter};
 use nanocl_stubs::system::{BinaryInfo, HostInfo};
 use nanocl_stubs::metric::{Metric, MetricKind};
 use nanocl_stubs::http_metric::HttpMetric;
@@ -489,7 +487,6 @@ impl Modify for VersionModifier {
     Any,
     BollardDate,
     EmptyObject,
-    GenericDelete,
     GenericClause,
     GenericFilter,
   )),
