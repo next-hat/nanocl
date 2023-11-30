@@ -13,7 +13,7 @@ use nanocl_stubs::namespace::{
   NamespaceListQuery,
 };
 
-use crate::{utils, repositories};
+use crate::utils;
 use crate::models::{Pool, DaemonState, CargoDb, NamespaceDb, Repository};
 
 /// Create a new namespace with his associated network.

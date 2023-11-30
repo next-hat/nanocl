@@ -9,7 +9,7 @@ use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::proxy::ProxySslConfig;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate, SecretQuery};
 
-use crate::{utils, repositories};
+use crate::utils;
 use crate::models::{DaemonState, SecretDb, Repository};
 
 /// List secrets

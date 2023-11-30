@@ -8,7 +8,6 @@ use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::system::EventAction;
 use nanocl_stubs::resource::{Resource, ResourcePartial};
 
-use crate::repositories;
 use crate::models::{
   Pool, ResourceKindPartial, DaemonState, ResourceKindVersionDb, Repository,
   ResourceKindDb, ResourceSpecDb, ResourceDb,
@@ -16,23 +15,11 @@ use crate::models::{
 
 use super::ctrl_client::CtrlClient;
 
-/// ## Hook create resource
-///
 /// This hook is called when a resource is created.
 /// It call a custom controller at a specific url or just validate a schema.
 /// If the resource is a Kind Kind, it will create a resource Kind with an associated version.
 /// To call a custom controller, the resource Kind must have a Url field in his config.
 /// Unless it must have a Schema field in his config that is a JSONSchema to validate the resource.
-///
-/// ## Arguments
-///
-/// * [resource](ResourcePartial) - The resource to create
-/// * [pool](Pool) - The database pool
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [ResourcePartial](ResourcePartial)
-///
 async fn hook_create_resource(
   resource: &ResourcePartial,
   pool: &Pool,
@@ -67,7 +54,7 @@ async fn hook_create_resource(
       ResourceKindVersionDb::create(&resource_kind, pool).await??;
     }
     _ => {
-      let kind = repositories::resource_kind::get_version(
+      let kind = ResourceKindVersionDb::get_version(
         &resource.kind,
         &resource.version,
         pool,
@@ -104,22 +91,14 @@ async fn hook_create_resource(
   Ok(resource)
 }
 
-/// ## Hook delete resource
-///
 /// This hook is called when a resource is deleted.
 /// It call a custom controller at a specific url.
 /// If the resource is a Kind Kind, it will delete the resource Kind with an associated version.
-///
-/// ## Arguments
-///
-/// * [resource](Resource) - The resource to delete
-/// * [pool](Pool) - The database pool
-///
 async fn hook_delete_resource(
   resource: &Resource,
   pool: &Pool,
 ) -> HttpResult<()> {
-  let kind = repositories::resource_kind::get_version(
+  let kind = ResourceKindVersionDb::get_version(
     &resource.kind,
     &resource.spec.version,
     pool,
@@ -134,20 +113,8 @@ async fn hook_delete_resource(
   Ok(())
 }
 
-/// ## Create
-///
 /// This function create a resource.
 /// It will call the hook_create_resource function to hook the resource.
-///
-/// ## Arguments
-///
-/// * [resource](ResourcePartial) - The resource to create
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Resource](Resource)
-///
 pub(crate) async fn create(
   resource: &ResourcePartial,
   state: &DaemonState,
@@ -169,20 +136,8 @@ pub(crate) async fn create(
   Ok(res)
 }
 
-/// ## Patch
-///
 /// This function patch a resource.
 /// It will call the hook_create_resource function to hook the resource.
-///
-/// ## Arguments
-///
-/// * [resource](ResourcePartial) - The resource to patch
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Resource](Resource)
-///
 pub(crate) async fn patch(
   resource: &ResourcePartial,
   state: &DaemonState,
@@ -195,16 +150,8 @@ pub(crate) async fn patch(
   Ok(res)
 }
 
-/// ## Delete
-///
 /// This function delete a resource.
 /// It will call the hook_delete_resource function to hook the resource.
-///
-/// ## Arguments
-///
-/// * [resource](Resource) - The resource to delete
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn delete(
   resource: &Resource,
   state: &DaemonState,
@@ -230,16 +177,8 @@ pub(crate) async fn delete(
   Ok(())
 }
 
-/// ## Delete by key
-///
 /// This function delete a resource by key.
 /// It will call the hook_delete_resource function to hook the resource.
-///
-/// ## Arguments
-///
-/// * [key](str) - The resource key
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn delete_by_key(
   key: &str,
   state: &DaemonState,

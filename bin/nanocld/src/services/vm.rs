@@ -18,7 +18,7 @@ use nanocl_stubs::cargo::OutputLog;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 
-use crate::{utils, repositories};
+use crate::utils;
 use crate::models::{DaemonState, WsConState, VmDb, Repository, VmSpecDb};
 
 /// List virtual machines

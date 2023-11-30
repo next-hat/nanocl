@@ -28,6 +28,13 @@ impl Repository for NodeDb {
   type Item = NodeDb;
   type UpdateItem = NodeDb;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,

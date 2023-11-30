@@ -5,8 +5,6 @@ use nanocl_stubs::metric::MetricFilterQuery;
 
 use crate::models::{DaemonState, MetricDb};
 
-use crate::repositories;
-
 /// Get specific metric of all peer nodes
 #[cfg_attr(feature = "dev", utoipa::path(
   get,

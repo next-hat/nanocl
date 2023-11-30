@@ -42,6 +42,13 @@ impl Repository for VmSpecDb {
   type Item = VmSpec;
   type UpdateItem = VmSpecDb;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,

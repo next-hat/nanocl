@@ -10,7 +10,7 @@ use nanocl_error::io::{FromIo, IoResult};
 use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
-use crate::{version, utils, repositories};
+use crate::{utils, version};
 use crate::models::{
   DaemonState, ContainerPartial, ContainerUpdateDb, CargoDb, ContainerDb,
   Repository, Container, NamespaceDb,

@@ -16,7 +16,7 @@ use nanocl_stubs::system::EventAction;
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
-use crate::{utils, repositories};
+use crate::utils;
 use crate::models::{
   Pool, VmImageDb, DaemonState, ContainerDb, NamespaceDb, Repository, VmDb,
   VmSpecDb, FromSpec,

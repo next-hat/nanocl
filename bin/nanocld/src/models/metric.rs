@@ -62,6 +62,13 @@ impl Repository for MetricDb {
   type Item = MetricDb;
   type UpdateItem = MetricDb;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,

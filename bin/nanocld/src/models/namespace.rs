@@ -50,6 +50,13 @@ impl Repository for NamespaceDb {
   type Item = NamespaceDb;
   type UpdateItem = NamespaceDb;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,

@@ -11,12 +11,10 @@ use nanocl_stubs::generic::{GenericFilter, GenericClause};
 use nanocl_stubs::vm::Vm;
 use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
-use crate::models::{VmSpecDb, FromSpec};
-use crate::{repositories, utils};
+use crate::utils;
 use crate::schema::vms;
 
-use super::{WithSpec, Repository, Pool};
-use super::namespace::NamespaceDb;
+use super::{Pool, Repository, FromSpec, WithSpec, VmSpecDb, NamespaceDb};
 
 /// This structure represent the vm in the database.
 /// A vm is a virtual machine that is running on the server.
@@ -71,6 +69,13 @@ impl Repository for VmDb {
   type Table = vms::table;
   type Item = Vm;
   type UpdateItem = VmUpdateDb;
+
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
 
   fn find(
     filter: &GenericFilter,

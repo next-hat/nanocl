@@ -69,6 +69,13 @@ impl Repository for ResourceDb {
   type Item = Resource;
   type UpdateItem = ResourceUpdateDb;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,

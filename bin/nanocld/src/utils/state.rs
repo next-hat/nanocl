@@ -13,7 +13,7 @@ use nanocl_stubs::cargo_spec::CargoSpecPartial;
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmDisk};
 use nanocl_stubs::state::{Statefile, StateStream, StateApplyQuery};
 
-use crate::{utils, repositories};
+use crate::utils;
 use crate::models::{DaemonState, ResourceDb, SecretDb, Repository, VmDb, CargoDb};
 
 /// ## Ensure namespace existence

@@ -13,7 +13,7 @@ use nanocl_stubs::cargo::{
 };
 use nanocl_stubs::cargo_spec::{CargoSpecPartial, CargoSpecUpdate};
 
-use crate::{utils, repositories};
+use crate::utils;
 use crate::models::{DaemonState, CargoSpecDb, Repository, FromSpec};
 
 /// List cargoes

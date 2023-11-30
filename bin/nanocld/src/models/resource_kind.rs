@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
 use nanocl_error::io::IoResult;
 
-use nanocl_stubs::generic::GenericFilter;
+use nanocl_stubs::generic::{GenericFilter, GenericClause};
 
 use crate::schema::{resource_kinds, resource_kind_versions};
 
@@ -68,6 +70,13 @@ impl Repository for ResourceKindVersionDb {
   type Item = ResourceKindVersionDb;
   type UpdateItem = ResourceKindVersionDb;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
@@ -90,10 +99,36 @@ impl Repository for ResourceKindDb {
   type Item = ResourceKindDb;
   type UpdateItem = ResourceKindDb;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
     unimplemented!()
+  }
+}
+
+impl ResourceKindVersionDb {
+  pub(crate) async fn get_version(
+    name: &str,
+    version: &str,
+    pool: &Pool,
+  ) -> IoResult<ResourceKindVersionDb> {
+    let mut r#where = HashMap::new();
+    r#where.insert(
+      "ResourceKindName".to_owned(),
+      GenericClause::Eq(name.to_owned()),
+    );
+    r#where.insert("Version".to_owned(), GenericClause::Eq(version.to_owned()));
+    let filter = GenericFilter {
+      r#where: Some(r#where),
+    };
+    ResourceKindVersionDb::find_one(&filter, pool).await?
   }
 }

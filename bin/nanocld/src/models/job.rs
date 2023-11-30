@@ -41,6 +41,13 @@ impl Repository for JobDb {
   type Item = Job;
   type UpdateItem = JobUpdateDb;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,

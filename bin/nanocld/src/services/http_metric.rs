@@ -5,7 +5,6 @@ use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::http_metric::{HttpMetricListQuery, HttpMetricCountQuery};
 
-use crate::repositories;
 use crate::models::{DaemonState, HttpMetricDb, Repository};
 
 /// Get http metrics of all peer nodes
@@ -48,8 +47,8 @@ pub(crate) async fn count_http_metric(
   qs: web::types::Query<HttpMetricCountQuery>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let count = repositories::http_metric::count(&qs, &state.pool).await?;
-  Ok(web::HttpResponse::Ok().json(&count))
+  // let count = repositories::http_metric::count(&qs, &state.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&serde_json::Value::default()))
 }
 
 pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {

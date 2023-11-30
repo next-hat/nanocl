@@ -27,7 +27,7 @@ use nanocl_stubs::cargo_spec::{
   CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config,
 };
 
-use crate::{utils, repositories};
+use crate::utils;
 use crate::models::{
   DaemonState, CargoDb, Repository, ContainerDb, NamespaceDb, NodeDb, SecretDb,
   CargoSpecDb, FromSpec,

@@ -124,6 +124,13 @@ impl Repository for ContainerDb {
   type Item = Container;
   type UpdateItem = ContainerUpdateDb;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,

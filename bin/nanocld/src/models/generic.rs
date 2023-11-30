@@ -77,6 +77,11 @@ pub trait Repository {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>>;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>>;
+
   fn create<I>(item: I, pool: &Pool) -> JoinHandle<IoResult<Self>>
   where
     Self: From<I>,

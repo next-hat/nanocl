@@ -292,6 +292,13 @@ impl Repository for HttpMetricDb {
   type Item = HttpMetricDb;
   type UpdateItem = HttpMetricDb;
 
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
@@ -304,6 +311,13 @@ impl Repository for StreamMetricDb {
   type Table = stream_metrics::table;
   type Item = StreamMetricDb;
   type UpdateItem = StreamMetricDb;
+
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    unimplemented!()
+  }
 
   fn find(
     filter: &GenericFilter,

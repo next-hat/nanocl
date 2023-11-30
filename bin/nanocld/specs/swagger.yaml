@@ -2147,7 +2147,7 @@ components:
           minimum: 0
     Cargo:
       type: object
-      description: |
+      description: |-
         A Cargo is a replicable container
         It is used to run one or multiple instances of the same container
         You can define the number of replicas you want to run
@@ -2182,7 +2182,7 @@ components:
           example: nginx:latest
     CargoInspect:
       type: object
-      description: |
+      description: |-
         Cargo Inspect is a detailed view of a cargo
         It contains all the information about the cargo
         It also contains the list of containers
@@ -2218,8 +2218,7 @@ components:
           description: List of containers
     CargoKillOptions:
       type: object
-      description: |
-        Options for the kill command
+      description: Options for the kill command
       required:
       - Signal
       properties:
@@ -2228,8 +2227,7 @@ components:
           description: 'Signal to send to the container default: SIGKILL'
     CargoScale:
       type: object
-      description: |
-        Payload for the cargo scale endpoint
+      description: Payload for the cargo scale endpoint
       required:
       - Replicas
       properties:
@@ -2349,7 +2347,7 @@ components:
           nullable: true
     CargoSummary:
       type: object
-      description: |
+      description: |-
         A CargoSummary is a summary of a cargo
         It's the datastructure returned by the list operation
       required:
