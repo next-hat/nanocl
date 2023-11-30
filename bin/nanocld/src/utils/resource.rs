@@ -160,14 +160,19 @@ pub(crate) async fn delete(
     log::warn!("{err}");
   }
   if resource.kind.as_str() == "Kind" {
-    let pk = resource.spec.resource_key.as_str();
-    // ResourceKindVersionDb::delete_by_pk(pk, &state.pool).await??;
-    ResourceKindDb::delete_by_pk(pk, &state.pool).await??;
+    ResourceKindVersionDb::delete_by(
+      crate::schema::resource_kind_versions::dsl::resource_kind_name
+        .eq(resource.spec.resource_key.to_owned()),
+      &state.pool,
+    )
+    .await??;
+    ResourceKindDb::delete_by_pk(&resource.spec.resource_key, &state.pool)
+      .await??;
   }
   ResourceDb::delete_by_pk(&resource.spec.resource_key, &state.pool).await??;
   ResourceSpecDb::delete_by(
     crate::schema::resource_specs::dsl::resource_key
-      .eq(resource.spec.resource_key.clone()),
+      .eq(resource.spec.resource_key.to_owned()),
     &state.pool,
   )
   .await??;

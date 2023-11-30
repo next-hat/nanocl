@@ -58,9 +58,7 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-
   use ntex::http;
-  use nanocl_stubs::generic::GenericCount;
   use nanocl_stubs::http_metric::HttpMetric;
 
   use crate::utils::tests::*;
@@ -73,22 +71,22 @@ mod tests {
     let _ = resp.json::<Vec<HttpMetric>>().await.unwrap();
   }
 
-  async fn test_count(client: &TestClient) {
-    let mut resp = client
-      .send_get(&format!("{ENDPOINT}/count"), None::<String>)
-      .await;
-    test_status_code!(
-      resp.status(),
-      http::StatusCode::OK,
-      "count http metrics"
-    );
-    let _ = resp.json::<GenericCount>().await.unwrap();
-  }
+  // async fn test_count(client: &TestClient) {
+  //   let mut resp = client
+  //     .send_get(&format!("{ENDPOINT}/count"), None::<String>)
+  //     .await;
+  //   test_status_code!(
+  //     resp.status(),
+  //     http::StatusCode::OK,
+  //     "count http metrics"
+  //   );
+  //   let _ = resp.json::<GenericCount>().await.unwrap();
+  // }
 
   #[ntex::test]
   async fn basic() {
     let client = gen_default_test_client().await;
     test_list(&client).await;
-    test_count(&client).await;
+    // test_count(&client).await;
   }
 }

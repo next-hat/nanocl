@@ -21,16 +21,6 @@ impl GenericNspQuery {
   }
 }
 
-/// Generic delete response
-#[derive(Debug)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct GenericDelete {
-  /// Number of deleted items
-  pub count: usize,
-}
-
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -69,6 +59,10 @@ pub enum GenericClause {
   IsNull,
   /// Is not null
   IsNotNull,
+  /// JSON contains
+  Contains(serde_json::Value),
+  /// JSON Has key
+  HasKey(String),
 }
 
 #[derive(Default, Debug, Clone)]
@@ -76,7 +70,7 @@ pub enum GenericClause {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct GenericFilter {
-  #[cfg_attr(feature = "serde", serde(rename = "where"))]
+  #[cfg_attr(feature = "serde", serde(rename = "Where"))]
   pub r#where: Option<HashMap<String, GenericClause>>,
 }
 
@@ -93,6 +87,7 @@ pub struct GenericListQuery {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct GenericListNspQuery {
-  pub filter: Option<GenericFilter>,
+  /// A json as string as GenericFilter
+  pub filter: Option<String>,
   pub namespace: Option<String>,
 }

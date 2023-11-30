@@ -36,12 +36,13 @@ use bollard_next::service::{
 
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
-use nanocl_stubs::generic::GenericCount;
+use nanocl_stubs::generic::{
+  GenericCount, GenericDelete, GenericClause, GenericFilter,
+};
 use nanocl_stubs::system::{BinaryInfo, HostInfo};
 use nanocl_stubs::metric::{Metric, MetricKind};
 use nanocl_stubs::http_metric::HttpMetric;
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
-use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::node::{Node, NodeContainerSummary};
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespacePartial, NamespaceInspect,
@@ -489,6 +490,8 @@ impl Modify for VersionModifier {
     BollardDate,
     EmptyObject,
     GenericDelete,
+    GenericClause,
+    GenericFilter,
   )),
   tags(
     (name = "CargoImages", description = "Cargo images management endpoints."),

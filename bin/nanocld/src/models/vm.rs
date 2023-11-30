@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use ntex::web;
 use diesel::prelude::*;
@@ -7,11 +7,11 @@ use tokio::task::JoinHandle;
 
 use nanocl_error::io::{IoResult, IoError, FromIo};
 
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
 use nanocl_stubs::vm::Vm;
+use nanocl_stubs::generic::{GenericFilter, GenericClause};
 use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
-use crate::utils;
+use crate::{utils, gen_where4string};
 use crate::schema::vms;
 
 use super::{Pool, Repository, FromSpec, WithSpec, VmSpecDb, NamespaceDb};
@@ -74,14 +74,55 @@ impl Repository for VmDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
+    use crate::schema::vm_specs;
+    let pool = Arc::clone(pool);
+    let mut query = vms::dsl::vms.inner_join(vm_specs::table).into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Name") {
+      gen_where4string!(query, vms::dsl::name, value);
+    }
+    if let Some(value) = r#where.get("NamespaceName") {
+      gen_where4string!(query, vms::dsl::namespace_name, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let (i, s) = query
+        .get_result::<(Self, VmSpecDb)>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      let spec = &s.try_to_spec()?;
+      let item = i.with_spec(spec);
+      Ok::<_, IoError>(item)
+    })
   }
 
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    unimplemented!()
+    use crate::schema::vm_specs;
+    let pool = Arc::clone(pool);
+    let mut query = vms::dsl::vms.inner_join(vm_specs::table).into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Name") {
+      gen_where4string!(query, vms::dsl::name, value);
+    }
+    if let Some(value) = r#where.get("NamespaceName") {
+      gen_where4string!(query, vms::dsl::namespace_name, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<(Self, VmSpecDb)>(&mut conn)
+        .map_err(Self::map_err_context)?
+        .into_iter()
+        .map(|(i, s)| {
+          let spec = &s.try_to_spec()?;
+          let item = i.with_spec(spec);
+          Ok::<_, IoError>(item)
+        })
+        .collect::<IoResult<Vec<_>>>()?;
+      Ok::<_, IoError>(items)
+    })
   }
 }
 

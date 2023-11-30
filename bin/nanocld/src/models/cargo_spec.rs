@@ -1,15 +1,18 @@
+use std::sync::Arc;
 use std::collections::HashMap;
 
-use nanocl_error::io::IoResult;
-use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use diesel::prelude::*;
 use tokio::task::JoinHandle;
+
+use nanocl_error::io::{IoResult, IoError, FromIo};
+
+use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
 
 use crate::schema::cargo_specs;
 
-use super::{Repository, Pool};
-use super::generic::FromSpec;
-use super::cargo::CargoDb;
+use crate::{utils, gen_where4json, gen_where4string};
+use super::{Pool, Repository, FromSpec, CargoDb};
 
 /// This structure represent the cargo spec in the database.
 /// A cargo spec represent the specification of container that can be replicated.
@@ -86,14 +89,59 @@ impl Repository for CargoSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
+    let mut query = cargo_specs::dsl::cargo_specs.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("CargoKey") {
+      gen_where4string!(query, cargo_specs::dsl::cargo_key, value);
+    }
+    if let Some(value) = r#where.get("Version") {
+      gen_where4string!(query, cargo_specs::dsl::version, value);
+    }
+    if let Some(value) = r#where.get("Data") {
+      gen_where4json!(query, cargo_specs::dsl::data, value);
+    }
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_result::<CargoSpecDb>(&mut conn)
+        .map_err(|err| err.map_err_context(|| "Cargo"))?
+        .try_to_spec()?;
+      Ok::<_, IoError>(items)
+    })
   }
 
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    unimplemented!()
+    let mut query = cargo_specs::dsl::cargo_specs
+      .order(cargo_specs::dsl::created_at.desc())
+      .into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("CargoKey") {
+      gen_where4string!(query, cargo_specs::dsl::cargo_key, value);
+    }
+    if let Some(value) = r#where.get("Version") {
+      gen_where4string!(query, cargo_specs::dsl::version, value);
+    }
+    if let Some(value) = r#where.get("Data") {
+      gen_where4json!(query, cargo_specs::dsl::data, value);
+    }
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<CargoSpecDb>(&mut conn)
+        .map_err(|err| err.map_err_context(|| "Cargo"))?
+        .into_iter()
+        .map(|item| {
+          let spec = item.try_to_spec()?;
+          Ok::<_, IoError>(spec)
+        })
+        .collect::<IoResult<Vec<CargoSpec>>>()?;
+      Ok::<_, IoError>(items)
+    })
   }
 }
 

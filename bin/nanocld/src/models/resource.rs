@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use diesel::prelude::*;
-use diesel::{ExpressionMethods, QueryDsl};
 use ntex::web;
+use diesel::prelude::*;
 use tokio::task::JoinHandle;
 use serde::{Serialize, Deserialize};
 
@@ -13,6 +12,7 @@ use nanocl_stubs::{
   generic::GenericFilter,
 };
 
+use crate::gen_where4string;
 use crate::{schema::resources, utils};
 
 use crate::models::resource_spec::ResourceSpecDb;
@@ -73,14 +73,55 @@ impl Repository for ResourceDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
+    use crate::schema::resource_specs;
+    let pool = Arc::clone(pool);
+    let mut query = resources::dsl::resources
+      .inner_join(resource_specs::table)
+      .into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Key") {
+      gen_where4string!(query, resources::dsl::key, value);
+    }
+    if let Some(value) = r#where.get("Kind") {
+      gen_where4string!(query, resources::dsl::kind, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_result::<(ResourceDb, ResourceSpecDb)>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      let item = items.0.with_spec(&items.1);
+      Ok::<_, IoError>(item)
+    })
   }
 
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    unimplemented!()
+    use crate::schema::resource_specs;
+    let pool = Arc::clone(pool);
+    let mut query = resources::dsl::resources
+      .order(resources::dsl::created_at.desc())
+      .inner_join(resource_specs::table)
+      .into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Key") {
+      gen_where4string!(query, resources::dsl::key, value);
+    }
+    if let Some(value) = r#where.get("Kind") {
+      gen_where4string!(query, resources::dsl::kind, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<(ResourceDb, ResourceSpecDb)>(&mut conn)
+        .map_err(Self::map_err_context)?
+        .into_iter()
+        .map(|(r, s)| r.with_spec(&s))
+        .collect();
+      Ok::<_, IoError>(items)
+    })
   }
 }
 
@@ -147,7 +188,7 @@ impl ResourceDb {
         .inner_join(resource_specs::table)
         .filter(resources::key.eq(pk))
         .get_result(&mut conn)
-        .map_err(|err| err.map_err_context(|| "Resource"))?;
+        .map_err(Self::map_err_context)?;
       Ok::<_, IoError>(res)
     })
     .await?;

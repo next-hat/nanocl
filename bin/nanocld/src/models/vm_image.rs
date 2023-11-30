@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use nanocl_error::io::IoResult;
+use diesel::prelude::*;
+use nanocl_error::io::{IoResult, IoError};
 use serde::{Serialize, Deserialize};
 
 use nanocl_stubs::{
@@ -9,7 +10,7 @@ use nanocl_stubs::{
 };
 use tokio::task::JoinHandle;
 
-use crate::schema::vm_images;
+use crate::{schema::vm_images, gen_where4string, utils};
 
 use super::{Repository, Pool};
 
@@ -92,14 +93,62 @@ impl Repository for VmImageDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query = vm_images::dsl::vm_images.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Name") {
+      gen_where4string!(query, vm_images::dsl::name, value);
+    }
+    if let Some(value) = r#where.get("Kind") {
+      gen_where4string!(query, vm_images::dsl::kind, value);
+    }
+    if let Some(value) = r#where.get("Parent") {
+      gen_where4string!(query, vm_images::dsl::parent, value);
+    }
+    if let Some(value) = r#where.get("Format") {
+      gen_where4string!(query, vm_images::dsl::format, value);
+    }
+    if let Some(value) = r#where.get("Path") {
+      gen_where4string!(query, vm_images::dsl::path, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let item = query
+        .get_result::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(item)
+    })
   }
 
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query = vm_images::dsl::vm_images.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Name") {
+      gen_where4string!(query, vm_images::dsl::name, value);
+    }
+    if let Some(value) = r#where.get("Kind") {
+      gen_where4string!(query, vm_images::dsl::kind, value);
+    }
+    if let Some(value) = r#where.get("Parent") {
+      gen_where4string!(query, vm_images::dsl::parent, value);
+    }
+    if let Some(value) = r#where.get("Format") {
+      gen_where4string!(query, vm_images::dsl::format, value);
+    }
+    if let Some(value) = r#where.get("Path") {
+      gen_where4string!(query, vm_images::dsl::path, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(items)
+    })
   }
 }
 
@@ -109,10 +158,7 @@ impl VmImageDb {
     pool: &Pool,
   ) -> IoResult<Vec<VmImageDb>> {
     let mut r#where = HashMap::new();
-    r#where.insert(
-      "NamespaceName".to_owned(),
-      GenericClause::Eq(name.to_owned()),
-    );
+    r#where.insert("Parent".to_owned(), GenericClause::Eq(name.to_owned()));
     let filter = GenericFilter {
       r#where: Some(r#where),
     };

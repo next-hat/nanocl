@@ -1,12 +1,17 @@
-use nanocl_error::io::IoResult;
-use nanocl_stubs::generic::GenericFilter;
-use tokio::task::JoinHandle;
+use std::sync::Arc;
+
 use uuid::Uuid;
+use diesel::prelude::*;
+use tokio::task::JoinHandle;
 use serde::{Serialize, Deserialize};
 
-use crate::schema::metrics;
+use nanocl_error::io::{IoResult, FromIo, IoError};
 
-use super::{Repository, Pool};
+use nanocl_stubs::generic::GenericFilter;
+
+use crate::{schema::metrics, utils};
+
+use super::{Pool, Repository};
 
 /// This structure represent a metric in the database.
 /// A metric is a data point that can be used to monitor the system.
@@ -66,13 +71,65 @@ impl Repository for MetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
+    let mut query = metrics::dsl::metrics
+      .order(metrics::dsl::created_at.desc())
+      .into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    // if let Some(value) = r#where.get("Key") {
+    //   gen_where4string!(query, stream_metrics::dsl::key, value);
+    // }
+    // if let Some(value) = r#where.get("Name") {
+    //   gen_where4string!(query, stream_metrics::dsl::name, value);
+    // }
+    // if let Some(value) = r#where.get("Kind") {
+    //   gen_where4string!(query, stream_metrics::dsl::kind, value);
+    // }
+    // if let Some(value) = r#where.get("NodeId") {
+    //   gen_where4string!(query, stream_metrics::dsl::node_id, value);
+    // }
+    // if let Some(value) = r#where.get("KindId") {
+    //   gen_where4string!(query, stream_metrics::dsl::kind_id, value);
+    // }
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let item = query
+        .get_result::<Self>(&mut conn)
+        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+      Ok::<_, IoError>(item)
+    })
   }
 
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    unimplemented!()
+    let mut query = metrics::dsl::metrics
+      .order(metrics::dsl::created_at.desc())
+      .into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    // if let Some(value) = r#where.get("Key") {
+    //   gen_where4string!(query, stream_metrics::dsl::key, value);
+    // }
+    // if let Some(value) = r#where.get("Name") {
+    //   gen_where4string!(query, stream_metrics::dsl::name, value);
+    // }
+    // if let Some(value) = r#where.get("Kind") {
+    //   gen_where4string!(query, stream_metrics::dsl::kind, value);
+    // }
+    // if let Some(value) = r#where.get("NodeId") {
+    //   gen_where4string!(query, stream_metrics::dsl::node_id, value);
+    // }
+    // if let Some(value) = r#where.get("KindId") {
+    //   gen_where4string!(query, stream_metrics::dsl::kind_id, value);
+    // }
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<Self>(&mut conn)
+        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+      Ok::<_, IoError>(items)
+    })
   }
 }

@@ -110,7 +110,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 mod test_namespace {
   use serde_json::json;
 
-  use nanocl_stubs::generic::GenericDelete;
   use nanocl_stubs::namespace::{Namespace, NamespacePartial};
 
   use crate::utils::tests::*;
@@ -167,8 +166,6 @@ mod test_namespace {
       .send_delete(&format!("{ENDPOINT}/{NAME}"), None::<String>)
       .await;
     assert!(res.status().is_success(), "Expect success on delete");
-    let body = TestClient::res_json::<GenericDelete>(res).await;
-    assert_eq!(body.count, 1, "Expect 1 item deleted");
   }
 
   #[ntex::test]

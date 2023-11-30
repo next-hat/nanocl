@@ -60,6 +60,7 @@ pub use container::*;
 pub type Pool = Arc<R2D2Pool<ConnectionManager<PgConnection>>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;
 
+/// Generate a where clause for a string column
 #[macro_export]
 macro_rules! gen_where4string {
   ($query: expr, $column: expr, $value: expr) => {
@@ -99,6 +100,33 @@ macro_rules! gen_where4string {
       }
       nanocl_stubs::generic::GenericClause::IsNotNull => {
         $query = $query.filter($column.is_not_null());
+      }
+      _ => {
+        // Ignore unsupported clause
+      }
+    }
+  };
+}
+
+/// Generate a where clause for a json column
+#[macro_export]
+macro_rules! gen_where4json {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        $query = $query.filter($column.is_null());
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        $query = $query.filter($column.is_not_null());
+      }
+      nanocl_stubs::generic::GenericClause::Contains(val) => {
+        $query = $query.filter($column.contains(val.clone()));
+      }
+      nanocl_stubs::generic::GenericClause::HasKey(val) => {
+        $query = $query.filter($column.has_key(val.clone()));
+      }
+      _ => {
+        // Ignore unsupported clause
       }
     }
   };

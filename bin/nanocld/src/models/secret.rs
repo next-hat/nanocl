@@ -1,4 +1,8 @@
-use nanocl_error::io::IoResult;
+use std::sync::Arc;
+
+use diesel::prelude::*;
+
+use nanocl_error::io::{IoResult, IoError};
 use serde::{Serialize, Deserialize};
 
 use nanocl_stubs::{
@@ -7,7 +11,7 @@ use nanocl_stubs::{
 };
 use tokio::task::JoinHandle;
 
-use crate::schema::secrets;
+use crate::{schema::secrets, gen_where4string, utils};
 
 use super::{Repository, Pool};
 
@@ -106,13 +110,47 @@ impl Repository for SecretDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query = secrets::dsl::secrets.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Key") {
+      gen_where4string!(query, secrets::dsl::key, value);
+    }
+    if let Some(value) = r#where.get("Kind") {
+      gen_where4string!(query, secrets::dsl::kind, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_result::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?
+        .into();
+      Ok::<_, IoError>(items)
+    })
   }
 
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query = secrets::dsl::secrets.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Key") {
+      gen_where4string!(query, secrets::dsl::key, value);
+    }
+    if let Some(value) = r#where.get("Kind") {
+      gen_where4string!(query, secrets::dsl::kind, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?
+        .into_iter()
+        .map(|db| db.into())
+        .collect();
+      Ok::<_, IoError>(items)
+    })
   }
 }

@@ -4,7 +4,7 @@ use tokio::task::JoinHandle;
 use diesel::query_dsl::methods::{FindDsl, FilterDsl};
 use diesel::{associations, RunQueryDsl, query_builder, pg, query_dsl};
 
-use nanocl_error::io::{IoResult, FromIo};
+use nanocl_error::io::{IoResult, FromIo, IoError};
 use nanocl_stubs::generic::GenericFilter;
 
 use crate::utils;
@@ -72,6 +72,16 @@ pub trait Repository {
   type Item;
   type UpdateItem;
 
+  /// Map an error with the context of the current type name
+  fn map_err_context<E>(err: E) -> Box<IoError>
+  where
+    E: FromIo<Box<IoError>>,
+  {
+    let name = std::any::type_name::<Self::Item>();
+    let short = name.split("::").last().unwrap_or(name);
+    err.map_err_context(|| short)
+  }
+
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
@@ -101,7 +111,7 @@ pub trait Repository {
         diesel::insert_into(<Self::Table as associations::HasTable>::table())
           .values(item)
           .get_result(&mut conn)
-          .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+          .map_err(Self::map_err_context)?;
       Ok(item)
     })
   }
@@ -126,7 +136,7 @@ pub trait Repository {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       diesel::delete(<Self::Table as associations::HasTable>::table().find(pk))
         .execute(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+        .map_err(Self::map_err_context)?;
       Ok(())
     })
   }
@@ -149,7 +159,7 @@ pub trait Repository {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let res = query
         .get_result::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+        .map_err(Self::map_err_context)?;
       // let res = R::try_from(res).map_err(|_| {
       //   IoError::invalid_data(std::any::type_name::<Self>(), "try_from")
       // })?;
@@ -190,7 +200,7 @@ pub trait Repository {
       )
       .set(values)
       .get_result(&mut conn)
-      .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+      .map_err(Self::map_err_context)?;
       Ok(res)
     })
   }
@@ -215,7 +225,7 @@ pub trait Repository {
         <Self::Table as associations::HasTable>::table().filter(predicate),
       )
       .execute(&mut conn)
-      .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+      .map_err(Self::map_err_context)?;
       Ok(())
     })
   }

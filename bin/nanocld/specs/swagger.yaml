@@ -55,9 +55,9 @@ paths:
         description: Filter for cargoes
         required: false
         schema:
-          allOf:
-          - $ref: '#/components/schemas/GenericFilter'
+          type: string
           nullable: true
+        example: '{ "Where": { "Name": { "Eq": "test" } } }'
       - name: Namespace
         in: query
         description: Namespace where the cargoes are
@@ -3248,6 +3248,103 @@ components:
           format: int64
           description: The system process ID for the exec process.
           nullable: true
+    GenericClause:
+      oneOf:
+      - type: object
+        required:
+        - Eq
+        properties:
+          Eq:
+            type: string
+            description: Equal
+      - type: object
+        required:
+        - Ne
+        properties:
+          Ne:
+            type: string
+            description: Not equal
+      - type: object
+        required:
+        - Gt
+        properties:
+          Gt:
+            type: string
+            description: Greater than
+      - type: object
+        required:
+        - Lt
+        properties:
+          Lt:
+            type: string
+            description: Less than
+      - type: object
+        required:
+        - Ge
+        properties:
+          Ge:
+            type: string
+            description: Greater than or equal
+      - type: object
+        required:
+        - Le
+        properties:
+          Le:
+            type: string
+            description: Less than or equal
+      - type: object
+        required:
+        - Like
+        properties:
+          Like:
+            type: string
+            description: Like
+      - type: object
+        required:
+        - NotLike
+        properties:
+          NotLike:
+            type: string
+            description: Not like
+      - type: object
+        required:
+        - In
+        properties:
+          In:
+            type: array
+            items:
+              type: string
+            description: In
+      - type: object
+        required:
+        - NotIn
+        properties:
+          NotIn:
+            type: array
+            items:
+              type: string
+            description: Not in
+      - type: string
+        description: Is null
+        enum:
+        - IsNull
+      - type: string
+        description: Is not null
+        enum:
+        - IsNotNull
+      - type: object
+        required:
+        - Contains
+        properties:
+          Contains:
+            description: JSON contains
+      - type: object
+        required:
+        - HasKey
+        properties:
+          HasKey:
+            type: string
+            description: JSON Has key
     GenericCount:
       type: object
       required:
@@ -3267,6 +3364,14 @@ components:
           type: integer
           description: Number of deleted items
           minimum: 0
+    GenericFilter:
+      type: object
+      properties:
+        Where:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/GenericClause'
+          nullable: true
     GenericResources:
       type: object
       properties:

@@ -1,8 +1,12 @@
-use nanocl_error::io::IoResult;
-use nanocl_stubs::{resource::ResourceSpec, generic::GenericFilter};
+use std::sync::Arc;
+
+use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
-use crate::schema::resource_specs;
+use nanocl_error::io::{IoResult, IoError, FromIo};
+use nanocl_stubs::{resource::ResourceSpec, generic::GenericFilter};
+
+use crate::{schema::resource_specs, gen_where4string, utils, gen_where4json};
 
 use super::{resource::ResourceDb, Repository, Pool};
 
@@ -52,13 +56,55 @@ impl Repository for ResourceSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query = resource_specs::dsl::resource_specs.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Version") {
+      gen_where4string!(query, resource_specs::dsl::version, value);
+    }
+    if let Some(value) = r#where.get("ResourceKey") {
+      gen_where4string!(query, resource_specs::dsl::resource_key, value);
+    }
+    if let Some(value) = r#where.get("Data") {
+      gen_where4json!(query, resource_specs::dsl::data, value);
+    }
+    if let Some(value) = r#where.get("Metadata") {
+      gen_where4json!(query, resource_specs::dsl::metadata, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_result::<Self>(&mut conn)
+        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+      Ok::<_, IoError>(items)
+    })
   }
 
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query = resource_specs::dsl::resource_specs.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Version") {
+      gen_where4string!(query, resource_specs::dsl::version, value);
+    }
+    if let Some(value) = r#where.get("ResourceKey") {
+      gen_where4string!(query, resource_specs::dsl::resource_key, value);
+    }
+    if let Some(value) = r#where.get("Data") {
+      gen_where4json!(query, resource_specs::dsl::data, value);
+    }
+    if let Some(value) = r#where.get("Metadata") {
+      gen_where4json!(query, resource_specs::dsl::metadata, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<Self>(&mut conn)
+        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+      Ok::<_, IoError>(items)
+    })
   }
 }

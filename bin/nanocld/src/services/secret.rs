@@ -231,12 +231,10 @@ mod test_secret {
   }
 
   async fn test_delete(client: &TestClient) {
-    let mut res = client
+    let res = client
       .send_delete(&format!("{ENDPOINT}/test-secret"), None::<String>)
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "delete secret");
-    let body = res.json::<GenericDelete>().await.unwrap();
-    assert_eq!(body.count, 1, "Expect 1 secret deleted");
   }
 
   #[ntex::test]

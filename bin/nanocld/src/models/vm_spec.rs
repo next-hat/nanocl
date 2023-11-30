@@ -1,16 +1,18 @@
+use std::sync::Arc;
 use std::collections::HashMap;
 
-use nanocl_error::io::IoResult;
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
-use nanocl_stubs::vm::Vm;
-use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
+use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
+use nanocl_error::io::{IoError, IoResult};
+
+use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
+
+use crate::{utils, gen_where4string};
 use crate::schema::vm_specs;
 
-use super::{Repository, Pool};
-use super::vm::VmDb;
-use super::generic::FromSpec;
+use super::{Pool, Repository, VmDb, FromSpec};
 
 /// This structure represent the vm spec in the database.
 /// A vm spec represent the specification of a virtual machine.
@@ -46,14 +48,48 @@ impl Repository for VmSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query = vm_specs::dsl::vm_specs.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("VmKey") {
+      gen_where4string!(query, vm_specs::dsl::vm_key, value);
+    }
+    if let Some(value) = r#where.get("Version") {
+      gen_where4string!(query, vm_specs::dsl::version, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let item = query
+        .get_result::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?
+        .try_to_spec()?;
+      Ok::<_, IoError>(item)
+    })
   }
 
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query = vm_specs::dsl::vm_specs.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("VmKey") {
+      gen_where4string!(query, vm_specs::dsl::vm_key, value);
+    }
+    if let Some(value) = r#where.get("Version") {
+      gen_where4string!(query, vm_specs::dsl::version, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?
+        .into_iter()
+        .map(|i| i.try_to_spec())
+        .collect::<IoResult<Vec<_>>>()?;
+      Ok::<_, IoError>(items)
+    })
   }
 }
 
@@ -103,14 +139,11 @@ impl FromSpec for VmSpecDb {
 
 impl VmSpecDb {
   pub(crate) async fn find_by_vm(
-    name: &str,
+    vm_pk: &str,
     pool: &Pool,
   ) -> IoResult<Vec<VmSpec>> {
     let mut r#where = HashMap::new();
-    r#where.insert(
-      "NamespaceName".to_owned(),
-      GenericClause::Eq(name.to_owned()),
-    );
+    r#where.insert("VmKey".to_owned(), GenericClause::Eq(vm_pk.to_owned()));
     let filter = GenericFilter {
       r#where: Some(r#where),
     };

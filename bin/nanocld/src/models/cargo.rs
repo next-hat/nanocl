@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 
-use diesel::prelude::*;
 use ntex::web;
+use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
 use nanocl_error::io::{IoResult, FromIo, IoError};
@@ -75,18 +75,11 @@ impl Repository for CargoDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
-  }
-
-  fn find(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
     let mut query = cargoes::dsl::cargoes
       .inner_join(crate::schema::cargo_specs::table)
-      .into_boxed()
-      .order(cargoes::dsl::created_at.desc());
+      .into_boxed();
     let r#where = filter.r#where.to_owned().unwrap_or_default();
+    log::debug!("CargoDb::find_one filter: {:?}", r#where);
     if let Some(value) = r#where.get("Key") {
       gen_where4string!(query, cargoes::dsl::key, value);
     }
@@ -99,9 +92,39 @@ impl Repository for CargoDb {
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items: Vec<(CargoDb, CargoSpecDb)> = query
-        .load(&mut conn)
-        .map_err(|err| err.map_err_context(|| "Cargo"))?;
+      let items = query
+        .get_result::<(CargoDb, CargoSpecDb)>(&mut conn)
+        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+      let item = items.0.with_spec(&items.1.try_to_spec()?);
+      Ok::<_, IoError>(item)
+    })
+  }
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    let mut query = cargoes::dsl::cargoes
+      .inner_join(crate::schema::cargo_specs::table)
+      .order(cargoes::dsl::created_at.desc())
+      .into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    log::debug!("CargoDb::find filter: {:?}", r#where);
+    if let Some(value) = r#where.get("Key") {
+      gen_where4string!(query, cargoes::dsl::key, value);
+    }
+    if let Some(value) = r#where.get("Name") {
+      gen_where4string!(query, cargoes::dsl::name, value);
+    }
+    if let Some(value) = r#where.get("NamespaceName") {
+      gen_where4string!(query, cargoes::dsl::namespace_name, value);
+    }
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<(CargoDb, CargoSpecDb)>(&mut conn)
+        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
       let items = items
         .into_iter()
         .map(|item| {
@@ -109,7 +132,7 @@ impl Repository for CargoDb {
           Ok::<_, IoError>(item.0.with_spec(spec))
         })
         .collect::<IoResult<Vec<_>>>()?;
-      Ok::<_, nanocl_error::io::IoError>(items)
+      Ok::<_, IoError>(items)
     })
   }
 }
@@ -177,7 +200,7 @@ impl CargoDb {
         .inner_join(cargo_specs::table)
         .filter(cargoes::key.eq(key))
         .get_result(&mut conn)
-        .map_err(|err| err.map_err_context(|| "Cargo"))?;
+        .map_err(Self::map_err_context)?;
       Ok::<_, IoError>(item)
     })
     .await?;
@@ -214,7 +237,7 @@ impl CargoDb {
         .filter(cargoes::namespace_name.eq(nsp))
         .count()
         .get_result(&mut conn)
-        .map_err(|err| err.map_err_context(|| "Cargo"))?;
+        .map_err(Self::map_err_context)?;
       Ok::<_, IoError>(count)
     })
     .await?;

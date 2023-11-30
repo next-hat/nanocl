@@ -1,12 +1,14 @@
+use std::sync::Arc;
 use std::collections::HashMap;
 
 use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoResult, FromIo, IoError};
 
 use nanocl_stubs::generic::{GenericFilter, GenericClause};
 
+use crate::{utils, gen_where4string};
 use crate::schema::{resource_kinds, resource_kind_versions};
 
 use super::{Repository, Pool};
@@ -19,10 +21,15 @@ use super::{Repository, Pool};
 #[diesel(table_name = resource_kind_versions)]
 #[diesel(primary_key(resource_kind_name, version))]
 pub struct ResourceKindVersionDb {
+  /// The related resource kind reference
   pub resource_kind_name: String,
+  /// When the resource kind version have been created
   pub created_at: chrono::NaiveDateTime,
+  /// The version of the resource kind
   pub version: String,
+  /// The JSONSchema of the resource of this kind and version
   pub schema: Option<serde_json::Value>,
+  /// The service to call when creating, updating or deleting a resource of this kind and version
   pub url: Option<String>,
 }
 
@@ -74,14 +81,73 @@ impl Repository for ResourceKindVersionDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query =
+      resource_kind_versions::dsl::resource_kind_versions.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("ResourceKindName") {
+      gen_where4string!(
+        query,
+        resource_kind_versions::dsl::resource_kind_name,
+        value
+      );
+    }
+    if let Some(value) = r#where.get("Version") {
+      gen_where4string!(query, resource_kind_versions::dsl::version, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_result::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(items)
+    })
   }
 
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query =
+      resource_kind_versions::dsl::resource_kind_versions.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("ResourceKindName") {
+      gen_where4string!(
+        query,
+        resource_kind_versions::dsl::resource_kind_name,
+        value
+      );
+    }
+    if let Some(value) = r#where.get("Version") {
+      gen_where4string!(query, resource_kind_versions::dsl::version, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(items)
+    })
+  }
+}
+
+impl ResourceKindVersionDb {
+  pub(crate) async fn get_version(
+    name: &str,
+    version: &str,
+    pool: &Pool,
+  ) -> IoResult<ResourceKindVersionDb> {
+    let mut r#where = HashMap::new();
+    r#where.insert(
+      "ResourceKindName".to_owned(),
+      GenericClause::Eq(name.to_owned()),
+    );
+    r#where.insert("Version".to_owned(), GenericClause::Eq(version.to_owned()));
+    let filter = GenericFilter {
+      r#where: Some(r#where),
+    };
+    ResourceKindVersionDb::find_one(&filter, pool).await?
   }
 }
 
@@ -103,32 +169,37 @@ impl Repository for ResourceKindDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
+    let pool = Arc::clone(pool);
+    let mut query = resource_kinds::dsl::resource_kinds.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Name") {
+      gen_where4string!(query, resource_kinds::dsl::name, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_result::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(items)
+    })
   }
 
   fn find(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    unimplemented!()
-  }
-}
-
-impl ResourceKindVersionDb {
-  pub(crate) async fn get_version(
-    name: &str,
-    version: &str,
-    pool: &Pool,
-  ) -> IoResult<ResourceKindVersionDb> {
-    let mut r#where = HashMap::new();
-    r#where.insert(
-      "ResourceKindName".to_owned(),
-      GenericClause::Eq(name.to_owned()),
-    );
-    r#where.insert("Version".to_owned(), GenericClause::Eq(version.to_owned()));
-    let filter = GenericFilter {
-      r#where: Some(r#where),
-    };
-    ResourceKindVersionDb::find_one(&filter, pool).await?
+    let pool = Arc::clone(pool);
+    let mut query = resource_kinds::dsl::resource_kinds.into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Name") {
+      gen_where4string!(query, resource_kinds::dsl::name, value);
+    }
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(items)
+    })
   }
 }

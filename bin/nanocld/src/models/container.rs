@@ -128,16 +128,9 @@ impl Repository for ContainerDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    unimplemented!()
-  }
-
-  fn find(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
     let mut query = containers::dsl::containers
-      .into_boxed()
-      .order(containers::dsl::created_at.desc());
+      .order(containers::dsl::created_at.desc())
+      .into_boxed();
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     if let Some(value) = r#where.get("Key") {
       gen_where4string!(query, containers::dsl::key, value);
@@ -157,10 +150,45 @@ impl Repository for ContainerDb {
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items: Vec<Self> = query
-        .load(&mut conn)
-        .map_err(|err| err.map_err_context(|| "Cargo"))?;
-      let items = items
+      let item = query
+        .get_result::<Self>(&mut conn)
+        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+      let item = Self::Item::try_from(item).map_err(|_| {
+        IoError::invalid_data(std::any::type_name::<Self>(), "try_from")
+      })?;
+      Ok::<_, IoError>(item)
+    })
+  }
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    let mut query = containers::dsl::containers
+      .order(containers::dsl::created_at.desc())
+      .into_boxed();
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
+    if let Some(value) = r#where.get("Key") {
+      gen_where4string!(query, containers::dsl::key, value);
+    }
+    if let Some(value) = r#where.get("Name") {
+      gen_where4string!(query, containers::dsl::name, value);
+    }
+    if let Some(value) = r#where.get("Kind") {
+      gen_where4string!(query, containers::dsl::kind, value);
+    }
+    if let Some(value) = r#where.get("NodeId") {
+      gen_where4string!(query, containers::dsl::node_id, value);
+    }
+    if let Some(value) = r#where.get("KindId") {
+      gen_where4string!(query, containers::dsl::kind_id, value);
+    }
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<Self>(&mut conn)
+        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?
         .into_iter()
         .map(|item| {
           let item = Self::Item::try_from(item).map_err(|_| {
@@ -169,7 +197,7 @@ impl Repository for ContainerDb {
           Ok::<_, IoError>(item)
         })
         .collect::<IoResult<Vec<_>>>()?;
-      Ok::<_, nanocl_error::io::IoError>(items)
+      Ok::<_, IoError>(items)
     })
   }
 }

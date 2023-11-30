@@ -1,7 +1,3 @@
-/*
-* Endpoints to manipulate cargoes
-*/
-
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
@@ -22,7 +18,7 @@ use crate::models::{DaemonState, CargoSpecDb, Repository, FromSpec};
   tag = "Cargoes",
   path = "/cargoes",
   params(
-    ("Filter" = Option<GenericFilter>, Query, description = "Filter for cargoes"),
+    ("Filter" = Option<String>, Query, description = "Filter for cargoes", example = "{ \"Where\": { \"Name\": { \"Eq\": \"test\" } } }"),
     ("Namespace" = Option<String>, Query, description = "Namespace where the cargoes are"),
   ),
   responses(
@@ -137,6 +133,7 @@ pub(crate) async fn delete_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
+  log::debug!("service::delete_cargo: {key}");
   utils::cargo::delete_by_key(&key, qs.force, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }

@@ -224,7 +224,7 @@ mod tests {
       "resource",
       "revert",
       "deploy-example.com",
-      &history.key.to_string(),
+      &history.key.to_string()
     );
     // Remove resource
     assert_cli_ok!("resource", "rm", "-y", "deploy-example.com");
