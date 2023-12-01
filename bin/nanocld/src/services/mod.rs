@@ -18,7 +18,6 @@ mod resource;
 mod cargo;
 mod cargo_image;
 mod metric;
-mod http_metric;
 mod vm;
 mod vm_image;
 mod secret;
@@ -66,7 +65,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
       .configure(vm_image::ntex_config)
       .configure(vm::ntex_config)
       .configure(metric::ntex_config)
-      .configure(http_metric::ntex_config)
       .configure(secret::ntex_config)
       .configure(job::ntex_config),
   );

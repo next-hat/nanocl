@@ -48,15 +48,16 @@ impl Repository for VmSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    let pool = Arc::clone(pool);
-    let mut query = vm_specs::dsl::vm_specs.into_boxed();
+    log::debug!("VmSpecDb::find_one filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("VmKey") {
+    let mut query = vm_specs::dsl::vm_specs.into_boxed();
+    if let Some(value) = r#where.get("vm_key") {
       gen_where4string!(query, vm_specs::dsl::vm_key, value);
     }
-    if let Some(value) = r#where.get("Version") {
+    if let Some(value) = r#where.get("version") {
       gen_where4string!(query, vm_specs::dsl::version, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let item = query
@@ -71,15 +72,16 @@ impl Repository for VmSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    let pool = Arc::clone(pool);
-    let mut query = vm_specs::dsl::vm_specs.into_boxed();
+    log::debug!("VmSpecDb::find filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("VmKey") {
+    let mut query = vm_specs::dsl::vm_specs.into_boxed();
+    if let Some(value) = r#where.get("vm_key") {
       gen_where4string!(query, vm_specs::dsl::vm_key, value);
     }
-    if let Some(value) = r#where.get("Version") {
+    if let Some(value) = r#where.get("version") {
       gen_where4string!(query, vm_specs::dsl::version, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query

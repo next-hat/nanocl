@@ -6,7 +6,6 @@ use serde::{Serialize, Deserialize};
 /// Generic namespace query filter
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct GenericNspQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
@@ -21,6 +20,7 @@ impl GenericNspQuery {
   }
 }
 
+/// Generic count response
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -30,10 +30,11 @@ pub struct GenericCount {
   pub count: i64,
 }
 
+/// Generic where clause
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 pub enum GenericClause {
   /// Equal
   Eq(String),
@@ -65,29 +66,82 @@ pub enum GenericClause {
   HasKey(String),
 }
 
+/// Generic filter for list operation
 #[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct GenericFilter {
-  #[cfg_attr(feature = "serde", serde(rename = "Where"))]
+  /// Where clause
+  #[cfg_attr(feature = "serde", serde(rename = "where"))]
   pub r#where: Option<HashMap<String, GenericClause>>,
 }
 
+/// Generic query string parameters for list operations
 #[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct GenericListQuery {
-  pub filter: Option<GenericFilter>,
+  /// A json as string as GenericFilter
+  pub filter: Option<String>,
 }
 
+impl TryFrom<GenericFilter> for GenericListQuery {
+  type Error = serde_json::Error;
+
+  fn try_from(filter: GenericFilter) -> Result<Self, Self::Error> {
+    Ok(Self {
+      filter: Some(serde_json::to_string(&filter)?),
+    })
+  }
+}
+
+impl TryFrom<GenericListQuery> for GenericFilter {
+  type Error = serde_json::Error;
+
+  fn try_from(query: GenericListQuery) -> Result<Self, Self::Error> {
+    match query.filter {
+      None => Ok(Self::default()),
+      Some(filter) => serde_json::from_str(&filter),
+    }
+  }
+}
+
+impl TryFrom<GenericListNspQuery> for GenericFilter {
+  type Error = serde_json::Error;
+
+  fn try_from(query: GenericListNspQuery) -> Result<Self, Self::Error> {
+    let filter = match query.filter {
+      None => Self::default(),
+      Some(filter) => serde_json::from_str(&filter)?,
+    };
+    Ok(filter)
+  }
+}
+
+/// Generic query string parameters for list operations that include a namespace
 #[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct GenericListNspQuery {
   /// A json as string as GenericFilter
   pub filter: Option<String>,
   pub namespace: Option<String>,
+}
+
+impl GenericFilter {
+  pub fn new() -> Self {
+    Self::default()
+  }
+
+  pub fn r#where(mut self, key: &str, clause: GenericClause) -> Self {
+    if self.r#where.is_none() {
+      self.r#where = Some(HashMap::new());
+    }
+    self
+      .r#where
+      .as_mut()
+      .unwrap()
+      .insert(key.to_owned(), clause);
+    self
+  }
 }

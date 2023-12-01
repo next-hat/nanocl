@@ -18,8 +18,8 @@ use crate::models::{DaemonState, CargoSpecDb, Repository, FromSpec};
   tag = "Cargoes",
   path = "/cargoes",
   params(
-    ("Filter" = Option<String>, Query, description = "Filter for cargoes", example = "{ \"Where\": { \"Name\": { \"Eq\": \"test\" } } }"),
-    ("Namespace" = Option<String>, Query, description = "Namespace where the cargoes are"),
+    ("filter" = Option<String>, Query, description = "Filter for cargoes", example = "{ \"where\": { \"name\": { \"eq\": \"test\" } } }"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargoes are"),
   ),
   responses(
     (status = 200, description = "List of cargoes", body = [CargoSummary]),

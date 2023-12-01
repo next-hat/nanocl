@@ -1,17 +1,16 @@
 use std::sync::Arc;
-use std::collections::HashMap;
 
 use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
-use nanocl_error::io::{IoResult, IoError, FromIo};
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::{GenericFilter, GenericClause};
 use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
 
+use crate::{utils, gen_where4json, gen_where4string};
 use crate::schema::cargo_specs;
 
-use crate::{utils, gen_where4json, gen_where4string};
 use super::{Pool, Repository, FromSpec, CargoDb};
 
 /// This structure represent the cargo spec in the database.
@@ -89,25 +88,26 @@ impl Repository for CargoSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    let mut query = cargo_specs::dsl::cargo_specs.into_boxed();
+    log::debug!("CargoSpecDb::find_one filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("CargoKey") {
+    let mut query = cargo_specs::dsl::cargo_specs.into_boxed();
+    if let Some(value) = r#where.get("cargo_key") {
       gen_where4string!(query, cargo_specs::dsl::cargo_key, value);
     }
-    if let Some(value) = r#where.get("Version") {
+    if let Some(value) = r#where.get("version") {
       gen_where4string!(query, cargo_specs::dsl::version, value);
     }
-    if let Some(value) = r#where.get("Data") {
+    if let Some(value) = r#where.get("data") {
       gen_where4json!(query, cargo_specs::dsl::data, value);
     }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_result::<CargoSpecDb>(&mut conn)
-        .map_err(|err| err.map_err_context(|| "Cargo"))?
+      let item = query
+        .get_result::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?
         .try_to_spec()?;
-      Ok::<_, IoError>(items)
+      Ok::<_, IoError>(item)
     })
   }
 
@@ -115,31 +115,32 @@ impl Repository for CargoSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    log::debug!("CargoSpecDb::find filter: {filter:?}");
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargo_specs::dsl::cargo_specs
       .order(cargo_specs::dsl::created_at.desc())
       .into_boxed();
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("CargoKey") {
+    if let Some(value) = r#where.get("cargo_key") {
       gen_where4string!(query, cargo_specs::dsl::cargo_key, value);
     }
-    if let Some(value) = r#where.get("Version") {
+    if let Some(value) = r#where.get("version") {
       gen_where4string!(query, cargo_specs::dsl::version, value);
     }
-    if let Some(value) = r#where.get("Data") {
+    if let Some(value) = r#where.get("data") {
       gen_where4json!(query, cargo_specs::dsl::data, value);
     }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
-        .get_results::<CargoSpecDb>(&mut conn)
-        .map_err(|err| err.map_err_context(|| "Cargo"))?
+        .get_results::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?
         .into_iter()
         .map(|item| {
           let spec = item.try_to_spec()?;
           Ok::<_, IoError>(spec)
         })
-        .collect::<IoResult<Vec<CargoSpec>>>()?;
+        .collect::<IoResult<Vec<_>>>()?;
       Ok::<_, IoError>(items)
     })
   }
@@ -150,11 +151,8 @@ impl CargoSpecDb {
     name: &str,
     pool: &Pool,
   ) -> IoResult<Vec<CargoSpec>> {
-    let mut r#where = HashMap::new();
-    r#where.insert("CargoKey".to_owned(), GenericClause::Eq(name.to_owned()));
-    let filter = GenericFilter {
-      r#where: Some(r#where),
-    };
+    let filter = GenericFilter::new()
+      .r#where("cargo_key", GenericClause::Eq(name.to_owned()));
     CargoSpecDb::find(&filter, pool).await?
   }
 }

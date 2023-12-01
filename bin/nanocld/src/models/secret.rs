@@ -1,19 +1,18 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-
-use nanocl_error::io::{IoResult, IoError};
+use tokio::task::JoinHandle;
 use serde::{Serialize, Deserialize};
 
-use nanocl_stubs::{
-  secret::{Secret, SecretPartial, SecretUpdate},
-  generic::GenericFilter,
-};
-use tokio::task::JoinHandle;
+use nanocl_error::io::{IoError, IoResult};
 
-use crate::{schema::secrets, gen_where4string, utils};
+use nanocl_stubs::generic::GenericFilter;
+use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 
-use super::{Repository, Pool};
+use crate::{utils, gen_where4string};
+use crate::schema::secrets;
+
+use super::{Pool, Repository};
 
 /// This structure represent the secret in the database.
 /// A secret is a key/value pair that can be used by the user to store
@@ -110,22 +109,23 @@ impl Repository for SecretDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    let pool = Arc::clone(pool);
-    let mut query = secrets::dsl::secrets.into_boxed();
+    log::debug!("SecretDb::find_one filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("Key") {
+    let mut query = secrets::dsl::secrets.into_boxed();
+    if let Some(value) = r#where.get("key") {
       gen_where4string!(query, secrets::dsl::key, value);
     }
-    if let Some(value) = r#where.get("Kind") {
+    if let Some(value) = r#where.get("kind") {
       gen_where4string!(query, secrets::dsl::kind, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
+      let item = query
         .get_result::<Self>(&mut conn)
         .map_err(Self::map_err_context)?
         .into();
-      Ok::<_, IoError>(items)
+      Ok::<_, IoError>(item)
     })
   }
 
@@ -133,15 +133,16 @@ impl Repository for SecretDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    let pool = Arc::clone(pool);
-    let mut query = secrets::dsl::secrets.into_boxed();
+    log::debug!("SecretDb::find filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("Key") {
+    let mut query = secrets::dsl::secrets.into_boxed();
+    if let Some(value) = r#where.get("key") {
       gen_where4string!(query, secrets::dsl::key, value);
     }
-    if let Some(value) = r#where.get("Kind") {
+    if let Some(value) = r#where.get("kind") {
       gen_where4string!(query, secrets::dsl::kind, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query

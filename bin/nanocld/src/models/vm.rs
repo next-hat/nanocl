@@ -1,14 +1,12 @@
 use std::sync::Arc;
-use std::collections::HashMap;
 
-use ntex::web;
 use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
-use nanocl_error::io::{IoResult, IoError, FromIo};
+use nanocl_error::io::{IoError, IoResult};
 
-use nanocl_stubs::vm::Vm;
 use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::vm::Vm;
 use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
 
 use crate::{utils, gen_where4string};
@@ -75,15 +73,16 @@ impl Repository for VmDb {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
     use crate::schema::vm_specs;
-    let pool = Arc::clone(pool);
-    let mut query = vms::dsl::vms.inner_join(vm_specs::table).into_boxed();
+    log::debug!("VmDb::find_one filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("Name") {
+    let mut query = vms::dsl::vms.inner_join(vm_specs::table).into_boxed();
+    if let Some(value) = r#where.get("name") {
       gen_where4string!(query, vms::dsl::name, value);
     }
-    if let Some(value) = r#where.get("NamespaceName") {
+    if let Some(value) = r#where.get("namespace_name") {
       gen_where4string!(query, vms::dsl::namespace_name, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let (i, s) = query
@@ -100,15 +99,16 @@ impl Repository for VmDb {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
     use crate::schema::vm_specs;
-    let pool = Arc::clone(pool);
-    let mut query = vms::dsl::vms.inner_join(vm_specs::table).into_boxed();
+    log::debug!("VmDb::find filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("Name") {
+    let mut query = vms::dsl::vms.inner_join(vm_specs::table).into_boxed();
+    if let Some(value) = r#where.get("name") {
       gen_where4string!(query, vms::dsl::name, value);
     }
-    if let Some(value) = r#where.get("NamespaceName") {
+    if let Some(value) = r#where.get("namespace_name") {
       gen_where4string!(query, vms::dsl::namespace_name, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
@@ -175,36 +175,17 @@ impl VmDb {
   }
 
   pub(crate) async fn inspect_by_pk(key: &str, pool: &Pool) -> IoResult<Vm> {
-    use crate::schema::vm_specs;
-    let key = key.to_owned();
-    let pool = Arc::clone(pool);
-    let item: (VmDb, VmSpecDb) = web::block(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = vms::table
-        .inner_join(vm_specs::table)
-        .filter(vms::key.eq(key))
-        .get_result(&mut conn)
-        .map_err(|err| err.map_err_context(|| "Vm"))?;
-      Ok::<_, IoError>(item)
-    })
-    .await?;
-    let spec = item.1.try_to_spec()?;
-    let item = item.0.with_spec(&spec);
-    Ok(item)
+    let filter =
+      GenericFilter::new().r#where("key", GenericClause::Eq(key.to_owned()));
+    Self::find_one(&filter, pool).await?
   }
 
   pub(crate) async fn find_by_namespace(
     name: &str,
     pool: &Pool,
   ) -> IoResult<Vec<Vm>> {
-    let mut r#where = HashMap::new();
-    r#where.insert(
-      "NamespaceName".to_owned(),
-      GenericClause::Eq(name.to_owned()),
-    );
-    let filter = GenericFilter {
-      r#where: Some(r#where),
-    };
+    let filter = GenericFilter::new()
+      .r#where("namespace_name", GenericClause::Eq(name.to_owned()));
     VmDb::find(&filter, pool).await?
   }
 }

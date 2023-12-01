@@ -1,9 +1,6 @@
 use uuid::Uuid;
 
 #[cfg(feature = "serde")]
-use serde::Deserializer;
-
-#[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Debug)]
@@ -67,54 +64,4 @@ pub struct HttpMetric {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub http_accept_language: Option<String>,
-}
-
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
-pub struct HttpMetricListQuery {
-  pub limit: Option<i64>,
-  pub offset: Option<i64>,
-}
-
-#[cfg(feature = "serde")]
-fn deserialize_status_between<'de, D>(
-  deserializer: D,
-) -> Result<Option<(i64, Option<i64>)>, D::Error>
-where
-  D: Deserializer<'de>,
-{
-  let buf = Option::<String>::deserialize(deserializer)?;
-  let buf = match &buf {
-    None => {
-      return Ok(None);
-    }
-    Some(buf) => buf,
-  };
-  let res: Vec<_> = buf
-    .split(',')
-    .map(|s| s.parse::<i64>().unwrap_or_default())
-    .collect();
-  let status_min = *res.first().unwrap_or(&0);
-  let status_max = res.get(1).copied();
-  Ok(Some((status_min, status_max)))
-}
-
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
-pub struct HttpMetricCountQuery {
-  #[cfg_attr(
-    feature = "serde",
-    serde(default, deserialize_with = "deserialize_status_between")
-  )]
-  pub status: Option<(i64, Option<i64>)>,
 }

@@ -5,11 +5,12 @@ use diesel::prelude::*;
 use tokio::task::JoinHandle;
 use serde::{Serialize, Deserialize};
 
-use nanocl_error::io::{IoResult, FromIo, IoError};
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::GenericFilter;
 
-use crate::{schema::metrics, utils};
+use crate::{utils, gen_where4string, gen_where4json};
+use crate::schema::metrics;
 
 use super::{Pool, Repository};
 
@@ -71,31 +72,26 @@ impl Repository for MetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
+    log::debug!("MetricDb::find_one filter: {filter:?}");
     let mut query = metrics::dsl::metrics
       .order(metrics::dsl::created_at.desc())
       .into_boxed();
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    // if let Some(value) = r#where.get("Key") {
-    //   gen_where4string!(query, stream_metrics::dsl::key, value);
-    // }
-    // if let Some(value) = r#where.get("Name") {
-    //   gen_where4string!(query, stream_metrics::dsl::name, value);
-    // }
-    // if let Some(value) = r#where.get("Kind") {
-    //   gen_where4string!(query, stream_metrics::dsl::kind, value);
-    // }
-    // if let Some(value) = r#where.get("NodeId") {
-    //   gen_where4string!(query, stream_metrics::dsl::node_id, value);
-    // }
-    // if let Some(value) = r#where.get("KindId") {
-    //   gen_where4string!(query, stream_metrics::dsl::kind_id, value);
-    // }
+    if let Some(node_name) = r#where.get("node_name") {
+      gen_where4string!(query, metrics::dsl::node_name, node_name);
+    }
+    if let Some(kind) = r#where.get("kind") {
+      gen_where4string!(query, metrics::dsl::kind, kind);
+    }
+    if let Some(data) = r#where.get("data") {
+      gen_where4json!(query, metrics::dsl::data, data);
+    }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let item = query
         .get_result::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+        .map_err(Self::map_err_context)?;
       Ok::<_, IoError>(item)
     })
   }
@@ -104,31 +100,26 @@ impl Repository for MetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    log::debug!("MetricDb::find filter: {filter:?}");
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = metrics::dsl::metrics
       .order(metrics::dsl::created_at.desc())
       .into_boxed();
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    // if let Some(value) = r#where.get("Key") {
-    //   gen_where4string!(query, stream_metrics::dsl::key, value);
-    // }
-    // if let Some(value) = r#where.get("Name") {
-    //   gen_where4string!(query, stream_metrics::dsl::name, value);
-    // }
-    // if let Some(value) = r#where.get("Kind") {
-    //   gen_where4string!(query, stream_metrics::dsl::kind, value);
-    // }
-    // if let Some(value) = r#where.get("NodeId") {
-    //   gen_where4string!(query, stream_metrics::dsl::node_id, value);
-    // }
-    // if let Some(value) = r#where.get("KindId") {
-    //   gen_where4string!(query, stream_metrics::dsl::kind_id, value);
-    // }
+    if let Some(node_name) = r#where.get("node_name") {
+      gen_where4string!(query, metrics::dsl::node_name, node_name);
+    }
+    if let Some(kind) = r#where.get("kind") {
+      gen_where4string!(query, metrics::dsl::kind, kind);
+    }
+    if let Some(data) = r#where.get("data") {
+      gen_where4json!(query, metrics::dsl::data, data);
+    }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
         .get_results::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+        .map_err(Self::map_err_context)?;
       Ok::<_, IoError>(items)
     })
   }

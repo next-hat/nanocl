@@ -73,7 +73,7 @@ use nanocl_stubs::state::{Statefile, StatefileArg};
 
 use super::{
   node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
-  metric, http_metric, secret, job,
+  metric, secret, job,
 };
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -296,9 +296,6 @@ impl Modify for VersionModifier {
     resource::revert_resource,
     // Metric
     metric::list_metric,
-    // Http Metric
-    http_metric::list_http_metric,
-    http_metric::count_http_metric,
   ),
   components(schemas(
     // Node

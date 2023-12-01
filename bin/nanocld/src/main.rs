@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate diesel;
-
 use clap::Parser;
 use nanocl_error::io::FromIo;
 

@@ -3,16 +3,15 @@ use std::sync::Arc;
 use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
-use nanocl_error::io::{IoResult, IoError, FromIo};
+use nanocl_error::io::{IoError, IoResult};
 
-use nanocl_stubs::{
-  job::{Job, JobPartial},
-  generic::GenericFilter,
-};
+use nanocl_stubs::generic::GenericFilter;
+use nanocl_stubs::job::{Job, JobPartial};
 
-use crate::{schema::jobs, utils};
+use crate::utils;
+use crate::schema::jobs;
 
-use super::{generic::FromSpec, Repository, Pool};
+use super::{Pool, Repository, FromSpec};
 
 /// This structure represent a job to run.
 /// It will create and run a list of containers.
@@ -38,82 +37,6 @@ pub struct JobDb {
 #[diesel(table_name = jobs)]
 pub struct JobUpdateDb {
   pub updated_at: Option<chrono::NaiveDateTime>,
-}
-
-impl Repository for JobDb {
-  type Table = jobs::table;
-  type Item = Job;
-  type UpdateItem = JobUpdateDb;
-
-  fn find_one(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Item>> {
-    let mut query = jobs::dsl::jobs
-      .order(jobs::dsl::created_at.desc())
-      .into_boxed();
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    // if let Some(value) = r#where.get("Key") {
-    //   gen_where4string!(query, stream_metrics::dsl::key, value);
-    // }
-    // if let Some(value) = r#where.get("Name") {
-    //   gen_where4string!(query, stream_metrics::dsl::name, value);
-    // }
-    // if let Some(value) = r#where.get("Kind") {
-    //   gen_where4string!(query, stream_metrics::dsl::kind, value);
-    // }
-    // if let Some(value) = r#where.get("NodeId") {
-    //   gen_where4string!(query, stream_metrics::dsl::node_id, value);
-    // }
-    // if let Some(value) = r#where.get("KindId") {
-    //   gen_where4string!(query, stream_metrics::dsl::kind_id, value);
-    // }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_result::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?
-        .try_to_spec()?;
-      Ok::<_, IoError>(item)
-    })
-  }
-
-  fn find(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    let mut query = jobs::dsl::jobs
-      .order(jobs::dsl::created_at.desc())
-      .into_boxed();
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    // if let Some(value) = r#where.get("Key") {
-    //   gen_where4string!(query, stream_metrics::dsl::key, value);
-    // }
-    // if let Some(value) = r#where.get("Name") {
-    //   gen_where4string!(query, stream_metrics::dsl::name, value);
-    // }
-    // if let Some(value) = r#where.get("Kind") {
-    //   gen_where4string!(query, stream_metrics::dsl::kind, value);
-    // }
-    // if let Some(value) = r#where.get("NodeId") {
-    //   gen_where4string!(query, stream_metrics::dsl::node_id, value);
-    // }
-    // if let Some(value) = r#where.get("KindId") {
-    //   gen_where4string!(query, stream_metrics::dsl::kind_id, value);
-    // }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_results::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?
-        .into_iter()
-        .map(|item| item.try_to_spec())
-        .collect::<IoResult<Vec<_>>>()?;
-      Ok::<_, IoError>(item)
-    })
-  }
 }
 
 impl FromSpec for JobDb {
@@ -150,5 +73,51 @@ impl FromSpec for JobDb {
       ttl: p.ttl,
       containers: p.containers.clone(),
     }
+  }
+}
+
+impl Repository for JobDb {
+  type Table = jobs::table;
+  type Item = Job;
+  type UpdateItem = JobUpdateDb;
+
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    log::debug!("JobDb::find_one filter: {filter:?}");
+    let query = jobs::dsl::jobs
+      .order(jobs::dsl::created_at.desc())
+      .into_boxed();
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let item = query
+        .get_result::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?
+        .try_to_spec()?;
+      Ok::<_, IoError>(item)
+    })
+  }
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    log::debug!("JobDb::find filter: {filter:?}");
+    let query = jobs::dsl::jobs
+      .order(jobs::dsl::created_at.desc())
+      .into_boxed();
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let item = query
+        .get_results::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?
+        .into_iter()
+        .map(|item| item.try_to_spec())
+        .collect::<IoResult<Vec<_>>>()?;
+      Ok::<_, IoError>(item)
+    })
   }
 }

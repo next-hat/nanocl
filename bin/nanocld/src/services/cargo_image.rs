@@ -92,7 +92,7 @@ pub(crate) async fn create_cargo_image(
     ("IdOrName" = String, Path, description = "Image ID or name")
   ),
   responses(
-    (status = 200, description = "Delete response", body = GenericDelete),
+    (status = 202, description = "Image have been deleted"),
     (status = 404, description = "Image not found", body = ApiError),
   ),
 ))]
@@ -101,8 +101,8 @@ pub(crate) async fn delete_cargo_image(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let res = utils::cargo_image::delete(&path.1, &state).await?;
-  Ok(web::HttpResponse::Ok().json(&res))
+  utils::cargo_image::delete(&path.1, &state).await?;
+  Ok(web::HttpResponse::Accepted().into())
 }
 
 /// Import a container image from a tarball
@@ -330,8 +330,8 @@ pub mod tests {
       .await
       .expect("Expect inspect to return ImageInspect json data");
     // Delete
-    let mut res = delete(&client, TEST_IMAGE).await;
+    let res = delete(&client, TEST_IMAGE).await;
     let status = res.status();
-    test_status_code!(status, http::StatusCode::OK, "basic delete image");
+    test_status_code!(status, http::StatusCode::ACCEPTED, "basic delete image");
   }
 }

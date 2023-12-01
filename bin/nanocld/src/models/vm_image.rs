@@ -1,18 +1,18 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use diesel::prelude::*;
-use nanocl_error::io::{IoResult, IoError};
+use tokio::task::JoinHandle;
 use serde::{Serialize, Deserialize};
 
-use nanocl_stubs::{
-  vm_image::VmImage,
-  generic::{GenericFilter, GenericClause},
-};
-use tokio::task::JoinHandle;
+use nanocl_error::io::{IoResult, IoError};
 
-use crate::{schema::vm_images, gen_where4string, utils};
+use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::vm_image::VmImage;
 
-use super::{Repository, Pool};
+use crate::{utils, gen_where4string};
+use crate::schema::vm_images;
+
+use super::{Pool, Repository};
 
 /// This structure represent a virtual machine image in the database.
 /// A virtual machine image is a file that represent a virtual machine disk.
@@ -93,24 +93,25 @@ impl Repository for VmImageDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    let pool = Arc::clone(pool);
-    let mut query = vm_images::dsl::vm_images.into_boxed();
+    log::debug!("VmImageDb::find_one filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("Name") {
+    let mut query = vm_images::dsl::vm_images.into_boxed();
+    if let Some(value) = r#where.get("name") {
       gen_where4string!(query, vm_images::dsl::name, value);
     }
-    if let Some(value) = r#where.get("Kind") {
+    if let Some(value) = r#where.get("kind") {
       gen_where4string!(query, vm_images::dsl::kind, value);
     }
-    if let Some(value) = r#where.get("Parent") {
+    if let Some(value) = r#where.get("parent") {
       gen_where4string!(query, vm_images::dsl::parent, value);
     }
-    if let Some(value) = r#where.get("Format") {
+    if let Some(value) = r#where.get("format") {
       gen_where4string!(query, vm_images::dsl::format, value);
     }
-    if let Some(value) = r#where.get("Path") {
+    if let Some(value) = r#where.get("path") {
       gen_where4string!(query, vm_images::dsl::path, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let item = query
@@ -124,24 +125,25 @@ impl Repository for VmImageDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    let pool = Arc::clone(pool);
-    let mut query = vm_images::dsl::vm_images.into_boxed();
+    log::debug!("VmImageDb::find filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("Name") {
+    let mut query = vm_images::dsl::vm_images.into_boxed();
+    if let Some(value) = r#where.get("name") {
       gen_where4string!(query, vm_images::dsl::name, value);
     }
-    if let Some(value) = r#where.get("Kind") {
+    if let Some(value) = r#where.get("kind") {
       gen_where4string!(query, vm_images::dsl::kind, value);
     }
-    if let Some(value) = r#where.get("Parent") {
+    if let Some(value) = r#where.get("parent") {
       gen_where4string!(query, vm_images::dsl::parent, value);
     }
-    if let Some(value) = r#where.get("Format") {
+    if let Some(value) = r#where.get("format") {
       gen_where4string!(query, vm_images::dsl::format, value);
     }
-    if let Some(value) = r#where.get("Path") {
+    if let Some(value) = r#where.get("path") {
       gen_where4string!(query, vm_images::dsl::path, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
@@ -157,11 +159,8 @@ impl VmImageDb {
     name: &str,
     pool: &Pool,
   ) -> IoResult<Vec<VmImageDb>> {
-    let mut r#where = HashMap::new();
-    r#where.insert("Parent".to_owned(), GenericClause::Eq(name.to_owned()));
-    let filter = GenericFilter {
-      r#where: Some(r#where),
-    };
+    let filter = GenericFilter::new()
+      .r#where("parent", GenericClause::Eq(name.to_owned()));
     VmImageDb::find(&filter, pool).await?
   }
 }

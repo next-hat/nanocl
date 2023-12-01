@@ -27,7 +27,6 @@ pub use resource::exec_resource;
 pub use state::exec_state;
 pub use info::exec_info;
 pub use vm::exec_vm;
-pub use system::exec_system;
 pub use node::exec_node;
 pub use system::exec_process;
 pub use install::exec_install;

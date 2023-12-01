@@ -571,6 +571,9 @@ pub(crate) async fn list(
   query: &GenericListNspQuery,
   state: &DaemonState,
 ) -> HttpResult<Vec<CargoSummary>> {
+  let filter = GenericFilter::try_from(query.clone()).map_err(|err| {
+    HttpError::bad_request(format!("Invalid query string: {}", err))
+  })?;
   let namespace = utils::key::resolve_nsp(&query.namespace);
   // ensure namespace exists
   NamespaceDb::find_by_pk(&namespace, &state.pool).await??;

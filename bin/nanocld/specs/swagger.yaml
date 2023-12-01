@@ -50,15 +50,15 @@ paths:
       description: List cargoes
       operationId: list_cargo
       parameters:
-      - name: Filter
+      - name: filter
         in: query
         description: Filter for cargoes
         required: false
         schema:
           type: string
           nullable: true
-        example: '{ "Where": { "Name": { "Eq": "test" } } }'
-      - name: Namespace
+        example: '{ "where": { "name": { "eq": "test" } } }'
+      - name: namespace
         in: query
         description: Namespace where the cargoes are
         required: false
@@ -201,12 +201,8 @@ paths:
         schema:
           type: string
       responses:
-        '200':
-          description: Delete response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericDelete'
+        '202':
+          description: Image have been deleted
         '404':
           description: Image not found
           content:
@@ -792,62 +788,6 @@ paths:
           description: Event Stream of the command output
         '404':
           description: Cargo does not exist
-  /http_metrics:
-    get:
-      tags:
-      - HttpMetrics
-      summary: Get http metrics of all peer nodes
-      description: Get http metrics of all peer nodes
-      operationId: list_http_metric
-      parameters:
-      - name: Limit
-        in: query
-        description: Limit of the list
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: Offset
-        in: query
-        description: Offset of the list
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      responses:
-        '200':
-          description: Array of HTTP metrics founds
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/HttpMetric'
-  /http_metrics/count:
-    get:
-      tags:
-      - HttpMetrics
-      summary: Count http metrics of all peer nodes
-      description: Count http metrics of all peer nodes
-      operationId: count_http_metric
-      parameters:
-      - name: Status
-        in: query
-        description: Filter by status
-        required: false
-        schema:
-          type: string
-          nullable: true
-        example: 200,299
-      responses:
-        '200':
-          description: Count of HTTP metrics founds
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericCount'
   /info:
     get:
       tags:
@@ -1005,20 +945,21 @@ paths:
     get:
       tags:
       - Metrics
-      summary: Get specific metric of all peer nodes
-      description: Get specific metric of all peer nodes
+      summary: Get metrics of all peer nodes
+      description: Get metrics of all peer nodes
       operationId: list_metric
       parameters:
-      - name: Kind
+      - name: filter
         in: query
-        description: Kind of the metrics CPU | MEMORY | NETWORK | DISK
-        required: true
+        description: Filter for the list operation
+        required: false
         schema:
-          $ref: '#/components/schemas/MetricKind'
-        example: CPU
+          type: string
+          nullable: true
+        example: '{ "where": { "kind": { "eq": "CPU" } } }'
       responses:
         '200':
-          description: Kind of the metrics peer node
+          description: List of metrics
           content:
             application/json:
               schema:
@@ -3248,74 +3189,74 @@ components:
       oneOf:
       - type: object
         required:
-        - Eq
+        - eq
         properties:
-          Eq:
+          eq:
             type: string
             description: Equal
       - type: object
         required:
-        - Ne
+        - ne
         properties:
-          Ne:
+          ne:
             type: string
             description: Not equal
       - type: object
         required:
-        - Gt
+        - gt
         properties:
-          Gt:
+          gt:
             type: string
             description: Greater than
       - type: object
         required:
-        - Lt
+        - lt
         properties:
-          Lt:
+          lt:
             type: string
             description: Less than
       - type: object
         required:
-        - Ge
+        - ge
         properties:
-          Ge:
+          ge:
             type: string
             description: Greater than or equal
       - type: object
         required:
-        - Le
+        - le
         properties:
-          Le:
+          le:
             type: string
             description: Less than or equal
       - type: object
         required:
-        - Like
+        - like
         properties:
-          Like:
+          like:
             type: string
             description: Like
       - type: object
         required:
-        - NotLike
+        - not-like
         properties:
-          NotLike:
+          not-like:
             type: string
             description: Not like
       - type: object
         required:
-        - In
+        - in
         properties:
-          In:
+          in:
             type: array
             items:
               type: string
             description: In
       - type: object
         required:
-        - NotIn
+        - not-in
         properties:
-          NotIn:
+          not-in:
             type: array
             items:
               type: string
@@ -3323,26 +3264,28 @@ components:
       - type: string
         description: Is null
         enum:
-        - IsNull
+        - is-null
       - type: string
         description: Is not null
         enum:
-        - IsNotNull
+        - is-not-null
       - type: object
         required:
-        - Contains
+        - contains
         properties:
-          Contains:
+          contains:
             description: JSON contains
       - type: object
         required:
-        - HasKey
+        - has-key
         properties:
-          HasKey:
+          has-key:
             type: string
             description: JSON Has key
+      description: Generic where clause
     GenericCount:
       type: object
+      description: Generic count response
       required:
       - Count
       properties:
@@ -3352,9 +3295,11 @@ components:
           description: Number of items
     GenericFilter:
       type: object
+      description: Generic filter for list operation
       properties:
-        Where:
+        where:
           type: object
+          description: Where clause
           additionalProperties:
             $ref: '#/components/schemas/GenericClause'
           nullable: true
@@ -4776,17 +4721,22 @@ components:
         Key:
           type: string
           format: uuid
+          description: The key of the metric in the database `UUID`
         CreatedAt:
           type: string
           format: date-time
+          description: When the metric was created
         ExpireAt:
           type: string
           format: date-time
+          description: When the metric will expire
         NodeName:
           type: string
+          description: The node where the metric come from
         Kind:
           $ref: '#/components/schemas/MetricKind'
-        Data: {}
+        Data:
+          description: The data of the metric
     MetricKind:
       type: string
       enum:

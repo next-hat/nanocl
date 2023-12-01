@@ -3,12 +3,15 @@ use std::sync::Arc;
 use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
-use nanocl_error::io::{IoResult, IoError, FromIo};
-use nanocl_stubs::{resource::ResourceSpec, generic::GenericFilter};
+use nanocl_error::io::{IoError, IoResult};
 
-use crate::{schema::resource_specs, gen_where4string, utils, gen_where4json};
+use nanocl_stubs::generic::GenericFilter;
+use nanocl_stubs::resource::ResourceSpec;
 
-use super::{resource::ResourceDb, Repository, Pool};
+use crate::schema::resource_specs;
+use crate::{utils, gen_where4string, gen_where4json};
+
+use super::{Pool, Repository, ResourceDb};
 
 /// This structure represent the resource spec in the database.
 /// A resource spec represent the specification of a resource.
@@ -56,27 +59,28 @@ impl Repository for ResourceSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    let pool = Arc::clone(pool);
-    let mut query = resource_specs::dsl::resource_specs.into_boxed();
+    log::debug!("ResourceSpecDb::find_one filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("Version") {
+    let mut query = resource_specs::dsl::resource_specs.into_boxed();
+    if let Some(value) = r#where.get("version") {
       gen_where4string!(query, resource_specs::dsl::version, value);
     }
-    if let Some(value) = r#where.get("ResourceKey") {
+    if let Some(value) = r#where.get("resource_key") {
       gen_where4string!(query, resource_specs::dsl::resource_key, value);
     }
-    if let Some(value) = r#where.get("Data") {
+    if let Some(value) = r#where.get("data") {
       gen_where4json!(query, resource_specs::dsl::data, value);
     }
-    if let Some(value) = r#where.get("Metadata") {
+    if let Some(value) = r#where.get("metadata") {
       gen_where4json!(query, resource_specs::dsl::metadata, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
+      let item = query
         .get_result::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
-      Ok::<_, IoError>(items)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(item)
     })
   }
 
@@ -84,26 +88,27 @@ impl Repository for ResourceSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    let pool = Arc::clone(pool);
-    let mut query = resource_specs::dsl::resource_specs.into_boxed();
+    log::debug!("ResourceSpecDb::find filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("Version") {
+    let mut query = resource_specs::dsl::resource_specs.into_boxed();
+    if let Some(value) = r#where.get("version") {
       gen_where4string!(query, resource_specs::dsl::version, value);
     }
-    if let Some(value) = r#where.get("ResourceKey") {
+    if let Some(value) = r#where.get("resource_key") {
       gen_where4string!(query, resource_specs::dsl::resource_key, value);
     }
-    if let Some(value) = r#where.get("Data") {
+    if let Some(value) = r#where.get("data") {
       gen_where4json!(query, resource_specs::dsl::data, value);
     }
-    if let Some(value) = r#where.get("Metadata") {
+    if let Some(value) = r#where.get("metadata") {
       gen_where4json!(query, resource_specs::dsl::metadata, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
         .get_results::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+        .map_err(Self::map_err_context)?;
       Ok::<_, IoError>(items)
     })
   }

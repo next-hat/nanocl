@@ -82,8 +82,6 @@ pub enum Command {
   Upgrade(UpgradeOpts),
   /// Show all processes managed by nanocl
   Ps(ProcessOpts),
-  /// Manage system
-  System(SystemArg),
   /// Manage secrets
   Secret(SecretArg),
   // TODO: shell completion

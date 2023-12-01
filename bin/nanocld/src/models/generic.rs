@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use tokio::task::JoinHandle;
 use diesel::query_dsl::methods::{FindDsl, FilterDsl};
-use diesel::{associations, RunQueryDsl, query_builder, pg, query_dsl};
+use diesel::{RunQueryDsl, associations, query_builder, pg, query_dsl};
 
-use nanocl_error::io::{IoResult, FromIo, IoError};
+use nanocl_error::io::{IoError, IoResult, FromIo};
+
 use nanocl_stubs::generic::GenericFilter;
 
 use crate::utils;
@@ -67,19 +68,25 @@ pub trait WithSpec {
   fn with_spec(self, s: &Self::Relation) -> Self::Type;
 }
 
+/// Generic trait to represent a database table
 pub trait Repository {
   type Table;
   type Item;
   type UpdateItem;
+
+  /// Get the name of the current type
+  fn get_name() -> &'static str {
+    let name = std::any::type_name::<Self::Item>();
+    let short = name.split("::").last().unwrap_or(name);
+    short
+  }
 
   /// Map an error with the context of the current type name
   fn map_err_context<E>(err: E) -> Box<IoError>
   where
     E: FromIo<Box<IoError>>,
   {
-    let name = std::any::type_name::<Self::Item>();
-    let short = name.split("::").last().unwrap_or(name);
-    err.map_err_context(|| short)
+    err.map_err_context(Self::get_name)
   }
 
   fn find(
@@ -143,7 +150,6 @@ pub trait Repository {
 
   fn find_by_pk<Pk>(pk: &Pk, pool: &Pool) -> JoinHandle<IoResult<Self>>
   where
-    // R: TryFrom<Self> + Send + 'static,
     Pk: ToOwned + ?Sized,
     <Pk as ToOwned>::Owned: Send + 'static,
     Self: std::marker::Sized + Send + 'static,
@@ -157,13 +163,10 @@ pub trait Repository {
     ntex::rt::spawn_blocking(move || {
       let query = <Self::Table as associations::HasTable>::table().find(pk);
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let res = query
+      let item = query
         .get_result::<Self>(&mut conn)
         .map_err(Self::map_err_context)?;
-      // let res = R::try_from(res).map_err(|_| {
-      //   IoError::invalid_data(std::any::type_name::<Self>(), "try_from")
-      // })?;
-      Ok(res)
+      Ok(item)
     })
   }
 
@@ -195,13 +198,13 @@ pub trait Repository {
     let values = values.into();
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let res = diesel::update(
+      let item = diesel::update(
         <Self::Table as associations::HasTable>::table().find(pk),
       )
       .set(values)
       .get_result(&mut conn)
       .map_err(Self::map_err_context)?;
-      Ok(res)
+      Ok(item)
     })
   }
 

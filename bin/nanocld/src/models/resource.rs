@@ -1,23 +1,18 @@
 use std::sync::Arc;
 
-use ntex::web;
 use diesel::prelude::*;
 use tokio::task::JoinHandle;
 use serde::{Serialize, Deserialize};
 
-use nanocl_error::io::{IoResult, IoError, FromIo};
+use nanocl_error::io::{IoError, IoResult};
 
-use nanocl_stubs::{
-  resource::{Resource, ResourcePartial},
-  generic::GenericFilter,
-};
+use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::resource::{Resource, ResourcePartial};
 
-use crate::gen_where4string;
-use crate::{schema::resources, utils};
+use crate::{utils, gen_where4string};
+use crate::schema::resources;
 
-use crate::models::resource_spec::ResourceSpecDb;
-
-use super::{WithSpec, Repository, Pool};
+use super::{Pool, Repository, WithSpec, ResourceSpecDb};
 
 /// This structure represent a resource in the database.
 /// A resource is a representation of a specification for internal nanocl services (controllers).
@@ -74,23 +69,24 @@ impl Repository for ResourceDb {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
     use crate::schema::resource_specs;
-    let pool = Arc::clone(pool);
+    log::debug!("ResourceDb::find_one filter: {filter:?}");
+    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resources::dsl::resources
       .inner_join(resource_specs::table)
       .into_boxed();
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("Key") {
+    if let Some(value) = r#where.get("key") {
       gen_where4string!(query, resources::dsl::key, value);
     }
-    if let Some(value) = r#where.get("Kind") {
+    if let Some(value) = r#where.get("kind") {
       gen_where4string!(query, resources::dsl::kind, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
+      let item = query
         .get_result::<(ResourceDb, ResourceSpecDb)>(&mut conn)
         .map_err(Self::map_err_context)?;
-      let item = items.0.with_spec(&items.1);
+      let item = item.0.with_spec(&item.1);
       Ok::<_, IoError>(item)
     })
   }
@@ -100,18 +96,19 @@ impl Repository for ResourceDb {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
     use crate::schema::resource_specs;
-    let pool = Arc::clone(pool);
+    log::debug!("ResourceDb::find filter: {filter:?}");
     let mut query = resources::dsl::resources
       .order(resources::dsl::created_at.desc())
       .inner_join(resource_specs::table)
       .into_boxed();
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    if let Some(value) = r#where.get("Key") {
+    if let Some(value) = r#where.get("key") {
       gen_where4string!(query, resources::dsl::key, value);
     }
-    if let Some(value) = r#where.get("Kind") {
+    if let Some(value) = r#where.get("kind") {
       gen_where4string!(query, resources::dsl::kind, value);
     }
+    let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
@@ -126,6 +123,7 @@ impl Repository for ResourceDb {
 }
 
 impl ResourceDb {
+  /// Create a new resource from a spec.
   pub(crate) async fn create_from_spec(
     item: &ResourcePartial,
     pool: &Pool,
@@ -150,6 +148,7 @@ impl ResourceDb {
     Ok(item)
   }
 
+  /// Update a resource from a spec.
   pub(crate) async fn update_from_spec(
     item: &ResourcePartial,
     pool: &Pool,
@@ -179,20 +178,8 @@ impl ResourceDb {
     pk: &str,
     pool: &Pool,
   ) -> IoResult<Resource> {
-    use crate::schema::resource_specs;
-    let pk = pk.to_owned();
-    let pool = Arc::clone(pool);
-    let res: (ResourceDb, ResourceSpecDb) = web::block(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let res = resources::table
-        .inner_join(resource_specs::table)
-        .filter(resources::key.eq(pk))
-        .get_result(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(res)
-    })
-    .await?;
-    let item = res.0.with_spec(&res.1);
-    Ok(item)
+    let filter =
+      GenericFilter::new().r#where("key", GenericClause::Eq(pk.to_owned()));
+    Self::find_one(&filter, pool).await?
   }
 }

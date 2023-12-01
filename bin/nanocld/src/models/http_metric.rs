@@ -6,11 +6,11 @@ use tokio::task::JoinHandle;
 use chrono::{DateTime, FixedOffset};
 use serde::{Serialize, Deserialize, Deserializer};
 
-use nanocl_error::io::{IoResult, IoError, FromIo};
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::GenericFilter;
 
-use crate::{utils, gen_where4string};
+use crate::utils;
 use crate::schema::{http_metrics, stream_metrics};
 
 use super::{Pool, Repository, ToMeticDb};
@@ -299,32 +299,18 @@ impl Repository for HttpMetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    let mut query = http_metrics::dsl::http_metrics
+    log::debug!("HttpMetricDb::find_one filter: {filter:?}");
+    // let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let query = http_metrics::dsl::http_metrics
       .order(http_metrics::dsl::created_at.desc())
       .into_boxed();
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    // if let Some(value) = r#where.get("Key") {
-    //   gen_where4string!(query, stream_metrics::dsl::key, value);
-    // }
-    // if let Some(value) = r#where.get("Name") {
-    //   gen_where4string!(query, stream_metrics::dsl::name, value);
-    // }
-    // if let Some(value) = r#where.get("Kind") {
-    //   gen_where4string!(query, stream_metrics::dsl::kind, value);
-    // }
-    // if let Some(value) = r#where.get("NodeId") {
-    //   gen_where4string!(query, stream_metrics::dsl::node_id, value);
-    // }
-    // if let Some(value) = r#where.get("KindId") {
-    //   gen_where4string!(query, stream_metrics::dsl::kind_id, value);
-    // }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
+      let item = query
         .get_result::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
-      Ok::<_, IoError>(items)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(item)
     })
   }
 
@@ -332,16 +318,17 @@ impl Repository for HttpMetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    let mut query = http_metrics::dsl::http_metrics
+    log::debug!("HttpMetricDb::find filter: {filter:?}");
+    // let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let query = http_metrics::dsl::http_metrics
       .order(http_metrics::dsl::created_at.desc())
       .into_boxed();
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
         .get_results::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+        .map_err(Self::map_err_context)?;
       Ok::<_, IoError>(items)
     })
   }
@@ -356,16 +343,17 @@ impl Repository for StreamMetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    let mut query = stream_metrics::dsl::stream_metrics
+    log::debug!("StreamMetricDb::find_one filter: {filter:?}");
+    // let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let query = stream_metrics::dsl::stream_metrics
       .order(stream_metrics::dsl::created_at.desc())
       .into_boxed();
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
         .get_result::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+        .map_err(Self::map_err_context)?;
       Ok::<_, IoError>(items)
     })
   }
@@ -374,16 +362,17 @@ impl Repository for StreamMetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    let mut query = stream_metrics::dsl::stream_metrics
+    log::debug!("StreamMetricDb::find filter: {filter:?}");
+    // let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let query = stream_metrics::dsl::stream_metrics
       .order(stream_metrics::dsl::created_at.desc())
       .into_boxed();
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
         .get_results::<Self>(&mut conn)
-        .map_err(|err| err.map_err_context(std::any::type_name::<Self>))?;
+        .map_err(Self::map_err_context)?;
       Ok::<_, IoError>(items)
     })
   }
