@@ -1,11 +1,12 @@
+use nanocl_stubs::generic::{GenericListQuery, GenericFilter};
 /*
 * Endpoints to manipulate namespaces
 */
 use ntex::web;
 
-use nanocl_error::http::HttpResult;
+use nanocl_error::http::{HttpResult, HttpError};
 
-use nanocl_stubs::namespace::{NamespacePartial, NamespaceListQuery};
+use nanocl_stubs::namespace::NamespacePartial;
 
 use crate::utils;
 use crate::models::{DaemonState, NamespaceDb, Repository};
@@ -27,10 +28,12 @@ use crate::models::{DaemonState, NamespaceDb, Repository};
 #[web::get("/namespaces")]
 pub(crate) async fn list_namespace(
   state: web::types::State<DaemonState>,
-  web::types::Query(query): web::types::Query<NamespaceListQuery>,
+  web::types::Query(query): web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
+  let filter = GenericFilter::try_from(query)
+    .map_err(|err| HttpError::bad_request(err.to_string()))?;
   let items =
-    utils::namespace::list(&query, &state.docker_api, &state.pool).await?;
+    utils::namespace::list(&filter, &state.docker_api, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 

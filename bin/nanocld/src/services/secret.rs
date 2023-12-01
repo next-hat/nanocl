@@ -1,4 +1,3 @@
-use nanocl_stubs::generic::GenericFilter;
 /*
 * Endpoints to manipulate secrets
 */
@@ -6,8 +5,9 @@ use ntex::web;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
+use nanocl_stubs::generic::{GenericFilter, GenericListQuery};
 use nanocl_stubs::proxy::ProxySslConfig;
-use nanocl_stubs::secret::{SecretPartial, SecretUpdate, SecretQuery};
+use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
 
 use crate::utils;
 use crate::models::{DaemonState, SecretDb, Repository};
@@ -24,9 +24,11 @@ use crate::models::{DaemonState, SecretDb, Repository};
 #[web::get("/secrets")]
 pub(crate) async fn list_secret(
   state: web::types::State<DaemonState>,
-  web::types::Query(query): web::types::Query<SecretQuery>,
+  web::types::Query(query): web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let items = SecretDb::find(&GenericFilter::default(), &state.pool).await??;
+  let filter = GenericFilter::try_from(query)
+    .map_err(|err| HttpError::bad_request(err.to_string()))?;
+  let items = SecretDb::find(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -154,7 +156,7 @@ mod test_secret {
 
   use serde_json::json;
 
-  use nanocl_stubs::secret::{Secret, SecretPartial, SecretQuery};
+  use nanocl_stubs::secret::{Secret, SecretPartial};
 
   use crate::utils::tests::*;
 
@@ -162,21 +164,6 @@ mod test_secret {
 
   async fn test_list(client: &TestClient) {
     let res = client.send_get(ENDPOINT, None::<String>).await;
-    test_status_code!(res.status(), http::StatusCode::OK, "list secrets");
-    let res = client
-      .send_get(
-        ENDPOINT,
-        Some(SecretQuery {
-          kind: Some("Tls".to_owned()),
-          contains: Some(serde_json::json!({"VerifyClient": true}).to_string()),
-          exists: Some("CertificateClient".to_owned()),
-          meta_contains: Some(
-            serde_json::json!({"CertManagerIssuer": "letsencrypt"}).to_string(),
-          ),
-          meta_exists: Some("cert_manager_domain".to_owned()),
-        }),
-      )
-      .await;
     test_status_code!(res.status(), http::StatusCode::OK, "list secrets");
   }
 

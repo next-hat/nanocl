@@ -1,8 +1,8 @@
 use nanocl_error::io::{FromIo, IoResult, IoError};
 
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::resource::ResourceQuery;
 use nanocld_client::stubs::dns::ResourceDnsRule;
+use nanocld_client::stubs::generic::{GenericFilter, GenericClause};
 
 use crate::dnsmasq::Dnsmasq;
 
@@ -69,14 +69,15 @@ pub(crate) async fn update_entries(
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
-  let query = ResourceQuery {
-    contains: Some(
-      serde_json::json!({ "Network": dns_rule.network }).to_string(),
-    ),
-    kind: Some("DnsRule".into()),
-    ..Default::default()
-  };
-  let resources = client.list_resource(Some(&query)).await.map_err(|err| {
+  let filter = GenericFilter::new()
+    .r#where("kind", GenericClause::Eq("DnsRule".to_owned()))
+    .r#where(
+      "data",
+      GenericClause::Contains(
+        serde_json::json!({ "Network": dns_rule.network }),
+      ),
+    );
+  let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
     err.map_err_context(|| "Unable to list resources from nanocl daemon")
   })?;
   let mut entries = Vec::new();

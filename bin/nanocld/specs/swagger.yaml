@@ -449,13 +449,13 @@ paths:
       description: List cargo instances
       operationId: list_cargo_instance
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
         description: Namespace of the cargo
         required: false
@@ -1154,41 +1154,14 @@ paths:
       description: List resources
       operationId: list_resource
       parameters:
-      - name: Kind
+      - name: filter
         in: query
         description: Filter by resource kind
         required: false
         schema:
           type: string
           nullable: true
-      - name: Exists
-        in: query
-        description: Filter by resource by existing key in data
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: Contains
-        in: query
-        description: Filter by resource data
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: MetaContains
-        in: query
-        description: Filter by resource metadata
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: MetaExists
-        in: query
-        description: Filter by resource existing key in metadata
-        required: false
-        schema:
-          type: string
-          nullable: true
+        example: '{ "where": { "kind": { "eq": "ProxyRule" } } }'
       responses:
         '200':
           description: List of resources

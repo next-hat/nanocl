@@ -40,8 +40,8 @@ pub(crate) async fn list_cargo(
   tag = "Cargoes",
   path = "/cargoes/{Name}/instances",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace of the cargo"),
   ),
   responses(
     (status = 200, description = "List of cargo instances", body = [ContainerSummary]),
@@ -801,7 +801,7 @@ mod tests {
   async fn logs() {
     const CARGO_NAME: &str = "nstore";
     let client = gen_default_test_client().await;
-    let mut res = client
+    let res = client
       .send_get(
         &format!("{ENDPOINT}/{CARGO_NAME}/logs"),
         Some(&GenericNspQuery {

@@ -4,11 +4,13 @@ use nanocl_error::io::{IoResult, FromIo, IoError};
 
 use nanocld_client::bollard_next;
 use nanocld_client::NanocldClient;
+use nanocld_client::stubs::generic::GenericClause;
+use nanocld_client::stubs::generic::GenericFilter;
 use nanocld_client::stubs::vm::VmInspect;
 use nanocld_client::stubs::cargo::{CargoInspect, CreateExecOptions};
 use nanocld_client::stubs::proxy::ProxySsl;
 use nanocld_client::stubs::proxy::ProxySslConfig;
-use nanocld_client::stubs::resource::{ResourceQuery, ResourcePartial};
+use nanocld_client::stubs::resource::ResourcePartial;
 use nanocld_client::stubs::proxy::{
   ProxyRule, StreamTarget, ProxyStreamProtocol, ProxyRuleHttp, UpstreamTarget,
   ProxyHttpLocation, ProxyRuleStream, LocationTarget, ResourceProxyRule,
@@ -664,27 +666,28 @@ pub(crate) async fn list_resource_by_cargo(
   let namespace = namespace.unwrap_or("global".into());
   let target_key = format!("{name}.{namespace}.c");
   log::debug!("matching resources for target: {target_key}");
-  let query = ResourceQuery {
-    contains: Some(
-      serde_json::json!({ "Rules": [ { "Locations": [ { "Target": { "Key": target_key } } ] }  ] }).to_string(),
+  let filter = GenericFilter::new()
+  .r#where("kind", GenericClause::Eq("ProxyRule".to_owned()))
+  .r#where(
+    "data",
+    GenericClause::Contains(
+      serde_json::json!({ "Rules": [ { "Locations": [ { "Target": { "Key": target_key } } ] }  ] }),
     ),
-    kind: Some("ProxyRule".into()),
-    ..Default::default()
-  };
+  );
   let http_ressources =
-    client.list_resource(Some(&query)).await.map_err(|err| {
+    client.list_resource(Some(&filter)).await.map_err(|err| {
       err.map_err_context(|| "Unable to list resources from nanocl daemon")
     })?;
-  let query = ResourceQuery {
-    contains: Some(
-      serde_json::json!({ "Rules": [ {  "Target": { "Key": target_key } } ] })
-        .to_string(),
+  let filter = GenericFilter::new()
+  .r#where("kind", GenericClause::Eq("ProxyRule".to_owned()))
+  .r#where(
+    "data",
+    GenericClause::Contains(
+      serde_json::json!({ "Rules": [ {  "Target": { "Key": target_key } } ] }),
     ),
-    kind: Some("ProxyRule".into()),
-    ..Default::default()
-  };
+  );
   let stream_resources =
-    client.list_resource(Some(&query)).await.map_err(|err| {
+    client.list_resource(Some(&filter)).await.map_err(|err| {
       err.map_err_context(|| "Unable to list resources from nanocl daemon")
     })?;
   let resources = http_ressources
@@ -709,14 +712,15 @@ pub(crate) async fn list_resource_by_secret(
   secret: &str,
   client: &NanocldClient,
 ) -> IoResult<Vec<nanocld_client::stubs::resource::Resource>> {
-  let query = ResourceQuery {
-    contains: Some(
-      serde_json::json!({ "Rules": [ { "Ssl": secret }  ] }).to_string(),
-    ),
-    kind: Some("ProxyRule".into()),
-    ..Default::default()
-  };
-  let resources = client.list_resource(Some(&query)).await.map_err(|err| {
+  let filter = GenericFilter::new()
+    .r#where("kind", GenericClause::Eq("ProxyRule".to_owned()))
+    .r#where(
+      "data",
+      GenericClause::Contains(
+        serde_json::json!({ "Rules": [ { "Ssl": secret }  ] }),
+      ),
+    );
+  let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
     err.map_err_context(|| "Unable to list resources from nanocl daemon")
   })?;
   if resources.is_empty() {

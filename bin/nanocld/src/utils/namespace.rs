@@ -10,7 +10,6 @@ use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 use nanocl_stubs::generic::GenericFilter;
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
-  NamespaceListQuery,
 };
 
 use crate::utils;
@@ -82,11 +81,11 @@ pub(crate) async fn list_instances(
 
 /// List all existing namespaces
 pub(crate) async fn list(
-  query: &NamespaceListQuery,
+  query: &GenericFilter,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> HttpResult<Vec<NamespaceSummary>> {
-  let items = NamespaceDb::find(&GenericFilter::default(), pool).await??;
+  let items = NamespaceDb::find(query, pool).await??;
   let mut new_items = Vec::new();
   for item in items {
     let cargo_count = CargoDb::count_by_namespace(&item.name, pool).await?;

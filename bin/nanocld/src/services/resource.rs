@@ -3,11 +3,11 @@
 */
 use ntex::web;
 
-use nanocl_error::http::HttpResult;
+use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::generic::{GenericFilter, GenericClause, GenericListQuery};
+use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::resource::{ResourceUpdate, ResourceSpec};
-use nanocl_stubs::resource::{ResourcePartial, ResourceQuery};
 
 use crate::utils;
 use crate::models::{DaemonState, ResourceSpecDb, Repository, ResourceDb};
@@ -18,11 +18,7 @@ use crate::models::{DaemonState, ResourceSpecDb, Repository, ResourceDb};
   tag = "Resources",
   path = "/resources",
   params(
-    ("Kind" = Option<String>, Query, description = "Filter by resource kind"),
-    ("Exists" = Option<String>, Query, description = "Filter by resource by existing key in data"),
-    ("Contains" = Option<String>, Query, description = "Filter by resource data"),
-    ("MetaContains" = Option<String>, Query, description = "Filter by resource metadata"),
-    ("MetaExists" = Option<String>, Query, description = "Filter by resource existing key in metadata"),
+    ("filter" = Option<String>, Query, description = "Filter by resource kind", example = "{ \"where\": { \"kind\": { \"eq\": \"ProxyRule\" } } }"),
   ),
   responses(
     (status = 200, description = "List of resources", body = [Resource]),
@@ -30,12 +26,12 @@ use crate::models::{DaemonState, ResourceSpecDb, Repository, ResourceDb};
 ))]
 #[web::get("/resources")]
 pub(crate) async fn list_resource(
-  web::types::Query(query): web::types::Query<ResourceQuery>,
+  web::types::Query(query): web::types::Query<GenericListQuery>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  // let items = repositories::resource::find(Some(query), &state.pool).await?;
-  let items =
-    ResourceDb::find(&GenericFilter::default(), &state.pool).await??;
+  let filter = GenericFilter::try_from(query)
+    .map_err(|err| HttpError::bad_request(err.to_string()))?;
+  let items = ResourceDb::find(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -207,9 +203,7 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
   use ntex::http;
-  use nanocl_stubs::resource::{
-    Resource, ResourcePartial, ResourceUpdate, ResourceQuery,
-  };
+  use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceUpdate};
 
   use crate::utils::tests::*;
 
