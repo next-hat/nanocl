@@ -13,12 +13,9 @@ use nanocl_stubs::config::DaemonConfig;
 use crate::{event, utils, version};
 use crate::models::DaemonState;
 
-/// ## Set unix permission
-///
 /// Create a new thread and watch for change in the run directory
 /// and set the permission of the unix socket
 /// Then close the thread
-///
 fn set_unix_sock_perm() {
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async {
@@ -48,7 +45,6 @@ fn set_unix_sock_perm() {
       for res in rx {
         match res {
           Ok(event) => {
-            log::debug!("event: {:?}", event);
             if event.kind.is_modify()
               || event.kind.is_create()
               || event.kind.is_access()

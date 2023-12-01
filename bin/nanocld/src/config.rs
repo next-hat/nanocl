@@ -5,19 +5,7 @@ use nanocl_error::io::{IoResult, FromIo};
 
 use crate::cli::Cli;
 
-/// ## Gen daemon config
-///
 /// Merge cli and config file together to generate the daemon config
-///
-/// ## Arguments
-///
-/// * [args](Cli) - The cli arguments
-/// * [config](DaemonConfigFile) - The config file
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [DaemonConfig](DaemonConfig)
-///
 fn gen_daemon_conf(
   args: &Cli,
   config: &DaemonConfigFile,
@@ -78,18 +66,7 @@ fn gen_daemon_conf(
   })
 }
 
-/// ## Read config file
-///
 /// Read config file from config_dir
-///
-/// ## Arguments
-///
-/// * [config_dir](str) - Config dir
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [DaemonConfigFile](DaemonConfigFile)
-///
 fn read_config_file(config_dir: &str) -> IoResult<DaemonConfigFile> {
   let config_path = std::path::Path::new(&config_dir).join("nanocl.conf");
   if !config_path.exists() {
@@ -108,20 +85,9 @@ fn read_config_file(config_dir: &str) -> IoResult<DaemonConfigFile> {
   Ok(config)
 }
 
-/// ## Init
-///
 /// Init Daemon config
 /// It will read /etc/nanocl/nanocl.conf
 /// and parse Cli arguments we merge them together with a priority to Cli arguments
-///
-/// ## Arguments
-///
-/// * [args](Cli) - Cli arguments
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [DaemonConfig](DaemonConfig)
-///
 pub fn init(args: &Cli) -> IoResult<DaemonConfig> {
   let file_config = read_config_file(&args.conf_dir)?;
   gen_daemon_conf(args, &file_config)
