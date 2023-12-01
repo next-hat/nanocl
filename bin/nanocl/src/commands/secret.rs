@@ -6,14 +6,7 @@ use crate::models::{
   SecretArg, SecretCommand, SecretRow, SecretRemoveOpts, SecretInspectOpts,
 };
 
-/// ## Exec secret list
-///
 /// Function that execute when running `nanocl secret ls`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-///
 async fn exec_secret_ls(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;
   let secrets = client.list_secret(None).await?;
@@ -25,15 +18,7 @@ async fn exec_secret_ls(cli_conf: &CliConfig) -> IoResult<()> {
   Ok(())
 }
 
-/// ## Exec secret rm
-///
 /// Function that execute when running `nanocl secret rm`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [opts](SecretRemoveOpts) The secret remove options
-///
 async fn exec_secret_rm(
   cli_conf: &CliConfig,
   opts: &SecretRemoveOpts,
@@ -49,15 +34,7 @@ async fn exec_secret_rm(
   Ok(())
 }
 
-/// ## Exec secret inspect
-///
 /// Function that execute when running `nanocl secret inspect`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [opts](SecretInspectOpts) The secret inspect options
-///
 async fn exec_secret_inspect(
   cli_conf: &CliConfig,
   opts: &SecretInspectOpts,
@@ -71,15 +48,7 @@ async fn exec_secret_inspect(
   Ok(())
 }
 
-/// ## Exec secret
-///
 /// Function that execute when running `nanocl secret`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [args](SecretArg) The secret options
-///
 pub async fn exec_secret(
   cli_conf: &CliConfig,
   args: &SecretArg,

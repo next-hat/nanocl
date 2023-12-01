@@ -4,20 +4,14 @@ use tabled::Tabled;
 use clap::{Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
-/// ## ContextArg
-///
 /// `nanocl context` available arguments
-///
 #[derive(Parser)]
 pub struct ContextArg {
   #[clap(subcommand)]
   pub command: ContextCommand,
 }
 
-/// ## ContextCommand
-///
 /// `nanocl context` available commands
-///
 #[derive(Subcommand)]
 pub enum ContextCommand {
   /// List contexts
@@ -35,30 +29,21 @@ pub enum ContextCommand {
   },
 }
 
-/// ## ContextEndpoint
-///
 /// A context endpoint definition
-///
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ContextEndpoint {
   pub host: String,
 }
 
-/// ## ContextMetaData
-///
 /// A context metadata definition
-///
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ContextMetaData {
   pub description: String,
 }
 
-/// ## Context
-///
 /// A context definition is a user defined set of endpoints to manage remote nanocl clusters
-///
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Context {
@@ -90,10 +75,7 @@ impl std::default::Default for Context {
   }
 }
 
-/// ## ContextRow
-///
 /// A row of the context table
-///
 #[derive(Clone, Tabled)]
 pub struct ContextRow {
   /// Name of the context
@@ -122,20 +104,14 @@ impl From<Context> for ContextRow {
   }
 }
 
-/// ## DockerContextMetaEndpoint
-///
 /// A docker context endpoint definition used to parse the docker context metadata endpoint
-///
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DockerContextMetaEndpoint {
   pub host: String,
 }
 
-/// ## DockerContextMeta
-///
 /// A docker context metadata definition used to parse the docker context metadata
-///
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct DockerContextMeta {

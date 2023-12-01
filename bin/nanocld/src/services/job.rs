@@ -38,9 +38,9 @@ pub(crate) async fn list_job(
 ))]
 #[web::post("/jobs")]
 pub(crate) async fn create_job(
-  web::types::Json(payload): web::types::Json<JobPartial>,
   state: web::types::State<DaemonState>,
   _version: web::types::Path<String>,
+  payload: web::types::Json<JobPartial>,
 ) -> HttpResult<web::HttpResponse> {
   let job = utils::job::create(&payload, &state).await?;
   Ok(web::HttpResponse::Created().json(&job))
@@ -50,9 +50,9 @@ pub(crate) async fn create_job(
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Jobs",
-  path = "/jobs/{Name}/start",
+  path = "/jobs/{name}/start",
   params(
-    ("Name" = String, Path, description = "Name of the job"),
+    ("name" = String, Path, description = "Name of the job"),
   ),
   responses(
     (status = 202, description = "Job started"),
@@ -61,8 +61,8 @@ pub(crate) async fn create_job(
 ))]
 #[web::post("/jobs/{name}/start")]
 pub(crate) async fn start_job(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   utils::job::start_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
@@ -72,9 +72,9 @@ pub(crate) async fn start_job(
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Jobs",
-  path = "/jobs/{Name}",
+  path = "/jobs/{name}",
   params(
-    ("Name" = String, Path, description = "Name of the job"),
+    ("name" = String, Path, description = "Name of the job"),
   ),
   responses(
     (status = 202, description = "Job deleted"),
@@ -83,8 +83,8 @@ pub(crate) async fn start_job(
 ))]
 #[web::delete("/jobs/{name}")]
 pub(crate) async fn delete_job(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   utils::job::delete_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
@@ -94,10 +94,9 @@ pub(crate) async fn delete_job(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Jobs",
-  path = "/jobs/{Name}/inspect",
+  path = "/jobs/{name}/inspect",
   params(
-    ("Name" = String, Path, description = "Name of the job"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the job"),
+    ("name" = String, Path, description = "Name of the job"),
   ),
   responses(
     (status = 200, description = "Job details", body = JobInspect),
@@ -105,8 +104,8 @@ pub(crate) async fn delete_job(
 ))]
 #[web::get("/jobs/{name}/inspect")]
 pub(crate) async fn inspect_job(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let job = utils::job::inspect_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&job))
@@ -116,7 +115,10 @@ pub(crate) async fn inspect_job(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Jobs",
-  path = "/jobs/{Name}/logs",
+  path = "/jobs/{name}/logs",
+  params(
+    ("name" = String, Path, description = "Name of the job"),
+  ),
   responses(
     (status = 200, description = "Job logs", content_type = "application/vdn.nanocl.raw-stream"),
     (status = 404, description = "Job does not exist"),
@@ -124,8 +126,8 @@ pub(crate) async fn inspect_job(
 ))]
 #[web::get("/jobs/{name}/logs")]
 pub(crate) async fn logs_job(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let stream = utils::job::logs_by_name(&path.1, &state).await?;
   Ok(
@@ -139,10 +141,9 @@ pub(crate) async fn logs_job(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Jobs",
-  path = "/jobs/{Name}/wait",
+  path = "/jobs/{name}/wait",
   params(
-    ("Name" = String, Path, description = "Name of the job instance usually `name` or `name-number`"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the job"),
+    ("name" = String, Path, description = "Name of the job instance usually `name` or `name-number`"),
   ),
   responses(
     (status = 200, description = "Job wait", content_type = "application/vdn.nanocl.raw-stream"),
@@ -151,14 +152,14 @@ pub(crate) async fn logs_job(
 ))]
 #[web::get("/jobs/{name}/wait")]
 pub(crate) async fn wait_job(
-  web::types::Query(qs): web::types::Query<JobWaitQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<JobWaitQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let stream = utils::job::wait(
     &path.1,
     WaitContainerOptions {
-      condition: qs.condition.unwrap_or_default(),
+      condition: qs.condition.clone().unwrap_or_default(),
     },
     &state,
   )

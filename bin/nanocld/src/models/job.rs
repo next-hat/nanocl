@@ -1,16 +1,20 @@
-use nanocl_error::io::IoResult;
+use std::sync::Arc;
 
+use diesel::prelude::*;
+use tokio::task::JoinHandle;
+
+use nanocl_error::io::{IoError, IoResult};
+
+use nanocl_stubs::generic::GenericFilter;
 use nanocl_stubs::job::{Job, JobPartial};
 
+use crate::utils;
 use crate::schema::jobs;
 
-use super::generic::FromSpec;
+use super::{Pool, Repository, FromSpec};
 
-/// ## JobDb
-///
 /// This structure represent a job to run.
 /// It will create and run a list of containers.
-///
 #[derive(Clone, Queryable, Identifiable, Insertable)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = jobs)]
@@ -25,6 +29,14 @@ pub struct JobDb {
   pub data: serde_json::Value,
   /// The metadata
   pub metadata: Option<serde_json::Value>,
+}
+
+/// This structure represent the update of a job.
+/// It will update the job with the new data.
+#[derive(Clone, AsChangeset)]
+#[diesel(table_name = jobs)]
+pub struct JobUpdateDb {
+  pub updated_at: Option<chrono::NaiveDateTime>,
 }
 
 impl FromSpec for JobDb {
@@ -64,13 +76,48 @@ impl FromSpec for JobDb {
   }
 }
 
-/// ## JobUpdateDb
-///
-/// This structure represent the update of a job.
-/// It will update the job with the new data.
-///
-#[derive(Clone, AsChangeset)]
-#[diesel(table_name = jobs)]
-pub struct JobUpdateDb {
-  pub updated_at: Option<chrono::NaiveDateTime>,
+impl Repository for JobDb {
+  type Table = jobs::table;
+  type Item = Job;
+  type UpdateItem = JobUpdateDb;
+
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    log::debug!("JobDb::find_one filter: {filter:?}");
+    let query = jobs::dsl::jobs
+      .order(jobs::dsl::created_at.desc())
+      .into_boxed();
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let item = query
+        .get_result::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?
+        .try_to_spec()?;
+      Ok::<_, IoError>(item)
+    })
+  }
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    log::debug!("JobDb::find filter: {filter:?}");
+    let query = jobs::dsl::jobs
+      .order(jobs::dsl::created_at.desc())
+      .into_boxed();
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let item = query
+        .get_results::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?
+        .into_iter()
+        .map(|item| item.try_to_spec())
+        .collect::<IoResult<Vec<_>>>()?;
+      Ok::<_, IoError>(item)
+    })
+  }
 }

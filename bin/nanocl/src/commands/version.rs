@@ -3,14 +3,7 @@ use nanocld_client::NanocldClient;
 
 use crate::{version, config::CliConfig};
 
-/// ## Print version
-///
 /// Print version of nanocli and nanocld
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-///
 async fn print_version(client: &NanocldClient) -> IoResult<()> {
   println!("=== [nanocli] ===");
   version::print_version();
@@ -26,14 +19,7 @@ async fn print_version(client: &NanocldClient) -> IoResult<()> {
   Ok(())
 }
 
-/// ## Exec version
-///
 /// Function that execute when running `nanocl version`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-///
 pub async fn exec_version(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;
   print_version(client).await?;

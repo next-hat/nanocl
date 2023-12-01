@@ -148,23 +148,3 @@ impl From<Resource> for ResourcePartial {
     }
   }
 }
-
-/// Query filter when listing resources
-#[derive(Debug, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
-pub struct ResourceQuery {
-  /// The kind of resource to target
-  pub kind: Option<String>,
-  /// Match what contains the resource data
-  pub contains: Option<String>,
-  /// Test if key exist in the resource data
-  pub exists: Option<String>,
-  /// Match what contains the metadata of the resource
-  pub meta_contains: Option<String>,
-  /// Test if key exist in the metadata of the resource
-  pub meta_exists: Option<String>,
-}

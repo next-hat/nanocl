@@ -18,7 +18,6 @@ mod resource;
 mod cargo;
 mod cargo_image;
 mod metric;
-mod http_metric;
 mod vm;
 mod vm_image;
 mod secret;
@@ -66,7 +65,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
       .configure(vm_image::ntex_config)
       .configure(vm::ntex_config)
       .configure(metric::ntex_config)
-      .configure(http_metric::ntex_config)
       .configure(secret::ntex_config)
       .configure(job::ntex_config),
   );
@@ -76,7 +74,7 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 mod tests {
   use ntex::http;
 
-  use nanocl_stubs::system::Version;
+  use nanocl_stubs::system::BinaryInfo;
 
   use super::ntex_config;
 
@@ -88,7 +86,7 @@ mod tests {
     let client = gen_test_client(ntex_config, version::VERSION).await;
     let mut res = client.send_get("/version", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "version");
-    let data = res.json::<Version>().await.unwrap();
+    let data = res.json::<BinaryInfo>().await.unwrap();
     assert_eq!(
       data.arch,
       version::ARCH,

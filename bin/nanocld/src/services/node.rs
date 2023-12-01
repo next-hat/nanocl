@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::time::Instant;
 
+use nanocl_stubs::generic::GenericFilter;
 use ntex::{rt, ws, web};
 use ntex::channel::oneshot;
 use ntex::util::ByteString;
@@ -11,8 +12,8 @@ use futures::future::ready;
 
 use nanocl_error::http::HttpResult;
 
-use crate::{utils, repositories};
-use crate::models::{DaemonState, WsConState};
+use crate::utils;
+use crate::models::{DaemonState, WsConState, NodeDb, Repository};
 
 /// List nodes
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -27,7 +28,7 @@ use crate::models::{DaemonState, WsConState};
 pub(crate) async fn list_node(
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let items = repositories::node::list(&state.pool).await?;
+  let items = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -80,8 +81,8 @@ async fn node_ws_service(
   ),
 ))]
 pub(crate) async fn node_ws(
-  req: web::HttpRequest,
   state: web::types::State<DaemonState>,
+  req: web::HttpRequest,
 ) -> Result<web::HttpResponse, web::Error> {
   web::ws::start(
     req,

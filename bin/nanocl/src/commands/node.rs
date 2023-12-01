@@ -4,15 +4,7 @@ use crate::utils;
 use crate::config::CliConfig;
 use crate::models::{NodeArg, NodeCommand, NodeRow};
 
-/// ## Exec node
-///
 /// Function that execute when running `nanocl node`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [args](NodeArg) The node options
-///
 pub async fn exec_node(cli_conf: &CliConfig, args: &NodeArg) -> IoResult<()> {
   let client = &cli_conf.client;
   match args.command {

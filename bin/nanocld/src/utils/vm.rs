@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use diesel::ExpressionMethods;
 use ntex::http;
 
 use bollard_next::Docker;
@@ -15,23 +16,18 @@ use nanocl_stubs::system::EventAction;
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
-use crate::{utils, repositories};
-use crate::models::{Pool, VmImageDb, DaemonState};
+use crate::utils;
+use crate::models::{
+  Pool, VmImageDb, DaemonState, ContainerDb, NamespaceDb, Repository, VmDb,
+  VmSpecDb, FromSpec,
+};
 
-/// ## Start by key
-///
 /// Start a VM by his key
-///
-/// ## Arguments
-///
-/// * [vm_key](str) - The vm key
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn start_by_key(
   vm_key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
+  let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
   let container_name = format!("{}.v", vm_key);
   state
     .docker_api
@@ -47,15 +43,7 @@ pub(crate) async fn start_by_key(
   Ok(())
 }
 
-/// ## Stop
-///
 /// Stop a VM by his model
-///
-/// ## Arguments
-///
-/// * [vm](Vm) - The vm
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn stop(vm: &Vm, state: &DaemonState) -> HttpResult<()> {
   let container_name = format!("{}.v", vm.spec.vm_key);
   state
@@ -72,41 +60,21 @@ pub(crate) async fn stop(vm: &Vm, state: &DaemonState) -> HttpResult<()> {
   Ok(())
 }
 
-/// ## Stop by key
-///
 /// Stop a VM by his key
-///
-/// ## Arguments
-///
-/// * [vm_key](str) - The vm key
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn stop_by_key(
   vm_key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
+  let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
   stop(&vm, state).await
 }
 
-/// ## Inspect by key
-///
 /// Get detailed information about a VM by his key
-///
-/// ## Arguments
-///
-/// * [vm_key](str) - The vm key
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [VmInspect](VmInspect)
-///
 pub(crate) async fn inspect_by_key(
   vm_key: &str,
   state: &DaemonState,
 ) -> HttpResult<VmInspect> {
-  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
+  let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
   let containers =
     list_instances_by_key(&vm.spec.vm_key, &state.docker_api).await?;
   let mut running_instances = 0;
@@ -125,19 +93,7 @@ pub(crate) async fn inspect_by_key(
   })
 }
 
-/// ## List instances by key
-///
 /// List VM instances by his key
-///
-/// ## Arguments
-///
-/// * [vm_key](str) - The vm key
-/// * [docker_api](Docker) - The docker api
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Vec](Vec) of [ContainerSummary](ContainerSummary)
-///
 pub(crate) async fn list_instances_by_key(
   vm_key: &str,
   docker_api: &Docker,
@@ -154,22 +110,13 @@ pub(crate) async fn list_instances_by_key(
   Ok(containers)
 }
 
-/// ## Delete by key
-///
 /// Delete a VM by his key
-///
-/// ## Arguments
-///
-/// * [vm_key](str) - The vm key
-/// * [force](bool) - Force the deletion
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn delete_by_key(
   vm_key: &str,
   force: bool,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
+  let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
   let options = bollard_next::container::RemoveContainerOptions {
     force,
     ..Default::default()
@@ -179,8 +126,12 @@ pub(crate) async fn delete_by_key(
     .docker_api
     .remove_container(&container_name, Some(options))
     .await;
-  repositories::vm::delete_by_key(vm_key, &state.pool).await?;
-  repositories::vm_spec::delete_by_vm_key(&vm.spec.vm_key, &state.pool).await?;
+  VmDb::delete_by_pk(vm_key, &state.pool).await??;
+  VmSpecDb::delete_by(
+    crate::schema::vm_specs::dsl::vm_key.eq(vm.spec.vm_key.clone()),
+    &state.pool,
+  )
+  .await??;
   utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
   state
     .event_emitter
@@ -188,31 +139,19 @@ pub(crate) async fn delete_by_key(
   Ok(())
 }
 
-/// ## List by namespace
-///
 /// List VMs by namespace
-///
-/// ## Arguments
-///
-/// * [nsp](str) - The namespace name
-/// * [docker_api](bollard_next::Docker) - The docker api
-/// * [pool](Pool) - The database pool
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Vec](Vec) of [VmSummary](VmSummary)
-///
 pub(crate) async fn list_by_namespace(
   nsp: &str,
   pool: &Pool,
 ) -> HttpResult<Vec<VmSummary>> {
-  let namespace = repositories::namespace::find_by_name(nsp, pool).await?;
-  let vmes = repositories::vm::find_by_namespace(&namespace, pool).await?;
+  let namespace = NamespaceDb::find_by_pk(nsp, pool).await??;
+  let vmes = VmDb::find_by_namespace(&namespace.name, pool).await?;
   let mut vm_summaries = Vec::new();
   for vm in vmes {
-    let spec = repositories::vm_spec::find_by_key(&vm.spec_key, pool).await?;
-    let instances =
-      repositories::container::list_for_kind("Vm", &vm.key, pool).await?;
+    let spec = VmSpecDb::find_by_pk(&vm.spec.key, pool)
+      .await??
+      .try_to_spec()?;
+    let instances = ContainerDb::find_by_kind_id(&vm.spec.vm_key, pool).await?;
     let mut running_instances = 0;
     for instance in &instances {
       if instance
@@ -237,17 +176,7 @@ pub(crate) async fn list_by_namespace(
   Ok(vm_summaries)
 }
 
-/// ## Create instance
-///
 /// Create a VM instance from a VM image
-///
-/// ## Arguments
-///
-/// * [vm](Vm) - The VM
-/// * [image](VmImageDb) - The VM image
-/// * [disable_keygen](bool) - Disable SSH key generation
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn create_instance(
   vm: &Vm,
   image: &VmImageDb,
@@ -355,21 +284,7 @@ pub(crate) async fn create_instance(
   Ok(())
 }
 
-/// ## Create
-///
 /// Create a VM from a `VmSpecPartial` in the given namespace
-///
-/// ## Arguments
-///
-/// * [vm](VmSpecPartial) - The VM specification
-/// * [namespace](str) - The namespace
-/// * [version](str) - The version
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Vm](Vm)
-///
 pub(crate) async fn create(
   vm: &VmSpecPartial,
   namespace: &str,
@@ -383,10 +298,7 @@ pub(crate) async fn create(
   );
   let vm_key = utils::key::gen_key(namespace, &vm.name);
   let mut vm = vm.clone();
-  if repositories::vm::find_by_key(&vm_key, &state.pool)
-    .await
-    .is_ok()
-  {
+  if VmDb::find_by_pk(&vm_key, &state.pool).await?.is_ok() {
     return Err(HttpError {
       status: http::StatusCode::CONFLICT,
       msg: format!(
@@ -395,8 +307,7 @@ pub(crate) async fn create(
       ),
     });
   }
-  let image =
-    repositories::vm_image::find_by_name(&vm.disk.image, &state.pool).await?;
+  let image = VmImageDb::find_by_pk(&vm.disk.image, &state.pool).await??;
   if image.kind.as_str() != "Base" {
     return Err(HttpError {
       msg: format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image),
@@ -410,8 +321,7 @@ pub(crate) async fn create(
   // Use the snapshot image
   vm.disk.image = image.name.clone();
   vm.disk.size = Some(size);
-  let vm =
-    repositories::vm::create(namespace, &vm, version, &state.pool).await?;
+  let vm = VmDb::create_from_spec(namespace, &vm, version, &state.pool).await?;
   create_instance(&vm, &image, true, state).await?;
   state
     .event_emitter
@@ -419,31 +329,18 @@ pub(crate) async fn create(
   Ok(vm)
 }
 
-/// ## Patch
-///
 /// Patch a VM specification from a `VmSpecUpdate` in the given namespace.
 /// This will merge the new specification with the old one.
-///
-/// ## Arguments
-///
-/// * [vm_key](str) - The VM key
-/// * [spec](VmSpecUpdate) - The VM specification
-/// * [version](str) - The version
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Vm](Vm)
-///
 pub(crate) async fn patch(
   vm_key: &str,
   spec: &VmSpecUpdate,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
-  let vm = repositories::vm::find_by_key(vm_key, &state.pool).await?;
-  let old_spec =
-    repositories::vm_spec::find_by_key(&vm.spec_key, &state.pool).await?;
+  let vm = VmDb::find_by_pk(vm_key, &state.pool).await??;
+  let old_spec = VmSpecDb::find_by_pk(&vm.spec_key, &state.pool)
+    .await??
+    .try_to_spec()?;
   let vm_partial = VmSpecPartial {
     name: spec.name.to_owned().unwrap_or(vm.name.clone()),
     disk: old_spec.disk,
@@ -485,45 +382,25 @@ pub(crate) async fn patch(
   put(vm_key, &vm_partial, version, state).await
 }
 
-/// ## Put
-///
 /// Put a VM specification from a `VmSpecPartial` in the given namespace.
 /// This will replace the old specification with the new one.
-///
-/// ## Arguments
-///
-/// * [vm_key](str) - The VM key
-/// * [vm_partial](VmSpecPartial) - The VM specification
-/// * [version](str) - The version
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Vm](Vm)
-///
 pub(crate) async fn put(
   vm_key: &str,
   vm_partial: &VmSpecPartial,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
-  let vm = repositories::vm::inspect_by_key(vm_key, &state.pool).await?;
+  let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
   let container_name = format!("{}.v", &vm.spec.vm_key);
   stop(&vm, state).await?;
   state
     .docker_api
     .remove_container(&container_name, None::<RemoveContainerOptions>)
     .await?;
-  let vm = repositories::vm::update_by_key(
-    &vm.spec.vm_key,
-    vm_partial,
-    version,
-    &state.pool,
-  )
-  .await?;
-  let image =
-    repositories::vm_image::find_by_name(&vm.spec.disk.image, &state.pool)
+  let vm =
+    VmDb::update_from_spec(&vm.spec.vm_key, vm_partial, version, &state.pool)
       .await?;
+  let image = VmImageDb::find_by_pk(&vm.spec.disk.image, &state.pool).await??;
   create_instance(&vm, &image, false, state).await?;
   start_by_key(&vm.spec.vm_key, state).await?;
   state

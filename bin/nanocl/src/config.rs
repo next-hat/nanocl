@@ -5,11 +5,8 @@ use nanocld_client::NanocldClient;
 
 use crate::models::{Context, DisplayFormat};
 
-/// ## CliConfig
-///
 /// This struct is used to store the user configuration
 /// It is stored in the user's home directory in a file located at `.nanocl/conf.yml`
-///
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct UserConfig {
@@ -19,18 +16,12 @@ pub struct UserConfig {
   pub display_format: DisplayFormat,
 }
 
-/// ## Default current context
-///
 /// This function is used to set the default current context
-///
 fn default_current_context() -> String {
   "default".to_owned()
 }
 
-/// ## Default CliConfig
-///
 /// This is the default configuration used when no configuration file is found
-///
 impl Default for UserConfig {
   fn default() -> Self {
     Self {
@@ -40,15 +31,10 @@ impl Default for UserConfig {
   }
 }
 
-/// ## CliConfig implementations
-///
 impl UserConfig {
-  /// ## New
-  ///
   /// This function is used to create a new CliConfig struct
   /// It will read the configuration file located in the user's home directory
   /// If no configuration file is found, it will return the default configuration
-  ///
   pub fn new() -> Self {
     // Get user config path
     let home_path = match std::env::var("HOME") {
@@ -67,12 +53,9 @@ impl UserConfig {
   }
 }
 
-/// ## Cli Config
-///
 /// A new `CliConfig` is created for each command.
 /// It is used to pass the configuration to the command functions.
 /// And contains the host, the client, the context and the command arguments.
-///
 pub struct CliConfig {
   /// Nanocld host to use
   pub host: String,

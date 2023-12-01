@@ -1,32 +1,32 @@
 use ntex::web;
 
-use nanocl_error::http::HttpResult;
-use nanocl_stubs::metric::MetricFilterQuery;
+use nanocl_error::http::{HttpError, HttpResult};
 
-use crate::models::DaemonState;
+use nanocl_stubs::generic::{GenericFilter, GenericListQuery};
 
-use crate::repositories;
+use crate::models::{DaemonState, Repository, MetricDb};
 
-/// Get specific metric of all peer nodes
+/// Get metrics of all peer nodes
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Metrics",
   path = "/metrics",
   params(
-    ("Kind" = MetricKind, Query, description = "Kind of the metrics CPU | MEMORY | NETWORK | DISK", example = "CPU"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"kind\": { \"eq\": \"CPU\" } } }"),
   ),
   responses(
-    (status = 200, description = "Kind of the metrics peer node", body = Vec<Metric>),
+    (status = 200, description = "List of metrics", body = Vec<Metric>),
   ),
 ))]
 #[web::get("/metrics")]
 pub(crate) async fn list_metric(
-  qs: web::types::Query<MetricFilterQuery>,
   state: web::types::State<DaemonState>,
+  qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let metrics =
-    repositories::metric::list_by_kind(&qs.kind.to_string(), &state.pool)
-      .await?;
+  let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
+    HttpError::bad_request(format!("Invalid query string: {}", err))
+  })?;
+  let metrics = MetricDb::find(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&metrics))
 }
 
@@ -36,25 +36,20 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-
   use ntex::http;
-  use nanocl_stubs::metric::{Metric, MetricKind, MetricFilterQuery};
+  use nanocl_stubs::generic::{GenericFilter, GenericClause, GenericListQuery};
+  use nanocl_stubs::metric::MetricKind;
 
   use crate::utils::tests::*;
 
   const ENDPOINT: &str = "/metrics";
 
   async fn test_list(client: &TestClient) {
-    let mut res = client
-      .send_get(
-        ENDPOINT,
-        Some(&MetricFilterQuery {
-          kind: MetricKind::Cpu,
-        }),
-      )
-      .await;
+    let filter = GenericFilter::new()
+      .r#where("kind", GenericClause::Eq(MetricKind::Cpu.to_string()));
+    let qs = GenericListQuery::try_from(filter).unwrap();
+    let res = client.send_get(ENDPOINT, Some(&qs)).await;
     test_status_code!(res.status(), http::StatusCode::OK, "list metrics");
-    let _ = res.json::<Vec<Metric>>().await.unwrap();
   }
 
   #[ntex::test]

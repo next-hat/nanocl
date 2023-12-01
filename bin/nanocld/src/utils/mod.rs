@@ -39,10 +39,7 @@ pub mod tests {
 
   type Config = fn(&mut ServiceConfig);
 
-  /// ## Before
-  ///
   /// Set the log level to info and build a test env logger for tests purpose
-  ///
   pub fn before() {
     // Build a test env logger
     if std::env::var("LOG_LEVEL").is_err() {
@@ -54,14 +51,7 @@ pub mod tests {
       .try_init();
   }
 
-  /// ## Gen docker client
-  ///
   /// Generate a docker client for tests purpose
-  ///
-  /// ## Return
-  ///
-  /// * [bollard_next::Docker](bollard_next::Docker) - The docker client
-  ///
   pub fn gen_docker_client() -> bollard_next::Docker {
     let socket_path = env::var("DOCKER_SOCKET_PATH")
       .unwrap_or_else(|_| String::from("/var/run/docker.sock"));
@@ -74,20 +64,7 @@ pub mod tests {
     .unwrap()
   }
 
-  /// ## Parse statefile
-  ///
   /// Parse a state file from yaml to json format for tests purpose
-  ///
-  /// ## Arguments
-  ///
-  /// * [path](str) Path to the state file
-  ///
-  /// ## Return
-  ///
-  /// * [Result](Result) Result of the operation
-  ///   * [Ok](serde_json::Value) - The state file parsed
-  ///   * [Err](Box) - The state file has not been parsed
-  ///
   pub fn parse_statefile(
     path: &str,
   ) -> Result<serde_json::Value, Box<dyn std::error::Error + 'static>> {
@@ -97,14 +74,7 @@ pub mod tests {
     Ok(data)
   }
 
-  /// ## Gen postgre pool
-  ///
   /// Generate a postgre pool for tests purpose
-  ///
-  /// ## Return
-  ///
-  /// * [Pool](Pool) - The postgre pool
-  ///
   pub async fn gen_postgre_pool() -> Pool {
     let home = std::env::var("HOME").expect("Failed to get home dir");
     let daemon_conf = DaemonConfig {
@@ -116,18 +86,7 @@ pub mod tests {
       .expect("Failed to connect to store at: {ip_addr}")
   }
 
-  /// ## Gen server
-  ///
   /// Generate a test server for tests purpose
-  ///
-  /// ## Arguments
-  ///
-  /// * [routes](Config) Routes to configure
-  ///
-  /// ## Return
-  ///
-  /// * [TestServer](TestServer) - The test server
-  ///
   pub async fn gen_server(routes: Config) -> test::TestServer {
     before();
     // Build a test daemon config

@@ -3,20 +3,14 @@ use nanocl_error::io::IoResult;
 use crate::config::UserConfig;
 use crate::models::{Context, ContextRow};
 
-/// ## Context
-///
 /// Context is a struct that represents a nanocl context
 /// A nanocl context is a configuration for a specific cluster
-///
 impl Context {
   pub fn new() -> Self {
     Self::default()
   }
 
-  /// ## Ensure
-  ///
   /// Ensure that the contexts directory exists in $HOME/.nanocl/contexts
-  ///
   pub fn ensure() -> IoResult<()> {
     let home = std::env::var("HOME").map_err(|_| {
       std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
@@ -26,18 +20,7 @@ impl Context {
     Ok(())
   }
 
-  /// ## Read
-  ///
   /// Read a context from a file
-  ///
-  /// ## Arguments
-  ///
-  /// * [path](str) The path to the context file
-  ///
-  /// ## Return
-  ///
-  /// [IoResult](IoResult) containing a [Context](Context)
-  ///
   pub fn read(path: &str) -> IoResult<Context> {
     let s = std::fs::read_to_string(path)?;
     let context = serde_yaml::from_str::<Context>(&s).map_err(|err| {
@@ -49,18 +32,7 @@ impl Context {
     Ok(context)
   }
 
-  /// ## Read by name
-  ///
   /// Read a context by name
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) The name of the context
-  ///
-  /// ## Return
-  ///
-  /// [IoResult](IoResult) containing a [Context](Context)
-  ///
   pub fn read_by_name(name: &str) -> IoResult<Context> {
     let home = std::env::var("HOME").map_err(|_| {
       std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
@@ -70,14 +42,7 @@ impl Context {
     Ok(context)
   }
 
-  /// ## Write
-  ///
   /// Write a context to a file
-  ///
-  /// ## Arguments
-  ///
-  /// * [context](Context) The context to write
-  ///
   pub fn write(context: &Context) -> IoResult<()> {
     let home = std::env::var("HOME").map_err(|_| {
       std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
@@ -93,14 +58,7 @@ impl Context {
     Ok(())
   }
 
-  /// ## List
-  ///
   /// List all contexts
-  ///
-  /// ## Return
-  ///
-  /// [IoResult](IoResult) containing a [Vec](Vec) of [ContextRow](ContextRow)
-  ///
   pub fn list() -> IoResult<Vec<ContextRow>> {
     let home = std::env::var("HOME").map_err(|_| {
       std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")
@@ -118,14 +76,7 @@ impl Context {
     Ok(contexts)
   }
 
-  /// ## Use
-  ///
   /// Use a context
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) The name of the context
-  ///
   pub fn r#use(name: &str) -> IoResult<()> {
     let home = std::env::var("HOME").map_err(|_| {
       std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")

@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate diesel;
-
 use clap::Parser;
 use nanocl_error::io::FromIo;
 
@@ -15,16 +12,12 @@ mod event;
 mod config;
 mod server;
 mod services;
-mod repositories;
 
-/// ## The Nanocl daemon
-///
 /// Provides an api to manage containers and virtual machines accross physical hosts
 /// There are these advantages :
 /// - It's Opensource
 /// - It's Easy to use
 /// - It keep an history of all your containers and virtual machines
-///
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
   // Parse command line arguments

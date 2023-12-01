@@ -21,7 +21,6 @@ use super::cargo_spec::CargoSpec;
 /// Cargo contain a specification which is used to create the container
 /// The specification can be updated and the old specification will be kept in the history
 /// That way you can rollback to a previous specification quickly
-///
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -69,7 +68,6 @@ impl ToEvent for Cargo {
 
 /// A CargoSummary is a summary of a cargo
 /// It's the datastructure returned by the list operation
-///
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -90,7 +88,6 @@ pub struct CargoSummary {
 /// Cargo Inspect is a detailed view of a cargo
 /// It contains all the information about the cargo
 /// It also contains the list of containers
-///
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -129,7 +126,6 @@ pub enum OutputKind {
 
 /// ExecOutput is the output of an exec command
 /// It contains the kind of the output and the data
-///
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -165,14 +161,9 @@ impl From<LogOutput> for OutputLog {
 }
 
 /// Options for the kill command
-///
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
 pub struct CargoKillOptions {
   /// Signal to send to the container default: SIGKILL
   pub signal: String,
@@ -195,13 +186,8 @@ impl From<CargoKillOptions> for KillContainerOptions<String> {
 }
 
 /// Delete cargo query
-///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
 pub struct CargoDeleteQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
@@ -209,57 +195,9 @@ pub struct CargoDeleteQuery {
   pub force: Option<bool>,
 }
 
-/// To use this structure for database access it needs to be able to hold a NamespaceDb
-///
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
-pub struct GenericCargoListQuery<NS> {
-  /// Name of the namespace
-  pub namespace: NS,
-  /// Filter for cargoes with similar name
-  pub name: Option<String>,
-  /// Max amount of cargoes in response
-  pub limit: Option<i64>,
-  /// Offset of the first cargo in response
-  pub offset: Option<i64>,
-}
-
-impl<NS> GenericCargoListQuery<NS> {
-  /// Create a GenericCargoListQuery with only the namespace specified
-  pub fn of_namespace(nsp: NS) -> GenericCargoListQuery<NS> {
-    GenericCargoListQuery {
-      namespace: nsp,
-      name: None,
-      limit: None,
-      offset: None,
-    }
-  }
-  /// Move fields to new query with different namespace
-  pub fn merge<T>(self, nsp: T) -> GenericCargoListQuery<T> {
-    GenericCargoListQuery {
-      namespace: nsp,
-      name: self.name,
-      limit: self.limit,
-      offset: self.offset,
-    }
-  }
-}
-
-/// List cargo query
-pub type CargoListQuery = GenericCargoListQuery<Option<String>>;
-
 /// Log cargo query
-///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
 pub struct CargoLogQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
@@ -280,13 +218,8 @@ pub struct CargoLogQuery {
 }
 
 /// Stats cargo query
-///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
 pub struct CargoStatsQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
@@ -335,7 +268,6 @@ impl From<CargoLogQuery> for LogsOptions<String> {
 }
 
 /// Payload for the cargo scale endpoint
-///
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(

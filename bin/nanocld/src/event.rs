@@ -15,9 +15,7 @@ use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::system::{Event, ToEvent, EventAction};
 
-/// ## Client
 /// Stream: Wrap Receiver in our own type, with correct error type
-///
 pub struct Client(pub Receiver<Bytes>);
 
 impl Stream for Client {

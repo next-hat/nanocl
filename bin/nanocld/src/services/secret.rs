@@ -5,17 +5,21 @@ use ntex::web;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
+use nanocl_stubs::generic::{GenericFilter, GenericListQuery};
 use nanocl_stubs::proxy::ProxySslConfig;
-use nanocl_stubs::secret::{SecretPartial, SecretUpdate, SecretQuery};
+use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
 
-use crate::{utils, repositories};
-use crate::models::DaemonState;
+use crate::utils;
+use crate::models::{DaemonState, SecretDb, Repository};
 
-/// List secrets
+/// List secret
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Secrets",
   path = "/secrets",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"kind\": { \"eq\": \"Env\" } } }"),
+  ),
   responses(
     (status = 200, description = "List of secret", body = [Secret]),
   ),
@@ -23,9 +27,11 @@ use crate::models::DaemonState;
 #[web::get("/secrets")]
 pub(crate) async fn list_secret(
   state: web::types::State<DaemonState>,
-  web::types::Query(query): web::types::Query<SecretQuery>,
+  query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let items = repositories::secret::list(Some(query), &state.pool).await?;
+  let filter = GenericFilter::try_from(query.into_inner())
+    .map_err(|err| HttpError::bad_request(err.to_string()))?;
+  let items = SecretDb::find(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -33,21 +39,21 @@ pub(crate) async fn list_secret(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Secrets",
-  path = "/secrets/{Key}/inspect",
+  path = "/secrets/{key}/inspect",
   params(
-    ("Name" = String, Path, description = "The secret name to inspect")
+    ("key" = String, Path, description = "Key of the secret")
   ),
   responses(
-    (status = 200, description = "Detailed information about a secret", body = [Secret]),
+    (status = 200, description = "Detailed information about a secret", body = Secret),
     (status = 404, description = "Namespace is not existing", body = ApiError),
   ),
 ))]
 #[web::get("/secrets/{key}/inspect")]
 pub(crate) async fn inspect_secret(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let secret = repositories::secret::find_by_key(&path.1, &state.pool).await?;
+  let secret = SecretDb::find_by_pk(&path.1, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&secret))
 }
 
@@ -64,8 +70,8 @@ pub(crate) async fn inspect_secret(
 ))]
 #[web::post("/secrets")]
 pub(crate) async fn create_secret(
-  web::types::Json(payload): web::types::Json<SecretPartial>,
   state: web::types::State<DaemonState>,
+  payload: web::types::Json<SecretPartial>,
 ) -> HttpResult<web::HttpResponse> {
   match payload.kind.as_str() {
     "Tls" => {
@@ -96,33 +102,32 @@ pub(crate) async fn create_secret(
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Secrets",
-  path = "/secrets/{Key}",
+  path = "/secrets/{key}",
   params(
-    ("Name" = String, Path, description = "The secret name to delete")
+    ("key" = String, Path, description = "Key of the secret")
   ),
   responses(
-    (status = 200, description = "Delete response", body = GenericDelete),
-    (status = 404, description = "Namespace is not existing", body = ApiError),
+    (status = 202, description = "Secret have been deleted"),
+    (status = 404, description = "Secret don't exists", body = ApiError),
   ),
 ))]
 #[web::delete("/secrets/{key}")]
 pub(crate) async fn delete_secret(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let res = utils::secret::delete_by_key(&path.1, &state).await?;
-  Ok(web::HttpResponse::Ok().json(&res))
+  utils::secret::delete_by_key(&path.1, &state).await?;
+  Ok(web::HttpResponse::Accepted().into())
 }
 
-/// Scale or Downscale number of instances
+/// Update a secret
 #[cfg_attr(feature = "dev", utoipa::path(
   patch,
   tag = "Secrets",
   request_body = SecretUpdate,
-  path = "/secrets/{Key}",
+  path = "/secrets/{key}",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("key" = String, Path, description = "Key of the secret"),
   ),
   responses(
     (status = 200, description = "Secret scaled", body = Secret),
@@ -131,9 +136,9 @@ pub(crate) async fn delete_secret(
 ))]
 #[web::patch("/secrets/{key}")]
 async fn patch_secret(
-  web::types::Json(payload): web::types::Json<SecretUpdate>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  payload: web::types::Json<SecretUpdate>,
 ) -> HttpResult<web::HttpResponse> {
   let item = utils::secret::patch_by_key(&path.1, &payload, &state).await?;
   Ok(web::HttpResponse::Ok().json(&item))
@@ -153,8 +158,7 @@ mod test_secret {
 
   use serde_json::json;
 
-  use nanocl_stubs::secret::{Secret, SecretPartial, SecretQuery};
-  use nanocl_stubs::generic::GenericDelete;
+  use nanocl_stubs::secret::{Secret, SecretPartial};
 
   use crate::utils::tests::*;
 
@@ -162,21 +166,6 @@ mod test_secret {
 
   async fn test_list(client: &TestClient) {
     let res = client.send_get(ENDPOINT, None::<String>).await;
-    test_status_code!(res.status(), http::StatusCode::OK, "list secrets");
-    let res = client
-      .send_get(
-        ENDPOINT,
-        Some(SecretQuery {
-          kind: Some("Tls".to_owned()),
-          contains: Some(serde_json::json!({"VerifyClient": true}).to_string()),
-          exists: Some("CertificateClient".to_owned()),
-          meta_contains: Some(
-            serde_json::json!({"CertManagerIssuer": "letsencrypt"}).to_string(),
-          ),
-          meta_exists: Some("cert_manager_domain".to_owned()),
-        }),
-      )
-      .await;
     test_status_code!(res.status(), http::StatusCode::OK, "list secrets");
   }
 
@@ -230,12 +219,14 @@ mod test_secret {
   }
 
   async fn test_delete(client: &TestClient) {
-    let mut res = client
+    let res = client
       .send_delete(&format!("{ENDPOINT}/test-secret"), None::<String>)
       .await;
-    test_status_code!(res.status(), http::StatusCode::OK, "delete secret");
-    let body = res.json::<GenericDelete>().await.unwrap();
-    assert_eq!(body.count, 1, "Expect 1 secret deleted");
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "delete secret"
+    );
   }
 
   #[ntex::test]

@@ -514,15 +514,7 @@ async fn pull_image(
   Ok(())
 }
 
-/// ## Exec state apply
-///
 /// Function called when running `nanocl state apply`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [opts](StateApplyOpts) The state apply options
-///
 async fn exec_state_apply(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
@@ -601,15 +593,7 @@ async fn exec_state_apply(
   Ok(())
 }
 
-/// ## Exec state logs
-///
 /// Follow logs of all cargoes in state
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [opts](StateLogsOpts) The state logs options
-///
 async fn exec_state_logs(
   cli_conf: &CliConfig,
   opts: &StateLogsOpts,
@@ -645,15 +629,7 @@ async fn exec_state_logs(
   Ok(())
 }
 
-/// ## Exec state remove
-///
 /// Function called when running `nanocl state rm`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [opts](StateRemoveOpts) The state remove options
-///
 async fn exec_state_remove(
   cli_conf: &CliConfig,
   opts: &StateRemoveOpts,
@@ -684,15 +660,7 @@ async fn exec_state_remove(
   Ok(())
 }
 
-/// ## Exec state
-///
 /// Function called when running `nanocl state` with correct arguments
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [args](StateArg) The state arguments
-///
 pub async fn exec_state(cli_conf: &CliConfig, args: &StateArg) -> IoResult<()> {
   match &args.command {
     StateCommand::Apply(opts) => exec_state_apply(cli_conf, opts).await,

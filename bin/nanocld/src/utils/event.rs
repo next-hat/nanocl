@@ -8,13 +8,13 @@ use bollard_next::container::InspectContainerOptions;
 use bollard_next::service::{EventMessageTypeEnum, EventMessage};
 use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
 
-use crate::{utils, repositories};
+use crate::utils;
 use crate::event::Client;
-use crate::models::DaemonState;
+use crate::models::{DaemonState, ContainerDb, Repository, JobDb, FromSpec};
 
 /// Remove a job after when finished and ttl is set
 async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
-  if e.kind != EventKind::ContainerInstance {
+  if e.kind != EventKind::Container {
     return Ok(());
   }
   let actor = e.actor.unwrap_or_default();
@@ -30,7 +30,9 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
     }
     _ => {}
   }
-  let job = repositories::job::find_by_name(job_id, &state.pool).await?;
+  let job = JobDb::find_by_pk(job_id, &state.pool)
+    .await??
+    .try_to_spec()?;
   let ttl = match job.ttl {
     None => return Ok(()),
     Some(ttl) => ttl,
@@ -124,7 +126,7 @@ async fn exec_docker_event(
   log::debug!("docker event: {action}");
   let action = action.as_str();
   let mut event = Event {
-    kind: EventKind::ContainerInstance,
+    kind: EventKind::Container,
     action: EventAction::Deleted,
     actor: Some(EventActor {
       key: Some(id.clone()),
@@ -137,7 +139,7 @@ async fn exec_docker_event(
   match action {
     "destroy" => {
       log::debug!("docker event destroy container: {id}");
-      repositories::container::delete_by_id(&id, &state.pool).await?;
+      ContainerDb::delete_by_pk(&id, &state.pool).await??;
       state.event_emitter.spawn_emit_event(event);
       return Ok(());
     }

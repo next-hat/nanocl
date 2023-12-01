@@ -8,15 +8,7 @@ use crate::models::{
   NamespaceDeleteOpts, NamespaceListOpts,
 };
 
-/// ## Exec namespace ls
-///
 /// Function that execute when running `nanocl namespace ls`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [options](NamespaceListOpts) The namespace list options
-///
 async fn exec_namespace_ls(
   client: &NanocldClient,
   options: &NamespaceListOpts,
@@ -39,15 +31,7 @@ async fn exec_namespace_ls(
   Ok(())
 }
 
-/// ## Exec namespace create
-///
 /// Function that execute when running `nanocl namespace create`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [options](NamespaceOpts) The namespace options
-///
 async fn exec_namespace_create(
   client: &NanocldClient,
   options: &NamespaceOpts,
@@ -57,15 +41,7 @@ async fn exec_namespace_create(
   Ok(())
 }
 
-/// ## Exec namespace inspect
-///
 /// Function that execute when running `nanocl namespace inspect`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [options](NamespaceOpts) The namespace options
-///
 async fn exec_namespace_inspect(
   client: &NanocldClient,
   options: &NamespaceOpts,
@@ -75,15 +51,7 @@ async fn exec_namespace_inspect(
   Ok(())
 }
 
-/// ## Exec namespace rm
-///
 /// Function that execute when running `nanocl namespace rm`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [options](NamespaceDeleteOpts) The namespace delete options
-///
 async fn exec_namespace_rm(
   client: &NanocldClient,
   options: &NamespaceDeleteOpts,
@@ -101,15 +69,7 @@ async fn exec_namespace_rm(
   Ok(())
 }
 
-/// ## Exec namespace
-///
 /// Function that execute when running `nanocl namespace`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [args](NamespaceArg) The namespace options
-///
 pub async fn exec_namespace(
   cli_conf: &CliConfig,
   args: &NamespaceArg,

@@ -18,10 +18,6 @@ pub struct CargoImagePartial {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
 pub struct ListCargoImagesOptions {
   /// Show all images. Only images from a final layer (no children) are shown by default.
   pub all: Option<bool>,

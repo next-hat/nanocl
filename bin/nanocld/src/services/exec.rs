@@ -1,7 +1,3 @@
-/*
-* Endpoints to manipulate cargoes
-*/
-
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
@@ -16,19 +12,19 @@ use crate::models::DaemonState;
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Exec",
-  path = "/exec/{Id}/cargo/inspect",
+  path = "/exec/{id}/cargo/inspect",
   params(
-    ("Id" = String, Path, description = "Exec id to inspect"),
+    ("id" = String, Path, description = "Exec id to inspect"),
   ),
   responses(
     (status = 200, description = "Inspect exec infos", body = ExecInspectResponse),
     (status = 404, description = "Exec instance does not exist"),
   ),
 ))]
-#[web::get("/exec/{Id}/cargo/inspect")]
+#[web::get("/exec/{id}/cargo/inspect")]
 pub(crate) async fn inspect_exec_command(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let infos = utils::exec::inspect_exec_command(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&infos))
@@ -39,20 +35,20 @@ pub(crate) async fn inspect_exec_command(
   post,
   tag = "Exec",
   request_body = StartExecOptions,
-  path = "/exec/{Id}/cargo/start",
+  path = "/exec/{id}/cargo/start",
   params(
-    ("Id" = String, Path, description = "Exec command id"),
+    ("id" = String, Path, description = "Exec command id"),
   ),
   responses(
     (status = 200, description = "Event Stream of the command output", content_type = "text/event-stream"),
     (status = 404, description = "Cargo does not exist"),
   ),
 ))]
-#[web::post("/exec/{Id}/cargo/start")]
+#[web::post("/exec/{id}/cargo/start")]
 pub(crate) async fn start_exec_command(
-  web::types::Json(payload): web::types::Json<StartExecOptions>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  payload: web::types::Json<StartExecOptions>,
 ) -> HttpResult<web::HttpResponse> {
   utils::exec::start_exec_command(&path.1, &payload, &state).await
 }
@@ -62,7 +58,7 @@ pub(crate) async fn start_exec_command(
   post,
   tag = "Cargoes",
   request_body = CreateExecOptions,
-  path = "/cargoes/{CargoName}/exec",
+  path = "/cargoes/{cargo_name}/exec",
   params(
     ("Name" = String, Path, description = "Name of the cargo"),
     ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
@@ -72,12 +68,12 @@ pub(crate) async fn start_exec_command(
     (status = 404, description = "Cargo does not exist"),
   ),
 ))]
-#[web::post("/cargoes/{CargoName}/exec")]
+#[web::post("/cargoes/{cargo_name}/exec")]
 pub(crate) async fn create_exec_command(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<CreateExecOptions>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  payload: web::types::Json<CreateExecOptions>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);

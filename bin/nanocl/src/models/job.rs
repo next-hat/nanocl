@@ -6,10 +6,7 @@ use nanocld_client::stubs::job::{WaitCondition, JobSummary};
 
 use super::DisplayFormat;
 
-/// ## Job wait options
-///
 /// `nanocl job wait` available options
-///
 #[derive(Parser)]
 pub struct JobWaitOpts {
   /// State to wait
@@ -19,10 +16,7 @@ pub struct JobWaitOpts {
   pub name: String,
 }
 
-/// ## Job list options
-///
 /// `nanocl job ls` available options
-///
 #[derive(Parser)]
 pub struct JobListOpts {
   /// Only show job names
@@ -30,10 +24,7 @@ pub struct JobListOpts {
   pub quiet: bool,
 }
 
-/// ## Job remove options
-///
 /// `nanocl job rm` available options
-///
 #[derive(Parser)]
 pub struct JobRemoveOpts {
   /// Name of job to remove
@@ -43,10 +34,7 @@ pub struct JobRemoveOpts {
   pub skip_confirm: bool,
 }
 
-/// ## Job inspect options
-///
 /// `nanocl job inspect` available options
-///
 #[derive(Parser)]
 pub struct JobInspectOpts {
   /// Display format
@@ -62,10 +50,7 @@ pub struct JobLogsOpts {
   pub name: String,
 }
 
-/// ## Job command
-///
 /// `nanocl job` available commands
-///
 #[derive(Subcommand)]
 pub enum JobCommand {
   /// List existing job
@@ -84,20 +69,14 @@ pub enum JobCommand {
   Start(JobStartOpts),
 }
 
-/// ## Job start options
-///
 /// `nanocl job start` available options
-///
 #[derive(Parser)]
 pub struct JobStartOpts {
   /// Name of job to start
   pub name: String,
 }
 
-/// ## Job arguments
-///
 /// `nanocl job` available subcommands
-///
 #[derive(Parser)]
 pub struct JobArg {
   #[clap(subcommand)]

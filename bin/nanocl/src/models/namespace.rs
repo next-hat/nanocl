@@ -3,10 +3,7 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::namespace::NamespaceSummary;
 
-/// ## NamespaceCommand
-///
 /// `nanocl namespace` available commands
-///
 #[derive(Subcommand)]
 pub enum NamespaceCommand {
   /// Create new namespace
@@ -21,10 +18,7 @@ pub enum NamespaceCommand {
   List(NamespaceListOpts),
 }
 
-/// ## NamespaceListOpts
-///
 /// `nanocl namespace list` available options
-///
 #[derive(Parser)]
 pub struct NamespaceListOpts {
   /// Show only namespace names
@@ -32,10 +26,7 @@ pub struct NamespaceListOpts {
   pub quiet: bool,
 }
 
-/// ## NamespaceDeleteOpts
-///
 /// `nanocl namespace delete` available options
-///
 #[derive(Parser)]
 pub struct NamespaceDeleteOpts {
   /// skip confirmation
@@ -45,10 +36,7 @@ pub struct NamespaceDeleteOpts {
   pub names: Vec<String>,
 }
 
-/// ## NamespaceArg
-///
 /// `nanocl namespace` available arguments
-///
 #[derive(Parser)]
 #[clap(name = "nanocl namespace")]
 pub struct NamespaceArg {
@@ -56,20 +44,14 @@ pub struct NamespaceArg {
   pub command: NamespaceCommand,
 }
 
-/// ## NamespaceOpts
-///
 /// `nanocl namespace create` and `nanocl namespace inspect` generic name option
-///
 #[derive(Parser)]
 pub struct NamespaceOpts {
   /// name of the namespace to create
   pub name: String,
 }
 
-/// ## NamespaceRow
-///
 /// A row of the namespace table
-///
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct NamespaceRow {

@@ -6,14 +6,7 @@ use nanocl_error::http_client::{HttpClientResult, HttpClientError};
 
 use crate::version::{VERSION, CHANNEL};
 
-/// ## Get
-///
 /// Get template from our GitHub repo for installation
-///
-/// ## Return
-///
-/// [HttpClientResult](HttpClientResult) containing a [String](String)
-///
 async fn get() -> HttpClientResult<String> {
   let client = http::client::Client::new();
   let url = format!("https://raw.githubusercontent.com/nxthat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.yml");
@@ -36,18 +29,7 @@ async fn get() -> HttpClientResult<String> {
   Ok(body)
 }
 
-/// ## Get template
-///
 /// Get template from our GitHub repo or from the specified file if it's provided
-///
-/// ## Arguments
-///
-/// * [template](Option<String>) The template file
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [String](String)
-///
 pub async fn get_template(template: Option<String>) -> IoResult<String> {
   match template {
     None => {

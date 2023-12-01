@@ -6,22 +6,11 @@ use nanocl_utils::ntex::middlewares;
 use crate::services;
 use crate::models::DaemonState;
 
-/// ## Gen
-///
 /// This function will generate the HTTP server with the given configuration.
 /// It will also bind the server to the given address.
 /// The server will be returned.
 /// NOTE: In development we bind the address to [http://0.0.0.0:8585](http://0.0.0.0:8585)
 ///       with an explorer on [http://0.0.0.0:8585/explorer/](http://0.0.0.0:8585/explorer/)
-///
-/// ## Arguments
-///
-/// * [daemon_state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [Result](std::io::Result) containing [Server](ntex::server::Server)
-///
 pub async fn gen(
   daemon_state: DaemonState,
 ) -> std::io::Result<ntex::server::Server> {

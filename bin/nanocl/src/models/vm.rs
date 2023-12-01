@@ -9,10 +9,7 @@ use nanocld_client::stubs::vm_spec::{
 
 use super::{VmImageArg, DisplayFormat};
 
-/// ## VmCommands
-///
 /// `nanocl vm` available commands
-///
 #[derive(Subcommand)]
 pub enum VmCommand {
   /// Run a vm
@@ -42,20 +39,14 @@ pub enum VmCommand {
   Patch(VmPatchOpts),
 }
 
-/// ## VmNamesOpts
-///
 /// Generic names options
-///
 #[derive(Parser)]
 pub struct VmNamesOpts {
   /// Names of the vm
   pub names: Vec<String>,
 }
 
-/// ## VmInspectOpts
-///
 /// `nanocl vm inspect` available options
-///
 #[derive(Parser)]
 pub struct VmInspectOpts {
   /// Display format
@@ -65,10 +56,7 @@ pub struct VmInspectOpts {
   pub name: String,
 }
 
-/// ## VmListOpts
-///
 /// `nanocl vm list` available options
-///
 #[derive(Parser)]
 pub struct VmListOpts {
   /// Show only vms name
@@ -76,10 +64,7 @@ pub struct VmListOpts {
   pub quiet: bool,
 }
 
-/// ## VmPatchOpts
-///
 /// `nanocl vm patch` available options
-///
 #[derive(Clone, Parser)]
 pub struct VmPatchOpts {
   /// Name of the vm
@@ -131,10 +116,7 @@ impl From<VmPatchOpts> for VmSpecUpdate {
   }
 }
 
-/// ## VmRunOpts
-///
 /// `nanocl vm run` available options
-///
 #[derive(Clone, Parser)]
 pub struct VmRunOpts {
   /// hostname of the vm
@@ -198,10 +180,7 @@ impl From<VmRunOpts> for VmSpecPartial {
   }
 }
 
-/// ## VmCreateOpts
-///
 /// `nanocl vm create` available options
-///
 #[derive(Clone, Parser)]
 pub struct VmCreateOpts {
   /// hostname of the vm
@@ -259,10 +238,7 @@ impl From<VmCreateOpts> for VmSpecPartial {
   }
 }
 
-/// ## VmRow
-///
 /// A row for the vm table
-///
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct VmRow {
@@ -311,10 +287,7 @@ impl From<VmSummary> for VmRow {
   }
 }
 
-/// ## VmArg
-///
 /// `nanocl vm` available arguments
-///
 #[derive(Parser)]
 pub struct VmArg {
   /// namespace to target by default global is used

@@ -1,7 +1,9 @@
-use nanocl_error::http_client::HttpClientResult;
+use nanocl_error::http_client::{HttpClientResult, HttpClientError};
 
+use nanocl_error::io::IoError;
+use nanocl_stubs::generic::{GenericFilter, GenericListQuery};
 use nanocl_stubs::resource::{
-  Resource, ResourcePartial, ResourceSpec, ResourceQuery, ResourceUpdate,
+  Resource, ResourcePartial, ResourceSpec, ResourceUpdate,
 };
 
 use super::http_client::NanocldClient;
@@ -10,17 +12,7 @@ impl NanocldClient {
   /// ## Default path for resources
   const RESOURCE_PATH: &'static str = "/resources";
 
-  /// ## List resources
-  ///
   /// List existing resources in the system.
-  ///
-  /// ## Arguments
-  ///
-  /// * [query](Option) - The optional [query](ResourceQuery)
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [Resource](Resource)
   ///
   /// ## Example
   ///
@@ -33,23 +25,20 @@ impl NanocldClient {
   ///
   pub async fn list_resource(
     &self,
-    query: Option<&ResourceQuery>,
+    query: Option<&GenericFilter>,
   ) -> HttpClientResult<Vec<Resource>> {
-    let res = self.send_get(Self::RESOURCE_PATH, query).await?;
+    let query = query.cloned().unwrap_or_default();
+    let query = GenericListQuery::try_from(query).map_err(|err| {
+      HttpClientError::IoError(IoError::invalid_data(
+        "Query".to_owned(),
+        err.to_string(),
+      ))
+    })?;
+    let res = self.send_get(Self::RESOURCE_PATH, Some(query)).await?;
     Self::res_json(res).await
   }
 
-  /// ## Create resource
-  ///
   /// Create a new resource from a partial resource in the system.
-  ///
-  /// ## Arguments
-  ///
-  /// * [data](ResourcePartial) - The partial
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Resource](Resource)
   ///
   /// ## Example
   ///
@@ -76,17 +65,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Inspect resource
-  ///
   /// Inspect an existing resource
-  ///
-  /// ## Arguments
-  ///
-  /// * [key](str) - The key of the resource to inspect
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Resource](Resource)
   ///
   /// ## Example
   ///
@@ -107,18 +86,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Patch resource
-  ///
   /// Patch an existing resource
-  ///
-  /// ## Arguments
-  ///
-  /// * [key](str) - The key of the resource to patch
-  /// * [data](ResourcePartial) - The data to patch
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Resource](Resource)
   ///
   /// ## Example
   ///
@@ -144,13 +112,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Delete resource
-  ///
   /// Delete an existing resource
-  ///
-  /// ## Arguments
-  ///
-  /// * [key](str) - The key of the resource to delete
   ///
   /// ## Example
   ///
@@ -168,17 +130,7 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## List history resource
-  ///
   /// List history of an existing resource
-  ///
-  /// ## Arguments
-  ///
-  /// * [key](str) - The key of the resource to list history
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [ResourceSpec](ResourceSpec)
   ///
   /// ## Example
   ///
@@ -202,18 +154,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Revert resource
-  ///
   /// Revert a resource to a previous version
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the resource to revert
-  /// * [key](str) - The key of the resource to revert
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Resource](Resource)
   ///
   /// ## Example
   ///

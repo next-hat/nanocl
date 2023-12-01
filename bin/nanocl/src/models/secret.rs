@@ -6,10 +6,7 @@ use nanocld_client::stubs::secret::Secret;
 
 use super::DisplayFormat;
 
-/// ## SecretCommand
-///
 /// `nanocl resource` available commands
-///
 #[derive(Subcommand)]
 pub enum SecretCommand {
   /// Remove existing secret
@@ -22,10 +19,7 @@ pub enum SecretCommand {
   Inspect(SecretInspectOpts),
 }
 
-/// ## SecretArg
-///
 /// `nanocl secret` available arguments
-///
 #[derive(Parser)]
 pub struct SecretArg {
   /// Secret command
@@ -33,10 +27,7 @@ pub struct SecretArg {
   pub command: SecretCommand,
 }
 
-/// ## SecretListOpts
-///
 /// `nanocl secret list` available options
-///
 #[derive(Parser)]
 pub struct SecretRemoveOpts {
   /// Skip confirmation
@@ -46,10 +37,7 @@ pub struct SecretRemoveOpts {
   pub keys: Vec<String>,
 }
 
-/// ## SecretListOpts
-///
 /// `nanocl secret inspect` available options
-///
 #[derive(Parser)]
 pub struct SecretInspectOpts {
   /// Name of secret to inspect
@@ -59,6 +47,7 @@ pub struct SecretInspectOpts {
   pub display: Option<DisplayFormat>,
 }
 
+/// A row of the secret table
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct SecretRow {

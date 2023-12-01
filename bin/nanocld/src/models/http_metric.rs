@@ -1,15 +1,21 @@
+use std::sync::Arc;
+
 use uuid::Uuid;
+use diesel::prelude::*;
+use tokio::task::JoinHandle;
 use chrono::{DateTime, FixedOffset};
 use serde::{Serialize, Deserialize, Deserializer};
 
+use nanocl_error::io::{IoError, IoResult};
+
+use nanocl_stubs::generic::GenericFilter;
+
+use crate::utils;
 use crate::schema::{http_metrics, stream_metrics};
 
-use super::generic::ToMeticDb;
+use super::{Pool, Repository, ToMeticDb};
 
-/// ## deserialize empty string
-///
 /// Serde helper to deserialize string that can be empty to `Option<String>`.
-///
 fn deserialize_empty_string<'de, D>(
   deserializer: D,
 ) -> Result<Option<String>, D::Error>
@@ -24,10 +30,7 @@ where
   }
 }
 
-/// ## deserialize string to i64
-///
 /// Serde helper to deserialize string to `i64`.
-///
 fn deserialize_string_to_i64<'de, D>(deserializer: D) -> Result<i64, D::Error>
 where
   D: Deserializer<'de>,
@@ -37,8 +40,6 @@ where
   Ok(res)
 }
 
-/// ## deserialize string to f64
-///
 /// Serde helper to deserialize string to `f64`.
 fn deserialize_string_to_f64<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
@@ -49,11 +50,8 @@ where
   Ok(res)
 }
 
-/// ## HttpMetricPartial
-///
 /// This structure represent a partial http metric.
 /// It is used to insert http metrics in the database.
-///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all(serialize = "PascalCase"))]
 pub struct HttpMetricPartial {
@@ -289,5 +287,93 @@ impl ToMeticDb for StreamMetricPartial {
       upstream_connect_time: self.upstream_connect_time,
       node_name: node_name.to_owned(),
     }
+  }
+}
+
+impl Repository for HttpMetricDb {
+  type Table = http_metrics::table;
+  type Item = HttpMetricDb;
+  type UpdateItem = HttpMetricDb;
+
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    log::debug!("HttpMetricDb::find_one filter: {filter:?}");
+    // let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let query = http_metrics::dsl::http_metrics
+      .order(http_metrics::dsl::created_at.desc())
+      .into_boxed();
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let item = query
+        .get_result::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(item)
+    })
+  }
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    log::debug!("HttpMetricDb::find filter: {filter:?}");
+    // let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let query = http_metrics::dsl::http_metrics
+      .order(http_metrics::dsl::created_at.desc())
+      .into_boxed();
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(items)
+    })
+  }
+}
+
+impl Repository for StreamMetricDb {
+  type Table = stream_metrics::table;
+  type Item = StreamMetricDb;
+  type UpdateItem = StreamMetricDb;
+
+  fn find_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Item>> {
+    log::debug!("StreamMetricDb::find_one filter: {filter:?}");
+    // let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let query = stream_metrics::dsl::stream_metrics
+      .order(stream_metrics::dsl::created_at.desc())
+      .into_boxed();
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_result::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(items)
+    })
+  }
+
+  fn find(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
+    log::debug!("StreamMetricDb::find filter: {filter:?}");
+    // let r#where = filter.r#where.to_owned().unwrap_or_default();
+    let query = stream_metrics::dsl::stream_metrics
+      .order(stream_metrics::dsl::created_at.desc())
+      .into_boxed();
+    let pool = Arc::clone(pool);
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let items = query
+        .get_results::<Self>(&mut conn)
+        .map_err(Self::map_err_context)?;
+      Ok::<_, IoError>(items)
+    })
   }
 }

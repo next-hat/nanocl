@@ -6,12 +6,8 @@ use bollard_next::service::ContainerStateStatusEnum;
 
 use nanocld_client::stubs::system::ProccessQuery;
 use nanocld_client::stubs::node::NodeContainerSummary;
-use nanocld_client::stubs::http_metric::HttpMetricListQuery;
 
-/// ## SystemArg
-///
 /// `nanocl system` available arguments
-///
 #[derive(Clone, Parser)]
 pub struct SystemArg {
   /// Command to run
@@ -19,20 +15,14 @@ pub struct SystemArg {
   pub command: SystemCommand,
 }
 
-/// ## SystemCommand
-///
 /// `nanocl system` available commands
-///
 #[derive(Clone, Parser)]
 pub enum SystemCommand {
   /// System HTTP metrics information
   Http(SystemHttpArg),
 }
 
-/// ## SystemHttpArg
-///
 /// `nanocl system http` available arguments
-///
 #[derive(Clone, Parser)]
 pub struct SystemHttpArg {
   /// Command to run
@@ -40,20 +30,14 @@ pub struct SystemHttpArg {
   pub command: SystemHttpCommand,
 }
 
-/// ## SystemHttpCommand
-///
 /// `nanocl system http` available commands
-///
 #[derive(Clone, Parser)]
 pub enum SystemHttpCommand {
   /// Show HTTP metrics information
   Logs(SystemHttpLogsOpts),
 }
 
-/// ## SystemHttpLogsOpts
-///
 /// `nanocl system http logs` available options
-///
 #[derive(Clone, Parser)]
 pub struct SystemHttpLogsOpts {
   // #[clap(long, short)]
@@ -66,20 +50,7 @@ pub struct SystemHttpLogsOpts {
   pub offset: Option<i64>,
 }
 
-/// Convert SystemHttpLogsOpts to HttpMetricListQuery
-impl From<SystemHttpLogsOpts> for HttpMetricListQuery {
-  fn from(opts: SystemHttpLogsOpts) -> Self {
-    Self {
-      limit: opts.limit,
-      offset: opts.offset,
-    }
-  }
-}
-
-/// ## ProcessOpts
-///
 /// `nanocl ps` available options
-///
 #[derive(Clone, Parser)]
 pub struct ProcessOpts {
   /// Return containers for all nodes by default only the current node
@@ -107,10 +78,7 @@ impl From<ProcessOpts> for ProccessQuery {
   }
 }
 
-/// ## ProcessRow
-///
 /// A row for the process table
-///
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct ProcessRow {

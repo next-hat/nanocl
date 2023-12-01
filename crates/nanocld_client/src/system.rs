@@ -4,7 +4,7 @@ use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::node::NodeContainerSummary;
-use nanocl_stubs::system::{Event, Version, HostInfo, ProccessQuery};
+use nanocl_stubs::system::{Event, BinaryInfo, HostInfo, ProccessQuery};
 
 use super::http_client::NanocldClient;
 
@@ -26,7 +26,7 @@ impl NanocldClient {
   /// let res = client.get_version().await;
   /// ```
   ///
-  pub async fn get_version(&self) -> HttpClientResult<Version> {
+  pub async fn get_version(&self) -> HttpClientResult<BinaryInfo> {
     let res = self.send_get("/version", None::<String>).await?;
     Self::res_json(res).await
   }

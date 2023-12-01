@@ -13,22 +13,10 @@ use nanocl_stubs::cargo_spec::CargoSpecPartial;
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmDisk};
 use nanocl_stubs::state::{Statefile, StateStream, StateApplyQuery};
 
-use crate::{utils, repositories};
-use crate::models::DaemonState;
+use crate::utils;
+use crate::models::{DaemonState, ResourceDb, SecretDb, Repository, VmDb, CargoDb};
 
-/// ## Ensure namespace existence
-///
 /// Ensure that the namespace exists in the system
-///
-/// ## Arguments
-///
-/// * [namespace](Option) - The optional [namespace name](String)
-/// * [state](DaemonState) - The system state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [String](String)
-///
 async fn ensure_namespace_existence(
   namespace: &Option<String>,
   state: &DaemonState,
@@ -40,18 +28,7 @@ async fn ensure_namespace_existence(
   Ok("global".to_owned())
 }
 
-/// ## Stream to bytes
-///
 /// Local utility to convert a state stream to bytes to send to the client
-///
-/// ## Arguments
-///
-/// * [state_stream](StateStream) - The state stream to convert
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Bytes](Bytes)
-///
 fn stream_to_bytes(state_stream: StateStream) -> HttpResult<Bytes> {
   let bytes =
     serde_json::to_string(&state_stream).map_err(|err| HttpError {
@@ -61,31 +38,12 @@ fn stream_to_bytes(state_stream: StateStream) -> HttpResult<Bytes> {
   Ok(Bytes::from(bytes + "\r\n"))
 }
 
-/// ## Send
-///
 /// Send a state stream to the client through the sender channel
-///
-/// ## Arguments
-///
-/// * [state_stream](StateStream) - The state stream to send
-/// * [sx](mpsc::Sender) - The response sender
-///
 fn send(state_stream: StateStream, sx: &mpsc::Sender<HttpResult<Bytes>>) {
   let _ = sx.send(stream_to_bytes(state_stream));
 }
 
-/// ## Parse State
-///
 /// Parse the state payload and return the data
-///
-/// ## Arguments
-///
-/// * [data](serde_json::Value) - The state payload
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [StateFileData](StateFileData)
-///
 pub(crate) fn parse_state(data: &serde_json::Value) -> HttpResult<Statefile> {
   let data =
     serde_json::from_value::<Statefile>(data.to_owned()).map_err(|err| {
@@ -97,18 +55,9 @@ pub(crate) fn parse_state(data: &serde_json::Value) -> HttpResult<Statefile> {
   Ok(data)
 }
 
-/// ## Apply Secret
-///
 /// Apply the list of secrets to the system.
 /// It will create the secrets if they don't exist.
 /// If they exists but are not up to date, it will update them.
-///
-/// ## Arguments
-///
-/// * [data](Vec<SecretPartial>) - The list of secrets to apply
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender) - The response sender
-///
 async fn apply_secrets(
   data: &[SecretPartial],
   state: &DaemonState,
@@ -120,34 +69,42 @@ async fn apply_secrets(
     .map(|secret| async {
       let key = secret.key.to_owned();
       send(StateStream::new_secret_pending(&key), sx);
-      match repositories::secret::find_by_key(&key, &state.pool).await {
+      match SecretDb::find_by_pk(&key, &state.pool).await {
         Ok(existing) => {
-          let existing: SecretPartial = existing.clone().into();
-          if existing == *secret && !qs.reload.unwrap_or(false) {
-            send(StateStream::new_secret_unchanged(&key), sx);
-            return;
-          }
-          if let Err(err) = repositories::secret::update_by_key(
-            &key,
-            &SecretUpdate {
-              data: secret.data.to_owned(),
-              metadata: secret.metadata.to_owned(),
-            },
-            &state.pool,
-          )
-          .await
-          {
-            send(StateStream::new_secret_error(&key, &err.to_string()), sx);
-            return;
-          }
+          match existing {
+            Err(_) => {
+              if let Err(err) =
+                SecretDb::create(&secret.clone(), &state.pool).await
+              {
+                send(StateStream::new_secret_error(&key, &err.to_string()), sx);
+                return;
+              }
+            }
+            Ok(existing) => {
+              let existing: SecretPartial = existing.into();
+              if existing == *secret && !qs.reload.unwrap_or(false) {
+                send(StateStream::new_secret_unchanged(&key), sx);
+                return;
+              }
+              if let Err(err) = SecretDb::update_by_pk(
+                &key,
+                &SecretUpdate {
+                  data: secret.data.to_owned(),
+                  metadata: secret.metadata.to_owned(),
+                },
+                &state.pool,
+              )
+              .await
+              {
+                send(StateStream::new_secret_error(&key, &err.to_string()), sx);
+                return;
+              }
+            }
+          };
         }
-        Err(_err) => {
-          if let Err(err) =
-            repositories::secret::create(secret, &state.pool).await
-          {
-            send(StateStream::new_secret_error(&key, &err.to_string()), sx);
-            return;
-          }
+        Err(err) => {
+          send(StateStream::new_secret_error(&key, &err.to_string()), sx);
+          return;
         }
       };
       send(StateStream::new_secret_success(&key), sx);
@@ -157,16 +114,7 @@ async fn apply_secrets(
     .await;
 }
 
-/// ## Apply jobs
-///
 /// Apply the list of jobs to the system.
-///
-/// ## Arguments
-///
-/// * [data](Vec<JobPartial>) - The list of jobs to apply
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender) - The response sender
-///
 async fn apply_jobs(
   data: &[JobPartial],
   state: &DaemonState,
@@ -215,20 +163,9 @@ async fn apply_jobs(
     .await;
 }
 
-/// ## Apply cargoes
-///
 /// Apply the list of cargoes to the system.
 /// It will create the cargoes if they don't exist, and start them.
 /// If they exists but are not up to date, it will update them.
-///
-/// ## Arguments
-///
-/// * [namespace](str) - The namespace name
-/// * [data](Vec<CargoSpecPartial>) - The list of cargoes to apply
-/// * [version](str) - The version of the cargoes
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender) - The response sender
-///
 async fn apply_cargoes(
   namespace: &str,
   data: &[CargoSpecPartial],
@@ -242,7 +179,7 @@ async fn apply_cargoes(
     .map(|cargo| async {
       let key = utils::key::gen_key(namespace, &cargo.name);
       send(StateStream::new_cargo_pending(&key), sx);
-      match repositories::cargo::inspect_by_key(&key, &state.pool).await {
+      match CargoDb::inspect_by_pk(&key, &state.pool).await {
         Ok(existing) => {
           let existing: CargoSpecPartial = existing.into();
           if existing == *cargo && !qs.reload.unwrap_or(false) {
@@ -276,19 +213,8 @@ async fn apply_cargoes(
     .await;
 }
 
-/// ## Apply VMS
-///
 /// This will apply a list of VMs to the system.
 /// It will create or update VMs as needed.
-///
-/// ## Arguments
-///
-/// * [namespace](str) - The namespace to apply the VMs to
-/// * [data](Vec<VmSpecPartial>) - The VMs to apply
-/// * [version](str) - The version of the VMs
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender) - The response sender
-///
 pub(crate) async fn apply_vms(
   namespace: &str,
   data: &[VmSpecPartial],
@@ -302,7 +228,7 @@ pub(crate) async fn apply_vms(
     .map(|vm| async {
       let key = utils::key::gen_key(namespace, &vm.name);
       send(StateStream::new_vm_pending(&key), sx);
-      match repositories::vm::inspect_by_key(&key, &state.pool).await {
+      match VmDb::inspect_by_pk(&key, &state.pool).await {
         Ok(existing) => {
           let existing: VmSpecPartial = existing.into();
           let vm = VmSpecPartial {
@@ -343,17 +269,8 @@ pub(crate) async fn apply_vms(
     .await;
 }
 
-/// ## Apply resources
-///
 /// Apply the list of resources to the system.
 /// It will create the resources if they don't exist or update them if they are not up to date.
-///
-/// ## Arguments
-///
-/// * [data](Vec<ResourcePartial>) - The list of resources to apply
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender) - The response sender
-///
 async fn apply_resources(
   data: &[ResourcePartial],
   state: &DaemonState,
@@ -365,18 +282,17 @@ async fn apply_resources(
     .map(|resource| async {
       let key = resource.name.to_owned();
       send(StateStream::new_resource_pending(&key), sx);
-      let res =
-        match repositories::resource::inspect_by_key(&key, &state.pool).await {
-          Err(_) => utils::resource::create(resource, state).await,
-          Ok(cur_resource) => {
-            let casted: ResourcePartial = cur_resource.into();
-            if *resource == casted && !qs.reload.unwrap_or(false) {
-              send(StateStream::new_resource_unchanged(&key), sx);
-              return;
-            }
-            utils::resource::patch(&resource.clone(), state).await
+      let res = match ResourceDb::inspect_by_pk(&key, &state.pool).await {
+        Err(_) => utils::resource::create(resource, state).await,
+        Ok(cur_resource) => {
+          let casted: ResourcePartial = cur_resource.into();
+          if *resource == casted && !qs.reload.unwrap_or(false) {
+            send(StateStream::new_resource_unchanged(&key), sx);
+            return;
           }
-        };
+          utils::resource::patch(&resource.clone(), state).await
+        }
+      };
       if let Err(err) = res {
         send(StateStream::new_resource_error(&key, &err.to_string()), sx);
         return;
@@ -388,16 +304,7 @@ async fn apply_resources(
     .await;
 }
 
-/// ## Remove jobs
-///
 /// Remove jobs from the system based on a list of jobs
-///
-/// ## Arguments
-///
-/// * [data](serde_json::Value) - The state payload
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender) - The response sender
-///
 async fn remove_jobs(
   data: &[JobPartial],
   state: &DaemonState,
@@ -426,16 +333,7 @@ async fn remove_jobs(
     .await;
 }
 
-/// ## Remove secrets
-///
 /// Delete secrets from the system based on a list of secrets
-///
-/// ## Arguments
-///
-/// * [data](Vec<SecretPartial>) - The list of secrets to delete
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender) - The response sender
-///
 async fn remove_secrets(
   data: &[SecretPartial],
   state: &DaemonState,
@@ -446,17 +344,20 @@ async fn remove_secrets(
     .map(|secret| async {
       let key = secret.key.to_owned();
       send(StateStream::new_secret_pending(&key), sx);
-      let secret =
-        match repositories::secret::find_by_key(&key, &state.pool).await {
+      let secret = match SecretDb::find_by_pk(&key, &state.pool).await {
+        Ok(secret) => match secret {
           Ok(secret) => secret,
           Err(_) => {
             send(StateStream::new_secret_not_found(&key), sx);
             return;
           }
-        };
-      if let Err(err) =
-        repositories::secret::delete_by_key(&secret.key, &state.pool).await
-      {
+        },
+        Err(_) => {
+          send(StateStream::new_secret_not_found(&key), sx);
+          return;
+        }
+      };
+      if let Err(err) = SecretDb::delete_by_pk(&secret.key, &state.pool).await {
         send(StateStream::new_secret_error(&key, &err.to_string()), sx);
         return;
       }
@@ -467,17 +368,7 @@ async fn remove_secrets(
     .await;
 }
 
-/// ## Remove cargoes
-///
 /// Delete cargoes from the system based on a list of cargoes for a namespace
-///
-/// ## Arguments
-///
-/// * [namespace](str) - The namespace of the cargoes
-/// * [data](Vec<CargoSpecPartial>) - The list of cargoes to delete
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender) - The response sender
-///
 async fn remove_cargoes(
   namespace: &str,
   data: &[CargoSpecPartial],
@@ -489,14 +380,13 @@ async fn remove_cargoes(
     .map(|cargo| async {
       let key = utils::key::gen_key(namespace, &cargo.name);
       send(StateStream::new_cargo_pending(&key), sx);
-      let cargo =
-        match repositories::cargo::inspect_by_key(&key, &state.pool).await {
-          Ok(cargo) => cargo,
-          Err(_) => {
-            send(StateStream::new_cargo_not_found(&key), sx);
-            return;
-          }
-        };
+      let cargo = match CargoDb::inspect_by_pk(&key, &state.pool).await {
+        Ok(cargo) => cargo,
+        Err(_) => {
+          send(StateStream::new_cargo_not_found(&key), sx);
+          return;
+        }
+      };
       if let Err(err) =
         utils::cargo::delete_by_key(&cargo.spec.cargo_key, Some(true), state)
           .await
@@ -514,17 +404,7 @@ async fn remove_cargoes(
     .await;
 }
 
-/// ## Remove VMs
-///
 /// This will delete a list of VMs from the system for the given namespace.
-///
-/// ## Arguments
-///
-/// * [namespace](str) - The namespace to delete the VMs from
-/// * [data](Vec<VmSpecPartial>) - The VMs to delete
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender) - The response sender
-///
 pub(crate) async fn remove_vms(
   namespace: &str,
   data: &[VmSpecPartial],
@@ -536,7 +416,7 @@ pub(crate) async fn remove_vms(
     .map(|vm| async {
       let key = utils::key::gen_key(namespace, &vm.name);
       send(StateStream::new_vm_pending(&key), sx);
-      let res = repositories::vm::inspect_by_key(&key, &state.pool).await;
+      let res = VmDb::inspect_by_pk(&key, &state.pool).await;
       if res.is_err() {
         send(StateStream::new_vm_not_found(&key), sx);
         return;
@@ -552,16 +432,7 @@ pub(crate) async fn remove_vms(
     .await;
 }
 
-/// ## Remove resources
-///
 /// Delete resources from the system based on a list of resources
-///
-/// ## Arguments
-///
-/// * [data](Vec<ResourcePartial>) - The list of resources to delete
-/// * [state](DaemonState) - The system state
-/// * [sx](mpsc::Sender) - The response sender
-///
 async fn remove_resources(
   data: &[ResourcePartial],
   state: &DaemonState,
@@ -571,18 +442,14 @@ async fn remove_resources(
     .iter()
     .map(|resource| async {
       send(StateStream::new_resource_pending(&resource.name), sx);
-      let resource = match repositories::resource::inspect_by_key(
-        &resource.name,
-        &state.pool,
-      )
-      .await
-      {
-        Ok(resource) => resource,
-        Err(_) => {
-          send(StateStream::new_resource_not_found(&resource.name), sx);
-          return;
-        }
-      };
+      let resource =
+        match ResourceDb::inspect_by_pk(&resource.name, &state.pool).await {
+          Ok(resource) => resource,
+          Err(_) => {
+            send(StateStream::new_resource_not_found(&resource.name), sx);
+            return;
+          }
+        };
       if let Err(err) = utils::resource::delete(&resource, state).await {
         send(
           StateStream::new_resource_error(
@@ -603,19 +470,7 @@ async fn remove_resources(
     .await;
 }
 
-/// ## Apply statefile
-///
 /// Apply a Statefile in the system
-///
-/// /// ## Arguments
-///
-/// * [data](StateFileData) - The Statefile data
-/// * [state](DaemonState) - The system state
-///
-/// ## Return
-///
-/// [Receiver](mpsc::Receiver) of [HttpResult](HttpResult) of [Bytes](Bytes)
-///
 pub(crate) fn apply_statefile(
   data: &Statefile,
   version: &str,
@@ -649,19 +504,7 @@ pub(crate) fn apply_statefile(
   rx
 }
 
-/// ## Remove statefile
-///
 /// Remove a Statefile from the system and return a stream of the result for
-///
-/// ## Arguments
-///
-/// * [data](StateFileData) - The Statefile data
-/// * [state](DaemonState) - The system state
-///
-/// ## Return
-///
-/// [Receiver](mpsc::Receiver) of [HttpResult](HttpResult) of [Bytes](Bytes)
-///
 pub(crate) fn remove_statefile(
   data: &Statefile,
   state: &DaemonState,

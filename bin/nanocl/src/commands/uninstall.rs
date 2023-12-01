@@ -6,16 +6,9 @@ use bollard_next::container::{InspectContainerOptions, RemoveContainerOptions};
 use crate::{utils, version};
 use crate::models::UninstallOpts;
 
-/// ## Exec uninstall
-///
 /// This function is called when running `nanocl uninstall`.
 /// It will remove nanocl system containers but not the images
 /// It will keep existing cargoes, virtual machines and volumes
-///
-/// ## Arguments
-///
-/// * [args](UninstallOpts) The command arguments
-///
 pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
   let detected_host = utils::docker::detect_docker_host()?;
   let (docker_host, is_docker_desktop) = match &args.docker_host {

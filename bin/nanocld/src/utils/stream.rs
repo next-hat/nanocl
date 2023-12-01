@@ -5,20 +5,7 @@ use serde::Serialize;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-/// ## Transform stream
-///
 /// Transform a stream of items serializable in json into a stream of bytes
-///
-/// ## Arguments
-///
-/// * [stream](impl StreamExt<Item = Result<I, impl std::error::Error>>) The stream to transform
-///   * [I](I) - The type of the stream items
-///   * [T](T) - The type to transform the stream items into
-///
-/// ## Return
-///
-/// [Stream](StreamExt) of [HttpResult](HttpResult) of [Bytes](Bytes)
-///
 pub(crate) fn transform_stream<I, T>(
   stream: impl StreamExt<Item = Result<I, impl std::error::Error>>,
 ) -> impl StreamExt<Item = HttpResult<Bytes>>

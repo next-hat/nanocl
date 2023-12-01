@@ -85,10 +85,7 @@ impl Nginx {
     Ok(())
   }
 
-  /// ## Ensure
-  ///
   /// Ensure default configuration files and directories
-  ///
   pub async fn ensure(&self) -> IoResult<()> {
     [
       "sites-available",

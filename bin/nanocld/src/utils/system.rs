@@ -10,20 +10,14 @@ use nanocl_error::io::{FromIo, IoResult};
 use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
-use crate::{version, utils, repositories};
-use crate::models::{DaemonState, ContainerPartial, ContainerInstanceUpdateDb};
+use crate::{utils, version};
+use crate::models::{
+  DaemonState, ContainerPartial, ContainerUpdateDb, CargoDb, ContainerDb,
+  Repository, Container, NamespaceDb,
+};
 
-/// Sync instance
-///
 /// Will determine if the instance is registered by nanocl
 /// and sync his data with our store accordinly
-///
-///
-/// ## Arguments
-///
-/// * [instance](ContainerInspectResponse) - The instance to sync
-/// * [state](DaemonState) - The state
-///
 pub(crate) async fn sync_instance(
   instance: &ContainerInspectResponse,
   state: &DaemonState,
@@ -32,7 +26,7 @@ pub(crate) async fn sync_instance(
   let id = instance.id.clone().unwrap_or_default();
   let container_instance_data = serde_json::to_value(instance)
     .map_err(|err| err.map_err_context(|| "ContainerInstance"))?;
-  let current_res = repositories::container::find_by_id(&id, &state.pool).await;
+  let current_res = ContainerDb::find_by_pk(&id, &state.pool).await?;
   let labels = instance
     .config
     .clone()
@@ -58,15 +52,16 @@ pub(crate) async fn sync_instance(
   }
   match current_res {
     Ok(current_instance) => {
+      let current_instance: Container = current_instance.try_into()?;
       if current_instance.data == *instance {
         log::debug!("container instance already synced");
         return Ok(());
       }
-      let new_instance = ContainerInstanceUpdateDb {
+      let new_instance = ContainerUpdateDb {
         updated_at: Some(chrono::Utc::now().naive_utc()),
         data: Some(container_instance_data),
       };
-      let _ = repositories::container::update(&id, &new_instance, &state.pool)
+      let _ = ContainerDb::update_by_pk(&id, new_instance, &state.pool)
         .await
         .map_err(|err| log::error!("{err}"));
     }
@@ -79,7 +74,7 @@ pub(crate) async fn sync_instance(
         node_id: state.config.hostname.clone(),
         kind_id: kind_id.to_owned(),
       };
-      let _ = repositories::container::create(&new_instance, &state.pool)
+      let _ = ContainerDb::create(&new_instance, &state.pool)
         .await
         .map_err(|err| log::error!("{err}"));
     }
@@ -87,26 +82,17 @@ pub(crate) async fn sync_instance(
   Ok(())
 }
 
-/// ## Register namespace
-///
 /// Ensure existance of specific namespace in our store.
 /// We use it to be sure `system` and `global` namespace exists.
 /// system is the namespace used by internal nanocl components.
 /// where global is the namespace used by default.
 /// User can registed they own namespace to ensure better encaptusation.
-///
-/// ## Arguments
-///
-/// * [name](str) Name of the namespace to register
-/// * [create_network](bool) If true we create the network for the namespace
-/// * [state](DaemonState) The daemon state
-///
 pub(crate) async fn register_namespace(
   name: &str,
   create_network: bool,
   state: &DaemonState,
 ) -> IoResult<()> {
-  if repositories::namespace::exist_by_name(name, &state.pool).await? {
+  if NamespaceDb::find_by_pk(name, &state.pool).await?.is_ok() {
     return Ok(());
   }
   let new_nsp = NamespacePartial {
@@ -115,20 +101,13 @@ pub(crate) async fn register_namespace(
   if create_network {
     utils::namespace::create(&new_nsp, state).await?;
   } else {
-    repositories::namespace::create(&new_nsp, &state.pool).await?;
+    NamespaceDb::create(&new_nsp, &state.pool).await??;
   }
   Ok(())
 }
 
-/// ## Sync instances
-///
 /// Convert existing container instances with our labels to cargo.
 /// We use it to be sure that all existing containers are registered as cargo.
-///
-/// ## Arguments
-///
-/// * [state](DaemonState) - The state
-///
 pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
   log::info!("Syncing existing container");
   let options = Some(ListContainersOptions::<&str> {
@@ -139,7 +118,7 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
     .docker_api
     .list_containers(options)
     .await
-    .map_err(|err| err.map_err_context(|| "ListContainer"))?;
+    .map_err(|err| err.map_err_context(|| "SyncInstance"))?;
   let mut cargo_inspected: HashMap<String, bool> = HashMap::new();
   for container_summary in containers {
     // extract cargo name and namespace
@@ -165,7 +144,7 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
         None::<InspectContainerOptions>,
       )
       .await
-      .map_err(|err| err.map_err_context(|| "InspectContainer"))?;
+      .map_err(|err| err.map_err_context(|| "SyncInstance"))?;
     let config = container.config.clone().unwrap_or_default();
     let mut config: bollard_next::container::Config = config.into();
     config.host_config = container.host_config.clone();
@@ -186,7 +165,7 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
       ..Default::default()
     };
     cargo_inspected.insert(metadata[0].to_owned(), true);
-    match repositories::cargo::inspect_by_key(cargo_key, &state.pool).await {
+    match CargoDb::inspect_by_pk(cargo_key, &state.pool).await {
       // If the cargo is already in our store and the config is different we update it
       Ok(cargo) => {
         if cargo.spec.container != config {
@@ -195,7 +174,7 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
             metadata[0],
             metadata[1]
           );
-          repositories::cargo::update_by_key(
+          CargoDb::update_from_spec(
             cargo_key,
             &new_cargo,
             &format!("v{}", version::VERSION),
@@ -212,19 +191,19 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
           metadata[0],
           metadata[1]
         );
-        if repositories::namespace::find_by_name(metadata[1], &state.pool)
+        if NamespaceDb::find_by_pk(metadata[1], &state.pool)
           .await
           .is_err()
         {
-          repositories::namespace::create(
+          NamespaceDb::create(
             &NamespacePartial {
               name: metadata[1].to_owned(),
             },
             &state.pool,
           )
-          .await?;
+          .await??;
         }
-        repositories::cargo::create(
+        CargoDb::create_from_spec(
           metadata[1],
           &new_cargo,
           &format!("v{}", version::VERSION),
@@ -239,15 +218,8 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
   Ok(())
 }
 
-/// ## Sync vm images
-///
 /// Check for vm images inside the vm images directory
 /// and create them in the database if they don't exist
-///
-/// ## Arguments
-///
-/// * [state](DaemonState) - The state
-///
 pub(crate) async fn sync_vm_images(state: &DaemonState) -> IoResult<()> {
   log::info!("Syncing existing VM images");
   let files =

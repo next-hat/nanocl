@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use ntex::util::Bytes;
 use futures::StreamExt;
+use diesel::ExpressionMethods;
 use futures_util::TryFutureExt;
 use futures_util::stream::FuturesUnordered;
-use bollard_next::service::ContainerCreateResponse;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
+use bollard_next::service::ContainerCreateResponse;
 use bollard_next::container::{
   Stats, LogOutput, ListContainersOptions, CreateContainerOptions,
   StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
@@ -17,29 +18,24 @@ use bollard_next::service::{
 };
 use nanocl_stubs::system::EventAction;
 use nanocl_stubs::node::NodeContainerSummary;
+use nanocl_stubs::generic::{GenericListNspQuery, GenericClause, GenericFilter};
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,
-  CargoKillOptions, GenericCargoListQuery, CargoScale, CargoStats,
-  CargoStatsQuery,
+  CargoKillOptions, CargoScale, CargoStats, CargoStatsQuery,
 };
 use nanocl_stubs::cargo_spec::{
   CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config,
 };
 
-use crate::{utils, repositories};
-use crate::models::DaemonState;
+use crate::utils;
+use crate::models::{
+  DaemonState, CargoDb, Repository, ContainerDb, NamespaceDb, NodeDb, SecretDb,
+  CargoSpecDb, FromSpec,
+};
 
 use super::stream::transform_stream;
 
-/// ## Execute before
-///
 /// Container to execute before the cargo instances
-///
-/// ## Arguments
-///
-/// * [cargo](Cargo) - The cargo
-/// * [docker_api](bollard_next::Docker) - The docker api
-///
 async fn execute_before(
   cargo: &Cargo,
   docker_api: &bollard_next::Docker,
@@ -93,8 +89,6 @@ async fn execute_before(
   }
 }
 
-/// ## Create instances
-///
 /// Create instances (containers) based on the cargo spec
 /// The number of containers created is based on the number of instances
 /// defined in the cargo spec
@@ -103,18 +97,6 @@ async fn execute_before(
 /// Example: cargo-key-1, cargo-key-2, cargo-key-3
 /// If the number of instances is equal to 1, the container will be named with
 /// the cargo key.
-///
-/// ## Arguments
-///
-/// * [cargo](Cargo) - The cargo
-/// * [start](usize) - The number of already created containers
-/// * [number](usize) - The number of containers to create
-/// * [docker_api](bollard_next::Docker) - The docker api
-///
-/// ## Return
-///
-/// [HttpResult][HttpResult] containing a [Vec](Vec) of [ContainerCreateResponse][ContainerCreateResponse]
-///
 async fn create_instances(
   cargo: &Cargo,
   start: usize,
@@ -127,8 +109,7 @@ async fn create_instances(
     let fetched_secrets = secrets
       .iter()
       .map(|secret| async move {
-        let secret =
-          repositories::secret::find_by_key(secret, &state.pool).await?;
+        let secret = SecretDb::find_by_pk(secret, &state.pool).await??;
         if secret.kind.as_str() != "Env" {
           return Err(HttpError::bad_request(format!(
             "Secret {} is not an Env secret",
@@ -251,16 +232,8 @@ async fn create_instances(
     .collect::<Result<Vec<ContainerCreateResponse>, HttpError>>()
 }
 
-/// ## Restore instances backup
-///
 /// Restore the instances backup. The instances are restored in parallel.
 /// It's happenning if when a cargo fail to updates.
-///
-/// ## Arguments
-///
-/// * [instances](Vec<ContainerSummary>) - The instances to restore
-/// * [state](DaemonState) - The daemon state
-///
 async fn restore_instances_backup(
   instances: &[ContainerSummary],
   state: &DaemonState,
@@ -291,17 +264,9 @@ async fn restore_instances_backup(
     .collect::<Result<(), _>>()
 }
 
-/// ## Rename instances original
-///
 /// Rename the containers of the given cargo by adding `-backup` to the name
 /// of the container to mark them as backup.
 /// In case of failure, the backup containers are restored.
-///
-/// ## Arguments
-///
-/// * [instances](Vec<ContainerSummary>) - The instances to rename
-/// * [state](DaemonState) - The daemon state
-///
 async fn rename_instances_original(
   instances: &[ContainerSummary],
   state: &DaemonState,
@@ -332,16 +297,8 @@ async fn rename_instances_original(
     .collect::<Result<(), _>>()
 }
 
-/// ## Delete instances
-///
 /// The instances (containers) are deleted but the cargo is not.
 /// The cargo is not deleted because it can be used to restore the containers.
-///
-/// ## Arguments
-///
-/// * [instances](Vec<ContainerSummary>) - The instances to delete
-/// * [state](DaemonState) - The daemon state
-///
 async fn delete_instances(
   instances: &[String],
   state: &DaemonState,
@@ -368,19 +325,7 @@ async fn delete_instances(
     .collect::<Result<(), _>>()
 }
 
-/// ## List instances
-///
 /// List the cargo instances (containers) based on the cargo key
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [docker_api](bollard_next::Docker) - The docker api
-///
-/// ## Return
-///
-/// [HttpResult][HttpResult] containing a [Vec](Vec) of [ContainerSummary][ContainerSummary]
-///
 pub(crate) async fn list_instances(
   key: &str,
   docker_api: &bollard_next::Docker,
@@ -397,22 +342,8 @@ pub(crate) async fn list_instances(
   Ok(containers)
 }
 
-/// ## Create
-///
 /// Create a cargo based on the given partial spec
 /// And create his instances (containers).
-///
-/// ## Arguments
-///
-/// * [namespace](str) - The namespace
-/// * [spec](CargoSpecPartial) - The cargo spec partial
-/// * [version](str) - The cargo version
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [cargo](Cargo)
-///
 pub(crate) async fn create(
   namespace: &str,
   spec: &CargoSpecPartial,
@@ -420,7 +351,7 @@ pub(crate) async fn create(
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
   let cargo =
-    repositories::cargo::create(namespace, spec, version, &state.pool).await?;
+    CargoDb::create_from_spec(namespace, spec, version, &state.pool).await?;
   let number = if let Some(mode) = &cargo.spec.replication {
     match mode {
       ReplicationMode::Static(replication_static) => replication_static.number,
@@ -433,8 +364,7 @@ pub(crate) async fn create(
     1
   };
   if let Err(err) = create_instances(&cargo, 0, number, state).await {
-    repositories::cargo::delete_by_key(&cargo.spec.cargo_key, &state.pool)
-      .await?;
+    CargoDb::delete_by_pk(&cargo.spec.cargo_key, &state.pool).await??;
     return Err(err);
   }
   state
@@ -443,24 +373,15 @@ pub(crate) async fn create(
   Ok(cargo)
 }
 
-/// ## Start by key
-///
 /// The cargo instances (containers) are started in parallel
 /// If one container fails to start, the other containers will continue to start
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn start_by_key(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
   let cargo_key = key.to_owned();
   let docker_api = state.docker_api.clone();
-  let cargo =
-    repositories::cargo::inspect_by_key(&cargo_key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(&cargo_key, &state.pool).await?;
   let containers = list_instances(&cargo_key, &docker_api).await?;
   containers
     .into_iter()
@@ -480,21 +401,13 @@ pub(crate) async fn start_by_key(
   Ok(())
 }
 
-/// ## Stop by key
-///
 /// Stop all instances (containers) for the given cargo key.
 /// The containers are stopped in parallel.
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn stop_by_key(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let containers = list_instances(key, &state.docker_api).await?;
   containers
     .into_iter()
@@ -517,15 +430,7 @@ pub(crate) async fn stop_by_key(
   Ok(())
 }
 
-/// ## Restart by key
-///
 /// Restart cargo instances (containers) by key
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [docker_api](bollard_next::Docker) - The docker api
-///
 pub(crate) async fn restart(
   key: &str,
   docker_api: &bollard_next::Docker,
@@ -549,22 +454,13 @@ pub(crate) async fn restart(
   Ok(())
 }
 
-/// ## Delete by key
-///
 /// Delete a cargo by key with his given instances (containers).
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [force](Option<bool>) - Force the deletion of the cargo
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn delete_by_key(
   key: &str,
   force: Option<bool>,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let containers = list_instances(key, &state.docker_api).await?;
   containers
     .into_iter()
@@ -586,42 +482,29 @@ pub(crate) async fn delete_by_key(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
-  repositories::cargo::delete_by_key(key, &state.pool).await?;
-  repositories::cargo_spec::delete_by_cargo_key(key, &state.pool).await?;
+  CargoDb::delete_by_pk(key, &state.pool).await??;
+  CargoSpecDb::delete_by(
+    crate::schema::cargo_specs::dsl::cargo_key.eq(key.to_owned()),
+    &state.pool,
+  )
+  .await??;
   state
     .event_emitter
     .spawn_emit_to_event(&cargo, EventAction::Deleted);
   Ok(())
 }
 
-/// ## Put
-///
 /// A new history entry is added and the containers are updated
 /// with the new cargo specification
-///
-/// ## Arguments
-/// * [cargo_key](str) - The cargo key
-/// * [cargo_partial](CargoSpecPartial) - The cargo spec
-/// * [version](str) - The version of the api to use
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [cargo](Cargo)
-///
 pub(crate) async fn put(
   cargo_key: &str,
   cargo_partial: &CargoSpecPartial,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
-  let cargo = repositories::cargo::update_by_key(
-    cargo_key,
-    cargo_partial,
-    version,
-    &state.pool,
-  )
-  .await?;
+  let cargo =
+    CargoDb::update_from_spec(cargo_key, cargo_partial, version, &state.pool)
+      .await?;
   // Get the number of instance to create
   let number = if let Some(mode) = &cargo.spec.replication {
     match mode {
@@ -682,35 +565,27 @@ pub(crate) async fn put(
   Ok(cargo)
 }
 
-/// ## List
-///
 /// List the cargoes for the given query
-///
-/// ## Arguments
-///
-/// * [query](GenericCargoListQuery) - The filter query
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Vec](Vec) of [CargoSummary][CargoSummary
-///
 pub(crate) async fn list(
-  query: GenericCargoListQuery<&str>,
+  query: &GenericListNspQuery,
   state: &DaemonState,
 ) -> HttpResult<Vec<CargoSummary>> {
-  let namespace =
-    repositories::namespace::find_by_name(query.namespace, &state.pool).await?;
-  let query = query.merge(namespace);
-  let cargoes = repositories::cargo::list_by_query(&query, &state.pool).await?;
+  let namespace = utils::key::resolve_nsp(&query.namespace);
+  let filter = GenericFilter::try_from(query.clone())
+    .map_err(|err| {
+      HttpError::bad_request(format!("Invalid query string: {}", err))
+    })?
+    .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
+  // ensure namespace exists
+  NamespaceDb::find_by_pk(&namespace, &state.pool).await??;
+  let cargoes = CargoDb::find(&filter, &state.pool).await??;
   let mut cargo_summaries = Vec::new();
   for cargo in cargoes {
-    let spec =
-      repositories::cargo_spec::find_by_key(&cargo.spec_key, &state.pool)
-        .await?;
+    let spec = CargoSpecDb::find_by_pk(&cargo.spec.key, &state.pool)
+      .await??
+      .try_to_spec()?;
     let instances =
-      repositories::container::list_for_kind("Cargo", &cargo.key, &state.pool)
-        .await?;
+      ContainerDb::find_by_kind_id(&cargo.spec.cargo_key, &state.pool).await?;
     let mut running_instances = 0;
     for instance in &instances {
       let state = instance.data.state.clone().unwrap_or_default();
@@ -732,28 +607,15 @@ pub(crate) async fn list(
   Ok(cargo_summaries)
 }
 
-/// ## Inspect by key
-///
 /// Return detailed information about the cargo for the given key
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [cargo](CargoInspect)
-///
 pub(crate) async fn inspect_by_key(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<CargoInspect> {
-  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let mut running_instances = 0;
-  let instances =
-    repositories::container::list_for_kind("Cargo", key, &state.pool).await?;
-  let nodes = repositories::node::list(&state.pool).await?;
+  let instances = ContainerDb::find_by_kind_id(key, &state.pool).await?;
+  let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
   // Convert into a hashmap for faster lookup
   let nodes = nodes
     .into_iter()
@@ -792,27 +654,20 @@ pub(crate) async fn inspect_by_key(
   })
 }
 
-/// ## Delete by namespace
-///
 /// This remove all cargo in the given namespace and all their instances (containers)
 /// from the system (database and docker).
-///
-/// ## Arguments
-///
-/// * [namespace](str) - The namespace name
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn delete_by_namespace(
   namespace: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let namespace =
-    repositories::namespace::find_by_name(namespace, &state.pool).await?;
+  let namespace = NamespaceDb::find_by_pk(namespace, &state.pool).await??;
   let cargoes =
-    repositories::cargo::find_by_namespace(&namespace, &state.pool).await?;
+    CargoDb::find_by_namespace(&namespace.name, &state.pool).await?;
   cargoes
     .into_iter()
-    .map(|cargo| async move { delete_by_key(&cargo.key, None, state).await })
+    .map(|cargo| async move {
+      delete_by_key(&cargo.spec.cargo_key, None, state).await
+    })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<Result<(), HttpError>>>()
     .await
@@ -821,17 +676,8 @@ pub(crate) async fn delete_by_namespace(
   Ok(())
 }
 
-/// ## Kill by name
-///
 /// Send a signal to a cargo instance the cargo name can be used if the cargo has only one instance
 /// The signal is send to one instance only
-///
-/// ## Arguments
-///
-/// * [name](str) - The cargo name
-/// * [options](CargoKillOptions) - The kill options
-/// * [docker_api](bollard_next::Docker) - The docker api
-///
 pub(crate) async fn kill_by_name(
   name: &str,
   options: &CargoKillOptions,
@@ -843,28 +689,14 @@ pub(crate) async fn kill_by_name(
   Ok(())
 }
 
-/// ## Patch
-///
 /// Merge the given cargo spec with the existing one
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [payload](CargoSpecUpdate) - The cargo spec update
-/// * [version](str) - The cargo version
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [cargo](Cargo)
-///
 pub async fn patch(
   key: &str,
   payload: &CargoSpecUpdate,
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
-  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let container = if let Some(container) = payload.container.clone() {
     // merge env and ensure no duplicate key
     let new_env = container.env.unwrap_or_default();
@@ -958,22 +790,9 @@ pub async fn patch(
   utils::cargo::put(key, &spec, version, state).await
 }
 
-/// ## Get logs
-///
 /// Get the logs of a cargo instance
 /// The cargo name can be used if the cargo has only one instance
 /// The query parameter can be used to filter the logs
-///
-/// ## Arguments
-///
-/// * [name](str): The cargo name
-/// * [query](CargoLogQuery): The query parameters
-/// * [docker_api](bollard_next::Docker): The docker api
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [stream](StreamExt) of [LogOutput](LogOutput)
-///
 pub(crate) fn get_logs(
   name: &str,
   query: &CargoLogQuery,
@@ -985,21 +804,8 @@ pub(crate) fn get_logs(
   Ok(stream)
 }
 
-/// ## Get stats
-///
 /// Get the stats of a cargo instance
 /// The cargo name can be used if the cargo has only one instance
-///
-/// ## Arguments
-///
-/// * [name](str): The cargo name
-/// * [query](CargoStatsQuery): The query parameters
-/// * [docker_api](bollard_next::Docker): The docker api
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [stream](StreamExt) of [CargoStats](CargoStats)
-///
 pub(crate) fn get_stats(
   name: &str,
   query: &CargoStatsQuery,
@@ -1011,22 +817,13 @@ pub(crate) fn get_stats(
   Ok(stream)
 }
 
-/// ## Scale
-///
 /// Scale a cargo instance up or down to the given number of instances (containers, replicas)
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [options](CargoScale) - The scale options
-/// * [state](DaemonState) - The daemon state
-///
 pub async fn scale(
   key: &str,
   options: &CargoScale,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let instances = list_instances(key, &state.docker_api).await?;
   let is_equal = usize::try_from(options.replicas)
     .map(|replica| instances.len() == replica)
@@ -1058,7 +855,7 @@ pub async fn scale(
       .into_iter()
       .collect::<Result<Vec<_>, HttpError>>()?;
   } else {
-    let cargo = repositories::cargo::inspect_by_key(key, &state.pool).await?;
+    let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
     let to_add = options.replicas.unsigned_abs();
     let created_instances =
       create_instances(&cargo, instances.len(), to_add, state).await?;

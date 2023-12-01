@@ -50,35 +50,20 @@ paths:
       description: List cargoes
       operationId: list_cargo
       parameters:
-      - name: Namespace
+      - name: filter
         in: query
-        description: Namespace of the cargo
+        description: Generic filter
         required: false
         schema:
           type: string
           nullable: true
-      - name: Name
+        example: '{ "where": { "name": { "eq": "test" } } }'
+      - name: namespace
         in: query
-        description: Filter for cargoes with similar name
+        description: Namespace where the cargoes are
         required: false
         schema:
           type: string
-          nullable: true
-      - name: Limit
-        in: query
-        description: Max amount of cargoes in response
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: Offset
-        in: query
-        description: Offset of the first cargo in response
-        required: false
-        schema:
-          type: integer
-          format: int64
           nullable: true
       responses:
         '200':
@@ -96,9 +81,9 @@ paths:
       description: Create a new cargo
       operationId: create_cargo
       parameters:
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -175,7 +160,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /cargoes/images/{IdOrName}:
+  /cargoes/images/{id_or_name}:
     get:
       tags:
       - CargoImages
@@ -183,7 +168,7 @@ paths:
       description: Get detailed information about a container image
       operationId: inspect_cargo_image
       parameters:
-      - name: IdOrName
+      - name: id_or_name
         in: path
         description: Image ID or name
         required: true
@@ -209,26 +194,22 @@ paths:
       description: Delete a container image
       operationId: delete_cargo_image
       parameters:
-      - name: IdOrName
+      - name: id_or_name
         in: path
         description: Image ID or name
         required: true
         schema:
           type: string
       responses:
-        '200':
-          description: Delete response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericDelete'
+        '202':
+          description: Image have been deleted
         '404':
           description: Image not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /cargoes/{CargoName}/exec:
+  /cargoes/{cargo_name}/exec:
     post:
       tags:
       - Cargoes
@@ -258,7 +239,7 @@ paths:
           description: Event Stream of the command output
         '404':
           description: Cargo does not exist
-  /cargoes/{Name}:
+  /cargoes/{name}:
     put:
       tags:
       - Cargoes
@@ -266,15 +247,15 @@ paths:
       description: Create a new cargo spec and add history entry
       operationId: put_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -301,20 +282,20 @@ paths:
       description: Delete a cargo
       operationId: delete_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
           nullable: true
-      - name: Force
+      - name: force
         in: query
         description: If true forces the delete operation
         required: true
@@ -332,15 +313,15 @@ paths:
       description: Patch a cargo spec meaning merging current spec with the new one and add history entry
       operationId: patch_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -360,7 +341,7 @@ paths:
                 $ref: '#/components/schemas/Cargo'
         '404':
           description: Cargo does not exist
-  /cargoes/{Name}/histories:
+  /cargoes/{name}/histories:
     get:
       tags:
       - Cargoes
@@ -368,15 +349,15 @@ paths:
       description: List cargo histories
       operationId: list_cargo_history
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -392,7 +373,7 @@ paths:
                   $ref: '#/components/schemas/CargoSpec'
         '404':
           description: Cargo does not exist
-  /cargoes/{Name}/histories/{Id}/revert:
+  /cargoes/{name}/histories/{id}/revert:
     patch:
       tags:
       - Cargoes
@@ -400,21 +381,21 @@ paths:
       description: Revert a cargo to a specific history
       operationId: revert_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Id
+      - name: id
         in: path
         description: Id of the cargo history
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -432,23 +413,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /cargoes/{Name}/inspect:
+  /cargoes/{name}/inspect:
     get:
       tags:
       - Cargoes
-      summary: Inspect a cargo
-      description: Inspect a cargo
+      summary: Get detailed information about a cargo
+      description: Get detailed information about a cargo
       operationId: inspect_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -460,7 +441,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CargoInspect'
-  /cargoes/{Name}/instances:
+  /cargoes/{name}/instances:
     get:
       tags:
       - Cargoes
@@ -468,15 +449,15 @@ paths:
       description: List cargo instances
       operationId: list_cargo_instance
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -490,7 +471,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ContainerSummary'
-  /cargoes/{Name}/kill:
+  /cargoes/{name}/kill:
     post:
       tags:
       - Cargoes
@@ -498,15 +479,15 @@ paths:
       description: Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
       operationId: kill_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -522,7 +503,7 @@ paths:
           description: Cargo killed
         '404':
           description: Cargo does not exist
-  /cargoes/{Name}/logs:
+  /cargoes/{name}/logs:
     get:
       tags:
       - Cargoes
@@ -530,20 +511,20 @@ paths:
       description: Get logs of a cargo instance
       operationId: logs_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo instance usually `name` or `name-number`
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
           nullable: true
-      - name: Since
+      - name: since
         in: query
         description: Only logs returned since timestamp
         required: false
@@ -551,7 +532,7 @@ paths:
           type: integer
           format: int64
           nullable: true
-      - name: Until
+      - name: until
         in: query
         description: Only logs returned until timestamp
         required: false
@@ -559,21 +540,21 @@ paths:
           type: integer
           format: int64
           nullable: true
-      - name: Timestamps
+      - name: timestamps
         in: query
         description: Add timestamps to every log line
         required: false
         schema:
           type: boolean
           nullable: true
-      - name: Follow
+      - name: follow
         in: query
         description: Boolean to return a stream or not
         required: false
         schema:
           type: boolean
           nullable: true
-      - name: Tail
+      - name: tail
         in: query
         description: Only return the n last (integer) or all ("all") logs
         required: false
@@ -585,7 +566,7 @@ paths:
           description: Cargo logs
         '404':
           description: Cargo does not exist
-  /cargoes/{Name}/restart:
+  /cargoes/{name}/restart:
     post:
       tags:
       - Cargoes
@@ -593,15 +574,15 @@ paths:
       description: Restart a cargo
       operationId: restart_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -611,7 +592,7 @@ paths:
           description: Cargo restarted
         '404':
           description: Cargo does not exist
-  /cargoes/{Name}/scale:
+  /cargoes/{name}/scale:
     patch:
       tags:
       - Cargoes
@@ -619,15 +600,15 @@ paths:
       description: Scale or Downscale number of instances
       operationId: scale_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -651,7 +632,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /cargoes/{Name}/start:
+  /cargoes/{name}/start:
     post:
       tags:
       - Cargoes
@@ -659,15 +640,15 @@ paths:
       description: Start a cargo
       operationId: start_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -677,7 +658,7 @@ paths:
           description: Cargo started
         '404':
           description: Cargo does not exist
-  /cargoes/{Name}/stats:
+  /cargoes/{name}/stats:
     get:
       tags:
       - Cargoes
@@ -685,27 +666,27 @@ paths:
       description: Get stats of a cargo instance
       operationId: stats_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo instance usually `name` or `name-number`
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
           nullable: true
-      - name: Stream
+      - name: stream
         in: query
         description: Only logs returned since timestamp
         required: false
         schema:
           type: boolean
           nullable: true
-      - name: OneShot
+      - name: one_shot
         in: query
         description: Only logs returned until timestamp
         required: false
@@ -721,7 +702,7 @@ paths:
                 $ref: '#/components/schemas/Stats'
         '404':
           description: Cargo does not exist
-  /cargoes/{Name}/stop:
+  /cargoes/{name}/stop:
     post:
       tags:
       - Cargoes
@@ -729,15 +710,15 @@ paths:
       description: Stop a cargo
       operationId: stop_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
-        description: Namespace of the cargo
+        description: Namespace where the cargo belongs
         required: false
         schema:
           type: string
@@ -761,7 +742,7 @@ paths:
             text/plain:
               schema:
                 type: string
-  /exec/{Id}/cargo/inspect:
+  /exec/{id}/cargo/inspect:
     post:
       tags:
       - Exec
@@ -769,7 +750,7 @@ paths:
       description: Inspect a command executed in a cargo
       operationId: inspect_exec_command
       parameters:
-      - name: Id
+      - name: id
         in: path
         description: Exec id to inspect
         required: true
@@ -784,13 +765,13 @@ paths:
                 $ref: '#/components/schemas/ExecInspectResponse'
         '404':
           description: Exec instance does not exist
-  /exec/{Id}/cargo/start:
+  /exec/{id}/cargo/start:
     post:
       tags:
       - Exec
       operationId: start_exec_command
       parameters:
-      - name: Id
+      - name: id
         in: path
         description: Exec command id
         required: true
@@ -807,62 +788,6 @@ paths:
           description: Event Stream of the command output
         '404':
           description: Cargo does not exist
-  /http_metrics:
-    get:
-      tags:
-      - HttpMetrics
-      summary: Get http metrics of all peer nodes
-      description: Get http metrics of all peer nodes
-      operationId: list_http_metric
-      parameters:
-      - name: Limit
-        in: query
-        description: Limit of the list
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: Offset
-        in: query
-        description: Offset of the list
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      responses:
-        '200':
-          description: Array of HTTP metrics founds
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/HttpMetric'
-  /http_metrics/count:
-    get:
-      tags:
-      - HttpMetrics
-      summary: Count http metrics of all peer nodes
-      description: Count http metrics of all peer nodes
-      operationId: count_http_metric
-      parameters:
-      - name: Status
-        in: query
-        description: Filter by status
-        required: false
-        schema:
-          type: string
-          nullable: true
-        example: 200,299
-      responses:
-        '200':
-          description: Count of HTTP metrics founds
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericCount'
   /info:
     get:
       tags:
@@ -912,7 +837,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Job'
-  /jobs/{Name}:
+  /jobs/{name}:
     delete:
       tags:
       - Jobs
@@ -920,7 +845,7 @@ paths:
       description: Delete a job
       operationId: delete_job
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the job
         required: true
@@ -931,7 +856,7 @@ paths:
           description: Job deleted
         '404':
           description: Job does not exist
-  /jobs/{Name}/inspect:
+  /jobs/{name}/inspect:
     get:
       tags:
       - Jobs
@@ -939,19 +864,12 @@ paths:
       description: Inspect a job
       operationId: inspect_job
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the job
         required: true
         schema:
           type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the job
-        required: false
-        schema:
-          type: string
-          nullable: true
       responses:
         '200':
           description: Job details
@@ -959,19 +877,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobInspect'
-  /jobs/{Name}/logs:
+  /jobs/{name}/logs:
     get:
       tags:
       - Jobs
       summary: Get logs of a job
       description: Get logs of a job
       operationId: logs_job
+      parameters:
+      - name: name
+        in: path
+        description: Name of the job
+        required: true
+        schema:
+          type: string
       responses:
         '200':
           description: Job logs
         '404':
           description: Job does not exist
-  /jobs/{Name}/start:
+  /jobs/{name}/start:
     post:
       tags:
       - Jobs
@@ -979,7 +904,7 @@ paths:
       description: Start a job
       operationId: start_job
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the job
         required: true
@@ -990,7 +915,7 @@ paths:
           description: Job started
         '404':
           description: Job does not exist
-  /jobs/{Name}/wait:
+  /jobs/{name}/wait:
     get:
       tags:
       - Jobs
@@ -998,19 +923,12 @@ paths:
       description: Wait for a job to finish
       operationId: wait_job
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the job instance usually `name` or `name-number`
         required: true
         schema:
           type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the job
-        required: false
-        schema:
-          type: string
-          nullable: true
       responses:
         '200':
           description: Job wait
@@ -1020,20 +938,21 @@ paths:
     get:
       tags:
       - Metrics
-      summary: Get specific metric of all peer nodes
-      description: Get specific metric of all peer nodes
+      summary: Get metrics of all peer nodes
+      description: Get metrics of all peer nodes
       operationId: list_metric
       parameters:
-      - name: Kind
+      - name: filter
         in: query
-        description: Kind of the metrics CPU | MEMORY | NETWORK | DISK
-        required: true
+        description: Generic filter
+        required: false
         schema:
-          $ref: '#/components/schemas/MetricKind'
-        example: CPU
+          type: string
+          nullable: true
+        example: '{ "where": { "kind": { "eq": "CPU" } } }'
       responses:
         '200':
-          description: Kind of the metrics peer node
+          description: List of metrics
           content:
             application/json:
               schema:
@@ -1048,29 +967,14 @@ paths:
       description: List namespaces
       operationId: list_namespace
       parameters:
-      - name: Name
+      - name: filter
         in: query
-        description: Filter by name
+        description: Generic filter
         required: false
         schema:
           type: string
           nullable: true
-      - name: Limit
-        in: query
-        description: Limit the number of items returned
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: Offset
-        in: query
-        description: Offset the number of items returned
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
+        example: '{ "where": { "name": { "eq": "test" } } }'
       responses:
         '200':
           description: List of namespace
@@ -1094,7 +998,7 @@ paths:
         required: true
       responses:
         '200':
-          description: List of namespace
+          description: The created namespace
           content:
             application/json:
               schema:
@@ -1105,7 +1009,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /namespaces/{Name}:
+  /namespaces/{name}:
     delete:
       tags:
       - Namespaces
@@ -1113,26 +1017,22 @@ paths:
       description: Delete a namespace
       operationId: delete_namespace
       parameters:
-      - name: Name
+      - name: name
         in: path
-        description: The namespace name to delete
+        description: Name of the namespace to delete
         required: true
         schema:
           type: string
       responses:
-        '200':
-          description: Delete response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericDelete'
+        '202':
+          description: Namespace have been deleted
         '404':
           description: Namespace is not existing
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /namespaces/{Name}/inspect:
+  /namespaces/{name}/inspect:
     get:
       tags:
       - Namespaces
@@ -1140,7 +1040,7 @@ paths:
       description: Get detailed information about a namespace
       operationId: inspect_namespace
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The namespace name to inspect
         required: true
@@ -1195,20 +1095,20 @@ paths:
       description: List instances (cargo/vm) including non running ones
       operationId: get_processes
       parameters:
-      - name: All
+      - name: all
         in: query
         description: Return instances from all nodes
         required: true
         schema:
           type: boolean
-      - name: Last
+      - name: last
         in: query
         description: Return this number of most recently created containers
         required: false
         schema:
           type: integer
           nullable: true
-      - name: Namespace
+      - name: namespace
         in: query
         description: Return instances from this namespace only
         required: false
@@ -1232,41 +1132,14 @@ paths:
       description: List resources
       operationId: list_resource
       parameters:
-      - name: Kind
+      - name: filter
         in: query
-        description: Filter by resource kind
+        description: Generic filter
         required: false
         schema:
           type: string
           nullable: true
-      - name: Exists
-        in: query
-        description: Filter by resource by existing key in data
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: Contains
-        in: query
-        description: Filter by resource data
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: MetaContains
-        in: query
-        description: Filter by resource metadata
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: MetaExists
-        in: query
-        description: Filter by resource existing key in metadata
-        required: false
-        schema:
-          type: string
-          nullable: true
+        example: '{ "where": { "kind": { "eq": "ProxyRule" } } }'
       responses:
         '200':
           description: List of resources
@@ -1295,7 +1168,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Resource'
-  /resources/{Name}:
+  /resources/{name}:
     get:
       tags:
       - Resources
@@ -1303,7 +1176,7 @@ paths:
       description: Get detailed information about a resource
       operationId: inspect_resource
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The resource name to inspect
         required: true
@@ -1329,7 +1202,7 @@ paths:
       description: Patch a resource (update its version and/or spec) and create a new history
       operationId: put_resource
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The resource name to patch
         required: true
@@ -1361,7 +1234,7 @@ paths:
       description: Delete a resource
       operationId: delete_resource
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The resource name to delete
         required: true
@@ -1376,7 +1249,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /resources/{Name}/histories:
+  /resources/{name}/histories:
     get:
       tags:
       - Resources
@@ -1384,7 +1257,7 @@ paths:
       description: List resource history
       operationId: list_resource_history
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The resource name to list history
         required: true
@@ -1405,7 +1278,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /resources/{Name}/histories/{Id}/revert:
+  /resources/{name}/histories/{id}/revert:
     patch:
       tags:
       - Resources
@@ -1413,13 +1286,13 @@ paths:
       description: Revert a resource to a specific history
       operationId: revert_resource
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The resource name to revert
         required: true
         schema:
           type: string
-      - name: Id
+      - name: id
         in: path
         description: The resource history id to revert to
         required: true
@@ -1442,9 +1315,18 @@ paths:
     get:
       tags:
       - Secrets
-      summary: List secrets
-      description: List secrets
+      summary: List secret
+      description: List secret
       operationId: list_secret
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "where": { "kind": { "eq": "Env" } } }'
       responses:
         '200':
           description: List of secret
@@ -1479,7 +1361,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /secrets/{Key}:
+  /secrets/{key}:
     delete:
       tags:
       - Secrets
@@ -1487,21 +1369,17 @@ paths:
       description: Delete a secret
       operationId: delete_secret
       parameters:
-      - name: Name
+      - name: key
         in: path
-        description: The secret name to delete
+        description: Key of the secret
         required: true
         schema:
           type: string
       responses:
-        '200':
-          description: Delete response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenericDelete'
+        '202':
+          description: Secret have been deleted
         '404':
-          description: Namespace is not existing
+          description: Secret don't exists
           content:
             application/json:
               schema:
@@ -1509,23 +1387,16 @@ paths:
     patch:
       tags:
       - Secrets
-      summary: Scale or Downscale number of instances
-      description: Scale or Downscale number of instances
+      summary: Update a secret
+      description: Update a secret
       operationId: patch_secret
       parameters:
-      - name: Name
+      - name: key
         in: path
-        description: Name of the cargo
+        description: Key of the secret
         required: true
         schema:
           type: string
-      - name: Namespace
-        in: query
-        description: Namespace of the cargo
-        required: false
-        schema:
-          type: string
-          nullable: true
       requestBody:
         content:
           application/json:
@@ -1545,7 +1416,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /secrets/{Key}/inspect:
+  /secrets/{key}/inspect:
     get:
       tags:
       - Secrets
@@ -1553,9 +1424,9 @@ paths:
       description: Get detailed information about a secret
       operationId: inspect_secret
       parameters:
-      - name: Name
+      - name: key
         in: path
-        description: The secret name to inspect
+        description: Key of the secret
         required: true
         schema:
           type: string
@@ -1565,9 +1436,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Secret'
+                $ref: '#/components/schemas/Secret'
         '404':
           description: Namespace is not existing
           content:
@@ -1596,7 +1465,7 @@ paths:
       description: List virtual machines
       operationId: list_vm
       parameters:
-      - name: Namespace
+      - name: namespace
         in: query
         description: The namespace of the virtual machine
         required: false
@@ -1619,7 +1488,7 @@ paths:
       description: Create a virtual machine
       operationId: create_vm
       parameters:
-      - name: Namespace
+      - name: namespace
         in: query
         description: The namespace of the virtual machine
         required: false
@@ -1646,6 +1515,15 @@ paths:
       summary: List virtual machine images
       description: List virtual machine images
       operationId: list_vm_images
+      parameters:
+      - name: filter
+        in: query
+        description: Generic filter
+        required: false
+        schema:
+          type: string
+          nullable: true
+        example: '{ "where": { "kind": { "eq": "Env" } } }'
       responses:
         '200':
           description: List of vm images
@@ -1672,7 +1550,7 @@ paths:
       responses:
         '200':
           description: Image have been deleted
-  /vms/images/{Name}/clone/{CloneName}:
+  /vms/images/{name}/clone/{clone_name}:
     post:
       tags:
       - VmImages
@@ -1680,13 +1558,13 @@ paths:
       description: Clone a virtual machine image
       operationId: clone_vm_image
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The name of the vm image
         required: true
         schema:
           type: string
-      - name: CloneName
+      - name: clone_name
         in: path
         description: The name of the clone
         required: true
@@ -1705,7 +1583,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmImage'
-  /vms/images/{Name}/import:
+  /vms/images/{name}/import:
     post:
       tags:
       - VmImages
@@ -1713,7 +1591,7 @@ paths:
       description: Import a virtual machine image from a file
       operationId: import_vm_image
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The name of the vm image
         required: true
@@ -1728,7 +1606,7 @@ paths:
       responses:
         '200':
           description: Image have been imported
-  /vms/images/{Name}/resize:
+  /vms/images/{name}/resize:
     post:
       tags:
       - VmImages
@@ -1736,15 +1614,9 @@ paths:
       description: Resize a virtual machine image
       operationId: resize_vm_image
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The name of the vm image
-        required: true
-        schema:
-          type: string
-      - name: CloneName
-        in: path
-        description: The name of the clone
         required: true
         schema:
           type: string
@@ -1761,7 +1633,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmImage'
-  /vms/images/{Name}/snapshot/{SnapshotName}:
+  /vms/images/{name}/snapshot/{snapshot_name}:
     post:
       tags:
       - VmImages
@@ -1769,13 +1641,13 @@ paths:
       description: Create a snapshot of a virtual machine image
       operationId: snapshot_vm_image
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The name of the vm image
         required: true
         schema:
           type: string
-      - name: SnapshotName
+      - name: snap
         in: path
         description: The name of the snapshot
         required: true
@@ -1794,7 +1666,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmImage'
-  /vms/{Name}:
+  /vms/{name}:
     delete:
       tags:
       - Vms
@@ -1802,13 +1674,13 @@ paths:
       description: Delete a virtual machine
       operationId: delete_vm
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The name of the virtual machine
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
         description: The namespace of the virtual machine
         required: false
@@ -1825,13 +1697,13 @@ paths:
       description: Patch a virtual machine config meaning merging current config with the new one and add history entry
       operationId: patch_vm
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the virtual machine
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
         description: Namespace of the virtual machine
         required: false
@@ -1857,7 +1729,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /vms/{Name}/attach:
+  /vms/{name}/attach:
     get:
       tags:
       - Vms
@@ -1865,13 +1737,13 @@ paths:
       description: Attach to a virtual machine via websocket
       operationId: vm_attach
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the virtual machine
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
         description: Namespace of the virtual machine
         required: false
@@ -1881,7 +1753,7 @@ paths:
       responses:
         '101':
           description: Websocket connection
-  /vms/{Name}/histories:
+  /vms/{name}/histories:
     get:
       tags:
       - Vms
@@ -1889,13 +1761,13 @@ paths:
       description: List virtual machine histories
       operationId: list_vm_history
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The name of the virtual machine
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
         description: The namespace of the virtual machine
         required: false
@@ -1911,7 +1783,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/VmSpec'
-  /vms/{Name}/inspect:
+  /vms/{name}/inspect:
     get:
       tags:
       - Vms
@@ -1919,13 +1791,13 @@ paths:
       description: Inspect a virtual machine
       operationId: inspect_vm
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The name of the virtual machine
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
         description: The namespace of the virtual machine
         required: false
@@ -1939,7 +1811,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmInspect'
-  /vms/{Name}/start:
+  /vms/{name}/start:
     post:
       tags:
       - Vms
@@ -1947,13 +1819,13 @@ paths:
       description: Start a virtual machine
       operationId: start_vm
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The name of the virtual machine
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
         description: The namespace of the virtual machine
         required: false
@@ -1963,7 +1835,7 @@ paths:
       responses:
         '200':
           description: The virtual machine has been started
-  /vms/{Name}/stop:
+  /vms/{name}/stop:
     post:
       tags:
       - Vms
@@ -1971,13 +1843,13 @@ paths:
       description: Stop a virtual machine
       operationId: stop_vm
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The name of the virtual machine
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
         description: The namespace of the virtual machine
         required: false
@@ -2023,6 +1895,27 @@ components:
       properties:
         msg:
           type: string
+    BinaryInfo:
+      type: object
+      description: Details about the binary
+      required:
+      - Arch
+      - Channel
+      - Version
+      - CommitId
+      properties:
+        Arch:
+          type: string
+          description: Arch is the architecture of the current binary
+        Channel:
+          type: string
+          description: Channel is the channel of the current binary
+        Version:
+          type: string
+          description: Version is the version of the current binary
+        CommitId:
+          type: string
+          description: CommitID is the commit id of the current binary
     BlkioStats:
       type: object
       description: I/O statistics for the container.
@@ -2145,7 +2038,7 @@ components:
           minimum: 0
     Cargo:
       type: object
-      description: |
+      description: |-
         A Cargo is a replicable container
         It is used to run one or multiple instances of the same container
         You can define the number of replicas you want to run
@@ -2180,7 +2073,7 @@ components:
           example: nginx:latest
     CargoInspect:
       type: object
-      description: |
+      description: |-
         Cargo Inspect is a detailed view of a cargo
         It contains all the information about the cargo
         It also contains the list of containers
@@ -2216,18 +2109,16 @@ components:
           description: List of containers
     CargoKillOptions:
       type: object
-      description: |
-        Options for the kill command
+      description: Options for the kill command
       required:
-      - Signal
+      - signal
       properties:
-        Signal:
+        signal:
           type: string
           description: 'Signal to send to the container default: SIGKILL'
     CargoScale:
       type: object
-      description: |
-        Payload for the cargo scale endpoint
+      description: Payload for the cargo scale endpoint
       required:
       - Replicas
       properties:
@@ -2347,7 +2238,7 @@ components:
           nullable: true
     CargoSummary:
       type: object
-      description: |
+      description: |-
         A CargoSummary is a summary of a cargo
         It's the datastructure returned by the list operation
       required:
@@ -3248,8 +3139,107 @@ components:
           format: int64
           description: The system process ID for the exec process.
           nullable: true
+    GenericClause:
+      oneOf:
+      - type: object
+        required:
+        - eq
+        properties:
+          eq:
+            type: string
+            description: Equal
+      - type: object
+        required:
+        - ne
+        properties:
+          ne:
+            type: string
+            description: Not equal
+      - type: object
+        required:
+        - gt
+        properties:
+          gt:
+            type: string
+            description: Greater than
+      - type: object
+        required:
+        - lt
+        properties:
+          lt:
+            type: string
+            description: Less than
+      - type: object
+        required:
+        - ge
+        properties:
+          ge:
+            type: string
+            description: Greater than or equal
+      - type: object
+        required:
+        - le
+        properties:
+          le:
+            type: string
+            description: Less than or equal
+      - type: object
+        required:
+        - like
+        properties:
+          like:
+            type: string
+            description: Like
+      - type: object
+        required:
+        - not-like
+        properties:
+          not-like:
+            type: string
+            description: Not like
+      - type: object
+        required:
+        - in
+        properties:
+          in:
+            type: array
+            items:
+              type: string
+            description: In
+      - type: object
+        required:
+        - not-in
+        properties:
+          not-in:
+            type: array
+            items:
+              type: string
+            description: Not in
+      - type: string
+        description: Is null
+        enum:
+        - is-null
+      - type: string
+        description: Is not null
+        enum:
+        - is-not-null
+      - type: object
+        required:
+        - contains
+        properties:
+          contains:
+            description: JSON contains
+      - type: object
+        required:
+        - has-key
+        properties:
+          has-key:
+            type: string
+            description: JSON Has key
+      description: Generic where clause
     GenericCount:
       type: object
+      description: Generic count response
       required:
       - Count
       properties:
@@ -3257,16 +3247,16 @@ components:
           type: integer
           format: int64
           description: Number of items
-    GenericDelete:
+    GenericFilter:
       type: object
-      description: Generic delete response
-      required:
-      - Count
+      description: Generic filter for list operation
       properties:
-        Count:
-          type: integer
-          description: Number of deleted items
-          minimum: 0
+        where:
+          type: object
+          description: Where clause
+          additionalProperties:
+            $ref: '#/components/schemas/GenericClause'
+          nullable: true
     GenericResources:
       type: object
       properties:
@@ -3789,10 +3779,7 @@ components:
             description: HostGateway is the gateway address of the host
           Config:
             $ref: '#/components/schemas/DaemonConfig'
-      description: |-
-        ## HostInfo
-
-        HostInfo contains information about the host and the docker daemon
+      description: HostInfo contains information about the host and the docker daemon
     HttpMetric:
       type: object
       required:
@@ -4688,17 +4675,22 @@ components:
         Key:
           type: string
           format: uuid
+          description: The key of the metric in the database `UUID`
         CreatedAt:
           type: string
           format: date-time
+          description: When the metric was created
         ExpireAt:
           type: string
           format: date-time
+          description: When the metric will expire
         NodeName:
           type: string
+          description: The node where the metric come from
         Kind:
           $ref: '#/components/schemas/MetricKind'
-        Data: {}
+        Data:
+          description: The data of the metric
     MetricKind:
       type: string
       enum:
@@ -6630,26 +6622,6 @@ components:
       - MovedPermanently
       - Permanent
       - Temporary
-    Version:
-      type: object
-      description: |
-        ## Version
-
-        Version contain details about the current version nanocl
-      required:
-      - Arch
-      - Channel
-      - Version
-      - CommitId
-      properties:
-        Arch:
-          type: string
-        Channel:
-          type: string
-        Version:
-          type: string
-        CommitId:
-          type: string
     Vm:
       type: object
       description: A virtual machine instance

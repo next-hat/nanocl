@@ -6,8 +6,6 @@ use serde::{Serialize, Deserialize};
 
 use crate::config::DaemonConfig;
 
-/// ## HostInfo
-///
 /// HostInfo contains information about the host and the docker daemon
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -23,24 +21,22 @@ pub struct HostInfo {
   pub config: DaemonConfig,
 }
 
-/// ## Version
-///
-/// Version contain details about the current version nanocl
-///
+/// Details about the binary
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct Version {
+pub struct BinaryInfo {
+  /// Arch is the architecture of the current binary
   pub arch: String,
+  /// Channel is the channel of the current binary
   pub channel: String,
+  /// Version is the version of the current binary
   pub version: String,
+  /// CommitID is the commit id of the current binary
   pub commit_id: String,
 }
 
-/// ## EventKind
-///
 /// Kind is the type of event related to the actor kind
-///
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -51,7 +47,7 @@ pub enum EventKind {
   Job,
   Resource,
   Secret,
-  ContainerInstance,
+  Container,
 }
 
 impl std::fmt::Display for EventKind {
@@ -63,15 +59,12 @@ impl std::fmt::Display for EventKind {
       EventKind::Job => write!(f, "Job"),
       EventKind::Resource => write!(f, "Resource"),
       EventKind::Secret => write!(f, "Secret"),
-      EventKind::ContainerInstance => write!(f, "ContainerInstance"),
+      EventKind::Container => write!(f, "ContainerInstance"),
     }
   }
 }
 
-/// ## EventAction
-///
 /// Action is the action that triggered the event
-///
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -97,10 +90,7 @@ impl std::fmt::Display for EventAction {
   }
 }
 
-/// ## EventActor
-///
 /// Actor is the actor that triggered the event
-///
 #[derive(Default, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -109,10 +99,7 @@ pub struct EventActor {
   pub attributes: Option<serde_json::Value>,
 }
 
-/// ## Event
-///
 /// Event is a generic event type that is used to notify state changes
-///
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
@@ -130,13 +117,9 @@ pub trait ToEvent {
   fn to_event(&self, action: EventAction) -> Event;
 }
 
-/// ## ProcessQuery
-///
 /// Query parameters for the process list endpoint.
-///
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProccessQuery {
   /// Return container from all nodes
   pub all: bool,

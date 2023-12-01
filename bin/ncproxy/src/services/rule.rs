@@ -11,10 +11,10 @@ use crate::nginx::Nginx;
 #[cfg_attr(feature = "dev", utoipa::path(
   put,
   tag = "Rules",
-  path = "/rules/{Name}",
+  path = "/rules/{name}",
   request_body = ResourceProxyRule,
   params(
-    ("Name" = String, Path, description = "Name of the rule"),
+    ("name" = String, Path, description = "Name of the rule"),
   ),
   responses(
     (status = 200, description = "The created rule", body = ResourceProxyRule),
@@ -22,10 +22,10 @@ use crate::nginx::Nginx;
 ))]
 #[web::put("/rules/{name}")]
 pub async fn apply_rule(
-  path: web::types::Path<(String, String)>,
-  nginx: web::types::State<Nginx>,
-  web::types::Json(payload): web::types::Json<ResourceProxyRule>,
   client: web::types::State<NanocldClient>,
+  nginx: web::types::State<Nginx>,
+  path: web::types::Path<(String, String)>,
+  payload: web::types::Json<ResourceProxyRule>,
 ) -> Result<web::HttpResponse, HttpError> {
   utils::create_resource_conf(&path.1, &payload, &client, &nginx).await?;
   if let Err(err) = utils::reload_config(&client).await {
@@ -33,16 +33,16 @@ pub async fn apply_rule(
     utils::reload_config(&client).await?;
     return Err(HttpError::bad_request(err.to_string()));
   }
-  Ok(web::HttpResponse::Ok().json(&payload))
+  Ok(web::HttpResponse::Ok().json(&payload.into_inner()))
 }
 
 /// Delete a ProxyRule
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Rules",
-  path = "/rules/{Name}",
+  path = "/rules/{name}",
   params(
-    ("Name" = String, Path, description = "Name of the rule"),
+    ("name" = String, Path, description = "Name of the rule"),
   ),
   responses(
     (status = 200, description = "Rule has been deleted"),
@@ -50,9 +50,9 @@ pub async fn apply_rule(
 ))]
 #[web::delete("/rules/{name}")]
 pub async fn remove_rule(
-  path: web::types::Path<(String, String)>,
-  nginx: web::types::State<Nginx>,
   client: web::types::State<NanocldClient>,
+  nginx: web::types::State<Nginx>,
+  path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpError> {
   nginx.delete_conf_file(&path.1).await;
   utils::reload_config(&client).await?;

@@ -13,18 +13,7 @@ use nanocl_error::io::{IoError, IoResult};
 
 use crate::models::{Pool, DBConn};
 
-/// ## Create pool
-///
 /// Create a pool connection to the store `cockroachdb`
-///
-/// ## Arguments
-///
-/// * [host](str) Host to connect to
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [Pool](Pool)
-///
 pub(crate) async fn create_pool(
   host: &str,
   daemon_conf: &DaemonConfig,
@@ -43,18 +32,7 @@ pub(crate) async fn create_pool(
   Ok(Arc::new(pool))
 }
 
-/// ## Get pool conn
-///
 /// Get connection from the connection pool for the store `cockroachdb`
-///
-/// ## Arguments
-///
-/// [pool](Pool) a pool wrapped in ntex State
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [DBConn](DBConn)
-///
 pub(crate) fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
   let conn = match pool.get() {
     Ok(conn) => conn,
@@ -68,19 +46,8 @@ pub(crate) fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
   Ok(conn)
 }
 
-/// ## Wait store
-///
 /// Wait for store to be ready to accept tcp connection.
 /// We loop until a tcp connection can be established to the store.
-///
-/// ## Arguments
-///
-/// * [addr](str) Address of the store
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [DBConn](DBConn)
-///
 async fn wait_store(addr: &str) -> IoResult<()> {
   // Open tcp connection to check if store is ready
   let addr = addr
@@ -101,17 +68,10 @@ async fn wait_store(addr: &str) -> IoResult<()> {
   Ok(())
 }
 
-/// ## Init
-///
 /// Ensure existance of a container for our store.
 /// We use cockroachdb with a postgresql connector.
 /// We also run latest migration on our database to have the latest schema.
 /// It will return a connection Pool that will be use in our State.
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [Pool](Pool)
-///
 pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
   let store_addr = std::env::var("STORE_URL")

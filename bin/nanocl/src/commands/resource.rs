@@ -8,16 +8,8 @@ use crate::models::{
   ResourceListOpts,
 };
 
-/// ## Exec resource ls
-///
 /// Function that execute when running `nanocl resource ls`
 /// Will list available resources
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [opts](ResourceListOpts) The resource list options
-///
 async fn exec_resource_ls(
   cli_conf: &CliConfig,
   opts: &ResourceListOpts,
@@ -41,15 +33,7 @@ async fn exec_resource_ls(
   Ok(())
 }
 
-/// ## Exec resource rm
-///
 /// Function that execute when running `nanocl resource rm`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [options](ResourceRemoveOpts) The resource remove options
-///
 async fn exec_resource_rm(
   cli_conf: &CliConfig,
   options: &ResourceRemoveOpts,
@@ -68,15 +52,7 @@ async fn exec_resource_rm(
   Ok(())
 }
 
-/// ## Exec resource inspect
-///
 /// Function that execute when running `nanocl resource inspect`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [opts](ResourceInspectOpts) The resource inspect options
-///
 async fn exec_resource_inspect(
   cli_conf: &CliConfig,
   opts: &ResourceInspectOpts,
@@ -91,15 +67,7 @@ async fn exec_resource_inspect(
   Ok(())
 }
 
-/// ## Exec resource history
-///
 /// Function that execute when running `nanocl resource history`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [opts](ResourceHistoryOpts) The resource history options
-///
 async fn exec_resource_history(
   cli_conf: &CliConfig,
   opts: &ResourceHistoryOpts,
@@ -110,15 +78,7 @@ async fn exec_resource_history(
   Ok(())
 }
 
-/// ## Exec resource revert
-///
 /// Function that execute when running `nanocl resource revert`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [opts](ResourceRevertOpts) The resource revert options
-///
 async fn exec_resource_revert(
   cli_conf: &CliConfig,
   opts: &ResourceRevertOpts,
@@ -129,15 +89,7 @@ async fn exec_resource_revert(
   Ok(())
 }
 
-/// ## Exec resource
-///
 /// Function that execute when running `nanocl resource`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [args](ResourceArg) The resource options
-///
 pub async fn exec_resource(
   cli_conf: &CliConfig,
   args: &ResourceArg,

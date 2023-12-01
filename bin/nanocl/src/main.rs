@@ -68,7 +68,6 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Install(args) => commands::exec_install(args).await,
     Command::Uninstall(args) => commands::exec_uninstall(args).await,
     Command::Upgrade(args) => commands::exec_upgrade(&cli_conf, args).await,
-    Command::System(args) => commands::exec_system(&cli_conf, args).await,
     Command::Node(args) => commands::exec_node(&cli_conf, args).await,
     Command::Context(args) => commands::exec_context(&cli_conf, args).await,
     Command::Info => commands::exec_info(&cli_conf).await,
@@ -224,7 +223,7 @@ mod tests {
       "resource",
       "revert",
       "deploy-example.com",
-      &history.key.to_string(),
+      &history.key.to_string()
     );
     // Remove resource
     assert_cli_ok!("resource", "rm", "-y", "deploy-example.com");
@@ -664,10 +663,5 @@ mod tests {
   #[ntex::test]
   async fn node_list() {
     assert_cli_ok!("node", "ls");
-  }
-
-  #[ntex::test]
-  async fn http_logs() {
-    assert_cli_ok!("system", "http", "logs");
   }
 }

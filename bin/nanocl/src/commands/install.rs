@@ -14,15 +14,8 @@ use crate::models::{
   InstallOpts, NanocldArg, Context, ContextMetaData, ContextEndpoint,
 };
 
-/// ## Exec install
-///
 /// This function is called when running `nanocl install`
 /// It will install nanocl system containers
-///
-/// ## Arguments
-///
-/// * [args](InstallOpts) The command arguments
-///
 pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   println!("Installing Nanocl components on your system");
   let home_dir = std::env::var("HOME").map_err(|err| {

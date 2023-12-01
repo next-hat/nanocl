@@ -36,12 +36,11 @@ use bollard_next::service::{
 
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
-use nanocl_stubs::generic::GenericCount;
-use nanocl_stubs::system::{Version, HostInfo};
+use nanocl_stubs::generic::{GenericCount, GenericClause, GenericFilter};
+use nanocl_stubs::system::{BinaryInfo, HostInfo};
 use nanocl_stubs::metric::{Metric, MetricKind};
 use nanocl_stubs::http_metric::HttpMetric;
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
-use nanocl_stubs::generic::GenericDelete;
 use nanocl_stubs::node::{Node, NodeContainerSummary};
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespacePartial, NamespaceInspect,
@@ -74,7 +73,7 @@ use nanocl_stubs::state::{Statefile, StatefileArg};
 
 use super::{
   node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
-  metric, http_metric, secret, job,
+  metric, secret, job,
 };
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -297,9 +296,6 @@ impl Modify for VersionModifier {
     resource::revert_resource,
     // Metric
     metric::list_metric,
-    // Http Metric
-    http_metric::list_http_metric,
-    http_metric::count_http_metric,
   ),
   components(schemas(
     // Node
@@ -310,7 +306,7 @@ impl Modify for VersionModifier {
     SecretPartial,
     SecretUpdate,
     // System
-    Version,
+    BinaryInfo,
     HostInfo,
     SystemInfo,
     Commit,
@@ -488,7 +484,8 @@ impl Modify for VersionModifier {
     Any,
     BollardDate,
     EmptyObject,
-    GenericDelete,
+    GenericClause,
+    GenericFilter,
   )),
   tags(
     (name = "CargoImages", description = "Cargo images management endpoints."),

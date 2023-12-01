@@ -46,10 +46,7 @@ pub struct Cli {
   pub command: Command,
 }
 
-/// ## Commands
-///
 /// `nanocl` available commands
-///
 #[derive(Subcommand)]
 pub enum Command {
   /// Manage namespaces
@@ -82,8 +79,6 @@ pub enum Command {
   Upgrade(UpgradeOpts),
   /// Show all processes managed by nanocl
   Ps(ProcessOpts),
-  /// Manage system
-  System(SystemArg),
   /// Manage secrets
   Secret(SecretArg),
   // TODO: shell completion
@@ -94,10 +89,7 @@ pub enum Command {
   // },
 }
 
-/// ## DisplayFormat
-///
 /// `nanocl` available display formats `yaml` by default
-///
 #[derive(Default, Clone, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "PascalCase")]
 pub enum DisplayFormat {

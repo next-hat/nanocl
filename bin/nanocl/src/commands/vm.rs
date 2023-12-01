@@ -23,17 +23,8 @@ use crate::models::{
 
 use super::vm_image::exec_vm_image;
 
-/// ## Exec vm create
-///
 /// Function executed when running `nanocl vm create`
 /// It will create a new virtual machine but not start it
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](VmArg) The command arguments
-/// * [options](VmCreateOpts) The command options
-///
 pub async fn exec_vm_create(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -46,17 +37,8 @@ pub async fn exec_vm_create(
   Ok(())
 }
 
-/// ## Exec vm ls
-///
 /// Function executed when running `nanocl vm ls`
 /// It will list existing virtual machine and output them on stdout as a table.
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](VmArg) The command arguments
-/// * [opts](VmListOpts) The command options
-///
 pub async fn exec_vm_ls(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -78,17 +60,8 @@ pub async fn exec_vm_ls(
   Ok(())
 }
 
-/// ## Exec vm rm
-///
 /// Function executed when running `nanocl vm rm`
 /// It will remove a virtual machine from the system
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](VmArg) The command arguments
-/// * [names](Vec<String>) The list of virtual machine names to remove
-///
 pub async fn exec_vm_rm(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -101,19 +74,10 @@ pub async fn exec_vm_rm(
   Ok(())
 }
 
-/// ## Exec vm inspect
-///
 /// Function executed when running `nanocl vm inspect`
 /// It will inspect a virtual machine
 /// and output the result on stdout as yaml, toml or json
 /// depending on user configuration
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](VmArg) The command arguments
-/// * [opts](VmInspectOpts) The command options
-///
 pub async fn exec_vm_inspect(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -131,17 +95,8 @@ pub async fn exec_vm_inspect(
   Ok(())
 }
 
-/// ## Exec vm start
-///
 /// Function executed when running `nanocl vm start`
 /// It will start a virtual machine that was previously created or stopped
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](VmArg) The command arguments
-/// * [names](Vec<String>) The list of virtual machine names to start
-///
 pub async fn exec_vm_start(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -156,17 +111,8 @@ pub async fn exec_vm_start(
   Ok(())
 }
 
-/// ## Exec vm stop
-///
 /// Function executed when running `nanocl vm stop`
 /// It will stop a virtual machine that was previously started
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](VmArg) The command arguments
-/// * [names](Vec<String>) The list of virtual machine names to stop
-///
 pub async fn exec_vm_stop(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -181,18 +127,9 @@ pub async fn exec_vm_stop(
   Ok(())
 }
 
-/// ## Exec vm run
-///
 /// Function executed when running `nanocl vm run`
 /// It will create a new virtual machine, start it.
 /// If the `attach` option is set, it will attach to the virtual machine console.
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](VmArg) The command arguments
-/// * [options](VmRunOpts) The command options
-///
 pub async fn exec_vm_run(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -210,17 +147,8 @@ pub async fn exec_vm_run(
   Ok(())
 }
 
-/// ## Exec vm patch
-///
 /// Function executed when running `nanocl vm patch`
 /// It will patch a virtual machine with the provided options
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](VmArg) The command arguments
-/// * [options](VmPatchOpts) The command options
-///
 pub async fn exec_vm_patch(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -234,17 +162,8 @@ pub async fn exec_vm_patch(
   Ok(())
 }
 
-/// ## Exec vm attach
-///
 /// Function executed when running `nanocl vm attach`
 /// It will attach to a virtual machine console
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](VmArg) The command arguments
-/// * [name](&str) The name of the virtual machine to attach to
-///
 pub async fn exec_vm_attach(
   cli_conf: &CliConfig,
   args: &VmArg,
@@ -343,16 +262,8 @@ pub async fn exec_vm_attach(
   Ok(())
 }
 
-/// ## Exec vm
-///
 /// Function executed when running `nanocl vm`
 /// It will execute the subcommand passed as argument
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](VmArg) The command arguments
-///
 pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
   let client = &cli_conf.client;
   match &args.command {

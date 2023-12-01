@@ -1,3 +1,4 @@
+use nanocl_stubs::generic::GenericFilter;
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
@@ -5,8 +6,8 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{HostInfo, ProccessQuery};
 
-use crate::{version, repositories};
-use crate::models::DaemonState;
+use crate::version;
+use crate::models::{DaemonState, ContainerDb, Repository, NodeDb};
 
 /// Get version information
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -91,9 +92,9 @@ pub(crate) async fn watch_event(
   tag = "System",
   path = "/processes",
   params(
-    ("All" = bool, Query, description = "Return instances from all nodes"),
-    ("Last" = Option<isize>, Query, description = "Return this number of most recently created containers"),
-    ("Namespace" = Option<String>, Query, description = "Return instances from this namespace only"),
+    ("all" = bool, Query, description = "Return instances from all nodes"),
+    ("last" = Option<isize>, Query, description = "Return this number of most recently created containers"),
+    ("namespace" = Option<String>, Query, description = "Return instances from this namespace only"),
   ),
   responses(
     (status = 200, description = "List of instances", body = [NodeContainerSummary]),
@@ -101,16 +102,16 @@ pub(crate) async fn watch_event(
 ))]
 #[web::get("/processes")]
 pub(crate) async fn get_processes(
-  web::types::Query(_): web::types::Query<ProccessQuery>,
   state: web::types::State<DaemonState>,
+  _: web::types::Query<ProccessQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let nodes = repositories::node::list(&state.pool).await?;
+  let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
   let nodes = nodes
     .into_iter()
     .map(|node| (node.name.clone(), node))
     .collect::<std::collections::HashMap<String, _>>();
-  let instances = repositories::container::list_all(&state.pool)
-    .await?
+  let instances = ContainerDb::find(&GenericFilter::default(), &state.pool)
+    .await??
     .into_iter()
     .map(|instance| NodeContainerSummary {
       node: instance.node_id.clone(),

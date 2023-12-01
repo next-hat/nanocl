@@ -6,10 +6,7 @@ use nanocld_client::stubs::resource::Resource;
 
 use super::DisplayFormat;
 
-/// ## ResourceCommand
-///
 /// `nanocl resource` available commands
-///
 #[derive(Subcommand)]
 pub enum ResourceCommand {
   /// Remove existing resource
@@ -26,10 +23,7 @@ pub enum ResourceCommand {
   Revert(ResourceRevertOpts),
 }
 
-/// ## ResourceListOpts
-///
 /// `nanocl resource list` available options
-///
 #[derive(Parser)]
 pub struct ResourceListOpts {
   /// Show only resource names
@@ -37,10 +31,7 @@ pub struct ResourceListOpts {
   pub quiet: bool,
 }
 
-/// ## ResourceArg
-///
 /// `nanocl resource` available arguments
-///
 #[derive(Parser)]
 #[clap(name = "nanocl-resource")]
 pub struct ResourceArg {
@@ -48,10 +39,7 @@ pub struct ResourceArg {
   pub command: ResourceCommand,
 }
 
-/// ## ResourceRow
-///
 /// A row of the resource table
-///
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct ResourceRow {
@@ -93,10 +81,7 @@ impl From<Resource> for ResourceRow {
   }
 }
 
-/// ## ResourceRemoveOpts
-///
 /// `nanocl resource remove` available options
-///
 #[derive(Parser)]
 pub struct ResourceRemoveOpts {
   /// Skip confirmation
@@ -106,10 +91,7 @@ pub struct ResourceRemoveOpts {
   pub names: Vec<String>,
 }
 
-/// ## ResourceInspectOpts
-///
 /// `nanocl resource inspect` available options
-///
 #[derive(Clone, Parser)]
 pub struct ResourceInspectOpts {
   /// Display format
@@ -119,20 +101,14 @@ pub struct ResourceInspectOpts {
   pub name: String,
 }
 
-/// ## ResourceHistoryOpts
-///
 /// `nanocl resource history` available options
-///
 #[derive(Parser)]
 pub struct ResourceHistoryOpts {
   /// The name of the resource to browse history
   pub name: String,
 }
 
-/// ## ResourceRevertOpts
-///
 /// `nanocl resource revert` available options
-///
 #[derive(Parser)]
 pub struct ResourceRevertOpts {
   /// The name of the resource to revert
