@@ -9,7 +9,7 @@ use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::generic::{GenericFilter, GenericClause};
 use nanocl_stubs::resource::{Resource, ResourcePartial};
 
-use crate::{utils, gen_where4string};
+use crate::{utils, gen_where4string, gen_where4json};
 use crate::schema::resources;
 
 use super::{Pool, Repository, WithSpec, ResourceSpecDb};
@@ -80,6 +80,12 @@ impl Repository for ResourceDb {
     if let Some(value) = r#where.get("kind") {
       gen_where4string!(query, resources::dsl::kind, value);
     }
+    if let Some(value) = r#where.get("data") {
+      gen_where4json!(query, resource_specs::dsl::data, value);
+    }
+    if let Some(value) = r#where.get("metadata") {
+      gen_where4json!(query, resource_specs::dsl::metadata, value);
+    }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -107,6 +113,12 @@ impl Repository for ResourceDb {
     }
     if let Some(value) = r#where.get("kind") {
       gen_where4string!(query, resources::dsl::kind, value);
+    }
+    if let Some(value) = r#where.get("data") {
+      gen_where4json!(query, resource_specs::dsl::data, value);
+    }
+    if let Some(value) = r#where.get("metadata") {
+      gen_where4json!(query, resource_specs::dsl::metadata, value);
     }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
