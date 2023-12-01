@@ -3,7 +3,7 @@ use std::io::Write;
 use ntex::{web, http};
 use futures::StreamExt;
 
-use nanocl_stubs::generic::GenericFilter;
+use nanocl_stubs::generic::{GenericFilter, GenericListQuery};
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::vm_image::VmImageResizePayload;
 
@@ -15,6 +15,9 @@ use crate::models::{DaemonState, VmImageDb, Repository};
   get,
   tag = "VmImages",
   path = "/vms/images",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"kind\": { \"eq\": \"Env\" } } }"),
+  ),
   responses(
     (status = 200, description = "List of vm images", body = [VmImage]),
   ),
@@ -22,9 +25,11 @@ use crate::models::{DaemonState, VmImageDb, Repository};
 #[web::get("/vms/images")]
 pub(crate) async fn list_vm_images(
   state: web::types::State<DaemonState>,
+  query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let images =
-    VmImageDb::find(&GenericFilter::default(), &state.pool).await??;
+  let filter = GenericFilter::try_from(query.into_inner())
+    .map_err(|err| HttpError::bad_request(err.to_string()))?;
+  let images = VmImageDb::find(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&images))
 }
 
@@ -33,9 +38,9 @@ pub(crate) async fn list_vm_images(
   post,
   tag = "VmImages",
   request_body = String,
-  path = "/vms/images/{Name}/import",
+  path = "/vms/images/{name}/import",
   params(
-    ("Name" = String, Path, description = "The name of the vm image"),
+    ("name" = String, Path, description = "The name of the vm image"),
   ),
   responses(
     (status = 200, description = "Image have been imported"),
@@ -43,9 +48,9 @@ pub(crate) async fn list_vm_images(
 ))]
 #[web::post("/vms/images/{name}/import")]
 pub(crate) async fn import_vm_image(
-  mut payload: web::types::Payload,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  mut payload: web::types::Payload,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   utils::key::validate_name(&name)?;
@@ -86,10 +91,10 @@ pub(crate) async fn import_vm_image(
   post,
   tag = "VmImages",
   request_body = String,
-  path = "/vms/images/{Name}/snapshot/{SnapshotName}",
+  path = "/vms/images/{name}/snapshot/{snapshot_name}",
   params(
-    ("Name" = String, Path, description = "The name of the vm image"),
-    ("SnapshotName" = String, Path, description = "The name of the snapshot"),
+    ("name" = String, Path, description = "The name of the vm image"),
+    ("snap" = String, Path, description = "The name of the snapshot"),
   ),
   responses(
     (status = 200, description = "The snapshot have been created", body = VmImage),
@@ -97,8 +102,8 @@ pub(crate) async fn import_vm_image(
 ))]
 #[web::post("/vms/images/{name}/snapshot/{snapshot_name}")]
 pub(crate) async fn snapshot_vm_image(
-  path: web::types::Path<(String, String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let snapshot_name = path.2.to_owned();
@@ -114,10 +119,10 @@ pub(crate) async fn snapshot_vm_image(
   post,
   tag = "VmImages",
   request_body = String,
-  path = "/vms/images/{Name}/clone/{CloneName}",
+  path = "/vms/images/{name}/clone/{clone_name}",
   params(
-    ("Name" = String, Path, description = "The name of the vm image"),
-    ("CloneName" = String, Path, description = "The name of the clone"),
+    ("name" = String, Path, description = "The name of the vm image"),
+    ("clone_name" = String, Path, description = "The name of the clone"),
   ),
   responses(
     (status = 200, description = "The snapshot have been created", body = VmImage),
@@ -125,8 +130,8 @@ pub(crate) async fn snapshot_vm_image(
 ))]
 #[web::post("/vms/images/{name}/clone/{clone_name}")]
 pub(crate) async fn clone_vm_image(
-  path: web::types::Path<(String, String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let clone_name = path.2.to_owned();
@@ -141,10 +146,9 @@ pub(crate) async fn clone_vm_image(
   post,
   tag = "VmImages",
   request_body = VmImageResizePayload,
-  path = "/vms/images/{Name}/resize",
+  path = "/vms/images/{name}/resize",
   params(
-    ("Name" = String, Path, description = "The name of the vm image"),
-    ("CloneName" = String, Path, description = "The name of the clone"),
+    ("name" = String, Path, description = "The name of the vm image"),
   ),
   responses(
     (status = 200, description = "The snapshot have been created", body = VmImage),
@@ -152,9 +156,9 @@ pub(crate) async fn clone_vm_image(
 ))]
 #[web::post("/vms/images/{name}/resize")]
 pub(crate) async fn resize_vm_image(
-  web::types::Json(payload): web::types::Json<VmImageResizePayload>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  web::types::Json(payload): web::types::Json<VmImageResizePayload>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let rx =
@@ -176,8 +180,8 @@ pub(crate) async fn resize_vm_image(
 ))]
 #[web::delete("/vms/images/{name}")]
 pub(crate) async fn delete_vm_image(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   utils::vm_image::delete_by_name(&name, &state.pool).await?;

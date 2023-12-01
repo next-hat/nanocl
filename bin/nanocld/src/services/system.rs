@@ -92,9 +92,9 @@ pub(crate) async fn watch_event(
   tag = "System",
   path = "/processes",
   params(
-    ("All" = bool, Query, description = "Return instances from all nodes"),
-    ("Last" = Option<isize>, Query, description = "Return this number of most recently created containers"),
-    ("Namespace" = Option<String>, Query, description = "Return instances from this namespace only"),
+    ("all" = bool, Query, description = "Return instances from all nodes"),
+    ("last" = Option<isize>, Query, description = "Return this number of most recently created containers"),
+    ("namespace" = Option<String>, Query, description = "Return instances from this namespace only"),
   ),
   responses(
     (status = 200, description = "List of instances", body = [NodeContainerSummary]),
@@ -102,8 +102,8 @@ pub(crate) async fn watch_event(
 ))]
 #[web::get("/processes")]
 pub(crate) async fn get_processes(
-  web::types::Query(_): web::types::Query<ProccessQuery>,
   state: web::types::State<DaemonState>,
+  _: web::types::Query<ProccessQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
   let nodes = nodes

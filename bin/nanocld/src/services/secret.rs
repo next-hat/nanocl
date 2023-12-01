@@ -17,6 +17,9 @@ use crate::models::{DaemonState, SecretDb, Repository};
   get,
   tag = "Secrets",
   path = "/secrets",
+  params(
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"kind\": { \"eq\": \"Env\" } } }"),
+  ),
   responses(
     (status = 200, description = "List of secret", body = [Secret]),
   ),
@@ -24,9 +27,9 @@ use crate::models::{DaemonState, SecretDb, Repository};
 #[web::get("/secrets")]
 pub(crate) async fn list_secret(
   state: web::types::State<DaemonState>,
-  web::types::Query(query): web::types::Query<GenericListQuery>,
+  query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::try_from(query)
+  let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
   let items = SecretDb::find(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&items))
@@ -36,19 +39,19 @@ pub(crate) async fn list_secret(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Secrets",
-  path = "/secrets/{Key}/inspect",
+  path = "/secrets/{key}/inspect",
   params(
-    ("Name" = String, Path, description = "The secret name to inspect")
+    ("key" = String, Path, description = "Key of the secret")
   ),
   responses(
-    (status = 200, description = "Detailed information about a secret", body = [Secret]),
+    (status = 200, description = "Detailed information about a secret", body = Secret),
     (status = 404, description = "Namespace is not existing", body = ApiError),
   ),
 ))]
 #[web::get("/secrets/{key}/inspect")]
 pub(crate) async fn inspect_secret(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let secret = SecretDb::find_by_pk(&path.1, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&secret))
@@ -67,8 +70,8 @@ pub(crate) async fn inspect_secret(
 ))]
 #[web::post("/secrets")]
 pub(crate) async fn create_secret(
-  web::types::Json(payload): web::types::Json<SecretPartial>,
   state: web::types::State<DaemonState>,
+  payload: web::types::Json<SecretPartial>,
 ) -> HttpResult<web::HttpResponse> {
   match payload.kind.as_str() {
     "Tls" => {
@@ -99,9 +102,9 @@ pub(crate) async fn create_secret(
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Secrets",
-  path = "/secrets/{Key}",
+  path = "/secrets/{key}",
   params(
-    ("Name" = String, Path, description = "The secret name to delete")
+    ("key" = String, Path, description = "Key of the secret")
   ),
   responses(
     (status = 202, description = "Secret have been deleted"),
@@ -110,8 +113,8 @@ pub(crate) async fn create_secret(
 ))]
 #[web::delete("/secrets/{key}")]
 pub(crate) async fn delete_secret(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   utils::secret::delete_by_key(&path.1, &state).await?;
   Ok(web::HttpResponse::Accepted().into())
@@ -122,10 +125,9 @@ pub(crate) async fn delete_secret(
   patch,
   tag = "Secrets",
   request_body = SecretUpdate,
-  path = "/secrets/{Key}",
+  path = "/secrets/{key}",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("key" = String, Path, description = "Key of the secret"),
   ),
   responses(
     (status = 200, description = "Secret scaled", body = Secret),
@@ -134,9 +136,9 @@ pub(crate) async fn delete_secret(
 ))]
 #[web::patch("/secrets/{key}")]
 async fn patch_secret(
-  web::types::Json(payload): web::types::Json<SecretUpdate>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  payload: web::types::Json<SecretUpdate>,
 ) -> HttpResult<web::HttpResponse> {
   let item = utils::secret::patch_by_key(&path.1, &payload, &state).await?;
   Ok(web::HttpResponse::Ok().json(&item))

@@ -607,19 +607,7 @@ pub(crate) async fn list(
   Ok(cargo_summaries)
 }
 
-/// ## Inspect by key
-///
 /// Return detailed information about the cargo for the given key
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [cargo](CargoInspect)
-///
 pub(crate) async fn inspect_by_key(
   key: &str,
   state: &DaemonState,
@@ -688,17 +676,8 @@ pub(crate) async fn delete_by_namespace(
   Ok(())
 }
 
-/// ## Kill by name
-///
 /// Send a signal to a cargo instance the cargo name can be used if the cargo has only one instance
 /// The signal is send to one instance only
-///
-/// ## Arguments
-///
-/// * [name](str) - The cargo name
-/// * [options](CargoKillOptions) - The kill options
-/// * [docker_api](bollard_next::Docker) - The docker api
-///
 pub(crate) async fn kill_by_name(
   name: &str,
   options: &CargoKillOptions,
@@ -710,21 +689,7 @@ pub(crate) async fn kill_by_name(
   Ok(())
 }
 
-/// ## Patch
-///
 /// Merge the given cargo spec with the existing one
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [payload](CargoSpecUpdate) - The cargo spec update
-/// * [version](str) - The cargo version
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [cargo](Cargo)
-///
 pub async fn patch(
   key: &str,
   payload: &CargoSpecUpdate,
@@ -825,22 +790,9 @@ pub async fn patch(
   utils::cargo::put(key, &spec, version, state).await
 }
 
-/// ## Get logs
-///
 /// Get the logs of a cargo instance
 /// The cargo name can be used if the cargo has only one instance
 /// The query parameter can be used to filter the logs
-///
-/// ## Arguments
-///
-/// * [name](str): The cargo name
-/// * [query](CargoLogQuery): The query parameters
-/// * [docker_api](bollard_next::Docker): The docker api
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [stream](StreamExt) of [LogOutput](LogOutput)
-///
 pub(crate) fn get_logs(
   name: &str,
   query: &CargoLogQuery,
@@ -852,21 +804,8 @@ pub(crate) fn get_logs(
   Ok(stream)
 }
 
-/// ## Get stats
-///
 /// Get the stats of a cargo instance
 /// The cargo name can be used if the cargo has only one instance
-///
-/// ## Arguments
-///
-/// * [name](str): The cargo name
-/// * [query](CargoStatsQuery): The query parameters
-/// * [docker_api](bollard_next::Docker): The docker api
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [stream](StreamExt) of [CargoStats](CargoStats)
-///
 pub(crate) fn get_stats(
   name: &str,
   query: &CargoStatsQuery,
@@ -878,16 +817,7 @@ pub(crate) fn get_stats(
   Ok(stream)
 }
 
-/// ## Scale
-///
 /// Scale a cargo instance up or down to the given number of instances (containers, replicas)
-///
-/// ## Arguments
-///
-/// * [key](str) - The cargo key
-/// * [options](CargoScale) - The scale options
-/// * [state](DaemonState) - The daemon state
-///
 pub async fn scale(
   key: &str,
   options: &CargoScale,

@@ -12,7 +12,7 @@ use crate::models::{DaemonState, Repository, MetricDb};
   tag = "Metrics",
   path = "/metrics",
   params(
-    ("filter" = Option<String>, Query, description = "Filter for the list operation", example = "{ \"where\": { \"kind\": { \"eq\": \"CPU\" } } }"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"kind\": { \"eq\": \"CPU\" } } }"),
   ),
   responses(
     (status = 200, description = "List of metrics", body = Vec<Metric>),
@@ -20,8 +20,8 @@ use crate::models::{DaemonState, Repository, MetricDb};
 ))]
 #[web::get("/metrics")]
 pub(crate) async fn list_metric(
-  qs: web::types::Query<GenericListQuery>,
   state: web::types::State<DaemonState>,
+  qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
     HttpError::bad_request(format!("Invalid query string: {}", err))

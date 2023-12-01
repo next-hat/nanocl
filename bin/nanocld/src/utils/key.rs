@@ -7,19 +7,8 @@ use ntex::http;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-/// ## Resolve nsp
-///
 /// Resolve the namespace from the query paramater
 /// Namespace is an optional query paramater it's resolved with value `global` if it's empty
-///
-/// ## Arguments
-///
-/// * [nsp](Option) - Optional [namespace](String) to resolve
-///
-/// ## Return
-///
-/// [Namespace](String) the resolved namespace
-///
 pub(crate) fn resolve_nsp(nsp: &Option<String>) -> String {
   match nsp {
     None => String::from("global"),
@@ -27,32 +16,13 @@ pub(crate) fn resolve_nsp(nsp: &Option<String>) -> String {
   }
 }
 
-/// ## Gen key
-///
 /// Generate a key based on the namespace and the name of the model.
-///
-/// ## Arguments
-///
-/// * [m1](str)  The key of the first model
-/// * [m2](str) The name of the second model
-///
-/// ## Return
-///
-/// [Key](String) the generated key based on params
-///
 pub(crate) fn gen_key(nsp: &str, name: &str) -> String {
   name.to_owned() + "." + nsp
 }
 
-/// ## Validate name
-///
 /// Validate the name of a cargo or a vm
 /// By checking if it's only contain a-z, A-Z, 0-9, - and _
-///
-/// ## Arguments
-///
-/// * [name](str) The name to validate
-///
 pub(crate) fn validate_name(name: &str) -> HttpResult<()> {
   // Ensure name only contain a-z, A-Z, 0-9, - and _
   if !name

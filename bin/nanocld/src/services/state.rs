@@ -8,13 +8,13 @@ use crate::models::DaemonState;
 
 #[web::put("/state/apply")]
 pub(crate) async fn apply(
-  web::types::Json(payload): web::types::Json<serde_json::Value>,
-  qs: web::types::Query<StateApplyQuery>,
-  version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<String>,
+  payload: web::types::Json<serde_json::Value>,
+  qs: web::types::Query<StateApplyQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let data = utils::state::parse_state(&payload)?;
-  let rx = utils::state::apply_statefile(&data, &version, &qs, &state);
+  let rx = utils::state::apply_statefile(&data, &path, &qs, &state);
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
@@ -24,8 +24,8 @@ pub(crate) async fn apply(
 
 #[web::put("/state/remove")]
 pub(crate) async fn remove(
-  web::types::Json(payload): web::types::Json<serde_json::Value>,
   state: web::types::State<DaemonState>,
+  payload: web::types::Json<serde_json::Value>,
 ) -> HttpResult<web::HttpResponse> {
   let data = utils::state::parse_state(&payload)?;
   let rx = utils::state::remove_statefile(&data, &state);

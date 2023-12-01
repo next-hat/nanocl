@@ -18,7 +18,7 @@ use crate::models::{DaemonState, CargoSpecDb, Repository, FromSpec};
   tag = "Cargoes",
   path = "/cargoes",
   params(
-    ("filter" = Option<String>, Query, description = "Filter for cargoes", example = "{ \"where\": { \"name\": { \"eq\": \"test\" } } }"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"name\": { \"eq\": \"test\" } } }"),
     ("namespace" = Option<String>, Query, description = "Namespace where the cargoes are"),
   ),
   responses(
@@ -27,8 +27,8 @@ use crate::models::{DaemonState, CargoSpecDb, Repository, FromSpec};
 ))]
 #[web::get("/cargoes")]
 pub(crate) async fn list_cargo(
-  web::types::Query(qs): web::types::Query<GenericListNspQuery>,
   state: web::types::State<DaemonState>,
+  qs: web::types::Query<GenericListNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let cargoes = utils::cargo::list(&qs, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargoes))
@@ -38,10 +38,10 @@ pub(crate) async fn list_cargo(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Cargoes",
-  path = "/cargoes/{Name}/instances",
+  path = "/cargoes/{name}/instances",
   params(
     ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 200, description = "List of cargo instances", body = [ContainerSummary]),
@@ -49,9 +49,9 @@ pub(crate) async fn list_cargo(
 ))]
 #[web::get("/cargoes/{name}/instances")]
 pub(crate) async fn list_cargo_instance(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -59,14 +59,14 @@ pub(crate) async fn list_cargo_instance(
   Ok(web::HttpResponse::Ok().json(&instances))
 }
 
-/// Inspect a cargo
+/// Get detailed information about a cargo
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Cargoes",
-  path = "/cargoes/{Name}/inspect",
+  path = "/cargoes/{name}/inspect",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 200, description = "Cargo details", body = CargoInspect),
@@ -74,9 +74,9 @@ pub(crate) async fn list_cargo_instance(
 ))]
 #[web::get("/cargoes/{name}/inspect")]
 pub(crate) async fn inspect_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -91,7 +91,7 @@ pub(crate) async fn inspect_cargo(
   path = "/cargoes",
   request_body = CargoSpecPartial,
   params(
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 201, description = "Cargo created", body = Cargo),
@@ -99,14 +99,13 @@ pub(crate) async fn inspect_cargo(
 ))]
 #[web::post("/cargoes")]
 pub(crate) async fn create_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<CargoSpecPartial>,
-  version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<String>,
+  payload: web::types::Json<CargoSpecPartial>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let cargo =
-    utils::cargo::create(&namespace, &payload, &version, &state).await?;
+  let cargo = utils::cargo::create(&namespace, &payload, &path, &state).await?;
   Ok(web::HttpResponse::Created().json(&cargo))
 }
 
@@ -114,11 +113,11 @@ pub(crate) async fn create_cargo(
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Cargoes",
-  path = "/cargoes/{Name}",
+  path = "/cargoes/{name}",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
-    ("Force" = bool, Query, description = "If true forces the delete operation"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
+    ("force" = bool, Query, description = "If true forces the delete operation"),
   ),
   responses(
     (status = 202, description = "Cargo deleted"),
@@ -127,9 +126,9 @@ pub(crate) async fn create_cargo(
 ))]
 #[web::delete("/cargoes/{name}")]
 pub(crate) async fn delete_cargo(
-  web::types::Query(qs): web::types::Query<CargoDeleteQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<CargoDeleteQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -142,10 +141,10 @@ pub(crate) async fn delete_cargo(
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Cargoes",
-  path = "/cargoes/{Name}/start",
+  path = "/cargoes/{name}/start",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 202, description = "Cargo started"),
@@ -154,9 +153,9 @@ pub(crate) async fn delete_cargo(
 ))]
 #[web::post("/cargoes/{name}/start")]
 pub(crate) async fn start_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -168,10 +167,10 @@ pub(crate) async fn start_cargo(
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Cargoes",
-  path = "/cargoes/{Name}/stop",
+  path = "/cargoes/{name}/stop",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 202, description = "Cargo stopped"),
@@ -180,9 +179,9 @@ pub(crate) async fn start_cargo(
 ))]
 #[web::post("/cargoes/{name}/stop")]
 pub(crate) async fn stop_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -194,10 +193,10 @@ pub(crate) async fn stop_cargo(
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Cargoes",
-  path = "/cargoes/{Name}/restart",
+  path = "/cargoes/{name}/restart",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 202, description = "Cargo restarted"),
@@ -206,9 +205,9 @@ pub(crate) async fn stop_cargo(
 ))]
 #[web::post("/cargoes/{name}/restart")]
 pub(crate) async fn restart_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -222,10 +221,10 @@ pub(crate) async fn restart_cargo(
   put,
   tag = "Cargoes",
   request_body = CargoSpecPartial,
-  path = "/cargoes/{Name}",
+  path = "/cargoes/{name}",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 200, description = "Cargo updated", body = Cargo),
@@ -234,10 +233,10 @@ pub(crate) async fn restart_cargo(
 ))]
 #[web::put("/cargoes/{name}")]
 pub(crate) async fn put_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  payload: web::types::Json<CargoSpecPartial>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  payload: web::types::Json<CargoSpecPartial>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -250,10 +249,10 @@ pub(crate) async fn put_cargo(
   patch,
   tag = "Cargoes",
   request_body = CargoSpecUpdate,
-  path = "/cargoes/{Name}",
+  path = "/cargoes/{name}",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 200, description = "Cargo updated", body = Cargo),
@@ -262,10 +261,10 @@ pub(crate) async fn put_cargo(
 ))]
 #[web::patch("/cargoes/{name}")]
 pub(crate) async fn patch_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  payload: web::types::Json<CargoSpecUpdate>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  payload: web::types::Json<CargoSpecUpdate>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -278,10 +277,10 @@ pub(crate) async fn patch_cargo(
   post,
   tag = "Cargoes",
   request_body = CargoKillOptions,
-  path = "/cargoes/{Name}/kill",
+  path = "/cargoes/{name}/kill",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 200, description = "Cargo killed"),
@@ -290,10 +289,10 @@ pub(crate) async fn patch_cargo(
 ))]
 #[web::post("/cargoes/{name}/kill")]
 pub(crate) async fn kill_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<CargoKillOptions>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  payload: web::types::Json<CargoKillOptions>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -305,10 +304,10 @@ pub(crate) async fn kill_cargo(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Cargoes",
-  path = "/cargoes/{Name}/histories",
+  path = "/cargoes/{name}/histories",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 200, description = "List of cargo histories", body = Vec<CargoSpec>),
@@ -317,9 +316,9 @@ pub(crate) async fn kill_cargo(
 ))]
 #[web::get("/cargoes/{name}/histories")]
 pub(crate) async fn list_cargo_history(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -331,11 +330,11 @@ pub(crate) async fn list_cargo_history(
 #[cfg_attr(feature = "dev", utoipa::path(
   patch,
   tag = "Cargoes",
-  path = "/cargoes/{Name}/histories/{Id}/revert",
+  path = "/cargoes/{name}/histories/{id}/revert",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Id" = String, Path, description = "Id of the cargo history"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("id" = String, Path, description = "Id of the cargo history"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 200, description = "Cargo revert", body = Cargo),
@@ -344,9 +343,9 @@ pub(crate) async fn list_cargo_history(
 ))]
 #[web::patch("/cargoes/{name}/histories/{id}/revert")]
 pub(crate) async fn revert_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String, uuid::Uuid)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String, uuid::Uuid)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo_key = utils::key::gen_key(&namespace, &path.1);
@@ -363,10 +362,10 @@ pub(crate) async fn revert_cargo(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Cargoes",
-  path = "/cargoes/{Name}/logs",
+  path = "/cargoes/{name}/logs",
   params(
     ("name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
-    ("namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
     ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
     ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
     ("timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
@@ -380,9 +379,9 @@ pub(crate) async fn revert_cargo(
 ))]
 #[web::get("/cargoes/{name}/logs")]
 pub(crate) async fn logs_cargo(
-  web::types::Query(qs): web::types::Query<CargoLogQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<CargoLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -399,12 +398,12 @@ pub(crate) async fn logs_cargo(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Cargoes",
-  path = "/cargoes/{Name}/stats",
+  path = "/cargoes/{name}/stats",
   params(
-    ("Name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
-    ("Stream" = Option<bool>, Query, description = "Only logs returned since timestamp"),
-    ("OneShot" = Option<bool>, Query, description = "Only logs returned until timestamp"),
+    ("name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
+    ("stream" = Option<bool>, Query, description = "Only logs returned since timestamp"),
+    ("one_shot" = Option<bool>, Query, description = "Only logs returned until timestamp"),
   ),
   responses(
     (status = 200, description = "Cargo stats", content_type = "application/vdn.nanocl.raw-stream", body = Stats),
@@ -413,9 +412,9 @@ pub(crate) async fn logs_cargo(
 ))]
 #[web::get("/cargoes/{name}/stats")]
 pub(crate) async fn stats_cargo(
-  web::types::Query(qs): web::types::Query<CargoStatsQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<CargoStatsQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -432,10 +431,10 @@ pub(crate) async fn stats_cargo(
   patch,
   tag = "Cargoes",
   request_body = CargoScale,
-  path = "/cargoes/{Name}/scale",
+  path = "/cargoes/{name}/scale",
   params(
-    ("Name" = String, Path, description = "Name of the cargo"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
     (status = 200, description = "Cargo scaled", body = Cargo),
@@ -444,10 +443,10 @@ pub(crate) async fn stats_cargo(
 ))]
 #[web::patch("/cargoes/{name}/scale")]
 pub(crate) async fn scale_cargo(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<CargoScale>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
+  payload: web::types::Json<CargoScale>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);

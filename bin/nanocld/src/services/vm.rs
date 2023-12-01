@@ -4,8 +4,8 @@ use std::cell::RefCell;
 use std::time::Instant;
 
 use ntex::{rt, ws, web, http, chain, fn_service, Service};
-use ntex::channel::{mpsc, oneshot};
 use ntex::util::Bytes;
+use ntex::channel::{mpsc, oneshot};
 use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
 use futures::StreamExt;
 use futures::future::ready;
@@ -27,7 +27,7 @@ use crate::models::{DaemonState, WsConState, VmDb, Repository, VmSpecDb};
   tag = "Vms",
   path = "/vms",
   params(
-    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+    ("namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
   ),
   responses(
     (status = 200, description = "List of virtual machine", body = [VmSummary]),
@@ -35,8 +35,8 @@ use crate::models::{DaemonState, WsConState, VmDb, Repository, VmSpecDb};
 ))]
 #[web::get("/vms")]
 pub(crate) async fn list_vm(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
   state: web::types::State<DaemonState>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let vms = utils::vm::list_by_namespace(&namespace, &state.pool).await?;
@@ -47,10 +47,10 @@ pub(crate) async fn list_vm(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Vms",
-  path = "/vms/{Name}/inspect",
+  path = "/vms/{name}/inspect",
   params(
-    ("Name" = String, Path, description = "The name of the virtual machine"),
-    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+    ("name" = String, Path, description = "The name of the virtual machine"),
+    ("namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
   ),
   responses(
     (status = 200, description = "Detailed information about a virtual machine", body = VmInspect),
@@ -58,9 +58,9 @@ pub(crate) async fn list_vm(
 ))]
 #[web::get("/vms/{name}/inspect")]
 pub(crate) async fn inspect_vm(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
@@ -73,10 +73,10 @@ pub(crate) async fn inspect_vm(
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Vms",
-  path = "/vms/{Name}/start",
+  path = "/vms/{name}/start",
   params(
-    ("Name" = String, Path, description = "The name of the virtual machine"),
-    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+    ("name" = String, Path, description = "The name of the virtual machine"),
+    ("namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
   ),
   responses(
     (status = 200, description = "The virtual machine has been started"),
@@ -84,9 +84,9 @@ pub(crate) async fn inspect_vm(
 ))]
 #[web::post("/vms/{name}/start")]
 pub(crate) async fn start_vm(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
@@ -100,10 +100,10 @@ pub(crate) async fn start_vm(
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Vms",
-  path = "/vms/{Name}/stop",
+  path = "/vms/{name}/stop",
   params(
-    ("Name" = String, Path, description = "The name of the virtual machine"),
-    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+    ("name" = String, Path, description = "The name of the virtual machine"),
+    ("namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
   ),
   responses(
     (status = 200, description = "The virtual machine has been stopped"),
@@ -111,9 +111,9 @@ pub(crate) async fn start_vm(
 ))]
 #[web::post("/vms/{name}/stop")]
 pub(crate) async fn stop_vm(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
@@ -127,10 +127,10 @@ pub(crate) async fn stop_vm(
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Vms",
-  path = "/vms/{Name}",
+  path = "/vms/{name}",
   params(
-    ("Name" = String, Path, description = "The name of the virtual machine"),
-    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+    ("name" = String, Path, description = "The name of the virtual machine"),
+    ("namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
   ),
   responses(
     (status = 200, description = "The virtual machine has been deleted"),
@@ -138,9 +138,9 @@ pub(crate) async fn stop_vm(
 ))]
 #[web::delete("/vms/{name}")]
 pub(crate) async fn delete_vm(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
@@ -156,7 +156,7 @@ pub(crate) async fn delete_vm(
   path = "/vms",
   request_body = VmSpecPartial,
   params(
-    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+    ("namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
   ),
   responses(
     (status = 200, description = "The virtual machine has been created", body = Vm),
@@ -164,13 +164,13 @@ pub(crate) async fn delete_vm(
 ))]
 #[web::post("/vms")]
 pub(crate) async fn create_vm(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<VmSpecPartial>,
-  version: web::types::Path<String>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<String>,
+  payload: web::types::Json<VmSpecPartial>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let item = utils::vm::create(&payload, &namespace, &version, &state).await?;
+  let item = utils::vm::create(&payload, &namespace, &path, &state).await?;
   Ok(web::HttpResponse::Ok().json(&item))
 }
 
@@ -178,10 +178,10 @@ pub(crate) async fn create_vm(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Vms",
-  path = "/vms/{Name}/histories",
+  path = "/vms/{name}/histories",
   params(
-    ("Name" = String, Path, description = "The name of the virtual machine"),
-    ("Namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
+    ("name" = String, Path, description = "The name of the virtual machine"),
+    ("namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
   ),
   responses(
     (status = 200, description = "The virtual machine histories have been listed", body = [VmSpec]),
@@ -189,9 +189,9 @@ pub(crate) async fn create_vm(
 ))]
 #[web::get("/vms/{name}/histories")]
 pub(crate) async fn list_vm_history(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -204,10 +204,10 @@ pub(crate) async fn list_vm_history(
   patch,
   tag = "Vms",
   request_body = VmSpecUpdate,
-  path = "/vms/{Name}",
+  path = "/vms/{name}",
   params(
-    ("Name" = String, Path, description = "Name of the virtual machine"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the virtual machine"),
+    ("name" = String, Path, description = "Name of the virtual machine"),
+    ("namespace" = Option<String>, Query, description = "Namespace of the virtual machine"),
   ),
   responses(
     (status = 200, description = "Updated virtual machine", body = Vm),
@@ -216,10 +216,10 @@ pub(crate) async fn list_vm_history(
 ))]
 #[web::patch("/vms/{name}")]
 pub(crate) async fn patch_vm(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  web::types::Json(payload): web::types::Json<VmSpecUpdate>,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  payload: web::types::Json<VmSpecUpdate>,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
@@ -332,20 +332,20 @@ async fn ws_attach_service(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Vms",
-  path = "/vms/{Name}/attach",
+  path = "/vms/{name}/attach",
   params(
-    ("Name" = String, Path, description = "Name of the virtual machine"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the virtual machine"),
+    ("name" = String, Path, description = "Name of the virtual machine"),
+    ("namespace" = Option<String>, Query, description = "Namespace of the virtual machine"),
   ),
   responses(
     (status = 101, description = "Websocket connection"),
   ),
 ))]
 pub(crate) async fn vm_attach(
-  web::types::Query(qs): web::types::Query<GenericNspQuery>,
-  req: web::HttpRequest,
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+  req: web::HttpRequest,
+  qs: web::types::Query<GenericNspQuery>,
 ) -> Result<web::HttpResponse, web::Error> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);

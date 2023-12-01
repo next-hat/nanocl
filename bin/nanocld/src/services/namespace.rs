@@ -1,15 +1,12 @@
-use nanocl_stubs::generic::{GenericListQuery, GenericFilter};
-/*
-* Endpoints to manipulate namespaces
-*/
 use ntex::web;
 
 use nanocl_error::http::{HttpResult, HttpError};
 
+use nanocl_stubs::generic::{GenericFilter, GenericListQuery};
 use nanocl_stubs::namespace::NamespacePartial;
 
 use crate::utils;
-use crate::models::{DaemonState, NamespaceDb, Repository};
+use crate::models::{DaemonState, Repository, NamespaceDb};
 
 /// List namespaces
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -17,9 +14,7 @@ use crate::models::{DaemonState, NamespaceDb, Repository};
   tag = "Namespaces",
   path = "/namespaces",
   params(
-    ("Name" = Option<String>, Query, description = "Filter by name"),
-    ("Limit" = Option<i64>, Query, description = "Limit the number of items returned"),
-    ("Offset" = Option<i64>, Query, description = "Offset the number of items returned"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"name\": { \"eq\": \"test\" } } }"),
   ),
   responses(
     (status = 200, description = "List of namespace", body = [NamespaceSummary]),
@@ -28,9 +23,9 @@ use crate::models::{DaemonState, NamespaceDb, Repository};
 #[web::get("/namespaces")]
 pub(crate) async fn list_namespace(
   state: web::types::State<DaemonState>,
-  web::types::Query(query): web::types::Query<GenericListQuery>,
+  query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::try_from(query)
+  let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
   let items =
     utils::namespace::list(&filter, &state.docker_api, &state.pool).await?;
@@ -41,9 +36,9 @@ pub(crate) async fn list_namespace(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Namespaces",
-  path = "/namespaces/{Name}/inspect",
+  path = "/namespaces/{name}/inspect",
   params(
-    ("Name" = String, Path, description = "The namespace name to inspect")
+    ("name" = String, Path, description = "The namespace name to inspect")
   ),
   responses(
     (status = 200, description = "Detailed information about a namespace", body = [NamespaceInspect]),
@@ -52,8 +47,8 @@ pub(crate) async fn list_namespace(
 ))]
 #[web::get("/namespaces/{name}/inspect")]
 pub(crate) async fn inspect_namespace(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::namespace::inspect_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&namespace))
@@ -66,14 +61,14 @@ pub(crate) async fn inspect_namespace(
   tag = "Namespaces",
   path = "/namespaces",
   responses(
-    (status = 200, description = "List of namespace", body = Namespace),
+    (status = 200, description = "The created namespace", body = Namespace),
     (status = 409, description = "Namespace already exist", body = ApiError),
   ),
 ))]
 #[web::post("/namespaces")]
 pub(crate) async fn create_namespace(
-  web::types::Json(payload): web::types::Json<NamespacePartial>,
   state: web::types::State<DaemonState>,
+  payload: web::types::Json<NamespacePartial>,
 ) -> HttpResult<web::HttpResponse> {
   let item = utils::namespace::create(&payload, &state).await?;
   Ok(web::HttpResponse::Created().json(&item))
@@ -83,9 +78,9 @@ pub(crate) async fn create_namespace(
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "Namespaces",
-  path = "/namespaces/{Name}",
+  path = "/namespaces/{name}",
   params(
-    ("Name" = String, Path, description = "The namespace name to delete")
+    ("name" = String, Path, description = "Name of the namespace to delete")
   ),
   responses(
     (status = 202, description = "Namespace have been deleted"),
@@ -94,8 +89,8 @@ pub(crate) async fn create_namespace(
 ))]
 #[web::delete("/namespaces/{name}")]
 pub(crate) async fn delete_namespace(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   NamespaceDb::find_by_pk(&path.1, &state.pool).await??;
   utils::namespace::delete_by_name(&path.1, &state).await?;

@@ -1,6 +1,3 @@
-/*
-* Endpoints to manipulate cargo images
-*/
 use ntex::{web, http};
 use futures::StreamExt;
 use tokio::fs::File;
@@ -28,20 +25,21 @@ use crate::models::DaemonState;
 ))]
 #[web::get("/cargoes/images")]
 pub(crate) async fn list_cargo_image(
-  web::types::Query(query): web::types::Query<ListCargoImagesOptions>,
   state: web::types::State<DaemonState>,
+  query: web::types::Query<ListCargoImagesOptions>,
 ) -> HttpResult<web::HttpResponse> {
-  let images = utils::cargo_image::list(&query.into(), &state).await?;
+  let images =
+    utils::cargo_image::list(&query.into_inner().into(), &state).await?;
   Ok(web::HttpResponse::Ok().json(&images))
 }
 
 /// Get detailed information about a container image
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
-  path = "/cargoes/images/{IdOrName}",
+  path = "/cargoes/images/{id_or_name}",
   tag = "CargoImages",
   params(
-    ("IdOrName" = String, Path, description = "Image ID or name")
+    ("id_or_name" = String, Path, description = "Image ID or name")
   ),
   responses(
     (status = 200, description = "Detailed information about an image", body = ImageInspect),
@@ -50,8 +48,8 @@ pub(crate) async fn list_cargo_image(
 ))]
 #[web::get("/cargoes/images/{id_or_name}*")]
 pub(crate) async fn inspect_cargo_image(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let image = utils::cargo_image::inspect_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&image))
@@ -70,8 +68,8 @@ pub(crate) async fn inspect_cargo_image(
 ))]
 #[web::post("/cargoes/images")]
 pub(crate) async fn create_cargo_image(
-  web::types::Json(payload): web::types::Json<CargoImagePartial>,
   state: web::types::State<DaemonState>,
+  payload: web::types::Json<CargoImagePartial>,
 ) -> HttpResult<web::HttpResponse> {
   let (from_image, tag) = utils::cargo_image::parse_image_name(&payload.name)?;
   let rx_body = utils::cargo_image::pull(&from_image, &tag, &state).await?;
@@ -86,10 +84,10 @@ pub(crate) async fn create_cargo_image(
 /// Delete a container image
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
-  path = "/cargoes/images/{IdOrName}",
+  path = "/cargoes/images/{id_or_name}",
   tag = "CargoImages",
   params(
-    ("IdOrName" = String, Path, description = "Image ID or name")
+    ("id_or_name" = String, Path, description = "Image ID or name")
   ),
   responses(
     (status = 202, description = "Image have been deleted"),
@@ -98,8 +96,8 @@ pub(crate) async fn create_cargo_image(
 ))]
 #[web::delete("/cargoes/images/{id_or_name}*")]
 pub(crate) async fn delete_cargo_image(
-  path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   utils::cargo_image::delete(&path.1, &state).await?;
   Ok(web::HttpResponse::Accepted().into())
@@ -118,9 +116,9 @@ pub(crate) async fn delete_cargo_image(
 ))]
 #[web::post("/cargoes/images/import")]
 pub(crate) async fn import_cargo_image(
-  web::types::Query(query): web::types::Query<CargoImageImportOptions>,
-  mut payload: web::types::Payload,
   state: web::types::State<DaemonState>,
+  mut payload: web::types::Payload,
+  query: web::types::Query<CargoImageImportOptions>,
 ) -> HttpResult<web::HttpResponse> {
   // generate a random filename
   let filename = uuid::Uuid::new_v4().to_string();

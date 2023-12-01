@@ -120,7 +120,6 @@ pub trait ToEvent {
 /// Query parameters for the process list endpoint.
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProccessQuery {
   /// Return container from all nodes
   pub all: bool,

@@ -28,23 +28,7 @@ use crate::models::{
 
 use super::stream::transform_stream;
 
-/// ## Count instances
-///
 /// Count the number of instances (containers) of a job
-///
-/// ## Arguments
-///
-/// * [instances](Vec) - Instances of [ContainerInspectResponse](ContainerInspectResponse) and [NodeContainerSummary](NodeContainerSummary)
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// The tuple of the number of instances
-///   * [usize] - The total number of instances
-///   * [usize] - The number of failed instances
-///   * [usize] - The number of success instances
-///   * [usize] - The number of running instances
-///
 pub(crate) fn count_instances(
   instances: &[NodeContainerSummary],
 ) -> (usize, usize, usize, usize) {
@@ -83,19 +67,7 @@ pub(crate) fn count_instances(
   )
 }
 
-/// ## Format cron job command
-///
 /// Format the cron job command to start a job at a given time
-///
-/// ## Arguments
-///
-/// * [job](Job) - The job
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [String](String) - The cron job command
-///
 fn format_cron_job_command(job: &Job, state: &DaemonState) -> String {
   let host = state
     .config
@@ -111,10 +83,7 @@ fn format_cron_job_command(job: &Job, state: &DaemonState) -> String {
   )
 }
 
-/// ## Exec crontab
-///
 /// Execute the crontab command to update the cron jobs
-///
 async fn exec_crontab() -> IoResult<()> {
   web::block(|| {
     std::process::Command::new("crontab")
@@ -127,16 +96,7 @@ async fn exec_crontab() -> IoResult<()> {
   Ok(())
 }
 
-/// ## Add cron rule
-///
 /// Add a cron rule to the crontab to start a job at a given time
-///
-/// ## Arguments
-///
-/// * [item](Job) - The job
-/// * [schedule](str) - The schedule  policy
-/// * [state](DaemonState) - The daemon state
-///
 async fn add_cron_rule(
   item: &Job,
   schedule: &str,
@@ -162,15 +122,7 @@ async fn add_cron_rule(
   Ok(())
 }
 
-/// ## Remove cron rule
-///
 /// Remove a cron rule from the crontab for the given job
-///
-/// ## Arguments
-///
-/// * [item](Job) - The job
-/// * [state](DaemonState) - The daemon state
-///
 async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
   let mut content = fs::read_to_string("/var/spool/cron/crontabs/root")
     .await
@@ -189,19 +141,7 @@ async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
   Ok(())
 }
 
-/// ## Inspect instances
-///
 /// Return detailed informations about each instances of a job
-///
-/// ## Arguments
-///
-/// [name](str) The job name
-/// [state](DaemonState) The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Vec](Vec) of [NodeContainerSummary](NodeContainerSummary)
-///
 pub(crate) async fn inspect_instances(
   name: &str,
   state: &DaemonState,
@@ -228,19 +168,7 @@ pub(crate) async fn inspect_instances(
     .collect::<Result<Vec<NodeContainerSummary>, _>>()
 }
 
-/// ## List instances
-///
 /// List the job instances (containers) based on the job name
-///
-/// ## Arguments
-///
-/// * [name](str) - The job name
-/// * [docker_api](bollard_next::Docker) - The docker api
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Vec](Vec) of [ContainerSummary](ContainerSummary)
-///
 pub(crate) async fn list_instances(
   name: &str,
   docker_api: &bollard_next::Docker,
@@ -257,19 +185,7 @@ pub(crate) async fn list_instances(
   Ok(containers)
 }
 
-/// ## Create
-///
 /// Create a job and run it
-///
-/// ## Arguments
-///
-/// * [item](JobPartial) - The job partial
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) the created [job](Job)
-///
 pub(crate) async fn create(
   item: &JobPartial,
   state: &DaemonState,
@@ -310,15 +226,7 @@ pub(crate) async fn create(
   Ok(job)
 }
 
-/// ## Start by name
-///
 /// Start a job by name
-///
-/// ## Arguments
-///
-/// * [name](str) - The job name
-/// * [state](DaemonState) - The daemon state
-///
 pub(crate) async fn start_by_name(
   name: &str,
   state: &DaemonState,
@@ -420,19 +328,7 @@ pub(crate) async fn delete_by_name(
   Ok(())
 }
 
-/// ## Inspect by name
-///
 /// Inspect a job by name and return a detailed view of the job
-///
-/// ## Arguments
-///
-/// * [name](str) - The job name
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [JobInspect](JobInspect)
-///
 pub(crate) async fn inspect_by_name(
   name: &str,
   state: &DaemonState,
@@ -452,19 +348,7 @@ pub(crate) async fn inspect_by_name(
   Ok(job_inspect)
 }
 
-/// ## Logs by name
-///
 /// Get the logs of a job by name
-///
-/// ## Arguments
-///
-/// * [name](str) - The job name
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Stream](StreamExt) of [JobLogOutput](JobLogOutput)
-///
 pub(crate) async fn logs_by_name(
   name: &str,
   state: &DaemonState,
@@ -505,21 +389,8 @@ pub(crate) async fn logs_by_name(
   Ok(transform_stream::<JobLogOutput, JobLogOutput>(stream))
 }
 
-/// ## Wait
-///
 /// Wait a job to finish
 /// And create his instances (containers).
-///
-/// ## Arguments
-///
-/// * [name](str) - The job name
-/// * [wait_options](WaitContainerOptions) - The wait options
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [Stream](StreamExt) of [JobWaitResponse](JobWaitResponse)
-///
 pub(crate) async fn wait(
   name: &str,
   wait_options: WaitContainerOptions<WaitCondition>,

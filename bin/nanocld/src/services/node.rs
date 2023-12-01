@@ -81,8 +81,8 @@ async fn node_ws_service(
   ),
 ))]
 pub(crate) async fn node_ws(
-  req: web::HttpRequest,
   state: web::types::State<DaemonState>,
+  req: web::HttpRequest,
 ) -> Result<web::HttpResponse, web::Error> {
   web::ws::start(
     req,

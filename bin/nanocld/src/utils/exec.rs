@@ -11,20 +11,7 @@ use crate::models::DaemonState;
 
 use super::stream::transform_stream;
 
-/// ## Create exec command
-///
 /// Create an exec command in a cargo instance and return command id
-///
-/// ## Arguments
-///
-/// * [name](str) - The cargo name
-/// * [args](CreateExecOptions) - The exec options
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [CreateExecResults](CreateExecResults)
-///
 pub(crate) async fn create_exec_command(
   name: &str,
   args: &CreateExecOptions,
@@ -35,21 +22,7 @@ pub(crate) async fn create_exec_command(
   Ok(result)
 }
 
-/// ## Start exec command
-///
 /// Run an exec command in a cargo instance and return the output stream
-///
-/// ## Arguments
-///
-/// * [name](str) - The cargo name
-/// * [exec_id](str) - The cargo name
-/// * [args](StartExecOptions) - The exec options
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [web::HttpResponse](web::HttpResponse)
-///
 pub(crate) async fn start_exec_command(
   exec_id: &str,
   args: &StartExecOptions,
@@ -72,19 +45,7 @@ pub(crate) async fn start_exec_command(
   }
 }
 
-/// ## Exec inspect command
-///
 /// Inspect a command runned in a cargo instance and return the exec infos
-///
-/// ## Arguments
-///
-/// * [exec_id](String) - Exec command id to inspect
-/// * [state](DaemonState) - The daemon state
-///
-/// ## Return
-///
-/// [HttpResult](HttpResult) containing a [ExecInspectResponse](ExecInspectResponse)
-///
 pub(crate) async fn inspect_exec_command(
   exec_id: &str,
   state: &DaemonState,
