@@ -6,15 +6,7 @@ use crate::config::CliConfig;
 use crate::models::UpgradeOpts;
 use super::cargo_image::exec_cargo_image_pull;
 
-/// ## Exec upgrade
-///
 /// Function that execute when running `nanocl upgrade`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli config
-/// * [args](UpgradeOpts) The upgrade options
-///
 pub async fn exec_upgrade(
   cli_conf: &CliConfig,
   args: &UpgradeOpts,

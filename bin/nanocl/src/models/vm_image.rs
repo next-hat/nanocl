@@ -4,10 +4,7 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::vm_image::{VmImage, VmImageResizePayload};
 
-/// ## VmImageCommand
-///
 /// `nanocl vm image` available commands
-///
 #[derive(Subcommand)]
 pub enum VmImageCommand {
   /// Create a base VM image
@@ -32,10 +29,7 @@ pub enum VmImageCommand {
   },
 }
 
-/// ## VmImageCreateOpts
-///
 /// `nanocl vm image create` available options
-///
 #[derive(Parser)]
 pub struct VmImageCreateOpts {
   /// Name of the VM image
@@ -44,10 +38,7 @@ pub struct VmImageCreateOpts {
   pub file_path: String,
 }
 
-/// ## VmImageListOpts
-///
 /// `nanocl vm image list` available options
-///
 #[derive(Clone, Parser)]
 pub struct VmImageListOpts {
   /// Show only images name
@@ -55,10 +46,7 @@ pub struct VmImageListOpts {
   pub quiet: bool,
 }
 
-/// ## VmImageResizeOpts
-///
 /// `nanocl vm image resize` available options
-///
 #[derive(Clone, Parser)]
 pub struct VmImageResizeOpts {
   /// Shrink the image
@@ -80,10 +68,7 @@ impl From<VmImageResizeOpts> for VmImageResizePayload {
   }
 }
 
-/// ## VmImageArg
-///
 /// `nanocl vm image` available arguments
-///
 #[derive(Parser)]
 pub struct VmImageArg {
   /// Command to run
@@ -91,10 +76,7 @@ pub struct VmImageArg {
   pub command: VmImageCommand,
 }
 
-/// ## VmImageRow
-///
 /// A row for the vm image table
-///
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct VmImageRow {

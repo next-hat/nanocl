@@ -1,17 +1,6 @@
 use ring::digest;
 
-/// ## Calculate SHA256
-///
 /// Calculate the SHA256 hash of a string
-///
-/// ## Arguments
-///
-/// * [name](str) The string to hash
-///
-/// ## Return
-///
-/// [String](String) The hash
-///
 #[allow(non_snake_case)]
 pub fn calculate_SHA256(name: &str) -> String {
   let mut context = digest::Context::new(&digest::SHA256);

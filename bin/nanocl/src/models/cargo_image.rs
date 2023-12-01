@@ -4,10 +4,7 @@ use tabled::Tabled;
 use clap::{Parser, Subcommand};
 use bollard_next::models::ImageSummary;
 
-/// ## CargoImageRemoveOpts
-///
 /// `nanocl cargo image remove` available options
-///
 #[derive(Parser)]
 pub struct CargoImageRemoveOpts {
   /// Skip confirmation
@@ -17,30 +14,21 @@ pub struct CargoImageRemoveOpts {
   pub(crate) names: Vec<String>,
 }
 
-/// ## CargoImagePullOpts
-///
 /// `nanocl cargo image pull` available options
-///
 #[derive(Parser)]
 pub struct CargoImagePullOpts {
   /// Name of the image to pull
   pub(crate) name: String,
 }
 
-/// ## CargoImageInspectOpts
-///
 /// `nanocl cargo image inspect` available options
-///
 #[derive(Parser)]
 pub struct CargoImageInspectOpts {
   /// Name of the image to inspect
   pub(crate) name: String,
 }
 
-/// ## CargoImageCommand
-///
 /// `nanocl cargo image` available commands
-///
 #[derive(Subcommand)]
 pub enum CargoImageCommand {
   /// List cargo images
@@ -57,10 +45,7 @@ pub enum CargoImageCommand {
   Import(CargoImageImportOpts),
 }
 
-/// ## CargoImageListOpts
-///
 /// `nanocl cargo image list` available options
-///
 #[derive(Clone, Parser)]
 pub struct CargoImageListOpts {
   /// Show all images. Only images from a final layer (no children) are shown by default.
@@ -91,10 +76,7 @@ impl From<CargoImageListOpts> for ListCargoImagesOptions {
   }
 }
 
-/// ## CargoImageImportOpts
-///
 /// `nanocl cargo image import` available options
-///
 #[derive(Parser)]
 pub struct CargoImageImportOpts {
   /// path to tar archive
@@ -102,10 +84,7 @@ pub struct CargoImageImportOpts {
   pub(crate) file_path: String,
 }
 
-/// ## CargoImageArg
-///
 /// `nanocl cargo image` available arguments
-///
 #[derive(Parser)]
 #[clap(name = "nanocl cargo image")]
 pub struct CargoImageArg {
@@ -113,10 +92,7 @@ pub struct CargoImageArg {
   pub(crate) command: CargoImageCommand,
 }
 
-/// ## CargoImageRow
-///
 /// A row of the cargo image table
-///
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct CargoImageRow {
@@ -133,18 +109,7 @@ pub struct CargoImageRow {
   pub(crate) created_at: String,
 }
 
-/// ## Convert size
-///
 /// Convert size in bytes to human readable format
-///
-/// ## Arguments
-///
-/// * [size](i64) size in bytes
-///
-/// ## Return
-///
-/// [String](String) human readable size
-///
 fn convert_size(size: i64) -> String {
   if size >= 1_000_000_000 {
     format!("{} GB", size / 1024 / 1024 / 1024)

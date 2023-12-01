@@ -12,10 +12,7 @@ use nanocld_client::stubs::cargo_spec::{
 use super::DisplayFormat;
 use super::cargo_image::CargoImageArg;
 
-/// ## CargoRemoveOpts
-///
 /// `nanocl cargo remove` available options
-///
 #[derive(Parser)]
 pub struct CargoRemoveOpts {
   /// Skip confirmation
@@ -28,10 +25,7 @@ pub struct CargoRemoveOpts {
   pub names: Vec<String>,
 }
 
-/// ## CargoCreateOpts
-///
 /// `nanocl cargo create` available options
-///
 #[derive(Clone, Parser)]
 pub struct CargoCreateOpts {
   /// Name of the cargo
@@ -67,10 +61,7 @@ impl From<CargoCreateOpts> for CargoSpecPartial {
   }
 }
 
-/// ## CargoRunOpts
-///
 /// `nanocl cargo run` available options
-///
 #[derive(Clone, Parser)]
 pub struct CargoRunOpts {
   /// Name of the cargo
@@ -112,40 +103,28 @@ impl From<CargoRunOpts> for CargoSpecPartial {
   }
 }
 
-/// ## CargoStartOpts
-///
 /// `nanocl cargo start` available options
-///
 #[derive(Parser)]
 pub struct CargoStartOpts {
   // Name of cargo to start
   pub name: String,
 }
 
-/// ## CargoStopOpts
-///
 /// `nanocl cargo stop` available options
-///
 #[derive(Parser)]
 pub struct CargoStopOpts {
   // List of cargo to stop
   pub names: Vec<String>,
 }
 
-/// ## CargoRestartOpts
-///
 /// `nanocl cargo restart` available options
-///
 #[derive(Parser)]
 pub struct CargoRestartOpts {
   // List of cargo to stop
   pub names: Vec<String>,
 }
 
-/// ## CargoInspectOpts
-///
 /// `nanocl cargo inspect` available options
-///
 #[derive(Parser)]
 pub struct CargoInspectOpts {
   /// Display format
@@ -155,10 +134,7 @@ pub struct CargoInspectOpts {
   pub(crate) name: String,
 }
 
-/// ## CargoPatchOpts
-///
 /// `nanocl cargo patch` available options
-///
 #[derive(Clone, Parser)]
 pub struct CargoPatchOpts {
   /// Name of cargo to update
@@ -192,10 +168,7 @@ impl From<CargoPatchOpts> for CargoSpecUpdate {
   }
 }
 
-/// ## CargoExecOpts
-///
 /// `nanocl cargo exec` available options
-///
 #[derive(Clone, Parser)]
 pub struct CargoExecOpts {
   /// Allocate a pseudo-TTY.
@@ -241,20 +214,14 @@ impl From<CargoExecOpts> for CreateExecOptions {
   }
 }
 
-/// ## CargoHistoryOpts
-///
 /// `nanocl cargo history` available options
-///
 #[derive(Parser)]
 pub struct CargoHistoryOpts {
   /// Name of cargo to browse history
   pub name: String,
 }
 
-/// ## CargoRevertOpts
-///
 /// `nanocl cargo revert` available options
-///
 #[derive(Parser)]
 pub struct CargoRevertOpts {
   /// Name of cargo to revert
@@ -263,10 +230,7 @@ pub struct CargoRevertOpts {
   pub history_id: String,
 }
 
-/// ## CargoLogsOpts
-///
 /// `nanocl cargo logs` available options
-///
 #[derive(Parser)]
 pub struct CargoLogsOpts {
   /// Name of cargo to show logs
@@ -288,10 +252,7 @@ pub struct CargoLogsOpts {
   pub follow: bool,
 }
 
-/// ## CargoStatsOpts
-///
 /// `nanocl cargo stats` available options
-///
 #[derive(Parser)]
 pub struct CargoStatsOpts {
   /// Names of cargo to show stats
@@ -303,10 +264,7 @@ pub struct CargoStatsOpts {
   // pub all: bool,
 }
 
-/// ## CargoListOpts
-///
 /// `nanocl cargo list` available options
-///
 #[derive(Parser)]
 pub struct CargoListOpts {
   /// Only show cargo names
@@ -314,10 +272,7 @@ pub struct CargoListOpts {
   pub quiet: bool,
 }
 
-/// ## CargoCommand
-///
 /// `nanocl cargo` available commands
-///
 #[derive(Subcommand)]
 pub enum CargoCommand {
   /// List existing cargo
@@ -354,10 +309,7 @@ pub enum CargoCommand {
   Stats(CargoStatsOpts),
 }
 
-/// ## CargoArg
-///
 /// `nanocl cargo` available arguments
-///
 #[derive(Parser)]
 #[clap(name = "nanocl cargo")]
 pub struct CargoArg {
@@ -368,10 +320,7 @@ pub struct CargoArg {
   pub command: CargoCommand,
 }
 
-/// ## CargoRow
-///
 /// A row of the cargo table
-///
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct CargoRow {
@@ -419,6 +368,7 @@ impl From<CargoSummary> for CargoRow {
   }
 }
 
+/// A row of the cargo stats table
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct CargoStatsRow {

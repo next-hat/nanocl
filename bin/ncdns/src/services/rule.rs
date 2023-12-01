@@ -11,10 +11,10 @@ use crate::{utils, dnsmasq};
 #[cfg_attr(feature = "dev", utoipa::path(
   put,
   tag = "Rules",
-  path = "/rules/{Name}",
+  path = "/rules/{name}",
   request_body = ResourceDnsRule,
   params(
-    ("Name" = String, Path, description = "Name of the rule"),
+    ("name" = String, Path, description = "Name of the rule"),
   ),
   responses(
     (status = 200, description = "The created rule", body = ResourceDnsRule),

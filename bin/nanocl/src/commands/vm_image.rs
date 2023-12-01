@@ -15,15 +15,7 @@ use crate::models::{
   VmImageListOpts,
 };
 
-/// ## Exec vm image create
-///
 /// Function that execute when running `nanocl vm image create`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [options](VmImageCreateOpts) The vm image create options
-///
 async fn exec_vm_image_create(
   client: &NanocldClient,
   options: &VmImageCreateOpts,
@@ -62,15 +54,7 @@ async fn exec_vm_image_create(
   Ok(())
 }
 
-/// ## Exec vm image ls
-///
 /// Function that execute when running `nanocl vm image ls`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [opts](VmImageListOpts) The vm image list options
-///
 async fn exec_vm_image_ls(
   client: &NanocldClient,
   opts: &VmImageListOpts,
@@ -93,15 +77,7 @@ async fn exec_vm_image_ls(
   Ok(())
 }
 
-/// ## Exec vm image rm
-///
 /// Function that execute when running `nanocl vm image rm`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [names](Vec<String>) The list of vm image names
-///
 async fn exec_vm_image_rm(
   client: &NanocldClient,
   names: &[String],
@@ -112,16 +88,7 @@ async fn exec_vm_image_rm(
   Ok(())
 }
 
-/// ## Exec vm image clone
-///
 /// Function that execute when running `nanocl vm image clone`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [name](str) The name of the vm image
-/// * [clone_name](str) The name of the clone
-///
 async fn exec_vm_image_clone(
   client: &NanocldClient,
   name: &str,
@@ -149,15 +116,7 @@ async fn exec_vm_image_clone(
   Ok(())
 }
 
-/// ## Exec vm resize
-///
 /// Function that execute when running `nanocl vm resize`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [options](VmImageResizeOpts) The vm image resize options
-///
 async fn exec_vm_resize(
   client: &NanocldClient,
   options: &VmImageResizeOpts,
@@ -167,15 +126,7 @@ async fn exec_vm_resize(
   Ok(())
 }
 
-/// ## Exec vm image
-///
 /// Function that execute when running `nanocl vm image`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [args](VmImageArg) The vm image arguments
-///
 pub async fn exec_vm_image(
   client: &NanocldClient,
   args: &VmImageArg,

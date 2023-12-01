@@ -19,17 +19,7 @@ use crate::utils::hash;
 use crate::utils::math::calculate_percentage;
 use crate::models::DockerContextMeta;
 
-/// ## Update image progress
-///
 /// Update progress bar for install image
-///
-/// ## Arguments
-///
-/// * [multiprogress](MultiProgress) The multiprogress bar
-/// * [layers](HashMap) The layers
-/// * [id](str) The id of the layer
-/// * [progress](ProgressDetail) The progress detail
-///
 fn update_image_progress(
   multiprogress: &MultiProgress,
   layers: &mut HashMap<String, ProgressBar>,
@@ -64,16 +54,7 @@ fn update_image_progress(
   }
 }
 
-/// ## Install image
-///
 /// Install image directly with docker and output progress
-///
-/// ## Arguments
-///
-/// * [from_image](str) The image to install
-/// * [tag](str) The tag of the image
-/// * [docker_api](Docker) The docker client
-///
 pub async fn install_image(
   from_image: &str,
   tag: &str,
@@ -84,7 +65,6 @@ pub async fn install_image(
     tag,
     ..Default::default()
   });
-
   let mut stream = docker_api.create_image(options, None, None);
   let mut layers: HashMap<String, ProgressBar> = HashMap::new();
   let multiprogress = MultiProgress::new();
@@ -124,18 +104,7 @@ pub async fn install_image(
   Ok(())
 }
 
-/// ## Connect
-///
 /// Generate a docker client from the docker host
-///
-/// ## Arguments
-///
-/// * [docker_host](str) The docker host
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [Docker](Docker)
-///
 pub fn connect(docker_host: &str) -> IoResult<Docker> {
   let docker = match &docker_host {
     docker_host if docker_host.starts_with("unix://") => {
@@ -173,24 +142,10 @@ pub fn connect(docker_host: &str) -> IoResult<Docker> {
       ))
     }
   };
-
   Ok(docker)
 }
 
-/// ## Hook labels
-///
 /// Hook labels for a container
-///
-/// ## Arguments
-///
-/// * [key](str) The key of the container
-/// * [namespace](str) The namespace of the container
-/// * [labels](HashMap<String, String>) The labels of the container
-///
-/// ## Return
-///
-/// [HashMap](HashMap) of [String](String) to [String](String)
-///
 pub fn hook_labels(
   key: &str,
   namespace: &str,
@@ -208,20 +163,7 @@ pub fn hook_labels(
   hooked_labels
 }
 
-/// ## Create cargo container
-///
 /// Create a container from a cargo config
-///
-/// ## Arguments
-///
-/// * [cargo](CargoSpecPartial) The cargo config
-/// * [namespace](str) The namespace of the container
-/// * [docker](Docker) The docker client
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [ContainerCreateResponse](ContainerCreateResponse)
-///
 pub async fn create_cargo_container(
   cargo: &CargoSpecPartial,
   namespace: &str,
@@ -259,14 +201,7 @@ pub async fn create_cargo_container(
   Ok(container)
 }
 
-/// ## Detect docker host
-///
 /// Detect docker host from docker config
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a tuple of [String](String) and a [bool](bool)
-///
 pub fn detect_docker_host() -> IoResult<(String, bool)> {
   let home = std::env::var("HOME").map_err(|_| {
     std::io::Error::new(std::io::ErrorKind::Other, "Could not get $HOME")

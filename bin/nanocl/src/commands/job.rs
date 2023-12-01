@@ -11,15 +11,7 @@ use crate::models::{
   JobLogsOpts, JobWaitOpts, JobStartOpts,
 };
 
-/// ## Exec job ls
-///
 /// Execute the `nanocl job ls` command to list jobs
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) Cli configuration
-/// * [opts](JobListOpts) Cli options
-///
 async fn exec_job_ls(cli_conf: &CliConfig, opts: &JobListOpts) -> IoResult<()> {
   let client = &cli_conf.client;
   let items = client.list_job().await?;
@@ -37,15 +29,7 @@ async fn exec_job_ls(cli_conf: &CliConfig, opts: &JobListOpts) -> IoResult<()> {
   Ok(())
 }
 
-/// ## Exec job rm
-///
 /// Execute the `nanocl job rm` command to remove a job
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) Cli configuration
-/// * [args](JobRemoveOpts) Cli options
-///
 async fn exec_job_rm(
   cli_conf: &CliConfig,
   opts: &JobRemoveOpts,
@@ -61,15 +45,7 @@ async fn exec_job_rm(
   Ok(())
 }
 
-/// ## Exec job inspect
-///
 /// Execute the `nanocl job inspect` command to inspect a job
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) Cli configuration
-/// * [args](JobInspectOpts) Cli options
-///
 async fn exec_job_inspect(
   cli_conf: &CliConfig,
   opts: &JobInspectOpts,
@@ -84,15 +60,7 @@ async fn exec_job_inspect(
   Ok(())
 }
 
-/// ## Exec job logs
-///
 /// Execute the `nanocl job logs` command to list the logs of a job
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) Cli configuration
-/// * [args](JobLogsOpts) Cli options
-///
 async fn exec_job_logs(
   cli_conf: &CliConfig,
   opts: &JobLogsOpts,
@@ -119,15 +87,7 @@ async fn exec_job_logs(
   Ok(())
 }
 
-/// ## Exec job wait
-///
 /// Execute the `nanocl job wait` command to wait for a job to finish
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) Cli configuration
-/// * [opts](JobWaitOpts) Cli options
-///
 async fn exec_job_wait(
   cli_conf: &CliConfig,
   opts: &JobWaitOpts,
@@ -161,15 +121,7 @@ async fn exec_job_wait(
   Ok(())
 }
 
-/// ## Exec job start
-///
 /// Execute the `nanocl job start` command to start a job
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) Cli configuration
-/// * [opts](JobStartOpts) Cli options
-///
 async fn exec_job_start(
   cli_conf: &CliConfig,
   opts: &JobStartOpts,
@@ -179,15 +131,7 @@ async fn exec_job_start(
   Ok(())
 }
 
-/// ## Exec job
-///
 /// Function that execute when running `nanocl job`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) Cli configuration
-/// * [args](JobArg) Cli subcommand
-///
 pub async fn exec_job(cli_conf: &CliConfig, args: &JobArg) -> IoResult<()> {
   match &args.command {
     JobCommand::List(opts) => exec_job_ls(cli_conf, opts).await,

@@ -2,10 +2,7 @@ use tabled::Tabled;
 use clap::{Parser, Subcommand};
 use nanocld_client::stubs::node::Node;
 
-/// ## NodeArg
-///
 /// `nanocl node` available arguments
-///
 #[derive(Parser)]
 #[clap(name = "nanocl-resource")]
 pub struct NodeArg {
@@ -13,10 +10,7 @@ pub struct NodeArg {
   pub command: NodeCommand,
 }
 
-/// ## NodeCommand
-///
 /// `nanocl node` available commands
-///
 #[derive(Subcommand)]
 pub enum NodeCommand {
   /// List nodes
@@ -24,10 +18,7 @@ pub enum NodeCommand {
   List,
 }
 
-/// ## NodeRow
-///
 /// A row of the node table
-///
 #[derive(Tabled)]
 pub struct NodeRow {
   pub name: String,

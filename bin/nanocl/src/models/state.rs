@@ -2,10 +2,7 @@ use clap::{Parser, Subcommand};
 
 use super::DisplayFormat;
 
-/// ## StateApplyOpts
-///
 /// `nanocl state apply` available options
-///
 #[derive(Parser)]
 pub struct StateApplyOpts {
   /// Path or Url to the Statefile
@@ -28,10 +25,7 @@ pub struct StateApplyOpts {
   pub args: Vec<String>,
 }
 
-/// ## StateLogsOpts
-///
 /// `nanocl state logs` available options
-///
 #[derive(Parser)]
 pub struct StateLogsOpts {
   /// Path or Url to the Statefile
@@ -57,10 +51,7 @@ pub struct StateLogsOpts {
   pub follow: bool,
 }
 
-/// ## StateRemoveOpts
-///
 /// `nanocl state rm` available options
-///
 #[derive(Parser)]
 pub struct StateRemoveOpts {
   /// Path or Url to the Statefile
@@ -74,10 +65,7 @@ pub struct StateRemoveOpts {
   pub args: Vec<String>,
 }
 
-/// ## StateCommand
-///
 /// `nanocl state` available commands
-///
 #[derive(Subcommand)]
 pub enum StateCommand {
   /// Create or Update elements from a Statefile
@@ -89,20 +77,14 @@ pub enum StateCommand {
   Remove(StateRemoveOpts),
 }
 
-/// ## StateArg
-///
 /// `nanocl state` available arguments
-///
 #[derive(Parser)]
 pub struct StateArg {
   #[clap(subcommand)]
   pub command: StateCommand,
 }
 
-/// ## StateRef
-///
 /// Reference to a Statefile with his metadata once serialized
-///
 #[derive(Clone)]
 pub struct StateRef<T>
 where

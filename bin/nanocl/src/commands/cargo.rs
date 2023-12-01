@@ -23,16 +23,7 @@ use crate::models::{
 
 use super::cargo_image::{exec_cargo_image, exec_cargo_image_pull};
 
-/// ## Exec cargo create
-///
 /// Execute the `nanocl cargo create` command to create a new cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_create(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -47,16 +38,7 @@ async fn exec_cargo_create(
   Ok(())
 }
 
-/// ## Exec cargo rm
-///
 /// Execute the `nanocl cargo rm` command to remove a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_rm(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -77,16 +59,7 @@ async fn exec_cargo_rm(
   Ok(())
 }
 
-/// ## Exec cargo ls
-///
 /// Execute the `nanocl cargo ls` command to list cargos
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_ls(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -111,16 +84,7 @@ async fn exec_cargo_ls(
   Ok(())
 }
 
-/// ## Exec cargo start
-///
 /// Execute the `nanocl cargo start` command to start a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_start(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -133,16 +97,7 @@ async fn exec_cargo_start(
   Ok(())
 }
 
-/// ## Exec cargo stop
-///
 /// Execute the `nanocl cargo stop` command to stop a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_stop(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -155,16 +110,7 @@ async fn exec_cargo_stop(
   Ok(())
 }
 
-/// ## Exec cargo restart
-///
 /// Execute the `nanocl cargo restart` command to restart a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_restart(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -179,16 +125,7 @@ async fn exec_cargo_restart(
   Ok(())
 }
 
-/// ## Exec cargo patch
-///
 /// Execute the `nanocl cargo patch` command to patch a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_patch(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -201,16 +138,7 @@ async fn exec_cargo_patch(
   Ok(())
 }
 
-/// ## Exec cargo inspect
-///
 /// Execute the `nanocl cargo inspect` command to inspect a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_inspect(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -228,16 +156,7 @@ async fn exec_cargo_inspect(
   Ok(())
 }
 
-/// ## Exec cargo exec
-///
 /// Execute the `nanocl cargo exec` command to execute a command in a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_exec(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -282,16 +201,7 @@ async fn exec_cargo_exec(
   }
 }
 
-/// ## Exec cargo history
-///
 /// Execute the `nanocl cargo history` command to list the history of a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_history(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -305,16 +215,7 @@ async fn exec_cargo_history(
   Ok(())
 }
 
-/// ## Exec cargo logs
-///
 /// Execute the `nanocl cargo logs` command to list the logs of a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_logs(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -354,16 +255,7 @@ async fn exec_cargo_logs(
   Ok(())
 }
 
-/// ## Exec cargo stats
-///
 /// Execute the `nanocl cargo stats` command to list the stats of a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_stats(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -423,16 +315,7 @@ async fn exec_cargo_stats(
   Ok(())
 }
 
-/// ## Exec cargo revert
-///
 /// Execute the `nanocl cargo revert` command to revert a cargo to a previous state
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_revert(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -446,16 +329,7 @@ async fn exec_cargo_revert(
   Ok(())
 }
 
-/// ## Exec cargo run
-///
 /// Execute the `nanocl cargo run` command to run a cargo
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-/// * [opts](CargoCommand) Cargo command
-///
 async fn exec_cargo_run(
   cli_conf: &CliConfig,
   args: &CargoArg,
@@ -475,15 +349,7 @@ async fn exec_cargo_run(
   Ok(())
 }
 
-/// ## Exec cargo
-///
 /// Function that execute when running `nanocl cargo`
-///
-/// ## Arguments
-///
-/// * [cli_conf](CliConfig) The cli configuration
-/// * [args](CargoArg) Cargo arguments
-///
 pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
   let client = &cli_conf.client;
   match &args.command {

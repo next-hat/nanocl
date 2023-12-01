@@ -2,14 +2,7 @@ use dialoguer::Confirm;
 use dialoguer::theme::ColorfulTheme;
 use nanocl_error::io::IoResult;
 
-/// ## Confirm
-///
 /// Ask for confirmation
-///
-/// ## Arguments
-///
-/// * [msg](str) The message to display
-///
 pub fn confirm(msg: &str) -> IoResult<()> {
   let result = Confirm::with_theme(&ColorfulTheme::default())
     .with_prompt(msg)

@@ -16,15 +16,7 @@ use crate::models::{
   CargoImageListOpts,
 };
 
-/// ## Exec cargo image ls
-///
 /// Function that execute when running `nanocl cargo image ls`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [opts](CargoImageListOpts) Cli options
-///
 pub(crate) async fn exec_cargo_ls(
   client: &NanocldClient,
   opts: &CargoImageListOpts,
@@ -47,15 +39,7 @@ pub(crate) async fn exec_cargo_ls(
   Ok(())
 }
 
-/// ## Exec cargo image rm
-///
 /// Function that execute when running `nanocl cargo image rm`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [options](CargoImageRemoveOpts) The cargo image remove options
-///
 async fn exec_cargo_image_rm(
   client: &NanocldClient,
   options: &CargoImageRemoveOpts,
@@ -73,17 +57,7 @@ async fn exec_cargo_image_rm(
   Ok(())
 }
 
-/// ## Update progress
-///
 /// Update the progress bar when pulling an image
-///
-/// ## Arguments
-///
-/// * [multiprogress](MultiProgress) The multiprogress bar
-/// * [layers](HashMap) The layers of progress bar
-/// * [id](str) The id of the layer
-/// * [progress](ProgressDetail) The progress detail
-///
 fn update_progress(
   multiprogress: &MultiProgress,
   layers: &mut HashMap<String, ProgressBar>,
@@ -118,15 +92,7 @@ fn update_progress(
   }
 }
 
-/// ## Exec cargo image pull
-///
 /// Function that execute when running `nanocl cargo image pull`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [name](str) The name of the image to pull
-///
 pub(crate) async fn exec_cargo_image_pull(
   client: &NanocldClient,
   name: &str,
@@ -172,15 +138,7 @@ pub(crate) async fn exec_cargo_image_pull(
   Ok(())
 }
 
-/// ## Exec cargo image inspect
-///
 /// Function that execute when running `nanocl cargo image inspect`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [opts](CargoImageInspectOpts) The cargo image inspect options
-///
 async fn exec_cargo_image_inspect(
   client: &NanocldClient,
   opts: &CargoImageInspectOpts,
@@ -190,16 +148,8 @@ async fn exec_cargo_image_inspect(
   Ok(())
 }
 
-/// ## Exec cargo image import
-///
 /// Function that execute when running `nanocl cargo image import`
 /// To import a cargo/container image from a tarball
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [opts](CargoImageImportOpts) The cargo image import options
-///
 async fn exec_cargo_image_import(
   client: &NanocldClient,
   opts: &CargoImageImportOpts,
@@ -238,15 +188,7 @@ async fn exec_cargo_image_import(
   Ok(())
 }
 
-/// ## Exec cargo image
-///
 /// Function that execute when running `nanocl cargo image`
-///
-/// ## Arguments
-///
-/// * [client](NanocldClient) The nanocl daemon client
-/// * [opts](CargoImageArg) The cargo image options
-///
 pub(crate) async fn exec_cargo_image(
   client: &NanocldClient,
   opts: &CargoImageArg,

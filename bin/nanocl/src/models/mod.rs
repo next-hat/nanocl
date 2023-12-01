@@ -46,10 +46,7 @@ pub struct Cli {
   pub command: Command,
 }
 
-/// ## Commands
-///
 /// `nanocl` available commands
-///
 #[derive(Subcommand)]
 pub enum Command {
   /// Manage namespaces
@@ -92,10 +89,7 @@ pub enum Command {
   // },
 }
 
-/// ## DisplayFormat
-///
 /// `nanocl` available display formats `yaml` by default
-///
 #[derive(Default, Clone, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "PascalCase")]
 pub enum DisplayFormat {
