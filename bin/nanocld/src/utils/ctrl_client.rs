@@ -19,6 +19,7 @@ pub(crate) struct CtrlClient {
 impl CtrlClient {
   /// Create a new controller client
   pub(crate) fn new(name: &str, url: &str) -> Self {
+    log::debug!("CtrlClient::new {name}: {url}");
     let (client, url) = match url {
       url if url.starts_with("unix://") => {
         let url = url.to_owned();
@@ -99,9 +100,11 @@ impl CtrlClient {
     name: &str,
     data: &serde_json::Value,
   ) -> Result<serde_json::Value, HttpClientError> {
+    let url = self.format_url(&format!("/{version}/rules/{name}"));
+    log::debug!("CtrlClient::apply_rule url: {}", url);
     let mut res = self
       .client
-      .put(self.format_url(&format!("/{version}/rules/{name}")))
+      .put(url)
       .send_json(data)
       .await
       .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;
@@ -116,9 +119,11 @@ impl CtrlClient {
     version: &str,
     name: &str,
   ) -> Result<(), HttpClientError> {
+    let url = self.format_url(&format!("/{version}/rules/{name}"));
+    log::debug!("CtrlClient::delete_rule url: {}", url);
     let mut res = self
       .client
-      .delete(self.format_url(&format!("/{version}/rules/{name}")))
+      .delete(url)
       .send()
       .await
       .map_err(|err| err.map_err_context(|| self.name.to_owned()))?;

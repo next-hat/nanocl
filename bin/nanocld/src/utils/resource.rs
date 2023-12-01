@@ -60,25 +60,22 @@ async fn hook_create_resource(
         pool,
       )
       .await?;
-      if let Some(schema) = kind.schema {
+      if let Some(schema) = &kind.schema {
         let schema: JSONSchema = JSONSchema::options()
           .with_draft(Draft::Draft7)
-          .compile(&schema)
-          .map_err(|err| HttpError {
-            status: http::StatusCode::BAD_REQUEST,
-            msg: format!("Invalid schema {}", err),
+          .compile(schema)
+          .map_err(|err| {
+            HttpError::bad_request(format!("Invalid schema {}", err))
           })?;
         schema.validate(&resource.data).map_err(|err| {
           let mut msg = String::from("Invalid config ");
           for error in err {
             msg += &format!("{} ", error);
           }
-          HttpError {
-            status: http::StatusCode::BAD_REQUEST,
-            msg,
-          }
+          HttpError::bad_request(msg)
         })?;
       }
+      log::debug!("hook_create_resource kind: {kind:?}");
       if let Some(url) = kind.url {
         let ctrl_client = CtrlClient::new(&kind.resource_kind_name, &url);
         let config = ctrl_client
@@ -104,6 +101,7 @@ async fn hook_delete_resource(
     pool,
   )
   .await?;
+  log::debug!("hook_delete_resource kind: {kind:?}");
   if let Some(url) = kind.url {
     let ctrl_client = CtrlClient::new(&kind.resource_kind_name, &url);
     ctrl_client

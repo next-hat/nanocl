@@ -511,20 +511,20 @@ paths:
       description: Get logs of a cargo instance
       operationId: logs_cargo
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the cargo instance usually `name` or `name-number`
         required: true
         schema:
           type: string
-      - name: Namespace
+      - name: namespace
         in: query
         description: Namespace of the cargo
         required: false
         schema:
           type: string
           nullable: true
-      - name: Since
+      - name: since
         in: query
         description: Only logs returned since timestamp
         required: false
@@ -532,7 +532,7 @@ paths:
           type: integer
           format: int64
           nullable: true
-      - name: Until
+      - name: until
         in: query
         description: Only logs returned until timestamp
         required: false
@@ -540,21 +540,21 @@ paths:
           type: integer
           format: int64
           nullable: true
-      - name: Timestamps
+      - name: timestamps
         in: query
         description: Add timestamps to every log line
         required: false
         schema:
           type: boolean
           nullable: true
-      - name: Follow
+      - name: follow
         in: query
         description: Boolean to return a stream or not
         required: false
         schema:
           type: boolean
           nullable: true
-      - name: Tail
+      - name: tail
         in: query
         description: Only return the n last (integer) or all ("all") logs
         required: false
@@ -2157,9 +2157,9 @@ components:
       type: object
       description: Options for the kill command
       required:
-      - Signal
+      - signal
       properties:
-        Signal:
+        signal:
           type: string
           description: 'Signal to send to the container default: SIGKILL'
     CargoScale:

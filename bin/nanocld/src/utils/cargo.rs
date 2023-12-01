@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
-use diesel::ExpressionMethods;
-use nanocl_error::io::FromIo;
 use ntex::util::Bytes;
 use futures::StreamExt;
+use diesel::ExpressionMethods;
 use futures_util::TryFutureExt;
 use futures_util::stream::FuturesUnordered;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
+use bollard_next::service::ContainerCreateResponse;
 use bollard_next::container::{
   Stats, LogOutput, ListContainersOptions, CreateContainerOptions,
   StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
@@ -16,7 +16,6 @@ use bollard_next::container::{
 use bollard_next::service::{
   HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
 };
-use bollard_next::service::ContainerCreateResponse;
 use nanocl_stubs::system::EventAction;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::generic::{GenericListNspQuery, GenericClause, GenericFilter};
@@ -571,20 +570,14 @@ pub(crate) async fn list(
   query: &GenericListNspQuery,
   state: &DaemonState,
 ) -> HttpResult<Vec<CargoSummary>> {
-  let filter = GenericFilter::try_from(query.clone()).map_err(|err| {
-    HttpError::bad_request(format!("Invalid query string: {}", err))
-  })?;
   let namespace = utils::key::resolve_nsp(&query.namespace);
+  let filter = GenericFilter::try_from(query.clone())
+    .map_err(|err| {
+      HttpError::bad_request(format!("Invalid query string: {}", err))
+    })?
+    .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
   // ensure namespace exists
   NamespaceDb::find_by_pk(&namespace, &state.pool).await??;
-  let mut filter = match &query.filter {
-    Some(filter) => serde_json::from_str::<GenericFilter>(filter)
-      .map_err(|err| err.map_err_context(|| "GenericFilter"))?,
-    None => GenericFilter::default(),
-  };
-  let mut r#where = filter.r#where.clone().unwrap_or_default();
-  r#where.insert("NamespaceName".to_owned(), GenericClause::Eq(namespace));
-  filter.r#where = Some(r#where);
   let cargoes = CargoDb::find(&filter, &state.pool).await??;
   let mut cargo_summaries = Vec::new();
   for cargo in cargoes {

@@ -152,10 +152,8 @@ pub(crate) async fn list_resource_history(
   path: web::types::Path<(String, String)>,
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let mut filter = GenericFilter::default();
-  let mut r#where = std::collections::HashMap::new();
-  r#where.insert("ResourceKey".to_owned(), GenericClause::Eq(path.1.clone()));
-  filter.r#where = Some(r#where);
+  let filter = GenericFilter::new()
+    .r#where("resource_key", GenericClause::Eq(path.1.clone()));
   let items = ResourceSpecDb::find(&filter, &state.pool)
     .await??
     .into_iter()

@@ -105,7 +105,7 @@ impl TryFrom<ContainerDb> for Container {
   }
 }
 
-impl std::convert::From<&ContainerPartial> for ContainerDb {
+impl From<&ContainerPartial> for ContainerDb {
   fn from(model: &ContainerPartial) -> Self {
     Self {
       key: model.key.clone(),

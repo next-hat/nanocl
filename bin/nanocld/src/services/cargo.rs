@@ -365,13 +365,13 @@ pub(crate) async fn revert_cargo(
   tag = "Cargoes",
   path = "/cargoes/{Name}/logs",
   params(
-    ("Name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
-    ("Namespace" = Option<String>, Query, description = "Namespace of the cargo"),
-    ("Since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
-    ("Until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
-    ("Timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
-    ("Follow" = Option<bool>, Query, description = "Boolean to return a stream or not"),
-    ("Tail" = Option<String>, Query, description = "Only return the n last (integer) or all (\"all\") logs"),
+    ("name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
+    ("namespace" = Option<String>, Query, description = "Namespace of the cargo"),
+    ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
+    ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
+    ("timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
+    ("follow" = Option<bool>, Query, description = "Boolean to return a stream or not"),
+    ("tail" = Option<String>, Query, description = "Only return the n last (integer) or all (\"all\") logs"),
   ),
   responses(
     (status = 200, description = "Cargo logs", content_type = "application/vdn.nanocl.raw-stream"),
@@ -386,6 +386,7 @@ pub(crate) async fn logs_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
+  log::debug!("service::logs_cargo: {key}");
   let stream = utils::cargo::get_logs(&key, &qs, &state.docker_api)?;
   Ok(
     web::HttpResponse::Ok()
@@ -800,7 +801,7 @@ mod tests {
   async fn logs() {
     const CARGO_NAME: &str = "nstore";
     let client = gen_default_test_client().await;
-    let res = client
+    let mut res = client
       .send_get(
         &format!("{ENDPOINT}/{CARGO_NAME}/logs"),
         Some(&GenericNspQuery {

@@ -164,10 +164,6 @@ impl From<LogOutput> for OutputLog {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
 pub struct CargoKillOptions {
   /// Signal to send to the container default: SIGKILL
   pub signal: String,
@@ -192,10 +188,6 @@ impl From<CargoKillOptions> for KillContainerOptions<String> {
 /// Delete cargo query
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
 pub struct CargoDeleteQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
@@ -206,10 +198,6 @@ pub struct CargoDeleteQuery {
 /// Log cargo query
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
 pub struct CargoLogQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
@@ -232,10 +220,6 @@ pub struct CargoLogQuery {
 /// Stats cargo query
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
 pub struct CargoStatsQuery {
   /// Name of the namespace
   pub namespace: Option<String>,

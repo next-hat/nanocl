@@ -664,9 +664,4 @@ mod tests {
   async fn node_list() {
     assert_cli_ok!("node", "ls");
   }
-
-  #[ntex::test]
-  async fn http_logs() {
-    assert_cli_ok!("system", "http", "logs");
-  }
 }
