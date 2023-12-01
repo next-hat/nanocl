@@ -37,7 +37,7 @@ servers:
       - v0.2
       - v0.1
 paths:
-  /rules/{Name}:
+  /rules/{name}:
     put:
       tags:
       - Rules
@@ -45,7 +45,7 @@ paths:
       description: Create/Update a new ProxyRule
       operationId: apply_rule
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the rule
         required: true
@@ -71,7 +71,7 @@ paths:
       description: Delete a ProxyRule
       operationId: remove_rule
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: Name of the rule
         required: true

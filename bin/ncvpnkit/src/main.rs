@@ -14,10 +14,7 @@ use nanocld_client::stubs::proxy::{
 
 mod version;
 
-/// ## Resource to ProxyRule
-///
 /// Convert a Resource to a ProxyRule if the `Kind` is `ProxyRule`.
-///
 fn resource_to_proxy_rule(
   resource: &Resource,
 ) -> std::io::Result<ResourceProxyRule> {
@@ -30,10 +27,7 @@ fn resource_to_proxy_rule(
     })
 }
 
-/// ## Apply rule
-///
 /// Apply vpnkit rule
-///
 async fn apply_rule(port: &VpnKitPort, vpnkit_client: &VpnKitRc) {
   if let Some(VpnKitProtocol::UNIX) = port.proto {
     log::info!(
@@ -60,10 +54,7 @@ async fn apply_rule(port: &VpnKitPort, vpnkit_client: &VpnKitRc) {
   }
 }
 
-/// ## Remove rules
-///
 /// Remove vpnkit rule
-///
 async fn remove_rule(port: &VpnKitPort, vpnkit_client: &VpnKitRc) {
   if let Some(VpnKitProtocol::UNIX) = port.proto {
     log::info!(
@@ -90,10 +81,7 @@ async fn remove_rule(port: &VpnKitPort, vpnkit_client: &VpnKitRc) {
   }
 }
 
-/// ## Rule stream to VpnKitPort
-///
 /// Convert a `ProxyRuleStream` to a `VpnKitPort`
-///
 fn rule_stream_to_vpnkit_port(rule_stream: &ProxyRuleStream) -> VpnKitPort {
   VpnKitPort {
     proto: match rule_stream.protocol {
@@ -108,11 +96,8 @@ fn rule_stream_to_vpnkit_port(rule_stream: &ProxyRuleStream) -> VpnKitPort {
   }
 }
 
-/// ## On event
-///
 /// Handle event from the nanocl daemon.
 /// It's watching for ProxyRule events and apply the rules to vpnkit.
-///
 async fn on_event(
   event: &Event,
   nanocl_client: &NanocldClient,
