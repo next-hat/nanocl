@@ -13,19 +13,7 @@ impl NanocldClient {
   /// ## Default path for vms
   const VM_PATH: &'static str = "/vms";
 
-  /// ## Create vm
-  ///
   /// Create a new virtual machine in the system.
-  ///
-  /// ## Arguments
-  ///
-  /// * [vm](VmSpecPartial) - The spec for the vm
-  /// * [namespace](Option) - The [namespace](str) where belong the vm
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vm](Vm)
-  ///
   pub async fn create_vm(
     &self,
     vm: &VmSpecPartial,
@@ -41,17 +29,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## List vm
-  ///
   /// List existing vms
-  ///
-  /// ## Arguments
-  ///
-  /// * [namespace](Option) - The [namespace](str) where belong the vms
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [VmSummary](VmSummary)
   ///
   /// ## Example
   ///
@@ -61,7 +39,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.list_vm(None).await;
   /// ```
-  ///
   pub async fn list_vm(
     &self,
     namespace: Option<&str>,
@@ -72,14 +49,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Delete vm
-  ///
   /// Delete a vm by it's name and namespace
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the vm to delete
-  /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
   /// ## Example
   ///
@@ -89,7 +59,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.delete_vm("my-vm", None).await;
   /// ```
-  ///
   pub async fn delete_vm(
     &self,
     name: &str,
@@ -104,19 +73,8 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## Inspect vm
-  ///
   /// Inspect a vm by it's name and namespace
   /// And get detailed information about it
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the vm to inspect
-  /// * [namespace](Option) - The [namespace](str) where belong the vm
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [VmInspect](VmInspect)
   ///
   /// ## Example
   ///
@@ -126,7 +84,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.inspect_vm("my-vm", None).await;
   /// ```
-  ///
   pub async fn inspect_vm(
     &self,
     name: &str,
@@ -141,15 +98,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Start vm
-  ///
   /// Start a vm by it's name and namespace
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the vm to start
-  /// * [namespace](Option) - The [namespace](str) where belong the vm
-  ///
   pub async fn start_vm(
     &self,
     name: &str,
@@ -165,14 +114,7 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## Stop vm
-  ///
   /// Stop a vm by it's name and namespace
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the vm to stop
-  /// * [namespace](Option) - The [namespace](str) where belong the vm
   ///
   /// ## Example
   ///
@@ -182,7 +124,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.stop_vm("my-vm", None).await;
   /// ```
-  ///
   pub async fn stop_vm(
     &self,
     name: &str,
@@ -198,16 +139,7 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## Patch vm
-  ///
   /// Patch a vm by it's name and namespace to update it's spec
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the vm to patch
-  /// * [vm](VmSpecUpdate) - The spec to update the vm
-  /// * [namespace](Option) - The [namespace](str) where belong the vm
-  ///
   pub async fn patch_vm(
     &self,
     name: &str,
@@ -224,19 +156,8 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## Attach vm
-  ///
   /// Attach to a vm by it's name and namespace
   /// and return websocket stream to send input and receive output from the vm tty
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the vm to attach
-  /// * [namespace](Option) - The [namespace](str) where belong the vm
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [WsConnection](ws::WsConnection) of [Base](io::Base)
   ///
   /// ## Example
   ///
@@ -246,7 +167,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.attach_vm("my-vm", None).await;
   /// ```
-  ///
   pub async fn attach_vm(
     &self,
     name: &str,

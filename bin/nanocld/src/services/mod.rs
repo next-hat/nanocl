@@ -22,6 +22,7 @@ mod vm;
 mod vm_image;
 mod secret;
 mod job;
+mod process;
 
 pub(crate) async fn unhandled() -> HttpResult<web::HttpResponse> {
   Err(HttpError {
@@ -66,6 +67,7 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
       .configure(vm::ntex_config)
       .configure(metric::ntex_config)
       .configure(secret::ntex_config)
+      .configure(process::ntex_config)
       .configure(job::ntex_config),
   );
 }

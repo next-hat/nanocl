@@ -37,8 +37,8 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
   use ntex::http;
-  use nanocl_stubs::generic::{GenericFilter, GenericClause, GenericListQuery};
   use nanocl_stubs::metric::MetricKind;
+  use nanocl_stubs::generic::{GenericFilter, GenericClause, GenericListQuery};
 
   use crate::utils::tests::*;
 

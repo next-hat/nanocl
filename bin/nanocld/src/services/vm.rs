@@ -14,7 +14,7 @@ use tokio::io::AsyncWriteExt;
 use nanocl_error::http::{HttpError, HttpResult};
 
 use bollard_next::container::AttachContainerOptions;
-use nanocl_stubs::cargo::OutputLog;
+use nanocl_stubs::process::OutputLog;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 

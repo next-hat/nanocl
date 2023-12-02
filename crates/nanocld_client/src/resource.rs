@@ -54,7 +54,6 @@ impl NanocldClient {
   ///   data: serde_json::json!({}),
   /// }).await;
   /// ```
-  ///
   pub async fn create_resource(
     &self,
     data: &ResourcePartial,
@@ -75,7 +74,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.inspect_resource("my-resource").await;
   /// ```
-  ///
   pub async fn inspect_resource(
     &self,
     key: &str,
@@ -96,7 +94,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.patch_resource("my-resource", serde_json::json!({})).await;
   /// ```
-  ///
   pub async fn put_resource(
     &self,
     key: &str,
@@ -122,7 +119,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.delete_resource("my-resource").await;
   /// ```
-  ///
   pub async fn delete_resource(&self, key: &str) -> HttpClientResult<()> {
     self
       .send_delete(&format!("{}/{key}", Self::RESOURCE_PATH), None::<String>)
@@ -140,7 +136,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.list_history_resource("my-resource").await;
   /// ```
-  ///
   pub async fn list_history_resource(
     &self,
     key: &str,
@@ -165,7 +160,6 @@ impl NanocldClient {
   /// let history = client.list_history_resource("my-resource").await.unwrap().first().unwrap();
   /// let res = client.revert_resource("my-resource", history.key).await;
   /// ```
-  ///
   pub async fn revert_resource(
     &self,
     name: &str,

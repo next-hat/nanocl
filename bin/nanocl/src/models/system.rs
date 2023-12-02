@@ -108,13 +108,6 @@ impl From<NodeContainerSummary> for ProcessRow {
     let name = container.name.unwrap_or_default().replace('/', "");
     let mut names = name.split('.');
     let name = names.next().unwrap_or(&name);
-    let namespace = names.next().unwrap_or("None");
-    let network = container.network_settings.unwrap_or_default();
-    let networks = network.networks.unwrap_or_default();
-    let mut ipaddr = String::default();
-    if let Some(network) = networks.get(namespace) {
-      ipaddr = network.ip_address.clone().unwrap_or_default();
-    }
     let config = container.config.unwrap_or_default();
     let kind = config
       .labels
@@ -122,6 +115,17 @@ impl From<NodeContainerSummary> for ProcessRow {
       .get("io.nanocl.kind")
       .cloned()
       .unwrap_or("Unknow".to_owned());
+    let namespace = if kind.as_str() != "Job" {
+      names.next().unwrap_or("<none>")
+    } else {
+      "<none>"
+    };
+    let network = container.network_settings.unwrap_or_default();
+    let networks = network.networks.unwrap_or_default();
+    let mut ipaddr = String::default();
+    if let Some(network) = networks.get(namespace) {
+      ipaddr = network.ip_address.clone().unwrap_or_default();
+    }
     // Convert the created_at and updated_at to the current timezone
     let created_at = container.created.unwrap_or_default();
     let binding = chrono::Local::now();

@@ -1,17 +1,17 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard_next::container::{
-  LogOutput, KillContainerOptions, LogsOptions, StatsOptions,
-};
-pub use bollard_next::exec::CreateExecOptions;
-pub use bollard_next::container::Stats as CargoStats;
+use bollard_next::container::{StatsOptions, KillContainerOptions};
 
 use crate::node::NodeContainerSummary;
 use crate::cargo_spec::CargoSpecPartial;
 use crate::system::{Event, EventKind, ToEvent, EventAction, EventActor};
 
 use super::cargo_spec::CargoSpec;
+
+// Rexport some stuff from simplicity
+pub use bollard_next::exec::CreateExecOptions;
+pub use bollard_next::container::Stats as CargoStats;
 
 /// A Cargo is a replicable container
 /// It is used to run one or multiple instances of the same container
@@ -107,59 +107,6 @@ pub struct CargoInspect {
   pub instances: Vec<NodeContainerSummary>,
 }
 
-/// Kind of ExecOutput
-///
-#[derive(Debug)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub enum OutputKind {
-  /// Data is a standard input
-  StdIn,
-  /// Data is a standard output
-  StdOut,
-  /// Data is a standard error
-  StdErr,
-  /// Data is a console output
-  Console,
-}
-
-/// ExecOutput is the output of an exec command
-/// It contains the kind of the output and the data
-#[derive(Debug)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct OutputLog {
-  /// Kind of the output
-  pub kind: OutputKind,
-  /// Data of the output
-  pub data: String,
-}
-
-impl From<LogOutput> for OutputLog {
-  fn from(output: LogOutput) -> Self {
-    match output {
-      LogOutput::StdOut { message } => Self {
-        kind: OutputKind::StdOut,
-        data: String::from_utf8_lossy(&message).to_string(),
-      },
-      LogOutput::StdErr { message } => Self {
-        kind: OutputKind::StdErr,
-        data: String::from_utf8_lossy(&message).to_string(),
-      },
-      LogOutput::Console { message } => Self {
-        kind: OutputKind::Console,
-        data: String::from_utf8_lossy(&message).to_string(),
-      },
-      LogOutput::StdIn { message } => Self {
-        kind: OutputKind::StdIn,
-        data: String::from_utf8_lossy(&message).to_string(),
-      },
-    }
-  }
-}
-
 /// Options for the kill command
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -195,28 +142,6 @@ pub struct CargoDeleteQuery {
   pub force: Option<bool>,
 }
 
-/// Log cargo query
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct CargoLogQuery {
-  /// Name of the namespace
-  pub namespace: Option<String>,
-  /// Only include logs since unix timestamp
-  pub since: Option<i64>,
-  /// Only include logs until unix timestamp
-  pub until: Option<i64>,
-  /// Bool, if set include timestamp to ever log line
-  pub timestamps: Option<bool>,
-  /// Bool, if set open the log as stream
-  pub follow: Option<bool>,
-  /// If integer only return last n logs, if "all" returns all logs
-  pub tail: Option<String>,
-  /// Include stderr in response
-  pub stderr: Option<bool>,
-  /// Include stdout in response
-  pub stdout: Option<bool>,
-}
-
 /// Stats cargo query
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -234,35 +159,6 @@ impl From<CargoStatsQuery> for StatsOptions {
     StatsOptions {
       stream: query.stream.unwrap_or(true),
       one_shot: query.one_shot.unwrap_or_default(),
-    }
-  }
-}
-
-impl CargoLogQuery {
-  pub fn of_namespace(nsp: &str) -> CargoLogQuery {
-    CargoLogQuery {
-      namespace: Some(nsp.to_owned()),
-      since: None,
-      until: None,
-      timestamps: None,
-      follow: None,
-      tail: None,
-      stderr: None,
-      stdout: None,
-    }
-  }
-}
-
-impl From<CargoLogQuery> for LogsOptions<String> {
-  fn from(query: CargoLogQuery) -> LogsOptions<String> {
-    LogsOptions::<String> {
-      follow: query.follow.unwrap_or_default(),
-      timestamps: query.timestamps.unwrap_or_default(),
-      since: query.since.unwrap_or_default(),
-      until: query.until.unwrap_or_default(),
-      tail: query.tail.to_owned().unwrap_or("all".to_string()),
-      stdout: query.stdout.unwrap_or(true),
-      stderr: query.stdout.unwrap_or(true),
     }
   }
 }

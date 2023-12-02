@@ -73,7 +73,7 @@ use nanocl_stubs::state::{Statefile, StatefileArg};
 
 use super::{
   node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
-  metric, secret, job,
+  metric, secret, job, process,
 };
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -238,7 +238,6 @@ impl Modify for VersionModifier {
     job::list_job,
     job::delete_job,
     job::inspect_job,
-    job::logs_job,
     job::create_job,
     job::wait_job,
     job::start_job,
@@ -256,7 +255,6 @@ impl Modify for VersionModifier {
     cargo::kill_cargo,
     cargo::list_cargo_history,
     cargo::revert_cargo,
-    cargo::logs_cargo,
     cargo::scale_cargo,
     cargo::stats_cargo,
     // Exec
@@ -296,6 +294,8 @@ impl Modify for VersionModifier {
     resource::revert_resource,
     // Metric
     metric::list_metric,
+    // Process
+    process::get_process_logs,
   ),
   components(schemas(
     // Node
@@ -496,7 +496,7 @@ impl Modify for VersionModifier {
     (name = "VmImages", description = "Virtual machine images management endpoints."),
     (name = "Vms", description = "Virtual machines management endpoints."),
     (name = "Metrics", description = "Metrics management endpoints."),
-    (name = "HttpMetrics", description = "HTTP Metrics management endpoints."),
+    (name = "Processes", description = "Processes management endpoints."),
   ),
   modifiers(&VersionModifier),
 )]

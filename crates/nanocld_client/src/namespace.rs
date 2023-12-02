@@ -8,13 +8,7 @@ impl NanocldClient {
   /// ## Default path for namespaces
   const NAMESPACE_PATH: &'static str = "/namespaces";
 
-  /// ## List namespace
-  ///
   /// List all namespaces from the system
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [NamespaceSummary](NamespaceSummary)
   ///
   /// ## Example
   ///
@@ -24,7 +18,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.list_namespace().await;
   /// ```
-  ///
   pub async fn list_namespace(
     &self,
   ) -> HttpClientResult<Vec<NamespaceSummary>> {
@@ -32,18 +25,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Create namespace
-  ///
   /// Create a namespace by it's name
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the namespace to create
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Namespace](Namespace)
-  ///
   pub async fn create_namespace(
     &self,
     name: &str,
@@ -55,17 +37,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Inspect namespace
-  ///
   /// Inspect a namespace by it's name to get detailed information about it.
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the namespace to inspect
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [NamespaceInspect](NamespaceInspect)
   ///
   /// ## Example
   ///
@@ -75,7 +47,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.inspect_namespace("my-namespace").await;
   /// ```
-  ///
   pub async fn inspect_namespace(
     &self,
     name: &str,
@@ -89,13 +60,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Delete a namespace
-  ///
   /// Delete a namespace by it's name
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the namespace to delete
   ///
   /// ## Example
   ///
@@ -105,7 +70,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.delete_namespace("my-namespace").await;
   /// ```
-  ///
   pub async fn delete_namespace(&self, name: &str) -> HttpClientResult<()> {
     self
       .send_delete(&format!("{}/{name}", Self::NAMESPACE_PATH), None::<String>)

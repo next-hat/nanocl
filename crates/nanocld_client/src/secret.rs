@@ -20,7 +20,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.list_secret(None).await;
   /// ```
-  ///
   pub async fn list_secret(
     &self,
     query: Option<&GenericFilter>,
@@ -68,7 +67,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let secret = client.inspect_secret("my-secret").await?;
   /// ```
-  ///
   pub async fn inspect_secret(&self, key: &str) -> HttpClientResult<Secret> {
     let res = self
       .send_get(
@@ -89,7 +87,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// client.delete_secret("my-secret").await?;
   /// ```
-  ///
   pub async fn delete_secret(&self, key: &str) -> HttpClientResult<()> {
     self
       .send_delete(&format!("{}/{key}", Self::SECRET_PATH), None::<String>)

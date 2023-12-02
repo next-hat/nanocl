@@ -4,8 +4,7 @@ use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::generic::{GenericNspQuery, GenericListNspQuery};
 use nanocl_stubs::cargo::{
-  CargoDeleteQuery, CargoKillOptions, CargoLogQuery, CargoStatsQuery,
-  CargoScale,
+  CargoDeleteQuery, CargoKillOptions, CargoStatsQuery, CargoScale,
 };
 use nanocl_stubs::cargo_spec::{CargoSpecPartial, CargoSpecUpdate};
 
@@ -296,7 +295,7 @@ pub(crate) async fn kill_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::kill_by_name(&key, &payload, &state.docker_api).await?;
+  utils::cargo::kill_by_key(&key, &payload, &state).await?;
   Ok(web::HttpResponse::Ok().into())
 }
 
@@ -358,42 +357,6 @@ pub(crate) async fn revert_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-/// Get logs of a cargo instance
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  tag = "Cargoes",
-  path = "/cargoes/{name}/logs",
-  params(
-    ("name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-    ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
-    ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
-    ("timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
-    ("follow" = Option<bool>, Query, description = "Boolean to return a stream or not"),
-    ("tail" = Option<String>, Query, description = "Only return the n last (integer) or all (\"all\") logs"),
-  ),
-  responses(
-    (status = 200, description = "Cargo logs", content_type = "application/vdn.nanocl.raw-stream"),
-    (status = 404, description = "Cargo does not exist"),
-  ),
-))]
-#[web::get("/cargoes/{name}/logs")]
-pub(crate) async fn logs_cargo(
-  state: web::types::State<DaemonState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<CargoLogQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  log::debug!("service::logs_cargo: {key}");
-  let stream = utils::cargo::get_logs(&key, &qs, &state.docker_api)?;
-  Ok(
-    web::HttpResponse::Ok()
-      .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(stream),
-  )
-}
-
 /// Get stats of a cargo instance
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
@@ -402,8 +365,8 @@ pub(crate) async fn logs_cargo(
   params(
     ("name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
     ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-    ("stream" = Option<bool>, Query, description = "Only logs returned since timestamp"),
-    ("one_shot" = Option<bool>, Query, description = "Only logs returned until timestamp"),
+    ("stream" = Option<bool>, Query, description = "Return a stream of stats"),
+    ("one_shot" = Option<bool>, Query, description = "Return stats only once"),
   ),
   responses(
     (status = 200, description = "Cargo stats", content_type = "application/vdn.nanocl.raw-stream", body = Stats),
@@ -467,7 +430,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(inspect_cargo);
   config.service(list_cargo_history);
   config.service(revert_cargo);
-  config.service(logs_cargo);
   config.service(list_cargo_instance);
   config.service(scale_cargo);
   config.service(stats_cargo);
@@ -476,12 +438,10 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
   use ntex::http;
-  use futures::{TryStreamExt, StreamExt};
 
-  use nanocl_stubs::generic::GenericNspQuery;
   use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
   use nanocl_stubs::cargo::{
-    Cargo, CargoSummary, CargoInspect, OutputLog, CargoDeleteQuery, CargoScale,
+    Cargo, CargoSummary, CargoInspect, CargoDeleteQuery, CargoScale,
     CargoKillOptions,
   };
 
@@ -794,28 +754,5 @@ mod tests {
       res.status(),
       "scale cargo delete"
     );
-  }
-
-  #[ntex::test]
-  async fn logs() {
-    const CARGO_NAME: &str = "nstore";
-    let client = gen_default_test_client().await;
-    let res = client
-      .send_get(
-        &format!("{ENDPOINT}/{CARGO_NAME}/logs"),
-        Some(&GenericNspQuery {
-          namespace: Some("system".into()),
-        }),
-      )
-      .await;
-    test_status_code!(res.status(), http::StatusCode::OK, "logs cargo logs");
-    let mut stream = res.into_stream();
-    let mut payload = Vec::new();
-    let data = stream.next().await.unwrap().unwrap();
-    payload.extend_from_slice(&data);
-    if data.last() == Some(&b'\n') {
-      let _ = serde_json::from_slice::<OutputLog>(&payload).unwrap();
-      payload.clear();
-    }
   }
 }

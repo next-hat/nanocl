@@ -10,20 +10,19 @@ use futures_util::stream::{FuturesUnordered, select_all, FuturesOrdered};
 use bollard_next::service::{ContainerSummary, ContainerWaitExitError};
 use bollard_next::container::{
   CreateContainerOptions, StartContainerOptions, ListContainersOptions,
-  RemoveContainerOptions, LogsOptions, WaitContainerOptions,
+  RemoveContainerOptions, WaitContainerOptions,
 };
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
 use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::job::{
-  Job, JobPartial, JobInspect, JobLogOutput, JobWaitResponse, WaitCondition,
-  JobSummary,
+  Job, JobPartial, JobInspect, JobWaitResponse, WaitCondition, JobSummary,
 };
 
-use crate::version;
+use crate::{version, utils};
 use crate::models::{
-  DaemonState, JobUpdateDb, ContainerDb, JobDb, Repository, FromSpec, NodeDb,
+  DaemonState, JobUpdateDb, ProcessDb, JobDb, Repository, FromSpec, NodeDb,
 };
 
 use super::stream::transform_stream;
@@ -152,13 +151,13 @@ pub(crate) async fn inspect_instances(
     .into_iter()
     .map(|node| (node.name.clone(), node))
     .collect::<std::collections::HashMap<String, _>>();
-  ContainerDb::find_by_kind_id(name, &state.pool)
+  ProcessDb::find_by_kind_id(name, &state.pool)
     .await?
     .into_iter()
     .map(|instance| {
       Ok::<_, HttpError>(NodeContainerSummary {
-        node: instance.node_id.clone(),
-        ip_address: match nodes.get(&instance.node_id) {
+        node: instance.node_key.clone(),
+        ip_address: match nodes.get(&instance.node_key) {
           Some(node) => node.ip_address.clone(),
           None => "Unknow".to_owned(),
         },
@@ -185,7 +184,7 @@ pub(crate) async fn list_instances(
   Ok(containers)
 }
 
-/// Create a job and run it
+/// Create a job and with it's containers
 pub(crate) async fn create(
   item: &JobPartial,
   state: &DaemonState,
@@ -205,10 +204,14 @@ pub(crate) async fn create(
         labels.insert("io.nanocl.kind".to_owned(), "Job".to_owned());
         labels.insert("io.nanocl.j".to_owned(), job_name.clone());
         container.labels = Some(labels);
+        let short_id = utils::key::generate_short_id(6);
         state
           .docker_api
           .create_container(
-            None::<CreateContainerOptions<String>>,
+            Some(CreateContainerOptions::<String> {
+              name: format!("{job_name}-{short_id}.j"),
+              ..Default::default()
+            }),
             container.clone(),
           )
           .await?;
@@ -346,47 +349,6 @@ pub(crate) async fn inspect_by_name(
     instances,
   };
   Ok(job_inspect)
-}
-
-/// Get the logs of a job by name
-pub(crate) async fn logs_by_name(
-  name: &str,
-  state: &DaemonState,
-) -> HttpResult<impl StreamExt<Item = Result<Bytes, HttpError>>> {
-  JobDb::find_by_pk(name, &state.pool).await??;
-  let instances = list_instances(name, &state.docker_api).await?;
-  log::debug!("Instances: {instances:#?}");
-  let futures = instances
-    .into_iter()
-    .map(|instance| {
-      state
-        .docker_api
-        .logs(
-          &instance.id.unwrap_or_default(),
-          Some(LogsOptions::<String> {
-            stdout: true,
-            ..Default::default()
-          }),
-        )
-        .map(move |elem| match elem {
-          Err(err) => Err(err),
-          Ok(elem) => {
-            log::debug!("{:#?} {elem}", &instance.names);
-            Ok(JobLogOutput {
-              container_name: instance
-                .names
-                .clone()
-                .unwrap_or_default()
-                .join("")
-                .replace('/', ""),
-              log: elem.into(),
-            })
-          }
-        })
-    })
-    .collect::<Vec<_>>();
-  let stream = select_all(futures).into_stream();
-  Ok(transform_stream::<JobLogOutput, JobLogOutput>(stream))
 }
 
 /// Wait a job to finish

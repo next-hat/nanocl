@@ -9,13 +9,7 @@ use nanocl_stubs::system::{Event, BinaryInfo, HostInfo, ProccessQuery};
 use super::http_client::NanocldClient;
 
 impl NanocldClient {
-  /// ## Get version
-  ///
   /// Get the version of the daemon
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Version](Version)
   ///
   /// ## Example
   ///
@@ -25,20 +19,13 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.get_version().await;
   /// ```
-  ///
   pub async fn get_version(&self) -> HttpClientResult<BinaryInfo> {
     let res = self.send_get("/version", None::<String>).await?;
     Self::res_json(res).await
   }
 
-  /// ## Watch events
-  ///
   /// Watch daemon events
   /// It will emit an event when the daemon state change
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Receiver](Receiver) of [Event](Event)
   ///
   /// ## Example
   ///
@@ -51,7 +38,6 @@ impl NanocldClient {
   ///  println!("{:?}", event);
   /// }
   /// ```
-  ///
   pub async fn watch_events(
     &self,
   ) -> HttpClientResult<Receiver<HttpResult<Event>>> {
@@ -59,8 +45,6 @@ impl NanocldClient {
     Ok(Self::res_stream(res).await)
   }
 
-  /// ## Ping the daemon
-  ///
   /// Check if the daemon is running
   ///
   /// ## Example
@@ -71,19 +55,12 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.ping().await;
   /// ```
-  ///
   pub async fn ping(&self) -> HttpClientResult<()> {
     self.send_head("/_ping", None::<String>).await?;
     Ok(())
   }
 
-  /// ## Get the host info
-  ///
   /// Get details about the host and docker daemon
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [HostInfo](HostInfo)
   ///
   /// ## Example
   ///
@@ -93,23 +70,12 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let info = client.info().await.unwrap();
   /// ```
-  ///
   pub async fn info(&self) -> HttpClientResult<HostInfo> {
     let res = self.send_get("/info", None::<String>).await?;
     Self::res_json(res).await
   }
 
-  /// ## Process
-  ///
   /// List of current processes (vm, cargoes) managed by the daemon
-  ///
-  /// ## Arguments
-  ///
-  /// * [opts](Option) - The optional [query](ProccessQuery)
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [NodeContainerSummary](NodeContainerSummary)
   ///
   /// ## Example
   ///
@@ -119,7 +85,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.process(None).await;
   /// ```
-  ///
   pub async fn process(
     &self,
     opts: Option<&ProccessQuery>,

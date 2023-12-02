@@ -8,13 +8,7 @@ impl NanocldClient {
   /// ## Default path for nodes
   const NODE_PATH: &'static str = "/nodes";
 
-  /// ## List node
-  ///
   /// List existing nodes in the system
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [Node](Node)
   ///
   /// ## Example
   ///

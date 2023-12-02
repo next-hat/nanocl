@@ -11,19 +11,7 @@ impl NanocldClient {
   /// ## Default path for state
   const STATE_PATH: &'static str = "/state";
 
-  /// ## Apply state
-  ///
   /// Apply a state to the system
-  ///
-  /// ## Arguments
-  ///
-  /// * [data](serde_json::Value) - The state to apply
-  /// * [qs](Option) - Optional [options](StateApplyQuery)
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Receiver](Receiver) of [StateStream](StateStream)
-  ///
   pub async fn apply_state(
     &self,
     data: &serde_json::Value,
@@ -35,18 +23,7 @@ impl NanocldClient {
     Ok(Self::res_stream(res).await)
   }
 
-  /// ## Remove state
-  ///
   /// Remove a state from the system
-  ///
-  /// ## Arguments
-  ///
-  /// * [data](serde_json::Value) - The state to remove
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Receiver](Receiver) of [StateStream](StateStream)
-  ///
   pub async fn remove_state(
     &self,
     data: &serde_json::Value,

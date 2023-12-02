@@ -12,8 +12,8 @@ use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
 use crate::{utils, version};
 use crate::models::{
-  DaemonState, ContainerPartial, ContainerUpdateDb, CargoDb, ContainerDb,
-  Repository, Container, NamespaceDb,
+  DaemonState, ProcessPartial, ProcessUpdateDb, CargoDb, ProcessDb, Repository,
+  Process, NamespaceDb,
 };
 
 /// Will determine if the instance is registered by nanocl
@@ -26,7 +26,7 @@ pub(crate) async fn sync_instance(
   let id = instance.id.clone().unwrap_or_default();
   let container_instance_data = serde_json::to_value(instance)
     .map_err(|err| err.map_err_context(|| "ContainerInstance"))?;
-  let current_res = ContainerDb::find_by_pk(&id, &state.pool).await?;
+  let current_res = ProcessDb::find_by_pk(&id, &state.pool).await?;
   let labels = instance
     .config
     .clone()
@@ -52,29 +52,29 @@ pub(crate) async fn sync_instance(
   }
   match current_res {
     Ok(current_instance) => {
-      let current_instance: Container = current_instance.try_into()?;
+      let current_instance: Process = current_instance.try_into()?;
       if current_instance.data == *instance {
         log::debug!("container instance already synced");
         return Ok(());
       }
-      let new_instance = ContainerUpdateDb {
+      let new_instance = ProcessUpdateDb {
         updated_at: Some(chrono::Utc::now().naive_utc()),
         data: Some(container_instance_data),
       };
-      let _ = ContainerDb::update_by_pk(&id, new_instance, &state.pool)
+      let _ = ProcessDb::update_by_pk(&id, new_instance, &state.pool)
         .await
         .map_err(|err| log::error!("{err}"));
     }
     Err(_) => {
-      let new_instance = ContainerPartial {
+      let new_instance = ProcessPartial {
         key: id,
         name,
         kind: kind.to_owned(),
         data: container_instance_data.clone(),
-        node_id: state.config.hostname.clone(),
-        kind_id: kind_id.to_owned(),
+        node_key: state.config.hostname.clone(),
+        kind_key: kind_id.to_owned(),
       };
-      let _ = ContainerDb::create(&new_instance, &state.pool)
+      let _ = ProcessDb::create(&new_instance, &state.pool)
         .await
         .map_err(|err| log::error!("{err}"));
     }

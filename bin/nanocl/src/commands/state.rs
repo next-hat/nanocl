@@ -12,7 +12,7 @@ use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::job::JobPartial;
 use nanocld_client::stubs::state::{StateApplyQuery, StateStreamStatus, Statefile};
-use nanocld_client::stubs::cargo::{OutputKind, CargoLogQuery};
+use nanocld_client::stubs::process::ProcessLogQuery;
 use nanocld_client::stubs::cargo_spec::{CargoSpecPartial, Config};
 
 use crate::utils;
@@ -127,7 +127,7 @@ fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
 pub async fn log_cargo(
   client: &NanocldClient,
   cargo: CargoSpecPartial,
-  opts: &CargoLogQuery,
+  opts: &ProcessLogQuery,
 ) -> IoResult<Vec<rt::JoinHandle<()>>> {
   let cargo = match client
     .inspect_cargo(
@@ -160,7 +160,7 @@ pub async fn log_cargo(
     let tail = opts.tail.to_owned();
     let follow = opts.follow;
     let fut = rt::spawn(async move {
-      let query = CargoLogQuery {
+      let query = ProcessLogQuery {
         namespace: Some(namespace),
         follow,
         since,
@@ -169,31 +169,13 @@ pub async fn log_cargo(
         timestamps,
         ..Default::default()
       };
-      match client.logs_cargo(&name, Some(&query)).await {
+      match client.logs_process("cargo", &name, Some(&query)).await {
         Err(err) => {
           eprintln!("Cannot attach to cargo {name}: {err}");
         }
-        Ok(mut stream) => {
-          while let Some(output) = stream.next().await {
-            let output = match output {
-              Ok(output) => output,
-              Err(e) => {
-                eprintln!("Error: {e}");
-                break;
-              }
-            };
-            match output.kind {
-              OutputKind::StdOut => {
-                print!("[{name}]: {}", &output.data);
-              }
-              OutputKind::StdErr => {
-                eprint!("[{name}]: {}", &output.data);
-              }
-              OutputKind::Console => {
-                print!("[{name}]: {}", &output.data);
-              }
-              _ => {}
-            }
+        Ok(stream) => {
+          if let Err(err) = utils::print::logs_process_stream(stream).await {
+            eprintln!("{err}");
           }
         }
       }
@@ -212,33 +194,13 @@ pub async fn log_jobs(
   for job in jobs {
     let client = client.clone();
     let fut = async move {
-      match client.logs_job(&job.name).await {
+      match client.logs_process("job", &job.name, None).await {
         Err(err) => {
           eprintln!("Cannot attach to job {}: {err}", &job.name);
         }
-        Ok(mut stream) => {
-          while let Some(output) = stream.next().await {
-            let output = match output {
-              Ok(output) => output,
-              Err(e) => {
-                eprintln!("Error: {e}");
-                break;
-              }
-            };
-            let name = output.container_name;
-            let data = output.log.data;
-            match output.log.kind {
-              OutputKind::StdOut => {
-                print!("[{}@{name}]: {data}", &job.name);
-              }
-              OutputKind::StdErr => {
-                eprint!("[{}{name}]: {data}", &job.name);
-              }
-              OutputKind::Console => {
-                print!("[{}{name}]: {data}", &job.name);
-              }
-              _ => {}
-            }
+        Ok(stream) => {
+          if let Err(err) = utils::print::logs_process_stream(stream).await {
+            eprintln!("{err}");
           }
         }
       }
@@ -253,7 +215,7 @@ pub async fn log_jobs(
 pub async fn log_cargoes(
   client: &NanocldClient,
   cargoes: Vec<CargoSpecPartial>,
-  opts: &CargoLogQuery,
+  opts: &ProcessLogQuery,
 ) -> IoResult<()> {
   let mut futures = Vec::new();
   for cargo in cargoes {
@@ -573,7 +535,7 @@ async fn exec_state_apply(
   }
   if opts.follow {
     if let Some(cargoes) = state_file.data.cargoes {
-      let query = CargoLogQuery {
+      let query = ProcessLogQuery {
         namespace: state_file.data.namespace,
         follow: Some(true),
         ..Default::default()
@@ -607,7 +569,7 @@ async fn exec_state_logs(
     execute_template(&state_ref, &args, &client, cli_conf).await?;
   let tail_string = opts.tail.clone().unwrap_or_default();
   let tail = tail_string.as_str();
-  let log_opts = CargoLogQuery {
+  let log_opts = ProcessLogQuery {
     since: opts.since,
     until: opts.until,
     tail: if tail.is_empty() {
