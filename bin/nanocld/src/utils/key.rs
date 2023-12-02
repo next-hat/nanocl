@@ -9,6 +9,8 @@ use rand::distributions::Alphanumeric;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
+use crate::models::ProcessKind;
+
 /// Resolve the namespace from the query paramater
 /// Namespace is an optional query paramater it's resolved with value `global` if it's empty
 pub(crate) fn resolve_nsp(nsp: &Option<String>) -> String {
@@ -49,4 +51,18 @@ pub(crate) fn generate_short_id(length: usize) -> String {
     .map(char::from)
     .collect();
   short_id
+}
+
+pub(crate) fn gen_kind_key(
+  kind: &ProcessKind,
+  name: &str,
+  namespace: &Option<String>,
+) -> String {
+  match kind {
+    ProcessKind::Job => name.to_owned(),
+    ProcessKind::Cargo | ProcessKind::Vm => {
+      let namespace = resolve_nsp(namespace);
+      gen_key(&namespace, name)
+    }
+  }
 }

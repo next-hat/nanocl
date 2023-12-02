@@ -6,11 +6,10 @@ use ntex::util::Bytes;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use futures_util::{StreamExt, TryStreamExt};
-use futures_util::stream::{FuturesUnordered, select_all, FuturesOrdered};
+use futures_util::stream::{FuturesUnordered, select_all};
 use bollard_next::service::{ContainerSummary, ContainerWaitExitError};
 use bollard_next::container::{
-  CreateContainerOptions, StartContainerOptions, ListContainersOptions,
-  RemoveContainerOptions, WaitContainerOptions,
+  ListContainersOptions, RemoveContainerOptions, WaitContainerOptions,
 };
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
@@ -21,9 +20,7 @@ use nanocl_stubs::job::{
 };
 
 use crate::{version, utils};
-use crate::models::{
-  DaemonState, JobUpdateDb, ProcessDb, JobDb, Repository, FromSpec, NodeDb,
-};
+use crate::models::{DaemonState, ProcessDb, JobDb, Repository, FromSpec, NodeDb};
 
 use super::stream::transform_stream;
 
@@ -76,7 +73,7 @@ fn format_cron_job_command(job: &Job, state: &DaemonState) -> String {
     .unwrap_or("unix:///run/nanocl/nanocl.sock".to_owned())
     .replace("unix://", "");
   format!(
-    "curl -X POST --unix {host} http://localhost/v{}/jobs/{}/start",
+    "curl -X POST --unix {host} http://localhost/v{}/processes/job/{}/start",
     version::VERSION,
     &job.name
   )
@@ -151,7 +148,7 @@ pub(crate) async fn inspect_instances(
     .into_iter()
     .map(|node| (node.name.clone(), node))
     .collect::<std::collections::HashMap<String, _>>();
-  ProcessDb::find_by_kind_id(name, &state.pool)
+  ProcessDb::find_by_kind_key(name, &state.pool)
     .await?
     .into_iter()
     .map(|instance| {
@@ -200,20 +197,11 @@ pub(crate) async fn create(
       async move {
         let mut container = container.clone();
         let mut labels = container.labels.clone().unwrap_or_default();
-        labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
-        labels.insert("io.nanocl.kind".to_owned(), "Job".to_owned());
         labels.insert("io.nanocl.j".to_owned(), job_name.clone());
         container.labels = Some(labels);
         let short_id = utils::key::generate_short_id(6);
-        state
-          .docker_api
-          .create_container(
-            Some(CreateContainerOptions::<String> {
-              name: format!("{job_name}-{short_id}.j"),
-              ..Default::default()
-            }),
-            container.clone(),
-          )
+        let name = format!("{job_name}-{short_id}.j");
+        utils::process::create(&name, "job", &job_name, container, state)
           .await?;
         Ok::<_, HttpError>(())
       }
@@ -227,44 +215,6 @@ pub(crate) async fn create(
     add_cron_rule(&job, schedule, state).await?;
   }
   Ok(job)
-}
-
-/// Start a job by name
-pub(crate) async fn start_by_name(
-  name: &str,
-  state: &DaemonState,
-) -> HttpResult<()> {
-  JobDb::find_by_pk(name, &state.pool).await??;
-  let containers = list_instances(name, &state.docker_api).await?;
-  containers
-    .into_iter()
-    .map(|inspect| async {
-      if inspect.state.unwrap_or_default() == "running" {
-        return Ok(());
-      }
-      state
-        .docker_api
-        .start_container(
-          &inspect.id.unwrap_or_default(),
-          None::<StartContainerOptions<String>>,
-        )
-        .await?;
-      Ok::<_, HttpError>(())
-    })
-    .collect::<FuturesOrdered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<Vec<_>, _>>()?;
-  JobDb::update_by_pk(
-    name,
-    JobUpdateDb {
-      updated_at: Some(chrono::Utc::now().naive_utc()),
-    },
-    &state.pool,
-  )
-  .await??;
-  Ok(())
 }
 
 /// List all jobs

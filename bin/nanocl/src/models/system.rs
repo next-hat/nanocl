@@ -115,7 +115,7 @@ impl From<NodeContainerSummary> for ProcessRow {
       .get("io.nanocl.kind")
       .cloned()
       .unwrap_or("Unknow".to_owned());
-    let namespace = if kind.as_str() != "Job" {
+    let namespace = if kind.as_str() != "job" {
       names.next().unwrap_or("<none>")
     } else {
       "<none>"

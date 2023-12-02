@@ -104,7 +104,10 @@ pub async fn exec_vm_start(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in names {
-    if let Err(err) = client.start_vm(name, args.namespace.as_deref()).await {
+    if let Err(err) = client
+      .start_process("vm", name, args.namespace.as_deref())
+      .await
+    {
       eprintln!("Failed to start vm {}: {}", name, err);
     }
   }
@@ -139,7 +142,7 @@ pub async fn exec_vm_run(
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
   client
-    .start_vm(&vm.spec.name, args.namespace.as_deref())
+    .start_process("vm", &vm.spec.name, args.namespace.as_deref())
     .await?;
   if options.attach {
     exec_vm_attach(cli_conf, args, &options.name).await?;

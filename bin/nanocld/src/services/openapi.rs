@@ -240,14 +240,12 @@ impl Modify for VersionModifier {
     job::inspect_job,
     job::create_job,
     job::wait_job,
-    job::start_job,
     // Cargo
     cargo::list_cargo,
     cargo::list_cargo_instance,
     cargo::inspect_cargo,
     cargo::create_cargo,
     cargo::delete_cargo,
-    cargo::start_cargo,
     cargo::stop_cargo,
     cargo::restart_cargo,
     cargo::put_cargo,
@@ -277,7 +275,6 @@ impl Modify for VersionModifier {
     // Vm
     vm::list_vm,
     vm::inspect_vm,
-    vm::start_vm,
     vm::stop_vm,
     vm::delete_vm,
     vm::create_vm,
@@ -295,7 +292,8 @@ impl Modify for VersionModifier {
     // Metric
     metric::list_metric,
     // Process
-    process::get_process_logs,
+    process::logs_process,
+    process::start_process,
   ),
   components(schemas(
     // Node

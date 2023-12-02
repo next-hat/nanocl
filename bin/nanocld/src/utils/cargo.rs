@@ -3,12 +3,10 @@ use std::collections::HashMap;
 use ntex::util::Bytes;
 use futures::StreamExt;
 use diesel::ExpressionMethods;
-use futures_util::TryFutureExt;
 use futures_util::stream::FuturesUnordered;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use bollard_next::service::ContainerCreateResponse;
 use bollard_next::container::{
   Stats, ListContainersOptions, CreateContainerOptions, StartContainerOptions,
   WaitContainerOptions, RemoveContainerOptions,
@@ -30,7 +28,7 @@ use nanocl_stubs::cargo_spec::{
 use crate::utils;
 use crate::models::{
   DaemonState, CargoDb, Repository, ProcessDb, NamespaceDb, NodeDb, SecretDb,
-  CargoSpecDb, FromSpec,
+  CargoSpecDb, FromSpec, Process, ProcessKind,
 };
 
 use super::stream::transform_stream;
@@ -101,7 +99,7 @@ async fn create_instances(
   cargo: &Cargo,
   number: usize,
   state: &DaemonState,
-) -> HttpResult<Vec<ContainerCreateResponse>> {
+) -> HttpResult<Vec<Process>> {
   execute_before(cargo, &state.docker_api).await?;
   let mut secret_envs: Vec<String> = Vec::new();
   if let Some(secrets) = &cargo.spec.secrets {
@@ -141,17 +139,11 @@ async fn create_instances(
       async move {
         let short_id = utils::key::generate_short_id(6);
         let name = format!("{}-{}.{}.c", cargo.spec.name, short_id, cargo.namespace_name);
-        let create_options = bollard_next::container::CreateContainerOptions {
-          name: name.clone(),
-          ..Default::default()
-        };
         let spec = cargo.spec.clone();
         let container = spec.container;
         let host_config = container.host_config.unwrap_or_default();
         // Add cargo label to the container to track it
         let mut labels = container.labels.to_owned().unwrap_or_default();
-        labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
-        labels.insert("io.nanocl.kind".to_owned(), "Cargo".to_owned());
         labels.insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
         labels
           .insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
@@ -182,16 +174,16 @@ async fn create_instances(
           Some(ref hostname) => {
             format!("{hostname}-{short_id}")
           }
-          None => name,
+          None => name.to_owned(),
         };
         env.push(format!("NANOCL_NODE={}", state.config.hostname));
         env.push(format!("NANOCL_NODE_ADDR={}", state.config.gateway));
-        env.push(format!("NANOCL_CARGO_KEY={}", cargo.spec.cargo_key));
+        env.push(format!("NANOCL_CARGO_KEY={}", cargo.spec.cargo_key.to_owned()));
         env.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));
         env.push(format!("NANOCL_CARGO_INSTANCE={}", current));
         // Merge the cargo spec with the container spec
         // And set his network mode to the cargo namespace
-        let hook_container = bollard_next::container::Config {
+        let new_process = bollard_next::container::Config {
           attach_stderr: Some(true),
           attach_stdout: Some(true),
           tty: Some(true),
@@ -209,19 +201,15 @@ async fn create_instances(
           }),
           ..container
         };
-        let res = state
-          .docker_api
-          .create_container::<String>(Some(create_options), hook_container)
-          .map_err(HttpError::from)
-          .await?;
+        let res = utils::process::create(&name, "cargo", &cargo.spec.cargo_key, new_process, state).await?;
         Ok::<_, HttpError>(res)
       }
     })
     .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<ContainerCreateResponse, HttpError>>>()
+    .collect::<Vec<Result<Process, HttpError>>>()
     .await
     .into_iter()
-    .collect::<Result<Vec<ContainerCreateResponse>, HttpError>>()
+    .collect::<Result<Vec<Process>, HttpError>>()
 }
 
 /// Restore the instances backup. The instances are restored in parallel.
@@ -365,34 +353,6 @@ pub(crate) async fn create(
   Ok(cargo)
 }
 
-/// The cargo instances (containers) are started in parallel
-/// If one container fails to start, the other containers will continue to start
-pub(crate) async fn start_by_key(
-  key: &str,
-  state: &DaemonState,
-) -> HttpResult<()> {
-  let cargo_key = key.to_owned();
-  let docker_api = state.docker_api.clone();
-  let cargo = CargoDb::inspect_by_pk(&cargo_key, &state.pool).await?;
-  let containers = list_instances(&cargo_key, &docker_api).await?;
-  containers
-    .into_iter()
-    .map(|container| async {
-      let id = container.id.unwrap_or_default();
-      docker_api.start_container::<String>(&id, None).await?;
-      Ok::<_, HttpError>(())
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<Vec<_>, _>>()?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&cargo, EventAction::Started);
-  Ok(())
-}
-
 /// Stop all instances (containers) for the given cargo key.
 /// The containers are stopped in parallel.
 pub(crate) async fn stop_by_key(
@@ -523,7 +483,9 @@ pub(crate) async fn put(
     Ok(instances) => instances,
   };
   // start created containers
-  match start_by_key(cargo_key, state).await {
+  match utils::process::start_by_kind(&ProcessKind::Cargo, cargo_key, state)
+    .await
+  {
     Err(err) => {
       log::error!(
         "Unable to start cargo instance {} : {err}",
@@ -532,7 +494,7 @@ pub(crate) async fn put(
       delete_instances(
         &new_instances
           .iter()
-          .map(|i| i.id.clone())
+          .map(|i| i.key.clone())
           .collect::<Vec<_>>(),
         state,
       )
@@ -577,7 +539,7 @@ pub(crate) async fn list(
       .await??
       .try_to_spec()?;
     let instances =
-      ProcessDb::find_by_kind_id(&cargo.spec.cargo_key, &state.pool).await?;
+      ProcessDb::find_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
     let mut running_instances = 0;
     for instance in &instances {
       let state = instance.data.state.clone().unwrap_or_default();
@@ -606,7 +568,7 @@ pub(crate) async fn inspect_by_key(
 ) -> HttpResult<CargoInspect> {
   let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let mut running_instances = 0;
-  let instances = ProcessDb::find_by_kind_id(key, &state.pool).await?;
+  let instances = ProcessDb::find_by_kind_key(key, &state.pool).await?;
   let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
   // Convert into a hashmap for faster lookup
   let nodes = nodes
@@ -675,7 +637,7 @@ pub(crate) async fn kill_by_key(
   options: &CargoKillOptions,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let instances = ProcessDb::find_by_kind_id(key, &state.pool).await?;
+  let instances = ProcessDb::find_by_kind_key(key, &state.pool).await?;
   if instances.is_empty() {
     return Err(HttpError::not_found(format!(
       "Cargo instance not found: {key}"
@@ -847,7 +809,7 @@ pub async fn scale(
       .map(|instance| async {
         state
           .docker_api
-          .start_container::<String>(&instance.id, None)
+          .start_container::<String>(&instance.key, None)
           .await?;
         Ok::<_, HttpError>(())
       })

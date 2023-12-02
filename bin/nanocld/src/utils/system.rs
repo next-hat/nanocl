@@ -34,18 +34,18 @@ pub(crate) async fn sync_instance(
     .labels
     .unwrap_or_default();
   let mut kind = "unknow";
-  let mut kind_id = "";
+  let mut kind_key = "";
   if let Some(job_name) = labels.get("io.nanocl.j") {
-    kind = "Job";
-    kind_id = job_name;
+    kind = "job";
+    kind_key = job_name;
   }
   if let Some(cargo_key) = labels.get("io.nanocl.c") {
-    kind = "Cargo";
-    kind_id = cargo_key;
+    kind = "cargo";
+    kind_key = cargo_key;
   }
   if let Some(vm_key) = labels.get("io.nanocl.v") {
-    kind = "Vm";
-    kind_id = vm_key;
+    kind = "vm";
+    kind_key = vm_key;
   }
   if kind == "unknow" {
     return Ok(());
@@ -69,10 +69,10 @@ pub(crate) async fn sync_instance(
       let new_instance = ProcessPartial {
         key: id,
         name,
-        kind: kind.to_owned(),
+        kind: kind.to_owned().try_into()?,
         data: container_instance_data.clone(),
         node_key: state.config.hostname.clone(),
-        kind_key: kind_id.to_owned(),
+        kind_key: kind_key.to_owned(),
       };
       let _ = ProcessDb::create(&new_instance, &state.pool)
         .await

@@ -46,28 +46,6 @@ pub(crate) async fn create_job(
   Ok(web::HttpResponse::Created().json(&job))
 }
 
-/// Start a job
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Jobs",
-  path = "/jobs/{name}/start",
-  params(
-    ("name" = String, Path, description = "Name of the job"),
-  ),
-  responses(
-    (status = 202, description = "Job started"),
-    (status = 404, description = "Job does not exist"),
-  ),
-))]
-#[web::post("/jobs/{name}/start")]
-pub(crate) async fn start_job(
-  state: web::types::State<DaemonState>,
-  path: web::types::Path<(String, String)>,
-) -> HttpResult<web::HttpResponse> {
-  utils::job::start_by_name(&path.1, &state).await?;
-  Ok(web::HttpResponse::Accepted().finish())
-}
-
 /// Delete a job
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
@@ -151,7 +129,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(delete_job);
   config.service(inspect_job);
   config.service(wait_job);
-  config.service(start_job);
 }
 
 #[cfg(test)]
@@ -227,7 +204,7 @@ mod tests {
     );
     client
       .send_post(
-        &format!("{job_endpoint}/start"),
+        &format!("/processes/job/{}/start", &job.name),
         None::<String>,
         None::<String>,
       )

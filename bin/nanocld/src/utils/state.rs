@@ -14,7 +14,9 @@ use nanocl_stubs::vm_spec::{VmSpecPartial, VmDisk};
 use nanocl_stubs::state::{Statefile, StateStream, StateApplyQuery};
 
 use crate::utils;
-use crate::models::{DaemonState, ResourceDb, SecretDb, Repository, VmDb, CargoDb};
+use crate::models::{
+  DaemonState, ResourceDb, SecretDb, Repository, VmDb, CargoDb, ProcessKind,
+};
 
 /// Ensure that the namespace exists in the system
 async fn ensure_namespace_existence(
@@ -140,7 +142,10 @@ async fn apply_jobs(
             send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
             return;
           }
-          if let Err(err) = utils::job::start_by_name(&job.name, state).await {
+          if let Err(err) =
+            utils::process::start_by_kind(&ProcessKind::Job, &job.name, state)
+              .await
+          {
             send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
             return;
           }
@@ -150,7 +155,10 @@ async fn apply_jobs(
             send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
             return;
           }
-          if let Err(err) = utils::job::start_by_name(&job.name, state).await {
+          if let Err(err) =
+            utils::process::start_by_kind(&ProcessKind::Job, &job.name, state)
+              .await
+          {
             send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
             return;
           }
@@ -199,7 +207,9 @@ async fn apply_cargoes(
             send(StateStream::new_cargo_error(&key, &err.to_string()), sx);
             return;
           }
-          let res = utils::cargo::start_by_key(&key, state).await;
+          let res =
+            utils::process::start_by_kind(&ProcessKind::Cargo, &key, state)
+              .await;
           if let Err(err) = res {
             send(StateStream::new_cargo_error(&key, &err.to_string()), sx);
             return;
@@ -255,7 +265,8 @@ pub(crate) async fn apply_vms(
             send(StateStream::new_vm_error(&key, &err.to_string()), sx);
             return;
           }
-          let res = utils::vm::start_by_key(&key, state).await;
+          let res =
+            utils::process::start_by_kind(&ProcessKind::Vm, &key, state).await;
           if let Err(err) = res {
             send(StateStream::new_vm_error(&key, &err.to_string()), sx);
             return;

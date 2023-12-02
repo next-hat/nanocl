@@ -74,27 +74,6 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Start a job by it's name
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.start_job("my_job").await;
-  /// ```
-  pub async fn start_job(&self, name: &str) -> HttpClientResult<()> {
-    self
-      .send_post(
-        &format!("{}/{name}/start", Self::JOB_PATH),
-        None::<String>,
-        None::<String>,
-      )
-      .await?;
-    Ok(())
-  }
-
   /// A stream is returned, data are sent when job reach status
   ///
   /// ## Example
@@ -169,7 +148,7 @@ mod tests {
       .unwrap();
     assert_eq!(job.name, "my_test_job");
     let mut stream = client.wait_job(&job.name, None).await.unwrap();
-    client.start_job(&job.name).await.unwrap();
+    client.start_process("job", &job.name, None).await.unwrap();
     while let Some(Ok(_)) = stream.next().await {}
     let job = client.inspect_job(&job.name).await.unwrap();
     client.delete_job(&job.spec.name).await.unwrap();

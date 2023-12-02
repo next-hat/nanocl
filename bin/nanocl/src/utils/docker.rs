@@ -153,7 +153,7 @@ pub fn hook_labels(
 ) -> HashMap<String, String> {
   let mut hooked_labels = labels.clone();
   hooked_labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
-  hooked_labels.insert("io.nanocl.kind".to_owned(), "Cargo".to_owned());
+  hooked_labels.insert("io.nanocl.kind".to_owned(), "cargo".to_owned());
   hooked_labels.insert("io.nanocl.c".to_owned(), key.to_owned());
   hooked_labels.insert("io.nanocl.n".to_owned(), namespace.to_owned());
   hooked_labels.insert(
