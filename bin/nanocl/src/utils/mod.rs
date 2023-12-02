@@ -11,7 +11,7 @@ pub mod hash;
 pub mod tests {
 
   pub fn get_test_client() -> NanocldClient {
-    NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None)
+    NanocldClient::connect_to("http://nanocl.internal:8585", None)
   }
 
   #[macro_export]

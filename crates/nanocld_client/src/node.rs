@@ -31,8 +31,7 @@ mod tests {
 
   #[ntex::test]
   async fn basic() {
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     let node = client.list_node().await;
     assert!(node.is_ok());
   }

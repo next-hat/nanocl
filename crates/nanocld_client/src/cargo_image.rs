@@ -133,8 +133,7 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const IMAGE: &str = "busybox:1.26.1";
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     let mut stream = client.create_cargo_image(IMAGE).await.unwrap();
     while let Some(_info) = stream.next().await {}
     client.list_cargo_image(None).await.unwrap();

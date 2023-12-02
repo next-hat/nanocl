@@ -1,4 +1,4 @@
-ApiVersion: http://ndaemon.nanocl.internal:8585/v0.11
+ApiVersion: http://nanocl.internal:8585/v0.11
 
 Namespace: global
 

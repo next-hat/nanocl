@@ -100,16 +100,14 @@ mod tests {
 
   #[ntex::test]
   async fn get_version() {
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     let version = client.get_version().await;
     assert!(version.is_ok());
   }
 
   #[ntex::test]
   async fn watch_events() {
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     let _stream = client.watch_events().await.unwrap();
     // Todo : find a way to test this on CI because it's limited to 2 threads
     // let _event = stream.next().await.unwrap();
@@ -117,8 +115,7 @@ mod tests {
 
   #[ntex::test]
   async fn info() {
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     let info = client.info().await.unwrap();
     assert!(info.docker.containers.unwrap() > 0);
   }

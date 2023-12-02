@@ -98,31 +98,6 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Stop a vm by it's name and namespace
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.stop_vm("my-vm", None).await;
-  /// ```
-  pub async fn stop_vm(
-    &self,
-    name: &str,
-    namespace: Option<&str>,
-  ) -> HttpClientResult<()> {
-    self
-      .send_post(
-        &format!("{}/{name}/stop", Self::VM_PATH),
-        None::<String>,
-        Some(&GenericNspQuery::new(namespace)),
-      )
-      .await?;
-    Ok(())
-  }
-
   /// Patch a vm by it's name and namespace to update it's spec
   pub async fn patch_vm(
     &self,

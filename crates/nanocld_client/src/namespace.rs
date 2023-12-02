@@ -85,8 +85,7 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const NAMESPACE: &str = "clientnt";
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     client.list_namespace().await.unwrap();
     let namespace = client.create_namespace(NAMESPACE).await.unwrap();
     assert_eq!(namespace.name, NAMESPACE);

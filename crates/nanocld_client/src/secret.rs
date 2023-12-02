@@ -102,8 +102,7 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const SECRET_KEY: &str = "secret-test";
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     client.list_secret(None).await.unwrap();
     let secret = SecretPartial {
       key: SECRET_KEY.to_owned(),

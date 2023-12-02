@@ -163,8 +163,7 @@ pub mod tests {
     before();
     let dnsmasq = dnsmasq::Dnsmasq::new("/tmp/dnsmasq");
     dnsmasq.ensure().unwrap();
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     // Create test server
     let srv = ntex::web::test::server(move || {
       ntex::web::App::new()

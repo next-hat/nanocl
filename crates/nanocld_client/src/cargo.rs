@@ -95,31 +95,6 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Stop a cargo by it's name and namespace
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.stop_cargo("my-cargo", None).await;
-  /// ```
-  pub async fn stop_cargo(
-    &self,
-    name: &str,
-    namespace: Option<&str>,
-  ) -> HttpClientResult<()> {
-    self
-      .send_post(
-        &format!("{}/{name}/stop", Self::CARGO_PATH),
-        None::<String>,
-        Some(GenericNspQuery::new(namespace)),
-      )
-      .await?;
-    Ok(())
-  }
-
   /// Restart a cargo by it's name and namespace
   ///
   /// ## Example
@@ -349,8 +324,7 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const CARGO_NAME: &str = "client-test-cargo";
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     client.list_cargo(None).await.unwrap();
     let new_cargo = CargoSpecPartial {
       name: CARGO_NAME.into(),
@@ -389,14 +363,16 @@ mod tests {
       .revert_cargo(CARGO_NAME, &history.key.to_string(), None)
       .await
       .unwrap();
-    client.stop_cargo(CARGO_NAME, None).await.unwrap();
+    client
+      .stop_process("cargo", CARGO_NAME, None)
+      .await
+      .unwrap();
     client.delete_cargo(CARGO_NAME, None).await.unwrap();
   }
 
   #[ntex::test]
   async fn create_cargo_wrong_image() {
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     let new_cargo = CargoSpecPartial {
       name: "client-test-cargowi".into(),
       container: bollard_next::container::Config {
@@ -416,8 +392,7 @@ mod tests {
 
   #[ntex::test]
   async fn create_cargo_duplicate_name() {
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     let new_cargo = CargoSpecPartial {
       name: "client-test-cargodup".into(),
       container: bollard_next::container::Config {

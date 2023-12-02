@@ -75,7 +75,7 @@ async fn wait_store(addr: &str) -> IoResult<()> {
 pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
   let store_addr = std::env::var("STORE_URL")
-    .unwrap_or("nstore.nanocl.internal:26258".to_owned());
+    .unwrap_or("store.nanocl.internal:26258".to_owned());
   log::info!("Connecting to store at: {store_addr}");
   wait_store(&store_addr).await?;
   let pool = create_pool(&store_addr, daemon_conf).await?;

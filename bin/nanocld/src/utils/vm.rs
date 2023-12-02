@@ -5,9 +5,7 @@ use ntex::http;
 
 use bollard_next::Docker;
 use bollard_next::service::{HostConfig, DeviceMapping, ContainerSummary};
-use bollard_next::container::{
-  ListContainersOptions, StopContainerOptions, RemoveContainerOptions,
-};
+use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
@@ -20,32 +18,6 @@ use crate::models::{
   Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, Repository, VmDb,
   VmSpecDb, FromSpec, ProcessKind,
 };
-
-/// Stop a VM by his model
-pub(crate) async fn stop(vm: &Vm, state: &DaemonState) -> HttpResult<()> {
-  let container_name = format!("{}.v", vm.spec.vm_key);
-  state
-    .docker_api
-    .stop_container(&container_name, None::<StopContainerOptions>)
-    .await
-    .map_err(|e| HttpError {
-      msg: format!("Unable to stop container got error : {e}"),
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-    })?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(vm, EventAction::Stopped);
-  Ok(())
-}
-
-/// Stop a VM by his key
-pub(crate) async fn stop_by_key(
-  vm_key: &str,
-  state: &DaemonState,
-) -> HttpResult<()> {
-  let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
-  stop(&vm, state).await
-}
 
 /// Get detailed information about a VM by his key
 pub(crate) async fn inspect_by_key(
@@ -100,10 +72,7 @@ pub(crate) async fn delete_by_key(
     ..Default::default()
   };
   let container_name = format!("{}.v", vm_key);
-  let _ = state
-    .docker_api
-    .remove_container(&container_name, Some(options))
-    .await;
+  utils::process::remove(&container_name, Some(options), state).await?;
   VmDb::delete_by_pk(vm_key, &state.pool).await??;
   VmSpecDb::delete_by(
     crate::schema::vm_specs::dsl::vm_key.eq(vm.spec.vm_key.clone()),
@@ -365,11 +334,13 @@ pub(crate) async fn put(
 ) -> HttpResult<Vm> {
   let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
   let container_name = format!("{}.v", &vm.spec.vm_key);
-  stop(&vm, state).await?;
-  state
-    .docker_api
-    .remove_container(&container_name, None::<RemoveContainerOptions>)
-    .await?;
+  utils::process::stop_by_kind(&ProcessKind::Vm, vm_key, state).await?;
+  utils::process::remove(
+    &container_name,
+    None::<RemoveContainerOptions>,
+    state,
+  )
+  .await?;
   let vm =
     VmDb::update_from_spec(&vm.spec.vm_key, vm_partial, version, &state.pool)
       .await?;

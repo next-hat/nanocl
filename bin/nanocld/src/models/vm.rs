@@ -76,6 +76,9 @@ impl Repository for VmDb {
     log::debug!("VmDb::find_one filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vms::dsl::vms.inner_join(vm_specs::table).into_boxed();
+    if let Some(value) = r#where.get("key") {
+      gen_where4string!(query, vms::dsl::key, value);
+    }
     if let Some(value) = r#where.get("name") {
       gen_where4string!(query, vms::dsl::name, value);
     }
@@ -102,6 +105,9 @@ impl Repository for VmDb {
     log::debug!("VmDb::find filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vms::dsl::vms.inner_join(vm_specs::table).into_boxed();
+    if let Some(value) = r#where.get("key") {
+      gen_where4string!(query, vms::dsl::key, value);
+    }
     if let Some(value) = r#where.get("name") {
       gen_where4string!(query, vms::dsl::name, value);
     }

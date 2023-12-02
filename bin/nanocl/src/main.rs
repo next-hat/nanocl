@@ -39,7 +39,7 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
       host = cli_args
         .host
         .clone()
-        .unwrap_or("http://ndaemon.nanocl.internal:8585".into());
+        .unwrap_or("http://nanocl.internal:8585".into());
     }
   }
   let client = NanocldClient::connect_to(&host, None);

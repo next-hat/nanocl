@@ -122,15 +122,13 @@ mod tests {
 
   #[ntex::test]
   async fn list_job() {
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     client.list_job().await.unwrap();
   }
 
   #[ntex::test]
   async fn basic() {
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     let job = client
       .create_job(&JobPartial {
         name: "my_test_job".to_owned(),

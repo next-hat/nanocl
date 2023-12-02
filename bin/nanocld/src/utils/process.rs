@@ -1,17 +1,52 @@
 use bollard_next::container::{
   StartContainerOptions, Config, CreateContainerOptions,
-  InspectContainerOptions,
+  InspectContainerOptions, StopContainerOptions, RemoveContainerOptions,
 };
 
 use nanocl_error::{
   http::{HttpResult, HttpError},
   io::FromIo,
 };
+use nanocl_stubs::{
+  system::EventAction,
+  generic::{GenericFilter, GenericClause},
+};
 
 use crate::models::{
   DaemonState, Repository, ProcessDb, JobDb, JobUpdateDb, ProcessPartial,
-  Process, ProcessKind,
+  Process, ProcessKind, VmDb, CargoDb,
 };
+
+async fn after(
+  kind: &ProcessKind,
+  kind_key: &str,
+  action: EventAction,
+  state: &DaemonState,
+) -> HttpResult<()> {
+  let filter =
+    GenericFilter::new().r#where("key", GenericClause::Eq(kind_key.to_owned()));
+  match kind {
+    ProcessKind::Vm => {
+      let vm = VmDb::find_one(&filter, &state.pool).await??;
+      state.event_emitter.spawn_emit_to_event(&vm, action);
+    }
+    ProcessKind::Cargo => {
+      let vm = CargoDb::find_one(&filter, &state.pool).await??;
+      state.event_emitter.spawn_emit_to_event(&vm, action);
+    }
+    ProcessKind::Job => {
+      JobDb::update_by_pk(
+        kind_key,
+        JobUpdateDb {
+          updated_at: Some(chrono::Utc::now().naive_utc()),
+        },
+        &state.pool,
+      )
+      .await??;
+    }
+  }
+  Ok(())
+}
 
 pub(crate) async fn create(
   name: &str,
@@ -54,6 +89,16 @@ pub(crate) async fn create(
     .map_err(|err| HttpError::internal_server_error(err.to_string()))
 }
 
+pub(crate) async fn remove(
+  key: &str,
+  opts: Option<RemoveContainerOptions>,
+  state: &DaemonState,
+) -> HttpResult<()> {
+  state.docker_api.remove_container(key, opts).await?;
+  ProcessDb::delete_by_pk(key, &state.pool).await??;
+  Ok(())
+}
+
 pub(crate) async fn start_by_kind(
   kind: &ProcessKind,
   kind_key: &str,
@@ -74,15 +119,30 @@ pub(crate) async fn start_by_kind(
       )
       .await?;
   }
-  if kind == &ProcessKind::Job {
-    JobDb::update_by_pk(
-      kind_key,
-      JobUpdateDb {
-        updated_at: Some(chrono::Utc::now().naive_utc()),
-      },
-      &state.pool,
-    )
-    .await??;
+  after(kind, kind_key, EventAction::Started, state).await?;
+  Ok(())
+}
+
+pub(crate) async fn stop_by_kind(
+  kind: &ProcessKind,
+  kind_key: &str,
+  state: &DaemonState,
+) -> HttpResult<()> {
+  let processes = ProcessDb::find_by_kind_key(kind_key, &state.pool).await?;
+  log::debug!("process::stop_by_kind: {processes:#?}");
+  for process in processes {
+    let process_state = process.data.state.unwrap_or_default();
+    if !process_state.running.unwrap_or_default() {
+      return Ok(());
+    }
+    state
+      .docker_api
+      .stop_container(
+        &process.data.id.unwrap_or_default(),
+        None::<StopContainerOptions>,
+      )
+      .await?;
   }
+  after(kind, kind_key, EventAction::Stopped, state).await?;
   Ok(())
 }

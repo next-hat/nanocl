@@ -247,9 +247,11 @@ pub mod tests {
   #[ntex::test]
   async fn basic_list() {
     let client = gen_default_test_client().await;
-    let resp = list(&client).await;
-    let status = resp.status();
-    test_status_code!(status, http::StatusCode::OK, "basic cargo image list");
+    test_status_code!(
+      list(&client).await.status(),
+      http::StatusCode::OK,
+      "basic cargo image list"
+    );
   }
 
   /// Test to upload a cargo image as tarball
