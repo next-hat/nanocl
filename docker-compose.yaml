@@ -44,7 +44,7 @@ services:
         cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=nstore.system
       - io.nanocl.n=system
 
@@ -62,7 +62,7 @@ services:
       - unix:///run/nanocl/metrics.sock
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=nmetrics.system
       - io.nanocl.n=system
     volumes:
@@ -77,7 +77,7 @@ services:
       - TZ=Europe/Paris
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=nproxy.system
       - io.nanocl.n=system
     volumes:
@@ -112,7 +112,7 @@ services:
       - run --no-default-features --features dev --bin ncproxy
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=ncproxy.system
       - io.nanocl.n=system
     volumes:
@@ -139,7 +139,7 @@ services:
       - TZ=Europe/Paris
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=ndns.system
       - io.nanocl.n=system
     volumes:
@@ -163,7 +163,7 @@ services:
       - run --no-default-features --features dev --bin ncdns -- --conf-dir /opt/dns
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=ncdns.system
       - io.nanocl.n=system
     volumes:
@@ -188,7 +188,7 @@ services:
       - TZ=Europe/Paris
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=ndaemon.system
       - io.nanocl.n=system
     volumes:
@@ -225,7 +225,7 @@ services:
       - PGADMIN_DEFAULT_PASSWORD=admin
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=dbeaver.system
       - io.nanocl.n=system
     volumes:
@@ -245,7 +245,7 @@ services:
       - USER_HOME=${HOME}
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=ndaemon.system
       - io.nanocl.n=system
     volumes:

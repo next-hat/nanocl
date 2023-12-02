@@ -140,7 +140,9 @@ async fn apply_jobs(
             send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
             return;
           }
-          if let Err(err) = utils::job::start_by_name(&job.name, state).await {
+          if let Err(err) =
+            utils::process::start_by_kind("job", &job.name, state).await
+          {
             send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
             return;
           }
@@ -150,7 +152,9 @@ async fn apply_jobs(
             send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
             return;
           }
-          if let Err(err) = utils::job::start_by_name(&job.name, state).await {
+          if let Err(err) =
+            utils::process::start_by_kind("job", &job.name, state).await
+          {
             send(StateStream::new_job_error(&job.name, &err.to_string()), sx);
             return;
           }
@@ -199,7 +203,7 @@ async fn apply_cargoes(
             send(StateStream::new_cargo_error(&key, &err.to_string()), sx);
             return;
           }
-          let res = utils::cargo::start_by_key(&key, state).await;
+          let res = utils::process::start_by_kind("cargo", &key, state).await;
           if let Err(err) = res {
             send(StateStream::new_cargo_error(&key, &err.to_string()), sx);
             return;
@@ -255,7 +259,7 @@ pub(crate) async fn apply_vms(
             send(StateStream::new_vm_error(&key, &err.to_string()), sx);
             return;
           }
-          let res = utils::vm::start_by_key(&key, state).await;
+          let res = utils::process::start_by_kind("vm", &key, state).await;
           if let Err(err) = res {
             send(StateStream::new_vm_error(&key, &err.to_string()), sx);
             return;

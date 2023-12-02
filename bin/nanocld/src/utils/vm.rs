@@ -6,8 +6,7 @@ use ntex::http;
 use bollard_next::Docker;
 use bollard_next::service::{HostConfig, DeviceMapping, ContainerSummary};
 use bollard_next::container::{
-  CreateContainerOptions, StartContainerOptions, ListContainersOptions,
-  StopContainerOptions, RemoveContainerOptions,
+  ListContainersOptions, StopContainerOptions, RemoveContainerOptions,
 };
 
 use nanocl_error::http::{HttpError, HttpResult};
@@ -21,27 +20,6 @@ use crate::models::{
   Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, Repository, VmDb,
   VmSpecDb, FromSpec,
 };
-
-/// Start a VM by his key
-pub(crate) async fn start_by_key(
-  vm_key: &str,
-  state: &DaemonState,
-) -> HttpResult<()> {
-  let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
-  let container_name = format!("{}.v", vm_key);
-  state
-    .docker_api
-    .start_container(&container_name, None::<StartContainerOptions<String>>)
-    .await
-    .map_err(|e| HttpError {
-      msg: format!("Unable to start container got error : {e}"),
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-    })?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&vm, EventAction::Started);
-  Ok(())
-}
 
 /// Stop a VM by his model
 pub(crate) async fn stop(vm: &Vm, state: &DaemonState) -> HttpResult<()> {
@@ -151,7 +129,7 @@ pub(crate) async fn list_by_namespace(
     let spec = VmSpecDb::find_by_pk(&vm.spec.key, pool)
       .await??
       .try_to_spec()?;
-    let instances = ProcessDb::find_by_kind_id(&vm.spec.vm_key, pool).await?;
+    let instances = ProcessDb::find_by_kind_key(&vm.spec.vm_key, pool).await?;
     let mut running_instances = 0;
     for instance in &instances {
       if instance
@@ -186,7 +164,7 @@ pub(crate) async fn create_instance(
   let mut labels: HashMap<String, String> = HashMap::new();
   let vmimagespath = format!("{}/vms/images", state.config.state_dir);
   labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
-  labels.insert("io.nanocl.kind".to_owned(), "Vm".to_owned());
+  labels.insert("io.nanocl.kind".to_owned(), "vm".to_owned());
   labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
   labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   let mut args: Vec<String> =
@@ -276,11 +254,8 @@ pub(crate) async fn create_instance(
     }),
     ..Default::default()
   };
-  let options = Some(CreateContainerOptions {
-    name: format!("{}.v", &vm.spec.vm_key),
-    ..Default::default()
-  });
-  state.docker_api.create_container(options, spec).await?;
+  let name = format!("{}.v", &vm.spec.vm_key);
+  utils::process::create(&name, "vm", &vm.spec.vm_key, spec, state).await?;
   Ok(())
 }
 
@@ -402,7 +377,7 @@ pub(crate) async fn put(
       .await?;
   let image = VmImageDb::find_by_pk(&vm.spec.disk.image, &state.pool).await??;
   create_instance(&vm, &image, false, state).await?;
-  start_by_key(&vm.spec.vm_key, state).await?;
+  utils::process::start_by_kind("vm", &vm.spec.vm_key, state).await?;
   state
     .event_emitter
     .spawn_emit_to_event(&vm, EventAction::Patched);

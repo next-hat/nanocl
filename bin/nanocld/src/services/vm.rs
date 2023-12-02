@@ -69,33 +69,6 @@ pub(crate) async fn inspect_vm(
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
-/// Start a virtual machine
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Vms",
-  path = "/vms/{name}/start",
-  params(
-    ("name" = String, Path, description = "The name of the virtual machine"),
-    ("namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
-  ),
-  responses(
-    (status = 200, description = "The virtual machine has been started"),
-  ),
-))]
-#[web::post("/vms/{name}/start")]
-pub(crate) async fn start_vm(
-  state: web::types::State<DaemonState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let name = path.1.to_owned();
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &name);
-  VmDb::find_by_pk(&key, &state.pool).await??;
-  utils::vm::start_by_key(&key, &state).await?;
-  Ok(web::HttpResponse::Ok().finish())
-}
-
 /// Stop a virtual machine
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
@@ -364,7 +337,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_vm);
   config.service(delete_vm);
   config.service(inspect_vm);
-  config.service(start_vm);
   config.service(stop_vm);
   config.service(list_vm_history);
   config.service(patch_vm);

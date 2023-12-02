@@ -37,7 +37,7 @@ services:
         cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=nstore.system
       - io.nanocl.n=system
 
@@ -52,7 +52,7 @@ services:
       - /var/lib/nanocl/dns:/opt/dns
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=ndns.system
       - io.nanocl.n=system
 
@@ -70,7 +70,7 @@ services:
       - unix:///run/nanocl/metrics.sock
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=nmetrics.system
       - io.nanocl.n=system
     volumes:
@@ -85,7 +85,7 @@ services:
       - TZ=Europe/Paris
     labels:
       - io.nanocl=enabled
-      - io.nanocl.kind=Cargo
+      - io.nanocl.kind=cargo
       - io.nanocl.c=nproxy.system
       - io.nanocl.n=system
     volumes:

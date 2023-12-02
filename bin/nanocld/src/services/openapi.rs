@@ -275,7 +275,6 @@ impl Modify for VersionModifier {
     // Vm
     vm::list_vm,
     vm::inspect_vm,
-    vm::start_vm,
     vm::stop_vm,
     vm::delete_vm,
     vm::create_vm,

@@ -20,17 +20,17 @@ use super::{Pool, Repository};
 #[diesel(primary_key(key))]
 #[diesel(table_name = processes)]
 pub struct ProcessDb {
-  /// The key of the container instance
+  /// The key of the process
   pub key: String,
   /// The created at date
   pub created_at: chrono::NaiveDateTime,
   /// Last time the instance was updated
   pub updated_at: chrono::NaiveDateTime,
-  /// Name of the container instance
+  /// Name of the process
   pub name: String,
-  /// Kind of the container instance (job, vm, cargo)
+  /// Kind of the process (Job, Vm, Cargo)
   pub kind: String,
-  /// The data of the container instance a ContainerInspect
+  /// The data of the process a ContainerInspect
   pub data: serde_json::Value,
   /// Id of the node where the container is running
   pub node_key: String,
@@ -38,16 +38,50 @@ pub struct ProcessDb {
   pub kind_key: String,
 }
 
-/// Used to create a new container instance
+#[derive(Debug, Clone, Deserialize)]
+pub enum ProcessKind {
+  Vm,
+  Job,
+  Cargo,
+}
+
+impl TryFrom<String> for ProcessKind {
+  type Error = IoError;
+
+  fn try_from(value: String) -> Result<Self, Self::Error> {
+    match value.as_ref() {
+      "vm" => Ok(Self::Vm),
+      "job" => Ok(Self::Job),
+      "cargo" => Ok(Self::Cargo),
+      _ => Err(IoError::invalid_input(
+        "ProcessKind",
+        &format!("Invalid process kind: {value}"),
+      )),
+    }
+  }
+}
+
+impl ToString for ProcessKind {
+  fn to_string(&self) -> String {
+    match self {
+      Self::Vm => "vm",
+      Self::Job => "job",
+      Self::Cargo => "cargo",
+    }
+    .to_owned()
+  }
+}
+
+/// Used to create a new process
 #[derive(Debug, Clone)]
 pub struct ProcessPartial {
-  /// The key of the container instance
+  /// The key of the process
   pub key: String,
-  /// Name of the container instance
+  /// Name of the process
   pub name: String,
-  /// Kind of the container instance (job, vm, cargo)
-  pub kind: String,
-  /// The data of the container instance a ContainerInspect
+  /// Kind of the process (Job, Vm, Cargo)
+  pub kind: ProcessKind,
+  /// The data of the process a ContainerInspect
   pub data: serde_json::Value,
   /// Key of the node where the container is running
   pub node_key: String,
@@ -55,29 +89,29 @@ pub struct ProcessPartial {
   pub kind_key: String,
 }
 
-/// Represents a container instance
+/// Represents a process
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Process {
-  /// The key of the container instance
+  /// The key of the process
   pub key: String,
   /// The created at date
   pub created_at: chrono::NaiveDateTime,
   /// Last time the instance was updated
   pub updated_at: chrono::NaiveDateTime,
-  /// Name of the container instance
+  /// Name of the process
   pub name: String,
-  /// Kind of the container instance (job, vm, cargo)
-  pub kind: String,
+  /// Kind of the process (Job, Vm, Cargo)
+  pub kind: ProcessKind,
   /// Key of the node where the container is running
   pub node_key: String,
   /// Key of the related kind
   pub kind_key: String,
-  /// The data of the container instance a ContainerInspect
+  /// The data of the process a ContainerInspect
   pub data: ContainerInspectResponse,
 }
 
-/// Used to update a container instance
+/// Used to update a process
 #[derive(Clone, AsChangeset)]
 #[diesel(table_name = processes)]
 pub struct ProcessUpdateDb {
@@ -96,7 +130,7 @@ impl TryFrom<ProcessDb> for Process {
       created_at: model.created_at,
       updated_at: model.updated_at,
       name: model.name,
-      kind: model.kind,
+      kind: ProcessKind::try_from(model.kind)?,
       data: serde_json::from_value(model.data)
         .map_err(|err| err.map_err_context(|| "Process"))?,
       node_key: model.node_key,
@@ -110,7 +144,7 @@ impl From<&ProcessPartial> for ProcessDb {
     Self {
       key: model.key.clone(),
       name: model.name.clone(),
-      kind: model.kind.clone(),
+      kind: model.kind.to_string(),
       data: model.data.clone(),
       node_key: model.node_key.clone(),
       kind_key: model.kind_key.clone(),
@@ -199,12 +233,12 @@ impl Repository for ProcessDb {
 }
 
 impl ProcessDb {
-  pub(crate) async fn find_by_kind_id(
-    kind_id: &str,
+  pub(crate) async fn find_by_kind_key(
+    kind_key: &str,
     pool: &Pool,
   ) -> IoResult<Vec<Process>> {
     let filter = GenericFilter::new()
-      .r#where("kind_key", GenericClause::Eq(kind_id.to_owned()));
+      .r#where("kind_key", GenericClause::Eq(kind_key.to_owned()));
     ProcessDb::find(&filter, pool).await?
   }
 }

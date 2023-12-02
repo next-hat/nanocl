@@ -1785,30 +1785,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmInspect'
-  /vms/{name}/start:
-    post:
-      tags:
-      - Vms
-      summary: Start a virtual machine
-      description: Start a virtual machine
-      operationId: start_vm
-      parameters:
-      - name: name
-        in: path
-        description: The name of the virtual machine
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: The namespace of the virtual machine
-        required: false
-        schema:
-          type: string
-          nullable: true
-      responses:
-        '200':
-          description: The virtual machine has been started
   /vms/{name}/stop:
     post:
       tags:

@@ -18,6 +18,7 @@ pub(crate) mod metric;
 pub(crate) mod ctrl_client;
 pub(crate) mod secret;
 pub(crate) mod event;
+pub(crate) mod process;
 
 #[cfg(test)]
 pub mod tests {

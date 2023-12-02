@@ -1,15 +1,15 @@
-use nanocl_stubs::generic::GenericNspQuery;
 use ntex::web;
 use futures_util::stream::select_all;
-use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog};
 use futures_util::{StreamExt, TryStreamExt};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use bollard_next::container::{LogsOptions, StartContainerOptions};
+use bollard_next::container::LogsOptions;
+use nanocl_stubs::generic::GenericNspQuery;
+use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog};
 
 use crate::utils;
-use crate::models::{DaemonState, ProcessDb};
+use crate::models::{DaemonState, Repository, ProcessDb, JobDb, JobUpdateDb};
 
 /// Get logs of an process
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -38,7 +38,7 @@ async fn logs_process(
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind_id = match kind.as_str() {
+  let kind_key = match kind.as_str() {
     "job" => name,
     "cargo" | "vm" => {
       let namespace = utils::key::resolve_nsp(&qs.namespace);
@@ -46,7 +46,7 @@ async fn logs_process(
     }
     _ => return Err(HttpError::bad_request(format!("Invalid kind: {kind}"))),
   };
-  let processes = ProcessDb::find_by_kind_id(&kind_id, &state.pool).await?;
+  let processes = ProcessDb::find_by_kind_key(&kind_key, &state.pool).await?;
   log::debug!("process::logs_process: {processes:#?}");
   let options: LogsOptions<String> = qs.into_inner().into();
   let futures = processes
@@ -108,25 +108,16 @@ pub(crate) async fn start_process(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind_id = match kind.as_str() {
-    "job" => name,
+  let kind = kind.as_str();
+  let kind_key = match kind {
+    "job" => name.to_owned(),
     "cargo" | "vm" => {
       let namespace = utils::key::resolve_nsp(&qs.namespace);
       utils::key::gen_key(&namespace, &name)
     }
     _ => return Err(HttpError::bad_request(format!("Invalid kind: {kind}"))),
   };
-  let processes = ProcessDb::find_by_kind_id(&kind_id, &state.pool).await?;
-  log::debug!("process::start_process: {processes:#?}");
-  for process in processes {
-    state
-      .docker_api
-      .start_container(
-        &process.data.id.unwrap_or_default(),
-        None::<StartContainerOptions<String>>,
-      )
-      .await?;
-  }
+  utils::process::start_by_kind(kind, &kind_key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
