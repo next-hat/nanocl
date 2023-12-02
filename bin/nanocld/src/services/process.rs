@@ -87,8 +87,8 @@ async fn logs_process(
   path = "/processes/{kind}/{name}/start",
   params(
     ("kind" = String, Path, description = "Kind of the process"),
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
+    ("name" = String, Path, description = "Name of the process"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the process belongs is needed"),
   ),
   responses(
     (status = 202, description = "Process started"),

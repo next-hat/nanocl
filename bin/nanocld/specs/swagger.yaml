@@ -1082,13 +1082,13 @@ paths:
           type: string
       - name: name
         in: path
-        description: Name of the cargo
+        description: Name of the process
         required: true
         schema:
           type: string
       - name: namespace
         in: query
-        description: Namespace where the cargo belongs
+        description: Namespace where the process belongs is needed
         required: false
         schema:
           type: string
