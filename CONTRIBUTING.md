@@ -174,8 +174,8 @@ To run tests, make sure all `Nanocl` services are running with `docker compose u
 You also need theses entries in your `/etc/hosts`
 
 ```
-127.0.0.1 nstore.nanocl.internal
-127.0.0.1 ndaemon.nanocl.internal
+127.0.0.1 store.nanocl.internal
+127.0.0.1 nanocl.internal
 ```
 
 Then you need to chown the state directory to be able to read SSL/TLS certificate to connect to the database

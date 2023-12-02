@@ -19,7 +19,7 @@ use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 
 use crate::utils;
-use crate::models::{DaemonState, WsConState, VmDb, Repository, VmSpecDb};
+use crate::models::{DaemonState, WsConState, VmSpecDb};
 
 /// List virtual machines
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -67,33 +67,6 @@ pub(crate) async fn inspect_vm(
   let key = utils::key::gen_key(&namespace, &name);
   let vm = utils::vm::inspect_by_key(&key, &state).await?;
   Ok(web::HttpResponse::Ok().json(&vm))
-}
-
-/// Stop a virtual machine
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Vms",
-  path = "/vms/{name}/stop",
-  params(
-    ("name" = String, Path, description = "The name of the virtual machine"),
-    ("namespace" = Option<String>, Query, description = "The namespace of the virtual machine"),
-  ),
-  responses(
-    (status = 200, description = "The virtual machine has been stopped"),
-  ),
-))]
-#[web::post("/vms/{name}/stop")]
-pub(crate) async fn stop_vm(
-  state: web::types::State<DaemonState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let name = path.1.to_owned();
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &name);
-  VmDb::find_by_pk(&key, &state.pool).await??;
-  utils::vm::stop_by_key(&key, &state).await?;
-  Ok(web::HttpResponse::Ok().finish())
 }
 
 /// Delete a virtual machine
@@ -337,7 +310,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_vm);
   config.service(delete_vm);
   config.service(inspect_vm);
-  config.service(stop_vm);
   config.service(list_vm_history);
   config.service(patch_vm);
   config.service(

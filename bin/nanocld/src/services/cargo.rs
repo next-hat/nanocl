@@ -136,32 +136,6 @@ pub(crate) async fn delete_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Stop a cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Cargoes",
-  path = "/cargoes/{name}/stop",
-  params(
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-  ),
-  responses(
-    (status = 202, description = "Cargo stopped"),
-    (status = 404, description = "Cargo does not exist"),
-  ),
-))]
-#[web::post("/cargoes/{name}/stop")]
-pub(crate) async fn stop_cargo(
-  state: web::types::State<DaemonState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::stop_by_key(&key, &state).await?;
-  Ok(web::HttpResponse::Accepted().finish())
-}
-
 /// Restart a cargo
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
@@ -394,7 +368,6 @@ pub(crate) async fn scale_cargo(
 pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
-  config.service(stop_cargo);
   config.service(restart_cargo);
   config.service(kill_cargo);
   config.service(patch_cargo);
@@ -452,10 +425,9 @@ mod tests {
           None::<String>,
         )
         .await;
-      let status = res.status();
       test_status_code!(
+        res.status(),
         http::StatusCode::CREATED,
-        status,
         "basic cargo create"
       );
       let cargo = TestClient::res_json::<Cargo>(res).await;
@@ -514,8 +486,8 @@ mod tests {
       )
       .await;
     test_status_code!(
-      http::StatusCode::OK,
       res.status(),
+      http::StatusCode::OK,
       "basic cargo inspect"
     );
     let response = res.json::<CargoInspect>().await.unwrap();
@@ -536,8 +508,8 @@ mod tests {
       )
       .await;
     test_status_code!(
-      http::StatusCode::ACCEPTED,
       res.status(),
+      http::StatusCode::ACCEPTED,
       "basic cargo start"
     );
     let res = client
@@ -603,8 +575,8 @@ mod tests {
       )
       .await;
     test_status_code!(
-      http::StatusCode::OK,
       res.status(),
+      http::StatusCode::OK,
       "basic cargo history"
     );
     let histories = res.json::<Vec<CargoSpec>>().await.unwrap();
@@ -620,14 +592,14 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo revert");
     let res = client
       .send_post(
-        &format!("{ENDPOINT}/{main_test_cargo}/stop"),
+        &format!("/processes/cargo/{main_test_cargo}/stop"),
         None::<String>,
         None::<String>,
       )
       .await;
     test_status_code!(
-      http::StatusCode::ACCEPTED,
       res.status(),
+      http::StatusCode::ACCEPTED,
       "basic cargo stop"
     );
     for test_cargo in test_cargoes.iter() {
@@ -641,8 +613,8 @@ mod tests {
         )
         .await;
       test_status_code!(
-        http::StatusCode::ACCEPTED,
         res.status(),
+        http::StatusCode::ACCEPTED,
         "basic cargo delete"
       );
     }
@@ -667,8 +639,8 @@ mod tests {
       )
       .await;
     test_status_code!(
-      http::StatusCode::CREATED,
       res.status(),
+      http::StatusCode::CREATED,
       "scale cargo create"
     );
     let res = client
@@ -679,8 +651,8 @@ mod tests {
       )
       .await;
     test_status_code!(
-      http::StatusCode::ACCEPTED,
       res.status(),
+      http::StatusCode::ACCEPTED,
       "scale cargo start"
     );
     let res = client
@@ -691,8 +663,8 @@ mod tests {
       )
       .await;
     test_status_code!(
-      http::StatusCode::OK,
       res.status(),
+      http::StatusCode::OK,
       "scale cargo scale up"
     );
     let res = client
@@ -703,28 +675,28 @@ mod tests {
       )
       .await;
     test_status_code!(
-      http::StatusCode::OK,
       res.status(),
+      http::StatusCode::OK,
       "scale cargo scale down"
     );
     let res = client
       .send_post(
-        &format!("{ENDPOINT}/{CARGO_NAME}/stop"),
+        &format!("/processes/cargo/{CARGO_NAME}/stop"),
         None::<String>,
         None::<String>,
       )
       .await;
     test_status_code!(
-      http::StatusCode::ACCEPTED,
       res.status(),
+      http::StatusCode::ACCEPTED,
       "scale cargo stop"
     );
     let res = client
       .send_delete(&format!("{ENDPOINT}/{CARGO_NAME}"), None::<String>)
       .await;
     test_status_code!(
-      http::StatusCode::ACCEPTED,
       res.status(),
+      http::StatusCode::ACCEPTED,
       "scale cargo delete"
     );
   }

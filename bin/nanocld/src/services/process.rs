@@ -17,8 +17,8 @@ use crate::models::{DaemonState, ProcessDb, ProcessKind};
   tag = "Processes",
   path = "/processes/{kind}/{name}/logs",
   params(
-    ("kind" = String, Path, description = "Type of the process"),
-    ("name" = String, Path, description = "Name of the process"),
+    ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
     ("namespace" = Option<String>, Query, description = "Namespace of the process"),
     ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
     ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
@@ -27,8 +27,8 @@ use crate::models::{DaemonState, ProcessDb, ProcessKind};
     ("tail" = Option<String>, Query, description = "Only return the n last (integer) or all (\"all\") logs"),
   ),
   responses(
-    (status = 200, description = "Instance logs", content_type = "application/vdn.nanocl.raw-stream"),
-    (status = 404, description = "Instance not exists"),
+    (status = 200, description = "Process instances logs", content_type = "application/vdn.nanocl.raw-stream"),
+    (status = 404, description = "Process don't exist"),
   ),
 ))]
 #[web::get("/processes/{kind}/{name}/logs")]
@@ -86,8 +86,8 @@ async fn logs_process(
   tag = "Processes",
   path = "/processes/{kind}/{name}/start",
   params(
-    ("kind" = String, Path, description = "Kind of the process"),
-    ("name" = String, Path, description = "Name of the process"),
+    ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
     ("namespace" = Option<String>, Query, description = "Namespace where the process belongs is needed"),
   ),
   responses(
@@ -108,7 +108,36 @@ pub(crate) async fn start_process(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
+/// Stop a cargo
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Processes",
+  path = "/processes/{kind}/{name}/stop",
+  params(
+    ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the process belongs is needed"),
+  ),
+  responses(
+    (status = 202, description = "Cargo stopped"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
+#[web::post("/processes/{kind}/{name}/stop")]
+pub(crate) async fn stop_process(
+  state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, kind, name) = path.into_inner();
+  let kind: ProcessKind = kind.try_into()?;
+  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  utils::process::stop_by_kind(&kind, &kind_key, &state).await?;
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
 pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(logs_process);
   config.service(start_process);
+  config.service(stop_process);
 }

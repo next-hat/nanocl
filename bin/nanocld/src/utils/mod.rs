@@ -82,7 +82,7 @@ pub mod tests {
       state_dir: format!("{home}/.nanocl_dev/state"),
       ..Default::default()
     };
-    store::create_pool("nstore.nanocl.internal:26258", &daemon_conf)
+    store::create_pool("store.nanocl.internal:26258", &daemon_conf)
       .await
       .expect("Failed to connect to store at: {ip_addr}")
   }

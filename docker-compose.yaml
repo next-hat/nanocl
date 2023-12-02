@@ -17,7 +17,7 @@ networks:
 services:
   nstore:
     container_name: nstore.system.c
-    hostname: nstore.nanocl.internal
+    hostname: store.nanocl.internal
     image: cockroachdb/cockroach:v23.1.12
     entrypoint: /bin/sh
     tty: true
@@ -38,7 +38,7 @@ services:
         if [[ ! -f "/ca/ca.key" ]]; then
           echo "generating certs"
           cockroach cert create-ca --certs-dir=/certs --ca-key=/ca/ca.key
-          cockroach cert create-node 127.0.0.1 nstore.nanocl.internal --certs-dir=/certs --ca-key=/ca/ca.key
+          cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=/certs --ca-key=/ca/ca.key
           cockroach cert create-client root --certs-dir=/certs --ca-key=/ca/ca.key
         fi
         cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
@@ -179,7 +179,7 @@ services:
     container_name: ndaemon.system.c
     image: ghcr.io/nxthat/nanocl-dev:dev
     tty: true
-    hostname: ndaemon.nanocl.internal
+    hostname: nanocl.internal
     networks:
       - system
     ports:

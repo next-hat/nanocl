@@ -246,7 +246,6 @@ impl Modify for VersionModifier {
     cargo::inspect_cargo,
     cargo::create_cargo,
     cargo::delete_cargo,
-    cargo::stop_cargo,
     cargo::restart_cargo,
     cargo::put_cargo,
     cargo::patch_cargo,
@@ -275,7 +274,6 @@ impl Modify for VersionModifier {
     // Vm
     vm::list_vm,
     vm::inspect_vm,
-    vm::stop_vm,
     vm::delete_vm,
     vm::create_vm,
     vm::list_vm_history,
@@ -294,6 +292,7 @@ impl Modify for VersionModifier {
     // Process
     process::logs_process,
     process::start_process,
+    process::stop_process,
   ),
   components(schemas(
     // Node

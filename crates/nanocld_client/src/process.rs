@@ -24,7 +24,7 @@ impl NanocldClient {
     Ok(Self::res_stream(res).await)
   }
 
-  /// Start a process by it's kind and name
+  /// Start a process by it's kind and name and namespace
   ///
   /// ## Example
   ///
@@ -49,6 +49,32 @@ impl NanocldClient {
       .await?;
     Ok(())
   }
+
+  /// Stop a process by it's kind and name and namespace
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let res = client.stop_cargo("my-cargo", None).await;
+  /// ```
+  pub async fn stop_process(
+    &self,
+    kind: &str,
+    name: &str,
+    namespace: Option<&str>,
+  ) -> HttpClientResult<()> {
+    self
+      .send_post(
+        &format!("{}/{kind}/{name}/stop", Self::PROCESS_PATH),
+        None::<String>,
+        Some(GenericNspQuery::new(namespace)),
+      )
+      .await?;
+    Ok(())
+  }
 }
 
 #[cfg(test)]
@@ -59,8 +85,7 @@ mod tests {
 
   #[ntex::test]
   async fn logs_cargo() {
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     let mut rx = client
       .logs_process(
         "cargo",

@@ -257,17 +257,15 @@ pub(crate) async fn delete_by_name(
   containers
     .into_iter()
     .map(|container| async {
-      state
-        .docker_api
-        .remove_container(
-          &container.id.unwrap_or_default(),
-          Some(RemoveContainerOptions {
-            force: true,
-            ..Default::default()
-          }),
-        )
-        .await
-        .map_err(HttpError::from)
+      utils::process::remove(
+        &container.id.unwrap_or_default(),
+        Some(RemoveContainerOptions {
+          force: true,
+          ..Default::default()
+        }),
+        state,
+      )
+      .await
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<Result<(), HttpError>>>()

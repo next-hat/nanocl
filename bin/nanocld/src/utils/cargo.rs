@@ -286,17 +286,15 @@ async fn delete_instances(
   instances
     .iter()
     .map(|id| async {
-      state
-        .docker_api
-        .remove_container(
-          &id.clone(),
-          Some(RemoveContainerOptions {
-            force: true,
-            ..Default::default()
-          }),
-        )
-        .await
-        .map_err(HttpError::from)
+      utils::process::remove(
+        id,
+        Some(RemoveContainerOptions {
+          force: true,
+          ..Default::default()
+        }),
+        state,
+      )
+      .await
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<Result<(), HttpError>>>()
@@ -353,35 +351,6 @@ pub(crate) async fn create(
   Ok(cargo)
 }
 
-/// Stop all instances (containers) for the given cargo key.
-/// The containers are stopped in parallel.
-pub(crate) async fn stop_by_key(
-  key: &str,
-  state: &DaemonState,
-) -> HttpResult<()> {
-  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
-  let containers = list_instances(key, &state.docker_api).await?;
-  containers
-    .into_iter()
-    .map(|container| async {
-      let id = container.id.unwrap_or_default();
-      state
-        .docker_api
-        .stop_container(&id, None)
-        .await
-        .map_err(HttpError::from)
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<Vec<_>, _>>()?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&cargo, EventAction::Stopped);
-  Ok(())
-}
-
 /// Restart cargo instances (containers) by key
 pub(crate) async fn restart(
   key: &str,
@@ -417,17 +386,15 @@ pub(crate) async fn delete_by_key(
   containers
     .into_iter()
     .map(|container| async {
-      state
-        .docker_api
-        .remove_container(
-          &container.id.unwrap_or_default(),
-          Some(RemoveContainerOptions {
-            force: force.unwrap_or(false),
-            ..Default::default()
-          }),
-        )
-        .await
-        .map_err(HttpError::from)
+      utils::process::remove(
+        &container.id.unwrap_or_default(),
+        Some(RemoveContainerOptions {
+          force: force.unwrap_or(false),
+          ..Default::default()
+        }),
+        state,
+      )
+      .await
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<Result<(), HttpError>>>()
@@ -770,7 +737,7 @@ pub async fn scale(
   state: &DaemonState,
 ) -> HttpResult<()> {
   let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
-  let instances = list_instances(key, &state.docker_api).await?;
+  let instances = ProcessDb::find_by_kind_key(key, &state.pool).await?;
   let is_equal = usize::try_from(options.replicas)
     .map(|replica| instances.len() == replica)
     .unwrap_or(false);
@@ -782,18 +749,15 @@ pub async fn scale(
     instances
       .iter()
       .take(to_remove)
-      .map(|instance| async {
-        state
-          .docker_api
-          .remove_container(
-            &instance.id.clone().unwrap_or_default(),
-            Some(RemoveContainerOptions {
-              force: true,
-              ..Default::default()
-            }),
-          )
-          .await?;
-        Ok::<_, HttpError>(())
+      .map(|instance| {
+        utils::process::remove(
+          &instance.key,
+          Some(RemoveContainerOptions {
+            force: true,
+            ..Default::default()
+          }),
+          state,
+        )
       })
       .collect::<FuturesUnordered<_>>()
       .collect::<Vec<Result<_, HttpError>>>()

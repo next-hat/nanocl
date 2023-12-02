@@ -53,7 +53,9 @@ async fn exec_cargo_rm(
     force: Some(opts.force),
   };
   for name in &opts.names {
-    client.delete_cargo(name, Some(&query)).await?;
+    if let Err(err) = client.delete_cargo(name, Some(&query)).await {
+      eprintln!("{name}: {err}");
+    }
   }
   Ok(())
 }
@@ -104,7 +106,12 @@ async fn exec_cargo_stop(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in &opts.names {
-    client.stop_cargo(name, args.namespace.as_deref()).await?;
+    if let Err(err) = client
+      .stop_process("cargo", name, args.namespace.as_deref())
+      .await
+    {
+      eprintln!("{name}: {err}");
+    }
   }
   Ok(())
 }

@@ -69,7 +69,9 @@ pub async fn exec_vm_rm(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in names {
-    client.delete_vm(name, args.namespace.as_deref()).await?;
+    if let Err(err) = client.delete_vm(name, args.namespace.as_deref()).await {
+      eprintln!("{name}: {err}");
+    }
   }
   Ok(())
 }
@@ -108,7 +110,7 @@ pub async fn exec_vm_start(
       .start_process("vm", name, args.namespace.as_deref())
       .await
     {
-      eprintln!("Failed to start vm {}: {}", name, err);
+      eprintln!("{name}: {err}");
     }
   }
   Ok(())
@@ -123,8 +125,11 @@ pub async fn exec_vm_stop(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   for name in names {
-    if let Err(err) = client.stop_vm(name, args.namespace.as_deref()).await {
-      eprintln!("Failed to stop vm {}: {}", name, err);
+    if let Err(err) = client
+      .stop_process("vm", name, args.namespace.as_deref())
+      .await
+    {
+      eprintln!("{name}: {err}");
     }
   }
   Ok(())
