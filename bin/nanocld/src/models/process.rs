@@ -38,7 +38,7 @@ pub struct ProcessDb {
   pub kind_key: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Deserialize)]
 pub enum ProcessKind {
   Vm,
   Job,

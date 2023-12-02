@@ -2,14 +2,14 @@ use ntex::web;
 use futures_util::stream::select_all;
 use futures_util::{StreamExt, TryStreamExt};
 
-use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_error::http::HttpResult;
 
 use bollard_next::container::LogsOptions;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog};
 
 use crate::utils;
-use crate::models::{DaemonState, Repository, ProcessDb, JobDb, JobUpdateDb};
+use crate::models::{DaemonState, ProcessDb, ProcessKind};
 
 /// Get logs of an process
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -38,14 +38,8 @@ async fn logs_process(
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind_key = match kind.as_str() {
-    "job" => name,
-    "cargo" | "vm" => {
-      let namespace = utils::key::resolve_nsp(&qs.namespace);
-      utils::key::gen_key(&namespace, &name)
-    }
-    _ => return Err(HttpError::bad_request(format!("Invalid kind: {kind}"))),
-  };
+  let kind: ProcessKind = kind.try_into()?;
+  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let processes = ProcessDb::find_by_kind_key(&kind_key, &state.pool).await?;
   log::debug!("process::logs_process: {processes:#?}");
   let options: LogsOptions<String> = qs.into_inner().into();
@@ -108,16 +102,9 @@ pub(crate) async fn start_process(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind = kind.as_str();
-  let kind_key = match kind {
-    "job" => name.to_owned(),
-    "cargo" | "vm" => {
-      let namespace = utils::key::resolve_nsp(&qs.namespace);
-      utils::key::gen_key(&namespace, &name)
-    }
-    _ => return Err(HttpError::bad_request(format!("Invalid kind: {kind}"))),
-  };
-  utils::process::start_by_kind(kind, &kind_key, &state).await?;
+  let kind: ProcessKind = kind.try_into()?;
+  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  utils::process::start_by_kind(&kind, &kind_key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 

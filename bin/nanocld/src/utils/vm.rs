@@ -18,7 +18,7 @@ use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 use crate::utils;
 use crate::models::{
   Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, Repository, VmDb,
-  VmSpecDb, FromSpec,
+  VmSpecDb, FromSpec, ProcessKind,
 };
 
 /// Stop a VM by his model
@@ -163,8 +163,6 @@ pub(crate) async fn create_instance(
 ) -> HttpResult<()> {
   let mut labels: HashMap<String, String> = HashMap::new();
   let vmimagespath = format!("{}/vms/images", state.config.state_dir);
-  labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
-  labels.insert("io.nanocl.kind".to_owned(), "vm".to_owned());
   labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
   labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   let mut args: Vec<String> =
@@ -377,7 +375,8 @@ pub(crate) async fn put(
       .await?;
   let image = VmImageDb::find_by_pk(&vm.spec.disk.image, &state.pool).await??;
   create_instance(&vm, &image, false, state).await?;
-  utils::process::start_by_kind("vm", &vm.spec.vm_key, state).await?;
+  utils::process::start_by_kind(&ProcessKind::Vm, &vm.spec.vm_key, state)
+    .await?;
   state
     .event_emitter
     .spawn_emit_to_event(&vm, EventAction::Patched);

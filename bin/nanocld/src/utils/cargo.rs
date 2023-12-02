@@ -28,7 +28,7 @@ use nanocl_stubs::cargo_spec::{
 use crate::utils;
 use crate::models::{
   DaemonState, CargoDb, Repository, ProcessDb, NamespaceDb, NodeDb, SecretDb,
-  CargoSpecDb, FromSpec, Process,
+  CargoSpecDb, FromSpec, Process, ProcessKind,
 };
 
 use super::stream::transform_stream;
@@ -144,8 +144,6 @@ async fn create_instances(
         let host_config = container.host_config.unwrap_or_default();
         // Add cargo label to the container to track it
         let mut labels = container.labels.to_owned().unwrap_or_default();
-        labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
-        labels.insert("io.nanocl.kind".to_owned(), "cargo".to_owned());
         labels.insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
         labels
           .insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
@@ -485,7 +483,9 @@ pub(crate) async fn put(
     Ok(instances) => instances,
   };
   // start created containers
-  match utils::process::start_by_kind("cargo", cargo_key, state).await {
+  match utils::process::start_by_kind(&ProcessKind::Cargo, cargo_key, state)
+    .await
+  {
     Err(err) => {
       log::error!(
         "Unable to start cargo instance {} : {err}",

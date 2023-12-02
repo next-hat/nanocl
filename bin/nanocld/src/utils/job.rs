@@ -197,8 +197,6 @@ pub(crate) async fn create(
       async move {
         let mut container = container.clone();
         let mut labels = container.labels.clone().unwrap_or_default();
-        labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
-        labels.insert("io.nanocl.kind".to_owned(), "job".to_owned());
         labels.insert("io.nanocl.j".to_owned(), job_name.clone());
         container.labels = Some(labels);
         let short_id = utils::key::generate_short_id(6);
