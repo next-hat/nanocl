@@ -367,9 +367,9 @@ impl NanocldClient {
 mod tests {
   use super::*;
 
+  use ntex::http;
   use nanocl_error::http_client::HttpClientError;
   use nanocl_stubs::cargo_spec::CargoSpecPartial;
-  use ntex::http;
 
   #[ntex::test]
   async fn basic() {
@@ -461,15 +461,4 @@ mod tests {
       .await
       .unwrap();
   }
-
-  // #[ntex::test]
-  // async fn logs_cargo() {
-  //   let client =
-  //     NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-  //   let mut rx = client
-  //     .logs_cargo("nstore", Some(&InstanceLogQuery::of_namespace("system")))
-  //     .await
-  //     .unwrap();
-  //   let _out = rx.next().await.unwrap().unwrap();
-  // }
 }

@@ -26,3 +26,25 @@ impl NanocldClient {
     Ok(Self::res_stream(res).await)
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  use futures::StreamExt;
+
+  #[ntex::test]
+  async fn logs_cargo() {
+    let client =
+      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+    let mut rx = client
+      .logs_process(
+        "cargo",
+        "nstore",
+        Some(&ProcessLogQuery::of_namespace("system")),
+      )
+      .await
+      .unwrap();
+    let _out = rx.next().await.unwrap().unwrap();
+  }
+}
