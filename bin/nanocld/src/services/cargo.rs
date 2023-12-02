@@ -136,32 +136,6 @@ pub(crate) async fn delete_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Start a cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Cargoes",
-  path = "/cargoes/{name}/start",
-  params(
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-  ),
-  responses(
-    (status = 202, description = "Cargo started"),
-    (status = 404, description = "Cargo does not exist"),
-  ),
-))]
-#[web::post("/cargoes/{name}/start")]
-pub(crate) async fn start_cargo(
-  state: web::types::State<DaemonState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::start_by_key(&key, &state).await?;
-  Ok(web::HttpResponse::Accepted().finish())
-}
-
 /// Stop a cargo
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
@@ -420,7 +394,6 @@ pub(crate) async fn scale_cargo(
 pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
-  config.service(start_cargo);
   config.service(stop_cargo);
   config.service(restart_cargo);
   config.service(kill_cargo);
@@ -557,7 +530,7 @@ mod tests {
     assert!(!cargoes.is_empty(), "Expected to find cargoes");
     let res = client
       .send_post(
-        &format!("{ENDPOINT}/{main_test_cargo}/start"),
+        &format!("/processes/cargo/{main_test_cargo}/start"),
         None::<String>,
         None::<String>,
       )
@@ -700,7 +673,7 @@ mod tests {
     );
     let res = client
       .send_post(
-        &format!("{ENDPOINT}/{CARGO_NAME}/start"),
+        &format!("/processes/cargo/{CARGO_NAME}/start"),
         None::<String>,
         None::<String>,
       )

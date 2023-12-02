@@ -1,3 +1,4 @@
+use nanocl_stubs::generic::GenericNspQuery;
 use ntex::web;
 use futures_util::stream::select_all;
 use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog};
@@ -5,20 +6,20 @@ use futures_util::{StreamExt, TryStreamExt};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use bollard_next::container::LogsOptions;
+use bollard_next::container::{LogsOptions, StartContainerOptions};
 
 use crate::utils;
 use crate::models::{DaemonState, ProcessDb};
 
-/// Get logs of an instance
+/// Get logs of an process
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Processes",
   path = "/processes/{kind}/{name}/logs",
   params(
-    ("kind" = String, Path, description = "Type of the instance"),
-    ("name" = String, Path, description = "Name of the instance"),
-    ("namespace" = Option<String>, Query, description = "Namespace of the instance"),
+    ("kind" = String, Path, description = "Type of the process"),
+    ("name" = String, Path, description = "Name of the process"),
+    ("namespace" = Option<String>, Query, description = "Namespace of the process"),
     ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
     ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
     ("timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
@@ -31,7 +32,7 @@ use crate::models::{DaemonState, ProcessDb};
   ),
 ))]
 #[web::get("/processes/{kind}/{name}/logs")]
-async fn get_process_logs(
+async fn logs_process(
   state: web::types::State<DaemonState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<ProcessLogQuery>,
@@ -45,16 +46,16 @@ async fn get_process_logs(
     }
     _ => return Err(HttpError::bad_request(format!("Invalid kind: {kind}"))),
   };
-  let instances = ProcessDb::find_by_kind_id(&kind_id, &state.pool).await?;
-  log::debug!("instance::get_instances_logs instances: {instances:#?}");
+  let processes = ProcessDb::find_by_kind_id(&kind_id, &state.pool).await?;
+  log::debug!("process::logs_process: {processes:#?}");
   let options: LogsOptions<String> = qs.into_inner().into();
-  let futures = instances
+  let futures = processes
     .into_iter()
-    .map(|instance| {
+    .map(|process| {
       state
         .docker_api
         .logs(
-          &instance.data.id.unwrap_or_default(),
+          &process.data.id.unwrap_or_default(),
           Some(LogsOptions::<String> {
             stdout: true,
             stderr: true,
@@ -64,9 +65,9 @@ async fn get_process_logs(
         .map(move |elem| match elem {
           Err(err) => Err(err),
           Ok(elem) => {
-            log::debug!("{:#?} {elem}", &instance.name);
+            log::debug!("{:#?} {elem}", &process.name);
             Ok(ProcessOutputLog {
-              name: instance.name.clone(),
+              name: process.name.clone(),
               log: elem.into(),
             })
           }
@@ -85,6 +86,51 @@ async fn get_process_logs(
   )
 }
 
+/// Start a process
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Processes",
+  path = "/processes/{kind}/{name}/start",
+  params(
+    ("kind" = String, Path, description = "Kind of the process"),
+    ("name" = String, Path, description = "Name of the cargo"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
+  ),
+  responses(
+    (status = 202, description = "Process started"),
+    (status = 404, description = "Process does not exist"),
+  ),
+))]
+#[web::post("/processes/{type}/{name}/start")]
+pub(crate) async fn start_process(
+  state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, kind, name) = path.into_inner();
+  let kind_id = match kind.as_str() {
+    "job" => name,
+    "cargo" | "vm" => {
+      let namespace = utils::key::resolve_nsp(&qs.namespace);
+      utils::key::gen_key(&namespace, &name)
+    }
+    _ => return Err(HttpError::bad_request(format!("Invalid kind: {kind}"))),
+  };
+  let processes = ProcessDb::find_by_kind_id(&kind_id, &state.pool).await?;
+  log::debug!("process::start_process: {processes:#?}");
+  for process in processes {
+    state
+      .docker_api
+      .start_container(
+        &process.data.id.unwrap_or_default(),
+        None::<StartContainerOptions<String>>,
+      )
+      .await?;
+  }
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
 pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(get_process_logs);
+  config.service(logs_process);
+  config.service(start_process);
 }

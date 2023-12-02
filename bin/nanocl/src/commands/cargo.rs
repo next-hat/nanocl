@@ -91,7 +91,7 @@ async fn exec_cargo_start(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   client
-    .start_cargo(&opts.name, args.namespace.as_deref())
+    .start_process("cargo", &opts.name, args.namespace.as_deref())
     .await?;
   Ok(())
 }
@@ -327,7 +327,7 @@ async fn exec_cargo_run(
     .create_cargo(&opts.clone().into(), args.namespace.as_deref())
     .await?;
   client
-    .start_cargo(&cargo.spec.name, Some(&cargo.namespace_name))
+    .start_process("cargo", &cargo.spec.name, Some(&cargo.namespace_name))
     .await?;
   Ok(())
 }

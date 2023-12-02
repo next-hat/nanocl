@@ -98,22 +98,6 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Start a vm by it's name and namespace
-  pub async fn start_vm(
-    &self,
-    name: &str,
-    namespace: Option<&str>,
-  ) -> HttpClientResult<()> {
-    self
-      .send_post(
-        &format!("{}/{name}/start", Self::VM_PATH),
-        None::<String>,
-        Some(&GenericNspQuery::new(namespace)),
-      )
-      .await?;
-    Ok(())
-  }
-
   /// Stop a vm by it's name and namespace
   ///
   /// ## Example

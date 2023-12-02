@@ -569,32 +569,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
-  /cargoes/{name}/start:
-    post:
-      tags:
-      - Cargoes
-      summary: Start a cargo
-      description: Start a cargo
-      operationId: start_cargo
-      parameters:
-      - name: name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargo belongs
-        required: false
-        schema:
-          type: string
-          nullable: true
-      responses:
-        '202':
-          description: Cargo started
-        '404':
-          description: Cargo does not exist
   /cargoes/{name}/stats:
     get:
       tags:
@@ -814,25 +788,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobInspect'
-  /jobs/{name}/start:
-    post:
-      tags:
-      - Jobs
-      summary: Start a job
-      description: Start a job
-      operationId: start_job
-      parameters:
-      - name: name
-        in: path
-        description: Name of the job
-        required: true
-        schema:
-          type: string
-      responses:
-        '202':
-          description: Job started
-        '404':
-          description: Job does not exist
   /jobs/{name}/wait:
     get:
       tags:
@@ -1046,25 +1001,25 @@ paths:
     get:
       tags:
       - Processes
-      summary: Get logs of an instance
-      description: Get logs of an instance
-      operationId: get_process_logs
+      summary: Get logs of an process
+      description: Get logs of an process
+      operationId: logs_process
       parameters:
       - name: kind
         in: path
-        description: Type of the instance
+        description: Type of the process
         required: true
         schema:
           type: string
       - name: name
         in: path
-        description: Name of the instance
+        description: Name of the process
         required: true
         schema:
           type: string
       - name: namespace
         in: query
-        description: Namespace of the instance
+        description: Namespace of the process
         required: false
         schema:
           type: string
@@ -1111,6 +1066,38 @@ paths:
           description: Instance logs
         '404':
           description: Instance not exists
+  /processes/{kind}/{name}/start:
+    post:
+      tags:
+      - Processes
+      summary: Start a process
+      description: Start a process
+      operationId: start_process
+      parameters:
+      - name: kind
+        in: path
+        description: Kind of the process
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        description: Name of the cargo
+        required: true
+        schema:
+          type: string
+      - name: namespace
+        in: query
+        description: Namespace where the cargo belongs
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '202':
+          description: Process started
+        '404':
+          description: Process does not exist
   /resources:
     get:
       tags:

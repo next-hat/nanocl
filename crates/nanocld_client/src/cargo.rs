@@ -95,31 +95,6 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Start a cargo by it's name and namespace
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.start_cargo("my-cargo", None).await;
-  /// ```
-  pub async fn start_cargo(
-    &self,
-    name: &str,
-    namespace: Option<&str>,
-  ) -> HttpClientResult<()> {
-    self
-      .send_post(
-        &format!("{}/{name}/start", Self::CARGO_PATH),
-        None::<String>,
-        Some(GenericNspQuery::new(namespace)),
-      )
-      .await?;
-    Ok(())
-  }
-
   /// Stop a cargo by it's name and namespace
   ///
   /// ## Example
@@ -386,7 +361,10 @@ mod tests {
       ..Default::default()
     };
     client.create_cargo(&new_cargo, None).await.unwrap();
-    client.start_cargo(CARGO_NAME, None).await.unwrap();
+    client
+      .start_process("cargo", CARGO_NAME, None)
+      .await
+      .unwrap();
     client.inspect_cargo(CARGO_NAME, None).await.unwrap();
     let cargo_update = CargoSpecUpdate {
       container: Some(bollard_next::container::Config {

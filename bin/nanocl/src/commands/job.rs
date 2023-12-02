@@ -110,7 +110,7 @@ async fn exec_job_start(
   opts: &JobStartOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  client.start_job(&opts.name).await?;
+  client.start_process("job", &opts.name, None).await?;
   Ok(())
 }
 
