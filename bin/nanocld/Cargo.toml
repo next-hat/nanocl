@@ -85,3 +85,4 @@ nanocl_utils = { version = "0.3.0", features = ["unix", "ntex", "logger"] }
 utoipa = { version = "4.1", features = ["yaml"], optional = true }
 notify = "6.1.1"
 ntex-cors = "0.4.0"
+rand = "0.8.5"

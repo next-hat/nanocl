@@ -10,7 +10,7 @@ use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
 
 use crate::utils;
 use crate::event::Client;
-use crate::models::{DaemonState, ContainerDb, Repository, JobDb, FromSpec};
+use crate::models::{DaemonState, ProcessDb, Repository, JobDb, FromSpec};
 
 /// Remove a job after when finished and ttl is set
 async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
@@ -139,7 +139,7 @@ async fn exec_docker_event(
   match action {
     "destroy" => {
       log::debug!("docker event destroy container: {id}");
-      ContainerDb::delete_by_pk(&id, &state.pool).await??;
+      ProcessDb::delete_by_pk(&id, &state.pool).await??;
       state.event_emitter.spawn_emit_event(event);
       return Ok(());
     }

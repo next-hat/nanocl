@@ -616,7 +616,6 @@ mod tests {
     assert_cli_ok!("job", "rm", "-y", "job-example");
     assert_cli_ok!("state", "rm", "-ys", "../../examples/job_example.yml");
     assert_cli_err!("job", "inspect", "job-example");
-    assert_cli_err!("job", "logs", "job-example");
   }
 
   #[ntex::test]

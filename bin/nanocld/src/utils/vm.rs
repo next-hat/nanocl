@@ -18,7 +18,7 @@ use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::utils;
 use crate::models::{
-  Pool, VmImageDb, DaemonState, ContainerDb, NamespaceDb, Repository, VmDb,
+  Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, Repository, VmDb,
   VmSpecDb, FromSpec,
 };
 
@@ -151,7 +151,7 @@ pub(crate) async fn list_by_namespace(
     let spec = VmSpecDb::find_by_pk(&vm.spec.key, pool)
       .await??
       .try_to_spec()?;
-    let instances = ContainerDb::find_by_kind_id(&vm.spec.vm_key, pool).await?;
+    let instances = ProcessDb::find_by_kind_id(&vm.spec.vm_key, pool).await?;
     let mut running_instances = 0;
     for instance in &instances {
       if instance

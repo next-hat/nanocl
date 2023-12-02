@@ -111,32 +111,6 @@ pub(crate) async fn inspect_job(
   Ok(web::HttpResponse::Ok().json(&job))
 }
 
-/// Get logs of a job
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  tag = "Jobs",
-  path = "/jobs/{name}/logs",
-  params(
-    ("name" = String, Path, description = "Name of the job"),
-  ),
-  responses(
-    (status = 200, description = "Job logs", content_type = "application/vdn.nanocl.raw-stream"),
-    (status = 404, description = "Job does not exist"),
-  ),
-))]
-#[web::get("/jobs/{name}/logs")]
-pub(crate) async fn logs_job(
-  state: web::types::State<DaemonState>,
-  path: web::types::Path<(String, String)>,
-) -> HttpResult<web::HttpResponse> {
-  let stream = utils::job::logs_by_name(&path.1, &state).await?;
-  Ok(
-    web::HttpResponse::Ok()
-      .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(stream),
-  )
-}
-
 /// Wait for a job to finish
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
@@ -176,7 +150,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_job);
   config.service(delete_job);
   config.service(inspect_job);
-  config.service(logs_job);
   config.service(wait_job);
   config.service(start_job);
 }
@@ -269,18 +242,6 @@ mod tests {
       let response =
         serde_json::from_slice::<JobWaitResponse>(&wait_response).unwrap();
       assert_eq!(response.status_code, 0);
-    }
-    let res = client
-      .send_get(&format!("{job_endpoint}/logs"), None::<String>)
-      .await;
-    test_status_code!(
-      res.status(),
-      http::StatusCode::OK,
-      &format!("logs job {}", &job.name)
-    );
-    let mut stream = res.into_stream();
-    while let Some(Ok(log)) = stream.next().await {
-      assert!(!log.is_empty());
     }
     let res = client
       .send_get(&format!("{job_endpoint}/inspect"), None::<String>)

@@ -12,7 +12,7 @@ use futures::{SinkExt, StreamExt};
 use termios::{TCSANOW, tcsetattr, Termios, ICANON, ECHO};
 
 use nanocl_error::io::{IoResult, FromIo};
-use nanocld_client::stubs::cargo::{OutputLog, OutputKind};
+use nanocld_client::stubs::process::{OutputLog, OutputKind};
 
 use crate::utils;
 use crate::config::CliConfig;

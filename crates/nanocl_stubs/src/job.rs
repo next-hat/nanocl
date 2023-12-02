@@ -4,7 +4,6 @@ use serde::{Serialize, Deserialize};
 use bollard_next::container::Config;
 use bollard_next::service::{ContainerWaitExitError, ContainerWaitResponse};
 
-use crate::cargo::OutputLog;
 use crate::node::NodeContainerSummary;
 
 /// Job partial is used to create a new job
@@ -146,16 +145,6 @@ impl From<JobInspect> for JobPartial {
   fn from(job: JobInspect) -> Self {
     job.spec.into()
   }
-}
-
-/// Stream of logs of a job
-#[derive(Debug)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct JobLogOutput {
-  pub container_name: String,
-  pub log: OutputLog,
 }
 
 /// Used to wait for a job to reach a certain state

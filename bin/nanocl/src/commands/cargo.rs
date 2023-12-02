@@ -8,9 +8,8 @@ use futures::stream::FuturesUnordered;
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
 use nanocl_error::io::{FromIo, IoResult};
-use nanocld_client::stubs::cargo::{
-  OutputKind, CargoDeleteQuery, CargoLogQuery, CargoStatsQuery,
-};
+use nanocld_client::stubs::process::{OutputKind, ProcessLogQuery};
+use nanocld_client::stubs::cargo::{CargoDeleteQuery, CargoStatsQuery};
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -222,7 +221,7 @@ async fn exec_cargo_logs(
   opts: &CargoLogsOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let query = CargoLogQuery {
+  let query = ProcessLogQuery {
     namespace: args.namespace.clone(),
     tail: opts.tail.clone(),
     since: opts.since,
@@ -232,26 +231,10 @@ async fn exec_cargo_logs(
     stderr: None,
     stdout: None,
   };
-  let mut stream = client.logs_cargo(&opts.name, Some(&query)).await?;
-  while let Some(log) = stream.next().await {
-    let log = match log {
-      Ok(log) => log,
-      Err(e) => {
-        eprintln!("Error: {e}");
-        break;
-      }
-    };
-    match log.kind {
-      OutputKind::StdOut => {
-        print!("{}", &log.data);
-      }
-      OutputKind::StdErr => {
-        eprint!("{}", log.data);
-      }
-      OutputKind::StdIn => println!("TODO: StdIn {}", &log.data),
-      OutputKind::Console => print!("{}", &log.data),
-    }
-  }
+  let stream = client
+    .logs_process("cargo", &opts.name, Some(&query))
+    .await?;
+  utils::print::logs_process_stream(stream).await?;
   Ok(())
 }
 

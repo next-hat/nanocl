@@ -11,15 +11,15 @@ use bollard_next::service::ContainerInspectResponse;
 use nanocl_stubs::generic::{GenericFilter, GenericClause};
 
 use crate::{utils, gen_where4string};
-use crate::schema::containers;
+use crate::schema::processes;
 
 use super::{Pool, Repository};
 
-/// Represents a container instance in the database
+/// Represents a process (job, cargo, vm) in the database
 #[derive(Clone, Queryable, Identifiable, Insertable)]
 #[diesel(primary_key(key))]
-#[diesel(table_name = containers)]
-pub struct ContainerDb {
+#[diesel(table_name = processes)]
+pub struct ProcessDb {
   /// The key of the container instance
   pub key: String,
   /// The created at date
@@ -33,14 +33,14 @@ pub struct ContainerDb {
   /// The data of the container instance a ContainerInspect
   pub data: serde_json::Value,
   /// Id of the node where the container is running
-  pub node_id: String,
+  pub node_key: String,
   /// Id of the related kind
-  pub kind_id: String,
+  pub kind_key: String,
 }
 
 /// Used to create a new container instance
 #[derive(Debug, Clone)]
-pub struct ContainerPartial {
+pub struct ProcessPartial {
   /// The key of the container instance
   pub key: String,
   /// Name of the container instance
@@ -49,16 +49,16 @@ pub struct ContainerPartial {
   pub kind: String,
   /// The data of the container instance a ContainerInspect
   pub data: serde_json::Value,
-  /// Id of the node where the container is running
-  pub node_id: String,
-  /// Id of the related kind
-  pub kind_id: String,
+  /// Key of the node where the container is running
+  pub node_key: String,
+  /// Key of the related kind
+  pub kind_key: String,
 }
 
 /// Represents a container instance
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct Container {
+pub struct Process {
   /// The key of the container instance
   pub key: String,
   /// The created at date
@@ -69,28 +69,28 @@ pub struct Container {
   pub name: String,
   /// Kind of the container instance (job, vm, cargo)
   pub kind: String,
-  /// Id of the node where the container is running
-  pub node_id: String,
-  /// Id of the related kind
-  pub kind_id: String,
+  /// Key of the node where the container is running
+  pub node_key: String,
+  /// Key of the related kind
+  pub kind_key: String,
   /// The data of the container instance a ContainerInspect
   pub data: ContainerInspectResponse,
 }
 
 /// Used to update a container instance
 #[derive(Clone, AsChangeset)]
-#[diesel(table_name = containers)]
-pub struct ContainerUpdateDb {
+#[diesel(table_name = processes)]
+pub struct ProcessUpdateDb {
   /// Last time the instance was updated
   pub updated_at: Option<chrono::NaiveDateTime>,
   // The updated at data
   pub data: Option<serde_json::Value>,
 }
 
-impl TryFrom<ContainerDb> for Container {
+impl TryFrom<ProcessDb> for Process {
   type Error = IoError;
 
-  fn try_from(model: ContainerDb) -> Result<Self, Self::Error> {
+  fn try_from(model: ProcessDb) -> Result<Self, Self::Error> {
     Ok(Self {
       key: model.key,
       created_at: model.created_at,
@@ -98,32 +98,32 @@ impl TryFrom<ContainerDb> for Container {
       name: model.name,
       kind: model.kind,
       data: serde_json::from_value(model.data)
-        .map_err(|err| err.map_err_context(|| "Container instance"))?,
-      node_id: model.node_id,
-      kind_id: model.kind_id,
+        .map_err(|err| err.map_err_context(|| "Process"))?,
+      node_key: model.node_key,
+      kind_key: model.kind_key,
     })
   }
 }
 
-impl From<&ContainerPartial> for ContainerDb {
-  fn from(model: &ContainerPartial) -> Self {
+impl From<&ProcessPartial> for ProcessDb {
+  fn from(model: &ProcessPartial) -> Self {
     Self {
       key: model.key.clone(),
       name: model.name.clone(),
       kind: model.kind.clone(),
       data: model.data.clone(),
-      node_id: model.node_id.clone(),
-      kind_id: model.kind_id.clone(),
+      node_key: model.node_key.clone(),
+      kind_key: model.kind_key.clone(),
       created_at: chrono::Utc::now().naive_utc(),
       updated_at: chrono::Utc::now().naive_utc(),
     }
   }
 }
 
-impl Repository for ContainerDb {
-  type Table = containers::table;
-  type Item = Container;
-  type UpdateItem = ContainerUpdateDb;
+impl Repository for ProcessDb {
+  type Table = processes::table;
+  type Item = Process;
+  type UpdateItem = ProcessUpdateDb;
 
   fn find_one(
     filter: &GenericFilter,
@@ -131,23 +131,23 @@ impl Repository for ContainerDb {
   ) -> JoinHandle<IoResult<Self::Item>> {
     log::debug!("ContainerDb::find_one filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = containers::dsl::containers
-      .order(containers::dsl::created_at.desc())
+    let mut query = processes::dsl::processes
+      .order(processes::dsl::created_at.desc())
       .into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, containers::dsl::key, value);
+      gen_where4string!(query, processes::dsl::key, value);
     }
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, containers::dsl::name, value);
+      gen_where4string!(query, processes::dsl::name, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, containers::dsl::kind, value);
+      gen_where4string!(query, processes::dsl::kind, value);
     }
-    if let Some(value) = r#where.get("node_id") {
-      gen_where4string!(query, containers::dsl::node_id, value);
+    if let Some(value) = r#where.get("node_key") {
+      gen_where4string!(query, processes::dsl::node_key, value);
     }
-    if let Some(value) = r#where.get("kind_id") {
-      gen_where4string!(query, containers::dsl::kind_id, value);
+    if let Some(value) = r#where.get("kind_key") {
+      gen_where4string!(query, processes::dsl::kind_key, value);
     }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
@@ -166,23 +166,23 @@ impl Repository for ContainerDb {
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
     log::debug!("ContainerDb::find filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = containers::dsl::containers
-      .order(containers::dsl::created_at.desc())
+    let mut query = processes::dsl::processes
+      .order(processes::dsl::created_at.desc())
       .into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, containers::dsl::key, value);
+      gen_where4string!(query, processes::dsl::key, value);
     }
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, containers::dsl::name, value);
+      gen_where4string!(query, processes::dsl::name, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, containers::dsl::kind, value);
+      gen_where4string!(query, processes::dsl::kind, value);
     }
-    if let Some(value) = r#where.get("node_id") {
-      gen_where4string!(query, containers::dsl::node_id, value);
+    if let Some(value) = r#where.get("node_key") {
+      gen_where4string!(query, processes::dsl::node_key, value);
     }
-    if let Some(value) = r#where.get("kind_id") {
-      gen_where4string!(query, containers::dsl::kind_id, value);
+    if let Some(value) = r#where.get("kind_key") {
+      gen_where4string!(query, processes::dsl::kind_key, value);
     }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
@@ -198,13 +198,13 @@ impl Repository for ContainerDb {
   }
 }
 
-impl ContainerDb {
+impl ProcessDb {
   pub(crate) async fn find_by_kind_id(
     kind_id: &str,
     pool: &Pool,
-  ) -> IoResult<Vec<Container>> {
+  ) -> IoResult<Vec<Process>> {
     let filter = GenericFilter::new()
-      .r#where("kind_id", GenericClause::Eq(kind_id.to_owned()));
-    ContainerDb::find(&filter, pool).await?
+      .r#where("kind_key", GenericClause::Eq(kind_id.to_owned()));
+    ProcessDb::find(&filter, pool).await?
   }
 }

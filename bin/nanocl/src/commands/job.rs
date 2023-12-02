@@ -1,7 +1,6 @@
 use futures::StreamExt;
 use nanocl_error::io::{IoResult, FromIo, IoError};
 
-use nanocld_client::stubs::cargo::OutputKind;
 use nanocld_client::stubs::job::JobWaitQuery;
 
 use crate::utils;
@@ -66,24 +65,8 @@ async fn exec_job_logs(
   opts: &JobLogsOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let mut stream = client.logs_job(&opts.name).await?;
-  while let Some(chunk) = stream.next().await {
-    let chunk = match chunk {
-      Ok(chunk) => chunk,
-      Err(e) => return Err(e.map_err_context(|| "Stream logs").into()),
-    };
-    let output = format!("[{}] {}", &chunk.container_name, &chunk.log.data);
-    match chunk.log.kind {
-      OutputKind::StdOut => {
-        print!("{output}");
-      }
-      OutputKind::StdErr => {
-        eprint!("{output}");
-      }
-      OutputKind::StdIn => println!("TODO: StdIn {output}"),
-      OutputKind::Console => print!("{output}"),
-    }
-  }
+  let stream = client.logs_process("job", &opts.name, None).await?;
+  utils::print::logs_process_stream(stream).await?;
   Ok(())
 }
 

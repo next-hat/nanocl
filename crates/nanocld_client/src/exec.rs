@@ -6,7 +6,8 @@ use nanocl_error::http_client::HttpClientResult;
 use bollard_next::service::ExecInspectResponse;
 use bollard_next::exec::{CreateExecResults, StartExecOptions};
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::cargo::{CreateExecOptions, OutputLog};
+use nanocl_stubs::cargo::CreateExecOptions;
+use nanocl_stubs::process::OutputLog;
 
 use super::http_client::NanocldClient;
 
@@ -14,17 +15,7 @@ impl NanocldClient {
   /// ## Default path for exec commands
   const EXEC_PATH: &'static str = "/exec";
 
-  /// ## Create exec command inside a cargo
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to exec the command in
-  /// * [exec](CreateExecOptions) - The config for the exec command
-  /// * [namespace](Option) - The [namespace](str) where belong the cargo
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [CreateExecResults](CreateExecResults)
+  /// Create exec command inside a cargo
   ///
   /// ## Example
   ///
@@ -40,7 +31,6 @@ impl NanocldClient {
   /// let result = client.create_exec("my-cargo", exec, None).await.unwrap();
   /// println!("{}", result);
   /// ```
-  ///
   pub async fn create_exec(
     &self,
     name: &str,
@@ -57,17 +47,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Inspect exec
-  ///
   /// Inspect an exec command inside a cargo instance.
-  ///
-  /// ## Arguments
-  ///
-  /// * [id](str) - Id of command to inspect
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [ExecInspectResponse](ExecInspectResponse)
   ///
   /// ## Example
   ///
@@ -91,7 +71,6 @@ impl NanocldClient {
   /// let result = client.inspect_exec("my-cargo", exec, None).await.unwrap();
   /// println!("{}", result);
   /// ```
-  ///
   pub async fn inspect_exec(
     &self,
     id: &str,
@@ -102,16 +81,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Run an command inside a cargo
-  ///
-  /// ## Arguments
-  ///
-  /// * [id](str) - Id of command to run
-  /// * [exec](CreateExecOptions) - The config for the exec command
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Receiver](Receiver) of [OutputLog](OutputLog)
+  /// Run an command inside a cargo
   ///
   /// ## Example
   ///
@@ -131,7 +101,6 @@ impl NanocldClient {
   ///  println!("{}", output);
   /// };
   /// ```
-  ///
   pub async fn start_exec(
     &self,
     id: &str,

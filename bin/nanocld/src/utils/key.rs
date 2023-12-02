@@ -4,6 +4,8 @@
 /// For example if we create a cargo `get-started` in the default namespace `global`
 /// The cargo key will be `get-started.global`
 use ntex::http;
+use rand::{Rng, thread_rng};
+use rand::distributions::Alphanumeric;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
@@ -11,14 +13,15 @@ use nanocl_error::http::{HttpError, HttpResult};
 /// Namespace is an optional query paramater it's resolved with value `global` if it's empty
 pub(crate) fn resolve_nsp(nsp: &Option<String>) -> String {
   match nsp {
-    None => String::from("global"),
-    Some(nsp) => nsp.to_owned(),
+    None => "global",
+    Some(nsp) => nsp,
   }
+  .to_owned()
 }
 
 /// Generate a key based on the namespace and the name of the model.
 pub(crate) fn gen_key(nsp: &str, name: &str) -> String {
-  name.to_owned() + "." + nsp
+  format!("{name}.{nsp}")
 }
 
 /// Validate the name of a cargo or a vm
@@ -35,4 +38,15 @@ pub(crate) fn validate_name(name: &str) -> HttpResult<()> {
     });
   }
   Ok(())
+}
+
+/// Generate a short id based on the length
+pub(crate) fn generate_short_id(length: usize) -> String {
+  let rng = thread_rng();
+  let short_id: String = rng
+    .sample_iter(&Alphanumeric)
+    .take(length)
+    .map(char::from)
+    .collect();
+  short_id
 }

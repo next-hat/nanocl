@@ -7,7 +7,7 @@ use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::system::{HostInfo, ProccessQuery};
 
 use crate::version;
-use crate::models::{DaemonState, ContainerDb, Repository, NodeDb};
+use crate::models::{DaemonState, ProcessDb, Repository, NodeDb};
 
 /// Get version information
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -110,12 +110,12 @@ pub(crate) async fn get_processes(
     .into_iter()
     .map(|node| (node.name.clone(), node))
     .collect::<std::collections::HashMap<String, _>>();
-  let instances = ContainerDb::find(&GenericFilter::default(), &state.pool)
+  let instances = ProcessDb::find(&GenericFilter::default(), &state.pool)
     .await??
     .into_iter()
     .map(|instance| NodeContainerSummary {
-      node: instance.node_id.clone(),
-      ip_address: match nodes.get(&instance.node_id) {
+      node: instance.node_key.clone(),
+      ip_address: match nodes.get(&instance.node_key) {
         Some(node) => node.ip_address.clone(),
         None => "Unknow".to_owned(),
       },

@@ -503,69 +503,6 @@ paths:
           description: Cargo killed
         '404':
           description: Cargo does not exist
-  /cargoes/{name}/logs:
-    get:
-      tags:
-      - Cargoes
-      summary: Get logs of a cargo instance
-      description: Get logs of a cargo instance
-      operationId: logs_cargo
-      parameters:
-      - name: name
-        in: path
-        description: Name of the cargo instance usually `name` or `name-number`
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargo belongs
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: since
-        in: query
-        description: Only logs returned since timestamp
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: until
-        in: query
-        description: Only logs returned until timestamp
-        required: false
-        schema:
-          type: integer
-          format: int64
-          nullable: true
-      - name: timestamps
-        in: query
-        description: Add timestamps to every log line
-        required: false
-        schema:
-          type: boolean
-          nullable: true
-      - name: follow
-        in: query
-        description: Boolean to return a stream or not
-        required: false
-        schema:
-          type: boolean
-          nullable: true
-      - name: tail
-        in: query
-        description: Only return the n last (integer) or all ("all") logs
-        required: false
-        schema:
-          type: string
-          nullable: true
-      responses:
-        '200':
-          description: Cargo logs
-        '404':
-          description: Cargo does not exist
   /cargoes/{name}/restart:
     post:
       tags:
@@ -681,14 +618,14 @@ paths:
           nullable: true
       - name: stream
         in: query
-        description: Only logs returned since timestamp
+        description: Return a stream of stats
         required: false
         schema:
           type: boolean
           nullable: true
       - name: one_shot
         in: query
-        description: Only logs returned until timestamp
+        description: Return stats only once
         required: false
         schema:
           type: boolean
@@ -877,25 +814,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobInspect'
-  /jobs/{name}/logs:
-    get:
-      tags:
-      - Jobs
-      summary: Get logs of a job
-      description: Get logs of a job
-      operationId: logs_job
-      parameters:
-      - name: name
-        in: path
-        description: Name of the job
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Job logs
-        '404':
-          description: Job does not exist
   /jobs/{name}/start:
     post:
       tags:
@@ -1124,6 +1042,75 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/NodeContainerSummary'
+  /processes/{kind}/{name}/logs:
+    get:
+      tags:
+      - Processes
+      summary: Get logs of an instance
+      description: Get logs of an instance
+      operationId: get_process_logs
+      parameters:
+      - name: kind
+        in: path
+        description: Type of the instance
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        description: Name of the instance
+        required: true
+        schema:
+          type: string
+      - name: namespace
+        in: query
+        description: Namespace of the instance
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: since
+        in: query
+        description: Only logs returned since timestamp
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: until
+        in: query
+        description: Only logs returned until timestamp
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: timestamps
+        in: query
+        description: Add timestamps to every log line
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      - name: follow
+        in: query
+        description: Boolean to return a stream or not
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      - name: tail
+        in: query
+        description: Only return the n last (integer) or all ("all") logs
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: Instance logs
+        '404':
+          description: Instance not exists
   /resources:
     get:
       tags:
@@ -6984,5 +6971,5 @@ tags:
   description: Virtual machines management endpoints.
 - name: Metrics
   description: Metrics management endpoints.
-- name: HttpMetrics
-  description: HTTP Metrics management endpoints.
+- name: Processes
+  description: Processes management endpoints.

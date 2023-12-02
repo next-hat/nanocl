@@ -6,8 +6,8 @@ use nanocl_error::http_client::HttpClientResult;
 use bollard_next::service::ContainerSummary;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, OutputLog, CargoKillOptions,
-  CargoDeleteQuery, CargoLogQuery, CargoStatsQuery, CargoStats,
+  Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoDeleteQuery,
+  CargoStatsQuery, CargoStats,
 };
 use nanocl_stubs::cargo_spec::{CargoSpecUpdate, CargoSpecPartial, CargoSpec};
 
@@ -17,19 +17,8 @@ impl NanocldClient {
   /// ## Default path for cargoes
   const CARGO_PATH: &'static str = "/cargoes";
 
-  /// ## Create cargo
-  ///
   /// Create a new cargo in the system
   /// Note that the cargo is not started by default
-  ///
-  /// ## Arguments
-  ///
-  /// * [item](CargoSpecPartial) - The cargo to create
-  /// * [namespace](Option) - The [namespace](str) to create the cargo in
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing the [cargo](Cargo) created
   ///
   /// ## Example
   ///
@@ -46,7 +35,6 @@ impl NanocldClient {
   /// };
   /// let res = client.create_cargo(new_cargo, None).await;
   /// ```
-  ///
   pub async fn create_cargo(
     &self,
     item: &CargoSpecPartial,
@@ -62,14 +50,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Delete a cargo
-  ///
   /// Delete a cargo by it's name and namespace
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to delete
-  /// * [query](CargoDeleteQuery) - The [namespace](str) where the cargo belongs
   ///
   /// ## Example
   ///
@@ -79,7 +60,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.delete_cargo("my-cargo", None).await;
   /// ```
-  ///
   pub async fn delete_cargo(
     &self,
     name: &str,
@@ -91,18 +71,7 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## Inspect a cargo
-  ///
   /// Inspect a cargo by it's name to get more information about it
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to inspect
-  /// * [namespace](Option) - The [namespace](str) where the cargo belongs
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [cargo inspect](CargoInspect)
   ///
   /// ## Example
   ///
@@ -112,7 +81,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.inspect_cargo("my-cargo", None).await;
   /// ```
-  ///
   pub async fn inspect_cargo(
     &self,
     name: &str,
@@ -127,14 +95,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Start a cargo
-  ///
   /// Start a cargo by it's name and namespace
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to start
-  /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
   /// ## Example
   ///
@@ -144,7 +105,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.start_cargo("my-cargo", None).await;
   /// ```
-  ///
   pub async fn start_cargo(
     &self,
     name: &str,
@@ -160,14 +120,7 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// # Stop a cargo
-  ///
   /// Stop a cargo by it's name and namespace
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to stop
-  /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
   /// ## Example
   ///
@@ -177,7 +130,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.stop_cargo("my-cargo", None).await;
   /// ```
-  ///
   pub async fn stop_cargo(
     &self,
     name: &str,
@@ -193,14 +145,7 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// # Restart a cargo
-  ///
   /// Restart a cargo by it's name and namespace
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to restart
-  /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
   /// ## Example
   ///
@@ -210,7 +155,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.restart_cargo("my-cargo", None).await;
   /// ```
-  ///
   pub async fn restart_cargo(
     &self,
     name: &str,
@@ -226,17 +170,7 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## List cargoes
-  ///
   /// List all cargoes in a namespace
-  ///
-  /// ## Arguments
-  ///
-  /// * [namespace](Option) - The [namespace](str) where the cargoes belongs
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [CargoSummary](CargoSummary)
   ///
   /// ## Example
   ///
@@ -246,7 +180,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let cargoes = client.list_cargoes(None).await.unwrap();
   /// ```
-  ///
   pub async fn list_cargo(
     &self,
     namespace: Option<&str>,
@@ -257,16 +190,8 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Patch a cargo
-  ///
   /// Patch a cargo by it's name
   /// This will update the cargo's spec by merging current spec with new spec and creating an history entry
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to patch
-  /// * [cargo](CargoSpecUpdate) - The spec to patch the cargo with
-  /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
   /// ## Example
   ///
@@ -279,7 +204,6 @@ impl NanocldClient {
   /// };
   /// client.patch_cargo("my-cargo", cargo, None).await.unwrap();
   /// ```
-  ///
   pub async fn patch_cargo(
     &self,
     name: &str,
@@ -296,16 +220,8 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## Put a cargo
-  ///
   /// Put a cargo by it's name
   /// It will create a new cargo spec and store old one in history
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to update
-  /// * [cargo](CargoSpecPartial) - The spec to update the cargo with
-  /// * [namespace](Option) - The [namespace](str) where the cargo belongs
   ///
   /// ## Example
   ///
@@ -318,7 +234,6 @@ impl NanocldClient {
   /// };
   /// client.put_cargo("my-cargo", &cargo, None).await.unwrap();
   /// ```
-  ///
   pub async fn put_cargo(
     &self,
     name: &str,
@@ -335,16 +250,7 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## List all the cargo histories
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to list the histories
-  /// * [namespace](Option) - The [namespace](str) where belong the cargo
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [CargoSpec](CargoSpec)
+  /// List cargo histories
   ///
   /// ## Example
   ///
@@ -354,7 +260,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let histories = client.list_history("my-cargo", None).await.unwrap();
   /// ```
-  ///
   pub async fn list_history_cargo(
     &self,
     name: &str,
@@ -369,17 +274,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Revert a cargo to a specific history
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to revert
-  /// * [id](str) - The id of the history to revert to
-  /// * [namespace](Option) - The [namespace](str) where belong the cargo
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing the [cargo](Cargo) reverted
+  /// Revert a cargo to a specific history
   ///
   /// ## Example
   ///
@@ -389,7 +284,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let cargo = client.revert_cargo("my-cargo", "my-history-id", None).await.unwrap();
   /// ```
-  ///
   pub async fn revert_cargo(
     &self,
     name: &str,
@@ -406,44 +300,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// ## Logs a cargo
-  ///
-  /// Get logs of a cargo by it's name
-  /// The logs are streamed as a [Receiver](Receiver) of [output log](OutputLog)
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to get the logs
-  /// * [query](Option) - The optional [query](CargoLogQuery)
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Receiver](Receiver) of [output log](OutputLog)
-  ///
-  pub async fn logs_cargo(
-    &self,
-    name: &str,
-    query: Option<&CargoLogQuery>,
-  ) -> HttpClientResult<Receiver<HttpResult<OutputLog>>> {
-    let res = self
-      .send_get(&format!("{}/{name}/logs", Self::CARGO_PATH), query)
-      .await?;
-    Ok(Self::res_stream(res).await)
-  }
-
-  /// ## Get the stats of a cargo
-  ///
   /// The stats are streamed as a [Receiver](Receiver) of [cargo stats](CargoStats)
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to get the stats
-  /// * [query](Option) - The option [query](CargoStatsQuery)
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Receiver](Receiver) of [cargo stats](CargoStats)
-  ///
   pub async fn stats_cargo(
     &self,
     name: &str,
@@ -455,15 +312,7 @@ impl NanocldClient {
     Ok(Self::res_stream(res).await)
   }
 
-  /// ## Kill a cargo
-  ///
   /// Kill a cargo by it's name
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to kill
-  /// * [query](Option) - The optional [query](CargoKillOptions)
-  /// * [namespace](Option) - The [namespace](str) where belong the cargo
   ///
   /// ## Example
   ///
@@ -473,7 +322,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.kill_cargo("my-cargo", None, None).await;
   /// ```
-  ///
   pub async fn kill_cargo(
     &self,
     name: &str,
@@ -490,18 +338,7 @@ impl NanocldClient {
     Ok(())
   }
 
-  /// ## List cargo instance
-  ///
   /// List all the instances of a cargo by it's name and namespace
-  ///
-  /// ## Arguments
-  ///
-  /// * [name](str) - The name of the cargo to list the instances
-  /// * [namespace](Option) - The [namespace](str) where belong the cargo
-  ///
-  /// ## Return
-  ///
-  /// [HttpClientResult](HttpClientResult) containing a [Vec](Vec) of [ContainerSummary](ContainerSummary)
   ///
   /// ## Example
   ///
@@ -511,7 +348,6 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.list_cargo_instance("my-cargo", None).await;
   /// ```
-  ///
   pub async fn list_cargo_instance(
     &self,
     name: &str,
@@ -531,7 +367,6 @@ impl NanocldClient {
 mod tests {
   use super::*;
 
-  use futures::StreamExt;
   use nanocl_error::http_client::HttpClientError;
   use nanocl_stubs::cargo_spec::CargoSpecPartial;
   use ntex::http;
@@ -627,14 +462,14 @@ mod tests {
       .unwrap();
   }
 
-  #[ntex::test]
-  async fn logs_cargo() {
-    let client =
-      NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
-    let mut rx = client
-      .logs_cargo("nstore", Some(&CargoLogQuery::of_namespace("system")))
-      .await
-      .unwrap();
-    let _out = rx.next().await.unwrap().unwrap();
-  }
+  // #[ntex::test]
+  // async fn logs_cargo() {
+  //   let client =
+  //     NanocldClient::connect_to("http://ndaemon.nanocl.internal:8585", None);
+  //   let mut rx = client
+  //     .logs_cargo("nstore", Some(&InstanceLogQuery::of_namespace("system")))
+  //     .await
+  //     .unwrap();
+  //   let _out = rx.next().await.unwrap().unwrap();
+  // }
 }

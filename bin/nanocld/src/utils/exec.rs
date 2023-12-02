@@ -5,7 +5,8 @@ use bollard_next::container::LogOutput;
 use bollard_next::exec::{StartExecOptions, StartExecResults, CreateExecResults};
 
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::cargo::{OutputLog, CreateExecOptions};
+use nanocl_stubs::cargo::CreateExecOptions;
+use nanocl_stubs::process::OutputLog;
 
 use crate::models::DaemonState;
 

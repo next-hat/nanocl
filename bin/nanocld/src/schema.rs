@@ -22,19 +22,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    containers (key) {
-        key -> Varchar,
-        created_at -> Timestamptz,
-        updated_at -> Timestamptz,
-        name -> Varchar,
-        kind -> Varchar,
-        data -> Jsonb,
-        node_id -> Varchar,
-        kind_id -> Varchar,
-    }
-}
-
-diesel::table! {
     http_metrics (key) {
         key -> Uuid,
         created_at -> Timestamptz,
@@ -113,13 +100,15 @@ diesel::table! {
 }
 
 diesel::table! {
-    resource_specs (key) {
-        key -> Uuid,
+    processes (key) {
+        key -> Varchar,
         created_at -> Timestamptz,
-        resource_key -> Varchar,
-        version -> Varchar,
+        updated_at -> Timestamptz,
+        name -> Varchar,
+        kind -> Varchar,
         data -> Jsonb,
-        metadata -> Nullable<Jsonb>,
+        node_key -> Varchar,
+        kind_key -> Varchar,
     }
 }
 
@@ -137,6 +126,17 @@ diesel::table! {
     resource_kinds (name) {
         name -> Varchar,
         created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    resource_specs (key) {
+        key -> Uuid,
+        created_at -> Timestamptz,
+        resource_key -> Varchar,
+        version -> Varchar,
+        data -> Jsonb,
+        metadata -> Nullable<Jsonb>,
     }
 }
 
@@ -182,17 +182,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    vm_specs (key) {
-        key -> Uuid,
-        created_at -> Timestamptz,
-        vm_key -> Varchar,
-        version -> Varchar,
-        data -> Jsonb,
-        metadata -> Nullable<Jsonb>,
-    }
-}
-
-diesel::table! {
     vm_images (name) {
         name -> Varchar,
         created_at -> Timestamptz,
@@ -202,6 +191,17 @@ diesel::table! {
         size_actual -> Int8,
         size_virtual -> Int8,
         parent -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
+    vm_specs (key) {
+        key -> Uuid,
+        created_at -> Timestamptz,
+        vm_key -> Varchar,
+        version -> Varchar,
+        data -> Jsonb,
+        metadata -> Nullable<Jsonb>,
     }
 }
 
@@ -227,7 +227,6 @@ diesel::joinable!(vms -> vm_specs (spec_key));
 diesel::allow_tables_to_appear_in_same_query!(
   cargo_specs,
   cargoes,
-  containers,
   http_metrics,
   jobs,
   metrics,
@@ -235,13 +234,14 @@ diesel::allow_tables_to_appear_in_same_query!(
   node_group_links,
   node_groups,
   nodes,
-  resource_specs,
+  processes,
   resource_kind_versions,
   resource_kinds,
+  resource_specs,
   resources,
   secrets,
   stream_metrics,
-  vm_specs,
   vm_images,
+  vm_specs,
   vms,
 );

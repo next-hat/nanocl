@@ -10,8 +10,8 @@ use nanocl_error::http::{HttpError, HttpResult};
 
 use bollard_next::service::ContainerCreateResponse;
 use bollard_next::container::{
-  Stats, LogOutput, ListContainersOptions, CreateContainerOptions,
-  StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
+  Stats, ListContainersOptions, CreateContainerOptions, StartContainerOptions,
+  WaitContainerOptions, RemoveContainerOptions,
 };
 use bollard_next::service::{
   HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
@@ -20,8 +20,8 @@ use nanocl_stubs::system::EventAction;
 use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::generic::{GenericListNspQuery, GenericClause, GenericFilter};
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, OutputLog, CargoLogQuery,
-  CargoKillOptions, CargoScale, CargoStats, CargoStatsQuery,
+  Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoScale, CargoStats,
+  CargoStatsQuery,
 };
 use nanocl_stubs::cargo_spec::{
   CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config,
@@ -29,7 +29,7 @@ use nanocl_stubs::cargo_spec::{
 
 use crate::utils;
 use crate::models::{
-  DaemonState, CargoDb, Repository, ContainerDb, NamespaceDb, NodeDb, SecretDb,
+  DaemonState, CargoDb, Repository, ProcessDb, NamespaceDb, NodeDb, SecretDb,
   CargoSpecDb, FromSpec,
 };
 
@@ -99,7 +99,6 @@ async fn execute_before(
 /// the cargo key.
 async fn create_instances(
   cargo: &Cargo,
-  start: usize,
   number: usize,
   state: &DaemonState,
 ) -> HttpResult<Vec<ContainerCreateResponse>> {
@@ -140,11 +139,8 @@ async fn create_instances(
     .map(move |current| {
       let secret_envs = secret_envs.clone();
       async move {
-        let name = if current > 0 || start > 0 {
-          format!("{}-{}.c", current + start, cargo.spec.cargo_key)
-        } else {
-          format!("{}.c", cargo.spec.cargo_key)
-        };
+        let short_id = utils::key::generate_short_id(6);
+        let name = format!("{}-{}.{}.c", cargo.spec.name, short_id, cargo.namespace_name);
         let create_options = bollard_next::container::CreateContainerOptions {
           name: name.clone(),
           ..Default::default()
@@ -184,13 +180,9 @@ async fn create_instances(
         env.extend(secret_envs);
         let hostname = match cargo.spec.container.hostname {
           Some(ref hostname) => {
-            if current > 0 {
-              format!("{current}-{hostname}")
-            } else {
-              hostname.to_owned()
-            }
+            format!("{hostname}-{short_id}")
           }
-          None => name.replace('.', "-"),
+          None => name,
         };
         env.push(format!("NANOCL_NODE={}", state.config.hostname));
         env.push(format!("NANOCL_NODE_ADDR={}", state.config.gateway));
@@ -363,7 +355,7 @@ pub(crate) async fn create(
   } else {
     1
   };
-  if let Err(err) = create_instances(&cargo, 0, number, state).await {
+  if let Err(err) = create_instances(&cargo, number, state).await {
     CargoDb::delete_by_pk(&cargo.spec.cargo_key, &state.pool).await??;
     return Err(err);
   }
@@ -520,7 +512,7 @@ pub(crate) async fn put(
   let containers = list_instances(cargo_key, &state.docker_api).await?;
   restore_instances_backup(&containers, state).await?;
   // Create instance with the new spec
-  let new_instances = match create_instances(&cargo, 0, number, state).await {
+  let new_instances = match create_instances(&cargo, number, state).await {
     // If the creation of the new instance failed, we rename the old containers
     Err(err) => {
       log::warn!("Unable to create cargo instance: {}", err);
@@ -585,7 +577,7 @@ pub(crate) async fn list(
       .await??
       .try_to_spec()?;
     let instances =
-      ContainerDb::find_by_kind_id(&cargo.spec.cargo_key, &state.pool).await?;
+      ProcessDb::find_by_kind_id(&cargo.spec.cargo_key, &state.pool).await?;
     let mut running_instances = 0;
     for instance in &instances {
       let state = instance.data.state.clone().unwrap_or_default();
@@ -614,7 +606,7 @@ pub(crate) async fn inspect_by_key(
 ) -> HttpResult<CargoInspect> {
   let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let mut running_instances = 0;
-  let instances = ContainerDb::find_by_kind_id(key, &state.pool).await?;
+  let instances = ProcessDb::find_by_kind_id(key, &state.pool).await?;
   let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
   // Convert into a hashmap for faster lookup
   let nodes = nodes
@@ -625,8 +617,8 @@ pub(crate) async fn inspect_by_key(
     .into_iter()
     .map(|instance| {
       let node_instance = NodeContainerSummary {
-        node: instance.node_id.clone(),
-        ip_address: match nodes.get(&instance.node_id) {
+        node: instance.node_key.clone(),
+        ip_address: match nodes.get(&instance.node_key) {
           Some(node) => node.ip_address.clone(),
           None => "Unknow".to_owned(),
         },
@@ -678,14 +670,20 @@ pub(crate) async fn delete_by_namespace(
 
 /// Send a signal to a cargo instance the cargo name can be used if the cargo has only one instance
 /// The signal is send to one instance only
-pub(crate) async fn kill_by_name(
-  name: &str,
+pub(crate) async fn kill_by_key(
+  key: &str,
   options: &CargoKillOptions,
-  docker_api: &bollard_next::Docker,
+  state: &DaemonState,
 ) -> HttpResult<()> {
-  let name = format!("{name}.c");
+  let instances = ProcessDb::find_by_kind_id(key, &state.pool).await?;
+  if instances.is_empty() {
+    return Err(HttpError::not_found(format!(
+      "Cargo instance not found: {key}"
+    )));
+  }
+  let id = instances[0].data.id.clone().unwrap_or_default();
   let options = options.clone().into();
-  docker_api.kill_container(&name, Some(options)).await?;
+  state.docker_api.kill_container(&id, Some(options)).await?;
   Ok(())
 }
 
@@ -790,20 +788,6 @@ pub async fn patch(
   utils::cargo::put(key, &spec, version, state).await
 }
 
-/// Get the logs of a cargo instance
-/// The cargo name can be used if the cargo has only one instance
-/// The query parameter can be used to filter the logs
-pub(crate) fn get_logs(
-  name: &str,
-  query: &CargoLogQuery,
-  docker_api: &bollard_next::Docker,
-) -> HttpResult<impl StreamExt<Item = HttpResult<Bytes>>> {
-  let stream =
-    docker_api.logs(&format!("{name}.c"), Some(query.clone().into()));
-  let stream = transform_stream::<LogOutput, OutputLog>(stream);
-  Ok(stream)
-}
-
 /// Get the stats of a cargo instance
 /// The cargo name can be used if the cargo has only one instance
 pub(crate) fn get_stats(
@@ -857,8 +841,7 @@ pub async fn scale(
   } else {
     let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
     let to_add = options.replicas.unsigned_abs();
-    let created_instances =
-      create_instances(&cargo, instances.len(), to_add, state).await?;
+    let created_instances = create_instances(&cargo, to_add, state).await?;
     created_instances
       .iter()
       .map(|instance| async {

@@ -1,13 +1,18 @@
+use ntex::channel::mpsc::Receiver;
+use futures::StreamExt;
 use tabled::Table;
 use tabled::settings::object::Segment;
 use tabled::settings::{Style, Modify, Padding, Alignment};
 
-use nanocl_error::io::{IoResult, FromIo, IoError};
+use nanocl_error::http::HttpError;
+use nanocl_error::io::{IoError, IoResult, FromIo};
+
+use nanocld_client::stubs::process::{ProcessOutputLog, OutputKind};
 
 use crate::models::DisplayFormat;
 
 /// Print a table from an iterator of [Tabled](tabled::Tabled) elements
-pub fn print_table<T>(iter: impl IntoIterator<Item = T>)
+pub(crate) fn print_table<T>(iter: impl IntoIterator<Item = T>)
 where
   T: tabled::Tabled,
 {
@@ -23,7 +28,7 @@ where
 }
 
 /// Print yaml from a serializable data
-pub fn print_yml<T>(data: T) -> IoResult<()>
+pub(crate) fn print_yml<T>(data: T) -> IoResult<()>
 where
   T: serde::Serialize,
 {
@@ -34,7 +39,7 @@ where
 }
 
 /// Print json from a serializable data
-pub fn print_json<T>(data: T) -> IoResult<()>
+pub(crate) fn print_json<T>(data: T) -> IoResult<()>
 where
   T: serde::Serialize,
 {
@@ -45,7 +50,7 @@ where
 }
 
 /// Print toml from a serializable data
-pub fn print_toml<T>(data: T) -> IoResult<()>
+pub(crate) fn print_toml<T>(data: T) -> IoResult<()>
 where
   T: serde::Serialize,
 {
@@ -60,7 +65,7 @@ where
 }
 
 /// Display data in a specific format
-pub fn display_format<T>(format: &DisplayFormat, data: T) -> IoResult<()>
+pub(crate) fn display_format<T>(format: &DisplayFormat, data: T) -> IoResult<()>
 where
   T: serde::Serialize,
 {
@@ -69,4 +74,28 @@ where
     DisplayFormat::Toml => print_toml(data),
     DisplayFormat::Json => print_json(data),
   }
+}
+
+pub(crate) async fn logs_process_stream(
+  stream: Receiver<Result<ProcessOutputLog, HttpError>>,
+) -> IoResult<()> {
+  let mut stream = stream;
+  while let Some(s) = stream.next().await {
+    let s = match s {
+      Ok(s) => s,
+      Err(e) => return Err(e.map_err_context(|| "Stream").into()),
+    };
+    let output = format!("[{}] {}", &s.name, &s.log.data);
+    match s.log.kind {
+      OutputKind::StdOut => {
+        print!("{output}");
+      }
+      OutputKind::StdErr => {
+        eprint!("{output}");
+      }
+      OutputKind::Console => print!("{output}"),
+      _ => {}
+    }
+  }
+  Ok(())
 }
