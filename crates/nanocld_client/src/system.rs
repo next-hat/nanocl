@@ -3,8 +3,7 @@ use ntex::channel::mpsc::Receiver;
 use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_stubs::node::NodeContainerSummary;
-use nanocl_stubs::system::{Event, BinaryInfo, HostInfo, ProccessQuery};
+use nanocl_stubs::system::{Event, BinaryInfo, HostInfo};
 
 use super::http_client::NanocldClient;
 
@@ -72,24 +71,6 @@ impl NanocldClient {
   /// ```
   pub async fn info(&self) -> HttpClientResult<HostInfo> {
     let res = self.send_get("/info", None::<String>).await?;
-    Self::res_json(res).await
-  }
-
-  /// List of current processes (vm, cargoes) managed by the daemon
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.process(None).await;
-  /// ```
-  pub async fn process(
-    &self,
-    opts: Option<&ProccessQuery>,
-  ) -> HttpClientResult<Vec<NodeContainerSummary>> {
-    let res = self.send_get("/processes", opts).await?;
     Self::res_json(res).await
   }
 }

@@ -1,3 +1,4 @@
+use nanocl_stubs::node::NodeContainerSummary;
 use ntex::web;
 use futures_util::stream::select_all;
 use futures_util::{StreamExt, TryStreamExt};
@@ -5,13 +6,52 @@ use futures_util::{StreamExt, TryStreamExt};
 use nanocl_error::http::HttpResult;
 
 use bollard_next::container::LogsOptions;
-use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog};
+use nanocl_stubs::generic::{GenericNspQuery, GenericFilter};
+use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog, ProccessQuery};
 
 use crate::utils;
-use crate::models::{DaemonState, ProcessDb, ProcessKind};
+use crate::models::{DaemonState, ProcessDb, ProcessKind, NodeDb, Repository};
 
-/// Get logs of an process
+/// List process (Vm, Job, Cargo)
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Processes",
+  path = "/processes",
+  params(
+    ("all" = bool, Query, description = "Return instances from all nodes"),
+    ("last" = Option<isize>, Query, description = "Return this number of most recently created containers"),
+    ("namespace" = Option<String>, Query, description = "Return instances from this namespace only"),
+  ),
+  responses(
+    (status = 200, description = "List of instances", body = [NodeContainerSummary]),
+  ),
+))]
+#[web::get("/processes")]
+pub(crate) async fn list_process(
+  state: web::types::State<DaemonState>,
+  _: web::types::Query<ProccessQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
+  let nodes = nodes
+    .into_iter()
+    .map(|node| (node.name.clone(), node))
+    .collect::<std::collections::HashMap<String, _>>();
+  let instances = ProcessDb::find(&GenericFilter::default(), &state.pool)
+    .await??
+    .into_iter()
+    .map(|instance| NodeContainerSummary {
+      node: instance.node_key.clone(),
+      ip_address: match nodes.get(&instance.node_key) {
+        Some(node) => node.ip_address.clone(),
+        None => "Unknow".to_owned(),
+      },
+      container: instance.data,
+    })
+    .collect::<Vec<NodeContainerSummary>>();
+  Ok(web::HttpResponse::Ok().json(&instances))
+}
+
+/// Get logs of a process
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Processes",
@@ -137,7 +177,34 @@ pub(crate) async fn stop_process(
 }
 
 pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+  config.service(list_process);
   config.service(logs_process);
   config.service(start_process);
   config.service(stop_process);
+}
+
+#[cfg(test)]
+mod tests {
+  use ntex::http;
+
+  use crate::utils::tests::*;
+
+  use nanocl_stubs::process::ProccessQuery;
+  use nanocl_stubs::node::NodeContainerSummary;
+
+  #[ntex::test]
+  async fn basic_list() {
+    let client = gen_default_test_client().await;
+    let mut res = client
+      .send_get(
+        "/processes",
+        Some(&ProccessQuery {
+          all: false,
+          ..Default::default()
+        }),
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "processes");
+    let _ = res.json::<Vec<NodeContainerSummary>>().await.unwrap();
+  }
 }

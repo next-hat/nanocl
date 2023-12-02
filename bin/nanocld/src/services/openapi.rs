@@ -220,7 +220,6 @@ impl Modify for VersionModifier {
     // System
     system::get_info,
     system::watch_event,
-    system::get_processes,
     system::get_version,
     system::get_ping,
     // Namespace
@@ -293,6 +292,7 @@ impl Modify for VersionModifier {
     process::logs_process,
     process::start_process,
     process::stop_process,
+    process::list_process,
   ),
   components(schemas(
     // Node

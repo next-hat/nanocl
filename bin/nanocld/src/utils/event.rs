@@ -10,16 +10,15 @@ use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
 
 use crate::utils;
 use crate::event::Client;
-use crate::models::{DaemonState, ProcessDb, Repository, JobDb, FromSpec};
+use crate::models::{DaemonState, Repository, JobDb, FromSpec};
 
 /// Remove a job after when finished and ttl is set
 async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
-  if e.kind != EventKind::Container {
+  if e.kind != EventKind::Process {
     return Ok(());
   }
   let actor = e.actor.unwrap_or_default();
   let attributes = actor.attributes.unwrap_or_default();
-  log::debug!("Job auto remove attributes: {attributes}");
   let job_id = match attributes.get("io.nanocl.j") {
     None => return Ok(()),
     Some(job_id) => job_id.as_str().unwrap_or_default(),
@@ -126,7 +125,7 @@ async fn exec_docker_event(
   log::debug!("docker event: {action}");
   let action = action.as_str();
   let mut event = Event {
-    kind: EventKind::Container,
+    kind: EventKind::Process,
     action: EventAction::Deleted,
     actor: Some(EventActor {
       key: Some(id.clone()),
@@ -138,13 +137,13 @@ async fn exec_docker_event(
   };
   match action {
     "destroy" => {
-      log::debug!("docker event destroy container: {id}");
-      ProcessDb::delete_by_pk(&id, &state.pool).await??;
       state.event_emitter.spawn_emit_event(event);
       return Ok(());
     }
     "create" => {
       event.action = EventAction::Created;
+      state.event_emitter.spawn_emit_event(event);
+      return Ok(());
     }
     "start" => {
       event.action = EventAction::Started;

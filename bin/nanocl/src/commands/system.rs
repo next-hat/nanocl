@@ -12,7 +12,7 @@ pub async fn exec_process(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let opts = args.clone().into();
-  let items = client.process(Some(&opts)).await?;
+  let items = client.list_process(Some(&opts)).await?;
   let rows = items
     .into_iter()
     .map(ProcessRow::from)

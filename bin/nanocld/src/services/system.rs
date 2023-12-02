@@ -1,13 +1,11 @@
-use nanocl_stubs::generic::GenericFilter;
 use ntex::web;
 
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::node::NodeContainerSummary;
-use nanocl_stubs::system::{HostInfo, ProccessQuery};
+use nanocl_stubs::system::HostInfo;
 
 use crate::version;
-use crate::models::{DaemonState, ProcessDb, Repository, NodeDb};
+use crate::models::DaemonState;
 
 /// Get version information
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -86,51 +84,11 @@ pub(crate) async fn watch_event(
   )
 }
 
-/// List instances (cargo/vm) including non running ones
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  tag = "System",
-  path = "/processes",
-  params(
-    ("all" = bool, Query, description = "Return instances from all nodes"),
-    ("last" = Option<isize>, Query, description = "Return this number of most recently created containers"),
-    ("namespace" = Option<String>, Query, description = "Return instances from this namespace only"),
-  ),
-  responses(
-    (status = 200, description = "List of instances", body = [NodeContainerSummary]),
-  ),
-))]
-#[web::get("/processes")]
-pub(crate) async fn get_processes(
-  state: web::types::State<DaemonState>,
-  _: web::types::Query<ProccessQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
-  let nodes = nodes
-    .into_iter()
-    .map(|node| (node.name.clone(), node))
-    .collect::<std::collections::HashMap<String, _>>();
-  let instances = ProcessDb::find(&GenericFilter::default(), &state.pool)
-    .await??
-    .into_iter()
-    .map(|instance| NodeContainerSummary {
-      node: instance.node_key.clone(),
-      ip_address: match nodes.get(&instance.node_key) {
-        Some(node) => node.ip_address.clone(),
-        None => "Unknow".to_owned(),
-      },
-      container: instance.data,
-    })
-    .collect::<Vec<NodeContainerSummary>>();
-  Ok(web::HttpResponse::Ok().json(&instances))
-}
-
 pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(watch_event);
-  config.service(get_info);
-  config.service(get_processes);
   config.service(get_ping);
   config.service(get_version);
+  config.service(get_info);
+  config.service(watch_event);
 }
 
 #[cfg(test)]
@@ -138,8 +96,7 @@ mod tests {
 
   use ntex::http;
 
-  use nanocl_stubs::node::NodeContainerSummary;
-  use nanocl_stubs::system::{HostInfo, ProccessQuery};
+  use nanocl_stubs::system::HostInfo;
 
   use crate::services::ntex_config;
   use crate::utils::tests::*;
@@ -182,21 +139,5 @@ mod tests {
     let client = gen_default_test_client().await;
     let res = client.send_head("/_ping", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::ACCEPTED, "ping");
-  }
-
-  #[ntex::test]
-  async fn process() {
-    let client = gen_default_test_client().await;
-    let mut res = client
-      .send_get(
-        "/processes",
-        Some(&ProccessQuery {
-          all: false,
-          ..Default::default()
-        }),
-      )
-      .await;
-    test_status_code!(res.status(), http::StatusCode::OK, "processes");
-    let _ = res.json::<Vec<NodeContainerSummary>>().await.unwrap();
   }
 }

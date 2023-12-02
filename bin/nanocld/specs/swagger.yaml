@@ -937,10 +937,10 @@ paths:
   /processes:
     get:
       tags:
-      - System
-      summary: List instances (cargo/vm) including non running ones
-      description: List instances (cargo/vm) including non running ones
-      operationId: get_processes
+      - Processes
+      summary: List process (Vm, Job, Cargo)
+      description: List process (Vm, Job, Cargo)
+      operationId: list_process
       parameters:
       - name: all
         in: query
@@ -975,8 +975,8 @@ paths:
     get:
       tags:
       - Processes
-      summary: Get logs of an process
-      description: Get logs of an process
+      summary: Get logs of a process
+      description: Get logs of a process
       operationId: logs_process
       parameters:
       - name: kind

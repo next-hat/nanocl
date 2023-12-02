@@ -4,8 +4,7 @@ use chrono::DateTime;
 
 use bollard_next::service::ContainerStateStatusEnum;
 
-use nanocld_client::stubs::system::ProccessQuery;
-use nanocld_client::stubs::node::NodeContainerSummary;
+use nanocld_client::stubs::{node::NodeContainerSummary, process::ProccessQuery};
 
 /// `nanocl system` available arguments
 #[derive(Clone, Parser)]

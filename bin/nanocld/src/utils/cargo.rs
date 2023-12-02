@@ -765,7 +765,6 @@ pub async fn scale(
       .into_iter()
       .collect::<Result<Vec<_>, HttpError>>()?;
   } else {
-    let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
     let to_add = options.replicas.unsigned_abs();
     let created_instances = create_instances(&cargo, to_add, state).await?;
     created_instances
