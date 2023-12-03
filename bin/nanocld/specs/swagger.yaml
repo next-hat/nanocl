@@ -5203,6 +5203,43 @@ components:
       - tcp
       - udp
       - sctp
+    Process:
+      type: object
+      description: Represents a process (Vm, Job, Cargo)
+      required:
+      - Key
+      - CreatedAt
+      - UpdatedAt
+      - Name
+      - Kind
+      - NodeKey
+      - KindKey
+      - Data
+      properties:
+        Key:
+          type: string
+          description: The key of the process
+        CreatedAt:
+          type: string
+          format: date-time
+          description: The created at date
+        UpdatedAt:
+          type: string
+          format: date-time
+          description: Last time the instance was updated
+        Name:
+          type: string
+          description: Name of the process
+        Kind:
+          $ref: '#/components/schemas/ProcessKind'
+        NodeKey:
+          type: string
+          description: Key of the node where the container is running
+        KindKey:
+          type: string
+          description: Key of the related kind
+        Data:
+          $ref: '#/components/schemas/ContainerInspectResponse'
     ProcessConfig:
       type: object
       properties:
