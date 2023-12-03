@@ -35,7 +35,7 @@ use bollard_next::service::{
 };
 
 use nanocl_stubs::node::Node;
-use nanocl_stubs::process::Process;
+use nanocl_stubs::process::{Process, ProcessKind};
 use nanocl_stubs::http_metric::HttpMetric;
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
@@ -341,6 +341,7 @@ impl Modify for VersionModifier {
     NamespaceSummary,
     // Process
     Process,
+    ProcessKind,
     // Job
     Job,
     JobPartial,
