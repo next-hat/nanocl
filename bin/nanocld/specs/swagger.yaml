@@ -970,7 +970,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/NodeContainerSummary'
+                  $ref: '#/components/schemas/Process'
   /processes/{kind}/{name}/logs:
     get:
       tags:

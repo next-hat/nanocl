@@ -2,12 +2,12 @@ use ntex::web;
 use futures_util::stream::select_all;
 use futures_util::{StreamExt, TryStreamExt};
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::HttpResult;
 
 use bollard_next::container::LogsOptions;
-use nanocl_stubs::generic::{GenericNspQuery, GenericFilter};
-use nanocl_stubs::process::{
-  ProcessLogQuery, ProcessOutputLog, ProccessQuery, ProcessKind,
+use nanocl_stubs::{
+  generic::{GenericNspQuery, GenericFilter},
+  process::{ProcessLogQuery, ProcessOutputLog, ProccessQuery},
 };
 
 use crate::utils;
@@ -24,7 +24,7 @@ use crate::models::{DaemonState, Repository, ProcessDb};
     ("namespace" = Option<String>, Query, description = "Return instances from this namespace only"),
   ),
   responses(
-    (status = 200, description = "List of instances", body = [NodeContainerSummary]),
+    (status = 200, description = "List of instances", body = [Process]),
   ),
 ))]
 #[web::get("/processes")]
@@ -64,9 +64,7 @@ async fn logs_process(
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind: ProcessKind = kind
-    .try_into()
-    .map_err(|err: std::io::Error| HttpError::bad_request(err.to_string()))?;
+  let kind = utils::process::parse_kind(&kind)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let processes = ProcessDb::find_by_kind_key(&kind_key, &state.pool).await?;
   log::debug!("process::logs_process: {processes:#?}");
@@ -130,9 +128,7 @@ pub(crate) async fn start_process(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind: ProcessKind = kind
-    .try_into()
-    .map_err(|err: std::io::Error| HttpError::bad_request(err.to_string()))?;
+  let kind = utils::process::parse_kind(&kind)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   utils::process::start_by_kind(&kind, &kind_key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
@@ -160,9 +156,7 @@ pub(crate) async fn stop_process(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind: ProcessKind = kind
-    .try_into()
-    .map_err(|err: std::io::Error| HttpError::bad_request(err.to_string()))?;
+  let kind = utils::process::parse_kind(&kind)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   utils::process::stop_by_kind(&kind, &kind_key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())

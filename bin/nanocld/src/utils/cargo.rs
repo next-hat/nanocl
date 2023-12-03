@@ -534,17 +534,8 @@ pub(crate) async fn inspect_by_key(
   state: &DaemonState,
 ) -> HttpResult<CargoInspect> {
   let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
-  let mut running_instances = 0;
   let processes = ProcessDb::find_by_kind_key(key, &state.pool).await?;
-  for process in &processes {
-    let state = process.data.state.clone().unwrap_or_default();
-    if state.restarting.unwrap_or_default() {
-      continue;
-    }
-    if state.running.unwrap_or_default() {
-      running_instances += 1;
-    }
-  }
+  let (_, _, _, running_instances) = utils::process::count_status(&processes);
   Ok(CargoInspect {
     created_at: cargo.created_at,
     namespace_name: cargo.namespace_name,

@@ -100,7 +100,7 @@ pub struct ProcessRow {
   created_at: String,
 }
 
-/// Convert NodeContainerSummary to ProcessRow
+/// Convert Process to ProcessRow
 impl From<Process> for ProcessRow {
   fn from(process: Process) -> Self {
     let container = process.data;

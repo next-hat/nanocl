@@ -38,8 +38,8 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
     None => return Ok(()),
     Some(ttl) => ttl,
   };
-  let instances = utils::job::inspect_instances(&job.name, state).await?;
-  let (_, _, _, running) = utils::job::count_instances(&instances);
+  let instances = ProcessDb::find_by_kind_key(&job.name, &state.pool).await?;
+  let (_, _, _, running) = utils::process::count_status(&instances);
   if running == 0 && !instances.is_empty() {
     let state = state.clone();
     rt::spawn(async move {

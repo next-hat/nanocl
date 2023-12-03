@@ -86,19 +86,7 @@ pub(crate) async fn list_by_namespace(
       .await??
       .try_to_spec()?;
     let processes = ProcessDb::find_by_kind_key(&vm.spec.vm_key, pool).await?;
-    let mut running_instances = 0;
-    for process in &processes {
-      if process
-        .data
-        .state
-        .clone()
-        .unwrap_or_default()
-        .running
-        .unwrap_or_default()
-      {
-        running_instances += 1;
-      }
-    }
+    let (_, _, _, running_instances) = utils::process::count_status(&processes);
     vm_summaries.push(VmSummary {
       created_at: vm.created_at,
       namespace_name: vm.namespace_name,

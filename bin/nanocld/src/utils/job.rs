@@ -1,68 +1,36 @@
 use std::collections::HashMap;
 
-use ntex::web;
-use ntex::util::Bytes;
-use tokio::fs;
-use tokio::io::AsyncWriteExt;
-use futures_util::{StreamExt, TryStreamExt};
-use futures_util::stream::{FuturesUnordered, select_all};
-
-use nanocl_error::io::{FromIo, IoError, IoResult};
-use nanocl_error::http::{HttpError, HttpResult};
-
-use bollard_next::service::{ContainerSummary, ContainerWaitExitError};
-use bollard_next::container::{
-  ListContainersOptions, RemoveContainerOptions, WaitContainerOptions,
-};
-use nanocl_stubs::process::Process;
-use nanocl_stubs::generic::GenericFilter;
-use nanocl_stubs::job::{
-  Job, JobPartial, JobInspect, JobWaitResponse, WaitCondition, JobSummary,
+use ntex::{web, util::Bytes};
+use tokio::{fs, io::AsyncWriteExt};
+use futures_util::{
+  StreamExt, TryStreamExt,
+  stream::{FuturesUnordered, select_all},
 };
 
-use crate::{version, utils};
-use crate::models::{DaemonState, ProcessDb, JobDb, Repository, FromSpec};
+use nanocl_error::{
+  io::{FromIo, IoError, IoResult},
+  http::{HttpError, HttpResult},
+};
+
+use bollard_next::{
+  service::{ContainerSummary, ContainerWaitExitError},
+  container::{
+    ListContainersOptions, RemoveContainerOptions, WaitContainerOptions,
+  },
+};
+use nanocl_stubs::{
+  generic::GenericFilter,
+  job::{
+    Job, JobPartial, JobInspect, JobWaitResponse, WaitCondition, JobSummary,
+  },
+};
+
+use crate::{
+  version, utils,
+  models::{DaemonState, ProcessDb, JobDb, Repository, FromSpec},
+};
 
 use super::stream::transform_stream;
-
-/// Count the number of instances (containers) of a job
-pub(crate) fn count_instances(
-  instances: &[Process],
-) -> (usize, usize, usize, usize) {
-  let mut instance_failed = 0;
-  let mut instance_success = 0;
-  let mut instance_running = 0;
-  for instance in instances {
-    let container = &instance.data;
-    let state = container.state.clone().unwrap_or_default();
-    if state.restarting.unwrap_or_default() {
-      instance_failed += 1;
-      continue;
-    }
-    if state.running.unwrap_or_default() {
-      instance_running += 1;
-      continue;
-    }
-    if let Some(exit_code) = state.exit_code {
-      if exit_code == 0 {
-        instance_success += 1;
-      } else {
-        instance_failed += 1;
-      }
-    }
-    if let Some(error) = state.error {
-      if !error.is_empty() {
-        instance_failed += 1;
-      }
-    }
-  }
-  (
-    instances.len(),
-    instance_failed,
-    instance_success,
-    instance_running,
-  )
-}
 
 /// Format the cron job command to start a job at a given time
 fn format_cron_job_command(job: &Job, state: &DaemonState) -> String {
@@ -138,15 +106,6 @@ async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
   Ok(())
 }
 
-/// Return detailed informations about each instances of a job
-pub(crate) async fn inspect_instances(
-  name: &str,
-  state: &DaemonState,
-) -> HttpResult<Vec<Process>> {
-  let process = ProcessDb::find_by_kind_key(name, &state.pool).await?;
-  Ok(process)
-}
-
 /// List the job instances (containers) based on the job name
 pub(crate) async fn list_instances(
   name: &str,
@@ -207,13 +166,14 @@ pub(crate) async fn list(state: &DaemonState) -> HttpResult<Vec<JobSummary>> {
     jobs
       .iter()
       .map(|job| async {
-        let instances = inspect_instances(&job.name, state).await?;
+        let instances =
+          ProcessDb::find_by_kind_key(&job.name, &state.pool).await?;
         let (
           instance_total,
           instance_failed,
           instance_success,
           instance_running,
-        ) = count_instances(&instances);
+        ) = utils::process::count_status(&instances);
         Ok::<_, HttpError>(JobSummary {
           instance_total,
           instance_success,
@@ -268,9 +228,9 @@ pub(crate) async fn inspect_by_name(
   state: &DaemonState,
 ) -> HttpResult<JobInspect> {
   let job = JobDb::find_by_pk(name, &state.pool).await??.try_to_spec()?;
-  let instances = inspect_instances(name, state).await?;
+  let instances = ProcessDb::find_by_kind_key(name, &state.pool).await?;
   let (instance_total, instance_failed, instance_success, instance_running) =
-    count_instances(&instances);
+    utils::process::count_status(&instances);
   let job_inspect = JobInspect {
     spec: job,
     instance_total,
