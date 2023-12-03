@@ -280,7 +280,7 @@ impl From<VmSummary> for VmRow {
       namespace: vm.namespace_name,
       disk: vm.spec.disk.image,
       version: vm.spec.version,
-      instances: format!("{}/{}", vm.running_instances, vm.instances),
+      instances: format!("{}/{}", vm.instance_running, vm.instance_total),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
     }

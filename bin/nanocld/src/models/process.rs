@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
-
 use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 
-use bollard_next::service::ContainerInspectResponse;
 use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::process::{Process, ProcessKind, ProcessPartial};
 
 use crate::{utils, gen_where4string};
 use crate::schema::processes;
@@ -36,79 +34,6 @@ pub struct ProcessDb {
   pub node_key: String,
   /// Id of the related kind
   pub kind_key: String,
-}
-
-#[derive(Clone, PartialEq, Debug, Deserialize)]
-pub enum ProcessKind {
-  Vm,
-  Job,
-  Cargo,
-}
-
-impl TryFrom<String> for ProcessKind {
-  type Error = IoError;
-
-  fn try_from(value: String) -> Result<Self, Self::Error> {
-    match value.as_ref() {
-      "vm" => Ok(Self::Vm),
-      "job" => Ok(Self::Job),
-      "cargo" => Ok(Self::Cargo),
-      _ => Err(IoError::invalid_input(
-        "ProcessKind",
-        &format!("Invalid process kind: {value}"),
-      )),
-    }
-  }
-}
-
-impl ToString for ProcessKind {
-  fn to_string(&self) -> String {
-    match self {
-      Self::Vm => "vm",
-      Self::Job => "job",
-      Self::Cargo => "cargo",
-    }
-    .to_owned()
-  }
-}
-
-/// Used to create a new process
-#[derive(Debug, Clone)]
-pub struct ProcessPartial {
-  /// The key of the process
-  pub key: String,
-  /// Name of the process
-  pub name: String,
-  /// Kind of the process (Job, Vm, Cargo)
-  pub kind: ProcessKind,
-  /// The data of the process a ContainerInspect
-  pub data: serde_json::Value,
-  /// Key of the node where the container is running
-  pub node_key: String,
-  /// Key of the related kind
-  pub kind_key: String,
-}
-
-/// Represents a process
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "PascalCase")]
-pub struct Process {
-  /// The key of the process
-  pub key: String,
-  /// The created at date
-  pub created_at: chrono::NaiveDateTime,
-  /// Last time the instance was updated
-  pub updated_at: chrono::NaiveDateTime,
-  /// Name of the process
-  pub name: String,
-  /// Kind of the process (Job, Vm, Cargo)
-  pub kind: ProcessKind,
-  /// Key of the node where the container is running
-  pub node_key: String,
-  /// Key of the related kind
-  pub kind_key: String,
-  /// The data of the process a ContainerInspect
-  pub data: ContainerInspectResponse,
 }
 
 /// Used to update a process
@@ -163,7 +88,7 @@ impl Repository for ProcessDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("ContainerDb::find_one filter: {filter:?}");
+    log::debug!("ProcesssDb::find_one filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = processes::dsl::processes
       .order(processes::dsl::created_at.desc())
@@ -198,7 +123,7 @@ impl Repository for ProcessDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("ContainerDb::find filter: {filter:?}");
+    log::debug!("ProcesssDb::find filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = processes::dsl::processes
       .order(processes::dsl::created_at.desc())

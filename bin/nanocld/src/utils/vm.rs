@@ -3,20 +3,20 @@ use std::collections::HashMap;
 use diesel::ExpressionMethods;
 use ntex::http;
 
-use bollard_next::Docker;
-use bollard_next::service::{HostConfig, DeviceMapping, ContainerSummary};
-use bollard_next::container::{ListContainersOptions, RemoveContainerOptions};
+use bollard_next::service::{HostConfig, DeviceMapping};
+use bollard_next::container::RemoveContainerOptions;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::system::EventAction;
+use nanocl_stubs::process::ProcessKind;
 use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
 use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::utils;
 use crate::models::{
   Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, Repository, VmDb,
-  VmSpecDb, FromSpec, ProcessKind,
+  VmSpecDb, FromSpec,
 };
 
 /// Get detailed information about a VM by his key
@@ -25,11 +25,15 @@ pub(crate) async fn inspect_by_key(
   state: &DaemonState,
 ) -> HttpResult<VmInspect> {
   let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
-  let containers =
-    list_instances_by_key(&vm.spec.vm_key, &state.docker_api).await?;
+  let processes =
+    ProcessDb::find_by_kind_key(&vm.spec.vm_key, &state.pool).await?;
   let mut running_instances = 0;
-  for container in &containers {
-    if container.state == Some("running".into()) {
+  for process in &processes {
+    let state = process.data.state.clone().unwrap_or_default();
+    if state.restarting.unwrap_or_default() {
+      continue;
+    }
+    if state.running.unwrap_or_default() {
       running_instances += 1;
     }
   }
@@ -37,27 +41,10 @@ pub(crate) async fn inspect_by_key(
     created_at: vm.created_at,
     namespace_name: vm.namespace_name,
     spec: vm.spec,
-    instance_total: containers.len(),
+    instance_total: processes.len(),
     instance_running: running_instances,
-    instances: containers,
+    instances: processes,
   })
-}
-
-/// List VM instances by his key
-pub(crate) async fn list_instances_by_key(
-  vm_key: &str,
-  docker_api: &Docker,
-) -> HttpResult<Vec<ContainerSummary>> {
-  let label = format!("io.nanocl.v={vm_key}");
-  let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
-  filters.insert("label", vec![&label]);
-  let options = Some(ListContainersOptions {
-    all: true,
-    filters,
-    ..Default::default()
-  });
-  let containers = docker_api.list_containers(options).await?;
-  Ok(containers)
 }
 
 /// Delete a VM by his key
@@ -98,25 +85,13 @@ pub(crate) async fn list_by_namespace(
     let spec = VmSpecDb::find_by_pk(&vm.spec.key, pool)
       .await??
       .try_to_spec()?;
-    let instances = ProcessDb::find_by_kind_key(&vm.spec.vm_key, pool).await?;
-    let mut running_instances = 0;
-    for instance in &instances {
-      if instance
-        .data
-        .state
-        .clone()
-        .unwrap_or_default()
-        .running
-        .unwrap_or_default()
-      {
-        running_instances += 1;
-      }
-    }
+    let processes = ProcessDb::find_by_kind_key(&vm.spec.vm_key, pool).await?;
+    let (_, _, _, running_instances) = utils::process::count_status(&processes);
     vm_summaries.push(VmSummary {
       created_at: vm.created_at,
       namespace_name: vm.namespace_name,
-      instances: instances.len(),
-      running_instances,
+      instance_total: processes.len(),
+      instance_running: running_instances,
       spec: spec.clone(),
     });
   }

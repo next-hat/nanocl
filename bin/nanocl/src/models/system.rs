@@ -4,8 +4,7 @@ use chrono::DateTime;
 
 use bollard_next::service::ContainerStateStatusEnum;
 
-use nanocld_client::stubs::system::ProccessQuery;
-use nanocld_client::stubs::node::NodeContainerSummary;
+use nanocld_client::stubs::process::{ProccessQuery, Process};
 
 /// `nanocl system` available arguments
 #[derive(Clone, Parser)]
@@ -82,29 +81,29 @@ impl From<ProcessOpts> for ProccessQuery {
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct ProcessRow {
-  /// Kind of instance cargo or vm
-  kind: String,
-  /// Node name
-  node: String,
-  /// Name of the instance of the cargo or the vm
-  name: String,
   /// Namespace of the cargo or the vm
   namespace: String,
+  /// Kind of instance cargo or vm
+  kind: String,
+  /// Name of the instance of the cargo or the vm
+  name: String,
   /// Image used by the cargo or the vm
   image: String,
-  /// Status of the cargo or the vm
-  status: String,
   /// IP address of the cargo or the vm
   ip: String,
+  /// Node name
+  node: String,
+  /// Status of the cargo or the vm
+  status: String,
   /// When the cargo or the vm was created
   #[tabled(rename = "CREATED AT")]
   created_at: String,
 }
 
-/// Convert NodeContainerSummary to ProcessRow
-impl From<NodeContainerSummary> for ProcessRow {
-  fn from(summary: NodeContainerSummary) -> Self {
-    let container = summary.container;
+/// Convert Process to ProcessRow
+impl From<Process> for ProcessRow {
+  fn from(process: Process) -> Self {
+    let container = process.data;
     let name = container.name.unwrap_or_default().replace('/', "");
     let mut names = name.split('.');
     let name = names.next().unwrap_or(&name);
@@ -122,9 +121,20 @@ impl From<NodeContainerSummary> for ProcessRow {
     };
     let network = container.network_settings.unwrap_or_default();
     let networks = network.networks.unwrap_or_default();
-    let mut ipaddr = String::default();
-    if let Some(network) = networks.get(namespace) {
-      ipaddr = network.ip_address.clone().unwrap_or_default();
+    let mut ipaddr = if let Some(network) = networks.get(namespace) {
+      network.ip_address.clone().unwrap_or("<none>".to_owned())
+    } else {
+      format!(
+        "<{}>",
+        container
+          .host_config
+          .unwrap_or_default()
+          .network_mode
+          .unwrap_or("<none>".to_owned())
+      )
+    };
+    if ipaddr.is_empty() {
+      ipaddr = "<none>".to_owned();
     }
     // Convert the created_at and updated_at to the current timezone
     let created_at = container.created.unwrap_or_default();
@@ -142,7 +152,7 @@ impl From<NodeContainerSummary> for ProcessRow {
       .unwrap_or(ContainerStateStatusEnum::EMPTY)
       .to_string();
     Self {
-      node: summary.node,
+      node: process.node_key,
       kind,
       name: name.to_owned(),
       namespace: namespace.to_owned(),

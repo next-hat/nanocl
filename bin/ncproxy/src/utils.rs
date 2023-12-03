@@ -85,30 +85,30 @@ async fn get_listen(
 async fn create_cargo_upstream(
   kind: &NginxConfKind,
   port: u16,
-  cargo: &CargoInspect,
+  processes: &CargoInspect,
   nginx: &Nginx,
 ) -> IoResult<String> {
   let mut ip_addresses = Vec::new();
-  for node_container in cargo.instances.iter() {
-    let container = node_container.container.clone();
+  for process in &processes.instances {
+    let container = process.data.clone();
     let networks = container
       .network_settings
       .unwrap_or_default()
       .networks
       .unwrap_or_default();
-    let network = networks.get(&cargo.namespace_name);
+    let network = networks.get(&processes.namespace_name);
     let Some(network) = network else {
-      log::warn!("empty ip address for cargo {}", &cargo.spec.name);
+      log::warn!("empty ip address for cargo {}", &processes.spec.name);
       log::warn!("Instance is unhealthy, skipping");
       continue;
     };
     let Some(ip_address) = network.ip_address.clone() else {
-      log::warn!("empty ip address for cargo {}", &cargo.spec.name);
+      log::warn!("empty ip address for cargo {}", &processes.spec.name);
       log::warn!("Instance is unhealthy, skipping");
       continue;
     };
     if ip_address.is_empty() {
-      log::warn!("empty ip address for cargo {}", &cargo.spec.name);
+      log::warn!("empty ip address for cargo {}", &processes.spec.name);
       log::warn!("Instance is unhealthy, skipping");
       continue;
     }
@@ -117,11 +117,14 @@ async fn create_cargo_upstream(
   if ip_addresses.is_empty() {
     return Err(IoError::invalid_data(
       "CargoInspect",
-      &format!("Unable to get ip addresses for cargo {}", &cargo.spec.name),
+      &format!(
+        "Unable to get ip addresses for cargo {}",
+        &processes.spec.name
+      ),
     ));
   }
   log::debug!("ip_addresses: {:?}", ip_addresses);
-  let upstream_key = format!("cargo-{}-{}", cargo.spec.cargo_key, port);
+  let upstream_key = format!("cargo-{}-{}", processes.spec.cargo_key, port);
   let upstream = format!(
     "
 upstream {upstream_key} {{
@@ -148,8 +151,9 @@ async fn create_vm_upstream(
   nginx: &Nginx,
 ) -> IoResult<String> {
   let mut ip_addresses = Vec::new();
-  for node_container in vm.instances.iter() {
-    let networks = node_container
+  for processes in &vm.instances {
+    let networks = processes
+      .data
       .network_settings
       .clone()
       .unwrap_or_default()

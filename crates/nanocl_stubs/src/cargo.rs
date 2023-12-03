@@ -3,8 +3,8 @@ use serde::{Serialize, Deserialize};
 
 use bollard_next::container::{StatsOptions, KillContainerOptions};
 
-use crate::node::NodeContainerSummary;
 use crate::cargo_spec::CargoSpecPartial;
+use crate::process::Process;
 use crate::system::{Event, EventKind, ToEvent, EventAction, EventActor};
 
 use super::cargo_spec::CargoSpec;
@@ -103,8 +103,8 @@ pub struct CargoInspect {
   pub instance_running: usize,
   /// Specification of the cargo
   pub spec: CargoSpec,
-  /// List of containers
-  pub instances: Vec<NodeContainerSummary>,
+  /// List of instances
+  pub instances: Vec<Process>,
 }
 
 /// Options for the kill command

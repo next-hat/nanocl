@@ -10,16 +10,17 @@ use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
 
 use crate::utils;
 use crate::event::Client;
-use crate::models::{DaemonState, ProcessDb, Repository, JobDb, FromSpec};
+use crate::models::{
+  DaemonState, Repository, JobDb, FromSpec, ProcessUpdateDb, ProcessDb,
+};
 
 /// Remove a job after when finished and ttl is set
 async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
-  if e.kind != EventKind::Container {
+  if e.kind != EventKind::Process {
     return Ok(());
   }
   let actor = e.actor.unwrap_or_default();
   let attributes = actor.attributes.unwrap_or_default();
-  log::debug!("Job auto remove attributes: {attributes}");
   let job_id = match attributes.get("io.nanocl.j") {
     None => return Ok(()),
     Some(job_id) => job_id.as_str().unwrap_or_default(),
@@ -37,8 +38,8 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
     None => return Ok(()),
     Some(ttl) => ttl,
   };
-  let instances = utils::job::inspect_instances(&job.name, state).await?;
-  let (_, _, _, running) = utils::job::count_instances(&instances);
+  let instances = ProcessDb::find_by_kind_key(&job.name, &state.pool).await?;
+  let (_, _, _, running) = utils::process::count_status(&instances);
   if running == 0 && !instances.is_empty() {
     let state = state.clone();
     rt::spawn(async move {
@@ -126,7 +127,7 @@ async fn exec_docker_event(
   log::debug!("docker event: {action}");
   let action = action.as_str();
   let mut event = Event {
-    kind: EventKind::Container,
+    kind: EventKind::Process,
     action: EventAction::Deleted,
     actor: Some(EventActor {
       key: Some(id.clone()),
@@ -136,15 +137,16 @@ async fn exec_docker_event(
       ),
     }),
   };
+  log::debug!("docker event: {action}");
   match action {
     "destroy" => {
-      log::debug!("docker event destroy container: {id}");
-      ProcessDb::delete_by_pk(&id, &state.pool).await??;
       state.event_emitter.spawn_emit_event(event);
       return Ok(());
     }
     "create" => {
       event.action = EventAction::Created;
+      state.event_emitter.spawn_emit_event(event);
+      return Ok(());
     }
     "start" => {
       event.action = EventAction::Started;
@@ -159,13 +161,19 @@ async fn exec_docker_event(
       event.action = EventAction::Patched;
     }
   }
+  state.event_emitter.spawn_emit_event(event);
   let instance = state
     .docker_api
     .inspect_container(&id, None::<InspectContainerOptions>)
     .await
     .map_err(|err| err.map_err_context(|| "Docker event"))?;
-  utils::system::sync_instance(&instance, state).await?;
-  state.event_emitter.spawn_emit_event(event);
+  let data = serde_json::to_value(instance)
+    .map_err(|err| err.map_err_context(|| "Docker event"))?;
+  let new_instance = ProcessUpdateDb {
+    updated_at: Some(chrono::Utc::now().naive_utc()),
+    data: Some(data),
+  };
+  ProcessDb::update_by_pk(&id, new_instance, &state.pool).await??;
   Ok(())
 }
 

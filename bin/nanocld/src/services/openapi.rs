@@ -34,14 +34,15 @@ use bollard_next::service::{
   HealthcheckResult,
 };
 
+use nanocl_stubs::node::Node;
+use nanocl_stubs::process::{Process, ProcessKind};
+use nanocl_stubs::http_metric::HttpMetric;
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 use nanocl_stubs::generic::{GenericCount, GenericClause, GenericFilter};
 use nanocl_stubs::system::{BinaryInfo, HostInfo};
 use nanocl_stubs::metric::{Metric, MetricKind};
-use nanocl_stubs::http_metric::HttpMetric;
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
-use nanocl_stubs::node::{Node, NodeContainerSummary};
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespacePartial, NamespaceInspect,
 };
@@ -220,7 +221,6 @@ impl Modify for VersionModifier {
     // System
     system::get_info,
     system::watch_event,
-    system::get_processes,
     system::get_version,
     system::get_ping,
     // Namespace
@@ -293,11 +293,11 @@ impl Modify for VersionModifier {
     process::logs_process,
     process::start_process,
     process::stop_process,
+    process::list_process,
   ),
   components(schemas(
     // Node
     Node,
-    NodeContainerSummary,
     // Secret
     Secret,
     SecretPartial,
@@ -339,6 +339,9 @@ impl Modify for VersionModifier {
     NamespacePartial,
     NamespaceInspect,
     NamespaceSummary,
+    // Process
+    Process,
+    ProcessKind,
     // Job
     Job,
     JobPartial,

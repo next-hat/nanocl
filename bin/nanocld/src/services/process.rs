@@ -5,13 +5,39 @@ use futures_util::{StreamExt, TryStreamExt};
 use nanocl_error::http::HttpResult;
 
 use bollard_next::container::LogsOptions;
-use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog};
+use nanocl_stubs::{
+  generic::{GenericNspQuery, GenericFilter},
+  process::{ProcessLogQuery, ProcessOutputLog, ProccessQuery},
+};
 
 use crate::utils;
-use crate::models::{DaemonState, ProcessDb, ProcessKind};
+use crate::models::{DaemonState, Repository, ProcessDb};
 
-/// Get logs of an process
+/// List process (Vm, Job, Cargo)
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Processes",
+  path = "/processes",
+  params(
+    ("all" = bool, Query, description = "Return instances from all nodes"),
+    ("last" = Option<isize>, Query, description = "Return this number of most recently created containers"),
+    ("namespace" = Option<String>, Query, description = "Return instances from this namespace only"),
+  ),
+  responses(
+    (status = 200, description = "List of instances", body = [Process]),
+  ),
+))]
+#[web::get("/processes")]
+pub(crate) async fn list_process(
+  state: web::types::State<DaemonState>,
+  _: web::types::Query<ProccessQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let processes =
+    ProcessDb::find(&GenericFilter::default(), &state.pool).await??;
+  Ok(web::HttpResponse::Ok().json(&processes))
+}
+
+/// Get logs of a process
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Processes",
@@ -38,7 +64,7 @@ async fn logs_process(
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind: ProcessKind = kind.try_into()?;
+  let kind = utils::process::parse_kind(&kind)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let processes = ProcessDb::find_by_kind_key(&kind_key, &state.pool).await?;
   log::debug!("process::logs_process: {processes:#?}");
@@ -102,7 +128,7 @@ pub(crate) async fn start_process(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind: ProcessKind = kind.try_into()?;
+  let kind = utils::process::parse_kind(&kind)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   utils::process::start_by_kind(&kind, &kind_key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
@@ -130,14 +156,40 @@ pub(crate) async fn stop_process(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind: ProcessKind = kind.try_into()?;
+  let kind = utils::process::parse_kind(&kind)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   utils::process::stop_by_kind(&kind, &kind_key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
 pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+  config.service(list_process);
   config.service(logs_process);
   config.service(start_process);
   config.service(stop_process);
+}
+
+#[cfg(test)]
+mod tests {
+  use ntex::http;
+
+  use crate::utils::tests::*;
+
+  use nanocl_stubs::process::{Process, ProccessQuery};
+
+  #[ntex::test]
+  async fn basic_list() {
+    let client = gen_default_test_client().await;
+    let mut res = client
+      .send_get(
+        "/processes",
+        Some(&ProccessQuery {
+          all: false,
+          ..Default::default()
+        }),
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "processes");
+    let _ = res.json::<Vec<Process>>().await.unwrap();
+  }
 }

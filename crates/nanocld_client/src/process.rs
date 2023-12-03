@@ -4,12 +4,32 @@ use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog};
+use nanocl_stubs::process::{
+  Process, ProccessQuery, ProcessLogQuery, ProcessOutputLog,
+};
 
 use super::NanocldClient;
 
 impl NanocldClient {
   const PROCESS_PATH: &'static str = "/processes";
+
+  /// List of current processes (vm, job, cargo) managed by the daemon
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let res = client.list_process(None).await;
+  /// ```
+  pub async fn list_process(
+    &self,
+    opts: Option<&ProccessQuery>,
+  ) -> HttpClientResult<Vec<Process>> {
+    let res = self.send_get(Self::PROCESS_PATH, opts).await?;
+    Self::res_json(res).await
+  }
 
   /// Get logs of a process
   pub async fn logs_process(

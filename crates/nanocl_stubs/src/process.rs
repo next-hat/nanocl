@@ -1,7 +1,89 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard_next::container::{LogsOptions, LogOutput};
+use bollard_next::service::ContainerInspectResponse;
+use bollard_next::container::{LogOutput, LogsOptions, ListContainersOptions};
+
+#[derive(Clone, PartialEq, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
+pub enum ProcessKind {
+  Vm,
+  Job,
+  Cargo,
+}
+
+impl TryFrom<String> for ProcessKind {
+  type Error = std::io::Error;
+
+  fn try_from(value: String) -> Result<Self, Self::Error> {
+    match value.as_ref() {
+      "vm" => Ok(Self::Vm),
+      "job" => Ok(Self::Job),
+      "cargo" => Ok(Self::Cargo),
+      _ => Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        format!("Invalid process kind {value}"),
+      )),
+    }
+  }
+}
+
+impl ToString for ProcessKind {
+  fn to_string(&self) -> String {
+    match self {
+      Self::Vm => "vm",
+      Self::Job => "job",
+      Self::Cargo => "cargo",
+    }
+    .to_owned()
+  }
+}
+
+/// Used to create a new process
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProcessPartial {
+  /// The key of the process
+  pub key: String,
+  /// Name of the process
+  pub name: String,
+  /// Kind of the process (Job, Vm, Cargo)
+  pub kind: ProcessKind,
+  /// The data of the process a ContainerInspect
+  pub data: serde_json::Value,
+  /// Key of the node where the container is running
+  pub node_key: String,
+  /// Key of the related kind
+  pub kind_key: String,
+}
+
+/// Represents a process (Vm, Job, Cargo)
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct Process {
+  /// The key of the process
+  pub key: String,
+  /// The created at date
+  pub created_at: chrono::NaiveDateTime,
+  /// Last time the instance was updated
+  pub updated_at: chrono::NaiveDateTime,
+  /// Name of the process
+  pub name: String,
+  /// Kind of the process (Job, Vm, Cargo)
+  pub kind: ProcessKind,
+  /// Key of the node where the container is running
+  pub node_key: String,
+  /// Key of the related kind
+  pub kind_key: String,
+  /// The data of the process a ContainerInspect
+  pub data: ContainerInspectResponse,
+}
 
 /// Kind of Output
 #[derive(Debug)]
@@ -112,6 +194,28 @@ impl From<ProcessLogQuery> for LogsOptions<String> {
       tail: query.tail.to_owned().unwrap_or("all".to_string()),
       stdout: query.stdout.unwrap_or(true),
       stderr: query.stdout.unwrap_or(true),
+    }
+  }
+}
+
+/// Query parameters for the process list endpoint.
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct ProccessQuery {
+  /// Return container from all nodes
+  pub all: bool,
+  /// Return this number of most recently created containers
+  pub last: Option<isize>,
+  /// Show all containers running for the given namespace
+  pub namespace: Option<String>,
+}
+
+impl From<ProccessQuery> for ListContainersOptions<String> {
+  fn from(query: ProccessQuery) -> Self {
+    ListContainersOptions {
+      all: query.all,
+      limit: query.last,
+      ..Default::default()
     }
   }
 }

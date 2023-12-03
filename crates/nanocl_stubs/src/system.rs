@@ -1,5 +1,4 @@
 use bollard_next::service::SystemInfo;
-use bollard_next::container::ListContainersOptions;
 
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
@@ -47,7 +46,7 @@ pub enum EventKind {
   Job,
   Resource,
   Secret,
-  Container,
+  Process,
 }
 
 impl std::fmt::Display for EventKind {
@@ -59,7 +58,7 @@ impl std::fmt::Display for EventKind {
       EventKind::Job => write!(f, "Job"),
       EventKind::Resource => write!(f, "Resource"),
       EventKind::Secret => write!(f, "Secret"),
-      EventKind::Container => write!(f, "ContainerInstance"),
+      EventKind::Process => write!(f, "Process"),
     }
   }
 }
@@ -115,26 +114,4 @@ pub struct Event {
 /// Generic trait to convert a type to an event
 pub trait ToEvent {
   fn to_event(&self, action: EventAction) -> Event;
-}
-
-/// Query parameters for the process list endpoint.
-#[derive(Clone, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ProccessQuery {
-  /// Return container from all nodes
-  pub all: bool,
-  /// Return this number of most recently created containers
-  pub last: Option<isize>,
-  /// Show all containers running for the given namespace
-  pub namespace: Option<String>,
-}
-
-impl From<ProccessQuery> for ListContainersOptions<String> {
-  fn from(query: ProccessQuery) -> Self {
-    ListContainersOptions {
-      all: query.all,
-      limit: query.last,
-      ..Default::default()
-    }
-  }
 }

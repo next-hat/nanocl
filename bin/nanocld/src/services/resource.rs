@@ -203,7 +203,10 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
   use ntex::http;
-  use nanocl_stubs::resource::{Resource, ResourcePartial, ResourceUpdate};
+  use nanocl_stubs::{
+    resource::{Resource, ResourcePartial, ResourceUpdate},
+    generic::{GenericFilter, GenericClause, GenericListQuery},
+  };
 
   use crate::utils::tests::*;
 
@@ -255,85 +258,72 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "list resource");
     let _ = res.json::<Vec<Resource>>().await.unwrap();
     // Using filter exists
-    // let mut res = client
-    //   .send_get(
-    //     ENDPOINT,
-    //     Some(&ResourceQuery {
-    //       exists: Some(String::from("Schema")),
-    //       ..Default::default()
-    //     }),
-    //   )
-    //   .await;
-    // test_status_code!(
-    //   res.status(),
-    //   http::StatusCode::OK,
-    //   "filter resource by exists"
-    // );
-    // let resources = res.json::<Vec<Resource>>().await.unwrap();
-    // assert!(
-    //   resources.len() == 1,
-    //   "Expect 1 resource when filter by exists"
-    // );
-    // Using filter contains
-    // let mut res = client
-    //   .send_get(
-    //     ENDPOINT,
-    //     Some(&ResourceQuery {
-    //       contains: Some(String::from("{\"Schema\": {\"type\": \"object\"}}")),
-    //       ..Default::default()
-    //     }),
-    //   )
-    //   .await;
-    // test_status_code!(
-    //   res.status(),
-    //   http::StatusCode::OK,
-    //   "filter resource by contains"
-    // );
-    // let resources = res.json::<Vec<Resource>>().await.unwrap();
-    // assert!(
-    //   resources.len() == 1,
-    //   "Expect 1 resource when filter by contains"
-    // );
-    // Using meta exists
-    // let mut res = client
-    //   .send_get(
-    //     ENDPOINT,
-    //     Some(&ResourceQuery {
-    //       meta_exists: Some(String::from("Test")),
-    //       ..Default::default()
-    //     }),
-    //   )
-    //   .await;
-    // test_status_code!(
-    //   res.status(),
-    //   http::StatusCode::OK,
-    //   "filter resource by meta exists"
-    // );
-    // let resources = res.json::<Vec<Resource>>().await.unwrap();
-    // assert!(
-    //   resources.len() == 1,
-    //   "Expect 1 resource when filter by meta exists"
-    // );
-    // Filter by meta contains
-    // let mut res = client
-    //   .send_get(
-    //     ENDPOINT,
-    //     Some(&ResourceQuery {
-    //       meta_contains: Some(String::from("{\"Test\": \"gg\"}")),
-    //       ..Default::default()
-    //     }),
-    //   )
-    //   .await;
-    // test_status_code!(
-    //   res.status(),
-    //   http::StatusCode::OK,
-    //   "filter resource by meta contains"
-    // );
-    // let resources = res.json::<Vec<Resource>>().await.unwrap();
-    // assert!(
-    //   resources.len() == 1,
-    //   "Expect 1 resource when filter by meta contains"
-    // );
+    let filter = GenericFilter::new()
+      .r#where("data", GenericClause::HasKey("Schema".to_owned()));
+    let query = GenericListQuery::try_from(filter).unwrap();
+    let mut res = client.send_get(ENDPOINT, Some(&query)).await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "filter resource by data HasKey"
+    );
+    let resources = res.json::<Vec<Resource>>().await.unwrap();
+    assert!(
+      resources.len() == 1,
+      "Expect 1 resource when filter by data HasKey"
+    );
+    let filter = GenericFilter::new().r#where(
+      "data",
+      GenericClause::Contains(serde_json::json!({
+        "Schema": {
+          "type": "object",
+        }
+      })),
+    );
+    let query = GenericListQuery::try_from(filter).unwrap();
+    let mut res = client.send_get(ENDPOINT, Some(&query)).await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "filter resource by data contains"
+    );
+    let resources = res.json::<Vec<Resource>>().await.unwrap();
+    assert!(
+      resources.len() == 1,
+      "Expect 1 resource when filter by data contains"
+    );
+    let filter = GenericFilter::new()
+      .r#where("metadata", GenericClause::HasKey("Test".to_owned()));
+    let query = GenericListQuery::try_from(filter).unwrap();
+    let mut res = client.send_get(ENDPOINT, Some(&query)).await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "filter resource by meta exists"
+    );
+    let resources = res.json::<Vec<Resource>>().await.unwrap();
+    assert!(
+      resources.len() == 1,
+      "Expect 1 resource when filter by metadata HasKey"
+    );
+    let filter = GenericFilter::new().r#where(
+      "metadata",
+      GenericClause::Contains(serde_json::json!({
+        "Test": "gg",
+      })),
+    );
+    let query = GenericListQuery::try_from(filter).unwrap();
+    let mut res = client.send_get(ENDPOINT, Some(&query)).await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::OK,
+      "filter resource by meta contains"
+    );
+    let resources = res.json::<Vec<Resource>>().await.unwrap();
+    assert!(
+      resources.len() == 1,
+      "Expect 1 resource when filter by meta contains"
+    );
     // Inspect
     let mut res = client
       .send_get(&format!("{ENDPOINT}/{TEST_RESOURCE}"), None::<String>)

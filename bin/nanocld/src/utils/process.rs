@@ -1,20 +1,16 @@
+use nanocl_error::io::FromIo;
+use nanocl_error::http::{HttpResult, HttpError};
+
 use bollard_next::container::{
   StartContainerOptions, Config, CreateContainerOptions,
   InspectContainerOptions, StopContainerOptions, RemoveContainerOptions,
 };
-
-use nanocl_error::{
-  http::{HttpResult, HttpError},
-  io::FromIo,
-};
-use nanocl_stubs::{
-  system::EventAction,
-  generic::{GenericFilter, GenericClause},
-};
+use nanocl_stubs::system::EventAction;
+use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::process::{Process, ProcessKind, ProcessPartial};
 
 use crate::models::{
-  DaemonState, Repository, ProcessDb, JobDb, JobUpdateDb, ProcessPartial,
-  Process, ProcessKind, VmDb, CargoDb,
+  DaemonState, Repository, ProcessDb, JobDb, JobUpdateDb, VmDb, CargoDb,
 };
 
 async fn after(
@@ -48,6 +44,51 @@ async fn after(
   Ok(())
 }
 
+pub(crate) fn parse_kind(kind: &str) -> HttpResult<ProcessKind> {
+  kind.to_owned().try_into().map_err(|err: std::io::Error| {
+    HttpError::internal_server_error(err.to_string())
+  })
+}
+
+/// Count the number of instances running failing or success
+pub(crate) fn count_status(
+  instances: &[Process],
+) -> (usize, usize, usize, usize) {
+  let mut instance_failed = 0;
+  let mut instance_success = 0;
+  let mut instance_running = 0;
+  for instance in instances {
+    let container = &instance.data;
+    let state = container.state.clone().unwrap_or_default();
+    if state.restarting.unwrap_or_default() {
+      instance_failed += 1;
+      continue;
+    }
+    if state.running.unwrap_or_default() {
+      instance_running += 1;
+      continue;
+    }
+    if let Some(exit_code) = state.exit_code {
+      if exit_code == 0 {
+        instance_success += 1;
+      } else {
+        instance_failed += 1;
+      }
+    }
+    if let Some(error) = state.error {
+      if !error.is_empty() {
+        instance_failed += 1;
+      }
+    }
+  }
+  (
+    instances.len(),
+    instance_failed,
+    instance_success,
+    instance_running,
+  )
+}
+
 pub(crate) async fn create(
   name: &str,
   kind: &str,
@@ -55,7 +96,10 @@ pub(crate) async fn create(
   item: Config,
   state: &DaemonState,
 ) -> HttpResult<Process> {
-  let kind: ProcessKind = kind.to_owned().try_into()?;
+  let kind: ProcessKind =
+    kind.to_owned().try_into().map_err(|err: std::io::Error| {
+      HttpError::internal_server_error(err.to_string())
+    })?;
   let mut config = item.clone();
   let mut labels = item.labels.to_owned().unwrap_or_default();
   labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
