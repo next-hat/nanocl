@@ -10,7 +10,9 @@ use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
 
 use crate::utils;
 use crate::event::Client;
-use crate::models::{DaemonState, Repository, JobDb, FromSpec};
+use crate::models::{
+  DaemonState, Repository, JobDb, FromSpec, ProcessUpdateDb, ProcessDb,
+};
 
 /// Remove a job after when finished and ttl is set
 async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
@@ -135,6 +137,7 @@ async fn exec_docker_event(
       ),
     }),
   };
+  log::debug!("docker event: {action}");
   match action {
     "destroy" => {
       state.event_emitter.spawn_emit_event(event);
@@ -158,13 +161,19 @@ async fn exec_docker_event(
       event.action = EventAction::Patched;
     }
   }
+  state.event_emitter.spawn_emit_event(event);
   let instance = state
     .docker_api
     .inspect_container(&id, None::<InspectContainerOptions>)
     .await
     .map_err(|err| err.map_err_context(|| "Docker event"))?;
-  utils::system::sync_instance(&instance, state).await?;
-  state.event_emitter.spawn_emit_event(event);
+  let data = serde_json::to_value(instance)
+    .map_err(|err| err.map_err_context(|| "Docker event"))?;
+  let new_instance = ProcessUpdateDb {
+    updated_at: Some(chrono::Utc::now().naive_utc()),
+    data: Some(data),
+  };
+  ProcessDb::update_by_pk(&id, new_instance, &state.pool).await??;
   Ok(())
 }
 
