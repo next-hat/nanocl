@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 use bollard_next::container::Config;
 use bollard_next::service::{ContainerWaitExitError, ContainerWaitResponse};
 
-use crate::node::NodeContainerSummary;
+use crate::process::Process;
 
 /// Job partial is used to create a new job
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -136,8 +136,8 @@ pub struct JobInspect {
   pub instance_failed: usize,
   /// Specification of the job
   pub spec: Job,
-  /// List of containers
-  pub instances: Vec<NodeContainerSummary>,
+  /// List of instances
+  pub instances: Vec<Process>,
 }
 
 /// Convert a job inspect into a job partial

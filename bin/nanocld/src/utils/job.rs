@@ -1,38 +1,39 @@
 use std::collections::HashMap;
 
-use nanocl_stubs::generic::GenericFilter;
 use ntex::web;
 use ntex::util::Bytes;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use futures_util::{StreamExt, TryStreamExt};
 use futures_util::stream::{FuturesUnordered, select_all};
+
+use nanocl_error::io::{FromIo, IoError, IoResult};
+use nanocl_error::http::{HttpError, HttpResult};
+
 use bollard_next::service::{ContainerSummary, ContainerWaitExitError};
 use bollard_next::container::{
   ListContainersOptions, RemoveContainerOptions, WaitContainerOptions,
 };
-
-use nanocl_error::io::{FromIo, IoError, IoResult};
-use nanocl_error::http::{HttpError, HttpResult};
-use nanocl_stubs::node::NodeContainerSummary;
+use nanocl_stubs::process::Process;
+use nanocl_stubs::generic::GenericFilter;
 use nanocl_stubs::job::{
   Job, JobPartial, JobInspect, JobWaitResponse, WaitCondition, JobSummary,
 };
 
 use crate::{version, utils};
-use crate::models::{DaemonState, ProcessDb, JobDb, Repository, FromSpec, NodeDb};
+use crate::models::{DaemonState, ProcessDb, JobDb, Repository, FromSpec};
 
 use super::stream::transform_stream;
 
 /// Count the number of instances (containers) of a job
 pub(crate) fn count_instances(
-  instances: &[NodeContainerSummary],
+  instances: &[Process],
 ) -> (usize, usize, usize, usize) {
   let mut instance_failed = 0;
   let mut instance_success = 0;
   let mut instance_running = 0;
   for instance in instances {
-    let container = &instance.container;
+    let container = &instance.data;
     let state = container.state.clone().unwrap_or_default();
     if state.restarting.unwrap_or_default() {
       instance_failed += 1;
@@ -141,27 +142,9 @@ async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
 pub(crate) async fn inspect_instances(
   name: &str,
   state: &DaemonState,
-) -> HttpResult<Vec<NodeContainerSummary>> {
-  // Convert into a hashmap for faster lookup
-  let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
-  let nodes = nodes
-    .into_iter()
-    .map(|node| (node.name.clone(), node))
-    .collect::<std::collections::HashMap<String, _>>();
-  ProcessDb::find_by_kind_key(name, &state.pool)
-    .await?
-    .into_iter()
-    .map(|instance| {
-      Ok::<_, HttpError>(NodeContainerSummary {
-        node: instance.node_key.clone(),
-        ip_address: match nodes.get(&instance.node_key) {
-          Some(node) => node.ip_address.clone(),
-          None => "Unknow".to_owned(),
-        },
-        container: instance.data,
-      })
-    })
-    .collect::<Result<Vec<NodeContainerSummary>, _>>()
+) -> HttpResult<Vec<Process>> {
+  let process = ProcessDb::find_by_kind_key(name, &state.pool).await?;
+  Ok(process)
 }
 
 /// List the job instances (containers) based on the job name

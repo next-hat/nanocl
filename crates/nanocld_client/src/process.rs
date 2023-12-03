@@ -1,11 +1,12 @@
-use nanocl_stubs::node::NodeContainerSummary;
 use ntex::channel::mpsc::Receiver;
 
 use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog, ProccessQuery};
+use nanocl_stubs::process::{
+  Process, ProccessQuery, ProcessLogQuery, ProcessOutputLog,
+};
 
 use super::NanocldClient;
 
@@ -25,7 +26,7 @@ impl NanocldClient {
   pub async fn list_process(
     &self,
     opts: Option<&ProccessQuery>,
-  ) -> HttpClientResult<Vec<NodeContainerSummary>> {
+  ) -> HttpClientResult<Vec<Process>> {
     let res = self.send_get(Self::PROCESS_PATH, opts).await?;
     Self::res_json(res).await
   }

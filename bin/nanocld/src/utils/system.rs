@@ -2,18 +2,18 @@ use std::collections::HashMap;
 
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
-use bollard_next::service::ContainerInspectResponse;
-use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 
 use nanocl_error::io::{FromIo, IoResult};
 
+use bollard_next::service::ContainerInspectResponse;
+use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
 use nanocl_stubs::namespace::NamespacePartial;
 use nanocl_stubs::cargo_spec::CargoSpecPartial;
+use nanocl_stubs::process::{Process, ProcessPartial};
 
 use crate::{utils, version};
 use crate::models::{
-  DaemonState, ProcessPartial, ProcessUpdateDb, CargoDb, ProcessDb, Repository,
-  Process, NamespaceDb,
+  DaemonState, ProcessUpdateDb, CargoDb, ProcessDb, Repository, NamespaceDb,
 };
 
 /// Will determine if the instance is registered by nanocl

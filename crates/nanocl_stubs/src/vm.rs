@@ -1,8 +1,8 @@
-use bollard_next::service::ContainerSummary;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
 use crate::{
+  process::Process,
   vm_spec::{VmSpec, VmSpecPartial},
   system::{EventActor, ToEvent, EventAction, Event, EventKind},
 };
@@ -66,9 +66,9 @@ pub struct VmSummary {
   /// Creation date of the vm
   pub created_at: chrono::NaiveDateTime,
   /// Number of instances
-  pub instances: usize,
+  pub instance_total: usize,
   /// Number of running instances
-  pub running_instances: usize,
+  pub instance_running: usize,
   /// Specification of the vm
   pub spec: VmSpec,
 }
@@ -92,6 +92,6 @@ pub struct VmInspect {
   pub instance_running: usize,
   /// Specification of the vm
   pub spec: VmSpec,
-  /// List of containers
-  pub instances: Vec<ContainerSummary>,
+  /// List of instances
+  pub instances: Vec<Process>,
 }

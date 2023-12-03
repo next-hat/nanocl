@@ -41,7 +41,7 @@ use nanocl_stubs::system::{BinaryInfo, HostInfo};
 use nanocl_stubs::metric::{Metric, MetricKind};
 use nanocl_stubs::http_metric::HttpMetric;
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
-use nanocl_stubs::node::{Node, NodeContainerSummary};
+use nanocl_stubs::node::Node;
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespacePartial, NamespaceInspect,
 };
@@ -297,7 +297,6 @@ impl Modify for VersionModifier {
   components(schemas(
     // Node
     Node,
-    NodeContainerSummary,
     // Secret
     Secret,
     SecretPartial,

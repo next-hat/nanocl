@@ -15,8 +15,8 @@ use bollard_next::service::{
   HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
 };
 use nanocl_stubs::system::EventAction;
-use nanocl_stubs::node::NodeContainerSummary;
 use nanocl_stubs::generic::{GenericListNspQuery, GenericClause, GenericFilter};
+use nanocl_stubs::process::{Process, ProcessKind};
 use nanocl_stubs::cargo::{
   Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoScale, CargoStats,
   CargoStatsQuery,
@@ -27,8 +27,8 @@ use nanocl_stubs::cargo_spec::{
 
 use crate::utils;
 use crate::models::{
-  DaemonState, CargoDb, Repository, ProcessDb, NamespaceDb, NodeDb, SecretDb,
-  CargoSpecDb, FromSpec, Process, ProcessKind,
+  DaemonState, CargoDb, Repository, ProcessDb, NamespaceDb, SecretDb,
+  CargoSpecDb, FromSpec,
 };
 
 use super::stream::transform_stream;
@@ -535,43 +535,23 @@ pub(crate) async fn inspect_by_key(
 ) -> HttpResult<CargoInspect> {
   let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
   let mut running_instances = 0;
-  let instances = ProcessDb::find_by_kind_key(key, &state.pool).await?;
-  let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
-  // Convert into a hashmap for faster lookup
-  let nodes = nodes
-    .into_iter()
-    .map(|node| (node.name.clone(), node))
-    .collect::<std::collections::HashMap<String, _>>();
-  let instances = instances
-    .into_iter()
-    .map(|instance| {
-      let node_instance = NodeContainerSummary {
-        node: instance.node_key.clone(),
-        ip_address: match nodes.get(&instance.node_key) {
-          Some(node) => node.ip_address.clone(),
-          None => "Unknow".to_owned(),
-        },
-        container: instance.data.clone(),
-      };
-      if instance
-        .data
-        .state
-        .unwrap_or_default()
-        .running
-        .unwrap_or_default()
-      {
-        running_instances += 1;
-      }
-      node_instance
-    })
-    .collect::<Vec<_>>();
+  let processes = ProcessDb::find_by_kind_key(key, &state.pool).await?;
+  for process in &processes {
+    let state = process.data.state.clone().unwrap_or_default();
+    if state.restarting.unwrap_or_default() {
+      continue;
+    }
+    if state.running.unwrap_or_default() {
+      running_instances += 1;
+    }
+  }
   Ok(CargoInspect {
     created_at: cargo.created_at,
     namespace_name: cargo.namespace_name,
-    instance_total: instances.len(),
+    instance_total: processes.len(),
     instance_running: running_instances,
     spec: cargo.spec,
-    instances,
+    instances: processes,
   })
 }
 

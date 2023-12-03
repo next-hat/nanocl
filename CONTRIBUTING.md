@@ -30,10 +30,8 @@ bin # Binaries (executable)
 │   ├── migrations # SQL table definition to generate schema.rs with diesel
 │   ├── specs # OpenApi specification
 │   └── src # Rust source code
-│       ├── models # Data structure used for the project
-│       ├── repositories # Functions to make SQL requests
+│       ├── models # Data structure and database model used for the project
 │       ├── services # Function to accept http requests
-│       ├── subsystem # Function executed before starting the server
 │       └── utils # Utils functions for the project
 ├── ncdns # Nanocl Controller Daemon DNS REST API
 │   ├── specs # OpenApi specification
@@ -47,15 +45,9 @@ bin # Binaries (executable)
 └── nproxy # Source to build custom nginx container image
 crates # Shared Libraries
 ├── nanocl_error # Error utils used in the porject
-│   └── src # The rust source code
 ├── nanocl_stubs # Shared data structure mostly used as input and output of the DAEMON
-│   └── src # The rust source code
-├── nanocld_client # A nanocld client
-│   └── src # The rust source code
 ├── nanocl_utils # A collection of utils used in the project
-│   └── src # The rust source code
 └── nanocld_client # A nanocld client
-    └── src # The rust source code
 ```
 
 ## 💾 Installation

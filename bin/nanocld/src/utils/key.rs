@@ -8,8 +8,7 @@ use rand::{Rng, thread_rng};
 use rand::distributions::Alphanumeric;
 
 use nanocl_error::http::{HttpError, HttpResult};
-
-use crate::models::ProcessKind;
+use nanocl_stubs::process::ProcessKind;
 
 /// Resolve the namespace from the query paramater
 /// Namespace is an optional query paramater it's resolved with value `global` if it's empty

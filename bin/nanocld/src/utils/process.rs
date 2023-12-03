@@ -1,20 +1,16 @@
+use nanocl_error::io::FromIo;
+use nanocl_error::http::{HttpResult, HttpError};
+
 use bollard_next::container::{
   StartContainerOptions, Config, CreateContainerOptions,
   InspectContainerOptions, StopContainerOptions, RemoveContainerOptions,
 };
-
-use nanocl_error::{
-  http::{HttpResult, HttpError},
-  io::FromIo,
-};
-use nanocl_stubs::{
-  system::EventAction,
-  generic::{GenericFilter, GenericClause},
-};
+use nanocl_stubs::system::EventAction;
+use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::process::{Process, ProcessKind, ProcessPartial};
 
 use crate::models::{
-  DaemonState, Repository, ProcessDb, JobDb, JobUpdateDb, ProcessPartial,
-  Process, ProcessKind, VmDb, CargoDb,
+  DaemonState, Repository, ProcessDb, JobDb, JobUpdateDb, VmDb, CargoDb,
 };
 
 async fn after(
@@ -55,7 +51,10 @@ pub(crate) async fn create(
   item: Config,
   state: &DaemonState,
 ) -> HttpResult<Process> {
-  let kind: ProcessKind = kind.to_owned().try_into()?;
+  let kind: ProcessKind =
+    kind.to_owned().try_into().map_err(|err: std::io::Error| {
+      HttpError::internal_server_error(err.to_string())
+    })?;
   let mut config = item.clone();
   let mut labels = item.labels.to_owned().unwrap_or_default();
   labels.insert("io.nanocl".to_owned(), "enabled".to_owned());

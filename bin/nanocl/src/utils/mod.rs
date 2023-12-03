@@ -87,7 +87,7 @@ pub mod tests {
             "No container {} in namespace {:#?} instance found",
             $cargo_name, $namespace_option
           ))
-          .container
+          .data
           .state
           .clone()
           .unwrap_or_default()

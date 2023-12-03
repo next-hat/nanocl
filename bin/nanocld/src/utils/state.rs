@@ -6,6 +6,7 @@ use futures_util::stream::FuturesUnordered;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
+use nanocl_stubs::process::ProcessKind;
 use nanocl_stubs::job::JobPartial;
 use nanocl_stubs::resource::ResourcePartial;
 use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
@@ -14,9 +15,7 @@ use nanocl_stubs::vm_spec::{VmSpecPartial, VmDisk};
 use nanocl_stubs::state::{Statefile, StateStream, StateApplyQuery};
 
 use crate::utils;
-use crate::models::{
-  DaemonState, ResourceDb, SecretDb, Repository, VmDb, CargoDb, ProcessKind,
-};
+use crate::models::{DaemonState, ResourceDb, SecretDb, Repository, VmDb, CargoDb};
 
 /// Ensure that the namespace exists in the system
 async fn ensure_namespace_existence(

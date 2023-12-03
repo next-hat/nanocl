@@ -2043,8 +2043,8 @@ components:
         Instances:
           type: array
           items:
-            $ref: '#/components/schemas/NodeContainerSummary'
-          description: List of containers
+            $ref: '#/components/schemas/Process'
+          description: List of instances
     CargoKillOptions:
       type: object
       description: Options for the kill command
@@ -4116,8 +4116,8 @@ components:
         Instances:
           type: array
           items:
-            $ref: '#/components/schemas/NodeContainerSummary'
-          description: List of containers
+            $ref: '#/components/schemas/Process'
+          description: List of instances
     JobPartial:
       type: object
       description: Job partial is used to create a new job
@@ -5081,19 +5081,6 @@ components:
           type: string
         IpAddress:
           type: string
-    NodeContainerSummary:
-      type: object
-      required:
-      - Node
-      - IpAddress
-      - Container
-      properties:
-        Node:
-          type: string
-        IpAddress:
-          type: string
-        Container:
-          $ref: '#/components/schemas/ContainerInspectResponse'
     ObjectVersion:
       type: object
       description: The version number of the object such as node, service, etc. This is needed to avoid conflicting writes. The client must send the version number along with the modified specification when updating these objects.  This approach ensures safe concurrency and determinism in that the change on the object may not be applied if the version number has changed from the last read. In other words, if two update requests specify the same base version, only one of the requests can succeed. As a result, two separate update requests that happen at the same time will not unintentionally overwrite each other.
@@ -6722,8 +6709,8 @@ components:
         Instances:
           type: array
           items:
-            $ref: '#/components/schemas/ContainerSummary'
-          description: List of containers
+            $ref: '#/components/schemas/Process'
+          description: List of instances
     VmSpec:
       type: object
       description: |-
@@ -6884,8 +6871,8 @@ components:
       required:
       - NamespaceName
       - CreatedAt
-      - Instances
-      - RunningInstances
+      - InstanceTotal
+      - InstanceRunning
       - Spec
       properties:
         NamespaceName:
@@ -6895,11 +6882,11 @@ components:
           type: string
           format: date-time
           description: Creation date of the vm
-        Instances:
+        InstanceTotal:
           type: integer
           description: Number of instances
           minimum: 0
-        RunningInstances:
+        InstanceRunning:
           type: integer
           description: Number of running instances
           minimum: 0

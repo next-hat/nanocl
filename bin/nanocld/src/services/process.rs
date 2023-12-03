@@ -1,16 +1,17 @@
-use nanocl_stubs::node::NodeContainerSummary;
 use ntex::web;
 use futures_util::stream::select_all;
 use futures_util::{StreamExt, TryStreamExt};
 
-use nanocl_error::http::HttpResult;
+use nanocl_error::http::{HttpResult, HttpError};
 
 use bollard_next::container::LogsOptions;
 use nanocl_stubs::generic::{GenericNspQuery, GenericFilter};
-use nanocl_stubs::process::{ProcessLogQuery, ProcessOutputLog, ProccessQuery};
+use nanocl_stubs::process::{
+  ProcessLogQuery, ProcessOutputLog, ProccessQuery, ProcessKind,
+};
 
 use crate::utils;
-use crate::models::{DaemonState, ProcessDb, ProcessKind, NodeDb, Repository};
+use crate::models::{DaemonState, Repository, ProcessDb};
 
 /// List process (Vm, Job, Cargo)
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -31,24 +32,9 @@ pub(crate) async fn list_process(
   state: web::types::State<DaemonState>,
   _: web::types::Query<ProccessQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let nodes = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
-  let nodes = nodes
-    .into_iter()
-    .map(|node| (node.name.clone(), node))
-    .collect::<std::collections::HashMap<String, _>>();
-  let instances = ProcessDb::find(&GenericFilter::default(), &state.pool)
-    .await??
-    .into_iter()
-    .map(|instance| NodeContainerSummary {
-      node: instance.node_key.clone(),
-      ip_address: match nodes.get(&instance.node_key) {
-        Some(node) => node.ip_address.clone(),
-        None => "Unknow".to_owned(),
-      },
-      container: instance.data,
-    })
-    .collect::<Vec<NodeContainerSummary>>();
-  Ok(web::HttpResponse::Ok().json(&instances))
+  let processes =
+    ProcessDb::find(&GenericFilter::default(), &state.pool).await??;
+  Ok(web::HttpResponse::Ok().json(&processes))
 }
 
 /// Get logs of a process
@@ -78,7 +64,9 @@ async fn logs_process(
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind: ProcessKind = kind.try_into()?;
+  let kind: ProcessKind = kind
+    .try_into()
+    .map_err(|err: std::io::Error| HttpError::bad_request(err.to_string()))?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let processes = ProcessDb::find_by_kind_key(&kind_key, &state.pool).await?;
   log::debug!("process::logs_process: {processes:#?}");
@@ -142,7 +130,9 @@ pub(crate) async fn start_process(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind: ProcessKind = kind.try_into()?;
+  let kind: ProcessKind = kind
+    .try_into()
+    .map_err(|err: std::io::Error| HttpError::bad_request(err.to_string()))?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   utils::process::start_by_kind(&kind, &kind_key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
@@ -170,7 +160,9 @@ pub(crate) async fn stop_process(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind: ProcessKind = kind.try_into()?;
+  let kind: ProcessKind = kind
+    .try_into()
+    .map_err(|err: std::io::Error| HttpError::bad_request(err.to_string()))?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   utils::process::stop_by_kind(&kind, &kind_key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
@@ -189,8 +181,7 @@ mod tests {
 
   use crate::utils::tests::*;
 
-  use nanocl_stubs::process::ProccessQuery;
-  use nanocl_stubs::node::NodeContainerSummary;
+  use nanocl_stubs::process::{Process, ProccessQuery};
 
   #[ntex::test]
   async fn basic_list() {
@@ -205,6 +196,6 @@ mod tests {
       )
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
-    let _ = res.json::<Vec<NodeContainerSummary>>().await.unwrap();
+    let _ = res.json::<Vec<Process>>().await.unwrap();
   }
 }
