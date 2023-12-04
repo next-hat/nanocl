@@ -27,7 +27,7 @@ dev = [
 test = ["nanocl_utils/ntex_test_client"]
 
 [build-dependencies]
-clap = { version = "4.4.8", features = ["derive"] }
+clap = { version = "4.4.11", features = ["derive"] }
 clap_mangen = { version = "0.2" }
 nanocl_utils = { version = "0.3.0", features = ["build_tools"] }
 
@@ -37,7 +37,7 @@ bollard-next = "0.15.4"
 
 [dependencies]
 log = "0.4.20"
-clap = { version = "4.4.8", features = ["derive"] }
+clap = { version = "4.4.11", features = ["derive"] }
 ntex = { version = "0.7.12", features = ["tokio"] }
 tokio = { version = "1.34.0", features = ["fs"] }
 serde = "1.0.192"
