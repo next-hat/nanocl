@@ -6,12 +6,13 @@ use tokio::task::JoinHandle;
 
 use nanocl_error::io::{IoError, IoResult};
 
-use nanocl_stubs::cargo::Cargo;
-use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
+use nanocl_stubs::{
+  cargo::Cargo,
+  cargo_spec::{CargoSpec, CargoSpecPartial},
+  generic::{GenericFilter, GenericClause},
+};
 
-use crate::{utils, gen_where4string};
-use crate::schema::cargoes;
+use crate::{utils, gen_where4string, schema::cargoes};
 
 use super::{Pool, CargoSpecDb, NamespaceDb, Repository, WithSpec, FromSpec};
 

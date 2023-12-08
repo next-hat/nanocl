@@ -1,4 +1,4 @@
-ApiVersion: v0.11
+ApiVersion: v0.12
 
 Namespace: global
 
@@ -11,7 +11,7 @@ Args:
 Resources:
 - Name: ${{ Args.domain }}
   Kind: ProxyRule
-  Version: v0.8
+  Version: v0.9
   Data:
     Rules:
     - Domain: ${{ Args.domain }}

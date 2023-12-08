@@ -1,4 +1,4 @@
-ApiVersion: v0.11
+ApiVersion: v0.12
 
 Namespace: global
 
@@ -7,7 +7,7 @@ Namespace: global
 Resources:
 - Name: vm-test
   Kind: ProxyRule
-  Version: v0.8
+  Version: v0.9
   Data:
     Rules:
     - Network: Internal
