@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Upgrade dependencies
+- Monthly dependencies upgrade
 
 ## [2.89.0.1] - 2023-11-06
 
