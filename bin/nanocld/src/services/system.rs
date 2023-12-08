@@ -27,7 +27,7 @@ pub(crate) async fn get_ping() -> HttpResult<web::HttpResponse> {
   tag = "System",
   path = "/version",
   responses(
-    (status = 200, description = "Version information", body = Version),
+    (status = 200, description = "Version information", body = BinaryInfo),
   ),
 ))]
 #[web::get("/version")]
