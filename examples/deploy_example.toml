@@ -1,4 +1,4 @@
-ApiVersion = "v0.11"
+ApiVersion = "v0.12"
 
 Namespace = "global"
 
@@ -20,7 +20,7 @@ Env = ["APP=GET_STARTED2"]
 [[Resources]]
 Name = "deploy-example.com"
 Kind = "ProxyRule"
-Version = "v0.8"
+Version = "v0.9"
 
 [[Resources.Data.Rules]]
 Domain = "deploy-example.com"
