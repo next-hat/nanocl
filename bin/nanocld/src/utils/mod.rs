@@ -24,18 +24,19 @@ pub(crate) mod process;
 pub mod tests {
   use super::*;
 
-  use std::fs;
-  use std::env;
+  use std::{fs, env};
   use ntex::web::{*, self};
 
+  pub use ntex::web::test::TestServer;
+
+  use crate::{
+    services,
+    version::VERSION,
+    event_emitter::EventEmitter,
+    models::{Pool, DaemonState},
+  };
   use nanocl_stubs::config::DaemonConfig;
 
-  use crate::version::VERSION;
-  use crate::services;
-  use crate::event::EventEmitter;
-  use crate::models::{Pool, DaemonState};
-
-  pub use ntex::web::test::TestServer;
   pub use nanocl_utils::ntex::test_client::*;
 
   type Config = fn(&mut ServiceConfig);

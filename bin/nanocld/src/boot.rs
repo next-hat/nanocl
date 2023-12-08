@@ -10,7 +10,7 @@ use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
 use nanocl_error::io::{FromIo, IoResult, IoError};
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::{event, utils, version};
+use crate::{utils, version, event_emitter::EventEmitter};
 use crate::models::DaemonState;
 
 /// Create a new thread and watch for change in the run directory
@@ -81,10 +81,7 @@ fn set_unix_sock_perm() {
   });
 }
 
-/// ## Spawn crond
-///
 /// Create a new thread and spawn and manage a crond instance to run cron jobs
-///
 fn spawn_crond() {
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async {
@@ -102,14 +99,7 @@ fn spawn_crond() {
   });
 }
 
-/// ## Ensure state dir
-///
 /// Ensure that the state dir exists and is ready to use
-///
-/// ## Arguments
-///
-/// * [state_dir](str) - The state dir path
-///
 async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   let vm_dir = format!("{state_dir}/vms/images");
   fs::create_dir_all(vm_dir).await.map_err(|err| {
@@ -118,19 +108,8 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
   Ok(())
 }
 
-/// ## Init
-///
 /// Init function called before http server start.
 /// To boot and initialize our state and database.
-///
-/// ## Arguments
-///
-/// * [daemon_conf](DaemonConfig) - The daemon configuration
-///
-/// ## Return
-///
-/// [IoResult](IoResult) containing a [DaemonState](DaemonState)
-///
 pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   spawn_crond();
   set_unix_sock_perm();
@@ -146,7 +125,7 @@ pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     pool: Arc::clone(&pool),
     docker_api: docker.clone(),
     config: daemon_conf.to_owned(),
-    event_emitter: event::EventEmitter::new(),
+    event_emitter: EventEmitter::new(),
     version: version::VERSION.to_owned(),
   };
   let daemon_ptr = daemon_state.clone();
