@@ -9,13 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Nanocl state apply return exit code on errors
+- Nanocl state apply return exit code on errors.
 - Nanocl state apply --reload to skip diff check.
 - Cargo image import with progress bar.
-- Use of nanocld_client 0.12
-- Fix double create_at column in `nanocl cargo ls`
-- Better `nanocl ps`
-
+- Use of nanocld_client 0.12.
+- Fix double create_at column in `nanocl cargo ls`.
+- Better `nanocl ps`.
 
 ## [0.11.0] - 2023-11-06
 
