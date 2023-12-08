@@ -3,13 +3,14 @@ use std::sync::Arc;
 use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::{IoError, IoResult, FromIo};
 
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
-use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
+use nanocl_stubs::{
+  generic::{GenericFilter, GenericClause},
+  cargo_spec::{CargoSpec, CargoSpecPartial},
+};
 
-use crate::{utils, gen_where4json, gen_where4string};
-use crate::schema::cargo_specs;
+use crate::{utils, gen_where4json, gen_where4string, schema::cargo_specs};
 
 use super::{Pool, Repository, FromSpec, CargoDb};
 
@@ -76,6 +77,19 @@ impl FromSpec for CargoSpecDb {
       metadata: p.metadata,
       secrets: p.secrets,
     }
+  }
+
+  fn try_to_spec(&self) -> IoResult<Self::Spec>
+  where
+    Self::SpecPartial: serde::de::DeserializeOwned,
+    Self::Spec: std::marker::Sized,
+  {
+    let p =
+      serde_json::from_value::<Self::SpecPartial>(self.get_data().clone())
+        .map_err(|err| err.map_err_context(|| "Spec"))?;
+    let mut spec = self.to_spec(&p);
+    spec.metadata = self.metadata.clone();
+    Ok(spec)
   }
 }
 
