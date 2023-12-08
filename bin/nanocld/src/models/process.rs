@@ -37,9 +37,10 @@ pub struct ProcessDb {
 }
 
 /// Used to update a process
-#[derive(Clone, AsChangeset)]
+#[derive(Clone, Default, AsChangeset)]
 #[diesel(table_name = processes)]
 pub struct ProcessUpdateDb {
+  pub key: Option<String>,
   /// Last time the instance was updated
   pub updated_at: Option<chrono::NaiveDateTime>,
   // The updated at data

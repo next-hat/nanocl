@@ -1,19 +1,26 @@
 use std::collections::HashMap;
 
-use futures_util::StreamExt;
-use futures_util::stream::FuturesUnordered;
+use diesel::prelude::*;
+use futures_util::{StreamExt, stream::FuturesUnordered};
 
 use nanocl_error::io::{FromIo, IoResult};
 
-use bollard_next::service::ContainerInspectResponse;
-use bollard_next::container::{ListContainersOptions, InspectContainerOptions};
-use nanocl_stubs::namespace::NamespacePartial;
-use nanocl_stubs::cargo_spec::CargoSpecPartial;
-use nanocl_stubs::process::{Process, ProcessPartial};
+use bollard_next::{
+  service::ContainerInspectResponse,
+  container::{ListContainersOptions, InspectContainerOptions},
+};
+use nanocl_stubs::{
+  generic::{GenericClause, GenericFilter},
+  namespace::NamespacePartial,
+  cargo_spec::CargoSpecPartial,
+  process::ProcessPartial,
+};
 
-use crate::{utils, version};
-use crate::models::{
-  DaemonState, ProcessUpdateDb, CargoDb, ProcessDb, Repository, NamespaceDb,
+use crate::{
+  utils, version,
+  models::{
+    DaemonState, ProcessUpdateDb, CargoDb, ProcessDb, Repository, NamespaceDb,
+  },
 };
 
 /// Will determine if the instance is registered by nanocl
@@ -26,7 +33,9 @@ pub(crate) async fn sync_instance(
   let id = instance.id.clone().unwrap_or_default();
   let container_instance_data = serde_json::to_value(instance)
     .map_err(|err| err.map_err_context(|| "Process"))?;
-  let current_res = ProcessDb::find_by_pk(&id, &state.pool).await?;
+  let filter =
+    GenericFilter::new().r#where("name", GenericClause::Eq(name.to_owned()));
+  let current_res = ProcessDb::find_one(&filter, &state.pool).await?;
   let labels = instance
     .config
     .clone()
@@ -52,16 +61,17 @@ pub(crate) async fn sync_instance(
   }
   match current_res {
     Ok(current_instance) => {
-      let current_instance: Process = current_instance.try_into()?;
       if current_instance.data == *instance {
         log::debug!("container instance already synced");
         return Ok(());
       }
       let new_instance = ProcessUpdateDb {
+        key: Some(id.to_owned()),
         updated_at: Some(chrono::Utc::now().naive_utc()),
         data: Some(container_instance_data),
       };
-      ProcessDb::update_by_pk(&id, new_instance, &state.pool).await??;
+      ProcessDb::update_by_pk(&current_instance.key, new_instance, &state.pool)
+        .await??;
     }
     Err(_) => {
       let new_instance = ProcessPartial {
@@ -116,6 +126,12 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
     .await
     .map_err(|err| err.map_err_context(|| "SyncInstance"))?;
   let mut cargo_inspected: HashMap<String, bool> = HashMap::new();
+  ProcessDb::delete_by(
+    crate::schema::processes::columns::node_key
+      .eq(state.config.hostname.clone()),
+    &state.pool,
+  )
+  .await??;
   for container_summary in containers {
     // extract cargo name and namespace
     let labels = container_summary.labels.unwrap_or_default();
@@ -128,10 +144,6 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
       // We don't have cargo label well formated, we skip it
       continue;
     }
-    // If we already inspected this cargo we skip it
-    if cargo_inspected.contains_key(metadata[0]) {
-      continue;
-    }
     // We inspect the container to have all the information we need
     let container = state
       .docker_api
@@ -141,20 +153,14 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
       )
       .await
       .map_err(|err| err.map_err_context(|| "SyncInstance"))?;
+    sync_instance(&container, state).await?;
+    // If we already inspected this cargo we skip it
+    if cargo_inspected.contains_key(metadata[0]) {
+      continue;
+    }
     let config = container.config.clone().unwrap_or_default();
     let mut config: bollard_next::container::Config = config.into();
     config.host_config = container.host_config.clone();
-    // TODO: handle network config
-    // If the container is replicated by nanocl we should not have any network settings
-    // Because we want docker to automatically set ip address and other network settings.
-    // But if the container is not replicated by nanocl we may want to keep the network settings
-    // Since container are automaticatly created or deleted by nanocl
-    // We should not save any network settings because we want docker to automatically set ip address
-    // and other network settings.
-    // let network_settings = container.network_settings.unwrap_or_default();
-    // if let Some(_endpoints_config) = network_settings.networks {
-    //   // config.networking_config = Some(NetworkingConfig { endpoints_config });
-    // }
     let new_cargo = CargoSpecPartial {
       name: metadata[0].to_owned(),
       container: config.to_owned(),
@@ -177,7 +183,6 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
             &state.pool,
           )
           .await?;
-          sync_instance(&container, state).await?;
         }
       }
       // unless we create his config
@@ -206,7 +211,6 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
           &state.pool,
         )
         .await?;
-        sync_instance(&container, state).await?;
       }
     }
   }
