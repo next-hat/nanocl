@@ -1,5 +1,5 @@
 {
-  "ApiVersion": "v0.11",
+  "ApiVersion": "v0.12",
   "Namespace": "global",
   "Cargoes": [
     {
@@ -25,7 +25,7 @@
     {
       "Kind": "ProxyRule",
       "Name": "deploy-example.com",
-      "Version": "v0.8",
+      "Version": "v0.9",
       "Data": {
         "Rules": [
           {

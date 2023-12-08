@@ -1,12 +1,12 @@
 [package]
 name = "nanocl"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Self-Sufficient Hybrid-Cloud Orchestrator CLI"
 readme = "../../README.md"
 license = "MIT OR Apache-2.0"
-homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
+homepage = "https://next-hat.com/nanocl"
 repository = "https://github.com/nxthat/nanocl"
 
 [[bin]]
@@ -31,8 +31,8 @@ chrono = { version = "0.4.31", default-features = false, features = [
   "clock",
 ] }
 bollard-next = { version = "0.15.4" }
-nanocl_utils = { version = "0.3.0", features = ["build_tools"] }
-nanocld_client = { version = "0.11.0" }
+nanocl_utils = { version = "0.3.1", features = ["build_tools"] }
+nanocld_client = { version = "0.12.0" }
 
 [dependencies]
 bollard-next = { version = "0.15.4" }
@@ -54,9 +54,9 @@ dialoguer = "0.11.0"
 termios = "0.3.3"
 liquid = { version = "0.26.1", features = ["stdlib"] }
 regex = "1.10.2"
-nanocld_client = { version = "0.11.0", features = ["tokio"] }
-nanocl_error = { version = "0.1.0", features = ["io", "http_client"] }
-nanocl_utils = { version = "0.3.0", features = ["unix"] }
+nanocld_client = { version = "0.12.0", features = ["tokio"] }
+nanocl_error = { version = "0.1.1", features = ["io", "http_client"] }
+nanocl_utils = { version = "0.3.1", features = ["unix"] }
 ctrlc = "3.3.1"
 toml = "0.8.8"
 ring = "0.17.5"

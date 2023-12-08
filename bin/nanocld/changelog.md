@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SSL/TLS connection to the store (db).
 - StateApplyQuery with reload option to skip diff.
 - Job to run a command as container.
+- Job schedule to run job at scheduler interval like a cron.
+- Process to save container state and reduce repeated code.
+- Generic filter on find and find_one for all models
+
+## Changed
+
+- Event datastructure
+
 
 ## [0.11.0] 2023-11-06
 

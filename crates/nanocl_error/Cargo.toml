@@ -1,12 +1,12 @@
 [package]
 name = "nanocl_error"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "Nanocl error types"
 readme = "readme.md"
 license = "MIT OR Apache-2.0"
-homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
+homepage = "https://next-hat.com/nanocl"
 repository = "https://github.com/nxthat/nanocl"
 
 [lib]
