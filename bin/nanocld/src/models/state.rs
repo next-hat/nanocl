@@ -1,6 +1,6 @@
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::event::EventEmitter;
+use crate::event_emitter::EventEmitter;
 
 use super::Pool;
 

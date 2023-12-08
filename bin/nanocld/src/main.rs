@@ -8,10 +8,10 @@ mod version;
 mod node;
 mod boot;
 mod utils;
-mod event;
 mod config;
 mod server;
 mod services;
+mod event_emitter;
 
 /// Provides an api to manage containers and virtual machines accross physical hosts
 /// There are these advantages :

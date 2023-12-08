@@ -3,15 +3,19 @@ use futures_util::StreamExt;
 
 use nanocl_error::io::{FromIo, IoResult};
 
-use bollard_next::system::EventsOptions;
-use bollard_next::container::InspectContainerOptions;
-use bollard_next::service::{EventMessageTypeEnum, EventMessage};
+use bollard_next::{
+  system::EventsOptions,
+  container::InspectContainerOptions,
+  service::{EventMessageTypeEnum, EventMessage},
+};
 use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
 
-use crate::utils;
-use crate::event::Client;
-use crate::models::{
-  DaemonState, Repository, JobDb, FromSpec, ProcessUpdateDb, ProcessDb,
+use crate::{
+  utils,
+  event_emitter::Client,
+  models::{
+    DaemonState, Repository, JobDb, FromSpec, ProcessUpdateDb, ProcessDb,
+  },
 };
 
 /// Remove a job after when finished and ttl is set
