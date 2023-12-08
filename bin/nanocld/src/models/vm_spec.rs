@@ -4,13 +4,14 @@ use std::collections::HashMap;
 use diesel::prelude::*;
 use tokio::task::JoinHandle;
 
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::{IoError, IoResult, FromIo};
 
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
-use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
+use nanocl_stubs::{
+  generic::{GenericFilter, GenericClause},
+  vm_spec::{VmSpec, VmSpecPartial},
+};
 
-use crate::{utils, gen_where4string};
-use crate::schema::vm_specs;
+use crate::{utils, gen_where4string, schema::vm_specs};
 
 use super::{Pool, Repository, VmDb, FromSpec};
 
@@ -136,6 +137,19 @@ impl FromSpec for VmSpecDb {
       ssh_key: p.ssh_key.clone(),
       metadata: p.metadata.clone(),
     }
+  }
+
+  fn try_to_spec(&self) -> IoResult<Self::Spec>
+  where
+    Self::SpecPartial: serde::de::DeserializeOwned,
+    Self::Spec: std::marker::Sized,
+  {
+    let p =
+      serde_json::from_value::<Self::SpecPartial>(self.get_data().clone())
+        .map_err(|err| err.map_err_context(|| "Spec"))?;
+    let mut spec = self.to_spec(&p);
+    spec.metadata = self.metadata.clone();
+    Ok(spec)
   }
 }
 
