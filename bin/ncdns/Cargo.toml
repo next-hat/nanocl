@@ -23,7 +23,7 @@ test = ["nanocl_utils/ntex_test_client"]
 [build-dependencies]
 clap = { version = "4.4.11", features = ["derive"] }
 clap_mangen = { version = "0.2" }
-nanocl_utils = { version = "0.3.0", features = ["build_tools"] }
+nanocl_utils = { version = "0.3.1", features = ["build_tools"] }
 
 [dev-dependencies]
 serde_yaml = "0.9.25"
@@ -36,9 +36,9 @@ tokio = { version = "1.34.0", features = ["fs"] }
 futures = "0.3.26"
 serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.108"
-nanocld_client = { version = "0.11.0", features = ["tokio"] }
-nanocl_error = { version = "0.1.0", features = ["io", "http", "http_client"] }
-nanocl_utils = { version = "0.3.0", features = [
+nanocld_client = { version = "0.12.0", features = ["tokio"] }
+nanocl_error = { version = "0.1.1", features = ["io", "http", "http_client"] }
+nanocl_utils = { version = "0.3.1", features = [
   "ntex",
   "logger",
   "versioning",

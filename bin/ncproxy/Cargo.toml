@@ -7,7 +7,7 @@ authors = ["nanocl contributors <team@next-hat.com>"]
 description = "Official nanocl controller daemon proxy"
 readme = "readme.md"
 license = "MIT OR Apache-2.0"
-homepage = "https://docs.next-hat.com/docs/guides/nanocl/overview"
+homepage = "https://next-hat.com/nanocl"
 repository = "https://github.com/nxthat/nanocld"
 
 [[bin]]
@@ -29,7 +29,7 @@ test = ["nanocl_utils/ntex_test_client"]
 [build-dependencies]
 clap = { version = "4.4.11", features = ["derive"] }
 clap_mangen = { version = "0.2" }
-nanocl_utils = { version = "0.3.0", features = ["build_tools"] }
+nanocl_utils = { version = "0.3.1", features = ["build_tools"] }
 
 [dev-dependencies]
 serde_yaml = "0.9.25"
@@ -46,14 +46,14 @@ futures = "0.3.25"
 notify = { version = "6.1.1", default-features = false, features = [
   "macos_kqueue",
 ] }
-nanocld_client = { version = "0.11.0", features = ["tokio"] }
-nanocl_error = { version = "0.1.0", features = [
+nanocld_client = { version = "0.12.0", features = ["tokio"] }
+nanocl_error = { version = "0.1.1", features = [
   "io",
   "http",
   "http_client",
   "serde_json",
 ] }
-nanocl_utils = { version = "0.3.0", features = [
+nanocl_utils = { version = "0.3.1", features = [
   "ntex",
   "logger",
   "versioning",
