@@ -345,10 +345,9 @@ impl NanocldClient {
         let bytes = match item {
           Ok(bytes) => bytes,
           Err(e) => {
-            let _ = tx.send(Err(HttpError {
-              status: http::StatusCode::INTERNAL_SERVER_ERROR,
-              msg: format!("Unable to read stream got error : {e}"),
-            }));
+            let _ = tx.send(Err(HttpError::internal_server_error(format!(
+              "Unable to read stream: {e}"
+            ))));
             break;
           }
         };
@@ -359,10 +358,9 @@ impl NanocldClient {
         let t = match serde_json::from_slice::<R>(&payload) {
           Ok(t) => t,
           Err(e) => {
-            let _ = tx.send(Err(HttpError {
-              status: http::StatusCode::INTERNAL_SERVER_ERROR,
-              msg: format!("Unable to parse stream got error : {e}"),
-            }));
+            let _ = tx.send(Err(HttpError::internal_server_error(format!(
+              "Unable to parse stream: {e}"
+            ))));
             break;
           }
         };

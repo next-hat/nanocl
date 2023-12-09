@@ -1,7 +1,6 @@
-use ntex::{web, http};
+use ntex::web;
 use futures::StreamExt;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use tokio::{fs::File, io::AsyncWriteExt};
 use tokio_util::codec;
 
 use nanocl_error::http::{HttpError, HttpResult};
@@ -11,8 +10,7 @@ use nanocl_stubs::cargo_image::{
   CargoImagePartial, ListCargoImagesOptions, CargoImageImportOptions,
 };
 
-use crate::utils;
-use crate::models::DaemonState;
+use crate::{utils, models::DaemonState};
 
 /// List container images
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -125,30 +123,31 @@ pub(crate) async fn import_cargo_image(
   let filepath = format!("/tmp/{filename}");
   // File::create is blocking operation, use threadpool
   let file_path_ptr = filepath.clone();
-  let mut f = File::create(&file_path_ptr)
-    .await
-    .map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Error while creating the file {err}"),
-    })?;
+  let mut f = File::create(&file_path_ptr).await.map_err(|err| {
+    HttpError::internal_server_error(format!(
+      "Error while creating the file {err}"
+    ))
+  })?;
   while let Some(bytes) = payload.next().await {
-    let bytes = bytes.map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Error while payload: {err}"),
+    let bytes = bytes.map_err(|err| {
+      HttpError::internal_server_error(format!("Error while payload: {err}"))
     })?;
-    f.write_all(&bytes).await.map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Error while writing the file {err}"),
+    f.write_all(&bytes).await.map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Error while writing the file {err}"
+      ))
     })?;
   }
-  f.shutdown().await.map_err(|err| HttpError {
-    status: http::StatusCode::INTERNAL_SERVER_ERROR,
-    msg: format!("Error while closing the file {err}"),
+  f.shutdown().await.map_err(|err| {
+    HttpError::internal_server_error(format!(
+      "Error while closing the file {err}"
+    ))
   })?;
   drop(f);
-  let file = File::open(&file_path_ptr).await.map_err(|err| HttpError {
-    status: http::StatusCode::INTERNAL_SERVER_ERROR,
-    msg: format!("Error while opening the file {err}"),
+  let file = File::open(&file_path_ptr).await.map_err(|err| {
+    HttpError::internal_server_error(format!(
+      "Error while opening the file {err}"
+    ))
   })?;
   // sending the file to the docker api
   let byte_stream =
@@ -161,9 +160,10 @@ pub(crate) async fn import_cargo_image(
   let options = ImportImageOptions { quiet };
   let mut stream = state.docker_api.import_image(options, body, None);
   while let Some(res) = stream.next().await {
-    let _ = res.map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Error while importing the image {err}"),
+    let _ = res.map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Error while importing the image {err}"
+      ))
     })?;
   }
   if let Err(err) = tokio::fs::remove_file(&filepath).await {

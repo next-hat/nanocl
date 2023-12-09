@@ -1,19 +1,17 @@
-use std::sync::Arc;
-use std::process::Stdio;
+use std::{sync::Arc, process::Stdio};
 
-use ntex::{rt, web, http};
-use ntex::util::Bytes;
-use ntex::channel::mpsc::Receiver;
-use tokio::fs;
-use tokio::io::AsyncReadExt;
-use tokio::process::Command;
+use ntex::{rt, web, util::Bytes, channel::mpsc::Receiver};
+use tokio::{fs, io::AsyncReadExt, process::Command};
 
 use nanocl_error::http::{HttpError, HttpResult};
+
 use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 
-use crate::utils;
-use crate::models::{
-  Pool, Repository, VmImageDb, QemuImgInfo, VmImageUpdateDb, DaemonState,
+use crate::{
+  utils,
+  models::{
+    Pool, Repository, VmImageDb, QemuImgInfo, VmImageUpdateDb, DaemonState,
+  },
 };
 
 /// Delete a vm image from the database and from the filesystem
@@ -21,12 +19,9 @@ pub(crate) async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
   let vm_image = VmImageDb::find_by_pk(name, pool).await??;
   let children = VmImageDb::find_by_parent(name, pool).await?;
   if !children.is_empty() {
-    return Err(HttpError {
-      status: http::StatusCode::CONFLICT,
-      msg: format!(
-        "Vm image {name} has children images please delete them first"
-      ),
-    });
+    return Err(HttpError::conflict(format!(
+      "Vm image {name} has children images please delete them first"
+    )));
   }
   let filepath = vm_image.path.clone();
   if let Err(err) = fs::remove_file(&filepath).await {
@@ -38,26 +33,25 @@ pub(crate) async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
 
 /// Get the info of a vm image using qemu-img info command and parse the output
 pub(crate) async fn get_info(path: &str) -> HttpResult<QemuImgInfo> {
-  let ouput = Command::new("qemu-img")
+  let output = Command::new("qemu-img")
     .args(["info", "--output=json", path])
     .output()
     .await
-    .map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to get info of {path}: {}", err),
+    .map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Failed to get info of {path}: {err}"
+      ))
     })?;
-  if !ouput.status.success() {
-    return Err(HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to get info of {path}: {ouput:#?}"),
-    });
+  if !output.status.success() {
+    return Err(HttpError::internal_server_error(format!(
+      "Failed to get info of {path}: {output:#?}"
+    )));
   }
   let info =
-    serde_json::from_slice::<QemuImgInfo>(&ouput.stdout).map_err(|err| {
-      HttpError {
-        status: http::StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Failed to parse info of {path}: {err}"),
-      }
+    serde_json::from_slice::<QemuImgInfo>(&output.stdout).map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Failed to parse info of {path}: {err}"
+      ))
     })?;
   Ok(info)
 }
@@ -73,11 +67,8 @@ pub(crate) async fn create_snap(
   image: &VmImageDb,
   state: &DaemonState,
 ) -> HttpResult<VmImageDb> {
-  if VmImageDb::find_by_pk(name, &state.pool).await.is_ok() {
-    return Err(HttpError {
-      status: http::StatusCode::CONFLICT,
-      msg: format!("Vm image {name} already used"),
-    });
+  if VmImageDb::find_by_pk(name, &state.pool).await?.is_ok() {
+    return Err(HttpError::conflict(format!("Vm image {name} already used")));
   }
   let imagepath = image.path.clone();
   let snapshotpath =
@@ -95,27 +86,31 @@ pub(crate) async fn create_snap(
     ])
     .output()
     .await
-    .map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to create snapshot of {imagepath}: {}", err),
+    .map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Failed to create snapshot {name}: {err}"
+      ))
     })?;
-  output.status.success().then_some(()).ok_or(HttpError {
-    status: http::StatusCode::INTERNAL_SERVER_ERROR,
-    msg: format!("Failed to create snapshot of {imagepath}: {output:#?}"),
-  })?;
+  output.status.success().then_some(()).ok_or(
+    HttpError::internal_server_error(format!(
+      "Failed to create snapshot {name}: {output:#?}"
+    )),
+  )?;
   let size = format!("{size}G");
   let output = Command::new("qemu-img")
     .args(["resize", &snapshotpath, &size])
     .output()
     .await
-    .map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to resize snapshot of {imagepath}: {}", err),
+    .map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Failed to resize snapshot {imagepath}: {err}"
+      ))
     })?;
-  output.status.success().then_some(()).ok_or(HttpError {
-    status: http::StatusCode::INTERNAL_SERVER_ERROR,
-    msg: format!("Failed to resize snapshot of {imagepath}: {output:#?}"),
-  })?;
+  output.status.success().then_some(()).ok_or(
+    HttpError::internal_server_error(format!(
+      "Failed to resize snapshot {name}: {output:#?}"
+    )),
+  )?;
   let image_info = get_info(&snapshotpath).await?;
   let snap_image = VmImageDb {
     name: name.to_owned(),
@@ -141,16 +136,12 @@ pub(crate) async fn clone(
   state: &DaemonState,
 ) -> HttpResult<Receiver<HttpResult<Bytes>>> {
   if image.kind != "Snapshot" {
-    return Err(HttpError {
-      status: http::StatusCode::BAD_REQUEST,
-      msg: format!("Vm image {name} is not a snapshot"),
-    });
+    return Err(HttpError::bad_request(format!(
+      "Vm image {name} is not a snapshot"
+    )));
   }
   if VmImageDb::find_by_pk(name, &state.pool).await?.is_ok() {
-    return Err(HttpError {
-      status: http::StatusCode::CONFLICT,
-      msg: format!("Vm image {name} already used"),
-    });
+    return Err(HttpError::conflict(format!("Vm image {name} already used")));
   }
   let (tx, rx) = ntex::channel::mpsc::channel::<HttpResult<Bytes>>();
   let name = name.to_owned();
@@ -174,9 +165,10 @@ pub(crate) async fn clone(
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())
       .spawn()
-      .map_err(|err| HttpError {
-        status: http::StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Failed to convert snapshot to base {err}"),
+      .map_err(|err| {
+        HttpError::internal_server_error(format!(
+          "Failed to convert snapshot to base {err}"
+        ))
       }) {
       Err(err) => {
         let _ = tx.send(Err(err.clone()));
@@ -184,10 +176,9 @@ pub(crate) async fn clone(
       }
       Ok(child) => child,
     };
-    let mut stdout = match child.stdout.take().ok_or(HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: "Failed to convert snapshot to base".into(),
-    }) {
+    let mut stdout = match child.stdout.take().ok_or(
+      HttpError::internal_server_error("Failed to convert snapshot to base"),
+    ) {
       Err(err) => {
         let _ = tx.send(Err(err.clone()));
         return Err(err);
@@ -218,9 +209,10 @@ pub(crate) async fn clone(
       }
       Ok::<(), HttpError>(())
     });
-    let output = match child.wait().await.map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to convert snapshot to base {err}"),
+    let output = match child.wait().await.map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Failed to convert snapshot to base {err}"
+      ))
     }) {
       Err(err) => {
         let _ = tx.send(Err(err.clone()));
@@ -228,10 +220,14 @@ pub(crate) async fn clone(
       }
       Ok(output) => output,
     };
-    if let Err(err) = output.success().then_some(()).ok_or(HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to convert snapshot to base {output:#?}"),
-    }) {
+    if let Err(err) =
+      output
+        .success()
+        .then_some(())
+        .ok_or(HttpError::internal_server_error(format!(
+          "Failed to convert snapshot to base {output:#?}"
+        )))
+    {
       let _ = tx.send(Err(err.clone()));
       return Err(err);
     };
@@ -286,16 +282,16 @@ pub(crate) async fn resize(
       .args(args)
       .output()
       .await
-      .map_err(|err| HttpError {
-        status: http::StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Unable to resize image {err}"),
+      .map_err(|err| {
+        HttpError::internal_server_error(format!(
+          "Unable to resize image {err}"
+        ))
       })?;
   if !ouput.status.success() {
-    let output = String::from_utf8(ouput.stderr).unwrap();
-    return Err(HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Unable to resize image {output}"),
-    });
+    let output = String::from_utf8(ouput.stdout).unwrap_or_default();
+    return Err(HttpError::internal_server_error(format!(
+      "Unable to resize image {output}"
+    )));
   }
   let image_info = get_info(&imagepath).await?;
   let res = VmImageDb::update_by_pk(

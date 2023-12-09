@@ -1,19 +1,23 @@
 use std::collections::HashMap;
 
-use ntex::http;
-
 use nanocl_error::http::{HttpError, HttpResult};
 
-use bollard_next::models::ContainerSummary;
-use bollard_next::container::ListContainersOptions;
-use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
-use nanocl_stubs::generic::GenericFilter;
-use nanocl_stubs::namespace::{
-  Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
+use bollard_next::{
+  models::ContainerSummary,
+  container::ListContainersOptions,
+  network::{CreateNetworkOptions, InspectNetworkOptions},
+};
+use nanocl_stubs::{
+  generic::GenericFilter,
+  namespace::{
+    Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
+  },
 };
 
-use crate::utils;
-use crate::models::{Pool, DaemonState, CargoDb, NamespaceDb, Repository};
+use crate::{
+  utils,
+  models::{Pool, DaemonState, CargoDb, NamespaceDb, Repository},
+};
 
 /// Create a new namespace with his associated network.
 /// Each vm and cargo created on this namespace will use the same network.
@@ -25,10 +29,10 @@ pub(crate) async fn create(
     .await?
     .is_ok()
   {
-    return Err(HttpError {
-      msg: format!("namespace {} error: already exist", &item.name),
-      status: http::StatusCode::CONFLICT,
-    });
+    return Err(HttpError::conflict(format!(
+      "Namespace {}: already exist",
+      &item.name
+    )));
   }
   if state
     .docker_api
@@ -97,10 +101,10 @@ pub(crate) async fn list(
     let ipam_config = ipam.config.unwrap_or_default();
     let gateway = ipam_config
       .get(0)
-      .ok_or(HttpError {
-        msg: format!("Unable to get gateway for network {}", &item.name),
-        status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      })?
+      .ok_or(HttpError::internal_server_error(format!(
+        "Unable to get gateway for network {}",
+        &item.name
+      )))?
       .gateway
       .clone()
       .unwrap_or_default();

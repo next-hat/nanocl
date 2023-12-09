@@ -3,11 +3,10 @@
 /// or on the key of the parent for relational purpose.
 /// For example if we create a cargo `get-started` in the default namespace `global`
 /// The cargo key will be `get-started.global`
-use ntex::http;
-use rand::{Rng, thread_rng};
-use rand::distributions::Alphanumeric;
+use rand::{Rng, thread_rng, distributions::Alphanumeric};
 
 use nanocl_error::http::{HttpError, HttpResult};
+
 use nanocl_stubs::process::ProcessKind;
 
 /// Resolve the namespace from the query paramater
@@ -33,10 +32,9 @@ pub(crate) fn validate_name(name: &str) -> HttpResult<()> {
     .chars()
     .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
   {
-    return Err(HttpError {
-      status: http::StatusCode::BAD_REQUEST,
-      msg: format!("Vm image name {name} is invalid"),
-    });
+    return Err(HttpError::bad_request(format!(
+      "Vm image name {name} is invalid"
+    )));
   }
   Ok(())
 }

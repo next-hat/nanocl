@@ -1,8 +1,8 @@
 use ntex::web;
-use ntex::http;
+
+use nanocl_error::http::HttpError;
 
 use nanocl_utils::ntex::middlewares;
-use nanocl_error::http::HttpError;
 
 use crate::version;
 
@@ -12,10 +12,7 @@ mod openapi;
 mod rule;
 
 pub async fn unhandled() -> Result<web::HttpResponse, HttpError> {
-  Err(HttpError {
-    status: http::StatusCode::NOT_FOUND,
-    msg: "Route or Method unhandled".to_owned(),
-  })
+  Err(HttpError::not_found("Route or method unhandled"))
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {

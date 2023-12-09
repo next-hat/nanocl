@@ -1,14 +1,19 @@
 use std::io::Write;
 
-use ntex::{web, http};
+use ntex::web;
 use futures::StreamExt;
 
-use nanocl_stubs::generic::{GenericFilter, GenericListQuery};
 use nanocl_error::http::{HttpError, HttpResult};
-use nanocl_stubs::vm_image::VmImageResizePayload;
 
-use crate::utils;
-use crate::models::{DaemonState, VmImageDb, Repository};
+use nanocl_stubs::{
+  generic::{GenericFilter, GenericListQuery},
+  vm_image::VmImageResizePayload,
+};
+
+use crate::{
+  utils,
+  models::{DaemonState, VmImageDb, Repository},
+};
 
 /// List virtual machine images
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -55,10 +60,9 @@ pub(crate) async fn import_vm_image(
   let name = path.1.to_owned();
   utils::key::validate_name(&name)?;
   if VmImageDb::find_by_pk(&name, &state.pool).await?.is_ok() {
-    return Err(HttpError {
-      status: http::StatusCode::BAD_REQUEST,
-      msg: format!("Vm image {name} already used"),
-    });
+    return Err(HttpError::bad_request(format!(
+      "Vm image {name} already used"
+    )));
   }
   let state_dir = state.config.state_dir.clone();
   let vm_images_dir = format!("{state_dir}/vms/images");
@@ -66,20 +70,23 @@ pub(crate) async fn import_vm_image(
   let fp = filepath.clone();
   let mut f = web::block(move || std::fs::File::create(fp))
     .await
-    .map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Unable to create vm image {name}: {err}"),
+    .map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Unable to create vm image {name}: {err}"
+      ))
     })?;
   while let Some(bytes) = payload.next().await {
-    let bytes = bytes.map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Unable to create vm image {name}: {err}"),
+    let bytes = bytes.map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Unable to create vm image {name}: {err}"
+      ))
     })?;
     f = web::block(move || f.write_all(&bytes).map(|_| f))
       .await
-      .map_err(|err| HttpError {
-        status: http::StatusCode::INTERNAL_SERVER_ERROR,
-        msg: format!("Unable to create vm image {name}: {err}"),
+      .map_err(|err| {
+        HttpError::internal_server_error(format!(
+          "Unable to create vm image {name}: {err}"
+        ))
       })?;
   }
   utils::vm_image::create(&name, &filepath, &state.pool).await?;

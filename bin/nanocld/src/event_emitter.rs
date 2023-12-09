@@ -1,14 +1,13 @@
-use std::pin::Pin;
-use std::time::Duration;
-use std::sync::{Arc, Mutex};
-use std::task::{Poll, Context};
+use std::{
+  pin::Pin,
+  time::Duration,
+  sync::{Arc, Mutex},
+  task::{Poll, Context},
+};
 
-use ntex::{rt, web, http, time};
-use ntex::util::Bytes;
-use ntex::web::error::BlockingError;
+use ntex::{rt, web, time, util::Bytes, web::error::BlockingError};
 use futures::Stream;
-use futures_util::StreamExt;
-use futures_util::stream::FuturesUnordered;
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_error::http::{HttpError, HttpResult};
@@ -49,9 +48,10 @@ impl TryToBytes for Event {
   type Error = HttpError;
 
   fn try_to_bytes(&self) -> Result<Bytes, Self::Error> {
-    let mut data = serde_json::to_vec(&self).map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Unable to serialize event: {err}"),
+    let mut data = serde_json::to_vec(&self).map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Unable to serialize event: {err}"
+      ))
     })?;
     data.push(b'\n');
     Ok(Bytes::from(data))
@@ -80,9 +80,10 @@ impl EventEmitter {
   /// Check if clients are still connected
   fn check_connection(&mut self) -> HttpResult<()> {
     let mut alive_clients = Vec::new();
-    let mut inner = self.inner.lock().map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Unable to lock event emitter mutex: {err}"),
+    let mut inner = self.inner.lock().map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Unable to lock event emitter mutex: {err}"
+      ))
     })?;
     for client in &inner.clients {
       let result = client.clone().try_send(Bytes::from(""));
@@ -116,9 +117,10 @@ impl EventEmitter {
       let inner = self_ptr
         .inner
         .lock()
-        .map_err(|err| HttpError {
-          status: http::StatusCode::INTERNAL_SERVER_ERROR,
-          msg: format!("Unable to lock event emitter mutex: {err}"),
+        .map_err(|err| {
+          HttpError::internal_server_error(format!(
+            "Unable to lock event emitter mutex: {err}"
+          ))
         })?
         .clone();
       Ok::<_, HttpError>(inner)
@@ -126,11 +128,9 @@ impl EventEmitter {
     .await
     .map_err(|err| match err {
       BlockingError::Error(err) => err,
-      BlockingError::Canceled => HttpError {
-        status: http::StatusCode::INTERNAL_SERVER_ERROR,
-        msg: "Unable to subscribe to metrics server furture got cancelled"
-          .into(),
-      },
+      BlockingError::Canceled => HttpError::internal_server_error(
+        "Unable to subscribe to metrics server future got cancelled",
+      ),
     })?;
     log::debug!(
       "Emitting {} {} to {} client(s)",
@@ -187,9 +187,10 @@ impl EventEmitter {
       self_ptr
         .inner
         .lock()
-        .map_err(|err| HttpError {
-          status: http::StatusCode::INTERNAL_SERVER_ERROR,
-          msg: format!("Unable to lock event emitter mutex: {err}"),
+        .map_err(|err| {
+          HttpError::internal_server_error(format!(
+            "Unable to lock event emitter mutex: {err}"
+          ))
         })?
         .clients
         .push(tx);
@@ -198,11 +199,9 @@ impl EventEmitter {
     .await
     .map_err(|err| match err {
       BlockingError::Error(err) => err,
-      BlockingError::Canceled => HttpError {
-        status: http::StatusCode::INTERNAL_SERVER_ERROR,
-        msg: "Unable to subscribe to metrics server furture got cancelled"
-          .into(),
-      },
+      BlockingError::Canceled => HttpError::internal_server_error(
+        "Unable to subscribe to metrics server future got cancelled",
+      ),
     })?;
     Ok(Client(rx))
   }

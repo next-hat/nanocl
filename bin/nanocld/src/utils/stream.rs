@@ -1,4 +1,3 @@
-use ntex::http;
 use ntex::util::Bytes;
 use futures::StreamExt;
 use serde::Serialize;
@@ -14,14 +13,16 @@ where
   T: Serialize + From<I>,
 {
   stream.map(|item| {
-    let item = item.map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to read stream item: {err}"),
+    let item = item.map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Failed to read stream item: {err}"
+      ))
     })?;
     let item = T::from(item);
-    let item = serde_json::to_string(&item).map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("Failed to serialize stream item: {err}"),
+    let item = serde_json::to_string(&item).map_err(|err| {
+      HttpError::internal_server_error(format!(
+        "Failed stringify stream item: {err}"
+      ))
     })?;
     Ok(Bytes::from(item + "\r\n"))
   })
