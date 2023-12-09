@@ -2,6 +2,7 @@ use futures::StreamExt;
 use nanocl_error::io::{IoResult, FromIo, IoError};
 
 use nanocld_client::stubs::job::JobWaitQuery;
+use nanocld_client::stubs::process::ProcessLogQuery;
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -65,7 +66,17 @@ async fn exec_job_logs(
   opts: &JobLogsOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  let stream = client.logs_process("job", &opts.name, None).await?;
+  let query = ProcessLogQuery {
+    namespace: None,
+    tail: opts.tail.clone(),
+    since: opts.since,
+    until: opts.until,
+    follow: Some(opts.follow),
+    timestamps: Some(opts.timestamps),
+    stderr: None,
+    stdout: None,
+  };
+  let stream = client.logs_process("job", &opts.name, Some(&query)).await?;
   utils::print::logs_process_stream(stream).await?;
   Ok(())
 }

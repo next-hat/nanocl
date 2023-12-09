@@ -84,13 +84,10 @@ async fn logs_process(
         )
         .map(move |elem| match elem {
           Err(err) => Err(err),
-          Ok(elem) => {
-            log::debug!("{:#?} {elem}", &process.name);
-            Ok(ProcessOutputLog {
-              name: process.name.clone(),
-              log: elem.into(),
-            })
-          }
+          Ok(elem) => Ok(ProcessOutputLog {
+            name: process.name.clone(),
+            log: elem.into(),
+          }),
         })
     })
     .collect::<Vec<_>>();
