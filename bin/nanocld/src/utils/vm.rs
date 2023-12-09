@@ -32,16 +32,7 @@ pub(crate) async fn inspect_by_key(
   let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
   let processes =
     ProcessDb::find_by_kind_key(&vm.spec.vm_key, &state.pool).await?;
-  let mut running_instances = 0;
-  for process in &processes {
-    let state = process.data.state.clone().unwrap_or_default();
-    if state.restarting.unwrap_or_default() {
-      continue;
-    }
-    if state.running.unwrap_or_default() {
-      running_instances += 1;
-    }
-  }
+  let (_, _, _, running_instances) = utils::process::count_status(&processes);
   Ok(VmInspect {
     created_at: vm.created_at,
     namespace_name: vm.namespace_name,
