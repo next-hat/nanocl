@@ -1,7 +1,6 @@
 use std::fs;
 use std::collections::HashMap;
 
-use ntex::rt;
 use futures::StreamExt;
 use clap::{Arg, Command, ArgAction};
 use serde_json::{Map, Value};
@@ -123,78 +122,17 @@ fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
   Ok(new_cargo)
 }
 
-/// Attach to a cargo and print its logs
-pub async fn log_cargo(
-  client: &NanocldClient,
-  cargo: CargoSpecPartial,
-  opts: &ProcessLogQuery,
-) -> IoResult<Vec<rt::JoinHandle<()>>> {
-  let cargo = match client
-    .inspect_cargo(
-      &cargo.name,
-      Some(opts.namespace.as_deref().unwrap_or("global")),
-    )
-    .await
-  {
-    Err(err) => {
-      eprintln!(
-        "Error while inspecting cargo {cargo}: {err}",
-        cargo = cargo.name
-      );
-      return Ok(Vec::default());
-    }
-    Ok(cargo) => cargo,
-  };
-  let mut futures = Vec::new();
-  for (index, _) in cargo.instances.iter().enumerate() {
-    let name = if index == 0 {
-      cargo.spec.name.to_owned()
-    } else {
-      format!("{index}-{}", cargo.spec.name)
-    };
-    let namespace = opts.namespace.to_owned().unwrap_or("global".to_owned());
-    let client = client.to_owned();
-    let since = opts.since;
-    let until = opts.until;
-    let timestamps = opts.timestamps;
-    let tail = opts.tail.to_owned();
-    let follow = opts.follow;
-    let fut = rt::spawn(async move {
-      let query = ProcessLogQuery {
-        namespace: Some(namespace),
-        follow,
-        since,
-        until,
-        tail,
-        timestamps,
-        ..Default::default()
-      };
-      match client.logs_process("cargo", &name, Some(&query)).await {
-        Err(err) => {
-          eprintln!("Cannot attach to cargo {name}: {err}");
-        }
-        Ok(stream) => {
-          if let Err(err) = utils::print::logs_process_stream(stream).await {
-            eprintln!("{err}");
-          }
-        }
-      }
-    });
-    futures.push(fut);
-  }
-  Ok(futures)
-}
-
 /// Logs existing jobs in the Statefile
-pub async fn log_jobs(
+async fn log_jobs(
   client: &NanocldClient,
   jobs: Vec<JobPartial>,
+  query: &ProcessLogQuery,
 ) -> IoResult<()> {
   let mut futures = Vec::new();
   for job in jobs {
     let client = client.clone();
     let fut = async move {
-      match client.logs_process("job", &job.name, None).await {
+      match client.logs_process("job", &job.name, Some(query)).await {
         Err(err) => {
           eprintln!("Cannot attach to job {}: {err}", &job.name);
         }
@@ -215,12 +153,24 @@ pub async fn log_jobs(
 pub async fn log_cargoes(
   client: &NanocldClient,
   cargoes: Vec<CargoSpecPartial>,
-  opts: &ProcessLogQuery,
+  query: &ProcessLogQuery,
 ) -> IoResult<()> {
   let mut futures = Vec::new();
   for cargo in cargoes {
-    let more_futures = log_cargo(client, cargo, opts).await?;
-    futures.extend(more_futures);
+    let client = client.clone();
+    let fut = async move {
+      match client.logs_process("cargo", &cargo.name, Some(query)).await {
+        Err(err) => {
+          eprintln!("Cannot attach to cargo {}: {err}", &cargo.name);
+        }
+        Ok(stream) => {
+          if let Err(err) = utils::print::logs_process_stream(stream).await {
+            eprintln!("{err}");
+          }
+        }
+      }
+    };
+    futures.push(fut);
   }
   futures::future::join_all(futures).await;
   Ok(())
@@ -534,16 +484,16 @@ async fn exec_state_apply(
     utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
   if opts.follow {
+    let query = ProcessLogQuery {
+      namespace: state_file.data.namespace,
+      follow: Some(true),
+      ..Default::default()
+    };
     if let Some(cargoes) = state_file.data.cargoes {
-      let query = ProcessLogQuery {
-        namespace: state_file.data.namespace,
-        follow: Some(true),
-        ..Default::default()
-      };
       log_cargoes(&client, cargoes, &query).await?;
     }
     if let Some(jobs) = state_file.data.jobs {
-      log_jobs(&client, jobs).await?;
+      log_jobs(&client, jobs, &query).await?;
     }
   }
   if has_error {
@@ -586,7 +536,7 @@ async fn exec_state_logs(
     log_cargoes(&client, cargoes, &log_opts).await?;
   }
   if let Some(jobs) = state_file.data.jobs {
-    log_jobs(&client, jobs).await?;
+    log_jobs(&client, jobs, &log_opts).await?;
   }
   Ok(())
 }

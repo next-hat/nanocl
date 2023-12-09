@@ -138,7 +138,23 @@ pub(crate) async fn remove(
   opts: Option<RemoveContainerOptions>,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  state.docker_api.remove_container(key, opts).await?;
+  match state.docker_api.remove_container(key, opts).await {
+    Ok(_) => {}
+    Err(err) => match &err {
+      bollard_next::errors::Error::DockerResponseServerError {
+        status_code,
+        message: _,
+      } => {
+        if *status_code == 404 {
+          return Ok(());
+        }
+        return Err(err.into());
+      }
+      _ => {
+        return Err(err.into());
+      }
+    },
+  };
   ProcessDb::delete_by_pk(key, &state.pool).await??;
   Ok(())
 }
@@ -149,7 +165,7 @@ pub(crate) async fn start_by_kind(
   state: &DaemonState,
 ) -> HttpResult<()> {
   let processes = ProcessDb::find_by_kind_key(kind_key, &state.pool).await?;
-  log::debug!("process::start_by_kind: {processes:#?}");
+  log::debug!("process::start_by_kind: {kind_key}");
   for process in processes {
     let process_state = process.data.state.unwrap_or_default();
     if process_state.running.unwrap_or_default() {
