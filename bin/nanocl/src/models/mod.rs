@@ -71,11 +71,11 @@ pub enum Command {
   Info,
   /// Show nanocl version information
   Version,
-  /// Install nanocl components
+  /// Install components
   Install(InstallOpts),
-  /// Uninstall nanocl components
+  /// Uninstall components
   Uninstall(UninstallOpts),
-  // TODO: Upgrade nanocl components
+  /// Upgrade components
   Upgrade(UpgradeOpts),
   /// Show all processes managed by nanocl
   Ps(ProcessOpts),
