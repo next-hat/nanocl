@@ -29,6 +29,7 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
     None => return Ok(()),
     Some(job_id) => job_id.as_str().unwrap_or_default(),
   };
+  log::debug!("utils::job_ttl testing: {job_id}");
   match &e.action {
     EventAction::Created | EventAction::Started | EventAction::Deleted => {
       return Ok(())
@@ -44,6 +45,10 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
   };
   let instances = ProcessDb::find_by_kind_key(&job.name, &state.pool).await?;
   let (_, _, _, running) = utils::process::count_status(&instances);
+  log::debug!(
+    "utils::job_ttl {} has {running} running instances",
+    job.name
+  );
   if running == 0 {
     let state = state.clone();
     rt::spawn(async move {
@@ -145,6 +150,7 @@ async fn exec_docker_event(
   match action {
     "destroy" => {
       state.event_emitter.spawn_emit_event(event);
+      let _ = ProcessDb::delete_by_pk(&id, &state.pool).await?;
       return Ok(());
     }
     "create" => {

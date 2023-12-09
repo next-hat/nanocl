@@ -67,7 +67,7 @@ async fn logs_process(
   let kind = utils::process::parse_kind(&kind)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let processes = ProcessDb::find_by_kind_key(&kind_key, &state.pool).await?;
-  log::debug!("process::logs_process: {processes:#?}");
+  log::debug!("process::logs_process: {kind_key}");
   let options: LogsOptions<String> = qs.into_inner().into();
   let futures = processes
     .into_iter()
