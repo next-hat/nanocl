@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use ntex::util::Bytes;
 use futures::StreamExt;
 use diesel::ExpressionMethods;
@@ -8,12 +6,10 @@ use futures_util::stream::FuturesUnordered;
 use nanocl_error::http::{HttpError, HttpResult};
 
 use bollard_next::container::{
-  Stats, ListContainersOptions, CreateContainerOptions, StartContainerOptions,
-  WaitContainerOptions, RemoveContainerOptions,
+  Stats, CreateContainerOptions, StartContainerOptions, WaitContainerOptions,
+  RemoveContainerOptions,
 };
-use bollard_next::service::{
-  HostConfig, ContainerSummary, RestartPolicy, RestartPolicyNameEnum,
-};
+use bollard_next::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};
 use nanocl_stubs::system::EventAction;
 use nanocl_stubs::generic::{GenericListNspQuery, GenericClause, GenericFilter};
 use nanocl_stubs::process::{Process, ProcessKind};
@@ -215,23 +211,21 @@ async fn create_instances(
 /// Restore the instances backup. The instances are restored in parallel.
 /// It's happenning if when a cargo fail to updates.
 async fn restore_instances_backup(
-  instances: &[ContainerSummary],
+  instances: &[Process],
   state: &DaemonState,
 ) -> HttpResult<()> {
   instances
     .iter()
-    .map(|container| async {
-      let id = container.id.clone().unwrap_or_default();
-      let container_state = container.state.clone().unwrap_or_default();
-      if container_state == "restarting" {
-        state.docker_api.stop_container(&id, None).await?;
+    .map(|process| async {
+      let container_state = process.data.state.clone().unwrap_or_default();
+      if container_state.restarting.unwrap_or_default() {
+        state.docker_api.stop_container(&process.key, None).await?;
       }
-      let names = container.names.clone().unwrap_or_default();
-      let name = format!("{}-backup", names[0]);
+      let name = format!("{}-backup", process.name);
       state
         .docker_api
         .rename_container(
-          &id,
+          &process.key,
           bollard_next::container::RenameContainerOptions { name },
         )
         .await
@@ -248,23 +242,21 @@ async fn restore_instances_backup(
 /// of the container to mark them as backup.
 /// In case of failure, the backup containers are restored.
 async fn rename_instances_original(
-  instances: &[ContainerSummary],
+  instances: &[Process],
   state: &DaemonState,
 ) -> HttpResult<()> {
   instances
     .iter()
-    .map(|container| async {
-      let id = container.id.clone().unwrap_or_default();
-      let container_state = container.state.clone().unwrap_or_default();
-      if container_state == "restarting" {
-        state.docker_api.stop_container(&id, None).await?;
+    .map(|process| async {
+      let container_state = process.data.state.clone().unwrap_or_default();
+      if container_state.restarting.unwrap_or_default() {
+        state.docker_api.stop_container(&process.key, None).await?;
       }
-      let names = container.names.clone().unwrap_or_default();
-      let name = names[0].replace("-backup", "");
+      let name = process.name.replace("-backup", "");
       state
         .docker_api
         .rename_container(
-          &id,
+          &process.key,
           bollard_next::container::RenameContainerOptions { name },
         )
         .await
@@ -303,23 +295,6 @@ async fn delete_instances(
     .collect::<Result<(), _>>()
 }
 
-/// List the cargo instances (containers) based on the cargo key
-pub(crate) async fn list_instances(
-  key: &str,
-  docker_api: &bollard_next::Docker,
-) -> HttpResult<Vec<ContainerSummary>> {
-  let label = format!("io.nanocl.c={key}");
-  let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
-  filters.insert("label", vec![&label]);
-  let options = Some(ListContainersOptions {
-    all: true,
-    filters,
-    ..Default::default()
-  });
-  let containers = docker_api.list_containers(options).await?;
-  Ok(containers)
-}
-
 /// Create a cargo based on the given partial spec
 /// And create his instances (containers).
 pub(crate) async fn create(
@@ -352,18 +327,16 @@ pub(crate) async fn create(
 }
 
 /// Restart cargo instances (containers) by key
-pub(crate) async fn restart(
-  key: &str,
-  docker_api: &bollard_next::Docker,
-) -> HttpResult<()> {
-  let containers = list_instances(key, docker_api).await?;
-  containers
+pub(crate) async fn restart(key: &str, state: &DaemonState) -> HttpResult<()> {
+  let cargo = utils::cargo::inspect_by_key(key, state).await?;
+  let processes =
+    ProcessDb::find_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
+  processes
     .into_iter()
-    .map(|container| async {
-      let id = container.id.unwrap_or_default();
-      let docker_api = docker_api.clone();
-      docker_api
-        .restart_container(&id, None)
+    .map(|process| async move {
+      state
+        .docker_api
+        .restart_container(&process.key, None)
         .await
         .map_err(HttpError::from)
     })
@@ -382,12 +355,13 @@ pub(crate) async fn delete_by_key(
   state: &DaemonState,
 ) -> HttpResult<()> {
   let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
-  let containers = list_instances(key, &state.docker_api).await?;
-  containers
+  let processes =
+    ProcessDb::find_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
+  processes
     .into_iter()
-    .map(|container| async {
+    .map(|process| async move {
       utils::process::remove(
-        &container.id.unwrap_or_default(),
+        &process.key,
         Some(RemoveContainerOptions {
           force: force.unwrap_or(false),
           ..Default::default()
@@ -436,15 +410,15 @@ pub(crate) async fn put(
   } else {
     1
   };
-  let containers = list_instances(cargo_key, &state.docker_api).await?;
-  restore_instances_backup(&containers, state).await?;
+  let processes = ProcessDb::find_by_kind_key(cargo_key, &state.pool).await?;
+  restore_instances_backup(&processes, state).await?;
   // Create instance with the new spec
   let new_instances = match create_instances(&cargo, number, state).await {
     // If the creation of the new instance failed, we rename the old containers
     Err(err) => {
       log::warn!("Unable to create cargo instance: {}", err);
       log::warn!("Rollback to previous instance");
-      rename_instances_original(&containers, state).await?;
+      rename_instances_original(&processes, state).await?;
       Vec::default()
     }
     Ok(instances) => instances,
@@ -466,15 +440,12 @@ pub(crate) async fn put(
         state,
       )
       .await?;
-      rename_instances_original(&containers, state).await?;
+      rename_instances_original(&processes, state).await?;
     }
     Ok(_) => {
       // Delete old containers
       delete_instances(
-        &containers
-          .iter()
-          .map(|c| c.id.clone().unwrap_or_default())
-          .collect::<Vec<_>>(),
+        &processes.iter().map(|c| c.key.clone()).collect::<Vec<_>>(),
         state,
       )
       .await?;

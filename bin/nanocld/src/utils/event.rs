@@ -44,7 +44,7 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
   };
   let instances = ProcessDb::find_by_kind_key(&job.name, &state.pool).await?;
   let (_, _, _, running) = utils::process::count_status(&instances);
-  if running == 0 && !instances.is_empty() {
+  if running == 0 {
     let state = state.clone();
     rt::spawn(async move {
       log::debug!("Job {} will be deleted in {ttl}s", job.name);

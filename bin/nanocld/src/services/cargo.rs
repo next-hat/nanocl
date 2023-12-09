@@ -9,7 +9,7 @@ use nanocl_stubs::cargo::{
 use nanocl_stubs::cargo_spec::{CargoSpecPartial, CargoSpecUpdate};
 
 use crate::utils;
-use crate::models::{DaemonState, CargoSpecDb, Repository, FromSpec};
+use crate::models::{DaemonState, CargoSpecDb, Repository, FromSpec, ProcessDb};
 
 /// List cargoes
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -43,7 +43,7 @@ pub(crate) async fn list_cargo(
     ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
   ),
   responses(
-    (status = 200, description = "List of cargo instances", body = [ContainerSummary]),
+    (status = 200, description = "List of cargo instances", body = [Process]),
   ),
 ))]
 #[web::get("/cargoes/{name}/instances")]
@@ -54,8 +54,8 @@ pub(crate) async fn list_cargo_instance(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let instances = utils::cargo::list_instances(&key, &state.docker_api).await?;
-  Ok(web::HttpResponse::Ok().json(&instances))
+  let processes = ProcessDb::find_by_kind_key(&key, &state.pool).await?;
+  Ok(web::HttpResponse::Ok().json(&processes))
 }
 
 /// Get detailed information about a cargo
@@ -158,8 +158,8 @@ pub(crate) async fn restart_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::inspect_by_key(&key, &state).await?;
-  utils::cargo::restart(&key, &state.docker_api).await?;
+
+  utils::cargo::restart(&key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 

@@ -470,7 +470,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ContainerSummary'
+                  $ref: '#/components/schemas/Process'
   /cargoes/{name}/kill:
     post:
       tags:

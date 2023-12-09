@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use ntex::{web, util::Bytes};
 use tokio::{fs, io::AsyncWriteExt};
 use futures_util::{
@@ -13,10 +11,8 @@ use nanocl_error::{
 };
 
 use bollard_next::{
-  service::{ContainerSummary, ContainerWaitExitError},
-  container::{
-    ListContainersOptions, RemoveContainerOptions, WaitContainerOptions,
-  },
+  service::ContainerWaitExitError,
+  container::{RemoveContainerOptions, WaitContainerOptions},
 };
 use nanocl_stubs::{
   generic::GenericFilter,
@@ -106,23 +102,6 @@ async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
   Ok(())
 }
 
-/// List the job instances (containers) based on the job name
-pub(crate) async fn list_instances(
-  name: &str,
-  docker_api: &bollard_next::Docker,
-) -> HttpResult<Vec<ContainerSummary>> {
-  let label = format!("io.nanocl.j={name}");
-  let mut filters: HashMap<&str, Vec<&str>> = HashMap::new();
-  filters.insert("label", vec![&label]);
-  let options = Some(ListContainersOptions {
-    all: true,
-    filters,
-    ..Default::default()
-  });
-  let containers = docker_api.list_containers(options).await?;
-  Ok(containers)
-}
-
 /// Create a job and with it's containers
 pub(crate) async fn create(
   item: &JobPartial,
@@ -196,12 +175,12 @@ pub(crate) async fn delete_by_name(
   state: &DaemonState,
 ) -> HttpResult<()> {
   let job = JobDb::find_by_pk(name, &state.pool).await??.try_to_spec()?;
-  let containers = list_instances(name, &state.docker_api).await?;
-  containers
+  let processes = ProcessDb::find_by_kind_key(name, &state.pool).await?;
+  processes
     .into_iter()
-    .map(|container| async {
+    .map(|process| async move {
       utils::process::remove(
-        &container.id.unwrap_or_default(),
+        &process.key,
         Some(RemoveContainerOptions {
           force: true,
           ..Default::default()
@@ -243,7 +222,6 @@ pub(crate) async fn inspect_by_name(
 }
 
 /// Wait a job to finish
-/// And create his instances (containers).
 pub(crate) async fn wait(
   name: &str,
   wait_options: WaitContainerOptions<WaitCondition>,
@@ -251,44 +229,34 @@ pub(crate) async fn wait(
 ) -> HttpResult<impl StreamExt<Item = Result<Bytes, HttpError>>> {
   let job = JobDb::find_by_pk(name, &state.pool).await??.try_to_spec()?;
   let docker_api = state.docker_api.clone();
-  let containers = list_instances(&job.name, &docker_api).await?;
+  let processes = ProcessDb::find_by_kind_key(&job.name, &state.pool).await?;
   let mut streams = Vec::new();
-  for container in containers {
-    let id = container.id.unwrap_or_default();
+  for process in processes {
     let options = Some(wait_options.clone());
-    let container_name = container
-      .names
-      .clone()
-      .unwrap_or_default()
-      .join("")
-      .replace('/', "");
-    let stream =
-      docker_api
-        .wait_container(&id, options)
-        .map(move |wait_result| match wait_result {
-          Err(err) => {
-            if let bollard_next::errors::Error::DockerContainerWaitError {
-              error,
-              code,
-            } = &err
-            {
-              return Ok(JobWaitResponse {
-                container_name: container_name.clone(),
-                status_code: *code,
-                error: Some(ContainerWaitExitError {
-                  message: Some(error.to_owned()),
-                }),
-              });
-            }
-            Err(err)
+    let stream = docker_api.wait_container(&process.key, options).map(
+      move |wait_result| match wait_result {
+        Err(err) => {
+          if let bollard_next::errors::Error::DockerContainerWaitError {
+            error,
+            code,
+          } = &err
+          {
+            return Ok(JobWaitResponse {
+              container_name: process.name.clone(),
+              status_code: *code,
+              error: Some(ContainerWaitExitError {
+                message: Some(error.to_owned()),
+              }),
+            });
           }
-          Ok(wait_response) => {
-            Ok(JobWaitResponse::from_container_wait_response(
-              wait_response,
-              container_name.clone(),
-            ))
-          }
-        });
+          Err(err)
+        }
+        Ok(wait_response) => Ok(JobWaitResponse::from_container_wait_response(
+          wait_response,
+          process.name.clone(),
+        )),
+      },
+    );
     streams.push(stream);
   }
   let stream = select_all(streams).into_stream();
