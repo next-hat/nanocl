@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use ntex::{web, http};
-use ntex::util::Bytes;
+use ntex::{web, util::Bytes};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
@@ -30,9 +29,10 @@ impl<'a> SwaggerConfig<'a> {
 async fn get_specs(
   openapi_conf: web::types::State<SwaggerConfig<'static>>,
 ) -> HttpResult<web::HttpResponse> {
-  let spec = openapi_conf.definition.to_json().map_err(|err| HttpError {
-    status: http::StatusCode::INTERNAL_SERVER_ERROR,
-    msg: format!("Error generating OpenAPI spec: {}", err),
+  let spec = openapi_conf.definition.to_json().map_err(|err| {
+    HttpError::internal_server_error(format!(
+      "Error generating OpenAPI spec: {err}",
+    ))
   })?;
   return Ok(
     web::HttpResponse::Ok()

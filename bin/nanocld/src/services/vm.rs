@@ -1,25 +1,27 @@
-use std::io;
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::time::Instant;
+use std::{io, rc::Rc, cell::RefCell, time::Instant};
 
-use ntex::{rt, ws, web, http, chain, fn_service, Service};
-use ntex::util::Bytes;
-use ntex::channel::{mpsc, oneshot};
-use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
-use futures::StreamExt;
-use futures::future::ready;
+use ntex::{
+  rt, ws, web, chain, fn_service, Service,
+  util::Bytes,
+  channel::{mpsc, oneshot},
+  service::{map_config, fn_shutdown, fn_factory_with_config},
+};
+use futures::{StreamExt, future::ready};
 use tokio::io::AsyncWriteExt;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
 use bollard_next::container::AttachContainerOptions;
-use nanocl_stubs::process::OutputLog;
-use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
+use nanocl_stubs::{
+  process::OutputLog,
+  generic::GenericNspQuery,
+  vm_spec::{VmSpecPartial, VmSpecUpdate},
+};
 
-use crate::utils;
-use crate::models::{DaemonState, WsConState, VmSpecDb};
+use crate::{
+  utils,
+  models::{DaemonState, WsConState, VmSpecDb},
+};
 
 /// List virtual machines
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -199,10 +201,7 @@ async fn ws_attach_service(
       }),
     )
     .await
-    .map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: err.to_string(),
-    })?;
+    .map_err(HttpError::internal_server_error)?;
   rt::spawn(async move {
     let mut output = stream.output;
     while let Some(output) = output.next().await {

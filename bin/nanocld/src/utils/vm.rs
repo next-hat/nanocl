@@ -1,22 +1,27 @@
 use std::collections::HashMap;
 
 use diesel::ExpressionMethods;
-use ntex::http;
 
-use bollard_next::service::{HostConfig, DeviceMapping};
-use bollard_next::container::RemoveContainerOptions;
+use bollard_next::{
+  service::{HostConfig, DeviceMapping},
+  container::RemoveContainerOptions,
+};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::system::EventAction;
-use nanocl_stubs::process::ProcessKind;
-use nanocl_stubs::vm_spec::{VmSpecPartial, VmSpecUpdate};
-use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
+use nanocl_stubs::{
+  system::EventAction,
+  process::ProcessKind,
+  vm_spec::{VmSpecPartial, VmSpecUpdate},
+  vm::{Vm, VmSummary, VmInspect},
+};
 
-use crate::utils;
-use crate::models::{
-  Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, Repository, VmDb,
-  VmSpecDb, FromSpec,
+use crate::{
+  utils,
+  models::{
+    Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, Repository, VmDb,
+    VmSpecDb, FromSpec,
+  },
 };
 
 /// Get detailed information about a VM by his key
@@ -208,33 +213,27 @@ pub(crate) async fn create(
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
+  let name = &vm.name;
   log::debug!(
-    "Creating VM {} in namespace {} with version: {version}",
-    vm.name,
-    namespace
+    "Creating VM {name} in namespace {namespace} with version: {version}",
   );
-  let vm_key = utils::key::gen_key(namespace, &vm.name);
+  let vm_key = utils::key::gen_key(namespace, name);
   let mut vm = vm.clone();
   if VmDb::find_by_pk(&vm_key, &state.pool).await?.is_ok() {
-    return Err(HttpError {
-      status: http::StatusCode::CONFLICT,
-      msg: format!(
-        "VM with name {} already exists in namespace {namespace}",
-        vm.name
-      ),
-    });
+    return Err(HttpError::conflict(format!(
+      "VM with name {name} already exists in namespace {namespace}",
+    )));
   }
   let image = VmImageDb::find_by_pk(&vm.disk.image, &state.pool).await??;
   if image.kind.as_str() != "Base" {
-    return Err(HttpError {
-      msg: format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image),
-      status: http::StatusCode::BAD_REQUEST,
-    });
+    return Err(HttpError::bad_request(format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image)));
   }
   let snapname = format!("{}.{vm_key}", &image.name);
   let size = vm.disk.size.unwrap_or(20);
+  log::debug!("Creating snapshot {snapname} with size {size}");
   let image =
     utils::vm_image::create_snap(&snapname, size, &image, state).await?;
+  log::debug!("Snapshot {snapname} created");
   // Use the snapshot image
   vm.disk.image = image.name.clone();
   vm.disk.size = Some(size);

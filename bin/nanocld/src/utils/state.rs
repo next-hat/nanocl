@@ -1,21 +1,22 @@
-use ntex::{rt, http};
-use ntex::util::Bytes;
-use ntex::channel::mpsc;
-use futures_util::StreamExt;
-use futures_util::stream::FuturesUnordered;
+use ntex::{rt, util::Bytes, channel::mpsc};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::process::ProcessKind;
-use nanocl_stubs::job::JobPartial;
-use nanocl_stubs::resource::ResourcePartial;
-use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
-use nanocl_stubs::cargo_spec::CargoSpecPartial;
-use nanocl_stubs::vm_spec::{VmSpecPartial, VmDisk};
-use nanocl_stubs::state::{Statefile, StateStream, StateApplyQuery};
+use nanocl_stubs::{
+  process::ProcessKind,
+  job::JobPartial,
+  resource::ResourcePartial,
+  secret::{SecretPartial, SecretUpdate},
+  cargo_spec::CargoSpecPartial,
+  vm_spec::{VmSpecPartial, VmDisk},
+  state::{Statefile, StateStream, StateApplyQuery},
+};
 
-use crate::utils;
-use crate::models::{DaemonState, ResourceDb, SecretDb, Repository, VmDb, CargoDb};
+use crate::{
+  utils,
+  models::{DaemonState, ResourceDb, SecretDb, Repository, VmDb, CargoDb},
+};
 
 /// Ensure that the namespace exists in the system
 async fn ensure_namespace_existence(
@@ -31,11 +32,11 @@ async fn ensure_namespace_existence(
 
 /// Local utility to convert a state stream to bytes to send to the client
 fn stream_to_bytes(state_stream: StateStream) -> HttpResult<Bytes> {
-  let bytes =
-    serde_json::to_string(&state_stream).map_err(|err| HttpError {
-      status: http::StatusCode::INTERNAL_SERVER_ERROR,
-      msg: format!("unable to serialize state_stream_to_bytes {err}"),
-    })?;
+  let bytes = serde_json::to_string(&state_stream).map_err(|err| {
+    HttpError::internal_server_error(format!(
+      "Unable to serialize state stream to bytes: {err}"
+    ))
+  })?;
   Ok(Bytes::from(bytes + "\r\n"))
 }
 
@@ -48,10 +49,7 @@ fn send(state_stream: StateStream, sx: &mpsc::Sender<HttpResult<Bytes>>) {
 pub(crate) fn parse_state(data: &serde_json::Value) -> HttpResult<Statefile> {
   let data =
     serde_json::from_value::<Statefile>(data.to_owned()).map_err(|err| {
-      HttpError {
-        status: http::StatusCode::BAD_REQUEST,
-        msg: format!("unable to serialize payload {err}"),
-      }
+      HttpError::bad_request(format!("Unable to serialize payload: {err}"))
     })?;
   Ok(data)
 }

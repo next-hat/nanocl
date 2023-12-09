@@ -1,12 +1,13 @@
 use diesel::ExpressionMethods;
-use ntex::http;
 use serde_json::Value;
 use jsonschema::{Draft, JSONSchema};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::system::EventAction;
-use nanocl_stubs::resource::{Resource, ResourcePartial};
+use nanocl_stubs::{
+  system::EventAction,
+  resource::{Resource, ResourcePartial},
+};
 
 use crate::models::{
   Pool, ResourceKindPartial, DaemonState, ResourceKindVersionDb, Repository,
@@ -40,10 +41,7 @@ async fn hook_create_resource(
         }),
       };
       if resource_kind.schema.is_none() && resource_kind.url.is_none() {
-        return Err(HttpError {
-          msg: "Neither schema nor url provided".to_owned(),
-          status: http::StatusCode::BAD_REQUEST,
-        });
+        return Err(HttpError::bad_request("Neither schema nor url provided"));
       }
       if ResourceKindDb::find_by_pk(&resource.name, pool)
         .await?
@@ -121,10 +119,10 @@ pub(crate) async fn create(
     .await
     .is_ok()
   {
-    return Err(HttpError {
-      status: http::StatusCode::CONFLICT,
-      msg: format!("Resource {} already exists", &resource.name),
-    });
+    return Err(HttpError::conflict(format!(
+      "Resource {}: already exists",
+      &resource.name
+    )));
   }
   let resource = hook_create_resource(resource, &state.pool).await?;
   let res = ResourceDb::create_from_spec(&resource, &state.pool).await?;
