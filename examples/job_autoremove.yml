@@ -1,0 +1,15 @@
+ApiVersion: v0.12
+
+Jobs:
+- Name: certbot-gen
+  Ttl: 5
+  Containers:
+  - Image: ubuntu:latest
+    Tty: true
+    HostConfig:
+      AutoRemove: true
+    Cmd:
+    - /bin/sh
+    - -c
+    - |
+      echo "Hello world!"

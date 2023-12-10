@@ -95,11 +95,11 @@ fn get_cargo_attributes(
   let attributes = attributes.clone().unwrap_or_default();
   let name = attributes
     .get("Name")
-    .map(|e| e.to_string())
+    .map(|e| e.as_str().unwrap_or_default().to_owned())
     .ok_or_else(|| IoError::invalid_data("Attribute Name", "Missing value"))?;
   let namespace_name = attributes
     .get("Namespace")
-    .map(|e| e.to_string())
+    .map(|e| e.as_str().unwrap_or_default().to_owned())
     .ok_or_else(|| {
       IoError::invalid_data("Attribute Namespace", "Missing value")
     })?;

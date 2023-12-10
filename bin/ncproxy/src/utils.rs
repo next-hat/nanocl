@@ -555,18 +555,18 @@ async fn resource_to_nginx_conf(
       }
     }
   }
-  log::info!("Generation conf for {name}");
+  log::info!("Generating conf for {name}");
   if !http_conf.is_empty() {
     nginx
       .write_conf_file(name, &http_conf, &NginxConfKind::Site)
       .await?;
-    log::info!("HTTP config generated:\n{http_conf}");
+    log::debug!("HTTP config generated:\n{http_conf}");
   }
   if !stream_conf.is_empty() {
     nginx
       .write_conf_file(name, &stream_conf, &NginxConfKind::Stream)
       .await?;
-    log::info!("Stream config generated:\n{stream_conf}");
+    log::debug!("Stream config generated:\n{stream_conf}");
   }
   Ok(())
 }
