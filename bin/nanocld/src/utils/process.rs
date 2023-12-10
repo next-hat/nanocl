@@ -145,10 +145,9 @@ pub(crate) async fn remove(
         status_code,
         message: _,
       } => {
-        if *status_code == 404 {
-          return Ok(());
+        if *status_code != 404 {
+          return Err(err.into());
         }
-        return Err(err.into());
       }
       _ => {
         return Err(err.into());
@@ -189,7 +188,7 @@ pub(crate) async fn stop_by_kind(
   state: &DaemonState,
 ) -> HttpResult<()> {
   let processes = ProcessDb::find_by_kind_key(kind_key, &state.pool).await?;
-  log::debug!("process::stop_by_kind: {processes:#?}");
+  log::debug!("process::stop_by_kind: {kind:#?} {kind_key}");
   for process in processes {
     let process_state = process.data.state.unwrap_or_default();
     if !process_state.running.unwrap_or_default() {
