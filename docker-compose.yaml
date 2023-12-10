@@ -41,7 +41,8 @@ services:
           cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=/certs --ca-key=/ca/ca.key
           cockroach cert create-client root --certs-dir=/certs --ca-key=/ca/ca.key
         fi
-        cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
+        cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=/certs
+# --insecure
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
