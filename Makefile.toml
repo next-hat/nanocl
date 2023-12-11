@@ -66,6 +66,22 @@ args = [
   "nanocl",
 ]
 
+# Test ncproxy
+[tasks.tests-ncproxy]
+command = "cargo"
+args = [
+  "nextest",
+  "run",
+  "--no-default-features",
+  "--features",
+  "test",
+  "${@}",
+  "-j",
+  "1",
+  "--bin",
+  "ncproxy",
+]
+
 # Test all
 [tasks.tests]
 command = "cargo"

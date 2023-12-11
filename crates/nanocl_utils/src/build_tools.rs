@@ -1,10 +1,7 @@
 use std::io::{Result, Error, ErrorKind};
 
-/// ## Set env git commit hash
-///
 /// Execute the git command to extract the hash of the current commit
 /// and set it as an environment variable for the produced binary
-///
 pub fn set_env_git_commit_hash() -> Result<()> {
   let output = std::process::Command::new("git")
     .args(["rev-parse", "HEAD"])
@@ -17,10 +14,7 @@ pub fn set_env_git_commit_hash() -> Result<()> {
   Ok(())
 }
 
-/// ## Set env target arch
-///
 /// Set the target arch as an environment variable for the produced binary
-///
 pub fn set_env_target_arch() -> Result<()> {
   let arch = std::env::var("CARGO_CFG_TARGET_ARCH")
     .map_err(|e| Error::new(ErrorKind::Other, e))?;
@@ -28,10 +22,7 @@ pub fn set_env_target_arch() -> Result<()> {
   Ok(())
 }
 
-/// ## Set channel
-///
 /// Set the release channel as an environment variable for the produced binary
-///
 pub fn set_channel() -> Result<()> {
   #[allow(unused)]
   let mut default_channel = "stable";
@@ -45,16 +36,7 @@ pub fn set_channel() -> Result<()> {
   Ok(())
 }
 
-/// ## Generate man page
-///
 /// Function to generate a man page
-///
-/// ## Arguments
-///
-/// * [name](str) Name of the man page
-/// * [app](clap::Command) Command to generate
-/// * [dir](str) Directory to generate page in
-///
 pub fn generate_man_page<'a>(
   name: &'a str,
   app: &'a clap::Command,

@@ -7,7 +7,7 @@ Resources:
   Data:
     Rules:
     - Domain: get-started.com
-      Network: Private
+      Network: Internal
       Locations:
       - Path: /
         Target:
