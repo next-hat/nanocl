@@ -192,7 +192,7 @@ Cargoes:
   - Name: ncvpnkit
     Container:
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/ncvpnkit:0.1.1-nightly
+      Image: ghcr.io/nxthat/ncvpnkit:0.2.0-nightly
       # {% else %}
       Image: ghcr.io/nxthat/ncvpnkit:0.1.1
       # {% endif %}
