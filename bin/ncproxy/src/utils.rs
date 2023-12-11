@@ -575,7 +575,6 @@ async fn resource_to_nginx_conf(
 /// This function will reload the nginx configuration
 pub(crate) async fn reload_config(client: &NanocldClient) -> IoResult<()> {
   log::info!("Reloading proxy configuration");
-
   let exec_options = CreateExecOptions {
     attach_stderr: Some(true),
     attach_stdout: Some(true),

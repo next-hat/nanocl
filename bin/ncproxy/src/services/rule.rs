@@ -31,7 +31,7 @@ pub async fn apply_rule(
   if let Err(err) = utils::reload_config(&client).await {
     nginx.delete_conf_file(&path.1).await;
     utils::reload_config(&client).await?;
-    return Err(HttpError::bad_request(err.to_string()));
+    return Err(HttpError::bad_request(err));
   }
   Ok(web::HttpResponse::Ok().json(&payload.into_inner()))
 }
@@ -66,12 +66,14 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
+  use futures::StreamExt;
+  use nanocld_client::NanocldClient;
   use ntex::http;
 
   use crate::utils::tests::*;
 
   #[ntex::test]
-  async fn rules() {
+  async fn redirect() {
     let client = gen_default_test_client().await;
     let resource: &str = include_str!("../../tests/resource_redirect.yml");
     let yaml: serde_yaml::Value = serde_yaml::from_str(resource).unwrap();
@@ -86,5 +88,39 @@ mod tests {
       .send_delete(&format!("/rules/{name}"), None::<String>)
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "delete a rule");
+  }
+
+  #[ntex::test]
+  async fn test_deploy() {
+    let client = gen_default_test_client().await;
+    let nanocld_client =
+      NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let state = include_str!("../../tests/test-deploy.yml");
+    let json: serde_json::Value = serde_yaml::from_str(state).unwrap();
+    let mut stream = nanocld_client.apply_state(&json, None).await.unwrap();
+    while let Some(chunk) = stream.next().await {
+      chunk.unwrap();
+    }
+    let rule = include_str!("../../tests/resource_http_internal.yml");
+    let state: serde_json::Value = serde_yaml::from_str(rule).unwrap();
+    let resource = state["Resources"][0].clone();
+    let name = resource["Name"].as_str().unwrap();
+    let payload = resource["Data"].clone();
+    let res = client
+      .send_put(&format!("/rules/{name}"), Some(&payload), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "put a rule");
+    let res = client
+      .send_delete(&format!("/rules/{name}"), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "delete a rule");
+    let mut stream = nanocld_client.remove_state(&json).await.unwrap();
+    while let Some(chunk) = stream.next().await {
+      chunk.unwrap();
+    }
+    let mut stream = nanocld_client.remove_state(&state).await.unwrap();
+    while let Some(chunk) = stream.next().await {
+      chunk.unwrap();
+    }
   }
 }

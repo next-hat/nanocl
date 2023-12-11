@@ -1,16 +1,20 @@
-use ntex::rt;
-use ntex::http;
-use futures::StreamExt;
-use futures::stream::FuturesUnordered;
+use ntex::{rt, http};
+use futures::{StreamExt, stream::FuturesUnordered};
 
-use nanocl_error::io::{IoResult, IoError};
-use nanocl_error::http_client::HttpClientError;
+use nanocl_error::{
+  io::{IoResult, IoError},
+  http_client::HttpClientError,
+};
 
 use nanocl_utils::versioning;
-use nanocld_client::NanocldClient;
-use nanocld_client::stubs::system::Event;
-use nanocld_client::stubs::resource::ResourcePartial;
-use nanocld_client::stubs::system::{EventKind, EventAction};
+use nanocld_client::{
+  NanocldClient,
+  stubs::{
+    system::Event,
+    resource::ResourcePartial,
+    system::{EventKind, EventAction},
+  },
+};
 
 use crate::{utils, version, nginx};
 
@@ -89,6 +93,7 @@ async fn update_resource_rule(
   Ok(())
 }
 
+/// Get cargo attributes from nanocld event
 fn get_cargo_attributes(
   attributes: &Option<serde_json::Value>,
 ) -> IoResult<(String, String)> {
@@ -106,6 +111,7 @@ fn get_cargo_attributes(
   Ok((name, namespace_name))
 }
 
+/// Analyze nanocld events and update nginx configuration
 async fn on_event(
   event: &Event,
   nginx: &nginx::Nginx,
@@ -126,6 +132,13 @@ async fn on_event(
     | (EventKind::Cargo, EventAction::Deleted) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       delete_cargo_rule(&name, &namespace, nginx, client).await?;
+      Ok::<_, IoError>(())
+    }
+    (EventKind::Resource, EventAction::Created)
+    | (EventKind::Resource, EventAction::Patched) => {
+      let key = actor.key.unwrap_or_default();
+      let resource = client.inspect_resource(&key).await?;
+      update_resource_rule(&resource.into(), nginx, client).await?;
       Ok::<_, IoError>(())
     }
     (EventKind::Secret, EventAction::Created)
@@ -229,6 +242,7 @@ pub(crate) fn spawn(nginx: &nginx::Nginx, client: &NanocldClient) {
   rt::Arbiter::new().exec_fn(move || {
     ntex::rt::spawn(async move {
       r#loop(&nginx, &client).await;
+      rt::Arbiter::current().stop();
     });
   });
 }
