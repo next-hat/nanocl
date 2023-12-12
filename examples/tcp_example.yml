@@ -10,8 +10,7 @@ Resources:
   Version: v0.9
   Data:
     Rules:
-    - Domain: tcp-example.com
-      Network: Internal
+    - Network: Internal
       Protocol: Tcp
       Port: 9000
       Target:
