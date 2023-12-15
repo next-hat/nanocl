@@ -3195,6 +3195,16 @@ components:
           additionalProperties:
             $ref: '#/components/schemas/GenericClause'
           nullable: true
+        limit:
+          type: integer
+          description: Limit number of items default (100)
+          nullable: true
+          minimum: 0
+        offset:
+          type: integer
+          description: Offset to navigate through items
+          nullable: true
+          minimum: 0
     GenericResources:
       type: object
       properties:
