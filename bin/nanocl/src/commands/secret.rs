@@ -12,7 +12,6 @@ impl GenericList for SecretArg {
   type Item = SecretRow;
   type Args = SecretArg;
   type ApiItem = nanocld_client::stubs::secret::Secret;
-  type ListQuery = ();
 
   fn object_name() -> &'static str {
     "secrets"

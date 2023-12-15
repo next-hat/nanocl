@@ -1,6 +1,9 @@
 use ntex::rt::JoinHandle;
 
-use nanocld_client::NanocldClient;
+use nanocld_client::{
+  NanocldClient,
+  stubs::generic::{GenericFilter, GenericListNspQuery},
+};
 use nanocl_error::io::{IoError, IoResult};
 
 use crate::{utils, models::GenericListOpts};
@@ -9,7 +12,6 @@ pub trait GenericList {
   type Item;
   type Args;
   type ApiItem;
-  type ListQuery;
 
   fn object_name() -> &'static str;
 
@@ -31,11 +33,11 @@ pub trait GenericList {
     }
   }
 
-  fn to_list_query(
+  fn get_list_query(
     _args: &Self::Args,
-    _opts: &GenericListOpts,
-  ) -> Option<Self::ListQuery> {
-    None
+    opts: &GenericListOpts,
+  ) -> GenericListNspQuery {
+    GenericListNspQuery::try_from(GenericFilter::from(opts.clone())).unwrap()
   }
 
   fn exec_ls(
@@ -44,7 +46,6 @@ pub trait GenericList {
     opts: &GenericListOpts,
   ) -> JoinHandle<IoResult<()>>
   where
-    Self::ListQuery: serde::Serialize,
     Self::Args: Clone + Send + 'static,
     Self::ApiItem: serde::de::DeserializeOwned + Send + 'static,
     Self::Item: tabled::Tabled + From<Self::ApiItem>,
@@ -56,7 +57,7 @@ pub trait GenericList {
       let res = client
         .send_get(
           &format!("/{}", Self::object_name()),
-          Self::to_list_query(&args, &opts),
+          Some(Self::get_list_query(&args, &opts)),
         )
         .await?;
       let items = NanocldClient::res_json::<Vec<Self::ApiItem>>(res).await?;

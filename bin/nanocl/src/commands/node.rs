@@ -11,7 +11,6 @@ impl GenericList for NodeArg {
   type Item = NodeRow;
   type Args = NodeArg;
   type ApiItem = nanocld_client::stubs::node::Node;
-  type ListQuery = ();
 
   fn object_name() -> &'static str {
     "nodes"

@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use std::os::fd::AsRawFd;
 use std::time::Duration;
 
+use nanocld_client::stubs::generic::{GenericListNspQuery, GenericFilter};
 use ntex::rt;
 use ntex::ws;
 use ntex::time;
@@ -27,10 +28,18 @@ impl GenericList for VmArg {
   type Item = VmRow;
   type Args = VmArg;
   type ApiItem = nanocld_client::stubs::vm::VmSummary;
-  type ListQuery = ();
 
   fn object_name() -> &'static str {
     "vms"
+  }
+
+  fn get_list_query(
+    args: &Self::Args,
+    opts: &crate::models::GenericListOpts,
+  ) -> GenericListNspQuery {
+    GenericListNspQuery::try_from(GenericFilter::from(opts.clone()))
+      .unwrap()
+      .with_namespace(args.namespace.as_deref())
   }
 
   fn get_key(item: &Self::Item) -> String {

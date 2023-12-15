@@ -13,7 +13,6 @@ impl GenericList for ResourceArg {
   type Item = ResourceRow;
   type Args = ResourceArg;
   type ApiItem = nanocld_client::stubs::resource::Resource;
-  type ListQuery = ();
 
   fn object_name() -> &'static str {
     "resources"

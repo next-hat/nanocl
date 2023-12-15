@@ -20,7 +20,6 @@ impl GenericList for VmImageArg {
   type Item = VmImageRow;
   type Args = VmImageArg;
   type ApiItem = nanocld_client::stubs::vm_image::VmImage;
-  type ListQuery = ();
 
   fn object_name() -> &'static str {
     "vms/images"

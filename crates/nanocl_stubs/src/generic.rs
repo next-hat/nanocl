@@ -132,9 +132,44 @@ pub struct GenericListNspQuery {
   pub namespace: Option<String>,
 }
 
+impl GenericListNspQuery {
+  pub fn new(namespace: Option<&str>) -> Self {
+    Self {
+      namespace: namespace.map(|s| s.to_owned()),
+      ..Default::default()
+    }
+  }
+
+  pub fn with_namespace(mut self, namespace: Option<&str>) -> Self {
+    self.namespace = namespace.map(|s| s.to_owned());
+    self
+  }
+}
+
+impl TryFrom<GenericFilter> for GenericListNspQuery {
+  type Error = serde_json::Error;
+
+  fn try_from(filter: GenericFilter) -> Result<Self, Self::Error> {
+    Ok(Self {
+      filter: Some(serde_json::to_string(&filter)?),
+      ..Default::default()
+    })
+  }
+}
+
 impl GenericFilter {
   pub fn new() -> Self {
     Self::default()
+  }
+
+  pub fn limit(mut self, limit: usize) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+
+  pub fn offset(mut self, offset: usize) -> Self {
+    self.offset = Some(offset);
+    self
   }
 
   pub fn r#where(mut self, key: &str, clause: GenericClause) -> Self {

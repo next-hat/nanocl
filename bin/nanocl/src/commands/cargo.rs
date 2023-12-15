@@ -1,7 +1,7 @@
 use std::process;
 use std::collections::HashMap;
 
-use nanocld_client::stubs::generic::GenericNspQuery;
+use nanocld_client::stubs::generic::{GenericFilter, GenericListNspQuery};
 use ntex::rt;
 use futures::channel::mpsc;
 use futures::{StreamExt, SinkExt};
@@ -31,17 +31,18 @@ impl GenericList for CargoArg {
   type Item = CargoRow;
   type Args = CargoArg;
   type ApiItem = CargoSummary;
-  type ListQuery = GenericNspQuery;
 
   fn object_name() -> &'static str {
     "cargoes"
   }
 
-  fn to_list_query(
+  fn get_list_query(
     args: &Self::Args,
-    _opts: &GenericListOpts,
-  ) -> Option<Self::ListQuery> {
-    Some(GenericNspQuery::new(args.namespace.as_deref()))
+    opts: &GenericListOpts,
+  ) -> GenericListNspQuery {
+    GenericListNspQuery::try_from(GenericFilter::from(opts.clone()))
+      .unwrap()
+      .with_namespace(args.namespace.as_deref())
   }
 
   fn get_key(item: &Self::Item) -> String {

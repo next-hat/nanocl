@@ -15,7 +15,6 @@ impl GenericList for NamespaceArg {
   type Item = NamespaceRow;
   type Args = NamespaceArg;
   type ApiItem = NamespaceSummary;
-  type ListQuery = ();
 
   fn object_name() -> &'static str {
     "namespaces"

@@ -17,7 +17,6 @@ impl GenericList for JobArg {
   type Item = JobRow;
   type Args = JobArg;
   type ApiItem = nanocld_client::stubs::job::JobSummary;
-  type ListQuery = ();
 
   fn object_name() -> &'static str {
     "jobs"
