@@ -74,6 +74,10 @@ pub struct GenericFilter {
   /// Where clause
   #[cfg_attr(feature = "serde", serde(rename = "where"))]
   pub r#where: Option<HashMap<String, GenericClause>>,
+  /// Limit number of items default (100)
+  pub limit: Option<usize>,
+  /// Offset to navigate through items
+  pub offset: Option<usize>,
 }
 
 /// Generic query string parameters for list operations

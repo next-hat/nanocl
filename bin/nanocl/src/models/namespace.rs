@@ -3,8 +3,10 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::namespace::NamespaceSummary;
 
+use super::GenericListOpts;
+
 /// `nanocl namespace` available commands
-#[derive(Subcommand)]
+#[derive(Clone, Subcommand)]
 pub enum NamespaceCommand {
   /// Create new namespace
   Create(NamespaceOpts),
@@ -15,19 +17,11 @@ pub enum NamespaceCommand {
   Remove(NamespaceDeleteOpts),
   /// List existing namespaces
   #[clap(alias("ls"))]
-  List(NamespaceListOpts),
-}
-
-/// `nanocl namespace list` available options
-#[derive(Parser)]
-pub struct NamespaceListOpts {
-  /// Show only namespace names
-  #[clap(long, short)]
-  pub quiet: bool,
+  List(GenericListOpts),
 }
 
 /// `nanocl namespace delete` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct NamespaceDeleteOpts {
   /// skip confirmation
   #[clap(short = 'y')]
@@ -37,7 +31,7 @@ pub struct NamespaceDeleteOpts {
 }
 
 /// `nanocl namespace` available arguments
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 #[clap(name = "nanocl namespace")]
 pub struct NamespaceArg {
   #[clap(subcommand)]
@@ -45,14 +39,14 @@ pub struct NamespaceArg {
 }
 
 /// `nanocl namespace create` and `nanocl namespace inspect` generic name option
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct NamespaceOpts {
   /// name of the namespace to create
   pub name: String,
 }
 
 /// A row of the namespace table
-#[derive(Tabled)]
+#[derive(Clone, Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct NamespaceRow {
   /// Name of the namespace

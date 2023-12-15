@@ -4,8 +4,10 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::vm_image::{VmImage, VmImageResizePayload};
 
+use super::GenericListOpts;
+
 /// `nanocl vm image` available commands
-#[derive(Subcommand)]
+#[derive(Clone, Subcommand)]
 pub enum VmImageCommand {
   /// Create a base VM image
   Create(VmImageCreateOpts),
@@ -20,7 +22,7 @@ pub enum VmImageCommand {
   Resize(VmImageResizeOpts),
   /// List VM images
   #[clap(alias("ls"))]
-  List(VmImageListOpts),
+  List(GenericListOpts),
   /// Remove a VM image
   #[clap(alias("rm"))]
   Remove {
@@ -30,20 +32,12 @@ pub enum VmImageCommand {
 }
 
 /// `nanocl vm image create` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct VmImageCreateOpts {
   /// Name of the VM image
   pub name: String,
   /// Path or url to the VM image
   pub file_path: String,
-}
-
-/// `nanocl vm image list` available options
-#[derive(Clone, Parser)]
-pub struct VmImageListOpts {
-  /// Show only images name
-  #[clap(long, short)]
-  pub quiet: bool,
 }
 
 /// `nanocl vm image resize` available options
@@ -69,7 +63,7 @@ impl From<VmImageResizeOpts> for VmImageResizePayload {
 }
 
 /// `nanocl vm image` available arguments
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct VmImageArg {
   /// Command to run
   #[clap(subcommand)]

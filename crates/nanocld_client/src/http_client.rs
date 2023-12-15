@@ -145,7 +145,7 @@ impl NanocldClient {
       .header("User-Agent", "nanocld_client")
   }
 
-  pub(crate) async fn send_get<Q>(
+  pub async fn send_get<Q>(
     &self,
     url: &str,
     query: Option<Q>,
@@ -167,7 +167,7 @@ impl NanocldClient {
     Ok(res)
   }
 
-  pub(crate) async fn send_post<Q, B>(
+  pub async fn send_post<Q, B>(
     &self,
     url: &str,
     body: Option<B>,
@@ -195,7 +195,7 @@ impl NanocldClient {
     Ok(res)
   }
 
-  pub(crate) async fn send_post_stream<S, Q, E>(
+  pub async fn send_post_stream<S, Q, E>(
     &self,
     url: &str,
     stream: S,
@@ -221,7 +221,7 @@ impl NanocldClient {
     Ok(res)
   }
 
-  pub(crate) async fn send_delete<Q>(
+  pub async fn send_delete<Q>(
     &self,
     url: &str,
     query: Option<Q>,
@@ -241,7 +241,7 @@ impl NanocldClient {
     Ok(res)
   }
 
-  pub(crate) async fn send_patch<B, Q>(
+  pub async fn send_patch<B, Q>(
     &self,
     url: &str,
     body: Option<B>,
@@ -269,7 +269,7 @@ impl NanocldClient {
     Ok(res)
   }
 
-  pub(crate) async fn send_head<Q>(
+  pub async fn send_head<Q>(
     &self,
     url: &str,
     query: Option<Q>,
@@ -289,7 +289,7 @@ impl NanocldClient {
     Ok(res)
   }
 
-  pub(crate) async fn send_put<B, Q>(
+  pub async fn send_put<B, Q>(
     &self,
     url: &str,
     body: Option<B>,
@@ -317,7 +317,7 @@ impl NanocldClient {
     Ok(res)
   }
 
-  pub(crate) async fn res_json<R>(
+  pub async fn res_json<R>(
     mut res: http::client::ClientResponse,
   ) -> Result<R, HttpClientError>
   where
@@ -331,7 +331,7 @@ impl NanocldClient {
     Ok(body)
   }
 
-  pub(crate) async fn res_stream<R>(
+  pub async fn res_stream<R>(
     res: http::client::ClientResponse,
   ) -> Receiver<Result<R, HttpError>>
   where

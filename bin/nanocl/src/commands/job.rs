@@ -7,26 +7,25 @@ use nanocld_client::stubs::process::ProcessLogQuery;
 use crate::utils;
 use crate::config::CliConfig;
 use crate::models::{
-  JobArg, JobCommand, JobListOpts, JobRow, JobRemoveOpts, JobInspectOpts,
-  JobLogsOpts, JobWaitOpts, JobStartOpts,
+  JobArg, JobCommand, JobRow, JobRemoveOpts, JobInspectOpts, JobLogsOpts,
+  JobWaitOpts, JobStartOpts,
 };
 
-/// Execute the `nanocl job ls` command to list jobs
-async fn exec_job_ls(cli_conf: &CliConfig, opts: &JobListOpts) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let items = client.list_job().await?;
-  let rows = items.into_iter().map(JobRow::from).collect::<Vec<JobRow>>();
-  match opts.quiet {
-    true => {
-      for row in rows {
-        println!("{}", row.name);
-      }
-    }
-    false => {
-      utils::print::print_table(rows);
-    }
+use super::GenericList;
+
+impl GenericList for JobArg {
+  type Item = JobRow;
+  type Args = JobArg;
+  type ApiItem = nanocld_client::stubs::job::JobSummary;
+  type ListQuery = ();
+
+  fn object_name() -> &'static str {
+    "jobs"
   }
-  Ok(())
+
+  fn get_key(item: &Self::Item) -> String {
+    item.name.clone()
+  }
 }
 
 /// Execute the `nanocl job rm` command to remove a job
@@ -128,7 +127,10 @@ async fn exec_job_start(
 /// Function that execute when running `nanocl job`
 pub async fn exec_job(cli_conf: &CliConfig, args: &JobArg) -> IoResult<()> {
   match &args.command {
-    JobCommand::List(opts) => exec_job_ls(cli_conf, opts).await,
+    JobCommand::List(opts) => {
+      JobArg::exec_ls(&cli_conf.client, args, opts).await??;
+      Ok(())
+    }
     JobCommand::Remove(opts) => exec_job_rm(cli_conf, opts).await,
     JobCommand::Inspect(opts) => exec_job_inspect(cli_conf, opts).await,
     JobCommand::Logs(opts) => exec_job_logs(cli_conf, opts).await,

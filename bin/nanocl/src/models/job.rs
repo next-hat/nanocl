@@ -4,10 +4,10 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::job::{WaitCondition, JobSummary};
 
-use super::DisplayFormat;
+use super::{DisplayFormat, GenericListOpts};
 
 /// `nanocl job wait` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct JobWaitOpts {
   /// State to wait
   #[clap(short = 'c')]
@@ -16,16 +16,8 @@ pub struct JobWaitOpts {
   pub name: String,
 }
 
-/// `nanocl job ls` available options
-#[derive(Parser)]
-pub struct JobListOpts {
-  /// Only show job names
-  #[clap(long, short)]
-  pub quiet: bool,
-}
-
 /// `nanocl job rm` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct JobRemoveOpts {
   /// Name of job to remove
   pub names: Vec<String>,
@@ -35,7 +27,7 @@ pub struct JobRemoveOpts {
 }
 
 /// `nanocl job inspect` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct JobInspectOpts {
   /// Display format
   #[clap(long)]
@@ -45,7 +37,7 @@ pub struct JobInspectOpts {
 }
 
 /// `nanocl job logs` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct JobLogsOpts {
   /// Name of job to show logs
   pub name: String,
@@ -67,11 +59,11 @@ pub struct JobLogsOpts {
 }
 
 /// `nanocl job` available commands
-#[derive(Subcommand)]
+#[derive(Clone, Subcommand)]
 pub enum JobCommand {
   /// List existing job
   #[clap(alias("ls"))]
-  List(JobListOpts),
+  List(GenericListOpts),
   /// Remove job by its name
   #[clap(alias("rm"))]
   Remove(JobRemoveOpts),
@@ -86,14 +78,14 @@ pub enum JobCommand {
 }
 
 /// `nanocl job start` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct JobStartOpts {
   /// Name of job to start
   pub name: String,
 }
 
 /// `nanocl job` available subcommands
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct JobArg {
   #[clap(subcommand)]
   pub command: JobCommand,

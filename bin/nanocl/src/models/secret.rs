@@ -4,23 +4,23 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::secret::Secret;
 
-use super::DisplayFormat;
+use super::{DisplayFormat, GenericListOpts};
 
 /// `nanocl resource` available commands
-#[derive(Subcommand)]
+#[derive(Clone, Subcommand)]
 pub enum SecretCommand {
   /// Remove existing secret
   #[clap(alias("rm"))]
   Remove(SecretRemoveOpts),
   /// List existing secret
   #[clap(alias("ls"))]
-  List,
+  List(GenericListOpts),
   /// Inspect a secret
   Inspect(SecretInspectOpts),
 }
 
 /// `nanocl secret` available arguments
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct SecretArg {
   /// Secret command
   #[clap(subcommand)]
@@ -28,7 +28,7 @@ pub struct SecretArg {
 }
 
 /// `nanocl secret list` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct SecretRemoveOpts {
   /// Skip confirmation
   #[clap(short = 'y')]
@@ -38,7 +38,7 @@ pub struct SecretRemoveOpts {
 }
 
 /// `nanocl secret inspect` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct SecretInspectOpts {
   /// Name of secret to inspect
   pub key: String,

@@ -1,8 +1,8 @@
 use clap::Parser;
 use dotenvy::dotenv;
 
-use nanocl_error::io::{IoError, IoResult};
 use nanocld_client::NanocldClient;
+use nanocl_error::io::{IoError, IoResult};
 
 mod utils;
 mod config;
