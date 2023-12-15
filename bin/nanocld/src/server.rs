@@ -3,8 +3,7 @@ use ntex_cors::Cors;
 
 use nanocl_utils::ntex::middlewares;
 
-use crate::services;
-use crate::models::DaemonState;
+use crate::{version, services, models::DaemonState};
 
 /// This function will generate the HTTP server with the given configuration.
 /// It will also bind the server to the given address.
@@ -24,6 +23,7 @@ pub async fn gen(
         web::types::PayloadConfig::new(20_000_000_000), // <- limit size of the payload
       )
       .wrap(Cors::new().finish())
+      .wrap(middlewares::Versioning::new(version::VERSION).finish())
       .wrap(middlewares::SerializeError)
       // Default logger middleware
       .wrap(web::middleware::Logger::default())
