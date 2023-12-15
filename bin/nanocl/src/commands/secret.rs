@@ -6,16 +6,20 @@ use crate::models::{
   SecretArg, SecretCommand, SecretRow, SecretRemoveOpts, SecretInspectOpts,
 };
 
-/// Function that execute when running `nanocl secret ls`
-async fn exec_secret_ls(cli_conf: &CliConfig) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let secrets = client.list_secret(None).await?;
-  let rows = secrets
-    .iter()
-    .map(|s| SecretRow::from(s.clone()))
-    .collect::<Vec<SecretRow>>();
-  utils::print::print_table(rows);
-  Ok(())
+use super::GenericList;
+
+impl GenericList for SecretArg {
+  type Item = SecretRow;
+  type Args = SecretArg;
+  type ApiItem = nanocld_client::stubs::secret::Secret;
+
+  fn object_name() -> &'static str {
+    "secrets"
+  }
+
+  fn get_key(item: &Self::Item) -> String {
+    item.key.clone()
+  }
 }
 
 /// Function that execute when running `nanocl secret rm`
@@ -54,7 +58,10 @@ pub async fn exec_secret(
   args: &SecretArg,
 ) -> IoResult<()> {
   match &args.command {
-    SecretCommand::List => exec_secret_ls(cli_conf).await,
+    SecretCommand::List(opts) => {
+      SecretArg::exec_ls(&cli_conf.client, args, opts).await??;
+      Ok(())
+    }
     SecretCommand::Remove(opts) => exec_secret_rm(cli_conf, opts).await,
     SecretCommand::Inspect(opts) => exec_secret_inspect(cli_conf, opts).await,
   }

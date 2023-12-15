@@ -5,32 +5,22 @@ use crate::config::CliConfig;
 use crate::models::{
   ResourceArg, ResourceCommand, ResourceRow, ResourceRemoveOpts,
   ResourceInspectOpts, ResourceRevertOpts, ResourceHistoryOpts,
-  ResourceListOpts,
 };
 
-/// Function that execute when running `nanocl resource ls`
-/// Will list available resources
-async fn exec_resource_ls(
-  cli_conf: &CliConfig,
-  opts: &ResourceListOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let resources = client.list_resource(None).await?;
-  let row = resources
-    .into_iter()
-    .map(ResourceRow::from)
-    .collect::<Vec<ResourceRow>>();
-  match opts.quiet {
-    true => {
-      for row in row {
-        println!("{}", row.name);
-      }
-    }
-    false => {
-      utils::print::print_table(row);
-    }
+use super::GenericList;
+
+impl GenericList for ResourceArg {
+  type Item = ResourceRow;
+  type Args = ResourceArg;
+  type ApiItem = nanocld_client::stubs::resource::Resource;
+
+  fn object_name() -> &'static str {
+    "resources"
   }
-  Ok(())
+
+  fn get_key(item: &Self::Item) -> String {
+    item.name.clone()
+  }
 }
 
 /// Function that execute when running `nanocl resource rm`
@@ -95,7 +85,10 @@ pub async fn exec_resource(
   args: &ResourceArg,
 ) -> IoResult<()> {
   match &args.command {
-    ResourceCommand::List(opts) => exec_resource_ls(cli_conf, opts).await,
+    ResourceCommand::List(opts) => {
+      ResourceArg::exec_ls(&cli_conf.client, args, opts).await??;
+      Ok(())
+    }
     ResourceCommand::Remove(opts) => exec_resource_rm(cli_conf, opts).await,
     ResourceCommand::Inspect(opts) => {
       exec_resource_inspect(cli_conf, opts).await

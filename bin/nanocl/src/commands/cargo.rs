@@ -1,6 +1,7 @@
 use std::process;
 use std::collections::HashMap;
 
+use nanocld_client::stubs::generic::{GenericFilter, GenericListNspQuery};
 use ntex::rt;
 use futures::channel::mpsc;
 use futures::{StreamExt, SinkExt};
@@ -9,7 +10,9 @@ use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
 use nanocl_error::io::{FromIo, IoResult};
 use nanocld_client::stubs::process::{OutputKind, ProcessLogQuery};
-use nanocld_client::stubs::cargo::{CargoDeleteQuery, CargoStatsQuery};
+use nanocld_client::stubs::cargo::{
+  CargoDeleteQuery, CargoStatsQuery, CargoSummary,
+};
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -17,10 +20,35 @@ use crate::models::{
   CargoArg, CargoCreateOpts, CargoCommand, CargoRemoveOpts, CargoRow,
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
   CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
-  CargoRunOpts, CargoRestartOpts, CargoListOpts, CargoStatsOpts, CargoStatsRow,
+  CargoRunOpts, CargoRestartOpts, CargoStatsOpts, CargoStatsRow,
+  GenericListOpts,
 };
 
+use super::GenericList;
 use super::cargo_image::{exec_cargo_image, exec_cargo_image_pull};
+
+impl GenericList for CargoArg {
+  type Item = CargoRow;
+  type Args = CargoArg;
+  type ApiItem = CargoSummary;
+
+  fn object_name() -> &'static str {
+    "cargoes"
+  }
+
+  fn get_list_query(
+    args: &Self::Args,
+    opts: &GenericListOpts,
+  ) -> GenericListNspQuery {
+    GenericListNspQuery::try_from(GenericFilter::from(opts.clone()))
+      .unwrap()
+      .with_namespace(args.namespace.as_deref())
+  }
+
+  fn get_key(item: &Self::Item) -> String {
+    item.name.clone()
+  }
+}
 
 /// Execute the `nanocl cargo create` command to create a new cargo
 async fn exec_cargo_create(
@@ -55,31 +83,6 @@ async fn exec_cargo_rm(
   for name in &opts.names {
     if let Err(err) = client.delete_cargo(name, Some(&query)).await {
       eprintln!("{name}: {err}");
-    }
-  }
-  Ok(())
-}
-
-/// Execute the `nanocl cargo ls` command to list cargos
-async fn exec_cargo_ls(
-  cli_conf: &CliConfig,
-  args: &CargoArg,
-  opts: &CargoListOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let items = client.list_cargo(args.namespace.as_deref()).await?;
-  let rows = items
-    .into_iter()
-    .map(CargoRow::from)
-    .collect::<Vec<CargoRow>>();
-  match opts.quiet {
-    true => {
-      for row in rows {
-        println!("{}", row.name);
-      }
-    }
-    false => {
-      utils::print::print_table(rows);
     }
   }
   Ok(())
@@ -343,7 +346,12 @@ async fn exec_cargo_run(
 pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
   let client = &cli_conf.client;
   match &args.command {
-    CargoCommand::List(opts) => exec_cargo_ls(cli_conf, args, opts).await,
+    CargoCommand::List(opts) => {
+      CargoArg::exec_ls(&cli_conf.client, args, opts)
+        .await
+        .map_err(|err| err.map_err_context(|| "List cargos"))??;
+      Ok(())
+    }
     CargoCommand::Create(opts) => exec_cargo_create(cli_conf, args, opts).await,
     CargoCommand::Remove(opts) => exec_cargo_rm(cli_conf, args, opts).await,
     CargoCommand::Image(opts) => exec_cargo_image(client, opts).await,

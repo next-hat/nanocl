@@ -1,34 +1,28 @@
-use nanocl_error::io::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
+use nanocl_error::io::{IoResult, FromIo};
 
+use nanocld_client::stubs::namespace::NamespaceSummary;
 use crate::config::CliConfig;
 use crate::utils;
 use crate::models::{
   NamespaceArg, NamespaceCommand, NamespaceOpts, NamespaceRow,
-  NamespaceDeleteOpts, NamespaceListOpts,
+  NamespaceDeleteOpts,
 };
 
-/// Function that execute when running `nanocl namespace ls`
-async fn exec_namespace_ls(
-  client: &NanocldClient,
-  options: &NamespaceListOpts,
-) -> IoResult<()> {
-  let items = client.list_namespace().await?;
-  let namespaces = items
-    .into_iter()
-    .map(NamespaceRow::from)
-    .collect::<Vec<NamespaceRow>>();
-  match options.quiet {
-    true => {
-      for namespace in namespaces {
-        println!("{}", namespace.name);
-      }
-    }
-    false => {
-      utils::print::print_table(namespaces);
-    }
+use super::GenericList;
+
+impl GenericList for NamespaceArg {
+  type Item = NamespaceRow;
+  type Args = NamespaceArg;
+  type ApiItem = NamespaceSummary;
+
+  fn object_name() -> &'static str {
+    "namespaces"
   }
-  Ok(())
+
+  fn get_key(item: &Self::Item) -> String {
+    item.name.clone()
+  }
 }
 
 /// Function that execute when running `nanocl namespace create`
@@ -76,7 +70,10 @@ pub async fn exec_namespace(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   match &args.command {
-    NamespaceCommand::List(options) => exec_namespace_ls(client, options).await,
+    NamespaceCommand::List(opts) => {
+      NamespaceArg::exec_ls(client, args, opts).await??;
+      Ok(())
+    }
     NamespaceCommand::Create(options) => {
       exec_namespace_create(client, options).await
     }

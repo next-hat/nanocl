@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use bollard_next::models::ImageSummary;
 
 /// `nanocl cargo image remove` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoImageRemoveOpts {
   /// Skip confirmation
   #[clap(short = 'y')]
@@ -15,21 +15,21 @@ pub struct CargoImageRemoveOpts {
 }
 
 /// `nanocl cargo image pull` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoImagePullOpts {
   /// Name of the image to pull
   pub(crate) name: String,
 }
 
 /// `nanocl cargo image inspect` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoImageInspectOpts {
   /// Name of the image to inspect
   pub(crate) name: String,
 }
 
 /// `nanocl cargo image` available commands
-#[derive(Subcommand)]
+#[derive(Clone, Subcommand)]
 pub enum CargoImageCommand {
   /// List cargo images
   #[clap(alias("ls"))]
@@ -77,7 +77,7 @@ impl From<CargoImageListOpts> for ListCargoImagesOptions {
 }
 
 /// `nanocl cargo image import` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoImageImportOpts {
   /// path to tar archive
   #[clap(short = 'f')]
@@ -85,7 +85,7 @@ pub struct CargoImageImportOpts {
 }
 
 /// `nanocl cargo image` available arguments
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 #[clap(name = "nanocl cargo image")]
 pub struct CargoImageArg {
   #[clap(subcommand)]

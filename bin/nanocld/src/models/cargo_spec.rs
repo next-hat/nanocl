@@ -143,6 +143,11 @@ impl Repository for CargoSpecDb {
     if let Some(value) = r#where.get("data") {
       gen_where4json!(query, cargo_specs::dsl::data, value);
     }
+    let limit = filter.limit.unwrap_or(100);
+    query = query.limit(limit as i64);
+    if let Some(offset) = filter.offset {
+      query = query.offset(offset as i64);
+    }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;

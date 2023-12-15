@@ -9,11 +9,11 @@ use nanocld_client::stubs::cargo_spec::{
   CargoSpecUpdate, Config, CargoSpecPartial, HostConfig,
 };
 
-use super::DisplayFormat;
+use super::{DisplayFormat, GenericListOpts};
 use super::cargo_image::CargoImageArg;
 
 /// `nanocl cargo remove` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoRemoveOpts {
   /// Skip confirmation
   #[clap(short = 'y')]
@@ -104,28 +104,28 @@ impl From<CargoRunOpts> for CargoSpecPartial {
 }
 
 /// `nanocl cargo start` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoStartOpts {
   // Name of cargo to start
   pub name: String,
 }
 
 /// `nanocl cargo stop` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoStopOpts {
   // List of cargo to stop
   pub names: Vec<String>,
 }
 
 /// `nanocl cargo restart` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoRestartOpts {
   // List of cargo to stop
   pub names: Vec<String>,
 }
 
 /// `nanocl cargo inspect` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoInspectOpts {
   /// Display format
   #[clap(long)]
@@ -215,14 +215,14 @@ impl From<CargoExecOpts> for CreateExecOptions {
 }
 
 /// `nanocl cargo history` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoHistoryOpts {
   /// Name of cargo to browse history
   pub name: String,
 }
 
 /// `nanocl cargo revert` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoRevertOpts {
   /// Name of cargo to revert
   pub name: String,
@@ -231,7 +231,7 @@ pub struct CargoRevertOpts {
 }
 
 /// `nanocl cargo logs` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoLogsOpts {
   /// Name of cargo to show logs
   pub name: String,
@@ -253,7 +253,7 @@ pub struct CargoLogsOpts {
 }
 
 /// `nanocl cargo stats` available options
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 pub struct CargoStatsOpts {
   /// Names of cargo to show stats
   pub names: Vec<String>,
@@ -264,20 +264,12 @@ pub struct CargoStatsOpts {
   // pub all: bool,
 }
 
-/// `nanocl cargo list` available options
-#[derive(Parser)]
-pub struct CargoListOpts {
-  /// Only show cargo names
-  #[clap(long, short)]
-  pub quiet: bool,
-}
-
 /// `nanocl cargo` available commands
-#[derive(Subcommand)]
+#[derive(Clone, Subcommand)]
 pub enum CargoCommand {
   /// List existing cargo
   #[clap(alias("ls"))]
-  List(CargoListOpts),
+  List(GenericListOpts),
   /// Create a new cargo
   Create(CargoCreateOpts),
   /// Start a cargo by its name
@@ -310,7 +302,7 @@ pub enum CargoCommand {
 }
 
 /// `nanocl cargo` available arguments
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 #[clap(name = "nanocl cargo")]
 pub struct CargoArg {
   /// namespace to target by default global is used

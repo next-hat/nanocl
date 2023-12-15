@@ -122,6 +122,11 @@ impl Repository for ResourceKindVersionDb {
     if let Some(value) = r#where.get("version") {
       gen_where4string!(query, resource_kind_versions::dsl::version, value);
     }
+    let limit = filter.limit.unwrap_or(100);
+    query = query.limit(limit as i64);
+    if let Some(offset) = filter.offset {
+      query = query.offset(offset as i64);
+    }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -189,6 +194,11 @@ impl Repository for ResourceKindDb {
     let mut query = resource_kinds::dsl::resource_kinds.into_boxed();
     if let Some(value) = r#where.get("name") {
       gen_where4string!(query, resource_kinds::dsl::name, value);
+    }
+    let limit = filter.limit.unwrap_or(100);
+    query = query.limit(limit as i64);
+    if let Some(offset) = filter.offset {
+      query = query.offset(offset as i64);
     }
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {

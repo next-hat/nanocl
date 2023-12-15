@@ -16,6 +16,9 @@ mod node;
 mod context;
 mod secret;
 mod job;
+mod generic;
+
+pub use generic::*;
 
 pub use job::exec_job;
 pub use context::exec_context;

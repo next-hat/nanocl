@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use std::os::fd::AsRawFd;
 use std::time::Duration;
 
+use nanocld_client::stubs::generic::{GenericListNspQuery, GenericFilter};
 use ntex::rt;
 use ntex::ws;
 use ntex::time;
@@ -17,11 +18,34 @@ use nanocld_client::stubs::process::{OutputLog, OutputKind};
 use crate::utils;
 use crate::config::CliConfig;
 use crate::models::{
-  VmArg, VmCommand, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts, VmListOpts,
-  VmInspectOpts,
+  VmArg, VmCommand, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts, VmInspectOpts,
 };
 
+use super::GenericList;
 use super::vm_image::exec_vm_image;
+
+impl GenericList for VmArg {
+  type Item = VmRow;
+  type Args = VmArg;
+  type ApiItem = nanocld_client::stubs::vm::VmSummary;
+
+  fn object_name() -> &'static str {
+    "vms"
+  }
+
+  fn get_list_query(
+    args: &Self::Args,
+    opts: &crate::models::GenericListOpts,
+  ) -> GenericListNspQuery {
+    GenericListNspQuery::try_from(GenericFilter::from(opts.clone()))
+      .unwrap()
+      .with_namespace(args.namespace.as_deref())
+  }
+
+  fn get_key(item: &Self::Item) -> String {
+    item.name.clone()
+  }
+}
 
 /// Function executed when running `nanocl vm create`
 /// It will create a new virtual machine but not start it
@@ -34,29 +58,6 @@ pub async fn exec_vm_create(
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
   println!("{}", &vm.spec.vm_key);
-  Ok(())
-}
-
-/// Function executed when running `nanocl vm ls`
-/// It will list existing virtual machine and output them on stdout as a table.
-pub async fn exec_vm_ls(
-  cli_conf: &CliConfig,
-  args: &VmArg,
-  opts: &VmListOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let items = client.list_vm(args.namespace.as_deref()).await?;
-  let rows = items.into_iter().map(VmRow::from).collect::<Vec<VmRow>>();
-  match opts.quiet {
-    true => {
-      for row in rows {
-        println!("{}", row.name);
-      }
-    }
-    false => {
-      utils::print::print_table(rows);
-    }
-  }
   Ok(())
 }
 
@@ -277,7 +278,10 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
   match &args.command {
     VmCommand::Image(args) => exec_vm_image(client, args).await,
     VmCommand::Create(options) => exec_vm_create(cli_conf, args, options).await,
-    VmCommand::List(opts) => exec_vm_ls(cli_conf, args, opts).await,
+    VmCommand::List(opts) => {
+      VmArg::exec_ls(client, args, opts).await??;
+      Ok(())
+    }
     VmCommand::Remove(opts) => exec_vm_rm(cli_conf, args, &opts.names).await,
     VmCommand::Inspect(opts) => exec_vm_inspect(cli_conf, args, opts).await,
     VmCommand::Start(opts) => exec_vm_start(cli_conf, args, &opts.names).await,
