@@ -29,7 +29,7 @@ build_tools = ["dep:clap", "dep:clap_mangen"]
 ntex_test_client = ["dep:ntex", "dep:serde"]
 
 [dependencies]
-ntex = { version = "0.7.14", optional = true }
+ntex = { version = "0.7.16", optional = true }
 log = { version = "0.4.20", optional = true }
 env_logger = { version = "0.10.1", optional = true }
 serde = { version = "1.0.192", features = ["derive"], optional = true }
