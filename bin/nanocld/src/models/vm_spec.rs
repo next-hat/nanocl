@@ -159,9 +159,10 @@ impl VmSpecDb {
     pool: &Pool,
   ) -> IoResult<Vec<VmSpec>> {
     let mut r#where = HashMap::new();
-    r#where.insert("VmKey".to_owned(), GenericClause::Eq(vm_pk.to_owned()));
+    r#where.insert("vm_key".to_owned(), GenericClause::Eq(vm_pk.to_owned()));
     let filter = GenericFilter {
       r#where: Some(r#where),
+      ..Default::default()
     };
     VmSpecDb::find(&filter, pool).await?
   }

@@ -2,10 +2,6 @@ use ntex::web;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_utils::ntex::middlewares;
-
-use crate::version;
-
 #[cfg(feature = "dev")]
 mod openapi;
 
@@ -48,10 +44,14 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
         .configure(swagger::register),
     );
   }
-  let versioning = middlewares::Versioning::new(version::VERSION).finish();
   config.service(
     web::scope("/{version}")
-      .wrap(versioning)
+      .wrap(
+        nanocl_utils::ntex::middlewares::Versioning::new(
+          crate::version::VERSION,
+        )
+        .finish(),
+      )
       .configure(exec::ntex_config)
       .configure(state::ntex_config)
       .configure(node::ntex_config)
@@ -118,5 +118,21 @@ mod tests {
     let client = gen_test_client(ntex_config, version::VERSION).await;
     let res = client.send_get("/v0.1/unhandled", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::NOT_FOUND, "unhandled");
+  }
+
+  #[ntex::test]
+  async fn test_wrong_version() {
+    let client = gen_test_client(ntex_config, "0.15").await;
+    let res = client.send_get("/version", None::<String>).await;
+    assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
+    let version = res.headers().get("x-api-version");
+    assert!(version.is_some());
+    assert_eq!(version.unwrap(), version::VERSION);
+    let client = gen_test_client(ntex_config, "xdlol").await;
+    let res = client.send_get("/version", None::<String>).await;
+    assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
+    let version = res.headers().get("x-api-version");
+    assert!(version.is_some());
+    assert_eq!(version.unwrap(), version::VERSION);
   }
 }

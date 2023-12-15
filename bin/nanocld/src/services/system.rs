@@ -118,12 +118,12 @@ mod tests {
 
   #[ntex::test]
   async fn wrong_version() {
-    let client = gen_test_client(ntex_config, "12.44").await;
+    let client = gen_test_client(ntex_config, "13.44").await;
     let res = client.send_get("/info", None::<String>).await;
     test_status_code!(
       res.status(),
       http::StatusCode::NOT_FOUND,
-      "wrong version 12.44"
+      "wrong version 13.44"
     );
     let client = gen_test_client(ntex_config, "5.2").await;
     let res = client.send_get("/info", None::<String>).await;
