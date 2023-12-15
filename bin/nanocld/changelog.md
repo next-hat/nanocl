@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Job schedule to run job at scheduler interval like a cron.
 - Process to save container state and reduce repeated code.
 - Generic filter on find and find_one for all models.
+- Better versionning middleware that return the version
 
 ## Changed
 
