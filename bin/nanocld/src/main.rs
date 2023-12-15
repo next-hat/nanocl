@@ -1,5 +1,7 @@
 use clap::Parser;
+
 use nanocl_error::io::FromIo;
+use nanocl_utils::logger;
 
 mod cli;
 mod schema;
@@ -23,13 +25,7 @@ async fn main() -> std::io::Result<()> {
   // Parse command line arguments
   let args = cli::Cli::parse();
   // Build env logger
-  if std::env::var("LOG_LEVEL").is_err() {
-    std::env::set_var("LOG_LEVEL", "nanocld=info,warn,error,nanocld=debug");
-  }
-  env_logger::Builder::new()
-    .parse_env("LOG_LEVEL")
-    .format_target(false)
-    .init();
+  logger::enable_logger("nanocld");
   log::info!(
     "nanocld_{}_{}_v{}:{}",
     version::ARCH,
