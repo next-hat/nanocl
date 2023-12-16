@@ -12,6 +12,7 @@ services:
   nstore:
     container_name: nstore.system.c
     image: cockroachdb/cockroach:v23.1.12
+    hostname: store.nanocl.internal
     entrypoint: /bin/sh
     tty: true
     ports:

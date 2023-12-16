@@ -22,7 +22,7 @@ jobs:
       - name: Cache register
         uses: actions/cache@v3
         with:
-          path: .buildx-cache
+          path: /tmp/from-buildx-cache
           key: buildx-cache
       # Install rust
       - uses: actions-rs/toolchain@v1
@@ -48,20 +48,19 @@ jobs:
           docker pull cockroachdb/cockroach:v23.1.12
           docker pull ghcr.io/nxthat/metrsd:0.3.2
           docker pull ghcr.io/nxthat/nanocl-get-started:latest
-          docker buildx build --load --cache-from type=local,src=.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
-          docker buildx build --load --cache-from type=local,src=.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
+          docker buildx build --load --cache-from type=local,src=/tmp/from-buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
+          docker buildx build --load --cache-from type=local,src=/tmp/from-buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
           cargo build --no-default-features --features test --bin nanocl
           cargo build --no-default-features --features test --bin ncproxy
           cargo build --no-default-features --features test --bin nanocld
           docker compose -f ./tests/docker-compose.yaml up -d
-          sleep 4
+          sleep 8
           sudo chmod 777 -R /run/nanocl
           sudo chmod 777 -R /home/$USER/.nanocl_dev
           cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir /home/$USER/.nanocl_dev/state &
           sleep 8
           cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /home/$USER/.nanocl_dev/state/proxy &
           sleep 8
-          mkdir -p /home/$USER/.nanocl_dev/state/proxy/sites-enabled
           cp ./target/debug/nanocl /usr/local/bin
           docker ps -a
       # Run coverage
