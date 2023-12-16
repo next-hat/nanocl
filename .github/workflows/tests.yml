@@ -61,11 +61,14 @@ jobs:
           cargo build --no-default-features --features test --bin nanocld
           cargo build --no-default-features --features test --bin ncproxy
           docker compose -f ./tests/docker-compose.yaml up -d
+          sleep 4
           sudo chown $USER:nanocl -R /run/nanocl
           sudo chown $USER:nanocl -R $HOME/.nanocl_dev
           cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir $HOME/.nanocl_dev/state &
           cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /tmp &
+          sleep 4
           docker ps -a
+          sudo chown -R $USER:nanocl /run/nanocl
           ls -la $HOME/.nanocl_dev/state
           ls -la $HOME/.nanocl_dev/state/proxy
           ls -la /run/nanocl
