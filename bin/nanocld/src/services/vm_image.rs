@@ -248,11 +248,19 @@ mod tests {
         let bytes = ntex::util::Bytes::from_iter(r.freeze().to_vec());
         Ok::<ntex::util::Bytes, std::io::Error>(bytes)
       });
-    let res = client
+    let mut res = client
       .post(&format!("/vms/images/{name}/import"))
       .send_stream(stream)
       .await
       .map_err(|err| err.map_err_context(|| &err_msg))?;
+    let status = res.status();
+    if status != StatusCode::OK {
+      let error = res
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|err| err.map_err_context(|| &err_msg))?;
+      println!("{:?}", error);
+    }
     test_status_code!(res.status(), StatusCode::OK, &err_msg);
     Ok(())
   }
