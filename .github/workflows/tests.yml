@@ -47,10 +47,10 @@ jobs:
           sudo usermod -aG nanocl "$USER"
           sudo mkdir -p /run/nanocl
           sudo chown $USER:nanocl -R /run/nanocl
-          mkdir -p /home/$USER/.nanocl_dev/state/vms/images
-          mkdir -p /home/$USER/.nanocl_dev/state/proxy/sites-enabled
-          mkdir -p /home/$USER/.nanocl_dev/state/proxy/sites-available
-          sudo chown $USER:nanocl -R /home/$USER/.nanocl_dev
+          mkdir -p $HOME/.nanocl_dev/state/vms/images
+          mkdir -p $HOME/.nanocl_dev/state/proxy/sites-enabled
+          mkdir -p $HOME/.nanocl_dev/state/proxy/sites-available
+          sudo chown $USER:nanocl -R $HOME/.nanocl_dev
           sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v23.1.12
           docker pull ghcr.io/nxthat/metrsd:0.3.2
@@ -62,16 +62,16 @@ jobs:
           docker compose -f ./tests/docker-compose.yaml up -d
           sleep 10
           sudo chown $USER:nanocl -R /run/nanocl
-          sudo chown $USER:nanocl -R /home/$USER/.nanocl_dev
-          sudo chmod 777 -R /home/$USER/.nanocl_dev/state/proxy
-          cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir /home/$USER/.nanocl_dev/state &
+          sudo chown $USER:nanocl -R $HOME/.nanocl_dev
+          sudo chmod 777 -R $HOME/.nanocl_dev/state/proxy
+          cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir $HOME/.nanocl_dev/state &
           cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /tmp &
           sleep 10
           docker ps -a
           sudo chown -R $USER:nanocl /run/nanocl
-          sudo chmod 777 -R /home/$USER/.nanocl_dev/state/vms
-          ls -la /home/$USER/.nanocl_dev/state
-          ls -la /home/$USER/.nanocl_dev/state/proxy
+          sudo chmod 777 -R $HOME/.nanocl_dev/state/vms
+          ls -la $HOME/.nanocl_dev/state
+          ls -la $HOME/.nanocl_dev/state/proxy
           ls -la /run/nanocl
           env
       # Run coverage
