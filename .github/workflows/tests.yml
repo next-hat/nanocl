@@ -46,7 +46,7 @@ jobs:
           sudo groupadd nanocl
           sudo usermod -aG nanocl "$USER"
           sudo mkdir -p /run/nanocl
-          sudo apt install -y qemu-kvm
+          sudo apt install -y qemu-kvm qemu-utils
           sudo chown $USER:nanocl -R /run/nanocl
           mkdir -p $HOME/.nanocl_dev/state/vms/images
           mkdir -p $HOME/.nanocl_dev/state/proxy/sites-enabled
