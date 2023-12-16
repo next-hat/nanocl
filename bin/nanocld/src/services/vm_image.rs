@@ -229,12 +229,12 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use nanocl_stubs::vm_image::VmImage;
   use tokio_util::codec;
   use ntex::http::StatusCode;
   use futures_util::StreamExt;
 
   use nanocl_error::io::{IoResult, FromIo};
+  use nanocl_stubs::vm_image::VmImage;
 
   use crate::utils::tests::*;
 
