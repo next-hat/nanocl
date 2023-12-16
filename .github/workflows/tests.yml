@@ -76,6 +76,7 @@ jobs:
           ls -la /home/$USER/.nanocl_dev/state
           ls -la /home/$USER/.nanocl_dev/state/proxy
           ls -la /run/nanocl
+          cargo run --no-default-features --features test --bin nanocl -- -H http://nanocl.internal:8585 state apply -sy ./tests/deploy_example.yml
       # Run coverage
       - name: Run tests
         run: cargo make covgen
