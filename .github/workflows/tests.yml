@@ -57,12 +57,15 @@ jobs:
           sleep 8
           sudo chmod 777 -R /run/nanocl
           sudo chmod 777 -R /home/$USER/.nanocl_dev
-          cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir /home/$USER/.nanocl_dev/state &
-          sleep 8
+          GID=$(id -g)
+          echo $GID
+          cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --gid $GID --state-dir /home/$USER/.nanocl_dev/state &
+          sleep 10
           cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /home/$USER/.nanocl_dev/state/proxy &
-          sleep 8
+          sleep 10
           cp ./target/debug/nanocl /usr/local/bin
           docker ps -a
+          sleep 10
       # Run coverage
       - name: Run tests
         run: cargo make covgen
