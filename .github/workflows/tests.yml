@@ -57,20 +57,19 @@ jobs:
           docker pull ghcr.io/nxthat/nanocl-get-started:latest
           docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
           docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
-          cargo build --no-default-features --features test --bin nanocl
-          cargo build --no-default-features --features test --bin ncproxy
           cargo build --no-default-features --features test --bin nanocld
+          cargo build --no-default-features --features test --bin ncproxy
           docker compose -f ./tests/docker-compose.yaml up -d
           sleep 10
           sudo chown $USER:nanocl -R /run/nanocl
           sudo chown $USER:nanocl -R /home/$USER/.nanocl_dev
           sudo chmod 777 -R /home/$USER/.nanocl_dev/state/proxy
           cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir /home/$USER/.nanocl_dev/state &
-          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /home/$USER/.nanocl_dev/state/proxy &
+          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /tmp &
           sleep 10
           docker ps -a
-          sleep 40
           sudo chown -R $USER:nanocl /run/nanocl
+          sudo chmod 777 -R /home/$USER/.nanocl_dev/state/vms
           ls -la /home/$USER/.nanocl_dev/state
           ls -la /home/$USER/.nanocl_dev/state/proxy
           ls -la /run/nanocl
