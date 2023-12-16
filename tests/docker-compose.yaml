@@ -12,6 +12,7 @@ services:
   nstore:
     container_name: nstore.system.c
     image: cockroachdb/cockroach:v23.1.12
+    hostname: store.nanocl.internal
     entrypoint: /bin/sh
     tty: true
     ports:
@@ -49,7 +50,7 @@ services:
     environment:
       - TZ=Europe/Paris
     volumes:
-      - /var/lib/nanocl/dns:/opt/dns
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:/opt/dns
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo

@@ -1519,7 +1519,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/VmImage'
-  /vms/images/{Name}:
+  /vms/images/{name}:
     delete:
       tags:
       - VmImages
@@ -1527,7 +1527,7 @@ paths:
       description: Delete a virtual machine image
       operationId: delete_vm_image
       parameters:
-      - name: Name
+      - name: name
         in: path
         description: The name of the vm image
         required: true

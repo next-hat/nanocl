@@ -22,7 +22,7 @@ jobs:
       - name: Cache register
         uses: actions/cache@v3
         with:
-          path: .buildx-cache
+          path: ~/buildx-cache
           key: buildx-cache
       # Install rust
       - uses: actions-rs/toolchain@v1
@@ -40,37 +40,38 @@ jobs:
       - uses: taiki-e/install-action@cargo-llvm-cov
       # Install nextest
       - uses: taiki-e/install-action@nextest
-      # Prepare CI
+      # Prepare CI with images containers and permissions
       - name: Prepare CI
         run: |
-          sudo ./scripts/prepare_tests.sh
-      # Setup daemon for the tests
-      - name: Setup
-        run: |
+          sudo apt install -y qemu-kvm qemu-utils
+          sudo groupadd nanocl
+          sudo usermod -aG nanocl "$USER"
+          sudo mkdir -p /run/nanocl
+          sudo chown $USER:nanocl -R /run/nanocl
+          mkdir -p $HOME/.nanocl_dev/state/vms/images
+          mkdir -p $HOME/.nanocl_dev/state/proxy/sites-enabled
+          mkdir -p $HOME/.nanocl_dev/state/proxy/sites-available
+          sudo chown $USER:nanocl -R $HOME/.nanocl_dev
           sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v23.1.12
           docker pull ghcr.io/nxthat/metrsd:0.3.2
           docker pull ghcr.io/nxthat/nanocl-get-started:latest
-          docker buildx build --load --cache-from type=local,src=.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
-          docker buildx build --load --cache-from type=local,src=.buildx-cache --cache-to type=local,dest=/tmp/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
-          cargo build --no-default-features --features test --bin nanocl
-          cargo build --no-default-features --features test --bin ncproxy
+          docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
+          docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
           cargo build --no-default-features --features test --bin nanocld
+          cargo build --no-default-features --features test --bin ncproxy
           docker compose -f ./tests/docker-compose.yaml up -d
           sleep 4
-          sudo chown $USER:$USER -R ~/.nanocl_dev
-          cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir ~/.nanocl_dev/state &
-          sleep 8
-          sudo mkdir -p /etc/nginx
-          sudo chmod 777 -R /run/nanocl
-          sudo chmod 777 -R /var/lib/nanocl
-          sudo chmod 777 -R /etc/nginx
-          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /etc/nginx &
-          sleep 8
-          sudo chmod 777 -R /run/nanocl
-          mkdir -p /tmp/nginx/sites-enabled
-          cp ./target/debug/nanocl /usr/local/bin
+          sudo chown $USER:nanocl -R /run/nanocl
+          sudo chown $USER:nanocl -R $HOME/.nanocl_dev
+          cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir $HOME/.nanocl_dev/state &
+          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /tmp &
+          sleep 4
           docker ps -a
+          sudo chown -R $USER:nanocl /run/nanocl
+          ls -la $HOME/.nanocl_dev/state
+          ls -la $HOME/.nanocl_dev/state/proxy
+          ls -la /run/nanocl
       # Run coverage
       - name: Run tests
         run: cargo make covgen
