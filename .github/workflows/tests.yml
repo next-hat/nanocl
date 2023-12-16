@@ -43,6 +43,7 @@ jobs:
       # Prepare CI with images containers and permissions
       - name: Prepare CI
         run: |
+          sudo apt-get install cron -y
           sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v23.1.12
           docker pull ghcr.io/nxthat/metrsd:0.3.2
@@ -57,7 +58,7 @@ jobs:
           sudo chown $USER:$USER -R ~/.nanocl_dev
           cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir /home/$USER/.nanocl_dev/state &
           sleep 8
-          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /home/$USER/.nanocl_dev/state/proxy &
+          cargo run --no-default-features --features test --bin ncproxy -- --hosts unix:///run/nanocl/proxy.sock --conf-dir /home/$USER/.nanocl_dev/state/proxy &
           sleep 8
           sudo chmod 777 -R ~/.nanocl_dev/state
           sudo chmod 777 -R /run/nanocl
