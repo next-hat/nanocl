@@ -173,13 +173,35 @@ pub(crate) async fn resize_vm_image(
   Ok(web::HttpResponse::Ok().json(&rx))
 }
 
+/// Get detailed information about a virtual machine image
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "VmImages",
+  path = "/vms/images/{name}",
+  params(
+    ("name" = String, Path, description = "The name of the vm image"),
+  ),
+  responses(
+    (status = 200, description = "Detailed information about the vm image", body = VmImage),
+  ),
+))]
+#[web::get("/vms/images/{name}/inspect")]
+pub(crate) async fn inspect_vm_image(
+  state: web::types::State<DaemonState>,
+  path: web::types::Path<(String, String)>,
+) -> HttpResult<web::HttpResponse> {
+  let name = path.1.to_owned();
+  let item = VmImageDb::find_by_pk(&name, &state.pool).await??;
+  Ok(web::HttpResponse::Ok().json(&item))
+}
+
 /// Delete a virtual machine image
 #[cfg_attr(feature = "dev", utoipa::path(
   delete,
   tag = "VmImages",
-  path = "/vms/images/{Name}",
+  path = "/vms/images/{name}",
   params(
-    ("Name" = String, Path, description = "The name of the vm image"),
+    ("name" = String, Path, description = "The name of the vm image"),
   ),
   responses(
     (status = 200, description = "Image have been deleted"),
@@ -202,4 +224,81 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(snapshot_vm_image);
   config.service(clone_vm_image);
   config.service(resize_vm_image);
+  config.service(inspect_vm_image);
+}
+
+#[cfg(test)]
+mod tests {
+  use nanocl_stubs::vm_image::VmImage;
+  use tokio_util::codec;
+  use ntex::http::StatusCode;
+  use futures_util::StreamExt;
+
+  use nanocl_error::io::{IoResult, FromIo};
+
+  use crate::utils::tests::*;
+
+  async fn import_image(name: &str, path: &str) -> IoResult<()> {
+    let client = gen_default_test_client().await;
+    let file = tokio::fs::File::open(path).await?;
+    let err_msg = format!("Unable to import image {name}:{path}");
+    let stream =
+      codec::FramedRead::new(file, codec::BytesCodec::new()).map(move |r| {
+        let r = r?;
+        let bytes = ntex::util::Bytes::from_iter(r.freeze().to_vec());
+        Ok::<ntex::util::Bytes, std::io::Error>(bytes)
+      });
+    let res = client
+      .post(&format!("/vms/images/{name}/import"))
+      .send_stream(stream)
+      .await
+      .map_err(|err| err.map_err_context(|| &err_msg))?;
+    test_status_code!(res.status(), StatusCode::OK, &err_msg);
+    Ok(())
+  }
+
+  async fn inspect_image(name: &str) -> IoResult<VmImage> {
+    let client = gen_default_test_client().await;
+    let err_msg = format!("Unable to inspect image {name}");
+    let mut res = client
+      .get(&format!("/vms/images/{name}/inspect"))
+      .send()
+      .await
+      .map_err(|err| err.map_err_context(|| &err_msg))?;
+    test_status_code!(res.status(), StatusCode::OK, &err_msg);
+    let data = res
+      .json::<VmImage>()
+      .await
+      .map_err(|err| err.map_err_context(|| &err_msg))?;
+    Ok(data)
+  }
+
+  // pub async fn ensure_test_image() {
+  //   let name = "ubuntu-22-test";
+  //   let path = "../../tests/ubuntu-22.04-minimal-cloudimg-amd64.img";
+  //   if inspect_image(name).await.is_ok() {
+  //     return;
+  //   }
+  //   import_image(name, path).await.unwrap();
+  // }
+
+  #[ntex::test]
+  async fn basic() {
+    let client = gen_default_test_client().await;
+    let name = "ubuntu-22-test-basic";
+    let path = "../../tests/ubuntu-22.04-minimal-cloudimg-amd64.img";
+    import_image(name, path).await.unwrap();
+    let image = inspect_image(name).await.unwrap();
+    assert_eq!(image.name, name);
+    let mut res = client.get("/vms/images").send().await.unwrap();
+    test_status_code!(res.status(), StatusCode::OK, "Unable to list images");
+    let images = res.json::<Vec<VmImage>>().await.unwrap();
+    assert!(images.iter().any(|i| i.name == name));
+    let res = client
+      .delete(&format!("/vms/images/{name}"))
+      .send()
+      .await
+      .unwrap();
+    test_status_code!(res.status(), StatusCode::OK, "Unable to delete image");
+  }
 }

@@ -96,7 +96,7 @@ pub mod tests {
     let docker_host = env::var("DOCKER_SOCKET_PATH")
       .unwrap_or_else(|_| String::from("/var/run/docker.sock"));
     let config = DaemonConfig {
-      state_dir: format!("{home}/.nanocl/state"),
+      state_dir: format!("{home}/.nanocl_dev/state"),
       docker_host,
       ..Default::default()
     };
