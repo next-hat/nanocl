@@ -61,14 +61,12 @@ jobs:
           cargo build --no-default-features --features test --bin ncproxy
           cargo build --no-default-features --features test --bin nanocld
           docker compose -f ./tests/docker-compose.yaml up -d
-          sleep 8
+          sleep 10
           sudo chown $USER:nanocl -R /run/nanocl
           sudo chown $USER:nanocl -R /home/$USER/.nanocl_dev
-          GID=$(id -g)
-          echo $GID
+          sudo chmod 777 -R /home/$USER/state/proxy
           cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir /home/$USER/.nanocl_dev/state &
-          sleep 10
-          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /tmp &
+          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /home/$USER/.nanocl_dev/state/proxy &
           sleep 10
           docker ps -a
           sleep 40
@@ -76,7 +74,6 @@ jobs:
           ls -la /home/$USER/.nanocl_dev/state
           ls -la /home/$USER/.nanocl_dev/state/proxy
           ls -la /run/nanocl
-          cargo run --no-default-features --features test --bin nanocl -- -H http://nanocl.internal:8585 state apply -ys ./examples/deploy_example.yml
       # Run coverage
       - name: Run tests
         run: cargo make covgen
