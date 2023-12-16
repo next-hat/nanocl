@@ -44,6 +44,13 @@ jobs:
       - name: Prepare CI
         run: |
           sudo apt-get install cron -y
+          groupadd nanocl
+          usermod -aG nanocl "$USER"
+          mkdir -p /run/nanocl
+          chmod 777 -R /run/nanocl
+          mkdir -p /home/$USER/.nanocl_dev/state/vms/images
+          mkdir -p /home/$USER/.nanocl_dev/state/proxy/nginx/sites-enabled
+          chmod 777 -R /home/$USER/.nanocl_dev/state
           sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v23.1.12
           docker pull ghcr.io/nxthat/metrsd:0.3.2
@@ -66,6 +73,7 @@ jobs:
           cp ./target/debug/nanocl /usr/local/bin
           docker ps -a
           sleep 10
+          sleep 20
       # Run coverage
       - name: Run tests
         run: cargo make covgen
