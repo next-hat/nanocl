@@ -61,12 +61,11 @@ jobs:
           sudo chown $USER:$USER -R ~/.nanocl_dev
           cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir ~/.nanocl_dev/state &
           sleep 8
-          sudo mkdir -p /etc/nginx
           sudo chmod 777 -R /run/nanocl
           sudo chmod 777 -R /var/lib/nanocl
-          sudo chmod 777 -R /etc/nginx
-          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /etc/nginx &
+          cargo run --no-default-features --features test --bin ncproxy -- --conf-dir ~/.nanocl_dev/state/proxy &
           sleep 8
+          sudo chmod 777 -R ~/.nanocl_dev/state
           sudo chmod 777 -R /run/nanocl
           mkdir -p /tmp/nginx/sites-enabled
           cp ./target/debug/nanocl /usr/local/bin
