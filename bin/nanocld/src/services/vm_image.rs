@@ -228,12 +228,12 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
   use tokio_util::codec;
   use ntex::http::StatusCode;
   use futures_util::StreamExt;
 
-  use nanocl_error::io::{IoResult, FromIo};
+  use nanocl_error::io::{IoResult, FromIo, IoError};
   use nanocl_stubs::vm_image::VmImage;
 
   use crate::utils::tests::*;
@@ -273,6 +273,9 @@ mod tests {
       .send()
       .await
       .map_err(|err| err.map_err_context(|| &err_msg))?;
+    if res.status() != StatusCode::OK {
+      return Err(IoError::not_found("vm_image", name));
+    }
     test_status_code!(res.status(), StatusCode::OK, &err_msg);
     let data = res
       .json::<VmImage>()
@@ -281,14 +284,14 @@ mod tests {
     Ok(data)
   }
 
-  // pub async fn ensure_test_image() {
-  //   let name = "ubuntu-22-test";
-  //   let path = "../../tests/ubuntu-22.04-minimal-cloudimg-amd64.img";
-  //   if inspect_image(name).await.is_ok() {
-  //     return;
-  //   }
-  //   import_image(name, path).await.unwrap();
-  // }
+  pub async fn ensure_test_image() {
+    let name = "ubuntu-22-test";
+    let path = "../../tests/ubuntu-22.04-minimal-cloudimg-amd64.img";
+    if inspect_image(name).await.is_ok() {
+      return;
+    }
+    import_image(name, path).await.unwrap();
+  }
 
   #[ntex::test]
   async fn basic() {

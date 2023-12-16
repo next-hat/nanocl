@@ -319,13 +319,44 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
   use ntex::http;
+  use nanocl_stubs::vm::{VmInspect, VmSummary};
+  use nanocl_stubs::vm_spec::{VmSpecPartial, VmDisk};
 
   use crate::utils::tests::*;
+  use crate::services::vm_image::tests::ensure_test_image;
 
   #[ntex::test]
-  async fn list_vm() {
+  async fn basic() {
+    ensure_test_image().await;
     let client = gen_default_test_client().await;
-    let resp = client.send_get("/vms", None::<String>).await;
-    test_status_code!(resp.status(), http::StatusCode::OK, "list vm");
+    let name = "api-test-vm";
+    let image = "ubuntu-22-test";
+    let res = client
+      .post("/vms")
+      .send_json(&VmSpecPartial {
+        name: name.to_owned(),
+        disk: VmDisk {
+          image: image.to_owned(),
+          ..Default::default()
+        },
+        ..Default::default()
+      })
+      .await
+      .unwrap();
+    test_status_code!(res.status(), http::StatusCode::OK, "create vm");
+    let mut res = client
+      .get(&format!("/vms/{name}/inspect"))
+      .send()
+      .await
+      .unwrap();
+    test_status_code!(res.status(), http::StatusCode::OK, "inspect vm");
+    let vm = res.json::<VmInspect>().await.unwrap();
+    assert_eq!(vm.spec.name, name);
+    let mut res = client.get("/vms").send().await.unwrap();
+    test_status_code!(res.status(), http::StatusCode::OK, "list vm");
+    let vms = res.json::<Vec<VmSummary>>().await.unwrap();
+    assert!(vms.iter().any(|i| i.spec.name == name));
+    let res = client.delete("/vms/api-test-vm").send().await.unwrap();
+    test_status_code!(res.status(), http::StatusCode::OK, "delete vm");
   }
 }

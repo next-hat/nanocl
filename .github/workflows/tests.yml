@@ -56,6 +56,7 @@ jobs:
           docker pull cockroachdb/cockroach:v23.1.12
           docker pull ghcr.io/nxthat/metrsd:0.3.2
           docker pull ghcr.io/nxthat/nanocl-get-started:latest
+          docker pull ghcr.io/nxthat/nanocl-qemu:8.0.2.0
           docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
           docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
           cargo build --no-default-features --features test --bin nanocld
