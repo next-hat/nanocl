@@ -43,14 +43,14 @@ jobs:
       # Prepare CI with images containers and permissions
       - name: Prepare CI
         run: |
-          sudo apt-get install cron -y
           sudo groupadd nanocl
           sudo usermod -aG nanocl "$USER"
           sudo mkdir -p /run/nanocl
           sudo chown $USER:nanocl -R /run/nanocl
-          sudo mkdir -p /home/$USER/.nanocl_dev/state/vms/images
-          sudo mkdir -p /home/$USER/.nanocl_dev/state/proxy/nginx/sites-enabled
-          sudo chown $USER:nanocl -R /home/$USER/.nanocl_dev/state
+          mkdir -p /home/$USER/.nanocl_dev/state/vms/images
+          mkdir -p /home/$USER/.nanocl_dev/state/proxy/nginx/sites-enabled
+          mkdir -p /home/$USER/.nanocl_dev/state/proxy/nginx/sites-available
+          sudo chown $USER:nanocl -R /home/$USER/.nanocl_dev
           sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v23.1.12
           docker pull ghcr.io/nxthat/metrsd:0.3.2
@@ -66,15 +66,15 @@ jobs:
           sudo chown $USER:nanocl -R /home/$USER/.nanocl_dev
           GID=$(id -g)
           echo $GID
-          ls -la /home/$USER/.nanocl_dev/state
           cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --gid $GID --state-dir /home/$USER/.nanocl_dev/state &
           sleep 10
           cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /home/$USER/.nanocl_dev/state/proxy &
           sleep 10
-          cp ./target/debug/nanocl /usr/local/bin
           docker ps -a
-          sleep 10
-          sleep 20
+          sleep 40
+          ls -la /home/$USER/.nanocl_dev/state
+          ls -la /home/$USER/.nanocl_dev/state/proxy
+          ls -la /run/nanocl
       # Run coverage
       - name: Run tests
         run: cargo make covgen
