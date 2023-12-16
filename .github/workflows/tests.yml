@@ -47,10 +47,10 @@ jobs:
           sudo groupadd nanocl
           sudo usermod -aG nanocl "$USER"
           sudo mkdir -p /run/nanocl
-          sudo chmod 777 -R /run/nanocl
+          sudo chown $USER:nanocl -R /run/nanocl
           sudo mkdir -p /home/$USER/.nanocl_dev/state/vms/images
           sudo mkdir -p /home/$USER/.nanocl_dev/state/proxy/nginx/sites-enabled
-          sudo chmod 777 -R /home/$USER/.nanocl_dev/state
+          sudo chown $USER:nanocl -R /home/$USER/.nanocl_dev/state
           sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v23.1.12
           docker pull ghcr.io/nxthat/metrsd:0.3.2
@@ -62,8 +62,8 @@ jobs:
           cargo build --no-default-features --features test --bin nanocld
           docker compose -f ./tests/docker-compose.yaml up -d
           sleep 8
-          sudo chmod 777 -R /run/nanocl
-          sudo chmod 777 -R /home/$USER/.nanocl_dev
+          sudo chown $USER:nanocl -R /run/nanocl
+          sudo chown $USER:nanocl -R /home/$USER/.nanocl_dev
           GID=$(id -g)
           echo $GID
           ls -la /home/$USER/.nanocl_dev/state
