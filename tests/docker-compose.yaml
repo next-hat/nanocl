@@ -49,7 +49,7 @@ services:
     environment:
       - TZ=Europe/Paris
     volumes:
-      - /var/lib/nanocl/dns:/opt/dns
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:/opt/dns
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
