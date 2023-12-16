@@ -59,6 +59,7 @@ jobs:
           sudo chown $USER:$USER -R ~/.nanocl_dev
           cargo run --no-default-features --features test --bin nanocld -- --hosts tcp://0.0.0.0:8585 --state-dir /home/$USER/.nanocl_dev/state &
           sleep 8
+          sudo chmod 777 -R /run/nanocl
           cargo run --no-default-features --features test --bin ncproxy -- --conf-dir /home/$USER/.nanocl_dev/state/proxy &
           sleep 8
           sudo chmod 777 -R /run/nanocl
