@@ -73,7 +73,6 @@ jobs:
           ls -la $HOME/.nanocl_dev/state
           ls -la $HOME/.nanocl_dev/state/proxy
           ls -la /run/nanocl
-          env
       # Run coverage
       - name: Run tests
         run: cargo make covgen
