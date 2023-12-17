@@ -43,6 +43,8 @@ pub struct ProcessUpdateDb {
   pub key: Option<String>,
   /// Last time the instance was updated
   pub updated_at: Option<chrono::NaiveDateTime>,
+  /// Name of instance
+  pub name: Option<String>,
   // The updated at data
   pub data: Option<serde_json::Value>,
 }
@@ -74,7 +76,9 @@ impl From<&ProcessPartial> for ProcessDb {
       data: model.data.clone(),
       node_key: model.node_key.clone(),
       kind_key: model.kind_key.clone(),
-      created_at: chrono::Utc::now().naive_utc(),
+      created_at: model
+        .created_at
+        .unwrap_or_else(|| chrono::Utc::now().naive_utc()),
       updated_at: chrono::Utc::now().naive_utc(),
     }
   }
@@ -91,9 +95,7 @@ impl Repository for ProcessDb {
   ) -> JoinHandle<IoResult<Self::Item>> {
     log::debug!("ProcesssDb::find_one filter: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = processes::dsl::processes
-      .order(processes::dsl::created_at.desc())
-      .into_boxed();
+    let mut query = processes::dsl::processes.into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, processes::dsl::key, value);
     }

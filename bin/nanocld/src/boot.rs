@@ -55,8 +55,9 @@ fn set_unix_sock_perm() {
               );
               let mut perms =
                 match fs::metadata("/run/nanocl/nanocl.sock").await {
-                  Err(_) => {
-                    continue;
+                  Err(err) => {
+                    log::warn!("metadata error: {err:?}");
+                    break;
                   }
                   Ok(perms) => perms.permissions(),
                 };

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use diesel::prelude::*;
 use futures_util::{StreamExt, stream::FuturesUnordered};
 
-use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::io::{FromIo, IoResult, IoError};
 
 use bollard_next::{
   service::ContainerInspectResponse,
@@ -20,45 +20,27 @@ use crate::{
   utils, version,
   models::{
     DaemonState, ProcessUpdateDb, CargoDb, ProcessDb, Repository, NamespaceDb,
+    VmImageDb,
   },
 };
 
 /// Will determine if the instance is registered by nanocl
 /// and sync his data with our store accordinly
 pub(crate) async fn sync_instance(
+  key: &str,
+  kind: &str,
   instance: &ContainerInspectResponse,
   state: &DaemonState,
 ) -> IoResult<()> {
-  let name = instance.name.clone().unwrap_or_default().replace('/', "");
   let id = instance.id.clone().unwrap_or_default();
+  let created_at = instance.created.clone().unwrap_or_default();
+  let name = instance.name.clone().unwrap_or_default().replace('/', "");
+  log::debug!("syncing instance: {id}:{name} created_at: {created_at}");
   let container_instance_data = serde_json::to_value(instance)
     .map_err(|err| err.map_err_context(|| "Process"))?;
   let filter =
-    GenericFilter::new().r#where("name", GenericClause::Eq(name.to_owned()));
+    GenericFilter::new().r#where("key", GenericClause::Eq(id.to_owned()));
   let current_res = ProcessDb::find_one(&filter, &state.pool).await?;
-  let labels = instance
-    .config
-    .clone()
-    .unwrap_or_default()
-    .labels
-    .unwrap_or_default();
-  let mut kind = "unknow";
-  let mut kind_key = "";
-  if let Some(job_name) = labels.get("io.nanocl.j") {
-    kind = "job";
-    kind_key = job_name;
-  }
-  if let Some(cargo_key) = labels.get("io.nanocl.c") {
-    kind = "cargo";
-    kind_key = cargo_key;
-  }
-  if let Some(vm_key) = labels.get("io.nanocl.v") {
-    kind = "vm";
-    kind_key = vm_key;
-  }
-  if kind == "unknow" {
-    return Ok(());
-  }
   match current_res {
     Ok(current_instance) => {
       if current_instance.data == *instance {
@@ -66,9 +48,10 @@ pub(crate) async fn sync_instance(
         return Ok(());
       }
       let new_instance = ProcessUpdateDb {
-        key: Some(id.to_owned()),
+        name: Some(name.to_owned()),
         updated_at: Some(chrono::Utc::now().naive_utc()),
         data: Some(container_instance_data),
+        ..Default::default()
       };
       ProcessDb::update_by_pk(&current_instance.key, new_instance, &state.pool)
         .await??;
@@ -80,7 +63,16 @@ pub(crate) async fn sync_instance(
         kind: kind.to_owned().try_into()?,
         data: container_instance_data.clone(),
         node_key: state.config.hostname.clone(),
-        kind_key: kind_key.to_owned(),
+        kind_key: key.to_owned(),
+        created_at: Some(
+          chrono::NaiveDateTime::parse_from_str(
+            &created_at,
+            "%Y-%m-%dT%H:%M:%S%.fZ",
+          )
+          .map_err(|err| {
+            IoError::invalid_data("ProcessDb", &err.to_string())
+          })?,
+        ),
       };
       ProcessDb::create(&new_instance, &state.pool).await??;
     }
@@ -133,18 +125,19 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
   )
   .await??;
   for container_summary in containers {
-    // extract cargo name and namespace
     let labels = container_summary.labels.unwrap_or_default();
-    let Some(cargo_key) = labels.get("io.nanocl.c") else {
-      // We don't have cargo label, we skip it
+    let Some(kind) = labels.get("io.nanocl.kind") else {
       continue;
     };
-    let metadata = cargo_key.split('.').collect::<Vec<&str>>();
-    if metadata.len() < 2 {
-      // We don't have cargo label well formated, we skip it
+    let key = match kind.as_str() {
+      "cargo" => labels.get("io.nanocl.c"),
+      "job" => labels.get("io.nanocl.j"),
+      "vm" => labels.get("io.nanocl.v"),
+      _ => continue,
+    };
+    let Some(key) = key else {
       continue;
-    }
-    // We inspect the container to have all the information we need
+    };
     let container = state
       .docker_api
       .inspect_container(
@@ -153,64 +146,66 @@ pub(crate) async fn sync_instances(state: &DaemonState) -> IoResult<()> {
       )
       .await
       .map_err(|err| err.map_err_context(|| "SyncInstance"))?;
-    sync_instance(&container, state).await?;
-    // If we already inspected this cargo we skip it
-    if cargo_inspected.contains_key(metadata[0]) {
-      continue;
-    }
-    let config = container.config.clone().unwrap_or_default();
-    let mut config: bollard_next::container::Config = config.into();
-    config.host_config = container.host_config.clone();
-    let new_cargo = CargoSpecPartial {
-      name: metadata[0].to_owned(),
-      container: config.to_owned(),
-      ..Default::default()
-    };
-    cargo_inspected.insert(metadata[0].to_owned(), true);
-    match CargoDb::inspect_by_pk(cargo_key, &state.pool).await {
-      // If the cargo is already in our store and the config is different we update it
-      Ok(cargo) => {
-        if cargo.spec.container != config {
+    sync_instance(key, kind, &container, state).await?;
+    if kind == "cargo" {
+      let metadata = key.split('.').collect::<Vec<&str>>();
+      if metadata.len() < 2 {
+        // We don't have cargo label well formated, we skip it
+        continue;
+      }
+      // We inspect the container to have all the information we need
+      // If we already inspected this cargo we skip it
+      if cargo_inspected.contains_key(key) {
+        continue;
+      }
+      let config = container.config.clone().unwrap_or_default();
+      let mut config: bollard_next::container::Config = config.into();
+      config.host_config = container.host_config.clone();
+      let new_cargo = CargoSpecPartial {
+        name: metadata[0].to_owned(),
+        container: config.to_owned(),
+        ..Default::default()
+      };
+      cargo_inspected.insert(key.to_owned(), true);
+      match CargoDb::inspect_by_pk(key, &state.pool).await {
+        // If the cargo is already in our store and the config is different we update it
+        Ok(cargo) => {
+          if cargo.spec.container == config {
+            continue;
+          }
           log::debug!(
             "updating cargo {} in namespace {}",
             metadata[0],
             metadata[1]
           );
           CargoDb::update_from_spec(
-            cargo_key,
+            key,
             &new_cargo,
             &format!("v{}", version::VERSION),
             &state.pool,
           )
           .await?;
         }
-      }
-      // unless we create his config
-      Err(_err) => {
-        log::debug!(
-          "creating cargo {} in namespace {}",
-          metadata[0],
-          metadata[1]
-        );
-        if NamespaceDb::find_by_pk(metadata[1], &state.pool)
-          .await
-          .is_err()
-        {
-          NamespaceDb::create(
-            &NamespacePartial {
-              name: metadata[1].to_owned(),
-            },
+        // unless we create his config
+        Err(_err) => {
+          log::debug!(
+            "syncing cargo {} in namespace {}",
+            metadata[0],
+            metadata[1]
+          );
+          if let Err(err) = register_namespace(metadata[1], false, state).await
+          {
+            log::warn!("error while syncing namespace: {err:?}");
+            continue;
+          }
+          CargoDb::create_from_spec(
+            metadata[1],
+            &new_cargo,
+            &format!("v{}", version::VERSION),
             &state.pool,
           )
-          .await??;
+          .await?;
         }
-        CargoDb::create_from_spec(
-          metadata[1],
-          &new_cargo,
-          &format!("v{}", version::VERSION),
-          &state.pool,
-        )
-        .await?;
       }
     }
   }
@@ -238,6 +233,9 @@ pub(crate) async fn sync_vm_images(state: &DaemonState) -> IoResult<()> {
       };
       let file_path = file.path();
       let path = file_path.to_str().unwrap_or_default();
+      if VmImageDb::find_by_pk(&name, &state.pool).await.is_ok() {
+        return Ok::<_, std::io::Error>(());
+      }
       if let Err(error) =
         utils::vm_image::create(&name, path, &state.pool).await
       {
