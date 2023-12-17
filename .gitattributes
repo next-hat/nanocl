@@ -1,1 +1,0 @@
-tests/ubuntu-22.04-minimal-cloudimg-amd64.img filter=lfs diff=lfs merge=lfs -text
