@@ -331,7 +331,7 @@ mod tests {
     let client = gen_default_test_client().await;
     let name = "api-test-vm";
     let image = "ubuntu-22-test";
-    let res = client
+    let mut res = client
       .post("/vms")
       .send_json(&VmSpecPartial {
         name: name.to_owned(),
@@ -343,6 +343,11 @@ mod tests {
       })
       .await
       .unwrap();
+    let status = res.status();
+    if status != http::StatusCode::OK {
+      let body = res.json::<serde_json::Value>().await.unwrap();
+      panic!("create vm failed: {} {}", status, body);
+    }
     test_status_code!(res.status(), http::StatusCode::OK, "create vm");
     let mut res = client
       .get(&format!("/vms/{name}/inspect"))
@@ -356,7 +361,7 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "list vm");
     let vms = res.json::<Vec<VmSummary>>().await.unwrap();
     assert!(vms.iter().any(|i| i.spec.name == name));
-    let res = client.delete("/vms/api-test-vm").send().await.unwrap();
+    let res = client.delete(&format!("/vms/{name}")).send().await.unwrap();
     test_status_code!(res.status(), http::StatusCode::OK, "delete vm");
   }
 }
