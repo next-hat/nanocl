@@ -34,6 +34,6 @@ Cargoes:
     Mode:
       Number: 3
   Container:
-    Image: nexthat/nanocl-get-started:latest
+    Image: ghcr.io/nxthat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED1
