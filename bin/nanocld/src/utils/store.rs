@@ -19,7 +19,6 @@ pub(crate) async fn create_pool(
   daemon_conf: &DaemonConfig,
 ) -> IoResult<Pool> {
   let state_dir = daemon_conf.state_dir.clone();
-  // let options = "/defaultdb";
   let options = format!("/defaultdb?sslmode=verify-full&sslcert={state_dir}/store/certs/client.root.crt&sslkey={state_dir}/store/certs/client.root.key&sslrootcert={state_dir}/store/certs/ca.crt");
   let db_url = format!("postgresql://root:root@{host}{options}");
   let pool = web::block(move || {
@@ -49,7 +48,7 @@ pub(crate) fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
 
 /// Wait for store to be ready to accept tcp connection.
 /// We loop until a tcp connection can be established to the store.
-async fn wait_store(addr: &str) -> IoResult<()> {
+async fn wait(addr: &str) -> IoResult<()> {
   // Open tcp connection to check if store is ready
   let addr = addr
     .to_socket_addrs()
@@ -61,11 +60,13 @@ async fn wait_store(addr: &str) -> IoResult<()> {
     })?
     .next()
     .expect("Unable to resolve store address");
+  log::info!("store::wait: {addr}");
   while let Err(_err) = rt::tcp_connect(addr).await {
-    log::warn!("Waiting for store");
+    log::warn!("store::wait: retry in 2s");
     time::sleep(Duration::from_secs(2)).await;
   }
   time::sleep(Duration::from_secs(2)).await;
+  log::info!("store::wait: ready");
   Ok(())
 }
 
@@ -77,14 +78,14 @@ pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
   let store_addr = std::env::var("STORE_URL")
     .unwrap_or("store.nanocl.internal:26258".to_owned());
-  log::info!("Connecting to store at: {store_addr}");
-  wait_store(&store_addr).await?;
+  log::info!("store::init: {store_addr}");
+  wait(&store_addr).await?;
   let pool = create_pool(&store_addr, daemon_conf).await?;
   let mut conn = get_pool_conn(&pool)?;
-  log::info!("Store connected, running migrations");
+  log::info!("store::init: migrations running");
   conn.run_pending_migrations(MIGRATIONS).map_err(|err| {
     IoError::interupted("CockroachDB migration", &format!("{err}"))
   })?;
-  log::info!("Migrations successfully applied");
+  log::info!("store::init: migrations success");
   Ok(pool)
 }

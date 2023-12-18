@@ -13,7 +13,7 @@ use crate::{version, services, models::DaemonState};
 pub async fn gen(
   daemon_state: DaemonState,
 ) -> std::io::Result<ntex::server::Server> {
-  log::info!("Preparing server");
+  log::info!("server::gen: start");
   let hosts = daemon_state.config.hosts.clone();
   let mut server = web::HttpServer::new(move || {
     web::App::new()
@@ -40,41 +40,42 @@ pub async fn gen(
       let addr = host.replace("unix://", "");
       server = match server.bind_uds(&addr) {
         Err(err) => {
-          log::error!("Error binding to unix socket {}: {}", &addr, &err);
+          log::error!("server::gen: {addr}: {err}");
           return Err(err);
         }
         Ok(server) => server,
       };
-      log::info!("Listening on {}", &host);
     } else if host.starts_with("tcp://") {
       let addr = host.replace("tcp://", "");
       server = match server.bind(&addr) {
         Err(err) => {
-          log::error!("Error binding to tcp host {}: {}", &addr, &err);
+          log::error!("server::gen: {addr}: {err}");
           return Err(err);
         }
         Ok(server) => server,
       };
-      log::info!("Listening on {}", &host);
     } else {
       log::error!(
-        "Error {} is not valid use tcp:// or unix:// as protocol",
+        "server::gen: {} invalid protocol [tcp:// | unix://] allowed",
         host
       );
       return Err(std::io::Error::new(
         std::io::ErrorKind::Other,
-        "Invalid protocol use tcp:// or unix://",
+        "invalid protocol [tcp:// | unix://] allowed",
       ));
     }
+    log::info!("server::gen: {host}");
     count += 1;
   }
   #[cfg(feature = "dev")]
   {
     server = server.bind("0.0.0.0:8585")?;
-    log::debug!("Running in dev mode, binding to: http://0.0.0.0:8585");
-    log::debug!("OpenAPI explorer available at: http://0.0.0.0:8585/explorer/");
+    log::debug!("server::gen: dev mode http://0.0.0.0:8585");
+    log::debug!(
+      "server::gen: swagger available at http://0.0.0.0:8585/explorer/"
+    );
   }
-  log::info!("Server ready");
+  log::info!("server::gen: ready");
   Ok(server.run())
 }
 

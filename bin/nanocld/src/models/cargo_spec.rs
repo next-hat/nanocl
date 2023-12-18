@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 
@@ -102,7 +102,7 @@ impl Repository for CargoSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("CargoSpecDb::find_one filter: {filter:?}");
+    log::trace!("CargoSpecDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargo_specs::dsl::cargo_specs.into_boxed();
     if let Some(value) = r#where.get("cargo_key") {
@@ -129,7 +129,7 @@ impl Repository for CargoSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("CargoSpecDb::find filter: {filter:?}");
+    log::trace!("CargoSpecDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargo_specs::dsl::cargo_specs
       .order(cargo_specs::dsl::created_at.desc())

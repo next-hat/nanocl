@@ -1,16 +1,17 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 use serde::{Serialize, Deserialize};
 
 use nanocl_error::io::{IoError, IoResult};
 
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
-use nanocl_stubs::resource::{Resource, ResourcePartial};
+use nanocl_stubs::{
+  generic::{GenericFilter, GenericClause},
+  resource::{Resource, ResourcePartial},
+};
 
-use crate::{utils, gen_where4string, gen_where4json};
-use crate::schema::resources;
+use crate::{utils, gen_where4string, gen_where4json, schema::resources};
 
 use super::{Pool, Repository, WithSpec, ResourceSpecDb};
 
@@ -69,7 +70,7 @@ impl Repository for ResourceDb {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
     use crate::schema::resource_specs;
-    log::debug!("ResourceDb::find_one filter: {filter:?}");
+    log::trace!("ResourceDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resources::dsl::resources
       .inner_join(resource_specs::table)
@@ -102,7 +103,7 @@ impl Repository for ResourceDb {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
     use crate::schema::resource_specs;
-    log::debug!("ResourceDb::find filter: {filter:?}");
+    log::trace!("ResourceDb::find: {filter:?}");
     let mut query = resources::dsl::resources
       .order(resources::dsl::created_at.desc())
       .inner_join(resource_specs::table)

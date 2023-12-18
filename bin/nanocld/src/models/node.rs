@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 use serde::{Serialize, Deserialize};
 
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::GenericFilter;
 
-use crate::utils;
-use crate::schema::nodes;
+use crate::{utils, schema::nodes};
 
 use super::{Pool, Repository};
 
@@ -37,7 +36,7 @@ impl Repository for NodeDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("NodeDb::find_one filter: {filter:?}");
+    log::trace!("NodeDb::find_one: {filter:?}");
     // let r#where = filter.r#where.to_owned().unwrap_or_default();
     let query = nodes::dsl::nodes.into_boxed();
     let pool = Arc::clone(pool);
@@ -54,7 +53,7 @@ impl Repository for NodeDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("NodeDb::find filter: {filter:?}");
+    log::trace!("NodeDb::find: {filter:?}");
     // let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = nodes::dsl::nodes.into_boxed();
     let limit = filter.limit.unwrap_or(100);

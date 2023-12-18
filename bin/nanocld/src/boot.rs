@@ -1,7 +1,6 @@
-use std::sync::Arc;
-use std::path::Path;
-use std::process::Command;
-use std::os::unix::prelude::PermissionsExt;
+use std::{
+  sync::Arc, path::Path, process::Command, os::unix::prelude::PermissionsExt,
+};
 
 use ntex::rt;
 use tokio::fs;
@@ -16,16 +15,13 @@ use crate::models::DaemonState;
 /// Create a new thread and watch for change in the run directory
 /// and set the permission of the unix socket
 /// Then close the thread
-fn set_unix_sock_perm() {
+fn set_uds_perm() {
+  log::trace!("boot::set_uds_perm: start thread");
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async {
-      log::debug!("set_unix_permission");
       let path = Path::new("/run/nanocl");
       if !path.exists() {
-        log::debug!(
-          "{} doesn't exists cannot change unix socket permission",
-          path.display()
-        );
+        log::warn!("boot::set_uds_perm: /run/nanocl not found");
         return;
       }
       let (tx, rx) = std::sync::mpsc::channel();
@@ -34,14 +30,14 @@ fn set_unix_sock_perm() {
       let mut watcher = match RecommendedWatcher::new(tx, Config::default()) {
         Ok(watcher) => watcher,
         Err(e) => {
-          log::warn!("watcher error: {:?}", e);
+          log::warn!("boot::set_uds_perm: {e}");
           return;
         }
       };
       // Add a path to be watched. All files and directories at that path and
       // below will be monitored for changes.
       watcher.watch(path, RecursiveMode::Recursive).unwrap();
-      log::debug!("watching change of: {}", path.display());
+      log::trace!("boot::set_uds_perm: watching /run/nanocl");
       for res in rx {
         match res {
           Ok(event) => {
@@ -50,13 +46,13 @@ fn set_unix_sock_perm() {
               || event.kind.is_access()
               || event.kind.is_other()
             {
-              log::debug!(
-                "change detected, change permission of /run/nanocl/nanocl.sock",
-              );
+              log::trace!("boot::set_uds_perm: /run/nanocl change detected",);
               let mut perms =
                 match fs::metadata("/run/nanocl/nanocl.sock").await {
                   Err(err) => {
-                    log::warn!("metadata error: {err:?}");
+                    log::warn!(
+                      "boot::set_uds_perm: /run/nanocl/nanocl.sock {err}"
+                    );
                     break;
                   }
                   Ok(perms) => perms.permissions(),
@@ -65,18 +61,21 @@ fn set_unix_sock_perm() {
               if let Err(err) =
                 fs::set_permissions("/run/nanocl/nanocl.sock", perms).await
               {
-                log::warn!("set_unix_permission error: {err:?}");
+                log::warn!("boot::set_uds_perm: /run/nanocl/nanocl.sock {err}");
               }
+              log::trace!(
+                "boot::set_uds_perm: /run/nanocl/nanocl.sock permission set"
+              );
               break;
             }
           }
           Err(err) => {
-            log::warn!("watch error: {err:?}");
+            log::warn!("boot::set_uds_perm: watcher {err}");
             break;
           }
         }
       }
-      log::debug!("set_unix_permission done");
+      log::trace!("boot::set_uds_perm: stop thread");
       rt::Arbiter::current().stop();
     });
   });
@@ -84,18 +83,24 @@ fn set_unix_sock_perm() {
 
 /// Create a new thread and spawn and manage a crond instance to run cron jobs
 fn spawn_crond() {
+  log::trace!("boot::spawn_crond: start thread");
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async {
-      match Command::new("crond").args(["-f"]).spawn() {
-        Ok(mut child) => {
-          if let Err(err) = child.wait() {
-            log::error!("Failed to wait for crond: {}", err);
+      let task = ntex::web::block(move || {
+        match Command::new("crond").args(["-f"]).spawn() {
+          Ok(mut child) => {
+            child.wait()?;
+            Ok(())
           }
+          Err(err) => Err(err),
         }
-        Err(err) => {
-          log::error!("Failed to spawn crond: {}", err);
-        }
+      })
+      .await;
+      if let Err(err) = task {
+        log::error!("boot::spawn_crond: {err}");
       }
+      log::trace!("boot::spawn_crond: stop thread");
+      rt::Arbiter::current().stop();
     });
   });
 }
@@ -113,7 +118,7 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
 /// To boot and initialize our state and database.
 pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   spawn_crond();
-  set_unix_sock_perm();
+  set_uds_perm();
   let docker = bollard_next::Docker::connect_with_unix(
     &daemon_conf.docker_host,
     120,
@@ -130,21 +135,22 @@ pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     version: version::VERSION.to_owned(),
   };
   let daemon_ptr = daemon_state.clone();
+  utils::node::register(&daemon_state).await?;
   utils::system::register_namespace("global", true, &daemon_state).await?;
   utils::system::register_namespace("system", false, &daemon_state).await?;
   rt::spawn(async move {
     let fut = async move {
-      utils::system::sync_instances(&daemon_ptr).await?;
+      utils::system::sync_processes(&daemon_ptr).await?;
       utils::system::sync_vm_images(&daemon_ptr).await?;
       Ok::<_, IoError>(())
     };
     if let Err(err) = fut.await {
-      log::warn!("sync error: {err:?}");
+      log::warn!("boot::init: {err}");
     }
     Ok::<_, IoError>(())
   });
   utils::event::analize_docker(&daemon_state);
-  utils::event::analize_events(&daemon_state);
+  utils::event::analize(&daemon_state);
   Ok(daemon_state)
 }
 

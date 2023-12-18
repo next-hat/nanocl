@@ -1,6 +1,6 @@
 use ntex::rt;
 use futures::StreamExt;
-use bollard_next::container::{LogsOptions, LogOutput};
+use bollard_next::container::{LogOutput, LogsOptions};
 
 use crate::models::{
   ToMeticDb, DaemonState, HttpMetricPartial, StreamMetricPartial, HttpMetricDb,
@@ -69,7 +69,6 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                 let trimmed_log = log.trim_start_matches("#STREAM");
                 let stream_metric =
                   serde_json::from_str::<StreamMetricPartial>(trimmed_log);
-
                 match stream_metric
                   .map(|metric| metric.to_metric_db(&state.config.hostname))
                 {

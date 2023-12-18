@@ -1,14 +1,16 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::{GenericFilter, GenericClause};
 
-use crate::{utils, gen_where4string};
-use crate::schema::{resource_kinds, resource_kind_versions};
+use crate::{
+  utils, gen_where4string,
+  schema::{resource_kinds, resource_kind_versions},
+};
 
 use super::{Repository, Pool};
 
@@ -80,7 +82,7 @@ impl Repository for ResourceKindVersionDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("ResourceKindVersionDb::find_one filter: {filter:?}");
+    log::trace!("ResourceKindVersionDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query =
       resource_kind_versions::dsl::resource_kind_versions.into_boxed();
@@ -108,7 +110,7 @@ impl Repository for ResourceKindVersionDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("ResourceKindVersionDb::find filter: {filter:?}");
+    log::trace!("ResourceKindVersionDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query =
       resource_kind_versions::dsl::resource_kind_versions.into_boxed();
@@ -169,7 +171,7 @@ impl Repository for ResourceKindDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("ResourceKindDb::find_one filter: {filter:?}");
+    log::trace!("ResourceKindDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resource_kinds::dsl::resource_kinds.into_boxed();
     if let Some(value) = r#where.get("name") {
@@ -189,7 +191,7 @@ impl Repository for ResourceKindDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("ResourceKindDb::find filter: {filter:?}");
+    log::trace!("ResourceKindDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resource_kinds::dsl::resource_kinds.into_boxed();
     if let Some(value) = r#where.get("name") {

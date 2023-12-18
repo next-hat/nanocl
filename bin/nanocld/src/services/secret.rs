@@ -116,7 +116,7 @@ pub(crate) async fn delete_secret(
   state: web::types::State<DaemonState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  utils::secret::delete_by_key(&path.1, &state).await?;
+  utils::secret::delete_by_pk(&path.1, &state).await?;
   Ok(web::HttpResponse::Accepted().into())
 }
 
@@ -140,7 +140,7 @@ async fn patch_secret(
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<SecretUpdate>,
 ) -> HttpResult<web::HttpResponse> {
-  let item = utils::secret::patch_by_key(&path.1, &payload, &state).await?;
+  let item = utils::secret::patch_by_pk(&path.1, &payload, &state).await?;
   Ok(web::HttpResponse::Ok().json(&item))
 }
 

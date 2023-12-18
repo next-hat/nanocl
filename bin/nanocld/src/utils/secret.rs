@@ -1,7 +1,9 @@
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::system::EventAction;
-use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
+use nanocl_stubs::{
+  system::EventAction,
+  secret::{Secret, SecretPartial, SecretUpdate},
+};
 
 use crate::models::{DaemonState, SecretDb, Repository};
 
@@ -17,7 +19,7 @@ pub(crate) async fn create(
   Ok(secret)
 }
 
-pub(crate) async fn delete_by_key(
+pub(crate) async fn delete_by_pk(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
@@ -30,7 +32,8 @@ pub(crate) async fn delete_by_key(
   Ok(())
 }
 
-pub(crate) async fn patch_by_key(
+/// Patch a secret by it's primary key
+pub(crate) async fn patch_by_pk(
   key: &str,
   item: &SecretUpdate,
   state: &DaemonState,

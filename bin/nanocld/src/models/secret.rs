@@ -1,16 +1,17 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 use serde::{Serialize, Deserialize};
 
 use nanocl_error::io::{IoError, IoResult};
 
-use nanocl_stubs::generic::GenericFilter;
-use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
+use nanocl_stubs::{
+  generic::GenericFilter,
+  secret::{Secret, SecretPartial, SecretUpdate},
+};
 
-use crate::{utils, gen_where4string};
-use crate::schema::secrets;
+use crate::{utils, gen_where4string, schema::secrets};
 
 use super::{Pool, Repository};
 
@@ -109,7 +110,7 @@ impl Repository for SecretDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("SecretDb::find_one filter: {filter:?}");
+    log::trace!("SecretDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = secrets::dsl::secrets.into_boxed();
     if let Some(value) = r#where.get("key") {
@@ -133,7 +134,7 @@ impl Repository for SecretDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("SecretDb::find filter: {filter:?}");
+    log::trace!("SecretDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = secrets::dsl::secrets.into_boxed();
     if let Some(value) = r#where.get("key") {

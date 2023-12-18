@@ -29,7 +29,7 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
     None => return Ok(()),
     Some(job_id) => job_id.as_str().unwrap_or_default(),
   };
-  log::debug!("utils::job_ttl testing: {job_id}");
+  log::debug!("event::job_ttl: {job_id}");
   match &e.action {
     EventAction::Created | EventAction::Started | EventAction::Deleted => {
       return Ok(())
@@ -46,13 +46,13 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
   let instances = ProcessDb::find_by_kind_key(&job.name, &state.pool).await?;
   let (_, _, _, running) = utils::process::count_status(&instances);
   log::debug!(
-    "utils::job_ttl {} has {running} running instances",
+    "event::job_ttl: {} has {running} running instances",
     job.name
   );
   if running == 0 {
     let state = state.clone();
     rt::spawn(async move {
-      log::debug!("Job {} will be deleted in {ttl}s", job.name);
+      log::debug!("event::job_ttl: {} will be deleted in {ttl}s", job.name);
       ntex::time::sleep(std::time::Duration::from_secs(ttl as u64)).await;
       let _ = utils::job::delete_by_name(&job.name, &state).await;
     });
@@ -92,13 +92,13 @@ async fn read_events(stream: &mut Client, state: &DaemonState) {
       Ok(e) => e,
     };
     if let Err(err) = exec_event(e, state).await {
-      log::warn!("{err}");
+      log::warn!("event::read_events: {err}");
     }
   }
 }
 
 /// Spawn a tread to analize events from the event stream in his own loop
-pub(crate) fn analize_events(state: &DaemonState) {
+pub(crate) fn analize(state: &DaemonState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async move {
@@ -106,11 +106,11 @@ pub(crate) fn analize_events(state: &DaemonState) {
         let mut stream = match state.event_emitter.subscribe().await {
           Ok(stream) => stream,
           Err(err) => {
-            log::error!("{err}");
+            log::error!("event::analize: {err}");
             continue;
           }
         };
-        log::debug!("Internal event stream connected");
+        log::info!("event::analize: stream connected");
         read_events(&mut stream, &state).await;
       }
     });
@@ -118,7 +118,7 @@ pub(crate) fn analize_events(state: &DaemonState) {
 }
 
 /// Take actions when a docker event is received
-async fn exec_docker_event(
+async fn exec_docker(
   event: &EventMessage,
   state: &DaemonState,
 ) -> IoResult<()> {
@@ -133,7 +133,7 @@ async fn exec_docker_event(
   }
   let action = event.action.clone().unwrap_or_default();
   let id = actor.id.unwrap_or_default();
-  log::debug!("docker event: {action}");
+  log::debug!("event::exec_docker: {action}");
   let action = action.as_str();
   let mut event = Event {
     kind: EventKind::Process,
@@ -146,7 +146,6 @@ async fn exec_docker_event(
       ),
     }),
   };
-  log::debug!("docker event: {action}");
   match action {
     "destroy" => {
       state.event_emitter.spawn_emit_event(event);
@@ -196,19 +195,20 @@ pub(crate) fn analize_docker(state: &DaemonState) {
       loop {
         let mut streams =
           state.docker_api.events(None::<EventsOptions<String>>);
+        log::info!("event::analize_docker: stream connected");
         while let Some(event) = streams.next().await {
           match event {
             Ok(event) => {
-              if let Err(err) = exec_docker_event(&event, &state).await {
-                log::warn!("docker event error: {err:?}")
+              if let Err(err) = exec_docker(&event, &state).await {
+                log::warn!("event::analize_docker: {err}")
               }
             }
             Err(err) => {
-              log::warn!("docker event error: {:?}", err);
+              log::warn!("event::analize_docker: {err}");
             }
           }
         }
-        log::warn!("disconnected from docker trying to reconnect");
+        log::warn!("event::analize_docker: disconnected trying to reconnect");
         ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       }
     });

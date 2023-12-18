@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
-use nanocl_stubs::process::{Process, ProcessKind, ProcessPartial};
+use nanocl_stubs::{
+  generic::{GenericFilter, GenericClause},
+  process::{Process, ProcessKind, ProcessPartial},
+};
 
-use crate::{utils, gen_where4string};
-use crate::schema::processes;
+use crate::{utils, gen_where4string, schema::processes};
 
 use super::{Pool, Repository};
 
@@ -93,7 +94,7 @@ impl Repository for ProcessDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("ProcesssDb::find_one filter: {filter:?}");
+    log::trace!("ProcesssDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = processes::dsl::processes.into_boxed();
     if let Some(value) = r#where.get("key") {
@@ -126,7 +127,7 @@ impl Repository for ProcessDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("ProcesssDb::find filter: {filter:?}");
+    log::trace!("ProcesssDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = processes::dsl::processes
       .order(processes::dsl::created_at.desc())
