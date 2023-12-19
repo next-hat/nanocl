@@ -38,7 +38,7 @@ impl RepositoryDelBy for ProcessDb {
     Self: diesel::associations::HasTable,
   {
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = diesel::delete(processes::dsl::processes).into_boxed();
+    let mut query = diesel::delete(processes::table).into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, processes::dsl::key, value);
     }
