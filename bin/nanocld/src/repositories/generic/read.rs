@@ -93,3 +93,22 @@ pub trait RepositoryRead: super::RepositoryBase {
     })
   }
 }
+
+pub trait RepositoryReadWithSpec: super::RepositoryBase {
+  type Output;
+
+  fn read_pk_with_spec(
+    filter: &str,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Output>>;
+
+  fn read_with_spec(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Vec<Self::Output>>>;
+
+  fn read_one_with_spec(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Output>>;
+}

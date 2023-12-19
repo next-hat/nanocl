@@ -5,10 +5,10 @@ mod create;
 mod update;
 mod delete;
 
-pub use read::RepositoryRead;
-pub use create::RepositoryCreate;
-pub use update::RepositoryUpdate;
-pub use delete::RepositoryDelete;
+pub use read::*;
+pub use create::*;
+pub use update::*;
+pub use delete::*;
 
 pub trait RepositoryBase {
   // fn map_err

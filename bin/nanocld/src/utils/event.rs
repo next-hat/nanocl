@@ -150,7 +150,7 @@ async fn exec_docker(
   match action {
     "destroy" => {
       state.event_emitter.spawn_emit_event(event);
-      let _ = ProcessDb::delete_by_pk(&id, &state.pool).await?;
+      let _ = ProcessDb::del_by_pk(&id, &state.pool).await?;
       return Ok(());
     }
     "create" => {

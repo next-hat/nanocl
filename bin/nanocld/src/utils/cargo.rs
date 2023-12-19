@@ -5,26 +5,31 @@ use futures_util::stream::FuturesUnordered;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use bollard_next::container::{
-  Stats, CreateContainerOptions, StartContainerOptions, WaitContainerOptions,
-  RemoveContainerOptions,
+use bollard_next::{
+  service::{HostConfig, RestartPolicy, RestartPolicyNameEnum},
+  container::{
+    Stats, CreateContainerOptions, StartContainerOptions, WaitContainerOptions,
+    RemoveContainerOptions,
+  },
 };
-use bollard_next::service::{HostConfig, RestartPolicy, RestartPolicyNameEnum};
-use nanocl_stubs::system::EventAction;
-use nanocl_stubs::generic::{GenericListNspQuery, GenericClause, GenericFilter};
-use nanocl_stubs::process::{Process, ProcessKind};
-use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoScale, CargoStats,
-  CargoStatsQuery,
-};
-use nanocl_stubs::cargo_spec::{
-  CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config,
+use nanocl_stubs::{
+  generic::{GenericListNspQuery, GenericClause, GenericFilter},
+  system::EventAction,
+  process::{Process, ProcessKind},
+  cargo::{
+    Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoScale,
+    CargoStats, CargoStatsQuery,
+  },
+  cargo_spec::{CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config},
 };
 
-use crate::utils;
-use crate::models::{
-  DaemonState, CargoDb, Repository, ProcessDb, NamespaceDb, SecretDb,
-  CargoSpecDb, FromSpec,
+use crate::{
+  utils,
+  repositories::generic::*,
+  models::{
+    DaemonState, CargoDb, Repository, ProcessDb, NamespaceDb, SecretDb,
+    CargoSpecDb, FromSpec,
+  },
 };
 
 use super::stream::transform_stream;
@@ -317,7 +322,7 @@ pub(crate) async fn create(
     1
   };
   if let Err(err) = create_instances(&cargo, number, state).await {
-    CargoDb::delete_by_pk(&cargo.spec.cargo_key, &state.pool).await??;
+    CargoDb::del_by_pk(&cargo.spec.cargo_key, &state.pool).await??;
     return Err(err);
   }
   state
@@ -375,7 +380,7 @@ pub(crate) async fn delete_by_key(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
-  CargoDb::delete_by_pk(key, &state.pool).await??;
+  CargoDb::del_by_pk(key, &state.pool).await??;
   CargoSpecDb::delete_by(
     crate::schema::cargo_specs::dsl::cargo_key.eq(key.to_owned()),
     &state.pool,
@@ -470,7 +475,7 @@ pub(crate) async fn list(
     .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
   // ensure namespace exists
   NamespaceDb::find_by_pk(&namespace, &state.pool).await??;
-  let cargoes = CargoDb::find(&filter, &state.pool).await??;
+  let cargoes = CargoDb::read_with_spec(&filter, &state.pool).await??;
   let mut cargo_summaries = Vec::new();
   for cargo in cargoes {
     let spec = CargoSpecDb::find_by_pk(&cargo.spec.key, &state.pool)
