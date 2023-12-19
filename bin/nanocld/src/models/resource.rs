@@ -11,7 +11,10 @@ use nanocl_stubs::{
   resource::{Resource, ResourcePartial},
 };
 
-use crate::{utils, gen_where4string, gen_where4json, schema::resources};
+use crate::{
+  utils, gen_where4string, gen_where4json, schema::resources,
+  repositories::generic::*,
+};
 
 use super::{Pool, Repository, WithSpec, ResourceSpecDb};
 
@@ -154,7 +157,7 @@ impl ResourceDb {
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };
-    let spec = ResourceSpecDb::create(spec, pool).await??;
+    let spec = ResourceSpecDb::create_from(spec, pool).await??;
     let new_item = ResourceDb {
       key: item.name.to_owned(),
       created_at: chrono::Utc::now().naive_utc(),
@@ -181,7 +184,7 @@ impl ResourceDb {
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };
-    let spec = ResourceSpecDb::create(spec, pool).await??;
+    let spec = ResourceSpecDb::create_from(spec, pool).await??;
     let resource_update = ResourceUpdateDb {
       key: None,
       spec_key: Some(spec.key.to_owned()),
