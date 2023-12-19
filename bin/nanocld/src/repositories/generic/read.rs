@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
 use ntex::rt::JoinHandle;
-use diesel::{prelude::*, associations::HasTable};
-use diesel::internal::table_macro::BoxedSelectStatement;
+use diesel::{prelude::*, associations::HasTable, query_dsl::methods::LoadQuery};
 
-use nanocl_error::io::{IoResult, IoError};
+use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::GenericFilter;
 
@@ -12,12 +11,17 @@ use crate::{utils, models::Pool};
 
 pub trait RepositoryRead: super::RepositoryBase {
   type Output;
+  type Query;
 
-  fn read_by_pk<Pk>(pk: &Pk, pool: &Pool) -> JoinHandle<IoResult<Self>>
+  fn gen_read_query(filter: &GenericFilter, is_multiple: bool) -> Self::Query;
+
+  fn read_by_pk<Pk>(pk: &Pk, pool: &Pool) -> JoinHandle<IoResult<Self::Output>>
   where
-    Self: Sized + Send + HasTable + 'static,
     Pk: ToOwned + ?Sized + std::fmt::Display,
     <Pk as ToOwned>::Owned: Send + 'static,
+    Self: Sized + Send + HasTable + 'static,
+    Self::Output: Send + TryFrom<Self>,
+    <Self::Output as TryFrom<Self>>::Error: std::fmt::Display,
     Self::Table: diesel::query_dsl::methods::FindDsl<<Pk as ToOwned>::Owned>
       + HasTable<Table = Self::Table>,
     diesel::dsl::Find<Self::Table, <Pk as ToOwned>::Owned>:
@@ -30,69 +34,28 @@ pub trait RepositoryRead: super::RepositoryBase {
       let query = <Self::Table as HasTable>::table().find(pk);
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let item = query.get_result::<Self>(&mut conn).map_err(Self::map_err)?;
-      Ok(item)
+      Self::Output::try_from(item).map_err(|err| {
+        IoError::invalid_data(Self::get_name(), &err.to_string())
+      })
     })
   }
-
-  fn gen_read_query(
-    filter: &GenericFilter,
-  ) -> BoxedSelectStatement<
-    'static,
-    diesel::helper_types::SqlTypeOf<<Self as HasTable>::Table>,
-    diesel::internal::table_macro::FromClause<<Self as HasTable>::Table>,
-    diesel::pg::Pg,
-  >
-  where
-    Self: Sized
-      + HasTable
-      + diesel::Selectable<diesel::pg::Pg>
-      + diesel::Queryable<Self, diesel::pg::Pg>,
-    <Self as HasTable>::Table:
-      diesel::query_builder::QueryFragment<diesel::pg::Pg>,
-    <Self as diesel::Selectable<diesel::pg::Pg>>::SelectExpression:
-      diesel::query_builder::QueryId,
-    <Self as HasTable>::Table: diesel::Expression;
 
   fn read(
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Output>>>
   where
-    Self: Sized
-      + Send
-      + HasTable
-      + diesel::Selectable<diesel::pg::Pg>
-      + diesel::Queryable<Self, diesel::pg::Pg>
-      + 'static,
-    Self::Output: Send + TryFrom<Self> + 'static,
+    Self: Sized + Send + HasTable + 'static,
+    Self::Output: Send + TryFrom<Self>,
     <Self::Output as TryFrom<Self>>::Error: std::fmt::Display,
-    <Self as HasTable>::Table: diesel::Table
-      + diesel::Expression
-      + diesel::query_builder::QueryFragment<diesel::pg::Pg>,
-    diesel::pg::Pg: diesel::sql_types::HasSqlType<Self>,
-    Self: diesel::Queryable<diesel::sql_types::Bool, diesel::pg::Pg>,
-    <<Self as HasTable>::Table as diesel::QuerySource>::FromClause:
-      diesel::query_builder::QueryFragment<diesel::pg::Pg>,
-    Self: diesel::Selectable<diesel::pg::Pg>,
-    <Self as diesel::Selectable<diesel::pg::Pg>>::SelectExpression:
-      diesel::query_builder::QueryId,
-    Self: diesel::Table,
-    <<Self as HasTable>::Table as diesel::Expression>::SqlType:
-      diesel::sql_types::SingleValue,
-    Self: diesel::Queryable<
-      <<Self as HasTable>::Table as diesel::Expression>::SqlType,
-      diesel::pg::Pg,
-    >,
-    diesel::pg::Pg: diesel::sql_types::HasSqlType<
-      <<Self as HasTable>::Table as diesel::Expression>::SqlType,
-    >, // diesel::query_dsl::LoadQuery<'_, _, Self>,
+    Self::Query: LoadQuery<'static, diesel::PgConnection, Self>,
   {
     log::trace!("{}::read: {filter:?}", Self::get_name());
     let pool = Arc::clone(pool);
     let filter = filter.clone();
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
-      let query = Self::gen_read_query(&filter);
+      let query = Self::gen_read_query(&filter, true);
       let items = query
         .get_results::<Self>(&mut conn)
         .map_err(Self::map_err)?
@@ -104,6 +67,29 @@ pub trait RepositoryRead: super::RepositoryBase {
         })
         .collect::<IoResult<Vec<Self::Output>>>()?;
       Ok(items)
+    })
+  }
+
+  fn read_one(
+    filter: &GenericFilter,
+    pool: &Pool,
+  ) -> JoinHandle<IoResult<Self::Output>>
+  where
+    Self: Sized + Send + HasTable + 'static,
+    Self::Output: Send + TryFrom<Self>,
+    <Self::Output as TryFrom<Self>>::Error: std::fmt::Display,
+    Self::Query: LoadQuery<'static, diesel::PgConnection, Self>,
+  {
+    log::trace!("{}::read_one: {filter:?}", Self::get_name());
+    let pool = Arc::clone(pool);
+    let filter = filter.clone();
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      let query = Self::gen_read_query(&filter, false);
+      let item = query.get_result::<Self>(&mut conn).map_err(Self::map_err)?;
+      Self::Output::try_from(item).map_err(|err| {
+        IoError::invalid_data(Self::get_name(), &err.to_string())
+      })
     })
   }
 }

@@ -38,7 +38,7 @@ pub(crate) async fn sync_process(
     .map_err(|err| err.map_err_context(|| "Process"))?;
   let filter =
     GenericFilter::new().r#where("key", GenericClause::Eq(id.to_owned()));
-  let current_res = ProcessDb::find_one(&filter, &state.pool).await?;
+  let current_res = ProcessDb::read_one(&filter, &state.pool).await?;
   match current_res {
     Ok(current_instance) => {
       if current_instance.data == *instance {
@@ -51,7 +51,7 @@ pub(crate) async fn sync_process(
         data: Some(container_instance_data),
         ..Default::default()
       };
-      ProcessDb::update_by_pk(&current_instance.key, new_instance, &state.pool)
+      ProcessDb::update_pk(&current_instance.key, new_instance, &state.pool)
         .await??;
       log::info!("system::sync_process: {name} updated");
     }

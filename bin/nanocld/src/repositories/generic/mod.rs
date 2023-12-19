@@ -1,11 +1,13 @@
 use nanocl_error::io::{IoError, FromIo};
 
-mod create;
 mod read;
+mod create;
+mod update;
 mod delete;
 
-pub use create::RepositoryCreate;
 pub use read::RepositoryRead;
+pub use create::RepositoryCreate;
+pub use update::RepositoryUpdate;
 pub use delete::RepositoryDelete;
 
 pub trait RepositoryBase {
