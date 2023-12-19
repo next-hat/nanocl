@@ -2,7 +2,6 @@ use nanocl_error::io::{IoError, FromIo};
 
 mod create;
 mod read;
-mod update;
 mod delete;
 
 pub use create::RepositoryCreate;
