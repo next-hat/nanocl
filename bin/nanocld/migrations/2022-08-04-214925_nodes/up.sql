@@ -1,7 +1,8 @@
 -- Your SQL goes here
 CREATE TABLE IF NOT EXISTS "nodes" (
   "name" VARCHAR NOT NULL UNIQUE PRIMARY KEY,
-  "ip_address" VARCHAR NOT NULL UNIQUE
+  "ip_address" VARCHAR NOT NULL UNIQUE,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS "node_groups" (

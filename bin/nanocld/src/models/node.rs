@@ -1,16 +1,7 @@
-use std::sync::Arc;
-
 use diesel::prelude::*;
-use ntex::rt::JoinHandle;
 use serde::{Serialize, Deserialize};
 
-use nanocl_error::io::{IoError, IoResult};
-
-use nanocl_stubs::generic::GenericFilter;
-
-use crate::{utils, schema::nodes};
-
-use super::{Pool, Repository};
+use crate::schema::nodes;
 
 /// This structure represent a node in the database.
 /// A node is a machine that is connected to nanocl network.
@@ -25,61 +16,6 @@ pub struct NodeDb {
   pub name: String,
   /// The ip address of the node
   pub ip_address: String,
-}
-
-impl Repository for NodeDb {
-  type Table = nodes::table;
-  type Item = NodeDb;
-  type UpdateItem = NodeDb;
-
-  fn find_one(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Item>> {
-    log::trace!("NodeDb::find_one: {filter:?}");
-    // let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let query = nodes::dsl::nodes.into_boxed();
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_result::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(item)
-    })
-  }
-
-  fn find(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::trace!("NodeDb::find: {filter:?}");
-    // let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = nodes::dsl::nodes.into_boxed();
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_results::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(items)
-    })
-  }
-}
-
-impl NodeDb {
-  pub(crate) async fn create_if_not_exists(
-    node: &NodeDb,
-    pool: &Pool,
-  ) -> IoResult<NodeDb> {
-    match NodeDb::find_by_pk(&node.name, pool).await? {
-      Err(_) => NodeDb::create(node.clone(), pool).await?,
-      Ok(node) => Ok(node),
-    }
-  }
+  /// The created at date
+  pub created_at: chrono::NaiveDateTime,
 }
