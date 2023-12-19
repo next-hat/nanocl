@@ -59,6 +59,8 @@ pub struct ProcessPartial {
   pub node_key: String,
   /// Key of the related kind
   pub kind_key: String,
+  /// The created at date
+  pub created_at: Option<chrono::NaiveDateTime>,
 }
 
 /// Represents a process (Vm, Job, Cargo)

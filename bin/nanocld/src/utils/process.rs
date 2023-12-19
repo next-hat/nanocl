@@ -119,6 +119,7 @@ pub(crate) async fn create(
     .docker_api
     .inspect_container(&res.id, None::<InspectContainerOptions>)
     .await?;
+  let created_at = inspect.created.clone().unwrap_or_default();
   let new_instance = ProcessPartial {
     key: res.id,
     name: name.to_owned(),
@@ -127,6 +128,15 @@ pub(crate) async fn create(
       .map_err(|err| err.map_err_context(|| "CreateProcess"))?,
     node_key: state.config.hostname.clone(),
     kind_key: kind_key.to_owned(),
+    created_at: Some(
+      chrono::NaiveDateTime::parse_from_str(
+        &created_at,
+        "%Y-%m-%dT%H:%M:%S%.fZ",
+      )
+      .map_err(|err| {
+        HttpError::internal_server_error(format!("Unable to parse date {err}"))
+      })?,
+    ),
   };
   let process = ProcessDb::create(&new_instance, &state.pool).await??;
   Process::try_from(process)

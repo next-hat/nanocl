@@ -2,6 +2,7 @@ pub(crate) mod ws;
 pub(crate) mod key;
 pub(crate) mod stream;
 
+pub(crate) mod node;
 pub(crate) mod store;
 pub(crate) mod system;
 pub(crate) mod namespace;

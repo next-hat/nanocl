@@ -121,25 +121,28 @@ async fn on_event(
   let action = &event.action;
   let actor = event.actor.clone().unwrap_or_default();
   log::debug!("Event {kind} {action}");
-  let res = match (kind, action) {
+  let res: Result<(), IoError> = match (kind, action) {
     (EventKind::Cargo, EventAction::Started)
     | (EventKind::Cargo, EventAction::Patched) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       update_cargo_rule(&name, &namespace, nginx, client).await?;
-      Ok::<_, IoError>(())
+      Ok(())
     }
     (EventKind::Cargo, EventAction::Stopped)
     | (EventKind::Cargo, EventAction::Deleted) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       delete_cargo_rule(&name, &namespace, nginx, client).await?;
-      Ok::<_, IoError>(())
+      Ok(())
     }
     (EventKind::Resource, EventAction::Created)
     | (EventKind::Resource, EventAction::Patched) => {
       let key = actor.key.unwrap_or_default();
       let resource = client.inspect_resource(&key).await?;
+      if resource.kind != "ProxyRule" {
+        return Ok(());
+      }
       update_resource_rule(&resource.into(), nginx, client).await?;
-      Ok::<_, IoError>(())
+      Ok(())
     }
     (EventKind::Secret, EventAction::Created)
     | (EventKind::Secret, EventAction::Patched) => {
@@ -150,7 +153,7 @@ async fn on_event(
         let resource: ResourcePartial = resource.into();
         update_resource_rule(&resource, nginx, client).await?;
       }
-      Ok::<_, IoError>(())
+      Ok(())
     }
     _ => Ok(()),
   };

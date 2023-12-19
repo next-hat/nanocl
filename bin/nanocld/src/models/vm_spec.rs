@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 
@@ -49,7 +49,7 @@ impl Repository for VmSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("VmSpecDb::find_one filter: {filter:?}");
+    log::trace!("VmSpecDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vm_specs::dsl::vm_specs.into_boxed();
     if let Some(value) = r#where.get("vm_key") {
@@ -73,7 +73,7 @@ impl Repository for VmSpecDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("VmSpecDb::find filter: {filter:?}");
+    log::trace!("VmSpecDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vm_specs::dsl::vm_specs.into_boxed();
     if let Some(value) = r#where.get("vm_key") {

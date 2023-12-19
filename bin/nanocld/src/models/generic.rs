@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
-use tokio::task::JoinHandle;
-use diesel::query_dsl::methods::{FindDsl, FilterDsl};
-use diesel::{RunQueryDsl, associations, query_builder, pg, query_dsl};
+use ntex::rt::JoinHandle;
+use diesel::{
+  RunQueryDsl, query_builder, pg, query_dsl, associations,
+  query_dsl::methods::{FindDsl, FilterDsl},
+};
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 
@@ -137,6 +139,7 @@ pub trait Repository {
       <diesel::helper_types::Find<Self::Table, <Pk as ToOwned>::Owned> as query_builder::IntoUpdateTarget>::WhereClause,
     >: query_builder::QueryFragment<pg::Pg> + query_builder::QueryId,
   {
+    log::trace!("{}::delete_by_pk", Self::get_name());
     let pool = Arc::clone(pool);
     let pk = pk.to_owned();
     ntex::rt::spawn_blocking(move || {
@@ -152,12 +155,13 @@ pub trait Repository {
   where
     Pk: ToOwned + ?Sized,
     <Pk as ToOwned>::Owned: Send + 'static,
-    Self: std::marker::Sized + Send + 'static,
+    Self: Sized + Send + 'static,
     Self::Table: query_dsl::methods::FindDsl<<Pk as ToOwned>::Owned>
       + associations::HasTable<Table = Self::Table>,
     diesel::dsl::Find<Self::Table, <Pk as ToOwned>::Owned>:
       diesel::query_dsl::LoadQuery<'static, diesel::PgConnection, Self>,
   {
+    log::trace!("{}::find_by_pk", Self::get_name());
     let pool = Arc::clone(pool);
     let pk = pk.to_owned();
     ntex::rt::spawn_blocking(move || {
@@ -193,6 +197,7 @@ pub trait Repository {
     >:
       diesel::query_builder::AsQuery + diesel::query_dsl::LoadQuery<'static, pg::PgConnection, Self>,
   {
+    log::trace!("{}::update_by_pk", Self::get_name());
     let pool = Arc::clone(pool);
     let pk = pk.to_owned();
     let values = values.into();

@@ -2,15 +2,14 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 use serde::{Serialize, Deserialize};
 
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::GenericFilter;
 
-use crate::{utils, gen_where4string, gen_where4json};
-use crate::schema::metrics;
+use crate::{utils, gen_where4string, gen_where4json, schema::metrics};
 
 use super::{Pool, Repository};
 
@@ -72,7 +71,7 @@ impl Repository for MetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("MetricDb::find_one filter: {filter:?}");
+    log::trace!("MetricDb::find_one: {filter:?}");
     let mut query = metrics::dsl::metrics
       .order(metrics::dsl::created_at.desc())
       .into_boxed();
@@ -100,7 +99,7 @@ impl Repository for MetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("MetricDb::find filter: {filter:?}");
+    log::trace!("MetricDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = metrics::dsl::metrics
       .order(metrics::dsl::created_at.desc())

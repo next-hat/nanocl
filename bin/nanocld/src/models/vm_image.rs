@@ -1,16 +1,17 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 use serde::{Serialize, Deserialize};
 
 use nanocl_error::io::{IoResult, IoError};
 
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
-use nanocl_stubs::vm_image::VmImage;
+use nanocl_stubs::{
+  generic::{GenericFilter, GenericClause},
+  vm_image::VmImage,
+};
 
-use crate::{utils, gen_where4string};
-use crate::schema::vm_images;
+use crate::{utils, gen_where4string, schema::vm_images};
 
 use super::{Pool, Repository};
 
@@ -93,7 +94,7 @@ impl Repository for VmImageDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("VmImageDb::find_one filter: {filter:?}");
+    log::trace!("VmImageDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vm_images::dsl::vm_images.into_boxed();
     if let Some(value) = r#where.get("name") {
@@ -125,7 +126,7 @@ impl Repository for VmImageDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("VmImageDb::find filter: {filter:?}");
+    log::trace!("VmImageDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vm_images::dsl::vm_images.into_boxed();
     if let Some(value) = r#where.get("name") {

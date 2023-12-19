@@ -133,7 +133,7 @@ impl EventEmitter {
       ),
     })?;
     log::debug!(
-      "Emitting {} {} to {} client(s)",
+      "event_emitter::emit: {}:{} to {} client(s)",
       e.kind,
       e.action,
       inner.clients.len()
@@ -152,7 +152,7 @@ impl EventEmitter {
       .collect::<FuturesUnordered<_>>()
       .collect::<Vec<_>>()
       .await;
-    log::debug!("Emitted");
+    log::debug!("event_emitter::emit: done");
     Ok(())
   }
 

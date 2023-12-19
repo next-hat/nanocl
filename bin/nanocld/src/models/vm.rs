@@ -1,16 +1,17 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 
 use nanocl_error::io::{IoError, IoResult};
 
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
-use nanocl_stubs::vm::Vm;
-use nanocl_stubs::vm_spec::{VmSpec, VmSpecPartial};
+use nanocl_stubs::{
+  generic::{GenericFilter, GenericClause},
+  vm_spec::{VmSpec, VmSpecPartial},
+  vm::Vm,
+};
 
-use crate::{utils, gen_where4string};
-use crate::schema::vms;
+use crate::{utils, gen_where4string, schema::vms};
 
 use super::{Pool, Repository, FromSpec, WithSpec, VmSpecDb, NamespaceDb};
 
@@ -73,7 +74,7 @@ impl Repository for VmDb {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
     use crate::schema::vm_specs;
-    log::debug!("VmDb::find_one filter: {filter:?}");
+    log::trace!("VmDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vms::dsl::vms.inner_join(vm_specs::table).into_boxed();
     if let Some(value) = r#where.get("key") {
@@ -102,7 +103,7 @@ impl Repository for VmDb {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
     use crate::schema::vm_specs;
-    log::debug!("VmDb::find filter: {filter:?}");
+    log::trace!("VmDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vms::dsl::vms.inner_join(vm_specs::table).into_boxed();
     if let Some(value) = r#where.get("key") {

@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
-use ntex::web;
+use ntex::{web, rt::JoinHandle};
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
 
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::{
-  cargo::Cargo,
-  cargo_spec::{CargoSpec, CargoSpecPartial},
   generic::{GenericFilter, GenericClause},
+  cargo_spec::{CargoSpec, CargoSpecPartial},
+  cargo::Cargo,
 };
 
 use crate::{utils, gen_where4string, schema::cargoes};
@@ -73,7 +72,7 @@ impl Repository for CargoDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("CargoDb::find_one filter: {filter:?}");
+    log::trace!("CargoDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargoes::dsl::cargoes
       .inner_join(crate::schema::cargo_specs::table)
@@ -102,7 +101,7 @@ impl Repository for CargoDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("CargoDb::find filter: {filter:?}");
+    log::trace!("CargoDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargoes::dsl::cargoes
       .inner_join(crate::schema::cargo_specs::table)

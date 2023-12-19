@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 use serde::{Serialize, Deserialize};
 
 use nanocl_error::io::{IoError, IoResult};
 
-use nanocl_stubs::generic::GenericFilter;
-use nanocl_stubs::namespace::NamespacePartial;
+use nanocl_stubs::{generic::GenericFilter, namespace::NamespacePartial};
 
-use crate::utils;
-use crate::schema::namespaces;
+use crate::{utils, schema::namespaces};
 
 use super::{Pool, Repository};
 
@@ -58,7 +56,7 @@ impl Repository for NamespaceDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("NamespaceDb::find_one filter: {filter:?}");
+    log::trace!("NamespaceDb::find_one: {filter:?}");
     // let r#where = filter.r#where.to_owned().unwrap_or_default();
     let query = namespaces::dsl::namespaces
       .order(namespaces::dsl::created_at.desc())
@@ -77,7 +75,7 @@ impl Repository for NamespaceDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("NamespaceDb::find filter: {filter:?}");
+    log::trace!("NamespaceDb::find: {filter:?}");
     // let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = namespaces::dsl::namespaces
       .order(namespaces::dsl::created_at.desc())

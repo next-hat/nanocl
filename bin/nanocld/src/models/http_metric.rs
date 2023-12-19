@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 use chrono::{DateTime, FixedOffset};
 use serde::{Serialize, Deserialize, Deserializer};
 
@@ -10,8 +10,10 @@ use nanocl_error::io::{IoError, IoResult};
 
 use nanocl_stubs::generic::GenericFilter;
 
-use crate::utils;
-use crate::schema::{http_metrics, stream_metrics};
+use crate::{
+  utils,
+  schema::{http_metrics, stream_metrics},
+};
 
 use super::{Pool, Repository, ToMeticDb};
 
@@ -299,7 +301,7 @@ impl Repository for HttpMetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("HttpMetricDb::find_one filter: {filter:?}");
+    log::trace!("HttpMetricDb::find_one: {filter:?}");
     // let r#where = filter.r#where.to_owned().unwrap_or_default();
     let query = http_metrics::dsl::http_metrics
       .order(http_metrics::dsl::created_at.desc())
@@ -318,7 +320,7 @@ impl Repository for HttpMetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("HttpMetricDb::find filter: {filter:?}");
+    log::trace!("HttpMetricDb::find: {filter:?}");
     // let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = http_metrics::dsl::http_metrics
       .order(http_metrics::dsl::created_at.desc())
@@ -348,7 +350,7 @@ impl Repository for StreamMetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("StreamMetricDb::find_one filter: {filter:?}");
+    log::trace!("StreamMetricDb::find_one: {filter:?}");
     // let r#where = filter.r#where.to_owned().unwrap_or_default();
     let query = stream_metrics::dsl::stream_metrics
       .order(stream_metrics::dsl::created_at.desc())
@@ -367,7 +369,7 @@ impl Repository for StreamMetricDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("StreamMetricDb::find filter: {filter:?}");
+    log::trace!("StreamMetricDb::find: {filter:?}");
     // let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = stream_metrics::dsl::stream_metrics
       .order(stream_metrics::dsl::created_at.desc())

@@ -2,14 +2,16 @@ use ntex::web;
 
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::generic::{GenericNspQuery, GenericListNspQuery};
-use nanocl_stubs::cargo::{
-  CargoDeleteQuery, CargoKillOptions, CargoStatsQuery, CargoScale,
+use nanocl_stubs::{
+  generic::{GenericNspQuery, GenericListNspQuery},
+  cargo::{CargoDeleteQuery, CargoKillOptions, CargoStatsQuery, CargoScale},
+  cargo_spec::{CargoSpecPartial, CargoSpecUpdate},
 };
-use nanocl_stubs::cargo_spec::{CargoSpecPartial, CargoSpecUpdate};
 
-use crate::utils;
-use crate::models::{DaemonState, CargoSpecDb, Repository, FromSpec, ProcessDb};
+use crate::{
+  utils,
+  models::{DaemonState, CargoSpecDb, Repository, FromSpec, ProcessDb},
+};
 
 /// List cargoes
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -438,47 +440,6 @@ mod tests {
         Some("ghcr.io/nxthat/nanocl-get-started:latest".to_owned())
       );
     }
-    // let mut res = client
-    //   .send_get(
-    //     ENDPOINT,
-    //     Some(&CargoListQuery {
-    //       name: Some(test_cargoes[1].to_owned()),
-    //       namespace: None,
-    //       limit: None,
-    //       offset: None,
-    //     }),
-    //   )
-    //   .await;
-    // test_status_code!(
-    //   http::StatusCode::OK,
-    //   res.status(),
-    //   "basic cargo list filter name"
-    // );
-    // let cargoes = res.json::<Vec<CargoSummary>>().await.unwrap();
-    // assert_eq!(
-    //   cargoes[0].spec.name, test_cargoes[1],
-    //   "Expected to find cargo with name {} got {}",
-    //   test_cargoes[1], cargoes[0].spec.name
-    // );
-    // let mut res = client
-    //   .send_get(
-    //     ENDPOINT,
-    //     Some(&CargoListQuery {
-    //       name: None,
-    //       namespace: None,
-    //       limit: Some(1),
-    //       offset: None,
-    //     }),
-    //   )
-    //   .await;
-    // test_status_code!(
-    //   http::StatusCode::OK,
-    //   res.status(),
-    //   "basic cargo list limit 1"
-    // );
-    // let cargoes = res.json::<Vec<CargoSummary>>().await.unwrap();
-    // let len = cargoes.len();
-    // assert_eq!(len, 1, "Expected to find 1 cargo got {len}");
     let mut res = client
       .send_get(
         &format!("{ENDPOINT}/{main_test_cargo}/inspect"),

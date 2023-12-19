@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
 use diesel::prelude::*;
-use tokio::task::JoinHandle;
+use ntex::rt::JoinHandle;
 
 use nanocl_error::io::{IoError, IoResult};
 
-use nanocl_stubs::generic::GenericFilter;
-use nanocl_stubs::job::{Job, JobPartial};
+use nanocl_stubs::{
+  generic::GenericFilter,
+  job::{Job, JobPartial},
+};
 
-use crate::utils;
-use crate::schema::jobs;
+use crate::{utils, schema::jobs};
 
 use super::{Pool, Repository, FromSpec};
 
@@ -85,7 +86,7 @@ impl Repository for JobDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
-    log::debug!("JobDb::find_one filter: {filter:?}");
+    log::trace!("JobDb::find_one: {filter:?}");
     let query = jobs::dsl::jobs
       .order(jobs::dsl::created_at.desc())
       .into_boxed();
@@ -104,7 +105,7 @@ impl Repository for JobDb {
     filter: &GenericFilter,
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::debug!("JobDb::find filter: {filter:?}");
+    log::trace!("JobDb::find: {filter:?}");
     let mut query = jobs::dsl::jobs
       .order(jobs::dsl::created_at.desc())
       .into_boxed();

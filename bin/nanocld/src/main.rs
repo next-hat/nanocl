@@ -4,16 +4,16 @@ use nanocl_error::io::FromIo;
 use nanocl_utils::logger;
 
 mod cli;
-mod schema;
-mod models;
-mod version;
-mod node;
-mod boot;
-mod utils;
 mod config;
-mod server;
-mod services;
+mod schema;
+mod version;
+mod boot;
+mod models;
 mod event_emitter;
+mod server;
+mod repositories;
+mod utils;
+mod services;
 
 /// Provides an api to manage containers and virtual machines accross physical hosts
 /// There are these advantages :
@@ -25,12 +25,16 @@ async fn main() -> std::io::Result<()> {
   // Parse command line arguments
   let args = cli::Cli::parse();
   // Build env logger
+  #[cfg(any(feature = "dev", feature = "test"))]
+  {
+    std::env::set_var("LOG_LEVEL", "nanocld=trace");
+  }
   logger::enable_logger("nanocld");
   log::info!(
-    "nanocld_{}_{}_v{}:{}",
+    "nanocld_{}_v{}-{}:{}",
     version::ARCH,
-    version::CHANNEL,
     version::VERSION,
+    version::CHANNEL,
     version::COMMIT_ID
   );
   // Init config by comparing command line arguments and config file
@@ -41,12 +45,12 @@ async fn main() -> std::io::Result<()> {
     Ok(config) => config,
   };
   // Boot internal dependencies (database, event bus, etc...)
-  let daemon_state = boot::init(&config).await?;
-  if let Err(err) = node::join_cluster(&daemon_state).await {
-    err.print_and_exit();
-  }
-  // Register node to the cluster
-  node::register(&daemon_state).await?;
+  let daemon_state = match boot::init(&config).await {
+    Err(err) => {
+      err.print_and_exit();
+    }
+    Ok(daemon_state) => daemon_state,
+  };
   // Spawn proxy logger and metric logger
   utils::proxy::spawn_logger(&daemon_state);
   utils::metric::spawn_logger(&daemon_state);
