@@ -197,7 +197,7 @@ pub(crate) async fn sync_processes(state: &DaemonState) -> IoResult<()> {
       }
     }
   }
-  // TODO: delete zombie instances
+  // delete zombie instances (not in docker anymore) from our store if any
   let filter = GenericFilter::new()
     .r#where(
       "key",
