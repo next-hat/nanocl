@@ -74,10 +74,7 @@ conf-dir={}/dnsmasq.d,*.conf
   /// Ensure that dnsmasq as a minimal config
   #[inline]
   pub(crate) fn ensure(&self) -> IoResult<Self> {
-    log::info!(
-      "Ensuring a minimal dnsmasq config inside {}",
-      &self.config_dir
-    );
+    log::info!("dnsmasq::ensure: minimal config {}", &self.config_dir);
     fs::create_dir_all(format!("{}/dnsmasq.d", &self.config_dir)).map_err(
       |err| {
         err.map_err_context(|| {
@@ -90,7 +87,7 @@ conf-dir={}/dnsmasq.d,*.conf
     )?;
     self.gen_main_conf()?;
     self.set_dns()?;
-    log::info!("Minimal dnsmasq config is ensured");
+    log::info!("dnsmasq::ensure: done");
     Ok(self.clone())
   }
 
@@ -127,6 +124,7 @@ conf-dir={}/dnsmasq.d,*.conf
     data: &str,
   ) -> IoResult<()> {
     let file_path = format!("{}/dnsmasq.d/{name}.conf", &self.config_dir);
+    log::debug!("dnsmasq::write_config: {file_path}\n{data}");
     tokio::fs::write(file_path, data).await.map_err(|err| {
       err.map_err_context(|| format!("unable to write domains file for {name}"))
     })?;
@@ -135,6 +133,7 @@ conf-dir={}/dnsmasq.d,*.conf
 
   pub(crate) async fn read_config(&self, name: &str) -> IoResult<String> {
     let file_path = format!("{}/dnsmasq.d/{name}.conf", &self.config_dir);
+    log::debug!("dnsmasq::read_config: {file_path}");
     let content =
       tokio::fs::read_to_string(file_path).await.map_err(|err| {
         err
@@ -146,6 +145,7 @@ conf-dir={}/dnsmasq.d,*.conf
   /// Remove domain records file for dnsmasq
   pub(crate) async fn remove_config(&self, name: &str) -> IoResult<()> {
     let file_path = format!("{}/dnsmasq.d/{name}.conf", &self.config_dir);
+    log::debug!("dnsmasq::remove_config: {file_path}");
     tokio::fs::remove_file(file_path).await.map_err(|err| {
       err
         .map_err_context(|| format!("unable to remove domains file for {name}"))

@@ -18,7 +18,7 @@ pub fn print_last_line(path: &Path) {
   let file = match File::open(path) {
     Ok(file) => file,
     Err(e) => {
-      log::warn!("open file error: {:?}", e);
+      log::warn!("network_log::print_last_line: {e}");
       return;
     }
   };
@@ -26,7 +26,7 @@ pub fn print_last_line(path: &Path) {
   let mut pos = match buf_reader.seek(SeekFrom::End(-2)) {
     Ok(pos) => pos,
     Err(e) => {
-      log::warn!("seek error: {:?}", e);
+      log::warn!("network_log::print_last_line: {e}");
       return;
     }
   };
@@ -35,7 +35,7 @@ pub fn print_last_line(path: &Path) {
     match buf_reader.seek(SeekFrom::Start(pos)) {
       Ok(_) => {}
       Err(e) => {
-        log::warn!("seek error: {:?}", e);
+        log::warn!("network_log::print_last_line: {e}");
         return;
       }
     }
@@ -52,7 +52,7 @@ pub fn print_last_line(path: &Path) {
     .unwrap_or_default()
     .to_str()
     .unwrap_or_default();
-  log::debug!("{file_name}");
+  log::debug!("network_log::print_last_line: {file_name}");
   match file_name {
     "http.log" => {
       println!("#HTTP {last_line}");
@@ -71,7 +71,10 @@ pub(crate) fn spawn() {
   rt::Arbiter::new().exec_fn(|| {
     let path = Path::new("/var/log/nginx/access");
     if !path.exists() {
-      log::debug!("{} doesn't exists logs wont be saved", path.display());
+      log::warn!(
+        "network_log::spawn: {} doesn't exists logs wont be saved",
+        path.display()
+      );
       return;
     }
     let (tx, rx) = std::sync::mpsc::channel();
@@ -85,20 +88,20 @@ pub(crate) fn spawn() {
     ) {
       Ok(watcher) => watcher,
       Err(e) => {
-        log::warn!("watcher error: {:?}", e);
+        log::warn!("network_log::spawn: {e}");
         return;
       }
     };
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
     watcher.watch(path, RecursiveMode::Recursive).unwrap();
-    log::debug!("watching change of: {}", path.display());
+    log::debug!("network_log::spawn: watching {}", path.display());
     for res in rx {
       match res {
         Ok(event) => match &event.kind {
           notify::EventKind::Modify(e) => match e {
             notify::event::ModifyKind::Data(_) => {
-              log::debug!("modified event: {:?}", event);
+              log::debug!("network_log::spawn: modified event {event:?}");
               let path = &event.paths.get(0);
               if let Some(path) = path {
                 print_last_line(path)
@@ -108,11 +111,11 @@ pub(crate) fn spawn() {
             _ => {}
           },
           notify::EventKind::Other => {
-            log::debug!("other");
+            log::debug!("network_log::spawn: other");
           }
           _ => {}
         },
-        Err(e) => log::warn!("watch error: {e:?}"),
+        Err(e) => log::warn!("network_log::spawn: {e}"),
       }
     }
   });

@@ -33,6 +33,9 @@ pub struct InstallOpts {
   /// Installation template to use for nanocl by default it's detected
   #[clap(short, long)]
   pub(crate) template: Option<String>,
+  /// Force repull of the nanocl components
+  #[clap(short = 'p', long)]
+  pub(crate) force_pull: bool,
 }
 
 /// Arguments for the nanocl daemon used by the install template

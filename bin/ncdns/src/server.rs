@@ -7,7 +7,7 @@ use nanocld_client::NanocldClient;
 use crate::services;
 use crate::dnsmasq::Dnsmasq;
 
-pub fn generate(
+pub fn gen(
   host: &str,
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
@@ -41,8 +41,8 @@ pub fn generate(
   #[cfg(feature = "dev")]
   {
     server = server.bind("0.0.0.0:8787")?;
-    log::debug!("Running in dev mode, binding to: http://0.0.0.0:8787");
-    log::debug!("OpenAPI explorer available at: http://0.0.0.0:8787/explorer/");
+    log::debug!("server::gen: dev mode http://0.0.0.0:8787");
+    log::debug!("server::gen: swagger http://0.0.0.0:8787/explorer/");
   }
   Ok(server.run())
 }
@@ -57,9 +57,9 @@ mod tests {
   async fn generate_unix_and_tcp() -> IoResult<()> {
     let dnsmasq = Dnsmasq::new("/tmp/ncdns");
     let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
-    let server = generate("unix:///tmp/ncdns.sock", &dnsmasq, &client)?;
+    let server = gen("unix:///tmp/ncdns.sock", &dnsmasq, &client)?;
     server.stop(true).await;
-    let server = generate("tcp://0.0.0.0:9987", &dnsmasq, &client)?;
+    let server = gen("tcp://0.0.0.0:9987", &dnsmasq, &client)?;
     server.stop(true).await;
     Ok(())
   }
@@ -68,7 +68,7 @@ mod tests {
   fn generate_wrong_host() -> IoResult<()> {
     let dnsmasq = Dnsmasq::new("/tmp/ncdns");
     let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
-    let server = generate("wrong://dsadsa", &dnsmasq, &client);
+    let server = gen("wrong://dsadsa", &dnsmasq, &client);
     assert!(server.is_err());
     Ok(())
   }

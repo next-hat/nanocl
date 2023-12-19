@@ -6,7 +6,7 @@ use nanocl_utils::ntex::middlewares;
 use crate::services;
 use crate::nginx::Nginx;
 
-pub fn generate(
+pub fn gen(
   nginx: &Nginx,
   client: &NanocldClient,
 ) -> std::io::Result<ntex::server::Server> {
@@ -24,8 +24,8 @@ pub fn generate(
   #[cfg(feature = "dev")]
   {
     server = server.bind("0.0.0.0:8686")?;
-    log::debug!("Running in dev mode, binding to: http://0.0.0.0:8686");
-    log::debug!("OpenAPI explorer available at: http://0.0.0.0:8686/explorer/");
+    log::debug!("server::gen: dev mode http://0.0.0.0:8686");
+    log::debug!("server::gen: swagger http://0.0.0.0:8686/explorer/");
   }
   Ok(server.run())
 }

@@ -1,0 +1,11 @@
+ApiVersion: v0.12
+
+Resources:
+- Name: vpn-dns
+  Kind: DnsRule
+  Version: v0.4
+  Data:
+    Network: global.nsp
+    Entries:
+    - Name: test.com
+      IpAddress: global.nsp

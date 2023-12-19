@@ -65,12 +65,14 @@ pub(crate) async fn reload_service(client: &NanocldClient) -> IoResult<()> {
 }
 
 pub(crate) async fn update_entries(
+  key: &str,
   dns_rule: &ResourceDnsRule,
   dnsmasq: &Dnsmasq,
   client: &NanocldClient,
 ) -> IoResult<()> {
   let filter = GenericFilter::new()
     .r#where("kind", GenericClause::Eq("DnsRule".to_owned()))
+    .r#where("key", GenericClause::Ne(key.to_owned()))
     .r#where(
       "data",
       GenericClause::Contains(
@@ -80,7 +82,8 @@ pub(crate) async fn update_entries(
   let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
     err.map_err_context(|| "Unable to list resources from nanocl daemon")
   })?;
-  let mut entries = Vec::new();
+  log::debug!("utils::update_entries: {} resources", resources.len());
+  let mut entries = dns_rule.entries.clone();
   for resource in resources {
     let mut dns_rule = serde_json::from_value::<ResourceDnsRule>(
       resource.spec.data,
@@ -99,12 +102,13 @@ pub(crate) async fn update_entries(
       }
       _ => entry.ip_address.clone(),
     };
-    file_content += &format!("address=/{}/{}\n", entry.name, ip_address);
+    let entry = &format!("address=/{}/{}", entry.name, ip_address);
+    file_content += &format!("{entry}\n");
+    log::debug!("utils::update_entries: {entry}");
   }
   dnsmasq
     .write_config(&dns_rule.network, &file_content)
     .await?;
-  reload_service(client).await?;
   Ok(())
 }
 

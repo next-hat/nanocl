@@ -30,10 +30,10 @@ impl CtrlClient {
                 let path = url.trim_start_matches("unix://").to_owned();
                 async move { Ok(rt::unix_connect(path).await?) }
               }))
-              .timeout(ntex::time::Millis::from_secs(20))
+              .timeout(ntex::time::Millis::from_secs(50))
               .finish(),
           )
-          .timeout(ntex::time::Millis::from_secs(20))
+          .timeout(ntex::time::Millis::from_secs(50))
           .finish();
         (client, "http://localhost")
       }
