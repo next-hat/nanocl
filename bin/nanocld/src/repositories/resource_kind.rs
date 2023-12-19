@@ -44,8 +44,6 @@ impl RepositoryBase for ResourceKindVersionDb {}
 
 impl RepositoryCreate for ResourceKindVersionDb {}
 
-impl RepositoryDelByPk for ResourceKindVersionDb {}
-
 impl RepositoryRead for ResourceKindVersionDb {
   type Output = ResourceKindVersionDb;
   type Query = resource_kind_versions::BoxedQuery<'static, diesel::pg::Pg>;

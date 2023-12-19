@@ -1,4 +1,3 @@
-use diesel::ExpressionMethods;
 use serde_json::Value;
 use jsonschema::{Draft, JSONSchema};
 
@@ -169,12 +168,11 @@ pub(crate) async fn delete(
       .await??;
   }
   ResourceDb::delete_by_pk(&resource.spec.resource_key, &state.pool).await??;
-  ResourceSpecDb::delete_by(
-    crate::schema::resource_specs::dsl::resource_key
-      .eq(resource.spec.resource_key.to_owned()),
-    &state.pool,
-  )
-  .await??;
+  let filter = GenericFilter::new().r#where(
+    "resource_key",
+    GenericClause::Eq(resource.spec.resource_key.to_owned()),
+  );
+  ResourceSpecDb::del_by(&filter, &state.pool).await??;
   state
     .event_emitter
     .spawn_emit_to_event(resource, EventAction::Deleted);
