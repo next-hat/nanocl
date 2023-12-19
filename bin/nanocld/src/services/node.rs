@@ -1,19 +1,22 @@
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::time::Instant;
+use std::{rc::Rc, cell::RefCell, time::Instant};
 
-use nanocl_stubs::generic::GenericFilter;
-use ntex::{rt, ws, web};
-use ntex::channel::oneshot;
-use ntex::util::ByteString;
-use ntex::{Service, fn_service, chain};
-use ntex::service::{map_config, fn_shutdown, fn_factory_with_config};
+use ntex::{
+  rt, ws, web, Service, chain, fn_service,
+  channel::oneshot,
+  util::ByteString,
+  service::{map_config, fn_shutdown, fn_factory_with_config},
+};
 use futures::future::ready;
 
 use nanocl_error::http::HttpResult;
 
-use crate::utils;
-use crate::models::{DaemonState, WsConState, NodeDb, Repository};
+use nanocl_stubs::generic::GenericFilter;
+
+use crate::{
+  utils,
+  repositories::generic::*,
+  models::{DaemonState, WsConState, NodeDb},
+};
 
 /// List nodes
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -28,7 +31,7 @@ use crate::models::{DaemonState, WsConState, NodeDb, Repository};
 pub(crate) async fn list_node(
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let items = NodeDb::find(&GenericFilter::default(), &state.pool).await??;
+  let items = NodeDb::read(&GenericFilter::default(), &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 

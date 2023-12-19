@@ -96,6 +96,7 @@ diesel::table! {
     nodes (name) {
         name -> Varchar,
         ip_address -> Varchar,
+        created_at -> Timestamptz,
     }
 }
 
