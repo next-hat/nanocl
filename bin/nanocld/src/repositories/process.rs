@@ -19,9 +19,15 @@ impl RepositoryBase for ProcessDb {}
 
 impl RepositoryCreate for ProcessDb {}
 
+impl RepositoryUpdate for ProcessDb {
+  type UpdateItem = ProcessUpdateDb;
+}
+
+impl RepositoryDelByPk for ProcessDb {}
+
 /// Implement delete_by_pk and delete_by_id for ProcessDb
-impl RepositoryDelete for ProcessDb {
-  fn get_del_query(
+impl RepositoryDelBy for ProcessDb {
+  fn gen_del_query(
     filter: &GenericFilter,
   ) -> diesel::query_builder::BoxedDeleteStatement<
     'static,
@@ -84,10 +90,6 @@ impl RepositoryRead for ProcessDb {
     }
     query
   }
-}
-
-impl RepositoryUpdate for ProcessDb {
-  type UpdateItem = ProcessUpdateDb;
 }
 
 impl ProcessDb {

@@ -17,7 +17,7 @@ pub trait RepositoryUpdate: super::RepositoryBase {
   ) -> JoinHandle<IoResult<Self>>
   where
     T: Into<Self::UpdateItem>,
-    Pk: ToOwned + ?Sized,
+    Pk: ToOwned + ?Sized + std::fmt::Display,
     <Pk as ToOwned>::Owned: Send + 'static,
     Self: Sized + Send + associations::HasTable + 'static,
     <Self as associations::HasTable>::Table: diesel::query_dsl::methods::FindDsl<<Pk as ToOwned>::Owned> + associations::HasTable<Table = Self::Table>,
@@ -33,7 +33,7 @@ pub trait RepositoryUpdate: super::RepositoryBase {
     >:
       diesel::query_builder::AsQuery + diesel::query_dsl::LoadQuery<'static, diesel::pg::PgConnection, Self>,
   {
-    log::trace!("{}::update_by_pk", Self::get_name());
+    log::trace!("{}::update_by_pk: {pk}", Self::get_name());
     let pool = Arc::clone(pool);
     let pk = pk.to_owned();
     let values = values.into();

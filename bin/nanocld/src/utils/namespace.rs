@@ -16,7 +16,8 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
-  models::{Pool, DaemonState, CargoDb, NamespaceDb, Repository},
+  repositories::generic::*,
+  models::{Pool, DaemonState, CargoDb, NamespaceDb},
 };
 
 /// Create a new namespace with his associated network.
@@ -25,7 +26,7 @@ pub(crate) async fn create(
   item: &NamespacePartial,
   state: &DaemonState,
 ) -> HttpResult<Namespace> {
-  if NamespaceDb::find_by_pk(&item.name, &state.pool)
+  if NamespaceDb::read_by_pk(&item.name, &state.pool)
     .await?
     .is_ok()
   {
@@ -40,7 +41,7 @@ pub(crate) async fn create(
     .await
     .is_ok()
   {
-    let res = NamespaceDb::create(item, &state.pool).await??;
+    let res = NamespaceDb::create_from(item, &state.pool).await??;
     return Ok(Namespace { name: res.name });
   }
   let config = CreateNetworkOptions {
@@ -49,7 +50,7 @@ pub(crate) async fn create(
     ..Default::default()
   };
   state.docker_api.create_network(config).await?;
-  let res = NamespaceDb::create(item, &state.pool).await??;
+  let res = NamespaceDb::create_from(item, &state.pool).await??;
   Ok(Namespace { name: res.name })
 }
 
@@ -59,7 +60,7 @@ pub(crate) async fn delete_by_name(
   state: &DaemonState,
 ) -> HttpResult<()> {
   utils::cargo::delete_by_namespace(name, state).await?;
-  NamespaceDb::delete_by_pk(name, &state.pool).await??;
+  NamespaceDb::del_by_pk(name, &state.pool).await??;
   if let Err(err) = state.docker_api.remove_network(name).await {
     log::error!("Unable to remove network {} got error: {}", name, err);
   }
@@ -85,11 +86,11 @@ pub(crate) async fn list_instances(
 
 /// List all existing namespaces
 pub(crate) async fn list(
-  query: &GenericFilter,
+  filter: &GenericFilter,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> HttpResult<Vec<NamespaceSummary>> {
-  let items = NamespaceDb::find(query, pool).await??;
+  let items = NamespaceDb::read(filter, pool).await??;
   let mut new_items = Vec::new();
   for item in items {
     let cargo_count = CargoDb::count_by_namespace(&item.name, pool).await?;
@@ -123,10 +124,8 @@ pub(crate) async fn inspect_by_name(
   name: &str,
   state: &DaemonState,
 ) -> HttpResult<NamespaceInspect> {
-  let namespace = NamespaceDb::find_by_pk(name, &state.pool).await??;
-  log::debug!("Found namespace to inspect {:?}", &namespace);
+  let namespace = NamespaceDb::read_by_pk(name, &state.pool).await??;
   let models = CargoDb::find_by_namespace(&namespace.name, &state.pool).await?;
-  log::debug!("Found namespace cargoes to inspect {:?}", &models);
   let mut cargoes = Vec::new();
   for cargo in models {
     let cargo =
@@ -149,7 +148,7 @@ pub(crate) async fn create_if_not_exists(
   name: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  if NamespaceDb::find_by_pk(name, &state.pool).await?.is_err() {
+  if NamespaceDb::read_by_pk(name, &state.pool).await?.is_err() {
     create(
       &NamespacePartial {
         name: name.to_owned(),

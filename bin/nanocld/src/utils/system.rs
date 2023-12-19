@@ -90,7 +90,7 @@ pub(crate) async fn register_namespace(
   create_network: bool,
   state: &DaemonState,
 ) -> IoResult<()> {
-  if NamespaceDb::find_by_pk(name, &state.pool).await?.is_ok() {
+  if NamespaceDb::read_by_pk(name, &state.pool).await?.is_ok() {
     return Ok(());
   }
   let new_nsp = NamespacePartial {
@@ -99,7 +99,7 @@ pub(crate) async fn register_namespace(
   if create_network {
     utils::namespace::create(&new_nsp, state).await?;
   } else {
-    NamespaceDb::create(&new_nsp, &state.pool).await??;
+    NamespaceDb::create_from(&new_nsp, &state.pool).await??;
   }
   Ok(())
 }
