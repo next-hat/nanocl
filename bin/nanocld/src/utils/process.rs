@@ -33,8 +33,8 @@ async fn after(
       state.event_emitter.spawn_emit_to_event(&vm, action);
     }
     ProcessKind::Cargo => {
-      let vm = CargoDb::find_one(&filter, &state.pool).await??;
-      state.event_emitter.spawn_emit_to_event(&vm, action);
+      let cargo = CargoDb::read_one_with_spec(&filter, &state.pool).await??;
+      state.event_emitter.spawn_emit_to_event(&cargo, action);
     }
     ProcessKind::Job => {
       JobDb::update_by_pk(
@@ -170,7 +170,7 @@ pub(crate) async fn remove(
       }
     },
   };
-  ProcessDb::delete_by_pk(key, &state.pool).await??;
+  ProcessDb::del_by_pk(key, &state.pool).await??;
   Ok(())
 }
 

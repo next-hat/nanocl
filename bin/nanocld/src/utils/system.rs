@@ -204,7 +204,7 @@ pub(crate) async fn sync_processes(state: &DaemonState) -> IoResult<()> {
       GenericClause::NotIn(ids.iter().map(|id| id.to_owned()).collect()),
     )
     .r#where("node_key", GenericClause::Eq(state.config.hostname.clone()));
-  ProcessDb::delete_by_filter(&filter, &state.pool).await??;
+  ProcessDb::del_by(&filter, &state.pool).await??;
   log::info!("system::sync_processes: done");
   Ok(())
 }
