@@ -4,15 +4,16 @@ use nanocl_error::io::FromIo;
 use nanocl_utils::logger;
 
 mod cli;
+mod config;
 mod schema;
-mod models;
 mod version;
 mod boot;
-mod utils;
-mod config;
-mod server;
-mod services;
+mod models;
 mod event_emitter;
+mod server;
+mod repositories;
+mod utils;
+mod services;
 
 /// Provides an api to manage containers and virtual machines accross physical hosts
 /// There are these advantages :

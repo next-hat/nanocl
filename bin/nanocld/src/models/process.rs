@@ -15,7 +15,7 @@ use crate::{utils, gen_where4string, schema::processes};
 use super::{Pool, Repository};
 
 /// Represents a process (job, cargo, vm) in the database
-#[derive(Clone, Queryable, Identifiable, Insertable)]
+#[derive(Clone, Queryable, Identifiable, Insertable, Selectable)]
 #[diesel(primary_key(key))]
 #[diesel(table_name = processes)]
 pub struct ProcessDb {
@@ -95,23 +95,7 @@ impl Repository for ProcessDb {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Self::Item>> {
     log::trace!("ProcesssDb::find_one: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = processes::dsl::processes.into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, processes::dsl::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, processes::dsl::name, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, processes::dsl::kind, value);
-    }
-    if let Some(value) = r#where.get("node_key") {
-      gen_where4string!(query, processes::dsl::node_key, value);
-    }
-    if let Some(value) = r#where.get("kind_key") {
-      gen_where4string!(query, processes::dsl::kind_key, value);
-    }
+    let query = gen_query(filter, false);
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -128,30 +112,7 @@ impl Repository for ProcessDb {
     pool: &Pool,
   ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
     log::trace!("ProcesssDb::find: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = processes::dsl::processes
-      .order(processes::dsl::created_at.desc())
-      .into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, processes::dsl::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, processes::dsl::name, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, processes::dsl::kind, value);
-    }
-    if let Some(value) = r#where.get("node_key") {
-      gen_where4string!(query, processes::dsl::node_key, value);
-    }
-    if let Some(value) = r#where.get("kind_key") {
-      gen_where4string!(query, processes::dsl::kind_key, value);
-    }
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
+    let query = gen_query(filter, true);
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
@@ -164,6 +125,38 @@ impl Repository for ProcessDb {
       Ok::<_, IoError>(items)
     })
   }
+}
+
+fn gen_query(
+  filter: &GenericFilter,
+  is_multiple: bool,
+) -> processes::BoxedQuery<'static, diesel::pg::Pg> {
+  let r#where = filter.r#where.to_owned().unwrap_or_default();
+  let mut query = processes::dsl::processes.into_boxed();
+  if let Some(value) = r#where.get("key") {
+    gen_where4string!(query, processes::dsl::key, value);
+  }
+  if let Some(value) = r#where.get("name") {
+    gen_where4string!(query, processes::dsl::name, value);
+  }
+  if let Some(value) = r#where.get("kind") {
+    gen_where4string!(query, processes::dsl::kind, value);
+  }
+  if let Some(value) = r#where.get("node_key") {
+    gen_where4string!(query, processes::dsl::node_key, value);
+  }
+  if let Some(value) = r#where.get("kind_key") {
+    gen_where4string!(query, processes::dsl::kind_key, value);
+  }
+  if is_multiple {
+    query = query.order(processes::dsl::created_at.desc());
+    let limit = filter.limit.unwrap_or(100);
+    query = query.limit(limit as i64);
+    if let Some(offset) = filter.offset {
+      query = query.offset(offset as i64);
+    }
+  }
+  query
 }
 
 impl ProcessDb {

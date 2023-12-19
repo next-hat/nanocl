@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use ntex::rt::JoinHandle;
 use diesel::{
-  RunQueryDsl, associations, query_builder, pg, query_dsl,
+  RunQueryDsl, query_builder, pg, query_dsl, associations,
   query_dsl::methods::{FindDsl, FilterDsl},
 };
 
@@ -155,7 +155,7 @@ pub trait Repository {
   where
     Pk: ToOwned + ?Sized,
     <Pk as ToOwned>::Owned: Send + 'static,
-    Self: std::marker::Sized + Send + 'static,
+    Self: Sized + Send + 'static,
     Self::Table: query_dsl::methods::FindDsl<<Pk as ToOwned>::Owned>
       + associations::HasTable<Table = Self::Table>,
     diesel::dsl::Find<Self::Table, <Pk as ToOwned>::Owned>:
@@ -225,8 +225,7 @@ pub trait Repository {
       <diesel::helper_types::Filter<Self::Table, P> as query_builder::IntoUpdateTarget>::WhereClause,
     >: query_builder::QueryFragment<pg::Pg> + query_builder::QueryId,
     P: Send + 'static,
-    {
-    log::trace!("{}::delete_by", Self::get_name());
+  {
     let pool = Arc::clone(pool);
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;

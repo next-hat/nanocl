@@ -15,6 +15,7 @@ use nanocl_stubs::{
 
 use crate::{
   utils, version,
+  repositories::generic::*,
   models::{
     DaemonState, ProcessUpdateDb, CargoDb, ProcessDb, Repository, NamespaceDb,
     VmImageDb,
@@ -72,7 +73,7 @@ pub(crate) async fn sync_process(
           })?,
         ),
       };
-      ProcessDb::create(&new_instance, &state.pool).await??;
+      ProcessDb::create_from(&new_instance, &state.pool).await??;
       log::info!("system::sync_process: {name} created");
     }
   }
@@ -197,6 +198,13 @@ pub(crate) async fn sync_processes(state: &DaemonState) -> IoResult<()> {
     }
   }
   // TODO: delete zombie instances
+  let filter = GenericFilter::new()
+    .r#where(
+      "key",
+      GenericClause::NotIn(ids.iter().map(|id| id.to_owned()).collect()),
+    )
+    .r#where("node_key", GenericClause::Eq(state.config.hostname.clone()));
+  ProcessDb::delete_by_filter(&filter, &state.pool).await??;
   log::info!("system::sync_processes: done");
   Ok(())
 }

@@ -165,6 +165,30 @@ impl Repository for CargoSpecDb {
   }
 }
 
+// impl RepositoryDelete for CargoSpecDb {
+//   type Table = cargo_specs::table;
+
+//   fn get_delete_query(
+//     filter: &GenericFilter,
+//   ) -> DeleteStatement<
+//     <Self::Table as HasTable>::Table,
+//     <Self::Table as IntoUpdateTarget>::WhereClause,
+//   > {
+//     let r#where = filter.r#where.to_owned().unwrap_or_default();
+//     let mut query = diesel::delete(cargo_specs::dsl::cargo_specs).into_boxed();
+//     if let Some(value) = r#where.get("cargo_key") {
+//       gen_where4string!(query, cargo_specs::dsl::cargo_key, value);
+//     }
+//     if let Some(value) = r#where.get("version") {
+//       gen_where4string!(query, cargo_specs::dsl::version, value);
+//     }
+//     if let Some(value) = r#where.get("data") {
+//       gen_where4json!(query, cargo_specs::dsl::data, value);
+//     }
+//     query
+//   }
+// }
+
 impl CargoSpecDb {
   pub(crate) async fn find_by_cargo(
     name: &str,
