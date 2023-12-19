@@ -9,21 +9,7 @@ impl RepositoryBase for NamespaceDb {}
 
 impl RepositoryCreate for NamespaceDb {}
 
-impl RepositoryDelete for NamespaceDb {
-  fn gen_del_query(
-    _filter: &GenericFilter,
-  ) -> diesel::query_builder::BoxedDeleteStatement<
-    'static,
-    diesel::pg::Pg,
-    <Self as diesel::associations::HasTable>::Table,
-  >
-  where
-    Self: diesel::associations::HasTable,
-  {
-    let query = diesel::delete(namespaces::table).into_boxed();
-    query
-  }
-}
+impl RepositoryDelByPk for NamespaceDb {}
 
 impl RepositoryRead for NamespaceDb {
   type Output = NamespaceDb;

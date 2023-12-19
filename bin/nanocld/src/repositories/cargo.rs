@@ -29,28 +29,7 @@ impl RepositoryUpdate for CargoDb {
   type UpdateItem = CargoUpdateDb;
 }
 
-impl RepositoryDelete for CargoDb {
-  fn gen_del_query(
-    filter: &GenericFilter,
-  ) -> diesel::query_builder::BoxedDeleteStatement<
-    'static,
-    diesel::pg::Pg,
-    <Self as diesel::associations::HasTable>::Table,
-  >
-  where
-    Self: diesel::associations::HasTable,
-  {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = diesel::delete(cargoes::dsl::cargoes).into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, cargoes::dsl::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, cargoes::dsl::name, value);
-    }
-    query
-  }
-}
+impl RepositoryDelByPk for CargoDb {}
 
 impl RepositoryReadWithSpec for CargoDb {
   type Output = Cargo;
