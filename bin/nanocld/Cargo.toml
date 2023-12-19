@@ -67,7 +67,7 @@ diesel = { version = "2.1.2", features = [
   "serde_json",
 ] }
 tokio = { version = "1.34.0", features = ["fs", "process", "io-std"] }
-hyper = "0.14.27"
+hyper = "1.1.0"
 tokio-util = "0.7.9"
 futures-util = "0.3.26"
 libc = "0.2.139"
