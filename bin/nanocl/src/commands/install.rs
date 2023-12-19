@@ -133,7 +133,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       format!("Cargo {} image", cargo.name),
       "invalid format expect image:tag".into(),
     ))?;
-    if docker.inspect_image(&image).await.is_err() {
+    if docker.inspect_image(&image).await.is_err() || args.force_pull {
       utils::docker::install_image(from_image, tag, &docker).await?;
     }
     let container = utils::docker::create_cargo_container(
