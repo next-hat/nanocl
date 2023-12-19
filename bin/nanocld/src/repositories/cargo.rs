@@ -30,7 +30,7 @@ impl RepositoryUpdate for CargoDb {
 }
 
 impl RepositoryDelete for CargoDb {
-  fn get_del_query(
+  fn gen_del_query(
     filter: &GenericFilter,
   ) -> diesel::query_builder::BoxedDeleteStatement<
     'static,

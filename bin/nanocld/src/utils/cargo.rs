@@ -474,7 +474,7 @@ pub(crate) async fn list(
     })?
     .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
   // ensure namespace exists
-  NamespaceDb::find_by_pk(&namespace, &state.pool).await??;
+  NamespaceDb::read_by_pk(&namespace, &state.pool).await??;
   let cargoes = CargoDb::read_with_spec(&filter, &state.pool).await??;
   let mut cargo_summaries = Vec::new();
   for cargo in cargoes {
@@ -528,7 +528,7 @@ pub(crate) async fn delete_by_namespace(
   namespace: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let namespace = NamespaceDb::find_by_pk(namespace, &state.pool).await??;
+  let namespace = NamespaceDb::read_by_pk(namespace, &state.pool).await??;
   let cargoes =
     CargoDb::find_by_namespace(&namespace.name, &state.pool).await?;
   cargoes

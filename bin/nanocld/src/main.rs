@@ -67,6 +67,6 @@ async fn main() -> std::io::Result<()> {
       }
     }
   }
-  log::info!("shutdown");
+  log::info!("main: shutdown");
   Ok(())
 }

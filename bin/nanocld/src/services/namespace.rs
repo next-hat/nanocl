@@ -2,11 +2,16 @@ use ntex::web;
 
 use nanocl_error::http::{HttpResult, HttpError};
 
-use nanocl_stubs::generic::{GenericFilter, GenericListQuery};
-use nanocl_stubs::namespace::NamespacePartial;
+use nanocl_stubs::{
+  generic::{GenericFilter, GenericListQuery},
+  namespace::NamespacePartial,
+};
 
-use crate::utils;
-use crate::models::{DaemonState, Repository, NamespaceDb};
+use crate::{
+  utils,
+  models::{DaemonState, NamespaceDb},
+  repositories::generic::RepositoryRead,
+};
 
 /// List namespaces
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -92,7 +97,7 @@ pub(crate) async fn delete_namespace(
   state: web::types::State<DaemonState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  NamespaceDb::find_by_pk(&path.1, &state.pool).await??;
+  NamespaceDb::read_by_pk(&path.1, &state.pool).await??;
   utils::namespace::delete_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Accepted().into())
 }

@@ -21,7 +21,7 @@ impl RepositoryCreate for ProcessDb {}
 
 /// Implement delete_by_pk and delete_by_id for ProcessDb
 impl RepositoryDelete for ProcessDb {
-  fn get_del_query(
+  fn gen_del_query(
     filter: &GenericFilter,
   ) -> diesel::query_builder::BoxedDeleteStatement<
     'static,

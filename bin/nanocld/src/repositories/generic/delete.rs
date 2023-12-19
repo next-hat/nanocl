@@ -10,7 +10,7 @@ use nanocl_stubs::generic::GenericFilter;
 use crate::{utils, models::Pool};
 
 pub trait RepositoryDelete: super::RepositoryBase {
-  fn get_del_query(
+  fn gen_del_query(
     filter: &GenericFilter,
   ) -> diesel::query_builder::BoxedDeleteStatement<
     'static,
@@ -59,7 +59,7 @@ pub trait RepositoryDelete: super::RepositoryBase {
     let pool = Arc::clone(pool);
     let filter = filter.clone();
     ntex::rt::spawn_blocking(move || {
-      let query = Self::get_del_query(&filter);
+      let query = Self::gen_del_query(&filter);
       let mut conn = utils::store::get_pool_conn(&pool)?;
       query.execute(&mut conn).map_err(Self::map_err)?;
       Ok(())

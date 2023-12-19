@@ -18,6 +18,7 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
+  repositories::generic::*,
   models::{
     Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, Repository, VmDb,
     VmSpecDb, FromSpec,
@@ -74,7 +75,7 @@ pub(crate) async fn list_by_namespace(
   nsp: &str,
   pool: &Pool,
 ) -> HttpResult<Vec<VmSummary>> {
-  let namespace = NamespaceDb::find_by_pk(nsp, pool).await??;
+  let namespace = NamespaceDb::read_by_pk(nsp, pool).await??;
   let vmes = VmDb::find_by_namespace(&namespace.name, pool).await?;
   let mut vm_summaries = Vec::new();
   for vm in vmes {
