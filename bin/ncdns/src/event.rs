@@ -10,7 +10,7 @@ use nanocld_client::stubs::resource::ResourcePartial;
 
 use crate::version;
 
-async fn ensure_resource_config(client: &NanocldClient) -> IoResult<()> {
+async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   let formated_version = versioning::format_version(version::VERSION);
   let dns_rule_kind = ResourcePartial {
     kind: "Kind".to_owned(),
@@ -31,11 +31,11 @@ async fn ensure_resource_config(client: &NanocldClient) -> IoResult<()> {
           HttpClientError::HttpError(err)
             if err.status == http::StatusCode::CONFLICT =>
           {
-            log::info!("DnsRule already exists. Skipping.");
+            log::info!("event::ensure_self_config: up to date");
             return Ok(());
           }
           _ => {
-            log::warn!("Unable to create DnsRule: {err}");
+            log::warn!("event::ensure_self_config: {err}");
             return Err(err.into());
           }
         }
@@ -48,11 +48,11 @@ async fn ensure_resource_config(client: &NanocldClient) -> IoResult<()> {
           HttpClientError::HttpError(err)
             if err.status == http::StatusCode::CONFLICT =>
           {
-            log::info!("DnsRule already exists. Skipping.");
+            log::info!("event::ensure_self_config: up to date");
             return Ok(());
           }
           _ => {
-            log::warn!("Unable to create DnsRule: {err}");
+            log::warn!("event::ensure_self_config: {err}");
             return Err(err.into());
           }
         }
@@ -64,19 +64,19 @@ async fn ensure_resource_config(client: &NanocldClient) -> IoResult<()> {
 
 async fn r#loop(client: &NanocldClient) {
   loop {
-    log::info!("Subscribing to nanocl daemon events..");
+    log::info!("event::loop: subscribing to nanocld events");
     match client.watch_events().await {
       Err(err) => {
-        log::warn!("Unable to Subscribe to nanocl daemon events: {err}");
+        log::warn!("event::loop: {err}");
       }
       Ok(_) => {
-        log::info!("Subscribed to nanocl daemon events");
-        if ensure_resource_config(client).await.is_ok() {
+        log::info!("event::loop: subscribed to nanocld events");
+        if ensure_self_config(client).await.is_ok() {
           break;
         }
       }
     }
-    log::warn!("Retrying to subscribe in 2 seconds");
+    log::warn!("event::loop: retrying in 2 seconds");
     ntex::time::sleep(std::time::Duration::from_secs(2)).await;
   }
 }
@@ -87,6 +87,7 @@ pub(crate) fn spawn(client: &NanocldClient) {
   rt::Arbiter::new().exec_fn(move || {
     ntex::rt::spawn(async move {
       r#loop(&client).await;
+      rt::Arbiter::current().stop();
     });
   });
 }

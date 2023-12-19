@@ -98,18 +98,33 @@ async fn create_cargo_upstream(
       .unwrap_or_default();
     let network = networks.get(&processes.namespace_name);
     let Some(network) = network else {
-      log::warn!("empty ip address for cargo {}", &processes.spec.name);
-      log::warn!("Instance is unhealthy, skipping");
+      log::warn!(
+        "utils::create_cargo_upstream: {} as empty address",
+        &processes.spec.name
+      );
+      log::warn!(
+        "utils::create_cargo_upstream: instance is unhealthy, skipping"
+      );
       continue;
     };
     let Some(ip_address) = network.ip_address.clone() else {
-      log::warn!("empty ip address for cargo {}", &processes.spec.name);
-      log::warn!("Instance is unhealthy, skipping");
+      log::warn!(
+        "utils::create_cargo_upstream: {} as empty address",
+        &processes.spec.name
+      );
+      log::warn!(
+        "utils::create_cargo_upstream: instance is unhealthy, skipping"
+      );
       continue;
     };
     if ip_address.is_empty() {
-      log::warn!("empty ip address for cargo {}", &processes.spec.name);
-      log::warn!("Instance is unhealthy, skipping");
+      log::warn!(
+        "utils::create_cargo_upstream: {} as empty address",
+        &processes.spec.name
+      );
+      log::warn!(
+        "utils::create_cargo_upstream: instance is unhealthy, skipping"
+      );
       continue;
     }
     ip_addresses.push(ip_address);
@@ -123,7 +138,10 @@ async fn create_cargo_upstream(
       ),
     ));
   }
-  log::debug!("ip_addresses: {:?}", ip_addresses);
+  log::debug!(
+    "utils::create_cargo_upstream: {} has ip_addresses {ip_addresses:#?}",
+    &processes.spec.name
+  );
   let upstream_key = format!("cargo-{}-{}", processes.spec.cargo_key, port);
   let upstream = format!(
     "
@@ -161,23 +179,35 @@ async fn create_vm_upstream(
       .unwrap_or_default();
     let network = networks.get(&vm.namespace_name);
     let Some(network) = network else {
-      log::warn!("empty ip address for vm {}", &vm.spec.name);
-      log::warn!("Instance is unhealthy, skipping");
+      log::warn!(
+        "utils::create_vm_upstream: {} as empty ip address",
+        &vm.spec.name
+      );
+      log::warn!("utils::create_vm_upstream: instance is unhealthy, skipping");
       continue;
     };
     let Some(ip_address) = network.ip_address.clone() else {
-      log::warn!("empty ip address for cargo {}", &vm.spec.name);
-      log::warn!("Instance is unhealthy, skipping");
+      log::warn!(
+        "utils::create_vm_upstream: {} as empty ip address",
+        &vm.spec.name
+      );
+      log::warn!("utils::create_vm_upstream: instance is unhealthy, skipping");
       continue;
     };
     if ip_address.is_empty() {
-      log::warn!("empty ip address for cargo {}", &vm.spec.name);
-      log::warn!("Instance is unhealthy, skipping");
+      log::warn!(
+        "utils::create_vm_upstream: {} as empty ip address",
+        &vm.spec.name
+      );
+      log::warn!("utils::create_vm_upstream: instance is unhealthy, skipping");
       continue;
     }
     ip_addresses.push(ip_address);
   }
-  log::debug!("ip_addresses: {:?}", ip_addresses);
+  log::debug!(
+    "utils::create_vm_upstream: {} has ip_addresses {ip_addresses:?}",
+    &vm.spec.name
+  );
   let upstream_key = format!("vm-{}-{}", vm.spec.vm_key, port);
   let upstream = format!(
     "
@@ -289,7 +319,6 @@ async fn gen_locations(
           gen_upstream(&NginxConfKind::Site, upstream_target, client, nginx)
             .await
         else {
-          log::warn!("Unable to generate cargo upstream for location rule {:?} got error", rule);
           continue;
         };
         let disable_logging =
@@ -543,6 +572,7 @@ async fn resource_to_nginx_conf(
   name: &str,
   resource_proxy: &ResourceProxyRule,
 ) -> IoResult<()> {
+  log::info!("utils::resource_to_nginx_conf: {name}");
   let mut http_conf = String::new();
   let mut stream_conf = String::new();
   for rule in resource_proxy.rules.iter() {
@@ -555,18 +585,17 @@ async fn resource_to_nginx_conf(
       }
     }
   }
-  log::info!("Generating conf for {name}");
   if !http_conf.is_empty() {
     nginx
       .write_conf_file(name, &http_conf, &NginxConfKind::Site)
       .await?;
-    log::debug!("HTTP config generated:\n{http_conf}");
+    log::debug!("utils::resource_to_nginx_conf: http\n{http_conf}");
   }
   if !stream_conf.is_empty() {
     nginx
       .write_conf_file(name, &stream_conf, &NginxConfKind::Stream)
       .await?;
-    log::debug!("Stream config generated:\n{stream_conf}");
+    log::debug!("utils::resource_to_nginx_conf: stream\n{stream_conf}");
   }
   Ok(())
 }
@@ -574,7 +603,7 @@ async fn resource_to_nginx_conf(
 /// Reload the proxy configuration
 /// This function will reload the nginx configuration
 pub(crate) async fn reload_config(client: &NanocldClient) -> IoResult<()> {
-  log::info!("Reloading proxy configuration");
+  log::info!("utils::reload_config: start");
   let exec_options = CreateExecOptions {
     attach_stderr: Some(true),
     attach_stdout: Some(true),
@@ -603,7 +632,7 @@ pub(crate) async fn reload_config(client: &NanocldClient) -> IoResult<()> {
   match inspect_result.exit_code {
     Some(code) => {
       if code == 0 {
-        log::info!("Proxy configuration reloaded");
+        log::info!("utils::reload_config: done");
         return Ok(());
       }
       Err(IoError::invalid_data("nproxy reload", &output))
@@ -668,7 +697,6 @@ pub(crate) async fn list_resource_by_cargo(
 ) -> IoResult<Vec<nanocld_client::stubs::resource::Resource>> {
   let namespace = namespace.unwrap_or("global".into());
   let target_key = format!("{name}.{namespace}.c");
-  log::debug!("matching resources for target: {target_key}");
   let filter = GenericFilter::new()
   .r#where("kind", GenericClause::Eq("ProxyRule".to_owned()))
   .r#where(

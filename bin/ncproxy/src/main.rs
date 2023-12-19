@@ -15,10 +15,10 @@ async fn main() -> std::io::Result<()> {
   let cli = cli::Cli::parse();
   logger::enable_logger("ncproxy");
   log::info!(
-    "ncproxy_{}_{}_v{}:{}",
+    "ncproxy_{}_v{}-{}:{}",
     version::ARCH,
-    version::CHANNEL,
     version::VERSION,
+    version::CHANNEL,
     version::COMMIT_ID
   );
   let (nginx, client) = match subsystem::init(&cli).await {
@@ -27,7 +27,7 @@ async fn main() -> std::io::Result<()> {
     }
     Ok(nginx) => nginx,
   };
-  let server = server::generate(&nginx, &client)?;
+  let server = server::gen(&nginx, &client)?;
   server.await?;
   Ok(())
 }

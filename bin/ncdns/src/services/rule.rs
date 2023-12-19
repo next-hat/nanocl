@@ -25,10 +25,10 @@ pub(crate) async fn apply_rule(
   // To follow the ressource service convention, we have to use a tuple
   client: web::types::State<NanocldClient>,
   dnsmasq: web::types::State<dnsmasq::Dnsmasq>,
-  _path: web::types::Path<(String, String)>,
+  path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceDnsRule>,
 ) -> Result<web::HttpResponse, HttpError> {
-  utils::update_entries(&payload, &dnsmasq, &client).await?;
+  utils::update_entries(&path.1, &payload, &dnsmasq, &client).await?;
   utils::reload_service(&client).await?;
   Ok(web::HttpResponse::Ok().json(&payload.into_inner()))
 }

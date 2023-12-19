@@ -127,7 +127,7 @@ impl Nginx {
       format!("{}/sites-enabled/default", self.conf_dir),
     )
     .await;
-    log::debug!("Writing default file conf:\n {default_conf}");
+    log::debug!("nginx::ensure_default_conf: {path}\n {default_conf}");
     Ok(())
   }
 

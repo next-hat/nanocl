@@ -19,10 +19,10 @@ use dnsmasq::Dnsmasq;
 async fn run(cli: &Cli) -> IoResult<()> {
   logger::enable_logger("ncdns");
   log::info!(
-    "ncdns_{}_{}_v{}:{}",
+    "ncdns_{}_v{}-{}:{}",
     version::ARCH,
-    version::CHANNEL,
     version::VERSION,
+    version::CHANNEL,
     version::COMMIT_ID
   );
   // Spawn a new thread to listen events from nanocld
@@ -35,7 +35,7 @@ async fn run(cli: &Cli) -> IoResult<()> {
     client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
   }
   event::spawn(&client);
-  let server = server::generate(&cli.host, &dnsmasq, &client)?;
+  let server = server::gen(&cli.host, &dnsmasq, &client)?;
   server.await?;
   Ok(())
 }
