@@ -1,18 +1,6 @@
-use std::sync::Arc;
-
 use diesel::prelude::*;
-use ntex::rt::JoinHandle;
 
-use nanocl_error::io::{IoError, IoResult};
-
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
-
-use crate::{
-  utils, gen_where4string,
-  schema::{resource_kinds, resource_kind_versions},
-};
-
-use super::{Repository, Pool};
+use crate::schema::{resource_kinds, resource_kind_versions};
 
 /// This structure represent the resource kind verion in the database.
 /// A resource kind version represent the version of a resource kind.
@@ -73,142 +61,11 @@ impl From<&ResourceKindPartial> for ResourceKindVersionDb {
   }
 }
 
-impl Repository for ResourceKindVersionDb {
-  type Table = resource_kind_versions::table;
-  type Item = ResourceKindVersionDb;
-  type UpdateItem = ResourceKindVersionDb;
-
-  fn find_one(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Item>> {
-    log::trace!("ResourceKindVersionDb::find_one: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query =
-      resource_kind_versions::dsl::resource_kind_versions.into_boxed();
-    if let Some(value) = r#where.get("resource_kind_name") {
-      gen_where4string!(
-        query,
-        resource_kind_versions::dsl::resource_kind_name,
-        value
-      );
-    }
-    if let Some(value) = r#where.get("version") {
-      gen_where4string!(query, resource_kind_versions::dsl::version, value);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_result::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(items)
-    })
-  }
-
-  fn find(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::trace!("ResourceKindVersionDb::find: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query =
-      resource_kind_versions::dsl::resource_kind_versions.into_boxed();
-    if let Some(value) = r#where.get("resource_kind_name") {
-      gen_where4string!(
-        query,
-        resource_kind_versions::dsl::resource_kind_name,
-        value
-      );
-    }
-    if let Some(value) = r#where.get("version") {
-      gen_where4string!(query, resource_kind_versions::dsl::version, value);
-    }
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_results::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(items)
-    })
-  }
-}
-
-impl ResourceKindVersionDb {
-  pub(crate) async fn get_version(
-    name: &str,
-    version: &str,
-    pool: &Pool,
-  ) -> IoResult<ResourceKindVersionDb> {
-    let filter = GenericFilter::new()
-      .r#where("resource_kind_name", GenericClause::Eq(name.to_owned()))
-      .r#where("version", GenericClause::Eq(version.to_owned()));
-    ResourceKindVersionDb::find_one(&filter, pool).await?
-  }
-}
-
 impl From<&ResourceKindPartial> for ResourceKindDb {
   fn from(p: &ResourceKindPartial) -> Self {
     ResourceKindDb {
       name: p.name.clone(),
       created_at: chrono::Utc::now().naive_utc(),
     }
-  }
-}
-
-impl Repository for ResourceKindDb {
-  type Table = resource_kinds::table;
-  type Item = ResourceKindDb;
-  type UpdateItem = ResourceKindDb;
-
-  fn find_one(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Item>> {
-    log::trace!("ResourceKindDb::find_one: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = resource_kinds::dsl::resource_kinds.into_boxed();
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, resource_kinds::dsl::name, value);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_result::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(item)
-    })
-  }
-
-  fn find(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::trace!("ResourceKindDb::find: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = resource_kinds::dsl::resource_kinds.into_boxed();
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, resource_kinds::dsl::name, value);
-    }
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_results::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(items)
-    })
   }
 }

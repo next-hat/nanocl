@@ -7,11 +7,15 @@ use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
   system::EventAction,
   resource::{Resource, ResourcePartial},
+  generic::{GenericFilter, GenericClause},
 };
 
-use crate::models::{
-  Pool, ResourceKindPartial, DaemonState, ResourceKindVersionDb, Repository,
-  ResourceKindDb, ResourceSpecDb, ResourceDb,
+use crate::{
+  repositories::generic::*,
+  models::{
+    Pool, ResourceKindPartial, DaemonState, ResourceKindVersionDb, Repository,
+    ResourceKindDb, ResourceSpecDb, ResourceDb,
+  },
 };
 
 use super::ctrl_client::CtrlClient;
@@ -43,13 +47,13 @@ async fn hook_create_resource(
       if resource_kind.schema.is_none() && resource_kind.url.is_none() {
         return Err(HttpError::bad_request("Neither schema nor url provided"));
       }
-      if ResourceKindDb::find_by_pk(&resource.name, pool)
+      if ResourceKindDb::read_by_pk(&resource.name, pool)
         .await?
         .is_err()
       {
-        ResourceKindDb::create(&resource_kind, pool).await??;
+        ResourceKindDb::create_from(&resource_kind, pool).await??;
       }
-      ResourceKindVersionDb::create(&resource_kind, pool).await??;
+      ResourceKindVersionDb::create_from(&resource_kind, pool).await??;
     }
     _ => {
       let kind = ResourceKindVersionDb::get_version(
@@ -156,13 +160,12 @@ pub(crate) async fn delete(
     log::warn!("{err}");
   }
   if resource.kind.as_str() == "Kind" {
-    ResourceKindVersionDb::delete_by(
-      crate::schema::resource_kind_versions::dsl::resource_kind_name
-        .eq(resource.spec.resource_key.to_owned()),
-      &state.pool,
-    )
-    .await??;
-    ResourceKindDb::delete_by_pk(&resource.spec.resource_key, &state.pool)
+    let filter = GenericFilter::new().r#where(
+      "resource_kind_name",
+      GenericClause::Eq(resource.spec.resource_key.to_owned()),
+    );
+    ResourceKindVersionDb::del_by(&filter, &state.pool).await??;
+    ResourceKindDb::del_by_pk(&resource.spec.resource_key, &state.pool)
       .await??;
   }
   ResourceDb::delete_by_pk(&resource.spec.resource_key, &state.pool).await??;
