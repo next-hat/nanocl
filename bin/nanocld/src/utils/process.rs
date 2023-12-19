@@ -5,12 +5,18 @@ use bollard_next::container::{
   StartContainerOptions, Config, CreateContainerOptions,
   InspectContainerOptions, StopContainerOptions, RemoveContainerOptions,
 };
-use nanocl_stubs::system::EventAction;
-use nanocl_stubs::generic::{GenericFilter, GenericClause};
-use nanocl_stubs::process::{Process, ProcessKind, ProcessPartial};
 
-use crate::models::{
-  DaemonState, Repository, ProcessDb, JobDb, JobUpdateDb, VmDb, CargoDb,
+use nanocl_stubs::{
+  generic::{GenericFilter, GenericClause},
+  system::EventAction,
+  process::{Process, ProcessKind, ProcessPartial},
+};
+
+use crate::{
+  repositories::generic::*,
+  models::{
+    DaemonState, Repository, ProcessDb, JobDb, JobUpdateDb, VmDb, CargoDb,
+  },
 };
 
 async fn after(
@@ -138,7 +144,7 @@ pub(crate) async fn create(
       })?,
     ),
   };
-  let process = ProcessDb::create(&new_instance, &state.pool).await??;
+  let process = ProcessDb::create_from(&new_instance, &state.pool).await??;
   Process::try_from(process)
     .map_err(|err| HttpError::internal_server_error(err.to_string()))
 }

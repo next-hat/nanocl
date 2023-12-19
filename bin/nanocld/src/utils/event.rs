@@ -13,6 +13,7 @@ use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
 use crate::{
   utils,
   event_emitter::Client,
+  repositories::generic::*,
   models::{
     DaemonState, Repository, JobDb, FromSpec, ProcessUpdateDb, ProcessDb,
   },
@@ -183,7 +184,7 @@ async fn exec_docker(
     data: Some(data),
     ..Default::default()
   };
-  ProcessDb::update_by_pk(&id, new_instance, &state.pool).await??;
+  ProcessDb::update_pk(&id, new_instance, &state.pool).await??;
   Ok(())
 }
 

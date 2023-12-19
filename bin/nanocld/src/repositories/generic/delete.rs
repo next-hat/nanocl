@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use diesel::prelude::*;
+use diesel::{prelude::*, associations::HasTable, query_dsl, query_builder};
 use ntex::rt::JoinHandle;
 
 use nanocl_error::io::IoResult;
@@ -19,6 +19,33 @@ pub trait RepositoryDelete: super::RepositoryBase {
   >
   where
     Self: diesel::associations::HasTable;
+
+    fn delete_by_pk<Pk>(
+      pk: &Pk,
+      pool: &Pool,
+    ) -> JoinHandle<IoResult<()>>
+    where
+      Self: Sized + HasTable,
+      Pk: ToOwned + ?Sized + std::fmt::Display,
+      <Pk as ToOwned>::Owned: Send + 'static,
+      Self::Table: query_dsl::methods::FindDsl<<Pk as ToOwned>::Owned> + HasTable<Table = Self::Table>,
+      diesel::helper_types::Find<Self::Table, <Pk as ToOwned>::Owned>: query_builder::IntoUpdateTarget,
+      query_builder::DeleteStatement<
+        <diesel::helper_types::Find<Self::Table, <Pk as ToOwned>::Owned> as HasTable>::Table,
+        <diesel::helper_types::Find<Self::Table, <Pk as ToOwned>::Owned> as query_builder::IntoUpdateTarget>::WhereClause,
+      >: query_builder::QueryFragment<diesel::pg::Pg> + query_builder::QueryId,
+    {
+    log::trace!("{}::delete_by_pk: {pk}", Self::get_name());
+    let pool = Arc::clone(pool);
+    let pk = pk.to_owned();
+    ntex::rt::spawn_blocking(move || {
+      let mut conn = utils::store::get_pool_conn(&pool)?;
+      diesel::delete(<Self::Table as HasTable>::table().find(pk))
+        .execute(&mut conn)
+        .map_err(Self::map_err)?;
+      Ok(())
+    })
+  }
 
   fn delete_by_filter(
     filter: &GenericFilter,

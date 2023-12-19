@@ -1,6 +1,5 @@
 use ntex::web;
-use futures_util::stream::select_all;
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::{StreamExt, TryStreamExt, stream::select_all};
 
 use nanocl_error::http::HttpResult;
 
@@ -10,8 +9,11 @@ use nanocl_stubs::{
   process::{ProcessLogQuery, ProcessOutputLog, ProccessQuery},
 };
 
-use crate::utils;
-use crate::models::{DaemonState, Repository, ProcessDb};
+use crate::{
+  utils,
+  repositories::generic::*,
+  models::{DaemonState, ProcessDb},
+};
 
 /// List process (Vm, Job, Cargo)
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -33,7 +35,7 @@ pub(crate) async fn list_process(
   _: web::types::Query<ProccessQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let processes =
-    ProcessDb::find(&GenericFilter::default(), &state.pool).await??;
+    ProcessDb::read(&GenericFilter::default(), &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&processes))
 }
 
