@@ -2,6 +2,10 @@ use uuid::Uuid;
 use diesel::prelude::*;
 use serde::{Serialize, Deserialize};
 
+use nanocl_error::io::{IoError, IoResult};
+
+use nanocl_stubs::metric::MetricPartial;
+
 use crate::schema::metrics;
 
 /// This structure represent a metric in the database.
@@ -21,27 +25,43 @@ pub struct MetricDb {
   pub created_at: chrono::NaiveDateTime,
   /// When the metric will expire
   pub expire_at: chrono::NaiveDateTime,
-  /// The node where the metric come from
+  /// The node who saved the metric
   pub node_name: String,
-  /// The kind of the metric (CPU, MEMORY, DISK, NETWORK)
+  /// The kind of the metric
   pub kind: String,
   /// The data of the metric
   pub data: serde_json::Value,
 }
 
 /// This structure is used to insert a metric in the database.
-#[derive(Clone, Debug)]
-pub struct MetricPartial {
-  /// The kind of the metric (CPU, MEMORY, DISK, NETWORK)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MetricNodePartial {
+  /// The kind of the metric
   pub kind: String,
-  /// The node where the metric come from
+  /// The node who saved the metric
   pub node_name: String,
   /// The data of the metric
   pub data: serde_json::Value,
 }
 
-impl From<&MetricPartial> for MetricDb {
-  fn from(p: &MetricPartial) -> Self {
+impl MetricNodePartial {
+  pub fn try_new_node(node_name: &str, item: &MetricPartial) -> IoResult<Self> {
+    if item.kind.split('/').collect::<Vec<_>>().len() != 2 {
+      return Err(IoError::invalid_data(
+        "MetricKind",
+        "must be of the form `domain.tld/kind`",
+      ));
+    }
+    Ok(MetricNodePartial {
+      node_name: node_name.to_owned(),
+      kind: item.kind.clone(),
+      data: item.data.clone(),
+    })
+  }
+}
+
+impl From<&MetricNodePartial> for MetricDb {
+  fn from(p: &MetricNodePartial) -> Self {
     MetricDb {
       key: Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),

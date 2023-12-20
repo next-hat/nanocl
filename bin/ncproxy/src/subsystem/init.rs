@@ -5,7 +5,7 @@ use crate::cli::Cli;
 use crate::nginx::Nginx;
 
 use super::event;
-use super::network_log;
+use super::metric;
 
 pub async fn init(cli: &Cli) -> IoResult<(Nginx, NanocldClient)> {
   #[allow(unused)]
@@ -17,6 +17,6 @@ pub async fn init(cli: &Cli) -> IoResult<(Nginx, NanocldClient)> {
   let nginx = Nginx::new(&cli.conf_dir.clone().unwrap_or("/etc/nginx".into()));
   nginx.ensure().await?;
   event::spawn(&nginx, &client);
-  network_log::spawn();
+  metric::spawn(&client);
   Ok((nginx, client))
 }

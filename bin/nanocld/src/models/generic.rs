@@ -1,12 +1,5 @@
 use nanocl_error::io::{IoResult, FromIo};
 
-/// Generic trait to convert a metric type into a insertable database type
-pub trait ToMeticDb {
-  type MetricDb;
-
-  fn to_metric_db(self, node_name: &str) -> Self::MetricDb;
-}
-
 /// Generic trait to convert a spec type into a insertable database type and vise versa
 pub trait FromSpec {
   type Spec;

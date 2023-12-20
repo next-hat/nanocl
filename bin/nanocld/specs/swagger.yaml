@@ -441,36 +441,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CargoInspect'
-  /cargoes/{name}/instances:
-    get:
-      tags:
-      - Cargoes
-      summary: List cargo instances
-      description: List cargo instances
-      operationId: list_cargo_instance
-      parameters:
-      - name: name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargo belongs
-        required: false
-        schema:
-          type: string
-          nullable: true
-      responses:
-        '200':
-          description: List of cargo instances
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Process'
   /cargoes/{name}/kill:
     post:
       tags:
@@ -806,6 +776,23 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Metric'
+    post:
+      tags:
+      - Metrics
+      operationId: create_metric
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricPartial'
+        required: true
+      responses:
+        '201':
+          description: Metric created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metric'
   /namespaces:
     get:
       tags:
@@ -3728,91 +3715,6 @@ components:
           Config:
             $ref: '#/components/schemas/DaemonConfig'
       description: HostInfo contains information about the host and the docker daemon
-    HttpMetric:
-      type: object
-      required:
-      - Key
-      - CreatedAt
-      - ExpireAt
-      - DateGmt
-      - Status
-      - BytesSent
-      - ContentLength
-      - BodyBytesSent
-      - RequestTime
-      - NodeName
-      - Uri
-      - Host
-      - RemoteAddr
-      - RealipRemoteAddr
-      - ServerProtocol
-      - RequestMethod
-      properties:
-        Key:
-          type: string
-          format: uuid
-        CreatedAt:
-          type: string
-          format: date-time
-        ExpireAt:
-          type: string
-          format: date-time
-        DateGmt:
-          type: string
-          format: date-time
-        Status:
-          type: integer
-          format: int64
-        BytesSent:
-          type: integer
-          format: int64
-        ContentLength:
-          type: integer
-          format: int64
-        BodyBytesSent:
-          type: integer
-          format: int64
-        RequestTime:
-          type: number
-          format: double
-        NodeName:
-          type: string
-        Uri:
-          type: string
-        Host:
-          type: string
-        RemoteAddr:
-          type: string
-        RealipRemoteAddr:
-          type: string
-        ServerProtocol:
-          type: string
-        RequestMethod:
-          type: string
-        ProxyHost:
-          type: string
-          nullable: true
-        UpstreamAddr:
-          type: string
-          nullable: true
-        QueryString:
-          type: string
-          nullable: true
-        RequestBody:
-          type: string
-          nullable: true
-        ContentType:
-          type: string
-          nullable: true
-        HttpUserAgent:
-          type: string
-          nullable: true
-        HttpReferrer:
-          type: string
-          nullable: true
-        HttpAcceptLanguage:
-          type: string
-          nullable: true
     HttpTarget:
       type: object
       required:
@@ -4636,16 +4538,22 @@ components:
           type: string
           description: The node where the metric come from
         Kind:
-          $ref: '#/components/schemas/MetricKind'
+          type: string
+          description: The kind of the metric
         Data:
           description: The data of the metric
-    MetricKind:
-      type: string
-      enum:
-      - CPU
-      - MEMORY
-      - NETWORK
-      - DISK
+    MetricPartial:
+      type: object
+      description: Used to create a new metric
+      required:
+      - Kind
+      - Data
+      properties:
+        Kind:
+          type: string
+          description: The kind of the metric
+        Data:
+          description: The data of the metric
     Mount:
       type: object
       properties:

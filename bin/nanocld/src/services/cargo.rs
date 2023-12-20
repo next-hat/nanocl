@@ -10,8 +10,8 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
-  models::{DaemonState, CargoSpecDb, FromSpec, ProcessDb},
-  repositories::generic::RepositoryRead,
+  repositories::generic::*,
+  models::{DaemonState, CargoSpecDb, FromSpec},
 };
 
 /// List cargoes
@@ -34,31 +34,6 @@ pub(crate) async fn list_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let cargoes = utils::cargo::list(&qs, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargoes))
-}
-
-/// List cargo instances
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  tag = "Cargoes",
-  path = "/cargoes/{name}/instances",
-  params(
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-  ),
-  responses(
-    (status = 200, description = "List of cargo instances", body = [Process]),
-  ),
-))]
-#[web::get("/cargoes/{name}/instances")]
-pub(crate) async fn list_cargo_instance(
-  state: web::types::State<DaemonState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  let processes = ProcessDb::find_by_kind_key(&key, &state.pool).await?;
-  Ok(web::HttpResponse::Ok().json(&processes))
 }
 
 /// Get detailed information about a cargo
@@ -161,7 +136,6 @@ pub(crate) async fn restart_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-
   utils::cargo::restart(&key, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
@@ -379,7 +353,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(inspect_cargo);
   config.service(list_cargo_history);
   config.service(revert_cargo);
-  config.service(list_cargo_instance);
   config.service(scale_cargo);
   config.service(stats_cargo);
 }

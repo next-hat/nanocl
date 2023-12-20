@@ -9,7 +9,7 @@ use metrsd_client::{MetrsdClient, MetrsdEvent};
 
 use crate::{
   repositories::generic::*,
-  models::{Pool, DaemonState, MetricDb, MetricPartial},
+  models::{Pool, DaemonState, MetricDb, MetricNodePartial},
 };
 
 /// Save metric event send by [metrsd](http://github.com/nxthat/metrsd) to the database
@@ -21,27 +21,21 @@ async fn save_metric(
   ev: &MetrsdEvent,
   pool: &Pool,
 ) -> IoResult<()> {
+  let node_name = node.to_owned();
   let metric = match ev {
-    MetrsdEvent::Cpu(cpus) => MetricPartial {
-      kind: "CPU".into(),
-      node_name: node.to_owned(),
-      data: serde_json::to_value(cpus).unwrap(),
-    },
-    MetrsdEvent::Memory(mem) => MetricPartial {
-      kind: "MEMORY".into(),
-      node_name: node.to_owned(),
-      data: serde_json::to_value(mem).unwrap(),
-    },
-    MetrsdEvent::Disk(disk) => MetricPartial {
-      kind: "DISK".into(),
-      node_name: node.to_owned(),
-      data: serde_json::to_value(disk).unwrap(),
-    },
-    MetrsdEvent::Network(net) => MetricPartial {
-      kind: "NETWORK".into(),
-      node_name: node.to_owned(),
-      data: serde_json::to_value(net).unwrap(),
-    },
+    MetrsdEvent::Cpu(cpus) => ("nanocl.io/cpu", serde_json::to_value(cpus)?),
+    MetrsdEvent::Memory(mem) => {
+      ("nanocl.io/memory", serde_json::to_value(mem)?)
+    }
+    MetrsdEvent::Disk(disk) => ("nanocl.io/disk", serde_json::to_value(disk)?),
+    MetrsdEvent::Network(net) => {
+      ("nanocl.io/network", serde_json::to_value(net)?)
+    }
+  };
+  let metric = MetricNodePartial {
+    node_name,
+    kind: metric.0.to_owned(),
+    data: metric.1,
   };
   MetricDb::create_from(&metric, pool).await??;
   Ok(())

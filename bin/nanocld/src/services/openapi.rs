@@ -36,12 +36,11 @@ use bollard_next::service::{
 
 use nanocl_stubs::node::Node;
 use nanocl_stubs::process::{Process, ProcessKind};
-use nanocl_stubs::http_metric::HttpMetric;
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 use nanocl_stubs::generic::{GenericCount, GenericClause, GenericFilter};
 use nanocl_stubs::system::{BinaryInfo, HostInfo};
-use nanocl_stubs::metric::{Metric, MetricKind};
+use nanocl_stubs::metric::{Metric, MetricPartial};
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
 use nanocl_stubs::namespace::{
   Namespace, NamespaceSummary, NamespacePartial, NamespaceInspect,
@@ -242,7 +241,6 @@ impl Modify for VersionModifier {
     job::wait_job,
     // Cargo
     cargo::list_cargo,
-    cargo::list_cargo_instance,
     cargo::inspect_cargo,
     cargo::create_cargo,
     cargo::delete_cargo,
@@ -289,6 +287,7 @@ impl Modify for VersionModifier {
     resource::revert_resource,
     // Metric
     metric::list_metric,
+    metric::create_metric,
     // Process
     process::logs_process,
     process::start_process,
@@ -472,9 +471,7 @@ impl Modify for VersionModifier {
     DnsEntry,
     // Metric
     Metric,
-    MetricKind,
-    // HttpMetric
-    HttpMetric,
+    MetricPartial,
     // Daemon
     DaemonConfig,
     // Error

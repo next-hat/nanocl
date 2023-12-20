@@ -15,7 +15,6 @@ pub mod vm;
 pub mod vm_spec;
 pub mod vm_image;
 pub mod metric;
-pub mod http_metric;
 pub mod secret;
 pub mod job;
 pub mod process;

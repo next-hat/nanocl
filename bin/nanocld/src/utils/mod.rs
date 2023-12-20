@@ -13,7 +13,6 @@ pub(crate) mod vm_image;
 pub(crate) mod job;
 pub(crate) mod exec;
 pub(crate) mod state;
-pub(crate) mod proxy;
 pub(crate) mod resource;
 pub(crate) mod metric;
 pub(crate) mod ctrl_client;

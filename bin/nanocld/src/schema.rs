@@ -22,35 +22,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    http_metrics (key) {
-        key -> Uuid,
-        created_at -> Timestamptz,
-        expire_at -> Timestamptz,
-        date_gmt -> Timestamptz,
-        status -> Int8,
-        bytes_sent -> Int8,
-        content_length -> Int8,
-        body_bytes_sent -> Int8,
-        request_time -> Float8,
-        node_name -> Varchar,
-        uri -> Varchar,
-        host -> Varchar,
-        remote_addr -> Varchar,
-        realip_remote_addr -> Varchar,
-        server_protocol -> Varchar,
-        request_method -> Varchar,
-        proxy_host -> Nullable<Varchar>,
-        upstream_addr -> Nullable<Varchar>,
-        query_string -> Nullable<Varchar>,
-        request_body -> Nullable<Varchar>,
-        content_type -> Nullable<Varchar>,
-        http_user_agent -> Nullable<Varchar>,
-        http_referrer -> Nullable<Varchar>,
-        http_accept_language -> Nullable<Varchar>,
-    }
-}
-
-diesel::table! {
     jobs (key) {
         key -> Varchar,
         created_at -> Timestamptz,
@@ -163,26 +134,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    stream_metrics (key) {
-        key -> Uuid,
-        created_at -> Timestamptz,
-        expire_at -> Timestamptz,
-        date_gmt -> Timestamptz,
-        remote_addr -> Varchar,
-        upstream_addr -> Varchar,
-        protocol -> Nullable<Varchar>,
-        status -> Int8,
-        session_time -> Varchar,
-        bytes_sent -> Int8,
-        bytes_received -> Int8,
-        upstream_bytes_sent -> Int8,
-        upstream_bytes_received -> Int8,
-        upstream_connect_time -> Varchar,
-        node_name -> Varchar,
-    }
-}
-
-diesel::table! {
     vm_images (name) {
         name -> Varchar,
         created_at -> Timestamptz,
@@ -228,7 +179,6 @@ diesel::joinable!(vms -> vm_specs (spec_key));
 diesel::allow_tables_to_appear_in_same_query!(
   cargo_specs,
   cargoes,
-  http_metrics,
   jobs,
   metrics,
   namespaces,
@@ -241,7 +191,6 @@ diesel::allow_tables_to_appear_in_same_query!(
   resource_specs,
   resources,
   secrets,
-  stream_metrics,
   vm_images,
   vm_specs,
   vms,

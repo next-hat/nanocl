@@ -256,6 +256,13 @@ impl FromIo<Box<IoError>> for serde_json::Error {
   }
 }
 
+#[cfg(feature = "serde_json")]
+impl From<serde_json::Error> for IoError {
+  fn from(f: serde_json::Error) -> Self {
+    *f.map_err_context(|| "serde_json")
+  }
+}
+
 #[cfg(feature = "serde_yaml")]
 impl FromIo<Box<IoError>> for serde_yaml::Error {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> Box<IoError>
