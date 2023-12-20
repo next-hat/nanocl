@@ -13,7 +13,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{DaemonState, ResourceSpecDb, Repository, ResourceDb},
+  models::{DaemonState, ResourceSpecDb, ResourceDb},
 };
 
 /// List resources
@@ -35,7 +35,7 @@ pub(crate) async fn list_resource(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
-  let items = ResourceDb::find(&filter, &state.pool).await??;
+  let items = ResourceDb::read_with_spec(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 

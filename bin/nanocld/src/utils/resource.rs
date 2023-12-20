@@ -12,7 +12,7 @@ use nanocl_stubs::{
 use crate::{
   repositories::generic::*,
   models::{
-    Pool, ResourceKindPartial, DaemonState, ResourceKindVersionDb, Repository,
+    Pool, ResourceKindPartial, DaemonState, ResourceKindVersionDb,
     ResourceKindDb, ResourceSpecDb, ResourceDb,
   },
 };
@@ -167,7 +167,7 @@ pub(crate) async fn delete(
     ResourceKindDb::del_by_pk(&resource.spec.resource_key, &state.pool)
       .await??;
   }
-  ResourceDb::delete_by_pk(&resource.spec.resource_key, &state.pool).await??;
+  ResourceDb::del_by_pk(&resource.spec.resource_key, &state.pool).await??;
   let filter = GenericFilter::new().r#where(
     "resource_key",
     GenericClause::Eq(resource.spec.resource_key.to_owned()),

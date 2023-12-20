@@ -11,5 +11,6 @@ mod job;
 mod metric;
 mod http_metric;
 mod vm_spec;
+mod resource;
 
 pub mod generic;
