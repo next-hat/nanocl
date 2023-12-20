@@ -1,5 +1,7 @@
-use nanocl_error::io::FromIo;
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::{
+  io::FromIo,
+  http::{HttpResult, HttpError},
+};
 
 use bollard_next::container::{
   StartContainerOptions, Config, CreateContainerOptions,
@@ -8,8 +10,8 @@ use bollard_next::container::{
 
 use nanocl_stubs::{
   generic::{GenericFilter, GenericClause},
-  system::EventAction,
   process::{Process, ProcessKind, ProcessPartial},
+  system::EventAction,
 };
 
 use crate::{
@@ -37,7 +39,7 @@ async fn after(
       state.event_emitter.spawn_emit_to_event(&cargo, action);
     }
     ProcessKind::Job => {
-      JobDb::update_by_pk(
+      JobDb::update_pk(
         kind_key,
         JobUpdateDb {
           updated_at: Some(chrono::Utc::now().naive_utc()),

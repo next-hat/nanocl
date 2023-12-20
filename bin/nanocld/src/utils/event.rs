@@ -14,9 +14,7 @@ use crate::{
   utils,
   event_emitter::Client,
   repositories::generic::*,
-  models::{
-    DaemonState, Repository, JobDb, FromSpec, ProcessUpdateDb, ProcessDb,
-  },
+  models::{DaemonState, JobDb, FromSpec, ProcessUpdateDb, ProcessDb},
 };
 
 /// Remove a job after when finished and ttl is set
@@ -37,7 +35,7 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
     }
     _ => {}
   }
-  let job = JobDb::find_by_pk(job_id, &state.pool)
+  let job = JobDb::read_by_pk(job_id, &state.pool)
     .await??
     .try_to_spec()?;
   let ttl = match job.ttl {
