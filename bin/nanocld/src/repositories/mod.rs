@@ -9,7 +9,6 @@ mod resource_spec;
 mod vm_image;
 mod job;
 mod metric;
-mod http_metric;
 mod vm;
 mod vm_spec;
 mod resource;

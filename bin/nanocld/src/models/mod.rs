@@ -18,9 +18,6 @@ pub use state::*;
 mod metric;
 pub use metric::*;
 
-mod http_metric;
-pub use http_metric::*;
-
 mod namespace;
 pub use namespace::*;
 

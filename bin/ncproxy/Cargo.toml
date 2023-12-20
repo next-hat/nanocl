@@ -59,3 +59,8 @@ nanocl_utils = { version = "0.3.1", features = [
   "versioning",
 ] }
 utoipa = { version = "4.1", features = ["yaml"], optional = true }
+chrono = { version = "0.4.31", default-features = false, features = [
+  "std",
+  "clock",
+  "serde",
+] }
