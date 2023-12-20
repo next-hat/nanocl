@@ -7,5 +7,6 @@ mod resource_kind;
 mod resource_spec;
 mod vm_image;
 mod job;
+mod metric;
 
 pub mod generic;
