@@ -13,9 +13,7 @@ use nanocl_stubs::{
 
 use crate::{
   utils, gen_where4string,
-  models::{
-    Pool, CargoDb, CargoSpecDb, CargoUpdateDb, WithSpec, FromSpec, Repository,
-  },
+  models::{Pool, CargoDb, CargoSpecDb, CargoUpdateDb, WithSpec, FromSpec},
   schema::cargoes,
 };
 
@@ -144,7 +142,9 @@ impl CargoDb {
     }
     let key = utils::key::gen_key(&nsp, &item.name);
     let new_spec = CargoSpecDb::try_from_spec_partial(&key, &version, &item)?;
-    let spec = CargoSpecDb::create(new_spec, pool).await??.try_to_spec()?;
+    let spec = CargoSpecDb::create_from(new_spec, pool)
+      .await??
+      .try_to_spec()?;
     let new_item = CargoDb {
       key,
       name: item.name,
@@ -166,7 +166,9 @@ impl CargoDb {
     let version = version.to_owned();
     let mut cargo = CargoDb::read_pk_with_spec(key, pool).await??;
     let new_spec = CargoSpecDb::try_from_spec_partial(key, &version, item)?;
-    let spec = CargoSpecDb::create(new_spec, pool).await??.try_to_spec()?;
+    let spec = CargoSpecDb::create_from(new_spec, pool)
+      .await??
+      .try_to_spec()?;
     let new_item = CargoUpdateDb {
       name: Some(item.name.to_owned()),
       spec_key: Some(spec.key),
