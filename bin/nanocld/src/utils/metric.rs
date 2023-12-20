@@ -56,10 +56,10 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
     let client = MetrsdClient::connect("unix:///run/nanocl/metrics.sock");
     rt::spawn(async move {
       loop {
-        log::info!("metrics::spawn_logger: subscribing to metrsd");
+        log::info!("metrics::spawn_logger: subscribing");
         match client.subscribe().await {
           Ok(mut stream) => {
-            log::info!("metrics::spawn_logger: subcribed to metrsd");
+            log::info!("metrics::spawn_logger: subcribed");
             while let Some(res) = stream.next().await {
               match res {
                 Ok(ev) => {

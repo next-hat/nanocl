@@ -1,10 +1,14 @@
 use ntex::rt;
 use futures::StreamExt;
+
 use bollard_next::container::{LogOutput, LogsOptions};
 
-use crate::models::{
-  ToMeticDb, DaemonState, HttpMetricPartial, StreamMetricPartial, HttpMetricDb,
-  Repository, StreamMetricDb,
+use crate::{
+  repositories::generic::*,
+  models::{
+    ToMeticDb, DaemonState, HttpMetricPartial, StreamMetricPartial,
+    HttpMetricDb, StreamMetricDb,
+  },
 };
 
 /// Create a background thread that will watch the logs of the `ncproxy.system.c` container
@@ -13,9 +17,11 @@ use crate::models::{
 /// This function will parse the logs and save the metrics to the database.
 pub(crate) fn spawn_logger(state: &DaemonState) {
   let state = state.clone();
+  log::trace!("proxy::spawn_logger: thread start");
   rt::Arbiter::new().exec_fn(move || {
     rt::spawn(async move {
       let now = chrono::Utc::now().timestamp();
+      log::info!("proxy::spawn_logger: subcribing");
       let mut res = state.docker_api.logs(
         "ncproxy.system.c",
         Some(LogsOptions::<String> {
@@ -26,10 +32,11 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
           ..Default::default()
         }),
       );
+      log::info!("proxy::spawn_logger: subscribed");
       while let Some(log) = res.next().await {
         match log {
           Err(e) => {
-            log::warn!("Failed to get log: {}", e);
+            log::warn!("proxy::spawn_logger: {e}");
             continue;
           }
           Ok(log) => {
@@ -55,13 +62,13 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                     let http_metric =
                       http_metric.to_metric_db(&state.config.hostname);
                     let res =
-                      HttpMetricDb::create(http_metric, &state.pool).await;
-                    if let Err(e) = res {
-                      log::warn!("Failed to save http metric: {}", e);
+                      HttpMetricDb::create_from(http_metric, &state.pool).await;
+                    if let Err(err) = res {
+                      log::warn!("proxy::spawn_logger: {err}");
                     }
                   }
-                  Err(e) => {
-                    log::warn!("Failed to parse http metric: {}", e);
+                  Err(err) => {
+                    log::warn!("proxy::spawn_logger: {err}");
                   }
                 }
               }
@@ -74,16 +81,14 @@ pub(crate) fn spawn_logger(state: &DaemonState) {
                 {
                   Ok(stream_db_model) => {
                     let insert_result =
-                      StreamMetricDb::create(stream_db_model, &state.pool)
+                      StreamMetricDb::create_from(stream_db_model, &state.pool)
                         .await;
-                    if let Err(db_error) = insert_result {
-                      log::warn!("Failed to save tcp metric: {db_error}");
+                    if let Err(err) = insert_result {
+                      log::warn!("proxy::spawn_logger: {err}");
                     }
                   }
-                  Err(stream_parsing_error) => {
-                    log::warn!(
-                      "Failed to parse tcp metric: {stream_parsing_error}"
-                    );
+                  Err(err) => {
+                    log::warn!("proxy::spawn_logger: {err}");
                   }
                 }
               }
