@@ -61,8 +61,8 @@ jobs:
           docker pull ghcr.io/nxthat/nanocl-qemu:8.0.2.0
           docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
           docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
-          cargo build --no-default-features --features test --bin nanocld
           cargo build --no-default-features --features test --bin ncproxy
+          cargo build --no-default-features --features test --bin nanocld
           docker compose -f ./tests/docker-compose.yaml up -d
           sleep 4
           sudo chown $USER:nanocl -R /run/nanocl

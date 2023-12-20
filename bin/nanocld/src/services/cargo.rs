@@ -10,7 +10,8 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
-  models::{DaemonState, CargoSpecDb, Repository, FromSpec, ProcessDb},
+  models::{DaemonState, CargoSpecDb, FromSpec, ProcessDb},
+  repositories::generic::RepositoryRead,
 };
 
 /// List cargoes
@@ -298,7 +299,7 @@ pub(crate) async fn revert_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo_key = utils::key::gen_key(&namespace, &path.1);
-  let spec = CargoSpecDb::find_by_pk(&path.2, &state.pool)
+  let spec = CargoSpecDb::read_by_pk(&path.2, &state.pool)
     .await??
     .try_to_spec()?;
   let cargo =

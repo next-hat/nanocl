@@ -1,6 +1,5 @@
 use ntex::util::Bytes;
 use futures::StreamExt;
-use diesel::ExpressionMethods;
 use futures_util::stream::FuturesUnordered;
 
 use nanocl_error::http::{HttpError, HttpResult};
@@ -27,8 +26,8 @@ use crate::{
   utils,
   repositories::generic::*,
   models::{
-    DaemonState, CargoDb, Repository, ProcessDb, NamespaceDb, SecretDb,
-    CargoSpecDb, FromSpec,
+    DaemonState, CargoDb, ProcessDb, NamespaceDb, SecretDb, CargoSpecDb,
+    FromSpec,
   },
 };
 
@@ -381,11 +380,9 @@ pub(crate) async fn delete_by_key(
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
   CargoDb::del_by_pk(key, &state.pool).await??;
-  CargoSpecDb::delete_by(
-    crate::schema::cargo_specs::dsl::cargo_key.eq(key.to_owned()),
-    &state.pool,
-  )
-  .await??;
+  let filter = GenericFilter::new()
+    .r#where("cargo_key", GenericClause::Eq(key.to_owned()));
+  CargoSpecDb::del_by(&filter, &state.pool).await??;
   state
     .event_emitter
     .spawn_emit_to_event(&cargo, EventAction::Deleted);
@@ -478,7 +475,7 @@ pub(crate) async fn list(
   let cargoes = CargoDb::read_with_spec(&filter, &state.pool).await??;
   let mut cargo_summaries = Vec::new();
   for cargo in cargoes {
-    let spec = CargoSpecDb::find_by_pk(&cargo.spec.key, &state.pool)
+    let spec = CargoSpecDb::read_by_pk(&cargo.spec.key, &state.pool)
       .await??
       .try_to_spec()?;
     let instances =

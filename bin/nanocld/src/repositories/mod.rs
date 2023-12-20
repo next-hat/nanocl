@@ -1,5 +1,6 @@
 mod node;
 mod cargo;
+mod cargo_spec;
 mod secret;
 mod process;
 mod namespace;
