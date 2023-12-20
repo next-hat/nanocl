@@ -11,7 +11,7 @@ use nanocl_stubs::{
   vm::Vm,
 };
 
-use crate::{utils, gen_where4string, schema::vms};
+use crate::{utils, gen_where4string, repositories::generic::*, schema::vms};
 
 use super::{Pool, Repository, FromSpec, WithSpec, VmSpecDb, NamespaceDb};
 
@@ -154,7 +154,7 @@ impl VmDb {
     }
     let key = utils::key::gen_key(&nsp, &item.name);
     let new_spec = VmSpecDb::try_from_spec_partial(&key, version, item)?;
-    let spec = VmSpecDb::create(new_spec, pool).await??.to_spec(item);
+    let spec = VmSpecDb::create_from(new_spec, pool).await??.to_spec(item);
     let new_item = VmDb {
       key,
       name: item.name.clone(),
@@ -175,7 +175,7 @@ impl VmDb {
   ) -> IoResult<Vm> {
     let vmdb = VmDb::find_by_pk(key, pool).await??;
     let new_spec = VmSpecDb::try_from_spec_partial(&vmdb.key, version, item)?;
-    let spec = VmSpecDb::create(new_spec, pool).await??.to_spec(item);
+    let spec = VmSpecDb::create_from(new_spec, pool).await??.to_spec(item);
     let new_item = VmUpdateDb {
       name: Some(item.name.clone()),
       spec_key: Some(spec.key),
