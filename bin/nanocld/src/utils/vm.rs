@@ -216,7 +216,7 @@ pub(crate) async fn create(
       "VM with name {name} already exists in namespace {namespace}",
     )));
   }
-  let image = VmImageDb::find_by_pk(&vm.disk.image, &state.pool).await??;
+  let image = VmImageDb::read_by_pk(&vm.disk.image, &state.pool).await??;
   if image.kind.as_str() != "Base" {
     return Err(HttpError::bad_request(format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image)));
   }
@@ -310,7 +310,7 @@ pub(crate) async fn put(
   let vm =
     VmDb::update_from_spec(&vm.spec.vm_key, vm_partial, version, &state.pool)
       .await?;
-  let image = VmImageDb::find_by_pk(&vm.spec.disk.image, &state.pool).await??;
+  let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await??;
   create_instance(&vm, &image, false, state).await?;
   utils::process::start_by_kind(&ProcessKind::Vm, &vm.spec.vm_key, state)
     .await?;

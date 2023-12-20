@@ -12,7 +12,8 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
-  models::{DaemonState, VmImageDb, Repository},
+  repositories::generic::*,
+  models::{DaemonState, VmImageDb},
 };
 
 /// List virtual machine images
@@ -34,7 +35,7 @@ pub(crate) async fn list_vm_images(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
-  let images = VmImageDb::find(&filter, &state.pool).await??;
+  let images = VmImageDb::read(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&images))
 }
 
@@ -59,10 +60,8 @@ pub(crate) async fn import_vm_image(
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
   utils::key::validate_name(&name)?;
-  if VmImageDb::find_by_pk(&name, &state.pool).await?.is_ok() {
-    return Err(HttpError::bad_request(format!(
-      "Vm image {name} already used"
-    )));
+  if VmImageDb::read_by_pk(&name, &state.pool).await?.is_ok() {
+    return Err(HttpError::conflict(format!("Vm image {name} already used")));
   }
   let state_dir = state.config.state_dir.clone();
   let vm_images_dir = format!("{state_dir}/vms/images");
@@ -115,7 +114,7 @@ pub(crate) async fn snapshot_vm_image(
   let name = path.1.to_owned();
   let snapshot_name = path.2.to_owned();
   utils::key::validate_name(&snapshot_name)?;
-  let image = VmImageDb::find_by_pk(&name, &state.pool).await??;
+  let image = VmImageDb::read_by_pk(&name, &state.pool).await??;
   let vm_image =
     utils::vm_image::create_snap(&snapshot_name, 50, &image, &state).await?;
   Ok(web::HttpResponse::Ok().json(&vm_image))
@@ -143,7 +142,7 @@ pub(crate) async fn clone_vm_image(
   let name = path.1.to_owned();
   let clone_name = path.2.to_owned();
   utils::key::validate_name(&clone_name)?;
-  let image = VmImageDb::find_by_pk(&name, &state.pool).await??;
+  let image = VmImageDb::read_by_pk(&name, &state.pool).await??;
   let rx = utils::vm_image::clone(&clone_name, &image, &state).await?;
   Ok(web::HttpResponse::Ok().streaming(rx))
 }
@@ -191,7 +190,7 @@ pub(crate) async fn inspect_vm_image(
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
-  let item = VmImageDb::find_by_pk(&name, &state.pool).await??;
+  let item = VmImageDb::read_by_pk(&name, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&item))
 }
 

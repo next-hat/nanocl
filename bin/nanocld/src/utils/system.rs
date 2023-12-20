@@ -17,8 +17,7 @@ use crate::{
   utils, version,
   repositories::generic::*,
   models::{
-    DaemonState, ProcessUpdateDb, CargoDb, ProcessDb, Repository, NamespaceDb,
-    VmImageDb,
+    DaemonState, CargoDb, ProcessDb, NamespaceDb, VmImageDb, ProcessUpdateDb,
   },
 };
 
@@ -227,7 +226,7 @@ pub(crate) async fn sync_vm_images(state: &DaemonState) -> IoResult<()> {
     };
     let file_path = file.path();
     let path = file_path.to_str().unwrap_or_default();
-    if VmImageDb::find_by_pk(&name, &state.pool).await.is_ok() {
+    if VmImageDb::read_by_pk(&name, &state.pool).await.is_ok() {
       continue;
     }
     if let Err(error) = utils::vm_image::create(&name, path, &state.pool).await
