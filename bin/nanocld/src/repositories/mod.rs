@@ -10,5 +10,6 @@ mod vm_image;
 mod job;
 mod metric;
 mod http_metric;
+mod vm_spec;
 
 pub mod generic;

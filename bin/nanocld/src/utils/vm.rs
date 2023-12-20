@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use diesel::ExpressionMethods;
-
 use bollard_next::{
   service::{HostConfig, DeviceMapping},
   container::RemoveContainerOptions,
@@ -14,6 +12,7 @@ use nanocl_stubs::{
   process::ProcessKind,
   vm_spec::{VmSpecPartial, VmSpecUpdate},
   vm::{Vm, VmSummary, VmInspect},
+  generic::{GenericFilter, GenericClause},
 };
 
 use crate::{
@@ -58,11 +57,9 @@ pub(crate) async fn delete_by_key(
   let container_name = format!("{}.v", vm_key);
   utils::process::remove(&container_name, Some(options), state).await?;
   VmDb::delete_by_pk(vm_key, &state.pool).await??;
-  VmSpecDb::delete_by(
-    crate::schema::vm_specs::dsl::vm_key.eq(vm.spec.vm_key.clone()),
-    &state.pool,
-  )
-  .await??;
+  let filter = GenericFilter::new()
+    .r#where("vm_key", GenericClause::Eq(vm_key.to_owned()));
+  VmSpecDb::del_by(&filter, &state.pool).await??;
   utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
   state
     .event_emitter
@@ -79,7 +76,7 @@ pub(crate) async fn list_by_namespace(
   let vmes = VmDb::find_by_namespace(&namespace.name, pool).await?;
   let mut vm_summaries = Vec::new();
   for vm in vmes {
-    let spec = VmSpecDb::find_by_pk(&vm.spec.key, pool)
+    let spec = VmSpecDb::read_by_pk(&vm.spec.key, pool)
       .await??
       .try_to_spec()?;
     let processes = ProcessDb::find_by_kind_key(&vm.spec.vm_key, pool).await?;
@@ -246,7 +243,7 @@ pub(crate) async fn patch(
   state: &DaemonState,
 ) -> HttpResult<Vm> {
   let vm = VmDb::find_by_pk(vm_key, &state.pool).await??;
-  let old_spec = VmSpecDb::find_by_pk(&vm.spec_key, &state.pool)
+  let old_spec = VmSpecDb::read_by_pk(&vm.spec_key, &state.pool)
     .await??
     .try_to_spec()?;
   let vm_partial = VmSpecPartial {
