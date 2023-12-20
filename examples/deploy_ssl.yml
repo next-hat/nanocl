@@ -3,8 +3,8 @@ ApiVersion: v0.12
 Namespace: global
 
 Secrets:
-- Key: secret-tls
-  Kind: Tls
+- Name: tls.secret
+  Kind: nanocl.io/tls
   Data:
     Certificate: |
       -----BEGIN CERTIFICATE-----
@@ -68,7 +68,7 @@ Resources:
     Rules:
     - Domain: secret-tls.com
       Network: All
-      Ssl: secret-tls
+      Ssl: tls.secret
       Locations:
       - Path: /
         Target:
@@ -82,4 +82,4 @@ Cargoes:
   Container:
     Image: ghcr.io/nxthat/nanocl-get-started:latest
     Env:
-      - APP=GET_STARTED
+      - APP=SECRET_TLS

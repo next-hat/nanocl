@@ -18,7 +18,7 @@ impl GenericList for SecretArg {
   }
 
   fn get_key(item: &Self::Item) -> String {
-    item.key.clone()
+    item.name.clone()
   }
 }
 

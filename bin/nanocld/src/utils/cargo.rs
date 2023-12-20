@@ -107,17 +107,17 @@ async fn create_instances(
       .iter()
       .map(|secret| async move {
         let secret = SecretDb::read_by_pk(secret, &state.pool).await??;
-        if secret.kind.as_str() != "Env" {
+        if secret.kind.as_str() != "nanocl.io/env" {
           return Err(HttpError::bad_request(format!(
-            "Secret {} is not an Env secret",
-            secret.key
+            "Secret {} is not an nanocl.io/env secret",
+            secret.name
           )));
         }
         let envs = serde_json::from_value::<Vec<String>>(secret.data).map_err(
           |err| {
             HttpError::internal_server_error(format!(
               "Invalid secret data for secret {} {err}",
-              secret.key
+              secret.name
             ))
           },
         )?;

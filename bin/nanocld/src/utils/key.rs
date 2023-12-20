@@ -5,7 +5,10 @@
 /// The cargo key will be `get-started.global`
 use rand::{Rng, thread_rng, distributions::Alphanumeric};
 
-use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_error::{
+  http::{HttpError, HttpResult},
+  io::{IoResult, IoError},
+};
 
 use nanocl_stubs::process::ProcessKind;
 
@@ -48,6 +51,16 @@ pub(crate) fn generate_short_id(length: usize) -> String {
     .map(char::from)
     .collect();
   short_id
+}
+
+pub(crate) fn ensure_kind(kind: &str) -> IoResult<()> {
+  if kind.split('/').collect::<Vec<_>>().len() != 2 {
+    return Err(IoError::invalid_input(
+      "Kind",
+      "must be of the form `domain.tld/kind`",
+    ));
+  }
+  Ok(())
 }
 
 pub(crate) fn gen_kind_key(

@@ -101,20 +101,20 @@ mod tests {
 
   #[ntex::test]
   async fn basic() {
-    const SECRET_KEY: &str = "secret-test";
+    const SECRET_NAME: &str = "secret-test";
     let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
     client.list_secret(None).await.unwrap();
     let secret = SecretPartial {
-      key: SECRET_KEY.to_owned(),
-      kind: "generic".to_owned(),
+      name: SECRET_NAME.to_owned(),
+      kind: "gen.io/generic".to_owned(),
       data: serde_json::json!({"key": "value"}),
       metadata: None,
       immutable: None,
     };
     let secret = client.create_secret(&secret).await.unwrap();
-    assert_eq!(secret.key, SECRET_KEY);
-    let secret = client.inspect_secret(SECRET_KEY).await.unwrap();
-    assert_eq!(secret.key, SECRET_KEY);
-    client.delete_secret(SECRET_KEY).await.unwrap();
+    assert_eq!(secret.name, SECRET_NAME);
+    let secret = client.inspect_secret(SECRET_NAME).await.unwrap();
+    assert_eq!(secret.name, SECRET_NAME);
+    client.delete_secret(SECRET_NAME).await.unwrap();
   }
 }

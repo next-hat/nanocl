@@ -14,8 +14,8 @@ use crate::system::{EventActor, ToEvent, EventAction, EventKind, Event};
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
 pub struct SecretPartial {
-  /// The key of the secret
-  pub key: String,
+  /// The name of the secret
+  pub name: String,
   /// The kind of secret
   pub kind: String,
   /// The secret cannot be updated
@@ -41,8 +41,8 @@ pub struct SecretPartial {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Secret {
-  /// The key of the secret
-  pub key: String,
+  /// The name of the secret
+  pub name: String,
   /// The creation date
   pub created_at: chrono::NaiveDateTime,
   /// The last update date
@@ -64,7 +64,7 @@ pub struct Secret {
 impl From<Secret> for SecretPartial {
   fn from(db: Secret) -> Self {
     SecretPartial {
-      key: db.key,
+      name: db.name,
       kind: db.kind,
       immutable: Some(db.immutable),
       data: db.data,
@@ -77,7 +77,7 @@ impl From<Secret> for SecretPartial {
 impl From<Secret> for EventActor {
   fn from(secret: Secret) -> Self {
     Self {
-      key: Some(secret.key),
+      key: Some(secret.name),
       attributes: Some(serde_json::json!({
         "Kind": secret.kind,
         "Metadata": secret.metadata,

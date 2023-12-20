@@ -398,18 +398,18 @@ async fn get_ssl_config(
         serde_json::from_value::<ProxySslConfig>(secret.data).map_err(
           |err| err.map_err_context(|| "Unable to deserialize ProxySslConfig"),
         )?;
-      let cert_path = format!("/opt/secrets/{}.cert", secret.key);
+      let cert_path = format!("/opt/secrets/{}.cert", secret.name);
       tokio::fs::write(&cert_path, ssl_config.certificate.clone()).await?;
-      let key_path = format!("/opt/secrets/{}.key", secret.key);
+      let key_path = format!("/opt/secrets/{}.key", secret.name);
       tokio::fs::write(&key_path, ssl_config.certificate_key.clone()).await?;
       if let Some(certificate_client) = ssl_config.certificate_client {
         let certificate_client_path =
-          format!("/opt/secrets/{}.client.cert", secret.key);
+          format!("/opt/secrets/{}.client.cert", secret.name);
         tokio::fs::write(&certificate_client_path, certificate_client).await?;
         ssl_config.certificate_client = Some(certificate_client_path);
       }
       if let Some(dh_param) = ssl_config.dh_param {
-        let dh_param_path = format!("/opt/secrets/{}.pem", secret.key);
+        let dh_param_path = format!("/opt/secrets/{}.pem", secret.name);
         tokio::fs::write(&dh_param_path, dh_param).await?;
         ssl_config.dh_param = Some(dh_param_path);
       }

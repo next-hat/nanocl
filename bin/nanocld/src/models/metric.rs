@@ -2,11 +2,11 @@ use uuid::Uuid;
 use diesel::prelude::*;
 use serde::{Serialize, Deserialize};
 
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::IoResult;
 
 use nanocl_stubs::metric::MetricPartial;
 
-use crate::schema::metrics;
+use crate::{utils, schema::metrics};
 
 /// This structure represent a metric in the database.
 /// A metric is a data point that can be used to monitor the system.
@@ -46,12 +46,7 @@ pub struct MetricNodePartial {
 
 impl MetricNodePartial {
   pub fn try_new_node(node_name: &str, item: &MetricPartial) -> IoResult<Self> {
-    if item.kind.split('/').collect::<Vec<_>>().len() != 2 {
-      return Err(IoError::invalid_data(
-        "MetricKind",
-        "must be of the form `domain.tld/kind`",
-      ));
-    }
+    utils::key::ensure_kind(&item.kind)?;
     Ok(MetricNodePartial {
       node_name: node_name.to_owned(),
       kind: item.kind.clone(),

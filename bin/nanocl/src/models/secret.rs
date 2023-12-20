@@ -51,8 +51,8 @@ pub struct SecretInspectOpts {
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct SecretRow {
-  /// The key of the secret
-  pub key: String,
+  /// The name of the secret
+  pub name: String,
   /// The kind of secret
   pub kind: String,
   /// When the secret have been created
@@ -78,7 +78,7 @@ impl From<Secret> for SecretRow {
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
-      key: secret.key,
+      name: secret.name,
       kind: secret.kind,
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),

@@ -3,8 +3,8 @@ ApiVersion: v0.12
 Namespace: global
 
 Secrets:
-- Key: env.deploy-example.com
-  Kind: Env
+- Name: env.deploy-example.com
+  Kind: nanocl.io/env
   Metadata:
     Selector:
       App: deploy-example

@@ -5650,16 +5650,16 @@ components:
         A secret is a key/value pair that can be used by the user to store
         sensitive data. It is stored as a json object in the database.
       required:
-      - Key
+      - Name
       - CreatedAt
       - UpdatedAt
       - Kind
       - Immutable
       - Data
       properties:
-        Key:
+        Name:
           type: string
-          description: The key of the secret
+          description: The name of the secret
         CreatedAt:
           type: string
           format: date-time
@@ -5685,13 +5685,13 @@ components:
         A secret is a key/value pair that can be used by the user to store
         sensitive data. It is stored as a json object in the database.
       required:
-      - Key
+      - Name
       - Kind
       - Data
       properties:
-        Key:
+        Name:
           type: string
-          description: The key of the secret
+          description: The name of the secret
         Kind:
           type: string
           description: The kind of secret

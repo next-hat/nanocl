@@ -67,7 +67,7 @@ async fn apply_secrets(
   data
     .iter()
     .map(|secret| async {
-      let key = secret.key.to_owned();
+      let key = secret.name.to_owned();
       send(StateStream::new_secret_pending(&key), sx);
       match SecretDb::read_by_pk(&key, &state.pool).await {
         Ok(existing) => {
@@ -351,7 +351,7 @@ async fn remove_secrets(
   data
     .iter()
     .map(|secret| async {
-      let key = secret.key.to_owned();
+      let key = secret.name.to_owned();
       send(StateStream::new_secret_pending(&key), sx);
       let secret = match SecretDb::read_by_pk(&key, &state.pool).await {
         Ok(secret) => match secret {
@@ -366,7 +366,7 @@ async fn remove_secrets(
           return;
         }
       };
-      if let Err(err) = SecretDb::del_by_pk(&secret.key, &state.pool).await {
+      if let Err(err) = SecretDb::del_by_pk(&secret.name, &state.pool).await {
         send(StateStream::new_secret_error(&key, &err.to_string()), sx);
         return;
       }

@@ -78,24 +78,18 @@ pub(crate) async fn create_secret(
   state: web::types::State<DaemonState>,
   payload: web::types::Json<SecretPartial>,
 ) -> HttpResult<web::HttpResponse> {
+  if payload.kind.starts_with("nanocl.io") {
+    return Err(HttpError::bad_request("reserved kind nanocl.io"));
+  }
+  utils::key::ensure_kind(&payload.kind)?;
   match payload.kind.as_str() {
-    "Tls" => {
-      serde_json::from_value::<ProxySslConfig>(payload.data.clone()).map_err(
-        |e| {
-          HttpError::bad_request(format!(
-            "Invalid data for secret of kind Tls: {e}",
-          ))
-        },
-      )?;
+    "nanocl.io/tls" => {
+      serde_json::from_value::<ProxySslConfig>(payload.data.clone())
+        .map_err(|e| HttpError::bad_request(e.to_string()))?;
     }
-    "Env" => {
-      serde_json::from_value::<Vec<String>>(payload.data.clone()).map_err(
-        |e| {
-          HttpError::bad_request(format!(
-            "Invalid data for secret of kind Env: {e}",
-          ))
-        },
-      )?;
+    "nanocl.io/env" => {
+      serde_json::from_value::<Vec<String>>(payload.data.clone())
+        .map_err(|e| HttpError::bad_request(e.to_string()))?;
     }
     _ => {}
   }
@@ -176,8 +170,8 @@ mod test_secret {
 
   async fn test_create(client: &TestClient) {
     let new_secret = SecretPartial {
-      key: String::from("test-secret"),
-      kind: String::from("test"),
+      name: String::from("test-secret"),
+      kind: String::from("test-create.io/test"),
       immutable: None,
       data: json!({
         "Tls": { "cert": "MY CERT", "key": "MY KEY" },

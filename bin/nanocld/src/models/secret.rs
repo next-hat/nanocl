@@ -37,7 +37,7 @@ pub struct SecretDb {
 impl From<&SecretPartial> for SecretDb {
   fn from(secret: &SecretPartial) -> Self {
     Self {
-      key: secret.key.clone(),
+      key: secret.name.clone(),
       created_at: chrono::Utc::now().naive_utc(),
       updated_at: chrono::Utc::now().naive_utc(),
       kind: secret.kind.clone(),
@@ -53,7 +53,7 @@ impl TryFrom<SecretDb> for Secret {
 
   fn try_from(db: SecretDb) -> Result<Self, Self::Error> {
     Ok(Secret {
-      key: db.key,
+      name: db.key,
       created_at: db.created_at,
       updated_at: db.updated_at,
       kind: db.kind,
