@@ -107,7 +107,7 @@ async fn create_instances(
     let fetched_secrets = secrets
       .iter()
       .map(|secret| async move {
-        let secret = SecretDb::find_by_pk(secret, &state.pool).await??;
+        let secret = SecretDb::read_by_pk(secret, &state.pool).await??;
         if secret.kind.as_str() != "Env" {
           return Err(HttpError::bad_request(format!(
             "Secret {} is not an Env secret",

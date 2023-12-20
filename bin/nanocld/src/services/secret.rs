@@ -5,12 +5,17 @@ use ntex::web;
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::generic::{GenericFilter, GenericListQuery};
-use nanocl_stubs::proxy::ProxySslConfig;
-use nanocl_stubs::secret::{SecretPartial, SecretUpdate};
+use nanocl_stubs::{
+  generic::{GenericFilter, GenericListQuery},
+  proxy::ProxySslConfig,
+  secret::{SecretPartial, SecretUpdate},
+};
 
-use crate::utils;
-use crate::models::{DaemonState, SecretDb, Repository};
+use crate::{
+  utils,
+  repositories::generic::*,
+  models::{DaemonState, SecretDb},
+};
 
 /// List secret
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -31,7 +36,7 @@ pub(crate) async fn list_secret(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
-  let items = SecretDb::find(&filter, &state.pool).await??;
+  let items = SecretDb::read(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -53,7 +58,7 @@ pub(crate) async fn inspect_secret(
   state: web::types::State<DaemonState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let secret = SecretDb::find_by_pk(&path.1, &state.pool).await??;
+  let secret = SecretDb::read_by_pk(&path.1, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&secret))
 }
 
