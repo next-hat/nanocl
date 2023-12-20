@@ -9,8 +9,6 @@ impl RepositoryBase for MetricDb {}
 
 impl RepositoryCreate for MetricDb {}
 
-// impl RepositoryDelByPk for MetricDb {}
-
 impl RepositoryRead for MetricDb {
   type Output = MetricDb;
   type Query = metrics::BoxedQuery<'static, diesel::pg::Pg>;
