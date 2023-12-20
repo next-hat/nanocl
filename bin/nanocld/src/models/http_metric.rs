@@ -1,21 +1,11 @@
-use std::sync::Arc;
-
 use uuid::Uuid;
 use diesel::prelude::*;
-use ntex::rt::JoinHandle;
 use chrono::{DateTime, FixedOffset};
 use serde::{Serialize, Deserialize, Deserializer};
 
-use nanocl_error::io::{IoError, IoResult};
+use crate::schema::{http_metrics, stream_metrics};
 
-use nanocl_stubs::generic::GenericFilter;
-
-use crate::{
-  utils,
-  schema::{http_metrics, stream_metrics},
-};
-
-use super::{Pool, Repository, ToMeticDb};
+use super::ToMeticDb;
 
 /// Serde helper to deserialize string that can be empty to `Option<String>`.
 fn deserialize_empty_string<'de, D>(
@@ -289,103 +279,5 @@ impl ToMeticDb for StreamMetricPartial {
       upstream_connect_time: self.upstream_connect_time,
       node_name: node_name.to_owned(),
     }
-  }
-}
-
-impl Repository for HttpMetricDb {
-  type Table = http_metrics::table;
-  type Item = HttpMetricDb;
-  type UpdateItem = HttpMetricDb;
-
-  fn find_one(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Item>> {
-    log::trace!("HttpMetricDb::find_one: {filter:?}");
-    // let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let query = http_metrics::dsl::http_metrics
-      .order(http_metrics::dsl::created_at.desc())
-      .into_boxed();
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_result::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(item)
-    })
-  }
-
-  fn find(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::trace!("HttpMetricDb::find: {filter:?}");
-    // let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = http_metrics::dsl::http_metrics
-      .order(http_metrics::dsl::created_at.desc())
-      .into_boxed();
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_results::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(items)
-    })
-  }
-}
-
-impl Repository for StreamMetricDb {
-  type Table = stream_metrics::table;
-  type Item = StreamMetricDb;
-  type UpdateItem = StreamMetricDb;
-
-  fn find_one(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Item>> {
-    log::trace!("StreamMetricDb::find_one: {filter:?}");
-    // let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let query = stream_metrics::dsl::stream_metrics
-      .order(stream_metrics::dsl::created_at.desc())
-      .into_boxed();
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_result::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(items)
-    })
-  }
-
-  fn find(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::trace!("StreamMetricDb::find: {filter:?}");
-    // let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = stream_metrics::dsl::stream_metrics
-      .order(stream_metrics::dsl::created_at.desc())
-      .into_boxed();
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_results::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?;
-      Ok::<_, IoError>(items)
-    })
   }
 }

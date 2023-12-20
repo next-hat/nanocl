@@ -1,4 +1,5 @@
 use diesel::prelude::*;
+
 use nanocl_stubs::generic::GenericFilter;
 
 use crate::{models::NamespaceDb, schema::namespaces};
