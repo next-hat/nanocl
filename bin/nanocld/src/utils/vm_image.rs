@@ -9,14 +9,13 @@ use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 
 use crate::{
   utils,
-  models::{
-    Pool, Repository, VmImageDb, QemuImgInfo, VmImageUpdateDb, DaemonState,
-  },
+  repositories::generic::*,
+  models::{Pool, VmImageDb, QemuImgInfo, VmImageUpdateDb, DaemonState},
 };
 
 /// Delete a vm image from the database and from the filesystem
 pub(crate) async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
-  let vm_image = VmImageDb::find_by_pk(name, pool).await??;
+  let vm_image = VmImageDb::read_by_pk(name, pool).await??;
   let children = VmImageDb::find_by_parent(name, pool).await?;
   if !children.is_empty() {
     return Err(HttpError::conflict(format!(
@@ -27,7 +26,7 @@ pub(crate) async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
   if let Err(err) = fs::remove_file(&filepath).await {
     log::warn!("Error while deleting the file {filepath}: {err}");
   }
-  VmImageDb::delete_by_pk(name, pool).await??;
+  VmImageDb::del_by_pk(name, pool).await??;
   Ok(())
 }
 
@@ -67,7 +66,7 @@ pub(crate) async fn create_snap(
   image: &VmImageDb,
   state: &DaemonState,
 ) -> HttpResult<VmImageDb> {
-  if VmImageDb::find_by_pk(name, &state.pool).await?.is_ok() {
+  if VmImageDb::read_by_pk(name, &state.pool).await?.is_ok() {
     return Err(HttpError::conflict(format!("Vm image {name} already used")));
   }
   let imagepath = image.path.clone();
@@ -122,7 +121,7 @@ pub(crate) async fn create_snap(
     size_virtual: image_info.virtual_size,
     parent: Some(image.name.clone()),
   };
-  let snap_image = VmImageDb::create(snap_image, &state.pool).await??;
+  let snap_image = VmImageDb::create_from(snap_image, &state.pool).await??;
   Ok(snap_image)
 }
 
@@ -140,7 +139,7 @@ pub(crate) async fn clone(
       "Vm image {name} is not a snapshot"
     )));
   }
-  if VmImageDb::find_by_pk(name, &state.pool).await?.is_ok() {
+  if VmImageDb::read_by_pk(name, &state.pool).await?.is_ok() {
     return Err(HttpError::conflict(format!("Vm image {name} already used")));
   }
   let (tx, rx) = ntex::channel::mpsc::channel::<HttpResult<Bytes>>();
@@ -248,7 +247,7 @@ pub(crate) async fn clone(
       size_virtual: image_info.virtual_size,
       parent: None,
     };
-    let vm = match VmImageDb::create(new_base_image, &pool).await? {
+    let vm = match VmImageDb::create_from(new_base_image, &pool).await? {
       Err(err) => {
         let _ = tx.send(Err(err.clone().into()));
         return Err(err.into());
@@ -294,7 +293,7 @@ pub(crate) async fn resize(
     )));
   }
   let image_info = get_info(&imagepath).await?;
-  let res = VmImageDb::update_by_pk(
+  let res = VmImageDb::update_pk(
     &image.name,
     VmImageUpdateDb {
       size_actual: image_info.actual_size,
@@ -312,7 +311,7 @@ pub(crate) async fn resize_by_name(
   payload: &VmImageResizePayload,
   pool: &Pool,
 ) -> HttpResult<VmImageDb> {
-  let image = VmImageDb::find_by_pk(name, pool).await??;
+  let image = VmImageDb::read_by_pk(name, pool).await??;
   resize(&image, payload, pool).await
 }
 
@@ -341,6 +340,6 @@ pub(crate) async fn create(
     path: filepath.to_owned(),
     parent: None,
   };
-  let image = VmImageDb::create(vm_image, pool).await??;
+  let image = VmImageDb::create_from(vm_image, pool).await??;
   Ok(image)
 }
