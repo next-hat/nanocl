@@ -19,8 +19,8 @@ use crate::{
   utils,
   repositories::generic::*,
   models::{
-    Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, Repository, VmDb,
-    VmSpecDb, FromSpec,
+    Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, VmDb, VmSpecDb,
+    FromSpec,
   },
 };
 
@@ -56,7 +56,7 @@ pub(crate) async fn delete_by_key(
   };
   let container_name = format!("{}.v", vm_key);
   utils::process::remove(&container_name, Some(options), state).await?;
-  VmDb::delete_by_pk(vm_key, &state.pool).await??;
+  VmDb::del_by_pk(vm_key, &state.pool).await??;
   let filter = GenericFilter::new()
     .r#where("vm_key", GenericClause::Eq(vm_key.to_owned()));
   VmSpecDb::del_by(&filter, &state.pool).await??;
@@ -208,7 +208,7 @@ pub(crate) async fn create(
   );
   let vm_key = utils::key::gen_key(namespace, name);
   let mut vm = vm.clone();
-  if VmDb::find_by_pk(&vm_key, &state.pool).await?.is_ok() {
+  if VmDb::read_pk_with_spec(&vm_key, &state.pool).await?.is_ok() {
     return Err(HttpError::conflict(format!(
       "VM with name {name} already exists in namespace {namespace}",
     )));
@@ -242,12 +242,12 @@ pub(crate) async fn patch(
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
-  let vm = VmDb::find_by_pk(vm_key, &state.pool).await??;
-  let old_spec = VmSpecDb::read_by_pk(&vm.spec_key, &state.pool)
+  let vm = VmDb::read_pk_with_spec(vm_key, &state.pool).await??;
+  let old_spec = VmSpecDb::read_by_pk(&vm.spec.key, &state.pool)
     .await??
     .try_to_spec()?;
   let vm_partial = VmSpecPartial {
-    name: spec.name.to_owned().unwrap_or(vm.name.clone()),
+    name: spec.name.to_owned().unwrap_or(vm.spec.name.clone()),
     disk: old_spec.disk,
     host_config: Some(
       spec.host_config.to_owned().unwrap_or(old_spec.host_config),

@@ -16,9 +16,7 @@ use nanocl_stubs::{
 
 use crate::{
   repositories::generic::*,
-  models::{
-    DaemonState, Repository, ProcessDb, JobDb, JobUpdateDb, VmDb, CargoDb,
-  },
+  models::{DaemonState, ProcessDb, JobDb, JobUpdateDb, VmDb, CargoDb},
 };
 
 async fn after(
@@ -31,7 +29,7 @@ async fn after(
     GenericFilter::new().r#where("key", GenericClause::Eq(kind_key.to_owned()));
   match kind {
     ProcessKind::Vm => {
-      let vm = VmDb::find_one(&filter, &state.pool).await??;
+      let vm = VmDb::read_one_with_spec(&filter, &state.pool).await??;
       state.event_emitter.spawn_emit_to_event(&vm, action);
     }
     ProcessKind::Cargo => {
