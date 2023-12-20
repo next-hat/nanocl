@@ -3,12 +3,9 @@ use serde::{Serialize, Deserialize};
 
 use crate::system::{EventActor, ToEvent, EventAction, EventKind, Event};
 
-/// ## SecretPartial
-///
 /// A partial secret object. This is used to create a secret.
 /// A secret is a key/value pair that can be used by the user to store
 /// sensitive data. It is stored as a json object in the database.
-///
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -35,12 +32,9 @@ pub struct SecretPartial {
   pub metadata: Option<serde_json::Value>,
 }
 
-/// ## Secret
-///
 /// This structure represent the secret in the database.
 /// A secret is a key/value pair that can be used by the user to store
 /// sensitive data. It is stored as a json object in the database.
-///
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -67,6 +61,18 @@ pub struct Secret {
   pub metadata: Option<serde_json::Value>,
 }
 
+impl From<Secret> for SecretPartial {
+  fn from(db: Secret) -> Self {
+    SecretPartial {
+      key: db.key,
+      kind: db.kind,
+      immutable: Some(db.immutable),
+      data: db.data,
+      metadata: db.metadata,
+    }
+  }
+}
+
 /// Convert a Secret into an EventActor
 impl From<Secret> for EventActor {
   fn from(secret: Secret) -> Self {
@@ -91,6 +97,7 @@ impl ToEvent for Secret {
   }
 }
 
+/// This structure is used to update a secret.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

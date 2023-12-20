@@ -15,7 +15,8 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
-  models::{DaemonState, ResourceDb, SecretDb, Repository, VmDb, CargoDb},
+  repositories::generic::*,
+  models::{DaemonState, ResourceDb, SecretDb, VmDb, CargoDb},
 };
 
 /// Ensure that the namespace exists in the system
@@ -68,12 +69,12 @@ async fn apply_secrets(
     .map(|secret| async {
       let key = secret.key.to_owned();
       send(StateStream::new_secret_pending(&key), sx);
-      match SecretDb::find_by_pk(&key, &state.pool).await {
+      match SecretDb::read_by_pk(&key, &state.pool).await {
         Ok(existing) => {
           match existing {
             Err(_) => {
               if let Err(err) =
-                SecretDb::create(&secret.clone(), &state.pool).await
+                SecretDb::create_from(&secret.clone(), &state.pool).await
               {
                 send(StateStream::new_secret_error(&key, &err.to_string()), sx);
                 return;
@@ -85,7 +86,7 @@ async fn apply_secrets(
                 send(StateStream::new_secret_unchanged(&key), sx);
                 return;
               }
-              if let Err(err) = SecretDb::update_by_pk(
+              if let Err(err) = SecretDb::update_pk(
                 &key,
                 &SecretUpdate {
                   data: secret.data.to_owned(),
@@ -352,7 +353,7 @@ async fn remove_secrets(
     .map(|secret| async {
       let key = secret.key.to_owned();
       send(StateStream::new_secret_pending(&key), sx);
-      let secret = match SecretDb::find_by_pk(&key, &state.pool).await {
+      let secret = match SecretDb::read_by_pk(&key, &state.pool).await {
         Ok(secret) => match secret {
           Ok(secret) => secret,
           Err(_) => {
@@ -365,7 +366,7 @@ async fn remove_secrets(
           return;
         }
       };
-      if let Err(err) = SecretDb::delete_by_pk(&secret.key, &state.pool).await {
+      if let Err(err) = SecretDb::del_by_pk(&secret.key, &state.pool).await {
         send(StateStream::new_secret_error(&key, &err.to_string()), sx);
         return;
       }

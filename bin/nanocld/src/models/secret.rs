@@ -1,19 +1,11 @@
-use std::sync::Arc;
-
 use diesel::prelude::*;
-use ntex::rt::JoinHandle;
 use serde::{Serialize, Deserialize};
 
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::IoError;
 
-use nanocl_stubs::{
-  generic::GenericFilter,
-  secret::{Secret, SecretPartial, SecretUpdate},
-};
+use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 
-use crate::{utils, gen_where4string, schema::secrets};
-
-use super::{Pool, Repository};
+use crate::schema::secrets;
 
 /// This structure represent the secret in the database.
 /// A secret is a key/value pair that can be used by the user to store
@@ -56,21 +48,11 @@ impl From<&SecretPartial> for SecretDb {
   }
 }
 
-impl From<SecretDb> for SecretPartial {
-  fn from(db: SecretDb) -> Self {
-    SecretPartial {
-      key: db.key,
-      kind: db.kind,
-      immutable: Some(db.immutable),
-      data: db.data,
-      metadata: db.metadata,
-    }
-  }
-}
+impl TryFrom<SecretDb> for Secret {
+  type Error = IoError;
 
-impl From<SecretDb> for Secret {
-  fn from(db: SecretDb) -> Self {
-    Secret {
+  fn try_from(db: SecretDb) -> Result<Self, Self::Error> {
+    Ok(Secret {
       key: db.key,
       created_at: db.created_at,
       updated_at: db.updated_at,
@@ -78,7 +60,7 @@ impl From<SecretDb> for Secret {
       immutable: db.immutable,
       data: db.data,
       metadata: db.metadata,
-    }
+    })
   }
 }
 
@@ -98,66 +80,5 @@ impl From<&SecretUpdate> for SecretUpdateDb {
       data: Some(update.data.clone()),
       metadata: update.metadata.clone(),
     }
-  }
-}
-
-impl Repository for SecretDb {
-  type Table = secrets::table;
-  type Item = Secret;
-  type UpdateItem = SecretUpdateDb;
-
-  fn find_one(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Item>> {
-    log::trace!("SecretDb::find_one: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = secrets::dsl::secrets.into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, secrets::dsl::key, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, secrets::dsl::kind, value);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_result::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?
-        .into();
-      Ok::<_, IoError>(item)
-    })
-  }
-
-  fn find(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::trace!("SecretDb::find: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = secrets::dsl::secrets.into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, secrets::dsl::key, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, secrets::dsl::kind, value);
-    }
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_results::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?
-        .into_iter()
-        .map(|db| db.into())
-        .collect();
-      Ok::<_, IoError>(items)
-    })
   }
 }

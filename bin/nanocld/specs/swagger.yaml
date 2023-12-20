@@ -5737,9 +5737,7 @@ components:
           nullable: true
     Secret:
       type: object
-      description: |
-        ## Secret
-
+      description: |-
         This structure represent the secret in the database.
         A secret is a key/value pair that can be used by the user to store
         sensitive data. It is stored as a json object in the database.
@@ -5774,9 +5772,7 @@ components:
           nullable: true
     SecretPartial:
       type: object
-      description: |
-        ## SecretPartial
-
+      description: |-
         A partial secret object. This is used to create a secret.
         A secret is a key/value pair that can be used by the user to store
         sensitive data. It is stored as a json object in the database.
@@ -5807,6 +5803,7 @@ components:
             $ref: '#/components/schemas/Any'
     SecretUpdate:
       type: object
+      description: This structure is used to update a secret.
       required:
       - Data
       properties:
