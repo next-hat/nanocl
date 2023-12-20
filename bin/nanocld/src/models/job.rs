@@ -1,18 +1,12 @@
-use std::sync::Arc;
-
 use diesel::prelude::*;
-use ntex::rt::JoinHandle;
 
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::IoResult;
 
-use nanocl_stubs::{
-  generic::GenericFilter,
-  job::{Job, JobPartial},
-};
+use nanocl_stubs::job::{Job, JobPartial};
 
-use crate::{utils, schema::jobs};
+use crate::schema::jobs;
 
-use super::{Pool, Repository, FromSpec};
+use super::FromSpec;
 
 /// This structure represent a job to run.
 /// It will create and run a list of containers.
@@ -74,56 +68,5 @@ impl FromSpec for JobDb {
       ttl: p.ttl,
       containers: p.containers.clone(),
     }
-  }
-}
-
-impl Repository for JobDb {
-  type Table = jobs::table;
-  type Item = Job;
-  type UpdateItem = JobUpdateDb;
-
-  fn find_one(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Item>> {
-    log::trace!("JobDb::find_one: {filter:?}");
-    let query = jobs::dsl::jobs
-      .order(jobs::dsl::created_at.desc())
-      .into_boxed();
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_result::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?
-        .try_to_spec()?;
-      Ok::<_, IoError>(item)
-    })
-  }
-
-  fn find(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Item>>> {
-    log::trace!("JobDb::find: {filter:?}");
-    let mut query = jobs::dsl::jobs
-      .order(jobs::dsl::created_at.desc())
-      .into_boxed();
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_results::<Self>(&mut conn)
-        .map_err(Self::map_err_context)?
-        .into_iter()
-        .map(|item| item.try_to_spec())
-        .collect::<IoResult<Vec<_>>>()?;
-      Ok::<_, IoError>(item)
-    })
   }
 }
