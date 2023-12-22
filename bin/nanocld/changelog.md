@@ -16,13 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Process to save container state and reduce repeated code.
 - Generic filter on find and find_one for all models.
 - Better versionning middleware that return the version.
-- Install command with `-p | --force-pull` options to force repull images.
 - Cleaner code and data structure in general
 - Stabilize spec with modification on Kind and Version handling and history of object
 
 ## Changed
 
-- Use of nanocld_client 0.12
 - Event datastructure
 
 ## [0.11.0] 2023-11-06
