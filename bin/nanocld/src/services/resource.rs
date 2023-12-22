@@ -123,9 +123,8 @@ pub(crate) async fn put_resource(
   payload: web::types::Json<ResourceUpdate>,
 ) -> HttpResult<web::HttpResponse> {
   let resource = ResourceDb::inspect_by_pk(&path.1, &state.pool).await?;
-  let new_resource: ResourcePartial = ResourcePartial {
+  let new_resource = ResourcePartial {
     name: path.1.clone(),
-    version: payload.version.clone(),
     kind: resource.kind,
     data: payload.data.clone(),
     metadata: payload.metadata.clone(),
@@ -185,7 +184,6 @@ pub(crate) async fn revert_resource(
   let resource = ResourceDb::inspect_by_pk(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
     name: resource.spec.resource_key,
-    version: history.version,
     kind: resource.kind,
     data: history.data,
     metadata: history.metadata,
@@ -265,7 +263,6 @@ mod tests {
     });
     let resource = ResourcePartial {
       name: TEST_RESOURCE.to_owned(),
-      version: TEST_RESOURCE_KIND_VERSION.to_owned(),
       kind: TEST_RESOURCE_KIND.to_owned(),
       data: data.clone(),
       metadata: Some(serde_json::json!({
@@ -377,7 +374,6 @@ mod tests {
       "Username": "test_update",
     });
     let new_resource = ResourceUpdate {
-      version: "v1".to_owned(),
       data: data.clone(),
       metadata: None,
     };

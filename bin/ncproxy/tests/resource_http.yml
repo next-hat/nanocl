@@ -3,7 +3,6 @@ ApiVersion: v0.12
 Resources:
 - Name: proxy-get-started
   Kind: ncproxy.io/rule
-  Version: v0.9
   Data:
     Rules:
     - Domain: get-started.com

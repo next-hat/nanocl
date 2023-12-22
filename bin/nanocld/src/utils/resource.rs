@@ -28,8 +28,10 @@ async fn hook_create_resource(
   pool: &Pool,
 ) -> HttpResult<ResourcePartial> {
   let mut resource = resource.clone();
+  let (kind, version) = ResourceDb::parse_kind(&resource.kind, pool).await?;
+  log::trace!("hook_create_resource kind: {kind} {version}");
   let kind: ResourceKind =
-    ResourceKindVersionDb::get_version(&resource.kind, &resource.version, pool)
+    ResourceKindVersionDb::get_version(&kind, &version, pool)
       .await?
       .try_into()?;
   if let Some(schema) = &kind.data.schema {
@@ -47,11 +49,10 @@ async fn hook_create_resource(
       HttpError::bad_request(msg)
     })?;
   }
-  log::debug!("hook_create_resource kind: {kind:?}");
   if let Some(url) = &kind.data.url {
     let ctrl_client = CtrlClient::new(&kind.name, url);
     let config = ctrl_client
-      .apply_rule(&resource.version, &resource.name, &resource.data)
+      .apply_rule(&version, &resource.name, &resource.data)
       .await?;
     resource.data = config;
   }

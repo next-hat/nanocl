@@ -5,7 +5,6 @@ ApiVersion: v0.12
 Resources:
 - Name: resource-example
   Kind: ncproxy.io/rule
-  Version: v0.9
   Data:
     Rules:
       - Domain: deploy-example.com

@@ -25,7 +25,6 @@
     {
       "Kind": "ncproxy.io/rule",
       "Name": "deploy-example.com",
-      "Version": "v0.9",
       "Data": {
         "Rules": [
           {

@@ -3,7 +3,6 @@ ApiVersion: v0.12
 Resources:
 - Name: vpn-dns
   Kind: ncdns.io/rule
-  Version: v0.4
   Data:
     Network: global.nsp
     Entries:

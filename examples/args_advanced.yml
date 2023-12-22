@@ -26,7 +26,6 @@ Cargoes:
 Resources:
 - Name: ${{ Args.domain }}
   Kind: ncproxy.io/rule
-  Version: v0.9
   Data:
     Rules:
     - Domain: ${{ Args.domain }}

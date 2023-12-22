@@ -5724,7 +5724,6 @@ components:
       required:
       - Name
       - Kind
-      - Version
       - Data
       properties:
         Name:
@@ -5733,9 +5732,6 @@ components:
         Kind:
           type: string
           description: The kind of the resource
-        Version:
-          type: string
-          description: Version of the data
         Data:
           type: object
           description: The data of the resource (json object)
@@ -5795,12 +5791,8 @@ components:
       type: object
       description: Payload used to update a resource
       required:
-      - Version
       - Data
       properties:
-        Version:
-          type: string
-          description: Version of the spec
         Data:
           type: object
           description: The spec of the resource as a json object

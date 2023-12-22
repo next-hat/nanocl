@@ -13,7 +13,10 @@ use nanocl_stubs::{
 
 use crate::{
   utils, gen_where4string, gen_where4json,
-  models::{Pool, ResourceDb, ResourceSpecDb, ResourceUpdateDb, WithSpec},
+  models::{
+    Pool, ResourceDb, ResourceSpecDb, ResourceUpdateDb, WithSpec,
+    ResourceKindDb,
+  },
   schema::{resources, resource_specs},
 };
 
@@ -125,16 +128,33 @@ impl RepositoryReadWithSpec for ResourceDb {
 }
 
 impl ResourceDb {
+  pub(crate) async fn parse_kind(
+    kind: &str,
+    pool: &Pool,
+  ) -> IoResult<(String, String)> {
+    let items = kind.split('/').collect::<Vec<_>>();
+    match items.get(2) {
+      Some(version) => {
+        Ok((items[..2].join("/"), version.to_owned().to_string()))
+      }
+      None => {
+        let kind = ResourceKindDb::read_pk_with_spec(kind, pool).await??;
+        Ok((kind.name, kind.version))
+      }
+    }
+  }
+
   /// Create a new resource from a spec.
   pub(crate) async fn create_from_spec(
     item: &ResourcePartial,
     pool: &Pool,
   ) -> IoResult<Resource> {
+    let (_, version) = ResourceDb::parse_kind(&item.kind, pool).await?;
     let spec = ResourceSpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       resource_key: item.name.to_owned(),
-      version: item.version.to_owned(),
+      version: version.to_owned(),
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };
@@ -157,11 +177,12 @@ impl ResourceDb {
   ) -> IoResult<Resource> {
     let key = item.name.clone();
     let resource = ResourceDb::read_pk_with_spec(&item.name, pool).await??;
+    let (_, version) = ResourceDb::parse_kind(&item.kind, pool).await?;
     let spec = ResourceSpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       resource_key: resource.spec.resource_key,
-      version: item.version.clone(),
+      version: version.clone(),
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };

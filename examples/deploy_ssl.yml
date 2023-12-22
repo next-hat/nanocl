@@ -61,7 +61,6 @@ Secrets:
 Resources:
 - Name: secret-tls.com
   Kind: ncproxy.io/rule
-  Version: v0.9
   Metadata:
     Cert: certbot
   Data:
