@@ -1,17 +1,6 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    cargo_specs (key) {
-        key -> Uuid,
-        created_at -> Timestamptz,
-        cargo_key -> Varchar,
-        version -> Varchar,
-        data -> Jsonb,
-        metadata -> Nullable<Jsonb>,
-    }
-}
-
-diesel::table! {
     cargoes (key) {
         key -> Varchar,
         created_at -> Timestamptz,
@@ -85,33 +74,10 @@ diesel::table! {
 }
 
 diesel::table! {
-    resource_kind_versions (key) {
-        key -> Uuid,
-        created_at -> Timestamptz,
-        kind_name -> Varchar,
-        kind_key -> Varchar,
-        version -> Varchar,
-        data -> Jsonb,
-        metadata -> Nullable<Jsonb>,
-    }
-}
-
-diesel::table! {
     resource_kinds (name) {
         name -> Varchar,
-        version_key -> Uuid,
         created_at -> Timestamptz,
-    }
-}
-
-diesel::table! {
-    resource_specs (key) {
-        key -> Uuid,
-        created_at -> Timestamptz,
-        resource_key -> Varchar,
-        version -> Varchar,
-        data -> Jsonb,
-        metadata -> Nullable<Jsonb>,
+        spec_key -> Uuid,
     }
 }
 
@@ -137,6 +103,18 @@ diesel::table! {
 }
 
 diesel::table! {
+    specs (key) {
+        key -> Uuid,
+        created_at -> Timestamptz,
+        kind_name -> Varchar,
+        kind_key -> Varchar,
+        version -> Varchar,
+        data -> Jsonb,
+        metadata -> Nullable<Jsonb>,
+    }
+}
+
+diesel::table! {
     vm_images (name) {
         name -> Varchar,
         created_at -> Timestamptz,
@@ -150,17 +128,6 @@ diesel::table! {
 }
 
 diesel::table! {
-    vm_specs (key) {
-        key -> Uuid,
-        created_at -> Timestamptz,
-        vm_key -> Varchar,
-        version -> Varchar,
-        data -> Jsonb,
-        metadata -> Nullable<Jsonb>,
-    }
-}
-
-diesel::table! {
     vms (key) {
         key -> Varchar,
         created_at -> Timestamptz,
@@ -170,31 +137,28 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(cargoes -> cargo_specs (spec_key));
 diesel::joinable!(cargoes -> namespaces (namespace_name));
+diesel::joinable!(cargoes -> specs (spec_key));
 diesel::joinable!(node_group_links -> node_groups (node_group_name));
 diesel::joinable!(node_group_links -> nodes (node_name));
-diesel::joinable!(resource_kinds -> resource_kind_versions (version_key));
-diesel::joinable!(resources -> resource_specs (spec_key));
+diesel::joinable!(resource_kinds -> specs (spec_key));
+diesel::joinable!(resources -> specs (spec_key));
 diesel::joinable!(vms -> namespaces (namespace_name));
-diesel::joinable!(vms -> vm_specs (spec_key));
+diesel::joinable!(vms -> specs (spec_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
-  cargo_specs,
-  cargoes,
-  jobs,
-  metrics,
-  namespaces,
-  node_group_links,
-  node_groups,
-  nodes,
-  processes,
-  resource_kind_versions,
-  resource_kinds,
-  resource_specs,
-  resources,
-  secrets,
-  vm_images,
-  vm_specs,
-  vms,
+    cargoes,
+    jobs,
+    metrics,
+    namespaces,
+    node_group_links,
+    node_groups,
+    nodes,
+    processes,
+    resource_kinds,
+    resources,
+    secrets,
+    specs,
+    vm_images,
+    vms,
 );

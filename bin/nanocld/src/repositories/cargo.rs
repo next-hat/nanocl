@@ -8,12 +8,12 @@ use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
   generic::{GenericFilter, GenericClause},
   cargo::Cargo,
-  cargo_spec::CargoSpecPartial,
+  cargo_spec::{CargoSpecPartial, CargoSpec},
 };
 
 use crate::{
   utils, gen_where4string,
-  models::{Pool, CargoDb, CargoSpecDb, CargoUpdateDb, WithSpec, FromSpec},
+  models::{Pool, CargoDb, SpecDb, CargoUpdateDb},
   schema::cargoes,
 };
 
@@ -42,11 +42,11 @@ impl RepositoryReadWithSpec for CargoDb {
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let item = cargoes::dsl::cargoes
-        .inner_join(crate::schema::cargo_specs::table)
+        .inner_join(crate::schema::specs::table)
         .filter(cargoes::dsl::key.eq(pk))
-        .get_result::<(Self, CargoSpecDb)>(&mut conn)
+        .get_result::<(Self, SpecDb)>(&mut conn)
         .map_err(Self::map_err)?;
-      let item = item.0.with_spec(&item.1.try_to_spec()?);
+      let item = item.0.with_spec(&item.1.try_to_cargo_spec()?);
       Ok::<_, IoError>(item)
     })
   }
@@ -58,7 +58,7 @@ impl RepositoryReadWithSpec for CargoDb {
     log::trace!("CargoDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargoes::dsl::cargoes
-      .inner_join(crate::schema::cargo_specs::table)
+      .inner_join(crate::schema::specs::table)
       .into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, cargoes::dsl::key, value);
@@ -73,9 +73,9 @@ impl RepositoryReadWithSpec for CargoDb {
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let item = query
-        .get_result::<(Self, CargoSpecDb)>(&mut conn)
+        .get_result::<(Self, SpecDb)>(&mut conn)
         .map_err(Self::map_err)?;
-      let item = item.0.with_spec(&item.1.try_to_spec()?);
+      let item = item.0.with_spec(&item.1.try_to_cargo_spec()?);
       Ok::<_, IoError>(item)
     })
   }
@@ -87,7 +87,7 @@ impl RepositoryReadWithSpec for CargoDb {
     log::trace!("CargoDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargoes::dsl::cargoes
-      .inner_join(crate::schema::cargo_specs::table)
+      .inner_join(crate::schema::specs::table)
       .order(cargoes::dsl::created_at.desc())
       .into_boxed();
     if let Some(value) = r#where.get("key") {
@@ -108,17 +108,30 @@ impl RepositoryReadWithSpec for CargoDb {
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
-        .get_results::<(Self, CargoSpecDb)>(&mut conn)
+        .get_results::<(Self, SpecDb)>(&mut conn)
         .map_err(Self::map_err)?;
       let items = items
         .into_iter()
         .map(|item| {
-          let spec = &item.1.try_to_spec()?;
+          let spec = &item.1.try_to_cargo_spec()?;
           Ok::<_, IoError>(item.0.with_spec(spec))
         })
         .collect::<IoResult<Vec<_>>>()?;
       Ok::<_, IoError>(items)
     })
+  }
+}
+
+impl WithSpec for CargoDb {
+  type Output = Cargo;
+  type Relation = CargoSpec;
+
+  fn with_spec(self, r: &Self::Relation) -> Self::Output {
+    Self::Output {
+      namespace_name: self.namespace_name,
+      created_at: self.created_at,
+      spec: r.clone(),
+    }
   }
 }
 
@@ -141,10 +154,10 @@ impl CargoDb {
       ));
     }
     let key = utils::key::gen_key(&nsp, &item.name);
-    let new_spec = CargoSpecDb::try_from_spec_partial(&key, &version, &item)?;
-    let spec = CargoSpecDb::create_from(new_spec, pool)
+    let new_spec = SpecDb::try_from_cargo_partial(&key, &version, &item)?;
+    let spec = SpecDb::create_from(new_spec, pool)
       .await??
-      .try_to_spec()?;
+      .try_to_cargo_spec()?;
     let new_item = CargoDb {
       key,
       name: item.name,
@@ -165,10 +178,10 @@ impl CargoDb {
   ) -> IoResult<Cargo> {
     let version = version.to_owned();
     let mut cargo = CargoDb::read_pk_with_spec(key, pool).await??;
-    let new_spec = CargoSpecDb::try_from_spec_partial(key, &version, item)?;
-    let spec = CargoSpecDb::create_from(new_spec, pool)
+    let new_spec = SpecDb::try_from_cargo_partial(key, &version, item)?;
+    let spec = SpecDb::create_from(new_spec, pool)
       .await??
-      .try_to_spec()?;
+      .try_to_cargo_spec()?;
     let new_item = CargoUpdateDb {
       name: Some(item.name.to_owned()),
       spec_key: Some(spec.key),

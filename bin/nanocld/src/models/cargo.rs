@@ -1,10 +1,8 @@
 use diesel::prelude::*;
 
-use nanocl_stubs::{cargo::Cargo, cargo_spec::CargoSpec};
-
 use crate::schema::cargoes;
 
-use super::{NamespaceDb, WithSpec};
+use super::NamespaceDb;
 
 /// This structure represent the cargo in the database.
 /// A cargo is a replicable container that can be used to deploy a service.
@@ -39,17 +37,4 @@ pub struct CargoUpdateDb {
   pub namespace_name: Option<String>,
   /// The spec key reference
   pub spec_key: Option<uuid::Uuid>,
-}
-
-impl WithSpec for CargoDb {
-  type Type = Cargo;
-  type Relation = CargoSpec;
-
-  fn with_spec(self, r: &Self::Relation) -> Self::Type {
-    Self::Type {
-      namespace_name: self.namespace_name,
-      created_at: self.created_at,
-      spec: r.clone(),
-    }
-  }
 }

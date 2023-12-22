@@ -1,6 +1,6 @@
 use ntex::web;
 
-use nanocl_error::http::HttpResult;
+use nanocl_error::{http::HttpResult, io::IoResult};
 
 use nanocl_stubs::{
   generic::{GenericNspQuery, GenericListNspQuery},
@@ -11,7 +11,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{DaemonState, CargoSpecDb, FromSpec},
+  models::{DaemonState, SpecDb},
 };
 
 /// List cargoes
@@ -246,7 +246,11 @@ pub(crate) async fn list_cargo_history(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let histories = CargoSpecDb::find_by_cargo(&key, &state.pool).await?;
+  let histories = SpecDb::read_by_kind_key(&key, &state.pool)
+    .await?
+    .into_iter()
+    .map(|e| e.try_to_cargo_spec())
+    .collect::<IoResult<Vec<_>>>()?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 
@@ -273,9 +277,9 @@ pub(crate) async fn revert_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo_key = utils::key::gen_key(&namespace, &path.1);
-  let spec = CargoSpecDb::read_by_pk(&path.2, &state.pool)
+  let spec = SpecDb::read_by_pk(&path.2, &state.pool)
     .await??
-    .try_to_spec()?;
+    .try_to_cargo_spec()?;
   let cargo =
     utils::cargo::put(&cargo_key, &spec.clone().into(), &path.0, &state)
       .await?;

@@ -11,9 +11,7 @@ use nanocl_stubs::{
 
 use crate::{
   repositories::generic::*,
-  models::{
-    Pool, DaemonState, ResourceKindVersionDb, ResourceSpecDb, ResourceDb,
-  },
+  models::{Pool, DaemonState, SpecDb, ResourceDb},
 };
 
 use super::ctrl_client::CtrlClient;
@@ -30,10 +28,9 @@ async fn hook_create_resource(
   let mut resource = resource.clone();
   let (kind, version) = ResourceDb::parse_kind(&resource.kind, pool).await?;
   log::trace!("hook_create_resource kind: {kind} {version}");
-  let kind: ResourceKind =
-    ResourceKindVersionDb::get_version(&kind, &version, pool)
-      .await?
-      .try_into()?;
+  let kind: ResourceKind = SpecDb::get_version(&kind, &version, pool)
+    .await?
+    .try_into()?;
   if let Some(schema) = &kind.data.schema {
     let schema: JSONSchema = JSONSchema::options()
       .with_draft(Draft::Draft7)
@@ -66,13 +63,10 @@ async fn hook_delete_resource(
   resource: &Resource,
   pool: &Pool,
 ) -> HttpResult<()> {
-  let kind: ResourceKind = ResourceKindVersionDb::get_version(
-    &resource.kind,
-    &resource.spec.version,
-    pool,
-  )
-  .await?
-  .try_into()?;
+  let kind: ResourceKind =
+    SpecDb::get_version(&resource.kind, &resource.spec.version, pool)
+      .await?
+      .try_into()?;
   log::debug!("hook_delete_resource kind: {kind:?}");
   if let Some(url) = &kind.data.url {
     let ctrl_client = CtrlClient::new(&kind.name, url);
@@ -134,7 +128,7 @@ pub(crate) async fn delete(
     "resource_key",
     GenericClause::Eq(resource.spec.resource_key.to_owned()),
   );
-  ResourceSpecDb::del_by(&filter, &state.pool).await??;
+  SpecDb::del_by(&filter, &state.pool).await??;
   state
     .event_emitter
     .spawn_emit_to_event(resource, EventAction::Deleted);

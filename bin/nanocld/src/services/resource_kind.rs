@@ -9,7 +9,7 @@ use nanocl_stubs::{
 
 use crate::{
   repositories::generic::*,
-  models::{DaemonState, ResourceKindDb, ResourceKindVersionDb},
+  models::{DaemonState, ResourceKindDb, SpecDb},
 };
 
 /// List resource kinds
@@ -75,7 +75,7 @@ pub(crate) async fn delete_resource_kind(
   let filter =
     GenericFilter::new().r#where("kind_key", GenericClause::Eq(key.to_owned()));
   ResourceKindDb::del_by_pk(&key, &state.pool).await??;
-  ResourceKindVersionDb::del_by(&filter, &state.pool).await??;
+  SpecDb::del_by(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Accepted().into())
 }
 
@@ -121,8 +121,7 @@ pub(crate) async fn inspect_resource_kind_version(
   path: web::types::Path<(String, String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);
-  let kind_version =
-    ResourceKindVersionDb::get_version(&key, &path.3, &state.pool).await?;
+  let kind_version = SpecDb::get_version(&key, &path.3, &state.pool).await?;
   let kind_version: ResourceKindVersion = kind_version.try_into()?;
   Ok(web::HttpResponse::Ok().json(&kind_version))
 }

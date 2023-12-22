@@ -25,10 +25,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{
-    DaemonState, CargoDb, ProcessDb, NamespaceDb, SecretDb, CargoSpecDb,
-    FromSpec,
-  },
+  models::{DaemonState, CargoDb, ProcessDb, NamespaceDb, SecretDb, SpecDb},
 };
 
 use super::stream::transform_stream;
@@ -382,7 +379,7 @@ pub(crate) async fn delete_by_key(
   CargoDb::del_by_pk(key, &state.pool).await??;
   let filter = GenericFilter::new()
     .r#where("cargo_key", GenericClause::Eq(key.to_owned()));
-  CargoSpecDb::del_by(&filter, &state.pool).await??;
+  SpecDb::del_by(&filter, &state.pool).await??;
   state
     .event_emitter
     .spawn_emit_to_event(&cargo, EventAction::Deleted);
@@ -475,9 +472,9 @@ pub(crate) async fn list(
   let cargoes = CargoDb::read_with_spec(&filter, &state.pool).await??;
   let mut cargo_summaries = Vec::new();
   for cargo in cargoes {
-    let spec = CargoSpecDb::read_by_pk(&cargo.spec.key, &state.pool)
+    let spec = SpecDb::read_by_pk(&cargo.spec.key, &state.pool)
       .await??
-      .try_to_spec()?;
+      .try_to_cargo_spec()?;
     let instances =
       ProcessDb::find_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
     let mut running_instances = 0;

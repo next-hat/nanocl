@@ -14,7 +14,7 @@ use crate::{
   utils,
   event_emitter::Client,
   repositories::generic::*,
-  models::{DaemonState, JobDb, FromSpec, ProcessUpdateDb, ProcessDb},
+  models::{DaemonState, JobDb, ProcessUpdateDb, ProcessDb},
 };
 
 /// Remove a job after when finished and ttl is set

@@ -10,19 +10,10 @@ CREATE TABLE IF NOT EXISTS "vm_images" (
   "parent" VARCHAR REFERENCES vm_images("name")
 );
 
-CREATE TABLE IF NOT EXISTS "vm_specs" (
-  "key" UUID NOT NULL UNIQUE PRIMARY KEY,
-  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "vm_key" VARCHAR NOT NULL,
-  "version" VARCHAR NOT NULL,
-  "data" JSON NOT NULL,
-  "metadata" JSON
-);
-
 CREATE TABLE IF NOT EXISTS "vms" (
   "key" VARCHAR NOT NULL UNIQUE PRIMARY KEY,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "name" VARCHAR NOT NULL,
-  "spec_key" UUID NOT NULL REFERENCES vm_specs("key"),
+  "spec_key" UUID NOT NULL REFERENCES specs("key"),
   "namespace_name" VARCHAR NOT NULL REFERENCES namespaces("name")
 );
