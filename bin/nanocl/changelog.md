@@ -5,16 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.12.0]
+## [0.12.0] 2023-12-22
 
 ### Added
 
 - Nanocl state apply return exit code on errors.
 - Nanocl state apply --reload to skip diff check.
 - Cargo image import with progress bar.
-- Use of nanocld_client 0.12.
 - Fix double create_at column in `nanocl cargo ls`.
 - Better `nanocl ps`.
+- Install command with `-p | --force-pull` to force repull image
+
+### Changed
+
+- Use of nanocld_client 0.12.
 
 ## [0.11.0] - 2023-11-06
 
