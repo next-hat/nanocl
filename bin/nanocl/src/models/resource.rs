@@ -39,8 +39,6 @@ pub struct ResourceRow {
   pub name: String,
   /// Kind of resource
   pub kind: String,
-  /// Version of the ressource
-  pub version: String,
   /// When the resource was created
   #[tabled(rename = "CREATED AT")]
   pub created_at: String,
@@ -65,7 +63,6 @@ impl From<Resource> for ResourceRow {
       .format("%Y-%m-%d %H:%M:%S");
     Self {
       name: resource.spec.resource_key,
-      version: resource.spec.version,
       kind: resource.kind,
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
