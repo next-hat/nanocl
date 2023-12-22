@@ -9,7 +9,7 @@ use crate::version::{VERSION, CHANNEL};
 /// Get template from our GitHub repo for installation
 async fn get() -> HttpClientResult<String> {
   let client = http::client::Client::new();
-  let url = format!("https://raw.githubusercontent.com/nxthat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.yml");
+  let url = format!("https://raw.githubusercontent.com/next-hat/nanocl/release/{CHANNEL}/bin/nanocl/{VERSION}/installer.yml");
   let mut res = client.get(url).send().await.map_err(|err| {
     err.map_err_context(|| "Unable to fetch installer template")
   })?;

@@ -9,4 +9,4 @@ Cargoes:
   InitContainer:
     Image: doesntexists:latest
   Container:
-    Image: ghcr.io/nxthat/nanocl-get-started:latest
+    Image: ghcr.io/next-hat/nanocl-get-started:latest

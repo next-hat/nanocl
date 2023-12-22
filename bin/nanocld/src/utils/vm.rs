@@ -158,7 +158,7 @@ pub(crate) async fn create_instance(
   }
   let image = match &vm.spec.host_config.runtime {
     Some(runtime) => runtime.to_owned(),
-    None => "ghcr.io/nxthat/nanocl-qemu:8.0.2.0".into(),
+    None => "ghcr.io/next-hat/nanocl-qemu:8.0.2.0".into(),
   };
   let spec = bollard_next::container::Config {
     image: Some(image),

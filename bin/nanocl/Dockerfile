@@ -53,7 +53,7 @@ RUN export ARCH=$(uname -m) \
 # stage 4 - create runtime image
 FROM --platform=$BUILDPLATFORM scratch
 
-LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
+LABEL org.opencontainers.image.source https://github.com/next-hat/nanocl
 LABEL org.opencontainers.image.description Nanocl Cli
 
 COPY --from=builder /bin/nanocl /bin/nanocl

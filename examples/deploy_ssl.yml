@@ -79,6 +79,6 @@ Resources:
 Cargoes:
 - Name: secret-tls
   Container:
-    Image: ghcr.io/nxthat/nanocl-get-started:latest
+    Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
       - APP=SECRET_TLS

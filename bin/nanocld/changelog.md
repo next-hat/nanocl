@@ -89,7 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Vm runtime image to `ghcr.io/nxthat/nanocl-qemu:7.1.0.0`
+- Vm runtime image to `ghcr.io/next-hat/nanocl-qemu:7.1.0.0`
 - Better state messages
 
 ### Added

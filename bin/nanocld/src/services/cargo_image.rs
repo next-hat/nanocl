@@ -232,7 +232,7 @@ pub mod tests {
   pub async fn ensure_test_image() {
     let client = gen_default_test_client().await;
     let image = CargoImagePartial {
-      name: "ghcr.io/nxthat/nanocl-get-started:latest".to_owned(),
+      name: "ghcr.io/next-hat/nanocl-get-started:latest".to_owned(),
     };
     let res = create(&client, &image).await;
     let mut stream = res.into_stream();

@@ -53,7 +53,7 @@ RUN export ARCH=$(uname -m) \
 # stage 4 - create runtime image
 FROM --platform=$BUILDPLATFORM scratch
 
-LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
+LABEL org.opencontainers.image.source https://github.com/next-hat/nanocl
 LABEL org.opencontainers.image.description Nanocl Controller Dns
 
 COPY --from=builder /bin/ncdns /bin/ncdns

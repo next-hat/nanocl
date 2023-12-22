@@ -55,7 +55,7 @@ crates # Shared Libraries
 Clone the repository:
 
 ```sh
-git clone https://github.com/nxthat/nanocl
+git clone https://github.com/next-hat/nanocl
 ```
 
 To build and run `Nanocl` you will need these dependencies

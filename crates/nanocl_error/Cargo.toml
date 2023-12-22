@@ -7,7 +7,7 @@ description = "Nanocl error types"
 readme = "readme.md"
 license = "MIT OR Apache-2.0"
 homepage = "https://next-hat.com/nanocl"
-repository = "https://github.com/nxthat/nanocl"
+repository = "https://github.com/next-hat/nanocl"
 
 [lib]
 bench = false

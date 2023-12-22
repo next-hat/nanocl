@@ -71,7 +71,7 @@ COPY ./bin/nanocld/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 
-LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
+LABEL org.opencontainers.image.source https://github.com/next-hat/nanocl
 LABEL org.opencontainers.image.description Nanocl Daemon
 
 ## Set entrypoint

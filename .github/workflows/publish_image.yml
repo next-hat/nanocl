@@ -31,23 +31,23 @@ jobs:
       - name: Publish Nightly
         if: env.CHANNEL == 'nightly'
         run: |
-          gh release download -R nxthat/nanocl $BINARY_NAME-$VERSION-nightly -p $BINARY_NAME-$VERSION-nightly.tar.gz
+          gh release download -R next-hat/nanocl $BINARY_NAME-$VERSION-nightly -p $BINARY_NAME-$VERSION-nightly.tar.gz
           cat $BINARY_NAME-$VERSION-nightly.tar.gz | docker load
-          docker tag ghcr.io/nxthat/$BINARY_NAME:$VERSION-nightly ghcr.io/nxthat/$BINARY_NAME:nightly
-          docker tag ghcr.io/nxthat/$BINARY_NAME:$VERSION-nightly ghcr.io/nxthat/$BINARY_NAME:$VERSION-nightly
-          docker push ghcr.io/nxthat/$BINARY_NAME:nightly
-          docker push ghcr.io/nxthat/$BINARY_NAME:$VERSION-nightly
+          docker tag ghcr.io/next-hat/$BINARY_NAME:$VERSION-nightly ghcr.io/next-hat/$BINARY_NAME:nightly
+          docker tag ghcr.io/next-hat/$BINARY_NAME:$VERSION-nightly ghcr.io/next-hat/$BINARY_NAME:$VERSION-nightly
+          docker push ghcr.io/next-hat/$BINARY_NAME:nightly
+          docker push ghcr.io/next-hat/$BINARY_NAME:$VERSION-nightly
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
 
       - name: Publish Stable
         if: env.CHANNEL != 'nightly'
         run: |
-          gh release download -R nxthat/nanocl $BINARY_NAME-$VERSION -p $BINARY_NAME-$VERSION.tar.gz
+          gh release download -R next-hat/nanocl $BINARY_NAME-$VERSION -p $BINARY_NAME-$VERSION.tar.gz
           cat $BINARY_NAME-$VERSION.tar.gz | docker load
-          docker tag ghcr.io/nxthat/$BINARY_NAME:$VERSION ghcr.io/nxthat/$BINARY_NAME:latest
-          docker tag ghcr.io/nxthat/$BINARY_NAME:$VERSION ghcr.io/nxthat/$BINARY_NAME:$VERSION
-          docker push ghcr.io/nxthat/$BINARY_NAME:latest
-          docker push ghcr.io/nxthat/$BINARY_NAME:$VERSION
+          docker tag ghcr.io/next-hat/$BINARY_NAME:$VERSION ghcr.io/next-hat/$BINARY_NAME:latest
+          docker tag ghcr.io/next-hat/$BINARY_NAME:$VERSION ghcr.io/next-hat/$BINARY_NAME:$VERSION
+          docker push ghcr.io/next-hat/$BINARY_NAME:latest
+          docker push ghcr.io/next-hat/$BINARY_NAME:$VERSION
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}

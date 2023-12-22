@@ -24,7 +24,7 @@ COPY ./bin/nproxy/nginx.conf /etc/nginx/nginx.conf
 
 RUN chmod +x /entrypoint.sh
 
-LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
+LABEL org.opencontainers.image.source https://github.com/next-hat/nanocl
 LABEL org.opencontainers.image.description Nanocl Proxy
 
 ENTRYPOINT ["/entrypoint.sh"]

@@ -37,7 +37,7 @@ WORKDIR /project
 ENV TZ=${tz}
 ENV RUSTFLAGS="-C target-feature=-crt-static"
 
-LABEL org.opencontainers.image.source https://github.com/nxthat/nanocl
+LABEL org.opencontainers.image.source https://github.com/next-hat/nanocl
 LABEL org.opencontainers.image.description The dev image for nanocl services
 
 ENTRYPOINT ["cargo"]
