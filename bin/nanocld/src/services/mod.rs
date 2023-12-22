@@ -19,6 +19,7 @@ mod vm_image;
 mod secret;
 mod job;
 mod process;
+mod resource_kind;
 
 pub(crate) async fn unhandled() -> HttpResult<web::HttpResponse> {
   Err(HttpError::not_found("Route or method unhandled"))
@@ -65,7 +66,8 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
       .configure(metric::ntex_config)
       .configure(secret::ntex_config)
       .configure(process::ntex_config)
-      .configure(job::ntex_config),
+      .configure(job::ntex_config)
+      .configure(resource_kind::ntex_config),
   );
 }
 

@@ -65,6 +65,7 @@ pub struct CargoSpecPartial {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
   /// Action to run before the container
   #[cfg_attr(
@@ -110,6 +111,7 @@ pub struct CargoSpecUpdate {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
   /// Action to run before the container
   #[cfg_attr(
@@ -173,6 +175,7 @@ pub struct CargoSpec {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
   /// Action to run before the container
   #[cfg_attr(

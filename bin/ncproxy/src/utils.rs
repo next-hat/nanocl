@@ -17,6 +17,7 @@ use nanocld_client::stubs::proxy::{
 };
 
 use crate::nginx::{Nginx, NginxConfKind};
+use crate::version;
 
 /// Serialize a ProxyRule
 pub(crate) fn serialize_proxy_rule(
@@ -663,7 +664,7 @@ pub(crate) async fn create_resource_conf(
 //   nginx: &Nginx,
 // ) -> IoResult<()> {
 //   let query = ResourceQuery {
-//     kind: Some("ProxyRule".into()),
+//     kind: Some(version::RULE_KEY.into()),
 //     ..Default::default()
 //   };
 //   let resources = client.list_resource(Some(query)).await.map_err(|err| {
@@ -698,7 +699,7 @@ pub(crate) async fn list_resource_by_cargo(
   let namespace = namespace.unwrap_or("global".into());
   let target_key = format!("{name}.{namespace}.c");
   let filter = GenericFilter::new()
-  .r#where("kind", GenericClause::Eq("ProxyRule".to_owned()))
+  .r#where("kind", GenericClause::Eq(version::RULE_KEY.to_owned()))
   .r#where(
     "data",
     GenericClause::Contains(
@@ -710,7 +711,7 @@ pub(crate) async fn list_resource_by_cargo(
       err.map_err_context(|| "Unable to list resources from nanocl daemon")
     })?;
   let filter = GenericFilter::new()
-  .r#where("kind", GenericClause::Eq("ProxyRule".to_owned()))
+  .r#where("kind", GenericClause::Eq(version::RULE_KEY.to_owned()))
   .r#where(
     "data",
     GenericClause::Contains(
@@ -744,7 +745,7 @@ pub(crate) async fn list_resource_by_secret(
   client: &NanocldClient,
 ) -> IoResult<Vec<nanocld_client::stubs::resource::Resource>> {
   let filter = GenericFilter::new()
-    .r#where("kind", GenericClause::Eq("ProxyRule".to_owned()))
+    .r#where("kind", GenericClause::Eq(version::RULE_KEY.to_owned()))
     .r#where(
       "data",
       GenericClause::Contains(

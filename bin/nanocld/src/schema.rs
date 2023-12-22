@@ -85,18 +85,21 @@ diesel::table! {
 }
 
 diesel::table! {
-    resource_kind_versions (resource_kind_name, version) {
-        resource_kind_name -> Varchar,
+    resource_kind_versions (key) {
+        key -> Uuid,
         created_at -> Timestamptz,
+        kind_name -> Varchar,
+        kind_key -> Varchar,
         version -> Varchar,
-        schema -> Nullable<Jsonb>,
-        url -> Nullable<Varchar>,
+        data -> Jsonb,
+        metadata -> Nullable<Jsonb>,
     }
 }
 
 diesel::table! {
     resource_kinds (name) {
         name -> Varchar,
+        version_key -> Uuid,
         created_at -> Timestamptz,
     }
 }
@@ -171,7 +174,7 @@ diesel::joinable!(cargoes -> cargo_specs (spec_key));
 diesel::joinable!(cargoes -> namespaces (namespace_name));
 diesel::joinable!(node_group_links -> node_groups (node_group_name));
 diesel::joinable!(node_group_links -> nodes (node_name));
-diesel::joinable!(resource_kind_versions -> resource_kinds (resource_kind_name));
+diesel::joinable!(resource_kinds -> resource_kind_versions (version_key));
 diesel::joinable!(resources -> resource_specs (spec_key));
 diesel::joinable!(vms -> namespaces (namespace_name));
 diesel::joinable!(vms -> vm_specs (spec_key));

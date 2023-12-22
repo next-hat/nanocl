@@ -210,6 +210,7 @@ mod tests {
   use nanocl_stubs::{
     resource::{Resource, ResourcePartial, ResourceUpdate},
     generic::{GenericFilter, GenericClause, GenericListQuery},
+    resource_kind::{ResourceKindPartial, ResourceKindSpec},
   };
 
   use crate::utils::tests::*;
@@ -219,29 +220,54 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const TEST_RESOURCE: &str = "test_resource";
+    const TEST_RESOURCE_KIND: &str = "test.io/test-resource";
+    const TEST_RESOURCE_KIND_VERSION: &str = "v1";
     let client = gen_default_test_client().await;
     let spec = serde_json::json!({
       "Schema": {
+        "title": "VpnUser",
+        "description": "Create a new vpn user",
         "type": "object",
         "required": [
-          "Watch"
+          "Username"
         ],
         "properties": {
-          "Watch": {
-            "description": "Cargo to watch for changes",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "Username": {
+            "description": "Username for the vpn user",
+            "type": "string"
+          },
+          "Password": {
+            "description": "Password for the vpn user",
+            "type": "string"
           }
         }
       }
     });
+    let payload = ResourceKindPartial {
+      name: TEST_RESOURCE_KIND.to_owned(),
+      version: TEST_RESOURCE_KIND_VERSION.to_owned(),
+      metadata: None,
+      data: ResourceKindSpec {
+        schema: Some(spec),
+        url: None,
+      },
+    };
+    let res = client
+      .send_post("/resource/kinds", Some(&payload), None::<String>)
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::CREATED,
+      "create resource kind"
+    );
+    let data = serde_json::json!({
+      "Username": "test",
+    });
     let resource = ResourcePartial {
       name: TEST_RESOURCE.to_owned(),
-      version: "v0.0.1".to_owned(),
-      kind: "Kind".to_owned(),
-      data: spec.clone(),
+      version: TEST_RESOURCE_KIND_VERSION.to_owned(),
+      kind: TEST_RESOURCE_KIND.to_owned(),
+      data: data.clone(),
       metadata: Some(serde_json::json!({
         "Test": "gg",
       })),
@@ -256,14 +282,14 @@ mod tests {
     );
     let resource = res.json::<Resource>().await.unwrap();
     assert_eq!(resource.spec.resource_key, TEST_RESOURCE);
-    assert_eq!(resource.kind, String::from("Kind"));
+    assert_eq!(resource.kind, TEST_RESOURCE_KIND);
     // Basic list
     let mut res = client.send_get(ENDPOINT, None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "list resource");
     let _ = res.json::<Vec<Resource>>().await.unwrap();
     // Using filter exists
     let filter = GenericFilter::new()
-      .r#where("data", GenericClause::HasKey("Schema".to_owned()));
+      .r#where("data", GenericClause::HasKey("Username".to_owned()));
     let query = GenericListQuery::try_from(filter).unwrap();
     let mut res = client.send_get(ENDPOINT, Some(&query)).await;
     test_status_code!(
@@ -279,9 +305,7 @@ mod tests {
     let filter = GenericFilter::new().r#where(
       "data",
       GenericClause::Contains(serde_json::json!({
-        "Schema": {
-          "type": "object",
-        }
+        "Username": "test"
       })),
     );
     let query = GenericListQuery::try_from(filter).unwrap();
@@ -335,8 +359,8 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "inspect resource");
     let resource = res.json::<Resource>().await.unwrap();
     assert_eq!(resource.spec.resource_key, TEST_RESOURCE);
-    assert_eq!(resource.kind, String::from("Kind"));
-    assert_eq!(&resource.spec.data, &spec);
+    assert_eq!(&resource.kind, TEST_RESOURCE_KIND);
+    assert_eq!(&resource.spec.data, &data);
     // History
     let _ = client
       .send_get(
@@ -349,9 +373,12 @@ mod tests {
       http::StatusCode::OK,
       "list resource history"
     );
+    let data = serde_json::json!({
+      "Username": "test_update",
+    });
     let new_resource = ResourceUpdate {
-      version: "v0.0.2".to_owned(),
-      data: spec.clone(),
+      version: "v1".to_owned(),
+      data: data.clone(),
       metadata: None,
     };
     let mut res = client
@@ -364,7 +391,7 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "patch resource");
     let resource = res.json::<Resource>().await.unwrap();
     assert_eq!(resource.spec.resource_key, TEST_RESOURCE);
-    assert_eq!(resource.kind, String::from("Kind"));
+    assert_eq!(&resource.kind, TEST_RESOURCE_KIND);
     // Delete
     let resp = client
       .send_delete(&format!("{ENDPOINT}/{TEST_RESOURCE}"), None::<String>)
@@ -373,6 +400,17 @@ mod tests {
       resp.status(),
       http::StatusCode::ACCEPTED,
       "delete resource"
+    );
+    let res = client
+      .send_delete(
+        &format!("/resource/kinds/{TEST_RESOURCE_KIND}"),
+        None::<String>,
+      )
+      .await;
+    test_status_code!(
+      res.status(),
+      http::StatusCode::ACCEPTED,
+      "delete resource kind"
     );
   }
 }

@@ -59,6 +59,10 @@ use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
 use nanocl_stubs::vm_spec::{
   VmSpec, VmSpecPartial, VmSpecUpdate, VmDisk, VmHostConfig,
 };
+use nanocl_stubs::resource_kind::{
+  ResourceKind, ResourceKindSpec, ResourceKindPartial, ResourceKindInspect,
+  ResourceKindVersion,
+};
 use nanocl_stubs::resource::{
   Resource, ResourceUpdate, ResourceSpec, ResourcePartial,
 };
@@ -73,7 +77,7 @@ use nanocl_stubs::state::{Statefile, StatefileArg};
 
 use super::{
   node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
-  metric, secret, job, process,
+  metric, secret, job, process, resource_kind,
 };
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -277,6 +281,12 @@ impl Modify for VersionModifier {
     vm::list_vm_history,
     vm::patch_vm,
     vm::vm_attach,
+    // Resource Kind
+    resource_kind::list_resource_kind,
+    resource_kind::create_resource_kind,
+    resource_kind::delete_resource_kind,
+    resource_kind::inspect_resource_kind,
+    resource_kind::inspect_resource_kind_version,
     // Resource
     resource::list_resource,
     resource::inspect_resource,
@@ -469,6 +479,12 @@ impl Modify for VersionModifier {
     // DnsRules
     ResourceDnsRule,
     DnsEntry,
+    // Resource Kind
+    ResourceKindPartial,
+    ResourceKindInspect,
+    ResourceKindSpec,
+    ResourceKind,
+    ResourceKindVersion,
     // Metric
     Metric,
     MetricPartial,
