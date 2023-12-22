@@ -73,8 +73,8 @@ pub(crate) async fn delete_resource_kind(
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);
   ResourceKindDb::read_pk_with_spec(&key, &state.pool).await??;
-  SpecDb::del_by_kind_key(&key, &state.pool).await?;
   ResourceKindDb::del_by_pk(&key, &state.pool).await??;
+  SpecDb::del_by_kind_key(&key, &state.pool).await?;
   Ok(web::HttpResponse::Accepted().into())
 }
 

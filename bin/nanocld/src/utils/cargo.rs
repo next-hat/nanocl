@@ -376,8 +376,8 @@ pub(crate) async fn delete_by_key(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
-  SpecDb::del_by_kind_key(key, &state.pool).await?;
   CargoDb::del_by_pk(key, &state.pool).await??;
+  SpecDb::del_by_kind_key(key, &state.pool).await?;
   state
     .event_emitter
     .spawn_emit_to_event(&cargo, EventAction::Deleted);

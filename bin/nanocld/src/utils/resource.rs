@@ -122,8 +122,8 @@ pub(crate) async fn delete(
   if let Err(err) = hook_delete_resource(resource, &state.pool).await {
     log::warn!("{err}");
   }
-  SpecDb::del_by_kind_key(&resource.spec.resource_key, &state.pool).await?;
   ResourceDb::del_by_pk(&resource.spec.resource_key, &state.pool).await??;
+  SpecDb::del_by_kind_key(&resource.spec.resource_key, &state.pool).await?;
   state
     .event_emitter
     .spawn_emit_to_event(resource, EventAction::Deleted);
