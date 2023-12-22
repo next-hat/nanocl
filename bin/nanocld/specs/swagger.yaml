@@ -1097,6 +1097,120 @@ paths:
           description: Cargo stopped
         '404':
           description: Cargo does not exist
+  /resource/kinds:
+    get:
+      tags:
+      - ResourceKinds
+      summary: List resource kinds
+      description: List resource kinds
+      operationId: list_resource_kind
+      responses:
+        '200':
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResourceKind'
+    post:
+      tags:
+      - ResourceKinds
+      summary: Create a resource kind
+      description: Create a resource kind
+      operationId: create_resource_kind
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceKindPartial'
+        required: true
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceKind'
+  /resource/kinds/{domain}/{name}:
+    delete:
+      tags:
+      - ResourceKinds
+      summary: Delete a resource kind
+      description: Delete a resource kind
+      operationId: delete_resource_kind
+      parameters:
+      - name: domain
+        in: path
+        description: Domain of the resource kind
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        description: Name of the resource kind
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: Resource kind deleted
+        '404':
+          description: Resource kind does not exist
+  /resource/kinds/{domain}/{name}/inspect:
+    get:
+      tags:
+      - ResourceKinds
+      summary: Inspect a resource kind
+      description: Inspect a resource kind
+      operationId: inspect_resource_kind
+      parameters:
+      - name: domain
+        in: path
+        description: Domain of the resource kind
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        description: Name of the resource kind
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Details about a resource kind
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceKindInspect'
+  /resource/kinds/{domain}/{name}/version/{version}:
+    get:
+      tags:
+      - ResourceKinds
+      summary: Inspect a specific version of a resource kind
+      description: Inspect a specific version of a resource kind
+      operationId: inspect_resource_kind_version
+      parameters:
+      - name: domain
+        in: path
+        description: Domain of the resource kind
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        description: Name of the resource kind
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Details about a resource kind
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceKindVersion'
   /resources:
     get:
       tags:
@@ -2082,8 +2196,10 @@ components:
           type: string
           description: Name of the cargo
         Metadata:
+          type: object
           description: Metadata of the cargo (user defined)
-          nullable: true
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
         InitContainer:
           allOf:
           - $ref: '#/components/schemas/Config'
@@ -2111,8 +2227,10 @@ components:
           type: string
           description: Name of the cargo
         Metadata:
+          type: object
           description: Metadata of the cargo (user defined)
-          nullable: true
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
         InitContainer:
           allOf:
           - $ref: '#/components/schemas/Config'
@@ -2141,8 +2259,10 @@ components:
           description: New name of the cargo
           nullable: true
         Metadata:
+          type: object
           description: New metadata of the cargo (user defined)
-          nullable: true
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
         InitContainer:
           allOf:
           - $ref: '#/components/schemas/Config'
@@ -5488,6 +5608,116 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DnsEntry'
+    ResourceKind:
+      type: object
+      required:
+      - Name
+      - Version
+      - CreatedAt
+      - Data
+      properties:
+        Name:
+          type: string
+          description: Name of the kind
+        Version:
+          type: string
+          description: When the kind have been created
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the kind have been created
+        Metadata:
+          description: When the kind have been created
+          nullable: true
+        Data:
+          $ref: '#/components/schemas/ResourceKindSpec'
+    ResourceKindInspect:
+      type: object
+      required:
+      - Name
+      - CreatedAt
+      - Versions
+      properties:
+        Name:
+          type: string
+          description: Name of the kind
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the kind have been created
+        Versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceKindVersion'
+          description: List of versions available
+    ResourceKindPartial:
+      type: object
+      description: |-
+        This structure is a partial representation of a resource kind.
+        Used to define a new kind type for plugins.
+      required:
+      - Name
+      - Version
+      - Data
+      properties:
+        Name:
+          type: string
+          description: The name of the resource kind
+        Version:
+          type: string
+          description: The version of the resource kind
+        Metadata:
+          type: object
+          description: Metadata (user defined) of the resource kind
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Data:
+          $ref: '#/components/schemas/ResourceKindSpec'
+    ResourceKindSpec:
+      type: object
+      description: |-
+        Specification of a resource kind.
+        Depending on the spec it will validate a JSONSchema or call a service.
+      properties:
+        Schema:
+          type: object
+          description: The JSONSchema of the resource of this kind and version
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Url:
+          type: string
+          description: The service to call when creating, updating or deleting a resource of this kind and version
+          nullable: true
+    ResourceKindVersion:
+      type: object
+      required:
+      - Key
+      - CreatedAt
+      - KindKey
+      - Version
+      - Data
+      properties:
+        Key:
+          type: string
+          format: uuid
+          description: Key of the version
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the version have been created
+        KindKey:
+          type: string
+          description: Kind linked to this version
+        Version:
+          type: string
+          description: Version
+        Metadata:
+          type: object
+          description: Metadata (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Data:
+          $ref: '#/components/schemas/ResourceKindSpec'
     ResourcePartial:
       type: object
       description: Payload used to create a new resource
@@ -5674,10 +5904,15 @@ components:
         Immutable:
           type: boolean
           description: The secret cannot be updated
-        Data:
-          description: The secret data
         Metadata:
-          nullable: true
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Data:
+          type: object
+          description: The secret data
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
     SecretPartial:
       type: object
       description: |-
@@ -5699,14 +5934,14 @@ components:
           type: boolean
           description: The secret cannot be updated
           nullable: true
-        Data:
-          type: object
-          description: The secret data
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
         Metadata:
           type: object
           description: The metadata of the resource (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Data:
+          type: object
+          description: The secret data
           additionalProperties:
             $ref: '#/components/schemas/Any'
     SecretUpdate:
@@ -5715,14 +5950,14 @@ components:
       required:
       - Data
       properties:
-        Data:
-          type: object
-          description: The data of the secret as a json object
-          additionalProperties:
-            $ref: '#/components/schemas/Any'
         Metadata:
           type: object
           description: The metadata of the secret (user defined)
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
+        Data:
+          type: object
+          description: The data of the secret as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
     StartExecOptions:
@@ -6702,8 +6937,10 @@ components:
           type: string
           description: The key of the vm
         Metadata:
+          type: object
           description: The metadata (user defined)
-          nullable: true
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
         Hostname:
           type: string
           description: Hostname of the vm
@@ -6745,8 +6982,10 @@ components:
           type: string
           description: Name of the vm
         Metadata:
+          type: object
           description: The metadata (user defined)
-          nullable: true
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
         Hostname:
           type: string
           description: 'Hostname of the vm (default: generated from name)'
@@ -6793,8 +7032,10 @@ components:
           description: Name of the vm
           nullable: true
         Metadata:
+          type: object
           description: The metadata (user defined)
-          nullable: true
+          additionalProperties:
+            $ref: '#/components/schemas/Any'
         Hostname:
           type: string
           description: Hostname of the vm

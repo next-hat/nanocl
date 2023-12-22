@@ -103,6 +103,7 @@ pub struct VmSpecPartial {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
   /// Hostname of the vm (default: generated from name)
   #[cfg_attr(
@@ -175,6 +176,7 @@ pub struct VmSpecUpdate {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
   /// Hostname of the vm
   #[cfg_attr(
@@ -252,6 +254,7 @@ pub struct VmSpec {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
   /// Hostname of the vm
   #[cfg_attr(

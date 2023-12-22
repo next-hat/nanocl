@@ -131,7 +131,7 @@ async fn on_event(
         IoError::invalid_data("Resource spec", "attribute not found")
       })?;
       let resource = serde_json::from_value::<ResourceProxyRule>(spec)
-        .map_err(|err| err.map_err_context(|| "ProxyRule"))?;
+        .map_err(|err| err.map_err_context(|| "ncproxy.io/rule"))?;
       for rule in resource.rules.into_iter() {
         if let ProxyRule::Stream(stream) = rule {
           match stream.network.as_str() {

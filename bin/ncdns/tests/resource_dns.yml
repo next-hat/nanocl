@@ -2,7 +2,7 @@ ApiVersion: v0.12
 
 Resources:
 - Name: dns-get-started
-  Kind: DnsRule
+  Kind: ncdns.io/rule
   Version: v0.4
   Data:
     Network: system.nsp

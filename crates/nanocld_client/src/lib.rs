@@ -14,6 +14,7 @@ pub(crate) mod secret;
 pub(crate) mod job;
 pub(crate) mod process;
 pub(crate) mod metric;
+pub(crate) mod resource_kind;
 
 pub use bollard_next;
 pub mod error;

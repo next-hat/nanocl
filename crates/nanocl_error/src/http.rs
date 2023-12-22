@@ -110,6 +110,9 @@ impl From<crate::io::IoError> for HttpError {
       std::io::ErrorKind::InvalidData => {
         HttpError::bad_request(err.to_string())
       }
+      std::io::ErrorKind::InvalidInput => {
+        HttpError::bad_request(err.to_string())
+      }
       _ => HttpError::internal_server_error(err.to_string()),
     }
   }

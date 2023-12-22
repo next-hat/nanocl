@@ -8,18 +8,20 @@ CREATE TABLE IF NOT EXISTS "resource_specs" (
   "metadata" JSON
 );
 
-CREATE TABLE IF NOT EXISTS "resource_kinds" (
-  "name" VARCHAR NOT NULL UNIQUE PRIMARY KEY,
-  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS "resource_kind_versions" (
+  "key" UUID NOT NULL UNIQUE PRIMARY KEY,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "kind_name" VARCHAR NOT NULL,
+  "kind_key" VARCHAR NOT NULL,
+  "version" VARCHAR NOT NULL,
+  "data" JSON NOT NULL,
+  "metadata" JSON
 );
 
-CREATE TABLE IF NOT EXISTS "resource_kind_versions" (
-  "resource_kind_name" VARCHAR NOT NULL REFERENCES resource_kinds("name"),
-  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  "version" VARCHAR NOT NULL,
-  "schema" JSON,
-  "url" VARCHAR,
-  PRIMARY KEY ("resource_kind_name", "version")
+CREATE TABLE IF NOT EXISTS "resource_kinds" (
+  "name" VARCHAR NOT NULL UNIQUE PRIMARY KEY,
+  "version_key" UUID NOT NULL REFERENCES resource_kind_versions("key"),
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS "resources" (

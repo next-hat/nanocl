@@ -205,12 +205,6 @@ mod tests {
       "state",
       "apply",
       "-ys",
-      "../../examples/basic_resources.yml",
-    );
-    assert_cli_ok!(
-      "state",
-      "apply",
-      "-ys",
       "../../examples/deploy_example.yml",
     );
     // History

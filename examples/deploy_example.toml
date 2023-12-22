@@ -19,7 +19,7 @@ Env = ["APP=GET_STARTED2"]
 
 [[Resources]]
 Name = "deploy-example.com"
-Kind = "ProxyRule"
+Kind = "ncproxy.io/rule"
 Version = "v0.9"
 
 [[Resources.Data.Rules]]

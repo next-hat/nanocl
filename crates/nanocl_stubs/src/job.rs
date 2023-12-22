@@ -23,11 +23,11 @@ pub struct JobPartial {
   )]
   /// Secrets to load as environment variables
   pub secrets: Option<Vec<String>>,
+  /// Metadata (user defined)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  /// Metadata (user defined)
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
   /// Schedule of the job (cron)

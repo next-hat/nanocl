@@ -1,65 +1,35 @@
 use ntex::rt;
-use ntex::http;
 
 use nanocl_error::io::IoResult;
-use nanocl_error::http_client::HttpClientError;
+
 use nanocl_utils::versioning;
 
+use nanocld_client::stubs::resource_kind::{ResourceKindPartial, ResourceKindSpec};
+
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::resource::ResourcePartial;
 
 use crate::version;
 
 async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   let formated_version = versioning::format_version(version::VERSION);
-  let dns_rule_kind = ResourcePartial {
-    kind: "Kind".to_owned(),
-    name: "DnsRule".to_owned(),
-    data: serde_json::json!({
-      "Url": "unix:///run/nanocl/dns.sock"
-    }),
+  let resource_kind = ResourceKindPartial {
+    name: "ncdns.io/rule".to_owned(),
     version: format!("v{formated_version}"),
     metadata: None,
+    data: ResourceKindSpec {
+      schema: None,
+      url: Some("unix:///run/nanocl/dns.sock".to_owned()),
+    },
   };
-  match client.inspect_resource(&dns_rule_kind.name).await {
-    Ok(_) => {
-      if let Err(err) = client
-        .put_resource(&dns_rule_kind.name, &dns_rule_kind.clone().into())
-        .await
-      {
-        match err {
-          HttpClientError::HttpError(err)
-            if err.status == http::StatusCode::CONFLICT =>
-          {
-            log::info!("event::ensure_self_config: up to date");
-            return Ok(());
-          }
-          _ => {
-            log::warn!("event::ensure_self_config: {err}");
-            return Err(err.into());
-          }
-        }
-      }
-      Ok(())
-    }
-    Err(_) => {
-      if let Err(err) = client.create_resource(&dns_rule_kind).await {
-        match err {
-          HttpClientError::HttpError(err)
-            if err.status == http::StatusCode::CONFLICT =>
-          {
-            log::info!("event::ensure_self_config: up to date");
-            return Ok(());
-          }
-          _ => {
-            log::warn!("event::ensure_self_config: {err}");
-            return Err(err.into());
-          }
-        }
-      }
-      Ok(())
-    }
+  if client
+    .inspect_resource_kind_version(&resource_kind.name, &resource_kind.version)
+    .await
+    .is_ok()
+  {
+    return Ok(());
   }
+  client.create_resource_kind(&resource_kind).await?;
+  Ok(())
 }
 
 async fn r#loop(client: &NanocldClient) {

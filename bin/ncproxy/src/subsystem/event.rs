@@ -1,10 +1,7 @@
-use ntex::{rt, http};
+use ntex::rt;
 use futures::{StreamExt, stream::FuturesUnordered};
 
-use nanocl_error::{
-  io::{IoResult, IoError},
-  http_client::HttpClientError,
-};
+use nanocl_error::io::{IoResult, IoError};
 
 use nanocl_utils::versioning;
 use nanocld_client::{
@@ -13,6 +10,7 @@ use nanocld_client::{
     system::Event,
     resource::ResourcePartial,
     system::{EventKind, EventAction},
+    resource_kind::{ResourceKindPartial, ResourceKindSpec},
   },
 };
 
@@ -138,7 +136,7 @@ async fn on_event(
     | (EventKind::Resource, EventAction::Patched) => {
       let key = actor.key.unwrap_or_default();
       let resource = client.inspect_resource(&key).await?;
-      if resource.kind != "ProxyRule" {
+      if resource.kind != "ncproxy.io/rule" {
         return Ok(());
       }
       update_resource_rule(&resource.into(), nginx, client).await?;
@@ -163,50 +161,26 @@ async fn on_event(
   Ok(())
 }
 
-async fn ensure_self_config(client: &NanocldClient) {
+async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
   let formated_version = versioning::format_version(version::VERSION);
-  let proxy_rule_kind = ResourcePartial {
-    kind: "Kind".to_owned(),
-    name: "ProxyRule".to_owned(),
-    data: serde_json::json!({
-      "Url": "unix:///run/nanocl/proxy.sock"
-    }),
+  let resource_kind = ResourceKindPartial {
+    name: "ncproxy.io/rule".to_owned(),
     version: format!("v{formated_version}"),
     metadata: None,
+    data: ResourceKindSpec {
+      schema: None,
+      url: Some("unix:///run/nanocl/proxy.sock".to_owned()),
+    },
   };
-  match client.inspect_resource(&proxy_rule_kind.name).await {
-    Ok(_) => {
-      if let Err(err) = client
-        .put_resource(&proxy_rule_kind.name, &proxy_rule_kind.clone().into())
-        .await
-      {
-        match err {
-          HttpClientError::HttpError(err)
-            if err.status == http::StatusCode::CONFLICT =>
-          {
-            log::info!("event::ensure_self_config: up to date")
-          }
-          _ => {
-            log::warn!("event::ensure_self_config: {err}");
-          }
-        }
-      }
-    }
-    Err(_) => {
-      if let Err(err) = client.create_resource(&proxy_rule_kind).await {
-        match err {
-          HttpClientError::HttpError(err)
-            if err.status == http::StatusCode::CONFLICT =>
-          {
-            log::info!("event::ensure_self_config: up to date")
-          }
-          _ => {
-            log::warn!("event::ensure_self_config: {err}");
-          }
-        }
-      }
-    }
+  if client
+    .inspect_resource_kind_version(&resource_kind.name, &resource_kind.version)
+    .await
+    .is_ok()
+  {
+    return Ok(());
   }
+  client.create_resource_kind(&resource_kind).await?;
+  Ok(())
 }
 
 async fn r#loop(nginx: &nginx::Nginx, client: &NanocldClient) {
@@ -217,8 +191,11 @@ async fn r#loop(nginx: &nginx::Nginx, client: &NanocldClient) {
         log::warn!("event::loop: {err}");
       }
       Ok(mut stream) => {
+        if let Err(err) = ensure_self_config(client).await {
+          log::warn!("event::loop: {err}");
+          continue;
+        }
         log::info!("event::loop: subscribed to nanocld events");
-        ensure_self_config(client).await;
         while let Some(event) = stream.next().await {
           let event = match event {
             Err(err) => {

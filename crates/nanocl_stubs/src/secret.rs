@@ -20,16 +20,16 @@ pub struct SecretPartial {
   pub kind: String,
   /// The secret cannot be updated
   pub immutable: Option<bool>,
-  /// The secret data
-  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub data: serde_json::Value,
   /// The metadata of the resource (user defined)
-  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
+  /// The secret data
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
+  pub data: serde_json::Value,
 }
 
 /// This structure represent the secret in the database.
@@ -51,14 +51,16 @@ pub struct Secret {
   pub kind: String,
   /// The secret cannot be updated
   pub immutable: bool,
-  /// The secret data
-  pub data: serde_json::Value,
   // The metadata (user defined)
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
+  /// The secret data
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
+  pub data: serde_json::Value,
 }
 
 impl From<Secret> for SecretPartial {
@@ -106,14 +108,14 @@ impl ToEvent for Secret {
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
 pub struct SecretUpdate {
-  /// The data of the secret as a json object
-  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
-  pub data: serde_json::Value,
   /// The metadata of the secret (user defined)
-  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub metadata: Option<serde_json::Value>,
+  /// The data of the secret as a json object
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
+  pub data: serde_json::Value,
 }

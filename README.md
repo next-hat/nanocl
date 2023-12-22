@@ -122,7 +122,7 @@ Cargoes:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
 - Name: docs.next-hat.com
-  Kind: ProxyRule
+  Kind: ncproxy.io/rule
   Version: v0.7
   Data:
     Rules:

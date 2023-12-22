@@ -1,19 +1,18 @@
-use serde_json::Value;
 use jsonschema::{Draft, JSONSchema};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
   system::EventAction,
-  resource::{Resource, ResourcePartial},
   generic::{GenericFilter, GenericClause},
+  resource_kind::ResourceKind,
+  resource::{Resource, ResourcePartial},
 };
 
 use crate::{
   repositories::generic::*,
   models::{
-    Pool, ResourceKindPartial, DaemonState, ResourceKindVersionDb,
-    ResourceKindDb, ResourceSpecDb, ResourceDb,
+    Pool, DaemonState, ResourceKindVersionDb, ResourceSpecDb, ResourceDb,
   },
 };
 
@@ -29,62 +28,32 @@ async fn hook_create_resource(
   pool: &Pool,
 ) -> HttpResult<ResourcePartial> {
   let mut resource = resource.clone();
-  match resource.kind.as_str() {
-    "Kind" => {
-      // Todo: validate the resource with a structure
-      let resource_kind = ResourceKindPartial {
-        name: resource.name.to_owned(),
-        version: resource.version.to_owned(),
-        schema: resource.data.get("Schema").cloned(),
-        url: resource.data.get("Url").map(|item| match item {
-          Value::String(value) => value.clone(),
-          // Wtf ? so if it's not a string, we just convert it to a string ?
-          // Meaning that if it's a number an array or whatever, it will be converted to a string ?
-          value => value.to_string(),
-        }),
-      };
-      if resource_kind.schema.is_none() && resource_kind.url.is_none() {
-        return Err(HttpError::bad_request("Neither schema nor url provided"));
+  let kind: ResourceKind =
+    ResourceKindVersionDb::get_version(&resource.kind, &resource.version, pool)
+      .await?
+      .try_into()?;
+  if let Some(schema) = &kind.data.schema {
+    let schema: JSONSchema = JSONSchema::options()
+      .with_draft(Draft::Draft7)
+      .compile(schema)
+      .map_err(|err| {
+        HttpError::bad_request(format!("Invalid schema {}", err))
+      })?;
+    schema.validate(&resource.data).map_err(|err| {
+      let mut msg = String::from("Invalid config ");
+      for error in err {
+        msg += &format!("{} ", error);
       }
-      if ResourceKindDb::read_by_pk(&resource.name, pool)
-        .await?
-        .is_err()
-      {
-        ResourceKindDb::create_from(&resource_kind, pool).await??;
-      }
-      ResourceKindVersionDb::create_from(&resource_kind, pool).await??;
-    }
-    _ => {
-      let kind = ResourceKindVersionDb::get_version(
-        &resource.kind,
-        &resource.version,
-        pool,
-      )
+      HttpError::bad_request(msg)
+    })?;
+  }
+  log::debug!("hook_create_resource kind: {kind:?}");
+  if let Some(url) = &kind.data.url {
+    let ctrl_client = CtrlClient::new(&kind.name, url);
+    let config = ctrl_client
+      .apply_rule(&resource.version, &resource.name, &resource.data)
       .await?;
-      if let Some(schema) = &kind.schema {
-        let schema: JSONSchema = JSONSchema::options()
-          .with_draft(Draft::Draft7)
-          .compile(schema)
-          .map_err(|err| {
-            HttpError::bad_request(format!("Invalid schema {}", err))
-          })?;
-        schema.validate(&resource.data).map_err(|err| {
-          let mut msg = String::from("Invalid config ");
-          for error in err {
-            msg += &format!("{} ", error);
-          }
-          HttpError::bad_request(msg)
-        })?;
-      }
-      log::debug!("hook_create_resource kind: {kind:?}");
-      if let Some(url) = kind.url {
-        let ctrl_client = CtrlClient::new(&kind.resource_kind_name, &url);
-        let config = ctrl_client
-          .apply_rule(&resource.version, &resource.name, &resource.data)
-          .await?;
-        resource.data = config;
-      }
-    }
+    resource.data = config;
   }
   Ok(resource)
 }
@@ -96,15 +65,16 @@ async fn hook_delete_resource(
   resource: &Resource,
   pool: &Pool,
 ) -> HttpResult<()> {
-  let kind = ResourceKindVersionDb::get_version(
+  let kind: ResourceKind = ResourceKindVersionDb::get_version(
     &resource.kind,
     &resource.spec.version,
     pool,
   )
-  .await?;
+  .await?
+  .try_into()?;
   log::debug!("hook_delete_resource kind: {kind:?}");
-  if let Some(url) = kind.url {
-    let ctrl_client = CtrlClient::new(&kind.resource_kind_name, &url);
+  if let Some(url) = &kind.data.url {
+    let ctrl_client = CtrlClient::new(&kind.name, url);
     ctrl_client
       .delete_rule(&resource.spec.version, &resource.spec.resource_key)
       .await?;
@@ -123,7 +93,7 @@ pub(crate) async fn create(
     .is_ok()
   {
     return Err(HttpError::conflict(format!(
-      "Resource {}: already exists",
+      "Resource {} already exists",
       &resource.name
     )));
   }
@@ -157,15 +127,6 @@ pub(crate) async fn delete(
 ) -> HttpResult<()> {
   if let Err(err) = hook_delete_resource(resource, &state.pool).await {
     log::warn!("{err}");
-  }
-  if resource.kind.as_str() == "Kind" {
-    let filter = GenericFilter::new().r#where(
-      "resource_kind_name",
-      GenericClause::Eq(resource.spec.resource_key.to_owned()),
-    );
-    ResourceKindVersionDb::del_by(&filter, &state.pool).await??;
-    ResourceKindDb::del_by_pk(&resource.spec.resource_key, &state.pool)
-      .await??;
   }
   ResourceDb::del_by_pk(&resource.spec.resource_key, &state.pool).await??;
   let filter = GenericFilter::new().r#where(
