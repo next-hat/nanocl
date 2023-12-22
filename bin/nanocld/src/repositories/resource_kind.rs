@@ -170,20 +170,6 @@ impl ResourceKindDb {
     };
     Ok(item)
   }
-
-  pub(crate) async fn get_version(
-    kind: &str,
-    pool: &Pool,
-  ) -> HttpResult<String> {
-    let items = kind.split('/').collect::<Vec<_>>();
-    match items.get(2) {
-      Some(version) => Ok(version.to_owned().to_string()),
-      None => {
-        let kind = ResourceKindDb::read_pk_with_spec(kind, pool).await??;
-        Ok(kind.version)
-      }
-    }
-  }
 }
 
 impl RepositoryBase for ResourceKindVersionDb {}
@@ -202,10 +188,10 @@ impl RepositoryRead for ResourceKindVersionDb {
       gen_where4string!(query, resource_kind_versions::kind_key, value);
     }
     if let Some(value) = r#where.get("version") {
-      gen_where4string!(query, resource_kind_versions::dsl::version, value);
+      gen_where4string!(query, resource_kind_versions::version, value);
     }
     if is_multiple {
-      query = query.order(resource_kind_versions::dsl::created_at.desc());
+      query = query.order(resource_kind_versions::created_at.desc());
       let limit = filter.limit.unwrap_or(100);
       query = query.limit(limit as i64);
       if let Some(offset) = filter.offset {
@@ -233,7 +219,7 @@ impl RepositoryDelBy for ResourceKindVersionDb {
       gen_where4string!(query, resource_kind_versions::kind_key, value);
     }
     if let Some(value) = r#where.get("version") {
-      gen_where4string!(query, resource_kind_versions::dsl::version, value);
+      gen_where4string!(query, resource_kind_versions::version, value);
     }
     query
   }

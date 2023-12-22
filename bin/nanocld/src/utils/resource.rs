@@ -13,7 +13,6 @@ use crate::{
   repositories::generic::*,
   models::{
     Pool, DaemonState, ResourceKindVersionDb, ResourceSpecDb, ResourceDb,
-    ResourceKindDb,
   },
 };
 
@@ -29,9 +28,10 @@ async fn hook_create_resource(
   pool: &Pool,
 ) -> HttpResult<ResourcePartial> {
   let mut resource = resource.clone();
-  let version = ResourceKindDb::get_version(&resource.kind, pool).await?;
+  let (kind, version) = ResourceDb::parse_kind(&resource.kind, pool).await?;
+  log::trace!("hook_create_resource kind: {kind} {version}");
   let kind: ResourceKind =
-    ResourceKindVersionDb::get_version(&resource.kind, &version, pool)
+    ResourceKindVersionDb::get_version(&kind, &version, pool)
       .await?
       .try_into()?;
   if let Some(schema) = &kind.data.schema {
@@ -49,7 +49,6 @@ async fn hook_create_resource(
       HttpError::bad_request(msg)
     })?;
   }
-  log::debug!("hook_create_resource kind: {kind:?}");
   if let Some(url) = &kind.data.url {
     let ctrl_client = CtrlClient::new(&kind.name, url);
     let config = ctrl_client

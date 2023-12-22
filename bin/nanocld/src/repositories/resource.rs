@@ -128,12 +128,28 @@ impl RepositoryReadWithSpec for ResourceDb {
 }
 
 impl ResourceDb {
+  pub(crate) async fn parse_kind(
+    kind: &str,
+    pool: &Pool,
+  ) -> IoResult<(String, String)> {
+    let items = kind.split('/').collect::<Vec<_>>();
+    match items.get(2) {
+      Some(version) => {
+        Ok((items[..2].join("/"), version.to_owned().to_string()))
+      }
+      None => {
+        let kind = ResourceKindDb::read_pk_with_spec(kind, pool).await??;
+        Ok((kind.name, kind.version))
+      }
+    }
+  }
+
   /// Create a new resource from a spec.
   pub(crate) async fn create_from_spec(
     item: &ResourcePartial,
     pool: &Pool,
   ) -> IoResult<Resource> {
-    let version = ResourceKindDb::get_version(&item.kind, pool).await?;
+    let (_, version) = ResourceDb::parse_kind(&item.kind, pool).await?;
     let spec = ResourceSpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
@@ -161,7 +177,7 @@ impl ResourceDb {
   ) -> IoResult<Resource> {
     let key = item.name.clone();
     let resource = ResourceDb::read_pk_with_spec(&item.name, pool).await??;
-    let version = ResourceKindDb::get_version(&item.kind, pool).await?;
+    let (_, version) = ResourceDb::parse_kind(&item.kind, pool).await?;
     let spec = ResourceSpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
