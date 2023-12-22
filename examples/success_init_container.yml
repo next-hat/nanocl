@@ -13,6 +13,6 @@ Cargoes:
     Replication:
       Name: Auto
     Hostname: deploy-example
-    Image: ghcr.io/nxthat/nanocl-get-started:latest
+    Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED

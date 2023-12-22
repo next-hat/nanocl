@@ -51,7 +51,7 @@ services:
 
   nmetrics:
     container_name: nmetrics.system.c
-    image: ghcr.io/nxthat/metrsd:0.3.2
+    image: ghcr.io/next-hat/metrsd:0.3.2
     tty: true
     networks:
       - system
@@ -97,7 +97,7 @@ services:
 
   ncproxy:
     container_name: ncproxy.system.c
-    image: ghcr.io/nxthat/nanocl-dev:dev
+    image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     ports:
       - 8686:8686
@@ -148,7 +148,7 @@ services:
 
   ncdns:
     container_name: ncdns.system.c
-    image: ghcr.io/nxthat/nanocl-dev:dev
+    image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     ports:
       - 8787:8787
@@ -178,7 +178,7 @@ services:
 
   nanocld:
     container_name: ndaemon.system.c
-    image: ghcr.io/nxthat/nanocl-dev:dev
+    image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     hostname: nanocl.internal
     networks:
@@ -234,7 +234,7 @@ services:
 
   ncvpnkit:
     container_name: ncvpnkit.system.c
-    image: ghcr.io/nxthat/nanocl-dev:dev
+    image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     hostname: ncvpnkit.nanocl.internal
     profiles:

@@ -2,7 +2,7 @@
 
 The official nanocl controller dns build on top of dnsmasq.
 
-See [nanocl](https://github.com/nxthat/nanocl) for more informations.
+See [nanocl](https://github.com/next-hat/nanocl) for more informations.
 
 ## Overview
 

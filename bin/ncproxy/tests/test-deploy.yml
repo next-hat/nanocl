@@ -5,4 +5,4 @@ Namespace: global
 Cargoes:
   - Name: get-started
     Container:
-      Image: ghcr.io/nxthat/nanocl-get-started:latest
+      Image: ghcr.io/next-hat/nanocl-get-started:latest

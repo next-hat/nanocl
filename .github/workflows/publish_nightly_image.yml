@@ -55,10 +55,10 @@ jobs:
         run: docker buildx create --use --name=buildx-multi-arch --driver=docker-container --driver-opt=network=host
       # Build daemon image
       - name: Build image
-        run: docker buildx build --builder=buildx-multi-arch --platform=linux/amd64,linux/arm/v7,linux/arm64 --build-arg channel=$CHANNEL --push --label org.opencontainers.image.source=https://github.com/nxthat/nanocl -t ghcr.io/nxthat/$BINARY_NAME:$VERSION-$CHANNEL -t ghcr.io/nxthat/$BINARY_NAME:$CHANNEL -f ./bin/$BINARY_NAME/Dockerfile .
+        run: docker buildx build --builder=buildx-multi-arch --platform=linux/amd64,linux/arm/v7,linux/arm64 --build-arg channel=$CHANNEL --push --label org.opencontainers.image.source=https://github.com/next-hat/nanocl -t ghcr.io/next-hat/$BINARY_NAME:$VERSION-$CHANNEL -t ghcr.io/next-hat/$BINARY_NAME:$CHANNEL -f ./bin/$BINARY_NAME/Dockerfile .
       # Export it as tar.gz
       # - name: Export image
-      #   run: docker save ghcr.io/nxthat/$BINARY_NAME:$VERSION-$CHANNEL | gzip > /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz
+      #   run: docker save ghcr.io/next-hat/$BINARY_NAME:$VERSION-$CHANNEL | gzip > /tmp/$BINARY_NAME-$VERSION-$CHANNEL.tar.gz
       # Upload it to release
       - name: Test if release already exists
         id: release-exists

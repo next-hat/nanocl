@@ -149,7 +149,7 @@ mod tests {
   #[ntex::test]
   async fn cargo() {
     const CARGO_NAME: &str = "cli-test";
-    const IMAGE_NAME: &str = "ghcr.io/nxthat/nanocl-get-started:latest";
+    const IMAGE_NAME: &str = "ghcr.io/next-hat/nanocl-get-started:latest";
     const NAMESPACE_NAME: Option<&str> = None;
     let client = get_test_client();
     // Try to create cargo
@@ -347,7 +347,7 @@ mod tests {
       "--domain",
       "test.args.advanced.com",
       "--image",
-      "ghcr.io/nxthat/nanocl-get-started:latest",
+      "ghcr.io/next-hat/nanocl-get-started:latest",
       "--port",
       "9000",
     );
@@ -362,7 +362,7 @@ mod tests {
       "--domain",
       "test.args.advanced.com",
       "--image",
-      "ghcr.io/nxthat/nanocl-get-started:latest",
+      "ghcr.io/next-hat/nanocl-get-started:latest",
       "--port",
       "9000",
     );
@@ -377,7 +377,7 @@ mod tests {
       "--domain",
       "test.args.advanced.com",
       "--image",
-      "ghcr.io/nxthat/nanocl-get-started:latest",
+      "ghcr.io/next-hat/nanocl-get-started:latest",
       "--port",
       "9000",
     );
@@ -593,7 +593,7 @@ mod tests {
       "cargo",
       "run",
       "cli-test-run",
-      "ghcr.io/nxthat/nanocl-get-started:latest",
+      "ghcr.io/next-hat/nanocl-get-started:latest",
       "-e",
       "MESSAGE=GREETING",
     );

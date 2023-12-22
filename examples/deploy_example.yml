@@ -48,12 +48,12 @@ Cargoes:
   Secrets:
   - env.deploy-example.com
   Container:
-    Image: ghcr.io/nxthat/nanocl-get-started:latest
+    Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED
 
 - Name: deploy-example2
   Container:
-    Image: ghcr.io/nxthat/nanocl-get-started:latest
+    Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED2

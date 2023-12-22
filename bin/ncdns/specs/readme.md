@@ -4,7 +4,7 @@ It is the `API` the `Nanocl Daemon` uses, to create / update and delete `DnsRule
 ## OpenAPI Specification
 This API is documented in **OpenAPI format** using [Utoipa](https://github.com/juhaku/utoipa)<br />
 The specification is generated automatically when running in development only.<br />
-When releasing a version, the generated file is transfered to our [Documentation](https://github.com/nxthat/documentation).
+When releasing a version, the generated file is transfered to our [Documentation](https://github.com/next-hat/documentation).
 
 
 ## Cross-Origin Resource Sharing

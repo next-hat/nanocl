@@ -36,7 +36,7 @@ Cargoes:
 
   - Name: nmetrics
     Container:
-      Image: ghcr.io/nxthat/metrsd:0.3.2
+      Image: ghcr.io/next-hat/metrsd:0.3.2
       Tty: true
       Env:
         - TZ=Europe/Paris
@@ -55,9 +55,9 @@ Cargoes:
   - Name: nproxy
     Container:
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/nproxy:1.25.0.3-nightly
+      Image: ghcr.io/next-hat/nproxy:1.25.0.3-nightly
       # {% else %}
-      Image: ghcr.io/nxthat/nproxy:1.25.0.2
+      Image: ghcr.io/next-hat/nproxy:1.25.0.2
       # {% endif %}
       Tty: true
       Env:
@@ -84,9 +84,9 @@ Cargoes:
   - Name: ncproxy
     Container:
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/ncproxy:0.9.0-nightly
+      Image: ghcr.io/next-hat/ncproxy:0.9.0-nightly
       # {% else %}
-      Image: ghcr.io/nxthat/ncproxy:0.8.0
+      Image: ghcr.io/next-hat/ncproxy:0.8.0
       # {% endif %}
       Tty: true
       Env:
@@ -112,9 +112,9 @@ Cargoes:
       Env:
         - TZ=Europe/Paris
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/ndns:2.89.0.3-nightly
+      Image: ghcr.io/next-hat/ndns:2.89.0.3-nightly
       # {% else %}
-      Image: ghcr.io/nxthat/ndns:2.89.0.2
+      Image: ghcr.io/next-hat/ndns:2.89.0.2
       # {% endif %}
       HostConfig:
         NetworkMode: host
@@ -126,9 +126,9 @@ Cargoes:
       Env:
         - TZ=Europe/Paris
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/ncdns:0.4.0-nightly
+      Image: ghcr.io/next-hat/ncdns:0.4.0-nightly
       # {% else %}
-      Image: ghcr.io/nxthat/ncdns:0.3.2
+      Image: ghcr.io/next-hat/ncdns:0.3.2
       # {% endif %}
       Tty: true
       Cmd:
@@ -151,9 +151,9 @@ Cargoes:
   - Name: ndaemon
     Container:
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/nanocld:0.12.0-nightly
+      Image: ghcr.io/next-hat/nanocld:0.12.0-nightly
       # {% else %}
-      Image: ghcr.io/nxthat/nanocld:0.11.0
+      Image: ghcr.io/next-hat/nanocld:0.11.0
       # {% endif %}
       Tty: true
       Hostname: nanocl.internal
@@ -192,9 +192,9 @@ Cargoes:
   - Name: ncvpnkit
     Container:
       # {% if channel == "nightly" %}
-      Image: ghcr.io/nxthat/ncvpnkit:0.2.0-nightly
+      Image: ghcr.io/next-hat/ncvpnkit:0.2.0-nightly
       # {% else %}
-      Image: ghcr.io/nxthat/ncvpnkit:0.1.1
+      Image: ghcr.io/next-hat/ncvpnkit:0.1.1
       # {% endif %}
       Tty: true
       Hostname: ncvpnkit.nanocl.internal

@@ -7,7 +7,7 @@ Namespace: cargo-bind-test
 Cargoes:
 - Name: cargo-bind-test
   Container:
-    Image: ghcr.io/nxthat/nanocl-get-started:latest
+    Image: ghcr.io/next-hat/nanocl-get-started:latest
     HostConfig:
       Binds:
       - /tmp/toto:/tata

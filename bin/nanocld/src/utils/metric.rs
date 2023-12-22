@@ -12,7 +12,7 @@ use crate::{
   models::{Pool, DaemonState, MetricDb, MetricNodePartial},
 };
 
-/// Save metric event send by [metrsd](http://github.com/nxthat/metrsd) to the database
+/// Save metric event send by [metrsd](http://github.com/next-hat/metrsd) to the database
 /// The event can be a `CPU`, `MEMORY`, `DISK` or `NETWORK` event.
 /// The metric is saved for the current node.
 /// This allow us to know what node is the most used.

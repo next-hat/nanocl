@@ -24,7 +24,7 @@ Cargoes:
   Replication:
     Mode: Auto
   Container:
-    Image: ghcr.io/nxthat/nanocl-get-started:latest
+    Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED1
 
@@ -33,6 +33,6 @@ Cargoes:
     Mode:
       Number: 3
   Container:
-    Image: ghcr.io/nxthat/nanocl-get-started:latest
+    Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED1
