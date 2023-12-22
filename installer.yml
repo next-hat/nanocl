@@ -8,201 +8,201 @@ ApiVersion: v0.12
 Namespace: system
 
 Cargoes:
-  - Name: nstore
-    Container:
-      Image: cockroachdb/cockroach:v23.1.12
-      Tty: true
-      Hostname: store.nanocl.internal
-      Entrypoint:
-      - /bin/sh
-      Env:
-        - TZ=Europe/Paris
-      Cmd:
-        - -c
-        - |
-          if [[ ! -f "/ca/ca.key" ]]; then
-            echo "generating certs"
-            cockroach cert create-ca --certs-dir=/certs --ca-key=/ca/ca.key
-            cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=/certs --ca-key=/ca/ca.key
-            cockroach cert create-client root --certs-dir=/certs --ca-key=/ca/ca.key
-          fi
-          cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
-      HostConfig:
-        NetworkMode: system
-        Binds:
-          - ${{ state_dir }}/store/ca:/ca
-          - ${{ state_dir }}/store/certs:/certs
-          - ${{ state_dir }}/store/data:/cockroach/cockroach-data
+- Name: nstore
+  Container:
+    Image: cockroachdb/cockroach:v23.1.12
+    Tty: true
+    Hostname: store.nanocl.internal
+    Entrypoint:
+    - /bin/sh
+    Env:
+      - TZ=Europe/Paris
+    Cmd:
+      - -c
+      - |
+        if [[ ! -f "/ca/ca.key" ]]; then
+          echo "generating certs"
+          cockroach cert create-ca --certs-dir=/certs --ca-key=/ca/ca.key
+          cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=/certs --ca-key=/ca/ca.key
+          cockroach cert create-client root --certs-dir=/certs --ca-key=/ca/ca.key
+        fi
+        cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
+    HostConfig:
+      NetworkMode: system
+      Binds:
+        - ${{ state_dir }}/store/ca:/ca
+        - ${{ state_dir }}/store/certs:/certs
+        - ${{ state_dir }}/store/data:/cockroach/cockroach-data
 
-  - Name: nmetrics
-    Container:
-      Image: ghcr.io/next-hat/metrsd:0.3.2
-      Tty: true
-      Env:
-        - TZ=Europe/Paris
-      Cmd:
-        - --hosts
-        - unix:///run/nanocl/metrics.sock
-      HostConfig:
-        NetworkMode: system
-        Binds:
-          # {% if is_docker_desktop %}
-          - //run/guest-services/nanocl:/run/nanocl
-          # {% else %}
-          - /run/nanocl:/run/nanocl
-          # {% endif %}
+- Name: nmetrics
+  Container:
+    Image: ghcr.io/next-hat/metrsd:0.3.2
+    Tty: true
+    Env:
+      - TZ=Europe/Paris
+    Cmd:
+      - --hosts
+      - unix:///run/nanocl/metrics.sock
+    HostConfig:
+      NetworkMode: system
+      Binds:
+        # {% if is_docker_desktop %}
+        - //run/guest-services/nanocl:/run/nanocl
+        # {% else %}
+        - /run/nanocl:/run/nanocl
+        # {% endif %}
 
-  - Name: nproxy
-    Container:
-      # {% if channel == "nightly" %}
-      Image: ghcr.io/next-hat/nproxy:1.25.0.3-nightly
-      # {% else %}
-      Image: ghcr.io/next-hat/nproxy:1.25.0.2
-      # {% endif %}
-      Tty: true
-      Env:
-        - TZ=Europe/Paris
-      HostConfig:
-        NetworkMode: host
-        Binds:
-          # {% if is_docker_desktop %}
-          - //run:/run
-          # {% else %}
-          - /run:/run
-          # {% endif %}
-          - ${{ state_dir }}/proxy/certs:/etc/nginx/certs
-          - ${{ state_dir }}/proxy/secrets:/opt/secrets
-          - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
-          - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
-          - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
-          - ${{ state_dir }}/proxy/html:/usr/share/nginx/html
-          - ${{ state_dir }}/proxy/sites-available:/etc/nginx/sites-available
-          - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
-          - ${{ state_dir }}/proxy/streams-available:/etc/nginx/streams-available
-          - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
+- Name: nproxy
+  Container:
+    # {% if channel == "nightly" %}
+    Image: ghcr.io/next-hat/nproxy:1.25.0.3-nightly
+    # {% else %}
+    Image: ghcr.io/next-hat/nproxy:1.25.0.3
+    # {% endif %}
+    Tty: true
+    Env:
+      - TZ=Europe/Paris
+    HostConfig:
+      NetworkMode: host
+      Binds:
+        # {% if is_docker_desktop %}
+        - //run:/run
+        # {% else %}
+        - /run:/run
+        # {% endif %}
+        - ${{ state_dir }}/proxy/certs:/etc/nginx/certs
+        - ${{ state_dir }}/proxy/secrets:/opt/secrets
+        - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
+        - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
+        - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
+        - ${{ state_dir }}/proxy/html:/usr/share/nginx/html
+        - ${{ state_dir }}/proxy/sites-available:/etc/nginx/sites-available
+        - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
+        - ${{ state_dir }}/proxy/streams-available:/etc/nginx/streams-available
+        - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
-  - Name: ncproxy
-    Container:
-      # {% if channel == "nightly" %}
-      Image: ghcr.io/next-hat/ncproxy:0.9.0-nightly
-      # {% else %}
-      Image: ghcr.io/next-hat/ncproxy:0.8.0
-      # {% endif %}
-      Tty: true
-      Env:
-        - TZ=Europe/Paris
-      HostConfig:
-        NetworkMode: system
-        Binds:
-          # {% if is_docker_desktop %}
-          - //run/guest-services/nanocl:/run/nanocl
-          # {% else %}
-          - /run/nanocl:/run/nanocl
-          # {% endif %}
-          - ${{ state_dir }}/proxy/secrets:/opt/secrets
-          - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
-          - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
-          - ${{ state_dir }}/proxy/sites-available:/etc/nginx/sites-available
-          - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
-          - ${{ state_dir }}/proxy/streams-available:/etc/nginx/streams-available
-          - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
+- Name: ncproxy
+  Container:
+    # {% if channel == "nightly" %}
+    Image: ghcr.io/next-hat/ncproxy:0.9.0-nightly
+    # {% else %}
+    Image: ghcr.io/next-hat/ncproxy:0.9.0
+    # {% endif %}
+    Tty: true
+    Env:
+      - TZ=Europe/Paris
+    HostConfig:
+      NetworkMode: system
+      Binds:
+        # {% if is_docker_desktop %}
+        - //run/guest-services/nanocl:/run/nanocl
+        # {% else %}
+        - /run/nanocl:/run/nanocl
+        # {% endif %}
+        - ${{ state_dir }}/proxy/secrets:/opt/secrets
+        - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
+        - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
+        - ${{ state_dir }}/proxy/sites-available:/etc/nginx/sites-available
+        - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
+        - ${{ state_dir }}/proxy/streams-available:/etc/nginx/streams-available
+        - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
 
-  - Name: ndns
-    Container:
-      Env:
-        - TZ=Europe/Paris
-      # {% if channel == "nightly" %}
-      Image: ghcr.io/next-hat/ndns:2.89.0.3-nightly
-      # {% else %}
-      Image: ghcr.io/next-hat/ndns:2.89.0.2
-      # {% endif %}
-      HostConfig:
-        NetworkMode: host
-        Binds:
-          - ${{ state_dir }}/dns:/opt/dns
+- Name: ndns
+  Container:
+    Env:
+      - TZ=Europe/Paris
+    # {% if channel == "nightly" %}
+    Image: ghcr.io/next-hat/ndns:2.89.0.3-nightly
+    # {% else %}
+    Image: ghcr.io/next-hat/ndns:2.89.0.3
+    # {% endif %}
+    HostConfig:
+      NetworkMode: host
+      Binds:
+        - ${{ state_dir }}/dns:/opt/dns
 
-  - Name: ncdns
-    Container:
-      Env:
-        - TZ=Europe/Paris
-      # {% if channel == "nightly" %}
-      Image: ghcr.io/next-hat/ncdns:0.4.0-nightly
-      # {% else %}
-      Image: ghcr.io/next-hat/ncdns:0.3.2
-      # {% endif %}
-      Tty: true
-      Cmd:
-        - --conf-dir
-        - /opt/dns
-        - --dns
-        - 1.1.1.1
-        - --dns
-        - 1.0.0.1
-      HostConfig:
-        NetworkMode: system
-        Binds:
-          # {% if is_docker_desktop %}
-          - //run/guest-services/nanocl:/run/nanocl
-          # {% else %}
-          - /run/nanocl:/run/nanocl
-          # {% endif %}
-          - ${{ state_dir }}/dns:/opt/dns
+- Name: ncdns
+  Container:
+    Env:
+      - TZ=Europe/Paris
+    # {% if channel == "nightly" %}
+    Image: ghcr.io/next-hat/ncdns:0.4.0-nightly
+    # {% else %}
+    Image: ghcr.io/next-hat/ncdns:0.4.0
+    # {% endif %}
+    Tty: true
+    Cmd:
+      - --conf-dir
+      - /opt/dns
+      - --dns
+      - 1.1.1.1
+      - --dns
+      - 1.0.0.1
+    HostConfig:
+      NetworkMode: system
+      Binds:
+        # {% if is_docker_desktop %}
+        - //run/guest-services/nanocl:/run/nanocl
+        # {% else %}
+        - /run/nanocl:/run/nanocl
+        # {% endif %}
+        - ${{ state_dir }}/dns:/opt/dns
 
-  - Name: ndaemon
-    Container:
-      # {% if channel == "nightly" %}
-      Image: ghcr.io/next-hat/nanocld:0.12.0-nightly
-      # {% else %}
-      Image: ghcr.io/next-hat/nanocld:0.11.0
-      # {% endif %}
-      Tty: true
-      Hostname: nanocl.internal
-      Cmd:
-        - --state-dir
-        - ${{ state_dir }}
-        - --conf-dir
-        - ${{ conf_dir }}
-        - --docker-host
-        - /var/run/docker.sock
-        - --gateway
-        - ${{ gateway }}
-        - --hostname
-        - ${{ hostname }}
-        - --advertise-addr
-        - ${{ advertise_addr }}
-        - --gid
-        - "${{ gid }}"
-      Env:
-        - TZ=Europe/Paris
-        - NANOCL_GID=${{ gid }}
-      HostConfig:
-        NetworkMode: system
-        Binds:
-          # {% if is_docker_desktop %}
-          - //run/guest-services/nanocl:/run/nanocl
-          # {% else %}
-          - /run/nanocl:/run/nanocl
-          # {% endif %}
-          - /var/run/docker.sock:/var/run/docker.sock
-          - ${{ state_dir }}:${{ state_dir }}
-          - ${{ conf_dir }}:${{ conf_dir }}
+- Name: ndaemon
+  Container:
+    # {% if channel == "nightly" %}
+    Image: ghcr.io/next-hat/nanocld:0.12.0-nightly
+    # {% else %}
+    Image: ghcr.io/next-hat/nanocld:0.12.0
+    # {% endif %}
+    Tty: true
+    Hostname: nanocl.internal
+    Cmd:
+      - --state-dir
+      - ${{ state_dir }}
+      - --conf-dir
+      - ${{ conf_dir }}
+      - --docker-host
+      - /var/run/docker.sock
+      - --gateway
+      - ${{ gateway }}
+      - --hostname
+      - ${{ hostname }}
+      - --advertise-addr
+      - ${{ advertise_addr }}
+      - --gid
+      - "${{ gid }}"
+    Env:
+      - TZ=Europe/Paris
+      - NANOCL_GID=${{ gid }}
+    HostConfig:
+      NetworkMode: system
+      Binds:
+        # {% if is_docker_desktop %}
+        - //run/guest-services/nanocl:/run/nanocl
+        # {% else %}
+        - /run/nanocl:/run/nanocl
+        # {% endif %}
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ${{ state_dir }}:${{ state_dir }}
+        - ${{ conf_dir }}:${{ conf_dir }}
 
-  # Enable vpnkit on docker desktop
-  # {% if is_docker_desktop %}
-  - Name: ncvpnkit
-    Container:
-      # {% if channel == "nightly" %}
-      Image: ghcr.io/next-hat/ncvpnkit:0.2.0-nightly
-      # {% else %}
-      Image: ghcr.io/next-hat/ncvpnkit:0.1.1
-      # {% endif %}
-      Tty: true
-      Hostname: ncvpnkit.nanocl.internal
-      Env:
-        - USER_HOME=${{ home_dir }}
-      HostConfig:
-        NetworkMode: system
-        Binds:
-          - //run/guest-services/nanocl:/run/nanocl
-          - //run/host-services/backend.sock:/run/host-services/backend.sock
-  # {% endif %}
+# Enable vpnkit on docker desktop
+# {% if is_docker_desktop %}
+- Name: ncvpnkit
+  Container:
+    # {% if channel == "nightly" %}
+    Image: ghcr.io/next-hat/ncvpnkit:0.2.0-nightly
+    # {% else %}
+    Image: ghcr.io/next-hat/ncvpnkit:0.2.0
+    # {% endif %}
+    Tty: true
+    Hostname: ncvpnkit.nanocl.internal
+    Env:
+      - USER_HOME=${{ home_dir }}
+    HostConfig:
+      NetworkMode: system
+      Binds:
+        - //run/guest-services/nanocl:/run/nanocl
+        - //run/host-services/backend.sock:/run/host-services/backend.sock
+# {% endif %}
