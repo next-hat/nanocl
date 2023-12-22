@@ -12,7 +12,6 @@ use nanocl_stubs::{
   process::ProcessKind,
   vm_spec::{VmSpecPartial, VmSpecUpdate},
   vm::{Vm, VmSummary, VmInspect},
-  generic::{GenericFilter, GenericClause},
 };
 
 use crate::{
@@ -55,10 +54,8 @@ pub(crate) async fn delete_by_key(
   };
   let container_name = format!("{}.v", vm_key);
   utils::process::remove(&container_name, Some(options), state).await?;
+  SpecDb::del_by_kind_key(vm_key, &state.pool).await?;
   VmDb::del_by_pk(vm_key, &state.pool).await??;
-  let filter = GenericFilter::new()
-    .r#where("vm_key", GenericClause::Eq(vm_key.to_owned()));
-  SpecDb::del_by(&filter, &state.pool).await??;
   utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
   state
     .event_emitter

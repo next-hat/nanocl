@@ -69,6 +69,12 @@ impl RepositoryDelBy for SpecDb {
 }
 
 impl SpecDb {
+  pub(crate) async fn del_by_kind_key(key: &str, pool: &Pool) -> IoResult<()> {
+    let filter = GenericFilter::new()
+      .r#where("kind_key", GenericClause::Eq(key.to_owned()));
+    Self::del_by(&filter, pool).await?
+  }
+
   pub(crate) async fn get_version(
     name: &str,
     version: &str,

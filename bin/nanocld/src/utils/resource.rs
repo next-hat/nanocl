@@ -4,7 +4,6 @@ use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
   system::EventAction,
-  generic::{GenericFilter, GenericClause},
   resource_kind::ResourceKind,
   resource::{Resource, ResourcePartial},
 };
@@ -123,12 +122,8 @@ pub(crate) async fn delete(
   if let Err(err) = hook_delete_resource(resource, &state.pool).await {
     log::warn!("{err}");
   }
+  SpecDb::del_by_kind_key(&resource.spec.resource_key, &state.pool).await?;
   ResourceDb::del_by_pk(&resource.spec.resource_key, &state.pool).await??;
-  let filter = GenericFilter::new().r#where(
-    "resource_key",
-    GenericClause::Eq(resource.spec.resource_key.to_owned()),
-  );
-  SpecDb::del_by(&filter, &state.pool).await??;
   state
     .event_emitter
     .spawn_emit_to_event(resource, EventAction::Deleted);

@@ -3,7 +3,7 @@ use ntex::web;
 use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericClause},
+  generic::GenericFilter,
   resource_kind::{ResourceKindPartial, ResourceKindVersion},
 };
 
@@ -72,10 +72,9 @@ pub(crate) async fn delete_resource_kind(
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);
-  let filter =
-    GenericFilter::new().r#where("kind_key", GenericClause::Eq(key.to_owned()));
+  ResourceKindDb::read_pk_with_spec(&key, &state.pool).await??;
+  SpecDb::del_by_kind_key(&key, &state.pool).await?;
   ResourceKindDb::del_by_pk(&key, &state.pool).await??;
-  SpecDb::del_by(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Accepted().into())
 }
 

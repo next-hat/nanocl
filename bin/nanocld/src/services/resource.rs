@@ -151,8 +151,8 @@ pub(crate) async fn list_resource_history(
   state: web::types::State<DaemonState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::new()
-    .r#where("resource_key", GenericClause::Eq(path.1.clone()));
+  let filter =
+    GenericFilter::new().r#where("kind_key", GenericClause::Eq(path.1.clone()));
   let items = SpecDb::read(&filter, &state.pool)
     .await??
     .into_iter()
