@@ -1,10 +1,8 @@
 use diesel::prelude::*;
 
-use nanocl_stubs::{vm::Vm, vm_spec::VmSpec};
-
 use crate::schema::vms;
 
-use super::{WithSpec, NamespaceDb};
+use super::NamespaceDb;
 
 /// This structure represent the vm in the database.
 /// A vm is a virtual machine that is running on the server.
@@ -26,19 +24,6 @@ pub struct VmDb {
   pub spec_key: uuid::Uuid,
   /// The namespace name reference
   pub namespace_name: String,
-}
-
-impl WithSpec for VmDb {
-  type Type = Vm;
-  type Relation = VmSpec;
-
-  fn with_spec(self, r: &Self::Relation) -> Self::Type {
-    Self::Type {
-      namespace_name: self.namespace_name,
-      created_at: self.created_at,
-      spec: r.clone(),
-    }
-  }
 }
 
 /// This structure is used to update a vm in the database.

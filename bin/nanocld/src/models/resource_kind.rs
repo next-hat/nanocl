@@ -6,34 +6,9 @@ use nanocl_stubs::resource_kind::{
   ResourceKind, ResourceKindPartial, ResourceKindVersion,
 };
 
-use crate::{
-  schema::{resource_kinds, resource_kind_versions},
-  utils,
-};
+use crate::{utils, schema::resource_kinds};
 
-/// This structure represent the resource kind verion in the database.
-/// A resource kind version represent the version of a resource kind.
-/// It is stored as a json object in the database.
-/// We use the `resource_kind_name` to link to the resource kind.
-#[derive(Clone, Debug, Queryable, Identifiable, Insertable)]
-#[diesel(table_name = resource_kind_versions)]
-#[diesel(primary_key(key))]
-pub struct ResourceKindVersionDb {
-  /// The related resource kind reference
-  pub key: uuid::Uuid,
-  /// When the resource kind version have been created
-  pub created_at: chrono::NaiveDateTime,
-  /// Kind of kind key
-  pub kind_name: String,
-  /// Relation to the kind object
-  pub kind_key: String,
-  /// Version of the resource kind
-  pub version: String,
-  /// Config of the resource kind version
-  pub data: serde_json::Value,
-  /// Metadata (user defined) of the resource kind version
-  pub metadata: Option<serde_json::Value>,
-}
+use super::SpecDb;
 
 /// This structure represent the resource kind in the database.
 /// A resource kind represent the kind of a resource.
@@ -44,22 +19,22 @@ pub struct ResourceKindVersionDb {
 pub struct ResourceKindDb {
   /// Name of the kind
   pub name: String,
-  /// Last version
-  pub version_key: uuid::Uuid,
   /// When the kind have been created
   pub created_at: chrono::NaiveDateTime,
+  /// Last version
+  pub spec_key: uuid::Uuid,
 }
 
 #[derive(Clone, Debug, AsChangeset)]
 #[diesel(table_name = resource_kinds)]
 pub struct ResourceKindDbUpdate {
-  pub version_key: uuid::Uuid,
+  pub spec_key: uuid::Uuid,
 }
 
-impl TryFrom<ResourceKindVersionDb> for ResourceKind {
+impl TryFrom<SpecDb> for ResourceKind {
   type Error = IoError;
 
-  fn try_from(db: ResourceKindVersionDb) -> Result<Self, Self::Error> {
+  fn try_from(db: SpecDb) -> Result<Self, Self::Error> {
     let data = serde_json::from_value(db.data)
       .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
     Ok(Self {
@@ -72,10 +47,10 @@ impl TryFrom<ResourceKindVersionDb> for ResourceKind {
   }
 }
 
-impl TryFrom<ResourceKindVersionDb> for ResourceKindVersion {
+impl TryFrom<SpecDb> for ResourceKindVersion {
   type Error = IoError;
 
-  fn try_from(db: ResourceKindVersionDb) -> Result<Self, Self::Error> {
+  fn try_from(db: SpecDb) -> Result<Self, Self::Error> {
     let data = serde_json::from_value(db.data)
       .map_err(|err| err.map_err_context(|| "ResourceKind"))?;
     Ok(Self {
@@ -89,7 +64,7 @@ impl TryFrom<ResourceKindVersionDb> for ResourceKindVersion {
   }
 }
 
-impl TryFrom<&ResourceKindPartial> for ResourceKindVersionDb {
+impl TryFrom<&ResourceKindPartial> for SpecDb {
   type Error = IoError;
 
   fn try_from(p: &ResourceKindPartial) -> Result<Self, Self::Error> {
@@ -102,7 +77,7 @@ impl TryFrom<&ResourceKindPartial> for ResourceKindVersionDb {
         "Invalid data nor url or schema defined",
       ));
     }
-    Ok(ResourceKindVersionDb {
+    Ok(SpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       kind_name: "ResourceKind".to_owned(),

@@ -1,16 +1,14 @@
 mod node;
-mod cargo;
-mod cargo_spec;
+mod namespace;
 mod secret;
 mod process;
-mod namespace;
-mod resource_kind;
-mod resource_spec;
-mod vm_image;
+mod spec;
 mod job;
+mod cargo;
+mod resource_kind;
+mod resource;
 mod metric;
 mod vm;
-mod vm_spec;
-mod resource;
+mod vm_image;
 
 pub mod generic;

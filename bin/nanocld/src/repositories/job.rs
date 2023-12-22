@@ -1,6 +1,10 @@
 use diesel::prelude::*;
 
-use nanocl_stubs::generic::GenericFilter;
+use nanocl_error::io::IoResult;
+use nanocl_stubs::{
+  generic::GenericFilter,
+  job::{Job, JobPartial},
+};
 
 use crate::{
   models::{JobDb, JobUpdateDb},
@@ -34,5 +38,45 @@ impl RepositoryRead for JobDb {
       }
     }
     query
+  }
+}
+
+impl JobDb {
+  pub fn to_spec(&self, p: &JobPartial) -> Job {
+    Job {
+      name: self.key.clone(),
+      created_at: self.created_at,
+      updated_at: self.updated_at,
+      metadata: self.metadata.clone(),
+      secrets: p.secrets.clone(),
+      schedule: p.schedule.clone(),
+      ttl: p.ttl,
+      containers: p.containers.clone(),
+    }
+  }
+
+  pub fn try_from_partial(p: &JobPartial) -> IoResult<Self> {
+    let data = serde_json::to_value(p)?;
+    Ok(JobDb {
+      key: p.name.clone(),
+      created_at: chrono::Utc::now().naive_utc(),
+      updated_at: chrono::Utc::now().naive_utc(),
+      metadata: Default::default(),
+      data,
+    })
+  }
+
+  pub fn try_to_spec(&self) -> IoResult<Job> {
+    let p = serde_json::from_value::<JobPartial>(self.data.clone())?;
+    Ok(Job {
+      name: self.key.clone(),
+      created_at: self.created_at,
+      updated_at: self.updated_at,
+      metadata: self.metadata.clone(),
+      secrets: p.secrets.clone(),
+      schedule: p.schedule.clone(),
+      ttl: p.ttl,
+      containers: p.containers.clone(),
+    })
   }
 }

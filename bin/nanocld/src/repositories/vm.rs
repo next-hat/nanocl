@@ -8,13 +8,13 @@ use nanocl_error::io::{IoError, IoResult};
 use nanocl_stubs::{
   generic::{GenericFilter, GenericClause},
   vm::Vm,
-  vm_spec::VmSpecPartial,
+  vm_spec::{VmSpecPartial, VmSpec},
 };
 
 use crate::{
   utils, gen_where4string,
-  models::{Pool, VmDb, VmSpecDb, VmUpdateDb, WithSpec, FromSpec},
-  schema::{vms, vm_specs},
+  models::{Pool, VmDb, VmUpdateDb, SpecDb},
+  schema::{vms, specs},
 };
 
 use super::generic::*;
@@ -42,11 +42,11 @@ impl RepositoryReadWithSpec for VmDb {
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let item = vms::table
-        .inner_join(vm_specs::table)
+        .inner_join(specs::table)
         .filter(vms::key.eq(pk))
-        .get_result::<(Self, VmSpecDb)>(&mut conn)
+        .get_result::<(Self, SpecDb)>(&mut conn)
         .map_err(Self::map_err)?;
-      let item = item.0.with_spec(&item.1.try_to_spec()?);
+      let item = item.0.with_spec(&item.1.try_to_vm_spec()?);
       Ok::<_, IoError>(item)
     })
   }
@@ -57,7 +57,7 @@ impl RepositoryReadWithSpec for VmDb {
   ) -> JoinHandle<IoResult<Self::Output>> {
     log::trace!("VmDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = vms::table.inner_join(vm_specs::table).into_boxed();
+    let mut query = vms::table.inner_join(specs::table).into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, vms::key, value);
     }
@@ -71,9 +71,9 @@ impl RepositoryReadWithSpec for VmDb {
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let item = query
-        .get_result::<(Self, VmSpecDb)>(&mut conn)
+        .get_result::<(Self, SpecDb)>(&mut conn)
         .map_err(Self::map_err)?;
-      let item = item.0.with_spec(&item.1.try_to_spec()?);
+      let item = item.0.with_spec(&item.1.try_to_vm_spec()?);
       Ok::<_, IoError>(item)
     })
   }
@@ -85,7 +85,7 @@ impl RepositoryReadWithSpec for VmDb {
     log::trace!("VmDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vms::table
-      .inner_join(vm_specs::table)
+      .inner_join(specs::table)
       .order(vms::created_at.desc())
       .into_boxed();
     if let Some(value) = r#where.get("key") {
@@ -106,17 +106,30 @@ impl RepositoryReadWithSpec for VmDb {
     ntex::rt::spawn_blocking(move || {
       let mut conn = utils::store::get_pool_conn(&pool)?;
       let items = query
-        .get_results::<(Self, VmSpecDb)>(&mut conn)
+        .get_results::<(Self, SpecDb)>(&mut conn)
         .map_err(Self::map_err)?;
       let items = items
         .into_iter()
         .map(|item| {
-          let spec = &item.1.try_to_spec()?;
+          let spec = &item.1.try_to_vm_spec()?;
           Ok::<_, IoError>(item.0.with_spec(spec))
         })
         .collect::<IoResult<Vec<_>>>()?;
       Ok::<_, IoError>(items)
     })
+  }
+}
+
+impl WithSpec for VmDb {
+  type Output = Vm;
+  type Relation = VmSpec;
+
+  fn with_spec(self, r: &Self::Relation) -> Self::Output {
+    Self::Output {
+      namespace_name: self.namespace_name,
+      created_at: self.created_at,
+      spec: r.clone(),
+    }
   }
 }
 
@@ -135,8 +148,10 @@ impl VmDb {
       ));
     }
     let key = utils::key::gen_key(&nsp, &item.name);
-    let new_spec = VmSpecDb::try_from_spec_partial(&key, version, item)?;
-    let spec = VmSpecDb::create_from(new_spec, pool).await??.to_spec(item);
+    let new_spec = SpecDb::try_from_vm_partial(&key, version, item)?;
+    let spec = SpecDb::create_from(new_spec, pool)
+      .await??
+      .try_to_vm_spec()?;
     let new_item = VmDb {
       key,
       name: item.name.clone(),
@@ -156,9 +171,10 @@ impl VmDb {
     pool: &Pool,
   ) -> IoResult<Vm> {
     let mut vm = VmDb::read_pk_with_spec(key, pool).await??;
-    let new_spec =
-      VmSpecDb::try_from_spec_partial(&vm.spec.vm_key, version, item)?;
-    let spec = VmSpecDb::create_from(new_spec, pool).await??.to_spec(item);
+    let new_spec = SpecDb::try_from_vm_partial(&vm.spec.vm_key, version, item)?;
+    let spec = SpecDb::create_from(new_spec, pool)
+      .await??
+      .try_to_vm_spec()?;
     let new_item = VmUpdateDb {
       name: Some(item.name.clone()),
       spec_key: Some(spec.key),

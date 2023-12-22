@@ -9,7 +9,10 @@ use ntex::{
 use futures::{StreamExt, future::ready};
 use tokio::io::AsyncWriteExt;
 
-use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_error::{
+  http::{HttpError, HttpResult},
+  io::IoResult,
+};
 
 use bollard_next::container::AttachContainerOptions;
 use nanocl_stubs::{
@@ -20,7 +23,7 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
-  models::{DaemonState, WsConState, VmSpecDb},
+  models::{DaemonState, WsConState, SpecDb},
 };
 
 /// List virtual machines
@@ -143,7 +146,11 @@ pub(crate) async fn list_vm_history(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let histories = VmSpecDb::find_by_vm(&key, &state.pool).await?;
+  let histories = SpecDb::read_by_kind_key(&key, &state.pool)
+    .await?
+    .into_iter()
+    .map(|i| i.try_to_vm_spec())
+    .collect::<IoResult<Vec<_>>>()?;
   Ok(web::HttpResponse::Ok().json(&histories))
 }
 

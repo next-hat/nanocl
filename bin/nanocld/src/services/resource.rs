@@ -13,7 +13,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{DaemonState, ResourceSpecDb, ResourceDb},
+  models::{DaemonState, SpecDb, ResourceDb},
 };
 
 /// List resources
@@ -151,9 +151,9 @@ pub(crate) async fn list_resource_history(
   state: web::types::State<DaemonState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let filter = GenericFilter::new()
-    .r#where("resource_key", GenericClause::Eq(path.1.clone()));
-  let items = ResourceSpecDb::read(&filter, &state.pool)
+  let filter =
+    GenericFilter::new().r#where("kind_key", GenericClause::Eq(path.1.clone()));
+  let items = SpecDb::read(&filter, &state.pool)
     .await??
     .into_iter()
     .map(ResourceSpec::from)
@@ -180,7 +180,7 @@ pub(crate) async fn revert_resource(
   state: web::types::State<DaemonState>,
   path: web::types::Path<(String, String, uuid::Uuid)>,
 ) -> HttpResult<web::HttpResponse> {
-  let history = ResourceSpecDb::read_by_pk(&path.2, &state.pool).await??;
+  let history = SpecDb::read_by_pk(&path.2, &state.pool).await??;
   let resource = ResourceDb::inspect_by_pk(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
     name: resource.spec.resource_key,

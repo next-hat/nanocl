@@ -4,11 +4,13 @@ mod read;
 mod create;
 mod update;
 mod delete;
+mod with_spec;
 
 pub use read::*;
 pub use create::*;
 pub use update::*;
 pub use delete::*;
+pub use with_spec::*;
 
 pub trait RepositoryBase {
   // fn map_err

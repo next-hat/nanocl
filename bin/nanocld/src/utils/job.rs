@@ -24,7 +24,7 @@ use nanocl_stubs::{
 use crate::{
   version, utils,
   repositories::generic::*,
-  models::{DaemonState, ProcessDb, JobDb, FromSpec},
+  models::{DaemonState, ProcessDb, JobDb},
 };
 
 use super::stream::transform_stream;
@@ -108,8 +108,7 @@ pub(crate) async fn create(
   item: &JobPartial,
   state: &DaemonState,
 ) -> HttpResult<Job> {
-  let db_model =
-    JobDb::try_from_spec_partial(&item.name, crate::version::VERSION, item)?;
+  let db_model = JobDb::try_from_partial(item)?;
   let job = JobDb::create_from(db_model, &state.pool)
     .await??
     .to_spec(item);

@@ -12,15 +12,13 @@ use nanocl_stubs::{
   process::ProcessKind,
   vm_spec::{VmSpecPartial, VmSpecUpdate},
   vm::{Vm, VmSummary, VmInspect},
-  generic::{GenericFilter, GenericClause},
 };
 
 use crate::{
   utils,
   repositories::generic::*,
   models::{
-    Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, VmDb, VmSpecDb,
-    FromSpec,
+    Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, VmDb, SpecDb,
   },
 };
 
@@ -57,9 +55,7 @@ pub(crate) async fn delete_by_key(
   let container_name = format!("{}.v", vm_key);
   utils::process::remove(&container_name, Some(options), state).await?;
   VmDb::del_by_pk(vm_key, &state.pool).await??;
-  let filter = GenericFilter::new()
-    .r#where("vm_key", GenericClause::Eq(vm_key.to_owned()));
-  VmSpecDb::del_by(&filter, &state.pool).await??;
+  SpecDb::del_by_kind_key(vm_key, &state.pool).await?;
   utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
   state
     .event_emitter
@@ -76,9 +72,9 @@ pub(crate) async fn list_by_namespace(
   let vmes = VmDb::find_by_namespace(&namespace.name, pool).await?;
   let mut vm_summaries = Vec::new();
   for vm in vmes {
-    let spec = VmSpecDb::read_by_pk(&vm.spec.key, pool)
+    let spec = SpecDb::read_by_pk(&vm.spec.key, pool)
       .await??
-      .try_to_spec()?;
+      .try_to_vm_spec()?;
     let processes = ProcessDb::find_by_kind_key(&vm.spec.vm_key, pool).await?;
     let (_, _, _, running_instances) = utils::process::count_status(&processes);
     vm_summaries.push(VmSummary {
@@ -243,9 +239,9 @@ pub(crate) async fn patch(
   state: &DaemonState,
 ) -> HttpResult<Vm> {
   let vm = VmDb::read_pk_with_spec(vm_key, &state.pool).await??;
-  let old_spec = VmSpecDb::read_by_pk(&vm.spec.key, &state.pool)
+  let old_spec = SpecDb::read_by_pk(&vm.spec.key, &state.pool)
     .await??
-    .try_to_spec()?;
+    .try_to_vm_spec()?;
   let vm_partial = VmSpecPartial {
     name: spec.name.to_owned().unwrap_or(vm.spec.name.clone()),
     disk: old_spec.disk,

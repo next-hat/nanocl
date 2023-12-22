@@ -9,9 +9,6 @@ pub use ws::*;
 mod node;
 pub use node::*;
 
-mod generic;
-pub use generic::*;
-
 mod state;
 pub use state::*;
 
@@ -24,14 +21,8 @@ pub use namespace::*;
 mod cargo;
 pub use cargo::*;
 
-mod cargo_spec;
-pub use cargo_spec::*;
-
 pub mod vm;
 pub use vm::*;
-
-mod vm_spec;
-pub use vm_spec::*;
 
 pub mod vm_image;
 pub use vm_image::*;
@@ -50,6 +41,9 @@ pub use secret::*;
 
 mod job;
 pub use job::*;
+
+mod spec;
+pub use spec::*;
 
 mod process;
 pub use process::*;
