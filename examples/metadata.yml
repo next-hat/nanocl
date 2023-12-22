@@ -7,7 +7,6 @@ Namespace: global
 Resources:
 - Name: deploy-example.com
   Kind: ncproxy.io/rule
-  Version: v0.9
   Metadata:
     CertManager: certbot
   Data:

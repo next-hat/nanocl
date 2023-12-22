@@ -170,6 +170,20 @@ impl ResourceKindDb {
     };
     Ok(item)
   }
+
+  pub(crate) async fn get_version(
+    kind: &str,
+    pool: &Pool,
+  ) -> HttpResult<String> {
+    let items = kind.split('/').collect::<Vec<_>>();
+    match items.get(2) {
+      Some(version) => Ok(version.to_owned().to_string()),
+      None => {
+        let kind = ResourceKindDb::read_pk_with_spec(kind, pool).await??;
+        Ok(kind.version)
+      }
+    }
+  }
 }
 
 impl RepositoryBase for ResourceKindVersionDb {}

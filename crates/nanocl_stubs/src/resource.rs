@@ -16,8 +16,6 @@ pub struct ResourcePartial {
   pub name: String,
   /// The kind of the resource
   pub kind: String,
-  /// Version of the data
-  pub version: String,
   /// The data of the resource (json object)
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub data: serde_json::Value,
@@ -39,8 +37,6 @@ pub struct ResourcePartial {
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
 pub struct ResourceUpdate {
-  /// Version of the spec
-  pub version: String,
   /// The spec of the resource as a json object
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub data: serde_json::Value,
@@ -57,7 +53,6 @@ pub struct ResourceUpdate {
 impl From<ResourcePartial> for ResourceUpdate {
   fn from(resource: ResourcePartial) -> Self {
     Self {
-      version: resource.version,
       data: resource.data,
       metadata: resource.metadata,
     }
@@ -142,7 +137,6 @@ impl From<Resource> for ResourcePartial {
     Self {
       name: resource.spec.resource_key,
       kind: resource.kind,
-      version: resource.spec.version,
       data: resource.spec.data,
       metadata: resource.spec.metadata,
     }

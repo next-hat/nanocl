@@ -5,6 +5,5 @@ ApiVersion: v0.12
 Resources:
 - Name: TestResource
   Kind: Kind
-  Version: v0.1
   Data:
     Url: unix:///run/nanocl/test.sock

@@ -13,7 +13,10 @@ use nanocl_stubs::{
 
 use crate::{
   utils, gen_where4string, gen_where4json,
-  models::{Pool, ResourceDb, ResourceSpecDb, ResourceUpdateDb, WithSpec},
+  models::{
+    Pool, ResourceDb, ResourceSpecDb, ResourceUpdateDb, WithSpec,
+    ResourceKindDb,
+  },
   schema::{resources, resource_specs},
 };
 
@@ -130,11 +133,12 @@ impl ResourceDb {
     item: &ResourcePartial,
     pool: &Pool,
   ) -> IoResult<Resource> {
+    let version = ResourceKindDb::get_version(&item.kind, pool).await?;
     let spec = ResourceSpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       resource_key: item.name.to_owned(),
-      version: item.version.to_owned(),
+      version: version.to_owned(),
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };
@@ -157,11 +161,12 @@ impl ResourceDb {
   ) -> IoResult<Resource> {
     let key = item.name.clone();
     let resource = ResourceDb::read_pk_with_spec(&item.name, pool).await??;
+    let version = ResourceKindDb::get_version(&item.kind, pool).await?;
     let spec = ResourceSpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
       resource_key: resource.spec.resource_key,
-      version: item.version.clone(),
+      version: version.clone(),
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };

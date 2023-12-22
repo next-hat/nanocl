@@ -7,7 +7,6 @@ Namespace: global
 Resources:
 - Name: deploy-example.internal
   Kind: ncproxy.io/rule
-  Version: v0.9
   Data:
     Rules:
     - Domain: deploy-example.internal
