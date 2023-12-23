@@ -7,8 +7,8 @@ use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
   generic::{GenericFilter, GenericListQuery},
-  proxy::ProxySslConfig,
   secret::{SecretPartial, SecretUpdate},
+  proxy::ProxySslConfig,
 };
 
 use crate::{
@@ -78,9 +78,6 @@ pub(crate) async fn create_secret(
   state: web::types::State<DaemonState>,
   payload: web::types::Json<SecretPartial>,
 ) -> HttpResult<web::HttpResponse> {
-  if payload.kind.starts_with("nanocl.io") {
-    return Err(HttpError::bad_request("reserved kind nanocl.io"));
-  }
   utils::key::ensure_kind(&payload.kind)?;
   match payload.kind.as_str() {
     "nanocl.io/tls" => {

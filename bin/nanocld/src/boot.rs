@@ -151,6 +151,7 @@ pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
   });
   utils::event::analize_docker(&daemon_state);
   utils::event::analize(&daemon_state);
+  utils::metric::spawn_logger(&daemon_state);
   Ok(daemon_state)
 }
 

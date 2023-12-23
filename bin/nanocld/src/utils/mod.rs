@@ -12,7 +12,6 @@ pub(crate) mod vm;
 pub(crate) mod vm_image;
 pub(crate) mod job;
 pub(crate) mod exec;
-pub(crate) mod state;
 pub(crate) mod resource;
 pub(crate) mod metric;
 pub(crate) mod ctrl_client;
@@ -24,7 +23,7 @@ pub(crate) mod process;
 pub mod tests {
   use super::*;
 
-  use std::{fs, env};
+  use std::env;
   use ntex::web::{*, self};
 
   pub use ntex::web::test::TestServer;
@@ -64,16 +63,6 @@ pub mod tests {
       bollard_next::API_DEFAULT_VERSION,
     )
     .unwrap()
-  }
-
-  /// Parse a state file from yaml to json format for tests purpose
-  pub fn parse_statefile(
-    path: &str,
-  ) -> Result<serde_json::Value, Box<dyn std::error::Error + 'static>> {
-    let data = fs::read_to_string(path)?;
-    let data: serde_yaml::Value = serde_yaml::from_str(&data)?;
-    let data = serde_json::to_value(data)?;
-    Ok(data)
   }
 
   /// Generate a postgre pool for tests purpose

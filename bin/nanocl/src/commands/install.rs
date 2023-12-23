@@ -7,7 +7,7 @@ use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
 use nanocl_utils::unix;
 use nanocl_error::io::{IoError, IoResult, FromIo};
-use nanocld_client::stubs::state::Statefile;
+use nanocld_client::stubs::state_file::Statefile;
 
 use crate::utils;
 use crate::models::{

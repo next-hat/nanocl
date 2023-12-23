@@ -6,7 +6,6 @@ use nanocl_error::http::{HttpError, HttpResult};
 mod openapi;
 
 mod exec;
-mod state;
 mod node;
 mod namespace;
 mod system;
@@ -54,7 +53,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
         .finish(),
       )
       .configure(exec::ntex_config)
-      .configure(state::ntex_config)
       .configure(node::ntex_config)
       .configure(namespace::ntex_config)
       .configure(system::ntex_config)

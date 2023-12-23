@@ -1,14 +1,9 @@
-use std::collections::HashMap;
-
 use regex::Regex;
 use liquid::ObjectView;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-
-use nanocld_client::stubs::state::{StateStream, StateStreamStatus};
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
 
-use crate::models::{DisplayFormat, StateRef};
+use crate::models::{StateRef, DisplayFormat};
 
 /// Extract metadata eg: `ApiVersion`, `Kind` from a Statefile
 /// and return a StateRef with the raw data and the format
@@ -99,39 +94,4 @@ pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
     IoError::invalid_data("Template rendering", &format!("{err}"))
   })?;
   Ok(output)
-}
-
-/// Update the progress bar for a given state stream
-pub fn update_progress(
-  multiprogress: &MultiProgress,
-  layers: &mut HashMap<String, ProgressBar>,
-  id: &str,
-  state_stream: &StateStream,
-) {
-  if let Some(pg) = layers.get(id) {
-    pg.set_prefix(format!(
-      "{:#?}:{}",
-      &state_stream.status, &state_stream.kind
-    ));
-    if let Some(ctx) = &state_stream.context {
-      pg.set_message(format!("{}: {}", state_stream.key, ctx));
-    }
-    if state_stream.status != StateStreamStatus::Pending {
-      pg.finish();
-    }
-  } else {
-    let spinner_style =
-      ProgressStyle::with_template("{spinner} {prefix:.bold} {wide_msg}")
-        .unwrap()
-        .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈-");
-    let pg = multiprogress.add(ProgressBar::new(1));
-    pg.enable_steady_tick(std::time::Duration::from_millis(50));
-    pg.set_style(spinner_style);
-    pg.set_message(state_stream.key.to_owned());
-    pg.set_prefix(format!(
-      "{:#?}:{}",
-      &state_stream.status, &state_stream.kind
-    ));
-    layers.insert(id.to_owned(), pg);
-  }
 }
