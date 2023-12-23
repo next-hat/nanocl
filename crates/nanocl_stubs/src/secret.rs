@@ -119,3 +119,12 @@ pub struct SecretUpdate {
   #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub data: serde_json::Value,
 }
+
+impl From<SecretPartial> for SecretUpdate {
+  fn from(partial: SecretPartial) -> Self {
+    SecretUpdate {
+      metadata: partial.metadata,
+      data: partial.data,
+    }
+  }
+}

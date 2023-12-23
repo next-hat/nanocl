@@ -1,24 +1,34 @@
 use std::fs;
 use std::collections::HashMap;
 
-use futures::StreamExt;
-use clap::{Arg, Command, ArgAction};
 use serde_json::{Map, Value};
-use indicatif::{MultiProgress, ProgressBar};
+use clap::{Arg, Command, ArgAction};
+use indicatif::{ProgressBar, ProgressStyle};
 use bollard_next::service::HostConfig;
 
 use nanocl_error::io::{IoError, FromIo, IoResult};
-use nanocld_client::NanocldClient;
-use nanocld_client::stubs::job::JobPartial;
-use nanocld_client::stubs::state::{StateApplyQuery, StateStreamStatus, Statefile};
-use nanocld_client::stubs::process::ProcessLogQuery;
-use nanocld_client::stubs::cargo_spec::{CargoSpecPartial, Config};
 
-use crate::utils;
-use crate::config::CliConfig;
-use crate::models::{
-  StateArg, StateCommand, StateApplyOpts, StateRemoveOpts, DisplayFormat,
-  StateRef, Context, StateLogsOpts,
+use nanocld_client::{
+  NanocldClient,
+  stubs::{
+    job::JobPartial,
+    state_file::Statefile,
+    process::ProcessLogQuery,
+    cargo_spec::{CargoSpecPartial, Config},
+    vm_spec::{VmSpecPartial, VmSpecUpdate},
+    resource::{ResourcePartial, ResourceUpdate},
+    secret::{SecretUpdate, SecretPartial},
+    cargo::CargoDeleteQuery,
+  },
+};
+
+use crate::{
+  utils,
+  config::CliConfig,
+  models::{
+    StateArg, StateCommand, StateApplyOpts, StateRemoveOpts, DisplayFormat,
+    StateRef, Context, StateLogsOpts,
+  },
 };
 
 use super::cargo_image::exec_cargo_image_pull;
@@ -399,6 +409,9 @@ async fn execute_template(
     None => "global".to_owned(),
   };
   namespace = inject_namespace(&namespace, args)?;
+  if client.inspect_namespace(&namespace).await.is_err() {
+    client.create_namespace(&namespace).await?;
+  }
   let mut state_ref =
     inject_data(state_ref, args, &cli_conf.context, client).await?;
   state_ref.data.namespace = Some(namespace);
@@ -426,6 +439,13 @@ async fn pull_image(
   Ok(())
 }
 
+fn create_progress(token: &str, style: &ProgressStyle) -> ProgressBar {
+  let pg = ProgressBar::new(1);
+  pg.set_style(style.clone());
+  pg.set_message(token.to_owned());
+  pg
+}
+
 /// Function called when running `nanocl state apply`
 async fn exec_state_apply(
   cli_conf: &CliConfig,
@@ -438,50 +458,116 @@ async fn exec_state_apply(
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let state_file =
     execute_template(&state_ref, &args, &client, cli_conf).await?;
+  let namespace = state_file.data.namespace.clone().unwrap_or("global".into());
   if !opts.skip_confirm {
     println!("{}", state_file.raw);
     utils::dialog::confirm("Are you sure to apply this state ?")
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
+  let pg_style = ProgressStyle::with_template("{spinner:.green} {msg}")
+    .unwrap()
+    .tick_strings(&["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸", ">"]);
+  if let Some(secrets) = &state_ref.data.secrets {
+    for secret in secrets {
+      let token = format!("secret/{}", secret.name);
+      let pg = create_progress(&token, &pg_style);
+      match client.inspect_secret(&secret.name).await {
+        Err(_) => {
+          client.create_secret(secret).await?;
+        }
+        Ok(inspect) => {
+          let cmp: SecretPartial = inspect.into();
+          if cmp != *secret {
+            let update: SecretUpdate = secret.clone().into();
+            client.patch_secret(&secret.name, &update).await?;
+          }
+        }
+      }
+      pg.finish();
+    }
+  }
+  if let Some(jobs) = &state_file.data.jobs {
+    for job in jobs {
+      let token = format!("job/{}", job.name);
+      for container in &job.containers {
+        let image = container.image.clone().unwrap_or_default();
+        pull_image(&image, opts.force_pull, &client).await?;
+      }
+      let pg = create_progress(&token, &pg_style);
+      if client.inspect_job(&job.name).await.is_ok() {
+        client.delete_job(&job.name).await?;
+      }
+      client.create_job(job).await?;
+      client.start_process("job", &job.name, None).await?;
+      pg.finish();
+    }
+  }
   if let Some(cargoes) = &state_file.data.cargoes {
     for cargo in cargoes {
+      let token = format!("cargo/{}", cargo.name);
       if let Some(before) = &cargo.init_container {
         let image = before.image.clone().unwrap_or_default();
         pull_image(&image, opts.force_pull, &client).await?;
       }
       let image = cargo.container.image.clone().unwrap_or_default();
       pull_image(&image, opts.force_pull, &client).await?;
+      let pg = create_progress(&token, &pg_style);
+      match client.inspect_cargo(&cargo.name, Some(&namespace)).await {
+        Err(_) => {
+          client.create_cargo(cargo, Some(&namespace)).await?;
+        }
+        Ok(inspect) => {
+          let cmp: CargoSpecPartial = inspect.spec.into();
+          if cmp != *cargo || opts.reload {
+            client
+              .put_cargo(&cargo.name, cargo, Some(&namespace))
+              .await?;
+          }
+        }
+      }
+      client
+        .start_process("cargo", &cargo.name, Some(&namespace))
+        .await?;
+      pg.finish();
     }
-  }
-  if let Some(jobs) = &state_file.data.jobs {
-    for job in jobs {
-      for container in &job.containers {
-        let image = container.image.clone().unwrap_or_default();
-        pull_image(&image, opts.force_pull, &client).await?;
+    if let Some(vms) = &state_file.data.virtual_machines {
+      for vm in vms {
+        let token = format!("vm/{}", vm.name);
+        let pg = create_progress(&token, &pg_style);
+        match client.inspect_vm(&vm.name, Some(&namespace)).await {
+          Err(_) => {
+            client.create_vm(vm, Some(&namespace)).await?;
+          }
+          Ok(inspect) => {
+            let cmp: VmSpecPartial = inspect.spec.into();
+            if cmp != *vm {
+              let update: VmSpecUpdate = vm.clone().into();
+              client.patch_vm(&vm.name, &update, Some(&namespace)).await?;
+            }
+          }
+        }
+        client
+          .start_process("vm", &vm.name, Some(&namespace))
+          .await?;
+        pg.finish();
       }
     }
-  }
-  let data = serde_json::to_value(&state_file.data).map_err(|err| {
-    err.map_err_context(|| "Unable to create json payload for the daemon")
-  })?;
-  let mut stream = client
-    .apply_state(
-      &data,
-      Some(&StateApplyQuery {
-        reload: Some(opts.reload),
-      }),
-    )
-    .await?;
-  let multiprogress = MultiProgress::new();
-  multiprogress.set_move_cursor(false);
-  let mut has_error = false;
-  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
-  while let Some(res) = stream.next().await {
-    let res = res?;
-    if res.status == StateStreamStatus::Failed {
-      has_error = true;
+    if let Some(resources) = &state_file.data.resources {
+      for resource in resources {
+        match client.inspect_resource(&resource.name).await {
+          Err(_) => {
+            client.create_resource(resource).await?;
+          }
+          Ok(inspect) => {
+            let cmp: ResourcePartial = inspect.into();
+            if cmp != *resource {
+              let update: ResourceUpdate = resource.clone().into();
+              client.put_resource(&resource.name, &update).await?;
+            }
+          }
+        }
+      }
     }
-    utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
   }
   if opts.follow {
     let query = ProcessLogQuery {
@@ -495,12 +581,6 @@ async fn exec_state_apply(
     if let Some(jobs) = state_file.data.jobs {
       log_jobs(&client, jobs, &query).await?;
     }
-  }
-  if has_error {
-    return Err(IoError::invalid_data(
-      "Statefile",
-      "couldn't apply correctly",
-    ));
   }
   Ok(())
 }
@@ -558,16 +638,76 @@ async fn exec_state_remove(
     utils::dialog::confirm("Are you sure to remove this state ?")
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
-  let data = serde_json::to_value(&state_file.data).map_err(|err| {
-    err.map_err_context(|| "Unable to create json payload for the daemon")
-  })?;
-  let mut stream = client.remove_state(&data).await?;
-  let multiprogress = MultiProgress::new();
-  multiprogress.set_move_cursor(false);
-  let mut layers: HashMap<String, ProgressBar> = HashMap::new();
-  while let Some(res) = stream.next().await {
-    let res = res?;
-    utils::state::update_progress(&multiprogress, &mut layers, &res.key, &res);
+  let pg_style = ProgressStyle::with_template("{spinner:.red} {msg}")
+    .unwrap()
+    .tick_strings(&["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸", "x"]);
+  if let Some(jobs) = state_file.data.jobs {
+    for job in jobs {
+      let token = format!("job/{}", job.name);
+      let pg = create_progress(&token, &pg_style);
+      if client.inspect_job(&job.name).await.is_ok() {
+        client.delete_job(&job.name).await?;
+      }
+      pg.finish();
+    }
+  }
+  if let Some(cargoes) = state_file.data.cargoes {
+    for cargo in cargoes {
+      let token = format!("cargo/{}", cargo.name);
+      let pg = create_progress(&token, &pg_style);
+      if client
+        .inspect_cargo(&cargo.name, state_file.data.namespace.as_deref())
+        .await
+        .is_ok()
+      {
+        client
+          .delete_cargo(
+            &cargo.name,
+            Some(&CargoDeleteQuery {
+              namespace: state_file.data.namespace.clone(),
+              force: Some(true),
+            }),
+          )
+          .await?;
+      }
+      pg.finish();
+    }
+    if let Some(vms) = &state_file.data.virtual_machines {
+      for vm in vms {
+        let token = format!("vm/{}", vm.name);
+        let pg = create_progress(&token, &pg_style);
+        if client
+          .inspect_vm(&vm.name, state_file.data.namespace.as_deref())
+          .await
+          .is_ok()
+        {
+          client
+            .delete_vm(&vm.name, state_file.data.namespace.as_deref())
+            .await?;
+        }
+        pg.finish();
+      }
+    }
+    if let Some(resources) = &state_file.data.resources {
+      for resource in resources {
+        let token = format!("resource/{}", resource.name);
+        let pg = create_progress(&token, &pg_style);
+        if client.inspect_resource(&resource.name).await.is_ok() {
+          client.delete_resource(&resource.name).await?;
+        }
+        pg.finish();
+      }
+    }
+    if let Some(secrets) = &state_file.data.secrets {
+      for secret in secrets {
+        let token = format!("secret/{}", secret.name);
+        let pg = create_progress(&token, &pg_style);
+        if client.inspect_secret(&secret.name).await.is_ok() {
+          client.delete_secret(&secret.name).await?;
+        }
+        pg.finish();
+      }
+    }
   }
   Ok(())
 }

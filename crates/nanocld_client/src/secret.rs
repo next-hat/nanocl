@@ -49,10 +49,15 @@ impl NanocldClient {
   /// Patch a secret by it's key to update it with new data
   pub async fn patch_secret(
     &self,
+    key: &str,
     item: &SecretUpdate,
   ) -> HttpClientResult<Secret> {
     let res = self
-      .send_patch(Self::SECRET_PATH, Some(item), None::<String>)
+      .send_patch(
+        &format!("{}/{key}", Self::SECRET_PATH),
+        Some(item),
+        None::<String>,
+      )
       .await?;
     Self::res_json(res).await
   }

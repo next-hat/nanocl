@@ -51,8 +51,6 @@ async fn main() -> std::io::Result<()> {
     }
     Ok(daemon_state) => daemon_state,
   };
-  // Watch metrics using metrsd
-  utils::metric::spawn_logger(&daemon_state);
   // Start http server
   match server::gen(daemon_state).await {
     Err(err) => {

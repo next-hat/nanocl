@@ -142,20 +142,3 @@ pub(crate) async fn inspect_by_name(
     network,
   })
 }
-
-/// Create a namespace if it does not exists
-pub(crate) async fn create_if_not_exists(
-  name: &str,
-  state: &DaemonState,
-) -> HttpResult<()> {
-  if NamespaceDb::read_by_pk(name, &state.pool).await?.is_err() {
-    create(
-      &NamespacePartial {
-        name: name.to_owned(),
-      },
-      state,
-    )
-    .await?;
-  }
-  Ok(())
-}

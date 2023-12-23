@@ -1,5 +1,5 @@
 use nanocl_error::io::{FromIo, IoResult};
-use nanocld_client::stubs::state::Statefile;
+use nanocld_client::stubs::state_file::Statefile;
 
 use bollard_next::container::{InspectContainerOptions, RemoveContainerOptions};
 
