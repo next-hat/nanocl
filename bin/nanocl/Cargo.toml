@@ -57,6 +57,7 @@ regex = "1.10.2"
 nanocld_client = { version = "0.12.0", features = ["tokio"] }
 nanocl_error = { version = "0.1.1", features = [
   "io",
+  "tokio",
   "http_client",
   "serde_json",
   "bollard",

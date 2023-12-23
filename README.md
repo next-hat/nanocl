@@ -106,24 +106,20 @@ To install `Nanocl`, please refer to our online [installation guide](https://doc
 There is an example used to deploy our [documentation](https://docs.next-hat.com):
 
 ```yaml
-ApiVersion: v0.10
-Kind: Deployment
-
-Namespace: nexthat
+ApiVersion: v0.12
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo
 Cargoes:
 - Name: doc
   Container:
-    Image: nexthat-doc:0.9.6
+    Image: nh-doc:0.12.0
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
 - Name: docs.next-hat.com
-  Kind: ncproxy.io/rule
-  Version: v0.7
+  Kind: ncproxy.io/rule/v0.9
   Data:
     Rules:
     - Domain: docs.next-hat.com
