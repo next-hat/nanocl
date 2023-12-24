@@ -1,5 +1,5 @@
 use nanocl_error::io::{FromIo, IoResult};
-use nanocld_client::stubs::state_file::Statefile;
+use nanocld_client::stubs::statefile::Statefile;
 
 use bollard_next::container::{InspectContainerOptions, RemoveContainerOptions};
 
@@ -21,6 +21,7 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
     "docker_host": docker_host,
     "state_dir": "/tmp/random",
     "conf_dir": "/tmp/random",
+    "is_docker_uds": docker_host.starts_with("unix://"),
     "gateway": "127.0.0.1",
     "hosts": "tcp://127.0.0.1:8585",
     "hostname": "localhost",
@@ -34,7 +35,12 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
   let installer = serde_yaml::from_str::<Statefile>(&installer)
     .map_err(|err| err.map_err_context(|| "Unable to parse installer"))?;
   let cargoes = installer.cargoes.unwrap_or_default();
+  let pg_style = utils::progress::create_spinner_style("red");
   for cargo in cargoes {
+    let pg = utils::progress::create_progress(
+      &format!("cargo/{}", cargo.name),
+      &pg_style,
+    );
     let key = format!("{}.system.c", &cargo.name);
     if docker
       .inspect_container(&key, None::<InspectContainerOptions>)
@@ -57,7 +63,7 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
           format!("Unable to remove container {}", &cargo.name)
         })
       })?;
+    pg.finish();
   }
-  println!("Nanocl has been uninstalled successfully!");
   Ok(())
 }

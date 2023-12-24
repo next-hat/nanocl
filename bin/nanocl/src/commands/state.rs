@@ -3,7 +3,6 @@ use std::collections::HashMap;
 
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
-use indicatif::{ProgressBar, ProgressStyle};
 use bollard_next::service::HostConfig;
 
 use nanocl_error::io::{IoError, FromIo, IoResult};
@@ -12,7 +11,7 @@ use nanocld_client::{
   NanocldClient,
   stubs::{
     job::JobPartial,
-    state_file::Statefile,
+    statefile::Statefile,
     process::ProcessLogQuery,
     cargo_spec::{CargoSpecPartial, Config},
     vm_spec::{VmSpecPartial, VmSpecUpdate},
@@ -439,13 +438,6 @@ async fn pull_image(
   Ok(())
 }
 
-fn create_progress(token: &str, style: &ProgressStyle) -> ProgressBar {
-  let pg = ProgressBar::new(1);
-  pg.set_style(style.clone());
-  pg.set_message(token.to_owned());
-  pg
-}
-
 /// Function called when running `nanocl state apply`
 async fn exec_state_apply(
   cli_conf: &CliConfig,
@@ -464,13 +456,11 @@ async fn exec_state_apply(
     utils::dialog::confirm("Are you sure to apply this state ?")
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
-  let pg_style = ProgressStyle::with_template("{spinner:.green} {msg}")
-    .unwrap()
-    .tick_strings(&["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸", ">"]);
+  let pg_style = utils::progress::create_spinner_style("green");
   if let Some(secrets) = &state_ref.data.secrets {
     for secret in secrets {
       let token = format!("secret/{}", secret.name);
-      let pg = create_progress(&token, &pg_style);
+      let pg = utils::progress::create_progress(&token, &pg_style);
       match client.inspect_secret(&secret.name).await {
         Err(_) => {
           client.create_secret(secret).await?;
@@ -493,7 +483,7 @@ async fn exec_state_apply(
         let image = container.image.clone().unwrap_or_default();
         pull_image(&image, opts.force_pull, &client).await?;
       }
-      let pg = create_progress(&token, &pg_style);
+      let pg = utils::progress::create_progress(&token, &pg_style);
       if client.inspect_job(&job.name).await.is_ok() {
         client.delete_job(&job.name).await?;
       }
@@ -511,7 +501,7 @@ async fn exec_state_apply(
       }
       let image = cargo.container.image.clone().unwrap_or_default();
       pull_image(&image, opts.force_pull, &client).await?;
-      let pg = create_progress(&token, &pg_style);
+      let pg = utils::progress::create_progress(&token, &pg_style);
       match client.inspect_cargo(&cargo.name, Some(&namespace)).await {
         Err(_) => {
           client.create_cargo(cargo, Some(&namespace)).await?;
@@ -533,7 +523,7 @@ async fn exec_state_apply(
     if let Some(vms) = &state_file.data.virtual_machines {
       for vm in vms {
         let token = format!("vm/{}", vm.name);
-        let pg = create_progress(&token, &pg_style);
+        let pg = utils::progress::create_progress(&token, &pg_style);
         match client.inspect_vm(&vm.name, Some(&namespace)).await {
           Err(_) => {
             client.create_vm(vm, Some(&namespace)).await?;
@@ -638,13 +628,11 @@ async fn exec_state_remove(
     utils::dialog::confirm("Are you sure to remove this state ?")
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
-  let pg_style = ProgressStyle::with_template("{spinner:.red} {msg}")
-    .unwrap()
-    .tick_strings(&["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸", "x"]);
+  let pg_style = utils::progress::create_spinner_style("red");
   if let Some(jobs) = state_file.data.jobs {
     for job in jobs {
       let token = format!("job/{}", job.name);
-      let pg = create_progress(&token, &pg_style);
+      let pg = utils::progress::create_progress(&token, &pg_style);
       if client.inspect_job(&job.name).await.is_ok() {
         client.delete_job(&job.name).await?;
       }
@@ -654,7 +642,7 @@ async fn exec_state_remove(
   if let Some(cargoes) = state_file.data.cargoes {
     for cargo in cargoes {
       let token = format!("cargo/{}", cargo.name);
-      let pg = create_progress(&token, &pg_style);
+      let pg = utils::progress::create_progress(&token, &pg_style);
       if client
         .inspect_cargo(&cargo.name, state_file.data.namespace.as_deref())
         .await
@@ -675,7 +663,7 @@ async fn exec_state_remove(
     if let Some(vms) = &state_file.data.virtual_machines {
       for vm in vms {
         let token = format!("vm/{}", vm.name);
-        let pg = create_progress(&token, &pg_style);
+        let pg = utils::progress::create_progress(&token, &pg_style);
         if client
           .inspect_vm(&vm.name, state_file.data.namespace.as_deref())
           .await
@@ -691,7 +679,7 @@ async fn exec_state_remove(
     if let Some(resources) = &state_file.data.resources {
       for resource in resources {
         let token = format!("resource/{}", resource.name);
-        let pg = create_progress(&token, &pg_style);
+        let pg = utils::progress::create_progress(&token, &pg_style);
         if client.inspect_resource(&resource.name).await.is_ok() {
           client.delete_resource(&resource.name).await?;
         }
@@ -701,7 +689,7 @@ async fn exec_state_remove(
     if let Some(secrets) = &state_file.data.secrets {
       for secret in secrets {
         let token = format!("secret/{}", secret.name);
-        let pg = create_progress(&token, &pg_style);
+        let pg = utils::progress::create_progress(&token, &pg_style);
         if client.inspect_secret(&secret.name).await.is_ok() {
           client.delete_secret(&secret.name).await?;
         }

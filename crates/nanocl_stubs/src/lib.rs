@@ -9,7 +9,7 @@ pub mod namespace;
 pub mod cargo;
 pub mod cargo_image;
 pub mod cargo_spec;
-pub mod state_file;
+pub mod statefile;
 pub mod vm;
 pub mod vm_spec;
 pub mod vm_image;

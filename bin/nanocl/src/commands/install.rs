@@ -7,7 +7,7 @@ use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
 
 use nanocl_utils::unix;
 use nanocl_error::io::{IoError, IoResult, FromIo};
-use nanocld_client::stubs::state_file::Statefile;
+use nanocld_client::stubs::statefile::Statefile;
 
 use crate::utils;
 use crate::models::{
@@ -17,7 +17,6 @@ use crate::models::{
 /// This function is called when running `nanocl install`
 /// It will install nanocl system containers
 pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
-  println!("Installing Nanocl components on your system");
   let home_dir = std::env::var("HOME").map_err(|err| {
     IoError::interupted("Unable to get $HOME env variable", &err.to_string())
   })?;
@@ -32,7 +31,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       if is_docker_desktop {
         format!("{}/.nanocl/state", home_dir)
       } else {
-        "/var/lib/nanocl".into()
+        "/var/lib/nanocl".to_owned()
       }
     }
   };
@@ -40,11 +39,9 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   let gateway = match &args.gateway {
     None => {
       if is_docker_desktop {
-        "127.0.0.1".into()
+        "127.0.0.1".to_owned()
       } else {
-        let gateway = unix::network::get_default_ip()?;
-        println!("Using default gateway: {}", gateway);
-        gateway.to_string()
+        unix::network::get_default_ip()?.to_string()
       }
     }
     Some(gateway) => gateway.clone(),
@@ -64,21 +61,20 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       "Group",
       &format!(
         "Error cannot find group: {group}\n\
-  You can create it with: sudo groupadd {group}\n\
-  And be sure to add yourself to it: sudo usermod -aG {group} $USER\n\
-  Then update your current session: newgrp {group}\n\
-  And try again"
+  Those command can help:\n\
+  sudo groupadd {group}\n\
+  sudo usermod -aG {group} $USER\n\
+  newgrp {group}\n"
       ),
     ))?;
-  let hostname = if let Some(hostname) = &args.hostname {
-    hostname.to_owned()
-  } else {
-    let hostname = unix::network::get_hostname()?;
-    println!("Using default hostname: {hostname}");
-    hostname
+  let hostname = match &args.hostname {
+    Some(hostname) => hostname.to_owned(),
+    None => unix::network::get_hostname()?,
   };
+  let is_docker_uds = docker_host.starts_with("unix://");
   let nanocld_args = NanocldArg {
     docker_host,
+    is_docker_uds,
     state_dir,
     conf_dir,
     gateway,
@@ -106,7 +102,6 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     .await
     .is_err()
   {
-    println!("Creating system network");
     let mut options = HashMap::new();
     options.insert("com.docker.network.bridge.name", "nanocl.system");
     docker
@@ -119,23 +114,26 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       .await
       .map_err(|err| err.map_err_context(|| "Nanocl system network"))?;
   }
+  let pg_style = utils::progress::create_spinner_style("green");
   for cargo in cargoes {
     let image = cargo.container.image.clone().ok_or(IoError::invalid_data(
       format!("Cargo {} image", cargo.name),
       "is not specified".into(),
     ))?;
-    let mut image_detail = image.split(':');
-    let from_image = image_detail.next().ok_or(IoError::invalid_data(
-      format!("Cargo {} image", cargo.name),
-      "invalid format expect image:tag".into(),
-    ))?;
-    let tag = image_detail.next().ok_or(IoError::invalid_data(
-      format!("Cargo {} image", cargo.name),
-      "invalid format expect image:tag".into(),
-    ))?;
+    let image_details = image.split(':').collect::<Vec<_>>();
+    let [image_name, image_tag] = image_details[..] else {
+      return Err(IoError::invalid_data(
+        format!("Cargo {} image", cargo.name),
+        "invalid format expect image:tag".into(),
+      ));
+    };
     if docker.inspect_image(&image).await.is_err() || args.force_pull {
-      utils::docker::install_image(from_image, tag, &docker).await?;
+      utils::docker::install_image(image_name, image_tag, &docker).await?;
     }
+    let pg = utils::progress::create_progress(
+      &format!("cargo/{}", &cargo.name),
+      &pg_style,
+    );
     let container = utils::docker::create_cargo_container(
       &cargo,
       &deployment.namespace.clone().unwrap_or("system".into()),
@@ -149,6 +147,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
         err.map_err_context(|| format!("Unable to start cargo {}", cargo.name))
       })?;
     ntex::time::sleep(Duration::from_secs(2)).await;
+    pg.finish();
   }
   if is_docker_desktop {
     let context = Context {
@@ -174,6 +173,5 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       eprintln!("WARN: Unable to use context for docker desktop: {err}");
     }
   }
-  println!("Nanocl have been installed successfully!");
   Ok(())
 }

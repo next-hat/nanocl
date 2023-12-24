@@ -163,7 +163,7 @@ Cargoes:
       - --conf-dir
       - ${{ conf_dir }}
       - --docker-host
-      - /var/run/docker.sock
+      - ${{ docker_host }}
       - --gateway
       - ${{ gateway }}
       - --hostname
@@ -183,7 +183,9 @@ Cargoes:
         # {% else %}
         - /run/nanocl:/run/nanocl
         # {% endif %}
-        - /var/run/docker.sock:/var/run/docker.sock
+        # {% if is_docker_uds %}
+        - ${{ docker_host }}:${{ docker_host }}
+        # {% endif %}
         - ${{ state_dir }}:${{ state_dir }}
         - ${{ conf_dir }}:${{ conf_dir }}
 

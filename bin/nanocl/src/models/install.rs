@@ -64,6 +64,8 @@ pub struct NanocldArg {
   pub(crate) is_docker_desktop: bool,
   /// Build channel used
   pub(crate) channel: String,
+  /// Specify if the docker host is unix socket
+  pub(crate) is_docker_uds: bool,
 }
 
 /// Convert Nanocld to liquid::Object
@@ -81,6 +83,7 @@ impl From<NanocldArg> for liquid::Object {
       "is_docker_desktop": arg.is_docker_desktop,
       "home_dir": arg.home_dir,
       "channel": arg.channel,
+      "is_docker_unix": arg.is_docker_uds,
     })
   }
 }
