@@ -85,4 +85,3 @@ utoipa = { version = "4.1", features = ["yaml"], optional = true }
 notify = "6.1.1"
 ntex-cors = "0.4.0"
 rand = "0.8.5"
-openssl = "0.10"

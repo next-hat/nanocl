@@ -33,14 +33,13 @@ args = [
 [tasks.tests-daemon]
 command = "cargo"
 args = [
-  "nextest",
-  "run",
+  "test",
+  "-j",
+  "1",
   "--no-default-features",
   "--features",
   "test",
   "${@}",
-  "-j",
-  "1",
   "--bin",
   "nanocld",
 ]
@@ -54,14 +53,13 @@ args = ["nextest", "run", "-p", "nanocld_client"]
 [tasks.tests-cli]
 command = "cargo"
 args = [
-  "nextest",
-  "run",
+  "test",
+  "-j",
+  "1",
   "--no-default-features",
   "--features",
   "test",
   "${@}",
-  "-j",
-  "1",
   "--bin",
   "nanocl",
 ]
@@ -70,14 +68,13 @@ args = [
 [tasks.tests-ncproxy]
 command = "cargo"
 args = [
-  "nextest",
-  "run",
+  "test",
+  "-j",
+  "1",
   "--no-default-features",
   "--features",
   "test",
   "${@}",
-  "-j",
-  "1",
   "--bin",
   "ncproxy",
 ]
@@ -86,27 +83,19 @@ args = [
 [tasks.tests]
 command = "cargo"
 args = [
-  "nextest",
-  "run",
+  "test",
+  "-j",
+  "1",
   "--no-default-features",
   "--features",
   "test",
   "${@}",
-  "-j",
-  "1",
 ]
 
 # Test all with debug output
 [tasks.tests-debug]
 command = "cargo"
-args = [
-  "nextest",
-  "run",
-  "--no-default-features",
-  "--features",
-  "test",
-  "--nocapture",
-]
+args = ["test", "--no-default-features", "--features", "test", "--nocapture"]
 
 [tasks.dev]
 command = "docker"
@@ -115,22 +104,13 @@ args = ["compose", "up"]
 # Test coverage
 [tasks.cov]
 command = "cargo"
-args = [
-  "llvm-cov",
-  "nextest",
-  "--no-default-features",
-  "--features",
-  "test",
-  "-j",
-  "1",
-]
+args = ["llvm-cov", "--no-default-features", "--features", "test", "-j", "1"]
 
 # Test all with coverage for codecov
 [tasks.covgen]
 command = "cargo"
 args = [
   "llvm-cov",
-  "nextest",
   "--no-default-features",
   "--features",
   "test",

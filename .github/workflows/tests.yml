@@ -36,10 +36,6 @@ jobs:
           key: ${{ hashFiles('./Cargo.lock') }}
       # Install cargo make
       - uses: davidB/rust-cargo-make@v1
-      # Install llvm-cov
-      - uses: taiki-e/install-action@cargo-llvm-cov
-      # Install nextest
-      - uses: taiki-e/install-action@nextest
       # Prepare CI with images containers and permissions
       - name: Prepare CI
         run: |

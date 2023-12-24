@@ -1965,7 +1965,6 @@ dependencies = [
  "notify",
  "ntex",
  "ntex-cors",
- "openssl",
  "rand",
  "serde",
  "serde_json",
