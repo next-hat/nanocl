@@ -73,7 +73,7 @@ use nanocl_stubs::proxy::{
   LocationTarget, HttpTarget, UrlRedirect, UpstreamTarget, ProxyRule,
   UnixTarget, ProxySslConfig,
 };
-use nanocl_stubs::state_file::{Statefile, StatefileArg};
+use nanocl_stubs::statefile::{Statefile, StatefileArg};
 
 use super::{
   node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
