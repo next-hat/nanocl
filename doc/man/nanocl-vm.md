@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl - \#\# VmArg
+nanocl - \`nanocl vm\` available arguments
 
 SYNOPSIS
 ========
@@ -11,8 +11,6 @@ SYNOPSIS
 
 DESCRIPTION
 ===========
-
-\#\# VmArg
 
 \`nanocl vm\` available arguments
 
@@ -25,7 +23,7 @@ OPTIONS
 
 **-h**, **\--help**
 
-:   Print help (see a summary with -h)
+:   Print help
 
 SUBCOMMANDS
 ===========

@@ -1,18 +1,16 @@
 NAME
 ====
 
-nanocl cargo - \#\# CargoArg
+nanocl cargo - \`nanocl cargo\` available arguments
 
 SYNOPSIS
 ========
 
 **nanocl cargo** \[**-n**\|**\--namespace**\] \[**-h**\|**\--help**\]
-\[**-V**\|**\--version**\] \<*subcommands*\>
+\<*subcommands*\>
 
 DESCRIPTION
 ===========
-
-\#\# CargoArg
 
 \`nanocl cargo\` available arguments
 
@@ -25,11 +23,7 @@ OPTIONS
 
 **-h**, **\--help**
 
-:   Print help (see a summary with -h)
-
-**-V**, **\--version**
-
-:   Print version
+:   Print help
 
 SUBCOMMANDS
 ===========
@@ -97,8 +91,3 @@ nanocl cargo-stats(1)
 nanocl cargo-help(1)
 
 :   Print this message or the help of the given subcommand(s)
-
-VERSION
-=======
-
-v0.11.0

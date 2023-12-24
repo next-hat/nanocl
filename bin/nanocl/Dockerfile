@@ -23,7 +23,16 @@ COPY --from=planner /app /app
 WORKDIR /app
 RUN export ARCH=$(uname -m) \
   && rustup target add $ARCH-unknown-linux-musl
-RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base
+RUN apk add --no-cache --upgrade \
+  build-base \
+  musl-dev \
+  libpq-dev \
+  openssl-dev \
+  g++ \
+  make \
+  git \
+  upx \
+  perl
 COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
 COPY ./crates/nanocl_error/src ./crates/nanocl_error/src
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src

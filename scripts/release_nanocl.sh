@@ -51,4 +51,4 @@ mkdir -p ./target/debian
 mkdir -p ./target/linux
 dpkg-deb --build --root-owner-group "${release_path}" ./target/debian/${pkg_name}_"${version}"_"${pkg_arch}".deb
 rm -rf ${release_path}/DEBIAN
-tar -czvf ./target/linux/${pkg_name}_"${version}"_"${pkg_arch}".tar.gz "${release_path}"
+tar -czvf ./target/linux/${pkg_name}_${version}_${pkg_arch}.tar.gz -C ${release_path}/usr $(ls ${release_path}/usr)
