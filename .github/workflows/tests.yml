@@ -43,7 +43,7 @@ jobs:
       # Prepare CI with images containers and permissions
       - name: Prepare CI
         run: |
-          sudo apt install -y qemu-kvm qemu-utils openssl-dev libssl-dev libpq-dev libsqlite3-dev
+          sudo apt install -y qemu-kvm qemu-utils pkg-config gcc musl-dev libpq-dev libssl-dev musl-tools libc-dev g++ make
           wget https://cloud-images.ubuntu.com/minimal/releases/jammy/release/ubuntu-22.04-minimal-cloudimg-amd64.img
           mv ubuntu-22.04-minimal-cloudimg-amd64.img tests/ubuntu-22.04-minimal-cloudimg-amd64.img
           sudo groupadd nanocl
