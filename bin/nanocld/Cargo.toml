@@ -58,7 +58,7 @@ clap = { version = "4.4.11", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
 serde = { version = "1.0.192", features = ["derive"] }
 uuid = { version = "1.6", features = ["serde", "v4"] }
-ntex = { version = "0.7.16", features = ["tokio"] }
+ntex = { version = "0.7.16", features = ["tokio", "openssl"] }
 diesel = { version = "2.1.2", features = [
   "postgres",
   "r2d2",
@@ -78,7 +78,7 @@ chrono = { version = "0.4.31", default-features = false, features = [
 ] }
 jsonschema = { version = "0.17.0", default-features = false }
 nanocld_client = { version = "0.12.0", features = ["tokio"] }
-metrsd_client = "0.3.0"
+metrsd_client = "0.4.1"
 nanocl_stubs = { version = "0.12.0", features = ["serde"] }
 nanocl_utils = { version = "0.3.1", features = ["unix", "ntex", "logger"] }
 utoipa = { version = "4.1", features = ["yaml"], optional = true }

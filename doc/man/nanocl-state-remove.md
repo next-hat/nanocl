@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl - \#\# StateRemoveOpts
+nanocl - \`nanocl state rm\` available options
 
 SYNOPSIS
 ========
@@ -11,8 +11,6 @@ SYNOPSIS
 
 DESCRIPTION
 ===========
-
-\#\# StateRemoveOpts
 
 \`nanocl state rm\` available options
 
@@ -29,7 +27,7 @@ OPTIONS
 
 **-h**, **\--help**
 
-:   Print help (see a summary with -h)
+:   Print help
 
 \[*ARGS*\]
 

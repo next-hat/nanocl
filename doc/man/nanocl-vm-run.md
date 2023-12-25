@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl - \#\# VmRunOpts
+nanocl - \`nanocl vm run\` available options
 
 SYNOPSIS
 ========
@@ -13,8 +13,6 @@ SYNOPSIS
 
 DESCRIPTION
 ===========
-
-\#\# VmRunOpts
 
 \`nanocl vm run\` available options
 
@@ -63,7 +61,7 @@ OPTIONS
 
 **-h**, **\--help**
 
-:   Print help (see a summary with -h)
+:   Print help
 
 \<*NAME*\>
 

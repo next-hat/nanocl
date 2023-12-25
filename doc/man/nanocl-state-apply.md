@@ -1,19 +1,18 @@
 NAME
 ====
 
-nanocl - \#\# StateApplyOpts
+nanocl - \`nanocl state apply\` available options
 
 SYNOPSIS
 ========
 
 **nanocl** \[**-s**\|**\--state-location**\]
 \[**-p**\|**\--force-pull**\] \[**-f**\|**\--follow**\]
-\[**-y**\|**\--yes**\] \[**-h**\|**\--help**\] \[*ARGS*\]
+\[**-y**\|**\--yes**\] \[**-r**\|**\--reload**\] \[**-h**\|**\--help**\]
+\[*ARGS*\]
 
 DESCRIPTION
 ===========
-
-\#\# StateApplyOpts
 
 \`nanocl state apply\` available options
 
@@ -36,9 +35,13 @@ OPTIONS
 
 :   Skip the confirmation prompt
 
+**-r**, **\--reload**
+
+:   Perform an apply even if state didnt changed
+
 **-h**, **\--help**
 
-:   Print help (see a summary with -h)
+:   Print help
 
 \[*ARGS*\]
 

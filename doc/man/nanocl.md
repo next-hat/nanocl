@@ -36,6 +36,10 @@ nanocl-namespace(1)
 
 :   Manage namespaces
 
+nanocl-job(1)
+
+:   Manage jobs
+
 nanocl-cargo(1)
 
 :   Manage cargoes
@@ -74,23 +78,19 @@ nanocl-version(1)
 
 nanocl-install(1)
 
-:   Install nanocl components
+:   Install components
 
 nanocl-uninstall(1)
 
-:   Uninstall nanocl components
+:   Uninstall components
 
 nanocl-upgrade(1)
 
-:   \#\# UpgradeOpts
+:   Upgrade components
 
 nanocl-ps(1)
 
 :   Show all processes managed by nanocl
-
-nanocl-system(1)
-
-:   Manage system
 
 nanocl-secret(1)
 
@@ -103,4 +103,4 @@ nanocl-help(1)
 VERSION
 =======
 
-v0.11.0
+v0.12.0

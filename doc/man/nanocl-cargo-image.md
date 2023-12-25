@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl cargo image - \#\# CargoImageArg
+nanocl cargo image - \`nanocl cargo image\` available arguments
 
 SYNOPSIS
 ========
@@ -11,8 +11,6 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-\#\# CargoImageArg
-
 \`nanocl cargo image\` available arguments
 
 OPTIONS
@@ -20,7 +18,7 @@ OPTIONS
 
 **-h**, **\--help**
 
-:   Print help (see a summary with -h)
+:   Print help
 
 SUBCOMMANDS
 ===========

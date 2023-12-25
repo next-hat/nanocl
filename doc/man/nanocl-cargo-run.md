@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl - \#\# CargoRunOpts
+nanocl - \`nanocl cargo run\` available options
 
 SYNOPSIS
 ========
@@ -12,8 +12,6 @@ SYNOPSIS
 
 DESCRIPTION
 ===========
-
-\#\# CargoRunOpts
 
 \`nanocl cargo run\` available options
 
@@ -38,7 +36,7 @@ OPTIONS
 
 **-h**, **\--help**
 
-:   Print help (see a summary with -h)
+:   Print help
 
 \<*NAME*\>
 

@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl - \#\# InstallOpts
+nanocl - \`nanocl install\` available options
 
 SYNOPSIS
 ========
@@ -9,12 +9,11 @@ SYNOPSIS
 **nanocl** \[**\--docker-host**\] \[**\--docker-desktop**\]
 \[**\--state-dir**\] \[**\--conf-dir**\] \[**\--gateway**\]
 \[**\--advertise-addr**\] \[**\--deamon-hosts**\] \[**\--group**\]
-\[**\--hostname**\] \[**-t**\|**\--template**\] \[**-h**\|**\--help**\]
+\[**\--hostname**\] \[**-t**\|**\--template**\]
+\[**-p**\|**\--force-pull**\] \[**-h**\|**\--help**\]
 
 DESCRIPTION
 ===========
-
-\#\# InstallOpts
 
 \`nanocl install\` available options
 
@@ -65,6 +64,10 @@ OPTIONS
 
 :   Installation template to use for nanocl by default its detected
 
+**-p**, **\--force-pull**
+
+:   Force repull of the nanocl components
+
 **-h**, **\--help**
 
-:   Print help (see a summary with -h)
+:   Print help

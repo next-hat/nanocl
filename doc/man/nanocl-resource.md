@@ -1,7 +1,7 @@
 NAME
 ====
 
-nanocl-resource - \#\# ResourceArg
+nanocl-resource - \`nanocl resource\` available arguments
 
 SYNOPSIS
 ========
@@ -11,8 +11,6 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-\#\# ResourceArg
-
 \`nanocl resource\` available arguments
 
 OPTIONS
@@ -20,7 +18,7 @@ OPTIONS
 
 **-h**, **\--help**
 
-:   Print help (see a summary with -h)
+:   Print help
 
 SUBCOMMANDS
 ===========

@@ -17,14 +17,6 @@ use cli::Cli;
 use dnsmasq::Dnsmasq;
 
 async fn run(cli: &Cli) -> IoResult<()> {
-  logger::enable_logger("ncdns");
-  log::info!(
-    "ncdns_{}_v{}-{}:{}",
-    version::ARCH,
-    version::VERSION,
-    version::CHANNEL,
-    version::COMMIT_ID
-  );
   // Spawn a new thread to listen events from nanocld
   let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
   let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns.clone()).ensure()?;
@@ -42,6 +34,14 @@ async fn run(cli: &Cli) -> IoResult<()> {
 
 #[ntex::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+  logger::enable_logger("ncdns");
+  log::info!(
+    "ncdns_{}_v{}-{}:{}",
+    version::ARCH,
+    version::VERSION,
+    version::CHANNEL,
+    version::COMMIT_ID
+  );
   let cli = Cli::parse();
   if let Err(err) = run(&cli).await {
     err.print_and_exit();
