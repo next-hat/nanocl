@@ -34,15 +34,15 @@ args = [
 command = "cargo"
 args = [
   "test",
-  "--",
-  "--test-threads",
-  "1",
   "--no-default-features",
   "--features",
   "test",
   "${@}",
   "--bin",
   "nanocld",
+  "--",
+  "--test-threads",
+  "1",
 ]
 
 # Test nanocld_client
@@ -55,15 +55,15 @@ args = ["nextest", "run", "-p", "nanocld_client"]
 command = "cargo"
 args = [
   "test",
-  "--",
-  "--test-threads",
-  "1",
   "--no-default-features",
   "--features",
   "test",
   "${@}",
   "--bin",
   "nanocl",
+  "--",
+  "--test-threads",
+  "1",
 ]
 
 # Test ncproxy
@@ -71,15 +71,15 @@ args = [
 command = "cargo"
 args = [
   "test",
-  "--",
-  "--test-threads",
-  "1",
   "--no-default-features",
   "--features",
   "test",
   "${@}",
   "--bin",
   "ncproxy",
+  "--",
+  "--test-threads",
+  "1",
 ]
 
 # Test all
@@ -87,13 +87,13 @@ args = [
 command = "cargo"
 args = [
   "test",
-  "--",
-  "--test-threads",
-  "1",
   "--no-default-features",
   "--features",
   "test",
   "${@}",
+  "--",
+  "--test-threads",
+  "1",
 ]
 
 # Test all with debug output

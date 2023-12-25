@@ -149,7 +149,6 @@ pub(crate) async fn remove_entries(
 
 #[cfg(test)]
 pub mod tests {
-  use nanocl_utils::logger;
   pub use nanocl_utils::ntex::test_client::*;
   use nanocld_client::NanocldClient;
 
@@ -159,7 +158,6 @@ pub mod tests {
   pub fn before() {
     // Build a test env logger
     std::env::set_var("TEST", "true");
-    logger::enable_logger("ncdns");
   }
 
   // Generate a test server
