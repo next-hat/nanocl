@@ -34,7 +34,8 @@ args = [
 command = "cargo"
 args = [
   "test",
-  "-j",
+  "--",
+  "--test-threads",
   "1",
   "--no-default-features",
   "--features",
@@ -54,7 +55,8 @@ args = ["nextest", "run", "-p", "nanocld_client"]
 command = "cargo"
 args = [
   "test",
-  "-j",
+  "--",
+  "--test-threads",
   "1",
   "--no-default-features",
   "--features",
@@ -69,7 +71,8 @@ args = [
 command = "cargo"
 args = [
   "test",
-  "-j",
+  "--",
+  "--test-threads",
   "1",
   "--no-default-features",
   "--features",
@@ -84,7 +87,8 @@ args = [
 command = "cargo"
 args = [
   "test",
-  "-j",
+  "--",
+  "--test-threads",
   "1",
   "--no-default-features",
   "--features",
@@ -117,7 +121,8 @@ args = [
   "--output-path",
   "./lcov.info",
   "--lcov",
-  "-j",
+  "--",
+  "--test-threads",
   "1",
 ]
 
