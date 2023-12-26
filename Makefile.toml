@@ -33,7 +33,7 @@ args = [
 [tasks.tests-daemon]
 command = "sh"
 args = [
-  "scripts/test_unit.sh",
+  "scripts/runner.sh",
   "test",
   "--no-default-features",
   "--features",
@@ -50,7 +50,7 @@ args = [
 [tasks.tests-client]
 command = "sh"
 args = [
-  "scripts/test_unit.sh",
+  "scripts/runner.sh",
   "test",
   "--no-default-features",
   "--features",
@@ -67,7 +67,7 @@ args = [
 [tasks.tests-cli]
 command = "sh"
 args = [
-  "scripts/test_unit.sh",
+  "scripts/runner.sh",
   "test",
   "--no-default-features",
   "--features",
@@ -84,7 +84,7 @@ args = [
 [tasks.tests-ncproxy]
 command = "sh"
 args = [
-  "scripts/test_unit.sh",
+  "scripts/runner.sh",
   "test",
   "--no-default-features",
   "--features",
@@ -101,7 +101,7 @@ args = [
 [tasks.tests]
 command = "sh"
 args = [
-  "scripts/test_unit.sh",
+  "scripts/runner.sh",
   "test",
   "--no-default-features",
   "--features",
@@ -126,7 +126,7 @@ args = ["compose", "up"]
 [tasks.cov]
 command = "sh"
 args = [
-  "scripts/test_unit.sh",
+  "scripts/runner.sh",
   "llvm-cov",
   "--all",
   "--no-default-features",
@@ -140,7 +140,24 @@ args = [
 [tasks.covgen]
 command = "sh"
 args = [
-  "scripts/test_unit.sh",
+  "scripts/runner.sh",
+  "llvm-cov",
+  "--all",
+  "--no-default-features",
+  "--features",
+  "test",
+  "--output-path",
+  "./lcov.info",
+  "--lcov",
+  "--",
+  "--test-threads",
+  "1",
+]
+
+[tasks.covgenci]
+command = "sh"
+args = [
+  "scripts/runnerci.sh",
   "llvm-cov",
   "--all",
   "--no-default-features",

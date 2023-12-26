@@ -1,5 +1,5 @@
 #!/bin/sh
-## name: test_unit.sh
+## name: runner.sh
 
 docker run -it --rm \
   -v $(pwd):/project \
