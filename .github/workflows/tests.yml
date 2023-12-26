@@ -58,6 +58,7 @@ jobs:
           sleep 4
           docker ps -a
           sudo chown -R $USER:nanocl /run/nanocl
+          sudo chmod -R 777 $HOME/.cargo/registry
           ls -la $HOME/.nanocl_dev/state
           ls -la $HOME/.nanocl_dev/state/proxy
           ls -la /run/nanocl

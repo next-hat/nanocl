@@ -4,6 +4,7 @@
 docker run -i --rm \
   -v $(pwd):/project \
   -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /etc/hosts:/etc/hosts \
   -v $HOME/.cargo/registry:/usr/local/cargo/registry \
   -v $HOME/.nanocl_dev/state:/$HOME/.nanocl_dev/state \
   -v /tmp:/tmp \

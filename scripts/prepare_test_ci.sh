@@ -16,6 +16,7 @@ docker run -d --rm \
   -v $HOME/.cargo/registry:/usr/local/cargo/registry \
   -v $HOME/.nanocl_dev/state:/$HOME/.nanocl_dev/state \
   -v /tmp:/tmp \
+  -v /etc/hosts:/etc/hosts \
   -v /run/nanocl:/run/nanocl \
   -e HOME=$HOME \
   -w /project \
@@ -26,6 +27,7 @@ docker run -d --rm \
 docker run -d --rm \
   -v $(pwd):/project \
   -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /etc/hosts:/etc/hosts \
   -v $HOME/.cargo/registry:/usr/local/cargo/registry \
   -v $HOME/.nanocl_dev/state:/$HOME/.nanocl_dev/state \
   -v /tmp:/tmp \
