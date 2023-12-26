@@ -1,33 +1,20 @@
 use clap::Parser;
 
-use nanocl_utils::logger;
 use nanocl_error::io::IoResult;
+use nanocl_utils::logger;
 
 mod cli;
-mod utils;
-mod event;
-mod server;
 mod version;
-mod dnsmasq;
+mod utils;
+mod models;
 mod services;
-
-use nanocld_client::NanocldClient;
+mod subsystem;
 
 use cli::Cli;
-use dnsmasq::Dnsmasq;
 
 async fn run(cli: &Cli) -> IoResult<()> {
-  // Spawn a new thread to listen events from nanocld
-  let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
-  let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns.clone()).ensure()?;
-  #[allow(unused)]
-  let mut client = NanocldClient::connect_with_unix_default();
-  #[cfg(any(feature = "dev", feature = "test"))]
-  {
-    client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
-  }
-  event::spawn(&client);
-  let server = server::gen(&cli.host, &dnsmasq, &client)?;
+  let state = subsystem::init(cli).await?;
+  let server = utils::server::gen(&cli.host, &state)?;
   server.await?;
   Ok(())
 }

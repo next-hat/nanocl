@@ -1,6 +1,6 @@
 use std::fs;
 
-use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::io::{IoResult, FromIo};
 
 /// Dnsmasq configuration manager
 #[derive(Clone)]
@@ -31,7 +31,6 @@ impl Dnsmasq {
   }
 
   /// Write the main dnsmasq config
-  #[inline]
   fn write_main_conf(&self, data: &str) -> IoResult<()> {
     fs::write(&self.config_path, data).map_err(|err| {
       err.map_err_context(|| {
@@ -42,7 +41,6 @@ impl Dnsmasq {
   }
 
   /// Read the main dnsmasq config
-  #[inline]
   fn read_main_conf(&self) -> IoResult<String> {
     let data = fs::read_to_string(&self.config_path).map_err(|err| {
       err.map_err_context(|| {
@@ -54,7 +52,6 @@ impl Dnsmasq {
 
   /// Generate the main dnsmasq config
   /// This config is used to require all other configs from the dnsmasq.d directory
-  #[inline]
   fn gen_main_conf(&self) -> IoResult<()> {
     let contents = format!(
       "bind-dynamic
@@ -72,7 +69,6 @@ conf-dir={}/dnsmasq.d,*.conf
   }
 
   /// Ensure that dnsmasq as a minimal config
-  #[inline]
   pub(crate) fn ensure(&self) -> IoResult<Self> {
     log::info!("dnsmasq::ensure: minimal config {}", &self.config_dir);
     fs::create_dir_all(format!("{}/dnsmasq.d", &self.config_dir)).map_err(
@@ -92,7 +88,6 @@ conf-dir={}/dnsmasq.d,*.conf
   }
 
   /// Set dns server address to resolve domain name if not existing in local
-  #[inline]
   pub(crate) fn set_dns(&self) -> IoResult<()> {
     let data = match self.read_main_conf() {
       Err(_err) => {
@@ -117,7 +112,6 @@ conf-dir={}/dnsmasq.d,*.conf
   }
 
   /// Generate domain records file for dnsmasq
-  #[inline]
   pub(crate) async fn write_config(
     &self,
     name: &str,

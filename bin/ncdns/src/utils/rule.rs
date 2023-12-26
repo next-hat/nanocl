@@ -1,10 +1,15 @@
 use nanocl_error::io::{FromIo, IoResult, IoError};
 
-use nanocld_client::NanocldClient;
-use nanocld_client::stubs::dns::ResourceDnsRule;
-use nanocld_client::stubs::generic::{GenericFilter, GenericClause};
+use nanocld_client::{
+  NanocldClient,
+  stubs::{
+    generic::{GenericFilter, GenericClause},
+    dns::ResourceDnsRule,
+  },
+};
+use ntex::rt::System;
 
-use crate::dnsmasq::Dnsmasq;
+use crate::models::{Dnsmasq, SystemStateRef};
 
 /// Get gateway of given namespace
 async fn get_namespace_addr(
@@ -67,8 +72,7 @@ pub(crate) async fn reload_service(client: &NanocldClient) -> IoResult<()> {
 pub(crate) async fn update_entries(
   key: &str,
   dns_rule: &ResourceDnsRule,
-  dnsmasq: &Dnsmasq,
-  client: &NanocldClient,
+  state: &SystemStateRef,
 ) -> IoResult<()> {
   let filter = GenericFilter::new()
     .r#where("kind", GenericClause::Eq("DnsRule".to_owned()))
@@ -79,9 +83,14 @@ pub(crate) async fn update_entries(
         serde_json::json!({ "Network": dns_rule.network }),
       ),
     );
-  let resources = client.list_resource(Some(&filter)).await.map_err(|err| {
-    err.map_err_context(|| "Unable to list resources from nanocl daemon")
-  })?;
+  let resources =
+    state
+      .client
+      .list_resource(Some(&filter))
+      .await
+      .map_err(|err| {
+        err.map_err_context(|| "Unable to list resources from nanocl daemon")
+      })?;
   log::debug!("utils::update_entries: {} resources", resources.len());
   let mut entries = dns_rule.entries.clone();
   for resource in resources {
@@ -91,14 +100,15 @@ pub(crate) async fn update_entries(
     .map_err(|err| err.map_err_context(|| "Unable to serialize the DnsRule"))?;
     entries.append(&mut dns_rule.entries);
   }
-  let listen_address = get_network_addr(&dns_rule.network, client).await?;
+  let listen_address =
+    get_network_addr(&dns_rule.network, &state.client).await?;
   let mut file_content =
     format!("bind-dynamic\nlisten-address={listen_address}\n");
   for entry in &entries {
     let ip_address = match entry.ip_address.as_str() {
       namespace if namespace.ends_with(".nsp") => {
         let namespace = namespace.trim_end_matches(".nsp");
-        get_namespace_addr(namespace, client).await?
+        get_namespace_addr(namespace, &state.client).await?
       }
       _ => entry.ip_address.clone(),
     };
@@ -106,7 +116,8 @@ pub(crate) async fn update_entries(
     file_content += &format!("{entry}\n");
     log::debug!("utils::update_entries: {entry}");
   }
-  dnsmasq
+  state
+    .dnsmasq
     .write_config(&dns_rule.network, &file_content)
     .await?;
   Ok(())
@@ -114,14 +125,14 @@ pub(crate) async fn update_entries(
 
 pub(crate) async fn remove_entries(
   dns_rule: &ResourceDnsRule,
-  dnsmasq: &Dnsmasq,
-  client: &NanocldClient,
+  state: &SystemStateRef,
 ) -> IoResult<()> {
-  let content = dnsmasq.read_config(&dns_rule.network).await?;
+  let content = state.dnsmasq.read_config(&dns_rule.network).await?;
   println!("{}", content);
   let mut file_content = String::new();
   let lines = content.lines();
-  let listen_address = get_network_addr(&dns_rule.network, client).await?;
+  let listen_address =
+    get_network_addr(&dns_rule.network, &state.client).await?;
   let empty_entries = format!("listen-address={listen_address}\n");
   for line in lines {
     let mut found = false;
@@ -138,41 +149,12 @@ pub(crate) async fn remove_entries(
   }
   println!("{}", file_content);
   if file_content == empty_entries {
-    dnsmasq.remove_config(&dns_rule.network).await?;
+    state.dnsmasq.remove_config(&dns_rule.network).await?;
     return Ok(());
   }
-  dnsmasq
+  state
+    .dnsmasq
     .write_config(&dns_rule.network, &file_content)
     .await?;
   Ok(())
-}
-
-#[cfg(test)]
-pub mod tests {
-  pub use nanocl_utils::ntex::test_client::*;
-  use nanocld_client::NanocldClient;
-
-  use crate::{version, dnsmasq, services};
-
-  // Before a test
-  pub fn before() {
-    // Build a test env logger
-    std::env::set_var("TEST", "true");
-  }
-
-  // Generate a test server
-  pub fn gen_default_test_client() -> TestClient {
-    before();
-    let dnsmasq = dnsmasq::Dnsmasq::new("/tmp/dnsmasq");
-    dnsmasq.ensure().unwrap();
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
-    // Create test server
-    let srv = ntex::web::test::server(move || {
-      ntex::web::App::new()
-        .state(dnsmasq.clone())
-        .state(client.clone())
-        .configure(services::ntex_config)
-    });
-    TestClient::new(srv, version::VERSION)
-  }
 }
