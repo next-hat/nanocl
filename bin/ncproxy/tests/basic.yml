@@ -32,3 +32,17 @@ Rules:
   Target:
     Key: ncproxy-test.global.c
     Port: 9000
+- Protocol: Tcp
+  Port: 9999
+  Network: global.nsp
+  Ssl: test-secret
+  Target:
+    Key: ncproxy-test.global.c
+    Port: 9000
+- Protocol: Udp
+  Port: 9999
+  Network: global.nsp
+  Ssl: test-secret
+  Target:
+    Key: ncproxy-test.global.c
+    Port: 9000
