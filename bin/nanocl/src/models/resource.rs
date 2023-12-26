@@ -63,7 +63,7 @@ impl From<Resource> for ResourceRow {
       .format("%Y-%m-%d %H:%M:%S");
     Self {
       name: resource.spec.resource_key,
-      kind: resource.kind,
+      kind: format!("{}/{}", resource.kind, resource.spec.version),
       created_at: format!("{created_at}"),
       updated_at: format!("{updated_at}"),
     }

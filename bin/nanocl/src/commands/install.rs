@@ -2,16 +2,20 @@ use std::time::Duration;
 use std::collections::HashMap;
 
 use nix::unistd::Group;
-use bollard_next::container::StartContainerOptions;
-use bollard_next::network::{CreateNetworkOptions, InspectNetworkOptions};
+use bollard_next::{
+  network::{CreateNetworkOptions, InspectNetworkOptions},
+  container::StartContainerOptions,
+};
 
-use nanocl_utils::unix;
 use nanocl_error::io::{IoError, IoResult, FromIo};
+use nanocl_utils::unix;
 use nanocld_client::stubs::statefile::Statefile;
 
-use crate::utils;
-use crate::models::{
-  InstallOpts, NanocldArg, Context, ContextMetaData, ContextEndpoint,
+use crate::{
+  utils,
+  models::{
+    InstallOpts, NanocldArg, Context, ContextMetaData, ContextEndpoint,
+  },
 };
 
 /// This function is called when running `nanocl install`
@@ -71,10 +75,14 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     Some(hostname) => hostname.to_owned(),
     None => unix::network::get_hostname()?,
   };
-  let is_docker_uds = docker_host.starts_with("unix://");
+  let docker_uds_path = if docker_host.starts_with("unix://") {
+    Some(docker_host.replace("unix://", ""))
+  } else {
+    None
+  };
   let nanocld_args = NanocldArg {
     docker_host,
-    is_docker_uds,
+    docker_uds_path,
     state_dir,
     conf_dir,
     gateway,
