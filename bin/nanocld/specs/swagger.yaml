@@ -5410,7 +5410,7 @@ components:
           type: boolean
           description: Enable or disable client verification
           nullable: true
-        DhParam:
+        Dhparam:
           type: string
           description: Path to the dhparam file
           nullable: true

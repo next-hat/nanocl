@@ -14,6 +14,16 @@ jobs:
     steps:
       # Clone project
       - uses: actions/checkout@v3
+      # Install buildx
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+      # Set buildx cache
+      - name: Cache register
+        uses: actions/cache@v3
+        with:
+          path: ~/buildx-cache
+          key: buildx-cache
       # Install cargo make
       - uses: davidB/rust-cargo-make@v1
       # Cache Rust
@@ -34,6 +44,8 @@ jobs:
           docker pull ghcr.io/next-hat/nanocl-dev:dev
           docker pull ghcr.io/next-hat/nanocl-qemu:8.0.2.0
           docker pull ghcr.io/next-hat/nanocl-get-started:latest
+          docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t ndns:dev -f ./bin/ndns/Dockerfile .
+          docker buildx build --load --cache-from type=local,src=~/buildx-cache --cache-to type=local,dest=~/buildx-cache -t nproxy:dev -f ./bin/nproxy/Dockerfile .
           docker compose -f ./tests/docker-compose.yaml up -d
           sleep 4
           sh scripts/prepare_test_ci.sh

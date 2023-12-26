@@ -19,18 +19,15 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
   {
     client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
   }
+  let event_emitter = EventEmitter::new(&client);
   let state = Arc::new(SystemState {
     client,
-    event_emitter: EventEmitter::new(),
+    event_emitter,
     store: Store::new(&cli.state_dir),
     nginx_dir: cli.nginx_dir.clone(),
   });
   event::spawn(&state);
   metric::spawn(&state);
   utils::nginx::ensure_conf(&state).await?;
-  #[cfg(not(feature = "test"))]
-  {
-    utils::nginx::spawn().await?;
-  }
   Ok(state)
 }

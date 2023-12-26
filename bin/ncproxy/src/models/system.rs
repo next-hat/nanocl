@@ -28,14 +28,16 @@ pub enum SystemEventKind {
 }
 
 struct SystemEventInner {
+  client: NanocldClient,
   task: ntex::rt::JoinHandle<IoResult<()>>,
 }
 
 pub struct SystemEvent(SystemEventInner);
 
 impl SystemEvent {
-  pub fn new() -> Self {
+  pub fn new(client: &NanocldClient) -> Self {
     Self(SystemEventInner {
+      client: client.clone(),
       task: rt::spawn(async move { Ok::<_, IoError>(()) }),
     })
   }
@@ -46,9 +48,10 @@ impl SystemEvent {
       log::info!("system: aborting reload task");
       abort_handle.abort();
     }
+    let client = self.0.client.clone();
     self.0.task = rt::spawn(async move {
       ntex::time::sleep(std::time::Duration::from_millis(750)).await;
-      if let Err(err) = utils::nginx::reload().await {
+      if let Err(err) = utils::nginx::reload(&client).await {
         log::warn!("system: {err}");
       }
       Ok::<_, IoError>(())
@@ -61,11 +64,12 @@ pub struct EventEmitter(pub Arc<mpsc::UnboundedSender<SystemEventKind>>);
 
 impl EventEmitter {
   /// Create a new thread with it's own event loop and return an emitter to send events to it
-  pub fn new() -> Self {
+  pub fn new(client: &NanocldClient) -> Self {
     let (tx, mut rx) = mpsc::unbounded();
+    let client = client.clone();
     rt::Arbiter::new().exec_fn(move || {
       ntex::rt::spawn(async move {
-        let mut local_event = SystemEvent::new();
+        let mut local_event = SystemEvent::new(&client);
         while let Some(e) = rx.next().await {
           local_event.handle(e);
         }
