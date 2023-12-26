@@ -27,6 +27,7 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
   });
   event::spawn(&state);
   metric::spawn(&state);
+  utils::nginx::ensure_conf(&state).await?;
   #[cfg(not(feature = "test"))]
   {
     utils::nginx::spawn(&state).await?;

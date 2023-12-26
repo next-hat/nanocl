@@ -61,7 +61,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 
 #[cfg(test)]
 mod tests {
-  use nanocld_client::stubs::proxy::{ResourceProxyRule, ProxyRule};
   use ntex::http;
 
   use crate::utils::tests::*;

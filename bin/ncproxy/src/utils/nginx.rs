@@ -9,7 +9,7 @@ use crate::models::{
   HTTP_TEMPLATE, CONF_TEMPLATE,
 };
 
-async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
+pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
   let state = Arc::clone(state);
   let conf_path = format!("{}/nginx.conf", state.nginx_dir);
   let default_conf = CONF_TEMPLATE.compile(&liquid::object!({
@@ -67,7 +67,6 @@ pub async fn test() -> IoResult<()> {
 }
 
 pub async fn spawn(state: &SystemStateRef) -> IoResult<()> {
-  self::ensure_conf(state).await?;
   log::info!("starting nginx");
   rt::Arbiter::new().exec_fn(move || {
     rt::spawn(async move {

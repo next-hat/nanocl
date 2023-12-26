@@ -14,22 +14,18 @@ jobs:
     steps:
       # Clone project
       - uses: actions/checkout@v3
-      # Install buildx
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v2
-      # Set buildx cache
+      # Install cargo make
+      - uses: davidB/rust-cargo-make@v1
       - name: Cache register
         uses: actions/cache@v3
         with:
-          path: ~/buildx-cache
-          key: buildx-cache
-      # Cache Rust
-      - uses: Swatinem/rust-cache@v2
+          path: target
+          key: target-${{ hashFiles('./Cargo.lock') }}
+      - name: Cache register
+        uses: actions/cache@v3
         with:
-          key: ${{ hashFiles('./Cargo.lock') }}
-      # Install cargo make
-      - uses: davidB/rust-cargo-make@v1
+          path: $HOME/.cargo/registry
+          key: cargo-${{ hashFiles('./Cargo.lock') }}
       # Prepare CI with images containers and permissions
       - name: Prepare CI
         run: |
