@@ -1,8 +1,0 @@
-ApiVersion: v0.12
-
-Namespace: global
-
-Cargoes:
-  - Name: get-started
-    Container:
-      Image: ghcr.io/next-hat/nanocl-get-started:latest

@@ -206,7 +206,7 @@ pub async fn add_rule(
   Ok(())
 }
 
-pub async fn del_rule(name: &str, state: &SystemStateRef) -> IoResult<()> {
+pub async fn del_rule(name: &str, state: &SystemStateRef) {
   let _ = state
     .store
     .delete_conf_file(name, &NginxRuleKind::Site)
@@ -215,5 +215,4 @@ pub async fn del_rule(name: &str, state: &SystemStateRef) -> IoResult<()> {
     .store
     .delete_conf_file(name, &NginxRuleKind::Stream)
     .await;
-  Ok(())
 }

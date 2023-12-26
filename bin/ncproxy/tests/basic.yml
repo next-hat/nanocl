@@ -1,0 +1,34 @@
+Rules:
+- Domain: test-redirect.com
+  Network: All
+  Locations:
+  - Path: /proxy
+    Target:
+      Url: https://google.com
+  - Path: /redirect
+    Target:
+      Url: https://google.com
+      Redirect: Temporary
+  - Path: /permanent
+    Target:
+      Url: https://google.com
+      Redirect: Permanent
+  - Path: /unix
+    Target:
+      UnixPath: /tmp/ncproxy.sock
+  - Path: /cargo
+    Target:
+      Key: ncproxy-test.global.c
+      Port: 9000
+- Protocol: Tcp
+  Port: 9998
+  Network: Internal
+  Target:
+    Key: ncproxy-test.global.c
+    Port: 9000
+- Protocol: Tcp
+  Port: 9999
+  Network: All
+  Target:
+    Key: ncproxy-test.global.c
+    Port: 9000

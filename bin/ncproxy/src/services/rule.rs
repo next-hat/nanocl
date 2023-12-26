@@ -49,7 +49,7 @@ pub async fn remove_rule(
   path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpError> {
   log::info!("remove_rule: {}", path.1);
-  utils::nginx::del_rule(&path.1, &state).await?;
+  utils::nginx::del_rule(&path.1, &state).await;
   state.event_emitter.emit_reload().await;
   Ok(web::HttpResponse::Ok().finish())
 }
@@ -57,4 +57,31 @@ pub async fn remove_rule(
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(apply_rule);
   config.service(remove_rule);
+}
+
+#[cfg(test)]
+mod tests {
+  use nanocld_client::stubs::proxy::{ResourceProxyRule, ProxyRule};
+  use ntex::http;
+
+  use crate::utils::tests::*;
+
+  #[ntex::test]
+  async fn basic() {
+    let name = "ncproxy-io-test-resource";
+    let client = gen_default_test_client().await;
+    ensure_test_cargo().await.unwrap();
+    let payload = read_rule("tests/basic.yml").unwrap();
+    let mut res = client
+      .send_put(&format!("/rules/{name}"), Some(&payload), None::<String>)
+      .await;
+    let json = res.json::<serde_yaml::Value>().await.unwrap();
+    println!("{:?}", json);
+    test_status_code!(res.status(), http::StatusCode::OK, "put a rule");
+    let res = client
+      .send_delete(&format!("/rules/{name}"), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "delete a rule");
+    clean_test_cargo().await.unwrap();
+  }
 }
