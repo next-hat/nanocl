@@ -22,7 +22,7 @@ docker run -d --rm \
   -w /project \
   --network host \
   ghcr.io/next-hat/nanocl-dev:dev \
-  run --bin nanocld --no-default-features --features "dev" -- --hosts tcp://0.0.0.0:8585 --state-dir $HOME/.nanocl_dev/state
+  run --bin nanocld --no-default-features --features "test" -- --hosts tcp://0.0.0.0:8585 --state-dir $HOME/.nanocl_dev/state
 
 docker run -d --rm \
   -v $(pwd):/project \

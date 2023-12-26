@@ -52,6 +52,7 @@ jobs:
           docker compose -f ./tests/docker-compose.yaml up -d
           sleep 4
           sh scripts/prepare_test_ci.sh
+          sleep 4
           sudo chown $USER:nanocl -R /run/nanocl
           sudo chown $USER:nanocl -R /etc/nginx
           sudo chown $USER:nanocl -R $HOME/.nanocl_dev
