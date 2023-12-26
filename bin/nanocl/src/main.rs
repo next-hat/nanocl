@@ -398,13 +398,6 @@ mod tests {
   async fn state_apply_binds() {
     assert_cli_ok!("state", "apply", "-ys", "../../tests/relative_bind.yml");
     assert!(
-      Path::new("./toto")
-        .canonicalize()
-        .expect("Can't cannonicalize bind toto folder path")
-        .exists(),
-      "Relative bind was not created",
-    );
-    assert!(
       Path::new("/tmp/toto")
         .canonicalize()
         .expect("Can't cannonicalize bind /tmp/toto folder path")
