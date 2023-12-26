@@ -35,12 +35,15 @@ jobs:
         run: |
           wget https://cloud-images.ubuntu.com/minimal/releases/jammy/release/ubuntu-22.04-minimal-cloudimg-amd64.img
           mv ubuntu-22.04-minimal-cloudimg-amd64.img tests/ubuntu-22.04-minimal-cloudimg-amd64.img
+          mkdir -p $HOME/.nanocl_dev/state/vms/images
+          mkdir -p $HOME/.nanocl_dev/state/proxy/sites-enabled
+          mkdir -p $HOME/.nanocl_dev/state/proxy/sites-available
+          sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
           docker pull cockroachdb/cockroach:v23.1.12
           docker pull ghcr.io/next-hat/metrsd:0.4.1
           docker pull ghcr.io/next-hat/nanocl-dev:dev
           docker pull ghcr.io/next-hat/nanocl-qemu:8.0.2.0
           docker pull ghcr.io/next-hat/nanocl-get-started:latest
-          sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
           docker compose -f ./tests/docker-compose.yaml up -d
           sleep 4
           sh scripts/prepare_test_ci.sh
