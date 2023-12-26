@@ -154,6 +154,7 @@ async fn r#loop(state: &SystemStateRef) {
           log::warn!("event::loop: {err}");
           continue;
         }
+        let _ = utils::nginx::ensure_conf(state).await;
         log::info!("event::loop: subscribed to nanocld events");
         while let Some(event) = stream.next().await {
           let event = match event {

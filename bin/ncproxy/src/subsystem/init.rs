@@ -5,7 +5,6 @@ use nanocl_error::io::IoResult;
 use nanocld_client::NanocldClient;
 
 use crate::{
-  utils,
   cli::Cli,
   models::{Store, SystemState, SystemStateRef, EventEmitter},
 };
@@ -28,6 +27,5 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
   });
   event::spawn(&state);
   metric::spawn(&state);
-  utils::nginx::ensure_conf(&state).await?;
   Ok(state)
 }
