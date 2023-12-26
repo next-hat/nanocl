@@ -23,6 +23,7 @@ pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
       "streams-available",
       "streams-enabled",
       "log",
+      "secrets",
     ]
     .into_iter()
     .map(|name| {
@@ -67,7 +68,7 @@ pub async fn test() -> IoResult<()> {
 }
 
 #[cfg(not(feature = "test"))]
-pub async fn spawn(state: &SystemStateRef) -> IoResult<()> {
+pub async fn spawn() -> IoResult<()> {
   log::info!("starting nginx");
   rt::Arbiter::new().exec_fn(move || {
     rt::spawn(async move {
@@ -127,9 +128,23 @@ pub async fn add_rule(
         let upstream_key =
           super::rule::gen_stream_upstream_key(&stream_rule.target, state)
             .await?;
+        let ssl = match &stream_rule.ssl {
+          Some(ssl) => match super::rule::gen_ssl_config(ssl, state).await {
+            Err(err) => {
+              log::warn!("Not ssl found for {name} {ssl:#?} {err}");
+              None
+            }
+            Ok(ssl) => Some(ssl),
+          },
+          None => None,
+        };
+        if stream_rule.ssl.is_some() && ssl.is_none() {
+          continue;
+        }
         let data = STREAM_TEMPLATE.compile(&liquid::object!({
           "listen": listen,
           "upstream_key": upstream_key,
+          "ssl": ssl,
         }))?;
         stream_conf += &data;
       }
@@ -138,6 +153,22 @@ pub async fn add_rule(
         let listen =
           super::rule::get_network_addr(&http_rule.network, 80, &state.client)
             .await?;
+        let listen_https =
+          super::rule::get_network_addr(&http_rule.network, 443, &state.client)
+            .await?;
+        let ssl = match &http_rule.ssl {
+          Some(ssl) => match super::rule::gen_ssl_config(ssl, state).await {
+            Err(err) => {
+              log::warn!("Not ssl found for {name} {ssl:#?} {err}");
+              None
+            }
+            Ok(ssl) => Some(ssl),
+          },
+          None => None,
+        };
+        if http_rule.ssl.is_some() && ssl.is_none() {
+          continue;
+        }
         for location in &http_rule.locations {
           match &location.target {
             LocationTarget::Upstream(upstream) => {
@@ -180,8 +211,10 @@ pub async fn add_rule(
         }
         let data = HTTP_TEMPLATE.compile(&liquid::object!({
           "listen": listen,
+          "listen_https": listen_https,
           "domain": http_rule.domain,
           "locations": locations,
+          "ssl": ssl,
         }))?;
         http_conf += &data;
       }

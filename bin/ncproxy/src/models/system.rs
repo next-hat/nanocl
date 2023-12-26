@@ -43,13 +43,13 @@ impl SystemEvent {
   pub fn handle(&mut self, _e: SystemEventKind) {
     let abort_handle = self.0.task.abort_handle();
     if !abort_handle.is_finished() {
-      log::info!("local_event::handle: aborting reload task");
+      log::info!("system: aborting reload task");
       abort_handle.abort();
     }
     self.0.task = rt::spawn(async move {
-      ntex::time::sleep(std::time::Duration::from_millis(500)).await;
+      ntex::time::sleep(std::time::Duration::from_millis(750)).await;
       if let Err(err) = utils::nginx::reload().await {
-        log::warn!("local_event::handle: {err}");
+        log::warn!("system: {err}");
       }
       Ok::<_, IoError>(())
     });

@@ -1,5 +1,5 @@
-The `Nanocl Controller Daemon Proxy` is an `HTTP REST API`.<br />
-It is the `API` the `Nanocl Daemon` uses, to create / update and delete `ProxyRule`
+The `Nanocl Controller Proxy` is an `HTTP REST API`.<br />
+It is the `API` the `Nanocl Daemon` uses, to create / update and delete `ncproxy.io/rule`
 
 ## OpenAPI Specification
 This API is documented in **OpenAPI format** using [Utoipa](https://github.com/juhaku/utoipa)<br />

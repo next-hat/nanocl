@@ -4,7 +4,9 @@ use nanocld_client::{
   NanocldClient,
   stubs::{
     process::Process,
-    proxy::{UpstreamTarget, StreamTarget, UnixTarget},
+    proxy::{
+      UpstreamTarget, StreamTarget, UnixTarget, ProxySsl, ProxySslConfig,
+    },
   },
 };
 
@@ -103,6 +105,40 @@ pub async fn get_network_addr(
       "Network",
       &format!("invalid network {network}"),
     )),
+  }
+}
+
+pub async fn gen_ssl_config(
+  ssl: &ProxySsl,
+  state: &SystemStateRef,
+) -> IoResult<ProxySslConfig> {
+  match ssl {
+    ProxySsl::Config(ssl_config) => Ok(ssl_config.clone()),
+    ProxySsl::Secret(secret) => {
+      let secret = state.client.inspect_secret(secret).await?;
+      let mut ssl_config =
+        serde_json::from_value::<ProxySslConfig>(secret.data).map_err(
+          |err| err.map_err_context(|| "Unable to deserialize ProxySslConfig"),
+        )?;
+      let secret_path = format!("{}/secrets/{}", state.store.dir, secret.name);
+      let cert_path = format!("{secret_path}.cert");
+      tokio::fs::write(&cert_path, ssl_config.certificate.clone()).await?;
+      let key_path = format!("{secret_path}.key");
+      tokio::fs::write(&key_path, ssl_config.certificate_key.clone()).await?;
+      if let Some(certificate_client) = ssl_config.certificate_client {
+        let certificate_client_path = format!("{secret_path}.client.cert");
+        tokio::fs::write(&certificate_client_path, certificate_client).await?;
+        ssl_config.certificate_client = Some(certificate_client_path);
+      }
+      if let Some(dh_param) = ssl_config.dhparam {
+        let dh_param_path = format!("{secret_path}.pem");
+        tokio::fs::write(&dh_param_path, dh_param).await?;
+        ssl_config.dhparam = Some(dh_param_path);
+      }
+      ssl_config.certificate = cert_path;
+      ssl_config.certificate_key = key_path;
+      Ok(ssl_config)
+    }
   }
 }
 

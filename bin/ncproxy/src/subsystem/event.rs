@@ -90,17 +90,19 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let action = &event.action;
   let actor = event.actor.clone().unwrap_or_default();
   log::trace!("event::on_event: {kind} {action}");
-  let res: Result<(), IoError> = match (kind, action) {
+  match (kind, action) {
     (EventKind::Cargo, EventAction::Started)
     | (EventKind::Cargo, EventAction::Patched) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       update_cargo_rule(&name, &namespace, state).await?;
+      let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
     (EventKind::Cargo, EventAction::Stopped)
     | (EventKind::Cargo, EventAction::Deleted) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       delete_cargo_rule(&name, &namespace, state).await?;
+      let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
     (EventKind::Secret, EventAction::Created)
@@ -111,16 +113,10 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
       )
       .await?;
       utils::resource::update_rules(&resources, state).await?;
-      Ok(())
-    }
-    _ => Ok(()),
-  };
-  match res {
-    Err(err) => Err(err),
-    Ok(()) => {
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
+    _ => Ok(()),
   }
 }
 

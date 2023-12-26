@@ -30,7 +30,7 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
   utils::nginx::ensure_conf(&state).await?;
   #[cfg(not(feature = "test"))]
   {
-    utils::nginx::spawn(&state).await?;
+    utils::nginx::spawn().await?;
   }
   Ok(state)
 }

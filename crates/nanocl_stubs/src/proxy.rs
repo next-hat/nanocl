@@ -42,7 +42,7 @@ pub struct ProxySslConfig {
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
-  pub dh_param: Option<String>,
+  pub dhparam: Option<String>,
 }
 
 #[derive(Debug, Clone)]
