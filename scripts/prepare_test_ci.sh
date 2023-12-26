@@ -16,6 +16,7 @@ docker run -d --rm \
   -v $HOME/.cargo/registry:/usr/local/cargo/registry \
   -v $HOME/.nanocl_dev/state:/$HOME/.nanocl_dev/state \
   -v /tmp:/tmp \
+  -v /run/nanocl:/run/nanocl \
   -e HOME=$HOME \
   -w /project \
   --network host \
@@ -28,6 +29,7 @@ docker run -d --rm \
   -v $HOME/.cargo/registry:/usr/local/cargo/registry \
   -v $HOME/.nanocl_dev/state:/$HOME/.nanocl_dev/state \
   -v /tmp:/tmp \
+  -v /run/nanocl:/run/nanocl \
   -e HOME=$HOME \
   -w /project \
   --network host \
