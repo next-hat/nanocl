@@ -67,13 +67,30 @@ services:
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
 
+  nproxy:
+    container_name: nproxy.system.c
+    image: nproxy:dev
+    tty: true
+    network_mode: host
+    environment:
+      - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
+    labels:
+      - io.nanocl=enabled
+      - io.nanocl.kind=cargo
+      - io.nanocl.c=nproxy.system
+      - io.nanocl.n=system
+    volumes:
+      - //run/guest-services/nanocl:/run/nanocl
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy:${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
+
   ncproxy:
     container_name: ncproxy.system.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     ports:
       - 8686:8686
-    network_mode: host
+    networks:
+      - system
     command:
       - watch
       - -w

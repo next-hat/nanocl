@@ -1,8 +1,15 @@
-use std::{fs, sync::Arc, process::Command};
+use std::{fs, sync::Arc};
 
-use ntex::{rt, web};
+use ntex::web;
+use futures::StreamExt;
+
 use nanocl_error::io::{IoError, IoResult};
-use nanocld_client::stubs::proxy::{ResourceProxyRule, ProxyRule, LocationTarget};
+
+use nanocld_client::{
+  stubs::proxy::{ResourceProxyRule, ProxyRule, LocationTarget},
+  bollard_next::exec::{CreateExecOptions, StartExecOptions},
+  NanocldClient,
+};
 
 use crate::models::{
   SystemStateRef, NginxRuleKind, LocationTemplate, STREAM_TEMPLATE,
@@ -10,11 +17,11 @@ use crate::models::{
 };
 
 pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
-  let state = Arc::clone(state);
-  let conf_path = format!("{}/nginx.conf", state.nginx_dir);
+  let state_ref = Arc::clone(state);
+  let conf_path = format!("{}/nginx.conf", state_ref.store.dir);
   let default_conf = CONF_TEMPLATE.compile(&liquid::object!({
-    "nginx_dir": state.nginx_dir,
-    "state_dir": state.store.dir,
+    "nginx_dir": state_ref.nginx_dir,
+    "state_dir": state_ref.store.dir,
   }))?;
   web::block(move || {
     [
@@ -27,7 +34,7 @@ pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
     ]
     .into_iter()
     .map(|name| {
-      fs::create_dir_all(format!("{}/{}", state.store.dir, name))?;
+      fs::create_dir_all(format!("{}/{}", state_ref.store.dir, name))?;
       Ok::<_, IoError>(())
     })
     .collect::<IoResult<Vec<()>>>()?;
@@ -38,73 +45,52 @@ pub async fn ensure_conf(state: &SystemStateRef) -> IoResult<()> {
     "NginxManager: writing default conf to {conf_path}:\n{default_conf}"
   );
   std::fs::write(conf_path, default_conf)?;
-  let output = Command::new("nginx").arg("-t").output()?;
-  if !output.status.success() {
-    return Err(IoError::other(
-      "Nginx test failed",
-      format!(
-        "Unable to test nginx: {}",
-        String::from_utf8_lossy(&output.stderr)
-      )
-      .as_str(),
-    ));
-  }
+  self::test(&state.client).await?;
   Ok(())
 }
 
-pub async fn test() -> IoResult<()> {
-  let output = web::block(|| Command::new("nginx").arg("-t").output()).await?;
-  if !output.status.success() {
-    return Err(IoError::other(
-      "Nginx test failed",
-      format!(
-        "Unable to test nginx: {}",
-        String::from_utf8_lossy(&output.stderr)
-      )
-      .as_str(),
-    ));
-  }
+pub async fn test(client: &NanocldClient) -> IoResult<()> {
+  log::info!("nginx::test: starting");
+  exec_nginx_cmd("nginx -t", client).await?;
+  log::info!("nginx::test: done");
   Ok(())
 }
 
-#[cfg(not(feature = "test"))]
-pub async fn spawn() -> IoResult<()> {
-  log::info!("starting nginx");
-  rt::Arbiter::new().exec_fn(move || {
-    rt::spawn(async move {
-      let task = web::block(|| {
-        match Command::new("nginx").arg("-g").arg("daemon off;").spawn() {
-          Err(err) => Err(err),
-          Ok(mut child) => {
-            child.wait()?;
-            Ok(())
-          }
-        }
-      })
-      .await;
-      if let Err(err) = task {
-        log::error!("nginx start error: {err}");
+async fn exec_nginx_cmd(cmd: &str, client: &NanocldClient) -> IoResult<()> {
+  let exec_options = CreateExecOptions {
+    attach_stderr: Some(true),
+    attach_stdout: Some(true),
+    cmd: Some(cmd.split(' ').map(|e| e.into()).collect()),
+    ..Default::default()
+  };
+  let start_res = client
+    .create_exec("nproxy", &exec_options, Some("system"))
+    .await?;
+  let mut start_stream = client
+    .start_exec(&start_res.id, &StartExecOptions::default())
+    .await?;
+  let mut output = String::default();
+  while let Some(output_log) = start_stream.next().await {
+    let Ok(output_log) = output_log else {
+      break;
+    };
+    output += &output_log.data;
+  }
+  let inspect_result = client.inspect_exec(&start_res.id).await?;
+  match inspect_result.exit_code {
+    Some(code) => {
+      if code == 0 {
+        return Ok(());
       }
-    });
-  });
-  Ok(())
+      Err(IoError::other("exec", &output))
+    }
+    None => Ok(()),
+  }
 }
 
-pub async fn reload() -> IoResult<()> {
+pub async fn reload(client: &NanocldClient) -> IoResult<()> {
   log::info!("nginx::reload: starting");
-  let output =
-    web::block(|| Command::new("nginx").arg("-s").arg("reload").output())
-      .await?;
-  if !output.status.success() {
-    return Err(IoError::other(
-      "Nginx reload failed",
-      format!(
-        "Unable to reload nginx: {}",
-        String::from_utf8_lossy(&output.stderr)
-      )
-      .as_str(),
-    ));
-  }
+  exec_nginx_cmd("nginx -s reload", client).await?;
   log::info!("nginx::reload: done");
   Ok(())
 }
@@ -232,7 +218,7 @@ pub async fn add_rule(
       .write_conf_file(name, &http_conf, &NginxRuleKind::Site)
       .await?;
   }
-  if let Err(err) = self::test().await {
+  if let Err(err) = self::test(&state.client).await {
     let _ = del_rule(name, state).await;
     return Err(err);
   }

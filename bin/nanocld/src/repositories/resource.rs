@@ -159,7 +159,7 @@ impl ResourceDb {
     item: &ResourcePartial,
     pool: &Pool,
   ) -> IoResult<Resource> {
-    let (_, version) = ResourceDb::parse_kind(&item.kind, pool).await?;
+    let (kind, version) = ResourceDb::parse_kind(&item.kind, pool).await?;
     let spec = SpecDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
@@ -173,7 +173,7 @@ impl ResourceDb {
     let new_item = ResourceDb {
       key: item.name.to_owned(),
       created_at: chrono::Utc::now().naive_utc(),
-      kind: item.kind.clone(),
+      kind,
       spec_key: spec.key.to_owned(),
     };
     let dbmodel = ResourceDb::create_from(new_item, pool).await??;
