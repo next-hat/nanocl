@@ -66,6 +66,7 @@ pub async fn test() -> IoResult<()> {
   Ok(())
 }
 
+#[cfg(not(feature = "test"))]
 pub async fn spawn(state: &SystemStateRef) -> IoResult<()> {
   log::info!("starting nginx");
   rt::Arbiter::new().exec_fn(move || {

@@ -16,16 +16,10 @@ jobs:
       - uses: actions/checkout@v3
       # Install cargo make
       - uses: davidB/rust-cargo-make@v1
-      - name: Cache register
-        uses: actions/cache@v3
+      # Cache Rust
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: target
-          key: target-${{ hashFiles('./Cargo.lock') }}
-      - name: Cache register
-        uses: actions/cache@v3
-        with:
-          path: $HOME/.cargo/registry
-          key: cargo-${{ hashFiles('./Cargo.lock') }}
+          key: ${{ hashFiles('./Cargo.lock') }}
       # Prepare CI with images containers and permissions
       - name: Prepare CI
         run: |
@@ -59,3 +53,8 @@ jobs:
           token: ${{ secrets.CODECOV }}
           files: ./lcov.info
           flags: unittests # optional
+      # Fix permissions to upload artifacts
+      - name: Fix perms
+        run: |
+          sudo chmod -R 777 target
+          sudo chmod -R 777 $HOME/.cargo/registry
