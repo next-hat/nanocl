@@ -51,38 +51,7 @@ sequenceDiagram
 
 The controller proxy will watch for events:
 
-- Resource type `ProxyRule`:
+- Resource type `ncproxy.io/rule`:
   - Creation, Update, Suppresion
-- Cargo:
+- Cargo,Vm:
   - Creation, Update, Suppression
-
-## Installation
-
-### Production
-
-You need to have nanocl installed on your system, see how to install in our [documentation](https://docs.next-hat.com/setups/nanocl/).
-
-Then you need to download our images:
-
-```sh
-docker pull ghcr.io/next-hat/nanocl-proxy:latest
-docker pull ghcr.io/next-hat/ncproxy:latest
-```
-
-### Development
-
-You still need to have nanocl installed on your system.
-
-Build dev and test image
-
-```sh
-docker build -t nanocl-proxy:test -f ./nginx/Dockerfile .
-docker build -t nanocl-proxy:dev -f ./nginx/Dockerfile .
-docker build -t nanocl-ncproxy:dev -f dev.Dockerfile .
-```
-
-Apply nanocl dev state
-
-```
-nanocl state apply -af ./nanocl/dev.yml
-```

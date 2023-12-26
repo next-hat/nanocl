@@ -11,8 +11,8 @@ networks:
 services:
   nstore:
     container_name: nstore.system.c
-    image: cockroachdb/cockroach:v23.1.12
     hostname: store.nanocl.internal
+    image: cockroachdb/cockroach:v23.1.12
     entrypoint: /bin/sh
     tty: true
     ports:
@@ -21,41 +21,26 @@ services:
     networks:
       - system
     volumes:
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store/ca:/ca
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store/certs:/certs
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store/data:/cockroach/cockroach-data
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store:${STATE_DIR:-${HOME}/.nanocl_dev/state}/store
     environment:
-      - TZ=Europe/Paris
-    command:
-      - -c
-      - |
-        if [[ ! -f "/ca/ca.key" ]]; then
-          echo "generating certs"
-          cockroach cert create-ca --certs-dir=/certs --ca-key=/ca/ca.key
-          cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=/certs --ca-key=/ca/ca.key
-          cockroach cert create-client root --certs-dir=/certs --ca-key=/ca/ca.key
-        fi
-        cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
+      - STORE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/store
     labels:
       - io.nanocl=enabled
       - io.nanocl.kind=cargo
       - io.nanocl.c=nstore.system
       - io.nanocl.n=system
-
-  ndns:
-    container_name: ndns.system.c
-    image: ndns:dev
-    tty: true
-    network_mode: host
-    environment:
-      - TZ=Europe/Paris
-    volumes:
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:/opt/dns
-    labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=ndns.system
-      - io.nanocl.n=system
+    command:
+    - -c
+    - |
+      echo "starting cockroachdb"
+      if [ ! -f "$$STORE_DIR/ca/ca.key" ]; then
+        echo "generating certs"
+        mkdir -p $$STORE_DIR/ca $$STORE_DIR/certs $$STORE_DIR/data
+        cockroach cert create-ca --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
+        cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
+        cockroach cert create-client root --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
+      fi
+      cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$$STORE_DIR/certs --store=$$STORE_DIR/data
 
   nmetrics:
     container_name: nmetrics.system.c
@@ -76,29 +61,3 @@ services:
       - io.nanocl.n=system
     volumes:
       - /run/nanocl:/run/nanocl
-
-  nproxy:
-    container_name: nproxy.system.c
-    image: nproxy:dev
-    tty: true
-    network_mode: host
-    environment:
-      - TZ=Europe/Paris
-    labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=nproxy.system
-      - io.nanocl.n=system
-    volumes:
-      - /run:/run
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/run:/run
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/letsencrypt:/etc/letsencrypt
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/certs:/etc/nginx/certs
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/secrets:/opt/secrets
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/logs:/var/log/nginx/access
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/html:/usr/share/nginx/html
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/conf.d:/etc/nginx/conf.d
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/sites-available:/etc/nginx/sites-available
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/sites-enabled:/etc/nginx/sites-enabled
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/streams-available:/etc/nginx/streams-available
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy/streams-enabled:/etc/nginx/streams-enabled

@@ -3,9 +3,13 @@ use std::io::{Result, Error, ErrorKind};
 /// Execute the git command to extract the hash of the current commit
 /// and set it as an environment variable for the produced binary
 pub fn set_env_git_commit_hash() -> Result<()> {
-  let output = std::process::Command::new("git")
+  let Ok(output) = std::process::Command::new("git")
     .args(["rev-parse", "HEAD"])
-    .output()?;
+    .output()
+  else {
+    println!("cargo:rustc-env=GIT_HASH=<unknow>");
+    return Ok(());
+  };
   let mut git_hash = String::from_utf8(output.stdout).unwrap();
   if git_hash.is_empty() {
     git_hash = "<unknow>".to_owned();

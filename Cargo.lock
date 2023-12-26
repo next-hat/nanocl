@@ -2028,6 +2028,7 @@ dependencies = [
  "clap",
  "clap_mangen",
  "futures",
+ "liquid",
  "log",
  "nanocl_error",
  "nanocl_utils",

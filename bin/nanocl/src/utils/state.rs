@@ -77,7 +77,7 @@ where
   }
 }
 
-/// Compile a Statefile with given data
+/// Compile a template with given object using liquid syntax
 pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
   // replace "${{ }}" with "{{ }}" syntax for liquid
   let reg = Regex::new(r"\$\{\{(.+?)\}\}")

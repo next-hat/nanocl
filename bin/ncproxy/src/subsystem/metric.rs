@@ -4,6 +4,7 @@
 /// so the daemon will be able to save them to the database
 /// and broadcast them in real time
 use std::{
+  sync::Arc,
   fs::File,
   path::Path,
   time::Duration,
@@ -16,6 +17,8 @@ use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
 use nanocl_error::io::{IoResult, IoError, FromIo};
 
 use nanocld_client::{NanocldClient, stubs::metric::MetricPartial};
+
+use crate::models::SystemStateRef;
 
 fn read(path: &Path) -> IoResult<(&'static str, serde_json::Value)> {
   if !path.exists() {
@@ -30,7 +33,6 @@ fn read(path: &Path) -> IoResult<(&'static str, serde_json::Value)> {
     "http.log" => "ncproxy.io/http",
     "stream.log" => "ncproxy.io/stream",
     _ => {
-      log::warn!("metric::read: {}", file_name);
       return Err(IoError::invalid_data(
         "Metric",
         &format!("{}", path.display()),
@@ -40,7 +42,6 @@ fn read(path: &Path) -> IoResult<(&'static str, serde_json::Value)> {
   let file = match File::open(path) {
     Ok(file) => file,
     Err(e) => {
-      log::warn!("metric::read: {e}");
       return Err(e.map_err_context(|| "metric").into());
     }
   };
@@ -48,7 +49,6 @@ fn read(path: &Path) -> IoResult<(&'static str, serde_json::Value)> {
   let mut pos = match buf_reader.seek(SeekFrom::End(-2)) {
     Ok(pos) => pos,
     Err(e) => {
-      log::warn!("metric::read: {e}");
       return Err(e.map_err_context(|| "metric").into());
     }
   };
@@ -69,8 +69,10 @@ fn read(path: &Path) -> IoResult<(&'static str, serde_json::Value)> {
     last_line.insert(0, buffer[0] as char);
     pos -= 1;
   }
-  let data = serde_json::from_str(&last_line)
-    .map_err(|e| e.map_err_context(|| "metric"))?;
+  log::trace!("metric::read: {last_line}");
+  let data = serde_json::from_str(&last_line).map_err(|e| {
+    e.map_err_context(|| format!("metric failed to parse {last_line}"))
+  })?;
   Ok((kind, data))
 }
 
@@ -100,7 +102,6 @@ async fn watch(client: &NanocldClient) -> IoResult<()> {
   ) {
     Ok(watcher) => watcher,
     Err(e) => {
-      log::warn!("metric::watch: {e}");
       return Err(IoError::interupted("metric", &e.to_string()));
     }
   };
@@ -134,11 +135,11 @@ async fn watch(client: &NanocldClient) -> IoResult<()> {
 /// Spawn new thread and watch for change inside the access log directory
 /// to print them to the console that way we can see what is happening in real time with docker logs
 /// and the nanocl daemon will be able to save them to the database
-pub(crate) fn spawn(client: &NanocldClient) {
-  let client = client.clone();
+pub(crate) fn spawn(state: &SystemStateRef) {
+  let state = Arc::clone(state);
   rt::Arbiter::new().exec_fn(move || {
     rt::spawn(async move {
-      if let Err(err) = watch(&client).await {
+      if let Err(err) = watch(&state.client).await {
         log::warn!("metric::spawn: {err}");
       }
       rt::Arbiter::current().stop();

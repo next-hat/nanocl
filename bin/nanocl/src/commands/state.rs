@@ -544,6 +544,8 @@ async fn exec_state_apply(
     }
     if let Some(resources) = &state_file.data.resources {
       for resource in resources {
+        let token = format!("resource/{}", resource.name);
+        let pg = create_progress(&token, &pg_style);
         match client.inspect_resource(&resource.name).await {
           Err(_) => {
             client.create_resource(resource).await?;
@@ -556,6 +558,7 @@ async fn exec_state_apply(
             }
           }
         }
+        pg.finish();
       }
     }
   }

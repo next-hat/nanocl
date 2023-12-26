@@ -1,34 +1,32 @@
 # Create Builder image
-FROM --platform=$BUILDPLATFORM rust:1.74.1-alpine3.18
+FROM --platform=$BUILDPLATFORM rust:1.74.1-slim-bookworm
 
 # Setup timezone
 ARG tz=Europe/Paris
 
 # Install required dependencies
-RUN apk add --update alpine-sdk \
-  musl-dev \
+RUN apt-get update && \
+  apt-get install -y \
+  gcc \
   g++ \
-  make \
-  libpq-dev \
-  openssl-dev \
-  git \
-  perl \
-  build-base \
-  tzdata \
-  util-linux \
-  libgcc \
-  openssl \
-  libpq \
-  util-linux \
-  bash \
-  cloud-utils \
-  cdrkit \
-  && rm -rf /var/cache/apk/* \
-  && rm -rf /tmp/* \
-  && rm -rf /var/log/* \
-  && rm -rf /var/tmp/*
+  make
 
 RUN cargo install cargo-watch --locked
+RUN cargo install cargo-llvm-cov --locked
+RUN rustup component add llvm-tools-preview
+
+RUN apt-get install -y \
+  pkg-config \
+  musl-dev \
+  libpq-dev \
+  libssl-dev \
+  musl-tools \
+  libc-dev \
+  qemu-utils \
+  nginx \
+  nginx-extras \
+  dnsmasq \
+  cron
 
 # Create project directory
 RUN mkdir -p /project

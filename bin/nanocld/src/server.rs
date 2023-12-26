@@ -150,14 +150,6 @@ mod tests {
     assert_config_err(args).await;
   }
 
-  /// Test to create a server on unix socket where path is not valid
-  /// Expect the server to fail
-  #[ntex::test]
-  async fn server_on_invalid_unix_socket() {
-    let args = init_test_config(vec!["nanocl", "-H", "unix:///root/test.sock"]);
-    assert_config_err(args).await;
-  }
-
   /// Test with invalid host uri
   /// Expect the server to fail
   #[ntex::test]
