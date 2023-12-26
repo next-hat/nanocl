@@ -37,6 +37,7 @@ bollard-next = "0.15.4"
 
 [dependencies]
 log = "0.4.20"
+liquid = "0.26.1"
 clap = { version = "4.4.11", features = ["derive"] }
 ntex = { version = "0.7.16", features = ["tokio"] }
 tokio = { version = "1.34.0", features = ["fs"] }
@@ -49,6 +50,7 @@ notify = { version = "6.1.1", default-features = false, features = [
 nanocld_client = { version = "0.12.0", features = ["tokio"] }
 nanocl_error = { version = "0.1.1", features = [
   "io",
+  "ntex",
   "http",
   "http_client",
   "serde_json",

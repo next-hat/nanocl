@@ -23,7 +23,7 @@ Kind = "ncproxy.io/rule"
 
 [[Resources.Data.Rules]]
 Domain = "deploy-example.com"
-Network = "Public"
+Network = "All"
 
 [[Resources.Data.Rules.Locations]]
 Path = "/"

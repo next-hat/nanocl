@@ -2,9 +2,9 @@ use ntex::web;
 
 use nanocl_error::http::HttpError;
 
-use nanocld_client::{NanocldClient, stubs::proxy::ResourceProxyRule};
+use nanocld_client::stubs::proxy::ResourceProxyRule;
 
-use crate::{utils, nginx::Nginx};
+use crate::{utils, models::SystemStateRef};
 
 /// Create/Update a new ProxyRule
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -21,17 +21,13 @@ use crate::{utils, nginx::Nginx};
 ))]
 #[web::put("/rules/{name}")]
 pub async fn apply_rule(
-  client: web::types::State<NanocldClient>,
-  nginx: web::types::State<Nginx>,
+  state: web::types::State<SystemStateRef>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceProxyRule>,
 ) -> Result<web::HttpResponse, HttpError> {
-  utils::create_resource_conf(&path.1, &payload, &client, &nginx).await?;
-  if let Err(err) = utils::reload_config(&client).await {
-    nginx.delete_conf_file(&path.1).await;
-    utils::reload_config(&client).await?;
-    return Err(HttpError::bad_request(err));
-  }
+  log::info!("apply_rule: {}", path.1);
+  utils::nginx::add_rule(&path.1, &payload, &state).await?;
+  state.event_emitter.emit_reload().await;
   Ok(web::HttpResponse::Ok().json(&payload.into_inner()))
 }
 
@@ -49,12 +45,12 @@ pub async fn apply_rule(
 ))]
 #[web::delete("/rules/{name}")]
 pub async fn remove_rule(
-  client: web::types::State<NanocldClient>,
-  nginx: web::types::State<Nginx>,
+  state: web::types::State<SystemStateRef>,
   path: web::types::Path<(String, String)>,
 ) -> Result<web::HttpResponse, HttpError> {
-  nginx.delete_conf_file(&path.1).await;
-  utils::reload_config(&client).await?;
+  log::info!("remove_rule: {}", path.1);
+  utils::nginx::del_rule(&path.1, &state).await;
+  state.event_emitter.emit_reload().await;
   Ok(web::HttpResponse::Ok().finish())
 }
 
@@ -70,20 +66,21 @@ mod tests {
   use crate::utils::tests::*;
 
   #[ntex::test]
-  async fn redirect() {
+  async fn basic() {
+    let name = "ncproxy-io-test-resource";
     let client = gen_default_test_client().await;
-    let resource: &str = include_str!("../../tests/resource_redirect.yml");
-    let yaml: serde_yaml::Value = serde_yaml::from_str(resource).unwrap();
-    let resource = yaml["Resources"][0].clone();
-    let name = resource["Name"].as_str().unwrap();
-    let payload = resource["Data"].clone();
-    let res = client
+    ensure_test_cargo().await.unwrap();
+    let payload = read_rule("tests/basic.yml").unwrap();
+    let mut res = client
       .send_put(&format!("/rules/{name}"), Some(&payload), None::<String>)
       .await;
+    let json = res.json::<serde_yaml::Value>().await.unwrap();
+    println!("{:?}", json);
     test_status_code!(res.status(), http::StatusCode::OK, "put a rule");
     let res = client
       .send_delete(&format!("/rules/{name}"), None::<String>)
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "delete a rule");
+    clean_test_cargo().await.unwrap();
   }
 }

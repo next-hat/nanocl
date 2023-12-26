@@ -1,21 +1,18 @@
+use std::sync::Arc;
+
 use ntex::web;
 
-use nanocld_client::NanocldClient;
+use nanocl_error::io::IoResult;
+
 use nanocl_utils::ntex::middlewares;
 
-use crate::services;
-use crate::nginx::Nginx;
+use crate::{services, models::SystemStateRef};
 
-pub fn gen(
-  nginx: &Nginx,
-  client: &NanocldClient,
-) -> std::io::Result<ntex::server::Server> {
-  let nginx = nginx.clone();
-  let client = client.clone();
+pub fn gen(state: &SystemStateRef) -> IoResult<ntex::server::Server> {
+  let state = Arc::clone(state);
   let mut server = web::HttpServer::new(move || {
     web::App::new()
-      .state(nginx.clone())
-      .state(client.clone())
+      .state(Arc::clone(&state))
       .wrap(middlewares::SerializeError)
       .configure(services::ntex_config)
       .default_service(web::route().to(services::unhandled))

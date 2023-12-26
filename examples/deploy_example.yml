@@ -1,7 +1,5 @@
 ApiVersion: v0.12
 
-Namespace: global
-
 Secrets:
 - Name: env.deploy-example.com
   Kind: nanocl.io/env
@@ -37,6 +35,18 @@ Resources:
         Target:
           Key: deploy-example2.global.c
           Port: 9000
+
+- Name: proxy-get-started
+  Kind: ncproxy.io/rule/v0.9
+  Data:
+    Rules:
+    - Domain: get-started.com
+      Network: All
+      Locations:
+      - Path: /
+        Target:
+          Url: https://google.com
+          Redirect: Temporary
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/cargo

@@ -347,10 +347,15 @@ impl FromIo<Box<IoError>> for diesel::result::Error {
 }
 
 #[cfg(feature = "ntex")]
-impl From<ntex::http::error::BlockingError<IoError>> for IoError {
-  fn from(f: ntex::http::error::BlockingError<IoError>) -> Self {
+impl<T> From<ntex::http::error::BlockingError<T>> for IoError
+where
+  T: std::fmt::Debug,
+{
+  fn from(f: ntex::http::error::BlockingError<T>) -> Self {
     match f {
-      ntex::http::error::BlockingError::Error(e) => e,
+      ntex::http::error::BlockingError::Error(e) => {
+        IoError::interupted("Future", format!("{e:?}").as_str())
+      }
       ntex::http::error::BlockingError::Canceled => {
         IoError::interupted("Future", "Canceled")
       }

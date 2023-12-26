@@ -1,33 +1,46 @@
+/// # ncproxy
+///
+/// The program in charge of managing proxying network for nanocl.
+/// It's based on nginx and use the nanocld api to get the configuration wanted by the user.
+///
+/// It work by doing 4 main tasks:ncproxy is
+/// - Create a new rule in nginx when a resource `ncproxy.io/rule` is created
+/// - Delete a new rule in nginx when a resource `ncproxy.io/rule` is deleted
+/// - Watch nanocld events for resource, cargo and vm change to update proxy rules accordingly
+/// - Send a reload task to nginx when a rule is created, deleted or updated
+///
 use clap::Parser;
 
 use nanocl_utils::logger;
 
 mod cli;
-mod nginx;
 mod utils;
-mod server;
-mod version;
+mod models;
+mod variables;
 mod services;
 mod subsystem;
 
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
   let cli = cli::Cli::parse();
+  #[cfg(feature = "dev")]
+  {
+    std::env::set_var("LOG_LEVEL", "ncproxy=trace");
+  }
   logger::enable_logger("ncproxy");
   log::info!(
     "ncproxy_{}_v{}-{}:{}",
-    version::ARCH,
-    version::VERSION,
-    version::CHANNEL,
-    version::COMMIT_ID
+    variables::ARCH,
+    variables::VERSION,
+    variables::CHANNEL,
+    variables::COMMIT_ID
   );
-  let (nginx, client) = match subsystem::init(&cli).await {
-    Err(err) => {
-      err.print_and_exit();
-    }
-    Ok(nginx) => nginx,
+  let state = match subsystem::init(&cli).await {
+    Err(err) => err.print_and_exit(),
+    Ok(state) => state,
   };
-  let server = server::gen(&nginx, &client)?;
-  server.await?;
-  Ok(())
+  match utils::server::gen(&state) {
+    Err(err) => err.print_and_exit(),
+    Ok(srv) => srv.await,
+  }
 }

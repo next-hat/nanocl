@@ -31,8 +31,9 @@ args = [
 
 # Test daemon
 [tasks.tests-daemon]
-command = "cargo"
+command = "sh"
 args = [
+  "scripts/runner.sh",
   "test",
   "--no-default-features",
   "--features",
@@ -47,13 +48,26 @@ args = [
 
 # Test nanocld_client
 [tasks.tests-client]
-command = "cargo"
-args = ["nextest", "run", "-p", "nanocld_client"]
+command = "sh"
+args = [
+  "scripts/runner.sh",
+  "test",
+  "--no-default-features",
+  "--features",
+  "test",
+  "${@}",
+  "-p",
+  "nanocld_client",
+  "--",
+  "--test-threads",
+  "1",
+]
 
 # Test Cli
 [tasks.tests-cli]
-command = "cargo"
+command = "sh"
 args = [
+  "scripts/runner.sh",
   "test",
   "--no-default-features",
   "--features",
@@ -68,8 +82,9 @@ args = [
 
 # Test ncproxy
 [tasks.tests-ncproxy]
-command = "cargo"
+command = "sh"
 args = [
+  "scripts/runner.sh",
   "test",
   "--no-default-features",
   "--features",
@@ -84,12 +99,14 @@ args = [
 
 # Test all
 [tasks.tests]
-command = "cargo"
+command = "sh"
 args = [
+  "scripts/runner.sh",
   "test",
   "--no-default-features",
   "--features",
   "test",
+  "--all",
   "${@}",
   "--",
   "--test-threads",
@@ -107,14 +124,42 @@ args = ["compose", "up"]
 
 # Test coverage
 [tasks.cov]
-command = "cargo"
-args = ["llvm-cov", "--no-default-features", "--features", "test", "-j", "1"]
+command = "sh"
+args = [
+  "scripts/runner.sh",
+  "llvm-cov",
+  "--all",
+  "--no-default-features",
+  "--features",
+  "test",
+  "-j",
+  "1",
+]
 
 # Test all with coverage for codecov
 [tasks.covgen]
-command = "cargo"
+command = "sh"
 args = [
+  "scripts/runner.sh",
   "llvm-cov",
+  "--all",
+  "--no-default-features",
+  "--features",
+  "test",
+  "--output-path",
+  "./lcov.info",
+  "--lcov",
+  "--",
+  "--test-threads",
+  "1",
+]
+
+[tasks.covgenci]
+command = "sh"
+args = [
+  "scripts/runnerci.sh",
+  "llvm-cov",
+  "--all",
   "--no-default-features",
   "--features",
   "test",

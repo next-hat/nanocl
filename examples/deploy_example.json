@@ -29,7 +29,7 @@
         "Rules": [
           {
             "Domain": "deploy-example.com",
-            "Network": "Public",
+            "Network": "All",
             "Locations": [
               {
                 "Path": "/",
