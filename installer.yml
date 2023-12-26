@@ -1,8 +1,8 @@
 ApiVersion: v0.12
 
 # This is the required component for nanocl ecosystem.
-# It is a deployment that will be parsed and used to spin up nanocl
-# The settings may be dynamically updated when joining a cluster
+# It is a deployment that will be parsed and used to spin up nanocl.
+# The settings may be dynamically updated when joining a cluster.
 # or when a new node is added to the cluster.
 
 Namespace: system
@@ -10,47 +10,45 @@ Namespace: system
 Cargoes:
 - Name: nstore
   Container:
-    Image: cockroachdb/cockroach:v23.1.12
+    Image: cockroachdb/cockroach:v23.1.13
     Tty: true
     Hostname: store.nanocl.internal
     Entrypoint:
     - /bin/sh
-    Env:
-      - TZ=Europe/Paris
-    Cmd:
-      - -c
-      - |
-        if [[ ! -f "/ca/ca.key" ]]; then
-          echo "generating certs"
-          cockroach cert create-ca --certs-dir=/certs --ca-key=/ca/ca.key
-          cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=/certs --ca-key=/ca/ca.key
-          cockroach cert create-client root --certs-dir=/certs --ca-key=/ca/ca.key
-        fi
-        cockroach start-single-node --certs-dir=/certs --listen-addr=:26257 --sql-addr=:26258
     HostConfig:
       NetworkMode: system
       Binds:
-        - ${{ state_dir }}/store/ca:/ca
-        - ${{ state_dir }}/store/certs:/certs
-        - ${{ state_dir }}/store/data:/cockroach/cockroach-data
+      - ${{ state_dir }}/store:${{ state_dir }}/store
+    Env:
+    - STATE_DIR=${{ state_dir }}/store
+    Cmd:
+    - -c
+    - |
+      echo "starting cockroachdb"
+      if [ ! -f "$$STATE_DIR/ca/ca.key" ]; then
+        echo "generating certs"
+        mkdir -p $$STATE_DIR/ca $$STATE_DIR/certs $$STATE_DIR/data
+        cockroach cert create-ca --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
+        cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
+        cockroach cert create-client root --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
+      fi
+      cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$$STATE_DIR/certs --store=$$STATE_DIR/data
 
 - Name: nmetrics
   Container:
     Image: ghcr.io/next-hat/metrsd:0.3.2
     Tty: true
-    Env:
-      - TZ=Europe/Paris
     Cmd:
-      - --hosts
-      - unix:///run/nanocl/metrics.sock
+    - --hosts
+    - unix:///run/nanocl/metrics.sock
     HostConfig:
       NetworkMode: system
       Binds:
-        # {% if is_docker_desktop %}
-        - //run/guest-services/nanocl:/run/nanocl
-        # {% else %}
-        - /run/nanocl:/run/nanocl
-        # {% endif %}
+      # {% if is_docker_desktop %}
+      - //run/guest-services/nanocl:/run/nanocl
+      # {% else %}
+      - /run/nanocl:/run/nanocl
+      # {% endif %}
 
 - Name: nproxy
   Container:
@@ -61,25 +59,17 @@ Cargoes:
     # {% endif %}
     Tty: true
     Env:
-      - TZ=Europe/Paris
+    - STATE_DIR=${{ state_dir }}/proxy
     HostConfig:
       NetworkMode: host
       Binds:
-        # {% if is_docker_desktop %}
-        - //run:/run
-        # {% else %}
-        - /run:/run
-        # {% endif %}
-        - ${{ state_dir }}/proxy/certs:/etc/nginx/certs
-        - ${{ state_dir }}/proxy/secrets:/opt/secrets
-        - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
-        - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
-        - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
-        - ${{ state_dir }}/proxy/html:/usr/share/nginx/html
-        - ${{ state_dir }}/proxy/sites-available:/etc/nginx/sites-available
-        - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
-        - ${{ state_dir }}/proxy/streams-available:/etc/nginx/streams-available
-        - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
+      # {% if is_docker_desktop %}
+      - //run:/run
+      # {% else %}
+      - /run:/run
+      # {% endif %}
+      - ${{ state_dir }}/proxy:${{ state_dir }}/proxy
+      - ${{ state_dir }}/proxy/letsencrypt:/etc/letsencrypt
 
 - Name: ncproxy
   Container:
@@ -89,28 +79,21 @@ Cargoes:
     Image: ghcr.io/next-hat/ncproxy:0.9.0
     # {% endif %}
     Tty: true
-    Env:
-      - TZ=Europe/Paris
+    Cmd:
+    - --state-dir
+    - ${{ state_dir }}/proxy
     HostConfig:
       NetworkMode: system
       Binds:
-        # {% if is_docker_desktop %}
-        - //run/guest-services/nanocl:/run/nanocl
-        # {% else %}
-        - /run/nanocl:/run/nanocl
-        # {% endif %}
-        - ${{ state_dir }}/proxy/secrets:/opt/secrets
-        - ${{ state_dir }}/proxy/conf.d:/etc/nginx/conf.d
-        - ${{ state_dir }}/proxy/logs:/var/log/nginx/access
-        - ${{ state_dir }}/proxy/sites-available:/etc/nginx/sites-available
-        - ${{ state_dir }}/proxy/sites-enabled:/etc/nginx/sites-enabled
-        - ${{ state_dir }}/proxy/streams-available:/etc/nginx/streams-available
-        - ${{ state_dir }}/proxy/streams-enabled:/etc/nginx/streams-enabled
+      # {% if is_docker_desktop %}
+      - //run/guest-services/nanocl:/run/nanocl
+      # {% else %}
+      - /run/nanocl:/run/nanocl
+      # {% endif %}
+      - ${{ state_dir }}/proxy:${{ state_dir }}/proxy
 
 - Name: ndns
   Container:
-    Env:
-      - TZ=Europe/Paris
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ndns:2.89.0.3-nightly
     # {% else %}
@@ -119,7 +102,7 @@ Cargoes:
     HostConfig:
       NetworkMode: host
       Binds:
-        - ${{ state_dir }}/dns:/opt/dns
+      - ${{ state_dir }}/dns:/opt/dns
 
 - Name: ncdns
   Container:
@@ -132,12 +115,12 @@ Cargoes:
     # {% endif %}
     Tty: true
     Cmd:
-      - --conf-dir
-      - /opt/dns
-      - --dns
-      - 1.1.1.1
-      - --dns
-      - 1.0.0.1
+    - --conf-dir
+    - ${{ state_dir }}/dns
+    - --dns
+    - 1.1.1.1
+    - --dns
+    - 1.0.0.1
     HostConfig:
       NetworkMode: system
       Binds:
@@ -146,7 +129,7 @@ Cargoes:
         # {% else %}
         - /run/nanocl:/run/nanocl
         # {% endif %}
-        - ${{ state_dir }}/dns:/opt/dns
+        - ${{ state_dir }}/dns:${{ state_dir }}/dns
 
 - Name: ndaemon
   Container:
@@ -183,8 +166,8 @@ Cargoes:
         # {% else %}
         - /run/nanocl:/run/nanocl
         # {% endif %}
-        # {% if is_docker_uds %}
-        - ${{ docker_host }}:${{ docker_host }}
+        # {% if docker_uds_path %}
+        - ${{ docker_uds_path }}:${{ docker_uds_path }}
         # {% endif %}
         - ${{ state_dir }}:${{ state_dir }}
         - ${{ conf_dir }}:${{ conf_dir }}

@@ -21,7 +21,7 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
     "docker_host": docker_host,
     "state_dir": "/tmp/random",
     "conf_dir": "/tmp/random",
-    "is_docker_uds": docker_host.starts_with("unix://"),
+    "docker_uds_path": docker_host.replace("unix://", ""),
     "gateway": "127.0.0.1",
     "hosts": "tcp://127.0.0.1:8585",
     "hostname": "localhost",
