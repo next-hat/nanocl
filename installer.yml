@@ -99,10 +99,12 @@ Cargoes:
     # {% else %}
     Image: ghcr.io/next-hat/ndns:2.89.0.3
     # {% endif %}
+    Env:
+    - STATE_DIR=${{ state_dir }}/dns
     HostConfig:
       NetworkMode: host
       Binds:
-      - ${{ state_dir }}/dns:/opt/dns
+      - ${{ state_dir }}/dns:${{ state_dir }}/dns
 
 - Name: ncdns
   Container:
@@ -127,7 +129,7 @@ Cargoes:
       # {% else %}
       - /run/nanocl:/run/nanocl
       # {% endif %}
-      - ${{ state_dir }}/dns:/opt/dns
+      - ${{ state_dir }}/dns:${{ state_dir }}/dns
 
 - Name: ndaemon
   Container:
