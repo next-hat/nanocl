@@ -1,6 +1,6 @@
 [package]
 name = "nanocld_client"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
 authors = ["nanocl contributors <team@next-hat.com>"]
 description = "The Nanocl daemon api client"
@@ -20,14 +20,14 @@ async-std = ["ntex/async-std"]
 utoipa = ["nanocl_stubs/utoipa"]
 
 [dev-dependencies]
-tokio-util = "0.7.9"
-tokio = { version = "1.34.0", features = ["fs"] }
+tokio-util = "0.7"
+tokio = { version = "1.34", features = ["fs"] }
 
 [dependencies]
-futures = "0.3.25"
-serde_json = "1.0.108"
-ntex = { version = "0.7.16" }
-serde = { version = "1.0.192", features = ["derive"] }
+futures = "0.3"
+serde_json = "1.0"
+ntex = { version = "0.7" }
+serde = { version = "1.0", features = ["derive"] }
 bollard-next = { version = "0.15.4" }
-nanocl_stubs = { version = "0.12.0", features = ["serde"] }
-nanocl_error = { version = "0.1.1", features = ["io", "http_client"] }
+nanocl_stubs = { version = "0.13", features = ["serde"] }
+nanocl_error = { version = "0.2", features = ["io", "http_client"] }

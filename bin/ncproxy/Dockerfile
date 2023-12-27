@@ -45,7 +45,7 @@ COPY .git ./.git
 ENV NANOCL_CHANNEL=$channel
 ENV RUSTFLAGS="-C target-feature=+crt-static"
 RUN export ARCH=$(uname -m) \
-  && cargo build --release --target=$ARCH-unknown-linux-musl --features release --bin ncproxy
+  && cargo build --release --target=$ARCH-unknown-linux-musl --features vendored --features release --bin ncproxy
 RUN export ARCH=$(uname -m) \
   && cp /app/target/$ARCH-unknown-linux-musl/release/ncproxy /bin/ncproxy
 

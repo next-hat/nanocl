@@ -13,7 +13,7 @@ Secrets:
 # https://docs.next-hat.com/references/nanocl/resource
 Resources:
 - Name: deploy-example.com
-  Kind: ncproxy.io/rule/v0.9
+  Kind: ncproxy.io/rule
   Metadata:
     CertManager: certbot
     Selector:
@@ -37,7 +37,7 @@ Resources:
           Port: 9000
 
 - Name: proxy-get-started
-  Kind: ncproxy.io/rule/v0.9
+  Kind: ncproxy.io/rule
   Data:
     Rules:
     - Domain: get-started.com
@@ -61,6 +61,7 @@ Cargoes:
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
     - APP=GET_STARTED
+    - NEW=GG
 
 - Name: deploy-example2
   Container:

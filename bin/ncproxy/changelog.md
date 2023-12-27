@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Added state dir
-- Reload task that can be canceled
-- Test file generation before creating the resource
-- Self manage nginx process
-- Metrics saving
+- Added state dir.
+- Reload task that can be canceled to avoid burst from large Statefile.
+- Test file generation on creation and heal config if test fail.
+- Metrics saving for http and stream.
+- Use of template system for config file generation.
 
 ## [0.9.0] - 2023-12-22
 
