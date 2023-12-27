@@ -44,12 +44,11 @@ COPY ./bin/ncdns/src ./bin/ncdns/src
 COPY .git ./.git
 ENV NANOCL_CHANNEL=$channel
 ENV RUSTFLAGS="-C target-feature=-crt-static"
-ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN cargo build --release --features release --bin nanocld
 RUN upx --lzma --best /app/target/release/nanocld && cp /app/target/release/nanocld /bin/nanocld
 
 # stage 3 - Create runtime image
-FROM --platform=$BUILDPLATFORM alpine:3.18.4
+FROM --platform=$BUILDPLATFORM alpine:3.19.0
 
 ## Install dependencies
 RUN apk --update add libgcc \

@@ -26,7 +26,7 @@ mkdir -p "${release_path}"/usr/share/man/man1
 rustup target add ${target_arch}
 
 # Build binary
-cargo build --release --target=${target_arch} --features release --bin nanocl
+cargo build --release --target=${target_arch} --features vendored --features release --bin nanocl
 
 # Generate man pages
 for file in ./bin/nanocl/target/man/*; do

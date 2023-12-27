@@ -1,4 +1,4 @@
-FROM alpine:3.18.4
+FROM alpine:3.19.0
 
 RUN apk --update add dnsmasq \
   && rm -rf /var/cache/apk/* \
@@ -6,7 +6,7 @@ RUN apk --update add dnsmasq \
   && rm -rf /var/log/* \
   && rm -rf /var/tmp/*
 
-EXPOSE 53/tcp 53/udp
+EXPOSE 53/udp
 
 COPY ./bin/ndns/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
