@@ -23,7 +23,7 @@ COPY --from=planner /app /app
 WORKDIR /app
 RUN export ARCH=$(uname -m) \
   && rustup target add $ARCH-unknown-linux-musl
-RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base
+RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git perl build-base
 COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
 COPY ./crates/nanocl_error/src ./crates/nanocl_error/src
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
@@ -44,12 +44,11 @@ COPY ./bin/ncdns/src ./bin/ncdns/src
 COPY .git ./.git
 ENV NANOCL_CHANNEL=$channel
 ENV RUSTFLAGS="-C target-feature=-crt-static"
-ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN cargo build --release --features release --bin nanocld
-RUN upx --lzma --best /app/target/release/nanocld && cp /app/target/release/nanocld /bin/nanocld
+RUN cp /app/target/release/nanocld /bin/nanocld
 
 # stage 3 - Create runtime image
-FROM --platform=$BUILDPLATFORM alpine:3.18.4
+FROM --platform=$BUILDPLATFORM alpine:3.19.0
 
 ## Install dependencies
 RUN apk --update add libgcc \

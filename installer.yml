@@ -25,14 +25,14 @@ Cargoes:
     - -c
     - |
       echo "starting cockroachdb"
-      if [ ! -f "$$STATE_DIR/ca/ca.key" ]; then
+      if [ ! -f "$STATE_DIR/ca/ca.key" ]; then
         echo "generating certs"
-        mkdir -p $$STATE_DIR/ca $$STATE_DIR/certs $$STATE_DIR/data
-        cockroach cert create-ca --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
-        cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
-        cockroach cert create-client root --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
+        mkdir -p $STATE_DIR/ca $STATE_DIR/certs $STATE_DIR/data
+        cockroach cert create-ca --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
+        cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
+        cockroach cert create-client root --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
       fi
-      cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$$STATE_DIR/certs --store=$$STATE_DIR/data
+      cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$STATE_DIR/certs --store=$STATE_DIR/data
 
 - Name: nmetrics
   Container:
@@ -114,7 +114,7 @@ Cargoes:
     Tty: true
     Cmd:
     - --conf-dir
-    - ${{ state_dir }}/dns
+    - /opt/dns
     - --dns
     - 1.1.1.1
     - --dns
@@ -127,7 +127,7 @@ Cargoes:
       # {% else %}
       - /run/nanocl:/run/nanocl
       # {% endif %}
-      - ${{ state_dir }}/dns:${{ state_dir }}/dns
+      - ${{ state_dir }}/dns:/opt/dns
 
 - Name: ndaemon
   Container:

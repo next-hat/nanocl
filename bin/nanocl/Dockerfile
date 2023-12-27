@@ -31,8 +31,8 @@ RUN apk add --no-cache --upgrade \
   g++ \
   make \
   git \
-  upx \
   perl
+
 COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
 COPY ./crates/nanocl_error/src ./crates/nanocl_error/src
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
@@ -54,9 +54,8 @@ COPY .git ./.git
 ENV NANOCL_CHANNEL=$channel
 ENV RUSTFLAGS="-C target-feature=+crt-static"
 RUN export ARCH=$(uname -m) \
-  && cargo build --release --target=$ARCH-unknown-linux-musl --features release --bin nanocl
+  && cargo build --release --target=$ARCH-unknown-linux-musl --features vendored --features release --bin nanocl
 RUN export ARCH=$(uname -m) \
-  && upx --lzma --best /app/target/$ARCH-unknown-linux-musl/release/nanocl \
   && cp /app/target/$ARCH-unknown-linux-musl/release/nanocl /bin/nanocl
 
 # stage 4 - create runtime image

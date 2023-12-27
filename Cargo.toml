@@ -17,10 +17,9 @@ opt-level = 0
 
 [profile.release]
 strip = true
-# Todo test settings for release (segfault on macosx)
-# opt-level = "z"
-# lto = true
-# codegen-units = 1
+opt-level = "z"
+lto = true
+codegen-units = 1
 
 [patch.crates-io]
 nanocl_error = { path = "crates/nanocl_error" }
