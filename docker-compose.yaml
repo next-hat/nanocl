@@ -22,50 +22,50 @@ services:
     entrypoint: /bin/sh
     tty: true
     ports:
-      - 26257:26257
-      - 26258:26258
+    - 26257:26257
+    - 26258:26258
     networks:
-      - system
+    - system
     volumes:
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store:${STATE_DIR:-${HOME}/.nanocl_dev/state}/store
+    - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/store:${STATE_DIR:-${HOME}/.nanocl_dev/state}/store
     environment:
-      - STORE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/store
+    - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/store
     labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=nstore.system
-      - io.nanocl.n=system
+    - io.nanocl=enabled
+    - io.nanocl.kind=cargo
+    - io.nanocl.c=nstore.system
+    - io.nanocl.n=system
     command:
     - -c
     - |
       echo "starting cockroachdb"
-      if [ ! -f "$$STORE_DIR/ca/ca.key" ]; then
+      if [ ! -f "$$STATE_DIR/ca/ca.key" ]; then
         echo "generating certs"
-        mkdir -p $$STORE_DIR/ca $$STORE_DIR/certs $$STORE_DIR/data
-        cockroach cert create-ca --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
-        cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
-        cockroach cert create-client root --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
+        mkdir -p $$STATE_DIR/ca $$STATE_DIR/certs $$STATE_DIR/data
+        cockroach cert create-ca --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
+        cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
+        cockroach cert create-client root --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
       fi
-      cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$$STORE_DIR/certs --store=$$STORE_DIR/data
+      cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$$STATE_DIR/certs --store=$$STATE_DIR/data
 
   nmetrics:
     container_name: nmetrics.system.c
     image: ghcr.io/next-hat/metrsd:0.4.1
     tty: true
     networks:
-      - system
+    - system
     environment:
-      - LOG_LEVEL=metrsd=info
+    - LOG_LEVEL=metrsd=info
     command:
-      - --hosts
-      - unix:///run/nanocl/metrics.sock
+    - --hosts
+    - unix:///run/nanocl/metrics.sock
     labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=nmetrics.system
-      - io.nanocl.n=system
+    - io.nanocl=enabled
+    - io.nanocl.kind=cargo
+    - io.nanocl.c=nmetrics.system
+    - io.nanocl.n=system
     volumes:
-      - //run/guest-services/nanocl:/run/nanocl
+    - //run/guest-services/nanocl:/run/nanocl
 
   nproxy:
     container_name: nproxy.system.c
@@ -73,70 +73,86 @@ services:
     tty: true
     network_mode: host
     environment:
-      - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
+    - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
     labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=nproxy.system
-      - io.nanocl.n=system
+    - io.nanocl=enabled
+    - io.nanocl.kind=cargo
+    - io.nanocl.c=nproxy.system
+    - io.nanocl.n=system
     volumes:
-      - //run/guest-services/nanocl:/run/nanocl
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy:${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
+    - //run/guest-services/nanocl:/run/nanocl
+    - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy:${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
 
   ncproxy:
     container_name: ncproxy.system.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     ports:
-      - 8686:8686
+    - 8686:8686
     networks:
-      - system
+    - system
     command:
-      - watch
-      - -w
-      - /project/bin/ncproxy/src
-      - -x
-      - run --no-default-features --features dev --bin ncproxy -- --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
+    - watch
+    - -w
+    - /project/bin/ncproxy/src
+    - -x
+    - run --no-default-features --features dev --bin ncproxy -- --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
     labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=ncproxy.system
-      - io.nanocl.n=system
+    - io.nanocl=enabled
+    - io.nanocl.kind=cargo
+    - io.nanocl.c=ncproxy.system
+    - io.nanocl.n=system
     volumes:
-      - type: bind
-        source: .
-        target: /project
-      - nanocl-deps:/project/target
-      - rust-cache:/usr/local/cargo/registry
-      - //run/guest-services/nanocl:/run/nanocl
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy:${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
+    - type: bind
+      source: .
+      target: /project
+    - nanocl-deps:/project/target
+    - rust-cache:/usr/local/cargo/registry
+    - //run/guest-services/nanocl:/run/nanocl
+    - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy:${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
+
+  ndns:
+    container_name: ndns.system.c
+    image: ndns:dev
+    tty: true
+    network_mode: host
+    environment:
+    - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
+    labels:
+    - io.nanocl=enabled
+    - io.nanocl.kind=cargo
+    - io.nanocl.c=ndns.system
+    - io.nanocl.n=system
+    volumes:
+    - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
 
   ncdns:
     container_name: ncdns.system.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
     ports:
-      - 8787:8787
-    network_mode: host
+    - 8787:8787
+    networks:
+    - system
     command:
-      - watch
-      - -w
-      - /project/bin/ncdns/src
-      - -x
-      - run --no-default-features --features dev --bin ncdns -- --conf-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
+    - watch
+    - -w
+    - /project/bin/ncdns/src
+    - -x
+    - run --no-default-features --features dev --bin ncdns -- --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
     labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=ncdns.system
-      - io.nanocl.n=system
+    - io.nanocl=enabled
+    - io.nanocl.kind=cargo
+    - io.nanocl.c=ncdns.system
+    - io.nanocl.n=system
     volumes:
-      - type: bind
-        source: .
-        target: /project
-      - nanocl-deps:/project/target
-      - rust-cache:/usr/local/cargo/registry
-      - //run/guest-services/nanocl:/run/nanocl
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
+    - type: bind
+      source: .
+      target: /project
+    - nanocl-deps:/project/target
+    - rust-cache:/usr/local/cargo/registry
+    - //run/guest-services/nanocl:/run/nanocl
+    - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
 
   nanocld:
     container_name: ndaemon.system.c
@@ -144,29 +160,29 @@ services:
     tty: true
     hostname: nanocl.internal
     networks:
-      - system
+    - system
     ports:
-      - 8585:8585
+    - 8585:8585
     labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=ndaemon.system
-      - io.nanocl.n=system
+    - io.nanocl=enabled
+    - io.nanocl.kind=cargo
+    - io.nanocl.c=ndaemon.system
+    - io.nanocl.n=system
     volumes:
-      - type: bind
-        source: .
-        target: /project
-      - nanocl-deps:/project/target
-      - rust-cache:/usr/local/cargo/registry
-      - /var/run/docker.sock:/run/docker.sock
-      - //run/guest-services/nanocl:/run/nanocl
-      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}:${STATE_DIR:-${HOME}/.nanocl_dev/state}
+    - type: bind
+      source: .
+      target: /project
+    - nanocl-deps:/project/target
+    - rust-cache:/usr/local/cargo/registry
+    - /var/run/docker.sock:/run/docker.sock
+    - //run/guest-services/nanocl:/run/nanocl
+    - ${STATE_DIR:-${HOME}/.nanocl_dev/state}:${STATE_DIR:-${HOME}/.nanocl_dev/state}
     command:
-      - watch
-      - -w
-      - /project/bin/nanocld/src
-      - -x
-      - run --no-default-features --features dev --bin nanocld -- --gid 1001 --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
+    - watch
+    - -w
+    - /project/bin/nanocld/src
+    - -x
+    - run --no-default-features --features dev --bin nanocld -- --gid 1001 --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
 
   dbeaver:
     container_name: dbeaver.system.c
@@ -175,21 +191,21 @@ services:
     user: root
     hostname: dbeaver.nanocl.internal
     profiles:
-      - debug
+    - debug
     networks:
-      - system
+    - system
     ports:
-      - 9090:8978
+    - 9090:8978
     environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
-      - PGADMIN_DEFAULT_PASSWORD=admin
+    - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+    - PGADMIN_DEFAULT_PASSWORD=admin
     labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=dbeaver.system
-      - io.nanocl.n=system
+    - io.nanocl=enabled
+    - io.nanocl.kind=cargo
+    - io.nanocl.c=dbeaver.system
+    - io.nanocl.n=system
     volumes:
-      - ${STATE_DIR:-${HOME}/.nanocl_dev}/dbeaver:/opt/cloudbeaver/workspace
+    - ${STATE_DIR:-${HOME}/.nanocl_dev}/dbeaver:/opt/cloudbeaver/workspace
 
   ncvpnkit:
     container_name: ncvpnkit.system.c
@@ -197,27 +213,27 @@ services:
     tty: true
     hostname: ncvpnkit.nanocl.internal
     profiles:
-      - vpnkit
+    - vpnkit
     networks:
-      - system
+    - system
     environment:
-      - USER_HOME=${HOME}
+    - USER_HOME=${HOME}
     labels:
-      - io.nanocl=enabled
-      - io.nanocl.kind=cargo
-      - io.nanocl.c=ndaemon.system
-      - io.nanocl.n=system
+    - io.nanocl=enabled
+    - io.nanocl.kind=cargo
+    - io.nanocl.c=ndaemon.system
+    - io.nanocl.n=system
     volumes:
-      - type: bind
-        source: .
-        target: /project
-      - nanocl-deps:/project/target
-      - rust-cache:/usr/local/cargo/registry
-      - //run/guest-services/nanocl:/run/nanocl
-      - //run/host-services/backend.sock:/run/host-services/backend.sock
+    - type: bind
+      source: .
+      target: /project
+    - nanocl-deps:/project/target
+    - rust-cache:/usr/local/cargo/registry
+    - //run/guest-services/nanocl:/run/nanocl
+    - //run/host-services/backend.sock:/run/host-services/backend.sock
     command:
-      - watch
-      - -w
-      - /project/bin/ncvpnkit/src
-      - -x
-      - run --no-default-features --features dev --bin ncvpnkit
+    - watch
+    - -w
+    - /project/bin/ncvpnkit/src
+    - -x
+    - run --no-default-features --features dev --bin ncvpnkit

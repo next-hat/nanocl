@@ -18,8 +18,9 @@ use dnsmasq::Dnsmasq;
 
 async fn run(cli: &Cli) -> IoResult<()> {
   // Spawn a new thread to listen events from nanocld
-  let conf_dir = cli.conf_dir.to_owned().unwrap_or("/etc".into());
-  let dnsmasq = Dnsmasq::new(&conf_dir).with_dns(cli.dns.clone()).ensure()?;
+  let dnsmasq = Dnsmasq::new(&cli.state_dir)
+    .with_dns(cli.dns.clone())
+    .ensure()?;
   #[allow(unused)]
   let mut client = NanocldClient::connect_with_unix_default();
   #[cfg(any(feature = "dev", feature = "test"))]
@@ -60,7 +61,7 @@ mod tests {
       "ncdns",
       "--host",
       "wrong://dsadsa",
-      "--conf-dir",
+      "--state-dir",
       "/tmp/ncdns",
       "--dns",
       "1.1.1.1",

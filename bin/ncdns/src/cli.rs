@@ -5,7 +5,7 @@ use clap::Parser;
 pub(crate) struct Cli {
   /// Path to the config directory
   #[clap(long)]
-  pub(crate) conf_dir: Option<String>,
+  pub(crate) state_dir: String,
   /// Dns server address to resolve domain name if not existing in local
   #[clap(long)]
   pub(crate) dns: Vec<String>,
