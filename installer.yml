@@ -36,7 +36,7 @@ Cargoes:
 
 - Name: nmetrics
   Container:
-    Image: ghcr.io/next-hat/metrsd:0.3.2
+    Image: ghcr.io/next-hat/metrsd:0.4.1
     Tty: true
     Cmd:
     - --hosts
@@ -53,7 +53,7 @@ Cargoes:
 - Name: nproxy
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/nproxy:1.25.0.3-nightly
+    Image: ghcr.io/next-hat/nproxy:1.25.0.4-nightly
     # {% else %}
     Image: ghcr.io/next-hat/nproxy:1.25.0.3
     # {% endif %}
@@ -74,7 +74,7 @@ Cargoes:
 - Name: ncproxy
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ncproxy:0.9.0-nightly
+    Image: ghcr.io/next-hat/ncproxy:0.9.1-nightly
     # {% else %}
     Image: ghcr.io/next-hat/ncproxy:0.9.0
     # {% endif %}
@@ -106,8 +106,6 @@ Cargoes:
 
 - Name: ncdns
   Container:
-    Env:
-      - TZ=Europe/Paris
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ncdns:0.4.0-nightly
     # {% else %}
@@ -124,53 +122,52 @@ Cargoes:
     HostConfig:
       NetworkMode: system
       Binds:
-        # {% if is_docker_desktop %}
-        - //run/guest-services/nanocl:/run/nanocl
-        # {% else %}
-        - /run/nanocl:/run/nanocl
-        # {% endif %}
-        - ${{ state_dir }}/dns:${{ state_dir }}/dns
+      # {% if is_docker_desktop %}
+      - //run/guest-services/nanocl:/run/nanocl
+      # {% else %}
+      - /run/nanocl:/run/nanocl
+      # {% endif %}
+      - ${{ state_dir }}/dns:${{ state_dir }}/dns
 
 - Name: ndaemon
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/nanocld:0.12.0-nightly
+    Image: ghcr.io/next-hat/nanocld:0.12.1-nightly
     # {% else %}
     Image: ghcr.io/next-hat/nanocld:0.12.0
     # {% endif %}
     Tty: true
     Hostname: nanocl.internal
     Cmd:
-      - --state-dir
-      - ${{ state_dir }}
-      - --conf-dir
-      - ${{ conf_dir }}
-      - --docker-host
-      - ${{ docker_host }}
-      - --gateway
-      - ${{ gateway }}
-      - --hostname
-      - ${{ hostname }}
-      - --advertise-addr
-      - ${{ advertise_addr }}
-      - --gid
-      - "${{ gid }}"
+    - --state-dir
+    - ${{ state_dir }}
+    - --conf-dir
+    - ${{ conf_dir }}
+    - --docker-host
+    - ${{ docker_host }}
+    - --gateway
+    - ${{ gateway }}
+    - --hostname
+    - ${{ hostname }}
+    - --advertise-addr
+    - ${{ advertise_addr }}
+    - --gid
+    - "${{ gid }}"
     Env:
-      - TZ=Europe/Paris
-      - NANOCL_GID=${{ gid }}
+    - NANOCL_GID=${{ gid }}
     HostConfig:
       NetworkMode: system
       Binds:
-        # {% if is_docker_desktop %}
-        - //run/guest-services/nanocl:/run/nanocl
-        # {% else %}
-        - /run/nanocl:/run/nanocl
-        # {% endif %}
-        # {% if docker_uds_path %}
-        - ${{ docker_uds_path }}:${{ docker_uds_path }}
-        # {% endif %}
-        - ${{ state_dir }}:${{ state_dir }}
-        - ${{ conf_dir }}:${{ conf_dir }}
+      # {% if is_docker_desktop %}
+      - //run/guest-services/nanocl:/run/nanocl
+      # {% else %}
+      - /run/nanocl:/run/nanocl
+      # {% endif %}
+      # {% if docker_uds_path %}
+      - ${{ docker_uds_path }}:${{ docker_uds_path }}
+      # {% endif %}
+      - ${{ state_dir }}:${{ state_dir }}
+      - ${{ conf_dir }}:${{ conf_dir }}
 
 # Enable vpnkit on docker desktop
 # {% if is_docker_desktop %}
@@ -184,10 +181,10 @@ Cargoes:
     Tty: true
     Hostname: ncvpnkit.nanocl.internal
     Env:
-      - USER_HOME=${{ home_dir }}
+    - USER_HOME=${{ home_dir }}
     HostConfig:
       NetworkMode: system
       Binds:
-        - //run/guest-services/nanocl:/run/nanocl
-        - //run/host-services/backend.sock:/run/host-services/backend.sock
+      - //run/guest-services/nanocl:/run/nanocl
+      - //run/host-services/backend.sock:/run/host-services/backend.sock
 # {% endif %}
