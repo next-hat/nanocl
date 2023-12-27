@@ -61,7 +61,7 @@ mod tests {
       "ncdns",
       "--host",
       "wrong://dsadsa",
-      "--conf-dir",
+      "--state-dir",
       "/tmp/ncdns",
       "--dns",
       "1.1.1.1",

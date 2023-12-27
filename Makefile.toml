@@ -80,6 +80,23 @@ args = [
   "1",
 ]
 
+# Test ncdns
+[tasks.tests-ncdns]
+command = "sh"
+args = [
+  "scripts/runner.sh",
+  "test",
+  "--no-default-features",
+  "--features",
+  "test",
+  "${@}",
+  "--bin",
+  "ncdns",
+  "--",
+  "--test-threads",
+  "1",
+]
+
 # Test ncproxy
 [tasks.tests-ncproxy]
 command = "sh"
