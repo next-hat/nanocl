@@ -5,15 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## untagged
+## [0.10.0]
 
 ### Changed
 
-- Added state dir
-- Reload task that can be canceled
-- Test file generation before creating the resource
-- Self manage nginx process
-- Metrics saving
+- state-dir option to match with nproxy.
+- Use of nanocld_client 0.13.0.
+- Use of template system for config file generation.
+
+### Added
+
+- Metrics saving for http and stream.
+- Reload task that can be canceled to avoid burst from large Statefile.
+- Test file generation on creation and heal config if test fail.
+
+### Fixed
+
+- Openssl linking.
 
 ## [0.9.0] - 2023-12-22
 
