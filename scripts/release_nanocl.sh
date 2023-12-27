@@ -34,8 +34,7 @@ for file in ./bin/nanocl/target/man/*; do
   gzip < "$file" > "${release_path}"/usr/share/man/man1/"$file_name".gz
   pandoc --from man --to markdown < "$file" > ./doc/man/"${file_name%.1}".md
 done
-# Compress binary
-upx ./target/${target_arch}/release/${pkg_name}
+
 # Copy binary
 cp ./target/${target_arch}/release/${pkg_name} "${release_path}"/usr/bin
 # Generate DEBIAN controll

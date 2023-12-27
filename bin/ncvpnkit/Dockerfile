@@ -23,7 +23,7 @@ COPY --from=planner /app /app
 WORKDIR /app
 RUN export ARCH=$(uname -m) \
   && rustup target add $ARCH-unknown-linux-musl
-RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git upx perl build-base
+RUN apk add --update alpine-sdk musl-dev g++ make libpq-dev openssl-dev git perl build-base
 COPY ./bin/nanocld/migrations ./bin/nanocld/migrations
 COPY ./crates/nanocl_error/src ./crates/nanocl_error/src
 COPY ./crates/nanocl_stubs/src ./crates/nanocl_stubs/src
@@ -47,7 +47,6 @@ ENV RUSTFLAGS="-C target-feature=+crt-static"
 RUN export ARCH=$(uname -m) \
   && cargo build --release --target=$ARCH-unknown-linux-musl --features release --bin ncvpnkit
 RUN export ARCH=$(uname -m) \
-  && upx --lzma --best /app/target/$ARCH-unknown-linux-musl/release/ncvpnkit \
   && cp /app/target/$ARCH-unknown-linux-musl/release/ncvpnkit /bin/ncvpnkit
 
 # stage 4 - create runtime image
