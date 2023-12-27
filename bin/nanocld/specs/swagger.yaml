@@ -929,26 +929,14 @@ paths:
       description: List process (Vm, Job, Cargo)
       operationId: list_process
       parameters:
-      - name: all
+      - name: filter
         in: query
-        description: Return instances from all nodes
-        required: true
-        schema:
-          type: boolean
-      - name: last
-        in: query
-        description: Return this number of most recently created containers
-        required: false
-        schema:
-          type: integer
-          nullable: true
-      - name: namespace
-        in: query
-        description: Return instances from this namespace only
+        description: Generic filter
         required: false
         schema:
           type: string
           nullable: true
+        example: '{ "where": { "name": { "eq": "test" } } }'
       responses:
         '200':
           description: List of instances

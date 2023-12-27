@@ -1,12 +1,12 @@
 use ntex::web;
 use futures_util::{StreamExt, TryStreamExt, stream::select_all};
 
-use nanocl_error::http::HttpResult;
+use nanocl_error::http::{HttpResult, HttpError};
 
 use bollard_next::container::LogsOptions;
 use nanocl_stubs::{
-  generic::{GenericNspQuery, GenericFilter},
-  process::{ProcessLogQuery, ProcessOutputLog, ProccessQuery},
+  generic::{GenericNspQuery, GenericFilter, GenericListQuery},
+  process::{ProcessLogQuery, ProcessOutputLog},
 };
 
 use crate::{
@@ -21,9 +21,7 @@ use crate::{
   tag = "Processes",
   path = "/processes",
   params(
-    ("all" = bool, Query, description = "Return instances from all nodes"),
-    ("last" = Option<isize>, Query, description = "Return this number of most recently created containers"),
-    ("namespace" = Option<String>, Query, description = "Return instances from this namespace only"),
+    ("filter" = Option<String>, Query, description = "Generic filter", example = "{ \"where\": { \"name\": { \"eq\": \"test\" } } }"),
   ),
   responses(
     (status = 200, description = "List of instances", body = [Process]),
@@ -32,10 +30,12 @@ use crate::{
 #[web::get("/processes")]
 pub(crate) async fn list_process(
   state: web::types::State<DaemonState>,
-  _: web::types::Query<ProccessQuery>,
+  qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let processes =
-    ProcessDb::read(&GenericFilter::default(), &state.pool).await??;
+  let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
+    HttpError::bad_request(format!("Invalid query string: {err}"))
+  })?;
+  let processes = ProcessDb::read(&filter, &state.pool).await??;
   Ok(web::HttpResponse::Ok().json(&processes))
 }
 
@@ -174,21 +174,53 @@ mod tests {
 
   use crate::utils::tests::*;
 
-  use nanocl_stubs::process::{Process, ProccessQuery};
+  use nanocl_stubs::{
+    process::Process,
+    generic::{GenericFilter, GenericClause, GenericListQuery},
+  };
 
   #[ntex::test]
   async fn basic_list() {
     let client = gen_default_test_client().await;
-    let mut res = client
-      .send_get(
-        "/processes",
-        Some(&ProccessQuery {
-          all: false,
-          ..Default::default()
-        }),
-      )
-      .await;
+    let mut res = client.send_get("/processes", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let _ = res.json::<Vec<Process>>().await.unwrap();
+  }
+
+  #[ntex::test]
+  async fn list_by() {
+    let client = gen_default_test_client().await;
+    // Filter by namespace
+    let filter = GenericFilter::new().r#where(
+      "data",
+      GenericClause::Contains(serde_json::json!({
+        "Config": {
+          "Labels": {
+            "io.nanocl.n": "system",
+          }
+        }
+      })),
+    );
+    let qs = GenericListQuery::try_from(filter).unwrap();
+    let mut res = client.send_get("/processes", Some(qs)).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "processes");
+    let items: Vec<Process> = res.json::<Vec<Process>>().await.unwrap();
+    assert!(items.iter().any(|i| i.name == "nstore.system.c"));
+    // Filter by limit and offset
+    let filter = GenericFilter::new().limit(1).offset(1);
+    let qs = GenericListQuery::try_from(filter).unwrap();
+    let mut res = client.send_get("/processes", Some(qs)).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "processes");
+    let items: Vec<Process> = res.json::<Vec<Process>>().await.unwrap();
+    assert_eq!(items.len(), 1);
+    // Filter by name and kind
+    let filter = GenericFilter::new()
+      .r#where("name", GenericClause::Like("nstore%".to_owned()))
+      .r#where("kind", GenericClause::Eq("cargo".to_owned()));
+    let qs = GenericListQuery::try_from(filter).unwrap();
+    let mut res = client.send_get("/processes", Some(qs)).await;
+    test_status_code!(res.status(), http::StatusCode::OK, "processes");
+    let items: Vec<Process> = res.json::<Vec<Process>>().await.unwrap();
+    assert!(items.iter().any(|i| i.name == "nstore.system.c"));
   }
 }

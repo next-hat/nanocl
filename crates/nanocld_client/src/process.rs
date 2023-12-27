@@ -1,12 +1,11 @@
+use nanocl_error::io::IoError;
 use ntex::channel::mpsc::Receiver;
 
 use nanocl_error::http::HttpResult;
-use nanocl_error::http_client::HttpClientResult;
+use nanocl_error::http_client::{HttpClientResult, HttpClientError};
 
-use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::process::{
-  Process, ProccessQuery, ProcessLogQuery, ProcessOutputLog,
-};
+use nanocl_stubs::generic::{GenericNspQuery, GenericFilter, GenericListQuery};
+use nanocl_stubs::process::{Process, ProcessLogQuery, ProcessOutputLog};
 
 use super::NanocldClient;
 
@@ -25,9 +24,16 @@ impl NanocldClient {
   /// ```
   pub async fn list_process(
     &self,
-    opts: Option<&ProccessQuery>,
+    query: Option<&GenericFilter>,
   ) -> HttpClientResult<Vec<Process>> {
-    let res = self.send_get(Self::PROCESS_PATH, opts).await?;
+    let query = query.cloned().unwrap_or_default();
+    let query = GenericListQuery::try_from(query).map_err(|err| {
+      HttpClientError::IoError(IoError::invalid_data(
+        "Query".to_owned(),
+        err.to_string(),
+      ))
+    })?;
+    let res = self.send_get(Self::PROCESS_PATH, Some(&query)).await?;
     Self::res_json(res).await
   }
 
