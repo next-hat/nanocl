@@ -667,4 +667,32 @@ mod tests {
   async fn node_list() {
     assert_cli_ok!("node", "ls");
   }
+
+  #[ntex::test]
+  async fn ps() {
+    assert_cli_ok!("ps");
+    assert_cli_ok!("ps", "-n", "system");
+    assert_cli_ok!("ps", "--limit", "2");
+    assert_cli_ok!("ps", "--offset", "1");
+    assert_cli_ok!(
+      "ps",
+      "--namespace",
+      "system",
+      "--limit",
+      "2",
+      "--offset",
+      "1"
+    );
+    assert_cli_ok!(
+      "ps",
+      "--namespace",
+      "system",
+      "--kind",
+      "cargo",
+      "--limit",
+      "2",
+      "--offset",
+      "1"
+    );
+  }
 }

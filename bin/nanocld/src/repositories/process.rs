@@ -11,6 +11,7 @@ use crate::{
   gen_where4string,
   schema::processes,
   models::{Pool, ProcessDb, ProcessUpdateDb},
+  gen_where4json,
 };
 
 use super::generic::*;
@@ -79,6 +80,9 @@ impl RepositoryRead for ProcessDb {
     }
     if let Some(value) = r#where.get("kind_key") {
       gen_where4string!(query, processes::dsl::kind_key, value);
+    }
+    if let Some(value) = r#where.get("data") {
+      gen_where4json!(query, processes::dsl::data, value);
     }
     if is_multiple {
       query = query.order(processes::dsl::created_at.desc());

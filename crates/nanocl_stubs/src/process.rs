@@ -2,7 +2,7 @@
 use serde::{Serialize, Deserialize};
 
 use bollard_next::service::ContainerInspectResponse;
-use bollard_next::container::{LogOutput, LogsOptions, ListContainersOptions};
+use bollard_next::container::{LogOutput, LogsOptions};
 
 #[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -196,28 +196,6 @@ impl From<ProcessLogQuery> for LogsOptions<String> {
       tail: query.tail.to_owned().unwrap_or("all".to_string()),
       stdout: query.stdout.unwrap_or(true),
       stderr: query.stdout.unwrap_or(true),
-    }
-  }
-}
-
-/// Query parameters for the process list endpoint.
-#[derive(Clone, Debug, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ProccessQuery {
-  /// Return container from all nodes
-  pub all: bool,
-  /// Return this number of most recently created containers
-  pub last: Option<isize>,
-  /// Show all containers running for the given namespace
-  pub namespace: Option<String>,
-}
-
-impl From<ProccessQuery> for ListContainersOptions<String> {
-  fn from(query: ProccessQuery) -> Self {
-    ListContainersOptions {
-      all: query.all,
-      limit: query.last,
-      ..Default::default()
     }
   }
 }

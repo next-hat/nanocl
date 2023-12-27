@@ -4,7 +4,7 @@ use chrono::DateTime;
 
 use bollard_next::service::ContainerStateStatusEnum;
 
-use nanocld_client::stubs::process::{ProccessQuery, Process};
+use nanocld_client::stubs::process::Process;
 
 /// `nanocl system` available arguments
 #[derive(Clone, Parser)]
@@ -52,29 +52,18 @@ pub struct SystemHttpLogsOpts {
 /// `nanocl ps` available options
 #[derive(Clone, Parser)]
 pub struct ProcessOpts {
-  /// Return containers for all nodes by default only the current node
-  #[clap(long, short)]
-  pub all: bool,
-  /// Return this number of most recently created containers, including non-running ones
+  /// Limit the number of results default to 100
   #[clap(long)]
-  pub last: Option<isize>,
-  /// Return the size of container as fields `SizeRw` and `SizeRootFs`
-  #[clap(long, short)]
-  pub size: bool,
-  /// Show all containers running for the given namespace
+  pub limit: Option<usize>,
+  /// Offset the number of results default to 0
+  #[clap(long)]
+  pub offset: Option<usize>,
+  /// Show all processes for the given namespace
   #[clap(long, short)]
   pub namespace: Option<String>,
-}
-
-/// Convert ProcessOpts to ProccessQuery
-impl From<ProcessOpts> for ProccessQuery {
-  fn from(opts: ProcessOpts) -> Self {
-    Self {
-      all: opts.all,
-      last: opts.last,
-      namespace: opts.namespace,
-    }
-  }
+  /// Show all processes for the given kind
+  #[clap(long, short)]
+  pub kind: Option<String>,
 }
 
 /// A row for the process table
