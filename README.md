@@ -42,11 +42,12 @@ We stand for robust performance and efficiency with simplicity, trimming the blo
 - [❓ Why Nanocl ?](#-why-nanocl)
 - [📙 Table of Contents](#-table-of-contents)
 - [🚀 Key Benefits](#-key-benefits)
+- [🔧 Usage](#-usage)
+- [📺 Demo](#-demo)
 - [🧿 Architecture](#-architecture)
 - [📚 Documentation](#-documentation)
 - [📋 Requirements](#-requirements)
 - [💾 Installation](#-installation)
-- [🔧 Usage](#-usage)
 - [👨‍💻 Contributing](#-contributing)
 
 ## 🚀 Key Benefits
@@ -60,6 +61,50 @@ We stand for robust performance and efficiency with simplicity, trimming the blo
 - Revert configuration as quickly as pressing a button
 - Build an entire CI/CD pipeline, from tests to high-availability production
 - Best ideas and practices from the community
+
+## 🔧 Usage
+
+`Nanocl` is designed to be easy to operate by mostly using **Statefiles**.<br />
+**Statefiles** are `yaml` files that define the state you want.<br />
+There is an example used to deploy our [documentation](https://docs.next-hat.com):
+
+```yaml
+ApiVersion: v0.12
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/cargo
+Cargoes:
+- Name: doc
+  Container:
+    Image: nh-doc:0.12.0
+
+# See all options:
+# https://docs.next-hat.com/references/nanocl/resource
+Resources:
+- Name: docs.next-hat.com
+  Kind: ncproxy.io/rule/v0.9
+  Data:
+    Rules:
+    - Domain: docs.next-hat.com
+      Network: Public
+      Ssl: cert.next-hat.com
+      Locations:
+      - Path: /
+        Target:
+          Key: doc.nexthat.c
+          Port: 80
+```
+
+To apply a state we can do it easily bu running `nanocl state apply -s path|url`<br />
+We can also revert a state by calling `nanocl state rm -s path|url`<br />
+
+## 📺 Demo
+
+Demo of `Nanocl` in action when applying `example/deploy_example.yml`:
+
+<div align="center">
+  <img src="./doc/example.gif" />
+</div>
 
 ## 🧿 Architecture
 
@@ -99,41 +144,6 @@ To work properly `Nanocl` must have theses dependencies installed on the system:
 
 To install `Nanocl`, please refer to our online [installation guide](https://docs.next-hat.com/setups/nanocl/linux/ubuntu).
 
-## 🔧 Usage
-
-`Nanocl` is designed to be easy to operate by mostly using **Statefiles**.<br />
-**Statefiles** are `yaml` files that define the state you want.<br />
-There is an example used to deploy our [documentation](https://docs.next-hat.com):
-
-```yaml
-ApiVersion: v0.12
-
-# See all options:
-# https://docs.next-hat.com/references/nanocl/cargo
-Cargoes:
-- Name: doc
-  Container:
-    Image: nh-doc:0.12.0
-
-# See all options:
-# https://docs.next-hat.com/references/nanocl/resource
-Resources:
-- Name: docs.next-hat.com
-  Kind: ncproxy.io/rule/v0.9
-  Data:
-    Rules:
-    - Domain: docs.next-hat.com
-      Network: Public
-      Ssl: cert.next-hat.com
-      Locations:
-      - Path: /
-        Target:
-          Key: doc.nexthat.c
-          Port: 80
-```
-
-To apply a state we can do it easily bu running `nanocl state apply -s path|url`<br />
-We can also revert a state by calling `nanocl state rm -s path|url`
 
 ## 👨‍💻 Contributing
 
