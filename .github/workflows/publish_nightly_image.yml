@@ -64,7 +64,7 @@ jobs:
           --builder=buildx-multi-arch \
           --platform=linux/amd64,linux/arm/v7,linux/arm64 \
           --build-arg channel=$CHANNEL \
-          --label org.opencontainers.image.source=https://github.com/next-hat/nanocl \
+          --label org.opencontainers.image.source="https://github.com/next-hat/nanocl" \
           -t ghcr.io/next-hat/$BINARY_NAME:$VERSION-$CHANNEL \
           -t ghcr.io/next-hat/$BINARY_NAME:$CHANNEL \
           -f ./bin/$BINARY_NAME/Dockerfile . \
