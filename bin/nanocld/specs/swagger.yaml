@@ -24,7 +24,7 @@ info:
     email: team@next-hat.com
   license:
     name: MIT OR Apache-2.0
-  version: v0.12.1
+  version: v0.13.0
 servers:
 - url: /{Version}
   variables:
