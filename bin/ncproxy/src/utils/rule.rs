@@ -81,6 +81,12 @@ pub async fn get_addresses(
     }
     addresses.push(ip_address);
   }
+  if addresses.is_empty() {
+    return Err(IoError::invalid_data(
+      "Process",
+      &format!("No address found for {network} are processes running ?"),
+    ));
+  }
   Ok(addresses)
 }
 
