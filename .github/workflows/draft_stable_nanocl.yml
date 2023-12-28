@@ -54,8 +54,8 @@ jobs:
         if: steps.release-exists.outcome == 'failure' && steps.release-exists.conclusion == 'success'
         run: |
           gh release create -d \
-            $BINARY_NAME-$VERSION-$CHANNEL \
-            -t $BINARY_NAME-$VERSION-$CHANNEL \
+            $BINARY_NAME-$VERSION \
+            -t $BINARY_NAME-$VERSION \
             -F ./bin/$BINARY_NAME/changelog.md \
             target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb \
             target/linux/${BINARY_NAME}_${VERSION}_amd64.tar.gz#nanocl_amd64.tar.gz
@@ -65,16 +65,16 @@ jobs:
         if: steps.release-exists.outcome == 'success' && steps.release-exists.conclusion == 'success'
         run: |
           gh release delete-asset -y \
-            $BINARY_NAME-$VERSION-$CHANNEL \
+            $BINARY_NAME-$VERSION \
             ${BINARY_NAME}_${VERSION}_amd64.deb || true
           gh release delete-asset -y \
-            $BINARY_NAME-$VERSION-$CHANNEL \
+            $BINARY_NAME-$VERSION \
             ${BINARY_NAME}_${VERSION}_amd64.tar.gz || true
           gh release upload \
-            $BINARY_NAME-$VERSION-$CHANNEL \
+            $BINARY_NAME-$VERSION \
             target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
           gh release upload \
-            $BINARY_NAME-$VERSION-$CHANNEL \
+            $BINARY_NAME-$VERSION \
             target/linux/${BINARY_NAME}_${VERSION}_amd64.tar.gz#nanocl_amd64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
