@@ -111,9 +111,18 @@ pub async fn add_rule(
           &state.client,
         )
         .await?;
-        let upstream_key =
-          super::rule::gen_stream_upstream_key(&stream_rule.target, state)
-            .await?;
+        let upstream_key = match super::rule::gen_stream_upstream_key(
+          &stream_rule.target,
+          state,
+        )
+        .await
+        {
+          Err(err) => {
+            log::warn!("{err} {:#?}", stream_rule.target);
+            continue;
+          }
+          Ok(upstream_key) => upstream_key,
+        };
         let ssl = match &stream_rule.ssl {
           Some(ssl) => match super::rule::gen_ssl_config(ssl, state).await {
             Err(err) => {
@@ -158,12 +167,19 @@ pub async fn add_rule(
         for location in &http_rule.locations {
           match &location.target {
             LocationTarget::Upstream(upstream) => {
-              let upstream_key = super::rule::gen_upstream(
+              let upstream_key = match super::rule::gen_upstream(
                 upstream,
                 &NginxRuleKind::Site,
                 state,
               )
-              .await?;
+              .await
+              {
+                Err(err) => {
+                  log::warn!("{err} {:#?}", upstream);
+                  continue;
+                }
+                Ok(upstream_key) => upstream_key,
+              };
               let location = LocationTemplate {
                 path: location.path.clone(),
                 upstream_key: format!("http://{upstream_key}"),
