@@ -59,7 +59,7 @@ jobs:
             $BINARY_NAME-$VERSION-$CHANNEL \
             -t $BINARY_NAME-$VERSION-$CHANNEL \
             -F ./bin/$BINARY_NAME/changelog.md \
-            target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb
+            target/debian/${BINARY_NAME}_${VERSION}_amd64.deb#nanocl_amd64.deb \
             target/linux/${BINARY_NAME}_${VERSION}_amd64.tar.gz#nanocl_amd64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_TOKEN }}
@@ -68,7 +68,7 @@ jobs:
         run: |
           gh release delete-asset -y \
             $BINARY_NAME-$VERSION-$CHANNEL \
-            ${BINARY_NAME}_${VERSION}_amd64.deb
+            ${BINARY_NAME}_${VERSION}_amd64.deb || true
           gh release delete-asset -y \
             $BINARY_NAME-$VERSION-$CHANNEL \
             ${BINARY_NAME}_${VERSION}_amd64.tar.gz || true
