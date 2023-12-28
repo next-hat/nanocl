@@ -3,7 +3,7 @@ ApiVersion: v0.12
 Namespace: global
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/resource
+# https://docs.next-hat.com/references/nanocl/objects/resource
 Resources:
 - Name: deploy-example.internal
   Kind: ncproxy.io/rule
@@ -25,7 +25,7 @@ Resources:
           DisableLogging: true
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/cargo
+# https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: deploy-example
   Container:

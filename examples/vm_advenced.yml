@@ -7,7 +7,7 @@ ApiVersion: v0.12
 Namespace: global
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/virtual-machine
+# https://docs.next-hat.com/references/nanocl/objects/virtual-machine
 VirtualMachines:
 - Name: vm-test
   Disk:

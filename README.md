@@ -66,28 +66,27 @@ We stand for robust performance and efficiency with simplicity, trimming the blo
 
 `Nanocl` is designed to be easy to operate by mostly using **Statefiles**.<br />
 **Statefiles** are `yaml` files that define the state you want.<br />
-There is an example used to deploy our [documentation](https://docs.next-hat.com):
+There is an example used to deploy our [documentation][documentation]:
 
 ```yaml
-ApiVersion: v0.12
+ApiVersion: v0.13
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/cargo
+# https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: doc
   Container:
-    Image: nh-doc:0.12.0
+    Image: ghcr.io/next-hat/documentation:0.13.0
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/resource
+# https://docs.next-hat.com/references/nanocl/objects/resource
 Resources:
 - Name: docs.next-hat.com
-  Kind: ncproxy.io/rule/v0.9
+  Kind: ncproxy.io/rule/v0.10
   Data:
     Rules:
     - Domain: docs.next-hat.com
       Network: Public
-      Ssl: cert.next-hat.com
       Locations:
       - Path: /
         Target:
@@ -129,20 +128,20 @@ Simplified version of our architecture for a single node:
 
 To learn more about `Nanocl`, you can take a look at the following resources:
 
-- [Overview](https://docs.next-hat.com/guides/nanocl/overview)
-- [Get Started](https://docs.next-hat.com/guides/nanocl/get-started/orientation-and-setup)
-- [CLI References](https://docs.next-hat.com/references/nanocl/cli)
-- [DAEMON References](https://docs.next-hat.com/references/nanocl/daemon/overview)
+- [Overview][nanocl_overview]
+- [Get Started][nanocl_get_started]
+- [CLI References][nanocl_cli_ref]
+- [DAEMON References][nanocl_daemon_ref]
 
 ## 📋 Requirements
 
 To work properly `Nanocl` must have theses dependencies installed on the system:
 
-- [Docker](https://www.docker.com) minimum version 1.41
+- [Docker][docker] minimum version 1.41
 
 ## 💾 Installation
 
-To install `Nanocl`, please refer to our online [installation guide](https://docs.next-hat.com/setups/nanocl/linux/ubuntu).
+To install `Nanocl`, please refer to our online [installation guide][nanocl_install_guide].
 
 
 ## 👨‍💻 Contributing
@@ -150,5 +149,14 @@ To install `Nanocl`, please refer to our online [installation guide](https://doc
 Every contribution is very welcome.
 
 But to be abble to do so you need a dev environnement right ?<br />
-You can learn more about it on the [contribution guide](./CONTRIBUTING.md).<br />
+You can learn more about it on the [contribution guide][contributing_guide].<br />
 Also don't hesitate to join the discord if you have any question!
+
+[contributing_guide]: ./CONTRIBUTING.md
+[documentation]: https://docs.next-hat.com
+[nanocl_overview]: https://docs.next-hat.com/guides/nanocl/overview
+[nanocl_install_guide]: https://docs.next-hat.com/manuals/nanocl/install/overview
+[nanocl_get_started]: https://docs.next-hat.com/guides/nanocl/get-started/orientation-and-setup
+[nanocl_cli_ref]: https://docs.next-hat.com/references/nanocl/cli
+[nanocl_daemon_ref]: https://docs.next-hat.com/references/nanocl/daemon/overview
+[docker]: https://www.docker.com

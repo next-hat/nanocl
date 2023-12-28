@@ -15,14 +15,14 @@ Args:
 Namespace: global
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/cargo
+# https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: ${{ Args.name }}
   Container:
     Image: ${{ Args.image }}
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/resource
+# https://docs.next-hat.com/references/nanocl/objects/resource
 Resources:
 - Name: ${{ Args.domain }}
   Kind: ncproxy.io/rule

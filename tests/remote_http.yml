@@ -3,7 +3,7 @@ ApiVersion: http://nanocl.internal:8585/v0.12
 Namespace: global
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/cargo
+# https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: remote-example
   Container:

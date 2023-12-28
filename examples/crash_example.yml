@@ -3,7 +3,7 @@ ApiVersion: v0.12
 Namespace: global
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/resource
+# https://docs.next-hat.com/references/nanocl/objects/resource
 Resources:
 - Name: crash-example.com
   Kind: ncproxy.io/rule
@@ -18,7 +18,7 @@ Resources:
           Port: 9000
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/cargo
+# https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: crash-example
   Container:

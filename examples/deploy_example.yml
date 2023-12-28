@@ -10,7 +10,7 @@ Secrets:
   - MY_VALUE=MY_KEY
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/resource
+# https://docs.next-hat.com/references/nanocl/objects/resource
 Resources:
 - Name: deploy-example.com
   Kind: ncproxy.io/rule
@@ -49,7 +49,7 @@ Resources:
           Redirect: Temporary
 
 # See all options:
-# https://docs.next-hat.com/references/nanocl/cargo
+# https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
 - Name: deploy-example
   Metadata:
