@@ -69,8 +69,20 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
   use ntex::http;
+  use nanocld_client::stubs::dns::ResourceDnsRule;
 
   use crate::utils::tests::*;
+
+  #[ntex::test]
+  async fn basic() {
+    let data = std::fs::read_to_string("tests/resource_dns.yml").unwrap();
+    let payload = serde_yaml::from_str::<ResourceDnsRule>(&data).unwrap();
+    let client = gen_default_test_client();
+    let res = client
+      .send_put("/rules/test", Some(payload), None::<String>)
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "basic");
+  }
 
   #[ntex::test]
   async fn apply_empty_rule() {

@@ -1,13 +1,6 @@
-ApiVersion: v0.12
-
-Resources:
-- Name: dns-get-started
-  Kind: ncdns.io/rule
-  Version: v0.4
-  Data:
-    Network: system.nsp
-    Entries:
-    - Name: test.com
-      IpAddress: 127.0.0.1
-    - Name: test1.com
-      IpAddress: global.nsp
+Network: system.nsp
+Entries:
+- Name: test.com
+  IpAddress: 127.0.0.1
+- Name: test1.com
+  IpAddress: global.nsp
