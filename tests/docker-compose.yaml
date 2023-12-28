@@ -77,3 +77,18 @@ services:
     volumes:
       - //run/guest-services/nanocl:/run/nanocl
       - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy:${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
+
+  ndns:
+    container_name: ndns.system.c
+    image: ndns:dev
+    tty: true
+    network_mode: host
+    environment:
+    - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
+    labels:
+    - io.nanocl=enabled
+    - io.nanocl.kind=cargo
+    - io.nanocl.c=ndns.system
+    - io.nanocl.n=system
+    volumes:
+    - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
