@@ -4,6 +4,7 @@ use serde::{Serialize, Deserialize};
 /// Proxy rules modes
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum ProxyRule {
@@ -15,6 +16,7 @@ pub enum ProxyRule {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -47,6 +49,7 @@ pub struct ProxySslConfig {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum ProxySsl {
@@ -57,6 +60,7 @@ pub enum ProxySsl {
 /// Config for targetting a cargo or a vm
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -83,6 +87,7 @@ pub struct UpstreamTarget {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -109,6 +114,7 @@ impl std::fmt::Display for UrlRedirect {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -127,6 +133,7 @@ pub struct HttpTarget {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum LocationTarget {
@@ -140,6 +147,7 @@ pub enum LocationTarget {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -152,6 +160,7 @@ pub struct UriTarget {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -163,6 +172,7 @@ pub struct UnixTarget {
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum StreamTarget {
@@ -177,6 +187,7 @@ pub enum StreamTarget {
 /// Proxy rules modes
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -200,6 +211,7 @@ impl ToString for ProxyStreamProtocol {
 /// Proxy rules modes
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -225,6 +237,7 @@ pub struct ProxyRuleStream {
 /// Defines a proxy rule location
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -252,6 +265,7 @@ pub struct ProxyHttpLocation {
 /// Defines a proxy rule http config
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -285,6 +299,7 @@ pub struct ProxyRuleHttp {
 /// Define proxy rules to apply
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",

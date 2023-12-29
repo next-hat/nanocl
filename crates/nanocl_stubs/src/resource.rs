@@ -6,6 +6,7 @@ use crate::system::{EventActor, ToEvent, EventAction, Event, EventKind};
 /// Payload used to create a new resource
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -31,6 +32,7 @@ pub struct ResourcePartial {
 /// Payload used to update a resource
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -63,6 +65,7 @@ impl From<ResourcePartial> for ResourceUpdate {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -94,6 +97,7 @@ pub struct ResourceSpec {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Resource {

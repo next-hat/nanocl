@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 /// Depending on the spec it will validate a JSONSchema or call a service.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -30,6 +31,7 @@ pub struct ResourceKindSpec {
 /// Used to define a new kind type for plugins.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -53,6 +55,7 @@ pub struct ResourceKindPartial {
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -77,6 +80,7 @@ pub struct ResourceKind {
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -104,6 +108,7 @@ pub struct ResourceKindVersion {
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",

@@ -10,6 +10,7 @@ pub use bollard_next::models::HealthConfig;
 /// Note: auto will ensure at least 1 replica exists in the cluster
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -40,6 +41,7 @@ pub enum ReplicationMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -52,6 +54,7 @@ pub struct ReplicationStatic {
 /// A cargo spec partial is used to create a Cargo
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -94,6 +97,7 @@ pub struct CargoSpecPartial {
 /// It will keep the old values in the history
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -157,6 +161,7 @@ impl From<CargoSpecPartial> for CargoSpecUpdate {
 /// It keep tracking of an history when you patch an existing cargo
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoSpec {

@@ -6,6 +6,7 @@ use serde::{Serialize, Deserialize};
 /// Disk representation of a VM
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -25,6 +26,7 @@ pub struct VmDisk {
 /// A vm's resources (cpu, memory, network)
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -90,6 +92,7 @@ impl Default for VmHostConfig {
 /// A vm spec partial is used to create a vm
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -159,6 +162,7 @@ pub struct VmSpecPartial {
 ///
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -236,6 +240,7 @@ impl From<VmSpecPartial> for VmSpecUpdate {
 /// It keep tracking of an history when you patch an existing vm
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct VmSpec {

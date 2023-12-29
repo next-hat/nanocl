@@ -16,15 +16,17 @@ bench = false
 default = ["serde"]
 serde = ["dep:serde", "uuid/serde", "chrono/serde"]
 utoipa = ["dep:utoipa"]
+schemars = ["dep:schemars", "bollard-next/schemars"]
 test = []
 
 [dependencies]
 uuid = { version = "1.6" }
 serde_json = "1.0"
-bollard-next = { version = "0.15.4" }
+bollard-next = { version = "0.15.7" }
 chrono = { version = "0.4", default-features = false, features = [
   "std",
   "clock",
 ] }
 serde = { version = "1.0", features = ["derive"], optional = true }
 utoipa = { version = "4", features = ["uuid", "chrono"], optional = true }
+schemars = { version = "0.8", features = ["uuid1", "chrono"], optional = true }

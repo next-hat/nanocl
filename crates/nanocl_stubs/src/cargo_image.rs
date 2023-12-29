@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 
 /// Cargo Image Partial is used to pull a new container image
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -48,6 +49,7 @@ impl From<ListCargoImagesOptions>
 
 /// Cargo Image is used to pull a new container image from a tar archive
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",

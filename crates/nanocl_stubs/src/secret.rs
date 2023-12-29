@@ -8,6 +8,7 @@ use crate::system::{EventActor, ToEvent, EventAction, EventKind, Event};
 /// sensitive data. It is stored as a json object in the database.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
@@ -38,6 +39,7 @@ pub struct SecretPartial {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Secret {
@@ -102,6 +104,7 @@ impl ToEvent for Secret {
 /// This structure is used to update a secret.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
   feature = "serde",
