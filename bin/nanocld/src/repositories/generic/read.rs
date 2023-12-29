@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ntex::rt::JoinHandle;
 use diesel::{prelude::*, associations::HasTable, query_dsl::methods::LoadQuery};
 
 use nanocl_error::io::{IoError, IoResult};
@@ -15,7 +14,7 @@ pub trait RepositoryRead: super::RepositoryBase {
 
   fn gen_read_query(filter: &GenericFilter, is_multiple: bool) -> Self::Query;
 
-  fn read_by_pk<Pk>(pk: &Pk, pool: &Pool) -> JoinHandle<IoResult<Self::Output>>
+  async fn read_by_pk<Pk>(pk: &Pk, pool: &Pool) -> IoResult<Self::Output>
   where
     Pk: ToOwned + ?Sized + std::fmt::Display,
     <Pk as ToOwned>::Owned: Send + 'static,
@@ -38,12 +37,13 @@ pub trait RepositoryRead: super::RepositoryBase {
         IoError::invalid_data(Self::get_name(), &err.to_string())
       })
     })
+    .await?
   }
 
-  fn read(
+  async fn read(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Output>>>
+  ) -> IoResult<Vec<Self::Output>>
   where
     Self: Sized + Send + HasTable + 'static,
     Self::Output: Send + TryFrom<Self>,
@@ -68,12 +68,13 @@ pub trait RepositoryRead: super::RepositoryBase {
         .collect::<IoResult<Vec<Self::Output>>>()?;
       Ok(items)
     })
+    .await?
   }
 
-  fn read_one(
+  async fn read_one(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>>
+  ) -> IoResult<Self::Output>
   where
     Self: Sized + Send + HasTable + 'static,
     Self::Output: Send + TryFrom<Self>,
@@ -91,24 +92,25 @@ pub trait RepositoryRead: super::RepositoryBase {
         IoError::invalid_data(Self::get_name(), &err.to_string())
       })
     })
+    .await?
   }
 }
 
 pub trait RepositoryReadWithSpec: super::RepositoryBase {
   type Output;
 
-  fn read_pk_with_spec(
+  async fn read_pk_with_spec(
     filter: &str,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>>;
+  ) -> IoResult<Self::Output>;
 
-  fn read_with_spec(
+  async fn read_with_spec(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Output>>>;
+  ) -> IoResult<Vec<Self::Output>>;
 
-  fn read_one_with_spec(
+  async fn read_one_with_spec(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>>;
+  ) -> IoResult<Self::Output>;
 }

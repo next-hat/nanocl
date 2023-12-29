@@ -37,7 +37,7 @@ pub(crate) async fn sync_process(
     .map_err(|err| err.map_err_context(|| "Process"))?;
   let filter =
     GenericFilter::new().r#where("key", GenericClause::Eq(id.to_owned()));
-  let current_res = ProcessDb::read_one(&filter, &state.pool).await?;
+  let current_res = ProcessDb::read_one(&filter, &state.pool).await;
   match current_res {
     Ok(current_instance) => {
       if current_instance.data == *instance {
@@ -51,7 +51,7 @@ pub(crate) async fn sync_process(
         ..Default::default()
       };
       ProcessDb::update_pk(&current_instance.key, new_instance, &state.pool)
-        .await??;
+        .await?;
       log::info!("system::sync_process: {name} updated");
     }
     Err(_) => {
@@ -89,7 +89,7 @@ pub(crate) async fn register_namespace(
   create_network: bool,
   state: &DaemonState,
 ) -> IoResult<()> {
-  if NamespaceDb::read_by_pk(name, &state.pool).await?.is_ok() {
+  if NamespaceDb::read_by_pk(name, &state.pool).await.is_ok() {
     return Ok(());
   }
   let new_nsp = NamespacePartial {
@@ -203,7 +203,7 @@ pub(crate) async fn sync_processes(state: &DaemonState) -> IoResult<()> {
       GenericClause::NotIn(ids.iter().map(|id| id.to_owned()).collect()),
     )
     .r#where("node_key", GenericClause::Eq(state.config.hostname.clone()));
-  ProcessDb::del_by(&filter, &state.pool).await??;
+  ProcessDb::del_by(&filter, &state.pool).await?;
   log::info!("system::sync_processes: done");
   Ok(())
 }

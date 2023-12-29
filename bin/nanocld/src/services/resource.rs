@@ -35,7 +35,7 @@ pub(crate) async fn list_resource(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
-  let items = ResourceDb::read_with_spec(&filter, &state.pool).await??;
+  let items = ResourceDb::read_with_spec(&filter, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -154,7 +154,7 @@ pub(crate) async fn list_resource_history(
   let filter =
     GenericFilter::new().r#where("kind_key", GenericClause::Eq(path.1.clone()));
   let items = SpecDb::read(&filter, &state.pool)
-    .await??
+    .await?
     .into_iter()
     .map(ResourceSpec::from)
     .collect::<Vec<_>>();
@@ -180,7 +180,7 @@ pub(crate) async fn revert_resource(
   state: web::types::State<DaemonState>,
   path: web::types::Path<(String, String, uuid::Uuid)>,
 ) -> HttpResult<web::HttpResponse> {
-  let history = SpecDb::read_by_pk(&path.2, &state.pool).await??;
+  let history = SpecDb::read_by_pk(&path.2, &state.pool).await?;
   let resource = ResourceDb::inspect_by_pk(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
     name: resource.spec.resource_key,

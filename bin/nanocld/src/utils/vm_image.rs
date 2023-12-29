@@ -15,7 +15,7 @@ use crate::{
 
 /// Delete a vm image from the database and from the filesystem
 pub(crate) async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
-  let vm_image = VmImageDb::read_by_pk(name, pool).await??;
+  let vm_image = VmImageDb::read_by_pk(name, pool).await?;
   let children = VmImageDb::find_by_parent(name, pool).await?;
   if !children.is_empty() {
     return Err(HttpError::conflict(format!(
@@ -26,7 +26,7 @@ pub(crate) async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
   if let Err(err) = fs::remove_file(&filepath).await {
     log::warn!("Error while deleting the file {filepath}: {err}");
   }
-  VmImageDb::del_by_pk(name, pool).await??;
+  VmImageDb::del_by_pk(name, pool).await?;
   Ok(())
 }
 
@@ -66,7 +66,7 @@ pub(crate) async fn create_snap(
   image: &VmImageDb,
   state: &DaemonState,
 ) -> HttpResult<VmImageDb> {
-  if VmImageDb::read_by_pk(name, &state.pool).await?.is_ok() {
+  if VmImageDb::read_by_pk(name, &state.pool).await.is_ok() {
     return Err(HttpError::conflict(format!("Vm image {name} already used")));
   }
   let imagepath = image.path.clone();
@@ -139,7 +139,7 @@ pub(crate) async fn clone(
       "Vm image {name} is not a snapshot"
     )));
   }
-  if VmImageDb::read_by_pk(name, &state.pool).await?.is_ok() {
+  if VmImageDb::read_by_pk(name, &state.pool).await.is_ok() {
     return Err(HttpError::conflict(format!("Vm image {name} already used")));
   }
   let (tx, rx) = ntex::channel::mpsc::channel::<HttpResult<Bytes>>();
@@ -301,7 +301,7 @@ pub(crate) async fn resize(
     },
     pool,
   )
-  .await??;
+  .await?;
   Ok(res)
 }
 
@@ -311,7 +311,7 @@ pub(crate) async fn resize_by_name(
   payload: &VmImageResizePayload,
   pool: &Pool,
 ) -> HttpResult<VmImageDb> {
-  let image = VmImageDb::read_by_pk(name, pool).await??;
+  let image = VmImageDb::read_by_pk(name, pool).await?;
   resize(&image, payload, pool).await
 }
 

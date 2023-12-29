@@ -27,7 +27,7 @@ pub(crate) async fn create(
   state: &DaemonState,
 ) -> HttpResult<Namespace> {
   if NamespaceDb::read_by_pk(&item.name, &state.pool)
-    .await?
+    .await
     .is_ok()
   {
     return Err(HttpError::conflict(format!(
@@ -60,7 +60,7 @@ pub(crate) async fn delete_by_name(
   state: &DaemonState,
 ) -> HttpResult<()> {
   utils::cargo::delete_by_namespace(name, state).await?;
-  NamespaceDb::del_by_pk(name, &state.pool).await??;
+  NamespaceDb::del_by_pk(name, &state.pool).await?;
   if let Err(err) = state.docker_api.remove_network(name).await {
     log::error!("Unable to remove network {} got error: {}", name, err);
   }
@@ -90,7 +90,7 @@ pub(crate) async fn list(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> HttpResult<Vec<NamespaceSummary>> {
-  let items = NamespaceDb::read(filter, pool).await??;
+  let items = NamespaceDb::read(filter, pool).await?;
   let mut new_items = Vec::new();
   for item in items {
     let cargo_count = CargoDb::count_by_namespace(&item.name, pool).await?;
@@ -124,7 +124,7 @@ pub(crate) async fn inspect_by_name(
   name: &str,
   state: &DaemonState,
 ) -> HttpResult<NamespaceInspect> {
-  let namespace = NamespaceDb::read_by_pk(name, &state.pool).await??;
+  let namespace = NamespaceDb::read_by_pk(name, &state.pool).await?;
   let models = CargoDb::find_by_namespace(&namespace.name, &state.pool).await?;
   let mut cargoes = Vec::new();
   for cargo in models {

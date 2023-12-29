@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ntex::rt::JoinHandle;
 use diesel::{prelude::*, associations::HasTable, query_dsl, query_builder};
 
 use nanocl_error::io::IoResult;
@@ -10,10 +9,10 @@ use nanocl_stubs::generic::GenericFilter;
 use crate::{utils, models::Pool};
 
 pub trait RepositoryDelByPk: super::RepositoryBase {
-  fn del_by_pk<Pk>(
+  async fn del_by_pk<Pk>(
     pk: &Pk,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<()>>
+  ) -> IoResult<()>
   where
     Self: Sized + HasTable,
     Pk: ToOwned + ?Sized + std::fmt::Display,
@@ -35,6 +34,7 @@ pub trait RepositoryDelByPk: super::RepositoryBase {
         .map_err(Self::map_err)?;
       Ok(())
     })
+    .await?
   }
 }
 
@@ -49,10 +49,10 @@ pub trait RepositoryDelBy: super::RepositoryBase {
   where
     Self: diesel::associations::HasTable;
 
-  fn del_by(
+  async fn del_by(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<()>>
+  ) -> IoResult<()>
   where
     Self: Sized + diesel::associations::HasTable,
     <Self as diesel::associations::HasTable>::Table: diesel::query_builder::QueryId + 'static,
@@ -67,5 +67,6 @@ pub trait RepositoryDelBy: super::RepositoryBase {
       query.execute(&mut conn).map_err(Self::map_err)?;
       Ok(())
     })
+    .await?
   }
 }

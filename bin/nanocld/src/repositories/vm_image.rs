@@ -63,6 +63,6 @@ impl VmImageDb {
   ) -> IoResult<Vec<VmImageDb>> {
     let filter = GenericFilter::new()
       .r#where("parent", GenericClause::Eq(name.to_owned()));
-    VmImageDb::read(&filter, pool).await?
+    VmImageDb::read(&filter, pool).await
   }
 }

@@ -103,6 +103,6 @@ impl ProcessDb {
   ) -> IoResult<Vec<Process>> {
     let filter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(kind_key.to_owned()));
-    ProcessDb::read(&filter, pool).await?
+    ProcessDb::read(&filter, pool).await
   }
 }

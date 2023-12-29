@@ -31,7 +31,7 @@ use crate::{
 pub(crate) async fn list_node(
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
-  let items = NodeDb::read(&GenericFilter::default(), &state.pool).await??;
+  let items = NodeDb::read(&GenericFilter::default(), &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 

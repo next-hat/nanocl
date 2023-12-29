@@ -54,7 +54,7 @@ pub(crate) async fn delete_by_key(
   };
   let container_name = format!("{}.v", vm_key);
   utils::process::remove(&container_name, Some(options), state).await?;
-  VmDb::del_by_pk(vm_key, &state.pool).await??;
+  VmDb::del_by_pk(vm_key, &state.pool).await?;
   SpecDb::del_by_kind_key(vm_key, &state.pool).await?;
   utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
   state
@@ -68,12 +68,12 @@ pub(crate) async fn list_by_namespace(
   nsp: &str,
   pool: &Pool,
 ) -> HttpResult<Vec<VmSummary>> {
-  let namespace = NamespaceDb::read_by_pk(nsp, pool).await??;
+  let namespace = NamespaceDb::read_by_pk(nsp, pool).await?;
   let vmes = VmDb::find_by_namespace(&namespace.name, pool).await?;
   let mut vm_summaries = Vec::new();
   for vm in vmes {
     let spec = SpecDb::read_by_pk(&vm.spec.key, pool)
-      .await??
+      .await?
       .try_to_vm_spec()?;
     let processes = ProcessDb::find_by_kind_key(&vm.spec.vm_key, pool).await?;
     let (_, _, _, running_instances) = utils::process::count_status(&processes);
@@ -204,12 +204,12 @@ pub(crate) async fn create(
   );
   let vm_key = utils::key::gen_key(namespace, name);
   let mut vm = vm.clone();
-  if VmDb::read_pk_with_spec(&vm_key, &state.pool).await?.is_ok() {
+  if VmDb::read_pk_with_spec(&vm_key, &state.pool).await.is_ok() {
     return Err(HttpError::conflict(format!(
       "VM with name {name} already exists in namespace {namespace}",
     )));
   }
-  let image = VmImageDb::read_by_pk(&vm.disk.image, &state.pool).await??;
+  let image = VmImageDb::read_by_pk(&vm.disk.image, &state.pool).await?;
   if image.kind.as_str() != "Base" {
     return Err(HttpError::bad_request(format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image)));
   }
@@ -238,9 +238,9 @@ pub(crate) async fn patch(
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
-  let vm = VmDb::read_pk_with_spec(vm_key, &state.pool).await??;
+  let vm = VmDb::read_pk_with_spec(vm_key, &state.pool).await?;
   let old_spec = SpecDb::read_by_pk(&vm.spec.key, &state.pool)
-    .await??
+    .await?
     .try_to_vm_spec()?;
   let vm_partial = VmSpecPartial {
     name: spec.name.to_owned().unwrap_or(vm.spec.name.clone()),
@@ -303,7 +303,7 @@ pub(crate) async fn put(
   let vm =
     VmDb::update_from_spec(&vm.spec.vm_key, vm_partial, version, &state.pool)
       .await?;
-  let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await??;
+  let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await?;
   create_instance(&vm, &image, false, state).await?;
   utils::process::start_by_kind(&ProcessKind::Vm, &vm.spec.vm_key, state)
     .await?;

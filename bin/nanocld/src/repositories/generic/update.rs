@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ntex::rt::JoinHandle;
 use diesel::{prelude::*, associations};
 
 use nanocl_error::io::IoResult;
@@ -10,11 +9,11 @@ use crate::{utils, models::Pool};
 pub trait RepositoryUpdate: super::RepositoryBase {
   type UpdateItem;
 
-  fn update_pk<T, Pk>(
+  async fn update_pk<T, Pk>(
     pk: &Pk,
     values: T,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Self>>
+  ) -> IoResult<Self>
   where
     T: Into<Self::UpdateItem>,
     Pk: ToOwned + ?Sized + std::fmt::Display,
@@ -47,5 +46,6 @@ pub trait RepositoryUpdate: super::RepositoryBase {
       .map_err(Self::map_err)?;
       Ok(item)
     })
+    .await?
   }
 }

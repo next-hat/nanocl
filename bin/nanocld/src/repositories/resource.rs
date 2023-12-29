@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ntex::rt::JoinHandle;
 use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult};
@@ -32,10 +31,7 @@ impl RepositoryDelByPk for ResourceDb {}
 impl RepositoryReadWithSpec for ResourceDb {
   type Output = Resource;
 
-  fn read_pk_with_spec(
-    pk: &str,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>> {
+  async fn read_pk_with_spec(pk: &str, pool: &Pool) -> IoResult<Self::Output> {
     log::trace!("ResourceDb::find_by_pk: {pk}");
     let pool = Arc::clone(pool);
     let pk = pk.to_owned();
@@ -49,12 +45,13 @@ impl RepositoryReadWithSpec for ResourceDb {
       let item = item.0.with_spec(&item.1);
       Ok::<_, IoError>(item)
     })
+    .await?
   }
 
-  fn read_one_with_spec(
+  async fn read_one_with_spec(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>> {
+  ) -> IoResult<Self::Output> {
     log::trace!("ResourceDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resources::dsl::resources
@@ -81,12 +78,13 @@ impl RepositoryReadWithSpec for ResourceDb {
       let item = item.0.with_spec(&item.1);
       Ok::<_, IoError>(item)
     })
+    .await?
   }
 
-  fn read_with_spec(
+  async fn read_with_spec(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Output>>> {
+  ) -> IoResult<Vec<Self::Output>> {
     log::trace!("ResourceDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resources::dsl::resources
@@ -121,6 +119,7 @@ impl RepositoryReadWithSpec for ResourceDb {
         .collect::<Vec<_>>();
       Ok::<_, IoError>(items)
     })
+    .await?
   }
 }
 
@@ -148,7 +147,7 @@ impl ResourceDb {
         Ok((items[..2].join("/"), version.to_owned().to_string()))
       }
       None => {
-        let kind = ResourceKindDb::read_pk_with_spec(kind, pool).await??;
+        let kind = ResourceKindDb::read_pk_with_spec(kind, pool).await?;
         Ok((kind.name, kind.version))
       }
     }
@@ -187,7 +186,7 @@ impl ResourceDb {
     pool: &Pool,
   ) -> IoResult<Resource> {
     let key = item.name.clone();
-    let resource = ResourceDb::read_pk_with_spec(&item.name, pool).await??;
+    let resource = ResourceDb::read_pk_with_spec(&item.name, pool).await?;
     let (_, version) = ResourceDb::parse_kind(&item.kind, pool).await?;
     let spec = SpecDb {
       key: uuid::Uuid::new_v4(),
@@ -203,7 +202,7 @@ impl ResourceDb {
       key: None,
       spec_key: Some(spec.key.to_owned()),
     };
-    let dbmodel = ResourceDb::update_pk(&key, resource_update, pool).await??;
+    let dbmodel = ResourceDb::update_pk(&key, resource_update, pool).await?;
     let item = dbmodel.with_spec(&spec);
     Ok(item)
   }
@@ -214,6 +213,6 @@ impl ResourceDb {
   ) -> IoResult<Resource> {
     let filter =
       GenericFilter::new().r#where("key", GenericClause::Eq(pk.to_owned()));
-    Self::read_one_with_spec(&filter, pool).await?
+    Self::read_one_with_spec(&filter, pool).await
   }
 }

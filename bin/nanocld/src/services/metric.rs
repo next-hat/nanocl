@@ -32,7 +32,7 @@ pub(crate) async fn list_metric(
   let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
     HttpError::bad_request(format!("Invalid query string: {err}"))
   })?;
-  let metrics = MetricDb::read(&filter, &state.pool).await??;
+  let metrics = MetricDb::read(&filter, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&metrics))
 }
 

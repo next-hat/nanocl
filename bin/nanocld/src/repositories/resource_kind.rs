@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ntex::rt::JoinHandle;
 use diesel::prelude::*;
 
 use nanocl_error::{
@@ -34,10 +33,7 @@ impl RepositoryUpdate for ResourceKindDb {
 impl RepositoryReadWithSpec for ResourceKindDb {
   type Output = ResourceKind;
 
-  fn read_pk_with_spec(
-    pk: &str,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>> {
+  async fn read_pk_with_spec(pk: &str, pool: &Pool) -> IoResult<Self::Output> {
     log::trace!("CargoDb::find_by_pk: {pk}");
     let pool = Arc::clone(pool);
     let pk = pk.to_owned();
@@ -50,12 +46,13 @@ impl RepositoryReadWithSpec for ResourceKindDb {
         .map_err(Self::map_err)?;
       item.1.try_into()
     })
+    .await?
   }
 
-  fn read_one_with_spec(
+  async fn read_one_with_spec(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>> {
+  ) -> IoResult<Self::Output> {
     log::trace!("CargoDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resource_kinds::table
@@ -76,12 +73,13 @@ impl RepositoryReadWithSpec for ResourceKindDb {
       let item = item.1.try_into()?;
       Ok::<_, IoError>(item)
     })
+    .await?
   }
 
-  fn read_with_spec(
+  async fn read_with_spec(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Output>>> {
+  ) -> IoResult<Vec<Self::Output>> {
     log::trace!("CargoDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resource_kinds::table
@@ -111,6 +109,7 @@ impl RepositoryReadWithSpec for ResourceKindDb {
         .collect::<IoResult<Vec<_>>>()?;
       Ok::<_, IoError>(items)
     })
+    .await?
   }
 }
 
@@ -130,12 +129,12 @@ impl ResourceKindDb {
     }
     let kind_version: SpecDb = item.try_into()?;
     let version = SpecDb::create_from(kind_version, pool).await?;
-    match ResourceKindDb::read_pk_with_spec(&item.name, pool).await? {
+    match ResourceKindDb::read_pk_with_spec(&item.name, pool).await {
       Ok(resource_kind) => {
         let update = ResourceKindDbUpdate {
           spec_key: version.key,
         };
-        ResourceKindDb::update_pk(&resource_kind.name, update, pool).await??
+        ResourceKindDb::update_pk(&resource_kind.name, update, pool).await?
       }
       Err(_) => {
         let kind = ResourceKindDb {
@@ -154,11 +153,11 @@ impl ResourceKindDb {
     pk: &str,
     pool: &Pool,
   ) -> HttpResult<ResourceKindInspect> {
-    let item = ResourceKindDb::read_pk_with_spec(pk, pool).await??;
+    let item = ResourceKindDb::read_pk_with_spec(pk, pool).await?;
     let filter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(item.name.to_owned()));
     let versions = SpecDb::read(&filter, pool)
-      .await??
+      .await?
       .into_iter()
       .map(|item| item.try_into())
       .collect::<IoResult<Vec<_>>>()?;

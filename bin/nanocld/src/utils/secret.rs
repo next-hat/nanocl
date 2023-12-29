@@ -26,8 +26,8 @@ pub(crate) async fn delete_by_pk(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let secret = SecretDb::read_by_pk(key, &state.pool).await??;
-  SecretDb::del_by_pk(key, &state.pool).await??;
+  let secret = SecretDb::read_by_pk(key, &state.pool).await?;
+  SecretDb::del_by_pk(key, &state.pool).await?;
   state
     .event_emitter
     .spawn_emit_to_event(&secret, EventAction::Deleted);
@@ -40,7 +40,7 @@ pub(crate) async fn patch_by_pk(
   item: &SecretUpdate,
   state: &DaemonState,
 ) -> HttpResult<Secret> {
-  let secret = SecretDb::update_pk(key, item, &state.pool).await??;
+  let secret = SecretDb::update_pk(key, item, &state.pool).await?;
   let secret: Secret = secret.try_into()?;
   state
     .event_emitter

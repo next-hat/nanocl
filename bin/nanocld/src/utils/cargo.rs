@@ -103,7 +103,7 @@ async fn create_instances(
     let fetched_secrets = secrets
       .iter()
       .map(|secret| async move {
-        let secret = SecretDb::read_by_pk(secret, &state.pool).await??;
+        let secret = SecretDb::read_by_pk(secret, &state.pool).await?;
         if secret.kind.as_str() != "nanocl.io/env" {
           return Err(HttpError::bad_request(format!(
             "Secret {} is not an nanocl.io/env secret",
@@ -318,7 +318,7 @@ pub(crate) async fn create(
     1
   };
   if let Err(err) = create_instances(&cargo, number, state).await {
-    CargoDb::del_by_pk(&cargo.spec.cargo_key, &state.pool).await??;
+    CargoDb::del_by_pk(&cargo.spec.cargo_key, &state.pool).await?;
     return Err(err);
   }
   state
@@ -376,7 +376,7 @@ pub(crate) async fn delete_by_key(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
-  CargoDb::del_by_pk(key, &state.pool).await??;
+  CargoDb::del_by_pk(key, &state.pool).await?;
   SpecDb::del_by_kind_key(key, &state.pool).await?;
   state
     .event_emitter
@@ -466,12 +466,12 @@ pub(crate) async fn list(
     })?
     .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
   // ensure namespace exists
-  NamespaceDb::read_by_pk(&namespace, &state.pool).await??;
-  let cargoes = CargoDb::read_with_spec(&filter, &state.pool).await??;
+  NamespaceDb::read_by_pk(&namespace, &state.pool).await?;
+  let cargoes = CargoDb::read_with_spec(&filter, &state.pool).await?;
   let mut cargo_summaries = Vec::new();
   for cargo in cargoes {
     let spec = SpecDb::read_by_pk(&cargo.spec.key, &state.pool)
-      .await??
+      .await?
       .try_to_cargo_spec()?;
     let instances =
       ProcessDb::find_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
@@ -520,7 +520,7 @@ pub(crate) async fn delete_by_namespace(
   namespace: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let namespace = NamespaceDb::read_by_pk(namespace, &state.pool).await??;
+  let namespace = NamespaceDb::read_by_pk(namespace, &state.pool).await?;
   let cargoes =
     CargoDb::find_by_namespace(&namespace.name, &state.pool).await?;
   cargoes

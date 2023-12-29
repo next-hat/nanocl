@@ -29,11 +29,11 @@ async fn after(
     GenericFilter::new().r#where("key", GenericClause::Eq(kind_key.to_owned()));
   match kind {
     ProcessKind::Vm => {
-      let vm = VmDb::read_one_with_spec(&filter, &state.pool).await??;
+      let vm = VmDb::read_one_with_spec(&filter, &state.pool).await?;
       state.event_emitter.spawn_emit_to_event(&vm, action);
     }
     ProcessKind::Cargo => {
-      let cargo = CargoDb::read_one_with_spec(&filter, &state.pool).await??;
+      let cargo = CargoDb::read_one_with_spec(&filter, &state.pool).await?;
       state.event_emitter.spawn_emit_to_event(&cargo, action);
     }
     ProcessKind::Job => {
@@ -44,7 +44,7 @@ async fn after(
         },
         &state.pool,
       )
-      .await??;
+      .await?;
     }
   }
   Ok(())
@@ -170,7 +170,7 @@ pub(crate) async fn remove(
       }
     },
   };
-  ProcessDb::del_by_pk(key, &state.pool).await??;
+  ProcessDb::del_by_pk(key, &state.pool).await?;
   Ok(())
 }
 

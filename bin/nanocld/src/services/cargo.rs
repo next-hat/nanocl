@@ -278,7 +278,7 @@ pub(crate) async fn revert_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let cargo_key = utils::key::gen_key(&namespace, &path.1);
   let spec = SpecDb::read_by_pk(&path.2, &state.pool)
-    .await??
+    .await?
     .try_to_cargo_spec()?;
   let cargo =
     utils::cargo::put(&cargo_key, &spec.clone().into(), &path.0, &state)

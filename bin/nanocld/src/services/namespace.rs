@@ -97,7 +97,7 @@ pub(crate) async fn delete_namespace(
   state: web::types::State<DaemonState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  NamespaceDb::read_by_pk(&path.1, &state.pool).await??;
+  NamespaceDb::read_by_pk(&path.1, &state.pool).await?;
   utils::namespace::delete_by_name(&path.1, &state).await?;
   Ok(web::HttpResponse::Accepted().into())
 }
