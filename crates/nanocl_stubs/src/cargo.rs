@@ -24,6 +24,7 @@ pub use bollard_next::container::Stats as CargoStats;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "test", derive(Default))]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Cargo {
@@ -70,6 +71,7 @@ impl ToEvent for Cargo {
 /// It's the datastructure returned by the list operation
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoSummary {
@@ -90,6 +92,7 @@ pub struct CargoSummary {
 /// It also contains the list of containers
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct CargoInspect {
@@ -110,6 +113,7 @@ pub struct CargoInspect {
 /// Options for the kill command
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CargoKillOptions {
   /// Signal to send to the container default: SIGKILL
@@ -171,6 +175,7 @@ impl From<CargoStatsQuery> for StatsOptions {
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct CargoScale {
   /// Number of replicas to scale up or down can be negative value
   pub replicas: isize,

@@ -23,6 +23,7 @@ impl GenericNspQuery {
 /// Generic count response
 #[derive(Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct GenericCount {
@@ -33,6 +34,7 @@ pub struct GenericCount {
 /// Generic where clause
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 pub enum GenericClause {
@@ -69,6 +71,7 @@ pub enum GenericClause {
 /// Generic filter for list operation
 #[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GenericFilter {
   /// Where clause
@@ -83,6 +86,7 @@ pub struct GenericFilter {
 /// Generic query string parameters for list operations
 #[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GenericListQuery {
   /// A json as string as GenericFilter
@@ -125,6 +129,7 @@ impl TryFrom<GenericListNspQuery> for GenericFilter {
 /// Generic query string parameters for list operations that include a namespace
 #[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GenericListNspQuery {
   /// A json as string as GenericFilter
