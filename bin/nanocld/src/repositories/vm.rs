@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ntex::rt::JoinHandle;
 use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult};
@@ -32,10 +31,7 @@ impl RepositoryDelByPk for VmDb {}
 impl RepositoryReadWithSpec for VmDb {
   type Output = Vm;
 
-  fn read_pk_with_spec(
-    pk: &str,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>> {
+  async fn read_pk_with_spec(pk: &str, pool: &Pool) -> IoResult<Self::Output> {
     log::trace!("VmDb::find_by_pk: {pk}");
     let pool = Arc::clone(pool);
     let pk = pk.to_owned();
@@ -49,12 +45,13 @@ impl RepositoryReadWithSpec for VmDb {
       let item = item.0.with_spec(&item.1.try_to_vm_spec()?);
       Ok::<_, IoError>(item)
     })
+    .await?
   }
 
-  fn read_one_with_spec(
+  async fn read_one_with_spec(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>> {
+  ) -> IoResult<Self::Output> {
     log::trace!("VmDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vms::table.inner_join(specs::table).into_boxed();
@@ -76,12 +73,13 @@ impl RepositoryReadWithSpec for VmDb {
       let item = item.0.with_spec(&item.1.try_to_vm_spec()?);
       Ok::<_, IoError>(item)
     })
+    .await?
   }
 
-  fn read_with_spec(
+  async fn read_with_spec(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Output>>> {
+  ) -> IoResult<Vec<Self::Output>> {
     log::trace!("VmDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vms::table
@@ -117,6 +115,7 @@ impl RepositoryReadWithSpec for VmDb {
         .collect::<IoResult<Vec<_>>>()?;
       Ok::<_, IoError>(items)
     })
+    .await?
   }
 }
 
@@ -170,7 +169,7 @@ impl VmDb {
     version: &str,
     pool: &Pool,
   ) -> IoResult<Vm> {
-    let mut vm = VmDb::read_pk_with_spec(key, pool).await??;
+    let mut vm = VmDb::read_pk_with_spec(key, pool).await?;
     let new_spec = SpecDb::try_from_vm_partial(&vm.spec.vm_key, version, item)?;
     let spec = SpecDb::create_from(new_spec, pool)
       .await?
@@ -180,13 +179,13 @@ impl VmDb {
       spec_key: Some(spec.key),
       ..Default::default()
     };
-    VmDb::update_pk(key, new_item, pool).await??;
+    VmDb::update_pk(key, new_item, pool).await?;
     vm.spec = spec;
     Ok(vm)
   }
 
   pub(crate) async fn inspect_by_pk(pk: &str, pool: &Pool) -> IoResult<Vm> {
-    VmDb::read_pk_with_spec(pk, pool).await?
+    VmDb::read_pk_with_spec(pk, pool).await
   }
 
   pub(crate) async fn find_by_namespace(
@@ -195,6 +194,6 @@ impl VmDb {
   ) -> IoResult<Vec<Vm>> {
     let filter = GenericFilter::new()
       .r#where("namespace_name", GenericClause::Eq(name.to_owned()));
-    VmDb::read_with_spec(&filter, pool).await?
+    VmDb::read_with_spec(&filter, pool).await
   }
 }

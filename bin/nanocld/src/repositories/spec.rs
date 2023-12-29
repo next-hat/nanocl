@@ -72,7 +72,7 @@ impl SpecDb {
   pub(crate) async fn del_by_kind_key(key: &str, pool: &Pool) -> IoResult<()> {
     let filter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(key.to_owned()));
-    Self::del_by(&filter, pool).await?
+    Self::del_by(&filter, pool).await
   }
 
   pub(crate) async fn get_version(
@@ -83,7 +83,7 @@ impl SpecDb {
     let filter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(name.to_owned()))
       .r#where("version", GenericClause::Eq(version.to_owned()));
-    let item = SpecDb::read_one(&filter, pool).await??;
+    let item = SpecDb::read_one(&filter, pool).await?;
     Ok(item)
   }
 
@@ -93,7 +93,7 @@ impl SpecDb {
   ) -> IoResult<Vec<SpecDb>> {
     let filter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(key.to_owned()));
-    let items = SpecDb::read(&filter, pool).await??;
+    let items = SpecDb::read(&filter, pool).await?;
     Ok(items)
   }
 

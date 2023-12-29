@@ -1,7 +1,7 @@
 use ntex::rt;
 use futures_util::StreamExt;
 
-use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::io::{IoResult, FromIo};
 
 use bollard_next::{
   system::EventsOptions,
@@ -36,7 +36,7 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
     _ => {}
   }
   let job = JobDb::read_by_pk(job_id, &state.pool)
-    .await??
+    .await?
     .try_to_spec()?;
   let ttl = match job.ttl {
     None => return Ok(()),
@@ -148,7 +148,7 @@ async fn exec_docker(
   match action {
     "destroy" => {
       state.event_emitter.spawn_emit_event(event);
-      let _ = ProcessDb::del_by_pk(&id, &state.pool).await?;
+      let _ = ProcessDb::del_by_pk(&id, &state.pool).await;
       return Ok(());
     }
     "create" => {
@@ -182,7 +182,7 @@ async fn exec_docker(
     data: Some(data),
     ..Default::default()
   };
-  ProcessDb::update_pk(&id, new_instance, &state.pool).await??;
+  ProcessDb::update_pk(&id, new_instance, &state.pool).await?;
   Ok(())
 }
 

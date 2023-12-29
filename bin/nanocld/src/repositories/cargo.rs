@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ntex::rt::JoinHandle;
 use diesel::prelude::*;
 
 use nanocl_error::io::{IoError, IoResult};
@@ -32,10 +31,7 @@ impl RepositoryDelByPk for CargoDb {}
 impl RepositoryReadWithSpec for CargoDb {
   type Output = Cargo;
 
-  fn read_pk_with_spec(
-    pk: &str,
-    pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>> {
+  async fn read_pk_with_spec(pk: &str, pool: &Pool) -> IoResult<Self::Output> {
     log::trace!("CargoDb::find_by_pk: {pk}");
     let pool = Arc::clone(pool);
     let pk = pk.to_owned();
@@ -49,12 +45,13 @@ impl RepositoryReadWithSpec for CargoDb {
       let item = item.0.with_spec(&item.1.try_to_cargo_spec()?);
       Ok::<_, IoError>(item)
     })
+    .await?
   }
 
-  fn read_one_with_spec(
+  async fn read_one_with_spec(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Self::Output>> {
+  ) -> IoResult<Self::Output> {
     log::trace!("CargoDb::find_one: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargoes::dsl::cargoes
@@ -78,12 +75,13 @@ impl RepositoryReadWithSpec for CargoDb {
       let item = item.0.with_spec(&item.1.try_to_cargo_spec()?);
       Ok::<_, IoError>(item)
     })
+    .await?
   }
 
-  fn read_with_spec(
+  async fn read_with_spec(
     filter: &GenericFilter,
     pool: &Pool,
-  ) -> JoinHandle<IoResult<Vec<Self::Output>>> {
+  ) -> IoResult<Vec<Self::Output>> {
     log::trace!("CargoDb::find: {filter:?}");
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargoes::dsl::cargoes
@@ -119,6 +117,7 @@ impl RepositoryReadWithSpec for CargoDb {
         .collect::<IoResult<Vec<_>>>()?;
       Ok::<_, IoError>(items)
     })
+    .await?
   }
 }
 
@@ -177,7 +176,7 @@ impl CargoDb {
     pool: &Pool,
   ) -> IoResult<Cargo> {
     let version = version.to_owned();
-    let mut cargo = CargoDb::read_pk_with_spec(key, pool).await??;
+    let mut cargo = CargoDb::read_pk_with_spec(key, pool).await?;
     let new_spec = SpecDb::try_from_cargo_partial(key, &version, item)?;
     let spec = SpecDb::create_from(new_spec, pool)
       .await?
@@ -187,7 +186,7 @@ impl CargoDb {
       spec_key: Some(spec.key),
       ..Default::default()
     };
-    Self::update_pk(key, new_item, pool).await??;
+    Self::update_pk(key, new_item, pool).await?;
     cargo.spec = spec;
     Ok(cargo)
   }
@@ -196,7 +195,7 @@ impl CargoDb {
   pub(crate) async fn inspect_by_pk(key: &str, pool: &Pool) -> IoResult<Cargo> {
     let filter =
       GenericFilter::new().r#where("key", GenericClause::Eq(key.to_owned()));
-    Self::read_one_with_spec(&filter, pool).await?
+    Self::read_one_with_spec(&filter, pool).await
   }
 
   /// Find cargoes by namespace.
@@ -206,7 +205,7 @@ impl CargoDb {
   ) -> IoResult<Vec<Cargo>> {
     let filter = GenericFilter::new()
       .r#where("namespace_name", GenericClause::Eq(name.to_owned()));
-    Self::read_with_spec(&filter, pool).await?
+    Self::read_with_spec(&filter, pool).await
   }
 
   /// Count cargoes by namespace.
