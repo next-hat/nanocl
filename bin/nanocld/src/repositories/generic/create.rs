@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ntex::rt::JoinHandle;
 use diesel::{prelude::*, associations::HasTable};
 
 use nanocl_error::io::IoResult;
@@ -8,7 +7,7 @@ use nanocl_error::io::IoResult;
 use crate::{utils, models::Pool};
 
 pub trait RepositoryCreate: super::RepositoryBase {
-  fn create_from<I>(item: I, pool: &Pool) -> JoinHandle<IoResult<Self>>
+  async fn create_from<I>(item: I, pool: &Pool) -> IoResult<Self>
   where
     Self: Sized
       + Send
@@ -32,5 +31,6 @@ pub trait RepositoryCreate: super::RepositoryBase {
         .map_err(Self::map_err)?;
       Ok(item)
     })
+    .await?
   }
 }

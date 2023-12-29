@@ -41,7 +41,7 @@ impl NodeDb {
     pool: &Pool,
   ) -> IoResult<NodeDb> {
     match NodeDb::read_by_pk(&node.name, pool).await? {
-      Err(_) => NodeDb::create_from(node.clone(), pool).await?,
+      Err(_) => NodeDb::create_from(node.clone(), pool).await,
       Ok(node) => Ok(node),
     }
   }

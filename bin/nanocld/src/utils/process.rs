@@ -144,7 +144,7 @@ pub(crate) async fn create(
       })?,
     ),
   };
-  let process = ProcessDb::create_from(&new_instance, &state.pool).await??;
+  let process = ProcessDb::create_from(&new_instance, &state.pool).await?;
   Process::try_from(process)
     .map_err(|err| HttpError::internal_server_error(err.to_string()))
 }

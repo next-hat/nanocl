@@ -41,7 +41,7 @@ pub(crate) async fn create(
     .await
     .is_ok()
   {
-    let res = NamespaceDb::create_from(item, &state.pool).await??;
+    let res = NamespaceDb::create_from(item, &state.pool).await?;
     return Ok(Namespace { name: res.name });
   }
   let config = CreateNetworkOptions {
@@ -50,7 +50,7 @@ pub(crate) async fn create(
     ..Default::default()
   };
   state.docker_api.create_network(config).await?;
-  let res = NamespaceDb::create_from(item, &state.pool).await??;
+  let res = NamespaceDb::create_from(item, &state.pool).await?;
   Ok(Namespace { name: res.name })
 }
 
@@ -101,7 +101,7 @@ pub(crate) async fn list(
     let ipam = network.ipam.unwrap_or_default();
     let ipam_config = ipam.config.unwrap_or_default();
     let gateway = ipam_config
-      .get(0)
+      .first()
       .ok_or(HttpError::internal_server_error(format!(
         "Unable to get gateway for network {}",
         &item.name

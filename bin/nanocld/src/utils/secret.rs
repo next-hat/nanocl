@@ -14,7 +14,7 @@ pub(crate) async fn create(
   item: &SecretPartial,
   state: &DaemonState,
 ) -> HttpResult<Secret> {
-  let secret = SecretDb::create_from(item, &state.pool).await??;
+  let secret = SecretDb::create_from(item, &state.pool).await?;
   let secret: Secret = secret.try_into()?;
   state
     .event_emitter

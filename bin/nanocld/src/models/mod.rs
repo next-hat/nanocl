@@ -33,9 +33,6 @@ pub use resource::*;
 mod resource_kind;
 pub use resource_kind::*;
 
-mod resource_spec;
-pub use resource_spec::*;
-
 mod secret;
 pub use secret::*;
 

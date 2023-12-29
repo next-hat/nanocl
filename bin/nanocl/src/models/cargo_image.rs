@@ -1,8 +1,9 @@
-use chrono::NaiveDateTime;
-use nanocld_client::stubs::cargo_image::ListCargoImagesOptions;
 use tabled::Tabled;
+use chrono::NaiveDateTime;
 use clap::{Parser, Subcommand};
+
 use bollard_next::models::ImageSummary;
+use nanocld_client::stubs::cargo_image::ListCargoImagesOptions;
 
 /// `nanocl cargo image remove` available options
 #[derive(Clone, Parser)]
@@ -123,7 +124,7 @@ impl From<ImageSummary> for CargoImageRow {
   fn from(value: ImageSummary) -> Self {
     let binding = value
       .repo_tags
-      .get(0)
+      .first()
       .unwrap_or(&String::from("<none>"))
       .to_owned();
     let vals: Vec<_> = binding.split(':').collect();
