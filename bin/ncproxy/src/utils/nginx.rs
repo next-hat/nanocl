@@ -134,6 +134,7 @@ pub async fn add_rule(
           None => None,
         };
         if stream_rule.ssl.is_some() && ssl.is_none() {
+          log::warn!("Not ssl found for {name} {ssl:#?}");
           continue;
         }
         let data = STREAM_TEMPLATE.compile(&liquid::object!({
@@ -161,9 +162,6 @@ pub async fn add_rule(
           },
           None => None,
         };
-        if http_rule.ssl.is_some() && ssl.is_none() {
-          continue;
-        }
         for location in &http_rule.locations {
           match &location.target {
             LocationTarget::Upstream(upstream) => {
@@ -217,6 +215,7 @@ pub async fn add_rule(
           "domain": http_rule.domain,
           "locations": locations,
           "ssl": ssl,
+          "hide_upstream": http_rule.ssl.is_some() && ssl.is_none(),
         }))?;
         http_conf += &data;
       }

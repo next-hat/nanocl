@@ -33,7 +33,7 @@ Rules:
     Key: ncproxy-test.global.c
     Port: 9000
 - Protocol: Tcp
-  Port: 9999
+  Port: 9997
   Network: global.nsp
   Target:
     Key: ncproxy-test.global.c
