@@ -121,7 +121,7 @@ async fn watch(client: &NanocldClient) -> IoResult<()> {
     if let notify::EventKind::Modify(notify::event::ModifyKind::Data(_)) =
       event.kind
     {
-      let path = &event.paths.get(0);
+      let path = &event.paths.first();
       if let Some(path) = path {
         if let Err(err) = create(path, client).await {
           log::warn!("metric::watch: {err}");

@@ -150,7 +150,7 @@ impl VmDb {
     let key = utils::key::gen_key(&nsp, &item.name);
     let new_spec = SpecDb::try_from_vm_partial(&key, version, item)?;
     let spec = SpecDb::create_from(new_spec, pool)
-      .await??
+      .await?
       .try_to_vm_spec()?;
     let new_item = VmDb {
       key,
@@ -159,7 +159,7 @@ impl VmDb {
       namespace_name: nsp,
       spec_key: spec.key,
     };
-    let item = VmDb::create_from(new_item, pool).await??;
+    let item = VmDb::create_from(new_item, pool).await?;
     let vm = item.with_spec(&spec);
     Ok(vm)
   }
@@ -173,7 +173,7 @@ impl VmDb {
     let mut vm = VmDb::read_pk_with_spec(key, pool).await??;
     let new_spec = SpecDb::try_from_vm_partial(&vm.spec.vm_key, version, item)?;
     let spec = SpecDb::create_from(new_spec, pool)
-      .await??
+      .await?
       .try_to_vm_spec()?;
     let new_item = VmUpdateDb {
       name: Some(item.name.clone()),

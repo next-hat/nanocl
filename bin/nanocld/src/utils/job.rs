@@ -34,7 +34,7 @@ fn format_cron_job_command(job: &Job, state: &DaemonState) -> String {
   let host = state
     .config
     .hosts
-    .get(0)
+    .first()
     .cloned()
     .unwrap_or("unix:///run/nanocl/nanocl.sock".to_owned())
     .replace("unix://", "");
@@ -110,7 +110,7 @@ pub(crate) async fn create(
 ) -> HttpResult<Job> {
   let db_model = JobDb::try_from_partial(item)?;
   let job = JobDb::create_from(db_model, &state.pool)
-    .await??
+    .await?
     .to_spec(item);
   job
     .containers

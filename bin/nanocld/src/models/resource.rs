@@ -1,6 +1,10 @@
 use diesel::prelude::*;
 use serde::{Serialize, Deserialize};
 
+use nanocl_stubs::resource::ResourceSpec;
+
+use super::SpecDb;
+
 use crate::schema::resources;
 
 /// This structure represent a resource in the database.
@@ -33,4 +37,18 @@ pub struct ResourceUpdateDb {
   pub key: Option<String>,
   /// The spec key reference
   pub spec_key: Option<uuid::Uuid>,
+}
+
+/// Helper to convert a `SpecDb` to a `ResourceSpec`
+impl From<SpecDb> for ResourceSpec {
+  fn from(db: SpecDb) -> Self {
+    ResourceSpec {
+      key: db.key,
+      version: db.version,
+      created_at: db.created_at,
+      resource_key: db.kind_key,
+      data: db.data,
+      metadata: db.metadata,
+    }
+  }
 }

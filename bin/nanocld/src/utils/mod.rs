@@ -26,8 +26,6 @@ pub mod tests {
   use std::env;
   use ntex::web::{*, self};
 
-  pub use ntex::web::test::TestServer;
-
   use crate::{
     services,
     version::VERSION,

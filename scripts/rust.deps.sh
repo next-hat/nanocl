@@ -3,5 +3,3 @@
 set -e -x
 
 cargo install cargo-make
-cargo install cargo-nextest
-cargo install cargo-llvm-cov

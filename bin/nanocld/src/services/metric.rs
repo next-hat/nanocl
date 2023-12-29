@@ -56,7 +56,7 @@ pub(crate) async fn create_metric(
   }
   let new_metric =
     MetricNodePartial::try_new_node(&state.config.hostname, &payload)?;
-  let metric = MetricDb::create_from(&new_metric, &state.pool).await??;
+  let metric = MetricDb::create_from(&new_metric, &state.pool).await?;
   Ok(web::HttpResponse::Created().json(&metric))
 }
 

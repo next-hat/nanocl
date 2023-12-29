@@ -121,7 +121,7 @@ pub(crate) async fn create_snap(
     size_virtual: image_info.virtual_size,
     parent: Some(image.name.clone()),
   };
-  let snap_image = VmImageDb::create_from(snap_image, &state.pool).await??;
+  let snap_image = VmImageDb::create_from(snap_image, &state.pool).await?;
   Ok(snap_image)
 }
 
@@ -247,7 +247,7 @@ pub(crate) async fn clone(
       size_virtual: image_info.virtual_size,
       parent: None,
     };
-    let vm = match VmImageDb::create_from(new_base_image, &pool).await? {
+    let vm = match VmImageDb::create_from(new_base_image, &pool).await {
       Err(err) => {
         let _ = tx.send(Err(err.clone().into()));
         return Err(err.into());
@@ -340,6 +340,6 @@ pub(crate) async fn create(
     path: filepath.to_owned(),
     parent: None,
   };
-  let image = VmImageDb::create_from(vm_image, pool).await??;
+  let image = VmImageDb::create_from(vm_image, pool).await?;
   Ok(image)
 }

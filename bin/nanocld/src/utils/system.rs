@@ -72,7 +72,7 @@ pub(crate) async fn sync_process(
           })?,
         ),
       };
-      ProcessDb::create_from(&new_instance, &state.pool).await??;
+      ProcessDb::create_from(&new_instance, &state.pool).await?;
       log::info!("system::sync_process: {name} created");
     }
   }
@@ -98,7 +98,7 @@ pub(crate) async fn register_namespace(
   if create_network {
     utils::namespace::create(&new_nsp, state).await?;
   } else {
-    NamespaceDb::create_from(&new_nsp, &state.pool).await??;
+    NamespaceDb::create_from(&new_nsp, &state.pool).await?;
   }
   Ok(())
 }

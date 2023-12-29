@@ -169,14 +169,14 @@ impl ResourceDb {
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };
-    let spec = SpecDb::create_from(spec, pool).await??;
+    let spec = SpecDb::create_from(spec, pool).await?;
     let new_item = ResourceDb {
       key: item.name.to_owned(),
       created_at: chrono::Utc::now().naive_utc(),
       kind,
       spec_key: spec.key.to_owned(),
     };
-    let dbmodel = ResourceDb::create_from(new_item, pool).await??;
+    let dbmodel = ResourceDb::create_from(new_item, pool).await?;
     let item = dbmodel.with_spec(&spec);
     Ok(item)
   }
@@ -198,7 +198,7 @@ impl ResourceDb {
       data: item.data.clone(),
       metadata: item.metadata.clone(),
     };
-    let spec = SpecDb::create_from(spec, pool).await??;
+    let spec = SpecDb::create_from(spec, pool).await?;
     let resource_update = ResourceUpdateDb {
       key: None,
       spec_key: Some(spec.key.to_owned()),

@@ -129,7 +129,7 @@ impl ResourceKindDb {
       )));
     }
     let kind_version: SpecDb = item.try_into()?;
-    let version = SpecDb::create_from(kind_version, pool).await??;
+    let version = SpecDb::create_from(kind_version, pool).await?;
     match ResourceKindDb::read_pk_with_spec(&item.name, pool).await? {
       Ok(resource_kind) => {
         let update = ResourceKindDbUpdate {
@@ -143,7 +143,7 @@ impl ResourceKindDb {
           created_at: chrono::Utc::now().naive_utc(),
           spec_key: version.key,
         };
-        ResourceKindDb::create_from(kind, pool).await??
+        ResourceKindDb::create_from(kind, pool).await?
       }
     };
     let item: ResourceKind = version.try_into()?;

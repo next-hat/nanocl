@@ -156,7 +156,7 @@ impl CargoDb {
     let key = utils::key::gen_key(&nsp, &item.name);
     let new_spec = SpecDb::try_from_cargo_partial(&key, &version, &item)?;
     let spec = SpecDb::create_from(new_spec, pool)
-      .await??
+      .await?
       .try_to_cargo_spec()?;
     let new_item = CargoDb {
       key,
@@ -165,7 +165,7 @@ impl CargoDb {
       namespace_name: nsp,
       spec_key: spec.key,
     };
-    let item = Self::create_from(new_item, pool).await??.with_spec(&spec);
+    let item = Self::create_from(new_item, pool).await?.with_spec(&spec);
     Ok(item)
   }
 
@@ -180,7 +180,7 @@ impl CargoDb {
     let mut cargo = CargoDb::read_pk_with_spec(key, pool).await??;
     let new_spec = SpecDb::try_from_cargo_partial(key, &version, item)?;
     let spec = SpecDb::create_from(new_spec, pool)
-      .await??
+      .await?
       .try_to_cargo_spec()?;
     let new_item = CargoUpdateDb {
       name: Some(item.name.to_owned()),

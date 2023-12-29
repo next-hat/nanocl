@@ -37,7 +37,7 @@ async fn save_metric(
     kind: metric.0.to_owned(),
     data: metric.1,
   };
-  MetricDb::create_from(&metric, pool).await??;
+  MetricDb::create_from(&metric, pool).await?;
   Ok(())
 }
 

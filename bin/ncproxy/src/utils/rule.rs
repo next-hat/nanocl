@@ -33,7 +33,7 @@ async fn get_namespace_addr(
   let ipam = namespace.network.ipam.unwrap_or_default();
   let ipam_config = ipam.config.unwrap_or_default();
   let ipam_config = ipam_config
-    .get(0)
+    .first()
     .ok_or(IoError::invalid_data("IpamConfig", "Unable to get index 0"))?;
   let ip_address = ipam_config
     .gateway
