@@ -74,9 +74,9 @@ Cargoes:
 - Name: ncproxy
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ncproxy:0.10.0-nightly
+    Image: ghcr.io/next-hat/ncproxy:0.10.1-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/ncproxy:0.10.0
+    Image: ghcr.io/next-hat/ncproxy:0.10.1
     # {% endif %}
     Tty: true
     Cmd:
