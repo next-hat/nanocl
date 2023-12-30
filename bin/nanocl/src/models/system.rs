@@ -64,6 +64,9 @@ pub struct ProcessOpts {
   /// Show all processes for the given kind
   #[clap(long, short)]
   pub kind: Option<String>,
+  // Show all processes (default shows just running)
+  #[clap(long, short)]
+  pub all: bool,
 }
 
 /// A row for the process table
