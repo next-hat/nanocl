@@ -13,6 +13,17 @@ pub async fn exec_process(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let mut filter = GenericFilter::new();
+
+  if !args.all {
+    filter = filter.r#where(
+      "data",
+      GenericClause::Contains(serde_json::json!({
+        "State": {
+          "Status": "running"
+        }
+      })),
+    );
+  }
   if let Some(limit) = args.limit {
     filter = filter.limit(limit);
   }
@@ -39,6 +50,8 @@ pub async fn exec_process(
     .into_iter()
     .map(ProcessRow::from)
     .collect::<Vec<ProcessRow>>();
+
   print_table(rows);
+
   Ok(())
 }
