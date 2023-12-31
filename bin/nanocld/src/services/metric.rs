@@ -86,6 +86,7 @@ mod tests {
         Some(&MetricPartial {
           kind: "nanocl.io/test".to_owned(),
           data: serde_json::json!({ "test": "test" }),
+          display: None,
         }),
         None::<String>,
       )
@@ -101,6 +102,7 @@ mod tests {
         Some(&MetricPartial {
           kind: "test.io/test".to_owned(),
           data: serde_json::json!({ "test": "test" }),
+          display: None,
         }),
         None::<String>,
       )

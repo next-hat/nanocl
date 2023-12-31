@@ -5,14 +5,14 @@ use futures::StreamExt;
 
 use nanocl_error::io::IoResult;
 
-use metrsd_client::{MetrsdClient, MetrsdEvent};
+use metrsd_client::{MetrsdClient, stubs::MetrsdEvent};
 
 use crate::{
   repositories::generic::*,
   models::{Pool, DaemonState, MetricDb, MetricNodePartial},
 };
 
-/// Save metric event send by [metrsd](http://github.com/next-hat/metrsd) to the database
+/// Save metric event send by [metrsd](http://github.com/next-hat/metrs) to the database
 /// The event can be a `CPU`, `MEMORY`, `DISK` or `NETWORK` event.
 /// The metric is saved for the current node.
 /// This allow us to know what node is the most used.
@@ -22,20 +22,31 @@ async fn save_metric(
   pool: &Pool,
 ) -> IoResult<()> {
   let node_name = node.to_owned();
-  let metric = match ev {
-    MetrsdEvent::Cpu(cpus) => ("nanocl.io/cpu", serde_json::to_value(cpus)?),
-    MetrsdEvent::Memory(mem) => {
-      ("nanocl.io/memory", serde_json::to_value(mem)?)
-    }
-    MetrsdEvent::Disk(disk) => ("nanocl.io/disk", serde_json::to_value(disk)?),
-    MetrsdEvent::Network(net) => {
-      ("nanocl.io/network", serde_json::to_value(net)?)
-    }
+  let kind = "nanocl.io/metrs";
+  let data = serde_json::to_value(ev)?;
+  let mut cpu_percent = ev.cpus.iter().fold(0.0, |acc, cpu| acc + cpu.usage);
+  cpu_percent /= ev.cpus.len() as f32;
+  let mut memory_percent = ev.memory.used as f32 / ev.memory.total as f32;
+  memory_percent *= 100.0;
+  let new_cpu_percent = cpu_percent as u32;
+  let new_memory_percent = memory_percent as u32;
+  let formated_cpu_percent = if new_cpu_percent < 10 {
+    format!("0{}", new_cpu_percent)
+  } else {
+    new_cpu_percent.to_string()
   };
+  let formated_memory_percent = if new_memory_percent < 10 {
+    format!("0{}", new_memory_percent)
+  } else {
+    new_memory_percent.to_string()
+  };
+  let display =
+    format!("CPU {formated_cpu_percent}% | MEMORY {formated_memory_percent}%");
   let metric = MetricNodePartial {
+    data,
     node_name,
-    kind: metric.0.to_owned(),
-    data: metric.1,
+    kind: kind.to_owned(),
+    display: Some(display),
   };
   MetricDb::create_from(&metric, pool).await?;
   Ok(())

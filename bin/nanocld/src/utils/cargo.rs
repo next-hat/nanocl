@@ -571,13 +571,19 @@ pub async fn patch(
     // Merge environment variables from new_env into the merged array
     for env_var in new_env {
       let parts: Vec<&str> = env_var.split('=').collect();
-      if parts.len() != 2 {
+      if parts.len() < 2 {
         continue;
       }
       let name = parts[0].to_owned();
-      let value = parts[1].to_owned();
-      if let Some(pos) = env_vars.iter().position(|x| x.starts_with(&name)) {
-        let old_value = env_vars[pos].split('=').nth(1).unwrap().to_owned();
+      let value = parts[1..].join("=");
+      if let Some(pos) = env_vars
+        .iter()
+        .position(|x| x.starts_with(&format!("{name}=")))
+      {
+        let old_value = env_vars[pos].to_owned();
+        log::trace!(
+          "env var: {name} old_value: {old_value} new_value: {value}"
+        );
         if old_value != value && !value.is_empty() {
           // Update the value if it has changed
           env_vars[pos] = format!("{}={}", name, value);

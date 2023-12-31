@@ -11,34 +11,22 @@ use std::{
   io::{Read, Seek, BufReader, SeekFrom},
 };
 
-use ntex::rt;
+use ntex::{rt, http};
 use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
 
 use nanocl_error::io::{IoResult, IoError, FromIo};
 
-use nanocld_client::{NanocldClient, stubs::metric::MetricPartial};
+use nanocld_client::{
+  NanocldClient,
+  stubs::metric::{MetricPartial, HttpMetric},
+};
 
 use crate::models::SystemStateRef;
 
-fn read(path: &Path) -> IoResult<(&'static str, serde_json::Value)> {
+fn read(path: &Path) -> IoResult<serde_json::Value> {
   if !path.exists() {
     return Err(IoError::not_found("Metric", &format!("{}", path.display())));
   }
-  let file_name = path
-    .file_name()
-    .unwrap_or_default()
-    .to_str()
-    .unwrap_or_default();
-  let kind = match file_name {
-    "http.log" => "ncproxy.io/http",
-    "stream.log" => "ncproxy.io/stream",
-    _ => {
-      return Err(IoError::invalid_data(
-        "Metric",
-        &format!("{}", path.display()),
-      ));
-    }
-  };
   let file = match File::open(path) {
     Ok(file) => file,
     Err(e) => {
@@ -73,21 +61,46 @@ fn read(path: &Path) -> IoResult<(&'static str, serde_json::Value)> {
   let data = serde_json::from_str(&last_line).map_err(|e| {
     e.map_err_context(|| format!("metric failed to parse {last_line}"))
   })?;
-  Ok((kind, data))
+  Ok(data)
 }
 
-async fn create(path: &Path, client: &NanocldClient) -> IoResult<()> {
-  let (kind, data) = read(path)?;
+async fn create(
+  kind: &str,
+  path: &Path,
+  client: &NanocldClient,
+) -> IoResult<()> {
+  let data = read(path)?;
+  log::trace!("metric::create: {kind} {data}");
+  let display = match kind {
+    "ncproxy.io/http" => {
+      let data = serde_json::from_value::<HttpMetric>(data.clone())?;
+      let proxy_host = data.proxy_host.unwrap_or("<none>".to_owned());
+      let upstream_addr = data.upstream_addr.unwrap_or("<none>".to_owned());
+      let status = match http::StatusCode::from_u16(data.status as u16) {
+        Err(_) => data.status.to_string(),
+        Ok(status) => format!("{status}"),
+      };
+      let display = format!(
+        "[{status}] {} {} {}{} -> {proxy_host} {upstream_addr}",
+        data.server_protocol, data.request_method, data.host, data.uri,
+      );
+      Some(display)
+    }
+    "ncproxy.io/stream" => None,
+    _ => None,
+  };
   let metric = MetricPartial {
     kind: kind.to_owned(),
     data,
+    display,
   };
   client.create_metric(&metric).await?;
   Ok(())
 }
 
-async fn watch(client: &NanocldClient) -> IoResult<()> {
-  let path = Path::new("/var/log/nginx/access");
+async fn watch(state: &SystemStateRef) -> IoResult<()> {
+  let path = format!("{}/log", state.store.dir);
+  let path = Path::new(&path);
   if !path.exists() {
     return Err(IoError::not_found("Metric", &format!("{}", path.display())));
   }
@@ -121,9 +134,21 @@ async fn watch(client: &NanocldClient) -> IoResult<()> {
     if let notify::EventKind::Modify(notify::event::ModifyKind::Data(_)) =
       event.kind
     {
-      let path = &event.paths.first();
+      let path = event.paths.first();
       if let Some(path) = path {
-        if let Err(err) = create(path, client).await {
+        let file_name = path
+          .file_name()
+          .unwrap_or_default()
+          .to_str()
+          .unwrap_or_default();
+        let kind = match file_name {
+          "http.log" => "ncproxy.io/http",
+          "stream.log" => "ncproxy.io/stream",
+          _ => {
+            continue;
+          }
+        };
+        if let Err(err) = create(kind, path, &state.client).await {
           log::warn!("metric::watch: {err}");
         }
       }
@@ -139,7 +164,7 @@ pub(crate) fn spawn(state: &SystemStateRef) {
   let state = Arc::clone(state);
   rt::Arbiter::new().exec_fn(move || {
     rt::spawn(async move {
-      if let Err(err) = watch(&state.client).await {
+      if let Err(err) = watch(&state).await {
         log::warn!("metric::spawn: {err}");
       }
       rt::Arbiter::current().stop();

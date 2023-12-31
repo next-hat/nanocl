@@ -1,8 +1,11 @@
-use nanocl_error::http_client::HttpClientResult;
+use nanocl_error::{
+  http_client::{HttpClientResult, HttpClientError},
+  io::IoError,
+};
 
 use nanocl_stubs::{
   metric::{Metric, MetricPartial},
-  generic::GenericFilter,
+  generic::{GenericFilter, GenericListQuery},
 };
 
 use super::http_client::NanocldClient;
@@ -23,9 +26,16 @@ impl NanocldClient {
   /// ```
   pub async fn list_metric(
     &self,
-    filter: Option<&GenericFilter>,
+    query: Option<&GenericFilter>,
   ) -> HttpClientResult<Vec<Metric>> {
-    let res = self.send_get(Self::METRIC_PATH, filter).await?;
+    let query = query.cloned().unwrap_or_default();
+    let query = GenericListQuery::try_from(query).map_err(|err| {
+      HttpClientError::IoError(IoError::invalid_data(
+        "Query".to_owned(),
+        err.to_string(),
+      ))
+    })?;
+    let res = self.send_get(Self::METRIC_PATH, Some(&query)).await?;
     Self::res_json(res).await
   }
 
@@ -71,6 +81,7 @@ mod tests {
           "name": "my-metric",
           "description": "My metric",
         }),
+        display: None,
       })
       .await
       .unwrap();

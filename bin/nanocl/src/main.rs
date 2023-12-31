@@ -71,6 +71,7 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Node(args) => commands::exec_node(&cli_conf, args).await,
     Command::Context(args) => commands::exec_context(&cli_conf, args).await,
     Command::Info => commands::exec_info(&cli_conf).await,
+    Command::Metric(args) => commands::exec_metric(&cli_conf, args).await,
   }
 }
 
