@@ -31,6 +31,8 @@ pub struct MetricDb {
   pub kind: String,
   /// The data of the metric
   pub data: serde_json::Value,
+  /// Optional way to display
+  pub display: Option<String>,
 }
 
 /// This structure is used to insert a metric in the database.
@@ -42,6 +44,8 @@ pub struct MetricNodePartial {
   pub node_name: String,
   /// The data of the metric
   pub data: serde_json::Value,
+  /// Optional way to display
+  pub display: Option<String>,
 }
 
 impl MetricNodePartial {
@@ -51,6 +55,7 @@ impl MetricNodePartial {
       node_name: node_name.to_owned(),
       kind: item.kind.clone(),
       data: item.data.clone(),
+      display: item.display.clone(),
     })
   }
 }
@@ -64,6 +69,7 @@ impl From<&MetricNodePartial> for MetricDb {
       node_name: p.node_name.clone(),
       kind: p.kind.clone(),
       data: p.data.clone(),
+      display: p.display.clone(),
     }
   }
 }

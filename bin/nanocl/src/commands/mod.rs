@@ -17,6 +17,7 @@ mod context;
 mod secret;
 mod job;
 mod generic;
+mod metric;
 
 pub use generic::*;
 
@@ -36,3 +37,4 @@ pub use install::exec_install;
 pub use upgrade::exec_upgrade;
 pub use uninstall::exec_uninstall;
 pub use secret::exec_secret;
+pub use metric::exec_metric;

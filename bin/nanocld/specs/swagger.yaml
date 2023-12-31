@@ -4650,6 +4650,10 @@ components:
           description: The kind of the metric
         Data:
           description: The data of the metric
+        Display:
+          type: string
+          description: Optional way to display
+          nullable: true
     MetricPartial:
       type: object
       description: Used to create a new metric
@@ -4662,6 +4666,10 @@ components:
           description: The kind of the metric
         Data:
           description: The data of the metric
+        Display:
+          type: string
+          description: Optional way to display
+          nullable: true
     Mount:
       type: object
       properties:
