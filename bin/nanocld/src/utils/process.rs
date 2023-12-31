@@ -9,9 +9,8 @@ use bollard_next::container::{
 };
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericClause},
-  process::{Process, ProcessKind, ProcessPartial},
   system::EventAction,
+  process::{Process, ProcessKind, ProcessPartial},
 };
 
 use crate::{
@@ -25,15 +24,13 @@ async fn after(
   action: EventAction,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let filter =
-    GenericFilter::new().r#where("key", GenericClause::Eq(kind_key.to_owned()));
   match kind {
     ProcessKind::Vm => {
-      let vm = VmDb::read_one_with_spec(&filter, &state.pool).await?;
+      let vm = VmDb::transform_read_by_pk(kind_key, &state.pool).await?;
       state.event_emitter.spawn_emit_to_event(&vm, action);
     }
     ProcessKind::Cargo => {
-      let cargo = CargoDb::read_one_with_spec(&filter, &state.pool).await?;
+      let cargo = CargoDb::transform_read_by_pk(kind_key, &state.pool).await?;
       state.event_emitter.spawn_emit_to_event(&cargo, action);
     }
     ProcessKind::Job => {
@@ -179,7 +176,7 @@ pub(crate) async fn start_by_kind(
   kind_key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let processes = ProcessDb::find_by_kind_key(kind_key, &state.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(kind_key, &state.pool).await?;
   log::debug!("process::start_by_kind: {kind_key}");
   for process in processes {
     let process_state = process.data.state.unwrap_or_default();
@@ -203,7 +200,7 @@ pub(crate) async fn stop_by_kind(
   kind_key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let processes = ProcessDb::find_by_kind_key(kind_key, &state.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(kind_key, &state.pool).await?;
   log::debug!("process::stop_by_kind: {kind:#?} {kind_key}");
   for process in processes {
     let process_state = process.data.state.unwrap_or_default();

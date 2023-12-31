@@ -3,15 +3,14 @@ use diesel::prelude::*;
 use nanocl_error::io::IoResult;
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericClause},
   process::Process,
+  generic::{GenericFilter, GenericClause},
 };
 
 use crate::{
-  gen_where4string,
+  gen_multiple, gen_where4json, gen_where4string,
   schema::processes,
   models::{Pool, ProcessDb, ProcessUpdateDb},
-  gen_where4json,
 };
 
 use super::generic::*;
@@ -41,68 +40,81 @@ impl RepositoryDelBy for ProcessDb {
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = diesel::delete(processes::table).into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, processes::dsl::key, value);
+      gen_where4string!(query, processes::key, value);
     }
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, processes::dsl::name, value);
+      gen_where4string!(query, processes::name, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, processes::dsl::kind, value);
+      gen_where4string!(query, processes::kind, value);
     }
     if let Some(value) = r#where.get("node_key") {
-      gen_where4string!(query, processes::dsl::node_key, value);
+      gen_where4string!(query, processes::node_key, value);
     }
     if let Some(value) = r#where.get("kind_key") {
-      gen_where4string!(query, processes::dsl::kind_key, value);
+      gen_where4string!(query, processes::kind_key, value);
     }
     query
   }
 }
 
-impl RepositoryRead for ProcessDb {
-  type Output = Process;
-  type Query = processes::BoxedQuery<'static, diesel::pg::Pg>;
+impl RepositoryReadBy for ProcessDb {
+  type Output = ProcessDb;
 
-  fn gen_read_query(filter: &GenericFilter, is_multiple: bool) -> Self::Query {
+  fn get_pk() -> &'static str {
+    "key"
+  }
+
+  fn gen_read_query(
+    filter: &GenericFilter,
+    is_multiple: bool,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<
+    'static,
+    diesel::pg::PgConnection,
+    Self::Output,
+  > {
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = processes::dsl::processes.into_boxed();
+    let mut query = processes::table.into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, processes::dsl::key, value);
+      gen_where4string!(query, processes::key, value);
     }
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, processes::dsl::name, value);
+      gen_where4string!(query, processes::name, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, processes::dsl::kind, value);
+      gen_where4string!(query, processes::kind, value);
     }
     if let Some(value) = r#where.get("node_key") {
-      gen_where4string!(query, processes::dsl::node_key, value);
+      gen_where4string!(query, processes::node_key, value);
     }
     if let Some(value) = r#where.get("kind_key") {
-      gen_where4string!(query, processes::dsl::kind_key, value);
+      gen_where4string!(query, processes::kind_key, value);
     }
     if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, processes::dsl::data, value);
+      gen_where4json!(query, processes::data, value);
     }
     if is_multiple {
-      query = query.order(processes::dsl::created_at.desc());
-      let limit = filter.limit.unwrap_or(100);
-      query = query.limit(limit as i64);
-      if let Some(offset) = filter.offset {
-        query = query.offset(offset as i64);
-      }
+      gen_multiple!(query, processes::created_at, filter);
     }
     query
+  }
+}
+
+impl RepositoryReadByTransform for ProcessDb {
+  type NewOutput = Process;
+
+  fn transform(input: ProcessDb) -> IoResult<Self::NewOutput> {
+    input.try_into()
   }
 }
 
 impl ProcessDb {
-  pub(crate) async fn find_by_kind_key(
+  pub(crate) async fn read_by_kind_key(
     kind_key: &str,
     pool: &Pool,
   ) -> IoResult<Vec<Process>> {
     let filter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(kind_key.to_owned()));
-    ProcessDb::read(&filter, pool).await
+    ProcessDb::transform_read_by(&filter, pool).await
   }
 }

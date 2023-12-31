@@ -142,14 +142,14 @@ pub(crate) async fn create(
 
 /// List all jobs
 pub(crate) async fn list(state: &DaemonState) -> HttpResult<Vec<JobSummary>> {
-  let jobs = JobDb::read(&GenericFilter::default(), &state.pool).await?;
+  let jobs = JobDb::read_by(&GenericFilter::default(), &state.pool).await?;
   let job_summaries =
     jobs
       .iter()
       .map(|job| async {
         let job = job.try_to_spec()?;
         let instances =
-          ProcessDb::find_by_kind_key(&job.name, &state.pool).await?;
+          ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
         let (
           instance_total,
           instance_failed,
@@ -178,7 +178,7 @@ pub(crate) async fn delete_by_name(
   state: &DaemonState,
 ) -> HttpResult<()> {
   let job = JobDb::read_by_pk(name, &state.pool).await?.try_to_spec()?;
-  let processes = ProcessDb::find_by_kind_key(name, &state.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(name, &state.pool).await?;
   processes
     .into_iter()
     .map(|process| async move {
@@ -210,7 +210,7 @@ pub(crate) async fn inspect_by_name(
   state: &DaemonState,
 ) -> HttpResult<JobInspect> {
   let job = JobDb::read_by_pk(name, &state.pool).await?.try_to_spec()?;
-  let instances = ProcessDb::find_by_kind_key(name, &state.pool).await?;
+  let instances = ProcessDb::read_by_kind_key(name, &state.pool).await?;
   let (instance_total, instance_failed, instance_success, instance_running) =
     utils::process::count_status(&instances);
   let job_inspect = JobInspect {
@@ -232,7 +232,7 @@ pub(crate) async fn wait(
 ) -> HttpResult<impl StreamExt<Item = Result<Bytes, HttpError>>> {
   let job = JobDb::read_by_pk(name, &state.pool).await?.try_to_spec()?;
   let docker_api = state.docker_api.clone();
-  let processes = ProcessDb::find_by_kind_key(&job.name, &state.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
   let mut streams = Vec::new();
   for process in processes {
     let options = Some(wait_options.clone());

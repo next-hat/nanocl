@@ -16,7 +16,7 @@ use crate::{
 /// Delete a vm image from the database and from the filesystem
 pub(crate) async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
   let vm_image = VmImageDb::read_by_pk(name, pool).await?;
-  let children = VmImageDb::find_by_parent(name, pool).await?;
+  let children = VmImageDb::read_by_parent(name, pool).await?;
   if !children.is_empty() {
     return Err(HttpError::conflict(format!(
       "Vm image {name} has children images please delete them first"

@@ -35,7 +35,7 @@ pub(crate) async fn list_vm_images(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
-  let images = VmImageDb::read(&filter, &state.pool).await?;
+  let images = VmImageDb::read_by(&filter, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&images))
 }
 

@@ -35,7 +35,7 @@ pub(crate) async fn list_resource(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
-  let items = ResourceDb::read_with_spec(&filter, &state.pool).await?;
+  let items = ResourceDb::transform_read_by(&filter, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -57,7 +57,7 @@ pub(crate) async fn inspect_resource(
   state: web::types::State<DaemonState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let resource = ResourceDb::inspect_by_pk(&path.1, &state.pool).await?;
+  let resource = ResourceDb::transform_read_by_pk(&path.1, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
@@ -122,7 +122,7 @@ pub(crate) async fn put_resource(
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceUpdate>,
 ) -> HttpResult<web::HttpResponse> {
-  let resource = ResourceDb::inspect_by_pk(&path.1, &state.pool).await?;
+  let resource = ResourceDb::transform_read_by_pk(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
     name: path.1.clone(),
     kind: resource.kind,
@@ -153,7 +153,7 @@ pub(crate) async fn list_resource_history(
 ) -> HttpResult<web::HttpResponse> {
   let filter =
     GenericFilter::new().r#where("kind_key", GenericClause::Eq(path.1.clone()));
-  let items = SpecDb::read(&filter, &state.pool)
+  let items = SpecDb::read_by(&filter, &state.pool)
     .await?
     .into_iter()
     .map(ResourceSpec::from)
@@ -181,7 +181,7 @@ pub(crate) async fn revert_resource(
   path: web::types::Path<(String, String, uuid::Uuid)>,
 ) -> HttpResult<web::HttpResponse> {
   let history = SpecDb::read_by_pk(&path.2, &state.pool).await?;
-  let resource = ResourceDb::inspect_by_pk(&path.1, &state.pool).await?;
+  let resource = ResourceDb::transform_read_by_pk(&path.1, &state.pool).await?;
   let new_resource = ResourcePartial {
     name: resource.spec.resource_key,
     kind: resource.kind,

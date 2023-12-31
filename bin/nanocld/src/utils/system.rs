@@ -35,9 +35,7 @@ pub(crate) async fn sync_process(
   log::trace!("system::sync_process: {name}");
   let container_instance_data = serde_json::to_value(instance)
     .map_err(|err| err.map_err_context(|| "Process"))?;
-  let filter =
-    GenericFilter::new().r#where("key", GenericClause::Eq(id.to_owned()));
-  let current_res = ProcessDb::read_one(&filter, &state.pool).await;
+  let current_res = ProcessDb::transform_read_by_pk(&id, &state.pool).await;
   match current_res {
     Ok(current_instance) => {
       if current_instance.data == *instance {
@@ -159,7 +157,7 @@ pub(crate) async fn sync_processes(state: &DaemonState) -> IoResult<()> {
         ..Default::default()
       };
       cargo_inspected.insert(key.to_owned(), true);
-      match CargoDb::inspect_by_pk(key, &state.pool).await {
+      match CargoDb::transform_read_by_pk(key, &state.pool).await {
         // unless we create his config
         Err(_err) => {
           if let Err(err) = register_namespace(namespace, false, state).await {

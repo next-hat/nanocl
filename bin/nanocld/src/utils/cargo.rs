@@ -103,7 +103,8 @@ async fn create_instances(
     let fetched_secrets = secrets
       .iter()
       .map(|secret| async move {
-        let secret = SecretDb::read_by_pk(secret, &state.pool).await?;
+        let secret =
+          SecretDb::transform_read_by_pk(secret, &state.pool).await?;
         if secret.kind.as_str() != "nanocl.io/env" {
           return Err(HttpError::bad_request(format!(
             "Secret {} is not an nanocl.io/env secret",
@@ -331,7 +332,7 @@ pub(crate) async fn create(
 pub(crate) async fn restart(key: &str, state: &DaemonState) -> HttpResult<()> {
   let cargo = utils::cargo::inspect_by_key(key, state).await?;
   let processes =
-    ProcessDb::find_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
+    ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
   processes
     .into_iter()
     .map(|process| async move {
@@ -355,9 +356,9 @@ pub(crate) async fn delete_by_key(
   force: Option<bool>,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
+  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
   let processes =
-    ProcessDb::find_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
+    ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
   processes
     .into_iter()
     .map(|process| async move {
@@ -407,7 +408,7 @@ pub(crate) async fn put(
   } else {
     1
   };
-  let processes = ProcessDb::find_by_kind_key(cargo_key, &state.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(cargo_key, &state.pool).await?;
   restore_instances_backup(&processes, state).await?;
   // Create instance with the new spec
   let new_instances = match create_instances(&cargo, number, state).await {
@@ -467,14 +468,14 @@ pub(crate) async fn list(
     .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
   // ensure namespace exists
   NamespaceDb::read_by_pk(&namespace, &state.pool).await?;
-  let cargoes = CargoDb::read_with_spec(&filter, &state.pool).await?;
+  let cargoes = CargoDb::transform_read_by(&filter, &state.pool).await?;
   let mut cargo_summaries = Vec::new();
   for cargo in cargoes {
     let spec = SpecDb::read_by_pk(&cargo.spec.key, &state.pool)
       .await?
       .try_to_cargo_spec()?;
     let instances =
-      ProcessDb::find_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
+      ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
     let mut running_instances = 0;
     for instance in &instances {
       let state = instance.data.state.clone().unwrap_or_default();
@@ -501,8 +502,8 @@ pub(crate) async fn inspect_by_key(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<CargoInspect> {
-  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
-  let processes = ProcessDb::find_by_kind_key(key, &state.pool).await?;
+  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(key, &state.pool).await?;
   let (_, _, _, running_instances) = utils::process::count_status(&processes);
   Ok(CargoInspect {
     created_at: cargo.created_at,
@@ -522,7 +523,7 @@ pub(crate) async fn delete_by_namespace(
 ) -> HttpResult<()> {
   let namespace = NamespaceDb::read_by_pk(namespace, &state.pool).await?;
   let cargoes =
-    CargoDb::find_by_namespace(&namespace.name, &state.pool).await?;
+    CargoDb::read_by_namespace(&namespace.name, &state.pool).await?;
   cargoes
     .into_iter()
     .map(|cargo| async move {
@@ -543,7 +544,7 @@ pub(crate) async fn kill_by_key(
   options: &CargoKillOptions,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let instances = ProcessDb::find_by_kind_key(key, &state.pool).await?;
+  let instances = ProcessDb::read_by_kind_key(key, &state.pool).await?;
   if instances.is_empty() {
     return Err(HttpError::not_found(format!(
       "Cargo instance not found: {key}"
@@ -562,7 +563,7 @@ pub async fn patch(
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Cargo> {
-  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
+  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
   let container = if let Some(container) = payload.container.clone() {
     // merge env and ensure no duplicate key
     let new_env = container.env.unwrap_or_default();
@@ -681,8 +682,8 @@ pub async fn scale(
   options: &CargoScale,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let cargo = CargoDb::inspect_by_pk(key, &state.pool).await?;
-  let instances = ProcessDb::find_by_kind_key(key, &state.pool).await?;
+  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
+  let instances = ProcessDb::read_by_kind_key(key, &state.pool).await?;
   let is_equal = usize::try_from(options.replicas)
     .map(|replica| instances.len() == replica)
     .unwrap_or(false);

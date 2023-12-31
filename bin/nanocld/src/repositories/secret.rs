@@ -5,7 +5,7 @@ use nanocl_stubs::generic::GenericFilter;
 use nanocl_stubs::secret::Secret;
 
 use crate::{
-  gen_where4string,
+  gen_multiple, gen_where4string,
   models::{SecretDb, SecretUpdateDb},
   schema::secrets,
 };
@@ -22,27 +22,42 @@ impl RepositoryUpdate for SecretDb {
   type UpdateItem = SecretUpdateDb;
 }
 
-impl RepositoryRead for SecretDb {
-  type Output = Secret;
-  type Query = secrets::BoxedQuery<'static, diesel::pg::Pg>;
+impl RepositoryReadBy for SecretDb {
+  type Output = SecretDb;
 
-  fn gen_read_query(filter: &GenericFilter, is_multiple: bool) -> Self::Query {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = secrets::dsl::secrets.into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, secrets::dsl::key, value);
+  fn get_pk() -> &'static str {
+    "key"
+  }
+
+  fn gen_read_query(
+    filter: &GenericFilter,
+    is_multiple: bool,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<
+    'static,
+    diesel::pg::PgConnection,
+    Self::Output,
+  > {
+    let r#where = filter.r#where.clone().unwrap_or_default();
+    let mut query = secrets::table.into_boxed();
+    if let Some(key) = r#where.get("key") {
+      gen_where4string!(query, secrets::key, key);
     }
-    if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, secrets::dsl::kind, value);
+    if let Some(kind) = r#where.get("kind") {
+      gen_where4string!(query, secrets::kind, kind);
     }
     if is_multiple {
-      query = query.order(secrets::dsl::created_at.desc());
-      let limit = filter.limit.unwrap_or(100);
-      query = query.limit(limit as i64);
-      if let Some(offset) = filter.offset {
-        query = query.offset(offset as i64);
-      }
+      gen_multiple!(query, secrets::created_at, filter);
     }
     query
+  }
+}
+
+impl RepositoryReadByTransform for SecretDb {
+  type NewOutput = Secret;
+
+  fn transform(
+    input: Self::Output,
+  ) -> nanocl_error::io::IoResult<Self::NewOutput> {
+    input.try_into()
   }
 }

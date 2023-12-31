@@ -1,17 +1,13 @@
-use std::sync::Arc;
-
 use diesel::prelude::*;
 
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::IoResult;
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericClause},
-  resource::Resource,
-  resource::ResourcePartial,
+  generic::GenericFilter, resource::Resource, resource::ResourcePartial,
 };
 
 use crate::{
-  utils, gen_where4string, gen_where4json,
+  gen_multiple, gen_where4json, gen_where4string,
   models::{Pool, ResourceDb, ResourceUpdateDb, ResourceKindDb, SpecDb},
   schema::{resources, specs},
 };
@@ -28,98 +24,50 @@ impl RepositoryUpdate for ResourceDb {
 
 impl RepositoryDelByPk for ResourceDb {}
 
-impl RepositoryReadWithSpec for ResourceDb {
-  type Output = Resource;
+impl RepositoryReadBy for ResourceDb {
+  type Output = (ResourceDb, SpecDb);
 
-  async fn read_pk_with_spec(pk: &str, pool: &Pool) -> IoResult<Self::Output> {
-    log::trace!("ResourceDb::find_by_pk: {pk}");
-    let pool = Arc::clone(pool);
-    let pk = pk.to_owned();
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = resources::dsl::resources
-        .inner_join(crate::schema::specs::table)
-        .filter(resources::dsl::key.eq(pk))
-        .get_result::<(Self, SpecDb)>(&mut conn)
-        .map_err(Self::map_err)?;
-      let item = item.0.with_spec(&item.1);
-      Ok::<_, IoError>(item)
-    })
-    .await?
+  fn get_pk() -> &'static str {
+    "key"
   }
 
-  async fn read_one_with_spec(
+  fn gen_read_query(
     filter: &GenericFilter,
-    pool: &Pool,
-  ) -> IoResult<Self::Output> {
-    log::trace!("ResourceDb::find_one: {filter:?}");
+    is_multiple: bool,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<
+    'static,
+    diesel::PgConnection,
+    Self::Output,
+  > {
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = resources::dsl::resources
-      .inner_join(specs::table)
+    let mut query = resources::table
+      .inner_join(crate::schema::specs::table)
       .into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, resources::dsl::key, value);
+      gen_where4string!(query, resources::key, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, resources::dsl::kind, value);
+      gen_where4string!(query, resources::kind, value);
     }
     if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, specs::dsl::data, value);
+      gen_where4json!(query, specs::data, value);
     }
     if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, specs::dsl::metadata, value);
+      gen_where4json!(query, specs::metadata, value);
     }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_result::<(Self, SpecDb)>(&mut conn)
-        .map_err(Self::map_err)?;
-      let item = item.0.with_spec(&item.1);
-      Ok::<_, IoError>(item)
-    })
-    .await?
+    if is_multiple {
+      gen_multiple!(query, resources::created_at, filter);
+    }
+    query
   }
+}
 
-  async fn read_with_spec(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> IoResult<Vec<Self::Output>> {
-    log::trace!("ResourceDb::find: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = resources::dsl::resources
-      .inner_join(specs::table)
-      .into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, resources::dsl::key, value);
-    }
-    if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, resources::dsl::kind, value);
-    }
-    if let Some(value) = r#where.get("data") {
-      gen_where4json!(query, specs::dsl::data, value);
-    }
-    if let Some(value) = r#where.get("metadata") {
-      gen_where4json!(query, specs::dsl::metadata, value);
-    }
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_results::<(Self, SpecDb)>(&mut conn)
-        .map_err(Self::map_err)?;
-      let items = items
-        .into_iter()
-        .map(|item| item.0.with_spec(&item.1))
-        .collect::<Vec<_>>();
-      Ok::<_, IoError>(items)
-    })
-    .await?
+impl RepositoryReadByTransform for ResourceDb {
+  type NewOutput = Resource;
+
+  fn transform(input: (ResourceDb, SpecDb)) -> IoResult<Self::NewOutput> {
+    let item = input.0.with_spec(&input.1);
+    Ok(item)
   }
 }
 
@@ -147,7 +95,7 @@ impl ResourceDb {
         Ok((items[..2].join("/"), version.to_owned().to_string()))
       }
       None => {
-        let kind = ResourceKindDb::read_pk_with_spec(kind, pool).await?;
+        let kind = ResourceKindDb::transform_read_by_pk(kind, pool).await?;
         Ok((kind.name, kind.version))
       }
     }
@@ -186,7 +134,7 @@ impl ResourceDb {
     pool: &Pool,
   ) -> IoResult<Resource> {
     let key = item.name.clone();
-    let resource = ResourceDb::read_pk_with_spec(&item.name, pool).await?;
+    let resource = ResourceDb::transform_read_by_pk(&item.name, pool).await?;
     let (_, version) = ResourceDb::parse_kind(&item.kind, pool).await?;
     let spec = SpecDb {
       key: uuid::Uuid::new_v4(),
@@ -205,14 +153,5 @@ impl ResourceDb {
     let dbmodel = ResourceDb::update_pk(&key, resource_update, pool).await?;
     let item = dbmodel.with_spec(&spec);
     Ok(item)
-  }
-
-  pub(crate) async fn inspect_by_pk(
-    pk: &str,
-    pool: &Pool,
-  ) -> IoResult<Resource> {
-    let filter =
-      GenericFilter::new().r#where("key", GenericClause::Eq(pk.to_owned()));
-    Self::read_one_with_spec(&filter, pool).await
   }
 }

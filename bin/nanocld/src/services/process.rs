@@ -35,7 +35,7 @@ pub(crate) async fn list_process(
   let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
     HttpError::bad_request(format!("Invalid query string: {err}"))
   })?;
-  let processes = ProcessDb::read(&filter, &state.pool).await?;
+  let processes = ProcessDb::transform_read_by(&filter, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&processes))
 }
 
@@ -68,7 +68,7 @@ async fn logs_process(
   let (_, kind, name) = path.into_inner();
   let kind = utils::process::parse_kind(&kind)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  let processes = ProcessDb::find_by_kind_key(&kind_key, &state.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(&kind_key, &state.pool).await?;
   log::debug!("process::logs_process: {kind_key}");
   let options: LogsOptions<String> = qs.into_inner().into();
   let futures = processes

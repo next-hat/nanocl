@@ -27,9 +27,9 @@ pub(crate) async fn inspect_by_key(
   vm_key: &str,
   state: &DaemonState,
 ) -> HttpResult<VmInspect> {
-  let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
+  let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
   let processes =
-    ProcessDb::find_by_kind_key(&vm.spec.vm_key, &state.pool).await?;
+    ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.pool).await?;
   let (_, _, _, running_instances) = utils::process::count_status(&processes);
   Ok(VmInspect {
     created_at: vm.created_at,
@@ -47,7 +47,7 @@ pub(crate) async fn delete_by_key(
   force: bool,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
+  let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
   let options = bollard_next::container::RemoveContainerOptions {
     force,
     ..Default::default()
@@ -69,13 +69,13 @@ pub(crate) async fn list_by_namespace(
   pool: &Pool,
 ) -> HttpResult<Vec<VmSummary>> {
   let namespace = NamespaceDb::read_by_pk(nsp, pool).await?;
-  let vmes = VmDb::find_by_namespace(&namespace.name, pool).await?;
+  let vmes = VmDb::read_by_namespace(&namespace.name, pool).await?;
   let mut vm_summaries = Vec::new();
   for vm in vmes {
     let spec = SpecDb::read_by_pk(&vm.spec.key, pool)
       .await?
       .try_to_vm_spec()?;
-    let processes = ProcessDb::find_by_kind_key(&vm.spec.vm_key, pool).await?;
+    let processes = ProcessDb::read_by_kind_key(&vm.spec.vm_key, pool).await?;
     let (_, _, _, running_instances) = utils::process::count_status(&processes);
     vm_summaries.push(VmSummary {
       created_at: vm.created_at,
@@ -204,7 +204,7 @@ pub(crate) async fn create(
   );
   let vm_key = utils::key::gen_key(namespace, name);
   let mut vm = vm.clone();
-  if VmDb::read_pk_with_spec(&vm_key, &state.pool).await.is_ok() {
+  if VmDb::read_by_pk(&vm_key, &state.pool).await.is_ok() {
     return Err(HttpError::conflict(format!(
       "VM with name {name} already exists in namespace {namespace}",
     )));
@@ -238,7 +238,7 @@ pub(crate) async fn patch(
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
-  let vm = VmDb::read_pk_with_spec(vm_key, &state.pool).await?;
+  let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
   let old_spec = SpecDb::read_by_pk(&vm.spec.key, &state.pool)
     .await?
     .try_to_vm_spec()?;
@@ -291,7 +291,7 @@ pub(crate) async fn put(
   version: &str,
   state: &DaemonState,
 ) -> HttpResult<Vm> {
-  let vm = VmDb::inspect_by_pk(vm_key, &state.pool).await?;
+  let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
   let container_name = format!("{}.v", &vm.spec.vm_key);
   utils::process::stop_by_kind(&ProcessKind::Vm, vm_key, state).await?;
   utils::process::remove(

@@ -5,6 +5,7 @@ use nanocl_error::io::IoResult;
 use nanocl_stubs::generic::GenericFilter;
 
 use crate::{
+  gen_multiple, gen_where4string,
   models::{Pool, NodeDb},
   schema::nodes,
 };
@@ -17,19 +18,28 @@ impl RepositoryCreate for NodeDb {}
 
 impl RepositoryDelByPk for NodeDb {}
 
-impl RepositoryRead for NodeDb {
+impl RepositoryReadBy for NodeDb {
   type Output = NodeDb;
-  type Query = nodes::BoxedQuery<'static, diesel::pg::Pg>;
 
-  fn gen_read_query(filter: &GenericFilter, is_multiple: bool) -> Self::Query {
-    let mut query = nodes::dsl::nodes.into_boxed();
+  fn get_pk() -> &'static str {
+    "name"
+  }
+
+  fn gen_read_query(
+    filter: &GenericFilter,
+    is_multiple: bool,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<
+    'static,
+    diesel::pg::PgConnection,
+    Self::Output,
+  > {
+    let r#where = filter.r#where.clone().unwrap_or_default();
+    let mut query = nodes::table.into_boxed();
+    if let Some(name) = r#where.get("name") {
+      gen_where4string!(query, nodes::name, name);
+    }
     if is_multiple {
-      query = query.order(nodes::dsl::created_at.desc());
-      let limit = filter.limit.unwrap_or(100);
-      query = query.limit(limit as i64);
-      if let Some(offset) = filter.offset {
-        query = query.offset(offset as i64);
-      }
+      gen_multiple!(query, nodes::created_at, filter);
     }
     query
   }

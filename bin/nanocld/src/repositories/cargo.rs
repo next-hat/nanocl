@@ -11,7 +11,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils, gen_where4string,
+  gen_multiple, gen_where4string, utils,
   models::{Pool, CargoDb, SpecDb, CargoUpdateDb},
   schema::cargoes,
 };
@@ -28,96 +28,52 @@ impl RepositoryUpdate for CargoDb {
 
 impl RepositoryDelByPk for CargoDb {}
 
-impl RepositoryReadWithSpec for CargoDb {
-  type Output = Cargo;
+impl RepositoryReadBy for CargoDb {
+  type Output = (CargoDb, SpecDb);
 
-  async fn read_pk_with_spec(pk: &str, pool: &Pool) -> IoResult<Self::Output> {
-    log::trace!("CargoDb::find_by_pk: {pk}");
-    let pool = Arc::clone(pool);
-    let pk = pk.to_owned();
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = cargoes::dsl::cargoes
-        .inner_join(crate::schema::specs::table)
-        .filter(cargoes::dsl::key.eq(pk))
-        .get_result::<(Self, SpecDb)>(&mut conn)
-        .map_err(Self::map_err)?;
-      let item = item.0.with_spec(&item.1.try_to_cargo_spec()?);
-      Ok::<_, IoError>(item)
-    })
-    .await?
+  fn get_pk() -> &'static str {
+    "key"
   }
 
-  async fn read_one_with_spec(
+  fn gen_read_query(
     filter: &GenericFilter,
-    pool: &Pool,
-  ) -> IoResult<Self::Output> {
-    log::trace!("CargoDb::find_one: {filter:?}");
+    is_multiple: bool,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<
+    'static,
+    diesel::PgConnection,
+    Self::Output,
+  >
+  where
+    Self::Output: Sized,
+  {
     let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = cargoes::dsl::cargoes
+    let mut query = cargoes::table
       .inner_join(crate::schema::specs::table)
       .into_boxed();
     if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, cargoes::dsl::key, value);
+      gen_where4string!(query, cargoes::key, value);
     }
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, cargoes::dsl::name, value);
+      gen_where4string!(query, cargoes::name, value);
     }
     if let Some(value) = r#where.get("namespace_name") {
-      gen_where4string!(query, cargoes::dsl::namespace_name, value);
+      gen_where4string!(query, cargoes::namespace_name, value);
     }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_result::<(Self, SpecDb)>(&mut conn)
-        .map_err(Self::map_err)?;
-      let item = item.0.with_spec(&item.1.try_to_cargo_spec()?);
-      Ok::<_, IoError>(item)
-    })
-    .await?
+    if is_multiple {
+      gen_multiple!(query, cargoes::created_at, filter);
+    }
+    query
   }
+}
 
-  async fn read_with_spec(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> IoResult<Vec<Self::Output>> {
-    log::trace!("CargoDb::find: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = cargoes::dsl::cargoes
-      .inner_join(crate::schema::specs::table)
-      .order(cargoes::dsl::created_at.desc())
-      .into_boxed();
-    if let Some(value) = r#where.get("key") {
-      gen_where4string!(query, cargoes::dsl::key, value);
-    }
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, cargoes::dsl::name, value);
-    }
-    if let Some(value) = r#where.get("namespace_name") {
-      gen_where4string!(query, cargoes::dsl::namespace_name, value);
-    }
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_results::<(Self, SpecDb)>(&mut conn)
-        .map_err(Self::map_err)?;
-      let items = items
-        .into_iter()
-        .map(|item| {
-          let spec = &item.1.try_to_cargo_spec()?;
-          Ok::<_, IoError>(item.0.with_spec(spec))
-        })
-        .collect::<IoResult<Vec<_>>>()?;
-      Ok::<_, IoError>(items)
-    })
-    .await?
+impl RepositoryReadByTransform for CargoDb {
+  type NewOutput = Cargo;
+
+  fn transform(item: (CargoDb, SpecDb)) -> IoResult<Self::NewOutput> {
+    let (cargodb, specdb) = item;
+    let spec = specdb.try_to_cargo_spec()?;
+    let item = cargodb.with_spec(&spec);
+    Ok(item)
   }
 }
 
@@ -164,7 +120,7 @@ impl CargoDb {
       namespace_name: nsp,
       spec_key: spec.key,
     };
-    let item = Self::create_from(new_item, pool).await?.with_spec(&spec);
+    let item = CargoDb::create_from(new_item, pool).await?.with_spec(&spec);
     Ok(item)
   }
 
@@ -176,7 +132,7 @@ impl CargoDb {
     pool: &Pool,
   ) -> IoResult<Cargo> {
     let version = version.to_owned();
-    let mut cargo = CargoDb::read_pk_with_spec(key, pool).await?;
+    let mut cargo = CargoDb::transform_read_by_pk(key, pool).await?;
     let new_spec = SpecDb::try_from_cargo_partial(key, &version, item)?;
     let spec = SpecDb::create_from(new_spec, pool)
       .await?
@@ -186,26 +142,19 @@ impl CargoDb {
       spec_key: Some(spec.key),
       ..Default::default()
     };
-    Self::update_pk(key, new_item, pool).await?;
+    CargoDb::update_pk(key, new_item, pool).await?;
     cargo.spec = spec;
     Ok(cargo)
   }
 
-  /// Find a cargo by its key.
-  pub(crate) async fn inspect_by_pk(key: &str, pool: &Pool) -> IoResult<Cargo> {
-    let filter =
-      GenericFilter::new().r#where("key", GenericClause::Eq(key.to_owned()));
-    Self::read_one_with_spec(&filter, pool).await
-  }
-
   /// Find cargoes by namespace.
-  pub(crate) async fn find_by_namespace(
+  pub(crate) async fn read_by_namespace(
     name: &str,
     pool: &Pool,
   ) -> IoResult<Vec<Cargo>> {
     let filter = GenericFilter::new()
       .r#where("namespace_name", GenericClause::Eq(name.to_owned()));
-    Self::read_with_spec(&filter, pool).await
+    CargoDb::transform_read_by(&filter, pool).await
   }
 
   /// Count cargoes by namespace.
