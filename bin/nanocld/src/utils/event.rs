@@ -8,7 +8,7 @@ use bollard_next::{
   container::InspectContainerOptions,
   service::{EventMessageTypeEnum, EventMessage},
 };
-use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
+use nanocl_stubs::system::{Event, EventActorKind, EventAction, EventActor};
 
 use crate::{
   utils,
@@ -19,7 +19,7 @@ use crate::{
 
 /// Remove a job after when finished and ttl is set
 async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
-  if e.kind != EventKind::Process {
+  if e.kind != EventActorKind::Process {
     return Ok(());
   }
   let actor = e.actor.unwrap_or_default();
@@ -135,7 +135,7 @@ async fn exec_docker(
   log::debug!("event::exec_docker: {action}");
   let action = action.as_str();
   let mut event = Event {
-    kind: EventKind::Process,
+    kind: EventActorKind::Process,
     action: EventAction::Deleted,
     actor: Some(EventActor {
       key: Some(id.clone()),

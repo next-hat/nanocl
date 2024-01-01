@@ -11,7 +11,7 @@ use nanocld_client::{
   stubs::{
     system::Event,
     resource::ResourcePartial,
-    system::{EventKind, EventAction},
+    system::{EventActorKind, EventAction},
     resource_kind::{ResourceKindPartial, ResourceKindSpec},
   },
 };
@@ -91,22 +91,22 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let actor = event.actor.clone().unwrap_or_default();
   log::trace!("event::on_event: {kind} {action}");
   match (kind, action) {
-    (EventKind::Cargo, EventAction::Started)
-    | (EventKind::Cargo, EventAction::Patched) => {
+    (EventActorKind::Cargo, EventAction::Started)
+    | (EventActorKind::Cargo, EventAction::Patched) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       update_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
-    (EventKind::Cargo, EventAction::Stopped)
-    | (EventKind::Cargo, EventAction::Deleted) => {
+    (EventActorKind::Cargo, EventAction::Stopped)
+    | (EventActorKind::Cargo, EventAction::Deleted) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       delete_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
-    (EventKind::Secret, EventAction::Created)
-    | (EventKind::Secret, EventAction::Patched) => {
+    (EventActorKind::Secret, EventAction::Created)
+    | (EventActorKind::Secret, EventAction::Patched) => {
       let resources = utils::resource::list_by_secret(
         &actor.key.unwrap_or_default(),
         &state.client,

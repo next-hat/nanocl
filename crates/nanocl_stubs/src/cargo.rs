@@ -3,9 +3,11 @@ use serde::{Serialize, Deserialize};
 
 use bollard_next::container::{StatsOptions, KillContainerOptions};
 
-use crate::cargo_spec::CargoSpecPartial;
-use crate::process::Process;
-use crate::system::{Event, EventKind, ToEvent, EventAction, EventActor};
+use crate::{
+  system::{EventActor, EventActorKind},
+  cargo_spec::CargoSpecPartial,
+  process::Process,
+};
 
 use super::cargo_spec::CargoSpec;
 
@@ -47,22 +49,13 @@ impl From<Cargo> for EventActor {
   fn from(cargo: Cargo) -> Self {
     Self {
       key: Some(cargo.spec.cargo_key),
+      kind: EventActorKind::Cargo,
       attributes: Some(serde_json::json!({
         "Name": cargo.spec.name,
         "Namespace": cargo.namespace_name,
         "Version": cargo.spec.version,
         "Metadata": cargo.spec.metadata,
       })),
-    }
-  }
-}
-
-impl ToEvent for Cargo {
-  fn to_event(&self, action: EventAction) -> Event {
-    Event {
-      kind: EventKind::Cargo,
-      action,
-      actor: Some(self.clone().into()),
     }
   }
 }

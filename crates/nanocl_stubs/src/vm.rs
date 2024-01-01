@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 use crate::{
   process::Process,
   vm_spec::{VmSpec, VmSpecPartial},
-  system::{EventActor, ToEvent, EventAction, Event, EventKind},
+  system::{EventActor, EventActorKind},
 };
 
 /// A virtual machine instance
@@ -34,6 +34,7 @@ impl From<Vm> for EventActor {
   fn from(vm: Vm) -> Self {
     Self {
       key: Some(vm.spec.vm_key),
+      kind: EventActorKind::Vm,
       attributes: Some(serde_json::json!({
         "Name": vm.spec.name,
         "Namespace": vm.namespace_name,
@@ -41,16 +42,6 @@ impl From<Vm> for EventActor {
         "Namespace": vm.namespace_name,
         "Metadata": vm.spec.metadata,
       })),
-    }
-  }
-}
-
-impl ToEvent for Vm {
-  fn to_event(&self, action: EventAction) -> Event {
-    Event {
-      kind: EventKind::Vm,
-      action,
-      actor: Some(self.clone().into()),
     }
   }
 }

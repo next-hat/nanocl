@@ -41,7 +41,7 @@ pub struct BinaryInfo {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub enum EventKind {
+pub enum EventActorKind {
   Namespace,
   Cargo,
   Vm,
@@ -51,16 +51,16 @@ pub enum EventKind {
   Process,
 }
 
-impl std::fmt::Display for EventKind {
+impl std::fmt::Display for EventActorKind {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      EventKind::Namespace => write!(f, "Namespace"),
-      EventKind::Cargo => write!(f, "Cargo"),
-      EventKind::Vm => write!(f, "Vm"),
-      EventKind::Job => write!(f, "Job"),
-      EventKind::Resource => write!(f, "Resource"),
-      EventKind::Secret => write!(f, "Secret"),
-      EventKind::Process => write!(f, "Process"),
+      EventActorKind::Namespace => write!(f, "Namespace"),
+      EventActorKind::Cargo => write!(f, "Cargo"),
+      EventActorKind::Vm => write!(f, "Vm"),
+      EventActorKind::Job => write!(f, "Job"),
+      EventActorKind::Resource => write!(f, "Resource"),
+      EventActorKind::Secret => write!(f, "Secret"),
+      EventActorKind::Process => write!(f, "Process"),
     }
   }
 }
@@ -91,12 +91,33 @@ impl std::fmt::Display for EventAction {
   }
 }
 
+/// Kind of event (Error, Normal, Warning), new types could be added in the future.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub enum EventKind {
+  Error,
+  Normal,
+  Warning,
+}
+
+impl std::fmt::Display for EventKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      EventKind::Error => write!(f, "Error"),
+      EventKind::Normal => write!(f, "Normal"),
+      EventKind::Warning => write!(f, "Warning"),
+    }
+  }
+}
+
 /// Actor is the actor that triggered the event
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct EventActor {
   pub key: Option<String>,
+  pub kind: EventActorKind,
   pub attributes: Option<serde_json::Value>,
 }
 
@@ -105,12 +126,32 @@ pub struct EventActor {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Event {
-  /// Kind of event
+  /// When the event was created.
+  pub created_at: chrono::NaiveDateTime,
+  /// Reporting Controller is the name of the controller that emitted this Event.
+  /// e.g. `nanocl.io/core`. This field cannot be empty for new Events.
+  pub reporting_controller: String,
+  /// Reporting Node is the name of the node where the Event was generated.
+  pub reporting_node: String,
+  /// Kind of this event (Error, Normal, Warning), new types could be added in the future.
+  /// It is machine-readable. This field cannot be empty for new Events.
   pub kind: EventKind,
-  /// Action of event
-  pub action: EventAction,
-  /// Actor of event
+  /// Action is what action was taken/failed regarding to the regarding actor.
+  /// It is machine-readable.
+  /// This field cannot be empty for new Events and it can have at most 128 characters.
+  pub action: String,
+  /// Actor contains the object this Event is about.
   pub actor: Option<EventActor>,
+  /// Optional secondary actor for more complex actions.
+  /// E.g. when regarding actor triggers a creation or deletion of related actor.
+  pub related: Option<EventActor>,
+  /// Reason is why the action was taken. It is human-readable.
+  /// This field cannot be empty for new Events and it can have at most 128 characters.
+  pub reason: String,
+  /// Standard metadata.
+  pub metadata: Option<serde_json::Value>,
+  /// Human-readable description of the status of this operation
+  pub note: Option<String>,
 }
 
 /// Generic trait to convert a type to an event

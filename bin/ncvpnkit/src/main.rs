@@ -6,7 +6,7 @@ use vpnkitrc::stubs::*;
 
 use nanocl_utils::logger;
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::system::{Event, EventKind, EventAction};
+use nanocld_client::stubs::system::{Event, EventActorKind, EventAction};
 use nanocld_client::stubs::resource::Resource;
 use nanocld_client::stubs::proxy::{
   ResourceProxyRule, ProxyRule, ProxyStreamProtocol, ProxyRuleStream,
@@ -106,7 +106,7 @@ async fn on_event(
   let kind = &event.kind;
   let action = &event.action;
   let actor = event.actor.clone().unwrap_or_default();
-  if kind != &EventKind::Resource {
+  if kind != &EventActorKind::Resource {
     return Ok(());
   }
   match action {
