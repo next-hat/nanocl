@@ -92,7 +92,7 @@ async fn create(
   let metric = MetricPartial {
     kind: kind.to_owned(),
     data,
-    display,
+    note: display,
   };
   client.create_metric(&metric).await?;
   Ok(())

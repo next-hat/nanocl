@@ -28,7 +28,7 @@ diesel::table! {
         node_name -> Varchar,
         kind -> Varchar,
         data -> Jsonb,
-        display -> Nullable<Varchar>,
+        note -> Nullable<Varchar>,
     }
 }
 

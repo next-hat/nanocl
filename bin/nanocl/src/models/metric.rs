@@ -28,7 +28,7 @@ pub struct MetricRow {
   pub created_at: String,
   pub node: String,
   pub kind: String,
-  pub info: String,
+  pub note: String,
 }
 
 impl From<Metric> for MetricRow {
@@ -51,7 +51,7 @@ impl From<Metric> for MetricRow {
       created_at: created_at.to_string(),
       kind: metric.kind,
       node: metric.node_name,
-      info: metric.display.unwrap_or("<none>".to_owned()),
+      note: metric.note.unwrap_or("<none>".to_owned()),
     }
   }
 }
