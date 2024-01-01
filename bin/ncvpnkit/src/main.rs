@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use futures_util::StreamExt;
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
@@ -6,7 +8,7 @@ use vpnkitrc::stubs::*;
 
 use nanocl_utils::logger;
 use nanocld_client::NanocldClient;
-use nanocld_client::stubs::system::{Event, EventActorKind, EventAction};
+use nanocld_client::stubs::system::{Event, EventActorKind, NativeEventAction};
 use nanocld_client::stubs::resource::Resource;
 use nanocld_client::stubs::proxy::{
   ResourceProxyRule, ProxyRule, ProxyStreamProtocol, ProxyRuleStream,
@@ -103,14 +105,17 @@ async fn on_event(
   nanocl_client: &NanocldClient,
   vpnkit_client: &VpnKitRc,
 ) -> IoResult<()> {
-  let kind = &event.kind;
-  let action = &event.action;
-  let actor = event.actor.clone().unwrap_or_default();
-  if kind != &EventActorKind::Resource {
+  let action = NativeEventAction::from_str(&event.action)
+    .map_err(|_| IoError::invalid_data("Event action", "Action not valid"))?;
+  let Some(actor) = event.actor.clone() else {
+    return Ok(());
+  };
+  let actor_kind = &actor.kind;
+  if actor_kind != &EventActorKind::Resource {
     return Ok(());
   }
   match action {
-    EventAction::Created | EventAction::Patched => {
+    NativeEventAction::Create | NativeEventAction::Patch => {
       let key = actor.key.unwrap_or_default();
       let resource = nanocl_client.inspect_resource(&key).await?;
       let r_proxy_rule = resource_to_proxy_rule(&resource)?;
@@ -125,7 +130,7 @@ async fn on_event(
         }
       }
     }
-    EventAction::Deleted => {
+    NativeEventAction::Delete => {
       let attributes = actor.attributes.unwrap_or_default();
       let spec = attributes.get("Spec").cloned().ok_or_else(|| {
         IoError::invalid_data("Resource spec", "attribute not found")

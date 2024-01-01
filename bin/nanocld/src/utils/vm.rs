@@ -8,7 +8,7 @@ use bollard_next::{
 use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
-  system::EventAction,
+  system::NativeEventAction,
   process::ProcessKind,
   vm_spec::{VmSpecPartial, VmSpecUpdate},
   vm::{Vm, VmSummary, VmInspect},
@@ -57,9 +57,11 @@ pub(crate) async fn delete_by_key(
   VmDb::del_by_pk(vm_key, &state.pool).await?;
   SpecDb::del_by_kind_key(vm_key, &state.pool).await?;
   utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&vm, EventAction::Deleted);
+  super::event::emit_normal_native_action(
+    &vm,
+    NativeEventAction::Delete,
+    state,
+  );
   Ok(())
 }
 
@@ -224,9 +226,11 @@ pub(crate) async fn create(
   vm.disk.size = Some(size);
   let vm = VmDb::create_from_spec(namespace, &vm, version, &state.pool).await?;
   create_instance(&vm, &image, true, state).await?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&vm, EventAction::Created);
+  super::event::emit_normal_native_action(
+    &vm,
+    NativeEventAction::Create,
+    state,
+  );
   Ok(vm)
 }
 
@@ -307,8 +311,6 @@ pub(crate) async fn put(
   create_instance(&vm, &image, false, state).await?;
   utils::process::start_by_kind(&ProcessKind::Vm, &vm.spec.vm_key, state)
     .await?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&vm, EventAction::Patched);
+  super::event::emit_normal_native_action(&vm, NativeEventAction::Patch, state);
   Ok(vm)
 }

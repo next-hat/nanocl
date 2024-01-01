@@ -1,7 +1,7 @@
 use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::{
-  system::EventAction,
+  system::NativeEventAction,
   secret::{Secret, SecretPartial, SecretUpdate},
 };
 
@@ -16,9 +16,11 @@ pub(crate) async fn create(
 ) -> HttpResult<Secret> {
   let secret = SecretDb::create_from(item, &state.pool).await?;
   let secret: Secret = secret.try_into()?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&secret, EventAction::Created);
+  super::event::emit_normal_native_action(
+    &secret,
+    NativeEventAction::Create,
+    state,
+  );
   Ok(secret)
 }
 
@@ -28,9 +30,11 @@ pub(crate) async fn delete_by_pk(
 ) -> HttpResult<()> {
   let secret = SecretDb::transform_read_by_pk(key, &state.pool).await?;
   SecretDb::del_by_pk(key, &state.pool).await?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&secret, EventAction::Deleted);
+  super::event::emit_normal_native_action(
+    &secret,
+    NativeEventAction::Delete,
+    state,
+  );
   Ok(())
 }
 
@@ -42,8 +46,10 @@ pub(crate) async fn patch_by_pk(
 ) -> HttpResult<Secret> {
   let secret = SecretDb::update_pk(key, item, &state.pool).await?;
   let secret: Secret = secret.try_into()?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&secret, EventAction::Patched);
+  super::event::emit_normal_native_action(
+    &secret,
+    NativeEventAction::Patch,
+    state,
+  );
   Ok(secret)
 }

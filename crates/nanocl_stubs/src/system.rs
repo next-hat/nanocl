@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use bollard_next::service::SystemInfo;
 
 #[cfg(feature = "serde")]
@@ -68,25 +70,43 @@ impl std::fmt::Display for EventActorKind {
 /// Action is the action that triggered the event
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub enum EventAction {
-  Created,
-  Patched,
-  Started,
-  Stopped,
-  Deleted,
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+pub enum NativeEventAction {
+  Create,
+  Patch,
+  Start,
+  Stop,
+  Delete,
   Restart,
+  Other(String),
 }
 
-impl std::fmt::Display for EventAction {
+impl FromStr for NativeEventAction {
+  type Err = ();
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "Create" => Ok(NativeEventAction::Create),
+      "Patch" => Ok(NativeEventAction::Patch),
+      "Start" => Ok(NativeEventAction::Start),
+      "Stop" => Ok(NativeEventAction::Stop),
+      "Delete" => Ok(NativeEventAction::Delete),
+      "Restart" => Ok(NativeEventAction::Restart),
+      _ => Ok(NativeEventAction::Other(s.to_owned())),
+    }
+  }
+}
+
+impl std::fmt::Display for NativeEventAction {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      EventAction::Created => write!(f, "Created"),
-      EventAction::Patched => write!(f, "Patched"),
-      EventAction::Started => write!(f, "Started"),
-      EventAction::Stopped => write!(f, "Stopped"),
-      EventAction::Deleted => write!(f, "Deleted"),
-      EventAction::Restart => write!(f, "Restart"),
+      NativeEventAction::Create => write!(f, "create"),
+      NativeEventAction::Patch => write!(f, "patch"),
+      NativeEventAction::Start => write!(f, "start"),
+      NativeEventAction::Stop => write!(f, "stop"),
+      NativeEventAction::Delete => write!(f, "delete"),
+      NativeEventAction::Restart => write!(f, "restart"),
+      NativeEventAction::Other(s) => write!(f, "{}", s),
     }
   }
 }
@@ -104,9 +124,9 @@ pub enum EventKind {
 impl std::fmt::Display for EventKind {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      EventKind::Error => write!(f, "Error"),
-      EventKind::Normal => write!(f, "Normal"),
-      EventKind::Warning => write!(f, "Warning"),
+      EventKind::Error => write!(f, "error"),
+      EventKind::Normal => write!(f, "normal"),
+      EventKind::Warning => write!(f, "warning"),
     }
   }
 }
@@ -152,9 +172,4 @@ pub struct Event {
   pub metadata: Option<serde_json::Value>,
   /// Human-readable description of the status of this operation
   pub note: Option<String>,
-}
-
-/// Generic trait to convert a type to an event
-pub trait ToEvent {
-  fn to_event(&self, action: EventAction) -> Event;
 }

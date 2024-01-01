@@ -12,7 +12,7 @@ use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::system::{Event, ToEvent, EventAction};
+use nanocl_stubs::system::Event;
 
 /// Stream: Wrap Receiver in our own type, with correct error type
 pub struct Client(pub Receiver<Bytes>);
@@ -156,21 +156,7 @@ impl EventEmitter {
     Ok(())
   }
 
-  /// Call emit in the background
-  pub(crate) fn spawn_emit_to_event<T>(&self, e: &T, action: EventAction)
-  where
-    T: ToEvent,
-  {
-    let self_ptr = self.clone();
-    let e = e.to_event(action);
-    rt::spawn(async move {
-      if let Err(err) = self_ptr.emit(e).await {
-        log::error!("{err}");
-      }
-    });
-  }
-
-  pub(crate) fn spawn_emit_event(&self, e: Event) {
+  pub fn spawn_emit_event(&self, e: Event) {
     let self_ptr = self.clone();
     rt::spawn(async move {
       if let Err(err) = self_ptr.emit(e).await {
@@ -204,95 +190,5 @@ impl EventEmitter {
       ),
     })?;
     Ok(Client(rx))
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use futures::StreamExt;
-
-  use super::*;
-
-  use nanocl_stubs::vm::Vm;
-  use nanocl_stubs::cargo::Cargo;
-  use nanocl_stubs::secret::Secret;
-  use nanocl_stubs::resource::Resource;
-
-  pub async fn send_and_parse_events<T>(
-    client: &mut Client,
-    event_emitter: &EventEmitter,
-    events: Vec<(&T, EventAction)>,
-  ) where
-    T: ToEvent + Clone,
-  {
-    for event in events {
-      let e = event.0.to_event(event.1);
-      event_emitter.emit(e).await.expect("Emit event");
-      let event = client
-        .next()
-        .await
-        .unwrap_or_else(|| panic!("No event received"))
-        .unwrap_or_else(|err| panic!("Event error {err}"));
-      let _ = serde_json::from_slice::<Event>(&event)
-        .unwrap_or_else(|err| panic!("Parse event error {err}"));
-    }
-  }
-
-  #[ntex::test]
-  async fn basic() {
-    let event_emitter = EventEmitter::new();
-    let mut client = event_emitter.subscribe().await.unwrap();
-    let cargo = Cargo::default();
-    let vm = Vm::default();
-    let resource = Resource::default();
-    let secret = Secret::default();
-    // test with cargo
-    send_and_parse_events(
-      &mut client,
-      &event_emitter,
-      vec![
-        (&cargo, EventAction::Created),
-        (&cargo, EventAction::Started),
-        (&cargo, EventAction::Stopped),
-        (&cargo, EventAction::Patched),
-        (&cargo, EventAction::Deleted),
-      ],
-    )
-    .await;
-    // test with vm
-    send_and_parse_events(
-      &mut client,
-      &event_emitter,
-      vec![
-        (&vm, EventAction::Created),
-        (&vm, EventAction::Started),
-        (&vm, EventAction::Stopped),
-        (&vm, EventAction::Patched),
-        (&vm, EventAction::Deleted),
-      ],
-    )
-    .await;
-    // test with resource
-    send_and_parse_events(
-      &mut client,
-      &event_emitter,
-      vec![
-        (&resource, EventAction::Created),
-        (&resource, EventAction::Patched),
-        (&resource, EventAction::Deleted),
-      ],
-    )
-    .await;
-    // test with secret
-    send_and_parse_events(
-      &mut client,
-      &event_emitter,
-      vec![
-        (&secret, EventAction::Created),
-        (&secret, EventAction::Patched),
-        (&secret, EventAction::Deleted),
-      ],
-    )
-    .await;
   }
 }

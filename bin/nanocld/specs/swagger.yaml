@@ -4668,7 +4668,7 @@ components:
           description: The data of the metric
         Note:
           type: string
-          description: Optional way to display
+          description: Optional note about the metric
           nullable: true
     Mount:
       type: object

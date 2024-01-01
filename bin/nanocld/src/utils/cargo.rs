@@ -13,7 +13,7 @@ use bollard_next::{
 };
 use nanocl_stubs::{
   generic::{GenericListNspQuery, GenericClause, GenericFilter},
-  system::EventAction,
+  system::NativeEventAction,
   process::{Process, ProcessKind},
   cargo::{
     Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoScale,
@@ -322,9 +322,14 @@ pub(crate) async fn create(
     CargoDb::del_by_pk(&cargo.spec.cargo_key, &state.pool).await?;
     return Err(err);
   }
-  state
-    .event_emitter
-    .spawn_emit_to_event(&cargo, EventAction::Created);
+  utils::event::emit_normal_native_action(
+    &cargo,
+    NativeEventAction::Create,
+    state,
+  );
+  // state
+  //   .event_emitter
+  //   .spawn_emit_to_event(&cargo, NativeEventAction::Created);
   Ok(cargo)
 }
 
@@ -379,9 +384,9 @@ pub(crate) async fn delete_by_key(
     .collect::<Result<Vec<_>, _>>()?;
   CargoDb::del_by_pk(key, &state.pool).await?;
   SpecDb::del_by_kind_key(key, &state.pool).await?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&cargo, EventAction::Deleted);
+  // state
+  //   .event_emitter
+  //   .spawn_emit_to_event(&cargo, NativeEventAction::Deleted);
   Ok(())
 }
 
@@ -449,9 +454,9 @@ pub(crate) async fn put(
       .await?;
     }
   }
-  state
-    .event_emitter
-    .spawn_emit_to_event(&cargo, EventAction::Patched);
+  // state
+  //   .event_emitter
+  //   .spawn_emit_to_event(&cargo, NativeEventAction::Patched);
   Ok(cargo)
 }
 
@@ -728,8 +733,8 @@ pub async fn scale(
       .into_iter()
       .collect::<Result<Vec<_>, HttpError>>()?;
   }
-  state
-    .event_emitter
-    .spawn_emit_to_event(&cargo, EventAction::Patched);
+  // state
+  //   .event_emitter
+  //   .spawn_emit_to_event(&cargo, NativeEventAction::Patched);
   Ok(())
 }
