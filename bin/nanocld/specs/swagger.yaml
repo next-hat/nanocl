@@ -4650,9 +4650,9 @@ components:
           description: The kind of the metric
         Data:
           description: The data of the metric
-        Display:
+        Note:
           type: string
-          description: Optional way to display
+          description: Optional note about the metric
           nullable: true
     MetricPartial:
       type: object
@@ -4666,7 +4666,7 @@ components:
           description: The kind of the metric
         Data:
           description: The data of the metric
-        Display:
+        Note:
           type: string
           description: Optional way to display
           nullable: true

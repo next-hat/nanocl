@@ -81,7 +81,7 @@ mod tests {
           "name": "my-metric",
           "description": "My metric",
         }),
-        display: None,
+        note: None,
       })
       .await
       .unwrap();

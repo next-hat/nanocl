@@ -21,8 +21,8 @@ pub struct Metric {
   pub kind: String,
   /// The data of the metric
   pub data: serde_json::Value,
-  /// Optional way to display
-  pub display: Option<String>,
+  /// Optional note about the metric
+  pub note: Option<String>,
 }
 
 /// Used to create a new metric
@@ -36,8 +36,8 @@ pub struct MetricPartial {
   pub kind: String,
   /// The data of the metric
   pub data: serde_json::Value,
-  /// Optional way to display
-  pub display: Option<String>,
+  /// Optional note about the metric
+  pub note: Option<String>,
 }
 
 /// ## deserialize empty string

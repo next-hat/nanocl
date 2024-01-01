@@ -74,14 +74,13 @@ async fn create(
   let display = match kind {
     "ncproxy.io/http" => {
       let data = serde_json::from_value::<HttpMetric>(data.clone())?;
-      let proxy_host = data.proxy_host.unwrap_or("<none>".to_owned());
       let upstream_addr = data.upstream_addr.unwrap_or("<none>".to_owned());
       let status = match http::StatusCode::from_u16(data.status as u16) {
         Err(_) => data.status.to_string(),
         Ok(status) => format!("{status}"),
       };
       let display = format!(
-        "[{status}] {} {} {}{} -> {proxy_host} {upstream_addr}",
+        "[{status}] {} {} {}{} -> {upstream_addr}",
         data.server_protocol, data.request_method, data.host, data.uri,
       );
       Some(display)
@@ -92,7 +91,7 @@ async fn create(
   let metric = MetricPartial {
     kind: kind.to_owned(),
     data,
-    display,
+    note: display,
   };
   client.create_metric(&metric).await?;
   Ok(())

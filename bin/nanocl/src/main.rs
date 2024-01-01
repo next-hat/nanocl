@@ -697,4 +697,14 @@ mod tests {
       "1"
     );
   }
+
+  #[ntex::test]
+  async fn metric() {
+    assert_cli_ok!("metric", "ls");
+    assert_cli_ok!("metric", "ls", "-q");
+    assert_cli_ok!("metric", "ls", "--limit", "2");
+    assert_cli_ok!("metric", "ls", "--offset", "1");
+    assert_cli_ok!("metric", "ls", "--limit", "2", "--offset", "1");
+    assert_cli_ok!("metric", "ls", "-q", "--limit", "2", "--offset", "1");
+  }
 }
