@@ -7,6 +7,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
+  gen_multiple, gen_where4json, gen_where4string,
   models::{JobDb, JobUpdateDb},
   schema::jobs,
 };
@@ -23,19 +24,34 @@ impl RepositoryUpdate for JobDb {
 
 impl RepositoryDelByPk for JobDb {}
 
-impl RepositoryRead for JobDb {
+impl RepositoryReadBy for JobDb {
   type Output = JobDb;
-  type Query = jobs::BoxedQuery<'static, diesel::pg::Pg>;
 
-  fn gen_read_query(filter: &GenericFilter, is_multiple: bool) -> Self::Query {
-    let mut query = jobs::dsl::jobs.into_boxed();
+  fn get_pk() -> &'static str {
+    "key"
+  }
+
+  fn gen_read_query(
+    filter: &GenericFilter,
+    is_multiple: bool,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<
+    'static,
+    diesel::PgConnection,
+    Self::Output,
+  > {
+    let r#where = filter.r#where.clone().unwrap_or_default();
+    let mut query = jobs::table.into_boxed();
+    if let Some(key) = r#where.get("key") {
+      gen_where4string!(query, jobs::key, key);
+    }
+    if let Some(data) = r#where.get("data") {
+      gen_where4json!(query, jobs::data, data);
+    }
+    if let Some(metadata) = r#where.get("metadata") {
+      gen_where4json!(query, jobs::metadata, metadata);
+    }
     if is_multiple {
-      query = query.order(jobs::dsl::created_at.desc());
-      let limit = filter.limit.unwrap_or(100);
-      query = query.limit(limit as i64);
-      if let Some(offset) = filter.offset {
-        query = query.offset(offset as i64);
-      }
+      gen_multiple!(query, jobs::created_at, filter);
     }
     query
   }

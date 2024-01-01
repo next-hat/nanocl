@@ -28,7 +28,7 @@ pub(crate) async fn list_resource_kind(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::new();
   let resource_kinds =
-    ResourceKindDb::read_with_spec(&filter, &state.pool).await?;
+    ResourceKindDb::transform_read_by(&filter, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&resource_kinds))
 }
 
@@ -72,7 +72,7 @@ pub(crate) async fn delete_resource_kind(
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);
-  ResourceKindDb::read_pk_with_spec(&key, &state.pool).await?;
+  ResourceKindDb::read_by_pk(&key, &state.pool).await?;
   ResourceKindDb::del_by_pk(&key, &state.pool).await?;
   SpecDb::del_by_kind_key(&key, &state.pool).await?;
   Ok(web::HttpResponse::Accepted().into())

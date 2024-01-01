@@ -119,3 +119,36 @@ macro_rules! gen_where4json {
     }
   };
 }
+
+#[macro_export]
+macro_rules! gen_where4uuid {
+  ($query: expr, $column: expr, $value: expr) => {
+    match $value {
+      nanocl_stubs::generic::GenericClause::IsNull => {
+        $query = $query.filter($column.is_null());
+      }
+      nanocl_stubs::generic::GenericClause::IsNotNull => {
+        $query = $query.filter($column.is_not_null());
+      }
+      nanocl_stubs::generic::GenericClause::Eq(val) => {
+        let uuid = uuid::Uuid::parse_str(&val).unwrap_or_default();
+        $query = $query.filter($column.eq(uuid));
+      }
+      _ => {
+        // Ignore unsupported clause
+      }
+    }
+  };
+}
+
+#[macro_export]
+macro_rules! gen_multiple {
+  ($query: expr, $column: expr, $filter: expr) => {
+    $query = $query.order($column.desc());
+    let limit = $filter.limit.unwrap_or(100);
+    $query = $query.limit(limit as i64);
+    if let Some(offset) = $filter.offset {
+      $query = $query.offset(offset as i64);
+    }
+  };
+}

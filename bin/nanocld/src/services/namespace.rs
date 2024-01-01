@@ -10,7 +10,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   models::{DaemonState, NamespaceDb},
-  repositories::generic::RepositoryRead,
+  repositories::generic::RepositoryReadBy,
 };
 
 /// List namespaces

@@ -26,7 +26,7 @@ pub(crate) async fn delete_by_pk(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let secret = SecretDb::read_by_pk(key, &state.pool).await?;
+  let secret = SecretDb::transform_read_by_pk(key, &state.pool).await?;
   SecretDb::del_by_pk(key, &state.pool).await?;
   state
     .event_emitter

@@ -5,7 +5,7 @@ use nanocl_error::io::IoResult;
 use nanocl_stubs::generic::{GenericFilter, GenericClause};
 
 use crate::{
-  gen_where4string,
+  gen_multiple, gen_where4string,
   models::{Pool, VmImageDb, VmImageUpdateDb},
   schema::vm_images,
 };
@@ -22,47 +22,52 @@ impl RepositoryUpdate for VmImageDb {
 
 impl RepositoryDelByPk for VmImageDb {}
 
-impl RepositoryRead for VmImageDb {
+impl RepositoryReadBy for VmImageDb {
   type Output = VmImageDb;
-  type Query = vm_images::BoxedQuery<'static, diesel::pg::Pg>;
 
-  fn gen_read_query(filter: &GenericFilter, is_multiple: bool) -> Self::Query {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = vm_images::dsl::vm_images.into_boxed();
+  fn get_pk() -> &'static str {
+    "name"
+  }
+
+  fn gen_read_query(
+    filter: &GenericFilter,
+    is_multiple: bool,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<
+    'static,
+    diesel::pg::PgConnection,
+    Self::Output,
+  > {
+    let r#where = filter.r#where.clone().unwrap_or_default();
+    let mut query = vm_images::table.into_boxed();
     if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, vm_images::dsl::name, value);
+      gen_where4string!(query, vm_images::name, value);
     }
     if let Some(value) = r#where.get("kind") {
-      gen_where4string!(query, vm_images::dsl::kind, value);
+      gen_where4string!(query, vm_images::kind, value);
     }
     if let Some(value) = r#where.get("parent") {
-      gen_where4string!(query, vm_images::dsl::parent, value);
+      gen_where4string!(query, vm_images::parent, value);
     }
     if let Some(value) = r#where.get("format") {
-      gen_where4string!(query, vm_images::dsl::format, value);
+      gen_where4string!(query, vm_images::format, value);
     }
     if let Some(value) = r#where.get("path") {
-      gen_where4string!(query, vm_images::dsl::path, value);
+      gen_where4string!(query, vm_images::path, value);
     }
     if is_multiple {
-      query = query.order(vm_images::dsl::created_at.desc());
-      let limit = filter.limit.unwrap_or(100);
-      query = query.limit(limit as i64);
-      if let Some(offset) = filter.offset {
-        query = query.offset(offset as i64);
-      }
+      gen_multiple!(query, vm_images::created_at, filter);
     }
     query
   }
 }
 
 impl VmImageDb {
-  pub(crate) async fn find_by_parent(
+  pub(crate) async fn read_by_parent(
     name: &str,
     pool: &Pool,
   ) -> IoResult<Vec<VmImageDb>> {
     let filter = GenericFilter::new()
       .r#where("parent", GenericClause::Eq(name.to_owned()));
-    VmImageDb::read(&filter, pool).await
+    VmImageDb::read_by(&filter, pool).await
   }
 }

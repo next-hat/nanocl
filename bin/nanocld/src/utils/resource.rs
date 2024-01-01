@@ -82,7 +82,7 @@ pub(crate) async fn create(
   resource: &ResourcePartial,
   state: &DaemonState,
 ) -> HttpResult<Resource> {
-  if ResourceDb::inspect_by_pk(&resource.name, &state.pool)
+  if ResourceDb::transform_read_by_pk(&resource.name, &state.pool)
     .await
     .is_ok()
   {
@@ -136,7 +136,7 @@ pub(crate) async fn delete_by_key(
   key: &str,
   state: &DaemonState,
 ) -> HttpResult<()> {
-  let resource = ResourceDb::inspect_by_pk(key, &state.pool).await?;
+  let resource = ResourceDb::transform_read_by_pk(key, &state.pool).await?;
   delete(&resource, state).await?;
   Ok(())
 }

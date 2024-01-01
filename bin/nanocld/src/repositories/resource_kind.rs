@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
 use diesel::prelude::*;
 
 use nanocl_error::{
-  io::{IoError, IoResult},
+  io::IoResult,
   http::{HttpError, HttpResult},
 };
 
@@ -13,7 +11,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils, gen_where4string,
+  gen_multiple, gen_where4string,
   models::{Pool, ResourceKindDb, ResourceKindDbUpdate, SpecDb},
   schema::resource_kinds,
 };
@@ -30,30 +28,21 @@ impl RepositoryUpdate for ResourceKindDb {
   type UpdateItem = ResourceKindDbUpdate;
 }
 
-impl RepositoryReadWithSpec for ResourceKindDb {
-  type Output = ResourceKind;
+impl RepositoryReadBy for ResourceKindDb {
+  type Output = (ResourceKindDb, SpecDb);
 
-  async fn read_pk_with_spec(pk: &str, pool: &Pool) -> IoResult<Self::Output> {
-    log::trace!("CargoDb::find_by_pk: {pk}");
-    let pool = Arc::clone(pool);
-    let pk = pk.to_owned();
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = resource_kinds::table
-        .inner_join(crate::schema::specs::table)
-        .filter(resource_kinds::name.eq(pk))
-        .get_result::<(Self, SpecDb)>(&mut conn)
-        .map_err(Self::map_err)?;
-      item.1.try_into()
-    })
-    .await?
+  fn get_pk() -> &'static str {
+    "name"
   }
 
-  async fn read_one_with_spec(
+  fn gen_read_query(
     filter: &GenericFilter,
-    pool: &Pool,
-  ) -> IoResult<Self::Output> {
-    log::trace!("CargoDb::find_one: {filter:?}");
+    is_multiple: bool,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<
+    'static,
+    diesel::PgConnection,
+    Self::Output,
+  > {
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = resource_kinds::table
       .inner_join(crate::schema::specs::table)
@@ -61,59 +50,42 @@ impl RepositoryReadWithSpec for ResourceKindDb {
     if let Some(value) = r#where.get("name") {
       gen_where4string!(query, resource_kinds::name, value);
     }
-    // if let Some(value) = r#where.get("version_key") {
-    //   gen_where4string!(query, resource_kinds::version_key, value);
-    // }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let item = query
-        .get_result::<(Self, SpecDb)>(&mut conn)
-        .map_err(Self::map_err)?;
-      let item = item.1.try_into()?;
-      Ok::<_, IoError>(item)
-    })
-    .await?
+    if is_multiple {
+      gen_multiple!(query, resource_kinds::created_at, filter);
+    }
+    query
   }
+}
 
-  async fn read_with_spec(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> IoResult<Vec<Self::Output>> {
-    log::trace!("CargoDb::find: {filter:?}");
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = resource_kinds::table
-      .inner_join(crate::schema::specs::table)
-      .order(resource_kinds::created_at.desc())
-      .into_boxed();
-    if let Some(value) = r#where.get("name") {
-      gen_where4string!(query, resource_kinds::name, value);
-    }
-    // if let Some(value) = r#where.get("version_key") {
-    //   gen_where4string!(query, resource_kinds::dsl::version_key, value);
-    // }
-    let limit = filter.limit.unwrap_or(100);
-    query = query.limit(limit as i64);
-    if let Some(offset) = filter.offset {
-      query = query.offset(offset as i64);
-    }
-    let pool = Arc::clone(pool);
-    ntex::rt::spawn_blocking(move || {
-      let mut conn = utils::store::get_pool_conn(&pool)?;
-      let items = query
-        .get_results::<(Self, SpecDb)>(&mut conn)
-        .map_err(Self::map_err)?;
-      let items = items
-        .into_iter()
-        .map(|item| item.1.try_into())
-        .collect::<IoResult<Vec<_>>>()?;
-      Ok::<_, IoError>(items)
-    })
-    .await?
+impl RepositoryReadByTransform for ResourceKindDb {
+  type NewOutput = ResourceKind;
+
+  fn transform(item: (ResourceKindDb, SpecDb)) -> IoResult<Self::NewOutput> {
+    item.1.try_into()
   }
 }
 
 impl ResourceKindDb {
+  pub(crate) async fn inspect_by_pk(
+    pk: &str,
+    pool: &Pool,
+  ) -> HttpResult<ResourceKindInspect> {
+    let item = ResourceKindDb::transform_read_by_pk(pk, pool).await?;
+    let filter = GenericFilter::new()
+      .r#where("kind_key", GenericClause::Eq(item.name.to_owned()));
+    let versions = SpecDb::read_by(&filter, pool)
+      .await?
+      .into_iter()
+      .map(|item| item.try_into())
+      .collect::<IoResult<Vec<_>>>()?;
+    let item = ResourceKindInspect {
+      name: item.name,
+      created_at: item.created_at,
+      versions,
+    };
+    Ok(item)
+  }
+
   pub(crate) async fn create_from_spec(
     item: &ResourceKindPartial,
     pool: &Pool,
@@ -129,7 +101,7 @@ impl ResourceKindDb {
     }
     let kind_version: SpecDb = item.try_into()?;
     let version = SpecDb::create_from(kind_version, pool).await?;
-    match ResourceKindDb::read_pk_with_spec(&item.name, pool).await {
+    match ResourceKindDb::transform_read_by_pk(&item.name, pool).await {
       Ok(resource_kind) => {
         let update = ResourceKindDbUpdate {
           spec_key: version.key,
@@ -146,26 +118,6 @@ impl ResourceKindDb {
       }
     };
     let item: ResourceKind = version.try_into()?;
-    Ok(item)
-  }
-
-  pub(crate) async fn inspect_by_pk(
-    pk: &str,
-    pool: &Pool,
-  ) -> HttpResult<ResourceKindInspect> {
-    let item = ResourceKindDb::read_pk_with_spec(pk, pool).await?;
-    let filter = GenericFilter::new()
-      .r#where("kind_key", GenericClause::Eq(item.name.to_owned()));
-    let versions = SpecDb::read(&filter, pool)
-      .await?
-      .into_iter()
-      .map(|item| item.try_into())
-      .collect::<IoResult<Vec<_>>>()?;
-    let item = ResourceKindInspect {
-      name: item.name,
-      created_at: item.created_at,
-      versions,
-    };
     Ok(item)
   }
 }

@@ -1,7 +1,10 @@
 use diesel::prelude::*;
 use nanocl_stubs::generic::GenericFilter;
 
-use crate::{gen_where4json, gen_where4string, models::MetricDb, schema::metrics};
+use crate::{
+  gen_multiple, gen_where4json, gen_where4uuid, gen_where4string,
+  models::MetricDb, schema::metrics,
+};
 
 use super::generic::*;
 
@@ -9,29 +12,37 @@ impl RepositoryBase for MetricDb {}
 
 impl RepositoryCreate for MetricDb {}
 
-impl RepositoryRead for MetricDb {
+impl RepositoryReadBy for MetricDb {
   type Output = MetricDb;
-  type Query = metrics::BoxedQuery<'static, diesel::pg::Pg>;
 
-  fn gen_read_query(filter: &GenericFilter, is_multiple: bool) -> Self::Query {
+  fn get_pk() -> &'static str {
+    "key"
+  }
+
+  fn gen_read_query(
+    filter: &GenericFilter,
+    is_multiple: bool,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<
+    'static,
+    diesel::pg::PgConnection,
+    Self::Output,
+  > {
     let r#where = filter.r#where.clone().unwrap_or_default();
-    let mut query = metrics::dsl::metrics.into_boxed();
+    let mut query = metrics::table.into_boxed();
+    if let Some(key) = r#where.get("key") {
+      gen_where4uuid!(query, metrics::key, key);
+    }
     if let Some(node_name) = r#where.get("node_name") {
-      gen_where4string!(query, metrics::dsl::node_name, node_name);
+      gen_where4string!(query, metrics::node_name, node_name);
     }
     if let Some(kind) = r#where.get("kind") {
-      gen_where4string!(query, metrics::dsl::kind, kind);
+      gen_where4string!(query, metrics::kind, kind);
     }
     if let Some(data) = r#where.get("data") {
-      gen_where4json!(query, metrics::dsl::data, data);
+      gen_where4json!(query, metrics::data, data);
     }
     if is_multiple {
-      query = query.order(metrics::dsl::created_at.desc());
-      let limit = filter.limit.unwrap_or(100);
-      query = query.limit(limit as i64);
-      if let Some(offset) = filter.offset {
-        query = query.offset(offset as i64);
-      }
+      gen_multiple!(query, metrics::dsl::created_at, filter);
     }
     query
   }

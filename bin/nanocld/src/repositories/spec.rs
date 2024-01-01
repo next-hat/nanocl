@@ -9,7 +9,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_where4string,
+  gen_multiple, gen_where4uuid, gen_where4string,
   models::{Pool, SpecDb},
   schema::specs,
 };
@@ -19,31 +19,6 @@ use super::generic::*;
 impl RepositoryBase for SpecDb {}
 
 impl RepositoryCreate for SpecDb {}
-
-impl RepositoryRead for SpecDb {
-  type Output = SpecDb;
-  type Query = specs::BoxedQuery<'static, diesel::pg::Pg>;
-
-  fn gen_read_query(filter: &GenericFilter, is_multiple: bool) -> Self::Query {
-    let r#where = filter.r#where.to_owned().unwrap_or_default();
-    let mut query = specs::table.into_boxed();
-    if let Some(value) = r#where.get("kind_key") {
-      gen_where4string!(query, specs::kind_key, value);
-    }
-    if let Some(value) = r#where.get("version") {
-      gen_where4string!(query, specs::version, value);
-    }
-    if is_multiple {
-      query = query.order(specs::created_at.desc());
-      let limit = filter.limit.unwrap_or(100);
-      query = query.limit(limit as i64);
-      if let Some(offset) = filter.offset {
-        query = query.offset(offset as i64);
-      }
-    }
-    query
-  }
-}
 
 impl RepositoryDelBy for SpecDb {
   fn gen_del_query(
@@ -68,11 +43,44 @@ impl RepositoryDelBy for SpecDb {
   }
 }
 
+impl RepositoryReadBy for SpecDb {
+  type Output = SpecDb;
+
+  fn get_pk() -> &'static str {
+    "key"
+  }
+
+  fn gen_read_query(
+    filter: &GenericFilter,
+    is_multiple: bool,
+  ) -> impl diesel::query_dsl::methods::LoadQuery<
+    'static,
+    diesel::pg::PgConnection,
+    Self::Output,
+  > {
+    let r#where = filter.r#where.clone().unwrap_or_default();
+    let mut query = specs::table.into_boxed();
+    if let Some(key) = r#where.get("key") {
+      gen_where4uuid!(query, specs::key, key);
+    }
+    if let Some(kind_key) = r#where.get("kind_key") {
+      gen_where4string!(query, specs::kind_key, kind_key);
+    }
+    if let Some(version) = r#where.get("version") {
+      gen_where4string!(query, specs::version, version);
+    }
+    if is_multiple {
+      gen_multiple!(query, specs::created_at, filter);
+    }
+    query
+  }
+}
+
 impl SpecDb {
   pub(crate) async fn del_by_kind_key(key: &str, pool: &Pool) -> IoResult<()> {
     let filter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(key.to_owned()));
-    Self::del_by(&filter, pool).await
+    SpecDb::del_by(&filter, pool).await
   }
 
   pub(crate) async fn get_version(
@@ -83,8 +91,7 @@ impl SpecDb {
     let filter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(name.to_owned()))
       .r#where("version", GenericClause::Eq(version.to_owned()));
-    let item = SpecDb::read_one(&filter, pool).await?;
-    Ok(item)
+    SpecDb::read_one_by(&filter, pool).await
   }
 
   pub(crate) async fn read_by_kind_key(
@@ -93,8 +100,7 @@ impl SpecDb {
   ) -> IoResult<Vec<SpecDb>> {
     let filter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(key.to_owned()));
-    let items = SpecDb::read(&filter, pool).await?;
-    Ok(items)
+    SpecDb::read_by(&filter, pool).await
   }
 
   pub fn try_from_cargo_partial(

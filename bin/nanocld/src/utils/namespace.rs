@@ -90,7 +90,7 @@ pub(crate) async fn list(
   docker_api: &bollard_next::Docker,
   pool: &Pool,
 ) -> HttpResult<Vec<NamespaceSummary>> {
-  let items = NamespaceDb::read(filter, pool).await?;
+  let items = NamespaceDb::read_by(filter, pool).await?;
   let mut new_items = Vec::new();
   for item in items {
     let cargo_count = CargoDb::count_by_namespace(&item.name, pool).await?;
@@ -125,7 +125,7 @@ pub(crate) async fn inspect_by_name(
   state: &DaemonState,
 ) -> HttpResult<NamespaceInspect> {
   let namespace = NamespaceDb::read_by_pk(name, &state.pool).await?;
-  let models = CargoDb::find_by_namespace(&namespace.name, &state.pool).await?;
+  let models = CargoDb::read_by_namespace(&namespace.name, &state.pool).await?;
   let mut cargoes = Vec::new();
   for cargo in models {
     let cargo =

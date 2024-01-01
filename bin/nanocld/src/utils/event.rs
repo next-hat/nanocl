@@ -42,7 +42,7 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
     None => return Ok(()),
     Some(ttl) => ttl,
   };
-  let instances = ProcessDb::find_by_kind_key(&job.name, &state.pool).await?;
+  let instances = ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
   let (_, _, _, running) = utils::process::count_status(&instances);
   log::debug!(
     "event::job_ttl: {} has {running} running instances",
