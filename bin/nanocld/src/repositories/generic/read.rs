@@ -41,9 +41,9 @@ pub trait RepositoryReadBy: super::RepositoryBase {
     .await?
   }
 
-  async fn read_by_pk<PK>(pk: &PK, pool: &Pool) -> IoResult<Self::Output>
+  async fn read_by_pk<Pk>(pk: &Pk, pool: &Pool) -> IoResult<Self::Output>
   where
-    PK: ToString + ?Sized,
+    Pk: ToString + ?Sized,
     Self::Output: Sized + Send + 'static,
   {
     let pk = pk.to_string();
@@ -80,12 +80,12 @@ pub trait RepositoryReadByTransform: RepositoryReadBy {
 
   fn transform(input: Self::Output) -> IoResult<Self::NewOutput>;
 
-  async fn transform_read_by_pk<PK>(
-    pk: &PK,
+  async fn transform_read_by_pk<Pk>(
+    pk: &Pk,
     pool: &Pool,
   ) -> IoResult<Self::NewOutput>
   where
-    PK: ToString + ?Sized,
+    Pk: ToString + ?Sized,
     Self::Output: Sized + Send + 'static,
   {
     let output = Self::read_by_pk(pk, pool).await?;
