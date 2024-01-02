@@ -608,6 +608,20 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Event'
+  /events/watch:
+    get:
+      tags:
+      - System
+      summary: Watch on new events using Server-Sent Events / EventSource
+      description: Watch on new events using Server-Sent Events / EventSource
+      operationId: watch_event
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/plain:
+              schema:
+                type: string
   /exec/{id}/cargo/inspect:
     post:
       tags:

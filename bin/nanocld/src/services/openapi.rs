@@ -225,7 +225,7 @@ impl Modify for VersionModifier {
     node::node_ws,
     // System
     system::get_info,
-    // system::watch_event,
+    system::watch_event,
     system::get_version,
     system::get_ping,
     // Namespace
