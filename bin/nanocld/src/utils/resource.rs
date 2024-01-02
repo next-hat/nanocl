@@ -3,7 +3,7 @@ use jsonschema::{Draft, JSONSchema};
 use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
-  system::EventAction,
+  system::NativeEventAction,
   resource_kind::ResourceKind,
   resource::{Resource, ResourcePartial},
 };
@@ -93,9 +93,11 @@ pub(crate) async fn create(
   }
   let resource = hook_create_resource(resource, &state.pool).await?;
   let res = ResourceDb::create_from_spec(&resource, &state.pool).await?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&res, EventAction::Created);
+  super::event::emit_normal_native_action(
+    &res,
+    NativeEventAction::Create,
+    state,
+  );
   Ok(res)
 }
 
@@ -107,9 +109,11 @@ pub(crate) async fn patch(
 ) -> HttpResult<Resource> {
   let resource = hook_create_resource(resource, &state.pool).await?;
   let res = ResourceDb::update_from_spec(&resource, &state.pool).await?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(&res, EventAction::Patched);
+  super::event::emit_normal_native_action(
+    &res,
+    NativeEventAction::Patch,
+    state,
+  );
   Ok(res)
 }
 
@@ -124,9 +128,11 @@ pub(crate) async fn delete(
   }
   ResourceDb::del_by_pk(&resource.spec.resource_key, &state.pool).await?;
   SpecDb::del_by_kind_key(&resource.spec.resource_key, &state.pool).await?;
-  state
-    .event_emitter
-    .spawn_emit_to_event(resource, EventAction::Deleted);
+  super::event::emit_normal_native_action(
+    resource,
+    NativeEventAction::Delete,
+    state,
+  );
   Ok(())
 }
 

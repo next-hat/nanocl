@@ -9,7 +9,7 @@ use bollard_next::container::{
 };
 
 use nanocl_stubs::{
-  system::EventAction,
+  system::NativeEventAction,
   process::{Process, ProcessKind, ProcessPartial},
 };
 
@@ -21,17 +21,17 @@ use crate::{
 async fn after(
   kind: &ProcessKind,
   kind_key: &str,
-  action: EventAction,
+  action: NativeEventAction,
   state: &DaemonState,
 ) -> HttpResult<()> {
   match kind {
     ProcessKind::Vm => {
       let vm = VmDb::transform_read_by_pk(kind_key, &state.pool).await?;
-      state.event_emitter.spawn_emit_to_event(&vm, action);
+      super::event::emit_normal_native_action(&vm, action, state);
     }
     ProcessKind::Cargo => {
       let cargo = CargoDb::transform_read_by_pk(kind_key, &state.pool).await?;
-      state.event_emitter.spawn_emit_to_event(&cargo, action);
+      super::event::emit_normal_native_action(&cargo, action, state);
     }
     ProcessKind::Job => {
       JobDb::update_pk(
@@ -191,7 +191,7 @@ pub(crate) async fn start_by_kind(
       )
       .await?;
   }
-  after(kind, kind_key, EventAction::Started, state).await?;
+  after(kind, kind_key, NativeEventAction::Start, state).await?;
   Ok(())
 }
 
@@ -215,6 +215,6 @@ pub(crate) async fn stop_by_kind(
       )
       .await?;
   }
-  after(kind, kind_key, EventAction::Stopped, state).await?;
+  after(kind, kind_key, NativeEventAction::Stop, state).await?;
   Ok(())
 }

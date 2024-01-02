@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use crate::system::{EventActor, ToEvent, EventAction, EventKind, Event};
+use crate::system::{EventActor, EventActorKind};
 
 /// A partial secret object. This is used to create a secret.
 /// A secret is a key/value pair that can be used by the user to store
@@ -82,21 +82,11 @@ impl From<Secret> for EventActor {
   fn from(secret: Secret) -> Self {
     Self {
       key: Some(secret.name),
+      kind: EventActorKind::Secret,
       attributes: Some(serde_json::json!({
         "Kind": secret.kind,
         "Metadata": secret.metadata,
       })),
-    }
-  }
-}
-
-/// Implement ToEvent for Secret to generate an event
-impl ToEvent for Secret {
-  fn to_event(&self, action: EventAction) -> Event {
-    Event {
-      kind: EventKind::Secret,
-      action,
-      actor: Some(self.clone().into()),
     }
   }
 }

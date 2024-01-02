@@ -1,14 +1,18 @@
+use std::str::FromStr;
+
 use ntex::rt;
 use futures_util::StreamExt;
 
-use nanocl_error::io::{IoResult, FromIo};
+use nanocl_error::io::{IoResult, FromIo, IoError};
 
 use bollard_next::{
   system::EventsOptions,
   container::InspectContainerOptions,
   service::{EventMessageTypeEnum, EventMessage},
 };
-use nanocl_stubs::system::{Event, EventKind, EventAction, EventActor};
+use nanocl_stubs::system::{
+  Event, EventActorKind, NativeEventAction, EventActor, EventKind,
+};
 
 use crate::{
   utils,
@@ -19,20 +23,24 @@ use crate::{
 
 /// Remove a job after when finished and ttl is set
 async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
-  if e.kind != EventKind::Process {
+  let Some(actor) = e.actor else {
+    return Ok(());
+  };
+  if actor.kind != EventActorKind::Process {
     return Ok(());
   }
-  let actor = e.actor.unwrap_or_default();
   let attributes = actor.attributes.unwrap_or_default();
   let job_id = match attributes.get("io.nanocl.j") {
     None => return Ok(()),
     Some(job_id) => job_id.as_str().unwrap_or_default(),
   };
   log::debug!("event::job_ttl: {job_id}");
-  match &e.action {
-    EventAction::Created | EventAction::Started | EventAction::Deleted => {
-      return Ok(())
-    }
+  let action = NativeEventAction::from_str(e.action.as_str())
+    .map_err(|_| IoError::invalid_data("Job action", "action not valid"))?;
+  match &action {
+    NativeEventAction::Create
+    | NativeEventAction::Start
+    | NativeEventAction::Delete => return Ok(()),
     _ => {}
   }
   let job = JobDb::read_by_pk(job_id, &state.pool)
@@ -116,6 +124,29 @@ pub(crate) fn analize(state: &DaemonState) {
   });
 }
 
+pub fn emit_normal_native_action<A>(
+  actor: &A,
+  action: NativeEventAction,
+  state: &DaemonState,
+) where
+  A: Into<EventActor> + Clone,
+{
+  let actor = actor.clone().into();
+  let event = Event {
+    created_at: chrono::Utc::now().naive_utc(),
+    reporting_controller: "nanocl.io/core".to_owned(),
+    reporting_node: state.config.hostname.clone(),
+    kind: EventKind::Normal,
+    action: action.to_string(),
+    related: None,
+    reason: "StateSync".to_owned(),
+    note: None,
+    metadata: None,
+    actor: Some(actor),
+  };
+  state.event_emitter.spawn_emit_event(event);
+}
+
 /// Take actions when a docker event is received
 async fn exec_docker(
   event: &EventMessage,
@@ -135,10 +166,18 @@ async fn exec_docker(
   log::debug!("event::exec_docker: {action}");
   let action = action.as_str();
   let mut event = Event {
-    kind: EventKind::Process,
-    action: EventAction::Deleted,
+    created_at: chrono::Utc::now().naive_utc(),
+    reporting_controller: "nanocl.io/core".to_owned(),
+    reporting_node: state.config.hostname.clone(),
+    kind: EventKind::Normal,
+    action: NativeEventAction::Delete.to_string(),
+    related: None,
+    reason: "StateSync".to_owned(),
+    note: None,
+    metadata: None,
     actor: Some(EventActor {
       key: Some(id.clone()),
+      kind: EventActorKind::Process,
       attributes: Some(
         serde_json::to_value(attributes)
           .map_err(|err| err.map_err_context(|| "Event attributes"))?,
@@ -152,21 +191,21 @@ async fn exec_docker(
       return Ok(());
     }
     "create" => {
-      event.action = EventAction::Created;
+      event.action = NativeEventAction::Create.to_string();
       state.event_emitter.spawn_emit_event(event);
       return Ok(());
     }
     "start" => {
-      event.action = EventAction::Started;
+      event.action = NativeEventAction::Start.to_string();
     }
     "stop" => {
-      event.action = EventAction::Stopped;
+      event.action = NativeEventAction::Stop.to_string();
     }
     "restart" => {
-      event.action = EventAction::Restart;
+      event.action = NativeEventAction::Restart.to_string();
     }
     _ => {
-      event.action = EventAction::Patched;
+      event.action = NativeEventAction::Patch.to_string();
     }
   }
   state.event_emitter.spawn_emit_event(event);

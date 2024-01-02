@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, str::FromStr};
 
 use ntex::rt;
 use futures::{StreamExt, stream::FuturesUnordered};
@@ -11,7 +11,7 @@ use nanocld_client::{
   stubs::{
     system::Event,
     resource::ResourcePartial,
-    system::{EventKind, EventAction},
+    system::{EventActorKind, NativeEventAction},
     resource_kind::{ResourceKindPartial, ResourceKindSpec},
   },
 };
@@ -86,27 +86,30 @@ async fn delete_cargo_rule(
 
 /// Analyze nanocld events and update nginx configuration
 async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
-  let kind = &event.kind;
-  let action = &event.action;
-  let actor = event.actor.clone().unwrap_or_default();
-  log::trace!("event::on_event: {kind} {action}");
-  match (kind, action) {
-    (EventKind::Cargo, EventAction::Started)
-    | (EventKind::Cargo, EventAction::Patched) => {
+  let action = NativeEventAction::from_str(&event.action)
+    .map_err(|_| IoError::invalid_data("Event action", "Action not valid"))?;
+  let Some(actor) = event.actor.clone() else {
+    return Ok(());
+  };
+  let actor_kind = &actor.kind;
+  log::trace!("event::on_event: {actor_kind} {action}");
+  match (actor_kind, action) {
+    (EventActorKind::Cargo, NativeEventAction::Start)
+    | (EventActorKind::Cargo, NativeEventAction::Patch) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       update_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
-    (EventKind::Cargo, EventAction::Stopped)
-    | (EventKind::Cargo, EventAction::Deleted) => {
+    (EventActorKind::Cargo, NativeEventAction::Stop)
+    | (EventActorKind::Cargo, NativeEventAction::Delete) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       delete_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
       Ok(())
     }
-    (EventKind::Secret, EventAction::Created)
-    | (EventKind::Secret, EventAction::Patched) => {
+    (EventActorKind::Secret, NativeEventAction::Create)
+    | (EventActorKind::Secret, NativeEventAction::Patch) => {
       let resources = utils::resource::list_by_secret(
         &actor.key.unwrap_or_default(),
         &state.client,
