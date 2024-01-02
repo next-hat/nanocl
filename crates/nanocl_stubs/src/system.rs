@@ -41,6 +41,7 @@ pub struct BinaryInfo {
 
 /// Kind is the type of event related to the actor kind
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub enum EventActorKind {
@@ -69,6 +70,7 @@ impl std::fmt::Display for EventActorKind {
 
 /// Action is the action that triggered the event
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum NativeEventAction {
@@ -113,6 +115,7 @@ impl std::fmt::Display for NativeEventAction {
 
 /// Kind of event (Error, Normal, Warning), new types could be added in the future.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum EventKind {
@@ -149,11 +152,21 @@ impl std::fmt::Display for EventKind {
 
 /// Actor is the actor that triggered the event
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct EventActor {
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub key: Option<String>,
   pub kind: EventActorKind,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
   pub attributes: Option<serde_json::Value>,
 }
 
@@ -177,18 +190,35 @@ pub struct EventPartial {
   /// This field cannot be empty for new Events and it can have at most 128 characters.
   pub reason: String,
   /// Human-readable description of the status of this operation
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub note: Option<String>,
   /// Actor contains the object this Event is about.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub actor: Option<EventActor>,
   /// Optional secondary actor for more complex actions.
   /// E.g. when regarding actor triggers a creation or deletion of related actor.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub related: Option<EventActor>,
   /// Standard metadata.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub metadata: Option<serde_json::Value>,
 }
 
 /// Event is a generic event type that is used to notify state changes
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Event {
@@ -214,12 +244,29 @@ pub struct Event {
   /// This field cannot be empty for new Events and it can have at most 128 characters.
   pub reason: String,
   /// Human-readable description of the status of this operation
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub note: Option<String>,
   /// Actor contains the object this Event is about.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub actor: Option<EventActor>,
   /// Optional secondary actor for more complex actions.
   /// E.g. when regarding actor triggers a creation or deletion of related actor.
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub related: Option<EventActor>,
   /// Standard metadata.
+  #[cfg_attr(feature = "utoipa", schema(value_type = HashMap<String, Any>))]
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
   pub metadata: Option<serde_json::Value>,
 }

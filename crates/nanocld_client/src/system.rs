@@ -40,7 +40,7 @@ impl NanocldClient {
   pub async fn watch_events(
     &self,
   ) -> HttpClientResult<Receiver<HttpResult<Event>>> {
-    let res = self.send_get("/events", None::<String>).await?;
+    let res = self.send_get("/events/watch", None::<String>).await?;
     Ok(Self::res_stream(res).await)
   }
 
