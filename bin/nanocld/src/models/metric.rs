@@ -24,7 +24,7 @@ pub struct MetricDb {
   /// When the metric was created
   pub created_at: chrono::NaiveDateTime,
   /// When the metric will expire
-  pub expire_at: chrono::NaiveDateTime,
+  pub expires_at: chrono::NaiveDateTime,
   /// The node who saved the metric
   pub node_name: String,
   /// The kind of the metric
@@ -65,7 +65,7 @@ impl From<&MetricNodePartial> for MetricDb {
     MetricDb {
       key: Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
-      expire_at: chrono::Utc::now().naive_utc(),
+      expires_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30),
       node_name: p.node_name.clone(),
       kind: p.kind.clone(),
       data: p.data.clone(),

@@ -1,5 +1,5 @@
 -- Your SQL goes here
-CREATE TABLE IF NOT EXISTS metrics (
+CREATE TABLE IF NOT EXISTS "metrics" (
   "key" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "expire_at" TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '4 month',

@@ -45,6 +45,9 @@ pub use spec::*;
 mod process;
 pub use process::*;
 
+mod event;
+pub use event::*;
+
 pub type Pool = Arc<R2D2Pool<ConnectionManager<PgConnection>>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;
 

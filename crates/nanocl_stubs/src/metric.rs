@@ -14,7 +14,7 @@ pub struct Metric {
   /// When the metric was created
   pub created_at: chrono::NaiveDateTime,
   /// When the metric will expire
-  pub expire_at: chrono::NaiveDateTime,
+  pub expires_at: chrono::NaiveDateTime,
   /// The node where the metric come from
   pub node_name: String,
   /// The kind of the metric

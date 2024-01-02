@@ -11,6 +11,23 @@ diesel::table! {
 }
 
 diesel::table! {
+    events (key) {
+        key -> Uuid,
+        created_at -> Timestamptz,
+        expires_at -> Timestamptz,
+        reporting_node -> Varchar,
+        reporting_controller -> Varchar,
+        kind -> Varchar,
+        action -> Varchar,
+        reason -> Varchar,
+        note -> Nullable<Varchar>,
+        actor -> Nullable<Jsonb>,
+        related -> Nullable<Jsonb>,
+        metadata -> Nullable<Jsonb>,
+    }
+}
+
+diesel::table! {
     jobs (key) {
         key -> Varchar,
         created_at -> Timestamptz,
@@ -24,7 +41,7 @@ diesel::table! {
     metrics (key) {
         key -> Uuid,
         created_at -> Timestamptz,
-        expire_at -> Timestamptz,
+        expires_at -> Timestamptz,
         node_name -> Varchar,
         kind -> Varchar,
         data -> Jsonb,
@@ -149,6 +166,7 @@ diesel::joinable!(vms -> specs (spec_key));
 
 diesel::allow_tables_to_appear_in_same_query!(
   cargoes,
+  events,
   jobs,
   metrics,
   namespaces,

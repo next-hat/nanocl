@@ -4625,7 +4625,7 @@ components:
       required:
       - Key
       - CreatedAt
-      - ExpireAt
+      - ExpiresAt
       - NodeName
       - Kind
       - Data
@@ -4638,7 +4638,7 @@ components:
           type: string
           format: date-time
           description: When the metric was created
-        ExpireAt:
+        ExpiresAt:
           type: string
           format: date-time
           description: When the metric will expire
