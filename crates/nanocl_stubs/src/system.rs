@@ -86,12 +86,12 @@ impl FromStr for NativeEventAction {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
-      "Create" => Ok(NativeEventAction::Create),
-      "Patch" => Ok(NativeEventAction::Patch),
-      "Start" => Ok(NativeEventAction::Start),
-      "Stop" => Ok(NativeEventAction::Stop),
-      "Delete" => Ok(NativeEventAction::Delete),
-      "Restart" => Ok(NativeEventAction::Restart),
+      "create" => Ok(NativeEventAction::Create),
+      "patch" => Ok(NativeEventAction::Patch),
+      "start" => Ok(NativeEventAction::Start),
+      "stop" => Ok(NativeEventAction::Stop),
+      "delete" => Ok(NativeEventAction::Delete),
+      "restart" => Ok(NativeEventAction::Restart),
       _ => Ok(NativeEventAction::Other(s.to_owned())),
     }
   }
@@ -114,7 +114,7 @@ impl std::fmt::Display for NativeEventAction {
 /// Kind of event (Error, Normal, Warning), new types could be added in the future.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum EventKind {
   Error,
   Normal,
