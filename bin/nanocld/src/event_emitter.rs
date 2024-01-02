@@ -12,7 +12,12 @@ use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::system::Event;
+use nanocl_stubs::system::{Event, EventPartial};
+
+use crate::{
+  repositories::generic::*,
+  models::{Pool, EventDb},
+};
 
 /// Stream: Wrap Receiver in our own type, with correct error type
 pub struct Client(pub Receiver<Bytes>);
@@ -111,7 +116,12 @@ impl EventEmitter {
   }
 
   /// Send an event to all clients
-  pub(crate) async fn emit(&self, e: Event) -> HttpResult<()> {
+  pub(crate) async fn emit(
+    &self,
+    e: EventPartial,
+    pool: &Pool,
+  ) -> HttpResult<()> {
+    let e: Event = EventDb::create_try_from(e, pool).await?.try_into()?;
     let self_ptr = self.clone();
     let inner = web::block(move || {
       let inner = self_ptr
@@ -156,10 +166,11 @@ impl EventEmitter {
     Ok(())
   }
 
-  pub fn spawn_emit_event(&self, e: Event) {
+  pub fn spawn_emit_event(&self, e: EventPartial, pool: &Pool) {
     let self_ptr = self.clone();
+    let pool = Arc::clone(pool);
     rt::spawn(async move {
-      if let Err(err) = self_ptr.emit(e).await {
+      if let Err(err) = self_ptr.emit(e, &pool).await {
         log::error!("{err}");
       }
     });

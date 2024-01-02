@@ -82,7 +82,7 @@ pub enum NativeEventAction {
 }
 
 impl FromStr for NativeEventAction {
-  type Err = ();
+  type Err = std::io::Error;
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
@@ -121,6 +121,22 @@ pub enum EventKind {
   Warning,
 }
 
+impl FromStr for EventKind {
+  type Err = std::io::Error;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "error" => Ok(EventKind::Error),
+      "normal" => Ok(EventKind::Normal),
+      "warning" => Ok(EventKind::Warning),
+      _ => Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        format!("invalid event kind: {}", s),
+      )),
+    }
+  }
+}
+
 impl std::fmt::Display for EventKind {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
@@ -141,18 +157,15 @@ pub struct EventActor {
   pub attributes: Option<serde_json::Value>,
 }
 
-/// Event is a generic event type that is used to notify state changes
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
-pub struct Event {
-  /// When the event was created.
-  pub created_at: chrono::NaiveDateTime,
+pub struct EventPartial {
+  /// Reporting Node is the name of the node where the Event was generated.
+  pub reporting_node: String,
   /// Reporting Controller is the name of the controller that emitted this Event.
   /// e.g. `nanocl.io/core`. This field cannot be empty for new Events.
   pub reporting_controller: String,
-  /// Reporting Node is the name of the node where the Event was generated.
-  pub reporting_node: String,
   /// Kind of this event (Error, Normal, Warning), new types could be added in the future.
   /// It is machine-readable. This field cannot be empty for new Events.
   pub kind: EventKind,
@@ -160,16 +173,53 @@ pub struct Event {
   /// It is machine-readable.
   /// This field cannot be empty for new Events and it can have at most 128 characters.
   pub action: String,
+  /// Reason is why the action was taken. It is human-readable.
+  /// This field cannot be empty for new Events and it can have at most 128 characters.
+  pub reason: String,
+  /// Human-readable description of the status of this operation
+  pub note: Option<String>,
   /// Actor contains the object this Event is about.
   pub actor: Option<EventActor>,
   /// Optional secondary actor for more complex actions.
   /// E.g. when regarding actor triggers a creation or deletion of related actor.
   pub related: Option<EventActor>,
+  /// Standard metadata.
+  pub metadata: Option<serde_json::Value>,
+}
+
+/// Event is a generic event type that is used to notify state changes
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct Event {
+  /// Unique identifier of this event.
+  pub key: uuid::Uuid,
+  /// When the event was created.
+  pub created_at: chrono::NaiveDateTime,
+  /// When the event expires.
+  pub expires_at: chrono::NaiveDateTime,
+  /// Reporting Node is the name of the node where the Event was generated.
+  pub reporting_node: String,
+  /// Reporting Controller is the name of the controller that emitted this Event.
+  /// e.g. `nanocl.io/core`. This field cannot be empty for new Events.
+  pub reporting_controller: String,
+  /// Kind of this event (Error, Normal, Warning), new types could be added in the future.
+  /// It is machine-readable. This field cannot be empty for new Events.
+  pub kind: EventKind,
+  /// Action is what action was taken/failed regarding to the regarding actor.
+  /// It is machine-readable.
+  /// This field cannot be empty for new Events and it can have at most 128 characters.
+  pub action: String,
   /// Reason is why the action was taken. It is human-readable.
   /// This field cannot be empty for new Events and it can have at most 128 characters.
   pub reason: String,
-  /// Standard metadata.
-  pub metadata: Option<serde_json::Value>,
   /// Human-readable description of the status of this operation
   pub note: Option<String>,
+  /// Actor contains the object this Event is about.
+  pub actor: Option<EventActor>,
+  /// Optional secondary actor for more complex actions.
+  /// E.g. when regarding actor triggers a creation or deletion of related actor.
+  pub related: Option<EventActor>,
+  /// Standard metadata.
+  pub metadata: Option<serde_json::Value>,
 }

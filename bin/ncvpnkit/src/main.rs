@@ -105,8 +105,7 @@ async fn on_event(
   nanocl_client: &NanocldClient,
   vpnkit_client: &VpnKitRc,
 ) -> IoResult<()> {
-  let action = NativeEventAction::from_str(&event.action)
-    .map_err(|_| IoError::invalid_data("Event action", "Action not valid"))?;
+  let action = NativeEventAction::from_str(&event.action)?;
   let Some(actor) = event.actor.clone() else {
     return Ok(());
   };

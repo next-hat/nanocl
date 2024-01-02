@@ -86,8 +86,7 @@ async fn delete_cargo_rule(
 
 /// Analyze nanocld events and update nginx configuration
 async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
-  let action = NativeEventAction::from_str(&event.action)
-    .map_err(|_| IoError::invalid_data("Event action", "Action not valid"))?;
+  let action = NativeEventAction::from_str(&event.action)?;
   let Some(actor) = event.actor.clone() else {
     return Ok(());
   };

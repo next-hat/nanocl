@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use diesel::{prelude::*, associations::HasTable};
 
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{IoError, IoResult};
 
 use crate::{utils, models::Pool};
 
@@ -32,5 +32,23 @@ pub trait RepositoryCreate: super::RepositoryBase {
       Ok(item)
     })
     .await?
+  }
+
+  async fn create_try_from<I>(item: I, pool: &Pool) -> IoResult<Self>
+  where
+    Self: Sized
+      + Send
+      + TryFrom<I, Error = IoError>
+      + HasTable
+      + diesel::Insertable<Self::Table>
+      + 'static,
+    Self::Table: HasTable<Table = Self::Table> + diesel::Table,
+    diesel::query_builder::InsertStatement<
+      Self::Table,
+      <Self as diesel::Insertable<Self::Table>>::Values,
+    >: diesel::query_dsl::LoadQuery<'static, diesel::pg::PgConnection, Self>,
+  {
+    let item = Self::try_from(item)?;
+    Self::create_from(item, pool).await
   }
 }

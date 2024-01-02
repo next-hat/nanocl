@@ -3,7 +3,7 @@ use std::str::FromStr;
 use ntex::rt;
 use futures_util::StreamExt;
 
-use nanocl_error::io::{IoResult, FromIo, IoError};
+use nanocl_error::io::{IoResult, FromIo};
 
 use bollard_next::{
   system::EventsOptions,
@@ -11,7 +11,7 @@ use bollard_next::{
   service::{EventMessageTypeEnum, EventMessage},
 };
 use nanocl_stubs::system::{
-  Event, EventActorKind, NativeEventAction, EventActor, EventKind,
+  Event, EventActorKind, NativeEventAction, EventActor, EventKind, EventPartial,
 };
 
 use crate::{
@@ -35,8 +35,7 @@ async fn job_ttl(e: Event, state: &DaemonState) -> IoResult<()> {
     Some(job_id) => job_id.as_str().unwrap_or_default(),
   };
   log::debug!("event::job_ttl: {job_id}");
-  let action = NativeEventAction::from_str(e.action.as_str())
-    .map_err(|_| IoError::invalid_data("Job action", "action not valid"))?;
+  let action = NativeEventAction::from_str(e.action.as_str())?;
   match &action {
     NativeEventAction::Create
     | NativeEventAction::Start
@@ -132,19 +131,18 @@ pub fn emit_normal_native_action<A>(
   A: Into<EventActor> + Clone,
 {
   let actor = actor.clone().into();
-  let event = Event {
-    created_at: chrono::Utc::now().naive_utc(),
+  let event = EventPartial {
     reporting_controller: "nanocl.io/core".to_owned(),
     reporting_node: state.config.hostname.clone(),
     kind: EventKind::Normal,
     action: action.to_string(),
     related: None,
-    reason: "StateSync".to_owned(),
+    reason: "state_sync".to_owned(),
     note: None,
     metadata: None,
     actor: Some(actor),
   };
-  state.event_emitter.spawn_emit_event(event);
+  state.event_emitter.spawn_emit_event(event, &state.pool);
 }
 
 /// Take actions when a docker event is received
@@ -165,8 +163,7 @@ async fn exec_docker(
   let id = actor.id.unwrap_or_default();
   log::debug!("event::exec_docker: {action}");
   let action = action.as_str();
-  let mut event = Event {
-    created_at: chrono::Utc::now().naive_utc(),
+  let mut event = EventPartial {
     reporting_controller: "nanocl.io/core".to_owned(),
     reporting_node: state.config.hostname.clone(),
     kind: EventKind::Normal,
@@ -186,13 +183,13 @@ async fn exec_docker(
   };
   match action {
     "destroy" => {
-      state.event_emitter.spawn_emit_event(event);
+      state.event_emitter.spawn_emit_event(event, &state.pool);
       let _ = ProcessDb::del_by_pk(&id, &state.pool).await;
       return Ok(());
     }
     "create" => {
       event.action = NativeEventAction::Create.to_string();
-      state.event_emitter.spawn_emit_event(event);
+      state.event_emitter.spawn_emit_event(event, &state.pool);
       return Ok(());
     }
     "start" => {
@@ -208,7 +205,7 @@ async fn exec_docker(
       event.action = NativeEventAction::Patch.to_string();
     }
   }
-  state.event_emitter.spawn_emit_event(event);
+  state.event_emitter.spawn_emit_event(event, &state.pool);
   let instance = state
     .docker_api
     .inspect_container(&id, None::<InspectContainerOptions>)

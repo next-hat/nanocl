@@ -10,5 +10,6 @@ mod resource;
 mod metric;
 mod vm;
 mod vm_image;
+mod event;
 
 pub mod generic;
