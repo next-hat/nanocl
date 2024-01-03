@@ -39,7 +39,9 @@ use nanocl_stubs::process::{Process, ProcessKind};
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 use nanocl_stubs::generic::{GenericCount, GenericClause, GenericFilter};
-use nanocl_stubs::system::{BinaryInfo, HostInfo};
+use nanocl_stubs::system::{
+  BinaryInfo, HostInfo, Event, EventActor, EventActorKind, EventKind,
+};
 use nanocl_stubs::metric::{Metric, MetricPartial};
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
 use nanocl_stubs::namespace::{
@@ -77,7 +79,7 @@ use nanocl_stubs::statefile::{Statefile, StatefileArg};
 
 use super::{
   node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
-  metric, secret, job, process, resource_kind,
+  metric, secret, job, process, resource_kind, event,
 };
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -197,7 +199,7 @@ struct VersionModifier;
 impl Modify for VersionModifier {
   fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
     let variable = utoipa::openapi::ServerVariableBuilder::default()
-      .default_value("v0.11")
+      .default_value("v0.13")
       .description(Some("API version"))
       .build();
 
@@ -303,6 +305,8 @@ impl Modify for VersionModifier {
     process::start_process,
     process::stop_process,
     process::list_process,
+    // Event
+    event::list_event,
   ),
   components(schemas(
     // Node
@@ -499,6 +503,11 @@ impl Modify for VersionModifier {
     EmptyObject,
     GenericClause,
     GenericFilter,
+    // Event
+    Event,
+    EventActor,
+    EventActorKind,
+    EventKind,
   )),
   tags(
     (name = "CargoImages", description = "Cargo images management endpoints."),
@@ -510,6 +519,9 @@ impl Modify for VersionModifier {
     (name = "Vms", description = "Virtual machines management endpoints."),
     (name = "Metrics", description = "Metrics management endpoints."),
     (name = "Processes", description = "Processes management endpoints."),
+    (name = "Secrets", description = "Secrets management endpoints."),
+    (name = "Jobs", description = "Jobs management endpoints."),
+    (name = "Events", description = "Events management endpoints."),
   ),
   modifiers(&VersionModifier),
 )]

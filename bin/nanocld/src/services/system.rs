@@ -63,16 +63,16 @@ pub(crate) async fn get_info(
   Ok(web::HttpResponse::Ok().json(&info))
 }
 
-/// Listen on events using Server-Sent Events / EventSource
+/// Watch on new events using Server-Sent Events / EventSource
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "System",
-  path = "/events",
+  path = "/events/watch",
   responses(
     (status = 200, description = "Event stream", body = String),
   ),
 ))]
-#[web::get("/events")]
+#[web::get("/events/watch")]
 pub(crate) async fn watch_event(
   state: web::types::State<DaemonState>,
 ) -> HttpResult<web::HttpResponse> {
@@ -104,7 +104,7 @@ mod tests {
   #[ntex::test]
   async fn watch_events() {
     let client = gen_default_test_client().await;
-    let res = client.send_get("/events", None::<String>).await;
+    let res = client.send_get("/events/watch", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "watch events");
   }
 

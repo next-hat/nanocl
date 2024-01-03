@@ -169,7 +169,7 @@ async fn exec_docker(
     kind: EventKind::Normal,
     action: NativeEventAction::Delete.to_string(),
     related: None,
-    reason: "StateSync".to_owned(),
+    reason: "state_sync".to_owned(),
     note: None,
     metadata: None,
     actor: Some(EventActor {
@@ -202,7 +202,7 @@ async fn exec_docker(
       event.action = NativeEventAction::Restart.to_string();
     }
     _ => {
-      event.action = NativeEventAction::Patch.to_string();
+      event.action = action.to_owned();
     }
   }
   state.event_emitter.spawn_emit_event(event, &state.pool);
