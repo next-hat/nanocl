@@ -5,7 +5,7 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::system::HostInfo;
 
 use crate::version;
-use crate::models::DaemonState;
+use crate::models::SystemState;
 
 /// Get version information
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -51,7 +51,7 @@ pub(crate) async fn get_version() -> web::HttpResponse {
 ))]
 #[web::get("/info")]
 pub(crate) async fn get_info(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
 ) -> HttpResult<web::HttpResponse> {
   let docker = state.docker_api.info().await?;
   let host_gateway = state.config.gateway.clone();
@@ -74,9 +74,9 @@ pub(crate) async fn get_info(
 ))]
 #[web::get("/events/watch")]
 pub(crate) async fn watch_event(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
 ) -> HttpResult<web::HttpResponse> {
-  let stream = state.event_emitter.subscribe().await?;
+  let stream = state.event_manager.raw.subscribe().await?;
   Ok(
     web::HttpResponse::Ok()
       .content_type("text/event-stream")

@@ -9,7 +9,7 @@ use metrsd_client::{MetrsdClient, stubs::MetrsdEvent};
 
 use crate::{
   repositories::generic::*,
-  models::{Pool, DaemonState, MetricDb, MetricNodePartial},
+  models::{Pool, SystemState, MetricDb, MetricNodePartial},
 };
 
 /// Save metric event send by [metrsd](http://github.com/next-hat/metrs) to the database
@@ -55,7 +55,7 @@ async fn save_metric(
 /// Spawn a background thread that will listen to the metrics daemon
 /// and save the metrics to the database.
 /// The metrics are saved for the current node.
-pub(crate) fn spawn_logger(state: &DaemonState) {
+pub(crate) fn spawn_logger(state: &SystemState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(move || {
     let client = MetrsdClient::connect("unix:///run/nanocl/metrics.sock");

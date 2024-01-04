@@ -10,7 +10,7 @@ use nanocl_stubs::cargo_image::{
   CargoImagePartial, ListCargoImagesOptions, CargoImageImportOptions,
 };
 
-use crate::{utils, models::DaemonState};
+use crate::{utils, models::SystemState};
 
 /// List container images
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -23,7 +23,7 @@ use crate::{utils, models::DaemonState};
 ))]
 #[web::get("/cargoes/images")]
 pub(crate) async fn list_cargo_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   query: web::types::Query<ListCargoImagesOptions>,
 ) -> HttpResult<web::HttpResponse> {
   let images =
@@ -46,7 +46,7 @@ pub(crate) async fn list_cargo_image(
 ))]
 #[web::get("/cargoes/images/{id_or_name}*")]
 pub(crate) async fn inspect_cargo_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let image = utils::cargo_image::inspect_by_name(&path.1, &state).await?;
@@ -66,7 +66,7 @@ pub(crate) async fn inspect_cargo_image(
 ))]
 #[web::post("/cargoes/images")]
 pub(crate) async fn create_cargo_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   payload: web::types::Json<CargoImagePartial>,
 ) -> HttpResult<web::HttpResponse> {
   let (from_image, tag) = utils::cargo_image::parse_image_name(&payload.name)?;
@@ -94,7 +94,7 @@ pub(crate) async fn create_cargo_image(
 ))]
 #[web::delete("/cargoes/images/{id_or_name}*")]
 pub(crate) async fn delete_cargo_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   utils::cargo_image::delete(&path.1, &state).await?;
@@ -114,7 +114,7 @@ pub(crate) async fn delete_cargo_image(
 ))]
 #[web::post("/cargoes/images/import")]
 pub(crate) async fn import_cargo_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   mut payload: web::types::Payload,
   query: web::types::Query<CargoImageImportOptions>,
 ) -> HttpResult<web::HttpResponse> {

@@ -1,6 +1,4 @@
-use std::{
-  sync::Arc, path::Path, process::Command, os::unix::prelude::PermissionsExt,
-};
+use std::{path::Path, process::Command, os::unix::prelude::PermissionsExt};
 
 use ntex::rt;
 use tokio::fs;
@@ -9,8 +7,8 @@ use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
 use nanocl_error::io::{FromIo, IoResult, IoError};
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::{utils, version, event_emitter::EventEmitter};
-use crate::models::DaemonState;
+use crate::utils;
+use crate::models::SystemState;
 
 /// Create a new thread and watch for change in the run directory
 /// and set the permission of the unix socket
@@ -116,32 +114,19 @@ async fn ensure_state_dir(state_dir: &str) -> IoResult<()> {
 
 /// Init function called before http server start.
 /// To boot and initialize our state and database.
-pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
+pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   spawn_crond();
   set_uds_perm();
-  let docker = bollard_next::Docker::connect_with_unix(
-    &daemon_conf.docker_host,
-    120,
-    bollard_next::API_DEFAULT_VERSION,
-  )
-  .map_err(|err| err.map_err_context(|| "Docker"))?;
-  ensure_state_dir(&daemon_conf.state_dir).await?;
-  let pool = utils::store::init(daemon_conf).await?;
-  let daemon_state = DaemonState {
-    pool: Arc::clone(&pool),
-    docker_api: docker.clone(),
-    config: daemon_conf.to_owned(),
-    event_emitter: EventEmitter::new(),
-    version: version::VERSION.to_owned(),
-  };
-  let daemon_ptr = daemon_state.clone();
-  utils::node::register(&daemon_state).await?;
-  utils::system::register_namespace("global", true, &daemon_state).await?;
-  utils::system::register_namespace("system", false, &daemon_state).await?;
+  ensure_state_dir(&conf.state_dir).await?;
+  let system_state = SystemState::new(conf).await?;
+  let system_ptr = system_state.clone();
+  utils::node::register(&system_ptr).await?;
+  utils::system::register_namespace("global", true, &system_ptr).await?;
+  utils::system::register_namespace("system", false, &system_ptr).await?;
   rt::spawn(async move {
     let fut = async move {
-      utils::system::sync_processes(&daemon_ptr).await?;
-      utils::system::sync_vm_images(&daemon_ptr).await?;
+      utils::system::sync_processes(&system_ptr).await?;
+      utils::system::sync_vm_images(&system_ptr).await?;
       Ok::<_, IoError>(())
     };
     if let Err(err) = fut.await {
@@ -149,10 +134,10 @@ pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<DaemonState> {
     }
     Ok::<_, IoError>(())
   });
-  utils::event::analize_docker(&daemon_state);
-  utils::event::analize(&daemon_state);
-  utils::metric::spawn_logger(&daemon_state);
-  Ok(daemon_state)
+  super::docker_event::analize(&system_state);
+  super::event::analize(&system_state);
+  utils::metric::spawn_logger(&system_state);
+  Ok(system_state)
 }
 
 /// Init unit test

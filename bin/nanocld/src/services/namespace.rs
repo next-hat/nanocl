@@ -9,7 +9,7 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
-  models::{DaemonState, NamespaceDb},
+  models::{SystemState, NamespaceDb},
   repositories::generic::RepositoryReadBy,
 };
 
@@ -27,7 +27,7 @@ use crate::{
 ))]
 #[web::get("/namespaces")]
 pub(crate) async fn list_namespace(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
@@ -52,7 +52,7 @@ pub(crate) async fn list_namespace(
 ))]
 #[web::get("/namespaces/{name}/inspect")]
 pub(crate) async fn inspect_namespace(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::namespace::inspect_by_name(&path.1, &state).await?;
@@ -72,7 +72,7 @@ pub(crate) async fn inspect_namespace(
 ))]
 #[web::post("/namespaces")]
 pub(crate) async fn create_namespace(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   payload: web::types::Json<NamespacePartial>,
 ) -> HttpResult<web::HttpResponse> {
   let item = utils::namespace::create(&payload, &state).await?;
@@ -94,7 +94,7 @@ pub(crate) async fn create_namespace(
 ))]
 #[web::delete("/namespaces/{name}")]
 pub(crate) async fn delete_namespace(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   NamespaceDb::read_by_pk(&path.1, &state.pool).await?;

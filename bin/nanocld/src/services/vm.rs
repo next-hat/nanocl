@@ -23,7 +23,7 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
-  models::{DaemonState, WsConState, SpecDb},
+  models::{SystemState, WsConState, SpecDb},
 };
 
 /// List virtual machines
@@ -40,7 +40,7 @@ use crate::{
 ))]
 #[web::get("/vms")]
 pub(crate) async fn list_vm(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
@@ -63,7 +63,7 @@ pub(crate) async fn list_vm(
 ))]
 #[web::get("/vms/{name}/inspect")]
 pub(crate) async fn inspect_vm(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -89,7 +89,7 @@ pub(crate) async fn inspect_vm(
 ))]
 #[web::delete("/vms/{name}")]
 pub(crate) async fn delete_vm(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -115,7 +115,7 @@ pub(crate) async fn delete_vm(
 ))]
 #[web::post("/vms")]
 pub(crate) async fn create_vm(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<String>,
   payload: web::types::Json<VmSpecPartial>,
   qs: web::types::Query<GenericNspQuery>,
@@ -140,7 +140,7 @@ pub(crate) async fn create_vm(
 ))]
 #[web::get("/vms/{name}/histories")]
 pub(crate) async fn list_vm_history(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -171,7 +171,7 @@ pub(crate) async fn list_vm_history(
 ))]
 #[web::patch("/vms/{name}")]
 pub(crate) async fn patch_vm(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<VmSpecUpdate>,
   qs: web::types::Query<GenericNspQuery>,
@@ -184,7 +184,7 @@ pub(crate) async fn patch_vm(
 }
 
 async fn ws_attach_service(
-  (key, sink, state): (String, ws::WsSink, web::types::State<DaemonState>),
+  (key, sink, state): (String, ws::WsSink, web::types::State<SystemState>),
 ) -> Result<
   impl Service<ws::Frame, Response = Option<ws::Message>, Error = io::Error>,
   web::Error,
@@ -294,7 +294,7 @@ async fn ws_attach_service(
   ),
 ))]
 pub(crate) async fn vm_attach(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   req: web::HttpRequest,
   qs: web::types::Query<GenericNspQuery>,

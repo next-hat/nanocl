@@ -5,7 +5,7 @@ use nanocl_stubs::generic::{GenericListQuery, GenericFilter};
 
 use crate::{
   repositories::generic::*,
-  models::{EventDb, DaemonState},
+  models::{EventDb, SystemState},
 };
 
 /// Get events of all peer nodes
@@ -22,7 +22,7 @@ use crate::{
 ))]
 #[web::get("/events")]
 pub(crate) async fn list_event(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {

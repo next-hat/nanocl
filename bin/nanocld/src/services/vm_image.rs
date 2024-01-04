@@ -13,7 +13,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{DaemonState, VmImageDb},
+  models::{SystemState, VmImageDb},
 };
 
 /// List virtual machine images
@@ -30,7 +30,7 @@ use crate::{
 ))]
 #[web::get("/vms/images")]
 pub(crate) async fn list_vm_images(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
@@ -54,7 +54,7 @@ pub(crate) async fn list_vm_images(
 ))]
 #[web::post("/vms/images/{name}/import")]
 pub(crate) async fn import_vm_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   mut payload: web::types::Payload,
 ) -> HttpResult<web::HttpResponse> {
@@ -108,7 +108,7 @@ pub(crate) async fn import_vm_image(
 ))]
 #[web::post("/vms/images/{name}/snapshot/{snapshot_name}")]
 pub(crate) async fn snapshot_vm_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
@@ -136,7 +136,7 @@ pub(crate) async fn snapshot_vm_image(
 ))]
 #[web::post("/vms/images/{name}/clone/{clone_name}")]
 pub(crate) async fn clone_vm_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
@@ -162,7 +162,7 @@ pub(crate) async fn clone_vm_image(
 ))]
 #[web::post("/vms/images/{name}/resize")]
 pub(crate) async fn resize_vm_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   web::types::Json(payload): web::types::Json<VmImageResizePayload>,
 ) -> HttpResult<web::HttpResponse> {
@@ -186,7 +186,7 @@ pub(crate) async fn resize_vm_image(
 ))]
 #[web::get("/vms/images/{name}/inspect")]
 pub(crate) async fn inspect_vm_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
@@ -208,7 +208,7 @@ pub(crate) async fn inspect_vm_image(
 ))]
 #[web::delete("/vms/images/{name}")]
 pub(crate) async fn delete_vm_image(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();

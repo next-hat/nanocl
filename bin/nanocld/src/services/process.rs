@@ -12,7 +12,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{DaemonState, ProcessDb},
+  models::{SystemState, ProcessDb},
 };
 
 /// List process (Vm, Job, Cargo)
@@ -29,7 +29,7 @@ use crate::{
 ))]
 #[web::get("/processes")]
 pub(crate) async fn list_process(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
@@ -61,7 +61,7 @@ pub(crate) async fn list_process(
 ))]
 #[web::get("/processes/{kind}/{name}/logs")]
 async fn logs_process(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -122,7 +122,7 @@ async fn logs_process(
 ))]
 #[web::post("/processes/{type}/{name}/start")]
 pub(crate) async fn start_process(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -150,7 +150,7 @@ pub(crate) async fn start_process(
 ))]
 #[web::post("/processes/{kind}/{name}/stop")]
 pub(crate) async fn stop_process(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {

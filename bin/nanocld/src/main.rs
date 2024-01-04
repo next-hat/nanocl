@@ -6,13 +6,11 @@ use nanocl_utils::logger;
 mod cli;
 mod config;
 mod schema;
-mod version;
-mod boot;
 mod models;
-mod event_emitter;
-mod server;
-mod repositories;
+mod version;
 mod utils;
+mod subsystem;
+mod repositories;
 mod services;
 
 /// Provides an api to manage containers and virtual machines accross physical hosts
@@ -45,16 +43,16 @@ async fn main() -> std::io::Result<()> {
     Ok(config) => config,
   };
   // Boot internal dependencies (database, event bus, etc...)
-  let daemon_state = match boot::init(&config).await {
+  let daemon_state = match subsystem::init(&config).await {
     Err(err) => {
       err.print_and_exit();
     }
     Ok(daemon_state) => daemon_state,
   };
   // Start http server
-  match server::gen(daemon_state).await {
+  match utils::server::gen(daemon_state).await {
     Err(err) => {
-      err.map_err_context(|| "Daemon state").print_and_exit();
+      err.map_err_context(|| "Http server").print_and_exit();
     }
     Ok(server) => {
       // Start http server and wait for shutdown

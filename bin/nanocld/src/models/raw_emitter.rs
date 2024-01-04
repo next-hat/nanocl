@@ -5,6 +5,7 @@ use std::{
   task::{Poll, Context},
 };
 
+use nanocl_stubs::system::Event;
 use ntex::{rt, web, time, util::Bytes, web::error::BlockingError};
 use futures::Stream;
 use futures_util::{StreamExt, stream::FuturesUnordered};
@@ -12,17 +13,10 @@ use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_stubs::system::{Event, EventPartial};
-
-use crate::{
-  repositories::generic::*,
-  models::{Pool, EventDb},
-};
-
 /// Stream: Wrap Receiver in our own type, with correct error type
-pub struct Client(pub Receiver<Bytes>);
+pub struct RawEventClient(pub Receiver<Bytes>);
 
-impl Stream for Client {
+impl Stream for RawEventClient {
   type Item = Result<Bytes, web::Error>;
 
   fn poll_next(
@@ -34,12 +28,6 @@ impl Stream for Client {
       Poll::Ready(None) => Poll::Ready(None),
       Poll::Pending => Poll::Pending,
     }
-  }
-}
-
-impl Client {
-  pub async fn recv(&mut self) -> Option<Bytes> {
-    self.0.recv().await
   }
 }
 
@@ -64,19 +52,19 @@ impl TryToBytes for Event {
 }
 
 #[derive(Clone, Default)]
-pub struct EventEmitter {
-  inner: Arc<Mutex<EventEmitterInner>>,
+pub struct RawEventEmitter {
+  inner: Arc<Mutex<RawEventEmitterInner>>,
 }
 
 #[derive(Clone, Default)]
-pub struct EventEmitterInner {
+pub struct RawEventEmitterInner {
   clients: Vec<Sender<Bytes>>,
 }
 
-impl EventEmitter {
+impl RawEventEmitter {
   pub fn new() -> Self {
     let self_ptr = Self {
-      inner: Arc::new(Mutex::new(EventEmitterInner { clients: vec![] })),
+      inner: Arc::new(Mutex::new(RawEventEmitterInner { clients: vec![] })),
     };
     self_ptr.clone().spawn_check_connection();
     self_ptr
@@ -116,13 +104,9 @@ impl EventEmitter {
   }
 
   /// Send an event to all clients
-  pub(crate) async fn emit(
-    &self,
-    e: EventPartial,
-    pool: &Pool,
-  ) -> HttpResult<()> {
-    let e: Event = EventDb::create_try_from(e, pool).await?.try_into()?;
+  pub(crate) async fn emit(&self, e: &Event) -> HttpResult<()> {
     let self_ptr = self.clone();
+    let e = e.clone();
     let inner = web::block(move || {
       let inner = self_ptr
         .inner
@@ -143,7 +127,7 @@ impl EventEmitter {
       ),
     })?;
     log::debug!(
-      "event_emitter::emit: {}:{} to {} client(s)",
+      "raw_emitter::emit: {}:{} to {} client(s)",
       e.kind,
       e.action,
       inner.clients.len()
@@ -162,22 +146,12 @@ impl EventEmitter {
       .collect::<FuturesUnordered<_>>()
       .collect::<Vec<_>>()
       .await;
-    log::debug!("event_emitter::emit: done");
+    log::debug!("raw_emitter::emit: done");
     Ok(())
   }
 
-  pub fn spawn_emit_event(&self, e: EventPartial, pool: &Pool) {
-    let self_ptr = self.clone();
-    let pool = Arc::clone(pool);
-    rt::spawn(async move {
-      if let Err(err) = self_ptr.emit(e, &pool).await {
-        log::error!("{err}");
-      }
-    });
-  }
-
   /// Subscribe to events
-  pub(crate) async fn subscribe(&self) -> HttpResult<Client> {
+  pub(crate) async fn subscribe(&self) -> HttpResult<RawEventClient> {
     let self_ptr = self.clone();
     let (tx, rx) = channel(100);
     web::block(move || {
@@ -200,6 +174,6 @@ impl EventEmitter {
         "Unable to subscribe to metrics server future got cancelled",
       ),
     })?;
-    Ok(Client(rx))
+    Ok(RawEventClient(rx))
   }
 }

@@ -17,7 +17,7 @@ use crate::{
   utils, version,
   repositories::generic::*,
   models::{
-    DaemonState, CargoDb, ProcessDb, NamespaceDb, VmImageDb, ProcessUpdateDb,
+    SystemState, CargoDb, ProcessDb, NamespaceDb, VmImageDb, ProcessUpdateDb,
   },
 };
 
@@ -27,7 +27,7 @@ pub(crate) async fn sync_process(
   key: &str,
   kind: &str,
   instance: &ContainerInspectResponse,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> IoResult<()> {
   let id = instance.id.clone().unwrap_or_default();
   let created_at = instance.created.clone().unwrap_or_default();
@@ -85,7 +85,7 @@ pub(crate) async fn sync_process(
 pub(crate) async fn register_namespace(
   name: &str,
   create_network: bool,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> IoResult<()> {
   if NamespaceDb::read_by_pk(name, &state.pool).await.is_ok() {
     return Ok(());
@@ -103,7 +103,7 @@ pub(crate) async fn register_namespace(
 
 /// Convert existing container instances with our labels to cargo.
 /// We use it to be sure that all existing containers are registered as cargo.
-pub(crate) async fn sync_processes(state: &DaemonState) -> IoResult<()> {
+pub(crate) async fn sync_processes(state: &SystemState) -> IoResult<()> {
   log::info!("system::sync_processes: starting");
   let options = Some(ListContainersOptions::<&str> {
     all: true,
@@ -208,7 +208,7 @@ pub(crate) async fn sync_processes(state: &DaemonState) -> IoResult<()> {
 
 /// Check for vm images inside the vm images directory
 /// and create them in the database if they don't exist
-pub(crate) async fn sync_vm_images(state: &DaemonState) -> IoResult<()> {
+pub(crate) async fn sync_vm_images(state: &SystemState) -> IoResult<()> {
   log::info!("system::sync_vm_images: start");
   let files =
     std::fs::read_dir(format!("{}/vms/images", &state.config.state_dir))?;
