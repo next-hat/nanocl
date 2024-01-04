@@ -9,7 +9,7 @@ mod version;
 mod state;
 mod vm;
 mod vm_image;
-mod system;
+mod process;
 mod install;
 mod uninstall;
 mod upgrade;
@@ -23,7 +23,7 @@ mod event;
 
 pub use event::*;
 pub use generic::*;
-pub use system::*;
+pub use process::*;
 pub use metric::*;
 pub use secret::*;
 pub use context::*;
@@ -86,7 +86,7 @@ pub enum Command {
   /// Upgrade components
   Upgrade(UpgradeOpts),
   /// Show all processes managed by nanocl
-  Ps(ProcessOpts),
+  Ps(GenericListOpts<ProcessFilter>),
   /// Manage secrets
   Secret(SecretArg),
   // TODO: shell completion

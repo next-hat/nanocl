@@ -34,6 +34,7 @@ chrono = { version = "0.4", default-features = false, features = [
 bollard-next = { version = "0.15.4" }
 nanocl_utils = { version = "0.4", features = ["build_tools"] }
 nanocld_client = { version = "0.13" }
+serde_json = "1.0"
 
 [dependencies]
 bollard-next = { version = "0.15.4" }
