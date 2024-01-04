@@ -1,63 +1,19 @@
-use clap::Parser;
+use clap::Args;
 use tabled::Tabled;
 use chrono::DateTime;
 
 use bollard_next::service::ContainerStateStatusEnum;
 
-use nanocld_client::stubs::process::Process;
+use nanocld_client::stubs::{
+  process::Process,
+  generic::{GenericFilter, GenericClause},
+};
 
-/// `nanocl system` available arguments
-#[derive(Clone, Parser)]
-pub struct SystemArg {
-  /// Command to run
-  #[clap(subcommand)]
-  pub command: SystemCommand,
-}
-
-/// `nanocl system` available commands
-#[derive(Clone, Parser)]
-pub enum SystemCommand {
-  /// System HTTP metrics information
-  Http(SystemHttpArg),
-}
-
-/// `nanocl system http` available arguments
-#[derive(Clone, Parser)]
-pub struct SystemHttpArg {
-  /// Command to run
-  #[clap(subcommand)]
-  pub command: SystemHttpCommand,
-}
-
-/// `nanocl system http` available commands
-#[derive(Clone, Parser)]
-pub enum SystemHttpCommand {
-  /// Show HTTP metrics information
-  Logs(SystemHttpLogsOpts),
-}
-
-/// `nanocl system http logs` available options
-#[derive(Clone, Parser)]
-pub struct SystemHttpLogsOpts {
-  // #[clap(long, short)]
-  // pub follow: bool,
-  /// Limit the number of results
-  #[clap(long, short)]
-  pub limit: Option<i64>,
-  /// Offset the number of results
-  #[clap(long, short)]
-  pub offset: Option<i64>,
-}
+pub struct ProcessArg;
 
 /// `nanocl ps` available options
-#[derive(Clone, Parser)]
-pub struct ProcessOpts {
-  /// Limit the number of results default to 100
-  #[clap(long)]
-  pub limit: Option<usize>,
-  /// Offset the number of results default to 0
-  #[clap(long)]
-  pub offset: Option<usize>,
+#[derive(Clone, Args)]
+pub struct ProcessFilter {
   /// Show all processes for the given namespace
   #[clap(long, short)]
   pub namespace: Option<String>,
@@ -69,10 +25,44 @@ pub struct ProcessOpts {
   pub all: bool,
 }
 
+impl From<ProcessFilter> for GenericFilter {
+  fn from(filter: ProcessFilter) -> Self {
+    let mut gen_filter = GenericFilter::new();
+    if !filter.all {
+      gen_filter = gen_filter.r#where(
+        "data",
+        GenericClause::Contains(serde_json::json!({
+          "State": {
+            "Status": "running"
+          }
+        })),
+      );
+    }
+    if let Some(kind) = &filter.kind {
+      gen_filter = gen_filter.r#where("kind", GenericClause::Eq(kind.clone()));
+    }
+    if let Some(namespace) = &filter.namespace {
+      gen_filter = gen_filter.r#where(
+        "data",
+        GenericClause::Contains(serde_json::json!({
+          "Config": {
+            "Labels": {
+              "io.nanocl.n": namespace
+            }
+          }
+        })),
+      );
+    }
+    gen_filter
+  }
+}
+
 /// A row for the process table
 #[derive(Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
 pub struct ProcessRow {
+  #[tabled(skip)]
+  pub key: String,
   /// Namespace of the cargo or the vm
   namespace: String,
   /// Kind of instance cargo or vm
@@ -144,6 +134,7 @@ impl From<Process> for ProcessRow {
       .unwrap_or(ContainerStateStatusEnum::EMPTY)
       .to_string();
     Self {
+      key: process.key,
       node: process.node_key,
       kind,
       name: name.to_owned(),

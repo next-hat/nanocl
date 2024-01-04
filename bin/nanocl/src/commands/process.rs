@@ -1,0 +1,31 @@
+use nanocl_error::io::IoResult;
+use nanocld_client::stubs::process::Process;
+
+use crate::{
+  config::CliConfig,
+  models::{ProcessRow, ProcessArg, GenericListOpts, ProcessFilter},
+};
+
+use super::GenericList;
+
+impl GenericList for ProcessArg {
+  type Item = ProcessRow;
+  type Args = ProcessArg;
+  type ApiItem = Process;
+
+  fn object_name() -> &'static str {
+    "processes"
+  }
+
+  fn get_key(item: &Self::Item) -> String {
+    item.key.clone()
+  }
+}
+
+pub async fn exec_process(
+  cli_conf: &CliConfig,
+  opts: &GenericListOpts<ProcessFilter>,
+) -> IoResult<()> {
+  let args = &ProcessArg;
+  ProcessArg::exec_ls(&cli_conf.client, args, opts).await
+}
