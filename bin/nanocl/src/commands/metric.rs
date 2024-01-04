@@ -1,12 +1,9 @@
 use nanocl_error::io::IoResult;
-use nanocld_client::stubs::{
-  metric::Metric,
-  generic::{GenericListNspQuery, GenericFilter},
-};
+use nanocld_client::stubs::metric::Metric;
 
 use crate::{
   config::CliConfig,
-  models::{MetricArg, MetricRow, GenericListOpts, MetricCommand},
+  models::{MetricArg, MetricRow, MetricCommand},
 };
 
 use super::GenericList;
@@ -20,27 +17,19 @@ impl GenericList for MetricArg {
     "metrics"
   }
 
-  fn get_list_query(
-    _args: &Self::Args,
-    opts: &GenericListOpts,
-  ) -> GenericListNspQuery {
-    GenericListNspQuery::try_from(GenericFilter::from(opts.clone())).unwrap()
-  }
-
   fn get_key(item: &Self::Item) -> String {
     item.key.clone()
   }
 }
 
-/// Function that execute when running `nanocl job`
+/// Function that execute when running `nanocl metric`
 pub async fn exec_metric(
   cli_conf: &CliConfig,
   args: &MetricArg,
 ) -> IoResult<()> {
   match &args.command {
     MetricCommand::List(opts) => {
-      MetricArg::exec_ls(&cli_conf.client, args, opts).await??;
-      Ok(())
+      MetricArg::exec_ls(&cli_conf.client, args, opts).await
     }
   }
 }

@@ -2,7 +2,6 @@ mod version;
 mod namespace;
 mod cargo;
 mod cargo_image;
-mod events;
 mod resource;
 mod state;
 mod info;
@@ -18,15 +17,16 @@ mod secret;
 mod job;
 mod generic;
 mod metric;
+mod event;
 
 pub use generic::*;
 
 pub use job::exec_job;
+pub use event::exec_event;
 pub use context::exec_context;
 pub use version::exec_version;
 pub use namespace::exec_namespace;
 pub use cargo::exec_cargo;
-pub use events::exec_events;
 pub use resource::exec_resource;
 pub use state::exec_state;
 pub use info::exec_info;

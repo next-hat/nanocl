@@ -71,8 +71,7 @@ pub async fn exec_namespace(
   let client = &cli_conf.client;
   match &args.command {
     NamespaceCommand::List(opts) => {
-      NamespaceArg::exec_ls(client, args, opts).await??;
-      Ok(())
+      NamespaceArg::exec_ls(client, args, opts).await
     }
     NamespaceCommand::Create(options) => {
       exec_namespace_create(client, options).await

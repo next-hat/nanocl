@@ -1,24 +1,27 @@
-use std::thread;
-use std::io::{Read, Write};
-use std::os::fd::AsRawFd;
-use std::time::Duration;
+use std::{
+  thread,
+  io::{Read, Write},
+  os::fd::AsRawFd,
+  time::Duration,
+};
 
-use nanocld_client::stubs::generic::{GenericListNspQuery, GenericFilter};
-use ntex::rt;
-use ntex::ws;
-use ntex::time;
-use ntex::util::Bytes;
-use futures::channel::mpsc;
-use futures::{SinkExt, StreamExt};
+use ntex::{rt, ws, time, util::Bytes};
+use futures::{
+  channel::mpsc,
+  {SinkExt, StreamExt},
+};
 use termios::{TCSANOW, tcsetattr, Termios, ICANON, ECHO};
 
 use nanocl_error::io::{IoResult, FromIo};
 use nanocld_client::stubs::process::{OutputLog, OutputKind};
 
-use crate::utils;
-use crate::config::CliConfig;
-use crate::models::{
-  VmArg, VmCommand, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts, VmInspectOpts,
+use crate::{
+  utils,
+  config::CliConfig,
+  models::{
+    VmArg, VmCommand, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts,
+    VmInspectOpts,
+  },
 };
 
 use super::GenericList;
@@ -31,15 +34,6 @@ impl GenericList for VmArg {
 
   fn object_name() -> &'static str {
     "vms"
-  }
-
-  fn get_list_query(
-    args: &Self::Args,
-    opts: &crate::models::GenericListOpts,
-  ) -> GenericListNspQuery {
-    GenericListNspQuery::try_from(GenericFilter::from(opts.clone()))
-      .unwrap()
-      .with_namespace(args.namespace.as_deref())
   }
 
   fn get_key(item: &Self::Item) -> String {
@@ -278,10 +272,7 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
   match &args.command {
     VmCommand::Image(args) => exec_vm_image(client, args).await,
     VmCommand::Create(options) => exec_vm_create(cli_conf, args, options).await,
-    VmCommand::List(opts) => {
-      VmArg::exec_ls(client, args, opts).await??;
-      Ok(())
-    }
+    VmCommand::List(opts) => VmArg::exec_ls(client, args, opts).await,
     VmCommand::Remove(opts) => exec_vm_rm(cli_conf, args, &opts.names).await,
     VmCommand::Inspect(opts) => exec_vm_inspect(cli_conf, args, opts).await,
     VmCommand::Start(opts) => exec_vm_start(cli_conf, args, &opts.names).await,

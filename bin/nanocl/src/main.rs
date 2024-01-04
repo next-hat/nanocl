@@ -60,7 +60,7 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Resource(args) => commands::exec_resource(&cli_conf, args).await,
     Command::Cargo(args) => commands::exec_cargo(&cli_conf, args).await,
     Command::Secret(args) => commands::exec_secret(&cli_conf, args).await,
-    Command::Events => commands::exec_events(&cli_conf).await,
+    Command::Event(args) => commands::exec_event(&cli_conf, args).await,
     Command::State(args) => commands::exec_state(&cli_conf, args).await,
     Command::Version => commands::exec_version(&cli_conf).await,
     Command::Vm(args) => commands::exec_vm(&cli_conf, args).await,
@@ -706,5 +706,15 @@ mod tests {
     assert_cli_ok!("metric", "ls", "--offset", "1");
     assert_cli_ok!("metric", "ls", "--limit", "2", "--offset", "1");
     assert_cli_ok!("metric", "ls", "-q", "--limit", "2", "--offset", "1");
+  }
+
+  #[ntex::test]
+  async fn event() {
+    assert_cli_ok!("event", "ls");
+    assert_cli_ok!("event", "ls", "-q");
+    assert_cli_ok!("event", "ls", "--limit", "2");
+    assert_cli_ok!("event", "ls", "--offset", "1");
+    assert_cli_ok!("event", "ls", "--limit", "2", "--offset", "1");
+    assert_cli_ok!("event", "ls", "-q", "--limit", "2", "--offset", "1");
   }
 }

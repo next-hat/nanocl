@@ -1,10 +1,10 @@
-use ntex::rt::JoinHandle;
+use clap::Args;
 
 use nanocld_client::{
   NanocldClient,
-  stubs::generic::{GenericFilter, GenericListNspQuery},
+  stubs::generic::{GenericFilter, GenericListQuery},
 };
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::IoResult;
 
 use crate::{utils, models::GenericListOpts};
 
@@ -17,9 +17,10 @@ pub trait GenericList {
 
   fn get_key(item: &Self::Item) -> String;
 
-  fn print_table(opts: &GenericListOpts, rows: Vec<Self::Item>)
+  fn print_table<T>(opts: &GenericListOpts<T>, rows: Vec<Self::Item>)
   where
     Self::Item: tabled::Tabled,
+    T: Args + Clone,
   {
     match opts.quiet {
       true => {
@@ -33,40 +34,55 @@ pub trait GenericList {
     }
   }
 
-  fn get_list_query(
+  fn gen_default_filter<T>(
     _args: &Self::Args,
-    opts: &GenericListOpts,
-  ) -> GenericListNspQuery {
-    GenericListNspQuery::try_from(GenericFilter::from(opts.clone())).unwrap()
+    opts: &GenericListOpts<T>,
+  ) -> GenericFilter
+  where
+    T: Into<GenericFilter> + Args + Clone,
+  {
+    let mut filter = if let Some(f) = &opts.others {
+      f.clone().into()
+    } else {
+      GenericFilter::new()
+    };
+    if let Some(limit) = opts.limit {
+      filter = filter.limit(limit);
+    }
+    if let Some(offset) = opts.offset {
+      filter = filter.offset(offset);
+    }
+    filter
   }
 
-  fn exec_ls(
+  fn transform_filter(
+    _args: &Self::Args,
+    filter: &GenericFilter,
+  ) -> impl serde::Serialize {
+    GenericListQuery::try_from(filter.clone()).unwrap()
+  }
+
+  async fn exec_ls<T>(
     client: &NanocldClient,
     args: &Self::Args,
-    opts: &GenericListOpts,
-  ) -> JoinHandle<IoResult<()>>
+    opts: &GenericListOpts<T>,
+  ) -> IoResult<()>
   where
-    Self::Args: Clone + Send + 'static,
     Self::ApiItem: serde::de::DeserializeOwned + Send + 'static,
     Self::Item: tabled::Tabled + From<Self::ApiItem>,
+    T: Into<GenericFilter> + Args + Clone,
   {
-    let client = client.clone();
-    let args = args.clone();
-    let opts = opts.clone();
-    ntex::rt::spawn(async move {
-      let res = client
-        .send_get(
-          &format!("/{}", Self::object_name()),
-          Some(Self::get_list_query(&args, &opts)),
-        )
-        .await?;
-      let items = NanocldClient::res_json::<Vec<Self::ApiItem>>(res).await?;
-      let rows = items
-        .into_iter()
-        .map(Self::Item::from)
-        .collect::<Vec<Self::Item>>();
-      Self::print_table(&opts, rows);
-      Ok::<_, IoError>(())
-    })
+    let filter = Self::gen_default_filter(args, opts);
+    let transform_filter = Self::transform_filter(args, &filter);
+    let res = client
+      .send_get(&format!("/{}", Self::object_name()), Some(transform_filter))
+      .await?;
+    let items = NanocldClient::res_json::<Vec<Self::ApiItem>>(res).await?;
+    let rows = items
+      .into_iter()
+      .map(Self::Item::from)
+      .collect::<Vec<Self::Item>>();
+    Self::print_table(opts, rows);
+    Ok(())
   }
 }

@@ -127,10 +127,7 @@ pub async fn exec_vm_image(
     VmImageCommand::Create(options) => {
       exec_vm_image_create(client, options).await
     }
-    VmImageCommand::List(opts) => {
-      VmImageArg::exec_ls(client, args, opts).await??;
-      Ok(())
-    }
+    VmImageCommand::List(opts) => VmImageArg::exec_ls(client, args, opts).await,
     VmImageCommand::Remove { names } => exec_vm_image_rm(client, names).await,
     VmImageCommand::Clone { name, clone_name } => {
       exec_vm_image_clone(client, name, clone_name).await

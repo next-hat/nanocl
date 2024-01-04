@@ -59,8 +59,7 @@ pub async fn exec_secret(
 ) -> IoResult<()> {
   match &args.command {
     SecretCommand::List(opts) => {
-      SecretArg::exec_ls(&cli_conf.client, args, opts).await??;
-      Ok(())
+      SecretArg::exec_ls(&cli_conf.client, args, opts).await
     }
     SecretCommand::Remove(opts) => exec_secret_rm(cli_conf, opts).await,
     SecretCommand::Inspect(opts) => exec_secret_inspect(cli_conf, opts).await,

@@ -1,19 +1,20 @@
 use nanocl_error::io::IoResult;
 use nanocld_client::stubs::generic::{GenericFilter, GenericClause};
 
-use crate::config::CliConfig;
-use crate::models::{ProcessOpts, ProcessRow};
-use crate::utils::print::print_table;
+use crate::{
+  utils,
+  config::CliConfig,
+  models::{ProcessOpts, ProcessRow},
+};
 
 /// Function that execute when running `nanocl ps`
-/// Will print the list of existing instances of cargoes and virtual machines
+/// Will print the list of existing instances of jobs, cargoes and virtual machines
 pub async fn exec_process(
   cli_conf: &CliConfig,
   args: &ProcessOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let mut filter = GenericFilter::new();
-
   if !args.all {
     filter = filter.r#where(
       "data",
@@ -50,8 +51,6 @@ pub async fn exec_process(
     .into_iter()
     .map(ProcessRow::from)
     .collect::<Vec<ProcessRow>>();
-
-  print_table(rows);
-
+  utils::print::print_table(rows);
   Ok(())
 }

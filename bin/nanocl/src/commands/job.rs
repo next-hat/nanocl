@@ -127,8 +127,7 @@ async fn exec_job_start(
 pub async fn exec_job(cli_conf: &CliConfig, args: &JobArg) -> IoResult<()> {
   match &args.command {
     JobCommand::List(opts) => {
-      JobArg::exec_ls(&cli_conf.client, args, opts).await??;
-      Ok(())
+      JobArg::exec_ls(&cli_conf.client, args, opts).await
     }
     JobCommand::Remove(opts) => exec_job_rm(cli_conf, opts).await,
     JobCommand::Inspect(opts) => exec_job_inspect(cli_conf, opts).await,

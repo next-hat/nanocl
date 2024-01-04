@@ -19,7 +19,9 @@ mod secret;
 mod job;
 mod generic;
 mod metric;
+mod event;
 
+pub use event::*;
 pub use generic::*;
 pub use system::*;
 pub use metric::*;
@@ -67,8 +69,8 @@ pub enum Command {
   Node(NodeArg),
   /// Manage metrics
   Metric(MetricArg),
-  /// Watch daemon events
-  Events,
+  /// Manage events
+  Event(EventArg),
   /// Define, Run, or Remove Cargo or Virtual Machines
   State(StateArg),
   /// Manage contexts
