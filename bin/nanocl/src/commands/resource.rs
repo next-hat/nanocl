@@ -86,8 +86,7 @@ pub async fn exec_resource(
 ) -> IoResult<()> {
   match &args.command {
     ResourceCommand::List(opts) => {
-      ResourceArg::exec_ls(&cli_conf.client, args, opts).await??;
-      Ok(())
+      ResourceArg::exec_ls(&cli_conf.client, args, opts).await
     }
     ResourceCommand::Remove(opts) => exec_resource_rm(cli_conf, opts).await,
     ResourceCommand::Inspect(opts) => {

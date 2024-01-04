@@ -21,7 +21,6 @@ use crate::models::{
   CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
   CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
   CargoRunOpts, CargoRestartOpts, CargoStatsOpts, CargoStatsRow,
-  GenericListOpts,
 };
 
 use super::GenericList;
@@ -36,17 +35,17 @@ impl GenericList for CargoArg {
     "cargoes"
   }
 
-  fn get_list_query(
-    args: &Self::Args,
-    opts: &GenericListOpts,
-  ) -> GenericListNspQuery {
-    GenericListNspQuery::try_from(GenericFilter::from(opts.clone()))
-      .unwrap()
-      .with_namespace(args.namespace.as_deref())
-  }
-
   fn get_key(item: &Self::Item) -> String {
     item.name.clone()
+  }
+
+  fn transform_filter(
+    args: &Self::Args,
+    filter: &GenericFilter,
+  ) -> impl serde::Serialize {
+    GenericListNspQuery::try_from(filter.clone())
+      .unwrap()
+      .with_namespace(args.namespace.as_deref())
   }
 }
 
@@ -347,10 +346,7 @@ pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
   let client = &cli_conf.client;
   match &args.command {
     CargoCommand::List(opts) => {
-      CargoArg::exec_ls(&cli_conf.client, args, opts)
-        .await
-        .map_err(|err| err.map_err_context(|| "List cargos"))??;
-      Ok(())
+      CargoArg::exec_ls(&cli_conf.client, args, opts).await
     }
     CargoCommand::Create(opts) => exec_cargo_create(cli_conf, args, opts).await,
     CargoCommand::Remove(opts) => exec_cargo_rm(cli_conf, args, opts).await,

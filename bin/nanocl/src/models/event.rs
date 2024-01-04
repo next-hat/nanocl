@@ -2,46 +2,49 @@ use chrono::TimeZone;
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
 
-use nanocld_client::stubs::metric::Metric;
+use nanocld_client::stubs::system::Event;
 
 use super::GenericListOpts;
 
 #[derive(Clone, Parser)]
-pub struct MetricArg {
+pub struct EventArg {
   #[clap(subcommand)]
-  pub command: MetricCommand,
+  pub command: EventCommand,
 }
 
-/// metric available commands
+/// event available commands
 #[derive(Clone, Subcommand)]
-pub enum MetricCommand {
-  /// List existing metrics
+pub enum EventCommand {
+  /// List existing events
   #[clap(alias("ls"))]
   List(GenericListOpts),
+  /// Watch for new events in real time
+  Watch,
 }
 
 #[derive(Clone, Tabled)]
 #[tabled(rename_all = "UPPERCASE")]
-pub struct MetricRow {
+pub struct EventRow {
   pub key: String,
   #[tabled(rename = "CREATED AT")]
   pub created_at: String,
   pub node: String,
   pub kind: String,
+  pub action: String,
   pub note: String,
 }
 
-impl From<Metric> for MetricRow {
-  fn from(metric: Metric) -> Self {
+impl From<Event> for EventRow {
+  fn from(event: Event) -> Self {
     let binding = chrono::Local::now();
     let tz = binding.offset();
     // Convert the created_at and updated_at to the current timezone
     let created_at = tz
-      .timestamp_opt(metric.created_at.timestamp(), 0)
+      .timestamp_opt(event.created_at.timestamp(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
-      key: metric
+      key: event
         .key
         .to_string()
         .split('-')
@@ -49,9 +52,10 @@ impl From<Metric> for MetricRow {
         .unwrap_or("<error>")
         .to_string(),
       created_at: created_at.to_string(),
-      kind: metric.kind,
-      node: metric.node_name,
-      note: metric.note.unwrap_or("<none>".to_owned()),
+      kind: event.kind.to_string(),
+      action: event.action,
+      node: event.reporting_node,
+      note: event.note.unwrap_or("<none>".to_owned()),
     }
   }
 }

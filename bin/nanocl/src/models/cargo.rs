@@ -2,15 +2,14 @@ use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
-use bollard_next::exec::CreateExecOptions;
-use bollard_next::container::MemoryStatsStats;
-use nanocld_client::stubs::cargo::{CargoStats, CargoSummary};
-use nanocld_client::stubs::cargo_spec::{
-  CargoSpecUpdate, Config, CargoSpecPartial, HostConfig,
+use bollard_next::{exec::CreateExecOptions, container::MemoryStatsStats};
+
+use nanocld_client::stubs::{
+  cargo::{CargoStats, CargoSummary},
+  cargo_spec::{CargoSpecUpdate, Config, CargoSpecPartial, HostConfig},
 };
 
-use super::{DisplayFormat, GenericListOpts};
-use super::cargo_image::CargoImageArg;
+use super::{DisplayFormat, GenericListOpts, cargo_image::CargoImageArg};
 
 /// `nanocl cargo remove` available options
 #[derive(Clone, Parser)]

@@ -1,6 +1,7 @@
+use ntex::web;
+
 use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::generic::{GenericListQuery, GenericFilter};
-use ntex::web;
 
 use crate::{
   repositories::generic::*,
@@ -33,4 +34,18 @@ pub(crate) async fn list_event(
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_event);
+}
+
+#[cfg(test)]
+mod tests {
+  use ntex::http::StatusCode;
+
+  use crate::utils::tests::*;
+
+  #[ntex::test]
+  async fn basic() {
+    let client = gen_default_test_client().await;
+    let resp = client.get("/events").send().await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+  }
 }

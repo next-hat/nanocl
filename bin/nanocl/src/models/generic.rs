@@ -1,9 +1,21 @@
-use clap::Parser;
+use clap::{Args, Parser};
 
 use nanocld_client::stubs::generic::GenericFilter;
 
+#[derive(Clone, Args)]
+pub struct DefaultFilter;
+
+impl From<DefaultFilter> for GenericFilter {
+  fn from(_: DefaultFilter) -> Self {
+    Self::default()
+  }
+}
+
 #[derive(Clone, Parser)]
-pub struct GenericListOpts {
+pub struct GenericListOpts<T = DefaultFilter>
+where
+  T: Args + Clone,
+{
   /// Only show keys
   #[clap(long, short)]
   pub quiet: bool,
@@ -13,10 +25,18 @@ pub struct GenericListOpts {
   /// Offset the results to navigate through the results
   #[clap(long, short)]
   pub offset: Option<usize>,
+  /// Filters
+  #[clap(long)]
+  pub filters: Option<Vec<String>>,
+  #[clap(flatten)]
+  pub others: Option<T>,
 }
 
-impl From<GenericListOpts> for GenericFilter {
-  fn from(opts: GenericListOpts) -> Self {
+impl<T> From<GenericListOpts<T>> for GenericFilter
+where
+  T: Args + Clone,
+{
+  fn from(opts: GenericListOpts<T>) -> Self {
     Self {
       limit: opts.limit,
       offset: opts.offset,
