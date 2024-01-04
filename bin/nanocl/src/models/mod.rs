@@ -40,7 +40,7 @@ pub use upgrade::*;
 pub use node::*;
 pub use job::*;
 
-/// A self-sufficient hybrid-cloud manager
+/// Cli available options and commands
 #[derive(Parser)]
 #[clap(about, version, name = "nanocl")]
 pub struct Cli {
@@ -52,11 +52,13 @@ pub struct Cli {
   pub command: Command,
 }
 
-/// `nanocl` available commands
+/// Nanocl available commands
 #[derive(Subcommand)]
 pub enum Command {
   /// Manage namespaces
   Namespace(NamespaceArg),
+  /// Manage secrets
+  Secret(SecretArg),
   /// Manage jobs
   Job(JobArg),
   /// Manage cargoes
@@ -65,16 +67,18 @@ pub enum Command {
   Vm(VmArg),
   /// Manage resources
   Resource(ResourceArg),
-  /// Manage nodes (experimental)
-  Node(NodeArg),
   /// Manage metrics
   Metric(MetricArg),
-  /// Manage events
-  Event(EventArg),
-  /// Define, Run, or Remove Cargo or Virtual Machines
-  State(StateArg),
   /// Manage contexts
   Context(ContextArg),
+  /// Manage nodes (experimental)
+  Node(NodeArg),
+  /// Apply or Remove a Statefile
+  State(StateArg),
+  /// Show or watch events
+  Event(EventArg),
+  /// Show processes
+  Ps(GenericListOpts<ProcessFilter>),
   /// Show nanocl host information
   Info,
   /// Show nanocl version information
@@ -83,12 +87,8 @@ pub enum Command {
   Install(InstallOpts),
   /// Uninstall components
   Uninstall(UninstallOpts),
-  /// Upgrade components
+  /// Upgrade components (experimental)
   Upgrade(UpgradeOpts),
-  /// Show all processes managed by nanocl
-  Ps(GenericListOpts<ProcessFilter>),
-  /// Manage secrets
-  Secret(SecretArg),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for
