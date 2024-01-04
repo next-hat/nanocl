@@ -6,14 +6,14 @@ use std::{
 };
 
 use nanocl_stubs::system::Event;
-use ntex::{rt, web, time, util::Bytes, web::error::BlockingError};
+use ntex::{rt, web, time, util::Bytes};
 use futures::Stream;
-use futures_util::{StreamExt, stream::FuturesUnordered};
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 
-use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_error::io::{IoResult, IoError};
 
 /// Stream: Wrap Receiver in our own type, with correct error type
+/// This is needed to return a http stream of bytes
 pub struct RawEventClient(pub Receiver<Bytes>);
 
 impl Stream for RawEventClient {
@@ -31,31 +31,32 @@ impl Stream for RawEventClient {
   }
 }
 
+/// Trait to convert a type to bytes
 trait TryToBytes {
   type Error;
 
   fn try_to_bytes(&self) -> Result<Bytes, Self::Error>;
 }
 
+/// Convert event to bytes to send to clients
 impl TryToBytes for Event {
-  type Error = HttpError;
+  type Error = IoError;
 
   fn try_to_bytes(&self) -> Result<Bytes, Self::Error> {
-    let mut data = serde_json::to_vec(&self).map_err(|err| {
-      HttpError::internal_server_error(format!(
-        "Unable to serialize event: {err}"
-      ))
-    })?;
+    let mut data = serde_json::to_vec(&self)?;
     data.push(b'\n');
     Ok(Bytes::from(data))
   }
 }
 
+/// Raw event emitter
 #[derive(Clone, Default)]
 pub struct RawEventEmitter {
   inner: Arc<Mutex<RawEventEmitterInner>>,
 }
 
+/// Inner struct for raw event emitter
+/// Contains a list of clients
 #[derive(Clone, Default)]
 pub struct RawEventEmitterInner {
   clients: Vec<Sender<Bytes>>,
@@ -71,18 +72,16 @@ impl RawEventEmitter {
   }
 
   /// Check if clients are still connected
-  fn check_connection(&mut self) -> HttpResult<()> {
+  fn check_connection(&mut self) -> IoResult<()> {
     let mut alive_clients = Vec::new();
-    let mut inner = self.inner.lock().map_err(|err| {
-      HttpError::internal_server_error(format!(
-        "Unable to lock event emitter mutex: {err}"
-      ))
+    let mut inner = self.inner.try_lock().map_err(|err| {
+      IoError::interupted("RawEmitterMutex", err.to_string().as_str())
     })?;
     for client in &inner.clients {
-      let result = client.clone().try_send(Bytes::from(""));
-      if let Ok(()) = result {
-        alive_clients.push(client.clone());
+      if client.try_send(Bytes::from("")).is_err() {
+        continue;
       }
+      alive_clients.push(client.clone());
     }
     inner.clients = alive_clients;
     Ok(())
@@ -104,76 +103,34 @@ impl RawEventEmitter {
   }
 
   /// Send an event to all clients
-  pub(crate) async fn emit(&self, e: &Event) -> HttpResult<()> {
-    let self_ptr = self.clone();
-    let e = e.clone();
-    let inner = web::block(move || {
-      let inner = self_ptr
-        .inner
-        .lock()
-        .map_err(|err| {
-          HttpError::internal_server_error(format!(
-            "Unable to lock event emitter mutex: {err}"
-          ))
-        })?
-        .clone();
-      Ok::<_, HttpError>(inner)
-    })
-    .await
-    .map_err(|err| match err {
-      BlockingError::Error(err) => err,
-      BlockingError::Canceled => HttpError::internal_server_error(
-        "Unable to subscribe to metrics server future got cancelled",
-      ),
+  pub(crate) fn emit(&self, e: &Event) -> IoResult<()> {
+    let inner = self.inner.try_lock().map_err(|err| {
+      IoError::interupted("RawEmitterMutex", err.to_string().as_str())
     })?;
-    log::debug!(
-      "raw_emitter::emit: {}:{} to {} client(s)",
-      e.kind,
-      e.action,
-      inner.clients.len()
-    );
-    inner
-      .clients
-      .into_iter()
-      .map(|client| {
-        let e = e.clone();
-        async move {
-          let msg = e.try_to_bytes()?;
-          let _ = client.send(msg).await;
-          Ok::<(), HttpError>(())
+    for client in &inner.clients {
+      match e.try_to_bytes() {
+        Ok(msg) => {
+          let _ = client.try_send(msg);
         }
-      })
-      .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<_>>()
-      .await;
-    log::debug!("raw_emitter::emit: done");
+        Err(err) => {
+          log::error!("raw_emitter::emit: {err}");
+        }
+      }
+    }
     Ok(())
   }
 
   /// Subscribe to events
-  pub(crate) async fn subscribe(&self) -> HttpResult<RawEventClient> {
-    let self_ptr = self.clone();
+  pub(crate) fn subscribe(&self) -> IoResult<RawEventClient> {
     let (tx, rx) = channel(100);
-    web::block(move || {
-      self_ptr
-        .inner
-        .lock()
-        .map_err(|err| {
-          HttpError::internal_server_error(format!(
-            "Unable to lock event emitter mutex: {err}"
-          ))
-        })?
-        .clients
-        .push(tx);
-      Ok::<(), HttpError>(())
-    })
-    .await
-    .map_err(|err| match err {
-      BlockingError::Error(err) => err,
-      BlockingError::Canceled => HttpError::internal_server_error(
-        "Unable to subscribe to metrics server future got cancelled",
-      ),
-    })?;
+    self
+      .inner
+      .try_lock()
+      .map_err(|err| {
+        IoError::interupted("RawEmitterMutex", err.to_string().as_str())
+      })?
+      .clients
+      .push(tx);
     Ok(RawEventClient(rx))
   }
 }

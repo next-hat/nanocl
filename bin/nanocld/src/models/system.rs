@@ -14,7 +14,7 @@ use nanocl_stubs::{
 
 use crate::{version, utils, repositories::generic::*};
 
-use super::{Pool, EventDb, RawEventEmitter};
+use super::{Pool, EventDb, RawEventEmitter, RawEventClient};
 
 #[derive(Debug)]
 pub enum SystemEventKind {
@@ -59,14 +59,14 @@ impl EventManager {
   /// Check if clients are still connected
   async fn check_connection(&mut self) {
     let mut alive_clients = Vec::new();
-    let clients = self.inner.lock().unwrap().clients.clone();
+    let clients = self.inner.try_lock().unwrap().clients.clone();
     for mut client in clients {
-      let result = client.send(SystemEventKind::Ping).await;
-      if let Ok(()) = result {
-        alive_clients.push(client.clone());
+      if client.send(SystemEventKind::Ping).await.is_err() {
+        continue;
       }
+      alive_clients.push(client.clone());
     }
-    self.inner.lock().unwrap().clients = alive_clients;
+    self.inner.try_lock().unwrap().clients = alive_clients;
   }
 
   /// Spawn a task that will check if clients are still connected
@@ -83,36 +83,40 @@ impl EventManager {
     });
   }
 
-  async fn dispatch_event(&mut self, sys_ev: SystemEventKind) -> IoResult<()> {
+  fn dispatch_event(&self, sys_ev: SystemEventKind) -> IoResult<()> {
     log::trace!("event_manager: dispatch_event {:?}", sys_ev);
+    let self_ptr = self.clone();
     match sys_ev {
       SystemEventKind::Emit(event) => {
-        let clients = self.inner.lock().unwrap().clients.clone();
-        for mut client in clients {
-          let _ = client.send(SystemEventKind::Emit(event.clone())).await;
-        }
-        self.raw.emit(&event).await?;
+        rt::spawn(async move {
+          let clients = self_ptr.inner.try_lock().unwrap().clients.clone();
+          for mut client in clients {
+            let _ = client.send(SystemEventKind::Emit(event.clone())).await;
+          }
+          self_ptr.raw.emit(&event)?;
+          Ok::<(), IoError>(())
+        });
       }
       SystemEventKind::Ping => {
         log::trace!("event_manager: ping");
       }
-      SystemEventKind::Subscribe(mut emitter) => {
+      SystemEventKind::Subscribe(emitter) => {
         log::trace!("event_manager: subscribe");
-        emitter.send(SystemEventKind::Ping).await.map_err(|err| {
-          IoError::interupted("SystemEventEmitter", err.to_string().as_str())
-        })?;
-        self.inner.lock().unwrap().clients.push(emitter);
+        rt::spawn(async move {
+          self_ptr.inner.try_lock().unwrap().clients.push(emitter);
+          Ok::<(), IoError>(())
+        });
       }
     }
     Ok(())
   }
 
   fn run_event_loop(&self, mut rx: SystemEventReceiver) {
-    let mut self_ptr = self.clone();
+    let self_ptr = self.clone();
     rt::Arbiter::new().exec_fn(move || {
       rt::spawn(async move {
         while let Some(event) = rx.next().await {
-          if let Err(err) = self_ptr.dispatch_event(event).await {
+          if let Err(err) = self_ptr.dispatch_event(event) {
             log::warn!("event_manager: loop error {err}");
           }
         }
@@ -197,5 +201,9 @@ impl SystemState {
         IoError::interupted("EventEmitter", err.to_string().as_str())
       })?;
     Ok(rx)
+  }
+
+  pub fn subscribe_raw(&self) -> IoResult<RawEventClient> {
+    self.event_manager.raw.subscribe()
   }
 }

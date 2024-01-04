@@ -76,7 +76,7 @@ pub(crate) async fn get_info(
 pub(crate) async fn watch_event(
   state: web::types::State<SystemState>,
 ) -> HttpResult<web::HttpResponse> {
-  let stream = state.event_manager.raw.subscribe().await?;
+  let stream = state.subscribe_raw()?;
   Ok(
     web::HttpResponse::Ok()
       .content_type("text/event-stream")

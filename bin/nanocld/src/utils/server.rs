@@ -86,7 +86,7 @@ mod tests {
 
   use super::*;
 
-  use crate::{config, subsystem, cli::Cli, utils::tests::*};
+  use crate::{config, cli::Cli, utils::tests::*};
 
   fn init_test_config(cmd: Vec<&str>) -> Cli {
     before();
@@ -102,7 +102,7 @@ mod tests {
     args: Cli,
   ) -> Result<ntex::server::Server, std::io::Error> {
     let daemon_conf = config::init(&args).expect("Expect config to be valid");
-    let daemon_state = subsystem::init(&daemon_conf)
+    let daemon_state = SystemState::new(&daemon_conf)
       .await
       .expect("Init daemon state to be ok");
     gen(daemon_state).await
