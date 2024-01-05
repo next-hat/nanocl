@@ -10,7 +10,7 @@ use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 use crate::{
   utils,
   repositories::generic::*,
-  models::{Pool, VmImageDb, QemuImgInfo, VmImageUpdateDb, DaemonState},
+  models::{Pool, VmImageDb, QemuImgInfo, VmImageUpdateDb, SystemState},
 };
 
 /// Delete a vm image from the database and from the filesystem
@@ -64,7 +64,7 @@ pub(crate) async fn create_snap(
   name: &str,
   size: u64,
   image: &VmImageDb,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<VmImageDb> {
   if VmImageDb::read_by_pk(name, &state.pool).await.is_ok() {
     return Err(HttpError::conflict(format!("Vm image {name} already used")));
@@ -132,7 +132,7 @@ pub(crate) async fn create_snap(
 pub(crate) async fn clone(
   name: &str,
   image: &VmImageDb,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Receiver<HttpResult<Bytes>>> {
   if image.kind != "Snapshot" {
     return Err(HttpError::bad_request(format!(

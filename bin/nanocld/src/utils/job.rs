@@ -24,13 +24,13 @@ use nanocl_stubs::{
 use crate::{
   version, utils,
   repositories::generic::*,
-  models::{DaemonState, ProcessDb, JobDb},
+  models::{SystemState, ProcessDb, JobDb},
 };
 
 use super::stream::transform_stream;
 
 /// Format the cron job command to start a job at a given time
-fn format_cron_job_command(job: &Job, state: &DaemonState) -> String {
+fn format_cron_job_command(job: &Job, state: &SystemState) -> String {
   let host = state
     .config
     .hosts
@@ -62,7 +62,7 @@ async fn exec_crontab() -> IoResult<()> {
 async fn add_cron_rule(
   item: &Job,
   schedule: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> IoResult<()> {
   let cmd = format_cron_job_command(item, state);
   let cron_rule = format!("{} {cmd}", schedule);
@@ -85,7 +85,7 @@ async fn add_cron_rule(
 }
 
 /// Remove a cron rule from the crontab for the given job
-async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
+async fn remove_cron_rule(item: &Job, state: &SystemState) -> IoResult<()> {
   let mut content = fs::read_to_string("/var/spool/cron/crontabs/root")
     .await
     .map_err(|err| err.map_err_context(|| "Cron job"))?;
@@ -106,7 +106,7 @@ async fn remove_cron_rule(item: &Job, state: &DaemonState) -> IoResult<()> {
 /// Create a job and with it's containers
 pub(crate) async fn create(
   item: &JobPartial,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Job> {
   let db_model = JobDb::try_from_partial(item)?;
   let job = JobDb::create_from(db_model, &state.pool)
@@ -141,7 +141,7 @@ pub(crate) async fn create(
 }
 
 /// List all jobs
-pub(crate) async fn list(state: &DaemonState) -> HttpResult<Vec<JobSummary>> {
+pub(crate) async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
   let jobs = JobDb::read_by(&GenericFilter::default(), &state.pool).await?;
   let job_summaries =
     jobs
@@ -175,7 +175,7 @@ pub(crate) async fn list(state: &DaemonState) -> HttpResult<Vec<JobSummary>> {
 /// Delete a job by name with his given instances (containers).
 pub(crate) async fn delete_by_name(
   name: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   let job = JobDb::read_by_pk(name, &state.pool).await?.try_to_spec()?;
   let processes = ProcessDb::read_by_kind_key(name, &state.pool).await?;
@@ -207,7 +207,7 @@ pub(crate) async fn delete_by_name(
 /// Inspect a job by name and return a detailed view of the job
 pub(crate) async fn inspect_by_name(
   name: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<JobInspect> {
   let job = JobDb::read_by_pk(name, &state.pool).await?.try_to_spec()?;
   let instances = ProcessDb::read_by_kind_key(name, &state.pool).await?;
@@ -228,7 +228,7 @@ pub(crate) async fn inspect_by_name(
 pub(crate) async fn wait(
   name: &str,
   wait_options: WaitContainerOptions<WaitCondition>,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<impl StreamExt<Item = Result<Bytes, HttpError>>> {
   let job = JobDb::read_by_pk(name, &state.pool).await?.try_to_spec()?;
   let docker_api = state.docker_api.clone();

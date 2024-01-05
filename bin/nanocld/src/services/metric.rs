@@ -9,7 +9,7 @@ use nanocl_stubs::{
 
 use crate::{
   repositories::generic::*,
-  models::{DaemonState, MetricDb, MetricNodePartial},
+  models::{SystemState, MetricDb, MetricNodePartial},
 };
 
 /// Get metrics of all peer nodes
@@ -26,7 +26,7 @@ use crate::{
 ))]
 #[web::get("/metrics")]
 pub(crate) async fn list_metric(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
@@ -47,7 +47,7 @@ pub(crate) async fn list_metric(
 ))]
 #[web::post("/metrics")]
 pub(crate) async fn create_metric(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   _path: web::types::Path<String>,
   payload: web::types::Json<MetricPartial>,
 ) -> HttpResult<web::HttpResponse> {

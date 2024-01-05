@@ -25,7 +25,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{DaemonState, CargoDb, ProcessDb, NamespaceDb, SecretDb, SpecDb},
+  models::{SystemState, CargoDb, ProcessDb, NamespaceDb, SecretDb, SpecDb},
 };
 
 use super::stream::transform_stream;
@@ -95,7 +95,7 @@ async fn execute_before(
 async fn create_instances(
   cargo: &Cargo,
   number: usize,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Vec<Process>> {
   execute_before(cargo, &state.docker_api).await?;
   let mut secret_envs: Vec<String> = Vec::new();
@@ -214,7 +214,7 @@ async fn create_instances(
 /// It's happenning if when a cargo fail to updates.
 async fn restore_instances_backup(
   instances: &[Process],
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   instances
     .iter()
@@ -245,7 +245,7 @@ async fn restore_instances_backup(
 /// In case of failure, the backup containers are restored.
 async fn rename_instances_original(
   instances: &[Process],
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   instances
     .iter()
@@ -275,7 +275,7 @@ async fn rename_instances_original(
 /// The cargo is not deleted because it can be used to restore the containers.
 async fn delete_instances(
   instances: &[String],
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   instances
     .iter()
@@ -303,7 +303,7 @@ pub(crate) async fn create(
   namespace: &str,
   spec: &CargoSpecPartial,
   version: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Cargo> {
   let cargo =
     CargoDb::create_from_spec(namespace, spec, version, &state.pool).await?;
@@ -322,7 +322,7 @@ pub(crate) async fn create(
     CargoDb::del_by_pk(&cargo.spec.cargo_key, &state.pool).await?;
     return Err(err);
   }
-  utils::event::emit_normal_native_action(
+  utils::event_emitter::emit_normal_native_action(
     &cargo,
     NativeEventAction::Create,
     state,
@@ -334,7 +334,7 @@ pub(crate) async fn create(
 }
 
 /// Restart cargo instances (containers) by key
-pub(crate) async fn restart(key: &str, state: &DaemonState) -> HttpResult<()> {
+pub(crate) async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
   let cargo = utils::cargo::inspect_by_key(key, state).await?;
   let processes =
     ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
@@ -359,7 +359,7 @@ pub(crate) async fn restart(key: &str, state: &DaemonState) -> HttpResult<()> {
 pub(crate) async fn delete_by_key(
   key: &str,
   force: Option<bool>,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
   let processes =
@@ -396,7 +396,7 @@ pub(crate) async fn put(
   cargo_key: &str,
   cargo_partial: &CargoSpecPartial,
   version: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Cargo> {
   let cargo =
     CargoDb::update_from_spec(cargo_key, cargo_partial, version, &state.pool)
@@ -463,7 +463,7 @@ pub(crate) async fn put(
 /// List the cargoes for the given query
 pub(crate) async fn list(
   query: &GenericListNspQuery,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Vec<CargoSummary>> {
   let namespace = utils::key::resolve_nsp(&query.namespace);
   let filter = GenericFilter::try_from(query.clone())
@@ -505,7 +505,7 @@ pub(crate) async fn list(
 /// Return detailed information about the cargo for the given key
 pub(crate) async fn inspect_by_key(
   key: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<CargoInspect> {
   let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
   let processes = ProcessDb::read_by_kind_key(key, &state.pool).await?;
@@ -524,7 +524,7 @@ pub(crate) async fn inspect_by_key(
 /// from the system (database and docker).
 pub(crate) async fn delete_by_namespace(
   namespace: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   let namespace = NamespaceDb::read_by_pk(namespace, &state.pool).await?;
   let cargoes =
@@ -547,7 +547,7 @@ pub(crate) async fn delete_by_namespace(
 pub(crate) async fn kill_by_key(
   key: &str,
   options: &CargoKillOptions,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   let instances = ProcessDb::read_by_kind_key(key, &state.pool).await?;
   if instances.is_empty() {
@@ -566,7 +566,7 @@ pub async fn patch(
   key: &str,
   payload: &CargoSpecUpdate,
   version: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Cargo> {
   let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
   let container = if let Some(container) = payload.container.clone() {
@@ -685,7 +685,7 @@ pub(crate) fn get_stats(
 pub async fn scale(
   key: &str,
   options: &CargoScale,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
   let instances = ProcessDb::read_by_kind_key(key, &state.pool).await?;

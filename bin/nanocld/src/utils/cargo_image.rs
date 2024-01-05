@@ -8,7 +8,7 @@ use bollard_next::{
 
 use nanocl_error::http::{HttpError, HttpResult};
 
-use crate::models::DaemonState;
+use crate::models::SystemState;
 
 use super::stream;
 
@@ -26,7 +26,7 @@ pub(crate) fn parse_image_name(name: &str) -> HttpResult<(String, String)> {
 /// List all cargo images installed
 pub(crate) async fn list(
   opts: &bollard_next::image::ListImagesOptions<String>,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Vec<ImageSummary>> {
   let items = state.docker_api.list_images(Some(opts.clone())).await?;
   Ok(items)
@@ -35,7 +35,7 @@ pub(crate) async fn list(
 /// Get detailed information on a cargo image by name
 pub(crate) async fn inspect_by_name(
   image_name: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<ImageInspect> {
   let image = state.docker_api.inspect_image(image_name).await?;
   Ok(image)
@@ -45,7 +45,7 @@ pub(crate) async fn inspect_by_name(
 pub(crate) async fn pull(
   image_name: &str,
   tag: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<impl StreamExt<Item = HttpResult<Bytes>>> {
   let from_image = image_name.to_owned();
   let tag = tag.to_owned();
@@ -67,7 +67,7 @@ pub(crate) async fn pull(
 /// Delete an installed cargo/container image by id or name
 pub(crate) async fn delete(
   id_or_name: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   state
     .docker_api

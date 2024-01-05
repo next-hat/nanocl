@@ -17,14 +17,14 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{Pool, DaemonState, CargoDb, NamespaceDb},
+  models::{Pool, SystemState, CargoDb, NamespaceDb},
 };
 
 /// Create a new namespace with his associated network.
 /// Each vm and cargo created on this namespace will use the same network.
 pub(crate) async fn create(
   item: &NamespacePartial,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Namespace> {
   if NamespaceDb::read_by_pk(&item.name, &state.pool)
     .await
@@ -57,7 +57,7 @@ pub(crate) async fn create(
 /// Delete a namespace by name and remove all associated cargo and vm.
 pub(crate) async fn delete_by_name(
   name: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   utils::cargo::delete_by_namespace(name, state).await?;
   NamespaceDb::del_by_pk(name, &state.pool).await?;
@@ -122,7 +122,7 @@ pub(crate) async fn list(
 /// Get detailed information about a namespace
 pub(crate) async fn inspect_by_name(
   name: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<NamespaceInspect> {
   let namespace = NamespaceDb::read_by_pk(name, &state.pool).await?;
   let models = CargoDb::read_by_namespace(&namespace.name, &state.pool).await?;

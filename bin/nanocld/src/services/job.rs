@@ -6,7 +6,7 @@ use bollard_next::container::WaitContainerOptions;
 use nanocl_stubs::job::{JobPartial, JobWaitQuery};
 
 use crate::utils;
-use crate::models::DaemonState;
+use crate::models::SystemState;
 
 /// List jobs
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -19,7 +19,7 @@ use crate::models::DaemonState;
 ))]
 #[web::get("/jobs")]
 pub(crate) async fn list_job(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
 ) -> HttpResult<web::HttpResponse> {
   let jobs = utils::job::list(&state).await?;
@@ -38,7 +38,7 @@ pub(crate) async fn list_job(
 ))]
 #[web::post("/jobs")]
 pub(crate) async fn create_job(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
   payload: web::types::Json<JobPartial>,
 ) -> HttpResult<web::HttpResponse> {
@@ -61,7 +61,7 @@ pub(crate) async fn create_job(
 ))]
 #[web::delete("/jobs/{name}")]
 pub(crate) async fn delete_job(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   utils::job::delete_by_name(&path.1, &state).await?;
@@ -82,7 +82,7 @@ pub(crate) async fn delete_job(
 ))]
 #[web::get("/jobs/{name}/inspect")]
 pub(crate) async fn inspect_job(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let job = utils::job::inspect_by_name(&path.1, &state).await?;
@@ -104,7 +104,7 @@ pub(crate) async fn inspect_job(
 ))]
 #[web::get("/jobs/{name}/wait")]
 pub(crate) async fn wait_job(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<JobWaitQuery>,
 ) -> HttpResult<web::HttpResponse> {

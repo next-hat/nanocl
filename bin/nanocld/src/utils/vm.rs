@@ -18,14 +18,14 @@ use crate::{
   utils,
   repositories::generic::*,
   models::{
-    Pool, VmImageDb, DaemonState, ProcessDb, NamespaceDb, VmDb, SpecDb,
+    Pool, VmImageDb, SystemState, ProcessDb, NamespaceDb, VmDb, SpecDb,
   },
 };
 
 /// Get detailed information about a VM by his key
 pub(crate) async fn inspect_by_key(
   vm_key: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<VmInspect> {
   let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
   let processes =
@@ -45,7 +45,7 @@ pub(crate) async fn inspect_by_key(
 pub(crate) async fn delete_by_key(
   vm_key: &str,
   force: bool,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
   let options = bollard_next::container::RemoveContainerOptions {
@@ -57,7 +57,7 @@ pub(crate) async fn delete_by_key(
   VmDb::del_by_pk(vm_key, &state.pool).await?;
   SpecDb::del_by_kind_key(vm_key, &state.pool).await?;
   utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
-  super::event::emit_normal_native_action(
+  super::event_emitter::emit_normal_native_action(
     &vm,
     NativeEventAction::Delete,
     state,
@@ -95,7 +95,7 @@ pub(crate) async fn create_instance(
   vm: &Vm,
   image: &VmImageDb,
   disable_keygen: bool,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   let mut labels: HashMap<String, String> = HashMap::new();
   let vmimagespath = format!("{}/vms/images", state.config.state_dir);
@@ -198,7 +198,7 @@ pub(crate) async fn create(
   vm: &VmSpecPartial,
   namespace: &str,
   version: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Vm> {
   let name = &vm.name;
   log::debug!(
@@ -226,7 +226,7 @@ pub(crate) async fn create(
   vm.disk.size = Some(size);
   let vm = VmDb::create_from_spec(namespace, &vm, version, &state.pool).await?;
   create_instance(&vm, &image, true, state).await?;
-  super::event::emit_normal_native_action(
+  super::event_emitter::emit_normal_native_action(
     &vm,
     NativeEventAction::Create,
     state,
@@ -240,7 +240,7 @@ pub(crate) async fn patch(
   vm_key: &str,
   spec: &VmSpecUpdate,
   version: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Vm> {
   let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
   let old_spec = SpecDb::read_by_pk(&vm.spec.key, &state.pool)
@@ -293,7 +293,7 @@ pub(crate) async fn put(
   vm_key: &str,
   vm_partial: &VmSpecPartial,
   version: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Vm> {
   let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
   let container_name = format!("{}.v", &vm.spec.vm_key);
@@ -311,6 +311,10 @@ pub(crate) async fn put(
   create_instance(&vm, &image, false, state).await?;
   utils::process::start_by_kind(&ProcessKind::Vm, &vm.spec.vm_key, state)
     .await?;
-  super::event::emit_normal_native_action(&vm, NativeEventAction::Patch, state);
+  super::event_emitter::emit_normal_native_action(
+    &vm,
+    NativeEventAction::Patch,
+    state,
+  );
   Ok(vm)
 }

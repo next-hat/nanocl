@@ -6,7 +6,7 @@ use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 use nanocl_stubs::generic::GenericNspQuery;
 
 use crate::utils;
-use crate::models::DaemonState;
+use crate::models::SystemState;
 
 /// Inspect a command executed in a cargo
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -23,7 +23,7 @@ use crate::models::DaemonState;
 ))]
 #[web::get("/exec/{id}/cargo/inspect")]
 pub(crate) async fn inspect_exec_command(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let infos = utils::exec::inspect_exec_command(&path.1, &state).await?;
@@ -46,7 +46,7 @@ pub(crate) async fn inspect_exec_command(
 ))]
 #[web::post("/exec/{id}/cargo/start")]
 pub(crate) async fn start_exec_command(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<StartExecOptions>,
 ) -> HttpResult<web::HttpResponse> {
@@ -70,7 +70,7 @@ pub(crate) async fn start_exec_command(
 ))]
 #[web::post("/cargoes/{cargo_name}/exec")]
 pub(crate) async fn create_exec_command(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CreateExecOptions>,
   qs: web::types::Query<GenericNspQuery>,

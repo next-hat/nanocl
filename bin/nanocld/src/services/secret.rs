@@ -14,7 +14,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{DaemonState, SecretDb},
+  models::{SystemState, SecretDb},
 };
 
 /// List secret
@@ -31,7 +31,7 @@ use crate::{
 ))]
 #[web::get("/secrets")]
 pub(crate) async fn list_secret(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
@@ -55,7 +55,7 @@ pub(crate) async fn list_secret(
 ))]
 #[web::get("/secrets/{key}/inspect")]
 pub(crate) async fn inspect_secret(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let secret = SecretDb::transform_read_by_pk(&path.1, &state.pool).await?;
@@ -75,7 +75,7 @@ pub(crate) async fn inspect_secret(
 ))]
 #[web::post("/secrets")]
 pub(crate) async fn create_secret(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   payload: web::types::Json<SecretPartial>,
 ) -> HttpResult<web::HttpResponse> {
   utils::key::ensure_kind(&payload.kind)?;
@@ -109,7 +109,7 @@ pub(crate) async fn create_secret(
 ))]
 #[web::delete("/secrets/{key}")]
 pub(crate) async fn delete_secret(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   utils::secret::delete_by_pk(&path.1, &state).await?;
@@ -132,7 +132,7 @@ pub(crate) async fn delete_secret(
 ))]
 #[web::patch("/secrets/{key}")]
 async fn patch_secret(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<SecretUpdate>,
 ) -> HttpResult<web::HttpResponse> {

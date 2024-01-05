@@ -11,7 +11,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{DaemonState, SpecDb},
+  models::{SystemState, SpecDb},
 };
 
 /// List cargoes
@@ -29,7 +29,7 @@ use crate::{
 ))]
 #[web::get("/cargoes")]
 pub(crate) async fn list_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let cargoes = utils::cargo::list(&qs, &state).await?;
@@ -51,7 +51,7 @@ pub(crate) async fn list_cargo(
 ))]
 #[web::get("/cargoes/{name}/inspect")]
 pub(crate) async fn inspect_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -76,7 +76,7 @@ pub(crate) async fn inspect_cargo(
 ))]
 #[web::post("/cargoes")]
 pub(crate) async fn create_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<String>,
   payload: web::types::Json<CargoSpecPartial>,
   qs: web::types::Query<GenericNspQuery>,
@@ -103,7 +103,7 @@ pub(crate) async fn create_cargo(
 ))]
 #[web::delete("/cargoes/{name}")]
 pub(crate) async fn delete_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<CargoDeleteQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -130,7 +130,7 @@ pub(crate) async fn delete_cargo(
 ))]
 #[web::post("/cargoes/{name}/restart")]
 pub(crate) async fn restart_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -157,7 +157,7 @@ pub(crate) async fn restart_cargo(
 ))]
 #[web::put("/cargoes/{name}")]
 pub(crate) async fn put_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CargoSpecPartial>,
   qs: web::types::Query<GenericNspQuery>,
@@ -185,7 +185,7 @@ pub(crate) async fn put_cargo(
 ))]
 #[web::patch("/cargoes/{name}")]
 pub(crate) async fn patch_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CargoSpecUpdate>,
   qs: web::types::Query<GenericNspQuery>,
@@ -213,7 +213,7 @@ pub(crate) async fn patch_cargo(
 ))]
 #[web::post("/cargoes/{name}/kill")]
 pub(crate) async fn kill_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CargoKillOptions>,
   qs: web::types::Query<GenericNspQuery>,
@@ -240,7 +240,7 @@ pub(crate) async fn kill_cargo(
 ))]
 #[web::get("/cargoes/{name}/histories")]
 pub(crate) async fn list_cargo_history(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -271,7 +271,7 @@ pub(crate) async fn list_cargo_history(
 ))]
 #[web::patch("/cargoes/{name}/histories/{id}/revert")]
 pub(crate) async fn revert_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, uuid::Uuid)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -304,7 +304,7 @@ pub(crate) async fn revert_cargo(
 ))]
 #[web::get("/cargoes/{name}/stats")]
 pub(crate) async fn stats_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<CargoStatsQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -335,7 +335,7 @@ pub(crate) async fn stats_cargo(
 ))]
 #[web::patch("/cargoes/{name}/scale")]
 pub(crate) async fn scale_cargo(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
   payload: web::types::Json<CargoScale>,

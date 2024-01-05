@@ -15,7 +15,7 @@ use nanocl_stubs::generic::GenericFilter;
 use crate::{
   utils,
   repositories::generic::*,
-  models::{DaemonState, WsConState, NodeDb},
+  models::{SystemState, WsConState, NodeDb},
 };
 
 /// List nodes
@@ -29,14 +29,14 @@ use crate::{
 ))]
 #[web::get("/nodes")]
 pub(crate) async fn list_node(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
 ) -> HttpResult<web::HttpResponse> {
   let items = NodeDb::read_by(&GenericFilter::default(), &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
 async fn node_ws_service(
-  (sink, state): (ws::WsSink, web::types::State<DaemonState>),
+  (sink, state): (ws::WsSink, web::types::State<SystemState>),
 ) -> Result<
   impl Service<ws::Frame, Response = Option<ws::Message>, Error = std::io::Error>,
   web::Error,
@@ -84,7 +84,7 @@ async fn node_ws_service(
   ),
 ))]
 pub(crate) async fn node_ws(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   req: web::HttpRequest,
 ) -> Result<web::HttpResponse, web::Error> {
   web::ws::start(

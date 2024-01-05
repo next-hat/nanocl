@@ -16,22 +16,16 @@ pub(crate) mod resource;
 pub(crate) mod metric;
 pub(crate) mod ctrl_client;
 pub(crate) mod secret;
-pub(crate) mod event;
 pub(crate) mod process;
+pub(crate) mod server;
+pub(crate) mod event_emitter;
 
 #[cfg(test)]
 pub mod tests {
-  use super::*;
-
   use std::env;
   use ntex::web::{*, self};
 
-  use crate::{
-    services,
-    version::VERSION,
-    event_emitter::EventEmitter,
-    models::{Pool, DaemonState},
-  };
+  use crate::{services, version::VERSION, models::SystemState};
   use nanocl_stubs::config::DaemonConfig;
 
   pub use nanocl_utils::ntex::test_client::*;
@@ -50,31 +44,6 @@ pub mod tests {
       .try_init();
   }
 
-  /// Generate a docker client for tests purpose
-  pub fn gen_docker_client() -> bollard_next::Docker {
-    let socket_path = env::var("DOCKER_SOCKET_PATH")
-      .unwrap_or_else(|_| String::from("/var/run/docker.sock"));
-    println!("Using docker socket path: {}", socket_path);
-    bollard_next::Docker::connect_with_unix(
-      &socket_path,
-      120,
-      bollard_next::API_DEFAULT_VERSION,
-    )
-    .unwrap()
-  }
-
-  /// Generate a postgre pool for tests purpose
-  pub async fn gen_postgre_pool() -> Pool {
-    let home = std::env::var("HOME").expect("Failed to get home dir");
-    let daemon_conf = DaemonConfig {
-      state_dir: format!("{home}/.nanocl_dev/state"),
-      ..Default::default()
-    };
-    store::create_pool("store.nanocl.internal:26258", &daemon_conf)
-      .await
-      .expect("Failed to connect to store at: {ip_addr}")
-  }
-
   /// Generate a test server for tests purpose
   pub async fn gen_server(routes: Config) -> test::TestServer {
     before();
@@ -87,18 +56,7 @@ pub mod tests {
       docker_host,
       ..Default::default()
     };
-    let event_emitter = EventEmitter::new();
-    // Create docker_api
-    let docker_api = gen_docker_client();
-    // Create postgres pool
-    let pool = gen_postgre_pool().await;
-    let daemon_state = DaemonState {
-      config,
-      docker_api,
-      pool,
-      event_emitter,
-      version: VERSION.to_owned(),
-    };
+    let daemon_state = SystemState::new(&config).await.unwrap();
     // Create test server
     test::server(move || {
       App::new()

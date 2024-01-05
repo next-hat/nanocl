@@ -15,23 +15,23 @@ use nanocl_stubs::{
 
 use crate::{
   repositories::generic::*,
-  models::{DaemonState, ProcessDb, JobDb, JobUpdateDb, VmDb, CargoDb},
+  models::{SystemState, ProcessDb, JobDb, JobUpdateDb, VmDb, CargoDb},
 };
 
 async fn after(
   kind: &ProcessKind,
   kind_key: &str,
   action: NativeEventAction,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   match kind {
     ProcessKind::Vm => {
       let vm = VmDb::transform_read_by_pk(kind_key, &state.pool).await?;
-      super::event::emit_normal_native_action(&vm, action, state);
+      super::event_emitter::emit_normal_native_action(&vm, action, state);
     }
     ProcessKind::Cargo => {
       let cargo = CargoDb::transform_read_by_pk(kind_key, &state.pool).await?;
-      super::event::emit_normal_native_action(&cargo, action, state);
+      super::event_emitter::emit_normal_native_action(&cargo, action, state);
     }
     ProcessKind::Job => {
       JobDb::update_pk(
@@ -97,7 +97,7 @@ pub(crate) async fn create(
   kind: &str,
   kind_key: &str,
   item: Config,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Process> {
   let kind: ProcessKind =
     kind.to_owned().try_into().map_err(|err: std::io::Error| {
@@ -149,7 +149,7 @@ pub(crate) async fn create(
 pub(crate) async fn remove(
   key: &str,
   opts: Option<RemoveContainerOptions>,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   match state.docker_api.remove_container(key, opts).await {
     Ok(_) => {}
@@ -174,7 +174,7 @@ pub(crate) async fn remove(
 pub(crate) async fn start_by_kind(
   kind: &ProcessKind,
   kind_key: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   let processes = ProcessDb::read_by_kind_key(kind_key, &state.pool).await?;
   log::debug!("process::start_by_kind: {kind_key}");
@@ -198,7 +198,7 @@ pub(crate) async fn start_by_kind(
 pub(crate) async fn stop_by_kind(
   kind: &ProcessKind,
   kind_key: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   let processes = ProcessDb::read_by_kind_key(kind_key, &state.pool).await?;
   log::debug!("process::stop_by_kind: {kind:#?} {kind_key}");

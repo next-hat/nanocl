@@ -8,7 +8,7 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::cargo::CreateExecOptions;
 use nanocl_stubs::process::OutputLog;
 
-use crate::models::DaemonState;
+use crate::models::SystemState;
 
 use super::stream::transform_stream;
 
@@ -16,7 +16,7 @@ use super::stream::transform_stream;
 pub(crate) async fn create_exec_command(
   name: &str,
   args: &CreateExecOptions,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<CreateExecResults> {
   let name = format!("{name}.c");
   let result = state.docker_api.create_exec(&name, args.to_owned()).await?;
@@ -27,7 +27,7 @@ pub(crate) async fn create_exec_command(
 pub(crate) async fn start_exec_command(
   exec_id: &str,
   args: &StartExecOptions,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<web::HttpResponse> {
   let res = state
     .docker_api
@@ -49,7 +49,7 @@ pub(crate) async fn start_exec_command(
 /// Inspect a command runned in a cargo instance and return the exec infos
 pub(crate) async fn inspect_exec_command(
   exec_id: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<ExecInspectResponse> {
   let result = state.docker_api.inspect_exec(exec_id).await?;
   Ok(result)

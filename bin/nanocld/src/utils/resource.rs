@@ -10,7 +10,7 @@ use nanocl_stubs::{
 
 use crate::{
   repositories::generic::*,
-  models::{Pool, DaemonState, SpecDb, ResourceDb},
+  models::{Pool, SystemState, SpecDb, ResourceDb},
 };
 
 use super::ctrl_client::CtrlClient;
@@ -80,7 +80,7 @@ async fn hook_delete_resource(
 /// It will call the hook_create_resource function to hook the resource.
 pub(crate) async fn create(
   resource: &ResourcePartial,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Resource> {
   if ResourceDb::transform_read_by_pk(&resource.name, &state.pool)
     .await
@@ -93,7 +93,7 @@ pub(crate) async fn create(
   }
   let resource = hook_create_resource(resource, &state.pool).await?;
   let res = ResourceDb::create_from_spec(&resource, &state.pool).await?;
-  super::event::emit_normal_native_action(
+  super::event_emitter::emit_normal_native_action(
     &res,
     NativeEventAction::Create,
     state,
@@ -105,11 +105,11 @@ pub(crate) async fn create(
 /// It will call the hook_create_resource function to hook the resource.
 pub(crate) async fn patch(
   resource: &ResourcePartial,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<Resource> {
   let resource = hook_create_resource(resource, &state.pool).await?;
   let res = ResourceDb::update_from_spec(&resource, &state.pool).await?;
-  super::event::emit_normal_native_action(
+  super::event_emitter::emit_normal_native_action(
     &res,
     NativeEventAction::Patch,
     state,
@@ -121,14 +121,14 @@ pub(crate) async fn patch(
 /// It will call the hook_delete_resource function to hook the resource.
 pub(crate) async fn delete(
   resource: &Resource,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   if let Err(err) = hook_delete_resource(resource, &state.pool).await {
     log::warn!("{err}");
   }
   ResourceDb::del_by_pk(&resource.spec.resource_key, &state.pool).await?;
   SpecDb::del_by_kind_key(&resource.spec.resource_key, &state.pool).await?;
-  super::event::emit_normal_native_action(
+  super::event_emitter::emit_normal_native_action(
     resource,
     NativeEventAction::Delete,
     state,
@@ -140,7 +140,7 @@ pub(crate) async fn delete(
 /// It will call the hook_delete_resource function to hook the resource.
 pub(crate) async fn delete_by_key(
   key: &str,
-  state: &DaemonState,
+  state: &SystemState,
 ) -> HttpResult<()> {
   let resource = ResourceDb::transform_read_by_pk(key, &state.pool).await?;
   delete(&resource, state).await?;

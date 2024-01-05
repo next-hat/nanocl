@@ -9,7 +9,7 @@ use nanocl_stubs::{
 
 use crate::{
   repositories::generic::*,
-  models::{DaemonState, ResourceKindDb, SpecDb},
+  models::{SystemState, ResourceKindDb, SpecDb},
 };
 
 /// List resource kinds
@@ -23,7 +23,7 @@ use crate::{
 ))]
 #[web::get("/resource/kinds")]
 pub(crate) async fn list_resource_kind(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::new();
@@ -44,7 +44,7 @@ pub(crate) async fn list_resource_kind(
 ))]
 #[web::post("/resource/kinds")]
 pub(crate) async fn create_resource_kind(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
   payload: web::types::Json<ResourceKindPartial>,
 ) -> HttpResult<web::HttpResponse> {
@@ -68,7 +68,7 @@ pub(crate) async fn create_resource_kind(
 ))]
 #[web::delete("/resource/kinds/{domain}/{name}")]
 pub(crate) async fn delete_resource_kind(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);
@@ -93,7 +93,7 @@ pub(crate) async fn delete_resource_kind(
 ))]
 #[web::get("/resource/kinds/{domain}/{name}/inspect")]
 pub(crate) async fn inspect_resource_kind(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key: String = format!("{}/{}", path.1, path.2);
@@ -116,7 +116,7 @@ pub(crate) async fn inspect_resource_kind(
 ))]
 #[web::get("/resource/kinds/{domain}/{name}/version/{version}/inspect")]
 pub(crate) async fn inspect_resource_kind_version(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);

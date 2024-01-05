@@ -13,7 +13,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{DaemonState, SpecDb, ResourceDb},
+  models::{SystemState, SpecDb, ResourceDb},
 };
 
 /// List resources
@@ -30,7 +30,7 @@ use crate::{
 ))]
 #[web::get("/resources")]
 pub(crate) async fn list_resource(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
@@ -54,7 +54,7 @@ pub(crate) async fn list_resource(
 ))]
 #[web::get("/resources/{name}")]
 pub(crate) async fn inspect_resource(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let resource = ResourceDb::transform_read_by_pk(&path.1, &state.pool).await?;
@@ -73,7 +73,7 @@ pub(crate) async fn inspect_resource(
 ))]
 #[web::post("/resources")]
 pub(crate) async fn create_resource(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   payload: web::types::Json<ResourcePartial>,
 ) -> HttpResult<web::HttpResponse> {
   let resource = utils::resource::create(&payload, &state).await?;
@@ -95,7 +95,7 @@ pub(crate) async fn create_resource(
 ))]
 #[web::delete("/resources/{name}")]
 pub(crate) async fn delete_resource(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   utils::resource::delete_by_key(&path.1, &state).await?;
@@ -118,7 +118,7 @@ pub(crate) async fn delete_resource(
 ))]
 #[web::patch("/resources/{name}")]
 pub(crate) async fn put_resource(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceUpdate>,
 ) -> HttpResult<web::HttpResponse> {
@@ -148,7 +148,7 @@ pub(crate) async fn put_resource(
 ))]
 #[web::get("/resources/{name}/histories")]
 pub(crate) async fn list_resource_history(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let filter =
@@ -177,7 +177,7 @@ pub(crate) async fn list_resource_history(
 ))]
 #[web::patch("/resources/{name}/histories/{id}/revert")]
 pub(crate) async fn revert_resource(
-  state: web::types::State<DaemonState>,
+  state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, uuid::Uuid)>,
 ) -> HttpResult<web::HttpResponse> {
   let history = SpecDb::read_by_pk(&path.2, &state.pool).await?;
