@@ -67,7 +67,7 @@ impl RawEventEmitter {
     let self_ptr = Self {
       inner: Arc::new(Mutex::new(RawEventEmitterInner { clients: vec![] })),
     };
-    self_ptr.clone().spawn_check_connection();
+    self_ptr.spawn_check_connection();
     self_ptr
   }
 
@@ -88,13 +88,14 @@ impl RawEventEmitter {
   }
 
   /// Spawn a task that will check if clients are still connected
-  fn spawn_check_connection(mut self) {
+  fn spawn_check_connection(&self) {
+    let mut self_ptr = self.clone();
     rt::Arbiter::new().exec_fn(|| {
       rt::spawn(async move {
         let task = time::interval(Duration::from_secs(10));
         loop {
           task.tick().await;
-          if let Err(err) = self.check_connection() {
+          if let Err(err) = self_ptr.check_connection() {
             log::error!("{err}");
           }
         }
@@ -113,7 +114,7 @@ impl RawEventEmitter {
           let _ = client.try_send(msg);
         }
         Err(err) => {
-          log::error!("raw_emitter::emit: {err}");
+          log::error!("raw_emitter: emit {err}");
         }
       }
     }

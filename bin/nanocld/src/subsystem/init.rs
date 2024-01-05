@@ -143,10 +143,13 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
 /// Init unit test
 #[cfg(test)]
 mod tests {
+  use futures_util::StreamExt;
+
+  use nanocl_stubs::resource::Resource;
+
   use super::*;
 
-  use crate::{cli, config};
-  use crate::utils::tests::*;
+  use crate::{cli, config, utils::tests::*};
 
   /// Test init
   #[ntex::test]
@@ -168,7 +171,31 @@ mod tests {
     log::debug!("args: {args:?}");
     let config = config::init(&args).expect("Expect to init config");
     log::debug!("config: {config:?}");
-    // test function init
-    let _ = init(&config).await.unwrap();
+    // Test state
+    let state = init(&config).await.unwrap();
+    let state_ptr = state.clone();
+    let mut raw_sub = state.subscribe_raw().unwrap();
+    rt::spawn(async move {
+      ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+      let actor = Resource::default();
+      utils::event_emitter::emit_normal_native_action(
+        &actor,
+        nanocl_stubs::system::NativeEventAction::Create,
+        &state_ptr,
+      );
+    });
+    raw_sub.next().await;
+    let state_ptr = state.clone();
+    rt::spawn(async move {
+      ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+      let actor = Resource::default();
+      utils::event_emitter::emit_normal_native_action(
+        &actor,
+        nanocl_stubs::system::NativeEventAction::Create,
+        &state_ptr,
+      );
+    });
+    let mut sub = state.subscribe().await.unwrap();
+    sub.next().await;
   }
 }
