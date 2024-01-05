@@ -8,10 +8,7 @@ use nanocl_stubs::{
   resource::{Resource, ResourcePartial},
 };
 
-use crate::{
-  repositories::generic::*,
-  models::{Pool, SystemState, SpecDb, ResourceDb},
-};
+use crate::models::{Pool, SystemState, SpecDb, ResourceDb};
 
 use super::ctrl_client::CtrlClient;
 
@@ -20,7 +17,7 @@ use super::ctrl_client::CtrlClient;
 /// If the resource is a Kind Kind, it will create a resource Kind with an associated version.
 /// To call a custom controller, the resource Kind must have a Url field in his config.
 /// Unless it must have a Schema field in his config that is a JSONSchema to validate the resource.
-async fn hook_create_resource(
+pub(crate) async fn hook_create_resource(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> HttpResult<ResourcePartial> {
@@ -58,7 +55,7 @@ async fn hook_create_resource(
 /// This hook is called when a resource is deleted.
 /// It call a custom controller at a specific url.
 /// If the resource is a Kind Kind, it will delete the resource Kind with an associated version.
-async fn hook_delete_resource(
+pub(crate) async fn hook_delete_resource(
   resource: &Resource,
   pool: &Pool,
 ) -> HttpResult<()> {
@@ -76,31 +73,6 @@ async fn hook_delete_resource(
   Ok(())
 }
 
-/// This function create a resource.
-/// It will call the hook_create_resource function to hook the resource.
-pub(crate) async fn create(
-  resource: &ResourcePartial,
-  state: &SystemState,
-) -> HttpResult<Resource> {
-  if ResourceDb::transform_read_by_pk(&resource.name, &state.pool)
-    .await
-    .is_ok()
-  {
-    return Err(HttpError::conflict(format!(
-      "Resource {} already exists",
-      &resource.name
-    )));
-  }
-  let resource = hook_create_resource(resource, &state.pool).await?;
-  let res = ResourceDb::create_from_spec(&resource, &state.pool).await?;
-  super::event_emitter::emit_normal_native_action(
-    &res,
-    NativeEventAction::Create,
-    state,
-  );
-  Ok(res)
-}
-
 /// This function patch a resource.
 /// It will call the hook_create_resource function to hook the resource.
 pub(crate) async fn patch(
@@ -115,34 +87,4 @@ pub(crate) async fn patch(
     state,
   );
   Ok(res)
-}
-
-/// This function delete a resource.
-/// It will call the hook_delete_resource function to hook the resource.
-pub(crate) async fn delete(
-  resource: &Resource,
-  state: &SystemState,
-) -> HttpResult<()> {
-  if let Err(err) = hook_delete_resource(resource, &state.pool).await {
-    log::warn!("{err}");
-  }
-  ResourceDb::del_by_pk(&resource.spec.resource_key, &state.pool).await?;
-  SpecDb::del_by_kind_key(&resource.spec.resource_key, &state.pool).await?;
-  super::event_emitter::emit_normal_native_action(
-    resource,
-    NativeEventAction::Delete,
-    state,
-  );
-  Ok(())
-}
-
-/// This function delete a resource by key.
-/// It will call the hook_delete_resource function to hook the resource.
-pub(crate) async fn delete_by_key(
-  key: &str,
-  state: &SystemState,
-) -> HttpResult<()> {
-  let resource = ResourceDb::transform_read_by_pk(key, &state.pool).await?;
-  delete(&resource, state).await?;
-  Ok(())
 }

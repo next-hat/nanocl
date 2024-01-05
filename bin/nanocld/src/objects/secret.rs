@@ -1,11 +1,12 @@
-use nanocl_error::io::IoResult;
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 
 use crate::{
-  objects::generic::*,
   repositories::generic::*,
   models::{SecretDb, SystemState},
 };
+
+use super::generic::*;
 
 impl ObjCreate for SecretDb {
   type ObjCreateIn = SecretPartial;
@@ -14,7 +15,7 @@ impl ObjCreate for SecretDb {
   async fn fn_create_obj(
     obj: &Self::ObjCreateIn,
     state: &SystemState,
-  ) -> IoResult<Self::ObjCreateOut> {
+  ) -> HttpResult<Self::ObjCreateOut> {
     let secret = SecretDb::create_from(obj, &state.pool).await?;
     let secret: Secret = secret.try_into()?;
     Ok(secret)
@@ -29,7 +30,7 @@ impl ObjDelByPk for SecretDb {
     key: &str,
     _opts: &Self::ObjDelOpts,
     state: &SystemState,
-  ) -> IoResult<Self::ObjDelOut> {
+  ) -> HttpResult<Self::ObjDelOut> {
     let secret = SecretDb::transform_read_by_pk(key, &state.pool).await?;
     SecretDb::del_by_pk(key, &state.pool).await?;
     Ok(secret)
@@ -44,7 +45,10 @@ impl ObjPatchByPk for SecretDb {
     key: &str,
     obj: &Self::ObjPatchIn,
     state: &SystemState,
-  ) -> IoResult<Self::ObjPatchOut> {
-    SecretDb::update_pk(key, obj, &state.pool).await?.try_into()
+  ) -> HttpResult<Self::ObjPatchOut> {
+    let secret = SecretDb::update_pk(key, obj, &state.pool)
+      .await?
+      .try_into()?;
+    Ok(secret)
   }
 }

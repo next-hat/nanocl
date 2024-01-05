@@ -1,4 +1,4 @@
-use nanocl_error::io::IoResult;
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::system::{EventActor, NativeEventAction};
 
 use crate::utils;
@@ -13,13 +13,13 @@ pub trait ObjPatchByPk {
     pk: &str,
     obj: &Self::ObjPatchIn,
     state: &SystemState,
-  ) -> IoResult<Self::ObjPatchOut>;
+  ) -> HttpResult<Self::ObjPatchOut>;
 
   async fn patch_obj_by_pk(
     pk: &str,
     obj: &Self::ObjPatchIn,
     state: &SystemState,
-  ) -> IoResult<Self::ObjPatchOut>
+  ) -> HttpResult<Self::ObjPatchOut>
   where
     Self::ObjPatchOut: Into<EventActor> + Clone,
   {

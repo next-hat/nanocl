@@ -1,4 +1,4 @@
-use nanocl_error::io::IoResult;
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::system::{EventActor, NativeEventAction};
 
 use crate::utils;
@@ -18,12 +18,12 @@ pub trait ObjCreate {
   async fn fn_create_obj(
     obj: &Self::ObjCreateIn,
     state: &SystemState,
-  ) -> IoResult<Self::ObjCreateOut>;
+  ) -> HttpResult<Self::ObjCreateOut>;
 
   async fn create_obj(
     obj: &Self::ObjCreateIn,
     state: &SystemState,
-  ) -> IoResult<Self::ObjCreateOut>
+  ) -> HttpResult<Self::ObjCreateOut>
   where
     Self::ObjCreateOut: Into<EventActor> + Clone,
   {

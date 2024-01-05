@@ -1,4 +1,4 @@
-use nanocl_error::io::IoResult;
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::system::{EventActor, NativeEventAction};
 
 use crate::utils;
@@ -13,13 +13,13 @@ pub trait ObjDelByPk {
     key: &str,
     opts: &Self::ObjDelOpts,
     state: &SystemState,
-  ) -> IoResult<Self::ObjDelOut>;
+  ) -> HttpResult<Self::ObjDelOut>;
 
   async fn del_obj_by_pk(
     key: &str,
     opts: &Self::ObjDelOpts,
     state: &SystemState,
-  ) -> IoResult<Self::ObjDelOut>
+  ) -> HttpResult<Self::ObjDelOut>
   where
     Self::ObjDelOut: Into<EventActor> + Clone,
   {

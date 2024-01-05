@@ -1,11 +1,12 @@
-use nanocl_error::io::IoResult;
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::cargo::{Cargo, CargoDeleteQuery};
 
 use crate::{
   utils,
-  objects::generic::*,
   models::{CargoDb, SystemState, CargoObjCreateIn},
 };
+
+use super::generic::*;
 
 impl ObjCreate for CargoDb {
   type ObjCreateIn = CargoObjCreateIn;
@@ -14,7 +15,7 @@ impl ObjCreate for CargoDb {
   async fn fn_create_obj(
     obj: &Self::ObjCreateIn,
     state: &SystemState,
-  ) -> IoResult<Self::ObjCreateOut> {
+  ) -> HttpResult<Self::ObjCreateOut> {
     let cargo =
       utils::cargo::create(&obj.namespace, &obj.spec, &obj.version, state)
         .await?;
@@ -30,7 +31,7 @@ impl ObjDelByPk for CargoDb {
     key: &str,
     opts: &Self::ObjDelOpts,
     state: &SystemState,
-  ) -> IoResult<Self::ObjDelOut> {
+  ) -> HttpResult<Self::ObjDelOut> {
     let cargo = utils::cargo::delete_by_key(key, opts.force, state).await?;
     Ok(cargo)
   }

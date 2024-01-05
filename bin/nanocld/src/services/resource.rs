@@ -12,6 +12,7 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
+  objects::generic::*,
   repositories::generic::*,
   models::{SystemState, SpecDb, ResourceDb},
 };
@@ -76,7 +77,7 @@ pub(crate) async fn create_resource(
   state: web::types::State<SystemState>,
   payload: web::types::Json<ResourcePartial>,
 ) -> HttpResult<web::HttpResponse> {
-  let resource = utils::resource::create(&payload, &state).await?;
+  let resource = ResourceDb::create_obj(&payload, &state).await?;
   Ok(web::HttpResponse::Created().json(&resource))
 }
 
@@ -98,7 +99,7 @@ pub(crate) async fn delete_resource(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  utils::resource::delete_by_key(&path.1, &state).await?;
+  ResourceDb::del_obj_by_pk(&path.1, &(), &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
