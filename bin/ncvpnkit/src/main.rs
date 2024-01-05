@@ -114,7 +114,7 @@ async fn on_event(
     return Ok(());
   }
   match action {
-    NativeEventAction::Create | NativeEventAction::Patch => {
+    NativeEventAction::Create | NativeEventAction::Update => {
       let key = actor.key.unwrap_or_default();
       let resource = nanocl_client.inspect_resource(&key).await?;
       let r_proxy_rule = resource_to_proxy_rule(&resource)?;

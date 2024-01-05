@@ -178,10 +178,9 @@ mod tests {
     rt::spawn(async move {
       ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       let actor = Resource::default();
-      utils::event_emitter::emit_normal_native_action(
+      state_ptr.emit_normal_native_action(
         &actor,
         nanocl_stubs::system::NativeEventAction::Create,
-        &state_ptr,
       );
     });
     raw_sub.next().await;
@@ -189,10 +188,9 @@ mod tests {
     rt::spawn(async move {
       ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       let actor = Resource::default();
-      utils::event_emitter::emit_normal_native_action(
+      state_ptr.emit_normal_native_action(
         &actor,
         nanocl_stubs::system::NativeEventAction::Create,
-        &state_ptr,
       );
     });
     let mut sub = state.subscribe().await.unwrap();

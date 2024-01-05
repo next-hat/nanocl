@@ -84,7 +84,7 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Patch an existing resource
+  /// Update the new resource spec and add an history entry
   ///
   /// ## Example
   ///
@@ -100,7 +100,7 @@ impl NanocldClient {
     config: &ResourceUpdate,
   ) -> HttpClientResult<Resource> {
     let res = self
-      .send_patch(
+      .send_put(
         &format!("{}/{key}", Self::RESOURCE_PATH),
         Some(config),
         None::<String>,

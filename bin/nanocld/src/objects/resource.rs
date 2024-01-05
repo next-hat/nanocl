@@ -26,7 +26,7 @@ impl ObjCreate for ResourceDb {
         &obj.name
       )));
     }
-    let obj = utils::resource::hook_create_resource(obj, &state.pool).await?;
+    let obj = utils::resource::hook_create(obj, &state.pool).await?;
     let resource = ResourceDb::create_from_spec(&obj, &state.pool).await?;
     Ok(resource)
   }
@@ -42,8 +42,7 @@ impl ObjDelByPk for ResourceDb {
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
     let resource = ResourceDb::transform_read_by_pk(key, &state.pool).await?;
-    if let Err(err) =
-      utils::resource::hook_delete_resource(&resource, &state.pool).await
+    if let Err(err) = utils::resource::hook_delete(&resource, &state.pool).await
     {
       log::warn!("{err}");
     }

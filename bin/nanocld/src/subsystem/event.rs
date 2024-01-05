@@ -9,6 +9,7 @@ use nanocl_stubs::system::{Event, EventActorKind, NativeEventAction};
 
 use crate::{
   utils,
+  objects::generic::*,
   repositories::generic::*,
   models::{
     SystemState, JobDb, ProcessDb, SystemEventReceiver, SystemEventKind,
@@ -54,7 +55,7 @@ async fn job_ttl(e: Event, state: &SystemState) -> IoResult<()> {
     rt::spawn(async move {
       log::debug!("event::job_ttl: {} will be deleted in {ttl}s", job.name);
       ntex::time::sleep(std::time::Duration::from_secs(ttl as u64)).await;
-      let _ = utils::job::delete_by_name(&job.name, &state).await;
+      let _ = JobDb::del_obj_by_pk(&job.name, &(), &state).await;
     });
   }
   Ok(())

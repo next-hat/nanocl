@@ -103,21 +103,21 @@ pub(crate) async fn delete_resource(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Patch a resource (update its version and/or spec) and create a new history
+/// Create a new resource spec and add history entry
 #[cfg_attr(feature = "dev", utoipa::path(
   put,
   request_body = ResourceUpdate,
   tag = "Resources",
   path = "/resources/{name}",
   params(
-    ("name" = String, Path, description = "The resource name to patch")
+    ("name" = String, Path, description = "Name of the resource")
   ),
   responses(
-    (status = 200, description = "The patched resource", body = Resource),
-    (status = 404, description = "Resource is not existing", body = ApiError),
+    (status = 200, description = "Resource updated", body = Resource),
+    (status = 404, description = "Resource does not exit", body = ApiError),
   ),
 ))]
-#[web::patch("/resources/{name}")]
+#[web::put("/resources/{name}")]
 pub(crate) async fn put_resource(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
@@ -130,7 +130,7 @@ pub(crate) async fn put_resource(
     data: payload.data.clone(),
     metadata: payload.metadata.clone(),
   };
-  let resource = utils::resource::patch(&new_resource, &state).await?;
+  let resource = utils::resource::put(&new_resource, &state).await?;
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
@@ -189,7 +189,7 @@ pub(crate) async fn revert_resource(
     data: history.data,
     metadata: history.metadata,
   };
-  let resource = utils::resource::patch(&new_resource, &state).await?;
+  let resource = utils::resource::put(&new_resource, &state).await?;
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
@@ -379,7 +379,7 @@ mod tests {
       metadata: None,
     };
     let mut res = client
-      .send_patch(
+      .send_put(
         &format!("{ENDPOINT}/{TEST_RESOURCE}"),
         Some(&new_resource),
         None::<String>,

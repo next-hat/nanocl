@@ -9,7 +9,7 @@ use futures_util::{SinkExt, StreamExt};
 use nanocl_error::io::{IoResult, FromIo, IoError};
 use nanocl_stubs::{
   config::DaemonConfig,
-  system::{Event, EventPartial},
+  system::{Event, EventPartial, NativeEventAction, EventActor, EventKind},
 };
 
 use crate::{version, utils, repositories::generic::*};
@@ -205,5 +205,27 @@ impl SystemState {
 
   pub fn subscribe_raw(&self) -> IoResult<RawEventClient> {
     self.event_manager.raw.subscribe()
+  }
+
+  pub fn emit_normal_native_action<A>(
+    &self,
+    actor: &A,
+    action: NativeEventAction,
+  ) where
+    A: Into<EventActor> + Clone,
+  {
+    let actor = actor.clone().into();
+    let event = EventPartial {
+      reporting_controller: "nanocl.io/core".to_owned(),
+      reporting_node: self.config.hostname.clone(),
+      kind: EventKind::Normal,
+      action: action.to_string(),
+      related: None,
+      reason: "state_sync".to_owned(),
+      note: None,
+      metadata: None,
+      actor: Some(actor),
+    };
+    self.spawn_emit_event(event);
   }
 }

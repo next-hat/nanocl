@@ -16,7 +16,7 @@ use nanocl_stubs::{
   process::{Process, ProcessKind},
   cargo::{
     Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoScale,
-    CargoStats, CargoStatsQuery,
+    CargoStats, CargoStatsQuery, CargoDeleteQuery,
   },
   cargo_spec::{CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config},
 };
@@ -25,6 +25,7 @@ use crate::{
   utils,
   repositories::generic::*,
   models::{SystemState, CargoDb, ProcessDb, NamespaceDb, SecretDb, SpecDb},
+  objects::generic::ObjDelByPk,
 };
 
 use super::stream::transform_stream;
@@ -91,7 +92,7 @@ async fn execute_before(
 /// Example: cargo-key-1, cargo-key-2, cargo-key-3
 /// If the number of instances is equal to 1, the container will be named with
 /// the cargo key.
-async fn create_instances(
+pub(crate) async fn create_instances(
   cargo: &Cargo,
   number: usize,
   state: &SystemState,
@@ -296,34 +297,6 @@ async fn delete_instances(
     .collect::<Result<(), _>>()
 }
 
-/// Create a cargo based on the given partial spec
-/// And create his instances (containers).
-pub(crate) async fn create(
-  namespace: &str,
-  spec: &CargoSpecPartial,
-  version: &str,
-  state: &SystemState,
-) -> HttpResult<Cargo> {
-  let cargo =
-    CargoDb::create_from_spec(namespace, spec, version, &state.pool).await?;
-  let number = if let Some(mode) = &cargo.spec.replication {
-    match mode {
-      ReplicationMode::Static(replication_static) => replication_static.number,
-      ReplicationMode::Auto => 1,
-      ReplicationMode::Unique => 1,
-      ReplicationMode::UniqueByNode => 1,
-      _ => 1,
-    }
-  } else {
-    1
-  };
-  if let Err(err) = create_instances(&cargo, number, state).await {
-    CargoDb::del_by_pk(&cargo.spec.cargo_key, &state.pool).await?;
-    return Err(err);
-  }
-  Ok(cargo)
-}
-
 /// Restart cargo instances (containers) by key
 pub(crate) async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
   let cargo = utils::cargo::inspect_by_key(key, state).await?;
@@ -344,38 +317,6 @@ pub(crate) async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
   Ok(())
-}
-
-/// Delete a cargo by key with his given instances (containers).
-pub(crate) async fn delete_by_key(
-  key: &str,
-  force: Option<bool>,
-  state: &SystemState,
-) -> HttpResult<Cargo> {
-  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
-  let processes =
-    ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
-  processes
-    .into_iter()
-    .map(|process| async move {
-      utils::process::remove(
-        &process.key,
-        Some(RemoveContainerOptions {
-          force: force.unwrap_or(false),
-          ..Default::default()
-        }),
-        state,
-      )
-      .await
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<Vec<_>, _>>()?;
-  CargoDb::del_by_pk(key, &state.pool).await?;
-  SpecDb::del_by_kind_key(key, &state.pool).await?;
-  Ok(cargo)
 }
 
 /// A new history entry is added and the containers are updated
@@ -442,9 +383,6 @@ pub(crate) async fn put(
       .await?;
     }
   }
-  // state
-  //   .event_emitter
-  //   .spawn_emit_to_event(&cargo, NativeEventAction::Patched);
   Ok(cargo)
 }
 
@@ -520,7 +458,12 @@ pub(crate) async fn delete_by_namespace(
   cargoes
     .into_iter()
     .map(|cargo| async move {
-      delete_by_key(&cargo.spec.cargo_key, None, state).await
+      CargoDb::del_obj_by_pk(
+        &cargo.spec.cargo_key,
+        &CargoDeleteQuery::default(),
+        state,
+      )
+      .await
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<Result<_, HttpError>>>()

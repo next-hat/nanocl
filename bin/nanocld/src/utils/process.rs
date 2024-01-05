@@ -27,11 +27,11 @@ async fn after(
   match kind {
     ProcessKind::Vm => {
       let vm = VmDb::transform_read_by_pk(kind_key, &state.pool).await?;
-      super::event_emitter::emit_normal_native_action(&vm, action, state);
+      state.emit_normal_native_action(&vm, action);
     }
     ProcessKind::Cargo => {
       let cargo = CargoDb::transform_read_by_pk(kind_key, &state.pool).await?;
-      super::event_emitter::emit_normal_native_action(&cargo, action, state);
+      state.emit_normal_native_action(&cargo, action);
     }
     ProcessKind::Job => {
       JobDb::update_pk(

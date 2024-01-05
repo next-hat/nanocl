@@ -1,8 +1,6 @@
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::system::{EventActor, NativeEventAction};
 
-use crate::utils;
-
 use crate::models::SystemState;
 
 pub trait ObjDelByPk {
@@ -24,11 +22,7 @@ pub trait ObjDelByPk {
     Self::ObjDelOut: Into<EventActor> + Clone,
   {
     let obj = Self::fn_del_obj_by_pk(key, opts, state).await?;
-    utils::event_emitter::emit_normal_native_action(
-      &obj,
-      NativeEventAction::Delete,
-      state,
-    );
+    state.emit_normal_native_action(&obj, NativeEventAction::Delete);
     Ok(obj)
   }
 }

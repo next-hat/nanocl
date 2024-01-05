@@ -1,4 +1,5 @@
 use diesel::prelude::*;
+use nanocl_stubs::vm_spec::VmSpecPartial;
 
 use crate::schema::vms;
 
@@ -38,4 +39,10 @@ pub struct VmUpdateDb {
   pub name: Option<String>,
   /// The spec key reference
   pub spec_key: Option<uuid::Uuid>,
+}
+
+pub struct VmObjCreateIn {
+  pub namespace: String,
+  pub spec: VmSpecPartial,
+  pub version: String,
 }

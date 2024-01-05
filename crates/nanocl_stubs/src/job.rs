@@ -5,6 +5,7 @@ use bollard_next::container::Config;
 use bollard_next::service::{ContainerWaitExitError, ContainerWaitResponse};
 
 use crate::process::Process;
+use crate::system::{EventActorKind, EventActor};
 
 /// Job partial is used to create a new job
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -101,6 +102,20 @@ pub struct Job {
   pub ttl: Option<usize>,
   /// Containers to run
   pub containers: Vec<Config>,
+}
+
+/// Convert a Job into an EventActor
+impl From<Job> for EventActor {
+  fn from(job: Job) -> Self {
+    Self {
+      key: Some(job.name.clone()),
+      kind: EventActorKind::Job,
+      attributes: Some(serde_json::json!({
+        "Name": job.name,
+        "Metadata": job.metadata,
+      })),
+    }
+  }
 }
 
 /// Summary of a job (used in list)

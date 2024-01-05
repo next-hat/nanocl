@@ -1,8 +1,6 @@
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::system::{EventActor, NativeEventAction};
 
-use crate::utils;
-
 use crate::models::SystemState;
 
 pub trait ObjPatchByPk {
@@ -24,11 +22,7 @@ pub trait ObjPatchByPk {
     Self::ObjPatchOut: Into<EventActor> + Clone,
   {
     let obj = Self::fn_patch_obj_by_pk(pk, obj, state).await?;
-    utils::event_emitter::emit_normal_native_action(
-      &obj,
-      NativeEventAction::Patch,
-      state,
-    );
+    state.emit_normal_native_action(&obj, NativeEventAction::Update);
     Ok(obj)
   }
 }

@@ -94,7 +94,7 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   log::trace!("event::on_event: {actor_kind} {action}");
   match (actor_kind, action) {
     (EventActorKind::Cargo, NativeEventAction::Start)
-    | (EventActorKind::Cargo, NativeEventAction::Patch) => {
+    | (EventActorKind::Cargo, NativeEventAction::Update) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       update_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;
@@ -108,7 +108,7 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
       Ok(())
     }
     (EventActorKind::Secret, NativeEventAction::Create)
-    | (EventActorKind::Secret, NativeEventAction::Patch) => {
+    | (EventActorKind::Secret, NativeEventAction::Update) => {
       let resources = utils::resource::list_by_secret(
         &actor.key.unwrap_or_default(),
         &state.client,

@@ -1,8 +1,6 @@
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::system::{EventActor, NativeEventAction};
 
-use crate::utils;
-
 use crate::models::SystemState;
 
 /// A Create trait for all objects in Nanocl
@@ -28,11 +26,7 @@ pub trait ObjCreate {
     Self::ObjCreateOut: Into<EventActor> + Clone,
   {
     let obj = Self::fn_create_obj(obj, state).await?;
-    utils::event_emitter::emit_normal_native_action(
-      &obj,
-      NativeEventAction::Create,
-      state,
-    );
+    state.emit_normal_native_action(&obj, NativeEventAction::Create);
     Ok(obj)
   }
 }

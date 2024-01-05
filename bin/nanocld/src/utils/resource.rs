@@ -17,7 +17,7 @@ use super::ctrl_client::CtrlClient;
 /// If the resource is a Kind Kind, it will create a resource Kind with an associated version.
 /// To call a custom controller, the resource Kind must have a Url field in his config.
 /// Unless it must have a Schema field in his config that is a JSONSchema to validate the resource.
-pub(crate) async fn hook_create_resource(
+pub(crate) async fn hook_create(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> HttpResult<ResourcePartial> {
@@ -55,7 +55,7 @@ pub(crate) async fn hook_create_resource(
 /// This hook is called when a resource is deleted.
 /// It call a custom controller at a specific url.
 /// If the resource is a Kind Kind, it will delete the resource Kind with an associated version.
-pub(crate) async fn hook_delete_resource(
+pub(crate) async fn hook_delete(
   resource: &Resource,
   pool: &Pool,
 ) -> HttpResult<()> {
@@ -75,16 +75,12 @@ pub(crate) async fn hook_delete_resource(
 
 /// This function patch a resource.
 /// It will call the hook_create_resource function to hook the resource.
-pub(crate) async fn patch(
+pub(crate) async fn put(
   resource: &ResourcePartial,
   state: &SystemState,
 ) -> HttpResult<Resource> {
-  let resource = hook_create_resource(resource, &state.pool).await?;
+  let resource = hook_create(resource, &state.pool).await?;
   let res = ResourceDb::update_from_spec(&resource, &state.pool).await?;
-  super::event_emitter::emit_normal_native_action(
-    &res,
-    NativeEventAction::Patch,
-    state,
-  );
+  state.emit_normal_native_action(&res, NativeEventAction::Update);
   Ok(res)
 }

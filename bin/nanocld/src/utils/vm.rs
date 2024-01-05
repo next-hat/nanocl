@@ -5,7 +5,7 @@ use bollard_next::{
   container::RemoveContainerOptions,
 };
 
-use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::{
   system::NativeEventAction,
@@ -39,30 +39,6 @@ pub(crate) async fn inspect_by_key(
     instance_running: running_instances,
     instances: processes,
   })
-}
-
-/// Delete a VM by his key
-pub(crate) async fn delete_by_key(
-  vm_key: &str,
-  force: bool,
-  state: &SystemState,
-) -> HttpResult<()> {
-  let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
-  let options = bollard_next::container::RemoveContainerOptions {
-    force,
-    ..Default::default()
-  };
-  let container_name = format!("{}.v", vm_key);
-  utils::process::remove(&container_name, Some(options), state).await?;
-  VmDb::del_by_pk(vm_key, &state.pool).await?;
-  SpecDb::del_by_kind_key(vm_key, &state.pool).await?;
-  utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
-  super::event_emitter::emit_normal_native_action(
-    &vm,
-    NativeEventAction::Delete,
-    state,
-  );
-  Ok(())
 }
 
 /// List VMs by namespace
@@ -193,47 +169,6 @@ pub(crate) async fn create_instance(
   Ok(())
 }
 
-/// Create a VM from a `VmSpecPartial` in the given namespace
-pub(crate) async fn create(
-  vm: &VmSpecPartial,
-  namespace: &str,
-  version: &str,
-  state: &SystemState,
-) -> HttpResult<Vm> {
-  let name = &vm.name;
-  log::debug!(
-    "Creating VM {name} in namespace {namespace} with version: {version}",
-  );
-  let vm_key = utils::key::gen_key(namespace, name);
-  let mut vm = vm.clone();
-  if VmDb::read_by_pk(&vm_key, &state.pool).await.is_ok() {
-    return Err(HttpError::conflict(format!(
-      "VM with name {name} already exists in namespace {namespace}",
-    )));
-  }
-  let image = VmImageDb::read_by_pk(&vm.disk.image, &state.pool).await?;
-  if image.kind.as_str() != "Base" {
-    return Err(HttpError::bad_request(format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image)));
-  }
-  let snapname = format!("{}.{vm_key}", &image.name);
-  let size = vm.disk.size.unwrap_or(20);
-  log::debug!("Creating snapshot {snapname} with size {size}");
-  let image =
-    utils::vm_image::create_snap(&snapname, size, &image, state).await?;
-  log::debug!("Snapshot {snapname} created");
-  // Use the snapshot image
-  vm.disk.image = image.name.clone();
-  vm.disk.size = Some(size);
-  let vm = VmDb::create_from_spec(namespace, &vm, version, &state.pool).await?;
-  create_instance(&vm, &image, true, state).await?;
-  super::event_emitter::emit_normal_native_action(
-    &vm,
-    NativeEventAction::Create,
-    state,
-  );
-  Ok(vm)
-}
-
 /// Patch a VM specification from a `VmSpecUpdate` in the given namespace.
 /// This will merge the new specification with the old one.
 pub(crate) async fn patch(
@@ -311,10 +246,6 @@ pub(crate) async fn put(
   create_instance(&vm, &image, false, state).await?;
   utils::process::start_by_kind(&ProcessKind::Vm, &vm.spec.vm_key, state)
     .await?;
-  super::event_emitter::emit_normal_native_action(
-    &vm,
-    NativeEventAction::Patch,
-    state,
-  );
+  state.emit_normal_native_action(&vm, NativeEventAction::Update);
   Ok(vm)
 }

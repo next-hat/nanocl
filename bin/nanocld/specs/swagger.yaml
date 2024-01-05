@@ -1298,13 +1298,13 @@ paths:
     put:
       tags:
       - Resources
-      summary: Patch a resource (update its version and/or spec) and create a new history
-      description: Patch a resource (update its version and/or spec) and create a new history
+      summary: Create a new resource spec and add history entry
+      description: Create a new resource spec and add history entry
       operationId: put_resource
       parameters:
       - name: name
         in: path
-        description: The resource name to patch
+        description: Name of the resource
         required: true
         schema:
           type: string
@@ -1316,13 +1316,13 @@ paths:
         required: true
       responses:
         '200':
-          description: The patched resource
+          description: Resource updated
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Resource'
         '404':
-          description: Resource is not existing
+          description: Resource does not exit
           content:
             application/json:
               schema:
