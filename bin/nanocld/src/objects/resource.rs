@@ -51,3 +51,19 @@ impl ObjDelByPk for ResourceDb {
     Ok(resource)
   }
 }
+
+impl ObjPutByPk for ResourceDb {
+  type ObjPutIn = ResourcePartial;
+  type ObjPutOut = Resource;
+
+  async fn fn_put_obj_by_pk(
+    pk: &str,
+    obj: &Self::ObjPutIn,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjPutOut> {
+    ResourceDb::read_by_pk(pk, &state.pool).await?;
+    let resource = utils::resource::hook_create(obj, &state.pool).await?;
+    let resource = ResourceDb::update_from_spec(&resource, &state.pool).await?;
+    Ok(resource)
+  }
+}

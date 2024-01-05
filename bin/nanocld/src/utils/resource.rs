@@ -3,12 +3,11 @@ use jsonschema::{Draft, JSONSchema};
 use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
-  system::NativeEventAction,
   resource_kind::ResourceKind,
   resource::{Resource, ResourcePartial},
 };
 
-use crate::models::{Pool, SystemState, SpecDb, ResourceDb};
+use crate::models::{Pool, SpecDb, ResourceDb};
 
 use super::ctrl_client::CtrlClient;
 
@@ -71,16 +70,4 @@ pub(crate) async fn hook_delete(
       .await?;
   }
   Ok(())
-}
-
-/// This function patch a resource.
-/// It will call the hook_create_resource function to hook the resource.
-pub(crate) async fn put(
-  resource: &ResourcePartial,
-  state: &SystemState,
-) -> HttpResult<Resource> {
-  let resource = hook_create(resource, &state.pool).await?;
-  let res = ResourceDb::update_from_spec(&resource, &state.pool).await?;
-  state.emit_normal_native_action(&res, NativeEventAction::Update);
-  Ok(res)
 }

@@ -159,17 +159,3 @@ impl From<CargoStatsQuery> for StatsOptions {
     }
   }
 }
-
-/// Payload for the cargo scale endpoint
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-  feature = "serde",
-  serde(deny_unknown_fields, rename_all = "PascalCase")
-)]
-#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct CargoScale {
-  /// Number of replicas to scale up or down can be negative value
-  pub replicas: isize,
-}

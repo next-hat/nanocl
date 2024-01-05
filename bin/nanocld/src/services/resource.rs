@@ -11,7 +11,6 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
   objects::generic::*,
   repositories::generic::*,
   models::{SystemState, SpecDb, ResourceDb},
@@ -130,7 +129,8 @@ pub(crate) async fn put_resource(
     data: payload.data.clone(),
     metadata: payload.metadata.clone(),
   };
-  let resource = utils::resource::put(&new_resource, &state).await?;
+  let resource =
+    ResourceDb::put_obj_by_pk(&path.1, &new_resource, &state).await?;
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
@@ -189,7 +189,8 @@ pub(crate) async fn revert_resource(
     data: history.data,
     metadata: history.metadata,
   };
-  let resource = utils::resource::put(&new_resource, &state).await?;
+  let resource =
+    ResourceDb::put_obj_by_pk(&path.1, &new_resource, &state).await?;
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 

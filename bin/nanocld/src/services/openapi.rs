@@ -50,7 +50,7 @@ use nanocl_stubs::namespace::{
 use nanocl_stubs::job::{Job, JobPartial, JobInspect, JobSummary};
 use nanocl_stubs::cargo::{
   Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
-  CargoScale, CargoStats,
+  CargoStats,
 };
 use nanocl_stubs::cargo_spec::{
   CargoSpec, CargoSpecPartial, CargoSpecUpdate, ReplicationMode,
@@ -256,7 +256,6 @@ impl Modify for VersionModifier {
     cargo::kill_cargo,
     cargo::list_cargo_history,
     cargo::revert_cargo,
-    cargo::scale_cargo,
     cargo::stats_cargo,
     // Exec
     exec::create_exec_command,
@@ -371,7 +370,6 @@ impl Modify for VersionModifier {
     CargoSpecPartial,
     CargoSpecUpdate,
     ReplicationStatic,
-    CargoScale,
     CargoStats,
     PidsStats,
     NetworkStats,

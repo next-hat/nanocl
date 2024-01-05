@@ -1,10 +1,15 @@
+use bollard_next::container::RemoveContainerOptions;
+
 use nanocl_error::http::{HttpResult, HttpError};
-use nanocl_stubs::vm::Vm;
+use nanocl_stubs::{vm::Vm, process::ProcessKind, vm_spec::VmSpecPartial};
 
 use crate::{
   utils,
   repositories::generic::*,
-  models::{VmDb, SystemState, VmObjCreateIn, VmImageDb, SpecDb},
+  models::{
+    VmDb, SystemState, VmObjCreateIn, VmImageDb, SpecDb, VmObjPutIn,
+    VmObjPatchIn,
+  },
 };
 use super::generic::*;
 
@@ -54,20 +59,114 @@ impl ObjDelByPk for VmDb {
   type ObjDelOut = Vm;
 
   async fn fn_del_obj_by_pk(
-    key: &str,
+    pk: &str,
     _opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let vm = VmDb::transform_read_by_pk(key, &state.pool).await?;
+    let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
     let options = bollard_next::container::RemoveContainerOptions {
       force: true,
       ..Default::default()
     };
-    let container_name = format!("{}.v", key);
+    let container_name = format!("{}.v", pk);
     utils::process::remove(&container_name, Some(options), state).await?;
-    VmDb::del_by_pk(key, &state.pool).await?;
-    SpecDb::del_by_kind_key(key, &state.pool).await?;
+    VmDb::del_by_pk(pk, &state.pool).await?;
+    SpecDb::del_by_kind_key(pk, &state.pool).await?;
     utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
     Ok(vm)
+  }
+}
+
+impl ObjPutByPk for VmDb {
+  type ObjPutIn = VmObjPutIn;
+  type ObjPutOut = Vm;
+
+  async fn fn_put_obj_by_pk(
+    pk: &str,
+    obj: &Self::ObjPutIn,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjPutOut> {
+    let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
+    let container_name = format!("{}.v", &vm.spec.vm_key);
+    utils::process::stop_by_kind(&ProcessKind::Vm, pk, state).await?;
+    utils::process::remove(
+      &container_name,
+      None::<RemoveContainerOptions>,
+      state,
+    )
+    .await?;
+    let vm = VmDb::update_from_spec(
+      &vm.spec.vm_key,
+      &obj.spec,
+      &obj.version,
+      &state.pool,
+    )
+    .await?;
+    let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await?;
+    utils::vm::create_instance(&vm, &image, false, state).await?;
+    utils::process::start_by_kind(&ProcessKind::Vm, &vm.spec.vm_key, state)
+      .await?;
+    Ok(vm)
+  }
+}
+
+impl ObjPatchByPk for VmDb {
+  type ObjPatchIn = VmObjPatchIn;
+  type ObjPatchOut = Vm;
+
+  async fn fn_patch_obj_by_pk(
+    pk: &str,
+    obj: &Self::ObjPatchIn,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjPatchOut> {
+    let spec = &obj.spec;
+    let version = &obj.version;
+    let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
+    let old_spec = SpecDb::read_by_pk(&vm.spec.key, &state.pool)
+      .await?
+      .try_to_vm_spec()?;
+    let vm_partial = VmSpecPartial {
+      name: spec.name.to_owned().unwrap_or(vm.spec.name.clone()),
+      disk: old_spec.disk,
+      host_config: Some(
+        spec.host_config.to_owned().unwrap_or(old_spec.host_config),
+      ),
+      hostname: if spec.hostname.is_some() {
+        spec.hostname.clone()
+      } else {
+        old_spec.hostname
+      },
+      user: if spec.user.is_some() {
+        spec.user.clone()
+      } else {
+        old_spec.user
+      },
+      password: if spec.password.is_some() {
+        spec.password.clone()
+      } else {
+        old_spec.password
+      },
+      ssh_key: if spec.ssh_key.is_some() {
+        spec.ssh_key.clone()
+      } else {
+        old_spec.ssh_key
+      },
+      mac_address: old_spec.mac_address,
+      labels: if spec.labels.is_some() {
+        spec.labels.clone()
+      } else {
+        old_spec.labels
+      },
+      metadata: if spec.metadata.is_some() {
+        spec.metadata.clone()
+      } else {
+        old_spec.metadata
+      },
+    };
+    let obj = &VmObjPutIn {
+      spec: vm_partial,
+      version: version.to_owned(),
+    };
+    VmDb::fn_put_obj_by_pk(pk, obj, state).await
   }
 }

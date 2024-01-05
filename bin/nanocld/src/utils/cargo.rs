@@ -12,20 +12,19 @@ use bollard_next::{
   },
 };
 use nanocl_stubs::{
+  process::Process,
   generic::{GenericListNspQuery, GenericClause, GenericFilter},
-  process::{Process, ProcessKind},
   cargo::{
-    Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoScale,
-    CargoStats, CargoStatsQuery, CargoDeleteQuery,
+    Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoStats,
+    CargoStatsQuery, CargoDeleteQuery,
   },
-  cargo_spec::{CargoSpecPartial, CargoSpecUpdate, ReplicationMode, Config},
 };
 
 use crate::{
   utils,
+  objects::generic::*,
   repositories::generic::*,
   models::{SystemState, CargoDb, ProcessDb, NamespaceDb, SecretDb, SpecDb},
-  objects::generic::ObjDelByPk,
 };
 
 use super::stream::transform_stream;
@@ -212,7 +211,7 @@ pub(crate) async fn create_instances(
 
 /// Restore the instances backup. The instances are restored in parallel.
 /// It's happenning if when a cargo fail to updates.
-async fn restore_instances_backup(
+pub(crate) async fn restore_instances_backup(
   instances: &[Process],
   state: &SystemState,
 ) -> HttpResult<()> {
@@ -243,7 +242,7 @@ async fn restore_instances_backup(
 /// Rename the containers of the given cargo by adding `-backup` to the name
 /// of the container to mark them as backup.
 /// In case of failure, the backup containers are restored.
-async fn rename_instances_original(
+pub(crate) async fn rename_instances_original(
   instances: &[Process],
   state: &SystemState,
 ) -> HttpResult<()> {
@@ -273,7 +272,7 @@ async fn rename_instances_original(
 
 /// The instances (containers) are deleted but the cargo is not.
 /// The cargo is not deleted because it can be used to restore the containers.
-async fn delete_instances(
+pub(crate) async fn delete_instances(
   instances: &[String],
   state: &SystemState,
 ) -> HttpResult<()> {
@@ -317,73 +316,6 @@ pub(crate) async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
   Ok(())
-}
-
-/// A new history entry is added and the containers are updated
-/// with the new cargo specification
-pub(crate) async fn put(
-  cargo_key: &str,
-  cargo_partial: &CargoSpecPartial,
-  version: &str,
-  state: &SystemState,
-) -> HttpResult<Cargo> {
-  let cargo =
-    CargoDb::update_from_spec(cargo_key, cargo_partial, version, &state.pool)
-      .await?;
-  // Get the number of instance to create
-  let number = if let Some(mode) = &cargo.spec.replication {
-    match mode {
-      ReplicationMode::Static(replication_static) => replication_static.number,
-      ReplicationMode::Auto => 1,
-      ReplicationMode::Unique => 1,
-      ReplicationMode::UniqueByNode => 1,
-      _ => 1,
-    }
-  } else {
-    1
-  };
-  let processes = ProcessDb::read_by_kind_key(cargo_key, &state.pool).await?;
-  restore_instances_backup(&processes, state).await?;
-  // Create instance with the new spec
-  let new_instances = match create_instances(&cargo, number, state).await {
-    // If the creation of the new instance failed, we rename the old containers
-    Err(err) => {
-      log::warn!("Unable to create cargo instance: {}", err);
-      log::warn!("Rollback to previous instance");
-      rename_instances_original(&processes, state).await?;
-      Vec::default()
-    }
-    Ok(instances) => instances,
-  };
-  // start created containers
-  match utils::process::start_by_kind(&ProcessKind::Cargo, cargo_key, state)
-    .await
-  {
-    Err(err) => {
-      log::error!(
-        "Unable to start cargo instance {} : {err}",
-        cargo.spec.cargo_key
-      );
-      delete_instances(
-        &new_instances
-          .iter()
-          .map(|i| i.key.clone())
-          .collect::<Vec<_>>(),
-        state,
-      )
-      .await?;
-      rename_instances_original(&processes, state).await?;
-    }
-    Ok(_) => {
-      // Delete old containers
-      delete_instances(
-        &processes.iter().map(|c| c.key.clone()).collect::<Vec<_>>(),
-        state,
-      )
-      .await?;
-    }
-  }
-  Ok(cargo)
 }
 
 /// List the cargoes for the given query
@@ -492,113 +424,6 @@ pub(crate) async fn kill_by_key(
   Ok(())
 }
 
-/// Merge the given cargo spec with the existing one
-pub async fn patch(
-  key: &str,
-  payload: &CargoSpecUpdate,
-  version: &str,
-  state: &SystemState,
-) -> HttpResult<Cargo> {
-  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
-  let container = if let Some(container) = payload.container.clone() {
-    // merge env and ensure no duplicate key
-    let new_env = container.env.unwrap_or_default();
-    let mut env_vars: Vec<String> =
-      cargo.spec.container.env.unwrap_or_default();
-    // Merge environment variables from new_env into the merged array
-    for env_var in new_env {
-      let parts: Vec<&str> = env_var.split('=').collect();
-      if parts.len() < 2 {
-        continue;
-      }
-      let name = parts[0].to_owned();
-      let value = parts[1..].join("=");
-      if let Some(pos) = env_vars
-        .iter()
-        .position(|x| x.starts_with(&format!("{name}=")))
-      {
-        let old_value = env_vars[pos].to_owned();
-        log::trace!(
-          "env var: {name} old_value: {old_value} new_value: {value}"
-        );
-        if old_value != value && !value.is_empty() {
-          // Update the value if it has changed
-          env_vars[pos] = format!("{}={}", name, value);
-        } else if value.is_empty() {
-          // Remove the variable if the value is empty
-          env_vars.remove(pos);
-        }
-      } else {
-        // Add new environment variables
-        env_vars.push(env_var);
-      }
-    }
-    // merge volumes and ensure no duplication
-    let new_volumes = container
-      .host_config
-      .clone()
-      .unwrap_or_default()
-      .binds
-      .unwrap_or_default();
-    let mut volumes: Vec<String> = cargo
-      .spec
-      .container
-      .host_config
-      .clone()
-      .unwrap_or_default()
-      .binds
-      .unwrap_or_default();
-    for volume in new_volumes {
-      if !volumes.contains(&volume) {
-        volumes.push(volume);
-      }
-    }
-    let image = if let Some(image) = container.image.clone() {
-      Some(image)
-    } else {
-      cargo.spec.container.image
-    };
-    let cmd = if let Some(cmd) = container.cmd {
-      Some(cmd)
-    } else {
-      cargo.spec.container.cmd
-    };
-    Config {
-      cmd,
-      image,
-      env: Some(env_vars),
-      host_config: Some(HostConfig {
-        binds: Some(volumes),
-        ..cargo.spec.container.host_config.unwrap_or_default()
-      }),
-      ..cargo.spec.container
-    }
-  } else {
-    cargo.spec.container
-  };
-  let spec = CargoSpecPartial {
-    name: cargo.spec.name.clone(),
-    container,
-    init_container: if payload.init_container.is_some() {
-      payload.init_container.clone()
-    } else {
-      cargo.spec.init_container
-    },
-    replication: payload.replication.clone(),
-    secrets: if payload.secrets.is_some() {
-      payload.secrets.clone()
-    } else {
-      cargo.spec.secrets
-    },
-    metadata: if payload.metadata.is_some() {
-      payload.metadata.clone()
-    } else {
-      cargo.spec.metadata
-    },
-  };
-  utils::cargo::put(key, &spec, version, state).await
-}
-
 /// Get the stats of a cargo instance
 /// The cargo name can be used if the cargo has only one instance
 pub(crate) fn get_stats(
@@ -610,62 +435,4 @@ pub(crate) fn get_stats(
     docker_api.stats(&format!("{name}.c"), Some(query.clone().into()));
   let stream = transform_stream::<Stats, CargoStats>(stream);
   Ok(stream)
-}
-
-/// Scale a cargo instance up or down to the given number of instances (containers, replicas)
-pub async fn scale(
-  key: &str,
-  options: &CargoScale,
-  state: &SystemState,
-) -> HttpResult<()> {
-  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
-  let instances = ProcessDb::read_by_kind_key(key, &state.pool).await?;
-  let is_equal = usize::try_from(options.replicas)
-    .map(|replica| instances.len() == replica)
-    .unwrap_or(false);
-  if is_equal {
-    return Ok(());
-  }
-  if options.replicas.is_negative() {
-    let to_remove = options.replicas.unsigned_abs();
-    instances
-      .iter()
-      .take(to_remove)
-      .map(|instance| {
-        utils::process::remove(
-          &instance.key,
-          Some(RemoveContainerOptions {
-            force: true,
-            ..Default::default()
-          }),
-          state,
-        )
-      })
-      .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<Result<_, HttpError>>>()
-      .await
-      .into_iter()
-      .collect::<Result<Vec<_>, HttpError>>()?;
-  } else {
-    let to_add = options.replicas.unsigned_abs();
-    let created_instances = create_instances(&cargo, to_add, state).await?;
-    created_instances
-      .iter()
-      .map(|instance| async {
-        state
-          .docker_api
-          .start_container::<String>(&instance.key, None)
-          .await?;
-        Ok::<_, HttpError>(())
-      })
-      .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<Result<_, HttpError>>>()
-      .await
-      .into_iter()
-      .collect::<Result<Vec<_>, HttpError>>()?;
-  }
-  // state
-  //   .event_emitter
-  //   .spawn_emit_to_event(&cargo, NativeEventAction::Patched);
-  Ok(())
 }

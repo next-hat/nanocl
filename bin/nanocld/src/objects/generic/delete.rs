@@ -8,20 +8,20 @@ pub trait ObjDelByPk {
   type ObjDelOpts;
 
   async fn fn_del_obj_by_pk(
-    key: &str,
+    pk: &str,
     opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut>;
 
   async fn del_obj_by_pk(
-    key: &str,
+    pk: &str,
     opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut>
   where
     Self::ObjDelOut: Into<EventActor> + Clone,
   {
-    let obj = Self::fn_del_obj_by_pk(key, opts, state).await?;
+    let obj = Self::fn_del_obj_by_pk(pk, opts, state).await?;
     state.emit_normal_native_action(&obj, NativeEventAction::Delete);
     Ok(obj)
   }

@@ -27,12 +27,12 @@ impl ObjDelByPk for SecretDb {
   type ObjDelOpts = ();
 
   async fn fn_del_obj_by_pk(
-    key: &str,
+    pk: &str,
     _opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let secret = SecretDb::transform_read_by_pk(key, &state.pool).await?;
-    SecretDb::del_by_pk(key, &state.pool).await?;
+    let secret = SecretDb::transform_read_by_pk(pk, &state.pool).await?;
+    SecretDb::del_by_pk(pk, &state.pool).await?;
     Ok(secret)
   }
 }
@@ -42,11 +42,11 @@ impl ObjPatchByPk for SecretDb {
   type ObjPatchOut = Secret;
 
   async fn fn_patch_obj_by_pk(
-    key: &str,
+    pk: &str,
     obj: &Self::ObjPatchIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPatchOut> {
-    let secret = SecretDb::update_pk(key, obj, &state.pool)
+    let secret = SecretDb::update_pk(pk, obj, &state.pool)
       .await?
       .try_into()?;
     Ok(secret)

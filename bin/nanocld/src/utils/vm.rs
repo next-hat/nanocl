@@ -1,18 +1,10 @@
 use std::collections::HashMap;
 
-use bollard_next::{
-  service::{HostConfig, DeviceMapping},
-  container::RemoveContainerOptions,
-};
+use bollard_next::service::{HostConfig, DeviceMapping};
 
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::{
-  system::NativeEventAction,
-  process::ProcessKind,
-  vm_spec::{VmSpecPartial, VmSpecUpdate},
-  vm::{Vm, VmSummary, VmInspect},
-};
+use nanocl_stubs::vm::{Vm, VmSummary, VmInspect};
 
 use crate::{
   utils,
@@ -167,85 +159,4 @@ pub(crate) async fn create_instance(
   let name = format!("{}.v", &vm.spec.vm_key);
   utils::process::create(&name, "vm", &vm.spec.vm_key, spec, state).await?;
   Ok(())
-}
-
-/// Patch a VM specification from a `VmSpecUpdate` in the given namespace.
-/// This will merge the new specification with the old one.
-pub(crate) async fn patch(
-  vm_key: &str,
-  spec: &VmSpecUpdate,
-  version: &str,
-  state: &SystemState,
-) -> HttpResult<Vm> {
-  let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
-  let old_spec = SpecDb::read_by_pk(&vm.spec.key, &state.pool)
-    .await?
-    .try_to_vm_spec()?;
-  let vm_partial = VmSpecPartial {
-    name: spec.name.to_owned().unwrap_or(vm.spec.name.clone()),
-    disk: old_spec.disk,
-    host_config: Some(
-      spec.host_config.to_owned().unwrap_or(old_spec.host_config),
-    ),
-    hostname: if spec.hostname.is_some() {
-      spec.hostname.clone()
-    } else {
-      old_spec.hostname
-    },
-    user: if spec.user.is_some() {
-      spec.user.clone()
-    } else {
-      old_spec.user
-    },
-    password: if spec.password.is_some() {
-      spec.password.clone()
-    } else {
-      old_spec.password
-    },
-    ssh_key: if spec.ssh_key.is_some() {
-      spec.ssh_key.clone()
-    } else {
-      old_spec.ssh_key
-    },
-    mac_address: old_spec.mac_address,
-    labels: if spec.labels.is_some() {
-      spec.labels.clone()
-    } else {
-      old_spec.labels
-    },
-    metadata: if spec.metadata.is_some() {
-      spec.metadata.clone()
-    } else {
-      old_spec.metadata
-    },
-  };
-  put(vm_key, &vm_partial, version, state).await
-}
-
-/// Put a VM specification from a `VmSpecPartial` in the given namespace.
-/// This will replace the old specification with the new one.
-pub(crate) async fn put(
-  vm_key: &str,
-  vm_partial: &VmSpecPartial,
-  version: &str,
-  state: &SystemState,
-) -> HttpResult<Vm> {
-  let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
-  let container_name = format!("{}.v", &vm.spec.vm_key);
-  utils::process::stop_by_kind(&ProcessKind::Vm, vm_key, state).await?;
-  utils::process::remove(
-    &container_name,
-    None::<RemoveContainerOptions>,
-    state,
-  )
-  .await?;
-  let vm =
-    VmDb::update_from_spec(&vm.spec.vm_key, vm_partial, version, &state.pool)
-      .await?;
-  let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await?;
-  create_instance(&vm, &image, false, state).await?;
-  utils::process::start_by_kind(&ProcessKind::Vm, &vm.spec.vm_key, state)
-    .await?;
-  state.emit_normal_native_action(&vm, NativeEventAction::Update);
-  Ok(vm)
 }

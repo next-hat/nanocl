@@ -24,7 +24,9 @@ use nanocl_stubs::{
 use crate::{
   utils,
   objects::generic::*,
-  models::{SystemState, WsConState, SpecDb, VmDb, VmObjCreateIn},
+  models::{
+    SystemState, WsConState, SpecDb, VmDb, VmObjCreateIn, VmObjPatchIn,
+  },
 };
 
 /// List virtual machines
@@ -185,7 +187,11 @@ pub(crate) async fn patch_vm(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let version = path.0.clone();
-  let vm = utils::vm::patch(&key, &payload, &version, &state).await?;
+  let obj = &VmObjPatchIn {
+    spec: payload.into_inner(),
+    version: version.clone(),
+  };
+  let vm = VmDb::patch_obj_by_pk(&key, obj, &state).await?;
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
