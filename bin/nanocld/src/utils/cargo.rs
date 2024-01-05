@@ -13,7 +13,6 @@ use bollard_next::{
 };
 use nanocl_stubs::{
   generic::{GenericListNspQuery, GenericClause, GenericFilter},
-  system::NativeEventAction,
   process::{Process, ProcessKind},
   cargo::{
     Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoScale,
@@ -322,14 +321,6 @@ pub(crate) async fn create(
     CargoDb::del_by_pk(&cargo.spec.cargo_key, &state.pool).await?;
     return Err(err);
   }
-  utils::event_emitter::emit_normal_native_action(
-    &cargo,
-    NativeEventAction::Create,
-    state,
-  );
-  // state
-  //   .event_emitter
-  //   .spawn_emit_to_event(&cargo, NativeEventAction::Created);
   Ok(cargo)
 }
 
@@ -360,7 +351,7 @@ pub(crate) async fn delete_by_key(
   key: &str,
   force: Option<bool>,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> HttpResult<Cargo> {
   let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
   let processes =
     ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
@@ -384,10 +375,7 @@ pub(crate) async fn delete_by_key(
     .collect::<Result<Vec<_>, _>>()?;
   CargoDb::del_by_pk(key, &state.pool).await?;
   SpecDb::del_by_kind_key(key, &state.pool).await?;
-  // state
-  //   .event_emitter
-  //   .spawn_emit_to_event(&cargo, NativeEventAction::Deleted);
-  Ok(())
+  Ok(cargo)
 }
 
 /// A new history entry is added and the containers are updated
@@ -535,10 +523,10 @@ pub(crate) async fn delete_by_namespace(
       delete_by_key(&cargo.spec.cargo_key, None, state).await
     })
     .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
+    .collect::<Vec<Result<_, HttpError>>>()
     .await
     .into_iter()
-    .collect::<Result<Vec<()>, HttpError>>()?;
+    .collect::<Result<Vec<_>, HttpError>>()?;
   Ok(())
 }
 

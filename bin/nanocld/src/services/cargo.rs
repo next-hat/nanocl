@@ -10,8 +10,9 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
+  objects::generic::*,
   repositories::generic::*,
-  models::{SystemState, SpecDb},
+  models::{SystemState, SpecDb, CargoObjCreateIn, CargoDb},
 };
 
 /// List cargoes
@@ -82,7 +83,12 @@ pub(crate) async fn create_cargo(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let cargo = utils::cargo::create(&namespace, &payload, &path, &state).await?;
+  let obj = CargoObjCreateIn {
+    namespace: namespace.clone(),
+    spec: payload.into_inner(),
+    version: path.into_inner(),
+  };
+  let cargo = CargoDb::create_obj(&obj, &state).await?;
   Ok(web::HttpResponse::Created().json(&cargo))
 }
 
@@ -110,7 +116,7 @@ pub(crate) async fn delete_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("service::delete_cargo: {key}");
-  utils::cargo::delete_by_key(&key, qs.force, &state).await?;
+  CargoDb::del_obj_by_pk(&key, &qs, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 

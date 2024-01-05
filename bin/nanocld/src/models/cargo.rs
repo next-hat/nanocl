@@ -1,4 +1,5 @@
 use diesel::prelude::*;
+use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
 use crate::schema::cargoes;
 
@@ -37,4 +38,10 @@ pub struct CargoUpdateDb {
   pub namespace_name: Option<String>,
   /// The spec key reference
   pub spec_key: Option<uuid::Uuid>,
+}
+
+pub struct CargoObjCreateIn {
+  pub namespace: String,
+  pub spec: CargoSpecPartial,
+  pub version: String,
 }
