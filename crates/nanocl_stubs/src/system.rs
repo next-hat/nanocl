@@ -89,7 +89,7 @@ impl FromStr for NativeEventAction {
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
       "create" => Ok(NativeEventAction::Create),
-      "patch" => Ok(NativeEventAction::Update),
+      "update" => Ok(NativeEventAction::Update),
       "start" => Ok(NativeEventAction::Start),
       "stop" => Ok(NativeEventAction::Stop),
       "delete" => Ok(NativeEventAction::Delete),
@@ -103,7 +103,7 @@ impl std::fmt::Display for NativeEventAction {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       NativeEventAction::Create => write!(f, "create"),
-      NativeEventAction::Update => write!(f, "patch"),
+      NativeEventAction::Update => write!(f, "update"),
       NativeEventAction::Start => write!(f, "start"),
       NativeEventAction::Stop => write!(f, "stop"),
       NativeEventAction::Delete => write!(f, "delete"),
