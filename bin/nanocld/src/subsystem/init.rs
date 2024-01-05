@@ -7,8 +7,7 @@ use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
 use nanocl_error::io::{FromIo, IoResult, IoError};
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::utils;
-use crate::models::SystemState;
+use crate::{utils, models::SystemState};
 
 /// Create a new thread and watch for change in the run directory
 /// and set the permission of the unix socket
@@ -136,7 +135,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   });
   super::docker_event::analize(&system_state);
   super::event::analize(&system_state);
-  utils::metric::spawn_logger(&system_state);
+  super::metric::spawn(&system_state);
   Ok(system_state)
 }
 
