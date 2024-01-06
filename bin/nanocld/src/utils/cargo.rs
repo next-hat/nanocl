@@ -7,8 +7,7 @@ use nanocl_error::http::{HttpError, HttpResult};
 use bollard_next::{
   service::{HostConfig, RestartPolicy, RestartPolicyNameEnum},
   container::{
-    Stats, CreateContainerOptions, StartContainerOptions, WaitContainerOptions,
-    RemoveContainerOptions,
+    Stats, StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
   },
 };
 use nanocl_stubs::{
@@ -30,10 +29,7 @@ use crate::{
 use super::stream::transform_stream;
 
 /// Container to execute before the cargo instances
-async fn execute_before(
-  cargo: &Cargo,
-  docker_api: &bollard_next::Docker,
-) -> HttpResult<()> {
+async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
   match cargo.spec.init_container.clone() {
     Some(mut before) => {
       let image = before
@@ -43,20 +39,39 @@ async fn execute_before(
       before.image = Some(image);
       before.host_config = Some(HostConfig {
         network_mode: Some(cargo.namespace_name.clone()),
-        auto_remove: Some(true),
         ..before.host_config.unwrap_or_default()
       });
-      let container = docker_api
-        .create_container(None::<CreateContainerOptions<String>>, before)
-        .await?;
-      docker_api
-        .start_container(&container.id, None::<StartContainerOptions<String>>)
+      let mut labels = before.labels.to_owned().unwrap_or_default();
+      labels.insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
+      labels.insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
+      labels.insert(
+        "com.docker.compose.project".into(),
+        format!("nanocl_{}", cargo.namespace_name),
+      );
+      before.labels = Some(labels);
+      let short_id = utils::key::generate_short_id(6);
+      let name = format!(
+        "init-{}-{}.{}.c",
+        cargo.spec.name, short_id, cargo.namespace_name
+      );
+      utils::process::create(
+        &name,
+        "cargo",
+        &cargo.spec.cargo_key,
+        before,
+        state,
+      )
+      .await?;
+      state
+        .docker_api
+        .start_container(&name, None::<StartContainerOptions<String>>)
         .await?;
       let options = Some(WaitContainerOptions {
-        condition: "removed",
+        condition: "not-running",
       });
-      let mut stream = docker_api.wait_container(&container.id, options);
+      let mut stream = state.docker_api.wait_container(&name, options);
       while let Some(wait_status) = stream.next().await {
+        log::trace!("init_container: wait {wait_status:?}");
         match wait_status {
           Ok(wait_status) => {
             log::debug!("Wait status: {wait_status:?}");
@@ -96,7 +111,7 @@ pub async fn create_instances(
   number: usize,
   state: &SystemState,
 ) -> HttpResult<Vec<Process>> {
-  execute_before(cargo, &state.docker_api).await?;
+  execute_before(cargo, state).await?;
   let mut secret_envs: Vec<String> = Vec::new();
   if let Some(secrets) = &cargo.spec.secrets {
     let fetched_secrets = secrets
