@@ -17,7 +17,7 @@ use crate::models::SystemState;
   ),
 ))]
 #[web::head("/_ping")]
-pub(crate) async fn get_ping() -> HttpResult<web::HttpResponse> {
+pub async fn get_ping() -> HttpResult<web::HttpResponse> {
   Ok(web::HttpResponse::Accepted().into())
 }
 
@@ -31,7 +31,7 @@ pub(crate) async fn get_ping() -> HttpResult<web::HttpResponse> {
   ),
 ))]
 #[web::get("/version")]
-pub(crate) async fn get_version() -> web::HttpResponse {
+pub async fn get_version() -> web::HttpResponse {
   web::HttpResponse::Ok().json(&serde_json::json!({
     "Arch": version::ARCH,
     "Channel": version::CHANNEL,
@@ -50,7 +50,7 @@ pub(crate) async fn get_version() -> web::HttpResponse {
   ),
 ))]
 #[web::get("/info")]
-pub(crate) async fn get_info(
+pub async fn get_info(
   state: web::types::State<SystemState>,
 ) -> HttpResult<web::HttpResponse> {
   let docker = state.docker_api.info().await?;
@@ -73,7 +73,7 @@ pub(crate) async fn get_info(
   ),
 ))]
 #[web::get("/events/watch")]
-pub(crate) async fn watch_event(
+pub async fn watch_event(
   state: web::types::State<SystemState>,
 ) -> HttpResult<web::HttpResponse> {
   let stream = state.subscribe_raw()?;
@@ -84,7 +84,7 @@ pub(crate) async fn watch_event(
   )
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(get_ping);
   config.service(get_version);
   config.service(get_info);

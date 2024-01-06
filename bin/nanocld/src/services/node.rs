@@ -28,7 +28,7 @@ use crate::{
   ),
 ))]
 #[web::get("/nodes")]
-pub(crate) async fn list_node(
+pub async fn list_node(
   state: web::types::State<SystemState>,
 ) -> HttpResult<web::HttpResponse> {
   let items = NodeDb::read_by(&GenericFilter::default(), &state.pool).await?;
@@ -83,7 +83,7 @@ async fn node_ws_service(
     (status = 101, description = "Websocket connection"),
   ),
 ))]
-pub(crate) async fn node_ws(
+pub async fn node_ws(
   state: web::types::State<SystemState>,
   req: web::HttpRequest,
 ) -> Result<web::HttpResponse, web::Error> {
@@ -97,7 +97,7 @@ pub(crate) async fn node_ws(
   .await
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_node);
   config.service(web::resource("/nodes/ws").route(web::get().to(node_ws)));
 }

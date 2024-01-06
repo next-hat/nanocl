@@ -22,7 +22,7 @@ use crate::{
   ),
 ))]
 #[web::get("/resource/kinds")]
-pub(crate) async fn list_resource_kind(
+pub async fn list_resource_kind(
   state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
 ) -> HttpResult<web::HttpResponse> {
@@ -43,7 +43,7 @@ pub(crate) async fn list_resource_kind(
   ),
 ))]
 #[web::post("/resource/kinds")]
-pub(crate) async fn create_resource_kind(
+pub async fn create_resource_kind(
   state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
   payload: web::types::Json<ResourceKindPartial>,
@@ -67,7 +67,7 @@ pub(crate) async fn create_resource_kind(
   ),
 ))]
 #[web::delete("/resource/kinds/{domain}/{name}")]
-pub(crate) async fn delete_resource_kind(
+pub async fn delete_resource_kind(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -92,7 +92,7 @@ pub(crate) async fn delete_resource_kind(
   ),
 ))]
 #[web::get("/resource/kinds/{domain}/{name}/inspect")]
-pub(crate) async fn inspect_resource_kind(
+pub async fn inspect_resource_kind(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -115,7 +115,7 @@ pub(crate) async fn inspect_resource_kind(
   ),
 ))]
 #[web::get("/resource/kinds/{domain}/{name}/version/{version}/inspect")]
-pub(crate) async fn inspect_resource_kind_version(
+pub async fn inspect_resource_kind_version(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -125,7 +125,7 @@ pub(crate) async fn inspect_resource_kind_version(
   Ok(web::HttpResponse::Ok().json(&kind_version))
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config
     .service(list_resource_kind)
     .service(create_resource_kind)

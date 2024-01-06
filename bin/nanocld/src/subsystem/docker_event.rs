@@ -86,7 +86,7 @@ async fn exec_docker(
 }
 
 /// Create a new thread with his own loop to analize events from docker
-pub(crate) fn analize(state: &SystemState) {
+pub fn analize(state: &SystemState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(move || {
     rt::spawn(async move {

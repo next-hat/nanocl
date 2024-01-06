@@ -22,7 +22,7 @@ use crate::{
 
 /// Create a new namespace with his associated network.
 /// Each vm and cargo created on this namespace will use the same network.
-pub(crate) async fn create(
+pub async fn create(
   item: &NamespacePartial,
   state: &SystemState,
 ) -> HttpResult<Namespace> {
@@ -55,10 +55,7 @@ pub(crate) async fn create(
 }
 
 /// Delete a namespace by name and remove all associated cargo and vm.
-pub(crate) async fn delete_by_name(
-  name: &str,
-  state: &SystemState,
-) -> HttpResult<()> {
+pub async fn delete_by_name(name: &str, state: &SystemState) -> HttpResult<()> {
   utils::cargo::delete_by_namespace(name, state).await?;
   NamespaceDb::del_by_pk(name, &state.pool).await?;
   if let Err(err) = state.docker_api.remove_network(name).await {
@@ -67,8 +64,7 @@ pub(crate) async fn delete_by_name(
   Ok(())
 }
 
-/// List all instances on a namespace
-pub(crate) async fn list_instances(
+pub async fn list_instances(
   namespace: &str,
   docker_api: &bollard_next::Docker,
 ) -> HttpResult<Vec<ContainerSummary>> {
@@ -85,7 +81,7 @@ pub(crate) async fn list_instances(
 }
 
 /// List all existing namespaces
-pub(crate) async fn list(
+pub async fn list(
   filter: &GenericFilter,
   docker_api: &bollard_next::Docker,
   pool: &Pool,
@@ -120,7 +116,7 @@ pub(crate) async fn list(
 }
 
 /// Get detailed information about a namespace
-pub(crate) async fn inspect_by_name(
+pub async fn inspect_by_name(
   name: &str,
   state: &SystemState,
 ) -> HttpResult<NamespaceInspect> {

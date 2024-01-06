@@ -21,7 +21,7 @@ use crate::{
   ),
 ))]
 #[web::get("/events")]
-pub(crate) async fn list_event(
+pub async fn list_event(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {

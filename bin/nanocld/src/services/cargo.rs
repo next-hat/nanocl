@@ -32,7 +32,7 @@ use crate::{
   ),
 ))]
 #[web::get("/cargoes")]
-pub(crate) async fn list_cargo(
+pub async fn list_cargo(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -54,7 +54,7 @@ pub(crate) async fn list_cargo(
   ),
 ))]
 #[web::get("/cargoes/{name}/inspect")]
-pub(crate) async fn inspect_cargo(
+pub async fn inspect_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -79,7 +79,7 @@ pub(crate) async fn inspect_cargo(
   ),
 ))]
 #[web::post("/cargoes")]
-pub(crate) async fn create_cargo(
+pub async fn create_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<String>,
   payload: web::types::Json<CargoSpecPartial>,
@@ -111,7 +111,7 @@ pub(crate) async fn create_cargo(
   ),
 ))]
 #[web::delete("/cargoes/{name}")]
-pub(crate) async fn delete_cargo(
+pub async fn delete_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<CargoDeleteQuery>,
@@ -138,7 +138,7 @@ pub(crate) async fn delete_cargo(
   ),
 ))]
 #[web::post("/cargoes/{name}/restart")]
-pub(crate) async fn restart_cargo(
+pub async fn restart_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -165,7 +165,7 @@ pub(crate) async fn restart_cargo(
   ),
 ))]
 #[web::put("/cargoes/{name}")]
-pub(crate) async fn put_cargo(
+pub async fn put_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CargoSpecPartial>,
@@ -197,7 +197,7 @@ pub(crate) async fn put_cargo(
   ),
 ))]
 #[web::patch("/cargoes/{name}")]
-pub(crate) async fn patch_cargo(
+pub async fn patch_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CargoSpecUpdate>,
@@ -229,7 +229,7 @@ pub(crate) async fn patch_cargo(
   ),
 ))]
 #[web::post("/cargoes/{name}/kill")]
-pub(crate) async fn kill_cargo(
+pub async fn kill_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CargoKillOptions>,
@@ -256,7 +256,7 @@ pub(crate) async fn kill_cargo(
   ),
 ))]
 #[web::get("/cargoes/{name}/histories")]
-pub(crate) async fn list_cargo_history(
+pub async fn list_cargo_history(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -287,7 +287,7 @@ pub(crate) async fn list_cargo_history(
   ),
 ))]
 #[web::patch("/cargoes/{name}/histories/{id}/revert")]
-pub(crate) async fn revert_cargo(
+pub async fn revert_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, uuid::Uuid)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -322,7 +322,7 @@ pub(crate) async fn revert_cargo(
   ),
 ))]
 #[web::get("/cargoes/{name}/stats")]
-pub(crate) async fn stats_cargo(
+pub async fn stats_cargo(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<CargoStatsQuery>,
@@ -337,7 +337,7 @@ pub(crate) async fn stats_cargo(
   )
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
   config.service(restart_cargo);

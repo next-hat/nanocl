@@ -62,7 +62,7 @@ impl RepositoryReadBy for VmImageDb {
 }
 
 impl VmImageDb {
-  pub(crate) async fn read_by_parent(
+  pub async fn read_by_parent(
     name: &str,
     pool: &Pool,
   ) -> IoResult<Vec<VmImageDb>> {

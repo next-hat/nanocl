@@ -29,7 +29,7 @@ use crate::{
   ),
 ))]
 #[web::get("/resources")]
-pub(crate) async fn list_resource(
+pub async fn list_resource(
   state: web::types::State<SystemState>,
   query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -53,7 +53,7 @@ pub(crate) async fn list_resource(
   ),
 ))]
 #[web::get("/resources/{name}")]
-pub(crate) async fn inspect_resource(
+pub async fn inspect_resource(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -72,7 +72,7 @@ pub(crate) async fn inspect_resource(
   ),
 ))]
 #[web::post("/resources")]
-pub(crate) async fn create_resource(
+pub async fn create_resource(
   state: web::types::State<SystemState>,
   payload: web::types::Json<ResourcePartial>,
 ) -> HttpResult<web::HttpResponse> {
@@ -94,7 +94,7 @@ pub(crate) async fn create_resource(
   ),
 ))]
 #[web::delete("/resources/{name}")]
-pub(crate) async fn delete_resource(
+pub async fn delete_resource(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -117,7 +117,7 @@ pub(crate) async fn delete_resource(
   ),
 ))]
 #[web::put("/resources/{name}")]
-pub(crate) async fn put_resource(
+pub async fn put_resource(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<ResourceUpdate>,
@@ -148,7 +148,7 @@ pub(crate) async fn put_resource(
   ),
 ))]
 #[web::get("/resources/{name}/histories")]
-pub(crate) async fn list_resource_history(
+pub async fn list_resource_history(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -177,7 +177,7 @@ pub(crate) async fn list_resource_history(
   ),
 ))]
 #[web::patch("/resources/{name}/histories/{id}/revert")]
-pub(crate) async fn revert_resource(
+pub async fn revert_resource(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, uuid::Uuid)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -194,7 +194,7 @@ pub(crate) async fn revert_resource(
   Ok(web::HttpResponse::Ok().json(&resource))
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_resource);
   config.service(delete_resource);
   config.service(list_resource);

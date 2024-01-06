@@ -123,17 +123,10 @@ impl ObjPutByPk for CargoDb {
       1
     };
     let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
-    utils::cargo::restore_instances_backup(&processes, state).await?;
     // Create instance with the new spec
     let new_instances =
       match utils::cargo::create_instances(&cargo, number, state).await {
-        // If the creation of the new instance failed, we rename the old containers
-        Err(err) => {
-          log::warn!("Unable to create cargo instance: {}", err);
-          log::warn!("Rollback to previous instance");
-          utils::cargo::rename_instances_original(&processes, state).await?;
-          Vec::default()
-        }
+        Err(_) => Vec::default(),
         Ok(instances) => instances,
       };
     // start created containers
@@ -151,7 +144,6 @@ impl ObjPutByPk for CargoDb {
           state,
         )
         .await?;
-        utils::cargo::rename_instances_original(&processes, state).await?;
       }
       Ok(_) => {
         // Delete old containers

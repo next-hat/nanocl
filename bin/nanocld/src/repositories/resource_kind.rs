@@ -66,7 +66,7 @@ impl RepositoryReadByTransform for ResourceKindDb {
 }
 
 impl ResourceKindDb {
-  pub(crate) async fn inspect_by_pk(
+  pub async fn inspect_by_pk(
     pk: &str,
     pool: &Pool,
   ) -> HttpResult<ResourceKindInspect> {
@@ -86,7 +86,7 @@ impl ResourceKindDb {
     Ok(item)
   }
 
-  pub(crate) async fn create_from_spec(
+  pub async fn create_from_spec(
     item: &ResourceKindPartial,
     pool: &Pool,
   ) -> HttpResult<ResourceKind> {

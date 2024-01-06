@@ -21,11 +21,11 @@ mod process;
 mod resource_kind;
 mod event;
 
-pub(crate) async fn unhandled() -> HttpResult<web::HttpResponse> {
+pub async fn unhandled() -> HttpResult<web::HttpResponse> {
   Err(HttpError::not_found("Route or method unhandled"))
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   #[cfg(feature = "dev")]
   {
     use utoipa::OpenApi;

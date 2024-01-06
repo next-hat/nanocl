@@ -22,7 +22,7 @@ use crate::models::SystemState;
   ),
 ))]
 #[web::get("/exec/{id}/cargo/inspect")]
-pub(crate) async fn inspect_exec_command(
+pub async fn inspect_exec_command(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -45,7 +45,7 @@ pub(crate) async fn inspect_exec_command(
   ),
 ))]
 #[web::post("/exec/{id}/cargo/start")]
-pub(crate) async fn start_exec_command(
+pub async fn start_exec_command(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<StartExecOptions>,
@@ -69,7 +69,7 @@ pub(crate) async fn start_exec_command(
   ),
 ))]
 #[web::post("/cargoes/{cargo_name}/exec")]
-pub(crate) async fn create_exec_command(
+pub async fn create_exec_command(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<CreateExecOptions>,
@@ -81,7 +81,7 @@ pub(crate) async fn create_exec_command(
   Ok(web::HttpResponse::Ok().json(&result))
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_exec_command);
   config.service(start_exec_command);
   config.service(inspect_exec_command);

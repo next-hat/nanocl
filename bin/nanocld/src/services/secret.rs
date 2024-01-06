@@ -31,7 +31,7 @@ use crate::{
   ),
 ))]
 #[web::get("/secrets")]
-pub(crate) async fn list_secret(
+pub async fn list_secret(
   state: web::types::State<SystemState>,
   query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -55,7 +55,7 @@ pub(crate) async fn list_secret(
   ),
 ))]
 #[web::get("/secrets/{key}/inspect")]
-pub(crate) async fn inspect_secret(
+pub async fn inspect_secret(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -75,7 +75,7 @@ pub(crate) async fn inspect_secret(
   ),
 ))]
 #[web::post("/secrets")]
-pub(crate) async fn create_secret(
+pub async fn create_secret(
   state: web::types::State<SystemState>,
   payload: web::types::Json<SecretPartial>,
 ) -> HttpResult<web::HttpResponse> {
@@ -109,7 +109,7 @@ pub(crate) async fn create_secret(
   ),
 ))]
 #[web::delete("/secrets/{key}")]
-pub(crate) async fn delete_secret(
+pub async fn delete_secret(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -132,7 +132,7 @@ pub(crate) async fn delete_secret(
   ),
 ))]
 #[web::patch("/secrets/{key}")]
-async fn patch_secret(
+pub async fn patch_secret(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<SecretUpdate>,
@@ -141,7 +141,7 @@ async fn patch_secret(
   Ok(web::HttpResponse::Ok().json(&item))
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_secret);
   config.service(create_secret);
   config.service(inspect_secret);

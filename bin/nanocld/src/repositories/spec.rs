@@ -77,13 +77,13 @@ impl RepositoryReadBy for SpecDb {
 }
 
 impl SpecDb {
-  pub(crate) async fn del_by_kind_key(key: &str, pool: &Pool) -> IoResult<()> {
+  pub async fn del_by_kind_key(key: &str, pool: &Pool) -> IoResult<()> {
     let filter = GenericFilter::new()
       .r#where("kind_key", GenericClause::Eq(key.to_owned()));
     SpecDb::del_by(&filter, pool).await
   }
 
-  pub(crate) async fn get_version(
+  pub async fn get_version(
     name: &str,
     version: &str,
     pool: &Pool,
@@ -94,7 +94,7 @@ impl SpecDb {
     SpecDb::read_one_by(&filter, pool).await
   }
 
-  pub(crate) async fn read_by_kind_key(
+  pub async fn read_by_kind_key(
     key: &str,
     pool: &Pool,
   ) -> IoResult<Vec<SpecDb>> {

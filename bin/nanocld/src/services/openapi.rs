@@ -523,4 +523,4 @@ impl Modify for VersionModifier {
   ),
   modifiers(&VersionModifier),
 )]
-pub(crate) struct ApiDoc;
+pub struct ApiDoc;

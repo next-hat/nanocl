@@ -22,12 +22,14 @@ use crate::{utils, models::SystemState};
   ),
 ))]
 #[web::get("/cargoes/images")]
-pub(crate) async fn list_cargo_image(
+pub async fn list_cargo_image(
   state: web::types::State<SystemState>,
   query: web::types::Query<ListCargoImagesOptions>,
 ) -> HttpResult<web::HttpResponse> {
-  let images =
-    utils::cargo_image::list(&query.into_inner().into(), &state).await?;
+  let images = state
+    .docker_api
+    .list_images(Some(query.into_inner().into()))
+    .await?;
   Ok(web::HttpResponse::Ok().json(&images))
 }
 
@@ -45,11 +47,11 @@ pub(crate) async fn list_cargo_image(
   ),
 ))]
 #[web::get("/cargoes/images/{id_or_name}*")]
-pub(crate) async fn inspect_cargo_image(
+pub async fn inspect_cargo_image(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let image = utils::cargo_image::inspect_by_name(&path.1, &state).await?;
+  let image = state.docker_api.inspect_image(&path.1).await?;
   Ok(web::HttpResponse::Ok().json(&image))
 }
 
@@ -65,7 +67,7 @@ pub(crate) async fn inspect_cargo_image(
   ),
 ))]
 #[web::post("/cargoes/images")]
-pub(crate) async fn create_cargo_image(
+pub async fn create_cargo_image(
   state: web::types::State<SystemState>,
   payload: web::types::Json<CargoImagePartial>,
 ) -> HttpResult<web::HttpResponse> {
@@ -93,11 +95,11 @@ pub(crate) async fn create_cargo_image(
   ),
 ))]
 #[web::delete("/cargoes/images/{id_or_name}*")]
-pub(crate) async fn delete_cargo_image(
+pub async fn delete_cargo_image(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  utils::cargo_image::delete(&path.1, &state).await?;
+  state.docker_api.remove_image(&path.1, None, None).await?;
   Ok(web::HttpResponse::Accepted().into())
 }
 
@@ -113,7 +115,7 @@ pub(crate) async fn delete_cargo_image(
   ),
 ))]
 #[web::post("/cargoes/images/import")]
-pub(crate) async fn import_cargo_image(
+pub async fn import_cargo_image(
   state: web::types::State<SystemState>,
   mut payload: web::types::Payload,
   query: web::types::Query<CargoImageImportOptions>,
@@ -172,7 +174,7 @@ pub(crate) async fn import_cargo_image(
   Ok(web::HttpResponse::Ok().into())
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_cargo_image);
   config.service(create_cargo_image);
   config.service(delete_cargo_image);

@@ -7,18 +7,18 @@ use nanocl_error::http::HttpError;
 use nanocl_error::http_client::HttpClientError;
 
 /// Controller client
-pub(crate) struct CtrlClient {
+pub struct CtrlClient {
   /// Name of the controller eg: (ProxyRule)
-  pub(crate) name: String,
+  pub name: String,
   /// HTTP client
-  pub(crate) client: Client,
+  pub client: Client,
   /// Base url
-  pub(crate) base_url: String,
+  pub base_url: String,
 }
 
 impl CtrlClient {
   /// Create a new controller client
-  pub(crate) fn new(name: &str, url: &str) -> Self {
+  pub fn new(name: &str, url: &str) -> Self {
     log::debug!("CtrlClient::new {name}: {url}");
     let (client, url) = match url {
       url if url.starts_with("unix://") => {
@@ -94,7 +94,7 @@ impl CtrlClient {
   }
 
   /// Call apply rule method on controller
-  pub(crate) async fn apply_rule(
+  pub async fn apply_rule(
     &self,
     version: &str,
     name: &str,
@@ -114,7 +114,7 @@ impl CtrlClient {
   }
 
   /// Call delete rule method on controller
-  pub(crate) async fn delete_rule(
+  pub async fn delete_rule(
     &self,
     version: &str,
     name: &str,

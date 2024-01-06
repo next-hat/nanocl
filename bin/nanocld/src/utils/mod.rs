@@ -1,21 +1,21 @@
-pub(crate) mod ws;
-pub(crate) mod key;
-pub(crate) mod stream;
+pub mod ws;
+pub mod key;
+pub mod stream;
 
-pub(crate) mod node;
-pub(crate) mod store;
-pub(crate) mod system;
-pub(crate) mod namespace;
-pub(crate) mod cargo;
-pub(crate) mod cargo_image;
-pub(crate) mod vm;
-pub(crate) mod vm_image;
-pub(crate) mod job;
-pub(crate) mod exec;
-pub(crate) mod resource;
-pub(crate) mod ctrl_client;
-pub(crate) mod process;
-pub(crate) mod server;
+pub mod node;
+pub mod store;
+pub mod system;
+pub mod namespace;
+pub mod cargo;
+pub mod cargo_image;
+pub mod vm;
+pub mod vm_image;
+pub mod job;
+pub mod exec;
+pub mod resource;
+pub mod ctrl_client;
+pub mod process;
+pub mod server;
 
 #[cfg(test)]
 pub mod tests {

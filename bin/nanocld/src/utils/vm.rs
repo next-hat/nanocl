@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Get detailed information about a VM by his key
-pub(crate) async fn inspect_by_key(
+pub async fn inspect_by_key(
   vm_key: &str,
   state: &SystemState,
 ) -> HttpResult<VmInspect> {
@@ -34,7 +34,7 @@ pub(crate) async fn inspect_by_key(
 }
 
 /// List VMs by namespace
-pub(crate) async fn list_by_namespace(
+pub async fn list_by_namespace(
   nsp: &str,
   pool: &Pool,
 ) -> HttpResult<Vec<VmSummary>> {
@@ -59,7 +59,7 @@ pub(crate) async fn list_by_namespace(
 }
 
 /// Create a VM instance from a VM image
-pub(crate) async fn create_instance(
+pub async fn create_instance(
   vm: &Vm,
   image: &VmImageDb,
   disable_keygen: bool,

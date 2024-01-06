@@ -47,16 +47,14 @@ async fn after(
   Ok(())
 }
 
-pub(crate) fn parse_kind(kind: &str) -> HttpResult<ProcessKind> {
+pub fn parse_kind(kind: &str) -> HttpResult<ProcessKind> {
   kind.to_owned().try_into().map_err(|err: std::io::Error| {
     HttpError::internal_server_error(err.to_string())
   })
 }
 
 /// Count the number of instances running failing or success
-pub(crate) fn count_status(
-  instances: &[Process],
-) -> (usize, usize, usize, usize) {
+pub fn count_status(instances: &[Process]) -> (usize, usize, usize, usize) {
   let mut instance_failed = 0;
   let mut instance_success = 0;
   let mut instance_running = 0;
@@ -92,7 +90,7 @@ pub(crate) fn count_status(
   )
 }
 
-pub(crate) async fn create(
+pub async fn create(
   name: &str,
   kind: &str,
   kind_key: &str,
@@ -146,7 +144,7 @@ pub(crate) async fn create(
     .map_err(|err| HttpError::internal_server_error(err.to_string()))
 }
 
-pub(crate) async fn remove(
+pub async fn remove(
   key: &str,
   opts: Option<RemoveContainerOptions>,
   state: &SystemState,
@@ -171,7 +169,7 @@ pub(crate) async fn remove(
   Ok(())
 }
 
-pub(crate) async fn start_by_kind(
+pub async fn start_by_kind(
   kind: &ProcessKind,
   kind_key: &str,
   state: &SystemState,
@@ -195,7 +193,7 @@ pub(crate) async fn start_by_kind(
   Ok(())
 }
 
-pub(crate) async fn stop_by_kind(
+pub async fn stop_by_kind(
   kind: &ProcessKind,
   kind_key: &str,
   state: &SystemState,
