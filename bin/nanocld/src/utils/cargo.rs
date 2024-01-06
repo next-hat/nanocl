@@ -91,7 +91,7 @@ async fn execute_before(
 /// Example: cargo-key-1, cargo-key-2, cargo-key-3
 /// If the number of instances is equal to 1, the container will be named with
 /// the cargo key.
-pub(crate) async fn create_instances(
+pub async fn create_instances(
   cargo: &Cargo,
   number: usize,
   state: &SystemState,
@@ -209,70 +209,9 @@ pub(crate) async fn create_instances(
     .collect::<Result<Vec<Process>, HttpError>>()
 }
 
-/// Restore the instances backup. The instances are restored in parallel.
-/// It's happenning if when a cargo fail to updates.
-pub(crate) async fn restore_instances_backup(
-  instances: &[Process],
-  state: &SystemState,
-) -> HttpResult<()> {
-  instances
-    .iter()
-    .map(|process| async {
-      let container_state = process.data.state.clone().unwrap_or_default();
-      if container_state.restarting.unwrap_or_default() {
-        state.docker_api.stop_container(&process.key, None).await?;
-      }
-      let name = format!("{}-backup", process.name);
-      state
-        .docker_api
-        .rename_container(
-          &process.key,
-          bollard_next::container::RenameContainerOptions { name },
-        )
-        .await
-        .map_err(HttpError::from)
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<(), _>>()
-}
-
-/// Rename the containers of the given cargo by adding `-backup` to the name
-/// of the container to mark them as backup.
-/// In case of failure, the backup containers are restored.
-pub(crate) async fn rename_instances_original(
-  instances: &[Process],
-  state: &SystemState,
-) -> HttpResult<()> {
-  instances
-    .iter()
-    .map(|process| async {
-      let container_state = process.data.state.clone().unwrap_or_default();
-      if container_state.restarting.unwrap_or_default() {
-        state.docker_api.stop_container(&process.key, None).await?;
-      }
-      let name = process.name.replace("-backup", "");
-      state
-        .docker_api
-        .rename_container(
-          &process.key,
-          bollard_next::container::RenameContainerOptions { name },
-        )
-        .await
-        .map_err(HttpError::from)
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<(), _>>()
-}
-
 /// The instances (containers) are deleted but the cargo is not.
 /// The cargo is not deleted because it can be used to restore the containers.
-pub(crate) async fn delete_instances(
+pub async fn delete_instances(
   instances: &[String],
   state: &SystemState,
 ) -> HttpResult<()> {
@@ -297,7 +236,7 @@ pub(crate) async fn delete_instances(
 }
 
 /// Restart cargo instances (containers) by key
-pub(crate) async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
+pub async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
   let cargo = utils::cargo::inspect_by_key(key, state).await?;
   let processes =
     ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
@@ -319,7 +258,7 @@ pub(crate) async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
 }
 
 /// List the cargoes for the given query
-pub(crate) async fn list(
+pub async fn list(
   query: &GenericListNspQuery,
   state: &SystemState,
 ) -> HttpResult<Vec<CargoSummary>> {
@@ -361,7 +300,7 @@ pub(crate) async fn list(
 }
 
 /// Return detailed information about the cargo for the given key
-pub(crate) async fn inspect_by_key(
+pub async fn inspect_by_key(
   key: &str,
   state: &SystemState,
 ) -> HttpResult<CargoInspect> {
@@ -380,7 +319,7 @@ pub(crate) async fn inspect_by_key(
 
 /// This remove all cargo in the given namespace and all their instances (containers)
 /// from the system (database and docker).
-pub(crate) async fn delete_by_namespace(
+pub async fn delete_by_namespace(
   namespace: &str,
   state: &SystemState,
 ) -> HttpResult<()> {
@@ -407,7 +346,7 @@ pub(crate) async fn delete_by_namespace(
 
 /// Send a signal to a cargo instance the cargo name can be used if the cargo has only one instance
 /// The signal is send to one instance only
-pub(crate) async fn kill_by_key(
+pub async fn kill_by_key(
   key: &str,
   options: &CargoKillOptions,
   state: &SystemState,
@@ -426,7 +365,7 @@ pub(crate) async fn kill_by_key(
 
 /// Get the stats of a cargo instance
 /// The cargo name can be used if the cargo has only one instance
-pub(crate) fn get_stats(
+pub fn get_stats(
   name: &str,
   query: &CargoStatsQuery,
   docker_api: &bollard_next::Docker,

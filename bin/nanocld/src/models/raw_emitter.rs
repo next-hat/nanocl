@@ -104,7 +104,7 @@ impl RawEventEmitter {
   }
 
   /// Send an event to all clients
-  pub(crate) fn emit(&self, e: &Event) -> IoResult<()> {
+  pub fn emit(&self, e: &Event) -> IoResult<()> {
     let inner = self.inner.try_lock().map_err(|err| {
       IoError::interupted("RawEmitterMutex", err.to_string().as_str())
     })?;
@@ -122,7 +122,7 @@ impl RawEventEmitter {
   }
 
   /// Subscribe to events
-  pub(crate) fn subscribe(&self) -> IoResult<RawEventClient> {
+  pub fn subscribe(&self) -> IoResult<RawEventClient> {
     let (tx, rx) = channel(100);
     self
       .inner

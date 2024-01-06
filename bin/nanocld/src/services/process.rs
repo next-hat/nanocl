@@ -28,7 +28,7 @@ use crate::{
   ),
 ))]
 #[web::get("/processes")]
-pub(crate) async fn list_process(
+pub async fn list_process(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -121,7 +121,7 @@ async fn logs_process(
   ),
 ))]
 #[web::post("/processes/{type}/{name}/start")]
-pub(crate) async fn start_process(
+pub async fn start_process(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -149,7 +149,7 @@ pub(crate) async fn start_process(
   ),
 ))]
 #[web::post("/processes/{kind}/{name}/stop")]
-pub(crate) async fn stop_process(
+pub async fn stop_process(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -161,7 +161,7 @@ pub(crate) async fn stop_process(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_process);
   config.service(logs_process);
   config.service(start_process);

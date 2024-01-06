@@ -85,7 +85,7 @@ impl WithSpec for ResourceDb {
 }
 
 impl ResourceDb {
-  pub(crate) async fn parse_kind(
+  pub async fn parse_kind(
     kind: &str,
     pool: &Pool,
   ) -> IoResult<(String, String)> {
@@ -102,7 +102,7 @@ impl ResourceDb {
   }
 
   /// Create a new resource from a spec.
-  pub(crate) async fn create_from_spec(
+  pub async fn create_from_spec(
     item: &ResourcePartial,
     pool: &Pool,
   ) -> IoResult<Resource> {
@@ -129,7 +129,7 @@ impl ResourceDb {
   }
 
   /// Update a resource from a spec.
-  pub(crate) async fn update_from_spec(
+  pub async fn update_from_spec(
     item: &ResourcePartial,
     pool: &Pool,
   ) -> IoResult<Resource> {

@@ -13,7 +13,7 @@ use crate::models::SystemState;
 use super::stream::transform_stream;
 
 /// Create an exec command in a cargo instance and return command id
-pub(crate) async fn create_exec_command(
+pub async fn create_exec_command(
   name: &str,
   args: &CreateExecOptions,
   state: &SystemState,
@@ -24,7 +24,7 @@ pub(crate) async fn create_exec_command(
 }
 
 /// Run an exec command in a cargo instance and return the output stream
-pub(crate) async fn start_exec_command(
+pub async fn start_exec_command(
   exec_id: &str,
   args: &StartExecOptions,
   state: &SystemState,
@@ -47,7 +47,7 @@ pub(crate) async fn start_exec_command(
 }
 
 /// Inspect a command runned in a cargo instance and return the exec infos
-pub(crate) async fn inspect_exec_command(
+pub async fn inspect_exec_command(
   exec_id: &str,
   state: &SystemState,
 ) -> HttpResult<ExecInspectResponse> {

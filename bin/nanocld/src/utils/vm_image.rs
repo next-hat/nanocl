@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Delete a vm image from the database and from the filesystem
-pub(crate) async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
+pub async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
   let vm_image = VmImageDb::read_by_pk(name, pool).await?;
   let children = VmImageDb::read_by_parent(name, pool).await?;
   if !children.is_empty() {
@@ -31,7 +31,7 @@ pub(crate) async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
 }
 
 /// Get the info of a vm image using qemu-img info command and parse the output
-pub(crate) async fn get_info(path: &str) -> HttpResult<QemuImgInfo> {
+pub async fn get_info(path: &str) -> HttpResult<QemuImgInfo> {
   let output = Command::new("qemu-img")
     .args(["info", "--output=json", path])
     .output()
@@ -60,7 +60,7 @@ pub(crate) async fn get_info(path: &str) -> HttpResult<QemuImgInfo> {
 /// Resized to the given size it is a qcow2 image.
 /// Stored in the state directory and added to the database.
 /// It will be used to start a VM.
-pub(crate) async fn create_snap(
+pub async fn create_snap(
   name: &str,
   size: u64,
   image: &VmImageDb,
@@ -129,7 +129,7 @@ pub(crate) async fn create_snap(
 /// The snapshot is created using qemu-img create command using the `Snapshot` image.
 /// The created clone is a qcow2 image. Stored in the state directory and added to the database.
 /// It can be used as a new `Base` image.
-pub(crate) async fn clone(
+pub async fn clone(
   name: &str,
   image: &VmImageDb,
   state: &SystemState,
@@ -263,7 +263,7 @@ pub(crate) async fn clone(
 }
 
 /// Resize a vm image to a new size
-pub(crate) async fn resize(
+pub async fn resize(
   image: &VmImageDb,
   payload: &VmImageResizePayload,
   pool: &Pool,
@@ -306,7 +306,7 @@ pub(crate) async fn resize(
 }
 
 /// Resize a vm image to a new size by name.
-pub(crate) async fn resize_by_name(
+pub async fn resize_by_name(
   name: &str,
   payload: &VmImageResizePayload,
   pool: &Pool,
@@ -316,7 +316,7 @@ pub(crate) async fn resize_by_name(
 }
 
 /// Create a vm image from a file as a `Base` image
-pub(crate) async fn create(
+pub async fn create(
   name: &str,
   filepath: &str,
   pool: &Pool,

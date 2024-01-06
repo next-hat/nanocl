@@ -109,7 +109,7 @@ impl RepositoryReadByTransform for ProcessDb {
 }
 
 impl ProcessDb {
-  pub(crate) async fn read_by_kind_key(
+  pub async fn read_by_kind_key(
     kind_key: &str,
     pool: &Pool,
   ) -> IoResult<Vec<Process>> {

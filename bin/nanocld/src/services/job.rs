@@ -21,7 +21,7 @@ use crate::{
   ),
 ))]
 #[web::get("/jobs")]
-pub(crate) async fn list_job(
+pub async fn list_job(
   state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
 ) -> HttpResult<web::HttpResponse> {
@@ -40,7 +40,7 @@ pub(crate) async fn list_job(
   ),
 ))]
 #[web::post("/jobs")]
-pub(crate) async fn create_job(
+pub async fn create_job(
   state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
   payload: web::types::Json<JobPartial>,
@@ -63,7 +63,7 @@ pub(crate) async fn create_job(
   ),
 ))]
 #[web::delete("/jobs/{name}")]
-pub(crate) async fn delete_job(
+pub async fn delete_job(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -84,7 +84,7 @@ pub(crate) async fn delete_job(
   ),
 ))]
 #[web::get("/jobs/{name}/inspect")]
-pub(crate) async fn inspect_job(
+pub async fn inspect_job(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -106,7 +106,7 @@ pub(crate) async fn inspect_job(
   ),
 ))]
 #[web::get("/jobs/{name}/wait")]
-pub(crate) async fn wait_job(
+pub async fn wait_job(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<JobWaitQuery>,
@@ -126,7 +126,7 @@ pub(crate) async fn wait_job(
   )
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_job);
   config.service(create_job);
   config.service(delete_job);

@@ -14,7 +14,7 @@ use nanocl_stubs::process::ProcessKind;
 
 /// Resolve the namespace from the query paramater
 /// Namespace is an optional query paramater it's resolved with value `global` if it's empty
-pub(crate) fn resolve_nsp(nsp: &Option<String>) -> String {
+pub fn resolve_nsp(nsp: &Option<String>) -> String {
   match nsp {
     None => "global",
     Some(nsp) => nsp,
@@ -23,13 +23,13 @@ pub(crate) fn resolve_nsp(nsp: &Option<String>) -> String {
 }
 
 /// Generate a key based on the namespace and the name of the model.
-pub(crate) fn gen_key(nsp: &str, name: &str) -> String {
+pub fn gen_key(nsp: &str, name: &str) -> String {
   format!("{name}.{nsp}")
 }
 
 /// Validate the name of a cargo or a vm
 /// By checking if it's only contain a-z, A-Z, 0-9, - and _
-pub(crate) fn validate_name(name: &str) -> HttpResult<()> {
+pub fn validate_name(name: &str) -> HttpResult<()> {
   // Ensure name only contain a-z, A-Z, 0-9, - and _
   if !name
     .chars()
@@ -43,7 +43,7 @@ pub(crate) fn validate_name(name: &str) -> HttpResult<()> {
 }
 
 /// Generate a short id based on the length
-pub(crate) fn generate_short_id(length: usize) -> String {
+pub fn generate_short_id(length: usize) -> String {
   let rng = thread_rng();
   let short_id: String = rng
     .sample_iter(&Alphanumeric)
@@ -53,7 +53,7 @@ pub(crate) fn generate_short_id(length: usize) -> String {
   short_id
 }
 
-pub(crate) fn ensure_kind(kind: &str) -> IoResult<()> {
+pub fn ensure_kind(kind: &str) -> IoResult<()> {
   if kind.split('/').collect::<Vec<_>>().len() != 2 {
     return Err(IoError::invalid_input(
       "Kind",
@@ -63,7 +63,7 @@ pub(crate) fn ensure_kind(kind: &str) -> IoResult<()> {
   Ok(())
 }
 
-pub(crate) fn gen_kind_key(
+pub fn gen_kind_key(
   kind: &ProcessKind,
   name: &str,
   namespace: &Option<String>,

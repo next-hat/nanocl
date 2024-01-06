@@ -85,7 +85,7 @@ impl WithSpec for VmDb {
 }
 
 impl VmDb {
-  pub(crate) async fn create_from_spec(
+  pub async fn create_from_spec(
     nsp: &str,
     item: &VmSpecPartial,
     version: &str,
@@ -115,7 +115,7 @@ impl VmDb {
     Ok(vm)
   }
 
-  pub(crate) async fn update_from_spec(
+  pub async fn update_from_spec(
     key: &str,
     item: &VmSpecPartial,
     version: &str,
@@ -136,10 +136,7 @@ impl VmDb {
     Ok(vm)
   }
 
-  pub(crate) async fn read_by_namespace(
-    name: &str,
-    pool: &Pool,
-  ) -> IoResult<Vec<Vm>> {
+  pub async fn read_by_namespace(name: &str, pool: &Pool) -> IoResult<Vec<Vm>> {
     let filter = GenericFilter::new()
       .r#where("namespace_name", GenericClause::Eq(name.to_owned()));
     VmDb::transform_read_by(&filter, pool).await

@@ -46,7 +46,7 @@ impl RepositoryReadBy for NodeDb {
 }
 
 impl NodeDb {
-  pub(crate) async fn create_if_not_exists(
+  pub async fn create_if_not_exists(
     node: &NodeDb,
     pool: &Pool,
   ) -> IoResult<NodeDb> {

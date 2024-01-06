@@ -20,7 +20,7 @@ use crate::models::{WsConState, HEARTBEAT_INTERVAL, CLIENT_TIMEOUT};
 /// * [sink](ws::WsSink) Reference to websocket sink
 /// * [rx](oneshot::Receiver<()>) Reference to oneshot receiver
 ///
-pub(crate) async fn heartbeat(
+pub async fn heartbeat(
   state: Rc<RefCell<WsConState>>,
   sink: ws::WsSink,
   mut rx: oneshot::Receiver<()>,

@@ -25,7 +25,7 @@ use crate::{
   ),
 ))]
 #[web::get("/metrics")]
-pub(crate) async fn list_metric(
+pub async fn list_metric(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -46,7 +46,7 @@ pub(crate) async fn list_metric(
   ),
 ))]
 #[web::post("/metrics")]
-pub(crate) async fn create_metric(
+pub async fn create_metric(
   state: web::types::State<SystemState>,
   _path: web::types::Path<String>,
   payload: web::types::Json<MetricPartial>,
@@ -60,7 +60,7 @@ pub(crate) async fn create_metric(
   Ok(web::HttpResponse::Created().json(&metric))
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_metric);
   config.service(create_metric);
 }

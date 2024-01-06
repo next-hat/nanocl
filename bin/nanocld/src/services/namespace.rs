@@ -26,7 +26,7 @@ use crate::{
   ),
 ))]
 #[web::get("/namespaces")]
-pub(crate) async fn list_namespace(
+pub async fn list_namespace(
   state: web::types::State<SystemState>,
   query: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -51,7 +51,7 @@ pub(crate) async fn list_namespace(
   ),
 ))]
 #[web::get("/namespaces/{name}/inspect")]
-pub(crate) async fn inspect_namespace(
+pub async fn inspect_namespace(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -71,7 +71,7 @@ pub(crate) async fn inspect_namespace(
   ),
 ))]
 #[web::post("/namespaces")]
-pub(crate) async fn create_namespace(
+pub async fn create_namespace(
   state: web::types::State<SystemState>,
   payload: web::types::Json<NamespacePartial>,
 ) -> HttpResult<web::HttpResponse> {
@@ -93,7 +93,7 @@ pub(crate) async fn create_namespace(
   ),
 ))]
 #[web::delete("/namespaces/{name}")]
-pub(crate) async fn delete_namespace(
+pub async fn delete_namespace(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
@@ -102,7 +102,7 @@ pub(crate) async fn delete_namespace(
   Ok(web::HttpResponse::Accepted().into())
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_namespace);
   config.service(create_namespace);
   config.service(inspect_namespace);

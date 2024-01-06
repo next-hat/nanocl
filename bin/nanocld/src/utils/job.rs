@@ -55,7 +55,7 @@ async fn exec_crontab() -> IoResult<()> {
 }
 
 /// Add a cron rule to the crontab to start a job at a given time
-pub(crate) async fn add_cron_rule(
+pub async fn add_cron_rule(
   item: &Job,
   schedule: &str,
   state: &SystemState,
@@ -81,10 +81,7 @@ pub(crate) async fn add_cron_rule(
 }
 
 /// Remove a cron rule from the crontab for the given job
-pub(crate) async fn remove_cron_rule(
-  item: &Job,
-  state: &SystemState,
-) -> IoResult<()> {
+pub async fn remove_cron_rule(item: &Job, state: &SystemState) -> IoResult<()> {
   let mut content = fs::read_to_string("/var/spool/cron/crontabs/root")
     .await
     .map_err(|err| err.map_err_context(|| "Cron job"))?;
@@ -103,7 +100,7 @@ pub(crate) async fn remove_cron_rule(
 }
 
 /// List all jobs
-pub(crate) async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
+pub async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
   let jobs = JobDb::read_by(&GenericFilter::default(), &state.pool).await?;
   let job_summaries =
     jobs
@@ -135,7 +132,7 @@ pub(crate) async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
 }
 
 /// Inspect a job by name and return a detailed view of the job
-pub(crate) async fn inspect_by_name(
+pub async fn inspect_by_name(
   name: &str,
   state: &SystemState,
 ) -> HttpResult<JobInspect> {
@@ -155,7 +152,7 @@ pub(crate) async fn inspect_by_name(
 }
 
 /// Wait a job to finish
-pub(crate) async fn wait(
+pub async fn wait(
   name: &str,
   wait_options: WaitContainerOptions<WaitCondition>,
   state: &SystemState,

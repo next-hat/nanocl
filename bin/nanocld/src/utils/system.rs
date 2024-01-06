@@ -22,8 +22,8 @@ use crate::{
 };
 
 /// Will determine if the instance is registered by nanocl
-/// and sync his data with our store accordinly
-pub(crate) async fn sync_process(
+/// and sync his data with our store accordingly
+pub async fn sync_process(
   key: &str,
   kind: &str,
   instance: &ContainerInspectResponse,
@@ -82,7 +82,7 @@ pub(crate) async fn sync_process(
 /// system is the namespace used by internal nanocl components.
 /// where global is the namespace used by default.
 /// User can registed they own namespace to ensure better encaptusation.
-pub(crate) async fn register_namespace(
+pub async fn register_namespace(
   name: &str,
   create_network: bool,
   state: &SystemState,
@@ -103,7 +103,7 @@ pub(crate) async fn register_namespace(
 
 /// Convert existing container instances with our labels to cargo.
 /// We use it to be sure that all existing containers are registered as cargo.
-pub(crate) async fn sync_processes(state: &SystemState) -> IoResult<()> {
+pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
   log::info!("system::sync_processes: starting");
   let options = Some(ListContainersOptions::<&str> {
     all: true,
@@ -208,7 +208,7 @@ pub(crate) async fn sync_processes(state: &SystemState) -> IoResult<()> {
 
 /// Check for vm images inside the vm images directory
 /// and create them in the database if they don't exist
-pub(crate) async fn sync_vm_images(state: &SystemState) -> IoResult<()> {
+pub async fn sync_vm_images(state: &SystemState) -> IoResult<()> {
   log::info!("system::sync_vm_images: start");
   let files =
     std::fs::read_dir(format!("{}/vms/images", &state.config.state_dir))?;

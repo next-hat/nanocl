@@ -92,7 +92,7 @@ impl WithSpec for CargoDb {
 
 impl CargoDb {
   /// Create a new cargo from its specification.
-  pub(crate) async fn create_from_spec(
+  pub async fn create_from_spec(
     nsp: &str,
     item: &CargoSpecPartial,
     version: &str,
@@ -125,7 +125,7 @@ impl CargoDb {
   }
 
   /// Update a cargo from its specification.
-  pub(crate) async fn update_from_spec(
+  pub async fn update_from_spec(
     key: &str,
     item: &CargoSpecPartial,
     version: &str,
@@ -148,7 +148,7 @@ impl CargoDb {
   }
 
   /// Find cargoes by namespace.
-  pub(crate) async fn read_by_namespace(
+  pub async fn read_by_namespace(
     name: &str,
     pool: &Pool,
   ) -> IoResult<Vec<Cargo>> {
@@ -158,10 +158,7 @@ impl CargoDb {
   }
 
   /// Count cargoes by namespace.
-  pub(crate) async fn count_by_namespace(
-    nsp: &str,
-    pool: &Pool,
-  ) -> IoResult<i64> {
+  pub async fn count_by_namespace(nsp: &str, pool: &Pool) -> IoResult<i64> {
     let nsp = nsp.to_owned();
     let pool = Arc::clone(pool);
     let count = ntex::web::block(move || {

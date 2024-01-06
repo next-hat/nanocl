@@ -55,7 +55,7 @@ async fn save_metric(
 /// Spawn a background thread that will listen to the metrics daemon
 /// and save the metrics to the database.
 /// The metrics are saved for the current node.
-pub(crate) fn spawn(state: &SystemState) {
+pub fn spawn(state: &SystemState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(move || {
     let client = MetrsdClient::connect("unix:///run/nanocl/metrics.sock");

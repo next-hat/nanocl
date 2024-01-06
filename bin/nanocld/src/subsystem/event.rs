@@ -79,7 +79,7 @@ async fn read_events(stream: &mut SystemEventReceiver, state: &SystemState) {
 }
 
 /// Spawn a tread to analize events from the event stream in his own loop
-pub(crate) fn analize(state: &SystemState) {
+pub fn analize(state: &SystemState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async move {

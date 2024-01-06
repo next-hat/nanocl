@@ -1,20 +1,19 @@
-use std::sync::Arc;
-use std::time::Duration;
-use std::net::ToSocketAddrs;
+use std::{sync::Arc, time::Duration, net::ToSocketAddrs};
 
 use ntex::{rt, web, time};
-use diesel::PgConnection;
-use diesel::r2d2::{Pool as R2D2Pool, ConnectionManager};
-use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
-
-use nanocl_stubs::config::DaemonConfig;
+use diesel::{
+  PgConnection,
+  r2d2::{Pool as R2D2Pool, ConnectionManager},
+};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 use nanocl_error::io::{IoError, IoResult};
+use nanocl_stubs::config::DaemonConfig;
 
 use crate::models::{Pool, DBConn};
 
 /// Create a pool connection to the store `cockroachdb`
-pub(crate) async fn create_pool(
+pub async fn create_pool(
   host: &str,
   daemon_conf: &DaemonConfig,
 ) -> IoResult<Pool> {
@@ -33,7 +32,7 @@ pub(crate) async fn create_pool(
 }
 
 /// Get connection from the connection pool for the store `cockroachdb`
-pub(crate) fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
+pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
   let conn = match pool.get() {
     Ok(conn) => conn,
     Err(err) => {
@@ -74,7 +73,7 @@ async fn wait(addr: &str) -> IoResult<()> {
 /// We use cockroachdb with a postgresql connector.
 /// We also run latest migration on our database to have the latest schema.
 /// It will return a connection Pool that will be use in our State.
-pub(crate) async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
+pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
   let store_addr = std::env::var("STORE_URL")
     .unwrap_or("store.nanocl.internal:26258".to_owned());

@@ -8,32 +8,32 @@ use clap::Parser;
 pub struct Cli {
   /// Hosts to listen to use tcp:// and unix:// [default: unix:///run/nanocl.sock]
   #[clap(short = 'H', long = "hosts")]
-  pub(crate) hosts: Option<Vec<String>>,
+  pub hosts: Option<Vec<String>>,
   /// Docker daemon socket to connect [default: unix:///var/run/docker.sock]
   #[clap(long)]
-  pub(crate) docker_host: Option<String>,
+  pub docker_host: Option<String>,
   /// State directory
   /// [default: /var/lib/nanocl]
   #[clap(long)]
-  pub(crate) state_dir: Option<String>,
+  pub state_dir: Option<String>,
   /// Config directory
   #[clap(long, default_value = "/etc/nanocl")]
-  pub(crate) conf_dir: String,
+  pub conf_dir: String,
   /// Gateway automatically detected to host default source ip gateway if not set
   #[clap(long)]
-  pub(crate) gateway: Option<String>,
+  pub gateway: Option<String>,
   /// Hostname to use for the node automatically detected if not set
   #[clap(long)]
-  pub(crate) hostname: Option<String>,
+  pub hostname: Option<String>,
   /// Join current node to a cluster
   #[clap(long = "node")]
-  pub(crate) nodes: Vec<String>,
+  pub nodes: Vec<String>,
   /// Address to advertise to other nodes
   #[clap(long = "advertise-addr")]
-  pub(crate) advertise_addr: Option<String>,
+  pub advertise_addr: Option<String>,
   /// Group id
   #[clap(long, default_value = "0")]
-  pub(crate) gid: u32,
+  pub gid: u32,
 }
 
 /// Cli arguments unit test

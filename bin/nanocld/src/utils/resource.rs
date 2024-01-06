@@ -16,7 +16,7 @@ use super::ctrl_client::CtrlClient;
 /// If the resource is a Kind Kind, it will create a resource Kind with an associated version.
 /// To call a custom controller, the resource Kind must have a Url field in his config.
 /// Unless it must have a Schema field in his config that is a JSONSchema to validate the resource.
-pub(crate) async fn hook_create(
+pub async fn hook_create(
   resource: &ResourcePartial,
   pool: &Pool,
 ) -> HttpResult<ResourcePartial> {
@@ -54,10 +54,7 @@ pub(crate) async fn hook_create(
 /// This hook is called when a resource is deleted.
 /// It call a custom controller at a specific url.
 /// If the resource is a Kind Kind, it will delete the resource Kind with an associated version.
-pub(crate) async fn hook_delete(
-  resource: &Resource,
-  pool: &Pool,
-) -> HttpResult<()> {
+pub async fn hook_delete(resource: &Resource, pool: &Pool) -> HttpResult<()> {
   let (kind, version) = ResourceDb::parse_kind(&resource.kind, pool).await?;
   let kind: ResourceKind = SpecDb::get_version(&kind, &version, pool)
     .await?

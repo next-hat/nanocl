@@ -42,7 +42,7 @@ use crate::{
   ),
 ))]
 #[web::get("/vms")]
-pub(crate) async fn list_vm(
+pub async fn list_vm(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -65,7 +65,7 @@ pub(crate) async fn list_vm(
   ),
 ))]
 #[web::get("/vms/{name}/inspect")]
-pub(crate) async fn inspect_vm(
+pub async fn inspect_vm(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -91,7 +91,7 @@ pub(crate) async fn inspect_vm(
   ),
 ))]
 #[web::delete("/vms/{name}")]
-pub(crate) async fn delete_vm(
+pub async fn delete_vm(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -117,7 +117,7 @@ pub(crate) async fn delete_vm(
   ),
 ))]
 #[web::post("/vms")]
-pub(crate) async fn create_vm(
+pub async fn create_vm(
   state: web::types::State<SystemState>,
   path: web::types::Path<String>,
   payload: web::types::Json<VmSpecPartial>,
@@ -147,7 +147,7 @@ pub(crate) async fn create_vm(
   ),
 ))]
 #[web::get("/vms/{name}/histories")]
-pub(crate) async fn list_vm_history(
+pub async fn list_vm_history(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -178,7 +178,7 @@ pub(crate) async fn list_vm_history(
   ),
 ))]
 #[web::patch("/vms/{name}")]
-pub(crate) async fn patch_vm(
+pub async fn patch_vm(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<VmSpecUpdate>,
@@ -305,7 +305,7 @@ async fn ws_attach_service(
     (status = 101, description = "Websocket connection"),
   ),
 ))]
-pub(crate) async fn vm_attach(
+pub async fn vm_attach(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
   req: web::HttpRequest,
@@ -323,7 +323,7 @@ pub(crate) async fn vm_attach(
   .await
 }
 
-pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
+pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_vm);
   config.service(create_vm);
   config.service(delete_vm);
