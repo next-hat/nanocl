@@ -4,14 +4,18 @@ use nanocl_error::{http::HttpResult, io::IoResult};
 
 use nanocl_stubs::{
   generic::{GenericNspQuery, GenericListNspQuery},
-  cargo::{CargoDeleteQuery, CargoKillOptions, CargoStatsQuery, CargoScale},
+  cargo::{CargoDeleteQuery, CargoKillOptions, CargoStatsQuery},
   cargo_spec::{CargoSpecPartial, CargoSpecUpdate},
 };
 
 use crate::{
   utils,
+  objects::generic::*,
   repositories::generic::*,
-  models::{SystemState, SpecDb},
+  models::{
+    SystemState, SpecDb, CargoObjCreateIn, CargoDb, CargoObjPutIn,
+    CargoObjPatchIn,
+  },
 };
 
 /// List cargoes
@@ -82,7 +86,12 @@ pub(crate) async fn create_cargo(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let cargo = utils::cargo::create(&namespace, &payload, &path, &state).await?;
+  let obj = CargoObjCreateIn {
+    namespace: namespace.clone(),
+    spec: payload.into_inner(),
+    version: path.into_inner(),
+  };
+  let cargo = CargoDb::create_obj(&obj, &state).await?;
   Ok(web::HttpResponse::Created().json(&cargo))
 }
 
@@ -110,7 +119,7 @@ pub(crate) async fn delete_cargo(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   log::debug!("service::delete_cargo: {key}");
-  utils::cargo::delete_by_key(&key, qs.force, &state).await?;
+  CargoDb::del_obj_by_pk(&key, &qs, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -164,7 +173,11 @@ pub(crate) async fn put_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let cargo = utils::cargo::put(&key, &payload, &path.0, &state).await?;
+  let obj = &CargoObjPutIn {
+    spec: payload.into_inner(),
+    version: path.0.clone(),
+  };
+  let cargo = CargoDb::put_obj_by_pk(&key, obj, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -192,7 +205,11 @@ pub(crate) async fn patch_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let cargo = utils::cargo::patch(&key, &payload, &path.0, &state).await?;
+  let obj = &CargoObjPatchIn {
+    spec: payload.into_inner(),
+    version: path.0.clone(),
+  };
+  let cargo = CargoDb::patch_obj_by_pk(&key, obj, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -280,9 +297,11 @@ pub(crate) async fn revert_cargo(
   let spec = SpecDb::read_by_pk(&path.2, &state.pool)
     .await?
     .try_to_cargo_spec()?;
-  let cargo =
-    utils::cargo::put(&cargo_key, &spec.clone().into(), &path.0, &state)
-      .await?;
+  let obj = &CargoObjPutIn {
+    spec: spec.into(),
+    version: path.0.clone(),
+  };
+  let cargo = CargoDb::put_obj_by_pk(&cargo_key, obj, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
@@ -318,34 +337,6 @@ pub(crate) async fn stats_cargo(
   )
 }
 
-/// Scale or Downscale number of instances
-#[cfg_attr(feature = "dev", utoipa::path(
-  patch,
-  tag = "Cargoes",
-  request_body = CargoScale,
-  path = "/cargoes/{name}/scale",
-  params(
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-  ),
-  responses(
-    (status = 200, description = "Cargo scaled", body = Cargo),
-    (status = 404, description = "Cargo does not exist", body = ApiError),
-  ),
-))]
-#[web::patch("/cargoes/{name}/scale")]
-pub(crate) async fn scale_cargo(
-  state: web::types::State<SystemState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
-  payload: web::types::Json<CargoScale>,
-) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::scale(&key, &payload, &state).await?;
-  Ok(web::HttpResponse::Ok().into())
-}
-
 pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
@@ -357,7 +348,6 @@ pub(crate) fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(inspect_cargo);
   config.service(list_cargo_history);
   config.service(revert_cargo);
-  config.service(scale_cargo);
   config.service(stats_cargo);
 }
 
@@ -367,8 +357,7 @@ mod tests {
 
   use nanocl_stubs::cargo_spec::{CargoSpec, CargoSpecPartial};
   use nanocl_stubs::cargo::{
-    Cargo, CargoSummary, CargoInspect, CargoDeleteQuery, CargoScale,
-    CargoKillOptions,
+    Cargo, CargoSummary, CargoInspect, CargoDeleteQuery, CargoKillOptions,
   };
 
   use crate::utils::tests::*;
@@ -559,88 +548,5 @@ mod tests {
         "basic cargo delete"
       );
     }
-  }
-
-  #[ntex::test]
-  async fn scale() {
-    const CARGO_NAME: &str = "api-test-scale";
-    let client = gen_default_test_client().await;
-    let res = client
-      .send_post(
-        ENDPOINT,
-        Some(&CargoSpecPartial {
-          name: CARGO_NAME.to_owned(),
-          container: bollard_next::container::Config {
-            image: Some(
-              "ghcr.io/next-hat/nanocl-get-started:latest".to_owned(),
-            ),
-            ..Default::default()
-          },
-          ..Default::default()
-        }),
-        None::<String>,
-      )
-      .await;
-    test_status_code!(
-      res.status(),
-      http::StatusCode::CREATED,
-      "scale cargo create"
-    );
-    let res = client
-      .send_post(
-        &format!("/processes/cargo/{CARGO_NAME}/start"),
-        None::<String>,
-        None::<String>,
-      )
-      .await;
-    test_status_code!(
-      res.status(),
-      http::StatusCode::ACCEPTED,
-      "scale cargo start"
-    );
-    let res = client
-      .send_patch(
-        &format!("{ENDPOINT}/{CARGO_NAME}/scale"),
-        Some(&CargoScale { replicas: 2 }),
-        None::<String>,
-      )
-      .await;
-    test_status_code!(
-      res.status(),
-      http::StatusCode::OK,
-      "scale cargo scale up"
-    );
-    let res = client
-      .send_patch(
-        &format!("{ENDPOINT}/{CARGO_NAME}/scale"),
-        Some(&CargoScale { replicas: -1 }),
-        None::<String>,
-      )
-      .await;
-    test_status_code!(
-      res.status(),
-      http::StatusCode::OK,
-      "scale cargo scale down"
-    );
-    let res = client
-      .send_post(
-        &format!("/processes/cargo/{CARGO_NAME}/stop"),
-        None::<String>,
-        None::<String>,
-      )
-      .await;
-    test_status_code!(
-      res.status(),
-      http::StatusCode::ACCEPTED,
-      "scale cargo stop"
-    );
-    let res = client
-      .send_delete(&format!("{ENDPOINT}/{CARGO_NAME}"), None::<String>)
-      .await;
-    test_status_code!(
-      res.status(),
-      http::StatusCode::ACCEPTED,
-      "scale cargo delete"
-    );
   }
 }

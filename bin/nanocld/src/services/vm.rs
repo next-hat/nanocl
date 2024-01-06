@@ -23,7 +23,10 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
-  models::{SystemState, WsConState, SpecDb},
+  objects::generic::*,
+  models::{
+    SystemState, WsConState, SpecDb, VmDb, VmObjCreateIn, VmObjPatchIn,
+  },
 };
 
 /// List virtual machines
@@ -96,7 +99,7 @@ pub(crate) async fn delete_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-  utils::vm::delete_by_key(&key, true, &state).await?;
+  VmDb::del_obj_by_pk(&key, &(), &state).await?;
   Ok(web::HttpResponse::Ok().finish())
 }
 
@@ -121,8 +124,13 @@ pub(crate) async fn create_vm(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let item = utils::vm::create(&payload, &namespace, &path, &state).await?;
-  Ok(web::HttpResponse::Ok().json(&item))
+  let obj = VmObjCreateIn {
+    namespace,
+    spec: payload.into_inner(),
+    version: path.into_inner(),
+  };
+  let vm = VmDb::create_obj(&obj, &state).await?;
+  Ok(web::HttpResponse::Ok().json(&vm))
 }
 
 /// List virtual machine histories
@@ -179,7 +187,11 @@ pub(crate) async fn patch_vm(
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
   let version = path.0.clone();
-  let vm = utils::vm::patch(&key, &payload, &version, &state).await?;
+  let obj = &VmObjPatchIn {
+    spec: payload.into_inner(),
+    version: version.clone(),
+  };
+  let vm = VmDb::patch_obj_by_pk(&key, obj, &state).await?;
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 

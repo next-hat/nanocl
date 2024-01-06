@@ -13,6 +13,7 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
+  objects::generic::*,
   repositories::generic::*,
   models::{SystemState, SecretDb},
 };
@@ -90,8 +91,8 @@ pub(crate) async fn create_secret(
     }
     _ => {}
   }
-  let item = utils::secret::create(&payload, &state).await?;
-  Ok(web::HttpResponse::Created().json(&item))
+  let secret = SecretDb::create_obj(&payload, &state).await?;
+  Ok(web::HttpResponse::Created().json(&secret))
 }
 
 /// Delete a secret
@@ -112,7 +113,7 @@ pub(crate) async fn delete_secret(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  utils::secret::delete_by_pk(&path.1, &state).await?;
+  SecretDb::del_obj_by_pk(&path.1, &(), &state).await?;
   Ok(web::HttpResponse::Accepted().into())
 }
 
@@ -136,7 +137,7 @@ async fn patch_secret(
   path: web::types::Path<(String, String)>,
   payload: web::types::Json<SecretUpdate>,
 ) -> HttpResult<web::HttpResponse> {
-  let item = utils::secret::patch_by_pk(&path.1, &payload, &state).await?;
+  let item = SecretDb::patch_obj_by_pk(&path.1, &payload, &state).await?;
   Ok(web::HttpResponse::Ok().json(&item))
 }
 

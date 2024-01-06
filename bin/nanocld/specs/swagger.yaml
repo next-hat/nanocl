@@ -499,46 +499,6 @@ paths:
           description: Cargo restarted
         '404':
           description: Cargo does not exist
-  /cargoes/{name}/scale:
-    patch:
-      tags:
-      - Cargoes
-      summary: Scale or Downscale number of instances
-      description: Scale or Downscale number of instances
-      operationId: scale_cargo
-      parameters:
-      - name: name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargo belongs
-        required: false
-        schema:
-          type: string
-          nullable: true
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CargoScale'
-        required: true
-      responses:
-        '200':
-          description: Cargo scaled
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Cargo'
-        '404':
-          description: Cargo does not exist
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
   /cargoes/{name}/stats:
     get:
       tags:
@@ -1298,13 +1258,13 @@ paths:
     put:
       tags:
       - Resources
-      summary: Patch a resource (update its version and/or spec) and create a new history
-      description: Patch a resource (update its version and/or spec) and create a new history
+      summary: Create a new resource spec and add history entry
+      description: Create a new resource spec and add history entry
       operationId: put_resource
       parameters:
       - name: name
         in: path
-        description: The resource name to patch
+        description: Name of the resource
         required: true
         schema:
           type: string
@@ -1316,13 +1276,13 @@ paths:
         required: true
       responses:
         '200':
-          description: The patched resource
+          description: Resource updated
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Resource'
         '404':
-          description: Resource is not existing
+          description: Resource does not exit
           content:
             application/json:
               schema:
@@ -2168,15 +2128,6 @@ components:
         signal:
           type: string
           description: 'Signal to send to the container default: SIGKILL'
-    CargoScale:
-      type: object
-      description: Payload for the cargo scale endpoint
-      required:
-      - Replicas
-      properties:
-        Replicas:
-          type: integer
-          description: Number of replicas to scale up or down can be negative value
     CargoSpec:
       type: object
       description: |-

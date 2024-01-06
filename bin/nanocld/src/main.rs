@@ -12,6 +12,7 @@ mod utils;
 mod subsystem;
 mod repositories;
 mod services;
+mod objects;
 
 /// Provides an api to manage containers and virtual machines accross physical hosts
 /// There are these advantages :

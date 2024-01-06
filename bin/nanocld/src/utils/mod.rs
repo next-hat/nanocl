@@ -13,12 +13,9 @@ pub(crate) mod vm_image;
 pub(crate) mod job;
 pub(crate) mod exec;
 pub(crate) mod resource;
-pub(crate) mod metric;
 pub(crate) mod ctrl_client;
-pub(crate) mod secret;
 pub(crate) mod process;
 pub(crate) mod server;
-pub(crate) mod event_emitter;
 
 #[cfg(test)]
 pub mod tests {

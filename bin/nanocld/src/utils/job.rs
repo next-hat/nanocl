@@ -4,21 +4,17 @@ use futures_util::{
   StreamExt, TryStreamExt,
   stream::{FuturesUnordered, select_all},
 };
+use bollard_next::{
+  service::ContainerWaitExitError, container::WaitContainerOptions,
+};
 
 use nanocl_error::{
   io::{FromIo, IoError, IoResult},
   http::{HttpError, HttpResult},
 };
-
-use bollard_next::{
-  service::ContainerWaitExitError,
-  container::{RemoveContainerOptions, WaitContainerOptions},
-};
 use nanocl_stubs::{
   generic::GenericFilter,
-  job::{
-    Job, JobPartial, JobInspect, JobWaitResponse, WaitCondition, JobSummary,
-  },
+  job::{Job, JobInspect, JobWaitResponse, WaitCondition, JobSummary},
 };
 
 use crate::{
@@ -59,7 +55,7 @@ async fn exec_crontab() -> IoResult<()> {
 }
 
 /// Add a cron rule to the crontab to start a job at a given time
-async fn add_cron_rule(
+pub(crate) async fn add_cron_rule(
   item: &Job,
   schedule: &str,
   state: &SystemState,
@@ -85,7 +81,10 @@ async fn add_cron_rule(
 }
 
 /// Remove a cron rule from the crontab for the given job
-async fn remove_cron_rule(item: &Job, state: &SystemState) -> IoResult<()> {
+pub(crate) async fn remove_cron_rule(
+  item: &Job,
+  state: &SystemState,
+) -> IoResult<()> {
   let mut content = fs::read_to_string("/var/spool/cron/crontabs/root")
     .await
     .map_err(|err| err.map_err_context(|| "Cron job"))?;
@@ -101,43 +100,6 @@ async fn remove_cron_rule(item: &Job, state: &SystemState) -> IoResult<()> {
     .map_err(|err| err.map_err_context(|| "Cron job"))?;
   exec_crontab().await?;
   Ok(())
-}
-
-/// Create a job and with it's containers
-pub(crate) async fn create(
-  item: &JobPartial,
-  state: &SystemState,
-) -> HttpResult<Job> {
-  let db_model = JobDb::try_from_partial(item)?;
-  let job = JobDb::create_from(db_model, &state.pool)
-    .await?
-    .to_spec(item);
-  job
-    .containers
-    .iter()
-    .map(|container| {
-      let job_name = job.name.clone();
-      async move {
-        let mut container = container.clone();
-        let mut labels = container.labels.clone().unwrap_or_default();
-        labels.insert("io.nanocl.j".to_owned(), job_name.clone());
-        container.labels = Some(labels);
-        let short_id = utils::key::generate_short_id(6);
-        let name = format!("{job_name}-{short_id}.j");
-        utils::process::create(&name, "job", &job_name, container, state)
-          .await?;
-        Ok::<_, HttpError>(())
-      }
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<Vec<_>, _>>()?;
-  if let Some(schedule) = &job.schedule {
-    add_cron_rule(&job, schedule, state).await?;
-  }
-  Ok(job)
 }
 
 /// List all jobs
@@ -170,38 +132,6 @@ pub(crate) async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
       .into_iter()
       .collect::<HttpResult<Vec<_>>>()?;
   Ok(job_summaries)
-}
-
-/// Delete a job by name with his given instances (containers).
-pub(crate) async fn delete_by_name(
-  name: &str,
-  state: &SystemState,
-) -> HttpResult<()> {
-  let job = JobDb::read_by_pk(name, &state.pool).await?.try_to_spec()?;
-  let processes = ProcessDb::read_by_kind_key(name, &state.pool).await?;
-  processes
-    .into_iter()
-    .map(|process| async move {
-      utils::process::remove(
-        &process.key,
-        Some(RemoveContainerOptions {
-          force: true,
-          ..Default::default()
-        }),
-        state,
-      )
-      .await
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<Vec<_>, _>>()?;
-  JobDb::del_by_pk(&job.name, &state.pool).await?;
-  if job.schedule.is_some() {
-    remove_cron_rule(&job, state).await?;
-  }
-  Ok(())
 }
 
 /// Inspect a job by name and return a detailed view of the job

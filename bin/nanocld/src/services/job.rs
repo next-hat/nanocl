@@ -1,12 +1,15 @@
 use ntex::web;
 
-use nanocl_error::http::HttpResult;
-
 use bollard_next::container::WaitContainerOptions;
+
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::job::{JobPartial, JobWaitQuery};
 
-use crate::utils;
-use crate::models::SystemState;
+use crate::{
+  utils,
+  objects::generic::*,
+  models::{SystemState, JobDb},
+};
 
 /// List jobs
 #[cfg_attr(feature = "dev", utoipa::path(
@@ -42,7 +45,7 @@ pub(crate) async fn create_job(
   _version: web::types::Path<String>,
   payload: web::types::Json<JobPartial>,
 ) -> HttpResult<web::HttpResponse> {
-  let job = utils::job::create(&payload, &state).await?;
+  let job = JobDb::create_obj(&payload, &state).await?;
   Ok(web::HttpResponse::Created().json(&job))
 }
 
@@ -64,7 +67,7 @@ pub(crate) async fn delete_job(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  utils::job::delete_by_name(&path.1, &state).await?;
+  JobDb::del_obj_by_pk(&path.1, &(), &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
