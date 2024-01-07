@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 use serde::{Serialize, Deserialize};
 
-use nanocl_stubs::namespace::NamespacePartial;
+use nanocl_stubs::namespace::{NamespacePartial, Namespace};
 
 use crate::schema::namespaces;
 
@@ -15,9 +15,9 @@ use crate::schema::namespaces;
 #[diesel(table_name = namespaces)]
 #[serde(rename_all = "PascalCase")]
 pub struct NamespaceDb {
-  /// The name of the namespace
+  /// The name as primary key of the namespace
   pub name: String,
-  /// The created at date
+  /// When the namespace was created
   pub created_at: chrono::NaiveDateTime,
 }
 
@@ -36,6 +36,15 @@ impl From<&NamespacePartial> for NamespaceDb {
     Self {
       name: p.name.clone(),
       created_at: chrono::Utc::now().naive_utc(),
+    }
+  }
+}
+
+impl From<NamespaceDb> for Namespace {
+  fn from(namespace: NamespaceDb) -> Self {
+    Self {
+      name: namespace.name,
+      created_at: namespace.created_at,
     }
   }
 }

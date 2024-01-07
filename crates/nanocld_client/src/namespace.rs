@@ -1,6 +1,8 @@
 use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_stubs::namespace::{Namespace, NamespaceSummary, NamespaceInspect};
+use nanocl_stubs::namespace::{
+  Namespace, NamespaceSummary, NamespaceInspect, NamespacePartial,
+};
 
 use super::http_client::NanocldClient;
 
@@ -30,7 +32,7 @@ impl NanocldClient {
     &self,
     name: &str,
   ) -> HttpClientResult<Namespace> {
-    let new_item = Namespace { name: name.into() };
+    let new_item = NamespacePartial { name: name.into() };
     let res = self
       .send_post(Self::NAMESPACE_PATH, Some(new_item), None::<String>)
       .await?;

@@ -9,8 +9,8 @@ use nanocl_stubs::{
 
 use crate::{
   utils,
+  objects::generic::*,
   models::{SystemState, NamespaceDb},
-  repositories::generic::RepositoryReadBy,
 };
 
 /// List namespaces
@@ -32,8 +32,7 @@ pub async fn list_namespace(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
-  let items =
-    utils::namespace::list(&filter, &state.docker_api, &state.pool).await?;
+  let items = utils::namespace::list(&filter, &state).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -55,7 +54,7 @@ pub async fn inspect_namespace(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::namespace::inspect_by_name(&path.1, &state).await?;
+  let namespace = NamespaceDb::inspect_obj_by_pk(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&namespace))
 }
 
@@ -75,7 +74,7 @@ pub async fn create_namespace(
   state: web::types::State<SystemState>,
   payload: web::types::Json<NamespacePartial>,
 ) -> HttpResult<web::HttpResponse> {
-  let item = utils::namespace::create(&payload, &state).await?;
+  let item = NamespaceDb::create_obj(&payload, &state).await?;
   Ok(web::HttpResponse::Created().json(&item))
 }
 
@@ -97,8 +96,7 @@ pub async fn delete_namespace(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  NamespaceDb::read_by_pk(&path.1, &state.pool).await?;
-  utils::namespace::delete_by_name(&path.1, &state).await?;
+  NamespaceDb::del_obj_by_pk(&path.1, &(), &state).await?;
   Ok(web::HttpResponse::Accepted().into())
 }
 
