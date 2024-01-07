@@ -2,7 +2,7 @@ use bollard_next::container::RemoveContainerOptions;
 use futures_util::{StreamExt, stream::FuturesUnordered};
 
 use nanocl_error::http::{HttpResult, HttpError};
-use nanocl_stubs::job::{Job, JobPartial};
+use nanocl_stubs::job::{Job, JobPartial, JobInspect};
 
 use crate::{
   utils,
@@ -87,5 +87,28 @@ impl ObjDelByPk for JobDb {
       utils::job::remove_cron_rule(&job, state).await?;
     }
     Ok(job)
+  }
+}
+
+impl ObjInspectByPk for JobDb {
+  type ObjInspectOut = JobInspect;
+
+  async fn inspect_obj_by_pk(
+    pk: &str,
+    state: &crate::models::SystemState,
+  ) -> HttpResult<Self::ObjInspectOut> {
+    let job = JobDb::read_by_pk(pk, &state.pool).await?.try_to_spec()?;
+    let instances = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
+    let (instance_total, instance_failed, instance_success, instance_running) =
+      utils::process::count_status(&instances);
+    let job_inspect = JobInspect {
+      spec: job,
+      instance_total,
+      instance_success,
+      instance_running,
+      instance_failed,
+      instances,
+    };
+    Ok(job_inspect)
   }
 }

@@ -7,16 +7,14 @@ use nanocl_error::{
 
 use nanocl_stubs::{
   generic::{GenericFilter, GenericClause},
-  vm::{Vm, VmInspect, VmSummary},
+  vm::{Vm, VmSummary},
   vm_spec::{VmSpecPartial, VmSpec},
 };
 
 use crate::{
   gen_multiple, gen_where4string, utils,
   schema::vms,
-  models::{
-    Pool, VmDb, VmUpdateDb, SpecDb, SystemState, ProcessDb, NamespaceDb,
-  },
+  models::{Pool, VmDb, VmUpdateDb, SpecDb, ProcessDb, NamespaceDb},
 };
 
 use super::generic::*;
@@ -145,25 +143,6 @@ impl VmDb {
     let filter = GenericFilter::new()
       .r#where("namespace_name", GenericClause::Eq(name.to_owned()));
     VmDb::transform_read_by(&filter, pool).await
-  }
-
-  /// Get detailed information about a VM by his key
-  pub async fn inspect_by_pk(
-    vm_key: &str,
-    state: &SystemState,
-  ) -> HttpResult<VmInspect> {
-    let vm = VmDb::transform_read_by_pk(vm_key, &state.pool).await?;
-    let processes =
-      ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.pool).await?;
-    let (_, _, _, running_instances) = utils::process::count_status(&processes);
-    Ok(VmInspect {
-      created_at: vm.created_at,
-      namespace_name: vm.namespace_name,
-      spec: vm.spec,
-      instance_total: processes.len(),
-      instance_running: running_instances,
-      instances: processes,
-    })
   }
 
   /// List VMs by namespace

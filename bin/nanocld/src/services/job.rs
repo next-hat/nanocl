@@ -88,7 +88,7 @@ pub async fn inspect_job(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let job = utils::job::inspect_by_name(&path.1, &state).await?;
+  let job = JobDb::inspect_obj_by_pk(&path.1, &state).await?;
   Ok(web::HttpResponse::Ok().json(&job))
 }
 
