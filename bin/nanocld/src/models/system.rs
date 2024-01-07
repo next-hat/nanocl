@@ -42,6 +42,12 @@ pub struct EventManager {
   pub emitter: SystemEventEmitter,
 }
 
+impl Default for EventManager {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl EventManager {
   pub fn new() -> Self {
     let (sx, rx) = mpsc::unbounded();

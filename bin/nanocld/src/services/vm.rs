@@ -47,7 +47,7 @@ pub async fn list_vm(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let vms = utils::vm::list_by_namespace(&namespace, &state.pool).await?;
+  let vms = VmDb::list_by_namespace(&namespace, &state.pool).await?;
   Ok(web::HttpResponse::Ok().json(&vms))
 }
 
@@ -73,7 +73,7 @@ pub async fn inspect_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-  let vm = utils::vm::inspect_by_key(&key, &state).await?;
+  let vm = VmDb::inspect_by_pk(&key, &state).await?;
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
