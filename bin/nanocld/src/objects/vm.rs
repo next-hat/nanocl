@@ -1,14 +1,18 @@
 use bollard_next::container::RemoveContainerOptions;
 
 use nanocl_error::http::{HttpResult, HttpError};
-use nanocl_stubs::{vm::Vm, process::ProcessKind, vm_spec::VmSpecPartial};
+use nanocl_stubs::{
+  vm::{Vm, VmInspect},
+  process::ProcessKind,
+  vm_spec::VmSpecPartial,
+};
 
 use crate::{
   utils,
   repositories::generic::*,
   models::{
     VmDb, SystemState, VmObjCreateIn, VmImageDb, SpecDb, VmObjPutIn,
-    VmObjPatchIn,
+    VmObjPatchIn, ProcessDb,
   },
 };
 use super::generic::*;
@@ -168,5 +172,27 @@ impl ObjPatchByPk for VmDb {
       version: version.to_owned(),
     };
     VmDb::fn_put_obj_by_pk(pk, obj, state).await
+  }
+}
+
+impl ObjInspectByPk for VmDb {
+  type ObjInspectOut = VmInspect;
+
+  async fn inspect_obj_by_pk(
+    pk: &str,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjInspectOut> {
+    let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
+    let processes =
+      ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.pool).await?;
+    let (_, _, _, running_instances) = utils::process::count_status(&processes);
+    Ok(VmInspect {
+      created_at: vm.created_at,
+      namespace_name: vm.namespace_name,
+      spec: vm.spec,
+      instance_total: processes.len(),
+      instance_running: running_instances,
+      instances: processes,
+    })
   }
 }

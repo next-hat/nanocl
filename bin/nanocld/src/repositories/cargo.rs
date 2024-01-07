@@ -10,16 +10,14 @@ use nanocl_error::{
 
 use nanocl_stubs::{
   generic::{GenericFilter, GenericClause},
-  cargo::{Cargo, CargoDeleteQuery, CargoInspect},
+  cargo::{Cargo, CargoDeleteQuery},
   cargo_spec::{CargoSpecPartial, CargoSpec},
 };
 
 use crate::{
   gen_multiple, gen_where4string, utils,
   objects::generic::*,
-  models::{
-    Pool, CargoDb, SpecDb, CargoUpdateDb, SystemState, NamespaceDb, ProcessDb,
-  },
+  models::{Pool, CargoDb, SpecDb, CargoUpdateDb, SystemState, NamespaceDb},
   schema::cargoes,
 };
 
@@ -179,24 +177,6 @@ impl CargoDb {
     })
     .await?;
     Ok(count)
-  }
-
-  /// Return detailed information about the cargo for the given key
-  pub async fn inspect_by_pk(
-    key: &str,
-    state: &SystemState,
-  ) -> HttpResult<CargoInspect> {
-    let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
-    let processes = ProcessDb::read_by_kind_key(key, &state.pool).await?;
-    let (_, _, _, running_instances) = utils::process::count_status(&processes);
-    Ok(CargoInspect {
-      created_at: cargo.created_at,
-      namespace_name: cargo.namespace_name,
-      instance_total: processes.len(),
-      instance_running: running_instances,
-      spec: cargo.spec,
-      instances: processes,
-    })
   }
 
   /// This remove all cargo in the given namespace and all their instances (containers)

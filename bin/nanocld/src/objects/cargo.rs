@@ -7,7 +7,7 @@ use bollard_next::{
 use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::{
   process::ProcessKind,
-  cargo::{Cargo, CargoDeleteQuery},
+  cargo::{Cargo, CargoDeleteQuery, CargoInspect},
   cargo_spec::{ReplicationMode, CargoSpecPartial},
 };
 
@@ -271,5 +271,26 @@ impl ObjPatchByPk for CargoDb {
       version: version.to_owned(),
     };
     CargoDb::fn_put_obj_by_pk(pk, obj, state).await
+  }
+}
+
+impl ObjInspectByPk for CargoDb {
+  type ObjInspectOut = CargoInspect;
+
+  async fn inspect_obj_by_pk(
+    pk: &str,
+    state: &SystemState,
+  ) -> HttpResult<Self::ObjInspectOut> {
+    let cargo = CargoDb::transform_read_by_pk(pk, &state.pool).await?;
+    let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
+    let (_, _, _, running_instances) = utils::process::count_status(&processes);
+    Ok(CargoInspect {
+      created_at: cargo.created_at,
+      namespace_name: cargo.namespace_name,
+      instance_total: processes.len(),
+      instance_running: running_instances,
+      spec: cargo.spec,
+      instances: processes,
+    })
   }
 }

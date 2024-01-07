@@ -15,6 +15,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
+  objects::generic::*,
   repositories::generic::*,
   models::{Pool, SystemState, CargoDb, NamespaceDb},
 };
@@ -123,7 +124,8 @@ pub async fn inspect_by_name(
   let models = CargoDb::read_by_namespace(&namespace.name, &state.pool).await?;
   let mut cargoes = Vec::new();
   for cargo in models {
-    let cargo = CargoDb::inspect_by_pk(&cargo.spec.cargo_key, state).await?;
+    let cargo =
+      CargoDb::inspect_obj_by_pk(&cargo.spec.cargo_key, state).await?;
     cargoes.push(cargo);
   }
   let network = state

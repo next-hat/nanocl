@@ -14,7 +14,7 @@ use nanocl_error::{
 };
 use nanocl_stubs::{
   generic::GenericFilter,
-  job::{Job, JobInspect, JobWaitResponse, WaitCondition, JobSummary},
+  job::{Job, JobWaitResponse, WaitCondition, JobSummary},
 };
 
 use crate::{
@@ -129,26 +129,6 @@ pub async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
       .into_iter()
       .collect::<HttpResult<Vec<_>>>()?;
   Ok(job_summaries)
-}
-
-/// Inspect a job by name and return a detailed view of the job
-pub async fn inspect_by_name(
-  name: &str,
-  state: &SystemState,
-) -> HttpResult<JobInspect> {
-  let job = JobDb::read_by_pk(name, &state.pool).await?.try_to_spec()?;
-  let instances = ProcessDb::read_by_kind_key(name, &state.pool).await?;
-  let (instance_total, instance_failed, instance_success, instance_running) =
-    utils::process::count_status(&instances);
-  let job_inspect = JobInspect {
-    spec: job,
-    instance_total,
-    instance_success,
-    instance_running,
-    instance_failed,
-    instances,
-  };
-  Ok(job_inspect)
 }
 
 /// Wait a job to finish

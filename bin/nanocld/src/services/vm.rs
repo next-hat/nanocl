@@ -73,7 +73,7 @@ pub async fn inspect_vm(
   let name = path.1.to_owned();
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &name);
-  let vm = VmDb::inspect_by_pk(&key, &state).await?;
+  let vm = VmDb::inspect_obj_by_pk(&key, &state).await?;
   Ok(web::HttpResponse::Ok().json(&vm))
 }
 
