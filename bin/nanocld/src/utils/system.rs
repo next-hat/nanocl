@@ -19,6 +19,7 @@ use crate::{
   models::{
     SystemState, CargoDb, ProcessDb, NamespaceDb, VmImageDb, ProcessUpdateDb,
   },
+  objects::generic::ObjCreate,
 };
 
 /// Will determine if the instance is registered by nanocl
@@ -94,7 +95,7 @@ pub async fn register_namespace(
     name: name.to_owned(),
   };
   if create_network {
-    utils::namespace::create(&new_nsp, state).await?;
+    NamespaceDb::create_obj(&new_nsp, state).await?;
   } else {
     NamespaceDb::create_from(&new_nsp, &state.pool).await?;
   }

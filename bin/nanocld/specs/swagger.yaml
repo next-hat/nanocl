@@ -4910,10 +4910,15 @@ components:
         It is used to group cargoes together
       required:
       - Name
+      - CreatedAt
       properties:
         Name:
           type: string
-          description: Name of the namespace
+          description: The name as primary key of the namespace
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the namespace was created
     NamespaceInspect:
       type: object
       description: |-
@@ -4956,21 +4961,26 @@ components:
       - Cargoes
       - Instances
       - Gateway
+      - CreatedAt
       properties:
         Name:
           type: string
           description: Name of the namespace
         Cargoes:
           type: integer
-          format: int64
           description: Number of cargoes
+          minimum: 0
         Instances:
           type: integer
-          format: int64
           description: Number of instances
+          minimum: 0
         Gateway:
           type: string
           description: Gateway of the namespace
+        CreatedAt:
+          type: string
+          format: date-time
+          description: When the namespace was created
     Network:
       type: object
       properties:

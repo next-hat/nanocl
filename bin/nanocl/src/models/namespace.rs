@@ -1,3 +1,4 @@
+use chrono::TimeZone;
 use tabled::Tabled;
 use clap::{Parser, Subcommand};
 
@@ -50,23 +51,33 @@ pub struct NamespaceOpts {
 #[tabled(rename_all = "UPPERCASE")]
 pub struct NamespaceRow {
   /// Name of the namespace
-  pub(crate) name: String,
+  pub name: String,
   /// Number of cargoes
-  pub(crate) cargoes: i64,
+  pub cargoes: usize,
   /// Number of instances
-  pub(crate) instances: i64,
+  pub instances: usize,
   /// Default gateway of the namespace
-  pub(crate) gateway: String,
+  pub gateway: String,
+  #[tabled(rename = "CREATED AT")]
+  pub created_at: String,
 }
 
 /// Convert a NamespaceSummary to a NamespaceRow
 impl From<NamespaceSummary> for NamespaceRow {
   fn from(item: NamespaceSummary) -> Self {
+    let binding = chrono::Local::now();
+    let tz = binding.offset();
+    // Convert the created_at and updated_at to the current timezone
+    let created_at = tz
+      .timestamp_opt(item.created_at.timestamp(), 0)
+      .unwrap()
+      .format("%Y-%m-%d %H:%M:%S");
     Self {
       name: item.name,
       cargoes: item.cargoes,
       instances: item.instances,
       gateway: item.gateway,
+      created_at: created_at.to_string(),
     }
   }
 }

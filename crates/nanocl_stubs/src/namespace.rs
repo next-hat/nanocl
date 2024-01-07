@@ -2,7 +2,10 @@ use bollard_next::service::Network;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use crate::cargo::CargoInspect;
+use crate::{
+  cargo::CargoInspect,
+  system::{EventActor, EventActorKind},
+};
 
 /// Namespace is a identifier for a set of cargoes
 /// It is used to group cargoes together
@@ -12,8 +15,10 @@ use crate::cargo::CargoInspect;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct Namespace {
-  /// Name of the namespace
+  /// The name as primary key of the namespace
   pub name: String,
+  /// When the namespace was created
+  pub created_at: chrono::NaiveDateTime,
 }
 
 /// A Namespace partial is a payload used to create a new namespace
@@ -42,11 +47,13 @@ pub struct NamespaceSummary {
   /// Name of the namespace
   pub name: String,
   /// Number of cargoes
-  pub cargoes: i64,
+  pub cargoes: usize,
   /// Number of instances
-  pub instances: i64,
+  pub instances: usize,
   /// Gateway of the namespace
   pub gateway: String,
+  /// When the namespace was created
+  pub created_at: chrono::NaiveDateTime,
 }
 
 /// A Namespace Inspect is a detailed view of a namespace
@@ -65,4 +72,17 @@ pub struct NamespaceInspect {
   pub cargoes: Vec<CargoInspect>,
   // Network of the namespace
   pub network: Network,
+}
+
+/// Convert a Namespace into an EventActor
+impl From<Namespace> for EventActor {
+  fn from(namespace: Namespace) -> Self {
+    Self {
+      key: Some(namespace.name.clone()),
+      kind: EventActorKind::Namespace,
+      attributes: Some(serde_json::json!({
+        "Name": namespace.name,
+      })),
+    }
+  }
 }

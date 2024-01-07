@@ -11,6 +11,7 @@ use bollard_next::container::{
 use nanocl_stubs::{
   system::NativeEventAction,
   process::{Process, ProcessKind, ProcessPartial},
+  generic::{GenericFilter, GenericClause},
 };
 
 use crate::{
@@ -215,4 +216,22 @@ pub async fn stop_by_kind(
   }
   after(kind, kind_key, NativeEventAction::Stop, state).await?;
   Ok(())
+}
+
+pub async fn list_by_namespace(
+  name: &str,
+  state: &SystemState,
+) -> HttpResult<Vec<Process>> {
+  let filter = GenericFilter::new().r#where(
+    "data",
+    GenericClause::Contains(serde_json::json!({
+      "Config": {
+        "Labels": {
+          "io.nanocl.n": name
+        }
+      }
+    })),
+  );
+  let items = ProcessDb::transform_read_by(&filter, &state.pool).await?;
+  Ok(items)
 }
