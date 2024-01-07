@@ -2,17 +2,24 @@ use std::sync::Arc;
 
 use diesel::prelude::*;
 
-use nanocl_error::io::{IoError, IoResult};
+use futures_util::{stream::FuturesUnordered, StreamExt};
+use nanocl_error::{
+  io::{IoError, IoResult},
+  http::HttpResult,
+};
 
 use nanocl_stubs::{
   generic::{GenericFilter, GenericClause},
-  cargo::Cargo,
+  cargo::{Cargo, CargoDeleteQuery, CargoInspect},
   cargo_spec::{CargoSpecPartial, CargoSpec},
 };
 
 use crate::{
   gen_multiple, gen_where4string, utils,
-  models::{Pool, CargoDb, SpecDb, CargoUpdateDb},
+  objects::generic::*,
+  models::{
+    Pool, CargoDb, SpecDb, CargoUpdateDb, SystemState, NamespaceDb, ProcessDb,
+  },
   schema::cargoes,
 };
 
@@ -172,5 +179,50 @@ impl CargoDb {
     })
     .await?;
     Ok(count)
+  }
+
+  /// Return detailed information about the cargo for the given key
+  pub async fn inspect_by_pk(
+    key: &str,
+    state: &SystemState,
+  ) -> HttpResult<CargoInspect> {
+    let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
+    let processes = ProcessDb::read_by_kind_key(key, &state.pool).await?;
+    let (_, _, _, running_instances) = utils::process::count_status(&processes);
+    Ok(CargoInspect {
+      created_at: cargo.created_at,
+      namespace_name: cargo.namespace_name,
+      instance_total: processes.len(),
+      instance_running: running_instances,
+      spec: cargo.spec,
+      instances: processes,
+    })
+  }
+
+  /// This remove all cargo in the given namespace and all their instances (containers)
+  /// from the system (database and docker).
+  pub async fn delete_by_namespace(
+    namespace: &str,
+    state: &SystemState,
+  ) -> HttpResult<()> {
+    let namespace = NamespaceDb::read_by_pk(namespace, &state.pool).await?;
+    let cargoes =
+      CargoDb::read_by_namespace(&namespace.name, &state.pool).await?;
+    cargoes
+      .into_iter()
+      .map(|cargo| async move {
+        CargoDb::del_obj_by_pk(
+          &cargo.spec.cargo_key,
+          &CargoDeleteQuery::default(),
+          state,
+        )
+        .await
+      })
+      .collect::<FuturesUnordered<_>>()
+      .collect::<Vec<HttpResult<_>>>()
+      .await
+      .into_iter()
+      .collect::<HttpResult<Vec<_>>>()?;
+    Ok(())
   }
 }

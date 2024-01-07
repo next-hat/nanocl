@@ -13,15 +13,11 @@ use bollard_next::{
 use nanocl_stubs::{
   process::Process,
   generic::{GenericListNspQuery, GenericClause, GenericFilter},
-  cargo::{
-    Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoStats,
-    CargoStatsQuery, CargoDeleteQuery,
-  },
+  cargo::{Cargo, CargoSummary, CargoKillOptions, CargoStats, CargoStatsQuery},
 };
 
 use crate::{
   utils,
-  objects::generic::*,
   repositories::generic::*,
   models::{SystemState, CargoDb, ProcessDb, NamespaceDb, SecretDb, SpecDb},
 };
@@ -252,7 +248,7 @@ pub async fn delete_instances(
 
 /// Restart cargo instances (containers) by key
 pub async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
-  let cargo = utils::cargo::inspect_by_key(key, state).await?;
+  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
   let processes =
     ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
   processes
@@ -265,10 +261,10 @@ pub async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
         .map_err(HttpError::from)
     })
     .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
+    .collect::<Vec<HttpResult<()>>>()
     .await
     .into_iter()
-    .collect::<Result<Vec<_>, _>>()?;
+    .collect::<HttpResult<Vec<_>>>()?;
   Ok(())
 }
 
@@ -312,51 +308,6 @@ pub async fn list(
     });
   }
   Ok(cargo_summaries)
-}
-
-/// Return detailed information about the cargo for the given key
-pub async fn inspect_by_key(
-  key: &str,
-  state: &SystemState,
-) -> HttpResult<CargoInspect> {
-  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
-  let processes = ProcessDb::read_by_kind_key(key, &state.pool).await?;
-  let (_, _, _, running_instances) = utils::process::count_status(&processes);
-  Ok(CargoInspect {
-    created_at: cargo.created_at,
-    namespace_name: cargo.namespace_name,
-    instance_total: processes.len(),
-    instance_running: running_instances,
-    spec: cargo.spec,
-    instances: processes,
-  })
-}
-
-/// This remove all cargo in the given namespace and all their instances (containers)
-/// from the system (database and docker).
-pub async fn delete_by_namespace(
-  namespace: &str,
-  state: &SystemState,
-) -> HttpResult<()> {
-  let namespace = NamespaceDb::read_by_pk(namespace, &state.pool).await?;
-  let cargoes =
-    CargoDb::read_by_namespace(&namespace.name, &state.pool).await?;
-  cargoes
-    .into_iter()
-    .map(|cargo| async move {
-      CargoDb::del_obj_by_pk(
-        &cargo.spec.cargo_key,
-        &CargoDeleteQuery::default(),
-        state,
-      )
-      .await
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<_, HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<Vec<_>, HttpError>>()?;
-  Ok(())
 }
 
 /// Send a signal to a cargo instance the cargo name can be used if the cargo has only one instance

@@ -15,7 +15,6 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
   repositories::generic::*,
   models::{Pool, SystemState, CargoDb, NamespaceDb},
 };
@@ -56,7 +55,7 @@ pub async fn create(
 
 /// Delete a namespace by name and remove all associated cargo and vm.
 pub async fn delete_by_name(name: &str, state: &SystemState) -> HttpResult<()> {
-  utils::cargo::delete_by_namespace(name, state).await?;
+  CargoDb::delete_by_namespace(name, state).await?;
   NamespaceDb::del_by_pk(name, &state.pool).await?;
   if let Err(err) = state.docker_api.remove_network(name).await {
     log::error!("Unable to remove network {} got error: {}", name, err);
@@ -124,8 +123,7 @@ pub async fn inspect_by_name(
   let models = CargoDb::read_by_namespace(&namespace.name, &state.pool).await?;
   let mut cargoes = Vec::new();
   for cargo in models {
-    let cargo =
-      utils::cargo::inspect_by_key(&cargo.spec.cargo_key, state).await?;
+    let cargo = CargoDb::inspect_by_pk(&cargo.spec.cargo_key, state).await?;
     cargoes.push(cargo);
   }
   let network = state

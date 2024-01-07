@@ -61,7 +61,7 @@ pub async fn inspect_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let cargo = utils::cargo::inspect_by_key(&key, &state).await?;
+  let cargo = CargoDb::inspect_by_pk(&key, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
