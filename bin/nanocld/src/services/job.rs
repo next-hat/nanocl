@@ -163,7 +163,7 @@ mod tests {
     let _ = res.json::<Vec<JobSummary>>().await.unwrap();
     let res = client
       .send_get(
-        &format!("{job_endpoint}/wait"),
+        &format!("/processes/job/{}/wait", &job.name),
         Some(&serde_json::json!({
           "Condition": "yoloh"
         })),

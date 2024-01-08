@@ -854,6 +854,44 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Process'
+  /processes/{kind}/{name}/kill:
+    post:
+      tags:
+      - Processes
+      summary: Send a signal to processes of given kind and name
+      description: Send a signal to processes of given kind and name
+      operationId: kill_process
+      parameters:
+      - name: kind
+        in: path
+        description: Kind of the process
+        required: true
+        schema:
+          type: string
+        example: cargo
+      - name: name
+        in: path
+        description: Name of the process
+        required: true
+        schema:
+          type: string
+        example: deploy-example
+      - name: namespace
+        in: query
+        description: Namespace where the process belongs is needed
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CargoKillOptions'
+        required: true
+      responses:
+        '200':
+          description: Process instances killed
   /processes/{kind}/{name}/logs:
     get:
       tags:
@@ -1038,44 +1076,6 @@ paths:
           description: Job wait
         '404':
           description: Job does not exist
-  /processes/{name}/kill:
-    post:
-      tags:
-      - Processes
-      summary: Send a signal to processes of given kind and name
-      description: Send a signal to processes of given kind and name
-      operationId: kill_process
-      parameters:
-      - name: kind
-        in: path
-        description: Kind of the process
-        required: true
-        schema:
-          type: string
-        example: cargo
-      - name: name
-        in: path
-        description: Name of the process
-        required: true
-        schema:
-          type: string
-        example: deploy-example
-      - name: namespace
-        in: query
-        description: Namespace where the process belongs is needed
-        required: false
-        schema:
-          type: string
-          nullable: true
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CargoKillOptions'
-        required: true
-      responses:
-        '200':
-          description: Process instances killed
   /resource/kinds:
     get:
       tags:
