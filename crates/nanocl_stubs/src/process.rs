@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
@@ -13,6 +15,22 @@ pub enum ProcessKind {
   Vm,
   Job,
   Cargo,
+}
+
+impl FromStr for ProcessKind {
+  type Err = std::io::Error;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "vm" => Ok(Self::Vm),
+      "job" => Ok(Self::Job),
+      "cargo" => Ok(Self::Cargo),
+      _ => Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        format!("Invalid process kind {s}"),
+      )),
+    }
+  }
 }
 
 impl TryFrom<String> for ProcessKind {

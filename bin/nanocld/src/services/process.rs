@@ -6,13 +6,14 @@ use nanocl_error::http::{HttpResult, HttpError};
 use bollard_next::container::LogsOptions;
 use nanocl_stubs::{
   generic::{GenericNspQuery, GenericFilter, GenericListQuery},
-  process::{ProcessLogQuery, ProcessOutputLog},
+  process::{ProcessLogQuery, ProcessOutputLog, ProcessKind},
 };
 
 use crate::{
   utils,
   repositories::generic::*,
-  models::{SystemState, ProcessDb},
+  models::{SystemState, ProcessDb, VmDb, JobDb},
+  objects::generic::ObjProcess,
 };
 
 /// List process (Vm, Job, Cargo)
@@ -128,8 +129,18 @@ pub async fn start_process(
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
   let kind = utils::process::parse_kind(&kind)?;
-  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::process::start_by_kind(&kind, &kind_key, &state).await?;
+  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  match &kind {
+    ProcessKind::Vm => {
+      VmDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+    }
+    ProcessKind::Job => {
+      JobDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+    }
+    ProcessKind::Cargo => {
+      VmDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+    }
+  }
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -156,8 +167,18 @@ pub async fn stop_process(
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
   let kind = utils::process::parse_kind(&kind)?;
-  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::process::stop_by_kind(&kind, &kind_key, &state).await?;
+  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  match &kind {
+    ProcessKind::Vm => {
+      VmDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+    }
+    ProcessKind::Job => {
+      JobDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+    }
+    ProcessKind::Cargo => {
+      VmDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+    }
+  }
   Ok(web::HttpResponse::Accepted().finish())
 }
 

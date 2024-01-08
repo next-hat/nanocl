@@ -2,7 +2,10 @@ use bollard_next::container::RemoveContainerOptions;
 use futures_util::{StreamExt, stream::FuturesUnordered};
 
 use nanocl_error::http::{HttpResult, HttpError};
-use nanocl_stubs::job::{Job, JobPartial, JobInspect};
+use nanocl_stubs::{
+  job::{Job, JobPartial, JobInspect},
+  process::ProcessKind,
+};
 
 use crate::{
   utils,
@@ -11,6 +14,12 @@ use crate::{
 };
 
 use super::generic::*;
+
+impl ObjProcess for JobDb {
+  fn get_kind() -> ProcessKind {
+    ProcessKind::Job
+  }
+}
 
 impl ObjCreate for JobDb {
   type ObjCreateIn = JobPartial;
@@ -36,16 +45,15 @@ impl ObjCreate for JobDb {
           container.labels = Some(labels);
           let short_id = utils::key::generate_short_id(6);
           let name = format!("{job_name}-{short_id}.j");
-          utils::process::create(&name, "job", &job_name, container, state)
-            .await?;
+          JobDb::create_process(&name, &job_name, container, state).await?;
           Ok::<_, HttpError>(())
         }
       })
       .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<Result<(), HttpError>>>()
+      .collect::<Vec<HttpResult<()>>>()
       .await
       .into_iter()
-      .collect::<Result<Vec<_>, _>>()?;
+      .collect::<HttpResult<Vec<_>>>()?;
     if let Some(schedule) = &job.schedule {
       utils::job::add_cron_rule(&job, schedule, state).await?;
     }
@@ -67,7 +75,7 @@ impl ObjDelByPk for JobDb {
     processes
       .into_iter()
       .map(|process| async move {
-        utils::process::remove(
+        JobDb::del_process_by_pk(
           &process.key,
           Some(RemoveContainerOptions {
             force: true,
@@ -78,10 +86,10 @@ impl ObjDelByPk for JobDb {
         .await
       })
       .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<Result<(), HttpError>>>()
+      .collect::<Vec<HttpResult<()>>>()
       .await
       .into_iter()
-      .collect::<Result<Vec<_>, _>>()?;
+      .collect::<HttpResult<Vec<_>>>()?;
     JobDb::del_by_pk(&job.name, &state.pool).await?;
     if job.schedule.is_some() {
       utils::job::remove_cron_rule(&job, state).await?;

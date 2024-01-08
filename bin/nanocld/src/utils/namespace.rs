@@ -4,9 +4,8 @@ use bollard_next::network::InspectNetworkOptions;
 use nanocl_stubs::{generic::GenericFilter, namespace::NamespaceSummary};
 
 use crate::{
-  utils,
   repositories::generic::*,
-  models::{CargoDb, NamespaceDb, SystemState},
+  models::{CargoDb, NamespaceDb, SystemState, ProcessDb},
 };
 
 /// List all existing namespaces
@@ -20,7 +19,7 @@ pub async fn list(
     let cargo_count =
       CargoDb::count_by_namespace(&item.name, &state.pool).await?;
     let processes =
-      utils::process::list_by_namespace(&item.name, state).await?;
+      ProcessDb::list_by_namespace(&item.name, &state.pool).await?;
     let network = state
       .docker_api
       .inspect_network(&item.name, None::<InspectNetworkOptions<String>>)

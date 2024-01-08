@@ -118,3 +118,22 @@ impl ProcessDb {
     ProcessDb::transform_read_by(&filter, pool).await
   }
 }
+
+impl ProcessDb {
+  pub async fn list_by_namespace(
+    name: &str,
+    pool: &Pool,
+  ) -> IoResult<Vec<Process>> {
+    let filter = GenericFilter::new().r#where(
+      "data",
+      GenericClause::Contains(serde_json::json!({
+        "Config": {
+          "Labels": {
+            "io.nanocl.n": name
+          }
+        }
+      })),
+    );
+    ProcessDb::transform_read_by(&filter, pool).await
+  }
+}

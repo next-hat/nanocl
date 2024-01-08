@@ -20,6 +20,7 @@ use crate::{
   utils,
   repositories::generic::*,
   models::{SystemState, CargoDb, ProcessDb, NamespaceDb, SecretDb, SpecDb},
+  objects::generic::ObjProcess,
 };
 
 use super::stream::transform_stream;
@@ -50,14 +51,8 @@ async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
         "init-{}-{}.{}.c",
         cargo.spec.name, short_id, cargo.namespace_name
       );
-      utils::process::create(
-        &name,
-        "cargo",
-        &cargo.spec.cargo_key,
-        before,
-        state,
-      )
-      .await?;
+      CargoDb::create_process(&name, &cargo.spec.cargo_key, before, state)
+        .await?;
       state
         .docker_api
         .start_container(&name, None::<StartContainerOptions<String>>)
@@ -209,15 +204,14 @@ pub async fn create_instances(
           }),
           ..container
         };
-        let res = utils::process::create(&name, "cargo", &cargo.spec.cargo_key, new_process, state).await?;
-        Ok::<_, HttpError>(res)
+        CargoDb::create_process(&name, &cargo.spec.cargo_key, new_process, state).await
       }
     })
     .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<Process, HttpError>>>()
+    .collect::<Vec<HttpResult<Process>>>()
     .await
     .into_iter()
-    .collect::<Result<Vec<Process>, HttpError>>()
+    .collect::<HttpResult<Vec<Process>>>()
 }
 
 /// The instances (containers) are deleted but the cargo is not.
@@ -229,7 +223,7 @@ pub async fn delete_instances(
   instances
     .iter()
     .map(|id| async {
-      utils::process::remove(
+      CargoDb::del_process_by_pk(
         id,
         Some(RemoveContainerOptions {
           force: true,
@@ -240,10 +234,10 @@ pub async fn delete_instances(
       .await
     })
     .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
+    .collect::<Vec<HttpResult<()>>>()
     .await
     .into_iter()
-    .collect::<Result<(), _>>()
+    .collect::<HttpResult<()>>()
 }
 
 /// Restart cargo instances (containers) by key
