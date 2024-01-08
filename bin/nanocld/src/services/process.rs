@@ -132,13 +132,13 @@ pub async fn start_process(
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   match &kind {
     ProcessKind::Vm => {
-      VmDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+      VmDb::start_process_by_kind_pk(&kind_pk, &state).await?;
     }
     ProcessKind::Job => {
-      JobDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+      JobDb::start_process_by_kind_pk(&kind_pk, &state).await?;
     }
     ProcessKind::Cargo => {
-      VmDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+      VmDb::start_process_by_kind_pk(&kind_pk, &state).await?;
     }
   }
   Ok(web::HttpResponse::Accepted().finish())
