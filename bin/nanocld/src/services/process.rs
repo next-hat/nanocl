@@ -176,7 +176,7 @@ pub async fn stop_process(
       JobDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
     }
     ProcessKind::Cargo => {
-      VmDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+      CargoDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
     }
   }
   Ok(web::HttpResponse::Accepted().finish())
