@@ -1,4 +1,5 @@
 use nanocl_error::io::IoError;
+use nanocl_stubs::cargo::CargoKillOptions;
 use ntex::channel::mpsc::Receiver;
 
 use nanocl_error::http::HttpResult;
@@ -84,7 +85,7 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.start_process("cargo", "my-cargo", None).await;
+  /// let res = client.restart_process("cargo", "my-cargo", None).await;
   /// ```
   pub async fn restart_process(
     &self,
@@ -122,6 +123,33 @@ impl NanocldClient {
       .send_post(
         &format!("{}/{kind}/{name}/stop", Self::PROCESS_PATH),
         None::<String>,
+        Some(GenericNspQuery::new(namespace)),
+      )
+      .await?;
+    Ok(())
+  }
+
+  /// Kill processes by it's kind and name and namespace
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let res = client.kill_process("cargo", "my-cargo", None, None).await;
+  /// ```
+  pub async fn kill_cargo(
+    &self,
+    kind: &str,
+    name: &str,
+    query: Option<&CargoKillOptions>,
+    namespace: Option<&str>,
+  ) -> HttpClientResult<()> {
+    self
+      .send_post(
+        &format!("{}/{kind}/{name}/kill", Self::PROCESS_PATH),
+        query,
         Some(GenericNspQuery::new(namespace)),
       )
       .await?;

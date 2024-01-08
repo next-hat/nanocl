@@ -441,38 +441,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CargoInspect'
-  /cargoes/{name}/kill:
-    post:
-      tags:
-      - Cargoes
-      summary: Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
-      description: Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
-      operationId: kill_cargo
-      parameters:
-      - name: name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargo belongs
-        required: false
-        schema:
-          type: string
-          nullable: true
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CargoKillOptions'
-        required: true
-      responses:
-        '200':
-          description: Cargo killed
-        '404':
-          description: Cargo does not exist
   /cargoes/{name}/stats:
     get:
       tags:
@@ -1078,6 +1046,46 @@ paths:
           description: Process stopped
         '404':
           description: Process does not exist
+  /processes/{name}/kill:
+    post:
+      tags:
+      - Processes
+      summary: Send a signal to processes of given kind and name
+      description: Send a signal to processes of given kind and name
+      operationId: kill_process
+      parameters:
+      - name: kind
+        in: path
+        description: Kind of the process
+        required: true
+        schema:
+          type: string
+        example: cargo
+      - name: name
+        in: path
+        description: Name of the process
+        required: true
+        schema:
+          type: string
+        example: deploy-example
+      - name: namespace
+        in: query
+        description: Namespace where the process belongs is needed
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CargoKillOptions'
+        required: true
+      responses:
+        '200':
+          description: Cargo killed
+        '404':
+          description: Cargo does not exist
   /resource/kinds:
     get:
       tags:

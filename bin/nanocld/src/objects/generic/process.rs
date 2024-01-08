@@ -10,6 +10,7 @@ use nanocl_error::{
 use nanocl_stubs::{
   system::NativeEventAction,
   process::{ProcessKind, ProcessPartial, Process},
+  cargo::CargoKillOptions,
 };
 
 use crate::{
@@ -172,6 +173,31 @@ pub trait ObjProcess {
       .into_iter()
       .collect::<HttpResult<Vec<_>>>()?;
     Self::_emit(pk, NativeEventAction::Restart, state).await?;
+    Ok(())
+  }
+
+  async fn kill_process_by_kind_pk(
+    pk: &str,
+    opts: &CargoKillOptions,
+    state: &SystemState,
+  ) -> HttpResult<()> {
+    let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
+    processes
+      .into_iter()
+      .map(|process| async move {
+        let id = process.data.id.clone().unwrap_or_default();
+        let options = opts.clone().into();
+        state
+          .docker_api
+          .kill_container(&id, Some(options))
+          .await
+          .map_err(HttpError::from)
+      })
+      .collect::<FuturesUnordered<_>>()
+      .collect::<Vec<HttpResult<()>>>()
+      .await
+      .into_iter()
+      .collect::<HttpResult<Vec<_>>>()?;
     Ok(())
   }
 

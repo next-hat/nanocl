@@ -4,7 +4,7 @@ use nanocl_error::{http::HttpResult, io::IoResult};
 
 use nanocl_stubs::{
   generic::{GenericNspQuery, GenericListNspQuery},
-  cargo::{CargoDeleteQuery, CargoKillOptions, CargoStatsQuery},
+  cargo::{CargoDeleteQuery, CargoStatsQuery},
   cargo_spec::{CargoSpecPartial, CargoSpecUpdate},
 };
 
@@ -187,34 +187,6 @@ pub async fn patch_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-/// Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Cargoes",
-  request_body = CargoKillOptions,
-  path = "/cargoes/{name}/kill",
-  params(
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-  ),
-  responses(
-    (status = 200, description = "Cargo killed"),
-    (status = 404, description = "Cargo does not exist"),
-  ),
-))]
-#[web::post("/cargoes/{name}/kill")]
-pub async fn kill_cargo(
-  state: web::types::State<SystemState>,
-  path: web::types::Path<(String, String)>,
-  payload: web::types::Json<CargoKillOptions>,
-  qs: web::types::Query<GenericNspQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::kill_by_key(&key, &payload, &state).await?;
-  Ok(web::HttpResponse::Ok().into())
-}
-
 /// List cargo histories
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
@@ -314,7 +286,6 @@ pub async fn stats_cargo(
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
-  config.service(kill_cargo);
   config.service(patch_cargo);
   config.service(put_cargo);
   config.service(list_cargo);
@@ -415,7 +386,7 @@ mod tests {
     );
     let res = client
       .send_post(
-        &format!("{ENDPOINT}/{main_test_cargo}/kill"),
+        &format!("/processes/cargo/{main_test_cargo}/kill"),
         Some(&CargoKillOptions {
           signal: "SIGINT".to_owned(),
         }),

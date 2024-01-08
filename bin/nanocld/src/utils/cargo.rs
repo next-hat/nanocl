@@ -13,7 +13,7 @@ use bollard_next::{
 use nanocl_stubs::{
   process::Process,
   generic::{GenericListNspQuery, GenericClause, GenericFilter},
-  cargo::{Cargo, CargoSummary, CargoKillOptions, CargoStats, CargoStatsQuery},
+  cargo::{Cargo, CargoSummary, CargoStats, CargoStatsQuery},
 };
 
 use crate::{
@@ -280,25 +280,6 @@ pub async fn list(
     });
   }
   Ok(cargo_summaries)
-}
-
-/// Send a signal to a cargo instance the cargo name can be used if the cargo has only one instance
-/// The signal is send to one instance only
-pub async fn kill_by_key(
-  key: &str,
-  options: &CargoKillOptions,
-  state: &SystemState,
-) -> HttpResult<()> {
-  let instances = ProcessDb::read_by_kind_key(key, &state.pool).await?;
-  if instances.is_empty() {
-    return Err(HttpError::not_found(format!(
-      "Cargo instance not found: {key}"
-    )));
-  }
-  let id = instances[0].data.id.clone().unwrap_or_default();
-  let options = options.clone().into();
-  state.docker_api.kill_container(&id, Some(options)).await?;
-  Ok(())
 }
 
 /// Get the stats of a cargo instance

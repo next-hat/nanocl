@@ -252,7 +252,6 @@ impl Modify for VersionModifier {
     cargo::delete_cargo,
     cargo::put_cargo,
     cargo::patch_cargo,
-    cargo::kill_cargo,
     cargo::list_cargo_history,
     cargo::revert_cargo,
     cargo::stats_cargo,
@@ -304,6 +303,7 @@ impl Modify for VersionModifier {
     process::stop_process,
     process::list_process,
     process::restart_process,
+    process::kill_process,
     // Event
     event::list_event,
   ),

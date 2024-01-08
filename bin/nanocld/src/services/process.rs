@@ -7,6 +7,7 @@ use bollard_next::container::LogsOptions;
 use nanocl_stubs::{
   generic::{GenericNspQuery, GenericFilter, GenericListQuery},
   process::{ProcessLogQuery, ProcessOutputLog, ProcessKind},
+  cargo::CargoKillOptions,
 };
 
 use crate::{
@@ -220,12 +221,53 @@ pub async fn stop_process(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
+/// Send a signal to processes of given kind and name
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Processes",
+  request_body = CargoKillOptions,
+  path = "/processes/{name}/kill",
+  params(
+    ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the process belongs is needed"),
+  ),
+  responses(
+    (status = 200, description = "Cargo killed"),
+    (status = 404, description = "Cargo does not exist"),
+  ),
+))]
+#[web::post("/processes/kind/{name}/kill")]
+pub async fn kill_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String, String)>,
+  payload: web::types::Json<CargoKillOptions>,
+  qs: web::types::Query<GenericNspQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, kind, name) = path.into_inner();
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
+  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  match &kind {
+    ProcessKind::Vm => {
+      VmDb::kill_process_by_kind_pk(&kind_pk, &payload, &state).await?;
+    }
+    ProcessKind::Job => {
+      JobDb::kill_process_by_kind_pk(&kind_pk, &payload, &state).await?;
+    }
+    ProcessKind::Cargo => {
+      CargoDb::kill_process_by_kind_pk(&kind_pk, &payload, &state).await?;
+    }
+  }
+  Ok(web::HttpResponse::Ok().into())
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_process);
   config.service(logs_process);
   config.service(restart_process);
   config.service(start_process);
   config.service(stop_process);
+  config.service(kill_process);
 }
 
 #[cfg(test)]
