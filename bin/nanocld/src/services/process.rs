@@ -67,7 +67,7 @@ async fn logs_process(
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind = utils::process::parse_kind(&kind)?;
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let processes = ProcessDb::read_by_kind_key(&kind_key, &state.pool).await?;
   log::debug!("process::logs_process: {kind_key}");
@@ -121,14 +121,14 @@ async fn logs_process(
     (status = 404, description = "Process does not exist"),
   ),
 ))]
-#[web::post("/processes/{type}/{name}/start")]
+#[web::post("/processes/{kind}/{name}/start")]
 pub async fn start_process(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind = utils::process::parse_kind(&kind)?;
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   match &kind {
     ProcessKind::Vm => {
@@ -166,7 +166,7 @@ pub async fn stop_process(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind = utils::process::parse_kind(&kind)?;
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   match &kind {
     ProcessKind::Vm => {

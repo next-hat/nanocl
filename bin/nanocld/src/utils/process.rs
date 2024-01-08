@@ -1,12 +1,4 @@
-use nanocl_error::http::{HttpResult, HttpError};
-
-use nanocl_stubs::process::{Process, ProcessKind};
-
-pub fn parse_kind(kind: &str) -> HttpResult<ProcessKind> {
-  kind
-    .parse()
-    .map_err(|err| HttpError::bad_request(format!("Invalid kind {kind} {err}")))
-}
+use nanocl_stubs::process::Process;
 
 /// Count the number of instances running failing or success
 pub fn count_status(instances: &[Process]) -> (usize, usize, usize, usize) {
