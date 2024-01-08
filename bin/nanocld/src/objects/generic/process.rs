@@ -102,8 +102,7 @@ pub trait ObjProcess {
       ),
     };
     let process = ProcessDb::create_from(&new_instance, &state.pool).await?;
-    Process::try_from(process)
-      .map_err(|err| HttpError::internal_server_error(err.to_string()))
+    Process::try_from(process).map_err(HttpError::from)
   }
 
   async fn start_process_by_kind_pk(
