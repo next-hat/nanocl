@@ -12,7 +12,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{SystemState, ProcessDb, VmDb, JobDb},
+  models::{SystemState, ProcessDb, VmDb, JobDb, CargoDb},
   objects::generic::ObjProcess,
 };
 
@@ -138,7 +138,7 @@ pub async fn start_process(
       JobDb::start_process_by_kind_pk(&kind_pk, &state).await?;
     }
     ProcessKind::Cargo => {
-      VmDb::start_process_by_kind_pk(&kind_pk, &state).await?;
+      CargoDb::start_process_by_kind_pk(&kind_pk, &state).await?;
     }
   }
   Ok(web::HttpResponse::Accepted().finish())
