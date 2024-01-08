@@ -3,9 +3,12 @@ use std::str::FromStr;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard_next::service::ContainerInspectResponse;
+use bollard_next::service::{
+  ContainerInspectResponse, ContainerWaitExitError, ContainerWaitResponse,
+};
 use bollard_next::container::{LogOutput, LogsOptions};
 
+/// Kind of process (Vm, Job, Cargo)
 #[derive(Clone, PartialEq, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -17,6 +20,7 @@ pub enum ProcessKind {
   Cargo,
 }
 
+/// Implement FromStr for ProcessKind for .parse() method
 impl FromStr for ProcessKind {
   type Err = std::io::Error;
 
@@ -33,6 +37,7 @@ impl FromStr for ProcessKind {
   }
 }
 
+/// Try to convert a string into a ProcessKind
 impl TryFrom<String> for ProcessKind {
   type Error = std::io::Error;
 
@@ -49,6 +54,7 @@ impl TryFrom<String> for ProcessKind {
   }
 }
 
+/// Implement to_string for ProcessKind
 impl ToString for ProcessKind {
   fn to_string(&self) -> String {
     match self {
@@ -139,6 +145,7 @@ pub struct OutputLog {
   pub data: String,
 }
 
+/// Convert a LogOutput into an OutputLog
 impl From<LogOutput> for OutputLog {
   fn from(output: LogOutput) -> Self {
     match output {
@@ -196,6 +203,7 @@ pub struct ProcessLogQuery {
 }
 
 impl ProcessLogQuery {
+  /// Set namespace of a ProcessLogQuery
   pub fn of_namespace(nsp: &str) -> ProcessLogQuery {
     ProcessLogQuery {
       namespace: Some(nsp.to_owned()),
@@ -210,6 +218,7 @@ impl ProcessLogQuery {
   }
 }
 
+/// Convert a ProcessLogQuery into a LogsOptions
 impl From<ProcessLogQuery> for LogsOptions<String> {
   fn from(query: ProcessLogQuery) -> LogsOptions<String> {
     LogsOptions::<String> {
@@ -220,6 +229,99 @@ impl From<ProcessLogQuery> for LogsOptions<String> {
       tail: query.tail.to_owned().unwrap_or("all".to_string()),
       stdout: query.stdout.unwrap_or(true),
       stderr: query.stdout.unwrap_or(true),
+    }
+  }
+}
+
+/// Used to wait for a process to reach a certain state
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
+pub enum WaitCondition {
+  NotRunning,
+  #[default]
+  NextExit,
+  Removed,
+}
+
+/// Implement Display for WaitCondition
+impl std::fmt::Display for WaitCondition {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      WaitCondition::NextExit => write!(f, "next-exit"),
+      WaitCondition::NotRunning => write!(f, "not-running"),
+      WaitCondition::Removed => write!(f, "removed"),
+    }
+  }
+}
+
+/// Convert a WaitCondition into a String
+impl From<WaitCondition> for std::string::String {
+  fn from(value: WaitCondition) -> Self {
+    match value {
+      WaitCondition::NextExit => "next-exit",
+      WaitCondition::NotRunning => "not-running",
+      WaitCondition::Removed => "removed",
+    }
+    .to_owned()
+  }
+}
+
+/// Implement FromStr for WaitCondition
+impl std::str::FromStr for WaitCondition {
+  type Err = std::io::Error;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s.to_ascii_lowercase().as_str() {
+      "next-exit" => Ok(WaitCondition::NextExit),
+      "not-running" => Ok(WaitCondition::NotRunning),
+      "removed" => Ok(WaitCondition::Removed),
+      _ => Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        "Invalid wait condition",
+      )),
+    }
+  }
+}
+
+/// Query for the process wait endpoint
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProcessWaitQuery {
+  // Wait condition
+  pub condition: Option<WaitCondition>,
+  /// Namespace where belong the process
+  pub namespace: Option<String>,
+}
+
+/// Stream of wait response of a process
+#[derive(Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProcessWaitResponse {
+  /// Process name
+  pub process_name: String,
+  /// Exit code of the container
+  pub status_code: i64,
+  /// Wait error
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub error: Option<ContainerWaitExitError>,
+}
+
+impl ProcessWaitResponse {
+  pub fn from_container_wait_response(
+    response: ContainerWaitResponse,
+    container_name: String,
+  ) -> ProcessWaitResponse {
+    ProcessWaitResponse {
+      process_name: container_name,
+      status_code: response.status_code,
+      error: response.error,
     }
   }
 }

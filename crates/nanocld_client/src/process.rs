@@ -6,7 +6,10 @@ use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::{HttpClientResult, HttpClientError};
 
 use nanocl_stubs::generic::{GenericNspQuery, GenericFilter, GenericListQuery};
-use nanocl_stubs::process::{Process, ProcessLogQuery, ProcessOutputLog};
+use nanocl_stubs::process::{
+  Process, ProcessLogQuery, ProcessOutputLog, ProcessWaitQuery,
+  ProcessWaitResponse,
+};
 
 use super::NanocldClient;
 
@@ -154,6 +157,28 @@ impl NanocldClient {
       )
       .await?;
     Ok(())
+  }
+
+  /// A stream is returned, data are sent when processes reach status
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let stream = client.wait_process("job", "my_job", None).await.unwrap();
+  /// ```
+  pub async fn wait_process(
+    &self,
+    kind: &str,
+    name: &str,
+    query: Option<&ProcessWaitQuery>,
+  ) -> HttpClientResult<Receiver<HttpResult<ProcessWaitResponse>>> {
+    let res = self
+      .send_get(&format!("{}/{kind}/{name}/wait", Self::PROCESS_PATH), query)
+      .await?;
+    Ok(Self::res_stream(res).await)
   }
 }
 

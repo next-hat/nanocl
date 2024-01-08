@@ -244,7 +244,6 @@ impl Modify for VersionModifier {
     job::delete_job,
     job::inspect_job,
     job::create_job,
-    job::wait_job,
     // Cargo
     cargo::list_cargo,
     cargo::inspect_cargo,
@@ -304,6 +303,7 @@ impl Modify for VersionModifier {
     process::list_process,
     process::restart_process,
     process::kill_process,
+    process::wait_process,
     // Event
     event::list_event,
   ),
