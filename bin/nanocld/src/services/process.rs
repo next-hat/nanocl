@@ -40,7 +40,7 @@ pub async fn list_process(
   Ok(web::HttpResponse::Ok().json(&processes))
 }
 
-/// Get logs of a process
+/// Get logs of processes for given kind and name
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Processes",
@@ -106,7 +106,7 @@ async fn logs_process(
   )
 }
 
-/// Start a process
+/// Start processes of given kind and name
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Processes",
@@ -144,7 +144,45 @@ pub async fn start_process(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Stop a cargo
+/// Restart processes of given kind and name
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Processes",
+  path = "/processes/{kind}/{name}/restart",
+  params(
+    ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the process belongs is needed"),
+  ),
+  responses(
+    (status = 202, description = "Process restarted"),
+    (status = 404, description = "Process does not exist"),
+  ),
+))]
+#[web::post("/processes/{kind}/{name}/restart")]
+pub async fn restart_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, kind, name) = path.into_inner();
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
+  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  match &kind {
+    ProcessKind::Vm => {
+      VmDb::restart_process_by_kind_pk(&kind_pk, &state).await?;
+    }
+    ProcessKind::Job => {
+      JobDb::restart_process_by_kind_pk(&kind_pk, &state).await?;
+    }
+    ProcessKind::Cargo => {
+      CargoDb::restart_process_by_kind_pk(&kind_pk, &state).await?;
+    }
+  }
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Stop a processes of given kind and name
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Processes",
@@ -155,8 +193,8 @@ pub async fn start_process(
     ("namespace" = Option<String>, Query, description = "Namespace where the process belongs is needed"),
   ),
   responses(
-    (status = 202, description = "Cargo stopped"),
-    (status = 404, description = "Cargo does not exist"),
+    (status = 202, description = "Process stopped"),
+    (status = 404, description = "Process does not exist"),
   ),
 ))]
 #[web::post("/processes/{kind}/{name}/stop")]
@@ -185,6 +223,7 @@ pub async fn stop_process(
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_process);
   config.service(logs_process);
+  config.service(restart_process);
   config.service(start_process);
   config.service(stop_process);
 }

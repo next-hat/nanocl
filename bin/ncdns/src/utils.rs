@@ -60,7 +60,9 @@ async fn get_network_addr(
 /// Reload the dns service
 /// TODO: use a better way to reload the service, we may have to move from dnsmasq to something else
 pub(crate) async fn reload_service(client: &NanocldClient) -> IoResult<()> {
-  client.restart_cargo("ndns", Some("system")).await?;
+  client
+    .restart_process("cargo", "ndns", Some("system"))
+    .await?;
   Ok(())
 }
 

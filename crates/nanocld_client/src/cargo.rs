@@ -95,31 +95,6 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Restart a cargo by it's name and namespace
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.restart_cargo("my-cargo", None).await;
-  /// ```
-  pub async fn restart_cargo(
-    &self,
-    name: &str,
-    namespace: Option<&str>,
-  ) -> HttpClientResult<()> {
-    self
-      .send_post(
-        &format!("{}/{name}/restart", Self::CARGO_PATH),
-        None::<String>,
-        Some(GenericNspQuery::new(namespace)),
-      )
-      .await?;
-    Ok(())
-  }
-
   /// List all cargoes in a namespace
   ///
   /// ## Example

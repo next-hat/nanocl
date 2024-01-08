@@ -473,32 +473,6 @@ paths:
           description: Cargo killed
         '404':
           description: Cargo does not exist
-  /cargoes/{name}/restart:
-    post:
-      tags:
-      - Cargoes
-      summary: Restart a cargo
-      description: Restart a cargo
-      operationId: restart_cargo
-      parameters:
-      - name: name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargo belongs
-        required: false
-        schema:
-          type: string
-          nullable: true
-      responses:
-        '202':
-          description: Cargo restarted
-        '404':
-          description: Cargo does not exist
   /cargoes/{name}/stats:
     get:
       tags:
@@ -935,8 +909,8 @@ paths:
     get:
       tags:
       - Processes
-      summary: Get logs of a process
-      description: Get logs of a process
+      summary: Get logs of processes for given kind and name
+      description: Get logs of processes for given kind and name
       operationId: logs_process
       parameters:
       - name: kind
@@ -1002,12 +976,46 @@ paths:
           description: Process instances logs
         '404':
           description: Process don't exist
+  /processes/{kind}/{name}/restart:
+    post:
+      tags:
+      - Processes
+      summary: Restart processes of given kind and name
+      description: Restart processes of given kind and name
+      operationId: restart_process
+      parameters:
+      - name: kind
+        in: path
+        description: Kind of the process
+        required: true
+        schema:
+          type: string
+        example: cargo
+      - name: name
+        in: path
+        description: Name of the process
+        required: true
+        schema:
+          type: string
+        example: deploy-example
+      - name: namespace
+        in: query
+        description: Namespace where the process belongs is needed
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '202':
+          description: Process restarted
+        '404':
+          description: Process does not exist
   /processes/{kind}/{name}/start:
     post:
       tags:
       - Processes
-      summary: Start a process
-      description: Start a process
+      summary: Start processes of given kind and name
+      description: Start processes of given kind and name
       operationId: start_process
       parameters:
       - name: kind
@@ -1040,8 +1048,8 @@ paths:
     post:
       tags:
       - Processes
-      summary: Stop a cargo
-      description: Stop a cargo
+      summary: Stop a processes of given kind and name
+      description: Stop a processes of given kind and name
       operationId: stop_process
       parameters:
       - name: kind
@@ -1067,9 +1075,9 @@ paths:
           nullable: true
       responses:
         '202':
-          description: Cargo stopped
+          description: Process stopped
         '404':
-          description: Cargo does not exist
+          description: Process does not exist
   /resource/kinds:
     get:
       tags:

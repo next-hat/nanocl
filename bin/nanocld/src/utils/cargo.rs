@@ -240,28 +240,6 @@ pub async fn delete_instances(
     .collect::<HttpResult<()>>()
 }
 
-/// Restart cargo instances (containers) by key
-pub async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
-  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
-  let processes =
-    ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
-  processes
-    .into_iter()
-    .map(|process| async move {
-      state
-        .docker_api
-        .restart_container(&process.key, None)
-        .await
-        .map_err(HttpError::from)
-    })
-    .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<HttpResult<()>>>()
-    .await
-    .into_iter()
-    .collect::<HttpResult<Vec<_>>>()?;
-  Ok(())
-}
-
 /// List the cargoes for the given query
 pub async fn list(
   query: &GenericListNspQuery,

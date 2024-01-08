@@ -76,6 +76,32 @@ impl NanocldClient {
     Ok(())
   }
 
+  /// Restart a process by it's kind and name and namespace
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let res = client.start_process("cargo", "my-cargo", None).await;
+  /// ```
+  pub async fn restart_process(
+    &self,
+    kind: &str,
+    name: &str,
+    namespace: Option<&str>,
+  ) -> HttpClientResult<()> {
+    self
+      .send_post(
+        &format!("{}/{kind}/{name}/restart", Self::PROCESS_PATH),
+        None::<String>,
+        Some(GenericNspQuery::new(namespace)),
+      )
+      .await?;
+    Ok(())
+  }
+
   /// Stop a process by it's kind and name and namespace
   ///
   /// ## Example

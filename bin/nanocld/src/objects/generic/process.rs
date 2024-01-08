@@ -1,14 +1,15 @@
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use bollard_next::container::{
   RemoveContainerOptions, StartContainerOptions, StopContainerOptions, Config,
   CreateContainerOptions, InspectContainerOptions,
 };
 use nanocl_error::{
-  http::{HttpResult, HttpError},
   io::FromIo,
+  http::{HttpResult, HttpError},
 };
 use nanocl_stubs::{
-  process::{ProcessKind, ProcessPartial, Process},
   system::NativeEventAction,
+  process::{ProcessKind, ProcessPartial, Process},
 };
 
 use crate::{
@@ -148,6 +149,29 @@ pub trait ObjProcess {
         .await?;
     }
     Self::_emit(kind_pk, NativeEventAction::Stop, state).await?;
+    Ok(())
+  }
+
+  async fn restart_process_by_kind_pk(
+    pk: &str,
+    state: &SystemState,
+  ) -> HttpResult<()> {
+    let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
+    processes
+      .into_iter()
+      .map(|process| async move {
+        state
+          .docker_api
+          .restart_container(&process.key, None)
+          .await
+          .map_err(HttpError::from)
+      })
+      .collect::<FuturesUnordered<_>>()
+      .collect::<Vec<HttpResult<()>>>()
+      .await
+      .into_iter()
+      .collect::<HttpResult<Vec<_>>>()?;
+    Self::_emit(pk, NativeEventAction::Restart, state).await?;
     Ok(())
   }
 

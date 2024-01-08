@@ -123,32 +123,6 @@ pub async fn delete_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Restart a cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Cargoes",
-  path = "/cargoes/{name}/restart",
-  params(
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-  ),
-  responses(
-    (status = 202, description = "Cargo restarted"),
-    (status = 404, description = "Cargo does not exist"),
-  ),
-))]
-#[web::post("/cargoes/{name}/restart")]
-pub async fn restart_cargo(
-  state: web::types::State<SystemState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::restart(&key, &state).await?;
-  Ok(web::HttpResponse::Accepted().finish())
-}
-
 /// Create a new cargo spec and add history entry
 #[cfg_attr(feature = "dev", utoipa::path(
   put,
@@ -340,7 +314,6 @@ pub async fn stats_cargo(
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
-  config.service(restart_cargo);
   config.service(kill_cargo);
   config.service(patch_cargo);
   config.service(put_cargo);
@@ -459,7 +432,7 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo stats");
     let res = client
       .send_post(
-        &format!("{ENDPOINT}/{main_test_cargo}/restart"),
+        &format!("/processes/cargo/{main_test_cargo}/restart"),
         None::<String>,
         None::<String>,
       )
