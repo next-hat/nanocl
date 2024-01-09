@@ -130,9 +130,13 @@ impl ObjPutByPk for CargoDb {
     };
     let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
     // Create instance with the new spec
+    let mut error = None;
     let new_instances =
       match utils::cargo::create_instances(&cargo, number, state).await {
-        Err(_) => Vec::default(),
+        Err(err) => {
+          error = Some(err);
+          Vec::default()
+        }
         Ok(instances) => instances,
       };
     // start created containers
@@ -160,7 +164,10 @@ impl ObjPutByPk for CargoDb {
         .await?;
       }
     }
-    Ok(cargo)
+    match error {
+      Some(err) => Err(err),
+      None => Ok(cargo),
+    }
   }
 }
 

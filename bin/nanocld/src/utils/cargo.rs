@@ -9,16 +9,12 @@ use bollard_next::{
     StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
   },
 };
-use nanocl_stubs::{
-  process::Process,
-  generic::{GenericListNspQuery, GenericClause, GenericFilter},
-  cargo::{Cargo, CargoSummary},
-};
+use nanocl_stubs::{cargo::Cargo, process::Process};
 
 use crate::{
   utils,
   repositories::generic::*,
-  models::{SystemState, CargoDb, ProcessDb, NamespaceDb, SecretDb, SpecDb},
+  models::{SystemState, CargoDb, SecretDb},
   objects::generic::ObjProcess,
 };
 
@@ -68,12 +64,32 @@ async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
                 Some(error) => error.message.unwrap_or("Unknown error".into()),
                 None => "Unknown error".into(),
               };
+              state
+                .docker_api
+                .remove_container(
+                  &name,
+                  Some(RemoveContainerOptions {
+                    force: true,
+                    ..Default::default()
+                  }),
+                )
+                .await?;
               return Err(HttpError::internal_server_error(format!(
                 "Error while waiting for before container: {error}"
               )));
             }
           }
           Err(err) => {
+            state
+              .docker_api
+              .remove_container(
+                &name,
+                Some(RemoveContainerOptions {
+                  force: true,
+                  ..Default::default()
+                }),
+              )
+              .await?;
             return Err(HttpError::internal_server_error(format!(
               "Error while waiting for before container: {err}"
             )));
@@ -235,46 +251,4 @@ pub async fn delete_instances(
     .await
     .into_iter()
     .collect::<HttpResult<()>>()
-}
-
-/// List the cargoes for the given query
-pub async fn list(
-  query: &GenericListNspQuery,
-  state: &SystemState,
-) -> HttpResult<Vec<CargoSummary>> {
-  let namespace = utils::key::resolve_nsp(&query.namespace);
-  let filter = GenericFilter::try_from(query.clone())
-    .map_err(|err| {
-      HttpError::bad_request(format!("Invalid query string: {}", err))
-    })?
-    .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
-  // ensure namespace exists
-  NamespaceDb::read_by_pk(&namespace, &state.pool).await?;
-  let cargoes = CargoDb::transform_read_by(&filter, &state.pool).await?;
-  let mut cargo_summaries = Vec::new();
-  for cargo in cargoes {
-    let spec = SpecDb::read_by_pk(&cargo.spec.key, &state.pool)
-      .await?
-      .try_to_cargo_spec()?;
-    let instances =
-      ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
-    let mut running_instances = 0;
-    for instance in &instances {
-      let state = instance.data.state.clone().unwrap_or_default();
-      if state.restarting.unwrap_or_default() {
-        continue;
-      }
-      if state.running.unwrap_or_default() {
-        running_instances += 1;
-      }
-    }
-    cargo_summaries.push(CargoSummary {
-      created_at: cargo.created_at,
-      namespace_name: cargo.namespace_name,
-      instance_total: instances.len(),
-      instance_running: running_instances,
-      spec: spec.clone(),
-    });
-  }
-  Ok(cargo_summaries)
 }

@@ -1,5 +1,5 @@
-use bollard_next::container::Stats;
 use ntex::web;
+use bollard_next::container::Stats;
 
 use nanocl_error::{http::HttpResult, io::IoResult};
 
@@ -37,7 +37,7 @@ pub async fn list_cargo(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let cargoes = utils::cargo::list(&qs, &state).await?;
+  let cargoes = CargoDb::list(&qs, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargoes))
 }
 

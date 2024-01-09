@@ -1,6 +1,7 @@
 use nanocl_stubs::process::Process;
 
-/// Count the number of instances running failing or success
+/// Count the status for the given instances
+/// Return a tuple with the total, failed, success and running instances
 pub fn count_status(instances: &[Process]) -> (usize, usize, usize, usize) {
   let mut instance_failed = 0;
   let mut instance_success = 0;
