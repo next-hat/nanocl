@@ -34,6 +34,7 @@ async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
       let mut labels = before.labels.to_owned().unwrap_or_default();
       labels.insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
       labels.insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
+      labels.insert("io.nanocl.init-c".to_owned(), "true".to_owned());
       labels.insert(
         "com.docker.compose.project".into(),
         format!("nanocl_{}", cargo.namespace_name),
@@ -64,32 +65,12 @@ async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
                 Some(error) => error.message.unwrap_or("Unknown error".into()),
                 None => "Unknown error".into(),
               };
-              state
-                .docker_api
-                .remove_container(
-                  &name,
-                  Some(RemoveContainerOptions {
-                    force: true,
-                    ..Default::default()
-                  }),
-                )
-                .await?;
               return Err(HttpError::internal_server_error(format!(
                 "Error while waiting for before container: {error}"
               )));
             }
           }
           Err(err) => {
-            state
-              .docker_api
-              .remove_container(
-                &name,
-                Some(RemoveContainerOptions {
-                  force: true,
-                  ..Default::default()
-                }),
-              )
-              .await?;
             return Err(HttpError::internal_server_error(format!(
               "Error while waiting for before container: {err}"
             )));
