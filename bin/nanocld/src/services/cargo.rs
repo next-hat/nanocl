@@ -1,10 +1,11 @@
+use bollard_next::container::Stats;
 use ntex::web;
 
 use nanocl_error::{http::HttpResult, io::IoResult};
 
 use nanocl_stubs::{
   generic::{GenericNspQuery, GenericListNspQuery},
-  cargo::{CargoDeleteQuery, CargoStatsQuery},
+  cargo::{CargoStats, CargoDeleteQuery, CargoStatsQuery},
   cargo_spec::{CargoSpecPartial, CargoSpecUpdate},
 };
 
@@ -275,7 +276,10 @@ pub async fn stats_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let stream = utils::cargo::get_stats(&key, &qs, &state.docker_api)?;
+  let stream = state
+    .docker_api
+    .stats(&format!("{key}.c"), Some(qs.clone().into()));
+  let stream = utils::stream::transform_stream::<Stats, CargoStats>(stream);
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")

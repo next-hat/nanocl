@@ -1,4 +1,3 @@
-use ntex::util::Bytes;
 use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
@@ -7,13 +6,13 @@ use nanocl_error::http::{HttpError, HttpResult};
 use bollard_next::{
   service::{HostConfig, RestartPolicy, RestartPolicyNameEnum},
   container::{
-    Stats, StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
+    StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
   },
 };
 use nanocl_stubs::{
   process::Process,
   generic::{GenericListNspQuery, GenericClause, GenericFilter},
-  cargo::{Cargo, CargoSummary, CargoStats, CargoStatsQuery},
+  cargo::{Cargo, CargoSummary},
 };
 
 use crate::{
@@ -22,8 +21,6 @@ use crate::{
   models::{SystemState, CargoDb, ProcessDb, NamespaceDb, SecretDb, SpecDb},
   objects::generic::ObjProcess,
 };
-
-use super::stream::transform_stream;
 
 /// Container to execute before the cargo instances
 async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
@@ -280,17 +277,4 @@ pub async fn list(
     });
   }
   Ok(cargo_summaries)
-}
-
-/// Get the stats of a cargo instance
-/// The cargo name can be used if the cargo has only one instance
-pub fn get_stats(
-  name: &str,
-  query: &CargoStatsQuery,
-  docker_api: &bollard_next::Docker,
-) -> HttpResult<impl StreamExt<Item = HttpResult<Bytes>>> {
-  let stream =
-    docker_api.stats(&format!("{name}.c"), Some(query.clone().into()));
-  let stream = transform_stream::<Stats, CargoStats>(stream);
-  Ok(stream)
 }
