@@ -441,64 +441,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CargoInspect'
-  /cargoes/{name}/kill:
-    post:
-      tags:
-      - Cargoes
-      summary: Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
-      description: Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
-      operationId: kill_cargo
-      parameters:
-      - name: name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargo belongs
-        required: false
-        schema:
-          type: string
-          nullable: true
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CargoKillOptions'
-        required: true
-      responses:
-        '200':
-          description: Cargo killed
-        '404':
-          description: Cargo does not exist
-  /cargoes/{name}/restart:
-    post:
-      tags:
-      - Cargoes
-      summary: Restart a cargo
-      description: Restart a cargo
-      operationId: restart_cargo
-      parameters:
-      - name: name
-        in: path
-        description: Name of the cargo
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargo belongs
-        required: false
-        schema:
-          type: string
-          nullable: true
-      responses:
-        '202':
-          description: Cargo restarted
-        '404':
-          description: Cargo does not exist
   /cargoes/{name}/stats:
     get:
       tags:
@@ -717,25 +659,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobInspect'
-  /jobs/{name}/wait:
-    get:
-      tags:
-      - Jobs
-      summary: Wait for a job to finish
-      description: Wait for a job to finish
-      operationId: wait_job
-      parameters:
-      - name: name
-        in: path
-        description: Name of the job instance usually `name` or `name-number`
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Job wait
-        '404':
-          description: Job does not exist
   /metrics:
     get:
       tags:
@@ -931,12 +854,50 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Process'
+  /processes/{kind}/{name}/kill:
+    post:
+      tags:
+      - Processes
+      summary: Send a signal to processes of given kind and name
+      description: Send a signal to processes of given kind and name
+      operationId: kill_process
+      parameters:
+      - name: kind
+        in: path
+        description: Kind of the process
+        required: true
+        schema:
+          type: string
+        example: cargo
+      - name: name
+        in: path
+        description: Name of the process
+        required: true
+        schema:
+          type: string
+        example: deploy-example
+      - name: namespace
+        in: query
+        description: Namespace where the process belongs is needed
+        required: false
+        schema:
+          type: string
+          nullable: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CargoKillOptions'
+        required: true
+      responses:
+        '200':
+          description: Process instances killed
   /processes/{kind}/{name}/logs:
     get:
       tags:
       - Processes
-      summary: Get logs of a process
-      description: Get logs of a process
+      summary: Get logs of processes for given kind and name
+      description: Get logs of processes for given kind and name
       operationId: logs_process
       parameters:
       - name: kind
@@ -1000,14 +961,44 @@ paths:
       responses:
         '200':
           description: Process instances logs
-        '404':
-          description: Process don't exist
+  /processes/{kind}/{name}/restart:
+    post:
+      tags:
+      - Processes
+      summary: Restart processes of given kind and name
+      description: Restart processes of given kind and name
+      operationId: restart_process
+      parameters:
+      - name: kind
+        in: path
+        description: Kind of the process
+        required: true
+        schema:
+          type: string
+        example: cargo
+      - name: name
+        in: path
+        description: Name of the process
+        required: true
+        schema:
+          type: string
+        example: deploy-example
+      - name: namespace
+        in: query
+        description: Namespace where the process belongs is needed
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '202':
+          description: Process instances restarted
   /processes/{kind}/{name}/start:
     post:
       tags:
       - Processes
-      summary: Start a process
-      description: Start a process
+      summary: Start processes of given kind and name
+      description: Start processes of given kind and name
       operationId: start_process
       parameters:
       - name: kind
@@ -1033,15 +1024,13 @@ paths:
           nullable: true
       responses:
         '202':
-          description: Process started
-        '404':
-          description: Process does not exist
+          description: Process instances started
   /processes/{kind}/{name}/stop:
     post:
       tags:
       - Processes
-      summary: Stop a cargo
-      description: Stop a cargo
+      summary: Stop a processes of given kind and name
+      description: Stop a processes of given kind and name
       operationId: stop_process
       parameters:
       - name: kind
@@ -1067,9 +1056,26 @@ paths:
           nullable: true
       responses:
         '202':
-          description: Cargo stopped
+          description: Process instances stopped
+  /processes/{kind}/{name}/wait:
+    get:
+      tags:
+      - Processes
+      summary: Wait for a job to finish
+      description: Wait for a job to finish
+      operationId: wait_process
+      parameters:
+      - name: name
+        in: path
+        description: Name of the job instance usually `name` or `name-number`
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Job wait
         '404':
-          description: Cargo does not exist
+          description: Job does not exist
   /resource/kinds:
     get:
       tags:
@@ -5378,6 +5384,7 @@ components:
           nullable: true
     ProcessKind:
       type: string
+      description: Kind of process (Vm, Job, Cargo)
       enum:
       - vm
       - job

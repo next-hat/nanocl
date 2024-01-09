@@ -4,7 +4,7 @@ use bollard_next::{
   container::{RemoveContainerOptions, Config},
 };
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
   process::ProcessKind,
   cargo::{Cargo, CargoDeleteQuery, CargoInspect},
@@ -21,6 +21,12 @@ use crate::{
 };
 
 use super::generic::*;
+
+impl ObjProcess for CargoDb {
+  fn get_kind() -> ProcessKind {
+    ProcessKind::Cargo
+  }
+}
 
 impl ObjCreate for CargoDb {
   type ObjCreateIn = CargoObjCreateIn;
@@ -75,7 +81,7 @@ impl ObjDelByPk for CargoDb {
     processes
       .into_iter()
       .map(|process| async move {
-        utils::process::remove(
+        CargoDb::del_process_by_pk(
           &process.key,
           Some(RemoveContainerOptions {
             force: opts.force.unwrap_or(false),
@@ -86,10 +92,10 @@ impl ObjDelByPk for CargoDb {
         .await
       })
       .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<Result<(), HttpError>>>()
+      .collect::<Vec<HttpResult<()>>>()
       .await
       .into_iter()
-      .collect::<Result<Vec<_>, _>>()?;
+      .collect::<HttpResult<Vec<_>>>()?;
     CargoDb::del_by_pk(pk, &state.pool).await?;
     SpecDb::del_by_kind_key(pk, &state.pool).await?;
     Ok(cargo)
@@ -124,13 +130,17 @@ impl ObjPutByPk for CargoDb {
     };
     let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
     // Create instance with the new spec
+    let mut error = None;
     let new_instances =
       match utils::cargo::create_instances(&cargo, number, state).await {
-        Err(_) => Vec::default(),
+        Err(err) => {
+          error = Some(err);
+          Vec::default()
+        }
         Ok(instances) => instances,
       };
     // start created containers
-    match utils::process::start_by_kind(&ProcessKind::Cargo, pk, state).await {
+    match CargoDb::start_process_by_kind_key(pk, state).await {
       Err(err) => {
         log::error!(
           "Unable to start cargo instance {} : {err}",
@@ -154,7 +164,10 @@ impl ObjPutByPk for CargoDb {
         .await?;
       }
     }
-    Ok(cargo)
+    match error {
+      Some(err) => Err(err),
+      None => Ok(cargo),
+    }
   }
 }
 

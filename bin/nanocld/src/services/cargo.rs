@@ -1,10 +1,11 @@
 use ntex::web;
+use bollard_next::container::Stats;
 
 use nanocl_error::{http::HttpResult, io::IoResult};
 
 use nanocl_stubs::{
   generic::{GenericNspQuery, GenericListNspQuery},
-  cargo::{CargoDeleteQuery, CargoKillOptions, CargoStatsQuery},
+  cargo::{CargoStats, CargoDeleteQuery, CargoStatsQuery},
   cargo_spec::{CargoSpecPartial, CargoSpecUpdate},
 };
 
@@ -36,7 +37,7 @@ pub async fn list_cargo(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
-  let cargoes = utils::cargo::list(&qs, &state).await?;
+  let cargoes = CargoDb::list(&qs, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargoes))
 }
 
@@ -123,32 +124,6 @@ pub async fn delete_cargo(
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Restart a cargo
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Cargoes",
-  path = "/cargoes/{name}/restart",
-  params(
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-  ),
-  responses(
-    (status = 202, description = "Cargo restarted"),
-    (status = 404, description = "Cargo does not exist"),
-  ),
-))]
-#[web::post("/cargoes/{name}/restart")]
-pub async fn restart_cargo(
-  state: web::types::State<SystemState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<GenericNspQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::restart(&key, &state).await?;
-  Ok(web::HttpResponse::Accepted().finish())
-}
-
 /// Create a new cargo spec and add history entry
 #[cfg_attr(feature = "dev", utoipa::path(
   put,
@@ -211,34 +186,6 @@ pub async fn patch_cargo(
   };
   let cargo = CargoDb::patch_obj_by_pk(&key, obj, &state).await?;
   Ok(web::HttpResponse::Ok().json(&cargo))
-}
-
-/// Send a signal to a cargo this will kill the cargo if the signal is SIGKILL
-#[cfg_attr(feature = "dev", utoipa::path(
-  post,
-  tag = "Cargoes",
-  request_body = CargoKillOptions,
-  path = "/cargoes/{name}/kill",
-  params(
-    ("name" = String, Path, description = "Name of the cargo"),
-    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-  ),
-  responses(
-    (status = 200, description = "Cargo killed"),
-    (status = 404, description = "Cargo does not exist"),
-  ),
-))]
-#[web::post("/cargoes/{name}/kill")]
-pub async fn kill_cargo(
-  state: web::types::State<SystemState>,
-  path: web::types::Path<(String, String)>,
-  payload: web::types::Json<CargoKillOptions>,
-  qs: web::types::Query<GenericNspQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let key = utils::key::gen_key(&namespace, &path.1);
-  utils::cargo::kill_by_key(&key, &payload, &state).await?;
-  Ok(web::HttpResponse::Ok().into())
 }
 
 /// List cargo histories
@@ -329,7 +276,10 @@ pub async fn stats_cargo(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let stream = utils::cargo::get_stats(&key, &qs, &state.docker_api)?;
+  let stream = state
+    .docker_api
+    .stats(&format!("{key}.c"), Some(qs.clone().into()));
+  let stream = utils::stream::transform_stream::<Stats, CargoStats>(stream);
   Ok(
     web::HttpResponse::Ok()
       .content_type("application/vdn.nanocl.raw-stream")
@@ -340,8 +290,6 @@ pub async fn stats_cargo(
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
-  config.service(restart_cargo);
-  config.service(kill_cargo);
   config.service(patch_cargo);
   config.service(put_cargo);
   config.service(list_cargo);
@@ -442,7 +390,7 @@ mod tests {
     );
     let res = client
       .send_post(
-        &format!("{ENDPOINT}/{main_test_cargo}/kill"),
+        &format!("/processes/cargo/{main_test_cargo}/kill"),
         Some(&CargoKillOptions {
           signal: "SIGINT".to_owned(),
         }),
@@ -459,7 +407,7 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo stats");
     let res = client
       .send_post(
-        &format!("{ENDPOINT}/{main_test_cargo}/restart"),
+        &format!("/processes/cargo/{main_test_cargo}/restart"),
         None::<String>,
         None::<String>,
       )

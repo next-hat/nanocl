@@ -1,11 +1,15 @@
 use nanocl_error::io::IoError;
+use nanocl_stubs::cargo::CargoKillOptions;
 use ntex::channel::mpsc::Receiver;
 
 use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::{HttpClientResult, HttpClientError};
 
 use nanocl_stubs::generic::{GenericNspQuery, GenericFilter, GenericListQuery};
-use nanocl_stubs::process::{Process, ProcessLogQuery, ProcessOutputLog};
+use nanocl_stubs::process::{
+  Process, ProcessLogQuery, ProcessOutputLog, ProcessWaitQuery,
+  ProcessWaitResponse,
+};
 
 use super::NanocldClient;
 
@@ -76,6 +80,32 @@ impl NanocldClient {
     Ok(())
   }
 
+  /// Restart a process by it's kind and name and namespace
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let res = client.restart_process("cargo", "my-cargo", None).await;
+  /// ```
+  pub async fn restart_process(
+    &self,
+    kind: &str,
+    name: &str,
+    namespace: Option<&str>,
+  ) -> HttpClientResult<()> {
+    self
+      .send_post(
+        &format!("{}/{kind}/{name}/restart", Self::PROCESS_PATH),
+        None::<String>,
+        Some(GenericNspQuery::new(namespace)),
+      )
+      .await?;
+    Ok(())
+  }
+
   /// Stop a process by it's kind and name and namespace
   ///
   /// ## Example
@@ -100,6 +130,55 @@ impl NanocldClient {
       )
       .await?;
     Ok(())
+  }
+
+  /// Kill processes by it's kind and name and namespace
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let res = client.kill_process("cargo", "my-cargo", None, None).await;
+  /// ```
+  pub async fn kill_cargo(
+    &self,
+    kind: &str,
+    name: &str,
+    query: Option<&CargoKillOptions>,
+    namespace: Option<&str>,
+  ) -> HttpClientResult<()> {
+    self
+      .send_post(
+        &format!("{}/{kind}/{name}/kill", Self::PROCESS_PATH),
+        query,
+        Some(GenericNspQuery::new(namespace)),
+      )
+      .await?;
+    Ok(())
+  }
+
+  /// A stream is returned, data are sent when processes reach status
+  ///
+  /// ## Example
+  ///
+  /// ```no_run,ignore
+  /// use nanocld_client::NanocldClient;
+  ///
+  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
+  /// let stream = client.wait_process("job", "my_job", None).await.unwrap();
+  /// ```
+  pub async fn wait_process(
+    &self,
+    kind: &str,
+    name: &str,
+    query: Option<&ProcessWaitQuery>,
+  ) -> HttpClientResult<Receiver<HttpResult<ProcessWaitResponse>>> {
+    let res = self
+      .send_get(&format!("{}/{kind}/{name}/wait", Self::PROCESS_PATH), query)
+      .await?;
+    Ok(Self::res_stream(res).await)
   }
 }
 

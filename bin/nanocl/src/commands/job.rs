@@ -1,8 +1,7 @@
 use futures::StreamExt;
 use nanocl_error::io::{IoResult, FromIo, IoError};
 
-use nanocld_client::stubs::job::JobWaitQuery;
-use nanocld_client::stubs::process::ProcessLogQuery;
+use nanocld_client::stubs::process::{ProcessLogQuery, ProcessWaitQuery};
 
 use crate::utils;
 use crate::config::CliConfig;
@@ -86,10 +85,12 @@ async fn exec_job_wait(
 ) -> IoResult<()> {
   let client = &cli_conf.client;
   let mut stream = client
-    .wait_job(
+    .wait_process(
+      "job",
       &opts.name,
-      Some(&JobWaitQuery {
+      Some(&ProcessWaitQuery {
         condition: opts.condition.clone(),
+        namespace: None,
       }),
     )
     .await?;
@@ -102,7 +103,7 @@ async fn exec_job_wait(
     if resp.status_code != 0 {
       eprintln!(
         "Job container {}-{} ended with error code {}",
-        opts.name, resp.container_name, resp.status_code,
+        opts.name, resp.process_name, resp.status_code,
       );
       has_error = true;
     }

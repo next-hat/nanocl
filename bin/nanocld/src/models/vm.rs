@@ -41,17 +41,20 @@ pub struct VmUpdateDb {
   pub spec_key: Option<uuid::Uuid>,
 }
 
+/// Arguments to create a new vm obj
 pub struct VmObjCreateIn {
   pub namespace: String,
   pub spec: VmSpecPartial,
   pub version: String,
 }
 
+/// Arguments to create a new vm history entry
 pub struct VmObjPutIn {
   pub spec: VmSpecPartial,
   pub version: String,
 }
 
+/// Arguments to update a vm history entry
 pub struct VmObjPatchIn {
   pub spec: VmSpecUpdate,
   pub version: String,

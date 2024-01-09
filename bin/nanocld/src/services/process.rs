@@ -3,16 +3,24 @@ use futures_util::{StreamExt, TryStreamExt, stream::select_all};
 
 use nanocl_error::http::{HttpResult, HttpError};
 
-use bollard_next::container::LogsOptions;
+use bollard_next::{
+  container::{LogsOptions, WaitContainerOptions},
+  service::ContainerWaitExitError,
+};
 use nanocl_stubs::{
   generic::{GenericNspQuery, GenericFilter, GenericListQuery},
-  process::{ProcessLogQuery, ProcessOutputLog},
+  process::{
+    ProcessLogQuery, ProcessOutputLog, ProcessKind, ProcessWaitQuery,
+    ProcessWaitResponse,
+  },
+  cargo::CargoKillOptions,
 };
 
 use crate::{
   utils,
   repositories::generic::*,
-  models::{SystemState, ProcessDb},
+  models::{SystemState, ProcessDb, VmDb, JobDb, CargoDb},
+  objects::generic::ObjProcess,
 };
 
 /// List process (Vm, Job, Cargo)
@@ -39,7 +47,7 @@ pub async fn list_process(
   Ok(web::HttpResponse::Ok().json(&processes))
 }
 
-/// Get logs of a process
+/// Get logs of processes for given kind and name
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Processes",
@@ -56,7 +64,6 @@ pub async fn list_process(
   ),
   responses(
     (status = 200, description = "Process instances logs", content_type = "application/vdn.nanocl.raw-stream"),
-    (status = 404, description = "Process don't exist"),
   ),
 ))]
 #[web::get("/processes/{kind}/{name}/logs")]
@@ -66,7 +73,7 @@ async fn logs_process(
   qs: web::types::Query<ProcessLogQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind = utils::process::parse_kind(&kind)?;
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let processes = ProcessDb::read_by_kind_key(&kind_key, &state.pool).await?;
   log::debug!("process::logs_process: {kind_key}");
@@ -105,7 +112,7 @@ async fn logs_process(
   )
 }
 
-/// Start a process
+/// Start processes of given kind and name
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Processes",
@@ -116,24 +123,70 @@ async fn logs_process(
     ("namespace" = Option<String>, Query, description = "Namespace where the process belongs is needed"),
   ),
   responses(
-    (status = 202, description = "Process started"),
-    (status = 404, description = "Process does not exist"),
+    (status = 202, description = "Process instances started"),
   ),
 ))]
-#[web::post("/processes/{type}/{name}/start")]
+#[web::post("/processes/{kind}/{name}/start")]
 pub async fn start_process(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind = utils::process::parse_kind(&kind)?;
-  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::process::start_by_kind(&kind, &kind_key, &state).await?;
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
+  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  match &kind {
+    ProcessKind::Vm => {
+      VmDb::start_process_by_kind_key(&kind_pk, &state).await?;
+    }
+    ProcessKind::Job => {
+      JobDb::start_process_by_kind_key(&kind_pk, &state).await?;
+    }
+    ProcessKind::Cargo => {
+      CargoDb::start_process_by_kind_key(&kind_pk, &state).await?;
+    }
+  }
   Ok(web::HttpResponse::Accepted().finish())
 }
 
-/// Stop a cargo
+/// Restart processes of given kind and name
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Processes",
+  path = "/processes/{kind}/{name}/restart",
+  params(
+    ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the process belongs is needed"),
+  ),
+  responses(
+    (status = 202, description = "Process instances restarted"),
+  ),
+))]
+#[web::post("/processes/{kind}/{name}/restart")]
+pub async fn restart_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String, String)>,
+  qs: web::types::Query<GenericNspQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, kind, name) = path.into_inner();
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
+  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  match &kind {
+    ProcessKind::Vm => {
+      VmDb::restart_process_by_kind_key(&kind_pk, &state).await?;
+    }
+    ProcessKind::Job => {
+      JobDb::restart_process_by_kind_key(&kind_pk, &state).await?;
+    }
+    ProcessKind::Cargo => {
+      CargoDb::restart_process_by_kind_key(&kind_pk, &state).await?;
+    }
+  }
+  Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Stop a processes of given kind and name
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
   tag = "Processes",
@@ -144,8 +197,7 @@ pub async fn start_process(
     ("namespace" = Option<String>, Query, description = "Namespace where the process belongs is needed"),
   ),
   responses(
-    (status = 202, description = "Cargo stopped"),
-    (status = 404, description = "Cargo does not exist"),
+    (status = 202, description = "Process instances stopped"),
   ),
 ))]
 #[web::post("/processes/{kind}/{name}/stop")]
@@ -155,17 +207,137 @@ pub async fn stop_process(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
-  let kind = utils::process::parse_kind(&kind)?;
-  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::process::stop_by_kind(&kind, &kind_key, &state).await?;
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
+  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  match &kind {
+    ProcessKind::Vm => {
+      VmDb::stop_process_by_kind_key(&kind_pk, &state).await?;
+    }
+    ProcessKind::Job => {
+      JobDb::stop_process_by_kind_key(&kind_pk, &state).await?;
+    }
+    ProcessKind::Cargo => {
+      CargoDb::stop_process_by_kind_key(&kind_pk, &state).await?;
+    }
+  }
   Ok(web::HttpResponse::Accepted().finish())
+}
+
+/// Send a signal to processes of given kind and name
+#[cfg_attr(feature = "dev", utoipa::path(
+  post,
+  tag = "Processes",
+  request_body = CargoKillOptions,
+  path = "/processes/{kind}/{name}/kill",
+  params(
+    ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the process belongs is needed"),
+  ),
+  responses(
+    (status = 200, description = "Process instances killed"),
+  ),
+))]
+#[web::post("/processes/{kind}/{name}/kill")]
+pub async fn kill_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String, String)>,
+  payload: web::types::Json<CargoKillOptions>,
+  qs: web::types::Query<GenericNspQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, kind, name) = path.into_inner();
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
+  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  match &kind {
+    ProcessKind::Vm => {
+      VmDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
+    }
+    ProcessKind::Job => {
+      JobDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
+    }
+    ProcessKind::Cargo => {
+      CargoDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
+    }
+  }
+  Ok(web::HttpResponse::Ok().into())
+}
+
+/// Wait for a job to finish
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Processes",
+  path = "/processes/{kind}/{name}/wait",
+  params(
+    ("name" = String, Path, description = "Name of the job instance usually `name` or `name-number`"),
+  ),
+  responses(
+    (status = 200, description = "Job wait", content_type = "application/vdn.nanocl.raw-stream"),
+    (status = 404, description = "Job does not exist"),
+  ),
+))]
+#[web::get("/processes/{kind}/{name}/wait")]
+pub async fn wait_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String, String)>,
+  qs: web::types::Query<ProcessWaitQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, kind, name) = path.into_inner();
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
+  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  let opts = WaitContainerOptions {
+    condition: qs.condition.clone().unwrap_or_default(),
+  };
+  let processes = ProcessDb::read_by_kind_key(&kind_pk, &state.pool).await?;
+  let mut streams = Vec::new();
+  for process in processes {
+    let options = Some(opts.clone());
+    let stream = state.docker_api.wait_container(&process.key, options).map(
+      move |wait_result| match wait_result {
+        Err(err) => {
+          if let bollard_next::errors::Error::DockerContainerWaitError {
+            error,
+            code,
+          } = &err
+          {
+            return Ok(ProcessWaitResponse {
+              process_name: process.name.clone(),
+              status_code: *code,
+              error: Some(ContainerWaitExitError {
+                message: Some(error.to_owned()),
+              }),
+            });
+          }
+          Err(err)
+        }
+        Ok(wait_response) => {
+          Ok(ProcessWaitResponse::from_container_wait_response(
+            wait_response,
+            process.name.clone(),
+          ))
+        }
+      },
+    );
+    streams.push(stream);
+  }
+  let stream = select_all(streams).into_stream();
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("application/vdn.nanocl.raw-stream")
+      .streaming(utils::stream::transform_stream::<
+        ProcessWaitResponse,
+        ProcessWaitResponse,
+      >(stream)),
+  )
 }
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_process);
   config.service(logs_process);
+  config.service(restart_process);
   config.service(start_process);
   config.service(stop_process);
+  config.service(kill_process);
+  config.service(wait_process);
 }
 
 #[cfg(test)]

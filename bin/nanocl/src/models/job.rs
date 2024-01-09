@@ -2,7 +2,7 @@ use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
-use nanocld_client::stubs::job::{WaitCondition, JobSummary};
+use nanocld_client::stubs::{job::JobSummary, process::WaitCondition};
 
 use super::{DisplayFormat, GenericListOpts};
 

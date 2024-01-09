@@ -1,9 +1,7 @@
 use ntex::web;
 
-use bollard_next::container::WaitContainerOptions;
-
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::job::{JobPartial, JobWaitQuery};
+use nanocl_stubs::job::JobPartial;
 
 use crate::{
   utils,
@@ -92,53 +90,21 @@ pub async fn inspect_job(
   Ok(web::HttpResponse::Ok().json(&job))
 }
 
-/// Wait for a job to finish
-#[cfg_attr(feature = "dev", utoipa::path(
-  get,
-  tag = "Jobs",
-  path = "/jobs/{name}/wait",
-  params(
-    ("name" = String, Path, description = "Name of the job instance usually `name` or `name-number`"),
-  ),
-  responses(
-    (status = 200, description = "Job wait", content_type = "application/vdn.nanocl.raw-stream"),
-    (status = 404, description = "Job does not exist"),
-  ),
-))]
-#[web::get("/jobs/{name}/wait")]
-pub async fn wait_job(
-  state: web::types::State<SystemState>,
-  path: web::types::Path<(String, String)>,
-  qs: web::types::Query<JobWaitQuery>,
-) -> HttpResult<web::HttpResponse> {
-  let stream = utils::job::wait(
-    &path.1,
-    WaitContainerOptions {
-      condition: qs.condition.clone().unwrap_or_default(),
-    },
-    &state,
-  )
-  .await?;
-  Ok(
-    web::HttpResponse::Ok()
-      .content_type("application/vdn.nanocl.raw-stream")
-      .streaming(stream),
-  )
-}
-
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_job);
   config.service(create_job);
   config.service(delete_job);
   config.service(inspect_job);
-  config.service(wait_job);
 }
 
 #[cfg(test)]
 mod tests {
   use ntex::http;
   use futures_util::{StreamExt, TryStreamExt};
-  use nanocl_stubs::job::{Job, JobWaitResponse, JobSummary};
+  use nanocl_stubs::{
+    job::{Job, JobSummary},
+    process::ProcessWaitResponse,
+  };
 
   use crate::utils::tests::*;
 
@@ -183,7 +149,10 @@ mod tests {
     let job = res.json::<Job>().await.unwrap();
     let job_endpoint = format!("{ENDPOINT}/{}", &job.name);
     let wait_res = client
-      .send_get(&format!("{job_endpoint}/wait"), None::<String>)
+      .send_get(
+        &format!("/processes/job/{}/wait", &job.name),
+        None::<String>,
+      )
       .await;
     test_status_code!(
       wait_res.status(),
@@ -194,7 +163,7 @@ mod tests {
     let _ = res.json::<Vec<JobSummary>>().await.unwrap();
     let res = client
       .send_get(
-        &format!("{job_endpoint}/wait"),
+        &format!("/processes/job/{}/wait", &job.name),
         Some(&serde_json::json!({
           "Condition": "yoloh"
         })),
@@ -220,7 +189,7 @@ mod tests {
     let mut stream = wait_res.into_stream();
     while let Some(Ok(wait_response)) = stream.next().await {
       let response =
-        serde_json::from_slice::<JobWaitResponse>(&wait_response).unwrap();
+        serde_json::from_slice::<ProcessWaitResponse>(&wait_response).unwrap();
       assert_eq!(response.status_code, 0);
     }
     let res = client

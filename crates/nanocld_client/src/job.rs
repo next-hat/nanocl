@@ -1,11 +1,6 @@
-use ntex::channel::mpsc::Receiver;
-
-use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_stubs::job::{
-  Job, JobWaitQuery, JobWaitResponse, JobPartial, JobInspect, JobSummary,
-};
+use nanocl_stubs::job::{Job, JobPartial, JobInspect, JobSummary};
 
 use super::http_client::NanocldClient;
 
@@ -74,27 +69,6 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// A stream is returned, data are sent when job reach status
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let stream = client.wait_job("my_job", None).await.unwrap();
-  /// ```
-  pub async fn wait_job(
-    &self,
-    name: &str,
-    query: Option<&JobWaitQuery>,
-  ) -> HttpClientResult<Receiver<HttpResult<JobWaitResponse>>> {
-    let res = self
-      .send_get(&format!("{}/{name}/wait", Self::JOB_PATH), query)
-      .await?;
-    Ok(Self::res_stream(res).await)
-  }
-
   /// Delete a job by it's name
   ///
   /// ## Example
@@ -145,7 +119,7 @@ mod tests {
       .await
       .unwrap();
     assert_eq!(job.name, "my_test_job");
-    let mut stream = client.wait_job(&job.name, None).await.unwrap();
+    let mut stream = client.wait_process("job", &job.name, None).await.unwrap();
     client.start_process("job", &job.name, None).await.unwrap();
     while let Some(Ok(_)) = stream.next().await {}
     let job = client.inspect_job(&job.name).await.unwrap();

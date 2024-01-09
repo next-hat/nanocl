@@ -127,7 +127,7 @@ async fn exec_cargo_restart(
   let client = &cli_conf.client;
   for name in &opts.names {
     client
-      .restart_cargo(name, args.namespace.as_deref())
+      .restart_process("cargo", name, args.namespace.as_deref())
       .await?;
   }
   Ok(())

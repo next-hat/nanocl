@@ -1,4 +1,3 @@
-use ntex::util::Bytes;
 use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
@@ -7,22 +6,17 @@ use nanocl_error::http::{HttpError, HttpResult};
 use bollard_next::{
   service::{HostConfig, RestartPolicy, RestartPolicyNameEnum},
   container::{
-    Stats, StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
+    StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
   },
 };
-use nanocl_stubs::{
-  process::Process,
-  generic::{GenericListNspQuery, GenericClause, GenericFilter},
-  cargo::{Cargo, CargoSummary, CargoKillOptions, CargoStats, CargoStatsQuery},
-};
+use nanocl_stubs::{cargo::Cargo, process::Process};
 
 use crate::{
   utils,
   repositories::generic::*,
-  models::{SystemState, CargoDb, ProcessDb, NamespaceDb, SecretDb, SpecDb},
+  models::{SystemState, CargoDb, SecretDb},
+  objects::generic::ObjProcess,
 };
-
-use super::stream::transform_stream;
 
 /// Container to execute before the cargo instances
 async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
@@ -40,6 +34,7 @@ async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
       let mut labels = before.labels.to_owned().unwrap_or_default();
       labels.insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
       labels.insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
+      labels.insert("io.nanocl.init-c".to_owned(), "true".to_owned());
       labels.insert(
         "com.docker.compose.project".into(),
         format!("nanocl_{}", cargo.namespace_name),
@@ -50,14 +45,8 @@ async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
         "init-{}-{}.{}.c",
         cargo.spec.name, short_id, cargo.namespace_name
       );
-      utils::process::create(
-        &name,
-        "cargo",
-        &cargo.spec.cargo_key,
-        before,
-        state,
-      )
-      .await?;
+      CargoDb::create_process(&name, &cargo.spec.cargo_key, before, state)
+        .await?;
       state
         .docker_api
         .start_container(&name, None::<StartContainerOptions<String>>)
@@ -209,15 +198,14 @@ pub async fn create_instances(
           }),
           ..container
         };
-        let res = utils::process::create(&name, "cargo", &cargo.spec.cargo_key, new_process, state).await?;
-        Ok::<_, HttpError>(res)
+        CargoDb::create_process(&name, &cargo.spec.cargo_key, new_process, state).await
       }
     })
     .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<Process, HttpError>>>()
+    .collect::<Vec<HttpResult<Process>>>()
     .await
     .into_iter()
-    .collect::<Result<Vec<Process>, HttpError>>()
+    .collect::<HttpResult<Vec<Process>>>()
 }
 
 /// The instances (containers) are deleted but the cargo is not.
@@ -229,7 +217,7 @@ pub async fn delete_instances(
   instances
     .iter()
     .map(|id| async {
-      utils::process::remove(
+      CargoDb::del_process_by_pk(
         id,
         Some(RemoveContainerOptions {
           force: true,
@@ -240,104 +228,8 @@ pub async fn delete_instances(
       .await
     })
     .collect::<FuturesUnordered<_>>()
-    .collect::<Vec<Result<(), HttpError>>>()
-    .await
-    .into_iter()
-    .collect::<Result<(), _>>()
-}
-
-/// Restart cargo instances (containers) by key
-pub async fn restart(key: &str, state: &SystemState) -> HttpResult<()> {
-  let cargo = CargoDb::transform_read_by_pk(key, &state.pool).await?;
-  let processes =
-    ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
-  processes
-    .into_iter()
-    .map(|process| async move {
-      state
-        .docker_api
-        .restart_container(&process.key, None)
-        .await
-        .map_err(HttpError::from)
-    })
-    .collect::<FuturesUnordered<_>>()
     .collect::<Vec<HttpResult<()>>>()
     .await
     .into_iter()
-    .collect::<HttpResult<Vec<_>>>()?;
-  Ok(())
-}
-
-/// List the cargoes for the given query
-pub async fn list(
-  query: &GenericListNspQuery,
-  state: &SystemState,
-) -> HttpResult<Vec<CargoSummary>> {
-  let namespace = utils::key::resolve_nsp(&query.namespace);
-  let filter = GenericFilter::try_from(query.clone())
-    .map_err(|err| {
-      HttpError::bad_request(format!("Invalid query string: {}", err))
-    })?
-    .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
-  // ensure namespace exists
-  NamespaceDb::read_by_pk(&namespace, &state.pool).await?;
-  let cargoes = CargoDb::transform_read_by(&filter, &state.pool).await?;
-  let mut cargo_summaries = Vec::new();
-  for cargo in cargoes {
-    let spec = SpecDb::read_by_pk(&cargo.spec.key, &state.pool)
-      .await?
-      .try_to_cargo_spec()?;
-    let instances =
-      ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
-    let mut running_instances = 0;
-    for instance in &instances {
-      let state = instance.data.state.clone().unwrap_or_default();
-      if state.restarting.unwrap_or_default() {
-        continue;
-      }
-      if state.running.unwrap_or_default() {
-        running_instances += 1;
-      }
-    }
-    cargo_summaries.push(CargoSummary {
-      created_at: cargo.created_at,
-      namespace_name: cargo.namespace_name,
-      instance_total: instances.len(),
-      instance_running: running_instances,
-      spec: spec.clone(),
-    });
-  }
-  Ok(cargo_summaries)
-}
-
-/// Send a signal to a cargo instance the cargo name can be used if the cargo has only one instance
-/// The signal is send to one instance only
-pub async fn kill_by_key(
-  key: &str,
-  options: &CargoKillOptions,
-  state: &SystemState,
-) -> HttpResult<()> {
-  let instances = ProcessDb::read_by_kind_key(key, &state.pool).await?;
-  if instances.is_empty() {
-    return Err(HttpError::not_found(format!(
-      "Cargo instance not found: {key}"
-    )));
-  }
-  let id = instances[0].data.id.clone().unwrap_or_default();
-  let options = options.clone().into();
-  state.docker_api.kill_container(&id, Some(options)).await?;
-  Ok(())
-}
-
-/// Get the stats of a cargo instance
-/// The cargo name can be used if the cargo has only one instance
-pub fn get_stats(
-  name: &str,
-  query: &CargoStatsQuery,
-  docker_api: &bollard_next::Docker,
-) -> HttpResult<impl StreamExt<Item = HttpResult<Bytes>>> {
-  let stream =
-    docker_api.stats(&format!("{name}.c"), Some(query.clone().into()));
-  let stream = transform_stream::<Stats, CargoStats>(stream);
-  Ok(stream)
+    .collect::<HttpResult<()>>()
 }

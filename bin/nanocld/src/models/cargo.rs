@@ -40,17 +40,20 @@ pub struct CargoUpdateDb {
   pub spec_key: Option<uuid::Uuid>,
 }
 
+/// Arguments to create a new cargo obj
 pub struct CargoObjCreateIn {
   pub namespace: String,
   pub spec: CargoSpecPartial,
   pub version: String,
 }
 
+/// Arguments to create a new cargo history entry
 pub struct CargoObjPutIn {
   pub spec: CargoSpecPartial,
   pub version: String,
 }
 
+/// Arguments to update a cargo history entry
 pub struct CargoObjPatchIn {
   pub spec: CargoSpecUpdate,
   pub version: String,

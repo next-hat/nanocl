@@ -1,12 +1,6 @@
-use ntex::{web, util::Bytes};
+use ntex::web;
 use tokio::{fs, io::AsyncWriteExt};
-use futures_util::{
-  StreamExt, TryStreamExt,
-  stream::{FuturesUnordered, select_all},
-};
-use bollard_next::{
-  service::ContainerWaitExitError, container::WaitContainerOptions,
-};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 
 use nanocl_error::{
   io::{FromIo, IoError, IoResult},
@@ -14,7 +8,7 @@ use nanocl_error::{
 };
 use nanocl_stubs::{
   generic::GenericFilter,
-  job::{Job, JobWaitResponse, WaitCondition, JobSummary},
+  job::{Job, JobSummary},
 };
 
 use crate::{
@@ -22,8 +16,6 @@ use crate::{
   repositories::generic::*,
   models::{SystemState, ProcessDb, JobDb},
 };
-
-use super::stream::transform_stream;
 
 /// Format the cron job command to start a job at a given time
 fn format_cron_job_command(job: &Job, state: &SystemState) -> String {
@@ -129,46 +121,4 @@ pub async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
       .into_iter()
       .collect::<HttpResult<Vec<_>>>()?;
   Ok(job_summaries)
-}
-
-/// Wait a job to finish
-pub async fn wait(
-  name: &str,
-  wait_options: WaitContainerOptions<WaitCondition>,
-  state: &SystemState,
-) -> HttpResult<impl StreamExt<Item = Result<Bytes, HttpError>>> {
-  let job = JobDb::read_by_pk(name, &state.pool).await?.try_to_spec()?;
-  let docker_api = state.docker_api.clone();
-  let processes = ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
-  let mut streams = Vec::new();
-  for process in processes {
-    let options = Some(wait_options.clone());
-    let stream = docker_api.wait_container(&process.key, options).map(
-      move |wait_result| match wait_result {
-        Err(err) => {
-          if let bollard_next::errors::Error::DockerContainerWaitError {
-            error,
-            code,
-          } = &err
-          {
-            return Ok(JobWaitResponse {
-              container_name: process.name.clone(),
-              status_code: *code,
-              error: Some(ContainerWaitExitError {
-                message: Some(error.to_owned()),
-              }),
-            });
-          }
-          Err(err)
-        }
-        Ok(wait_response) => Ok(JobWaitResponse::from_container_wait_response(
-          wait_response,
-          process.name.clone(),
-        )),
-      },
-    );
-    streams.push(stream);
-  }
-  let stream = select_all(streams).into_stream();
-  Ok(transform_stream::<JobWaitResponse, JobWaitResponse>(stream))
 }

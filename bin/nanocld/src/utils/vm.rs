@@ -7,8 +7,8 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::vm::Vm;
 
 use crate::{
-  utils,
-  models::{VmImageDb, SystemState},
+  objects::generic::*,
+  models::{VmImageDb, SystemState, VmDb},
 };
 
 /// Create a VM instance from a VM image
@@ -110,6 +110,6 @@ pub async fn create_instance(
     ..Default::default()
   };
   let name = format!("{}.v", &vm.spec.vm_key);
-  utils::process::create(&name, "vm", &vm.spec.vm_key, spec, state).await?;
+  VmDb::create_process(&name, &vm.spec.vm_key, spec, state).await?;
   Ok(())
 }

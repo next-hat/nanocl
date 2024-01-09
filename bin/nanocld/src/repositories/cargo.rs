@@ -5,19 +5,21 @@ use diesel::prelude::*;
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use nanocl_error::{
   io::{IoError, IoResult},
-  http::HttpResult,
+  http::{HttpResult, HttpError},
 };
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericClause},
-  cargo::{Cargo, CargoDeleteQuery},
+  generic::{GenericFilter, GenericClause, GenericListNspQuery},
+  cargo::{Cargo, CargoDeleteQuery, CargoSummary},
   cargo_spec::{CargoSpecPartial, CargoSpec},
 };
 
 use crate::{
   gen_multiple, gen_where4string, utils,
   objects::generic::*,
-  models::{Pool, CargoDb, SpecDb, CargoUpdateDb, SystemState, NamespaceDb},
+  models::{
+    Pool, CargoDb, SpecDb, CargoUpdateDb, SystemState, NamespaceDb, ProcessDb,
+  },
   schema::cargoes,
 };
 
@@ -204,5 +206,35 @@ impl CargoDb {
       .into_iter()
       .collect::<HttpResult<Vec<_>>>()?;
     Ok(())
+  }
+
+  /// List the cargoes for the given query
+  pub async fn list(
+    query: &GenericListNspQuery,
+    state: &SystemState,
+  ) -> HttpResult<Vec<CargoSummary>> {
+    let namespace = utils::key::resolve_nsp(&query.namespace);
+    let filter = GenericFilter::try_from(query.clone())
+      .map_err(HttpError::bad_request)?
+      .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
+    NamespaceDb::read_by_pk(&namespace, &state.pool).await?;
+    let cargoes = CargoDb::transform_read_by(&filter, &state.pool).await?;
+    let mut cargo_summaries = Vec::new();
+    for cargo in cargoes {
+      let spec = SpecDb::read_by_pk(&cargo.spec.key, &state.pool)
+        .await?
+        .try_to_cargo_spec()?;
+      let processes =
+        ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
+      let (_, _, _, running) = utils::process::count_status(&processes);
+      cargo_summaries.push(CargoSummary {
+        created_at: cargo.created_at,
+        namespace_name: cargo.namespace_name,
+        instance_total: processes.len(),
+        instance_running: running,
+        spec: spec.clone(),
+      });
+    }
+    Ok(cargo_summaries)
   }
 }

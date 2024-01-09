@@ -6,8 +6,8 @@ use nanocl_error::http_client::HttpClientResult;
 use bollard_next::service::ContainerSummary;
 use nanocl_stubs::generic::GenericNspQuery;
 use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, CargoKillOptions, CargoDeleteQuery,
-  CargoStatsQuery, CargoStats,
+  Cargo, CargoSummary, CargoInspect, CargoDeleteQuery, CargoStatsQuery,
+  CargoStats,
 };
 use nanocl_stubs::cargo_spec::{CargoSpecUpdate, CargoSpecPartial, CargoSpec};
 
@@ -93,31 +93,6 @@ impl NanocldClient {
       )
       .await?;
     Self::res_json(res).await
-  }
-
-  /// Restart a cargo by it's name and namespace
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.restart_cargo("my-cargo", None).await;
-  /// ```
-  pub async fn restart_cargo(
-    &self,
-    name: &str,
-    namespace: Option<&str>,
-  ) -> HttpClientResult<()> {
-    self
-      .send_post(
-        &format!("{}/{name}/restart", Self::CARGO_PATH),
-        None::<String>,
-        Some(GenericNspQuery::new(namespace)),
-      )
-      .await?;
-    Ok(())
   }
 
   /// List all cargoes in a namespace
@@ -260,32 +235,6 @@ impl NanocldClient {
       .send_get(&format!("{}/{name}/stats", Self::CARGO_PATH), query)
       .await?;
     Ok(Self::res_stream(res).await)
-  }
-
-  /// Kill a cargo by it's name
-  ///
-  /// ## Example
-  ///
-  /// ```no_run,ignore
-  /// use nanocld_client::NanocldClient;
-  ///
-  /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let res = client.kill_cargo("my-cargo", None, None).await;
-  /// ```
-  pub async fn kill_cargo(
-    &self,
-    name: &str,
-    query: Option<&CargoKillOptions>,
-    namespace: Option<&str>,
-  ) -> HttpClientResult<()> {
-    self
-      .send_post(
-        &format!("{}/{name}/kill", Self::CARGO_PATH),
-        query,
-        Some(GenericNspQuery::new(namespace)),
-      )
-      .await?;
-    Ok(())
   }
 
   /// List all the instances of a cargo by it's name and namespace

@@ -17,6 +17,12 @@ use crate::{
 };
 use super::generic::*;
 
+impl ObjProcess for VmDb {
+  fn get_kind() -> ProcessKind {
+    ProcessKind::Vm
+  }
+}
+
 impl ObjCreate for VmDb {
   type ObjCreateIn = VmObjCreateIn;
   type ObjCreateOut = Vm;
@@ -73,7 +79,7 @@ impl ObjDelByPk for VmDb {
       ..Default::default()
     };
     let container_name = format!("{}.v", pk);
-    utils::process::remove(&container_name, Some(options), state).await?;
+    VmDb::del_process_by_pk(&container_name, Some(options), state).await?;
     VmDb::del_by_pk(pk, &state.pool).await?;
     SpecDb::del_by_kind_key(pk, &state.pool).await?;
     utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
@@ -92,8 +98,8 @@ impl ObjPutByPk for VmDb {
   ) -> HttpResult<Self::ObjPutOut> {
     let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
     let container_name = format!("{}.v", &vm.spec.vm_key);
-    utils::process::stop_by_kind(&ProcessKind::Vm, pk, state).await?;
-    utils::process::remove(
+    VmDb::stop_process_by_kind_key(pk, state).await?;
+    VmDb::del_process_by_pk(
       &container_name,
       None::<RemoveContainerOptions>,
       state,
@@ -108,8 +114,7 @@ impl ObjPutByPk for VmDb {
     .await?;
     let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await?;
     utils::vm::create_instance(&vm, &image, false, state).await?;
-    utils::process::start_by_kind(&ProcessKind::Vm, &vm.spec.vm_key, state)
-      .await?;
+    VmDb::start_process_by_kind_key(&vm.spec.vm_key, state).await?;
     Ok(vm)
   }
 }
