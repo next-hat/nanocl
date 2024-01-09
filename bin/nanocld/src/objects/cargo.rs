@@ -136,7 +136,7 @@ impl ObjPutByPk for CargoDb {
         Ok(instances) => instances,
       };
     // start created containers
-    match CargoDb::start_process_by_kind_pk(pk, state).await {
+    match CargoDb::start_process_by_kind_key(pk, state).await {
       Err(err) => {
         log::error!(
           "Unable to start cargo instance {} : {err}",

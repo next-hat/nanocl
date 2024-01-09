@@ -107,7 +107,7 @@ pub trait ObjProcess {
     Process::try_from(process).map_err(HttpError::from)
   }
 
-  async fn start_process_by_kind_pk(
+  async fn start_process_by_kind_key(
     kind_pk: &str,
     state: &SystemState,
   ) -> HttpResult<()> {
@@ -130,7 +130,7 @@ pub trait ObjProcess {
     Ok(())
   }
 
-  async fn stop_process_by_kind_pk(
+  async fn stop_process_by_kind_key(
     kind_pk: &str,
     state: &SystemState,
   ) -> HttpResult<()> {
@@ -153,7 +153,7 @@ pub trait ObjProcess {
     Ok(())
   }
 
-  async fn restart_process_by_kind_pk(
+  async fn restart_process_by_kind_key(
     pk: &str,
     state: &SystemState,
   ) -> HttpResult<()> {
@@ -176,7 +176,7 @@ pub trait ObjProcess {
     Ok(())
   }
 
-  async fn kill_process_by_kind_pk(
+  async fn kill_process_by_kind_key(
     pk: &str,
     opts: &CargoKillOptions,
     state: &SystemState,

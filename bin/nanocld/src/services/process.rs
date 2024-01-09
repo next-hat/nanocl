@@ -137,13 +137,13 @@ pub async fn start_process(
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   match &kind {
     ProcessKind::Vm => {
-      VmDb::start_process_by_kind_pk(&kind_pk, &state).await?;
+      VmDb::start_process_by_kind_key(&kind_pk, &state).await?;
     }
     ProcessKind::Job => {
-      JobDb::start_process_by_kind_pk(&kind_pk, &state).await?;
+      JobDb::start_process_by_kind_key(&kind_pk, &state).await?;
     }
     ProcessKind::Cargo => {
-      CargoDb::start_process_by_kind_pk(&kind_pk, &state).await?;
+      CargoDb::start_process_by_kind_key(&kind_pk, &state).await?;
     }
   }
   Ok(web::HttpResponse::Accepted().finish())
@@ -174,13 +174,13 @@ pub async fn restart_process(
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   match &kind {
     ProcessKind::Vm => {
-      VmDb::restart_process_by_kind_pk(&kind_pk, &state).await?;
+      VmDb::restart_process_by_kind_key(&kind_pk, &state).await?;
     }
     ProcessKind::Job => {
-      JobDb::restart_process_by_kind_pk(&kind_pk, &state).await?;
+      JobDb::restart_process_by_kind_key(&kind_pk, &state).await?;
     }
     ProcessKind::Cargo => {
-      CargoDb::restart_process_by_kind_pk(&kind_pk, &state).await?;
+      CargoDb::restart_process_by_kind_key(&kind_pk, &state).await?;
     }
   }
   Ok(web::HttpResponse::Accepted().finish())
@@ -211,13 +211,13 @@ pub async fn stop_process(
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   match &kind {
     ProcessKind::Vm => {
-      VmDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+      VmDb::stop_process_by_kind_key(&kind_pk, &state).await?;
     }
     ProcessKind::Job => {
-      JobDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+      JobDb::stop_process_by_kind_key(&kind_pk, &state).await?;
     }
     ProcessKind::Cargo => {
-      CargoDb::stop_process_by_kind_pk(&kind_pk, &state).await?;
+      CargoDb::stop_process_by_kind_key(&kind_pk, &state).await?;
     }
   }
   Ok(web::HttpResponse::Accepted().finish())
@@ -250,13 +250,13 @@ pub async fn kill_process(
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   match &kind {
     ProcessKind::Vm => {
-      VmDb::kill_process_by_kind_pk(&kind_pk, &payload, &state).await?;
+      VmDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
     }
     ProcessKind::Job => {
-      JobDb::kill_process_by_kind_pk(&kind_pk, &payload, &state).await?;
+      JobDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
     }
     ProcessKind::Cargo => {
-      CargoDb::kill_process_by_kind_pk(&kind_pk, &payload, &state).await?;
+      CargoDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
     }
   }
   Ok(web::HttpResponse::Ok().into())

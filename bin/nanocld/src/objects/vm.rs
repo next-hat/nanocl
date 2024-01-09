@@ -98,7 +98,7 @@ impl ObjPutByPk for VmDb {
   ) -> HttpResult<Self::ObjPutOut> {
     let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
     let container_name = format!("{}.v", &vm.spec.vm_key);
-    VmDb::stop_process_by_kind_pk(pk, state).await?;
+    VmDb::stop_process_by_kind_key(pk, state).await?;
     VmDb::del_process_by_pk(
       &container_name,
       None::<RemoveContainerOptions>,
@@ -114,7 +114,7 @@ impl ObjPutByPk for VmDb {
     .await?;
     let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await?;
     utils::vm::create_instance(&vm, &image, false, state).await?;
-    VmDb::start_process_by_kind_pk(&vm.spec.vm_key, state).await?;
+    VmDb::start_process_by_kind_key(&vm.spec.vm_key, state).await?;
     Ok(vm)
   }
 }
