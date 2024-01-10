@@ -71,8 +71,8 @@ pub async fn create_cargo_image(
   state: web::types::State<SystemState>,
   payload: web::types::Json<CargoImagePartial>,
 ) -> HttpResult<web::HttpResponse> {
-  let (from_image, tag) = utils::cargo_image::parse_image_name(&payload.name)?;
-  let rx_body = utils::cargo_image::pull(&from_image, &tag, &state).await?;
+  let (from_image, tag) = utils::container_image::parse_name(&payload.name)?;
+  let rx_body = utils::container_image::pull(&from_image, &tag, &state).await?;
   Ok(
     web::HttpResponse::Ok()
       .keep_alive()

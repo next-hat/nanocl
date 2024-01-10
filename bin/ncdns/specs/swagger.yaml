@@ -84,6 +84,7 @@ components:
           type: string
         IpAddress:
           type: string
+      additionalProperties: false
     ResourceDnsRule:
       type: object
       required:
@@ -96,6 +97,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DnsEntry'
+      additionalProperties: false
 tags:
 - name: Rules
   description: Rules management endpoints.

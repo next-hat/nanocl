@@ -18,7 +18,7 @@ use crate::{
 use super::generic::*;
 
 impl ObjProcess for VmDb {
-  fn get_kind() -> ProcessKind {
+  fn get_process_kind() -> ProcessKind {
     ProcessKind::Vm
   }
 }

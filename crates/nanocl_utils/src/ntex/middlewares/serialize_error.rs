@@ -1,6 +1,6 @@
 use ntex::{web, http};
 use ntex::util::BytesMut;
-use ntex::{Service, Middleware, util::BoxFuture, ServiceCtx};
+use ntex::{Service, Middleware, ServiceCtx};
 use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer};
 use futures::StreamExt;
 
@@ -26,36 +26,33 @@ where
 {
   type Response = WebResponse;
   type Error = Error;
-  type Future<'f> = BoxFuture<'f, Result<Self::Response, Self::Error>> where Self: 'f;
 
   ntex::forward_poll_ready!(service);
 
-  fn call<'a>(
-    &'a self,
+  async fn call<'a>(
+    &self,
     req: WebRequest<Err>,
     ctx: ServiceCtx<'a, Self>,
-  ) -> Self::Future<'_> {
-    Box::pin(async move {
-      let mut res = ctx.call(&self.service, req).await?;
-      if res.status() == http::StatusCode::BAD_REQUEST {
-        let content_type = res.headers().get(http::header::CONTENT_TYPE);
-        if let Some(content_type) = content_type {
-          if content_type == "text/plain; charset=utf-8" {
-            let mut payload = BytesMut::new();
-            let mut body = res.take_body();
-            while let Some(chunk) = body.next().await {
-              let chunk = chunk.unwrap_or_default();
-              payload.extend_from_slice(&chunk);
-            }
-            res = res.into_response(web::HttpResponse::BadRequest().json(
+  ) -> Result<Self::Response, Self::Error> {
+    let mut res = ctx.call(&self.service, req).await?;
+    if res.status() == http::StatusCode::BAD_REQUEST {
+      let content_type = res.headers().get(http::header::CONTENT_TYPE);
+      if let Some(content_type) = content_type {
+        if content_type == "text/plain; charset=utf-8" {
+          let mut payload = BytesMut::new();
+          let mut body = res.take_body();
+          while let Some(chunk) = body.next().await {
+            let chunk = chunk.unwrap_or_default();
+            payload.extend_from_slice(&chunk);
+          }
+          res = res.into_response(web::HttpResponse::BadRequest().json(
               &serde_json::json!({
                 "msg": &String::from_utf8_lossy(&payload).replace("Json deserialize error:", "payload"),
               }),
             ));
-          }
         }
       }
-      Ok(res)
-    })
+    }
+    Ok(res)
   }
 }

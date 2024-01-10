@@ -142,7 +142,7 @@ impl NanocldClient {
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
   /// let res = client.kill_process("cargo", "my-cargo", None, None).await;
   /// ```
-  pub async fn kill_cargo(
+  pub async fn kill_process(
     &self,
     kind: &str,
     name: &str,

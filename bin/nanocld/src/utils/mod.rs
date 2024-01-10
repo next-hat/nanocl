@@ -7,7 +7,7 @@ pub mod store;
 pub mod system;
 pub mod namespace;
 pub mod cargo;
-pub mod cargo_image;
+pub mod container_image;
 pub mod vm;
 pub mod vm_image;
 pub mod job;
@@ -22,7 +22,7 @@ pub mod tests {
   use std::env;
   use ntex::web::{*, self};
 
-  use crate::{services, version::VERSION, models::SystemState};
+  use crate::{services, vars::VERSION, models::SystemState};
   use nanocl_stubs::config::DaemonConfig;
 
   pub use nanocl_utils::ntex::test_client::*;

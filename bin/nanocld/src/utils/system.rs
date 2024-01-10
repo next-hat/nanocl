@@ -14,7 +14,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils, version,
+  vars, utils,
   repositories::generic::*,
   models::{
     SystemState, CargoDb, ProcessDb, NamespaceDb, VmImageDb, ProcessUpdateDb,
@@ -171,7 +171,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
           CargoDb::create_from_spec(
             namespace,
             &new_cargo,
-            &format!("v{}", version::VERSION),
+            &format!("v{}", vars::VERSION),
             &state.pool,
           )
           .await?;
@@ -187,7 +187,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
           CargoDb::update_from_spec(
             key,
             &new_cargo,
-            &format!("v{}", version::VERSION),
+            &format!("v{}", vars::VERSION),
             &state.pool,
           )
           .await?;

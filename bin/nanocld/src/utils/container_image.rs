@@ -10,7 +10,7 @@ use crate::models::SystemState;
 use super::stream;
 
 /// Get the image name and tag from a string
-pub fn parse_image_name(name: &str) -> HttpResult<(String, String)> {
+pub fn parse_name(name: &str) -> HttpResult<(String, String)> {
   let image_info: Vec<&str> = name.split(':').collect();
   if image_info.len() != 2 {
     return Err(HttpError::bad_request("Missing tag in image name"));

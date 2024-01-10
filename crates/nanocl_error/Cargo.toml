@@ -25,7 +25,7 @@ serde_urlencoded = ["dep:serde_urlencoded"]
 tokio = ["dep:tokio"]
 
 [dependencies]
-ntex = { version = "0.7", optional = true }
+ntex = { version = "1.0", optional = true }
 serde_json = { version = "1.0", optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
 diesel = { version = "2.1", default-features = false, optional = true }

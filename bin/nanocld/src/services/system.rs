@@ -4,7 +4,7 @@ use nanocl_error::http::HttpResult;
 
 use nanocl_stubs::system::HostInfo;
 
-use crate::version;
+use crate::vars;
 use crate::models::SystemState;
 
 /// Get version information
@@ -33,10 +33,10 @@ pub async fn get_ping() -> HttpResult<web::HttpResponse> {
 #[web::get("/version")]
 pub async fn get_version() -> web::HttpResponse {
   web::HttpResponse::Ok().json(&serde_json::json!({
-    "Arch": version::ARCH,
-    "Channel": version::CHANNEL,
-    "Version": version::VERSION,
-    "CommitId": version::COMMIT_ID,
+    "Arch": vars::ARCH,
+    "Channel": vars::CHANNEL,
+    "Version": vars::VERSION,
+    "CommitId": vars::COMMIT_ID,
   }))
 }
 

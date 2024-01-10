@@ -7,7 +7,7 @@ mod cli;
 mod config;
 mod schema;
 mod models;
-mod version;
+mod vars;
 mod utils;
 mod subsystem;
 mod repositories;
@@ -31,10 +31,10 @@ async fn main() -> std::io::Result<()> {
   logger::enable_logger("nanocld");
   log::info!(
     "nanocld_{}_v{}-{}:{}",
-    version::ARCH,
-    version::VERSION,
-    version::CHANNEL,
-    version::COMMIT_ID
+    vars::ARCH,
+    vars::VERSION,
+    vars::CHANNEL,
+    vars::COMMIT_ID
   );
   // Init config by comparing command line arguments and config file
   let config = match config::init(&args) {

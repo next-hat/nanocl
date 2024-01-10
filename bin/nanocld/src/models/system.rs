@@ -12,7 +12,7 @@ use nanocl_stubs::{
   system::{Event, EventPartial, NativeEventAction, EventActor, EventKind},
 };
 
-use crate::{version, utils, repositories::generic::*};
+use crate::{vars, utils, repositories::generic::*};
 
 use super::{Pool, EventDb, RawEventEmitter, RawEventClient};
 
@@ -165,7 +165,7 @@ impl SystemState {
       docker_api: docker.clone(),
       config: conf.to_owned(),
       event_manager: EventManager::new(),
-      version: version::VERSION.to_owned(),
+      version: vars::VERSION.to_owned(),
     };
     Ok(system_state)
   }
@@ -222,7 +222,7 @@ impl SystemState {
   {
     let actor = actor.clone().into();
     let event = EventPartial {
-      reporting_controller: "nanocl.io/core".to_owned(),
+      reporting_controller: vars::CONTROLLER_NAME.to_owned(),
       reporting_node: self.config.hostname.clone(),
       kind: EventKind::Normal,
       action: action.to_string(),
