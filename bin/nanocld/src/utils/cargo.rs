@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
-use nanocl_error::http::{HttpError, HttpResult};
+use nanocl_error::http::{HttpResult, HttpError};
 
 use bollard_next::{
   service::{HostConfig, RestartPolicy, RestartPolicyNameEnum},
@@ -9,10 +9,14 @@ use bollard_next::{
     StartContainerOptions, WaitContainerOptions, RemoveContainerOptions,
   },
 };
-use nanocl_stubs::{cargo::Cargo, process::Process};
+use nanocl_stubs::{
+  cargo::Cargo,
+  process::Process,
+  system::{EventPartial, EventActorKind, EventActor, EventKind},
+};
 
 use crate::{
-  utils,
+  vars, utils,
   repositories::generic::*,
   models::{SystemState, CargoDb, SecretDb},
   objects::generic::ObjProcess,
@@ -96,6 +100,7 @@ pub async fn create_instances(
   number: usize,
   state: &SystemState,
 ) -> HttpResult<Vec<Process>> {
+  download_image(cargo, state).await?;
   execute_before(cargo, state).await?;
   let mut secret_envs: Vec<String> = Vec::new();
   if let Some(secrets) = &cargo.spec.secrets {
@@ -232,4 +237,69 @@ pub async fn delete_instances(
     .await
     .into_iter()
     .collect::<HttpResult<()>>()
+}
+
+pub async fn download_image(
+  cargo: &Cargo,
+  state: &SystemState,
+) -> HttpResult<()> {
+  let image_name = &cargo.spec.container.image.clone().unwrap_or_default();
+  if state.docker_api.inspect_image(image_name).await.is_ok() {
+    return Ok(());
+  }
+  let (name, tag) = utils::container_image::parse_name(image_name)?;
+  let mut stream = state.docker_api.create_image(
+    Some(bollard_next::image::CreateImageOptions {
+      from_image: name.clone(),
+      tag: tag.clone(),
+      ..Default::default()
+    }),
+    None,
+    None,
+  );
+  while let Some(chunk) = stream.next().await {
+    let chunk = match chunk {
+      Err(err) => {
+        let event = EventPartial {
+          reporting_controller: vars::CONTROLLER_NAME.to_owned(),
+          reporting_node: state.config.hostname.clone(),
+          action: "download_image".to_owned(),
+          reason: "state_sync".to_owned(),
+          kind: EventKind::Error,
+          actor: Some(EventActor {
+            key: cargo.spec.container.image.clone(),
+            kind: EventActorKind::ContainerImage,
+            attributes: None,
+          }),
+          related: Some(cargo.clone().into()),
+          note: Some(format!(
+            "Error while downloading image {image_name} {err}"
+          )),
+          metadata: None,
+        };
+        state.spawn_emit_event(event);
+        return Err(err.into());
+      }
+      Ok(chunk) => chunk,
+    };
+    let event = EventPartial {
+      reporting_controller: vars::CONTROLLER_NAME.to_owned(),
+      reporting_node: state.config.hostname.clone(),
+      action: "download_image".to_owned(),
+      reason: "state_sync".to_owned(),
+      kind: EventKind::Normal,
+      actor: Some(EventActor {
+        key: cargo.spec.container.image.clone(),
+        kind: EventActorKind::ContainerImage,
+        attributes: None,
+      }),
+      related: Some(cargo.clone().into()),
+      note: Some(format!("Downloading image {name}:{tag}")),
+      metadata: Some(serde_json::json!({
+        "state": chunk,
+      })),
+    };
+    state.spawn_emit_event(event);
+  }
+  Ok(())
 }

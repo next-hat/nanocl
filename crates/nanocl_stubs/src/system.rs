@@ -52,6 +52,7 @@ pub enum EventActorKind {
   Resource,
   Secret,
   Process,
+  ContainerImage,
 }
 
 impl std::fmt::Display for EventActorKind {
@@ -64,6 +65,7 @@ impl std::fmt::Display for EventActorKind {
       EventActorKind::Resource => write!(f, "Resource"),
       EventActorKind::Secret => write!(f, "Secret"),
       EventActorKind::Process => write!(f, "Process"),
+      EventActorKind::ContainerImage => write!(f, "ContainerImage"),
     }
   }
 }

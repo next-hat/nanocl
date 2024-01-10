@@ -48,10 +48,8 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(
     web::scope("/{version}")
       .wrap(
-        nanocl_utils::ntex::middlewares::Versioning::new(
-          crate::version::VERSION,
-        )
-        .finish(),
+        nanocl_utils::ntex::middlewares::Versioning::new(crate::vars::VERSION)
+          .finish(),
       )
       .configure(exec::ntex_config)
       .configure(node::ntex_config)
@@ -79,45 +77,40 @@ mod tests {
 
   use super::ntex_config;
 
-  use crate::version;
+  use crate::vars;
   use crate::utils::tests::*;
 
   #[ntex::test]
   pub async fn get_version() {
-    let client = gen_test_client(ntex_config, version::VERSION).await;
+    let client = gen_test_client(ntex_config, vars::VERSION).await;
     let mut res = client.send_get("/version", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "version");
     let data = res.json::<BinaryInfo>().await.unwrap();
-    assert_eq!(
-      data.arch,
-      version::ARCH,
-      "Expect arch to be {}",
-      version::ARCH
-    );
+    assert_eq!(data.arch, vars::ARCH, "Expect arch to be {}", vars::ARCH);
     assert_eq!(
       data.version,
-      version::VERSION,
+      vars::VERSION,
       "Expect version to be {}",
-      version::VERSION
+      vars::VERSION
     );
     assert_eq!(
       data.commit_id,
-      version::COMMIT_ID,
+      vars::COMMIT_ID,
       "Expect commit_id to be {}",
-      version::COMMIT_ID
+      vars::COMMIT_ID
     );
   }
 
   #[ntex::test]
   async fn ping() {
-    let client = gen_test_client(ntex_config, version::VERSION).await;
+    let client = gen_test_client(ntex_config, vars::VERSION).await;
     let res = client.send_head("/_ping", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::ACCEPTED, "ping");
   }
 
   #[ntex::test]
   async fn unhandled_route() {
-    let client = gen_test_client(ntex_config, version::VERSION).await;
+    let client = gen_test_client(ntex_config, vars::VERSION).await;
     let res = client.send_get("/v0.1/unhandled", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::NOT_FOUND, "unhandled");
   }
@@ -129,12 +122,12 @@ mod tests {
     assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
     let version = res.headers().get("x-api-version");
     assert!(version.is_some());
-    assert_eq!(version.unwrap(), version::VERSION);
+    assert_eq!(version.unwrap(), vars::VERSION);
     let client = gen_test_client(ntex_config, "xdlol").await;
     let res = client.send_get("/version", None::<String>).await;
     assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
     let version = res.headers().get("x-api-version");
     assert!(version.is_some());
-    assert_eq!(version.unwrap(), version::VERSION);
+    assert_eq!(version.unwrap(), vars::VERSION);
   }
 }

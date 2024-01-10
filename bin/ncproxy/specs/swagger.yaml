@@ -94,6 +94,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/UrlRedirect'
           nullable: true
+      additionalProperties: false
     LocationTarget:
       oneOf:
       - $ref: '#/components/schemas/UpstreamTarget'
@@ -122,6 +123,7 @@ components:
           format: double
           description: Http version to use
           nullable: true
+      additionalProperties: false
     ProxyRule:
       oneOf:
       - $ref: '#/components/schemas/ProxyRuleHttp'
@@ -156,6 +158,7 @@ components:
             type: string
           description: Path to extra config file to include
           nullable: true
+      additionalProperties: false
     ProxyRuleStream:
       type: object
       description: Proxy rules modes
@@ -181,6 +184,7 @@ components:
           nullable: true
         Target:
           $ref: '#/components/schemas/StreamTarget'
+      additionalProperties: false
     ProxySsl:
       oneOf:
       - $ref: '#/components/schemas/ProxySslConfig'
@@ -209,6 +213,7 @@ components:
           type: string
           description: Path to the dhparam file
           nullable: true
+      additionalProperties: false
     ProxyStreamProtocol:
       type: string
       description: Proxy rules modes
@@ -226,6 +231,7 @@ components:
           items:
             $ref: '#/components/schemas/ProxyRule'
           description: The rules to apply
+      additionalProperties: false
     StreamTarget:
       oneOf:
       - $ref: '#/components/schemas/UpstreamTarget'
@@ -238,6 +244,7 @@ components:
       properties:
         UnixPath:
           type: string
+      additionalProperties: false
     UpstreamTarget:
       type: object
       description: Config for targetting a cargo or a vm
@@ -261,6 +268,7 @@ components:
           type: boolean
           description: Disable logging for this target
           nullable: true
+      additionalProperties: false
     UriTarget:
       type: object
       required:
@@ -269,6 +277,7 @@ components:
         Uri:
           type: string
           description: Uri to target
+      additionalProperties: false
     UrlRedirect:
       type: string
       enum:

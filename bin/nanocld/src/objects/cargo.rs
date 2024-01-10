@@ -23,7 +23,7 @@ use crate::{
 use super::generic::*;
 
 impl ObjProcess for CargoDb {
-  fn get_kind() -> ProcessKind {
+  fn get_process_kind() -> ProcessKind {
     ProcessKind::Cargo
   }
 }

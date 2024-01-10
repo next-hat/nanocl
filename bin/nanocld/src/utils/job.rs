@@ -12,7 +12,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  version, utils,
+  vars, utils,
   repositories::generic::*,
   models::{SystemState, ProcessDb, JobDb},
 };
@@ -28,7 +28,7 @@ fn format_cron_job_command(job: &Job, state: &SystemState) -> String {
     .replace("unix://", "");
   format!(
     "curl -X POST --unix {host} http://localhost/v{}/processes/job/{}/start",
-    version::VERSION,
+    vars::VERSION,
     &job.name
   )
 }

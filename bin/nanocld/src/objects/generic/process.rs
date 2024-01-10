@@ -21,14 +21,14 @@ use crate::{
 /// Represent a object that is treated as a process
 /// That you can start, restart, stop, logs, etc.
 pub trait ObjProcess {
-  fn get_kind() -> ProcessKind;
+  fn get_process_kind() -> ProcessKind;
 
   async fn _emit(
     kind_key: &str,
     action: NativeEventAction,
     state: &SystemState,
   ) -> HttpResult<()> {
-    match Self::get_kind() {
+    match Self::get_process_kind() {
       ProcessKind::Vm => {
         let vm = VmDb::transform_read_by_pk(kind_key, &state.pool).await?;
         state.emit_normal_native_action(&vm, action);
@@ -62,7 +62,7 @@ pub trait ObjProcess {
     item: Config,
     state: &SystemState,
   ) -> HttpResult<Process> {
-    let kind = Self::get_kind();
+    let kind = Self::get_process_kind();
     let mut config = item.clone();
     let mut labels = item.labels.to_owned().unwrap_or_default();
     labels.insert("io.nanocl".to_owned(), "enabled".to_owned());

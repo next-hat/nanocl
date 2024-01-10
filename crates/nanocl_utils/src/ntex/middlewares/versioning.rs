@@ -4,7 +4,6 @@ use std::rc::Rc;
 use ntex::http::header::{HeaderName, HeaderValue};
 use ntex::{Service, ServiceCtx, Middleware};
 use ntex::web::{WebRequest, WebResponse, Error, ErrorRenderer, HttpResponse};
-use futures::future::{ok, Either, Ready, LocalBoxFuture};
 
 struct Inner {
   version: String,
@@ -69,15 +68,14 @@ where
 {
   type Response = WebResponse;
   type Error = Error;
-  type Future<'f> = Either<LocalBoxFuture<'f, Result<Self::Response, S::Error>>, Ready<Result<Self::Response, S::Error>>> where Self: 'f;
 
   ntex::forward_poll_ready!(service);
 
-  fn call<'a>(
-    &'a self,
+  async fn call<'a>(
+    &self,
     mut req: WebRequest<Err>,
     ctx: ServiceCtx<'a, Self>,
-  ) -> Self::Future<'_> {
+  ) -> Result<Self::Response, Self::Error> {
     let version = req.match_info_mut().get("version");
     let header_name = HeaderName::from_static("x-api-version");
     let header_value = HeaderValue::from_str(&self.inner.version)
@@ -105,7 +103,7 @@ where
             .into_body(),
         );
         res.headers_mut().insert(header_name, header_value);
-        return Either::Right(ok(res));
+        return Ok(res);
       }
       let minor_number = minor.unwrap().parse::<usize>();
       let major_number = major.unwrap().parse::<usize>();
@@ -125,7 +123,7 @@ where
             .into_body(),
         );
         res.headers_mut().insert(header_name, header_value);
-        return Either::Right(ok(res));
+        return Ok(res);
       }
       let minor_number = minor_number.unwrap();
       let major_number = major_number.unwrap();
@@ -144,13 +142,11 @@ where
             .into_body(),
         );
         res.headers_mut().insert(header_name, header_value);
-        return Either::Right(ok(res));
+        return Ok(res);
       }
     }
-    Either::Left(Box::pin(async move {
-      let mut res = ctx.call(&self.service, req).await?;
-      res.headers_mut().insert(header_name, header_value);
-      Ok(res)
-    }))
+    let mut res = ctx.call(&self.service, req).await?;
+    res.headers_mut().insert(header_name, header_value);
+    Ok(res)
   }
 }

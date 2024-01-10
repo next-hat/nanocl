@@ -2089,6 +2089,7 @@ components:
           type: string
           description: Name of the image
           example: nginx:latest
+      additionalProperties: false
     CargoInspect:
       type: object
       description: |-
@@ -2217,6 +2218,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
           nullable: true
+      additionalProperties: false
     CargoSpecUpdate:
       type: object
       description: |-
@@ -2251,6 +2253,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ReplicationMode'
           nullable: true
+      additionalProperties: false
     CargoSummary:
       type: object
       description: |-
@@ -3017,6 +3020,7 @@ components:
           type: string
         IpAddress:
           type: string
+      additionalProperties: false
     Driver:
       type: object
       description: Driver represents a driver (network, logging, secrets).
@@ -3203,6 +3207,7 @@ components:
       - Resource
       - Secret
       - Process
+      - ContainerImage
     EventKind:
       type: string
       description: Kind of event (Error, Normal, Warning), new types could be added in the future.
@@ -3913,6 +3918,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/UrlRedirect'
           nullable: true
+      additionalProperties: false
     ImageInspect:
       type: object
       description: Information about an image in the local image cache.
@@ -4251,6 +4257,7 @@ components:
           items:
             $ref: '#/components/schemas/Config'
           description: List of container to run
+      additionalProperties: false
     JobSummary:
       type: object
       description: Summary of a job (used in list)
@@ -4534,6 +4541,7 @@ components:
           format: int64
           nullable: true
           minimum: 0
+      additionalProperties: false
     MemoryStatsStatsV2:
       type: object
       description: |-
@@ -4697,6 +4705,7 @@ components:
           type: integer
           format: int64
           minimum: 0
+      additionalProperties: false
     Metric:
       type: object
       description: Metric entry
@@ -4956,6 +4965,7 @@ components:
         Name:
           type: string
           description: Name of the namespace
+      additionalProperties: false
     NamespaceSummary:
       type: object
       description: |-
@@ -5412,6 +5422,7 @@ components:
           format: double
           description: Http version to use
           nullable: true
+      additionalProperties: false
     ProxyRule:
       oneOf:
       - $ref: '#/components/schemas/ProxyRuleHttp'
@@ -5446,6 +5457,7 @@ components:
             type: string
           description: Path to extra config file to include
           nullable: true
+      additionalProperties: false
     ProxyRuleStream:
       type: object
       description: Proxy rules modes
@@ -5471,6 +5483,7 @@ components:
           nullable: true
         Target:
           $ref: '#/components/schemas/StreamTarget'
+      additionalProperties: false
     ProxySsl:
       oneOf:
       - $ref: '#/components/schemas/ProxySslConfig'
@@ -5499,6 +5512,7 @@ components:
           type: string
           description: Path to the dhparam file
           nullable: true
+      additionalProperties: false
     ProxyStreamProtocol:
       type: string
       description: Proxy rules modes
@@ -5662,6 +5676,7 @@ components:
         Number:
           type: integer
           minimum: 0
+      additionalProperties: false
     Resource:
       type: object
       description: |-
@@ -5693,6 +5708,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DnsEntry'
+      additionalProperties: false
     ResourceKind:
       type: object
       required:
@@ -5716,6 +5732,7 @@ components:
           nullable: true
         Data:
           $ref: '#/components/schemas/ResourceKindSpec'
+      additionalProperties: false
     ResourceKindInspect:
       type: object
       required:
@@ -5735,6 +5752,7 @@ components:
           items:
             $ref: '#/components/schemas/ResourceKindVersion'
           description: List of versions available
+      additionalProperties: false
     ResourceKindPartial:
       type: object
       description: |-
@@ -5758,6 +5776,7 @@ components:
             $ref: '#/components/schemas/Any'
         Data:
           $ref: '#/components/schemas/ResourceKindSpec'
+      additionalProperties: false
     ResourceKindSpec:
       type: object
       description: |-
@@ -5773,6 +5792,7 @@ components:
           type: string
           description: The service to call when creating, updating or deleting a resource of this kind and version
           nullable: true
+      additionalProperties: false
     ResourceKindVersion:
       type: object
       required:
@@ -5803,6 +5823,7 @@ components:
             $ref: '#/components/schemas/Any'
         Data:
           $ref: '#/components/schemas/ResourceKindSpec'
+      additionalProperties: false
     ResourcePartial:
       type: object
       description: Payload used to create a new resource
@@ -5827,6 +5848,7 @@ components:
           description: The metadata of the resource (user defined)
           additionalProperties:
             $ref: '#/components/schemas/Any'
+      additionalProperties: false
     ResourceProxyRule:
       type: object
       description: Define proxy rules to apply
@@ -5838,6 +5860,7 @@ components:
           items:
             $ref: '#/components/schemas/ProxyRule'
           description: The rules to apply
+      additionalProperties: false
     ResourceSpec:
       type: object
       description: The spec of a resource once created in the system
@@ -5872,6 +5895,7 @@ components:
           description: The metadata of the resource (user defined)
           additionalProperties:
             $ref: '#/components/schemas/Any'
+      additionalProperties: false
     ResourceUpdate:
       type: object
       description: Payload used to update a resource
@@ -5888,6 +5912,7 @@ components:
           description: The metadata of the resource as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
+      additionalProperties: false
     ResourcesBlkioWeightDevice:
       type: object
       properties:
@@ -6021,6 +6046,7 @@ components:
           description: The secret data
           additionalProperties:
             $ref: '#/components/schemas/Any'
+      additionalProperties: false
     SecretUpdate:
       type: object
       description: This structure is used to update a secret.
@@ -6037,6 +6063,7 @@ components:
           description: The data of the secret as a json object
           additionalProperties:
             $ref: '#/components/schemas/Any'
+      additionalProperties: false
     StartExecOptions:
       type: object
       description: Exec configuration used in the [Create Exec API](Docker::create_exec())
@@ -6108,6 +6135,7 @@ components:
             $ref: '#/components/schemas/JobPartial'
           description: List of jobs to create and run
           nullable: true
+      additionalProperties: false
     StatefileArg:
       type: object
       description: Statefile argument definition to pass to the Statefile
@@ -6125,6 +6153,7 @@ components:
           type: string
           description: Default value of the build arg
           nullable: true
+      additionalProperties: false
     Stats:
       type: object
       description: Statistics for the container.
@@ -6780,6 +6809,7 @@ components:
       properties:
         UnixPath:
           type: string
+      additionalProperties: false
     UpstreamTarget:
       type: object
       description: Config for targetting a cargo or a vm
@@ -6803,6 +6833,7 @@ components:
           type: boolean
           description: Disable logging for this target
           nullable: true
+      additionalProperties: false
     UriTarget:
       type: object
       required:
@@ -6811,6 +6842,7 @@ components:
         Uri:
           type: string
           description: Uri to target
+      additionalProperties: false
     UrlRedirect:
       type: string
       enum:
@@ -6849,6 +6881,7 @@ components:
           description: 'Virtual size allowed for the disk in GB (default: 20)'
           nullable: true
           minimum: 0
+      additionalProperties: false
     VmHostConfig:
       type: object
       description: A vm's resources (cpu, memory, network)
@@ -6895,6 +6928,7 @@ components:
           type: boolean
           description: Use host tun device
           nullable: true
+      additionalProperties: false
     VmImage:
       type: object
       required:
@@ -6944,6 +6978,7 @@ components:
         Shrink:
           type: boolean
           description: Whether to shrink the image or not
+      additionalProperties: false
     VmInspect:
       type: object
       description: |-
@@ -7095,6 +7130,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/VmHostConfig'
           nullable: true
+      additionalProperties: false
     VmSpecUpdate:
       type: object
       description: |
@@ -7139,6 +7175,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/VmHostConfig'
           nullable: true
+      additionalProperties: false
     VmSummary:
       type: object
       description: |-
