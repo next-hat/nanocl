@@ -18,6 +18,7 @@ use crate::{
   repositories::generic::*,
   models::{
     SystemState, CargoDb, ProcessDb, NamespaceDb, VmImageDb, ProcessUpdateDb,
+    CargoObjCreateIn,
   },
   objects::generic::ObjCreate,
 };
@@ -168,13 +169,12 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
           log::trace!(
             "system::sync_processes: create cargo {name} in namespace {namespace}",
           );
-          CargoDb::create_from_spec(
-            namespace,
-            &new_cargo,
-            &format!("v{}", vars::VERSION),
-            &state.pool,
-          )
-          .await?;
+          let obj = &CargoObjCreateIn {
+            namespace: namespace.to_owned(),
+            spec: new_cargo.clone(),
+            version: format!("v{}", vars::VERSION),
+          };
+          CargoDb::create_obj(obj, state).await?;
         }
         // If the cargo is already in our store and the config is different we update it
         Ok(cargo) => {

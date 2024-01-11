@@ -34,7 +34,6 @@ async fn exec_docker(
   }
   let action = event.action.clone().unwrap_or_default();
   let id = actor.id.unwrap_or_default();
-  log::debug!("event::exec_docker: {action}");
   let action = action.as_str();
   let mut event = EventPartial {
     reporting_controller: vars::CONTROLLER_NAME.to_owned(),

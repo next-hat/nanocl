@@ -24,10 +24,10 @@ async fn main() -> std::io::Result<()> {
   // Parse command line arguments
   let args = cli::Cli::parse();
   // Build env logger
-  #[cfg(any(feature = "dev", feature = "test"))]
-  {
-    std::env::set_var("LOG_LEVEL", "nanocld=trace");
-  }
+  // #[cfg(any(feature = "dev", feature = "test"))]
+  // {
+  //   std::env::set_var("LOG_LEVEL", "nanocld=trace");
+  // }
   logger::enable_logger("nanocld");
   log::info!(
     "nanocld_{}_v{}-{}:{}",

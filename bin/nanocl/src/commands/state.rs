@@ -497,10 +497,10 @@ async fn exec_state_apply(
       let token = format!("cargo/{}", cargo.name);
       if let Some(before) = &cargo.init_container {
         let image = before.image.clone().unwrap_or_default();
-        pull_image(&image, opts.force_pull, &client).await?;
+        // pull_image(&image, opts.force_pull, &client).await?;
       }
       let image = cargo.container.image.clone().unwrap_or_default();
-      pull_image(&image, opts.force_pull, &client).await?;
+      // pull_image(&image, opts.force_pull, &client).await?;
       let pg = utils::progress::create_progress(&token, &pg_style);
       match client.inspect_cargo(&cargo.name, Some(&namespace)).await {
         Err(_) => {

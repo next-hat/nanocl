@@ -19,6 +19,7 @@ use crate::{
   objects::generic::*,
   models::{
     Pool, CargoDb, SpecDb, CargoUpdateDb, SystemState, NamespaceDb, ProcessDb,
+    ObjPsStatusDb,
   },
   schema::cargoes,
 };
@@ -98,39 +99,6 @@ impl WithSpec for CargoDb {
 }
 
 impl CargoDb {
-  /// Create a new cargo from its specification.
-  pub async fn create_from_spec(
-    nsp: &str,
-    item: &CargoSpecPartial,
-    version: &str,
-    pool: &Pool,
-  ) -> IoResult<Cargo> {
-    let nsp = nsp.to_owned();
-    let item = item.to_owned();
-    let version = version.to_owned();
-    // test if the name of the cargo include a . in the name and throw error if true
-    if item.name.contains('.') {
-      return Err(IoError::invalid_input(
-        "CargoSpecPartial",
-        "Name cannot contain a dot.",
-      ));
-    }
-    let key = utils::key::gen_key(&nsp, &item.name);
-    let new_spec = SpecDb::try_from_cargo_partial(&key, &version, &item)?;
-    let spec = SpecDb::create_from(new_spec, pool)
-      .await?
-      .try_to_cargo_spec()?;
-    let new_item = CargoDb {
-      key,
-      name: item.name,
-      created_at: chrono::Utc::now().naive_utc(),
-      namespace_name: nsp,
-      spec_key: spec.key,
-    };
-    let item = CargoDb::create_from(new_item, pool).await?.with_spec(&spec);
-    Ok(item)
-  }
-
   /// Update a cargo from its specification.
   pub async fn update_from_spec(
     key: &str,
@@ -236,5 +204,13 @@ impl CargoDb {
       });
     }
     Ok(cargo_summaries)
+  }
+
+  /// Delete a cargo and it's relations (Spec, ObjPsStatus).
+  pub async fn clear_by_pk(pk: &str, pool: &Pool) -> IoResult<()> {
+    CargoDb::del_by_pk(pk, pool).await?;
+    SpecDb::del_by_kind_key(pk, pool).await?;
+    ObjPsStatusDb::del_by_pk(pk, pool).await?;
+    Ok(())
   }
 }

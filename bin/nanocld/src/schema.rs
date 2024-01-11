@@ -6,6 +6,7 @@ diesel::table! {
         created_at -> Timestamptz,
         name -> Varchar,
         spec_key -> Uuid,
+        status_key -> Varchar,
         namespace_name -> Varchar,
     }
 }
@@ -75,6 +76,18 @@ diesel::table! {
         name -> Varchar,
         ip_address -> Varchar,
         created_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    object_process_statuses (key) {
+        key -> Varchar,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+        wanted -> Varchar,
+        prev_wanted -> Varchar,
+        actual -> Varchar,
+        prev_actual -> Varchar,
     }
 }
 
@@ -156,6 +169,7 @@ diesel::table! {
 }
 
 diesel::joinable!(cargoes -> namespaces (namespace_name));
+diesel::joinable!(cargoes -> object_process_statuses (status_key));
 diesel::joinable!(cargoes -> specs (spec_key));
 diesel::joinable!(node_group_links -> node_groups (node_group_name));
 diesel::joinable!(node_group_links -> nodes (node_name));
@@ -173,6 +187,7 @@ diesel::allow_tables_to_appear_in_same_query!(
   node_group_links,
   node_groups,
   nodes,
+  object_process_statuses,
   processes,
   resource_kinds,
   resources,

@@ -93,7 +93,7 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let actor_kind = &actor.kind;
   log::trace!("event::on_event: {actor_kind} {action}");
   match (actor_kind, action) {
-    (EventActorKind::Cargo, NativeEventAction::Start)
+    (EventActorKind::Cargo, NativeEventAction::Running)
     | (EventActorKind::Cargo, NativeEventAction::Update) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       update_cargo_rule(&name, &namespace, state).await?;

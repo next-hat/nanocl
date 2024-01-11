@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use bollard_next::container::StartContainerOptions;
 use ntex::rt;
 use futures_util::StreamExt;
 
@@ -13,18 +14,19 @@ use crate::{
   repositories::generic::*,
   models::{
     SystemState, JobDb, ProcessDb, SystemEventReceiver, SystemEventKind,
+    CargoDb, ObjPsStatusUpdate, ObjPsStatusDb, ObjPsStatusKind,
   },
 };
 
 /// Remove a job after when finished and ttl is set
-async fn job_ttl(e: Event, state: &SystemState) -> IoResult<()> {
-  let Some(actor) = e.actor else {
+async fn job_ttl(e: &Event, state: &SystemState) -> IoResult<()> {
+  let Some(ref actor) = e.actor else {
     return Ok(());
   };
   if actor.kind != EventActorKind::Process {
     return Ok(());
   }
-  let attributes = actor.attributes.unwrap_or_default();
+  let attributes = actor.attributes.clone().unwrap_or_default();
   let job_id = match attributes.get("io.nanocl.j") {
     None => return Ok(()),
     Some(job_id) => job_id.as_str().unwrap_or_default(),
@@ -61,9 +63,54 @@ async fn job_ttl(e: Event, state: &SystemState) -> IoResult<()> {
   Ok(())
 }
 
+async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
+  let action = NativeEventAction::from_str(e.action.as_str())?;
+  // If it's not a start action, we don't care
+  if action != NativeEventAction::Start {
+    return Ok(());
+  }
+  // If there is no actor, we don't care
+  let Some(ref actor) = e.actor else {
+    return Ok(());
+  };
+  let key = actor.key.clone().unwrap_or_default();
+  match actor.kind {
+    EventActorKind::Cargo => {
+      log::debug!("handling start event for cargo {key}");
+      let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
+      let mut processes =
+        ProcessDb::read_by_kind_key(&key, &state.pool).await?;
+      if processes.is_empty() {
+        processes = utils::cargo::create_instances(&cargo, 1, state).await?;
+      }
+      for process in processes {
+        let _ = state
+          .docker_api
+          .start_container(&process.key, None::<StartContainerOptions<String>>)
+          .await;
+      }
+      let cur_status = ObjPsStatusDb::read_by_pk(&key, &state.pool).await?;
+      let new_status = ObjPsStatusUpdate {
+        wanted: Some(ObjPsStatusKind::Running.to_string()),
+        prev_wanted: Some(cur_status.wanted),
+        actual: Some(ObjPsStatusKind::Running.to_string()),
+        prev_actual: Some(cur_status.actual),
+      };
+      ObjPsStatusDb::update_pk(&key, new_status, &state.pool).await?;
+      state.emit_normal_native_action(&cargo, NativeEventAction::Running);
+    }
+    EventActorKind::Vm => {}
+    EventActorKind::Job => {}
+    _ => {}
+  }
+  Ok(())
+}
+
 /// Take action when event is received
 async fn exec_event(e: Event, state: &SystemState) -> IoResult<()> {
-  job_ttl(e, state).await?;
+  log::debug!("exec_event: {} {}", e.kind, e.action);
+  job_ttl(&e, state).await?;
+  start(&e, state).await?;
   Ok(())
 }
 

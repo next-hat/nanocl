@@ -22,6 +22,8 @@ pub struct CargoDb {
   pub name: String,
   /// The spec key reference
   pub spec_key: uuid::Uuid,
+  /// The status key reference
+  pub status_key: String,
   /// The namespace name
   pub namespace_name: String,
 }
