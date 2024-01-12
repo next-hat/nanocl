@@ -7,7 +7,7 @@ use bollard_next::{container::Config, service::HostConfig};
 use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::{
   process::ProcessKind,
-  system::NativeEventAction,
+  system::{NativeEventAction, ObjPsStatusPartial, ObjPsStatusKind},
   cargo::{Cargo, CargoDeleteQuery, CargoInspect},
   cargo_spec::{ReplicationMode, CargoSpecPartial},
 };
@@ -17,8 +17,7 @@ use crate::{
   repositories::generic::*,
   models::{
     CargoDb, SystemState, CargoObjCreateIn, ProcessDb, SpecDb, CargoObjPutIn,
-    CargoObjPatchIn, ObjPsStatusPartial, ObjPsStatusKind, ObjPsStatusDb,
-    ObjPsStatusUpdate,
+    CargoObjPatchIn, ObjPsStatusDb, ObjPsStatusUpdate,
   },
 };
 
@@ -55,7 +54,7 @@ impl ObjCreate for CargoDb {
       actual: ObjPsStatusKind::Created,
       prev_actual: ObjPsStatusKind::Created,
     };
-    ObjPsStatusDb::create_from(status, &state.pool).await?;
+    let status = ObjPsStatusDb::create_from(status, &state.pool).await?;
     let new_item = CargoDb {
       key: key.clone(),
       name: obj.spec.name.clone(),
@@ -66,7 +65,12 @@ impl ObjCreate for CargoDb {
     };
     let cargo = CargoDb::create_from(new_item, &state.pool)
       .await?
-      .with_spec(&spec);
+      .with_spec(&(
+        spec,
+        status
+          .try_into()
+          .map_err(HttpError::internal_server_error)?,
+      ));
     Ok(cargo)
   }
 }
@@ -249,6 +253,7 @@ impl ObjInspectByPk for CargoDb {
     let cargo = CargoDb::transform_read_by_pk(pk, &state.pool).await?;
     let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
     let (_, _, _, running_instances) = utils::process::count_status(&processes);
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
     Ok(CargoInspect {
       created_at: cargo.created_at,
       namespace_name: cargo.namespace_name,
@@ -256,6 +261,9 @@ impl ObjInspectByPk for CargoDb {
       instance_running: running_instances,
       spec: cargo.spec,
       instances: processes,
+      status: status
+        .try_into()
+        .map_err(HttpError::internal_server_error)?,
     })
   }
 }

@@ -3,6 +3,7 @@ use std::{fs, str::FromStr};
 use std::collections::HashMap;
 
 use futures::StreamExt;
+use nanocld_client::stubs::system::ObjPsStatusKind;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
 use bollard_next::service::HostConfig;
@@ -447,7 +448,7 @@ async fn exec_state_apply(
   }
   let client_ptr = cli_conf.client.clone();
   let state_ptr = state_file.clone();
-  let mut keys = Arc::new(Mutex::new(
+  let keys = Arc::new(Mutex::new(
     state_ptr.data.cargoes.unwrap_or_default().into_iter().fold(
       HashMap::new(),
       |mut acc, elem| {
@@ -467,6 +468,7 @@ async fn exec_state_apply(
       },
     ),
   ));
+  let keys_ptr = keys.clone();
   let event_fut = ntex::rt::spawn(async move {
     let mut ev_stream = client_ptr.watch_events().await?;
     while let Some(ev) = ev_stream.next().await {
@@ -485,7 +487,7 @@ async fn exec_state_apply(
       let key = actor.key.clone().unwrap_or_default();
       let kind = actor.kind.clone();
       let entry = format!("{kind}@{key}");
-      let mut keys = keys.lock().unwrap();
+      let mut keys = keys_ptr.lock().unwrap();
       if action == NativeEventAction::Start {
         keys.insert(entry, true);
       }
@@ -543,6 +545,8 @@ async fn exec_state_apply(
             client
               .put_cargo(&cargo.name, cargo, Some(&namespace))
               .await?;
+          } else if inspect.status.actual == ObjPsStatusKind::Running {
+            keys.lock().unwrap().insert(key, true);
           }
         }
       }
@@ -593,7 +597,9 @@ async fn exec_state_apply(
       }
     }
   }
-  event_fut.await??;
+  if !keys.lock().unwrap().values().all(|v| *v) {
+    event_fut.await??;
+  }
   if opts.follow {
     let query = ProcessLogQuery {
       namespace: state_file.data.namespace,

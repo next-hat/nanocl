@@ -6,7 +6,9 @@ use futures_util::StreamExt;
 
 use nanocl_error::io::IoResult;
 
-use nanocl_stubs::system::{Event, EventActorKind, NativeEventAction};
+use nanocl_stubs::system::{
+  Event, EventActorKind, NativeEventAction, ObjPsStatusKind,
+};
 
 use crate::{
   utils,
@@ -14,7 +16,7 @@ use crate::{
   repositories::generic::*,
   models::{
     SystemState, JobDb, ProcessDb, SystemEventReceiver, SystemEventKind,
-    CargoDb, ObjPsStatusUpdate, ObjPsStatusDb, ObjPsStatusKind,
+    CargoDb, ObjPsStatusUpdate, ObjPsStatusDb,
   },
 };
 

@@ -12,6 +12,7 @@ use nanocl_stubs::{
   generic::{GenericFilter, GenericClause, GenericListNspQuery},
   cargo::{Cargo, CargoDeleteQuery, CargoSummary},
   cargo_spec::{CargoSpecPartial, CargoSpec},
+  system::ObjPsStatus,
 };
 
 use crate::{
@@ -37,7 +38,7 @@ impl RepositoryUpdate for CargoDb {
 impl RepositoryDelByPk for CargoDb {}
 
 impl RepositoryReadBy for CargoDb {
-  type Output = (CargoDb, SpecDb);
+  type Output = (CargoDb, SpecDb, ObjPsStatusDb);
 
   fn get_pk() -> &'static str {
     "key"
@@ -57,6 +58,7 @@ impl RepositoryReadBy for CargoDb {
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = cargoes::table
       .inner_join(crate::schema::specs::table)
+      .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, cargoes::key, value);
@@ -77,23 +79,26 @@ impl RepositoryReadBy for CargoDb {
 impl RepositoryReadByTransform for CargoDb {
   type NewOutput = Cargo;
 
-  fn transform(item: (CargoDb, SpecDb)) -> IoResult<Self::NewOutput> {
-    let (cargodb, specdb) = item;
+  fn transform(
+    item: (CargoDb, SpecDb, ObjPsStatusDb),
+  ) -> IoResult<Self::NewOutput> {
+    let (cargodb, specdb, status) = item;
     let spec = specdb.try_to_cargo_spec()?;
-    let item = cargodb.with_spec(&spec);
+    let item = cargodb.with_spec(&(spec, status.try_into()?));
     Ok(item)
   }
 }
 
 impl WithSpec for CargoDb {
   type Output = Cargo;
-  type Relation = CargoSpec;
+  type Relation = (CargoSpec, ObjPsStatus);
 
   fn with_spec(self, r: &Self::Relation) -> Self::Output {
     Self::Output {
       namespace_name: self.namespace_name,
       created_at: self.created_at,
-      spec: r.clone(),
+      spec: r.0.clone(),
+      status: r.1.clone(),
     }
   }
 }

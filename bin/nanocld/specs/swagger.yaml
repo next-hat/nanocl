@@ -2069,6 +2069,7 @@ components:
       - NamespaceName
       - CreatedAt
       - Spec
+      - Status
       properties:
         NamespaceName:
           type: string
@@ -2079,6 +2080,8 @@ components:
           description: When the cargo was created
         Spec:
           $ref: '#/components/schemas/CargoSpec'
+        Status:
+          $ref: '#/components/schemas/ObjPsStatus'
     CargoImagePartial:
       type: object
       description: Cargo Image Partial is used to pull a new container image
@@ -2102,6 +2105,7 @@ components:
       - InstanceTotal
       - InstanceRunning
       - Spec
+      - Status
       - Instances
       properties:
         NamespaceName:
@@ -2121,6 +2125,8 @@ components:
           minimum: 0
         Spec:
           $ref: '#/components/schemas/CargoSpec'
+        Status:
+          $ref: '#/components/schemas/ObjPsStatus'
         Instances:
           type: array
           items:

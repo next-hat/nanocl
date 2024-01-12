@@ -8,7 +8,7 @@ use nanocl_error::{
   http::{HttpResult, HttpError},
 };
 use nanocl_stubs::{
-  system::NativeEventAction,
+  system::{NativeEventAction, ObjPsStatusKind},
   process::{ProcessKind, ProcessPartial, Process},
   cargo::CargoKillOptions,
 };
@@ -17,7 +17,7 @@ use crate::{
   repositories::generic::*,
   models::{
     SystemState, ProcessDb, VmDb, CargoDb, JobDb, JobUpdateDb, ObjPsStatusDb,
-    ObjPsStatusUpdate, ObjPsStatusKind,
+    ObjPsStatusUpdate,
   },
 };
 
