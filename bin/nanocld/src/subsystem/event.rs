@@ -1,6 +1,6 @@
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
-use bollard_next::container::StartContainerOptions;
+use bollard_next::container::{StartContainerOptions, RemoveContainerOptions};
 use ntex::rt;
 use futures_util::StreamExt;
 
@@ -66,7 +66,7 @@ async fn job_ttl(e: &Event, state: &SystemState) -> IoResult<()> {
 async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
   let action = NativeEventAction::from_str(e.action.as_str())?;
   // If it's not a start action, we don't care
-  if action != NativeEventAction::Start {
+  if action != NativeEventAction::Starting {
     return Ok(());
   }
   // If there is no actor, we don't care
@@ -97,7 +97,7 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
         prev_actual: Some(cur_status.actual),
       };
       ObjPsStatusDb::update_pk(&key, new_status, &state.pool).await?;
-      state.emit_normal_native_action(&cargo, NativeEventAction::Running);
+      state.emit_normal_native_action(&cargo, NativeEventAction::Start);
     }
     EventActorKind::Vm => {}
     EventActorKind::Job => {}
@@ -106,11 +106,109 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
   Ok(())
 }
 
+async fn delete(e: &Event, state: &SystemState) -> IoResult<()> {
+  let action = NativeEventAction::from_str(e.action.as_str())?;
+  // If it's not a start action, we don't care
+  if action != NativeEventAction::Deleting {
+    return Ok(());
+  }
+  // If there is no actor, we don't care
+  let Some(ref actor) = e.actor else {
+    return Ok(());
+  };
+  let key = actor.key.clone().unwrap_or_default();
+  let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
+  for process in processes {
+    let _ = state
+      .docker_api
+      .remove_container(
+        &process.key,
+        Some(RemoveContainerOptions {
+          force: true,
+          ..Default::default()
+        }),
+      )
+      .await;
+  }
+  match actor.kind {
+    EventActorKind::Cargo => {
+      log::debug!("handling delete event for cargo {key}");
+      let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
+      CargoDb::clear_by_pk(&key, &state.pool).await?;
+      state.emit_normal_native_action(&cargo, NativeEventAction::Delete);
+    }
+    EventActorKind::Vm => {}
+    EventActorKind::Job => {}
+    _ => {}
+  };
+  Ok(())
+}
+
+async fn update(e: &Event, state: &SystemState) -> IoResult<()> {
+  let action = NativeEventAction::from_str(e.action.as_str())?;
+  // If it's not a start action, we don't care
+  if action != NativeEventAction::Update {
+    return Ok(());
+  }
+  // If there is no actor, we don't care
+  let Some(ref actor) = e.actor else {
+    return Ok(());
+  };
+  let key = actor.key.clone().unwrap_or_default();
+  let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
+  // Create instance with the new spec
+  let mut error = None;
+  let new_instances =
+    match utils::cargo::create_instances(&cargo, 1, state).await {
+      Err(err) => {
+        error = Some(err);
+        Vec::default()
+      }
+      Ok(instances) => instances,
+    };
+  // start created containers
+  match CargoDb::start_process_by_kind_key(&key, state).await {
+    Err(err) => {
+      log::error!(
+        "Unable to start cargo instance {} : {err}",
+        cargo.spec.cargo_key
+      );
+      let state_ptr = state.clone();
+      rt::spawn(async move {
+        ntex::time::sleep(std::time::Duration::from_secs(2)).await;
+        let _ = utils::cargo::delete_instances(
+          &new_instances
+            .iter()
+            .map(|i| i.key.clone())
+            .collect::<Vec<_>>(),
+          &state_ptr,
+        )
+        .await;
+      });
+    }
+    Ok(_) => {
+      // Delete old containers
+      utils::cargo::delete_instances(
+        &processes.iter().map(|c| c.key.clone()).collect::<Vec<_>>(),
+        state,
+      )
+      .await?;
+    }
+  }
+  match error {
+    Some(err) => Err(err.into()),
+    None => Ok(()),
+  }
+}
+
 /// Take action when event is received
 async fn exec_event(e: Event, state: &SystemState) -> IoResult<()> {
   log::debug!("exec_event: {} {}", e.kind, e.action);
   job_ttl(&e, state).await?;
   start(&e, state).await?;
+  delete(&e, state).await?;
+  update(&e, state).await?;
   Ok(())
 }
 

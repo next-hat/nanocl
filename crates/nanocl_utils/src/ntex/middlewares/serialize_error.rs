@@ -29,10 +29,10 @@ where
 
   ntex::forward_poll_ready!(service);
 
-  async fn call<'a>(
+  async fn call(
     &self,
     req: WebRequest<Err>,
-    ctx: ServiceCtx<'a, Self>,
+    ctx: ServiceCtx<'_, Self>,
   ) -> Result<Self::Response, Self::Error> {
     let mut res = ctx.call(&self.service, req).await?;
     if res.status() == http::StatusCode::BAD_REQUEST {

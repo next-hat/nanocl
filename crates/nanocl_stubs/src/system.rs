@@ -78,12 +78,15 @@ impl std::fmt::Display for EventActorKind {
 pub enum NativeEventAction {
   Create,
   Update,
+  Starting,
   Start,
-  Stop,
+  Deleting,
   Delete,
+  Stopping,
+  Stop,
+  Restarting,
   Restart,
-  Running,
-  Finished,
+  Finish,
   Other(String),
 }
 
@@ -98,8 +101,11 @@ impl FromStr for NativeEventAction {
       "stop" => Ok(NativeEventAction::Stop),
       "delete" => Ok(NativeEventAction::Delete),
       "restart" => Ok(NativeEventAction::Restart),
-      "running" => Ok(NativeEventAction::Running),
-      "finished" => Ok(NativeEventAction::Finished),
+      "starting" => Ok(NativeEventAction::Starting),
+      "finished" => Ok(NativeEventAction::Finish),
+      "deleting" => Ok(NativeEventAction::Deleting),
+      "stopping" => Ok(NativeEventAction::Stopping),
+      "restarting" => Ok(NativeEventAction::Restarting),
       _ => Ok(NativeEventAction::Other(s.to_owned())),
     }
   }
@@ -114,8 +120,11 @@ impl std::fmt::Display for NativeEventAction {
       NativeEventAction::Stop => write!(f, "stop"),
       NativeEventAction::Delete => write!(f, "delete"),
       NativeEventAction::Restart => write!(f, "restart"),
-      NativeEventAction::Running => write!(f, "running"),
-      NativeEventAction::Finished => write!(f, "finished"),
+      NativeEventAction::Starting => write!(f, "starting"),
+      NativeEventAction::Finish => write!(f, "finished"),
+      NativeEventAction::Deleting => write!(f, "deleting"),
+      NativeEventAction::Stopping => write!(f, "stopping"),
+      NativeEventAction::Restarting => write!(f, "restarting"),
       NativeEventAction::Other(s) => write!(f, "{}", s),
     }
   }

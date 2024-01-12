@@ -124,12 +124,12 @@ pub trait ObjProcess {
     let status_update = ObjPsStatusUpdate {
       wanted: Some(ObjPsStatusKind::Running.to_string()),
       prev_wanted: Some(current_status.wanted),
-      actual: Some(ObjPsStatusKind::Started.to_string()),
+      actual: Some(ObjPsStatusKind::Starting.to_string()),
       prev_actual: Some(current_status.actual),
     };
     log::debug!("start_process_by_kind_pk: {kind_pk} update status");
     ObjPsStatusDb::update_pk(kind_pk, status_update, &state.pool).await?;
-    Self::_emit(kind_pk, NativeEventAction::Start, state).await?;
+    Self::_emit(kind_pk, NativeEventAction::Starting, state).await?;
     log::debug!("start emitted !");
     Ok(())
   }

@@ -2,15 +2,12 @@
 /// For a cargo object in the database.
 /// An object will emit an event when it is created, updated or deleted.
 ///
-use futures_util::{StreamExt, stream::FuturesUnordered};
-use bollard_next::{
-  service::HostConfig,
-  container::{Config, RemoveContainerOptions},
-};
+use bollard_next::{container::Config, service::HostConfig};
 
 use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::{
   process::ProcessKind,
+  system::NativeEventAction,
   cargo::{Cargo, CargoDeleteQuery, CargoInspect},
   cargo_spec::{ReplicationMode, CargoSpecPartial},
 };
@@ -21,6 +18,7 @@ use crate::{
   models::{
     CargoDb, SystemState, CargoObjCreateIn, ProcessDb, SpecDb, CargoObjPutIn,
     CargoObjPatchIn, ObjPsStatusPartial, ObjPsStatusKind, ObjPsStatusDb,
+    ObjPsStatusUpdate,
   },
 };
 
@@ -85,25 +83,21 @@ impl ObjDelByPk for CargoDb {
     let cargo = CargoDb::transform_read_by_pk(pk, &state.pool).await?;
     let processes =
       ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
-    processes
-      .into_iter()
-      .map(|process| async move {
-        CargoDb::del_process_by_pk(
-          &process.key,
-          Some(RemoveContainerOptions {
-            force: opts.force.unwrap_or(false),
-            ..Default::default()
-          }),
-          state,
-        )
-        .await
-      })
-      .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<HttpResult<()>>>()
-      .await
-      .into_iter()
-      .collect::<HttpResult<Vec<_>>>()?;
-    CargoDb::clear_by_pk(pk, &state.pool).await?;
+    let (_, _, _, running) = utils::process::count_status(&processes);
+    if running > 0 && !opts.force.unwrap_or(false) {
+      return Err(HttpError::bad_request(
+        "Unable to delete cargo with running instances without force option",
+      ));
+    }
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
+    let new_status = ObjPsStatusUpdate {
+      wanted: Some(ObjPsStatusKind::Delete.to_string()),
+      prev_wanted: Some(status.wanted),
+      actual: Some(ObjPsStatusKind::Deleting.to_string()),
+      prev_actual: Some(status.actual),
+    };
+    ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
+    state.emit_normal_native_action(&cargo, NativeEventAction::Deleting);
     Ok(cargo)
   }
 }
@@ -117,63 +111,17 @@ impl ObjPutByPk for CargoDb {
     obj: &Self::ObjPutIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPutOut> {
-    let cargo =
-      CargoDb::update_from_spec(pk, &obj.spec, &obj.version, &state.pool)
-        .await?;
-    // Get the number of instance to create
-    let number = if let Some(mode) = &cargo.spec.replication {
-      match mode {
-        ReplicationMode::Static(replication_static) => {
-          replication_static.number
-        }
-        ReplicationMode::Auto => 1,
-        ReplicationMode::Unique => 1,
-        ReplicationMode::UniqueByNode => 1,
-        _ => 1,
-      }
-    } else {
-      1
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
+    let new_status = ObjPsStatusUpdate {
+      wanted: Some(ObjPsStatusKind::Running.to_string()),
+      prev_wanted: Some(status.wanted),
+      actual: Some(ObjPsStatusKind::Patching.to_string()),
+      prev_actual: Some(status.actual),
     };
-    let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
-    // Create instance with the new spec
-    let mut error = None;
-    let new_instances =
-      match utils::cargo::create_instances(&cargo, number, state).await {
-        Err(err) => {
-          error = Some(err);
-          Vec::default()
-        }
-        Ok(instances) => instances,
-      };
-    // start created containers
-    match CargoDb::start_process_by_kind_key(pk, state).await {
-      Err(err) => {
-        log::error!(
-          "Unable to start cargo instance {} : {err}",
-          cargo.spec.cargo_key
-        );
-        utils::cargo::delete_instances(
-          &new_instances
-            .iter()
-            .map(|i| i.key.clone())
-            .collect::<Vec<_>>(),
-          state,
-        )
-        .await?;
-      }
-      Ok(_) => {
-        // Delete old containers
-        utils::cargo::delete_instances(
-          &processes.iter().map(|c| c.key.clone()).collect::<Vec<_>>(),
-          state,
-        )
-        .await?;
-      }
-    }
-    match error {
-      Some(err) => Err(err),
-      None => Ok(cargo),
-    }
+    ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
+    CargoDb::update_from_spec(pk, &obj.spec, &obj.version, &state.pool)
+      .await
+      .map_err(HttpError::from)
   }
 }
 

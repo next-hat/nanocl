@@ -30,8 +30,11 @@ pub struct ObjPsStatusUpdate {
 pub enum ObjPsStatusKind {
   #[default]
   Created,
-  Started,
+  Starting,
   Running,
+  Patching,
+  Deleting,
+  Delete,
   Stopped,
   Failed,
   Unknown,
@@ -43,10 +46,13 @@ impl FromStr for ObjPsStatusKind {
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
       "created" => Ok(Self::Created),
-      "started" => Ok(Self::Started),
+      "starting" => Ok(Self::Starting),
       "running" => Ok(Self::Running),
       "stopped" => Ok(Self::Stopped),
       "failed" => Ok(Self::Failed),
+      "deleting" => Ok(Self::Deleting),
+      "delete" => Ok(Self::Delete),
+      "patching" => Ok(Self::Patching),
       _ => Ok(Self::Unknown),
     }
   }
@@ -56,11 +62,14 @@ impl ToString for ObjPsStatusKind {
   fn to_string(&self) -> String {
     match self {
       Self::Created => "created",
-      Self::Started => "started",
+      Self::Starting => "starting",
       Self::Running => "running",
       Self::Stopped => "stopped",
       Self::Failed => "failed",
-      Self::Unknown => "unknown",
+      Self::Unknown => "<unknown>",
+      Self::Deleting => "deleting",
+      Self::Delete => "delete",
+      Self::Patching => "patching",
     }
     .to_owned()
   }
