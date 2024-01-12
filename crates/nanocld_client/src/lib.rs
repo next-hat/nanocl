@@ -3,7 +3,6 @@ mod http_client;
 pub(crate) mod namespace;
 pub(crate) mod cargo;
 pub(crate) mod exec;
-pub(crate) mod cargo_image;
 pub(crate) mod system;
 pub(crate) mod resource;
 pub(crate) mod vm;
