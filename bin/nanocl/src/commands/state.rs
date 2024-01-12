@@ -485,7 +485,7 @@ async fn exec_state_apply(
       let key = actor.key.clone().unwrap_or_default();
       let kind = actor.kind.clone();
       let entry = format!("{kind}@{key}");
-      let mut keys = keys_ptr.lock().unwrap();
+      let mut keys = keys_ptr.try_lock().unwrap();
       if action == NativeEventAction::Start {
         keys.insert(entry, true);
       }
@@ -544,7 +544,7 @@ async fn exec_state_apply(
               .put_cargo(&cargo.name, cargo, Some(&namespace))
               .await?;
           } else if inspect.status.actual == ObjPsStatusKind::Running {
-            keys.lock().unwrap().insert(key, true);
+            keys.try_lock().unwrap().insert(key, true);
           }
         }
       }
@@ -595,7 +595,7 @@ async fn exec_state_apply(
       }
     }
   }
-  if !keys.lock().unwrap().values().all(|v| *v) {
+  if !keys.try_lock().unwrap().clone().values().all(|v| *v) {
     event_fut.await??;
   }
   if opts.follow {

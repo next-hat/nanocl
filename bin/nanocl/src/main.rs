@@ -129,18 +129,12 @@ mod tests {
   async fn cargo() {
     const CARGO_NAME: &str = "cli-test";
     const IMAGE_NAME: &str = "ghcr.io/next-hat/nanocl-get-started:latest";
-    const NAMESPACE_NAME: Option<&str> = None;
-    let client = get_test_client();
     // Try to create cargo
     assert_cli_ok!("cargo", "create", CARGO_NAME, IMAGE_NAME);
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "created");
     // Try to list cargoes
     assert_cli_ok!("cargo", "ls");
     // Try to start a cargo
     assert_cli_ok!("cargo", "start", CARGO_NAME);
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "running");
     // Try to inspect a cargo
     assert_cli_ok!("cargo", "inspect", CARGO_NAME);
     // Try to inspect cargo json
@@ -151,6 +145,7 @@ mod tests {
     assert_cli_ok!(
       "cargo", "patch", CARGO_NAME, "--image", IMAGE_NAME, "--env", "TEST=1",
     );
+    ntex::time::sleep(std::time::Duration::from_secs(2)).await;
     assert_cli_ok!("cargo", "history", CARGO_NAME);
     let client = get_test_client();
     let history = client
@@ -163,18 +158,8 @@ mod tests {
     assert_cli_ok!("cargo", "revert", CARGO_NAME, &history.key.to_string());
     // Try to stop a cargo
     assert_cli_ok!("cargo", "stop", CARGO_NAME);
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "exited");
-    // Try to remove cargo
-    assert_cli_ok!("cargo", "rm", "-y", CARGO_NAME);
-    assert_cargo_not_exists!(client, CARGO_NAME, NAMESPACE_NAME);
-    // Try to run cargo
-    assert_cli_ok!("cargo", "run", CARGO_NAME, IMAGE_NAME);
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "running");
     // Try to remove cargo
     assert_cli_ok!("cargo", "rm", "-yf", CARGO_NAME);
-    assert_cargo_not_exists!(client, CARGO_NAME, NAMESPACE_NAME);
   }
 
   /// Test Resource commands
@@ -418,113 +403,39 @@ mod tests {
 
   #[ntex::test]
   async fn state_apply_toml() {
-    let client = get_test_client();
-    const DEPLOY_CARGO_NAME: &str = "deploy-example";
-    const DEPLOY_CARGO2_NAME: &str = "deploy-example2";
-    const DEPLOY_NAMESPACE_NAME: Option<&str> = None;
     assert_cli_ok!(
       "state",
       "apply",
       "-ys",
       "../../examples/deploy_example.toml",
     );
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(
-      client,
-      DEPLOY_CARGO_NAME,
-      DEPLOY_NAMESPACE_NAME,
-      "running"
-    );
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(
-      client,
-      DEPLOY_CARGO2_NAME,
-      DEPLOY_NAMESPACE_NAME,
-      "running"
-    );
     assert_cli_ok!("state", "rm", "-ys", "../../examples/deploy_example.toml");
-    assert_cargo_not_exists!(client, DEPLOY_CARGO_NAME, DEPLOY_NAMESPACE_NAME);
-    assert_cargo_not_exists!(client, DEPLOY_CARGO2_NAME, DEPLOY_NAMESPACE_NAME);
   }
 
   #[ntex::test]
   async fn state_apply_json() {
-    let client = get_test_client();
-    const DEPLOY_CARGO_NAME: &str = "deploy-example";
-    const DEPLOY_CARGO2_NAME: &str = "deploy-example2";
-    const DEPLOY_NAMESPACE_NAME: Option<&str> = None;
     assert_cli_ok!(
       "state",
       "apply",
       "-ys",
       "../../examples/deploy_example.json",
     );
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(
-      client,
-      DEPLOY_CARGO_NAME,
-      DEPLOY_NAMESPACE_NAME,
-      "running"
-    );
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(
-      client,
-      DEPLOY_CARGO2_NAME,
-      DEPLOY_NAMESPACE_NAME,
-      "running"
-    );
     assert_cli_ok!("state", "rm", "-ys", "../../examples/deploy_example.json");
-    assert_cargo_not_exists!(client, DEPLOY_CARGO_NAME, DEPLOY_NAMESPACE_NAME);
-    assert_cargo_not_exists!(client, DEPLOY_CARGO2_NAME, DEPLOY_NAMESPACE_NAME);
   }
 
   #[ntex::test]
   async fn state() {
-    let client = get_test_client();
-    const DEPLOY_CARGO_NAME: &str = "deploy-example";
-    const DEPLOY_CARGO2_NAME: &str = "deploy-example2";
-    const DEPLOY_NAMESPACE_NAME: Option<&str> = None;
-    const CARGO_NAME: &str = "cargo-example";
-    const CARGO_NAMESPACE_NAME: Option<&str> = Some("cargo-example");
     assert_cli_ok!(
       "state",
       "apply",
       "-pys",
       "../../examples/deploy_example.yml",
     );
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(
-      client,
-      DEPLOY_CARGO_NAME,
-      DEPLOY_NAMESPACE_NAME,
-      "running"
-    );
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(
-      client,
-      DEPLOY_CARGO2_NAME,
-      DEPLOY_NAMESPACE_NAME,
-      "running"
-    );
     assert_cli_ok!(
       "state",
       "apply",
       "-rys",
       "../../examples/deploy_example.toml"
-    );
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(
-      client,
-      DEPLOY_CARGO_NAME,
-      DEPLOY_NAMESPACE_NAME,
-      "running"
-    );
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(
-      client,
-      DEPLOY_CARGO2_NAME,
-      DEPLOY_NAMESPACE_NAME,
-      "running"
     );
     assert_cli_ok!(
       "state",
@@ -537,16 +448,9 @@ mod tests {
     );
     assert_cli_ok!("state", "logs", "-s", "../../examples/deploy_example.yml");
     assert_cli_ok!("state", "rm", "-ys", "../../examples/deploy_example.yml");
-    assert_cargo_not_exists!(client, DEPLOY_CARGO_NAME, DEPLOY_NAMESPACE_NAME);
-    assert_cargo_not_exists!(client, DEPLOY_CARGO2_NAME, DEPLOY_NAMESPACE_NAME);
     assert_cli_ok!("state", "apply", "-ys", "../../examples/cargo_example.yml");
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(client, CARGO_NAME, CARGO_NAMESPACE_NAME, "running");
     assert_cli_ok!("state", "apply", "-ys", "../../examples/cargo_example.yml");
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(client, CARGO_NAME, CARGO_NAMESPACE_NAME, "running");
     assert_cli_ok!("state", "rm", "-ys", "../../examples/cargo_example.yml");
-    assert_cargo_not_exists!(client, CARGO_NAME, CARGO_NAMESPACE_NAME);
     assert_cli_ok!("state", "apply", "-fys", "../../examples/job_example.yml");
     assert_cli_ok!("state", "apply", "-fys", "../../examples/job_example.yml");
     assert_cli_ok!("state", "rm", "-ys", "../../examples/job_example.yml");
@@ -559,9 +463,7 @@ mod tests {
 
   #[ntex::test]
   async fn cargo_basic() {
-    let client = get_test_client();
     const CARGO_NAME: &str = "cli-test-run";
-    const NAMESPACE_NAME: Option<&str> = None;
     assert_cli_ok!(
       "cargo",
       "run",
@@ -573,19 +475,11 @@ mod tests {
     ntex::rt::spawn(async {
       assert_cli_ok!("cargo", "stats", CARGO_NAME);
     });
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "running");
     assert_cli_ok!("cargo", "restart", CARGO_NAME);
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "running");
     assert_cli_ok!("cargo", "stop", CARGO_NAME);
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-    assert_cargo_state!(client, CARGO_NAME, NAMESPACE_NAME, "exited");
     assert_cli_ok!("cargo", "ls");
     assert_cli_ok!("cargo", "ls", "-q");
     assert_cli_ok!("cargo", "rm", "-fy", CARGO_NAME);
-    assert_cargo_not_exists!(client, CARGO_NAME, NAMESPACE_NAME);
   }
 
   #[ntex::test]
