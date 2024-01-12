@@ -37,8 +37,6 @@ use crate::{
   },
 };
 
-use super::cargo_image::exec_cargo_image_pull;
-
 /// Get Statefile from url and return a StateRef with the raw data and the format
 async fn get_from_url(url: &str) -> IoResult<StateRef<Statefile>> {
   let url = if url.starts_with("http") {

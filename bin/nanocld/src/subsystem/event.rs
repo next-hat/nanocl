@@ -1,11 +1,10 @@
-use std::{str::FromStr, sync::Arc};
+use std::str::FromStr;
 
-use bollard_next::container::{StartContainerOptions, RemoveContainerOptions};
 use ntex::rt;
 use futures_util::StreamExt;
+use bollard_next::container::{StartContainerOptions, RemoveContainerOptions};
 
 use nanocl_error::io::IoResult;
-
 use nanocl_stubs::system::{
   Event, EventActorKind, NativeEventAction, ObjPsStatusKind,
 };

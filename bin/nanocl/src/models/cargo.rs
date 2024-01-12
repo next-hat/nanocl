@@ -9,7 +9,7 @@ use nanocld_client::stubs::{
   cargo_spec::{CargoSpecUpdate, Config, CargoSpecPartial, HostConfig},
 };
 
-use super::{DisplayFormat, GenericListOpts, cargo_image::CargoImageArg};
+use super::{DisplayFormat, GenericListOpts};
 
 /// `nanocl cargo remove` available options
 #[derive(Clone, Parser)]
@@ -284,8 +284,6 @@ pub enum CargoCommand {
   Inspect(CargoInspectOpts),
   /// Update a cargo by its name
   Patch(CargoPatchOpts),
-  /// Manage cargo image
-  Image(CargoImageArg),
   /// Execute a command inside a cargo
   Exec(CargoExecOpts),
   /// List cargo history

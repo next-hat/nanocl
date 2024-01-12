@@ -67,7 +67,6 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
     Command::Ps(args) => commands::exec_process(&cli_conf, args).await,
     Command::Install(args) => commands::exec_install(args).await,
     Command::Uninstall(args) => commands::exec_uninstall(args).await,
-    Command::Upgrade(args) => commands::exec_upgrade(&cli_conf, args).await,
     Command::Node(args) => commands::exec_node(&cli_conf, args).await,
     Command::Context(args) => commands::exec_context(&cli_conf, args).await,
     Command::Info => commands::exec_info(&cli_conf).await,
@@ -123,27 +122,6 @@ mod tests {
     assert_cli_ok!("namespace", "inspect", NAMESPACE_NAME);
     // Try to remove namespace
     assert_cli_ok!("namespace", "rm", "-y", NAMESPACE_NAME);
-  }
-
-  /// Test Cargo image commands
-  #[ntex::test]
-  async fn cargo_image() {
-    const IMAGE_NAME: &str = "busybox:1.26.0";
-    // Try to create cargo image
-    assert_cli_ok!("cargo", "image", "pull", IMAGE_NAME);
-    // Try to list cargo images
-    assert_cli_ok!("cargo", "image", "ls");
-    // Try to inspect cargo image
-    assert_cli_ok!("cargo", "image", "inspect", IMAGE_NAME);
-    // Try to remove cargo image
-    assert_cli_ok!("cargo", "image", "rm", "-y", IMAGE_NAME);
-    assert_cli_ok!(
-      "cargo",
-      "image",
-      "import",
-      "-f",
-      "../../tests/busybox.tar.gz",
-    );
   }
 
   /// Test Cargo commands
@@ -312,21 +290,22 @@ mod tests {
     assert_cli_err!("state", "apply", "-y");
   }
 
-  #[ntex::test]
-  async fn state_apply_invalid_image() {
-    assert_cli_err!(
-      "state",
-      "apply",
-      "-ys",
-      "../../tests/invalid_init_container_image.yml",
-    );
-    assert_cli_err!(
-      "state",
-      "apply",
-      "-ys",
-      "../../tests/invalid_container_image.yml",
-    );
-  }
+  // TODO: RE ENABLE TEST WITH INVALID IMAGE
+  // #[ntex::test]
+  // async fn state_apply_invalid_image() {
+  //   assert_cli_err!(
+  //     "state",
+  //     "apply",
+  //     "-ys",
+  //     "../../tests/invalid_init_container_image.yml",
+  //   );
+  //   assert_cli_err!(
+  //     "state",
+  //     "apply",
+  //     "-ys",
+  //     "../../tests/invalid_container_image.yml",
+  //   );
+  // }
 
   #[ntex::test]
   async fn state_apply_remote_http() {

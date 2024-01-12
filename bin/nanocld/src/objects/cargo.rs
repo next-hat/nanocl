@@ -9,7 +9,7 @@ use nanocl_stubs::{
   process::ProcessKind,
   system::{NativeEventAction, ObjPsStatusPartial, ObjPsStatusKind},
   cargo::{Cargo, CargoDeleteQuery, CargoInspect},
-  cargo_spec::{ReplicationMode, CargoSpecPartial},
+  cargo_spec::CargoSpecPartial,
 };
 
 use crate::{

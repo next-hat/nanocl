@@ -1,7 +1,6 @@
 use std::process;
 use std::collections::HashMap;
 
-use nanocld_client::stubs::generic::{GenericFilter, GenericListNspQuery};
 use ntex::rt;
 use futures::channel::mpsc;
 use futures::{StreamExt, SinkExt};
@@ -9,22 +8,24 @@ use futures::stream::FuturesUnordered;
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
 use nanocl_error::io::{FromIo, IoResult};
-use nanocld_client::stubs::process::{OutputKind, ProcessLogQuery};
-use nanocld_client::stubs::cargo::{
-  CargoDeleteQuery, CargoStatsQuery, CargoSummary,
+use nanocld_client::{
+  stubs::process::{OutputKind, ProcessLogQuery},
+  stubs::generic::{GenericFilter, GenericListNspQuery},
+  stubs::cargo::{CargoDeleteQuery, CargoStatsQuery, CargoSummary},
 };
 
-use crate::utils;
-use crate::config::CliConfig;
-use crate::models::{
-  CargoArg, CargoCreateOpts, CargoCommand, CargoRemoveOpts, CargoRow,
-  CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
-  CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
-  CargoRunOpts, CargoRestartOpts, CargoStatsOpts, CargoStatsRow,
+use crate::{
+  utils,
+  config::CliConfig,
+  models::{
+    CargoArg, CargoCreateOpts, CargoCommand, CargoRemoveOpts, CargoRow,
+    CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
+    CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
+    CargoRunOpts, CargoRestartOpts, CargoStatsOpts, CargoStatsRow,
+  },
 };
 
 use super::GenericList;
-use super::cargo_image::{exec_cargo_image, exec_cargo_image_pull};
 
 impl GenericList for CargoArg {
   type Item = CargoRow;
@@ -328,10 +329,6 @@ async fn exec_cargo_run(
   opts: &CargoRunOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
-  // Image is not existing so we donwload it
-  if client.inspect_cargo_image(&opts.image).await.is_err() {
-    exec_cargo_image_pull(client, &opts.image).await?;
-  }
   let cargo = client
     .create_cargo(&opts.clone().into(), args.namespace.as_deref())
     .await?;
@@ -343,14 +340,12 @@ async fn exec_cargo_run(
 
 /// Function that execute when running `nanocl cargo`
 pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
-  let client = &cli_conf.client;
   match &args.command {
     CargoCommand::List(opts) => {
       CargoArg::exec_ls(&cli_conf.client, args, opts).await
     }
     CargoCommand::Create(opts) => exec_cargo_create(cli_conf, args, opts).await,
     CargoCommand::Remove(opts) => exec_cargo_rm(cli_conf, args, opts).await,
-    CargoCommand::Image(opts) => exec_cargo_image(client, opts).await,
     CargoCommand::Start(opts) => exec_cargo_start(cli_conf, args, opts).await,
     CargoCommand::Stop(opts) => exec_cargo_stop(cli_conf, args, opts).await,
     CargoCommand::Patch(opts) => exec_cargo_patch(cli_conf, args, opts).await,
