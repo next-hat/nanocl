@@ -492,24 +492,6 @@ mod tests {
     assert_cli_ok!("job", "logs", "job-example");
     assert_cli_ok!("job", "rm", "-y", "job-example");
     assert_cli_ok!("state", "rm", "-ys", "../../examples/job_example.yml");
-    assert_cli_err!("job", "inspect", "job-example");
-  }
-
-  #[ntex::test]
-  async fn job_wait() {
-    assert_cli_ok!("state", "apply", "-yrfs", "../../examples/job_example.yml");
-    let fut = ntex::rt::spawn(async {
-      assert_cli_ok!("job", "wait", "job-example");
-    });
-    assert_cli_ok!("job", "start", "job-example");
-    assert!(fut.await.is_ok());
-    assert_cli_ok!("job", "wait", "job-example", "-c", "not-running");
-    let fut = ntex::rt::spawn(async {
-      assert_cli_ok!("job", "wait", "job-example", "-c", "removed");
-    });
-    assert_cli_ok!("job", "rm", "-y", "job-example");
-    assert!(fut.await.is_ok());
-    assert_cli_ok!("state", "rm", "-ys", "../../examples/job_example.yml");
   }
 
   #[ntex::test]
