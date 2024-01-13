@@ -1,15 +1,17 @@
 use ntex::channel::mpsc::Receiver;
+use bollard_next::service::ContainerSummary;
 
 use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::HttpClientResult;
 
-use bollard_next::service::ContainerSummary;
-use nanocl_stubs::generic::GenericNspQuery;
-use nanocl_stubs::cargo::{
-  Cargo, CargoSummary, CargoInspect, CargoDeleteQuery, CargoStatsQuery,
-  CargoStats,
+use nanocl_stubs::{
+  generic::GenericNspQuery,
+  cargo_spec::{CargoSpecUpdate, CargoSpecPartial, CargoSpec},
+  cargo::{
+    Cargo, CargoSummary, CargoInspect, CargoDeleteQuery, CargoStatsQuery,
+    CargoStats,
+  },
 };
-use nanocl_stubs::cargo_spec::{CargoSpecUpdate, CargoSpecPartial, CargoSpec};
 
 use super::http_client::NanocldClient;
 

@@ -124,22 +124,23 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
           state,
         )
         .await?;
-        let mut stream = state.docker_api.wait_container(
-          &process.key,
-          Some(WaitContainerOptions {
-            condition: "not-running",
-          }),
-        );
+        // When we run a sequencial order we wait for the container to finish to start the next one.
+        // let mut stream = state.docker_api.wait_container(
+        //   &process.key,
+        //   Some(WaitContainerOptions {
+        //     condition: "not-running",
+        //   }),
+        // );
         let _ = state
           .docker_api
           .start_container(&process.key, None::<StartContainerOptions<String>>)
           .await;
-        while let Some(stream) = stream.next().await {
-          let result = stream.map_err(HttpError::internal_server_error)?;
-          if result.status_code == 0 {
-            break;
-          }
-        }
+        // while let Some(stream) = stream.next().await {
+        //   let result = stream.map_err(HttpError::internal_server_error)?;
+        //   if result.status_code == 0 {
+        //     break;
+        //   }
+        // }
       }
     }
     _ => {}
