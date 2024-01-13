@@ -33,6 +33,7 @@ diesel::table! {
         key -> Varchar,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
+        status_key -> Varchar,
         data -> Jsonb,
         metadata -> Nullable<Jsonb>,
     }
@@ -171,6 +172,7 @@ diesel::table! {
 diesel::joinable!(cargoes -> namespaces (namespace_name));
 diesel::joinable!(cargoes -> object_process_statuses (status_key));
 diesel::joinable!(cargoes -> specs (spec_key));
+diesel::joinable!(jobs -> object_process_statuses (status_key));
 diesel::joinable!(node_group_links -> node_groups (node_group_name));
 diesel::joinable!(node_group_links -> nodes (node_name));
 diesel::joinable!(resource_kinds -> specs (spec_key));

@@ -11,7 +11,7 @@ use bollard_next::{
 };
 use nanocl_stubs::{
   cargo::Cargo,
-  process::Process,
+  process::{Process, ProcessKind},
   system::{EventPartial, EventActorKind, EventActor, EventKind},
 };
 
@@ -49,8 +49,14 @@ async fn execute_before(cargo: &Cargo, state: &SystemState) -> HttpResult<()> {
         "init-{}-{}.{}.c",
         cargo.spec.name, short_id, cargo.namespace_name
       );
-      CargoDb::create_process(&name, &cargo.spec.cargo_key, before, state)
-        .await?;
+      utils::container::create_process(
+        &ProcessKind::Cargo,
+        &name,
+        &cargo.spec.cargo_key,
+        before,
+        state,
+      )
+      .await?;
       state
         .docker_api
         .start_container(&name, None::<StartContainerOptions<String>>)
@@ -203,7 +209,13 @@ pub async fn create_instances(
           }),
           ..container
         };
-        CargoDb::create_process(&name, &cargo.spec.cargo_key, new_process, state).await
+        utils::container::create_process(
+          &ProcessKind::Cargo,
+          &name,
+          &cargo.spec.cargo_key,
+          new_process,
+          state,
+        ).await
       }
     })
     .collect::<FuturesUnordered<_>>()

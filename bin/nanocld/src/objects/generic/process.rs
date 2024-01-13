@@ -1,15 +1,10 @@
 use futures_util::{StreamExt, stream::FuturesUnordered};
-use bollard_next::container::{
-  RemoveContainerOptions, StopContainerOptions, Config, CreateContainerOptions,
-  InspectContainerOptions,
-};
-use nanocl_error::{
-  io::FromIo,
-  http::{HttpResult, HttpError},
-};
+use bollard_next::container::{RemoveContainerOptions, StopContainerOptions};
+
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::{
   system::{NativeEventAction, ObjPsStatusKind},
-  process::{ProcessKind, ProcessPartial, Process},
+  process::ProcessKind,
   cargo::CargoKillOptions,
 };
 
@@ -59,66 +54,16 @@ pub trait ObjProcess {
     Ok(())
   }
 
-  async fn create_process(
-    name: &str,
-    kind_key: &str,
-    item: Config,
-    state: &SystemState,
-  ) -> HttpResult<Process> {
-    let kind = Self::get_process_kind();
-    let mut config = item.clone();
-    let mut labels = item.labels.to_owned().unwrap_or_default();
-    labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
-    labels.insert("io.nanocl.kind".to_owned(), kind.to_string());
-    config.labels = Some(labels);
-    let res = state
-      .docker_api
-      .create_container(
-        Some(CreateContainerOptions {
-          name,
-          ..Default::default()
-        }),
-        config,
-      )
-      .await?;
-    let inspect = state
-      .docker_api
-      .inspect_container(&res.id, None::<InspectContainerOptions>)
-      .await?;
-    let created_at = inspect.created.clone().unwrap_or_default();
-    let new_instance = ProcessPartial {
-      key: res.id,
-      name: name.to_owned(),
-      kind,
-      data: serde_json::to_value(&inspect)
-        .map_err(|err| err.map_err_context(|| "CreateProcess"))?,
-      node_key: state.config.hostname.clone(),
-      kind_key: kind_key.to_owned(),
-      created_at: Some(
-        chrono::NaiveDateTime::parse_from_str(
-          &created_at,
-          "%Y-%m-%dT%H:%M:%S%.fZ",
-        )
-        .map_err(|err| {
-          HttpError::internal_server_error(format!(
-            "Unable to parse date {err}"
-          ))
-        })?,
-      ),
-    };
-    let process = ProcessDb::create_from(&new_instance, &state.pool).await?;
-    Process::try_from(process).map_err(HttpError::from)
-  }
-
   async fn start_process_by_kind_key(
-    kind_pk: &str,
+    kind_key: &str,
     state: &SystemState,
   ) -> HttpResult<()> {
-    log::debug!("start_process_by_kind_pk: {kind_pk}");
+    let kind = Self::get_process_kind().to_string();
+    log::debug!("{kind} {kind_key}",);
     let current_status =
-      ObjPsStatusDb::read_by_pk(kind_pk, &state.pool).await?;
+      ObjPsStatusDb::read_by_pk(kind_key, &state.pool).await?;
     if current_status.actual == ObjPsStatusKind::Running.to_string() {
-      log::debug!("start_process_by_kind_pk: {kind_pk} already running");
+      log::debug!("{kind} {kind_key} already running",);
       return Ok(());
     }
     let status_update = ObjPsStatusUpdate {
@@ -127,10 +72,9 @@ pub trait ObjProcess {
       actual: Some(ObjPsStatusKind::Starting.to_string()),
       prev_actual: Some(current_status.actual),
     };
-    log::debug!("start_process_by_kind_pk: {kind_pk} update status");
-    ObjPsStatusDb::update_pk(kind_pk, status_update, &state.pool).await?;
-    Self::_emit(kind_pk, NativeEventAction::Starting, state).await?;
-    log::debug!("start emitted !");
+    log::debug!("{kind} {kind_key} update status");
+    ObjPsStatusDb::update_pk(kind_key, status_update, &state.pool).await?;
+    Self::_emit(kind_key, NativeEventAction::Starting, state).await?;
     Ok(())
   }
 
@@ -153,7 +97,7 @@ pub trait ObjProcess {
         )
         .await?;
     }
-    Self::_emit(kind_pk, NativeEventAction::Stop, state).await?;
+    Self::_emit(kind_pk, NativeEventAction::Stopping, state).await?;
     Ok(())
   }
 

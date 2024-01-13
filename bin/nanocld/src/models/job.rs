@@ -14,6 +14,8 @@ pub struct JobDb {
   pub created_at: chrono::NaiveDateTime,
   /// The updated at data
   pub updated_at: chrono::NaiveDateTime,
+  /// The status key
+  pub status_key: String,
   /// The spec
   pub data: serde_json::Value,
   /// The metadata

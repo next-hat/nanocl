@@ -4,11 +4,11 @@ use bollard_next::service::{HostConfig, DeviceMapping};
 
 use nanocl_error::http::HttpResult;
 
-use nanocl_stubs::vm::Vm;
+use nanocl_stubs::{vm::Vm, process::ProcessKind};
 
 use crate::{
-  objects::generic::*,
-  models::{VmImageDb, SystemState, VmDb},
+  utils,
+  models::{SystemState, VmImageDb},
 };
 
 /// Create a VM instance from a VM image
@@ -110,6 +110,13 @@ pub async fn create_instance(
     ..Default::default()
   };
   let name = format!("{}.v", &vm.spec.vm_key);
-  VmDb::create_process(&name, &vm.spec.vm_key, spec, state).await?;
+  utils::container::create_process(
+    &ProcessKind::Vm,
+    &name,
+    &vm.spec.vm_key,
+    spec,
+    state,
+  )
+  .await?;
   Ok(())
 }

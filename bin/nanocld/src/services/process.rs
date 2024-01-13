@@ -161,16 +161,16 @@ pub async fn start_process(
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
-  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   match &kind {
     ProcessKind::Vm => {
-      VmDb::start_process_by_kind_key(&kind_pk, &state).await?;
+      VmDb::start_process_by_kind_key(&kind_key, &state).await?;
     }
     ProcessKind::Job => {
-      JobDb::start_process_by_kind_key(&kind_pk, &state).await?;
+      JobDb::start_process_by_kind_key(&kind_key, &state).await?;
     }
     ProcessKind::Cargo => {
-      CargoDb::start_process_by_kind_key(&kind_pk, &state).await?;
+      CargoDb::start_process_by_kind_key(&kind_key, &state).await?;
     }
   }
   Ok(web::HttpResponse::Accepted().finish())

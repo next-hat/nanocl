@@ -2,11 +2,14 @@ use std::str::FromStr;
 
 use ntex::rt;
 use futures_util::StreamExt;
-use bollard_next::container::{StartContainerOptions, RemoveContainerOptions};
+use bollard_next::container::{
+  StartContainerOptions, RemoveContainerOptions, WaitContainerOptions,
+};
 
-use nanocl_error::io::IoResult;
-use nanocl_stubs::system::{
-  Event, EventActorKind, NativeEventAction, ObjPsStatusKind,
+use nanocl_error::{io::IoResult, http::HttpError};
+use nanocl_stubs::{
+  system::{Event, EventActorKind, NativeEventAction, ObjPsStatusKind},
+  process::ProcessKind,
 };
 
 use crate::{
@@ -43,16 +46,19 @@ async fn job_ttl(e: &Event, state: &SystemState) -> IoResult<()> {
   let job = JobDb::read_by_pk(job_id, &state.pool)
     .await?
     .try_to_spec()?;
-  let ttl = match job.ttl {
-    None => return Ok(()),
-    Some(ttl) => ttl,
-  };
   let instances = ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
   let (_, _, _, running) = utils::process::count_status(&instances);
   log::debug!(
     "event::job_ttl: {} has {running} running instances",
     job.name
   );
+  if running == 0 {
+    state.emit_normal_native_action(&job, NativeEventAction::Finish);
+  }
+  let ttl = match job.ttl {
+    None => return Ok(()),
+    Some(ttl) => ttl,
+  };
   if running == 0 {
     let state = state.clone();
     rt::spawn(async move {
@@ -101,7 +107,41 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
       state.emit_normal_native_action(&cargo, NativeEventAction::Start);
     }
     EventActorKind::Vm => {}
-    EventActorKind::Job => {}
+    EventActorKind::Job => {
+      let job = JobDb::read_by_pk(&key, &state.pool).await?.try_to_spec()?;
+      for mut container in job.containers {
+        let job_name = job.name.clone();
+        let mut labels = container.labels.clone().unwrap_or_default();
+        labels.insert("io.nanocl.j".to_owned(), job_name.clone());
+        container.labels = Some(labels);
+        let short_id = utils::key::generate_short_id(6);
+        let name = format!("{job_name}-{short_id}.j");
+        let process = utils::container::create_process(
+          &ProcessKind::Job,
+          &name,
+          &job_name,
+          container,
+          state,
+        )
+        .await?;
+        let mut stream = state.docker_api.wait_container(
+          &process.key,
+          Some(WaitContainerOptions {
+            condition: "not-running",
+          }),
+        );
+        let _ = state
+          .docker_api
+          .start_container(&process.key, None::<StartContainerOptions<String>>)
+          .await;
+        while let Some(stream) = stream.next().await {
+          let result = stream.map_err(HttpError::internal_server_error)?;
+          if result.status_code == 0 {
+            break;
+          }
+        }
+      }
+    }
     _ => {}
   }
   Ok(())
@@ -139,7 +179,14 @@ async fn delete(e: &Event, state: &SystemState) -> IoResult<()> {
       state.emit_normal_native_action(&cargo, NativeEventAction::Delete);
     }
     EventActorKind::Vm => {}
-    EventActorKind::Job => {}
+    EventActorKind::Job => {
+      let job = JobDb::read_by_pk(&key, &state.pool).await?.try_to_spec()?;
+      JobDb::clear(&key, &state.pool).await?;
+      if job.schedule.is_some() {
+        utils::job::remove_cron_rule(&job, state).await?;
+      }
+      state.emit_normal_native_action(&job, NativeEventAction::Delete);
+    }
     _ => {}
   };
   Ok(())
@@ -156,46 +203,53 @@ async fn update(e: &Event, state: &SystemState) -> IoResult<()> {
     return Ok(());
   };
   let key = actor.key.clone().unwrap_or_default();
-  let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
-  let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
-  // Create instance with the new spec
   let mut error = None;
-  let new_instances =
-    match utils::cargo::create_instances(&cargo, 1, state).await {
-      Err(err) => {
-        error = Some(err);
-        Vec::default()
+  match actor.kind {
+    EventActorKind::Cargo => {
+      let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
+      let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
+      // Create instance with the new spec
+      let new_instances =
+        match utils::cargo::create_instances(&cargo, 1, state).await {
+          Err(err) => {
+            error = Some(err);
+            Vec::default()
+          }
+          Ok(instances) => instances,
+        };
+      // start created containers
+      match CargoDb::start_process_by_kind_key(&key, state).await {
+        Err(err) => {
+          log::error!(
+            "Unable to start cargo instance {} : {err}",
+            cargo.spec.cargo_key
+          );
+          let state_ptr = state.clone();
+          rt::spawn(async move {
+            ntex::time::sleep(std::time::Duration::from_secs(2)).await;
+            let _ = utils::cargo::delete_instances(
+              &new_instances
+                .iter()
+                .map(|i| i.key.clone())
+                .collect::<Vec<_>>(),
+              &state_ptr,
+            )
+            .await;
+          });
+        }
+        Ok(_) => {
+          // Delete old containers
+          utils::cargo::delete_instances(
+            &processes.iter().map(|c| c.key.clone()).collect::<Vec<_>>(),
+            state,
+          )
+          .await?;
+        }
       }
-      Ok(instances) => instances,
-    };
-  // start created containers
-  match CargoDb::start_process_by_kind_key(&key, state).await {
-    Err(err) => {
-      log::error!(
-        "Unable to start cargo instance {} : {err}",
-        cargo.spec.cargo_key
-      );
-      let state_ptr = state.clone();
-      rt::spawn(async move {
-        ntex::time::sleep(std::time::Duration::from_secs(2)).await;
-        let _ = utils::cargo::delete_instances(
-          &new_instances
-            .iter()
-            .map(|i| i.key.clone())
-            .collect::<Vec<_>>(),
-          &state_ptr,
-        )
-        .await;
-      });
     }
-    Ok(_) => {
-      // Delete old containers
-      utils::cargo::delete_instances(
-        &processes.iter().map(|c| c.key.clone()).collect::<Vec<_>>(),
-        state,
-      )
-      .await?;
-    }
+    EventActorKind::Vm => {}
+    EventActorKind::Job => {}
+    _ => {}
   }
   match error {
     Some(err) => Err(err.into()),
@@ -217,9 +271,12 @@ async fn exec_event(e: Event, state: &SystemState) -> IoResult<()> {
 async fn read_events(stream: &mut SystemEventReceiver, state: &SystemState) {
   while let Some(e) = stream.next().await {
     if let SystemEventKind::Emit(e) = e {
-      if let Err(err) = exec_event(e, state).await {
-        log::warn!("event::read_events: {err}");
-      }
+      let state = state.clone();
+      rt::spawn(async move {
+        if let Err(err) = exec_event(e, &state).await {
+          log::warn!("event::read_events: {err}");
+        }
+      });
     }
   }
 }

@@ -7,7 +7,7 @@ use bollard_next::{container::Config, service::HostConfig};
 use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::{
   process::ProcessKind,
-  system::{NativeEventAction, ObjPsStatusPartial, ObjPsStatusKind},
+  system::{ObjPsStatusPartial, ObjPsStatusKind},
   cargo::{Cargo, CargoDeleteQuery, CargoInspect},
   cargo_spec::CargoSpecPartial,
 };
@@ -101,7 +101,6 @@ impl ObjDelByPk for CargoDb {
       prev_actual: Some(status.actual),
     };
     ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
-    state.emit_normal_native_action(&cargo, NativeEventAction::Deleting);
     Ok(cargo)
   }
 }

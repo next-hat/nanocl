@@ -428,7 +428,7 @@ mod tests {
     assert_cli_ok!(
       "state",
       "apply",
-      "-pys",
+      "-ys",
       "../../examples/deploy_example.yml",
     );
     assert_cli_ok!(
@@ -451,7 +451,6 @@ mod tests {
     assert_cli_ok!("state", "apply", "-ys", "../../examples/cargo_example.yml");
     assert_cli_ok!("state", "apply", "-ys", "../../examples/cargo_example.yml");
     assert_cli_ok!("state", "rm", "-ys", "../../examples/cargo_example.yml");
-    assert_cli_ok!("state", "apply", "-fys", "../../examples/job_example.yml");
     assert_cli_ok!("state", "apply", "-fys", "../../examples/job_example.yml");
     assert_cli_ok!("state", "rm", "-ys", "../../examples/job_example.yml");
   }

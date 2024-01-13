@@ -114,7 +114,7 @@ impl ObjPutByPk for VmDb {
     .await?;
     let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await?;
     utils::vm::create_instance(&vm, &image, false, state).await?;
-    VmDb::start_process_by_kind_key(&vm.spec.vm_key, state).await?;
+    // VmDb::start_process_by_kind_key(&vm.spec.vm_key, state).await?;
     Ok(vm)
   }
 }
