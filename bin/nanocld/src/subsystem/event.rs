@@ -285,6 +285,11 @@ async fn update(e: &Event, state: &SystemState) -> IoResult<()> {
   let mut error = None;
   match actor.kind {
     EventActorKind::Cargo => {
+      let task_key = format!("{}@{key}", &actor.kind);
+      let curr_task = state.task_manager.get_task(&task_key).await;
+      if curr_task.is_some() {
+        state.task_manager.remove_task(&task_key).await?;
+      }
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
       let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
       // Create instance with the new spec

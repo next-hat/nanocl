@@ -1,10 +1,12 @@
 use std::{
   sync::{Arc, Mutex},
   collections::HashMap,
+  future::IntoFuture,
+  ops::Deref,
 };
 
 use ntex::{rt, web};
-use futures_util::Future;
+use futures_util::{Future, FutureExt};
 
 use nanocl_error::io::{IoResult, IoError};
 
@@ -43,7 +45,8 @@ impl TaskManager {
       let mut tasks = tasks
         .lock()
         .map_err(|err| IoError::interupted("Task", err.to_string().as_str()))?;
-      tasks.insert(key, task);
+      log::debug!("Adding task: {key} {}", task.kind);
+      tasks.insert(key.clone(), task.clone());
       Ok::<_, IoError>(())
     })
     .await?;
@@ -59,6 +62,7 @@ impl TaskManager {
         .map_err(|err| IoError::interupted("Task", err.to_string().as_str()))?;
       let task = tasks.get(&key);
       if let Some(task) = task {
+        log::debug!("Removing task: {key} {}", task.kind);
         task.fut.abort();
       }
       tasks.remove(&key);
