@@ -149,7 +149,11 @@ args = [
   "--no-default-features",
   "--features",
   "test",
-  "-j",
+  "--output-path",
+  "./lcov.info",
+  "--lcov",
+  "--",
+  "--test-threads",
   "1",
 ]
 
@@ -163,8 +167,8 @@ args = [
   "--no-default-features",
   "--features",
   "test",
-  "--output-path",
-  "./lcov.info",
+  "--html",
+  "report",
   "--lcov",
   "--",
   "--test-threads",

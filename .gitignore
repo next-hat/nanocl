@@ -2,3 +2,4 @@ target/
 test_local/
 .vagrant/
 tests/ubuntu-22.04-minimal-cloudimg-amd64.img
+lcov.info
