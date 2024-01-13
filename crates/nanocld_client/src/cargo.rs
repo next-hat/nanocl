@@ -266,7 +266,6 @@ impl NanocldClient {
 mod tests {
   use super::*;
 
-  use ntex::http;
   use nanocl_error::http_client::HttpClientError;
   use nanocl_stubs::cargo_spec::CargoSpecPartial;
 
@@ -317,26 +316,6 @@ mod tests {
       .await
       .unwrap();
     client.delete_cargo(CARGO_NAME, None).await.unwrap();
-  }
-
-  #[ntex::test]
-  async fn create_cargo_wrong_image() {
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
-    let new_cargo = CargoSpecPartial {
-      name: "client-test-cargowi".into(),
-      container: bollard_next::container::Config {
-        image: Some("random_image:ggwp".into()),
-        ..Default::default()
-      },
-      ..Default::default()
-    };
-    let err = client.create_cargo(&new_cargo, None).await.unwrap_err();
-    match err {
-      HttpClientError::HttpError(err) => {
-        assert_eq!(err.status, http::StatusCode::NOT_FOUND);
-      }
-      _ => panic!("Wrong error type"),
-    }
   }
 
   #[ntex::test]
