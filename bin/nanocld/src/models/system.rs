@@ -65,14 +65,14 @@ impl EventManager {
   /// Check if clients are still connected
   async fn check_connection(&mut self) {
     let mut alive_clients = Vec::new();
-    let clients = self.inner.try_lock().unwrap().clients.clone();
+    let clients = self.inner.lock().unwrap().clients.clone();
     for mut client in clients {
       if client.send(SystemEventKind::Ping).await.is_err() {
         continue;
       }
       alive_clients.push(client.clone());
     }
-    self.inner.try_lock().unwrap().clients = alive_clients;
+    self.inner.lock().unwrap().clients = alive_clients;
   }
 
   /// Spawn a task that will check if clients are still connected
@@ -95,7 +95,7 @@ impl EventManager {
     match sys_ev {
       SystemEventKind::Emit(event) => {
         rt::spawn(async move {
-          let clients = self_ptr.inner.try_lock().unwrap().clients.clone();
+          let clients = self_ptr.inner.lock().unwrap().clients.clone();
           for mut client in clients {
             let _ = client.send(SystemEventKind::Emit(event.clone())).await;
           }
@@ -109,7 +109,7 @@ impl EventManager {
       SystemEventKind::Subscribe(emitter) => {
         log::trace!("event_manager: subscribe");
         rt::spawn(async move {
-          self_ptr.inner.try_lock().unwrap().clients.push(emitter);
+          self_ptr.inner.lock().unwrap().clients.push(emitter);
           Ok::<(), IoError>(())
         });
       }
