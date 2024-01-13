@@ -134,7 +134,6 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
     Ok::<_, IoError>(())
   });
   super::docker_event::analyze(&system_state);
-  super::event::analyze(&system_state);
   super::metric::spawn(&system_state);
   Ok(system_state)
 }
@@ -192,7 +191,5 @@ mod tests {
         nanocl_stubs::system::NativeEventAction::Create,
       );
     });
-    let mut sub = state.subscribe().await.unwrap();
-    sub.next().await;
   }
 }

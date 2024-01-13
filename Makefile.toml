@@ -168,8 +168,6 @@ args = [
   "--features",
   "test",
   "--html",
-  "report",
-  "--lcov",
   "--",
   "--test-threads",
   "1",

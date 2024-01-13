@@ -20,8 +20,8 @@ use crate::{
   objects::generic::*,
   repositories::generic::*,
   models::{
-    SystemState, JobDb, ProcessDb, SystemEventReceiver, SystemEventKind,
-    CargoDb, ObjPsStatusUpdate, ObjPsStatusDb, ObjTask,
+    SystemState, JobDb, ProcessDb, CargoDb, ObjPsStatusUpdate, ObjPsStatusDb,
+    ObjTask,
   },
 };
 
@@ -344,46 +344,11 @@ async fn update(e: &Event, state: &SystemState) -> IoResult<()> {
 }
 
 /// Take action when event is received
-async fn exec_event(e: Event, state: &SystemState) -> IoResult<()> {
-  log::debug!("exec_event: {} {}", e.kind, e.action);
-  start(&e, state).await?;
-  delete(&e, state).await?;
-  update(&e, state).await?;
-  job_ttl(&e, state).await?;
+pub async fn exec_event(ev: &Event, state: &SystemState) -> IoResult<()> {
+  log::debug!("exec_event: {} {}", ev.kind, ev.action);
+  start(ev, state).await?;
+  delete(ev, state).await?;
+  update(ev, state).await?;
+  job_ttl(ev, state).await?;
   Ok(())
-}
-
-/// Read events from the event stream
-async fn read_events(stream: &mut SystemEventReceiver, state: &SystemState) {
-  while let Some(e) = stream.next().await {
-    if let SystemEventKind::Emit(e) = e {
-      let state = state.clone();
-      rt::spawn(async move {
-        if let Err(err) = exec_event(e, &state).await {
-          log::warn!("event::read_events: {err}");
-        }
-      });
-    }
-  }
-}
-
-/// Spawn a tread to analyze events from the event stream in his own loop
-pub fn analyze(state: &SystemState) {
-  let state = state.clone();
-  rt::Arbiter::new().exec_fn(|| {
-    rt::spawn(async move {
-      loop {
-        let mut stream = match state.subscribe().await {
-          Ok(stream) => stream,
-          Err(err) => {
-            log::error!("event::analyze: {err}");
-            continue;
-          }
-        };
-        log::info!("event::analyze: stream connected");
-        read_events(&mut stream, &state).await;
-        ntex::time::sleep(std::time::Duration::from_secs(1)).await;
-      }
-    });
-  });
 }
