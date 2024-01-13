@@ -14,7 +14,7 @@ use nanocl_stubs::{
 
 use crate::{vars, utils, repositories::generic::*};
 
-use super::{Pool, EventDb, RawEventEmitter, RawEventClient};
+use super::{Pool, EventDb, RawEventEmitter, RawEventClient, TaskManager};
 
 #[derive(Debug)]
 pub enum SystemEventKind {
@@ -144,6 +144,8 @@ pub struct SystemState {
   pub config: DaemonConfig,
   /// Event manager that run the event loop
   pub event_manager: EventManager,
+  /// Manager of the tasks
+  pub task_manager: TaskManager,
   /// Latest version of the daemon
   pub version: String,
 }
@@ -165,6 +167,7 @@ impl SystemState {
       docker_api: docker.clone(),
       config: conf.to_owned(),
       event_manager: EventManager::new(),
+      task_manager: TaskManager::new(),
       version: vars::VERSION.to_owned(),
     };
     Ok(system_state)
