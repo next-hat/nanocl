@@ -75,7 +75,7 @@ impl RawEventEmitter {
   fn check_connection(&mut self) -> IoResult<()> {
     let mut alive_clients = Vec::new();
     let mut inner = self.inner.lock().map_err(|err| {
-      IoError::interupted("RawEmitterMutex", err.to_string().as_str())
+      IoError::interrupted("RawEmitterMutex", err.to_string().as_str())
     })?;
     for client in &inner.clients {
       if client.try_send(Bytes::from("")).is_err() {
@@ -106,7 +106,7 @@ impl RawEventEmitter {
   /// Send an event to all clients
   pub fn emit(&self, e: &Event) -> IoResult<()> {
     let inner = self.inner.lock().map_err(|err| {
-      IoError::interupted("RawEmitterMutex", err.to_string().as_str())
+      IoError::interrupted("RawEmitterMutex", err.to_string().as_str())
     })?;
     for client in &inner.clients {
       match e.try_to_bytes() {
@@ -128,7 +128,7 @@ impl RawEventEmitter {
       .inner
       .lock()
       .map_err(|err| {
-        IoError::interupted("RawEmitterMutex", err.to_string().as_str())
+        IoError::interrupted("RawEmitterMutex", err.to_string().as_str())
       })?
       .clients
       .push(tx);

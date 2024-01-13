@@ -133,8 +133,8 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
     }
     Ok::<_, IoError>(())
   });
-  super::docker_event::analize(&system_state);
-  super::event::analize(&system_state);
+  super::docker_event::analyze(&system_state);
+  super::event::analyze(&system_state);
   super::metric::spawn(&system_state);
   Ok(system_state)
 }

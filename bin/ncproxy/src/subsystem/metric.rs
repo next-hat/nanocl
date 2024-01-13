@@ -114,7 +114,7 @@ async fn watch(state: &SystemStateRef) -> IoResult<()> {
   ) {
     Ok(watcher) => watcher,
     Err(e) => {
-      return Err(IoError::interupted("metric", &e.to_string()));
+      return Err(IoError::interrupted("metric", &e.to_string()));
     }
   };
   // Add a path to be watched. All files and directories at that path and

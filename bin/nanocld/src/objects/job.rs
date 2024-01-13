@@ -1,11 +1,8 @@
-use bollard_next::container::RemoveContainerOptions;
-use futures_util::{StreamExt, stream::FuturesUnordered};
-
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
   job::{Job, JobPartial, JobInspect},
   process::ProcessKind,
-  system::{NativeEventAction, ObjPsStatusPartial, ObjPsStatusKind},
+  system::{ObjPsStatusPartial, ObjPsStatusKind},
 };
 
 use crate::{

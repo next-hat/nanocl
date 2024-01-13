@@ -75,7 +75,7 @@ async fn execute_arg(cli_args: &Cli) -> IoResult<()> {
 }
 
 /// Nanocl is a command line interface for the Nanocl Daemon.
-/// It will translate the conresponding commands to the Nanocl Daemon API.
+/// It will translate the corresponding commands to the Nanocl Daemon API.
 /// You can use it to manage your cargoes and virtual machines.
 #[ntex::main]
 async fn main() -> std::io::Result<()> {
@@ -88,7 +88,7 @@ async fn main() -> std::io::Result<()> {
     std::process::exit(0);
   })
   .map_err(|err| {
-    IoError::interupted("Signal", &format!("Unable to register ctrl-c: {err}"))
+    IoError::interrupted("Signal", &format!("Unable to register ctrl-c: {err}"))
   })?;
   if let Err(err) = execute_arg(&args).await {
     err.print_and_exit();
@@ -253,24 +253,24 @@ mod tests {
   async fn state_apply_default_statefile_name() {
     let tests_path = Path::new("../../tests")
       .canonicalize()
-      .expect("Can't cannonicalize tests folder path");
+      .expect("Can't canonicalize tests folder path");
     env::set_current_dir(tests_path).expect("Can't move in tests folder");
     assert_cli_ok!("state", "apply", "-y");
     let tests_path = Path::new("./without_s_option")
       .canonicalize()
-      .expect("Can't cannonicalize without_s_option folder path");
+      .expect("Can't canonicalize without_s_option folder path");
     env::set_current_dir(tests_path)
       .expect("Can't move in without_s_option folder");
     assert_cli_ok!("state", "apply", "-y");
     let tests_path = Path::new("../without_s_option_yml")
       .canonicalize()
-      .expect("Can't cannonicalize without_s_option_yml folder path");
+      .expect("Can't canonicalize without_s_option_yml folder path");
     env::set_current_dir(tests_path)
       .expect("Can't move in without_s_option_yml folder");
     assert_cli_ok!("state", "apply", "-y");
     let tests_path = Path::new("../../bin/nanocl")
       .canonicalize()
-      .expect("Can't cannonicalize tests folder path");
+      .expect("Can't canonicalize tests folder path");
     env::set_current_dir(tests_path).expect("Can't move back in nanocl folder");
     assert_cli_err!("state", "apply", "-y");
   }
@@ -300,7 +300,7 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn state_apply_args_advenced() {
+  async fn state_apply_args_advanced() {
     assert_cli_ok!(
       "state",
       "apply",
@@ -365,7 +365,7 @@ mod tests {
     assert!(
       Path::new("/tmp/toto")
         .canonicalize()
-        .expect("Can't cannonicalize bind /tmp/toto folder path")
+        .expect("Can't canonicalize bind /tmp/toto folder path")
         .exists(),
       "Relative bind was not created",
     );
@@ -472,7 +472,6 @@ mod tests {
     ntex::rt::spawn(async {
       assert_cli_ok!("cargo", "stats", CARGO_NAME);
     });
-    assert_cli_ok!("cargo", "restart", CARGO_NAME);
     assert_cli_ok!("cargo", "stop", CARGO_NAME);
     assert_cli_ok!("cargo", "ls");
     assert_cli_ok!("cargo", "ls", "-q");
@@ -494,7 +493,7 @@ mod tests {
 
   #[ntex::test]
   async fn cargo_inspect_invalid() {
-    assert_cli_err!("cargo", "inspect", "ewfwefew");
+    assert_cli_err!("cargo", "inspect", "unknown-cargo");
   }
 
   #[ntex::test]

@@ -87,11 +87,12 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
   match actor.kind {
     EventActorKind::Cargo => {
       log::debug!("handling start event for cargo {key}");
+      let task_key = format!("{}@{key}", actor.kind);
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
       let state_ptr = state.clone();
-      let curr_task = state.task_manager.get_task(&key).await;
+      let curr_task = state.task_manager.get_task(&task_key).await;
       if curr_task.is_some() {
-        state.task_manager.remove_task(&key).await?;
+        state.task_manager.remove_task(&task_key).await?;
       }
       let task = ObjTask::new(action, async move {
         let mut processes =
@@ -128,18 +129,16 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
         state_ptr.emit_normal_native_action(&cargo, NativeEventAction::Start);
         Ok::<_, IoError>(())
       });
-      state
-        .task_manager
-        .add_task(&format!("{}@{key}", &actor.kind), task)
-        .await?;
+      state.task_manager.add_task(&task_key, task).await?;
     }
     EventActorKind::Vm => {}
     EventActorKind::Job => {
+      let task_key = format!("{}@{key}", actor.kind);
       let job = JobDb::read_by_pk(&key, &state.pool).await?.try_to_spec()?;
       let state_ptr = state.clone();
-      let curr_task = state.task_manager.get_task(&key).await;
+      let curr_task = state.task_manager.get_task(&task_key).await;
       if curr_task.is_some() {
-        state.task_manager.remove_task(&key).await?;
+        state.task_manager.remove_task(&task_key).await?;
       }
       let task = ObjTask::new(action, async move {
         for mut container in job.containers {
@@ -157,7 +156,7 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
             &state_ptr,
           )
           .await?;
-          // When we run a sequencial order we wait for the container to finish to start the next one.
+          // When we run a sequential order we wait for the container to finish to start the next one.
           let mut stream = state_ptr.docker_api.wait_container(
             &process.key,
             Some(WaitContainerOptions {
@@ -180,10 +179,7 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
         }
         Ok::<_, IoError>(())
       });
-      state
-        .task_manager
-        .add_task(&format!("{}@{key}", &actor.kind), task)
-        .await?;
+      state.task_manager.add_task(&task_key, task).await?;
     }
     _ => {}
   }
@@ -282,7 +278,6 @@ async fn update(e: &Event, state: &SystemState) -> IoResult<()> {
     return Ok(());
   };
   let key = actor.key.clone().unwrap_or_default();
-  let mut error = None;
   match actor.kind {
     EventActorKind::Cargo => {
       let task_key = format!("{}@{key}", &actor.kind);
@@ -290,64 +285,71 @@ async fn update(e: &Event, state: &SystemState) -> IoResult<()> {
       if curr_task.is_some() {
         state.task_manager.remove_task(&task_key).await?;
       }
-      let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
-      let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
-      // Create instance with the new spec
-      let new_instances =
-        match utils::cargo::create_instances(&cargo, 1, state).await {
+      let state_ptr = state.clone();
+      let task = ObjTask::new(action, async move {
+        let cargo =
+          CargoDb::transform_read_by_pk(&key, &state_ptr.pool).await?;
+        let processes =
+          ProcessDb::read_by_kind_key(&key, &state_ptr.pool).await?;
+        // Create instance with the new spec
+        let new_instances =
+          match utils::cargo::create_instances(&cargo, 1, &state_ptr).await {
+            Err(err) => {
+              log::warn!(
+                "Unable to create cargo instance {} : {err}",
+                cargo.spec.cargo_key
+              );
+              Vec::default()
+            }
+            Ok(instances) => instances,
+          };
+        // start created containers
+        match CargoDb::start_process_by_kind_key(&key, &state_ptr).await {
           Err(err) => {
-            error = Some(err);
-            Vec::default()
+            log::error!(
+              "Unable to start cargo instance {} : {err}",
+              cargo.spec.cargo_key
+            );
+            let state_ptr_ptr = state_ptr.clone();
+            rt::spawn(async move {
+              ntex::time::sleep(std::time::Duration::from_secs(2)).await;
+              let _ = utils::cargo::delete_instances(
+                &new_instances
+                  .iter()
+                  .map(|i| i.key.clone())
+                  .collect::<Vec<_>>(),
+                &state_ptr_ptr,
+              )
+              .await;
+            });
           }
-          Ok(instances) => instances,
-        };
-      // start created containers
-      match CargoDb::start_process_by_kind_key(&key, state).await {
-        Err(err) => {
-          log::error!(
-            "Unable to start cargo instance {} : {err}",
-            cargo.spec.cargo_key
-          );
-          let state_ptr = state.clone();
-          rt::spawn(async move {
-            ntex::time::sleep(std::time::Duration::from_secs(2)).await;
-            let _ = utils::cargo::delete_instances(
-              &new_instances
-                .iter()
-                .map(|i| i.key.clone())
-                .collect::<Vec<_>>(),
+          Ok(_) => {
+            // Delete old containers
+            utils::cargo::delete_instances(
+              &processes.iter().map(|c| c.key.clone()).collect::<Vec<_>>(),
               &state_ptr,
             )
-            .await;
-          });
+            .await?;
+          }
         }
-        Ok(_) => {
-          // Delete old containers
-          utils::cargo::delete_instances(
-            &processes.iter().map(|c| c.key.clone()).collect::<Vec<_>>(),
-            state,
-          )
-          .await?;
-        }
-      }
+        Ok::<_, IoError>(())
+      });
+      state.task_manager.add_task(&task_key, task).await?;
     }
     EventActorKind::Vm => {}
     EventActorKind::Job => {}
     _ => {}
   }
-  match error {
-    Some(err) => Err(err.into()),
-    None => Ok(()),
-  }
+  Ok(())
 }
 
 /// Take action when event is received
 async fn exec_event(e: Event, state: &SystemState) -> IoResult<()> {
   log::debug!("exec_event: {} {}", e.kind, e.action);
-  job_ttl(&e, state).await?;
   start(&e, state).await?;
   delete(&e, state).await?;
   update(&e, state).await?;
+  job_ttl(&e, state).await?;
   Ok(())
 }
 
@@ -365,8 +367,8 @@ async fn read_events(stream: &mut SystemEventReceiver, state: &SystemState) {
   }
 }
 
-/// Spawn a tread to analize events from the event stream in his own loop
-pub fn analize(state: &SystemState) {
+/// Spawn a tread to analyze events from the event stream in his own loop
+pub fn analyze(state: &SystemState) {
   let state = state.clone();
   rt::Arbiter::new().exec_fn(|| {
     rt::spawn(async move {
@@ -374,11 +376,11 @@ pub fn analize(state: &SystemState) {
         let mut stream = match state.subscribe().await {
           Ok(stream) => stream,
           Err(err) => {
-            log::error!("event::analize: {err}");
+            log::error!("event::analyze: {err}");
             continue;
           }
         };
-        log::info!("event::analize: stream connected");
+        log::info!("event::analyze: stream connected");
         read_events(&mut stream, &state).await;
         ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       }

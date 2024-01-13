@@ -184,7 +184,7 @@ impl SystemState {
       .send(SystemEventKind::Emit(event))
       .await
       .map_err(|err| {
-        IoError::interupted("EventEmitter", err.to_string().as_str())
+        IoError::interrupted("EventEmitter", err.to_string().as_str())
       })?;
     Ok(())
   }
@@ -207,7 +207,7 @@ impl SystemState {
       .send(SystemEventKind::Subscribe(sx))
       .await
       .map_err(|err| {
-        IoError::interupted("EventEmitter", err.to_string().as_str())
+        IoError::interrupted("EventEmitter", err.to_string().as_str())
       })?;
     Ok(rx)
   }
