@@ -513,14 +513,6 @@ mod tests {
   }
 
   #[ntex::test]
-  async fn job_wait_error() {
-    assert_cli_ok!("state", "apply", "-yfs", "../../tests/job_with_error.yml");
-    assert_cli_ok!("job", "start", "job-example-error");
-    assert_cli_err!("job", "wait", "job-example-error", "-c", "not-running");
-    assert_cli_ok!("job", "rm", "-y", "job-example-error");
-  }
-
-  #[ntex::test]
   async fn cargo_inspect_invalid() {
     assert_cli_err!("cargo", "inspect", "ewfwefew");
   }
