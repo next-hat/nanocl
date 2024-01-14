@@ -172,7 +172,7 @@ mod tests {
     // Test state
     let state = init(&config).await.unwrap();
     let state_ptr = state.clone();
-    let mut raw_sub = state.subscribe_raw().unwrap();
+    let mut raw_sub = state.subscribe_raw().await.unwrap();
     rt::spawn(async move {
       ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       let actor = Resource::default();

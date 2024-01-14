@@ -104,11 +104,14 @@ impl RawEventEmitter {
   }
 
   /// Send an event to all clients
-  pub fn emit(&self, e: &Event) -> IoResult<()> {
-    let inner = self.inner.lock().map_err(|err| {
-      IoError::interrupted("RawEmitterMutex", err.to_string().as_str())
-    })?;
-    for client in &inner.clients {
+  pub async fn emit(&self, e: &Event) -> IoResult<()> {
+    let inner = Arc::clone(&self.inner);
+    let clients = web::block(move || {
+      let clients = inner.lock()?.clients.clone();
+      Ok::<_, IoError>(clients)
+    })
+    .await?;
+    for client in clients {
       match e.try_to_bytes() {
         Ok(msg) => {
           let _ = client.try_send(msg);
@@ -122,16 +125,14 @@ impl RawEventEmitter {
   }
 
   /// Subscribe to events
-  pub fn subscribe(&self) -> IoResult<RawEventClient> {
+  pub async fn subscribe(&self) -> IoResult<RawEventClient> {
     let (tx, rx) = channel(100);
-    self
-      .inner
-      .lock()
-      .map_err(|err| {
-        IoError::interrupted("RawEmitterMutex", err.to_string().as_str())
-      })?
-      .clients
-      .push(tx);
+    let inner = Arc::clone(&self.inner);
+    web::block(move || {
+      inner.lock()?.clients.push(tx);
+      Ok::<_, IoError>(())
+    })
+    .await?;
     Ok(RawEventClient(rx))
   }
 }

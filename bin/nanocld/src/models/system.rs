@@ -34,7 +34,7 @@ impl EventManager {
     log::trace!("event_manager: dispatch_event {:?}", ev);
     let self_ptr = self.clone();
     rt::spawn(async move {
-      self_ptr.raw.emit(&ev)?;
+      self_ptr.raw.emit(&ev).await?;
       Ok::<(), IoError>(())
     });
   }
@@ -100,8 +100,8 @@ impl SystemState {
     });
   }
 
-  pub fn subscribe_raw(&self) -> IoResult<RawEventClient> {
-    self.event_manager.raw.subscribe()
+  pub async fn subscribe_raw(&self) -> IoResult<RawEventClient> {
+    self.event_manager.raw.subscribe().await
   }
 
   pub fn emit_normal_native_action<A>(

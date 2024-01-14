@@ -12,6 +12,7 @@
   "rust-analyzer.cargo.noDefaultFeatures": true,
   "rust-analyzer.cargo.features": ["dev", "test"],
   "cSpell.words": [
+    "aarch",
     "canonicalize",
     "chrono",
     "crond",
@@ -25,6 +26,8 @@
     "Nanocld",
     "nstore",
     "ntex",
-    "statefile"
+    "schemars",
+    "statefile",
+    "utoipa"
   ]
 }

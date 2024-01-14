@@ -76,7 +76,7 @@ pub async fn get_info(
 pub async fn watch_event(
   state: web::types::State<SystemState>,
 ) -> HttpResult<web::HttpResponse> {
-  let stream = state.subscribe_raw()?;
+  let stream = state.subscribe_raw().await?;
   Ok(
     web::HttpResponse::Ok()
       .content_type("text/event-stream")
