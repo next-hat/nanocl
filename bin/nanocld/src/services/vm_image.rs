@@ -11,7 +11,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
+  utils::{self, vm_image::ActionVmDelete},
   repositories::generic::*,
   models::{SystemState, VmImageDb},
 };
@@ -212,7 +212,7 @@ pub async fn delete_vm_image(
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let name = path.1.to_owned();
-  utils::vm_image::delete_by_name(&name, &state.pool).await?;
+  state.exec_action(ActionVmDelete(&name)).await?;
   Ok(web::HttpResponse::Ok().into())
 }
 

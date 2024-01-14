@@ -19,7 +19,7 @@ pub async fn create_instance(
   state: &SystemState,
 ) -> HttpResult<()> {
   let mut labels: HashMap<String, String> = HashMap::new();
-  let vmimagespath = format!("{}/vms/images", state.config.state_dir);
+  let img_path = format!("{}/vms/images", state.config.state_dir);
   labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
   labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   let mut args: Vec<String> =
@@ -102,7 +102,7 @@ pub async fn create_instance(
           .clone()
           .unwrap_or(vm.namespace_name.to_owned()),
       ),
-      binds: Some(vec![format!("{vmimagespath}:{vmimagespath}")]),
+      binds: Some(vec![format!("{img_path}:{img_path}")]),
       devices: Some(devices),
       cap_add: Some(vec!["NET_ADMIN".into()]),
       ..Default::default()

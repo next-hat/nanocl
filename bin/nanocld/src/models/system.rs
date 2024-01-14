@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
 use ntex::rt;
-use nanocl_error::io::{IoResult, FromIo, IoError};
+use nanocl_error::{
+  io::{IoResult, FromIo, IoError},
+  http::HttpResult,
+};
 use nanocl_stubs::{
   config::DaemonConfig,
   system::{Event, EventPartial, NativeEventAction, EventActor, EventKind},
 };
 
-use crate::{vars, utils, repositories::generic::*};
+use crate::{vars, utils, repositories::generic::*, objects::generic::StateAction};
 
 use super::{Pool, EventDb, RawEventEmitter, RawEventClient, TaskManager};
 
@@ -80,6 +83,13 @@ impl SystemState {
       version: vars::VERSION.to_owned(),
     };
     Ok(system_state)
+  }
+
+  pub async fn exec_action<A>(&self, action: A) -> HttpResult<A::StateActionOut>
+  where
+    A: StateAction,
+  {
+    action.fn_action(self).await
   }
 
   pub async fn emit_event(&self, new_ev: EventPartial) -> IoResult<()> {

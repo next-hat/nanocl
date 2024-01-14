@@ -23,7 +23,9 @@
     "dotenv",
     "dotenvy",
     "errno",
+    "iface",
     "Insertable",
+    "keygen",
     "metrs",
     "Metrsd",
     "nanocl",
@@ -31,6 +33,7 @@
     "ncproxy",
     "nstore",
     "ntex",
+    "qcow",
     "schemars",
     "statefile",
     "utoipa"
