@@ -1,7 +1,10 @@
 use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::{
+  io::{IoResult, IoError},
+  http::{HttpResult, HttpError},
+};
 
 use bollard_next::{
   service::{HostConfig, RestartPolicy, RestartPolicyNameEnum},
@@ -13,6 +16,7 @@ use nanocl_stubs::{
   cargo::Cargo,
   process::{Process, ProcessKind},
   system::{EventPartial, EventActorKind, EventActor, EventKind},
+  generic::{GenericFilter, GenericClause},
 };
 
 use crate::{
@@ -110,34 +114,19 @@ pub async fn create_instances(
   execute_before(cargo, state).await?;
   let mut secret_envs: Vec<String> = Vec::new();
   if let Some(secrets) = &cargo.spec.secrets {
-    let fetched_secrets = secrets
-      .iter()
-      .map(|secret| async move {
-        let secret =
-          SecretDb::transform_read_by_pk(secret, &state.pool).await?;
-        if secret.kind.as_str() != "nanocl.io/env" {
-          return Err(HttpError::bad_request(format!(
-            "Secret {} is not an nanocl.io/env secret",
-            secret.name
-          )));
-        }
-        let envs = serde_json::from_value::<Vec<String>>(secret.data).map_err(
-          |err| {
-            HttpError::internal_server_error(format!(
-              "Invalid secret data for secret {} {err}",
-              secret.name
-            ))
-          },
-        )?;
-        Ok::<_, HttpError>(envs)
-      })
-      .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<_>>()
-      .await
+    let filter = GenericFilter::new()
+      .r#where("key", GenericClause::In(secrets.clone()))
+      .r#where("kind", GenericClause::Eq("nanocl.io/env".to_owned()));
+    let secrets = SecretDb::transform_read_by(&filter, &state.pool)
+      .await?
       .into_iter()
-      .collect::<Result<Vec<_>, _>>()?;
-    // Flatten the secrets
-    secret_envs = fetched_secrets.into_iter().flatten().collect();
+      .map(|secret| {
+        let envs = serde_json::from_value::<Vec<String>>(secret.data)?;
+        Ok::<_, IoError>(envs)
+      })
+      .collect::<IoResult<Vec<Vec<String>>>>()?;
+    // Flatten the secrets to have envs in a single vector
+    secret_envs = secrets.into_iter().flatten().collect();
   }
   (0..number)
     .collect::<Vec<usize>>()

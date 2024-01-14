@@ -7,7 +7,7 @@ use bollard_next::{container::Config, service::HostConfig};
 use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::{
   process::ProcessKind,
-  system::{ObjPsStatusPartial, ObjPsStatusKind},
+  system::{ObjPsStatusPartial, ObjPsStatusKind, NativeEventAction},
   cargo::{Cargo, CargoDeleteQuery, CargoInspect},
   cargo_spec::CargoSpecPartial,
 };
@@ -78,6 +78,10 @@ impl ObjCreate for CargoDb {
 impl ObjDelByPk for CargoDb {
   type ObjDelOut = Cargo;
   type ObjDelOpts = CargoDeleteQuery;
+
+  fn get_del_event() -> NativeEventAction {
+    NativeEventAction::Deleting
+  }
 
   async fn fn_del_obj_by_pk(
     pk: &str,

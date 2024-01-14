@@ -3,11 +3,13 @@ ApiVersion: v0.12
 Secrets:
 - Name: env.deploy-example.com
   Kind: nanocl.io/env
-  Metadata:
-    Selector:
-      App: deploy-example
   Data:
   - MY_VALUE=MY_KEY
+
+- Name: env.trash
+  Kind: nanocl.io/env
+  Data:
+  - TRASH=MY_KEY
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/resource
@@ -64,6 +66,8 @@ Cargoes:
     - NEW=GG
 
 - Name: deploy-example2
+  Secrets:
+  - env.trash
   Container:
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:

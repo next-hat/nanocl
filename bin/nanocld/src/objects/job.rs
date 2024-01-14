@@ -2,7 +2,7 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
   job::{Job, JobPartial, JobInspect},
   process::ProcessKind,
-  system::{ObjPsStatusPartial, ObjPsStatusKind},
+  system::{ObjPsStatusPartial, ObjPsStatusKind, NativeEventAction},
 };
 
 use crate::{
@@ -49,6 +49,10 @@ impl ObjCreate for JobDb {
 impl ObjDelByPk for JobDb {
   type ObjDelOpts = ();
   type ObjDelOut = Job;
+
+  fn get_del_event() -> NativeEventAction {
+    NativeEventAction::Deleting
+  }
 
   async fn fn_del_obj_by_pk(
     pk: &str,
