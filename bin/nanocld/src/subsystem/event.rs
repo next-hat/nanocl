@@ -33,12 +33,6 @@ async fn job_ttl(e: &Event, state: &SystemState) -> IoResult<()> {
   if actor.kind != EventActorKind::Process {
     return Ok(());
   }
-  let attributes = actor.attributes.clone().unwrap_or_default();
-  let job_id = match attributes.get("io.nanocl.j") {
-    None => return Ok(()),
-    Some(job_id) => job_id.as_str().unwrap_or_default(),
-  };
-  log::debug!("event::job_ttl: {job_id}");
   let action = NativeEventAction::from_str(e.action.as_str())?;
   match &action {
     NativeEventAction::Create
@@ -46,6 +40,12 @@ async fn job_ttl(e: &Event, state: &SystemState) -> IoResult<()> {
     | NativeEventAction::Delete => return Ok(()),
     _ => {}
   }
+  let attributes = actor.attributes.clone().unwrap_or_default();
+  let job_id = match attributes.get("io.nanocl.j") {
+    None => return Ok(()),
+    Some(job_id) => job_id.as_str().unwrap_or_default(),
+  };
+  log::debug!("event::job_ttl: {job_id}");
   let job = JobDb::read_by_pk(job_id, &state.pool)
     .await?
     .try_to_spec()?;
@@ -55,21 +55,20 @@ async fn job_ttl(e: &Event, state: &SystemState) -> IoResult<()> {
     "event::job_ttl: {} has {running} running instances",
     job.name
   );
-  if running == 0 {
-    state.emit_normal_native_action(&job, NativeEventAction::Finish);
+  if running != 0 {
+    return Ok(());
   }
+  state.emit_normal_native_action(&job, NativeEventAction::Finish);
   let ttl = match job.ttl {
     None => return Ok(()),
     Some(ttl) => ttl,
   };
-  if running == 0 {
-    let state = state.clone();
-    rt::spawn(async move {
-      log::debug!("event::job_ttl: {} will be deleted in {ttl}s", job.name);
-      ntex::time::sleep(std::time::Duration::from_secs(ttl as u64)).await;
-      let _ = JobDb::del_obj_by_pk(&job.name, &(), &state).await;
-    });
-  }
+  let state = state.clone();
+  rt::spawn(async move {
+    log::debug!("event::job_ttl: {} will be deleted in {ttl}s", job.name);
+    ntex::time::sleep(std::time::Duration::from_secs(ttl as u64)).await;
+    let _ = JobDb::del_obj_by_pk(&job.name, &(), &state).await;
+  });
   Ok(())
 }
 

@@ -1,7 +1,6 @@
-use futures_util::{StreamExt, stream::FuturesUnordered};
 use bollard_next::container::{RemoveContainerOptions, StopContainerOptions};
 
-use nanocl_error::http::{HttpResult, HttpError};
+use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
   system::{NativeEventAction, ObjPsStatusKind},
   process::ProcessKind,
@@ -106,20 +105,12 @@ pub trait ObjProcess {
     state: &SystemState,
   ) -> HttpResult<()> {
     let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
-    processes
-      .into_iter()
-      .map(|process| async move {
-        state
-          .docker_api
-          .restart_container(&process.key, None)
-          .await
-          .map_err(HttpError::from)
-      })
-      .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<HttpResult<()>>>()
-      .await
-      .into_iter()
-      .collect::<HttpResult<Vec<_>>>()?;
+    for process in processes {
+      state
+        .docker_api
+        .restart_container(&process.key, None)
+        .await?;
+    }
     Self::_emit(pk, NativeEventAction::Restart, state).await?;
     Ok(())
   }
@@ -130,22 +121,12 @@ pub trait ObjProcess {
     state: &SystemState,
   ) -> HttpResult<()> {
     let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
-    processes
-      .into_iter()
-      .map(|process| async move {
-        let id = process.data.id.clone().unwrap_or_default();
-        let options = opts.clone().into();
-        state
-          .docker_api
-          .kill_container(&id, Some(options))
-          .await
-          .map_err(HttpError::from)
-      })
-      .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<HttpResult<()>>>()
-      .await
-      .into_iter()
-      .collect::<HttpResult<Vec<_>>>()?;
+    for process in processes {
+      state
+        .docker_api
+        .kill_container(&process.key, Some(opts.clone().into()))
+        .await?;
+    }
     Ok(())
   }
 
