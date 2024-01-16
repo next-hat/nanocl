@@ -5,12 +5,13 @@ use std::{
   task::{Poll, Context},
 };
 
-use nanocl_stubs::system::Event;
-use ntex::{rt, web, time, util::Bytes};
 use futures::Stream;
-use tokio::sync::mpsc::{Receiver, Sender, channel};
+
+use ntex::{rt, web, time, util::Bytes};
+use tokio::sync::mpsc::{Sender, Receiver, channel};
 
 use nanocl_error::io::{IoResult, IoError};
+use nanocl_stubs::system::Event;
 
 /// Stream: Wrap Receiver in our own type, with correct error type
 /// This is needed to return a http stream of bytes

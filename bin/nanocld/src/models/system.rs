@@ -10,7 +10,7 @@ use nanocl_stubs::{
   system::{Event, EventPartial, NativeEventAction, EventActor, EventKind},
 };
 
-use crate::{vars, utils, repositories::generic::*, objects::generic::StateAction};
+use crate::{vars, utils, repositories::generic::*, actions::StateAction};
 
 use super::{Pool, EventDb, RawEventEmitter, RawEventClient, TaskManager};
 

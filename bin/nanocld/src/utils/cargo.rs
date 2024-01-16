@@ -21,9 +21,9 @@ use nanocl_stubs::{
 
 use crate::{
   vars, utils,
+  objects::generic::*,
   repositories::generic::*,
   models::{SystemState, CargoDb, SecretDb},
-  objects::generic::ObjProcess,
 };
 
 /// Container to execute before the cargo instances

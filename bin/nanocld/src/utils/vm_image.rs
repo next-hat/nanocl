@@ -9,7 +9,7 @@ use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 
 use crate::{
   utils,
-  objects::generic::*,
+  actions::StateAction,
   repositories::generic::*,
   models::{Pool, VmImageDb, QemuImgInfo, VmImageUpdateDb, SystemState},
 };
