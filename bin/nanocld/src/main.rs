@@ -9,7 +9,6 @@ mod schema;
 mod models;
 mod vars;
 mod utils;
-mod actions;
 mod subsystem;
 mod repositories;
 mod services;

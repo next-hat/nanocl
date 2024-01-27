@@ -9,7 +9,7 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils::{self, vm_image::ActionVmDelete},
+  utils,
   repositories::generic::*,
   models::{
     VmDb, SystemState, VmObjCreateIn, VmImageDb, SpecDb, VmObjPutIn,
@@ -87,9 +87,7 @@ impl ObjDelByPk for VmDb {
     VmDb::del_process_by_pk(&container_name, Some(options), state).await?;
     VmDb::del_by_pk(pk, &state.pool).await?;
     SpecDb::del_by_kind_key(pk, &state.pool).await?;
-    state
-      .exec_action(ActionVmDelete(&vm.spec.disk.image))
-      .await?;
+    utils::vm_image::delete_by_pk(&vm.spec.disk.image, state).await?;
     Ok(vm)
   }
 }

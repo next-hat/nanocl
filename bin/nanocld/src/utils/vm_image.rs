@@ -9,35 +9,25 @@ use nanocl_stubs::vm_image::{VmImageCloneStream, VmImageResizePayload};
 
 use crate::{
   utils,
-  actions::StateAction,
   repositories::generic::*,
   models::{Pool, VmImageDb, QemuImgInfo, VmImageUpdateDb, SystemState},
 };
 
-pub struct ActionVmDelete<'a>(pub &'a str);
-
-impl<'a> StateAction for ActionVmDelete<'a> {
-  type StateActionOut = ();
-
-  async fn fn_action(
-    &self,
-    state: &SystemState,
-  ) -> HttpResult<Self::StateActionOut> {
-    let name = self.0;
-    let vm_image = VmImageDb::read_by_pk(name, &state.pool).await?;
-    let children = VmImageDb::read_by_parent(name, &state.pool).await?;
-    if !children.is_empty() {
-      return Err(HttpError::conflict(format!(
-        "Vm image {name} has children images please delete them first"
-      )));
-    }
-    let filepath = vm_image.path.clone();
-    if let Err(err) = fs::remove_file(&filepath).await {
-      log::warn!("Error while deleting the file {filepath}: {err}");
-    }
-    VmImageDb::del_by_pk(name, &state.pool).await?;
-    Ok(())
+/// Delete a vm image from the database and the filesystem
+pub async fn delete_by_pk(pk: &str, state: &SystemState) -> HttpResult<()> {
+  let vm_image = VmImageDb::read_by_pk(pk, &state.pool).await?;
+  let children = VmImageDb::read_by_parent(pk, &state.pool).await?;
+  if !children.is_empty() {
+    return Err(HttpError::conflict(format!(
+      "Vm image {pk} has children images please delete them first"
+    )));
   }
+  let filepath = vm_image.path.clone();
+  if let Err(err) = fs::remove_file(&filepath).await {
+    log::warn!("Error while deleting the file {filepath}: {err}");
+  }
+  VmImageDb::del_by_pk(pk, &state.pool).await?;
+  Ok(())
 }
 
 /// Get the info of a vm image using qemu-img info command and parse the output
