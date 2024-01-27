@@ -16,6 +16,7 @@ pub mod resource;
 pub mod ctrl_client;
 pub mod process;
 pub mod server;
+pub mod container;
 
 #[cfg(test)]
 pub mod tests {

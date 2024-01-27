@@ -1,7 +1,5 @@
 {
-  "editor.rulers": [
-    80
-  ],
+  "editor.rulers": [80],
   "editor.tabSize": 2,
   "editor.detectIndentation": false,
   "editor.trimAutoWhitespace": true,
@@ -12,8 +10,32 @@
   "rust-analyzer.checkOnSave": true,
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.cargo.noDefaultFeatures": true,
-  "rust-analyzer.cargo.features": [
-    "dev",
-    "test"
-  ],
+  "rust-analyzer.cargo.features": ["dev", "test"],
+  "cSpell.words": [
+    "aarch",
+    "canonicalize",
+    "certbot",
+    "chrono",
+    "cpus",
+    "crond",
+    "curr",
+    "dialoguer",
+    "dotenv",
+    "dotenvy",
+    "errno",
+    "iface",
+    "Insertable",
+    "keygen",
+    "metrs",
+    "Metrsd",
+    "nanocl",
+    "Nanocld",
+    "ncproxy",
+    "nstore",
+    "ntex",
+    "qcow",
+    "schemars",
+    "statefile",
+    "utoipa"
+  ]
 }

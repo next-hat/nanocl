@@ -22,7 +22,7 @@ use crate::{
 /// It will install nanocl system containers
 pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   let home_dir = std::env::var("HOME").map_err(|err| {
-    IoError::interupted("Unable to get $HOME env variable", &err.to_string())
+    IoError::interrupted("Unable to get $HOME env variable", &err.to_string())
   })?;
   let detected_host = utils::docker::detect_docker_host()?;
   let (docker_host, is_docker_desktop) = match &args.docker_host {

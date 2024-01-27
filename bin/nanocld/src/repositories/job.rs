@@ -8,7 +8,7 @@ use nanocl_stubs::{
 
 use crate::{
   gen_multiple, gen_where4json, gen_where4string,
-  models::{JobDb, JobUpdateDb},
+  models::{JobDb, JobUpdateDb, Pool, ObjPsStatusDb},
   schema::jobs,
 };
 
@@ -58,6 +58,12 @@ impl RepositoryReadBy for JobDb {
 }
 
 impl JobDb {
+  pub async fn clear(pk: &str, pool: &Pool) -> IoResult<()> {
+    JobDb::del_by_pk(pk, pool).await?;
+    ObjPsStatusDb::del_by_pk(pk, pool).await?;
+    Ok(())
+  }
+
   pub fn to_spec(&self, p: &JobPartial) -> Job {
     Job {
       name: self.key.clone(),
@@ -75,6 +81,7 @@ impl JobDb {
     let data = serde_json::to_value(p)?;
     Ok(JobDb {
       key: p.name.clone(),
+      status_key: p.name.clone(),
       created_at: chrono::Utc::now().naive_utc(),
       updated_at: chrono::Utc::now().naive_utc(),
       metadata: Default::default(),

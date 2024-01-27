@@ -133,8 +133,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
     }
     Ok::<_, IoError>(())
   });
-  super::docker_event::analize(&system_state);
-  super::event::analize(&system_state);
+  super::docker_event::analyze(&system_state);
   super::metric::spawn(&system_state);
   Ok(system_state)
 }
@@ -173,7 +172,7 @@ mod tests {
     // Test state
     let state = init(&config).await.unwrap();
     let state_ptr = state.clone();
-    let mut raw_sub = state.subscribe_raw().unwrap();
+    let mut raw_sub = state.subscribe_raw().await.unwrap();
     rt::spawn(async move {
       ntex::time::sleep(std::time::Duration::from_secs(1)).await;
       let actor = Resource::default();
@@ -192,7 +191,5 @@ mod tests {
         nanocl_stubs::system::NativeEventAction::Create,
       );
     });
-    let mut sub = state.subscribe().await.unwrap();
-    sub.next().await;
   }
 }

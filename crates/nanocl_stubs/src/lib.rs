@@ -7,7 +7,6 @@ pub mod proxy;
 pub mod config;
 pub mod namespace;
 pub mod cargo;
-pub mod cargo_image;
 pub mod cargo_spec;
 pub mod statefile;
 pub mod vm;

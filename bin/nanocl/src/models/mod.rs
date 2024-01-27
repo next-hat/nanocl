@@ -3,7 +3,6 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 mod namespace;
 mod cargo;
-mod cargo_image;
 mod resource;
 mod version;
 mod state;
@@ -12,7 +11,6 @@ mod vm_image;
 mod process;
 mod install;
 mod uninstall;
-mod upgrade;
 mod node;
 mod context;
 mod secret;
@@ -31,12 +29,10 @@ pub use vm::*;
 pub use vm_image::*;
 pub use namespace::*;
 pub use cargo::*;
-pub use cargo_image::*;
 pub use resource::*;
 pub use state::*;
 pub use install::*;
 pub use uninstall::*;
-pub use upgrade::*;
 pub use node::*;
 pub use job::*;
 
@@ -87,8 +83,6 @@ pub enum Command {
   Install(InstallOpts),
   /// Uninstall components
   Uninstall(UninstallOpts),
-  /// Upgrade components (experimental)
-  Upgrade(UpgradeOpts),
   // TODO: shell completion
   // Completion {
   //   /// Shell to generate completion for

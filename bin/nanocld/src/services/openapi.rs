@@ -15,17 +15,16 @@ use bollard_next::service::{
   HostConfigCgroupnsModeEnum, DeviceRequest, DeviceMapping,
   HostConfigIsolationEnum, HostConfigLogConfig, Mount, RestartPolicy,
   ResourcesUlimits, Driver, ConfigSpec, HostConfig, NetworkingConfig,
-  SwarmSpecCaConfigExternalCasProtocolEnum, ImageInspect, ImageSummary,
-  TlsInfo, SwarmSpecCaConfig, SwarmSpecDispatcher, SwarmSpecEncryptionConfig,
-  SwarmSpecOrchestration, SwarmSpecRaft, SwarmSpecTaskDefaults, ObjectVersion,
-  SwarmSpec, SystemInfoCgroupDriverEnum, SystemInfoCgroupVersionEnum, Commit,
-  IndexInfo, ClusterInfo, LocalNodeState, PeerNode,
-  SystemInfoDefaultAddressPools, SystemInfoIsolationEnum, PluginsInfo,
-  RegistryServiceConfig, Runtime, SwarmInfo, SystemInfo, EndpointIpamConfig,
-  EndpointSettings, MountPointTypeEnum, PortTypeEnum,
-  ContainerSummaryHostConfig, ContainerSummaryNetworkSettings, MountPoint,
-  Port, ContainerSummary, HealthConfig, ContainerConfig, GraphDriverData,
-  ImageInspectMetadata, ImageInspectRootFs, SwarmSpecCaConfigExternalCas,
+  SwarmSpecCaConfigExternalCasProtocolEnum, TlsInfo, SwarmSpecCaConfig,
+  SwarmSpecDispatcher, SwarmSpecEncryptionConfig, SwarmSpecOrchestration,
+  SwarmSpecRaft, SwarmSpecTaskDefaults, ObjectVersion, SwarmSpec,
+  SystemInfoCgroupDriverEnum, SystemInfoCgroupVersionEnum, Commit, IndexInfo,
+  ClusterInfo, LocalNodeState, PeerNode, SystemInfoDefaultAddressPools,
+  SystemInfoIsolationEnum, PluginsInfo, RegistryServiceConfig, Runtime,
+  SwarmInfo, SystemInfo, EndpointIpamConfig, EndpointSettings,
+  MountPointTypeEnum, PortTypeEnum, ContainerSummaryHostConfig,
+  ContainerSummaryNetworkSettings, MountPoint, Port, ContainerSummary,
+  HealthConfig, ContainerConfig, SwarmSpecCaConfigExternalCas,
   SwarmSpecTaskDefaultsLogDriver, GenericResourcesInnerDiscreteResourceSpec,
   Network, GenericResourcesInner, GenericResourcesInnerNamedResourceSpec,
   NetworkContainer, Ipam, IpamConfig, ExecInspectResponse, ProcessConfig,
@@ -56,7 +55,6 @@ use nanocl_stubs::cargo_spec::{
   CargoSpec, CargoSpecPartial, CargoSpecUpdate, ReplicationMode,
   ReplicationStatic,
 };
-use nanocl_stubs::cargo_image::CargoImagePartial;
 use nanocl_stubs::vm::{Vm, VmInspect, VmSummary};
 use nanocl_stubs::vm_spec::{
   VmSpec, VmSpecPartial, VmSpecUpdate, VmDisk, VmHostConfig,
@@ -78,8 +76,8 @@ use nanocl_stubs::proxy::{
 use nanocl_stubs::statefile::{Statefile, StatefileArg};
 
 use super::{
-  node, system, namespace, exec, cargo, cargo_image, vm, vm_image, resource,
-  metric, secret, job, process, resource_kind, event,
+  node, system, namespace, exec, cargo, vm, vm_image, resource, metric, secret,
+  job, process, resource_kind, event,
 };
 
 /// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
@@ -258,12 +256,6 @@ impl Modify for VersionModifier {
     exec::create_exec_command,
     exec::start_exec_command,
     exec::inspect_exec_command,
-    // Cargo Image
-    cargo_image::list_cargo_image,
-    cargo_image::inspect_cargo_image,
-    cargo_image::create_cargo_image,
-    cargo_image::delete_cargo_image,
-    cargo_image::import_cargo_image,
     // VM Image
     vm_image::list_vm_images,
     vm_image::import_vm_image,
@@ -383,13 +375,6 @@ impl Modify for VersionModifier {
     BlkioStatsEntry,
     CPUUsage,
     ThrottlingData,
-    // Container Image
-    ImageSummary,
-    ImageInspect,
-    ImageInspectMetadata,
-    ImageInspectRootFs,
-    GraphDriverData,
-    CargoImagePartial,
     // Container
     Config,
     Driver,

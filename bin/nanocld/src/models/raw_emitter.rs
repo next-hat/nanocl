@@ -5,12 +5,13 @@ use std::{
   task::{Poll, Context},
 };
 
-use nanocl_stubs::system::Event;
-use ntex::{rt, web, time, util::Bytes};
 use futures::Stream;
-use tokio::sync::mpsc::{Receiver, Sender, channel};
+
+use ntex::{rt, web, time, util::Bytes};
+use tokio::sync::mpsc::{Sender, Receiver, channel};
 
 use nanocl_error::io::{IoResult, IoError};
+use nanocl_stubs::system::Event;
 
 /// Stream: Wrap Receiver in our own type, with correct error type
 /// This is needed to return a http stream of bytes
@@ -74,8 +75,8 @@ impl RawEventEmitter {
   /// Check if clients are still connected
   fn check_connection(&mut self) -> IoResult<()> {
     let mut alive_clients = Vec::new();
-    let mut inner = self.inner.try_lock().map_err(|err| {
-      IoError::interupted("RawEmitterMutex", err.to_string().as_str())
+    let mut inner = self.inner.lock().map_err(|err| {
+      IoError::interrupted("RawEmitterMutex", err.to_string().as_str())
     })?;
     for client in &inner.clients {
       if client.try_send(Bytes::from("")).is_err() {
@@ -104,11 +105,14 @@ impl RawEventEmitter {
   }
 
   /// Send an event to all clients
-  pub fn emit(&self, e: &Event) -> IoResult<()> {
-    let inner = self.inner.try_lock().map_err(|err| {
-      IoError::interupted("RawEmitterMutex", err.to_string().as_str())
-    })?;
-    for client in &inner.clients {
+  pub async fn emit(&self, e: &Event) -> IoResult<()> {
+    let inner = Arc::clone(&self.inner);
+    let clients = web::block(move || {
+      let clients = inner.lock()?.clients.clone();
+      Ok::<_, IoError>(clients)
+    })
+    .await?;
+    for client in clients {
       match e.try_to_bytes() {
         Ok(msg) => {
           let _ = client.try_send(msg);
@@ -122,16 +126,14 @@ impl RawEventEmitter {
   }
 
   /// Subscribe to events
-  pub fn subscribe(&self) -> IoResult<RawEventClient> {
+  pub async fn subscribe(&self) -> IoResult<RawEventClient> {
     let (tx, rx) = channel(100);
-    self
-      .inner
-      .try_lock()
-      .map_err(|err| {
-        IoError::interupted("RawEmitterMutex", err.to_string().as_str())
-      })?
-      .clients
-      .push(tx);
+    let inner = Arc::clone(&self.inner);
+    web::block(move || {
+      inner.lock()?.clients.push(tx);
+      Ok::<_, IoError>(())
+    })
+    .await?;
     Ok(RawEventClient(rx))
   }
 }

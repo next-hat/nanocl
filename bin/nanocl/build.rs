@@ -42,10 +42,6 @@ pub fn generate_man_pages() -> Result<()> {
       command: CargoArg::command(),
     },
     ManPage {
-      name: "nanocl-cargo-image",
-      command: CargoImageArg::command(),
-    },
-    ManPage {
       name: "nanocl-cargo-run",
       command: CargoRunOpts::command(),
     },

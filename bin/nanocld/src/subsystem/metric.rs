@@ -30,18 +30,17 @@ async fn save_metric(
   memory_percent *= 100.0;
   let new_cpu_percent = cpu_percent as u32;
   let new_memory_percent = memory_percent as u32;
-  let formated_cpu_percent = if new_cpu_percent < 10 {
+  let fmt_cpu_p = if new_cpu_percent < 10 {
     format!("0{}", new_cpu_percent)
   } else {
     new_cpu_percent.to_string()
   };
-  let formated_memory_percent = if new_memory_percent < 10 {
+  let fmt_mem_p = if new_memory_percent < 10 {
     format!("0{}", new_memory_percent)
   } else {
     new_memory_percent.to_string()
   };
-  let display =
-    format!("CPU {formated_cpu_percent}% | MEMORY {formated_memory_percent}%");
+  let display = format!("CPU {fmt_cpu_p}% | MEMORY {fmt_mem_p}%");
   let metric = MetricNodePartial {
     data,
     node_name,
@@ -64,7 +63,7 @@ pub fn spawn(state: &SystemState) {
         log::info!("metrics::spawn_logger: subscribing");
         match client.subscribe().await {
           Ok(mut stream) => {
-            log::info!("metrics::spawn_logger: subcribed");
+            log::info!("metrics::spawn_logger: subscribed");
             while let Some(res) = stream.next().await {
               match res {
                 Ok(ev) => {

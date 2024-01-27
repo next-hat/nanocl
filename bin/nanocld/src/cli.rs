@@ -3,7 +3,7 @@ use clap::Parser;
 /// Nanocl Daemon - Self Sufficient Orchestrator
 #[derive(Debug, Clone, Parser)]
 #[command(name = "Nanocl")]
-#[command(author = "nexthat team <team@next-hat.com>")]
+#[command(author = "Next Hat team <team@next-hat.com>")]
 #[command(version)]
 pub struct Cli {
   /// Hosts to listen to use tcp:// and unix:// [default: unix:///run/nanocl.sock]

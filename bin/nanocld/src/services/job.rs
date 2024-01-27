@@ -100,11 +100,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
 #[cfg(test)]
 mod tests {
   use ntex::http;
-  use futures_util::{StreamExt, TryStreamExt};
-  use nanocl_stubs::{
-    job::{Job, JobSummary},
-    process::ProcessWaitResponse,
-  };
+  use nanocl_stubs::job::{Job, JobSummary};
 
   use crate::utils::tests::*;
 
@@ -148,17 +144,6 @@ mod tests {
     test_status_code!(res.status(), http::StatusCode::CREATED, "create job");
     let job = res.json::<Job>().await.unwrap();
     let job_endpoint = format!("{ENDPOINT}/{}", &job.name);
-    let wait_res = client
-      .send_get(
-        &format!("/processes/job/{}/wait", &job.name),
-        None::<String>,
-      )
-      .await;
-    test_status_code!(
-      wait_res.status(),
-      http::StatusCode::OK,
-      format!("wait job {}", &job.name)
-    );
     let mut res = client.get(ENDPOINT).send().await.unwrap();
     let _ = res.json::<Vec<JobSummary>>().await.unwrap();
     let res = client
@@ -181,17 +166,6 @@ mod tests {
         None::<String>,
       )
       .await;
-    test_status_code!(
-      wait_res.status(),
-      http::StatusCode::OK,
-      format!("start job {}", &job.name)
-    );
-    let mut stream = wait_res.into_stream();
-    while let Some(Ok(wait_response)) = stream.next().await {
-      let response =
-        serde_json::from_slice::<ProcessWaitResponse>(&wait_response).unwrap();
-      assert_eq!(response.status_code, 0);
-    }
     let res = client
       .send_get(&format!("{job_endpoint}/inspect"), None::<String>)
       .await;

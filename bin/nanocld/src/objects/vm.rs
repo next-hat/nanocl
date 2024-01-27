@@ -5,6 +5,7 @@ use nanocl_stubs::{
   vm::{Vm, VmInspect},
   process::ProcessKind,
   vm_spec::VmSpecPartial,
+  system::NativeEventAction,
 };
 
 use crate::{
@@ -48,12 +49,12 @@ impl ObjCreate for VmDb {
     if image.kind.as_str() != "Base" {
       return Err(HttpError::bad_request(format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image)));
     }
-    let snapname = format!("{}.{vm_key}", &image.name);
+    let snap_name = format!("{}.{vm_key}", &image.name);
     let size = vm.disk.size.unwrap_or(20);
-    log::debug!("Creating snapshot {snapname} with size {size}");
+    log::debug!("Creating snapshot {snap_name} with size {size}");
     let image =
-      utils::vm_image::create_snap(&snapname, size, &image, state).await?;
-    log::debug!("Snapshot {snapname} created");
+      utils::vm_image::create_snap(&snap_name, size, &image, state).await?;
+    log::debug!("Snapshot {snap_name} created");
     // Use the snapshot image
     vm.disk.image = image.name.clone();
     vm.disk.size = Some(size);
@@ -67,6 +68,10 @@ impl ObjCreate for VmDb {
 impl ObjDelByPk for VmDb {
   type ObjDelOpts = ();
   type ObjDelOut = Vm;
+
+  fn get_del_event() -> NativeEventAction {
+    NativeEventAction::Deleting
+  }
 
   async fn fn_del_obj_by_pk(
     pk: &str,
@@ -82,7 +87,7 @@ impl ObjDelByPk for VmDb {
     VmDb::del_process_by_pk(&container_name, Some(options), state).await?;
     VmDb::del_by_pk(pk, &state.pool).await?;
     SpecDb::del_by_kind_key(pk, &state.pool).await?;
-    utils::vm_image::delete_by_name(&vm.spec.disk.image, &state.pool).await?;
+    utils::vm_image::delete_by_pk(&vm.spec.disk.image, state).await?;
     Ok(vm)
   }
 }
@@ -114,7 +119,7 @@ impl ObjPutByPk for VmDb {
     .await?;
     let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await?;
     utils::vm::create_instance(&vm, &image, false, state).await?;
-    VmDb::start_process_by_kind_key(&vm.spec.vm_key, state).await?;
+    // VmDb::start_process_by_kind_key(&vm.spec.vm_key, state).await?;
     Ok(vm)
   }
 }

@@ -1,3 +1,5 @@
+use std::sync::{PoisonError, TryLockError};
+
 #[derive(Debug)]
 pub struct IoError {
   pub context: Option<String>,
@@ -74,7 +76,7 @@ impl IoError {
     )
   }
 
-  pub fn interupted<M>(context: M, message: M) -> Self
+  pub fn interrupted<M>(context: M, message: M) -> Self
   where
     M: ToString + std::fmt::Display,
   {
@@ -184,6 +186,36 @@ pub trait FromIo<T> {
   fn map_err_context<C>(self, context: impl FnOnce() -> C) -> T
   where
     C: ToString + std::fmt::Display;
+}
+
+impl<T> FromIo<IoError> for TryLockError<T> {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> IoError
+  where
+    C: ToString + std::fmt::Display,
+  {
+    IoError::interrupted((context)().to_string(), self.to_string())
+  }
+}
+
+impl<T> From<TryLockError<T>> for IoError {
+  fn from(e: TryLockError<T>) -> IoError {
+    IoError::interrupted("Mutex", e.to_string().as_str())
+  }
+}
+
+impl<T> FromIo<IoError> for PoisonError<T> {
+  fn map_err_context<C>(self, context: impl FnOnce() -> C) -> IoError
+  where
+    C: ToString + std::fmt::Display,
+  {
+    IoError::interrupted((context)().to_string(), self.to_string())
+  }
+}
+
+impl<T> From<PoisonError<T>> for IoError {
+  fn from(e: PoisonError<T>) -> IoError {
+    IoError::interrupted("Mutex", e.to_string().as_str())
+  }
 }
 
 impl FromIo<IoError> for IoError {
@@ -325,16 +357,16 @@ impl FromIo<Box<IoError>> for diesel::result::Error {
       diesel::result::Error::NotFound => {
         std::io::Error::new(std::io::ErrorKind::NotFound, self)
       }
-      diesel::result::Error::DatabaseError(dberr, infoerr) => match dberr {
+      diesel::result::Error::DatabaseError(db_err, info_err) => match db_err {
         diesel::result::DatabaseErrorKind::UniqueViolation => {
           std::io::Error::new(
             std::io::ErrorKind::AlreadyExists,
-            infoerr.details().unwrap_or_default(),
+            info_err.details().unwrap_or_default(),
           )
         }
         _ => std::io::Error::new(
           std::io::ErrorKind::InvalidData,
-          infoerr.details().unwrap_or_default(),
+          info_err.details().unwrap_or_default(),
         ),
       },
       _ => std::io::Error::new(std::io::ErrorKind::InvalidData, self),
@@ -354,10 +386,10 @@ where
   fn from(f: ntex::http::error::BlockingError<T>) -> Self {
     match f {
       ntex::http::error::BlockingError::Error(e) => {
-        IoError::interupted("Future", format!("{e:?}").as_str())
+        IoError::interrupted("Future", format!("{e:?}").as_str())
       }
       ntex::http::error::BlockingError::Canceled => {
-        IoError::interupted("Future", "Canceled")
+        IoError::interrupted("Future", "Canceled")
       }
     }
   }

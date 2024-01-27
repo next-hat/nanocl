@@ -309,7 +309,6 @@ mod tests {
   };
 
   use crate::utils::tests::*;
-  use crate::services::cargo_image::tests::ensure_test_image;
 
   const ENDPOINT: &str = "/cargoes";
 
@@ -317,7 +316,6 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     let client = gen_default_test_client().await;
-    ensure_test_image().await;
     let test_cargoes = [
       "1daemon-test-cargo",
       "2another-test-cargo",

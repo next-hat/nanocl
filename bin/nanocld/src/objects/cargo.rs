@@ -1,14 +1,15 @@
-use futures_util::{StreamExt, stream::FuturesUnordered};
-use bollard_next::{
-  service::HostConfig,
-  container::{RemoveContainerOptions, Config},
-};
+/// Handle object creation, deletion, update, read and inspect
+/// For a cargo object in the database.
+/// An object will emit an event when it is created, updated or deleted.
+///
+use bollard_next::{container::Config, service::HostConfig};
 
-use nanocl_error::http::HttpResult;
+use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::{
   process::ProcessKind,
+  system::{ObjPsStatusPartial, ObjPsStatusKind, NativeEventAction},
   cargo::{Cargo, CargoDeleteQuery, CargoInspect},
-  cargo_spec::{ReplicationMode, CargoSpecPartial},
+  cargo_spec::CargoSpecPartial,
 };
 
 use crate::{
@@ -16,7 +17,7 @@ use crate::{
   repositories::generic::*,
   models::{
     CargoDb, SystemState, CargoObjCreateIn, ProcessDb, SpecDb, CargoObjPutIn,
-    CargoObjPatchIn,
+    CargoObjPatchIn, ObjPsStatusDb, ObjPsStatusUpdate,
   },
 };
 
@@ -36,32 +37,40 @@ impl ObjCreate for CargoDb {
     obj: &Self::ObjCreateIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjCreateOut> {
-    let cargo = CargoDb::create_from_spec(
-      &obj.namespace,
-      &obj.spec,
-      &obj.version,
-      &state.pool,
-    )
-    .await?;
-    let number = if let Some(mode) = &cargo.spec.replication {
-      match mode {
-        ReplicationMode::Static(replication_static) => {
-          replication_static.number
-        }
-        ReplicationMode::Auto => 1,
-        ReplicationMode::Unique => 1,
-        ReplicationMode::UniqueByNode => 1,
-        _ => 1,
-      }
-    } else {
-      1
-    };
-    if let Err(err) =
-      utils::cargo::create_instances(&cargo, number, state).await
-    {
-      CargoDb::del_by_pk(&cargo.spec.cargo_key, &state.pool).await?;
-      return Err(err);
+    // test if the name of the cargo include a . in the name and throw error if true
+    if obj.spec.name.contains('.') {
+      return Err(HttpError::bad_request("Cargo name cannot contain '.'"));
     }
+    let key = utils::key::gen_key(&obj.namespace, &obj.spec.name);
+    let new_spec =
+      SpecDb::try_from_cargo_partial(&key, &obj.version, &obj.spec)?;
+    let spec = SpecDb::create_from(new_spec, &state.pool)
+      .await?
+      .try_to_cargo_spec()?;
+    let status = ObjPsStatusPartial {
+      key: key.clone(),
+      wanted: ObjPsStatusKind::Created,
+      prev_wanted: ObjPsStatusKind::Created,
+      actual: ObjPsStatusKind::Created,
+      prev_actual: ObjPsStatusKind::Created,
+    };
+    let status = ObjPsStatusDb::create_from(status, &state.pool).await?;
+    let new_item = CargoDb {
+      key: key.clone(),
+      name: obj.spec.name.clone(),
+      created_at: chrono::Utc::now().naive_utc(),
+      namespace_name: obj.namespace.clone(),
+      status_key: key,
+      spec_key: spec.key,
+    };
+    let cargo = CargoDb::create_from(new_item, &state.pool)
+      .await?
+      .with_spec(&(
+        spec,
+        status
+          .try_into()
+          .map_err(HttpError::internal_server_error)?,
+      ));
     Ok(cargo)
   }
 }
@@ -69,6 +78,10 @@ impl ObjCreate for CargoDb {
 impl ObjDelByPk for CargoDb {
   type ObjDelOut = Cargo;
   type ObjDelOpts = CargoDeleteQuery;
+
+  fn get_del_event() -> NativeEventAction {
+    NativeEventAction::Deleting
+  }
 
   async fn fn_del_obj_by_pk(
     pk: &str,
@@ -78,26 +91,20 @@ impl ObjDelByPk for CargoDb {
     let cargo = CargoDb::transform_read_by_pk(pk, &state.pool).await?;
     let processes =
       ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
-    processes
-      .into_iter()
-      .map(|process| async move {
-        CargoDb::del_process_by_pk(
-          &process.key,
-          Some(RemoveContainerOptions {
-            force: opts.force.unwrap_or(false),
-            ..Default::default()
-          }),
-          state,
-        )
-        .await
-      })
-      .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<HttpResult<()>>>()
-      .await
-      .into_iter()
-      .collect::<HttpResult<Vec<_>>>()?;
-    CargoDb::del_by_pk(pk, &state.pool).await?;
-    SpecDb::del_by_kind_key(pk, &state.pool).await?;
+    let (_, _, _, running) = utils::process::count_status(&processes);
+    if running > 0 && !opts.force.unwrap_or(false) {
+      return Err(HttpError::bad_request(
+        "Unable to delete cargo with running instances without force option",
+      ));
+    }
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
+    let new_status = ObjPsStatusUpdate {
+      wanted: Some(ObjPsStatusKind::Delete.to_string()),
+      prev_wanted: Some(status.wanted),
+      actual: Some(ObjPsStatusKind::Deleting.to_string()),
+      prev_actual: Some(status.actual),
+    };
+    ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
     Ok(cargo)
   }
 }
@@ -111,63 +118,17 @@ impl ObjPutByPk for CargoDb {
     obj: &Self::ObjPutIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPutOut> {
-    let cargo =
-      CargoDb::update_from_spec(pk, &obj.spec, &obj.version, &state.pool)
-        .await?;
-    // Get the number of instance to create
-    let number = if let Some(mode) = &cargo.spec.replication {
-      match mode {
-        ReplicationMode::Static(replication_static) => {
-          replication_static.number
-        }
-        ReplicationMode::Auto => 1,
-        ReplicationMode::Unique => 1,
-        ReplicationMode::UniqueByNode => 1,
-        _ => 1,
-      }
-    } else {
-      1
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
+    let new_status = ObjPsStatusUpdate {
+      wanted: Some(ObjPsStatusKind::Running.to_string()),
+      prev_wanted: Some(status.wanted),
+      actual: Some(ObjPsStatusKind::Patching.to_string()),
+      prev_actual: Some(status.actual),
     };
-    let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
-    // Create instance with the new spec
-    let mut error = None;
-    let new_instances =
-      match utils::cargo::create_instances(&cargo, number, state).await {
-        Err(err) => {
-          error = Some(err);
-          Vec::default()
-        }
-        Ok(instances) => instances,
-      };
-    // start created containers
-    match CargoDb::start_process_by_kind_key(pk, state).await {
-      Err(err) => {
-        log::error!(
-          "Unable to start cargo instance {} : {err}",
-          cargo.spec.cargo_key
-        );
-        utils::cargo::delete_instances(
-          &new_instances
-            .iter()
-            .map(|i| i.key.clone())
-            .collect::<Vec<_>>(),
-          state,
-        )
-        .await?;
-      }
-      Ok(_) => {
-        // Delete old containers
-        utils::cargo::delete_instances(
-          &processes.iter().map(|c| c.key.clone()).collect::<Vec<_>>(),
-          state,
-        )
-        .await?;
-      }
-    }
-    match error {
-      Some(err) => Err(err),
-      None => Ok(cargo),
-    }
+    ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
+    CargoDb::update_from_spec(pk, &obj.spec, &obj.version, &state.pool)
+      .await
+      .map_err(HttpError::from)
   }
 }
 
@@ -180,10 +141,8 @@ impl ObjPatchByPk for CargoDb {
     obj: &Self::ObjPatchIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPatchOut> {
-    let payload = &obj.spec;
-    let version = &obj.version;
     let cargo = CargoDb::transform_read_by_pk(pk, &state.pool).await?;
-    let container = if let Some(container) = payload.container.clone() {
+    let container = if let Some(container) = obj.spec.container.clone() {
       // merge env and ensure no duplicate key
       let new_env = container.env.unwrap_or_default();
       let mut env_vars: Vec<String> =
@@ -262,26 +221,26 @@ impl ObjPatchByPk for CargoDb {
     let spec = CargoSpecPartial {
       name: cargo.spec.name.clone(),
       container,
-      init_container: if payload.init_container.is_some() {
-        payload.init_container.clone()
+      init_container: if obj.spec.init_container.is_some() {
+        obj.spec.init_container.clone()
       } else {
         cargo.spec.init_container
       },
-      replication: payload.replication.clone(),
-      secrets: if payload.secrets.is_some() {
-        payload.secrets.clone()
+      replication: obj.spec.replication.clone(),
+      secrets: if obj.spec.secrets.is_some() {
+        obj.spec.secrets.clone()
       } else {
         cargo.spec.secrets
       },
-      metadata: if payload.metadata.is_some() {
-        payload.metadata.clone()
+      metadata: if obj.spec.metadata.is_some() {
+        obj.spec.metadata.clone()
       } else {
         cargo.spec.metadata
       },
     };
     let obj = &CargoObjPutIn {
       spec,
-      version: version.to_owned(),
+      version: obj.version.to_owned(),
     };
     CargoDb::fn_put_obj_by_pk(pk, obj, state).await
   }
@@ -297,6 +256,7 @@ impl ObjInspectByPk for CargoDb {
     let cargo = CargoDb::transform_read_by_pk(pk, &state.pool).await?;
     let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
     let (_, _, _, running_instances) = utils::process::count_status(&processes);
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
     Ok(CargoInspect {
       created_at: cargo.created_at,
       namespace_name: cargo.namespace_name,
@@ -304,6 +264,9 @@ impl ObjInspectByPk for CargoDb {
       instance_running: running_instances,
       spec: cargo.spec,
       instances: processes,
+      status: status
+        .try_into()
+        .map_err(HttpError::internal_server_error)?,
     })
   }
 }

@@ -70,64 +70,6 @@ pub mod tests {
     };
   }
 
-  #[macro_export]
-  macro_rules! assert_cargo_state {
-    ($client :expr, $cargo_name:expr, $namespace_option:expr, $state_str:expr) => {
-      let res = $client
-        .inspect_cargo($cargo_name, $namespace_option)
-        .await
-        .expect(&format!(
-          "Cargo {} in namespace {:#?} doesn't exists",
-          $cargo_name, $namespace_option
-        ));
-      assert_eq!(
-        res
-          .instances
-          .get(0)
-          .expect(&format!(
-            "No container {} in namespace {:#?} instance found",
-            $cargo_name, $namespace_option
-          ))
-          .data
-          .state
-          .clone()
-          .unwrap_or_default()
-          .status
-          .unwrap_or(bollard_next::models::ContainerStateStatusEnum::EMPTY)
-          .to_string(),
-        $state_str.to_owned()
-      );
-    };
-  }
-
-  #[macro_export]
-  macro_rules! assert_cargo_exists {
-    ($client :expr, $cargo_name:expr, $namespace_option:expr) => {
-      let res = $client.inspect_cargo($cargo_name, $namespace_option).await;
-      assert!(
-        res.is_ok(),
-        "Cargo {} in namespace {:#?} doesn't exists : {:#?}",
-        $cargo_name,
-        $namespace_option,
-        res
-      );
-    };
-  }
-
-  #[macro_export]
-  macro_rules! assert_cargo_not_exists {
-    ($client :expr, $cargo_name:expr, $namespace_option:expr) => {
-      let res = $client.inspect_cargo($cargo_name, $namespace_option).await;
-      assert!(
-        res.is_err(),
-        "Cargo {} in namespace {:#?} exists : {:#?}",
-        $cargo_name,
-        $namespace_option,
-        res
-      );
-    };
-  }
-
   pub use assert_cli_ok;
   use nanocld_client::NanocldClient;
 }

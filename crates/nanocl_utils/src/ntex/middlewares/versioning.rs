@@ -71,10 +71,10 @@ where
 
   ntex::forward_poll_ready!(service);
 
-  async fn call<'a>(
+  async fn call(
     &self,
     mut req: WebRequest<Err>,
-    ctx: ServiceCtx<'a, Self>,
+    ctx: ServiceCtx<'_, Self>,
   ) -> Result<Self::Response, Self::Error> {
     let version = req.match_info_mut().get("version");
     let header_name = HeaderName::from_static("x-api-version");

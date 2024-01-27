@@ -13,20 +13,20 @@ use crate::{
   models::{Pool, VmImageDb, QemuImgInfo, VmImageUpdateDb, SystemState},
 };
 
-/// Delete a vm image from the database and from the filesystem
-pub async fn delete_by_name(name: &str, pool: &Pool) -> HttpResult<()> {
-  let vm_image = VmImageDb::read_by_pk(name, pool).await?;
-  let children = VmImageDb::read_by_parent(name, pool).await?;
+/// Delete a vm image from the database and the filesystem
+pub async fn delete_by_pk(pk: &str, state: &SystemState) -> HttpResult<()> {
+  let vm_image = VmImageDb::read_by_pk(pk, &state.pool).await?;
+  let children = VmImageDb::read_by_parent(pk, &state.pool).await?;
   if !children.is_empty() {
     return Err(HttpError::conflict(format!(
-      "Vm image {name} has children images please delete them first"
+      "Vm image {pk} has children images please delete them first"
     )));
   }
   let filepath = vm_image.path.clone();
   if let Err(err) = fs::remove_file(&filepath).await {
     log::warn!("Error while deleting the file {filepath}: {err}");
   }
-  VmImageDb::del_by_pk(name, pool).await?;
+  VmImageDb::del_by_pk(pk, &state.pool).await?;
   Ok(())
 }
 
@@ -69,8 +69,8 @@ pub async fn create_snap(
   if VmImageDb::read_by_pk(name, &state.pool).await.is_ok() {
     return Err(HttpError::conflict(format!("Vm image {name} already used")));
   }
-  let imagepath = image.path.clone();
-  let snapshotpath =
+  let img_path = image.path.clone();
+  let snapshot_path =
     format!("{}/vms/images/{}.img", state.config.state_dir, name);
   let output = Command::new("qemu-img")
     .args([
@@ -80,8 +80,8 @@ pub async fn create_snap(
       "-f",
       "qcow2",
       "-b",
-      &imagepath,
-      &snapshotpath,
+      &img_path,
+      &snapshot_path,
     ])
     .output()
     .await
@@ -97,12 +97,12 @@ pub async fn create_snap(
   )?;
   let size = format!("{size}G");
   let output = Command::new("qemu-img")
-    .args(["resize", &snapshotpath, &size])
+    .args(["resize", &snapshot_path, &size])
     .output()
     .await
     .map_err(|err| {
       HttpError::internal_server_error(format!(
-        "Failed to resize snapshot {imagepath}: {err}"
+        "Failed to resize snapshot {img_path}: {err}"
       ))
     })?;
   output.status.success().then_some(()).ok_or(
@@ -110,15 +110,15 @@ pub async fn create_snap(
       "Failed to resize snapshot {name}: {output:#?}"
     )),
   )?;
-  let image_info = get_info(&snapshotpath).await?;
+  let img_info = get_info(&snapshot_path).await?;
   let snap_image = VmImageDb {
     name: name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: "Snapshot".into(),
-    path: snapshotpath.clone(),
-    format: image_info.format,
-    size_actual: image_info.actual_size,
-    size_virtual: image_info.virtual_size,
+    path: snapshot_path.clone(),
+    format: img_info.format,
+    size_actual: img_info.actual_size,
+    size_virtual: img_info.virtual_size,
     parent: Some(image.name.clone()),
   };
   let snap_image = VmImageDb::create_from(snap_image, &state.pool).await?;
@@ -148,19 +148,11 @@ pub async fn clone(
   let daemon_conf = state.config.clone();
   let pool = Arc::clone(&state.pool);
   rt::spawn(async move {
-    let imagepath = image.path.clone();
-    let newbasepath =
+    let img_path = image.path.clone();
+    let base_path =
       format!("{}/vms/images/{}.img", daemon_conf.state_dir, name);
     let mut child = match Command::new("qemu-img")
-      .args([
-        "convert",
-        "-p",
-        "-O",
-        "qcow2",
-        "-c",
-        &imagepath,
-        &newbasepath,
-      ])
+      .args(["convert", "-p", "-O", "qcow2", "-c", &img_path, &base_path])
       .stdout(Stdio::piped())
       .stderr(Stdio::piped())
       .spawn()
@@ -184,7 +176,7 @@ pub async fn clone(
       }
       Ok(stdout) => stdout,
     };
-    let txpg = tx.clone();
+    let tx_ptr = tx.clone();
     rt::spawn(async move {
       let mut buf = [0; 1024];
       loop {
@@ -201,7 +193,7 @@ pub async fn clone(
               .unwrap();
             let stream = VmImageCloneStream::Progress(progress);
             let stream = serde_json::to_string(&stream).unwrap();
-            let _ = txpg.send(Ok(Bytes::from(format!("{stream}\r\n"))));
+            let _ = tx_ptr.send(Ok(Bytes::from(format!("{stream}\r\n"))));
           }
           _ => break,
         }
@@ -230,21 +222,21 @@ pub async fn clone(
       let _ = tx.send(Err(err.clone()));
       return Err(err);
     };
-    let image_info = match get_info(&newbasepath).await {
+    let img_info = match get_info(&base_path).await {
       Err(err) => {
         let _ = tx.send(Err(err.clone()));
         return Err(err);
       }
-      Ok(image_info) => image_info,
+      Ok(img_info) => img_info,
     };
     let new_base_image = VmImageDb {
       name: name.to_owned(),
       created_at: chrono::Utc::now().naive_utc(),
       kind: "Base".into(),
-      path: newbasepath.clone(),
-      format: image_info.format,
-      size_actual: image_info.actual_size,
-      size_virtual: image_info.virtual_size,
+      path: base_path.clone(),
+      format: img_info.format,
+      size_actual: img_info.actual_size,
+      size_virtual: img_info.virtual_size,
       parent: None,
     };
     let vm = match VmImageDb::create_from(new_base_image, &pool).await {
@@ -268,15 +260,15 @@ pub async fn resize(
   payload: &VmImageResizePayload,
   pool: &Pool,
 ) -> HttpResult<VmImageDb> {
-  let imagepath = image.path.clone();
+  let img_path = image.path.clone();
   let size = format!("{}G", payload.size);
   let mut args = vec!["resize"];
   if payload.shrink {
     args.push("--shrink");
   }
-  args.push(&imagepath);
+  args.push(&img_path);
   args.push(&size);
-  let ouput =
+  let output =
     Command::new("qemu-img")
       .args(args)
       .output()
@@ -286,18 +278,18 @@ pub async fn resize(
           "Unable to resize image {err}"
         ))
       })?;
-  if !ouput.status.success() {
-    let output = String::from_utf8(ouput.stdout).unwrap_or_default();
+  if !output.status.success() {
+    let output = String::from_utf8(output.stdout).unwrap_or_default();
     return Err(HttpError::internal_server_error(format!(
       "Unable to resize image {output}"
     )));
   }
-  let image_info = get_info(&imagepath).await?;
+  let img_info = get_info(&img_path).await?;
   let res = VmImageDb::update_pk(
     &image.name,
     VmImageUpdateDb {
-      size_actual: image_info.actual_size,
-      size_virtual: image_info.virtual_size,
+      size_actual: img_info.actual_size,
+      size_virtual: img_info.virtual_size,
     },
     pool,
   )
@@ -322,21 +314,21 @@ pub async fn create(
   pool: &Pool,
 ) -> HttpResult<VmImageDb> {
   // Get image info
-  let image_info = match utils::vm_image::get_info(filepath).await {
+  let img_info = match utils::vm_image::get_info(filepath).await {
     Err(err) => {
       let fp2 = filepath.to_owned();
       let _ = web::block(move || std::fs::remove_file(fp2)).await;
       return Err(err);
     }
-    Ok(image_info) => image_info,
+    Ok(img_info) => img_info,
   };
   let vm_image = VmImageDb {
     name: name.to_owned(),
     created_at: chrono::Utc::now().naive_utc(),
     kind: "Base".into(),
-    format: image_info.format,
-    size_actual: image_info.actual_size,
-    size_virtual: image_info.virtual_size,
+    format: img_info.format,
+    size_actual: img_info.actual_size,
+    size_virtual: img_info.virtual_size,
     path: filepath.to_owned(),
     parent: None,
   };

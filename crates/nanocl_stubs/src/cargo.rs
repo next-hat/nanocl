@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 use bollard_next::container::{StatsOptions, KillContainerOptions};
 
 use crate::{
-  system::{EventActor, EventActorKind},
+  system::{EventActor, EventActorKind, ObjPsStatus},
   cargo_spec::CargoSpecPartial,
   process::Process,
 };
@@ -36,6 +36,8 @@ pub struct Cargo {
   pub created_at: chrono::NaiveDateTime,
   /// Specification of the cargo
   pub spec: CargoSpec,
+  /// Status of the cargo
+  pub status: ObjPsStatus,
 }
 
 impl From<Cargo> for CargoSpecPartial {
@@ -99,6 +101,8 @@ pub struct CargoInspect {
   pub instance_running: usize,
   /// Specification of the cargo
   pub spec: CargoSpec,
+  /// Status of the cargo
+  pub status: ObjPsStatus,
   /// List of instances
   pub instances: Vec<Process>,
 }

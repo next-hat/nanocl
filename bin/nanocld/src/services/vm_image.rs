@@ -211,8 +211,8 @@ pub async fn delete_vm_image(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let name = path.1.to_owned();
-  utils::vm_image::delete_by_name(&name, &state.pool).await?;
+  let pk = path.1.to_owned();
+  utils::vm_image::delete_by_pk(&pk, &state).await?;
   Ok(web::HttpResponse::Ok().into())
 }
 

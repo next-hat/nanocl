@@ -51,6 +51,12 @@ pub use event::*;
 mod raw_emitter;
 pub use raw_emitter::*;
 
+mod task_manager;
+pub use task_manager::*;
+
+mod object_process_status;
+pub use object_process_status::*;
+
 pub type Pool = Arc<R2D2Pool<ConnectionManager<PgConnection>>>;
 pub type DBConn = PooledConnection<ConnectionManager<PgConnection>>;
 

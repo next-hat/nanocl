@@ -26,7 +26,7 @@ pub async fn create_pool(
   })
   .await
   .map_err(|err| {
-    IoError::interupted("CockroachDB", &format!("Unable to create pool {err}"))
+    IoError::interrupted("CockroachDB", &format!("Unable to create pool {err}"))
   })?;
   Ok(Arc::new(pool))
 }
@@ -83,7 +83,7 @@ pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
   let mut conn = get_pool_conn(&pool)?;
   log::info!("store::init: migrations running");
   conn.run_pending_migrations(MIGRATIONS).map_err(|err| {
-    IoError::interupted("CockroachDB migration", &format!("{err}"))
+    IoError::interrupted("CockroachDB migration", &format!("{err}"))
   })?;
   log::info!("store::init: migrations success");
   Ok(pool)

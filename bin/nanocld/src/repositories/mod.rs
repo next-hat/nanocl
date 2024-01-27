@@ -11,5 +11,6 @@ mod metric;
 mod vm;
 mod vm_image;
 mod event;
+mod object_process_status;
 
 pub mod generic;

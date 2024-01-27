@@ -11,7 +11,6 @@ mod namespace;
 mod system;
 mod resource;
 mod cargo;
-mod cargo_image;
 mod metric;
 mod vm;
 mod vm_image;
@@ -56,7 +55,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
       .configure(namespace::ntex_config)
       .configure(system::ntex_config)
       .configure(resource::ntex_config)
-      .configure(cargo_image::ntex_config)
       .configure(cargo::ntex_config)
       .configure(vm_image::ntex_config)
       .configure(vm::ntex_config)
