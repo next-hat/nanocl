@@ -2854,6 +2854,18 @@ components:
           format: int32
           description: Group id
           minimum: 0
+        cert:
+          type: string
+          description: Certificate path
+          nullable: true
+        cert_key:
+          type: string
+          description: Certificate key path
+          nullable: true
+        cert_ca:
+          type: string
+          description: Ca certificate path
+          nullable: true
     DeviceMapping:
       type: object
       description: A device mapping between the host and container

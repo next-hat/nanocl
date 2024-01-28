@@ -122,11 +122,14 @@ mod tests {
   use bollard_next::exec::{CreateExecOptions, StartExecOptions};
   use futures::StreamExt;
 
-  use crate::NanocldClient;
+  use crate::{ConnectOpts, NanocldClient};
 
   #[ntex::test]
   async fn exec_cargo() {
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     let exec = CreateExecOptions {
       cmd: Some(vec!["echo".into(), "hello".into()]),
       ..Default::default()

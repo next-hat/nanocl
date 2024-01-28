@@ -14,7 +14,7 @@ pub(crate) mod tests {
   pub use nanocl_utils::ntex::test_client::*;
   use nanocld_client::{
     stubs::{proxy::ResourceProxyRule, cargo_spec::CargoSpecPartial},
-    NanocldClient,
+    ConnectOpts, NanocldClient,
   };
 
   use crate::{variables, services};
@@ -29,7 +29,10 @@ pub(crate) mod tests {
   pub async fn ensure_test_cargo() -> IoResult<()> {
     const CARGO_NAME: &str = "ncproxy-test";
     const CARGO_IMAGE: &str = "ghcr.io/next-hat/nanocl-get-started:latest";
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     if client.inspect_cargo(CARGO_NAME, None).await.is_err() {
       let cargo = CargoSpecPartial {
         name: CARGO_NAME.to_owned(),
@@ -47,7 +50,10 @@ pub(crate) mod tests {
 
   pub async fn clean_test_cargo() -> IoResult<()> {
     const CARGO_NAME: &str = "ncproxy-test";
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     if client.inspect_cargo(CARGO_NAME, None).await.is_err() {
       return Ok(());
     }

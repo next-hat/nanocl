@@ -1,7 +1,7 @@
 use clap::Parser;
 use dotenvy::dotenv;
 
-use nanocld_client::NanocldClient;
+use nanocld_client::{ConnectOpts, NanocldClient};
 use nanocl_error::io::{IoError, IoResult};
 
 mod utils;
@@ -42,7 +42,10 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
         .unwrap_or("http://nanocl.internal:8585".into());
     }
   }
-  let client = NanocldClient::connect_to(&host, None);
+  let client = NanocldClient::connect_to(&ConnectOpts {
+    url: host.clone(),
+    ..Default::default()
+  });
   Ok(CliConfig {
     host,
     client,

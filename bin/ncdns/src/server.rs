@@ -52,11 +52,15 @@ mod tests {
   use super::*;
   use crate::dnsmasq::Dnsmasq;
   use nanocl_error::io::IoResult;
+  use nanocld_client::ConnectOpts;
 
   #[ntex::test]
   async fn generate_unix_and_tcp() -> IoResult<()> {
     let dnsmasq = Dnsmasq::new("/tmp/ncdns");
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     let server = gen("unix:///tmp/ncdns.sock", &dnsmasq, &client)?;
     server.stop(true).await;
     let server = gen("tcp://0.0.0.0:9987", &dnsmasq, &client)?;
@@ -67,7 +71,10 @@ mod tests {
   #[test]
   fn generate_wrong_host() -> IoResult<()> {
     let dnsmasq = Dnsmasq::new("/tmp/ncdns");
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     let server = gen("wrong://dsadsa", &dnsmasq, &client);
     assert!(server.is_err());
     Ok(())

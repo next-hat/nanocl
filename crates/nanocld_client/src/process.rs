@@ -184,13 +184,18 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
+  use crate::ConnectOpts;
+
   use super::*;
 
   use futures::StreamExt;
 
   #[ntex::test]
   async fn logs_cargo() {
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     let mut rx = client
       .logs_process(
         "cargo",

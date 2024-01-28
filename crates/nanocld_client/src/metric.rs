@@ -69,11 +69,16 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
+  use crate::ConnectOpts;
+
   use super::*;
 
   #[ntex::test]
   async fn basic() {
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     let metric = client
       .create_metric(&MetricPartial {
         kind: "my-source.io/type".to_owned(),

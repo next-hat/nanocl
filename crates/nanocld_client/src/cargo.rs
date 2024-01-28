@@ -266,6 +266,8 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
+  use crate::ConnectOpts;
+
   use super::*;
 
   use nanocl_error::http_client::HttpClientError;
@@ -274,7 +276,10 @@ mod tests {
   #[ntex::test]
   async fn basic() {
     const CARGO_NAME: &str = "client-test-cargo";
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     client.list_cargo(None).await.unwrap();
     let new_cargo = CargoSpecPartial {
       name: CARGO_NAME.into(),
@@ -322,7 +327,10 @@ mod tests {
 
   #[ntex::test]
   async fn create_cargo_duplicate_name() {
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     let new_cargo = CargoSpecPartial {
       name: "client-test-cargodup".into(),
       container: bollard_next::container::Config {

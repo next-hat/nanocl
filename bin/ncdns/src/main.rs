@@ -25,7 +25,11 @@ async fn run(cli: &Cli) -> IoResult<()> {
   let mut client = NanocldClient::connect_with_unix_default();
   #[cfg(any(feature = "dev", feature = "test"))]
   {
-    client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    use nanocld_client::ConnectOpts;
+    client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
   }
   event::spawn(&client);
   let server = server::gen(&cli.host, &dnsmasq, &client)?;

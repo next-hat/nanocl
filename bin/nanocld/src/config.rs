@@ -63,6 +63,9 @@ fn gen_daemon_conf(
     advertise_addr,
     nodes: args.nodes.clone(),
     conf_dir: args.conf_dir.clone(),
+    cert: args.cert.clone(),
+    cert_key: args.cert_key.clone(),
+    cert_ca: args.cert_ca.clone(),
   })
 }
 
@@ -104,15 +107,11 @@ mod tests {
   #[test]
   fn merge_config() {
     let args = Cli {
-      gid: 0,
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/var/run/docker.sock")),
       conf_dir: String::from("/etc/nanocl"),
-      gateway: None,
-      hostname: None,
-      advertise_addr: None,
-      nodes: Vec::default(),
+      ..Default::default()
     };
     let config = DaemonConfigFile {
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
@@ -177,15 +176,11 @@ mod tests {
   #[test]
   fn init_config() {
     let args = Cli {
-      gid: 0,
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/var/run/docker.sock")),
       conf_dir: String::from("/etc/nanocl"),
-      gateway: None,
-      advertise_addr: None,
-      hostname: None,
-      nodes: Vec::default(),
+      ..Default::default()
     };
     let config = init(&args).unwrap();
     assert_eq!(config.hosts, args.hosts.unwrap());

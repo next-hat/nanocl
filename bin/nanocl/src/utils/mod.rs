@@ -10,9 +10,13 @@ pub mod progress;
 
 #[cfg(test)]
 pub mod tests {
+  use nanocld_client::{ConnectOpts, NanocldClient};
 
   pub fn get_test_client() -> NanocldClient {
-    NanocldClient::connect_to("http://nanocl.internal:8585", None)
+    NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    })
   }
 
   #[macro_export]
@@ -71,5 +75,4 @@ pub mod tests {
   }
 
   pub use assert_cli_ok;
-  use nanocld_client::NanocldClient;
 }

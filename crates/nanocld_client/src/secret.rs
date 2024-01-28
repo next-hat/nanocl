@@ -102,12 +102,17 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
+  use crate::ConnectOpts;
+
   use super::*;
 
   #[ntex::test]
   async fn basic() {
     const SECRET_NAME: &str = "secret-test";
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     client.list_secret(None).await.unwrap();
     let secret = SecretPartial {
       name: SECRET_NAME.to_owned(),

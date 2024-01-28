@@ -163,6 +163,7 @@ services:
     - system
     ports:
     - 8585:8585
+    - 9443:9443
     labels:
     - io.nanocl=enabled
     - io.nanocl.kind=cargo
@@ -182,7 +183,16 @@ services:
     - -w
     - /project/bin/nanocld/src
     - -x
-    - run --no-default-features --features dev --bin nanocld -- --gid 1001 --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
+    - |
+      run --no-default-features \
+        --features dev \
+        --bin nanocld \
+        -- --hosts tcp://0.0.0.0:9443 \
+        --gid 1001 \
+        --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state} \
+        --cert ./tests/server.crt \
+        --cert-key ./tests/server.key \
+        --cert-ca ./tests/ca.crt
 
   dbeaver:
     container_name: dbeaver.system.c
