@@ -157,14 +157,10 @@ mod tests {
     let home = std::env::var("HOME").expect("Failed to get home dir");
     let args = cli::Cli {
       gid: 0,
-      hosts: None,
-      docker_host: None,
       state_dir: Some(format!("{home}/.nanocl_dev/state")),
       conf_dir: String::from("/etc/nanocl"),
-      gateway: None,
       nodes: Vec::default(),
-      hostname: None,
-      advertise_addr: None,
+      ..Default::default()
     };
     log::debug!("args: {args:?}");
     let config = config::init(&args).expect("Expect to init config");

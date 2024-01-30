@@ -18,6 +18,7 @@ tokio = ["ntex/tokio"]
 glommio = ["ntex/glommio"]
 async-std = ["ntex/async-std"]
 utoipa = ["nanocl_stubs/utoipa"]
+openssl = ["dep:openssl"]
 
 [dev-dependencies]
 tokio-util = "0.7"
@@ -31,3 +32,4 @@ serde = { version = "1.0", features = ["derive"] }
 bollard-next = { version = "0.15.4" }
 nanocl_stubs = { version = "0.13", features = ["serde"] }
 nanocl_error = { version = "0.2", features = ["io", "http_client"] }
+openssl = { version = "0.10", optional = true }

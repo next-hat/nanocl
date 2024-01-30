@@ -1,5 +1,6 @@
 use ntex::web;
 use ntex_cors::Cors;
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 
 use nanocl_utils::ntex::middlewares;
 
@@ -14,11 +15,11 @@ pub async fn gen(
   daemon_state: SystemState,
 ) -> std::io::Result<ntex::server::Server> {
   log::info!("server::gen: start");
-  let hosts = daemon_state.config.hosts.clone();
+  let daemon_state_ptr = daemon_state.clone();
   let mut server = web::HttpServer::new(move || {
     web::App::new()
       // bind config state
-      .state(daemon_state.clone())
+      .state(daemon_state_ptr.clone())
       .state(
         web::types::PayloadConfig::new(20_000_000_000), // <- limit size of the payload
       )
@@ -32,7 +33,9 @@ pub async fn gen(
       .configure(services::ntex_config)
       .default_service(web::route().to(services::unhandled))
   });
+  let config = daemon_state.config.clone();
   let mut count = 0;
+  let hosts = config.hosts.clone();
   let len = hosts.len();
   while count < len {
     let host = &hosts[count];
@@ -47,13 +50,35 @@ pub async fn gen(
       };
     } else if host.starts_with("tcp://") {
       let addr = host.replace("tcp://", "");
-      server = match server.bind(&addr) {
-        Err(err) => {
-          log::error!("server::gen: {addr}: {err}");
-          return Err(err);
-        }
-        Ok(server) => server,
-      };
+      if let Some(cert) = config.cert.clone() {
+        log::debug!("server::gen: {addr}: with ssl");
+        let cert_key = config.cert_key.clone().unwrap();
+        let cert_ca = config.cert_ca.clone().unwrap();
+        server = match server.bind_openssl(&addr, {
+          let mut builder =
+            SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+          builder
+            .set_private_key_file(cert_key, SslFiletype::PEM)
+            .unwrap();
+          builder.set_certificate_chain_file(cert).unwrap();
+          builder.set_ca_file(cert_ca).expect("Failed to set ca file");
+          builder
+        }) {
+          Err(err) => {
+            log::error!("server::gen: {addr}: {err}");
+            return Err(err);
+          }
+          Ok(server) => server,
+        };
+      } else {
+        server = match server.bind(&addr) {
+          Err(err) => {
+            log::error!("server::gen: {addr}: {err}");
+            return Err(err);
+          }
+          Ok(server) => server,
+        };
+      }
     } else {
       log::error!(
         "server::gen: {} invalid protocol [tcp:// | unix://] allowed",

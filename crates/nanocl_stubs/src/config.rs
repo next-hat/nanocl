@@ -27,6 +27,12 @@ pub struct DaemonConfig {
   pub conf_dir: String,
   /// Group id
   pub gid: u32,
+  /// Certificate path
+  pub cert: Option<String>,
+  /// Certificate key path
+  pub cert_key: Option<String>,
+  /// Ca certificate path
+  pub cert_ca: Option<String>,
 }
 
 /// Configuration File of the daemon
@@ -58,6 +64,9 @@ impl Default for DaemonConfig {
       gateway: String::default(),
       nodes: Vec::default(),
       advertise_addr: String::default(),
+      cert: None,
+      cert_key: None,
+      cert_ca: None,
     }
   }
 }

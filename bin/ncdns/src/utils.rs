@@ -152,7 +152,7 @@ pub(crate) async fn remove_entries(
 #[cfg(test)]
 pub mod tests {
   pub use nanocl_utils::ntex::test_client::*;
-  use nanocld_client::NanocldClient;
+  use nanocld_client::{ConnectOpts, NanocldClient};
 
   use crate::{version, dnsmasq, services};
 
@@ -167,8 +167,10 @@ pub mod tests {
     before();
     let dnsmasq = dnsmasq::Dnsmasq::new("/tmp/dnsmasq");
     dnsmasq.ensure().unwrap();
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
-    // Create test server
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    }); // Create test server
     let srv = ntex::web::test::server(move || {
       ntex::web::App::new()
         .state(dnsmasq.clone())

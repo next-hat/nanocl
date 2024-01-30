@@ -92,17 +92,25 @@ mod tests {
   use futures::StreamExt;
   use bollard_next::container::Config;
 
+  use crate::ConnectOpts;
+
   use super::*;
 
   #[ntex::test]
   async fn list_job() {
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     client.list_job().await.unwrap();
   }
 
   #[ntex::test]
   async fn basic() {
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     let job = client
       .create_job(&JobPartial {
         name: "my_test_job".to_owned(),

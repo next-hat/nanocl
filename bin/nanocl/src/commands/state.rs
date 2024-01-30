@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use futures::StreamExt;
 use nanocld_client::stubs::system::ObjPsStatusKind;
+use nanocld_client::ConnectOpts;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
 use bollard_next::service::HostConfig;
@@ -220,10 +221,18 @@ fn gen_client(
         .ok_or(IoError::not_found("Version", "is not specified"))?;
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
-      NanocldClient::connect_to(&url, Some(version.into()))
+      NanocldClient::connect_to(&ConnectOpts {
+        url,
+        version: Some(version.into()),
+        ..Default::default()
+      })
     }
     api_version if state_ref.data.api_version.starts_with('v') => {
-      NanocldClient::connect_to(host, Some(api_version.clone()))
+      NanocldClient::connect_to(&ConnectOpts {
+        url: host.into(),
+        version: Some(api_version.clone()),
+        ..Default::default()
+      })
     }
     _ => {
       let mut paths = state_ref
@@ -240,7 +249,11 @@ fn gen_client(
       paths.remove(paths.len() - 1);
       let url = paths.join("/");
       let url = format!("https://{url}");
-      NanocldClient::connect_to(&url, Some(version.into()))
+      NanocldClient::connect_to(&ConnectOpts {
+        url,
+        version: Some(version.into()),
+        ..Default::default()
+      })
     }
   };
   Ok(client)

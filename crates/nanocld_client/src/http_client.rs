@@ -15,11 +15,40 @@ use crate::error::is_api_error;
 
 pub const NANOCLD_DEFAULT_VERSION: &str = "0.13.0";
 
+#[derive(Clone, Debug)]
+pub struct ConnectOpts {
+  /// Url to connect to
+  pub url: String,
+  /// Optional version
+  pub version: Option<String>,
+  /// Optional certificate path
+  pub cert: Option<String>,
+  /// Optional certificate key path
+  pub cert_key: Option<String>,
+  /// Optional ca certificate path
+  pub cert_ca: Option<String>,
+}
+
 #[derive(Clone)]
 pub struct NanocldClient {
   pub url: String,
   pub version: String,
   pub unix_socket: Option<String>,
+  pub cert: Option<String>,
+  pub cert_key: Option<String>,
+  pub cert_ca: Option<String>,
+}
+
+impl Default for ConnectOpts {
+  fn default() -> Self {
+    Self {
+      url: String::from("unix:///run/nanocl/nanocl.sock"),
+      version: None,
+      cert: None,
+      cert_key: None,
+      cert_ca: None,
+    }
+  }
 }
 
 impl std::fmt::Display for NanocldClient {
@@ -34,16 +63,24 @@ impl NanocldClient {
       unix_socket: Some(String::from("/run/nanocl/nanocl.sock")),
       version: format!("v{NANOCLD_DEFAULT_VERSION}"),
       url: "http://localhost".to_owned(),
+      cert: None,
+      cert_key: None,
+      cert_ca: None,
     }
   }
 
-  pub fn connect_to(url: &str, version: Option<String>) -> Self {
+  pub fn connect_to(opts: &ConnectOpts) -> Self {
+    let url = opts.url.clone();
+    let version = opts.version.clone();
     match url {
       url if url.starts_with("http://") || url.starts_with("https://") => {
         NanocldClient {
           url: url.to_owned(),
           unix_socket: None,
           version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
+          cert: opts.cert.clone(),
+          cert_key: opts.cert_key.clone(),
+          cert_ca: opts.cert_ca.clone(),
         }
       }
       url if url.starts_with("unix://") => {
@@ -52,6 +89,9 @@ impl NanocldClient {
           url: "http://localhost".to_owned(),
           unix_socket: Some(path.to_owned()),
           version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
+          cert: None,
+          cert_key: None,
+          cert_ca: None,
         }
       }
       _ => panic!("Invalid url: {}", url),
@@ -67,6 +107,9 @@ impl NanocldClient {
       unix_socket: Some(String::from("/run/nanocl/nanocl.sock")),
       version: version.to_owned(),
       url: String::from("http://localhost"),
+      cert: None,
+      cert_key: None,
+      cert_ca: None,
     }
   }
 

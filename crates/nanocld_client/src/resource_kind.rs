@@ -127,6 +127,8 @@ impl NanocldClient {
 
 #[cfg(test)]
 mod tests {
+  use crate::ConnectOpts;
+
   use super::*;
 
   use nanocl_stubs::resource_kind::ResourceKindSpec;
@@ -135,7 +137,10 @@ mod tests {
   async fn basic() {
     const RESOURCE_KIND_NAME: &str = "test.io/client-test";
     const RESOURCE_KIND_VERSION: &str = "v1";
-    let client = NanocldClient::connect_to("http://nanocl.internal:8585", None);
+    let client = NanocldClient::connect_to(&ConnectOpts {
+      url: "http://nanocl.internal:8585".into(),
+      ..Default::default()
+    });
     let resource_kind = ResourceKindPartial {
       name: RESOURCE_KIND_NAME.to_owned(),
       version: RESOURCE_KIND_VERSION.to_owned(),
