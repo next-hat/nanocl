@@ -182,6 +182,9 @@ pub async fn add_rule(
                 path: location.path.clone(),
                 upstream_key: format!("http://{upstream_key}"),
                 redirect: None,
+                version: location.version,
+                allowed_ips: location.allowed_ips.clone(),
+                headers: location.headers.clone(),
               };
               locations.push(location);
             }
@@ -196,6 +199,9 @@ pub async fn add_rule(
                 path: location.path.clone(),
                 upstream_key: format!("http://{upstream_key}"),
                 redirect: None,
+                version: location.version,
+                allowed_ips: location.allowed_ips.clone(),
+                headers: location.headers.clone(),
               };
               locations.push(location);
             }
@@ -203,6 +209,9 @@ pub async fn add_rule(
               let location = LocationTemplate {
                 path: location.path.clone(),
                 upstream_key: http.url.clone(),
+                version: location.version,
+                allowed_ips: location.allowed_ips.clone(),
+                headers: location.headers.clone(),
                 redirect: http.redirect.clone().map(|r| format!("{r}")),
               };
               locations.push(location);

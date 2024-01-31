@@ -248,6 +248,8 @@ pub struct ProxyHttpLocation {
   pub path: String,
   /// The target cargo
   pub target: LocationTarget,
+  /// Allowed ip addr
+  pub allowed_ips: Option<Vec<String>>,
   /// Extras header to add
   #[cfg_attr(
     feature = "serde",
