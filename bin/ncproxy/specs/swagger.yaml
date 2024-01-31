@@ -112,6 +112,12 @@ components:
           description: The path
         Target:
           $ref: '#/components/schemas/LocationTarget'
+        AllowedIps:
+          type: array
+          items:
+            type: string
+          description: Allowed ip addr
+          nullable: true
         Headers:
           type: array
           items:

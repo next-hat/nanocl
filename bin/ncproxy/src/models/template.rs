@@ -7,6 +7,9 @@ pub struct LocationTemplate {
   pub path: String,
   pub upstream_key: String,
   pub redirect: Option<String>,
+  pub allowed_ips: Option<Vec<String>>,
+  pub version: Option<f64>,
+  pub headers: Option<Vec<String>>,
 }
 
 pub struct Template<'a> {
