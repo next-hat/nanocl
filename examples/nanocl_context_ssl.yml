@@ -1,0 +1,9 @@
+Name: ssl-conn
+MetaData:
+  Description: Connection secure with ssl
+Endpoints:
+  Nanocl:
+    Host: https://nanocl.internal:9443
+    Ssl:
+      Cert: ./tests/client.crt
+      CertKey: ./tests/client.key

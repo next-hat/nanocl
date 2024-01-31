@@ -1,5 +1,6 @@
 use std::error::Error;
 
+use nanocl_stubs::system::SslConfig;
 use ntex::rt;
 use ntex::http;
 
@@ -10,7 +11,6 @@ use futures::{StreamExt, TryStreamExt};
 use nanocl_error::io::FromIo;
 use nanocl_error::http::HttpError;
 use nanocl_error::http_client::HttpClientError;
-
 use crate::error::is_api_error;
 
 pub const NANOCLD_DEFAULT_VERSION: &str = "0.13.0";
@@ -22,11 +22,7 @@ pub struct ConnectOpts {
   /// Optional version
   pub version: Option<String>,
   /// Optional certificate path
-  pub cert: Option<String>,
-  /// Optional certificate key path
-  pub cert_key: Option<String>,
-  /// Optional ca certificate path
-  pub cert_ca: Option<String>,
+  pub ssl: Option<SslConfig>,
 }
 
 #[derive(Clone)]
@@ -34,9 +30,7 @@ pub struct NanocldClient {
   pub url: String,
   pub version: String,
   pub unix_socket: Option<String>,
-  pub cert: Option<String>,
-  pub cert_key: Option<String>,
-  pub cert_ca: Option<String>,
+  pub ssl: Option<SslConfig>,
 }
 
 impl Default for ConnectOpts {
@@ -44,9 +38,7 @@ impl Default for ConnectOpts {
     Self {
       url: String::from("unix:///run/nanocl/nanocl.sock"),
       version: None,
-      cert: None,
-      cert_key: None,
-      cert_ca: None,
+      ssl: None,
     }
   }
 }
@@ -63,9 +55,7 @@ impl NanocldClient {
       unix_socket: Some(String::from("/run/nanocl/nanocl.sock")),
       version: format!("v{NANOCLD_DEFAULT_VERSION}"),
       url: "http://localhost".to_owned(),
-      cert: None,
-      cert_key: None,
-      cert_ca: None,
+      ssl: None,
     }
   }
 
@@ -78,9 +68,7 @@ impl NanocldClient {
           url: url.to_owned(),
           unix_socket: None,
           version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
-          cert: opts.cert.clone(),
-          cert_key: opts.cert_key.clone(),
-          cert_ca: opts.cert_ca.clone(),
+          ssl: opts.ssl.clone(),
         }
       }
       url if url.starts_with("unix://") => {
@@ -89,9 +77,7 @@ impl NanocldClient {
           url: "http://localhost".to_owned(),
           unix_socket: Some(path.to_owned()),
           version: version.unwrap_or(format!("v{NANOCLD_DEFAULT_VERSION}")),
-          cert: None,
-          cert_key: None,
-          cert_ca: None,
+          ssl: None,
         }
       }
       _ => panic!("Invalid url: {}", url),
@@ -107,9 +93,7 @@ impl NanocldClient {
       unix_socket: Some(String::from("/run/nanocl/nanocl.sock")),
       version: version.to_owned(),
       url: String::from("http://localhost"),
-      cert: None,
-      cert_key: None,
-      cert_ca: None,
+      ssl: None,
     }
   }
 
@@ -126,6 +110,28 @@ impl NanocldClient {
           .timeout(ntex::time::Millis::from_secs(100))
           .finish(),
       );
+    }
+    #[cfg(feature = "openssl")]
+    {
+      use openssl::ssl::{SslMethod, SslConnector, SslVerifyMode, SslFiletype};
+      if let Some(ssl) = &self.ssl {
+        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+        builder.set_verify(SslVerifyMode::NONE);
+        builder
+          .set_certificate_file(&ssl.cert.clone().unwrap(), SslFiletype::PEM)
+          .unwrap();
+        builder
+          .set_private_key_file(
+            &ssl.cert_key.clone().unwrap(),
+            SslFiletype::PEM,
+          )
+          .unwrap();
+        client = ntex::http::client::Client::build().connector(
+          http::client::Connector::default()
+            .openssl(builder.build())
+            .finish(),
+        )
+      }
     }
     client.timeout(ntex::time::Millis::from_secs(100)).finish()
   }

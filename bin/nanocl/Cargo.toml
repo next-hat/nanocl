@@ -56,7 +56,7 @@ dialoguer = "0.11"
 termios = "0.3"
 liquid = { version = "0.26", features = ["stdlib"] }
 regex = "1.10"
-nanocld_client = { version = "0.13", features = ["tokio"] }
+nanocld_client = { version = "0.13", features = ["tokio", "openssl"] }
 nanocl_error = { version = "0.2", features = [
   "io",
   "tokio",
