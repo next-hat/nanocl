@@ -81,7 +81,6 @@ diesel::table! {
 }
 
 diesel::table! {
-<<<<<<< Updated upstream
     object_process_statuses (key) {
         key -> Varchar,
         created_at -> Timestamptz,
@@ -90,15 +89,6 @@ diesel::table! {
         prev_wanted -> Varchar,
         actual -> Varchar,
         prev_actual -> Varchar,
-=======
-    process_statuses (key) {
-        key -> Varchar,
-        updated_at -> Timestamptz,
-        created_at -> Timestamptz,
-        current -> Varchar,
-        previous -> Varchar,
-        wanted -> Varchar,
->>>>>>> Stashed changes
     }
 }
 
@@ -199,11 +189,7 @@ diesel::allow_tables_to_appear_in_same_query!(
   node_group_links,
   node_groups,
   nodes,
-<<<<<<< Updated upstream
   object_process_statuses,
-=======
-  process_statuses,
->>>>>>> Stashed changes
   processes,
   resource_kinds,
   resources,
