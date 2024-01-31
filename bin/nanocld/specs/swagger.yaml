@@ -2854,17 +2854,9 @@ components:
           format: int32
           description: Group id
           minimum: 0
-        cert:
-          type: string
-          description: Certificate path
-          nullable: true
-        cert_key:
-          type: string
-          description: Certificate key path
-          nullable: true
-        cert_ca:
-          type: string
-          description: Ca certificate path
+        ssl:
+          allOf:
+          - $ref: '#/components/schemas/SslConfig'
           nullable: true
     DeviceMapping:
       type: object

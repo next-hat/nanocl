@@ -1,6 +1,6 @@
 use ntex::web;
 use ntex_cors::Cors;
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod, SslVerifyMode};
 
 use nanocl_utils::ntex::middlewares;
 
@@ -50,10 +50,11 @@ pub async fn gen(
       };
     } else if host.starts_with("tcp://") {
       let addr = host.replace("tcp://", "");
-      if let Some(cert) = config.cert.clone() {
+      if let Some(ssl) = config.ssl.clone() {
         log::debug!("server::gen: {addr}: with ssl");
-        let cert_key = config.cert_key.clone().unwrap();
-        let cert_ca = config.cert_ca.clone().unwrap();
+        let cert = ssl.cert.clone().unwrap();
+        let cert_key = ssl.cert_key.clone().unwrap();
+        let cert_ca = ssl.cert_ca.clone().unwrap();
         server = match server.bind_openssl(&addr, {
           let mut builder =
             SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
@@ -62,6 +63,9 @@ pub async fn gen(
             .unwrap();
           builder.set_certificate_chain_file(cert).unwrap();
           builder.set_ca_file(cert_ca).expect("Failed to set ca file");
+          builder.set_verify(
+            SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT,
+          );
           builder
         }) {
           Err(err) => {
@@ -108,6 +112,9 @@ pub async fn gen(
 #[cfg(test)]
 mod tests {
   use clap::Parser;
+  use nanocl_stubs::system::BinaryInfo;
+  use ntex::http::{client::Connector, StatusCode};
+  use openssl::ssl::SslConnector;
 
   use super::*;
 
@@ -179,5 +186,68 @@ mod tests {
   async fn server_on_invalid_host() {
     let args = init_test_config(vec!["nanocl", "-H", "not_valid"]);
     assert_config_err(args).await;
+  }
+
+  #[ntex::test]
+  async fn ssl_valid_client() {
+    let args = init_test_config(vec![
+      "nanocl",
+      "-H",
+      "tcp://0.0.0.0:6443",
+      "--cert",
+      "../../tests/server.crt",
+      "--cert-key",
+      "../../tests/server.key",
+      "--cert-ca",
+      "../../tests/ca.crt",
+    ]);
+    assert_config_ok(args).await;
+    // Configure SSL/TLS settings
+    let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+    builder.set_verify(SslVerifyMode::NONE);
+    builder
+      .set_certificate_file("../../tests/client.crt", SslFiletype::PEM)
+      .unwrap();
+    builder
+      .set_private_key_file("../../tests/client.key", SslFiletype::PEM)
+      .unwrap();
+    let client = ntex::http::client::Client::build()
+      .connector(Connector::default().openssl(builder.build()).finish())
+      .finish();
+    let mut res = client
+      .get("https://0.0.0.0:6443/v0.13/version")
+      .send()
+      .await
+      .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let version = res.json::<BinaryInfo>().await.unwrap();
+    assert_eq!(version.version, vars::VERSION);
+  }
+
+  #[ntex::test]
+  async fn ssl_wrong_client() {
+    let args = init_test_config(vec![
+      "nanocl",
+      "-H",
+      "tcp://0.0.0.0:4443",
+      "--cert",
+      "../../tests/server.crt",
+      "--cert-key",
+      "../../tests/server.key",
+      "--cert-ca",
+      "../../tests/ca.crt",
+    ]);
+    assert_config_ok(args).await;
+    // Configure SSL/TLS settings
+    let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
+    builder.set_verify(SslVerifyMode::NONE);
+    let client = ntex::http::client::Client::build()
+      .connector(Connector::default().openssl(builder.build()).finish())
+      .finish();
+    let res = client
+      .get("https://0.0.0.0:4443/v0.13/version")
+      .send()
+      .await;
+    assert!(res.is_err());
   }
 }

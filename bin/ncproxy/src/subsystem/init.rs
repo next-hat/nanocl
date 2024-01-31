@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use nanocl_error::io::IoResult;
 
-use nanocld_client::{ConnectOpts, NanocldClient};
+use nanocld_client::NanocldClient;
 
 use crate::{
   cli::Cli,
@@ -16,6 +16,7 @@ pub async fn init(cli: &Cli) -> IoResult<SystemStateRef> {
   let mut client = NanocldClient::connect_with_unix_default();
   #[cfg(any(feature = "dev", feature = "test"))]
   {
+    use nanocld_client::ConnectOpts;
     client = NanocldClient::connect_to(&ConnectOpts {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()

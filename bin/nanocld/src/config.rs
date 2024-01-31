@@ -63,9 +63,7 @@ fn gen_daemon_conf(
     advertise_addr,
     nodes: args.nodes.clone(),
     conf_dir: args.conf_dir.clone(),
-    cert: args.cert.clone(),
-    cert_key: args.cert_key.clone(),
-    cert_ca: args.cert_ca.clone(),
+    ssl: args.ssl.clone(),
   })
 }
 

@@ -28,11 +28,9 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
       }
     }
   }
+  let endpoint = context.endpoints.get("Nanocl").unwrap();
   #[allow(unused)]
-  let mut host = cli_args
-    .host
-    .clone()
-    .unwrap_or(context.endpoints.get("Nanocl").unwrap().host.clone());
+  let mut host = cli_args.host.clone().unwrap_or(endpoint.host.clone());
   #[cfg(any(feature = "dev", feature = "test"))]
   {
     if context.name == "default" {
@@ -44,6 +42,7 @@ fn create_cli_config(cli_args: &Cli) -> IoResult<CliConfig> {
   }
   let client = NanocldClient::connect_to(&ConnectOpts {
     url: host.clone(),
+    ssl: endpoint.ssl.clone(),
     ..Default::default()
   });
   Ok(CliConfig {

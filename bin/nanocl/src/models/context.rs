@@ -4,6 +4,8 @@ use tabled::Tabled;
 use clap::{Parser, Subcommand};
 use serde::{Serialize, Deserialize};
 
+use nanocld_client::stubs::system::SslConfig;
+
 /// `nanocl context` available arguments
 #[derive(Parser)]
 pub struct ContextArg {
@@ -34,6 +36,8 @@ pub enum ContextCommand {
 #[serde(rename_all = "PascalCase")]
 pub struct ContextEndpoint {
   pub host: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub ssl: Option<SslConfig>,
 }
 
 /// A context metadata definition
@@ -67,6 +71,7 @@ impl std::default::Default for Context {
           ContextEndpoint {
             host: std::env::var("NANOCL_HOST")
               .unwrap_or("unix:///run/nanocl/nanocl.sock".into()),
+            ssl: None,
           },
         );
         map

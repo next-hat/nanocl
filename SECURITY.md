@@ -6,7 +6,7 @@ This section tell which versions are currently being supported with security upd
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.10.x   | :white_check_mark: |
+| 0.13.x  | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
