@@ -50,10 +50,11 @@ pub async fn gen(
       };
     } else if host.starts_with("tcp://") {
       let addr = host.replace("tcp://", "");
-      if let Some(cert) = config.cert.clone() {
+      if let Some(ssl) = config.ssl.clone() {
         log::debug!("server::gen: {addr}: with ssl");
-        let cert_key = config.cert_key.clone().unwrap();
-        let cert_ca = config.cert_ca.clone().unwrap();
+        let cert = ssl.cert.clone().unwrap();
+        let cert_key = ssl.cert_key.clone().unwrap();
+        let cert_ca = ssl.cert_ca.clone().unwrap();
         server = match server.bind_openssl(&addr, {
           let mut builder =
             SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
@@ -207,7 +208,8 @@ mod tests {
     builder
       .set_certificate_file("../../tests/client.crt", SslFiletype::PEM)
       .unwrap();
-    builder.set_private_key_file("../../tests/client.key", SslFiletype::PEM)
+    builder
+      .set_private_key_file("../../tests/client.key", SslFiletype::PEM)
       .unwrap();
     let client = ntex::http::client::Client::build()
       .connector(Connector::default().openssl(builder.build()).finish())

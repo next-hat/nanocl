@@ -12,6 +12,21 @@ use crate::config::DaemonConfig;
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
+pub struct SslConfig {
+  #[cfg_attr(feature = "clap", clap(long))]
+  pub cert: Option<String>,
+  #[cfg_attr(feature = "clap", clap(long))]
+  pub cert_key: Option<String>,
+  #[cfg_attr(feature = "clap", clap(long))]
+  pub cert_ca: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum ObjPsStatusKind {
   #[default]
   Created,

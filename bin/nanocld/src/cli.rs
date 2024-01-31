@@ -1,5 +1,7 @@
 use clap::Parser;
 
+use nanocl_stubs::system::SslConfig;
+
 /// Nanocl Daemon - Self Sufficient Orchestrator
 #[derive(Debug, Clone, Parser)]
 #[command(name = "Nanocl")]
@@ -34,15 +36,9 @@ pub struct Cli {
   /// Group id
   #[clap(long, default_value = "0")]
   pub gid: u32,
-  /// Optional certificate path
-  #[clap(long)]
-  pub cert: Option<String>,
-  /// Optional certificate key path
-  #[clap(long)]
-  pub cert_key: Option<String>,
-  /// Optional ca certificate path
-  #[clap(long)]
-  pub cert_ca: Option<String>,
+  /// Optional ssl options
+  #[clap(flatten)]
+  pub ssl: Option<SslConfig>,
 }
 
 impl Default for Cli {
@@ -57,9 +53,7 @@ impl Default for Cli {
       nodes: vec![],
       advertise_addr: None,
       gid: 0,
-      cert: None,
-      cert_key: None,
-      cert_ca: None,
+      ssl: None,
     }
   }
 }
