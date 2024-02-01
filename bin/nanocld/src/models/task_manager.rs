@@ -1,12 +1,9 @@
-use std::{
-  sync::{Arc, Mutex},
-  collections::HashMap,
-};
+use std::{sync::Arc, collections::HashMap, time::Duration};
 
-use ntex::{rt, web};
-use futures_util::Future;
+use ntex::{rt, time};
+use futures_util::{Future, lock::Mutex};
 
-use nanocl_error::io::{IoResult, IoError};
+use nanocl_error::io::IoResult;
 
 use nanocl_stubs::system::NativeEventAction;
 
@@ -24,6 +21,17 @@ impl ObjTask {
     let fut = Arc::new(Mutex::new(rt::spawn(task)));
     Self { kind, fut }
   }
+
+  pub async fn wait(&self) {
+    loop {
+      let fut = self.fut.lock().await;
+      if fut.is_finished() {
+        break;
+      }
+      drop(fut);
+      time::sleep(Duration::from_secs(1)).await;
+    }
+  }
 }
 
 #[derive(Clone, Default)]
@@ -36,54 +44,34 @@ impl TaskManager {
     Self::default()
   }
 
-  pub async fn add_task(&self, key: &str, task: ObjTask) -> IoResult<()> {
+  pub async fn add_task(&self, key: &str, task: ObjTask) {
     let key = key.to_owned();
-    let tasks = Arc::clone(&self.tasks);
-    web::block(move || {
-      let mut tasks = tasks.lock()?;
-      log::debug!("Adding task: {key} {}", task.kind);
-      tasks.insert(key.clone(), task.clone());
-      Ok::<_, IoError>(())
-    })
-    .await?;
-    Ok(())
+    let mut tasks = self.tasks.lock().await;
+    log::debug!("Adding task: {key} {}", task.kind);
+    tasks.insert(key.clone(), task.clone());
   }
 
-  pub async fn remove_task(&self, key: &str) -> IoResult<()> {
+  pub async fn remove_task(&self, key: &str) {
     let key = key.to_owned();
-    let tasks = Arc::clone(&self.tasks);
-    web::block(move || {
-      let mut tasks = tasks.lock().map_err(|err| {
-        IoError::interrupted("Task", err.to_string().as_str())
-      })?;
-      let task = tasks.get(&key);
-      if let Some(task) = task {
-        log::debug!("Removing task: {key} {}", task.kind);
-        task.fut.lock()?.abort();
-      }
-      tasks.remove(&key);
-      Ok::<_, IoError>(())
-    })
-    .await?;
-    Ok(())
+    let mut tasks = self.tasks.lock().await;
+    let task = tasks.get(&key);
+    if let Some(task) = task {
+      log::debug!("Removing task: {key} {}", task.kind);
+      task.fut.lock().await.abort();
+    }
+    tasks.remove(&key);
   }
 
   pub async fn get_task(&self, key: &str) -> Option<ObjTask> {
     let key = key.to_owned();
-    let tasks = Arc::clone(&self.tasks);
-    let res = web::block(move || {
-      let tasks = tasks.lock().map_err(|err| {
-        IoError::interrupted("Task", err.to_string().as_str())
-      })?;
-      Ok::<_, IoError>(tasks.get(&key).cloned())
-    })
-    .await;
-    match res {
-      Ok(res) => res,
-      Err(err) => {
-        log::error!("Failed to get task: {}", err);
-        None
-      }
+    let tasks = self.tasks.lock().await;
+    tasks.get(&key).cloned()
+  }
+
+  pub async fn wait_task(&self, key: &str) {
+    if let Some(task) = self.get_task(key).await {
+      task.wait().await;
     }
+    self.remove_task(key).await;
   }
 }
