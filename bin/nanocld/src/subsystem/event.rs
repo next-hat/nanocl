@@ -89,10 +89,7 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
       let task_key = format!("{}@{key}", actor.kind);
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
       let state_ptr = state.clone();
-      let curr_task = state.task_manager.get_task(&task_key).await;
-      if curr_task.is_some() {
-        state.task_manager.remove_task(&task_key).await?;
-      }
+      state.task_manager.wait_task(&task_key).await;
       let task = ObjTask::new(action, async move {
         let mut processes =
           ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state_ptr.pool)
@@ -128,17 +125,14 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
         state_ptr.emit_normal_native_action(&cargo, NativeEventAction::Start);
         Ok::<_, IoError>(())
       });
-      state.task_manager.add_task(&task_key, task).await?;
+      state.task_manager.add_task(&task_key, task).await;
     }
     EventActorKind::Vm => {}
     EventActorKind::Job => {
       let task_key = format!("{}@{key}", actor.kind);
       let job = JobDb::read_by_pk(&key, &state.pool).await?.try_to_spec()?;
       let state_ptr = state.clone();
-      let curr_task = state.task_manager.get_task(&task_key).await;
-      if curr_task.is_some() {
-        state.task_manager.remove_task(&task_key).await?;
-      }
+      state.task_manager.wait_task(&task_key).await;
       let task = ObjTask::new(action, async move {
         for mut container in job.containers {
           let job_name = job.name.clone();
@@ -178,7 +172,7 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
         }
         Ok::<_, IoError>(())
       });
-      state.task_manager.add_task(&task_key, task).await?;
+      state.task_manager.add_task(&task_key, task).await;
     }
     _ => {}
   }
@@ -200,10 +194,7 @@ async fn delete(e: &Event, state: &SystemState) -> IoResult<()> {
     EventActorKind::Cargo => {
       log::debug!("handling delete event for cargo {key}");
       let task_key = format!("{}@{key}", &actor.kind);
-      let curr_task = state.task_manager.get_task(&task_key).await;
-      if curr_task.is_some() {
-        state.task_manager.remove_task(&task_key).await?;
-      }
+      state.task_manager.wait_task(&task_key).await;
       let state_ptr = state.clone();
       let task = ObjTask::new(action, async move {
         let processes =
@@ -226,16 +217,13 @@ async fn delete(e: &Event, state: &SystemState) -> IoResult<()> {
         state_ptr.emit_normal_native_action(&cargo, NativeEventAction::Delete);
         Ok::<_, IoError>(())
       });
-      state.task_manager.add_task(&task_key, task).await?;
+      state.task_manager.add_task(&task_key, task).await;
     }
     EventActorKind::Vm => {}
     EventActorKind::Job => {
       let job = JobDb::read_by_pk(&key, &state.pool).await?.try_to_spec()?;
       let task_key = format!("{}@{key}", &actor.kind);
-      let curr_task = state.task_manager.get_task(&task_key).await;
-      if curr_task.is_some() {
-        state.task_manager.remove_task(&task_key).await?;
-      }
+      state.task_manager.wait_task(&task_key).await;
       let state_ptr = state.clone();
       let task = ObjTask::new(action, async move {
         let processes =
@@ -259,7 +247,7 @@ async fn delete(e: &Event, state: &SystemState) -> IoResult<()> {
         state_ptr.emit_normal_native_action(&job, NativeEventAction::Delete);
         Ok::<_, IoError>(())
       });
-      state.task_manager.add_task(&task_key, task).await?;
+      state.task_manager.add_task(&task_key, task).await;
     }
     _ => {}
   };
@@ -280,10 +268,7 @@ async fn update(e: &Event, state: &SystemState) -> IoResult<()> {
   match actor.kind {
     EventActorKind::Cargo => {
       let task_key = format!("{}@{key}", &actor.kind);
-      let curr_task = state.task_manager.get_task(&task_key).await;
-      if curr_task.is_some() {
-        state.task_manager.remove_task(&task_key).await?;
-      }
+      state.task_manager.wait_task(&task_key).await;
       let state_ptr = state.clone();
       let task = ObjTask::new(action, async move {
         let cargo =
@@ -333,7 +318,7 @@ async fn update(e: &Event, state: &SystemState) -> IoResult<()> {
         }
         Ok::<_, IoError>(())
       });
-      state.task_manager.add_task(&task_key, task).await?;
+      state.task_manager.add_task(&task_key, task).await;
     }
     EventActorKind::Vm => {}
     EventActorKind::Job => {}
