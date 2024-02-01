@@ -66,6 +66,8 @@ pub struct NanocldArg {
   pub(crate) channel: String,
   /// Specify if the docker host is unix socket
   pub(crate) docker_uds_path: Option<String>,
+  /// Specify if the docker host is different on host
+  pub(crate) docker_uds_host_path: Option<String>,
 }
 
 /// Convert Nanocld to liquid::Object
@@ -84,6 +86,7 @@ impl From<NanocldArg> for liquid::Object {
       "home_dir": arg.home_dir,
       "channel": arg.channel,
       "docker_uds_path": arg.docker_uds_path,
+      "docker_uds_host_path": arg.docker_uds_host_path,
     })
   }
 }

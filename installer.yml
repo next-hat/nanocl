@@ -166,7 +166,11 @@ Cargoes:
       - /run/nanocl:/run/nanocl
       # {% endif %}
       # {% if docker_uds_path %}
+      # {% if docker_uds_host_path %}
+      - ${{ docker_uds_host_path }}:${{ docker_uds_path }}
+      # {% else %}
       - ${{ docker_uds_path }}:${{ docker_uds_path }}
+      # {% endif %}
       # {% endif %}
       - ${{ state_dir }}:${{ state_dir }}
       - ${{ conf_dir }}:${{ conf_dir }}
