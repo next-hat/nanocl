@@ -12,7 +12,7 @@ pub fn set_env_git_commit_hash() -> Result<()> {
   };
   let mut git_hash = String::from_utf8(output.stdout).unwrap();
   if git_hash.is_empty() {
-    git_hash = "<unknow>".to_owned();
+    git_hash = "<unknown>".to_owned();
   }
   println!("cargo:rustc-env=GIT_HASH={git_hash}");
   Ok(())
