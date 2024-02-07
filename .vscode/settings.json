@@ -23,9 +23,14 @@
     "dotenv",
     "dotenvy",
     "errno",
+    "freeifaddrs",
+    "gethostname",
+    "getifaddrs",
     "iface",
+    "ifaddrs",
     "Insertable",
     "keygen",
+    "libc",
     "metrs",
     "Metrsd",
     "nanocl",
@@ -35,7 +40,9 @@
     "ntex",
     "qcow",
     "schemars",
+    "sockaddr",
     "statefile",
+    "uninit",
     "utoipa"
   ]
 }
