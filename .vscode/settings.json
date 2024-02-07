@@ -30,6 +30,7 @@
     "iface",
     "ifaddrs",
     "Insertable",
+    "jsonschema",
     "keygen",
     "libc",
     "mangen",
