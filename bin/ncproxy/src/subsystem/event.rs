@@ -16,7 +16,7 @@ use nanocld_client::{
   },
 };
 
-use crate::{utils, variables, models::SystemStateRef};
+use crate::{utils, vars, models::SystemStateRef};
 
 /// Get cargo attributes from nanocld event
 fn get_cargo_attributes(
@@ -123,10 +123,10 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
 }
 
 async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
-  let formated_version = versioning::format_version(variables::VERSION);
+  let formatted_version = versioning::format_version(vars::VERSION);
   let resource_kind = ResourceKindPartial {
     name: "ncproxy.io/rule".to_owned(),
-    version: format!("v{formated_version}"),
+    version: format!("v{formatted_version}"),
     metadata: None,
     data: ResourceKindSpec {
       schema: None,

@@ -16,7 +16,7 @@ use nanocl_utils::logger;
 mod cli;
 mod utils;
 mod models;
-mod variables;
+mod vars;
 mod services;
 mod subsystem;
 
@@ -30,10 +30,10 @@ async fn main() -> std::io::Result<()> {
   logger::enable_logger("ncproxy");
   log::info!(
     "ncproxy_{}_v{}-{}:{}",
-    variables::ARCH,
-    variables::VERSION,
-    variables::CHANNEL,
-    variables::COMMIT_ID
+    vars::ARCH,
+    vars::VERSION,
+    vars::CHANNEL,
+    vars::COMMIT_ID
   );
   let state = match subsystem::init(&cli).await {
     Err(err) => err.print_and_exit(),

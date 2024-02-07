@@ -17,7 +17,7 @@ pub(crate) mod tests {
     ConnectOpts, NanocldClient,
   };
 
-  use crate::{variables, services};
+  use crate::{vars, services};
 
   // Before a test
   pub fn before() {
@@ -85,6 +85,6 @@ pub(crate) mod tests {
         .state(Arc::clone(&system_state))
         .configure(services::ntex_config)
     });
-    TestClient::new(srv, variables::VERSION)
+    TestClient::new(srv, vars::VERSION)
   }
 }
