@@ -7,7 +7,7 @@ pub fn set_env_git_commit_hash() -> Result<()> {
     .args(["rev-parse", "HEAD"])
     .output()
   else {
-    println!("cargo:rustc-env=GIT_HASH=<unknow>");
+    println!("cargo:rustc-env=GIT_HASH=<unknown>");
     return Ok(());
   };
   let mut git_hash = String::from_utf8(output.stdout).unwrap();
