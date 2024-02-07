@@ -59,7 +59,7 @@ clap = { version = "4.4", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 uuid = { version = "1.6", features = ["serde", "v4"] }
-ntex = { version = "1.0", features = ["tokio", "openssl"] }
+ntex = { version = "1.1", features = ["tokio", "openssl"] }
 diesel = { version = "2.1", features = [
   "postgres",
   "r2d2",
@@ -68,7 +68,6 @@ diesel = { version = "2.1", features = [
   "serde_json",
 ] }
 tokio = { version = "1.36", features = ["fs", "process", "io-std"] }
-hyper = "0.14"
 tokio-util = "0.7"
 futures-util = "0.3"
 libc = "0.2"
