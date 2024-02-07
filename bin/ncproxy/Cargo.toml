@@ -40,7 +40,7 @@ bollard-next = "0.15"
 log = "0.4"
 liquid = "0.26"
 clap = { version = "4.4", features = ["derive"] }
-ntex = { version = "1.0", features = ["tokio"] }
+ntex = { version = "1.1", features = ["tokio"] }
 tokio = { version = "1.36", features = ["fs"] }
 serde = "1.0"
 serde_json = "1.0"
