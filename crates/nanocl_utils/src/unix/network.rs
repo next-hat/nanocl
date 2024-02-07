@@ -2,7 +2,7 @@ use std::io::Error;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::net::{IpAddr, Ipv4Addr};
-use libc::{sockaddr_in, gethostname, c_char};
+use libc::{c_char, gethostname, sockaddr_in, _SC_HOST_NAME_MAX};
 
 use nanocl_error::io::{FromIo, IoResult};
 
@@ -68,7 +68,7 @@ pub fn get_default_ip() -> IoResult<IpAddr> {
 }
 
 pub fn get_hostname() -> std::io::Result<String> {
-  let mut name = [0 as c_char; 256];
+  let mut name = [0 as c_char; (_SC_HOST_NAME_MAX + 1) as usize];
   let result = unsafe { gethostname(name.as_mut_ptr(), name.len()) };
   if result != 0 {
     return Err(Error::last_os_error());
