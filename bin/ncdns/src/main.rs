@@ -7,7 +7,7 @@ mod cli;
 mod utils;
 mod event;
 mod server;
-mod version;
+mod vars;
 mod dnsmasq;
 mod services;
 
@@ -42,10 +42,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
   logger::enable_logger("ncdns");
   log::info!(
     "ncdns_{}_v{}-{}:{}",
-    version::ARCH,
-    version::VERSION,
-    version::CHANNEL,
-    version::COMMIT_ID
+    vars::ARCH,
+    vars::VERSION,
+    vars::CHANNEL,
+    vars::COMMIT_ID
   );
   let cli = Cli::parse();
   if let Err(err) = run(&cli).await {
@@ -64,7 +64,7 @@ mod tests {
     let cli = Cli::parse_from([
       "ncdns",
       "--host",
-      "wrong://dsadsa",
+      "wrong://dadas",
       "--state-dir",
       "/tmp/ncdns",
       "--dns",

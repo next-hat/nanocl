@@ -4,7 +4,7 @@ use nanocl_error::http::HttpError;
 
 use nanocl_utils::ntex::middlewares;
 
-use crate::variables;
+use crate::vars;
 
 #[cfg(feature = "dev")]
 mod openapi;
@@ -35,7 +35,7 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
         .configure(swagger::register),
     );
   }
-  let versioning = middlewares::Versioning::new(variables::VERSION).finish();
+  let versioning = middlewares::Versioning::new(vars::VERSION).finish();
   config.service(
     web::scope("/{version}")
       .wrap(versioning)

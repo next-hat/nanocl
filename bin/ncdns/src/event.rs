@@ -8,13 +8,13 @@ use nanocld_client::stubs::resource_kind::{ResourceKindPartial, ResourceKindSpec
 
 use nanocld_client::NanocldClient;
 
-use crate::version;
+use crate::vars;
 
 async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
-  let formated_version = versioning::format_version(version::VERSION);
+  let formatted_version = versioning::format_version(vars::VERSION);
   let resource_kind = ResourceKindPartial {
     name: "ncdns.io/rule".to_owned(),
-    version: format!("v{formated_version}"),
+    version: format!("v{formatted_version}"),
     metadata: None,
     data: ResourceKindSpec {
       schema: None,

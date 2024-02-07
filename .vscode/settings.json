@@ -20,6 +20,7 @@
     "crond",
     "curr",
     "dialoguer",
+    "dnsmasq",
     "dotenv",
     "dotenvy",
     "errno",
@@ -35,14 +36,21 @@
     "Metrsd",
     "nanocl",
     "Nanocld",
+    "ncdns",
     "ncproxy",
+    "ncvpnkit",
     "nstore",
     "ntex",
+    "openapi",
+    "proto",
     "qcow",
     "schemars",
     "sockaddr",
     "statefile",
+    "unexpose",
     "uninit",
-    "utoipa"
+    "utoipa",
+    "vpnkit",
+    "vpnkitrc"
   ]
 }

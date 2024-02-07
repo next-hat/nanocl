@@ -154,7 +154,7 @@ pub mod tests {
   pub use nanocl_utils::ntex::test_client::*;
   use nanocld_client::{ConnectOpts, NanocldClient};
 
-  use crate::{version, dnsmasq, services};
+  use crate::{vars, dnsmasq, services};
 
   // Before a test
   pub fn before() {
@@ -177,6 +177,6 @@ pub mod tests {
         .state(client.clone())
         .configure(services::ntex_config)
     });
-    TestClient::new(srv, version::VERSION)
+    TestClient::new(srv, vars::VERSION)
   }
 }

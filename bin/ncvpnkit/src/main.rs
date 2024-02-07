@@ -14,7 +14,7 @@ use nanocld_client::stubs::proxy::{
   ResourceProxyRule, ProxyRule, ProxyStreamProtocol, ProxyRuleStream,
 };
 
-mod version;
+mod vars;
 
 /// Convert a Resource to a ProxyRule if the `Kind` is `ProxyRule`.
 fn resource_to_proxy_rule(
@@ -51,7 +51,7 @@ async fn apply_rule(port: &VpnKitPort, vpnkit_client: &VpnKitRc) {
       port.in_port.unwrap_or_default(),
     );
     if let Err(err) = vpnkit_client.expose_port(port).await {
-      log::error!("Error while creating the forwaring rule: {err}");
+      log::error!("Error while creating the forwarding rule: {err}");
     }
   }
 }
@@ -60,17 +60,17 @@ async fn apply_rule(port: &VpnKitPort, vpnkit_client: &VpnKitRc) {
 async fn remove_rule(port: &VpnKitPort, vpnkit_client: &VpnKitRc) {
   if let Some(VpnKitProtocol::UNIX) = port.proto {
     log::info!(
-      "Backwarding {} - {} -> {}",
+      "Backward {} - {} -> {}",
       port.proto.clone().unwrap_or_default(),
       port.out_path.clone().unwrap_or_default(),
       port.in_path.clone().unwrap_or_default(),
     );
     if let Err(err) = vpnkit_client.unexpose_pipe_path(port).await {
-      log::error!("Error while removing the forwaring rule: {err}");
+      log::error!("Error while removing the forwarding rule: {err}");
     }
   } else {
     log::info!(
-      "Backwarding {}  - {}:{} -> {}:{}",
+      "Backward {}  - {}:{} -> {}:{}",
       port.proto.clone().unwrap_or_default(),
       port.out_ip.clone().unwrap_or_default(),
       port.out_port.unwrap_or_default(),
@@ -78,7 +78,7 @@ async fn remove_rule(port: &VpnKitPort, vpnkit_client: &VpnKitRc) {
       port.in_port.unwrap_or_default(),
     );
     if let Err(err) = vpnkit_client.unexpose_port(port).await {
-      log::error!("Error while removing the forwaring rule: {err}");
+      log::error!("Error while removing the forwarding rule: {err}");
     }
   }
 }
@@ -158,10 +158,10 @@ async fn main() -> std::io::Result<()> {
   logger::enable_logger("ncvpnkit");
   log::info!(
     "ncvpnkit_{}_{}_v{}:{}",
-    version::ARCH,
-    version::CHANNEL,
-    version::VERSION,
-    version::COMMIT_ID
+    vars::ARCH,
+    vars::CHANNEL,
+    vars::VERSION,
+    vars::COMMIT_ID
   );
   let user_home = match std::env::var("USER_HOME") {
     Err(err) => {
