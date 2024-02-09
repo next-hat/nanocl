@@ -11,8 +11,10 @@ use nanocl_error::{
   http::HttpError,
 };
 use nanocl_stubs::{
-  system::{Event, EventActorKind, NativeEventAction, ObjPsStatusKind},
   process::ProcessKind,
+  system::{
+    Event, EventActor, EventActorKind, NativeEventAction, ObjPsStatusKind,
+  },
 };
 
 use crate::{
@@ -26,20 +28,7 @@ use crate::{
 };
 
 /// Remove a job after when finished and ttl is set
-async fn job_ttl(e: &Event, state: &SystemState) -> IoResult<()> {
-  let Some(ref actor) = e.actor else {
-    return Ok(());
-  };
-  if actor.kind != EventActorKind::Process {
-    return Ok(());
-  }
-  let action = NativeEventAction::from_str(e.action.as_str())?;
-  match &action {
-    NativeEventAction::Create
-    | NativeEventAction::Start
-    | NativeEventAction::Delete => return Ok(()),
-    _ => {}
-  }
+async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
   let attributes = actor.attributes.clone().unwrap_or_default();
   let job_id = match attributes.get("io.nanocl.j") {
     None => return Ok(()),
@@ -72,25 +61,18 @@ async fn job_ttl(e: &Event, state: &SystemState) -> IoResult<()> {
   Ok(())
 }
 
-async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
-  let action = NativeEventAction::from_str(e.action.as_str())?;
-  // If it's not a start action, we don't care
-  if action != NativeEventAction::Starting {
-    return Ok(());
-  }
-  // If there is no actor, we don't care
-  let Some(ref actor) = e.actor else {
-    return Ok(());
-  };
-  let key = actor.key.clone().unwrap_or_default();
-  match actor.kind {
+async fn start(
+  key: &str,
+  actor: &EventActor,
+  state: &SystemState,
+) -> IoResult<Option<ObjTask>> {
+  let key = key.to_owned();
+  let state_ptr = state.clone();
+  let task = match actor.kind {
     EventActorKind::Cargo => {
-      log::debug!("handling start event for cargo {key}");
-      let task_key = format!("{}@{key}", actor.kind);
-      let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
-      let state_ptr = state.clone();
-      state.task_manager.wait_task(&task_key).await;
-      let task = ObjTask::new(action, async move {
+      let task = ObjTask::new(NativeEventAction::Starting, async move {
+        let cargo =
+          CargoDb::transform_read_by_pk(&key, &state_ptr.pool).await?;
         let mut processes =
           ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state_ptr.pool)
             .await?;
@@ -125,16 +107,17 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
         state_ptr.emit_normal_native_action(&cargo, NativeEventAction::Start);
         Ok::<_, IoError>(())
       });
-      state.task_manager.add_task(&task_key, task).await;
+      Some(task)
     }
-    EventActorKind::Vm => {}
+    EventActorKind::Vm => None,
     EventActorKind::Job => {
-      let task_key = format!("{}@{key}", actor.kind);
-      let job = JobDb::read_by_pk(&key, &state.pool).await?.try_to_spec()?;
-      let state_ptr = state.clone();
-      state.task_manager.wait_task(&task_key).await;
-      let task = ObjTask::new(action, async move {
-        for mut container in job.containers {
+      let task = ObjTask::new(NativeEventAction::Starting, async move {
+        let job = JobDb::read_by_pk(&key, &state_ptr.pool)
+          .await?
+          .try_to_spec()?;
+        state_ptr.emit_normal_native_action(&job, NativeEventAction::Start);
+        for container in &job.containers {
+          let mut container = container.clone();
           let job_name = job.name.clone();
           let mut labels = container.labels.clone().unwrap_or_default();
           labels.insert("io.nanocl.j".to_owned(), job_name.clone());
@@ -172,31 +155,27 @@ async fn start(e: &Event, state: &SystemState) -> IoResult<()> {
         }
         Ok::<_, IoError>(())
       });
-      state.task_manager.add_task(&task_key, task).await;
+      Some(task)
     }
-    _ => {}
-  }
-  Ok(())
+    _ => None,
+  };
+  Ok(task)
 }
 
-async fn delete(e: &Event, state: &SystemState) -> IoResult<()> {
-  let action = NativeEventAction::from_str(e.action.as_str())?;
-  // If it's not a start action, we don't care
-  if action != NativeEventAction::Deleting {
-    return Ok(());
-  }
-  // If there is no actor, we don't care
-  let Some(ref actor) = e.actor else {
-    return Ok(());
-  };
-  let key = actor.key.clone().unwrap_or_default();
-  match actor.kind {
+/// Handle delete event for living objects (job, cargo, vm)
+/// by checking if the event is `NativeEventAction::Deleting`
+/// and pushing into the task manager the task to delete the object
+async fn delete(
+  key: &str,
+  actor: &EventActor,
+  state: &SystemState,
+) -> IoResult<Option<ObjTask>> {
+  let key = key.to_owned();
+  let state_ptr = state.clone();
+  let task = match actor.kind {
     EventActorKind::Cargo => {
       log::debug!("handling delete event for cargo {key}");
-      let task_key = format!("{}@{key}", &actor.kind);
-      state.task_manager.wait_task(&task_key).await;
-      let state_ptr = state.clone();
-      let task = ObjTask::new(action, async move {
+      let task = ObjTask::new(NativeEventAction::Deleting, async move {
         let processes =
           ProcessDb::read_by_kind_key(&key, &state_ptr.pool).await?;
         for process in processes {
@@ -217,15 +196,14 @@ async fn delete(e: &Event, state: &SystemState) -> IoResult<()> {
         state_ptr.emit_normal_native_action(&cargo, NativeEventAction::Delete);
         Ok::<_, IoError>(())
       });
-      state.task_manager.add_task(&task_key, task).await;
+      Some(task)
     }
-    EventActorKind::Vm => {}
+    EventActorKind::Vm => None,
     EventActorKind::Job => {
-      let job = JobDb::read_by_pk(&key, &state.pool).await?.try_to_spec()?;
-      let task_key = format!("{}@{key}", &actor.kind);
-      state.task_manager.wait_task(&task_key).await;
-      let state_ptr = state.clone();
-      let task = ObjTask::new(action, async move {
+      let task = ObjTask::new(NativeEventAction::Deleting, async move {
+        let job = JobDb::read_by_pk(&key, &state_ptr.pool)
+          .await?
+          .try_to_spec()?;
         let processes =
           ProcessDb::read_by_kind_key(&key, &state_ptr.pool).await?;
         for process in processes {
@@ -247,30 +225,23 @@ async fn delete(e: &Event, state: &SystemState) -> IoResult<()> {
         state_ptr.emit_normal_native_action(&job, NativeEventAction::Delete);
         Ok::<_, IoError>(())
       });
-      state.task_manager.add_task(&task_key, task).await;
+      Some(task)
     }
-    _ => {}
+    _ => None,
   };
-  Ok(())
+  Ok(task)
 }
 
-async fn update(e: &Event, state: &SystemState) -> IoResult<()> {
-  let action = NativeEventAction::from_str(e.action.as_str())?;
-  // If it's not a start action, we don't care
-  if action != NativeEventAction::Update {
-    return Ok(());
-  }
-  // If there is no actor, we don't care
-  let Some(ref actor) = e.actor else {
-    return Ok(());
-  };
-  let key = actor.key.clone().unwrap_or_default();
-  match actor.kind {
+async fn update(
+  key: &str,
+  actor: &EventActor,
+  state: &SystemState,
+) -> IoResult<Option<ObjTask>> {
+  let key = key.to_owned();
+  let state_ptr = state.clone();
+  let task = match actor.kind {
     EventActorKind::Cargo => {
-      let task_key = format!("{}@{key}", &actor.kind);
-      state.task_manager.wait_task(&task_key).await;
-      let state_ptr = state.clone();
-      let task = ObjTask::new(action, async move {
+      let task = ObjTask::new(NativeEventAction::Updating, async move {
         let cargo =
           CargoDb::transform_read_by_pk(&key, &state_ptr.pool).await?;
         let processes =
@@ -316,23 +287,47 @@ async fn update(e: &Event, state: &SystemState) -> IoResult<()> {
             .await?;
           }
         }
+        state_ptr.emit_normal_native_action(&cargo, NativeEventAction::Update);
         Ok::<_, IoError>(())
       });
-      state.task_manager.add_task(&task_key, task).await;
+      Some(task)
     }
-    EventActorKind::Vm => {}
-    EventActorKind::Job => {}
-    _ => {}
-  }
-  Ok(())
+    EventActorKind::Vm => None,
+    EventActorKind::Job => None,
+    _ => None,
+  };
+  Ok(task)
 }
 
 /// Take action when event is received
-pub async fn exec_event(ev: &Event, state: &SystemState) -> IoResult<()> {
-  log::debug!("exec_event: {} {}", ev.kind, ev.action);
-  start(ev, state).await?;
-  delete(ev, state).await?;
-  update(ev, state).await?;
-  job_ttl(ev, state).await?;
+/// and push the action into the task manager
+/// The task manager will execute the action in background
+/// eg: starting, deleting, updating a living object
+pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
+  log::info!("executing event: {} {}", e.kind, e.action);
+  let Some(ref actor) = e.actor else {
+    return Ok(());
+  };
+  let key = actor.key.clone().unwrap_or_default();
+  log::info!("executing event: {} {key}", actor.kind);
+  // Specific key of the task for this object
+  // If a task is already running for this object, we wait for it to finish
+  // This is to avoid data races conditions when manipulating an object
+  let task_key = format!("{}@{key}", &actor.kind);
+  state.task_manager.wait_task(&task_key).await;
+  let action = NativeEventAction::from_str(e.action.as_str())?;
+  let task: Option<ObjTask> = match action {
+    NativeEventAction::Create => None,
+    NativeEventAction::Starting => start(&key, actor, state).await?,
+    NativeEventAction::Deleting => delete(&key, actor, state).await?,
+    NativeEventAction::Updating => update(&key, actor, state).await?,
+    _ => {
+      job_ttl(actor, state).await?;
+      None
+    }
+  };
+  let Some(task) = task else { return Ok(()) };
+  // push the task into the task manager
+  state.task_manager.add_task(&task_key, task).await;
   Ok(())
 }
