@@ -80,9 +80,16 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   } else {
     None
   };
+  let docker_uds_host_path =
+    if is_docker_desktop && docker_host.starts_with("unix://") {
+      Some("/var/run/docker.sock.raw".to_owned())
+    } else {
+      docker_uds_path.clone()
+    };
   let nanocld_args = NanocldArg {
     docker_host,
     docker_uds_path,
+    docker_uds_host_path,
     state_dir,
     conf_dir,
     gateway,
