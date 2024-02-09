@@ -183,6 +183,7 @@ impl std::fmt::Display for EventActorKind {
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum NativeEventAction {
   Create,
+  Updating,
   Update,
   Starting,
   Start,
@@ -221,16 +222,17 @@ impl std::fmt::Display for NativeEventAction {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       NativeEventAction::Create => write!(f, "create"),
+      NativeEventAction::Updating => write!(f, "updating"),
       NativeEventAction::Update => write!(f, "update"),
-      NativeEventAction::Start => write!(f, "start"),
-      NativeEventAction::Stop => write!(f, "stop"),
-      NativeEventAction::Delete => write!(f, "delete"),
-      NativeEventAction::Restart => write!(f, "restart"),
       NativeEventAction::Starting => write!(f, "starting"),
-      NativeEventAction::Finish => write!(f, "finished"),
-      NativeEventAction::Deleting => write!(f, "deleting"),
+      NativeEventAction::Start => write!(f, "start"),
       NativeEventAction::Stopping => write!(f, "stopping"),
+      NativeEventAction::Stop => write!(f, "stop"),
+      NativeEventAction::Deleting => write!(f, "deleting"),
+      NativeEventAction::Delete => write!(f, "delete"),
       NativeEventAction::Restarting => write!(f, "restarting"),
+      NativeEventAction::Restart => write!(f, "restart"),
+      NativeEventAction::Finish => write!(f, "finished"),
       NativeEventAction::Other(s) => write!(f, "{}", s),
     }
   }

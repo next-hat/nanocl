@@ -22,7 +22,7 @@ pub trait ObjPutByPk {
     Self::ObjPutOut: Into<EventActor> + Clone,
   {
     let obj = Self::fn_put_obj_by_pk(pk, obj, state).await?;
-    state.emit_normal_native_action(&obj, NativeEventAction::Update);
+    state.emit_normal_native_action(&obj, NativeEventAction::Updating);
     Ok(obj)
   }
 }
