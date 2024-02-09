@@ -153,7 +153,6 @@ async fn start(
             }
           }
         }
-        state_ptr.emit_normal_native_action(&job, NativeEventAction::Finish);
         Ok::<_, IoError>(())
       });
       Some(task)
