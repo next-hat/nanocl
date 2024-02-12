@@ -6,15 +6,12 @@ pub mod node;
 pub mod store;
 pub mod system;
 pub mod namespace;
-pub mod cargo;
-pub mod container_image;
 pub mod vm;
 pub mod vm_image;
 pub mod job;
 pub mod exec;
 pub mod resource;
 pub mod ctrl_client;
-pub mod process;
 pub mod server;
 pub mod container;
 

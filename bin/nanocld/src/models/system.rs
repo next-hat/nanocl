@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use futures::channel::mpsc;
+use futures_util::{SinkExt, StreamExt};
 use ntex::rt;
 use nanocl_error::io::{IoResult, FromIo, IoError};
 use nanocl_stubs::{
@@ -10,35 +12,6 @@ use nanocl_stubs::{
 use crate::{vars, utils, repositories::generic::*};
 
 use super::{Pool, EventDb, RawEventEmitter, RawEventClient, TaskManager};
-
-#[derive(Clone)]
-pub struct EventManager {
-  /// Raw emitter for http clients
-  pub raw: RawEventEmitter,
-}
-
-impl Default for EventManager {
-  fn default() -> Self {
-    Self::new()
-  }
-}
-
-impl EventManager {
-  pub fn new() -> Self {
-    Self {
-      raw: RawEventEmitter::new(),
-    }
-  }
-
-  fn dispatch_event(&self, ev: Event) {
-    log::trace!("event_manager: dispatch_event {:?}", ev);
-    let self_ptr = self.clone();
-    rt::spawn(async move {
-      self_ptr.raw.emit(&ev).await?;
-      Ok::<(), IoError>(())
-    });
-  }
-}
 
 /// This structure represent the state of the system.
 /// Used to share the state between the different handlers.
@@ -51,12 +24,14 @@ pub struct SystemState {
   pub docker_api: bollard_next::Docker,
   /// The config of the daemon
   pub config: DaemonConfig,
-  /// Event manager that run the event loop
-  pub event_manager: EventManager,
   /// Manager of the tasks
   pub task_manager: TaskManager,
   /// Latest version of the daemon
   pub version: String,
+  /// Event emitter
+  event_emitter: mpsc::UnboundedSender<Event>,
+  /// Http event client
+  event_emitter_raw: RawEventEmitter,
 }
 
 impl SystemState {
@@ -71,23 +46,43 @@ impl SystemState {
     )
     .map_err(|err| err.map_err_context(|| "Docker"))?;
     let pool = utils::store::init(conf).await?;
+    let (sx, rx) = mpsc::unbounded();
     let system_state = SystemState {
       pool: Arc::clone(&pool),
       docker_api: docker.clone(),
       config: conf.to_owned(),
-      event_manager: EventManager::new(),
+      event_emitter: sx,
+      event_emitter_raw: RawEventEmitter::new(),
       task_manager: TaskManager::new(),
       version: vars::VERSION.to_owned(),
     };
+    system_state.clone().run(rx);
     Ok(system_state)
+  }
+
+  fn run(self, mut rx: mpsc::UnboundedReceiver<Event>) {
+    rt::Arbiter::new().exec_fn(move || {
+      rt::spawn(async move {
+        while let Some(e) = rx.next().await {
+          if let Err(err) = self.event_emitter_raw.emit(&e).await {
+            log::error!("system::run: raw emit {err}");
+          }
+          if let Err(err) = crate::subsystem::exec_event(&e, &self).await {
+            log::error!("system::run: exec event {err}");
+          }
+        }
+        Ok::<(), IoError>(())
+      });
+    });
   }
 
   pub async fn emit_event(&self, new_ev: EventPartial) -> IoResult<()> {
     let ev: Event = EventDb::create_try_from(new_ev, &self.pool)
       .await?
       .try_into()?;
-    crate::subsystem::exec_event(&ev, self).await?;
-    self.event_manager.dispatch_event(ev);
+    self.event_emitter.clone().send(ev).await.map_err(|err| {
+      IoError::interrupted("Event Emitter", err.to_string().as_str())
+    })?;
     Ok(())
   }
 
@@ -101,7 +96,7 @@ impl SystemState {
   }
 
   pub async fn subscribe_raw(&self) -> IoResult<RawEventClient> {
-    self.event_manager.raw.subscribe().await
+    self.event_emitter_raw.subscribe().await
   }
 
   pub fn emit_normal_native_action<A>(
@@ -119,7 +114,11 @@ impl SystemState {
       action: action.to_string(),
       related: None,
       reason: "state_sync".to_owned(),
-      note: None,
+      note: Some(format!(
+        "{} {}",
+        actor.kind,
+        actor.key.clone().unwrap_or_default()
+      )),
       metadata: None,
       actor: Some(actor),
     };

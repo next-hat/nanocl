@@ -106,7 +106,7 @@ pub async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
           instance_failed,
           instance_success,
           instance_running,
-        ) = utils::process::count_status(&instances);
+        ) = utils::container::count_status(&instances);
         Ok::<_, HttpError>(JobSummary {
           instance_total,
           instance_success,

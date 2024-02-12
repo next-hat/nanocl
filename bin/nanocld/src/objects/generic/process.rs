@@ -1,16 +1,13 @@
-use bollard_next::container::{RemoveContainerOptions, StopContainerOptions};
-
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
   system::{NativeEventAction, ObjPsStatusKind},
   process::ProcessKind,
-  cargo::CargoKillOptions,
 };
 
 use crate::{
   repositories::generic::*,
   models::{
-    SystemState, ProcessDb, VmDb, CargoDb, JobDb, JobUpdateDb, ObjPsStatusDb,
+    SystemState, VmDb, CargoDb, JobDb, JobUpdateDb, ObjPsStatusDb,
     ObjPsStatusUpdate,
   },
 };
@@ -53,106 +50,51 @@ pub trait ObjProcess {
     Ok(())
   }
 
-  async fn start_process_by_kind_key(
-    kind_key: &str,
-    state: &SystemState,
-  ) -> HttpResult<()> {
+  /// Emit a start process event to the system
+  /// This will update the status of the process and emit a event
+  /// So the system can take action for the group of process
+  async fn emit_start(kind_key: &str, state: &SystemState) -> HttpResult<()> {
     let kind = Self::get_process_kind().to_string();
-    log::debug!("{kind} {kind_key}",);
+    log::debug!("starting {kind} {kind_key}");
     let current_status =
       ObjPsStatusDb::read_by_pk(kind_key, &state.pool).await?;
-    if current_status.actual == ObjPsStatusKind::Running.to_string() {
+    if current_status.actual == ObjPsStatusKind::Start.to_string() {
       log::debug!("{kind} {kind_key} already running",);
       return Ok(());
     }
     let status_update = ObjPsStatusUpdate {
-      wanted: Some(ObjPsStatusKind::Running.to_string()),
+      wanted: Some(ObjPsStatusKind::Start.to_string()),
       prev_wanted: Some(current_status.wanted),
       actual: Some(ObjPsStatusKind::Starting.to_string()),
       prev_actual: Some(current_status.actual),
     };
-    log::debug!("{kind} {kind_key} update status");
+    log::debug!("update status {kind} {kind_key}");
     ObjPsStatusDb::update_pk(kind_key, status_update, &state.pool).await?;
     Self::_emit(kind_key, NativeEventAction::Starting, state).await?;
     Ok(())
   }
 
-  async fn stop_process_by_kind_key(
-    kind_pk: &str,
-    state: &SystemState,
-  ) -> HttpResult<()> {
-    let processes = ProcessDb::read_by_kind_key(kind_pk, &state.pool).await?;
-    log::debug!("stop_process_by_kind_pk: {kind_pk}");
-    for process in processes {
-      let process_state = process.data.state.unwrap_or_default();
-      if !process_state.running.unwrap_or_default() {
-        return Ok(());
-      }
-      state
-        .docker_api
-        .stop_container(
-          &process.data.id.unwrap_or_default(),
-          None::<StopContainerOptions>,
-        )
-        .await?;
+  /// Emit a stop process event to the system
+  /// This will update the status of the process and emit a event
+  /// So the system can take action for the group of process
+  async fn emit_stop(kind_key: &str, state: &SystemState) -> HttpResult<()> {
+    let kind = Self::get_process_kind().to_string();
+    log::debug!("stopping {kind} {kind_key}");
+    let current_status =
+      ObjPsStatusDb::read_by_pk(kind_key, &state.pool).await?;
+    if current_status.actual == ObjPsStatusKind::Stop.to_string() {
+      log::debug!("{kind} {kind_key} already stopped",);
+      return Ok(());
     }
-    Self::_emit(kind_pk, NativeEventAction::Stopping, state).await?;
-    Ok(())
-  }
-
-  async fn restart_process_by_kind_key(
-    pk: &str,
-    state: &SystemState,
-  ) -> HttpResult<()> {
-    let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
-    for process in processes {
-      state
-        .docker_api
-        .restart_container(&process.key, None)
-        .await?;
-    }
-    Self::_emit(pk, NativeEventAction::Restart, state).await?;
-    Ok(())
-  }
-
-  async fn kill_process_by_kind_key(
-    pk: &str,
-    opts: &CargoKillOptions,
-    state: &SystemState,
-  ) -> HttpResult<()> {
-    let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
-    for process in processes {
-      state
-        .docker_api
-        .kill_container(&process.key, Some(opts.clone().into()))
-        .await?;
-    }
-    Ok(())
-  }
-
-  /// Delete a process by pk
-  async fn del_process_by_pk(
-    pk: &str,
-    opts: Option<RemoveContainerOptions>,
-    state: &SystemState,
-  ) -> HttpResult<()> {
-    match state.docker_api.remove_container(pk, opts).await {
-      Ok(_) => {}
-      Err(err) => match &err {
-        bollard_next::errors::Error::DockerResponseServerError {
-          status_code,
-          message: _,
-        } => {
-          if *status_code != 404 {
-            return Err(err.into());
-          }
-        }
-        _ => {
-          return Err(err.into());
-        }
-      },
+    let status_update = ObjPsStatusUpdate {
+      wanted: Some(ObjPsStatusKind::Stop.to_string()),
+      prev_wanted: Some(current_status.wanted),
+      actual: Some(ObjPsStatusKind::Stopping.to_string()),
+      prev_actual: Some(current_status.actual),
     };
-    ProcessDb::del_by_pk(pk, &state.pool).await?;
+    log::debug!("update status {kind} {kind_key}");
+    ObjPsStatusDb::update_pk(kind_key, status_update, &state.pool).await?;
+    Self::_emit(kind_key, NativeEventAction::Stopping, state).await?;
     Ok(())
   }
 }

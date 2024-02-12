@@ -499,7 +499,9 @@ async fn exec_state_apply(
       let kind = actor.kind.clone();
       let entry = format!("{kind}@{key}");
       let mut keys = keys_ptr.lock().unwrap();
-      if action == NativeEventAction::Start {
+      if action == NativeEventAction::Start
+        || action == NativeEventAction::Update
+      {
         keys.insert(entry, true);
       }
       // check if all keys are set to true
@@ -556,7 +558,7 @@ async fn exec_state_apply(
             client
               .put_cargo(&cargo.name, cargo, Some(&namespace))
               .await?;
-          } else if inspect.status.actual == ObjPsStatusKind::Running {
+          } else if inspect.status.actual == ObjPsStatusKind::Start {
             keys.lock().unwrap().insert(key, true);
           }
         }
@@ -680,6 +682,60 @@ async fn exec_state_remove(
     utils::dialog::confirm("Are you sure to remove this state ?")
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
+  let keys = Arc::new(Mutex::new(
+    state_file
+      .data
+      .cargoes
+      .clone()
+      .unwrap_or_default()
+      .into_iter()
+      .fold(HashMap::new(), |mut acc, elem| {
+        acc.insert(
+          format!(
+            "Cargo@{}.{}",
+            elem.name,
+            state_file
+              .data
+              .namespace
+              .clone()
+              .unwrap_or("global".to_owned())
+          ),
+          false,
+        );
+        acc
+      }),
+  ));
+  let client_ptr = client.clone();
+  let keys_ptr = keys.clone();
+  let event_fut = ntex::rt::spawn(async move {
+    let mut ev_stream = client_ptr.watch_events().await?;
+    while let Some(ev) = ev_stream.next().await {
+      let ev = match ev {
+        Err(err) => {
+          eprintln!("Unable to read event: {err}");
+          continue;
+        }
+        Ok(ev) => ev,
+      };
+      let Some(actor) = ev.actor else {
+        continue;
+      };
+      let action = NativeEventAction::from_str(&ev.action)
+        .map_err(HttpError::bad_request)?;
+      let key = actor.key.clone().unwrap_or_default();
+      let kind = actor.kind.clone();
+      let entry = format!("{kind}@{key}");
+      let mut keys = keys_ptr.lock().unwrap();
+      if action == NativeEventAction::Destroy {
+        keys.insert(entry, true);
+      }
+      // check if all keys are set to true
+      if keys.values().all(|v| *v) {
+        break;
+      }
+    }
+    Ok::<_, HttpError>(())
+  });
   let pg_style = utils::progress::create_spinner_style("red");
   if let Some(jobs) = state_file.data.jobs {
     for job in jobs {
@@ -749,6 +805,7 @@ async fn exec_state_remove(
       }
     }
   }
+  event_fut.await??;
   Ok(())
 }
 

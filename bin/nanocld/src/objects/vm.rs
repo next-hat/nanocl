@@ -70,7 +70,7 @@ impl ObjDelByPk for VmDb {
   type ObjDelOut = Vm;
 
   fn get_del_event() -> NativeEventAction {
-    NativeEventAction::Deleting
+    NativeEventAction::Destroying
   }
 
   async fn fn_del_obj_by_pk(
@@ -84,7 +84,8 @@ impl ObjDelByPk for VmDb {
       ..Default::default()
     };
     let container_name = format!("{}.v", pk);
-    VmDb::del_process_by_pk(&container_name, Some(options), state).await?;
+    utils::container::delete_instance(&container_name, Some(options), state)
+      .await?;
     VmDb::del_by_pk(pk, &state.pool).await?;
     SpecDb::del_by_kind_key(pk, &state.pool).await?;
     utils::vm_image::delete_by_pk(&vm.spec.disk.image, state).await?;
@@ -103,8 +104,8 @@ impl ObjPutByPk for VmDb {
   ) -> HttpResult<Self::ObjPutOut> {
     let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
     let container_name = format!("{}.v", &vm.spec.vm_key);
-    VmDb::stop_process_by_kind_key(pk, state).await?;
-    VmDb::del_process_by_pk(
+    utils::container::stop_instances(pk, &ProcessKind::Vm, state).await?;
+    utils::container::delete_instance(
       &container_name,
       None::<RemoveContainerOptions>,
       state,
@@ -195,7 +196,8 @@ impl ObjInspectByPk for VmDb {
     let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
     let processes =
       ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.pool).await?;
-    let (_, _, _, running_instances) = utils::process::count_status(&processes);
+    let (_, _, _, running_instances) =
+      utils::container::count_status(&processes);
     Ok(VmInspect {
       created_at: vm.created_at,
       namespace_name: vm.namespace_name,

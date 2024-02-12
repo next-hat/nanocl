@@ -164,13 +164,13 @@ pub async fn start_process(
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   match &kind {
     ProcessKind::Vm => {
-      VmDb::start_process_by_kind_key(&kind_key, &state).await?;
+      VmDb::emit_start(&kind_key, &state).await?;
     }
     ProcessKind::Job => {
-      JobDb::start_process_by_kind_key(&kind_key, &state).await?;
+      JobDb::emit_start(&kind_key, &state).await?;
     }
     ProcessKind::Cargo => {
-      CargoDb::start_process_by_kind_key(&kind_key, &state).await?;
+      CargoDb::emit_start(&kind_key, &state).await?;
     }
   }
   Ok(web::HttpResponse::Accepted().finish())
@@ -199,17 +199,7 @@ pub async fn restart_process(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  match &kind {
-    ProcessKind::Vm => {
-      VmDb::restart_process_by_kind_key(&kind_pk, &state).await?;
-    }
-    ProcessKind::Job => {
-      JobDb::restart_process_by_kind_key(&kind_pk, &state).await?;
-    }
-    ProcessKind::Cargo => {
-      CargoDb::restart_process_by_kind_key(&kind_pk, &state).await?;
-    }
-  }
+  utils::container::restart_instances(&kind_pk, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -236,17 +226,7 @@ pub async fn stop_process(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  match &kind {
-    ProcessKind::Vm => {
-      VmDb::stop_process_by_kind_key(&kind_pk, &state).await?;
-    }
-    ProcessKind::Job => {
-      JobDb::stop_process_by_kind_key(&kind_pk, &state).await?;
-    }
-    ProcessKind::Cargo => {
-      CargoDb::stop_process_by_kind_key(&kind_pk, &state).await?;
-    }
-  }
+  utils::container::stop_instances(&kind_pk, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -275,17 +255,7 @@ pub async fn kill_process(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  match &kind {
-    ProcessKind::Vm => {
-      VmDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
-    }
-    ProcessKind::Job => {
-      JobDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
-    }
-    ProcessKind::Cargo => {
-      CargoDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
-    }
-  }
+  utils::container::kill_by_kind_key(&kind_pk, &payload, &state).await?;
   Ok(web::HttpResponse::Ok().into())
 }
 

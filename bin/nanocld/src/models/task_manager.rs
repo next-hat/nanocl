@@ -71,7 +71,7 @@ impl TaskManager {
   pub async fn wait_task(&self, key: &str) {
     if let Some(task) = self.get_task(key).await {
       task.wait().await;
+      self.remove_task(key).await;
     }
-    self.remove_task(key).await;
   }
 }

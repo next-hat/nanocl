@@ -34,15 +34,16 @@ async fn exec_docker(
   }
   let action = event.action.clone().unwrap_or_default();
   let id = actor.id.unwrap_or_default();
+  let name = attributes.get("name").cloned().unwrap_or_default();
   let action = action.as_str();
   let mut event = EventPartial {
     reporting_controller: vars::CONTROLLER_NAME.to_owned(),
     reporting_node: state.config.hostname.clone(),
     kind: EventKind::Normal,
-    action: NativeEventAction::Delete.to_string(),
+    action: NativeEventAction::Destroy.to_string(),
     related: None,
     reason: "state_sync".to_owned(),
-    note: None,
+    note: Some(format!("Process {name}")),
     metadata: None,
     actor: Some(EventActor {
       key: Some(id.clone()),

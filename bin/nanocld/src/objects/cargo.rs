@@ -49,10 +49,10 @@ impl ObjCreate for CargoDb {
       .try_to_cargo_spec()?;
     let status = ObjPsStatusPartial {
       key: key.clone(),
-      wanted: ObjPsStatusKind::Created,
-      prev_wanted: ObjPsStatusKind::Created,
-      actual: ObjPsStatusKind::Created,
-      prev_actual: ObjPsStatusKind::Created,
+      wanted: ObjPsStatusKind::Create,
+      prev_wanted: ObjPsStatusKind::Create,
+      actual: ObjPsStatusKind::Create,
+      prev_actual: ObjPsStatusKind::Create,
     };
     let status = ObjPsStatusDb::create_from(status, &state.pool).await?;
     let new_item = CargoDb {
@@ -80,7 +80,7 @@ impl ObjDelByPk for CargoDb {
   type ObjDelOpts = CargoDeleteQuery;
 
   fn get_del_event() -> NativeEventAction {
-    NativeEventAction::Deleting
+    NativeEventAction::Destroying
   }
 
   async fn fn_del_obj_by_pk(
@@ -91,7 +91,7 @@ impl ObjDelByPk for CargoDb {
     let cargo = CargoDb::transform_read_by_pk(pk, &state.pool).await?;
     let processes =
       ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
-    let (_, _, _, running) = utils::process::count_status(&processes);
+    let (_, _, _, running) = utils::container::count_status(&processes);
     if running > 0 && !opts.force.unwrap_or(false) {
       return Err(HttpError::bad_request(
         "Unable to delete cargo with running instances without force option",
@@ -99,9 +99,9 @@ impl ObjDelByPk for CargoDb {
     }
     let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
     let new_status = ObjPsStatusUpdate {
-      wanted: Some(ObjPsStatusKind::Delete.to_string()),
+      wanted: Some(ObjPsStatusKind::Destroy.to_string()),
       prev_wanted: Some(status.wanted),
-      actual: Some(ObjPsStatusKind::Deleting.to_string()),
+      actual: Some(ObjPsStatusKind::Destroying.to_string()),
       prev_actual: Some(status.actual),
     };
     ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
@@ -120,9 +120,9 @@ impl ObjPutByPk for CargoDb {
   ) -> HttpResult<Self::ObjPutOut> {
     let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
     let new_status = ObjPsStatusUpdate {
-      wanted: Some(ObjPsStatusKind::Running.to_string()),
+      wanted: Some(ObjPsStatusKind::Start.to_string()),
       prev_wanted: Some(status.wanted),
-      actual: Some(ObjPsStatusKind::Patching.to_string()),
+      actual: Some(ObjPsStatusKind::Updating.to_string()),
       prev_actual: Some(status.actual),
     };
     ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
@@ -255,7 +255,8 @@ impl ObjInspectByPk for CargoDb {
   ) -> HttpResult<Self::ObjInspectOut> {
     let cargo = CargoDb::transform_read_by_pk(pk, &state.pool).await?;
     let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
-    let (_, _, _, running_instances) = utils::process::count_status(&processes);
+    let (_, _, _, running_instances) =
+      utils::container::count_status(&processes);
     let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
     Ok(CargoInspect {
       created_at: cargo.created_at,

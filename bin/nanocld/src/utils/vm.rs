@@ -110,7 +110,7 @@ pub async fn create_instance(
     ..Default::default()
   };
   let name = format!("{}.v", &vm.spec.vm_key);
-  utils::container::create_process(
+  utils::container::create_instance(
     &ProcessKind::Vm,
     &name,
     &vm.spec.vm_key,

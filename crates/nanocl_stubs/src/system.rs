@@ -41,14 +41,16 @@ pub struct SslConfig {
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum ObjPsStatusKind {
   #[default]
-  Created,
+  Create,
   Starting,
-  Running,
-  Patching,
-  Deleting,
-  Delete,
-  Stopped,
-  Failed,
+  Start,
+  Updating,
+  Update,
+  Destroying,
+  Destroy,
+  Stopping,
+  Stop,
+  Fail,
   Unknown,
 }
 
@@ -57,14 +59,16 @@ impl FromStr for ObjPsStatusKind {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
-      "created" => Ok(Self::Created),
+      "create" => Ok(Self::Create),
       "starting" => Ok(Self::Starting),
-      "running" => Ok(Self::Running),
-      "stopped" => Ok(Self::Stopped),
-      "failed" => Ok(Self::Failed),
-      "deleting" => Ok(Self::Deleting),
-      "delete" => Ok(Self::Delete),
-      "patching" => Ok(Self::Patching),
+      "start" => Ok(Self::Start),
+      "updating" => Ok(Self::Updating),
+      "update" => Ok(Self::Update),
+      "destroying" => Ok(Self::Destroying),
+      "destroy" => Ok(Self::Destroy),
+      "stopping" => Ok(Self::Stopping),
+      "stop" => Ok(Self::Stop),
+      "fail" => Ok(Self::Fail),
       _ => Ok(Self::Unknown),
     }
   }
@@ -73,15 +77,17 @@ impl FromStr for ObjPsStatusKind {
 impl ToString for ObjPsStatusKind {
   fn to_string(&self) -> String {
     match self {
-      Self::Created => "created",
+      Self::Create => "create",
       Self::Starting => "starting",
-      Self::Running => "running",
-      Self::Stopped => "stopped",
-      Self::Failed => "failed",
+      Self::Start => "start",
+      Self::Updating => "updating",
+      Self::Update => "update",
+      Self::Destroying => "destroying",
+      Self::Destroy => "destroy",
+      Self::Stopping => "stopping",
+      Self::Stop => "stop",
+      Self::Fail => "failed",
       Self::Unknown => "<unknown>",
-      Self::Deleting => "deleting",
-      Self::Delete => "delete",
-      Self::Patching => "patching",
     }
     .to_owned()
   }
@@ -183,17 +189,17 @@ impl std::fmt::Display for EventActorKind {
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum NativeEventAction {
   Create,
-  Updating,
-  Update,
   Starting,
   Start,
-  Deleting,
-  Delete,
+  Updating,
+  Update,
+  Destroying,
+  Destroy,
   Stopping,
   Stop,
-  Restarting,
   Restart,
   Finish,
+  Fail,
   Other(String),
 }
 
@@ -203,16 +209,17 @@ impl FromStr for NativeEventAction {
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
       "create" => Ok(NativeEventAction::Create),
-      "update" => Ok(NativeEventAction::Update),
-      "start" => Ok(NativeEventAction::Start),
-      "stop" => Ok(NativeEventAction::Stop),
-      "delete" => Ok(NativeEventAction::Delete),
-      "restart" => Ok(NativeEventAction::Restart),
       "starting" => Ok(NativeEventAction::Starting),
-      "finished" => Ok(NativeEventAction::Finish),
-      "deleting" => Ok(NativeEventAction::Deleting),
+      "start" => Ok(NativeEventAction::Start),
+      "updating" => Ok(NativeEventAction::Updating),
+      "update" => Ok(NativeEventAction::Update),
+      "destroying" => Ok(NativeEventAction::Destroying),
+      "destroy" => Ok(NativeEventAction::Destroy),
       "stopping" => Ok(NativeEventAction::Stopping),
-      "restarting" => Ok(NativeEventAction::Restarting),
+      "stop" => Ok(NativeEventAction::Stop),
+      "restart" => Ok(NativeEventAction::Restart),
+      "finish" => Ok(NativeEventAction::Finish),
+      "fail" => Ok(NativeEventAction::Fail),
       _ => Ok(NativeEventAction::Other(s.to_owned())),
     }
   }
@@ -222,17 +229,17 @@ impl std::fmt::Display for NativeEventAction {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       NativeEventAction::Create => write!(f, "create"),
-      NativeEventAction::Updating => write!(f, "updating"),
-      NativeEventAction::Update => write!(f, "update"),
       NativeEventAction::Starting => write!(f, "starting"),
       NativeEventAction::Start => write!(f, "start"),
+      NativeEventAction::Updating => write!(f, "updating"),
+      NativeEventAction::Update => write!(f, "update"),
       NativeEventAction::Stopping => write!(f, "stopping"),
       NativeEventAction::Stop => write!(f, "stop"),
-      NativeEventAction::Deleting => write!(f, "deleting"),
-      NativeEventAction::Delete => write!(f, "delete"),
-      NativeEventAction::Restarting => write!(f, "restarting"),
+      NativeEventAction::Destroying => write!(f, "destroying"),
+      NativeEventAction::Destroy => write!(f, "destroy"),
       NativeEventAction::Restart => write!(f, "restart"),
       NativeEventAction::Finish => write!(f, "finished"),
+      NativeEventAction::Fail => write!(f, "fail"),
       NativeEventAction::Other(s) => write!(f, "{}", s),
     }
   }

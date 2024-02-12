@@ -8,7 +8,7 @@ pub trait ObjDelByPk {
   type ObjDelOpts;
 
   fn get_del_event() -> NativeEventAction {
-    NativeEventAction::Delete
+    NativeEventAction::Destroy
   }
 
   async fn fn_del_obj_by_pk(

@@ -30,10 +30,10 @@ impl ObjCreate for JobDb {
     let db_model = JobDb::try_from_partial(obj)?;
     let status = ObjPsStatusPartial {
       key: obj.name.clone(),
-      wanted: ObjPsStatusKind::Created,
-      prev_wanted: ObjPsStatusKind::Created,
-      actual: ObjPsStatusKind::Created,
-      prev_actual: ObjPsStatusKind::Created,
+      wanted: ObjPsStatusKind::Create,
+      prev_wanted: ObjPsStatusKind::Create,
+      actual: ObjPsStatusKind::Create,
+      prev_actual: ObjPsStatusKind::Create,
     };
     ObjPsStatusDb::create_from(status, &state.pool).await?;
     let job = JobDb::create_from(db_model, &state.pool)
@@ -51,7 +51,7 @@ impl ObjDelByPk for JobDb {
   type ObjDelOut = Job;
 
   fn get_del_event() -> NativeEventAction {
-    NativeEventAction::Deleting
+    NativeEventAction::Destroying
   }
 
   async fn fn_del_obj_by_pk(
@@ -74,7 +74,7 @@ impl ObjInspectByPk for JobDb {
     let job = JobDb::read_by_pk(pk, &state.pool).await?.try_to_spec()?;
     let instances = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
     let (instance_total, instance_failed, instance_success, instance_running) =
-      utils::process::count_status(&instances);
+      utils::container::count_status(&instances);
     let job_inspect = JobInspect {
       spec: job,
       instance_total,
