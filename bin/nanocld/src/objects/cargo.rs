@@ -6,7 +6,6 @@ use bollard_next::{container::Config, service::HostConfig};
 
 use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::{
-  process::ProcessKind,
   system::{ObjPsStatusPartial, ObjPsStatusKind, NativeEventAction},
   cargo::{Cargo, CargoDeleteQuery, CargoInspect},
   cargo_spec::CargoSpecPartial,
@@ -22,12 +21,6 @@ use crate::{
 };
 
 use super::generic::*;
-
-impl ObjProcess for CargoDb {
-  fn get_process_kind() -> ProcessKind {
-    ProcessKind::Cargo
-  }
-}
 
 impl ObjCreate for CargoDb {
   type ObjCreateIn = CargoObjCreateIn;

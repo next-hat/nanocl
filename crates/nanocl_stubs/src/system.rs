@@ -238,7 +238,7 @@ impl std::fmt::Display for NativeEventAction {
       NativeEventAction::Destroying => write!(f, "destroying"),
       NativeEventAction::Destroy => write!(f, "destroy"),
       NativeEventAction::Restart => write!(f, "restart"),
-      NativeEventAction::Finish => write!(f, "finished"),
+      NativeEventAction::Finish => write!(f, "finish"),
       NativeEventAction::Fail => write!(f, "fail"),
       NativeEventAction::Other(s) => write!(f, "{}", s),
     }

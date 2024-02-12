@@ -144,3 +144,29 @@ impl ObjTaskUpdate for CargoDb {
     Ok(task)
   }
 }
+
+impl ObjTaskStop for CargoDb {
+  async fn create_stop_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask> {
+    let key = key.to_owned();
+    let state = state.clone();
+    let task = ObjTask::new(NativeEventAction::Stopping, async move {
+      utils::container::stop_instances(&key, &ProcessKind::Cargo, &state)
+        .await?;
+      let curr_status = ObjPsStatusDb::read_by_pk(&key, &state.pool).await?;
+      let new_status = ObjPsStatusUpdate {
+        wanted: Some(ObjPsStatusKind::Stop.to_string()),
+        prev_wanted: Some(curr_status.wanted),
+        actual: Some(ObjPsStatusKind::Stop.to_string()),
+        prev_actual: Some(curr_status.actual),
+      };
+      ObjPsStatusDb::update_pk(&key, new_status, &state.pool).await?;
+      let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
+      state.emit_normal_native_action(&cargo, NativeEventAction::Stop);
+      Ok::<_, IoError>(())
+    });
+    Ok(task)
+  }
+}

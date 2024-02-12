@@ -18,12 +18,6 @@ use crate::{
 };
 use super::generic::*;
 
-impl ObjProcess for VmDb {
-  fn get_process_kind() -> ProcessKind {
-    ProcessKind::Vm
-  }
-}
-
 impl ObjCreate for VmDb {
   type ObjCreateIn = VmObjCreateIn;
   type ObjCreateOut = Vm;

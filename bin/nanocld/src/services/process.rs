@@ -10,8 +10,7 @@ use bollard_next::{
 use nanocl_stubs::{
   generic::{GenericNspQuery, GenericFilter, GenericListQuery},
   process::{
-    ProcessLogQuery, ProcessOutputLog, ProcessKind, ProcessWaitQuery,
-    ProcessWaitResponse,
+    ProcessLogQuery, ProcessOutputLog, ProcessWaitQuery, ProcessWaitResponse,
   },
   cargo::CargoKillOptions,
 };
@@ -19,8 +18,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{SystemState, ProcessDb, VmDb, JobDb, CargoDb},
-  objects::generic::ObjProcess,
+  models::{SystemState, ProcessDb},
 };
 
 /// List process (Vm, Job, Cargo)
@@ -162,17 +160,7 @@ pub async fn start_process(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  match &kind {
-    ProcessKind::Vm => {
-      VmDb::emit_start(&kind_key, &state).await?;
-    }
-    ProcessKind::Job => {
-      JobDb::emit_start(&kind_key, &state).await?;
-    }
-    ProcessKind::Cargo => {
-      CargoDb::emit_start(&kind_key, &state).await?;
-    }
-  }
+  utils::container::emit_start(&kind_key, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -225,8 +213,8 @@ pub async fn stop_process(
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
-  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::container::stop_instances(&kind_pk, &kind, &state).await?;
+  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  utils::container::emit_stop(&kind_key, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 

@@ -106,6 +106,21 @@ async fn update(
   Ok(task)
 }
 
+async fn stop(
+  key: &str,
+  actor: &EventActor,
+  state: &SystemState,
+) -> IoResult<Option<ObjTask>> {
+  let task = match actor.kind {
+    EventActorKind::Cargo => {
+      let task = CargoDb::create_stop_task(key, state).await?;
+      Some(task)
+    }
+    _ => None,
+  };
+  Ok(task)
+}
+
 /// Take action when event is received
 /// and push the action into the task manager
 /// The task manager will execute the action in background
@@ -130,8 +145,9 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   let task: Option<ObjTask> = match action {
     NativeEventAction::Create => None,
     NativeEventAction::Starting => start(&key, actor, state).await?,
-    NativeEventAction::Destroying => delete(&key, actor, state).await?,
+    NativeEventAction::Stopping => stop(&key, actor, state).await?,
     NativeEventAction::Updating => update(&key, actor, state).await?,
+    NativeEventAction::Destroying => delete(&key, actor, state).await?,
     _ => {
       job_ttl(actor, state).await?;
       None

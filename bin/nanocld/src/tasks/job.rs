@@ -7,10 +7,15 @@ use nanocl_error::{
   io::{IoError, IoResult},
   http::HttpError,
 };
-use nanocl_stubs::system::NativeEventAction;
+use nanocl_stubs::{
+  process::ProcessKind,
+  system::{NativeEventAction, ObjPsStatusKind},
+};
 
 use crate::{
-  models::{JobDb, ObjTask, ProcessDb, SystemState},
+  models::{
+    JobDb, ObjPsStatusDb, ObjPsStatusUpdate, ObjTask, ProcessDb, SystemState,
+  },
   repositories::generic::*,
   utils,
 };
@@ -89,6 +94,35 @@ impl ObjTaskDelete for JobDb {
         utils::job::remove_cron_rule(&job, &state_ptr).await?;
       }
       state_ptr.emit_normal_native_action(&job, NativeEventAction::Destroy);
+      Ok::<_, IoError>(())
+    });
+    Ok(task)
+  }
+}
+
+impl ObjTaskStop for JobDb {
+  async fn create_stop_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask> {
+    let key = key.to_owned();
+    let state_ptr = state.clone();
+    let task = ObjTask::new(NativeEventAction::Stopping, async move {
+      utils::container::stop_instances(&key, &ProcessKind::Job, &state_ptr)
+        .await?;
+      let curr_status =
+        ObjPsStatusDb::read_by_pk(&key, &state_ptr.pool).await?;
+      let new_status = ObjPsStatusUpdate {
+        wanted: Some(ObjPsStatusKind::Stop.to_string()),
+        prev_wanted: Some(curr_status.wanted),
+        actual: Some(ObjPsStatusKind::Stop.to_string()),
+        prev_actual: Some(curr_status.actual),
+      };
+      ObjPsStatusDb::update_pk(&key, new_status, &state_ptr.pool).await?;
+      let job = JobDb::read_by_pk(&key, &state_ptr.pool)
+        .await?
+        .try_to_spec()?;
+      state_ptr.emit_normal_native_action(&job, NativeEventAction::Stop);
       Ok::<_, IoError>(())
     });
     Ok(task)

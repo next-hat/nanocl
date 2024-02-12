@@ -724,3 +724,55 @@ pub async fn create_job(
   }
   Ok(processes)
 }
+
+/// Emit a start process event to the system
+/// This will update the status of the process and emit a event
+/// So the system can take action for the group of process
+pub async fn emit_start(
+  kind_key: &str,
+  kind: &ProcessKind,
+  state: &SystemState,
+) -> HttpResult<()> {
+  log::debug!("starting {kind:?} {kind_key}");
+  let current_status = ObjPsStatusDb::read_by_pk(kind_key, &state.pool).await?;
+  if current_status.actual == ObjPsStatusKind::Start.to_string() {
+    log::debug!("{kind:?} {kind_key} already running",);
+    return Ok(());
+  }
+  let status_update = ObjPsStatusUpdate {
+    wanted: Some(ObjPsStatusKind::Start.to_string()),
+    prev_wanted: Some(current_status.wanted),
+    actual: Some(ObjPsStatusKind::Starting.to_string()),
+    prev_actual: Some(current_status.actual),
+  };
+  log::debug!("update status {kind:?} {kind_key}");
+  ObjPsStatusDb::update_pk(kind_key, status_update, &state.pool).await?;
+  _emit(kind_key, kind, NativeEventAction::Starting, state).await?;
+  Ok(())
+}
+
+/// Emit a stop process event to the system
+/// This will update the status of the process and emit a event
+/// So the system can take action for the group of process
+pub async fn emit_stop(
+  kind_key: &str,
+  kind: &ProcessKind,
+  state: &SystemState,
+) -> HttpResult<()> {
+  log::debug!("stopping {kind:?} {kind_key}");
+  let current_status = ObjPsStatusDb::read_by_pk(kind_key, &state.pool).await?;
+  if current_status.actual == ObjPsStatusKind::Stop.to_string() {
+    log::debug!("{kind:?} {kind_key} already stopped",);
+    return Ok(());
+  }
+  let status_update = ObjPsStatusUpdate {
+    wanted: Some(ObjPsStatusKind::Stop.to_string()),
+    prev_wanted: Some(current_status.wanted),
+    actual: Some(ObjPsStatusKind::Stopping.to_string()),
+    prev_actual: Some(current_status.actual),
+  };
+  log::debug!("update status {kind:?} {kind_key}");
+  ObjPsStatusDb::update_pk(kind_key, status_update, &state.pool).await?;
+  _emit(kind_key, kind, NativeEventAction::Stopping, state).await?;
+  Ok(())
+}

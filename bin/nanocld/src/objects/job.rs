@@ -1,6 +1,5 @@
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
-  process::ProcessKind,
   job::{Job, JobPartial, JobInspect},
   system::{ObjPsStatusPartial, ObjPsStatusKind, NativeEventAction},
 };
@@ -12,12 +11,6 @@ use crate::{
 };
 
 use super::generic::*;
-
-impl ObjProcess for JobDb {
-  fn get_process_kind() -> ProcessKind {
-    ProcessKind::Job
-  }
-}
 
 impl ObjCreate for JobDb {
   type ObjCreateIn = JobPartial;
