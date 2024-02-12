@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use ntex::rt;
 use futures::channel::mpsc;
 use futures_util::{SinkExt, StreamExt};
-use ntex::rt;
+
 use nanocl_error::io::{IoResult, FromIo, IoError};
 use nanocl_stubs::{
   config::DaemonConfig,
