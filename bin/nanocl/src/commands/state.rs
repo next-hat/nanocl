@@ -439,6 +439,41 @@ async fn execute_template(
   Ok(state_ref)
 }
 
+fn gen_obj_hashmap(state: &StateRef<Statefile>) -> HashMap<String, bool> {
+  let namespace = state.data.namespace.clone().unwrap_or("global".to_owned());
+  let mut obj_hashmap = state
+    .data
+    .cargoes
+    .clone()
+    .unwrap_or_default()
+    .into_iter()
+    .fold(HashMap::new(), |mut acc, elem| {
+      acc.insert(format!("Cargo@{}.{namespace}", elem.name), false);
+      acc
+    });
+  obj_hashmap = state
+    .data
+    .jobs
+    .clone()
+    .unwrap_or_default()
+    .into_iter()
+    .fold(obj_hashmap, |mut acc, elem| {
+      acc.insert(format!("Job@{}", elem.name), false);
+      acc
+    });
+  obj_hashmap = state
+    .data
+    .virtual_machines
+    .clone()
+    .unwrap_or_default()
+    .into_iter()
+    .fold(obj_hashmap, |mut acc, elem| {
+      acc.insert(format!("Vm@{}.{namespace}", elem.name), false);
+      acc
+    });
+  obj_hashmap
+}
+
 /// Function called when running `nanocl state apply`
 async fn exec_state_apply(
   cli_conf: &CliConfig,
@@ -458,28 +493,9 @@ async fn exec_state_apply(
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
   let client_ptr = cli_conf.client.clone();
-  let state_ptr = state_file.clone();
-  let keys = Arc::new(Mutex::new(
-    state_ptr.data.cargoes.unwrap_or_default().into_iter().fold(
-      HashMap::new(),
-      |mut acc, elem| {
-        acc.insert(
-          format!(
-            "Cargo@{}.{}",
-            elem.name,
-            state_ptr
-              .data
-              .namespace
-              .clone()
-              .unwrap_or("global".to_owned())
-          ),
-          false,
-        );
-        acc
-      },
-    ),
-  ));
-  let keys_ptr = keys.clone();
+  let obj_hashmap = gen_obj_hashmap(&state_file);
+  let obj_hashmap = Arc::new(Mutex::new(obj_hashmap));
+  let obj_hashmap_ptr = obj_hashmap.clone();
   let event_fut = ntex::rt::spawn(async move {
     let mut ev_stream = client_ptr.watch_events().await?;
     while let Some(ev) = ev_stream.next().await {
@@ -498,10 +514,8 @@ async fn exec_state_apply(
       let key = actor.key.clone().unwrap_or_default();
       let kind = actor.kind.clone();
       let entry = format!("{kind}@{key}");
-      let mut keys = keys_ptr.lock().unwrap();
-      if action == NativeEventAction::Start
-        || action == NativeEventAction::Update
-      {
+      let mut keys = obj_hashmap_ptr.lock().unwrap();
+      if action == NativeEventAction::Start {
         keys.insert(entry, true);
       }
       // check if all keys are set to true
@@ -559,7 +573,7 @@ async fn exec_state_apply(
               .put_cargo(&cargo.name, cargo, Some(&namespace))
               .await?;
           } else if inspect.status.actual == ObjPsStatusKind::Start {
-            keys.lock().unwrap().insert(key, true);
+            obj_hashmap.lock().unwrap().insert(key, true);
           }
         }
       }
@@ -610,7 +624,7 @@ async fn exec_state_apply(
       }
     }
   }
-  if !keys.lock().unwrap().clone().values().all(|v| *v) {
+  if !obj_hashmap.lock().unwrap().clone().values().all(|v| *v) {
     event_fut.await??;
   }
   if opts.follow {
@@ -682,31 +696,10 @@ async fn exec_state_remove(
     utils::dialog::confirm("Are you sure to remove this state ?")
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
-  let keys = Arc::new(Mutex::new(
-    state_file
-      .data
-      .cargoes
-      .clone()
-      .unwrap_or_default()
-      .into_iter()
-      .fold(HashMap::new(), |mut acc, elem| {
-        acc.insert(
-          format!(
-            "Cargo@{}.{}",
-            elem.name,
-            state_file
-              .data
-              .namespace
-              .clone()
-              .unwrap_or("global".to_owned())
-          ),
-          false,
-        );
-        acc
-      }),
-  ));
+  let obj_hashmap = gen_obj_hashmap(&state_file);
+  let obj_hashmap = Arc::new(Mutex::new(obj_hashmap));
   let client_ptr = client.clone();
-  let keys_ptr = keys.clone();
+  let obj_hashmap_ptr = obj_hashmap.clone();
   let event_fut = ntex::rt::spawn(async move {
     let mut ev_stream = client_ptr.watch_events().await?;
     while let Some(ev) = ev_stream.next().await {
@@ -725,7 +718,7 @@ async fn exec_state_remove(
       let key = actor.key.clone().unwrap_or_default();
       let kind = actor.kind.clone();
       let entry = format!("{kind}@{key}");
-      let mut keys = keys_ptr.lock().unwrap();
+      let mut keys = obj_hashmap_ptr.lock().unwrap();
       if action == NativeEventAction::Destroy {
         keys.insert(entry, true);
       }
@@ -805,7 +798,9 @@ async fn exec_state_remove(
       }
     }
   }
-  event_fut.await??;
+  if !obj_hashmap.lock().unwrap().clone().values().all(|v| *v) {
+    event_fut.await??;
+  }
   Ok(())
 }
 

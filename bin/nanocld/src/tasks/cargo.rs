@@ -18,7 +18,10 @@ use crate::{
 use super::generic::*;
 
 impl ObjTaskStart for CargoDb {
-  async fn start(key: &str, state: &SystemState) -> IoResult<ObjTask> {
+  async fn create_start_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask> {
     let key = key.to_owned();
     let state = state.clone();
     let task = ObjTask::new(NativeEventAction::Starting, async move {
@@ -52,7 +55,10 @@ impl ObjTaskStart for CargoDb {
 }
 
 impl ObjTaskDelete for CargoDb {
-  async fn delete(key: &str, state: &SystemState) -> IoResult<ObjTask> {
+  async fn create_delete_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask> {
     let key = key.to_owned();
     let state = state.clone();
     log::debug!("handling delete event for cargo {key}");
@@ -80,7 +86,10 @@ impl ObjTaskDelete for CargoDb {
 }
 
 impl ObjTaskUpdate for CargoDb {
-  async fn update(key: &str, state: &SystemState) -> IoResult<ObjTask> {
+  async fn create_update_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask> {
     let key = key.to_owned();
     let state = state.clone();
     let task = ObjTask::new(NativeEventAction::Updating, async move {
@@ -129,7 +138,7 @@ impl ObjTaskUpdate for CargoDb {
           .await?;
         }
       }
-      state.emit_normal_native_action(&cargo, NativeEventAction::Update);
+      state.emit_normal_native_action(&cargo, NativeEventAction::Start);
       Ok::<_, IoError>(())
     });
     Ok(task)

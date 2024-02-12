@@ -54,11 +54,11 @@ async fn start(
 ) -> IoResult<Option<ObjTask>> {
   let task = match actor.kind {
     EventActorKind::Job => {
-      let task = JobDb::start(key, state).await?;
+      let task = JobDb::create_start_task(key, state).await?;
       Some(task)
     }
     EventActorKind::Cargo => {
-      let task = CargoDb::start(key, state).await?;
+      let task = CargoDb::create_start_task(key, state).await?;
       Some(task)
     }
     EventActorKind::Vm => None,
@@ -78,12 +78,12 @@ async fn delete(
   let task = match actor.kind {
     EventActorKind::Cargo => {
       log::debug!("handling delete event for cargo {key}");
-      let task = CargoDb::delete(key, state).await?;
+      let task = CargoDb::create_delete_task(key, state).await?;
       Some(task)
     }
     EventActorKind::Vm => None,
     EventActorKind::Job => {
-      let task = JobDb::delete(key, state).await?;
+      let task = JobDb::create_delete_task(key, state).await?;
       Some(task)
     }
     _ => None,
@@ -98,7 +98,7 @@ async fn update(
 ) -> IoResult<Option<ObjTask>> {
   let task = match actor.kind {
     EventActorKind::Cargo => {
-      let task = CargoDb::update(key, state).await?;
+      let task = CargoDb::create_update_task(key, state).await?;
       Some(task)
     }
     _ => None,
@@ -114,13 +114,13 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   let Some(ref actor) = e.actor else {
     return Ok(());
   };
-  log::debug!(
-    "executing event: {} {} {}",
+  let key = actor.key.clone().unwrap_or_default();
+  log::info!(
+    "exec_event: {} {} {}",
     e.kind,
     e.action,
     actor.key.clone().unwrap_or_default()
   );
-  let key = actor.key.clone().unwrap_or_default();
   // Specific key of the task for this object
   // If a task is already running for this object, we wait for it to finish
   // This is to avoid data races conditions when manipulating an object

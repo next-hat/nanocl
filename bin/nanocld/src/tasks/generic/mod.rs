@@ -3,17 +3,29 @@ use nanocl_error::io::IoResult;
 use crate::models::{ObjTask, SystemState};
 
 pub trait ObjTaskStart {
-  async fn start(key: &str, state: &SystemState) -> IoResult<ObjTask>;
+  async fn create_start_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask>;
 }
 
 pub trait ObjTaskDelete {
-  async fn delete(key: &str, state: &SystemState) -> IoResult<ObjTask>;
+  async fn create_delete_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask>;
 }
 
 pub trait ObjTaskUpdate {
-  async fn update(key: &str, state: &SystemState) -> IoResult<ObjTask>;
+  async fn create_update_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask>;
 }
 
 pub trait ObjTaskStop {
-  async fn stop(key: &str, state: &SystemState) -> IoResult<ObjTask>;
+  async fn create_stop_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask>;
 }

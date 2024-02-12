@@ -86,7 +86,7 @@ impl ToString for ObjPsStatusKind {
       Self::Destroy => "destroy",
       Self::Stopping => "stopping",
       Self::Stop => "stop",
-      Self::Fail => "failed",
+      Self::Fail => "fail",
       Self::Unknown => "<unknown>",
     }
     .to_owned()

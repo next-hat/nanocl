@@ -18,7 +18,10 @@ use crate::{
 use super::generic::*;
 
 impl ObjTaskStart for JobDb {
-  async fn start(key: &str, state: &SystemState) -> IoResult<ObjTask> {
+  async fn create_start_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask> {
     let key = key.to_owned();
     let state_ptr = state.clone();
     let task = ObjTask::new(NativeEventAction::Starting, async move {
@@ -67,7 +70,10 @@ impl ObjTaskStart for JobDb {
 }
 
 impl ObjTaskDelete for JobDb {
-  async fn delete(key: &str, state: &SystemState) -> IoResult<ObjTask> {
+  async fn create_delete_task(
+    key: &str,
+    state: &SystemState,
+  ) -> IoResult<ObjTask> {
     let key = key.to_owned();
     let state_ptr = state.clone();
     let task = ObjTask::new(NativeEventAction::Destroying, async move {
