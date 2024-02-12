@@ -7,7 +7,7 @@ use nanocl_error::{
   io::{IoError, IoResult},
   http::HttpError,
 };
-use nanocl_stubs::{process::ProcessKind, system::NativeEventAction};
+use nanocl_stubs::system::NativeEventAction;
 
 use crate::{
   models::{JobDb, ObjTask, ProcessDb, SystemState},
@@ -28,24 +28,14 @@ impl ObjTaskStart for JobDb {
       let job = JobDb::read_by_pk(&key, &state_ptr.pool)
         .await?
         .try_to_spec()?;
+      let mut processes =
+        ProcessDb::read_by_kind_key(&job.name, &state_ptr.pool).await?;
+      if processes.is_empty() {
+        processes = utils::container::create_job(&job, &state_ptr).await?;
+      }
       state_ptr.emit_normal_native_action(&job, NativeEventAction::Start);
-      for container in &job.containers {
-        let mut container = container.clone();
-        let job_name = job.name.clone();
-        let mut labels = container.labels.clone().unwrap_or_default();
-        labels.insert("io.nanocl.j".to_owned(), job_name.clone());
-        container.labels = Some(labels);
-        let short_id = utils::key::generate_short_id(6);
-        let name = format!("{job_name}-{short_id}.j");
-        let process = utils::container::create_instance(
-          &ProcessKind::Job,
-          &name,
-          &job_name,
-          container,
-          &state_ptr,
-        )
-        .await?;
-        // When we run a sequential order we wait for the container to finish to start the next one.
+      for process in processes {
+        // We currently run a sequential order so we wait for the container to finish to start the next one.
         let mut stream = state_ptr.docker_api.wait_container(
           &process.key,
           Some(WaitContainerOptions {

@@ -6,7 +6,6 @@ pub mod node;
 pub mod store;
 pub mod system;
 pub mod namespace;
-pub mod vm;
 pub mod vm_image;
 pub mod job;
 pub mod exec;

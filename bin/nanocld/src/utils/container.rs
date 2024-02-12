@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
@@ -7,7 +9,7 @@ use bollard_next::{
     RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
     WaitContainerOptions,
   },
-  service::{HostConfig, RestartPolicy, RestartPolicyNameEnum},
+  service::{DeviceMapping, HostConfig, RestartPolicy, RestartPolicyNameEnum},
 };
 use nanocl_error::{
   http::{HttpError, HttpResult},
@@ -17,17 +19,19 @@ use nanocl_error::{
 use nanocl_stubs::{
   cargo::{Cargo, CargoKillOptions},
   generic::{GenericClause, GenericFilter},
+  job::Job,
   process::{Process, ProcessKind, ProcessPartial},
   system::{
     EventActor, EventActorKind, EventKind, EventPartial, NativeEventAction,
     ObjPsStatusKind,
   },
+  vm::Vm,
 };
 
 use crate::{
   models::{
     CargoDb, JobDb, JobUpdateDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb,
-    SecretDb, SystemState, VmDb,
+    SecretDb, SystemState, VmDb, VmImageDb,
   },
   repositories::generic::*,
   vars,
@@ -586,4 +590,137 @@ pub fn count_status(instances: &[Process]) -> (usize, usize, usize, usize) {
     instance_success,
     instance_running,
   )
+}
+
+/// Create a VM instance from a VM image
+pub async fn create_vm_instance(
+  vm: &Vm,
+  image: &VmImageDb,
+  disable_keygen: bool,
+  state: &SystemState,
+) -> HttpResult<()> {
+  let mut labels: HashMap<String, String> = HashMap::new();
+  let img_path = format!("{}/vms/images", state.config.state_dir);
+  labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
+  labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
+  let mut args: Vec<String> =
+    vec!["-hda".into(), image.path.clone(), "--nographic".into()];
+  let host_config = vm.spec.host_config.clone();
+  let kvm = host_config.kvm.unwrap_or_default();
+  let mut devices = vec![DeviceMapping {
+    path_on_host: Some("/dev/net/tun".into()),
+    path_in_container: Some("/dev/net/tun".into()),
+    cgroup_permissions: Some("rwm".into()),
+  }];
+  if kvm {
+    args.push("-accel".into());
+    args.push("kvm".into());
+    devices.push(DeviceMapping {
+      path_on_host: Some("/dev/kvm".into()),
+      path_in_container: Some("/dev/kvm".into()),
+      cgroup_permissions: Some("rwm".into()),
+    });
+    log::debug!("KVM enabled /dev/kvm mapped");
+  }
+  let cpu = host_config.cpu;
+  let cpu = if cpu > 0 { cpu.to_string() } else { "1".into() };
+  let cpu = cpu.clone();
+  args.push("-smp".into());
+  args.push(cpu.clone());
+  let memory = host_config.memory;
+  let memory = if memory > 0 {
+    format!("{memory}M")
+  } else {
+    "512M".into()
+  };
+  args.push("-m".into());
+  args.push(memory);
+  let mut envs: Vec<String> = Vec::new();
+  let net_iface = vm
+    .spec
+    .host_config
+    .net_iface
+    .clone()
+    .unwrap_or("ens3".into());
+  let link_net_iface = vm
+    .spec
+    .host_config
+    .link_net_iface
+    .clone()
+    .unwrap_or("eth0".into());
+  envs.push(format!("DEFAULT_INTERFACE={link_net_iface}"));
+  envs.push(format!("FROM_NETWORK={net_iface}"));
+  envs.push(format!("DELETE_SSH_KEY={disable_keygen}"));
+  if let Some(user) = &vm.spec.user {
+    envs.push(format!("USER={user}"));
+  }
+  if let Some(password) = &vm.spec.password {
+    envs.push(format!("PASSWORD={password}"));
+  }
+  if let Some(ssh_key) = &vm.spec.ssh_key {
+    envs.push(format!("SSH_KEY={ssh_key}"));
+  }
+  let image = match &vm.spec.host_config.runtime {
+    Some(runtime) => runtime.to_owned(),
+    None => "ghcr.io/next-hat/nanocl-qemu:8.0.2.0".into(),
+  };
+  let spec = bollard_next::container::Config {
+    image: Some(image),
+    tty: Some(true),
+    hostname: vm.spec.hostname.clone(),
+    env: Some(envs),
+    labels: Some(labels),
+    cmd: Some(args),
+    attach_stderr: Some(true),
+    attach_stdin: Some(true),
+    attach_stdout: Some(true),
+    open_stdin: Some(true),
+    host_config: Some(HostConfig {
+      network_mode: Some(
+        vm.spec
+          .host_config
+          .runtime_network
+          .clone()
+          .unwrap_or(vm.namespace_name.to_owned()),
+      ),
+      binds: Some(vec![format!("{img_path}:{img_path}")]),
+      devices: Some(devices),
+      cap_add: Some(vec!["NET_ADMIN".into()]),
+      ..Default::default()
+    }),
+    ..Default::default()
+  };
+  let name = format!("{}.v", &vm.spec.vm_key);
+  create_instance(&ProcessKind::Vm, &name, &vm.spec.vm_key, spec, state)
+    .await?;
+  Ok(())
+}
+
+pub async fn create_job_instance(
+  name: &str,
+  container: &Config,
+  state: &SystemState,
+) -> HttpResult<Process> {
+  let mut container = container.clone();
+  let mut labels = container.labels.clone().unwrap_or_default();
+  labels.insert("io.nanocl.j".to_owned(), name.to_owned());
+  labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
+  labels.insert("io.nanocl.kind".to_owned(), "job".to_owned());
+  container.labels = Some(labels);
+  let short_id = super::key::generate_short_id(6);
+  let container_name = format!("{name}-{short_id}.j");
+  create_instance(&ProcessKind::Job, &container_name, name, container, state)
+    .await
+}
+
+pub async fn create_job(
+  job: &Job,
+  state: &SystemState,
+) -> HttpResult<Vec<Process>> {
+  let mut processes = Vec::new();
+  for container in &job.containers {
+    let process = create_job_instance(&job.name, container, state).await?;
+    processes.push(process);
+  }
+  Ok(processes)
 }

@@ -1,7 +1,7 @@
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
-  job::{Job, JobPartial, JobInspect},
   process::ProcessKind,
+  job::{Job, JobPartial, JobInspect},
   system::{ObjPsStatusPartial, ObjPsStatusKind, NativeEventAction},
 };
 

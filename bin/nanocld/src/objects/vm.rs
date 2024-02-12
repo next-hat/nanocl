@@ -60,7 +60,7 @@ impl ObjCreate for VmDb {
     vm.disk.size = Some(size);
     let vm =
       VmDb::create_from_spec(namespace, &vm, version, &state.pool).await?;
-    utils::vm::create_instance(&vm, &image, true, state).await?;
+    utils::container::create_vm_instance(&vm, &image, true, state).await?;
     Ok(vm)
   }
 }
@@ -119,8 +119,7 @@ impl ObjPutByPk for VmDb {
     )
     .await?;
     let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await?;
-    utils::vm::create_instance(&vm, &image, false, state).await?;
-    // VmDb::start_process_by_kind_key(&vm.spec.vm_key, state).await?;
+    utils::container::create_vm_instance(&vm, &image, false, state).await?;
     Ok(vm)
   }
 }
