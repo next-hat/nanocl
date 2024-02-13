@@ -86,3 +86,4 @@ notify = "6.1"
 ntex-cors = "0.5"
 rand = "0.8"
 openssl = { version = "0.10" }
+num_cpus = "1"

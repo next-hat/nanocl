@@ -105,6 +105,10 @@ pub async fn gen(
     );
   }
   log::info!("server::gen: ready");
+  // get max cpu
+  let num = num_cpus::get();
+  let workers = if num < 2 { 1 } else { num / 2 };
+  server = server.workers(workers);
   Ok(server.run())
 }
 
