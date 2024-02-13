@@ -56,10 +56,10 @@ impl TaskManager {
     let mut tasks = self.tasks.lock().await;
     let task = tasks.get(&key);
     if let Some(task) = task {
-      log::debug!("Removing task: {key} {}", task.kind);
       task.fut.lock().await.abort();
+      log::debug!("Removing task: {key} {}", task.kind);
+      tasks.remove(&key);
     }
-    tasks.remove(&key);
   }
 
   pub async fn get_task(&self, key: &str) -> Option<ObjTask> {

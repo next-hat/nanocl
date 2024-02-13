@@ -2,11 +2,13 @@ use std::sync::{Arc, Mutex};
 use std::{fs, str::FromStr};
 use std::collections::HashMap;
 
+use ntex::rt;
 use futures::StreamExt;
-use nanocld_client::stubs::system::ObjPsStatusKind;
-use nanocld_client::ConnectOpts;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
+
+use nanocld_client::stubs::system::ObjPsStatusKind;
+use nanocld_client::ConnectOpts;
 use bollard_next::service::HostConfig;
 
 use nanocl_error::{
@@ -496,7 +498,7 @@ async fn exec_state_apply(
   let obj_hashmap = gen_obj_hashmap(&state_file);
   let obj_hashmap = Arc::new(Mutex::new(obj_hashmap));
   let obj_hashmap_ptr = obj_hashmap.clone();
-  let event_fut = ntex::rt::spawn(async move {
+  let fut = ntex::rt::spawn(async move {
     let mut ev_stream = client_ptr.watch_events().await?;
     while let Some(ev) = ev_stream.next().await {
       let ev = match ev {
@@ -506,6 +508,7 @@ async fn exec_state_apply(
         }
         Ok(ev) => ev,
       };
+      println!("receving event {ev:#?}");
       let Some(actor) = ev.actor else {
         continue;
       };
@@ -624,8 +627,9 @@ async fn exec_state_apply(
       }
     }
   }
-  if !obj_hashmap.lock().unwrap().clone().values().all(|v| *v) {
-    event_fut.await??;
+  let values = obj_hashmap.lock().unwrap().clone();
+  if !values.values().all(|v| *v) {
+    fut.await??;
   }
   if opts.follow {
     let query = ProcessLogQuery {
@@ -700,7 +704,7 @@ async fn exec_state_remove(
   let obj_hashmap = Arc::new(Mutex::new(obj_hashmap));
   let client_ptr = client.clone();
   let obj_hashmap_ptr = obj_hashmap.clone();
-  let event_fut = ntex::rt::spawn(async move {
+  let fut = ntex::rt::spawn(async move {
     let mut ev_stream = client_ptr.watch_events().await?;
     while let Some(ev) = ev_stream.next().await {
       let ev = match ev {
@@ -799,7 +803,8 @@ async fn exec_state_remove(
     }
   }
   if !obj_hashmap.lock().unwrap().clone().values().all(|v| *v) {
-    event_fut.await??;
+    println!("waiting event future");
+    fut.await??;
   }
   Ok(())
 }
