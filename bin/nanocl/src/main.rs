@@ -482,7 +482,7 @@ mod tests {
 
   #[ntex::test]
   async fn job_basic() {
-    assert_cli_ok!("state", "apply", "-ys", "../../examples/job_example.yml");
+    assert_cli_ok!("state", "apply", "-yfs", "../../examples/job_example.yml");
     assert_cli_ok!("job", "ls");
     assert_cli_ok!("job", "ls", "-q");
     assert_cli_ok!("job", "inspect", "job-example");

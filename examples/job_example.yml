@@ -9,6 +9,5 @@ Jobs:
     - Hello World
   - Image: alpine:latest
     Cmd:
-    - sh
-    - -c
-    - echo "Hello World2"
+    - echo
+    - Hello World

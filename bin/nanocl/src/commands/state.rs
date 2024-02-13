@@ -525,6 +525,7 @@ async fn exec_state_apply(
       if keys.values().all(|v| *v) {
         break;
       }
+      drop(keys);
     }
     Ok::<_, HttpError>(())
   });
