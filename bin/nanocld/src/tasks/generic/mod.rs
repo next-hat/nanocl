@@ -1,31 +1,25 @@
-use nanocl_error::io::IoResult;
+use std::pin::Pin;
+
+use futures_util::Future;
+use nanocl_error::io::{IoError, IoResult};
+use nanocl_stubs::system::NativeEventAction;
 
 use crate::models::{ObjTask, SystemState};
 
+pub type ObjTaskFuture = Pin<Box<dyn Future<Output = Result<(), IoError>>>>;
+
 pub trait ObjTaskStart {
-  async fn create_start_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask>;
+  fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture;
 }
 
 pub trait ObjTaskDelete {
-  async fn create_delete_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask>;
+  fn create_delete_task(key: &str, state: &SystemState) -> ObjTaskFuture;
 }
 
 pub trait ObjTaskUpdate {
-  async fn create_update_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask>;
+  fn create_update_task(key: &str, state: &SystemState) -> ObjTaskFuture;
 }
 
 pub trait ObjTaskStop {
-  async fn create_stop_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask>;
+  fn create_stop_task(key: &str, state: &SystemState) -> ObjTaskFuture;
 }

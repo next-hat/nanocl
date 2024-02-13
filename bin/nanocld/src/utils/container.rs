@@ -49,15 +49,19 @@ pub fn parse_img_name(name: &str) -> HttpResult<(String, String)> {
 }
 
 /// Download the image
-pub async fn download_image(
-  cargo: &Cargo,
+pub async fn download_image<A>(
+  image: &str,
+  actor: &A,
   state: &SystemState,
-) -> HttpResult<()> {
-  let image_name = &cargo.spec.container.image.clone().unwrap_or_default();
-  if state.docker_api.inspect_image(image_name).await.is_ok() {
-    return Ok(());
-  }
-  let (name, tag) = parse_img_name(image_name)?;
+) -> HttpResult<()>
+where
+  A: Into<EventActor> + Clone,
+{
+  // In case the image is a latest and not a pined tag we download the image in every case
+  // if state.docker_api.inspect_image(image).await.is_ok() {
+  //   return Ok(());
+  // }
+  let (name, tag) = parse_img_name(image)?;
   let mut stream = state.docker_api.create_image(
     Some(bollard_next::image::CreateImageOptions {
       from_image: name.clone(),
@@ -77,14 +81,12 @@ pub async fn download_image(
           reason: "state_sync".to_owned(),
           kind: EventKind::Error,
           actor: Some(EventActor {
-            key: cargo.spec.container.image.clone(),
+            key: Some(image.to_owned()),
             kind: EventActorKind::ContainerImage,
             attributes: None,
           }),
-          related: Some(cargo.clone().into()),
-          note: Some(format!(
-            "Error while downloading image {image_name} {err}"
-          )),
+          related: Some(actor.clone().into()),
+          note: Some(format!("Error while downloading image {image} {err}")),
           metadata: None,
         };
         state.spawn_emit_event(event);
@@ -99,11 +101,11 @@ pub async fn download_image(
       reason: "state_sync".to_owned(),
       kind: EventKind::Normal,
       actor: Some(EventActor {
-        key: cargo.spec.container.image.clone(),
+        key: Some(image.to_owned()),
         kind: EventActorKind::ContainerImage,
         attributes: None,
       }),
-      related: Some(cargo.clone().into()),
+      related: Some(actor.clone().into()),
       note: Some(format!("Downloading image {name}:{tag}")),
       metadata: Some(serde_json::json!({
         "state": chunk,
@@ -286,7 +288,12 @@ pub async fn create_cargo(
   number: usize,
   state: &SystemState,
 ) -> HttpResult<Vec<Process>> {
-  download_image(cargo, state).await?;
+  download_image(
+    &cargo.spec.container.image.clone().unwrap_or_default(),
+    cargo,
+    state,
+  )
+  .await?;
   execute_cargo_before(cargo, state).await?;
   let mut secret_envs: Vec<String> = Vec::new();
   if let Some(secrets) = &cargo.spec.secrets {
@@ -719,6 +726,8 @@ pub async fn create_job(
 ) -> HttpResult<Vec<Process>> {
   let mut processes = Vec::new();
   for container in &job.containers {
+    download_image(&container.image.clone().unwrap_or_default(), job, state)
+      .await?;
     let process = create_job_instance(&job.name, container, state).await?;
     processes.push(process);
   }

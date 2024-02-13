@@ -1,3 +1,4 @@
+use futures_util::Future;
 use ntex::rt;
 use bollard_next::container::{RemoveContainerOptions, StartContainerOptions};
 
@@ -18,13 +19,10 @@ use crate::{
 use super::generic::*;
 
 impl ObjTaskStart for CargoDb {
-  async fn create_start_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask> {
+  fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
     let state = state.clone();
-    let task = ObjTask::new(NativeEventAction::Starting, async move {
+    Box::pin(async move {
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
       let mut processes =
         ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
@@ -49,20 +47,16 @@ impl ObjTaskStart for CargoDb {
         .await?;
       state.emit_normal_native_action(&cargo, NativeEventAction::Start);
       Ok::<_, IoError>(())
-    });
-    Ok(task)
+    })
   }
 }
 
 impl ObjTaskDelete for CargoDb {
-  async fn create_delete_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask> {
+  fn create_delete_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
     let state = state.clone();
     log::debug!("handling delete event for cargo {key}");
-    let task = ObjTask::new(NativeEventAction::Destroying, async move {
+    Box::pin(async move {
       let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
       for process in processes {
         let _ = state
@@ -80,19 +74,15 @@ impl ObjTaskDelete for CargoDb {
       CargoDb::clear_by_pk(&key, &state.pool).await?;
       state.emit_normal_native_action(&cargo, NativeEventAction::Destroy);
       Ok::<_, IoError>(())
-    });
-    Ok(task)
+    })
   }
 }
 
 impl ObjTaskUpdate for CargoDb {
-  async fn create_update_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask> {
+  fn create_update_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
     let state = state.clone();
-    let task = ObjTask::new(NativeEventAction::Updating, async move {
+    Box::pin(async move {
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
       let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
       // Create instance with the new spec
@@ -140,19 +130,15 @@ impl ObjTaskUpdate for CargoDb {
       }
       state.emit_normal_native_action(&cargo, NativeEventAction::Start);
       Ok::<_, IoError>(())
-    });
-    Ok(task)
+    })
   }
 }
 
 impl ObjTaskStop for CargoDb {
-  async fn create_stop_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask> {
+  fn create_stop_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
     let state = state.clone();
-    let task = ObjTask::new(NativeEventAction::Stopping, async move {
+    Box::pin(async move {
       utils::container::stop_instances(&key, &ProcessKind::Cargo, &state)
         .await?;
       let curr_status = ObjPsStatusDb::read_by_pk(&key, &state.pool).await?;
@@ -166,7 +152,6 @@ impl ObjTaskStop for CargoDb {
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
       state.emit_normal_native_action(&cargo, NativeEventAction::Stop);
       Ok::<_, IoError>(())
-    });
-    Ok(task)
+    })
   }
 }

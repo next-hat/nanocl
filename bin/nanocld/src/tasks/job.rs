@@ -1,4 +1,4 @@
-use futures_util::StreamExt;
+use futures_util::{Future, StreamExt};
 
 use bollard_next::container::{
   RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
@@ -23,31 +23,26 @@ use crate::{
 use super::generic::*;
 
 impl ObjTaskStart for JobDb {
-  async fn create_start_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask> {
+  fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
-    let state_ptr = state.clone();
-    let task = ObjTask::new(NativeEventAction::Starting, async move {
-      let job = JobDb::read_by_pk(&key, &state_ptr.pool)
-        .await?
-        .try_to_spec()?;
+    let state = state.clone();
+    Box::pin(async move {
+      let job = JobDb::read_by_pk(&key, &state.pool).await?.try_to_spec()?;
       let mut processes =
-        ProcessDb::read_by_kind_key(&job.name, &state_ptr.pool).await?;
+        ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
       if processes.is_empty() {
-        processes = utils::container::create_job(&job, &state_ptr).await?;
+        processes = utils::container::create_job(&job, &state).await?;
       }
-      state_ptr.emit_normal_native_action(&job, NativeEventAction::Start);
+      state.emit_normal_native_action(&job, NativeEventAction::Start);
       for process in processes {
         // We currently run a sequential order so we wait for the container to finish to start the next one.
-        let mut stream = state_ptr.docker_api.wait_container(
+        let mut stream = state.docker_api.wait_container(
           &process.key,
           Some(WaitContainerOptions {
             condition: "not-running",
           }),
         );
-        let _ = state_ptr
+        let _ = state
           .docker_api
           .start_container(&process.key, None::<StartContainerOptions<String>>)
           .await;
@@ -59,19 +54,15 @@ impl ObjTaskStart for JobDb {
         }
       }
       Ok::<_, IoError>(())
-    });
-    Ok(task)
+    })
   }
 }
 
 impl ObjTaskDelete for JobDb {
-  async fn create_delete_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask> {
+  fn create_delete_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
     let state_ptr = state.clone();
-    let task = ObjTask::new(NativeEventAction::Destroying, async move {
+    Box::pin(async move {
       let job = JobDb::read_by_pk(&key, &state_ptr.pool)
         .await?
         .try_to_spec()?;
@@ -95,19 +86,15 @@ impl ObjTaskDelete for JobDb {
       }
       state_ptr.emit_normal_native_action(&job, NativeEventAction::Destroy);
       Ok::<_, IoError>(())
-    });
-    Ok(task)
+    })
   }
 }
 
 impl ObjTaskStop for JobDb {
-  async fn create_stop_task(
-    key: &str,
-    state: &SystemState,
-  ) -> IoResult<ObjTask> {
+  fn create_stop_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
     let state_ptr = state.clone();
-    let task = ObjTask::new(NativeEventAction::Stopping, async move {
+    Box::pin(async move {
       utils::container::stop_instances(&key, &ProcessKind::Job, &state_ptr)
         .await?;
       let curr_status =
@@ -124,7 +111,6 @@ impl ObjTaskStop for JobDb {
         .try_to_spec()?;
       state_ptr.emit_normal_native_action(&job, NativeEventAction::Stop);
       Ok::<_, IoError>(())
-    });
-    Ok(task)
+    })
   }
 }
