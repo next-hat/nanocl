@@ -160,7 +160,7 @@ pub async fn start_process(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::container::emit_start(&kind_key, &kind, &state).await?;
+  utils::container::emit_starting(&kind_key, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -214,7 +214,7 @@ pub async fn stop_process(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  utils::container::emit_stop(&kind_key, &kind, &state).await?;
+  utils::container::emit_stopping(&kind_key, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 

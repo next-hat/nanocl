@@ -1960,8 +1960,8 @@ components:
       required:
       - NamespaceName
       - CreatedAt
-      - Spec
       - Status
+      - Spec
       properties:
         NamespaceName:
           type: string
@@ -1970,10 +1970,10 @@ components:
           type: string
           format: date-time
           description: When the cargo was created
-        Spec:
-          $ref: '#/components/schemas/CargoSpec'
         Status:
           $ref: '#/components/schemas/ObjPsStatus'
+        Spec:
+          $ref: '#/components/schemas/CargoSpec'
     CargoInspect:
       type: object
       description: |-
@@ -1985,8 +1985,8 @@ components:
       - CreatedAt
       - InstanceTotal
       - InstanceRunning
-      - Spec
       - Status
+      - Spec
       - Instances
       properties:
         NamespaceName:
@@ -2004,10 +2004,10 @@ components:
           type: integer
           description: Number of running instances
           minimum: 0
-        Spec:
-          $ref: '#/components/schemas/CargoSpec'
         Status:
           $ref: '#/components/schemas/ObjPsStatus'
+        Spec:
+          $ref: '#/components/schemas/CargoSpec'
         Instances:
           type: array
           items:
@@ -6597,6 +6597,7 @@ components:
       required:
       - NamespaceName
       - CreatedAt
+      - Status
       - Spec
       properties:
         NamespaceName:
@@ -6606,6 +6607,8 @@ components:
           type: string
           format: date-time
           description: When the vm was created
+        Status:
+          $ref: '#/components/schemas/ObjPsStatus'
         Spec:
           $ref: '#/components/schemas/VmSpec'
     VmDisk:
@@ -6733,6 +6736,7 @@ components:
       - CreatedAt
       - InstanceTotal
       - InstanceRunning
+      - Status
       - Spec
       - Instances
       properties:
@@ -6751,6 +6755,8 @@ components:
           type: integer
           description: Number of running instances
           minimum: 0
+        Status:
+          $ref: '#/components/schemas/ObjPsStatus'
         Spec:
           $ref: '#/components/schemas/VmSpec'
         Instances:

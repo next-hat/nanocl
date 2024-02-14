@@ -510,13 +510,12 @@ pub async fn stop_instances(
       )
       .await?;
   }
-  let new_status = ObjPsStatusUpdate {
-    wanted: Some(ObjPsStatusKind::Stop.to_string()),
-    prev_wanted: Some(status.wanted),
-    actual: Some(ObjPsStatusKind::Stop.to_string()),
-    prev_actual: Some(status.actual),
-  };
-  ObjPsStatusDb::update_pk(kind_pk, new_status, &state.pool).await?;
+  ObjPsStatusDb::update_actual_status(
+    kind_pk,
+    &ObjPsStatusKind::Stop,
+    &state.pool,
+  )
+  .await?;
   _emit(kind_pk, kind, NativeEventAction::Stop, state).await?;
   Ok(())
 }
@@ -538,7 +537,7 @@ pub async fn start_instances(
   for process in processes {
     let process_state = process.data.state.unwrap_or_default();
     if process_state.running.unwrap_or_default() {
-      return Ok(());
+      continue;
     }
     state
       .docker_api
@@ -548,13 +547,12 @@ pub async fn start_instances(
       )
       .await?;
   }
-  let new_status = ObjPsStatusUpdate {
-    wanted: Some(ObjPsStatusKind::Start.to_string()),
-    prev_wanted: Some(status.wanted),
-    actual: Some(ObjPsStatusKind::Start.to_string()),
-    prev_actual: Some(status.actual),
-  };
-  ObjPsStatusDb::update_pk(kind_key, new_status, &state.pool).await?;
+  ObjPsStatusDb::update_actual_status(
+    kind_key,
+    &ObjPsStatusKind::Start,
+    &state.pool,
+  )
+  .await?;
   _emit(kind_key, kind, NativeEventAction::Start, state).await?;
   Ok(())
 }
@@ -603,7 +601,7 @@ pub async fn create_vm_instance(
   image: &VmImageDb,
   disable_keygen: bool,
   state: &SystemState,
-) -> HttpResult<()> {
+) -> HttpResult<Process> {
   let mut labels: HashMap<String, String> = HashMap::new();
   let img_path = format!("{}/vms/images", state.config.state_dir);
   labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
@@ -667,8 +665,9 @@ pub async fn create_vm_instance(
   }
   let image = match &vm.spec.host_config.runtime {
     Some(runtime) => runtime.to_owned(),
-    None => "ghcr.io/next-hat/nanocl-qemu:8.0.2.0".into(),
+    None => vars::VM_RUNTIME.to_owned(),
   };
+  download_image(&image, vm, state).await?;
   let spec = bollard_next::container::Config {
     image: Some(image),
     tty: Some(true),
@@ -696,11 +695,13 @@ pub async fn create_vm_instance(
     ..Default::default()
   };
   let name = format!("{}.v", &vm.spec.vm_key);
-  create_instance(&ProcessKind::Vm, &name, &vm.spec.vm_key, &spec, state)
-    .await?;
-  Ok(())
+  let process =
+    create_instance(&ProcessKind::Vm, &name, &vm.spec.vm_key, &spec, state)
+      .await?;
+  Ok(process)
 }
 
+/// Create process (container) for a job
 async fn create_job_instance(
   name: &str,
   index: usize,
@@ -717,7 +718,8 @@ async fn create_job_instance(
     .await
 }
 
-pub async fn create_job(
+/// Create processes (container) for a job
+pub async fn create_job_instances(
   job: &Job,
   state: &SystemState,
 ) -> HttpResult<Vec<Process>> {
@@ -732,10 +734,10 @@ pub async fn create_job(
   Ok(processes)
 }
 
-/// Emit a start process event to the system
+/// Emit a starting event to the system for the related process object (job, cargo, vm)
 /// This will update the status of the process and emit a event
-/// So the system can take action for the group of process
-pub async fn emit_start(
+/// So the system start to start the group of processes in the background
+pub async fn emit_starting(
   kind_key: &str,
   kind: &ProcessKind,
   state: &SystemState,
@@ -763,10 +765,10 @@ pub async fn emit_start(
   Ok(())
 }
 
-/// Emit a stop process event to the system
+/// Emit a stopping event to the system for the related process object (job, cargo, vm)
 /// This will update the status of the process and emit a event
-/// So the system can take action for the group of process
-pub async fn emit_stop(
+/// So the system start to stop the group of processes in the background
+pub async fn emit_stopping(
   kind_key: &str,
   kind: &ProcessKind,
   state: &SystemState,

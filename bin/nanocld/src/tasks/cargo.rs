@@ -1,5 +1,5 @@
 use ntex::rt;
-use bollard_next::container::{RemoveContainerOptions, StartContainerOptions};
+use bollard_next::container::RemoveContainerOptions;
 
 use nanocl_error::io::IoError;
 use nanocl_stubs::{
@@ -21,24 +21,17 @@ impl ObjTaskStart for CargoDb {
     let state = state.clone();
     Box::pin(async move {
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
-      let mut processes =
+      let processes =
         ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
       if processes.is_empty() {
-        processes = utils::container::create_cargo(&cargo, 1, &state).await?;
+        utils::container::create_cargo(&cargo, 1, &state).await?;
       }
-      for process in processes {
-        let _ = state
-          .docker_api
-          .start_container(&process.key, None::<StartContainerOptions<String>>)
-          .await;
-      }
-      ObjPsStatusDb::update_actual_status(
-        &key,
-        &ObjPsStatusKind::Start,
-        &state.pool,
+      utils::container::start_instances(
+        &cargo.spec.cargo_key,
+        &ProcessKind::Cargo,
+        &state,
       )
       .await?;
-      state.emit_normal_native_action(&cargo, NativeEventAction::Start);
       Ok::<_, IoError>(())
     })
   }
@@ -144,14 +137,6 @@ impl ObjTaskStop for CargoDb {
     Box::pin(async move {
       utils::container::stop_instances(&key, &ProcessKind::Cargo, &state)
         .await?;
-      ObjPsStatusDb::update_actual_status(
-        &key,
-        &ObjPsStatusKind::Stop,
-        &state.pool,
-      )
-      .await?;
-      let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
-      state.emit_normal_native_action(&cargo, NativeEventAction::Stop);
       Ok::<_, IoError>(())
     })
   }

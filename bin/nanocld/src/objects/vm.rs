@@ -1,21 +1,22 @@
-use bollard_next::container::RemoveContainerOptions;
+use nanocl_error::http::{HttpError, HttpResult};
 
-use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::{
+  system::{
+    NativeEventAction, ObjPsStatus, ObjPsStatusKind, ObjPsStatusPartial,
+  },
   vm::{Vm, VmInspect},
-  process::ProcessKind,
   vm_spec::VmSpecPartial,
-  system::NativeEventAction,
 };
 
 use crate::{
   utils,
   repositories::generic::*,
   models::{
-    VmDb, SystemState, VmObjCreateIn, VmImageDb, SpecDb, VmObjPutIn,
-    VmObjPatchIn, ProcessDb,
+    ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, SpecDb, SystemState, VmDb,
+    VmImageDb, VmObjCreateIn, VmObjPatchIn, VmObjPutIn,
   },
 };
+
 use super::generic::*;
 
 impl ObjCreate for VmDb {
@@ -39,6 +40,9 @@ impl ObjCreate for VmDb {
         "VM with name {name} already exists in namespace {namespace}",
       )));
     }
+    if name.contains('.') {
+      return Err(HttpError::bad_request("VM name cannot contain '.'"));
+    }
     let image = VmImageDb::read_by_pk(&vm.disk.image, &state.pool).await?;
     if image.kind.as_str() != "Base" {
       return Err(HttpError::bad_request(format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image)));
@@ -52,9 +56,30 @@ impl ObjCreate for VmDb {
     // Use the snapshot image
     vm.disk.image = image.name.clone();
     vm.disk.size = Some(size);
-    let vm =
-      VmDb::create_from_spec(namespace, &vm, version, &state.pool).await?;
-    utils::container::create_vm_instance(&vm, &image, true, state).await?;
+    let status = ObjPsStatusPartial {
+      key: vm_key.clone(),
+      wanted: ObjPsStatusKind::Create,
+      prev_wanted: ObjPsStatusKind::Create,
+      actual: ObjPsStatusKind::Create,
+      prev_actual: ObjPsStatusKind::Create,
+    };
+    let status: ObjPsStatus = ObjPsStatusDb::create_from(status, &state.pool)
+      .await?
+      .try_into()?;
+    let new_spec = SpecDb::try_from_vm_partial(&vm_key, version, &vm)?;
+    let spec = SpecDb::create_from(new_spec, &state.pool)
+      .await?
+      .try_to_vm_spec()?;
+    let new_item = VmDb {
+      key: vm_key.to_owned(),
+      name: vm.name.clone(),
+      created_at: chrono::Utc::now().naive_utc(),
+      namespace_name: namespace.clone(),
+      spec_key: spec.key,
+      status_key: vm_key,
+    };
+    let item = VmDb::create_from(new_item, &state.pool).await?;
+    let vm = item.with_spec(&(spec, status));
     Ok(vm)
   }
 }
@@ -73,16 +98,14 @@ impl ObjDelByPk for VmDb {
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
     let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
-    let options = bollard_next::container::RemoveContainerOptions {
-      force: true,
-      ..Default::default()
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
+    let new_status = ObjPsStatusUpdate {
+      wanted: Some(ObjPsStatusKind::Destroy.to_string()),
+      prev_wanted: Some(status.wanted),
+      actual: Some(ObjPsStatusKind::Destroying.to_string()),
+      prev_actual: Some(status.actual),
     };
-    let container_name = format!("{}.v", pk);
-    utils::container::delete_instance(&container_name, Some(options), state)
-      .await?;
-    VmDb::del_by_pk(pk, &state.pool).await?;
-    SpecDb::del_by_kind_key(pk, &state.pool).await?;
-    utils::vm_image::delete_by_pk(&vm.spec.disk.image, state).await?;
+    ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
     Ok(vm)
   }
 }
@@ -97,14 +120,14 @@ impl ObjPutByPk for VmDb {
     state: &SystemState,
   ) -> HttpResult<Self::ObjPutOut> {
     let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
-    let container_name = format!("{}.v", &vm.spec.vm_key);
-    utils::container::stop_instances(pk, &ProcessKind::Vm, state).await?;
-    utils::container::delete_instance(
-      &container_name,
-      None::<RemoveContainerOptions>,
-      state,
-    )
-    .await?;
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
+    let new_status = ObjPsStatusUpdate {
+      wanted: Some(ObjPsStatusKind::Start.to_string()),
+      prev_wanted: Some(status.wanted),
+      actual: Some(ObjPsStatusKind::Updating.to_string()),
+      prev_actual: Some(status.actual),
+    };
+    ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
     let vm = VmDb::update_from_spec(
       &vm.spec.vm_key,
       &obj.spec,
@@ -112,8 +135,6 @@ impl ObjPutByPk for VmDb {
       &state.pool,
     )
     .await?;
-    let image = VmImageDb::read_by_pk(&vm.spec.disk.image, &state.pool).await?;
-    utils::container::create_vm_instance(&vm, &image, false, state).await?;
     Ok(vm)
   }
 }
@@ -189,15 +210,16 @@ impl ObjInspectByPk for VmDb {
     let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
     let processes =
       ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.pool).await?;
-    let (_, _, _, running_instances) =
+    let (total, _, _, running_instances) =
       utils::container::count_status(&processes);
     Ok(VmInspect {
       created_at: vm.created_at,
       namespace_name: vm.namespace_name,
       spec: vm.spec,
-      instance_total: processes.len(),
+      instance_total: total,
       instance_running: running_instances,
       instances: processes,
+      status: vm.status,
     })
   }
 }

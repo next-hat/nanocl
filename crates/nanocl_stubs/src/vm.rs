@@ -3,8 +3,8 @@ use serde::{Serialize, Deserialize};
 
 use crate::{
   process::Process,
+  system::{EventActor, EventActorKind, ObjPsStatus},
   vm_spec::{VmSpec, VmSpecPartial},
-  system::{EventActor, EventActorKind},
 };
 
 /// A virtual machine instance
@@ -19,6 +19,8 @@ pub struct Vm {
   pub namespace_name: String,
   /// When the vm was created
   pub created_at: chrono::NaiveDateTime,
+  /// Status of the vm
+  pub status: ObjPsStatus,
   /// Specification of the vm
   pub spec: VmSpec,
 }
@@ -84,6 +86,8 @@ pub struct VmInspect {
   pub instance_total: usize,
   /// Number of running instances
   pub instance_running: usize,
+  /// Status of the vm
+  pub status: ObjPsStatus,
   /// Specification of the vm
   pub spec: VmSpec,
   /// List of instances

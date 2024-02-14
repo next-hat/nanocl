@@ -34,10 +34,10 @@ pub struct Cargo {
   pub namespace_name: String,
   /// When the cargo was created
   pub created_at: chrono::NaiveDateTime,
-  /// Specification of the cargo
-  pub spec: CargoSpec,
   /// Status of the cargo
   pub status: ObjPsStatus,
+  /// Specification of the cargo
+  pub spec: CargoSpec,
 }
 
 impl From<Cargo> for CargoSpecPartial {
@@ -99,10 +99,10 @@ pub struct CargoInspect {
   pub instance_total: usize,
   /// Number of running instances
   pub instance_running: usize,
-  /// Specification of the cargo
-  pub spec: CargoSpec,
   /// Status of the cargo
   pub status: ObjPsStatus,
+  /// Specification of the cargo
+  pub spec: CargoSpec,
   /// List of instances
   pub instances: Vec<Process>,
 }

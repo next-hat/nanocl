@@ -8,7 +8,7 @@ use nanocl_stubs::system::{
 };
 
 use crate::{
-  models::{CargoDb, JobDb, ObjPsStatusDb, ProcessDb, SystemState},
+  models::{CargoDb, JobDb, ObjPsStatusDb, ProcessDb, SystemState, VmDb},
   objects::generic::*,
   repositories::generic::*,
   tasks::generic::*,
@@ -24,6 +24,13 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
   };
   log::debug!("event::job_ttl: {job_id}");
   let job = JobDb::transform_read_by_pk(job_id, &state.pool).await?;
+  match job.status.actual {
+    ObjPsStatusKind::Finish | ObjPsStatusKind::Fail => {
+      log::debug!("event::job_ttl: {job_id} is already done");
+      return Ok(());
+    }
+    _ => {}
+  }
   let instances = ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
   let (_, instance_failed, _, running) =
     utils::container::count_status(&instances);
@@ -78,7 +85,10 @@ async fn start(
       let task = CargoDb::create_start_task(key, state);
       Some(task)
     }
-    EventActorKind::Vm => None,
+    EventActorKind::Vm => {
+      let task = VmDb::create_start_task(key, state);
+      Some(task)
+    }
     _ => None,
   };
   Ok(task)
@@ -98,7 +108,10 @@ async fn delete(
       let task = CargoDb::create_delete_task(key, state);
       Some(task)
     }
-    EventActorKind::Vm => None,
+    EventActorKind::Vm => {
+      let task = VmDb::create_delete_task(key, state);
+      Some(task)
+    }
     EventActorKind::Job => {
       let task = JobDb::create_delete_task(key, state);
       Some(task)
@@ -118,6 +131,10 @@ async fn update(
       let task = CargoDb::create_update_task(key, state);
       Some(task)
     }
+    EventActorKind::Vm => {
+      let task = VmDb::create_update_task(key, state);
+      Some(task)
+    }
     _ => None,
   };
   Ok(task)
@@ -131,6 +148,14 @@ async fn stop(
   let task = match actor.kind {
     EventActorKind::Cargo => {
       let task = CargoDb::create_stop_task(key, state);
+      Some(task)
+    }
+    EventActorKind::Vm => {
+      let task = VmDb::create_stop_task(key, state);
+      Some(task)
+    }
+    EventActorKind::Job => {
+      let task = JobDb::create_stop_task(key, state);
       Some(task)
     }
     _ => None,

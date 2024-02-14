@@ -1,4 +1,6 @@
 use diesel::prelude::*;
+
+use nanocl_error::io::IoError;
 use nanocl_stubs::system::{ObjPsStatusPartial, ObjPsStatus};
 
 use crate::schema::object_process_statuses;
@@ -17,7 +19,7 @@ pub struct ObjPsStatusDb {
 }
 
 impl TryFrom<ObjPsStatusDb> for ObjPsStatus {
-  type Error = std::io::Error;
+  type Error = IoError;
 
   fn try_from(value: ObjPsStatusDb) -> Result<Self, Self::Error> {
     Ok(Self {

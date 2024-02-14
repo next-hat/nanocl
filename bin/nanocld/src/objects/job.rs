@@ -7,7 +7,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{JobDb, ProcessDb, ObjPsStatusDb},
+  models::{JobDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb},
 };
 
 use super::generic::*;
@@ -53,6 +53,14 @@ impl ObjDelByPk for JobDb {
     state: &crate::models::SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
     let job = JobDb::transform_read_by_pk(pk, &state.pool).await?;
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
+    let new_status = ObjPsStatusUpdate {
+      wanted: Some(ObjPsStatusKind::Destroy.to_string()),
+      prev_wanted: Some(status.wanted),
+      actual: Some(ObjPsStatusKind::Destroying.to_string()),
+      prev_actual: Some(status.actual),
+    };
+    ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
     Ok(job)
   }
 }

@@ -1,7 +1,9 @@
 use futures_util::StreamExt;
 
 use bollard_next::container::{StartContainerOptions, WaitContainerOptions};
+
 use nanocl_error::{io::IoError, http::HttpError};
+
 use nanocl_stubs::{
   process::ProcessKind,
   system::{NativeEventAction, ObjPsStatusKind},
@@ -24,7 +26,8 @@ impl ObjTaskStart for JobDb {
       let mut processes =
         ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
       if processes.is_empty() {
-        processes = utils::container::create_job(&job, &state).await?;
+        processes =
+          utils::container::create_job_instances(&job, &state).await?;
       }
       ObjPsStatusDb::update_actual_status(
         &key,
@@ -88,14 +91,6 @@ impl ObjTaskStop for JobDb {
     let state = state.clone();
     Box::pin(async move {
       utils::container::stop_instances(&key, &ProcessKind::Job, &state).await?;
-      ObjPsStatusDb::update_actual_status(
-        &key,
-        &ObjPsStatusKind::Stop,
-        &state.pool,
-      )
-      .await?;
-      let job = JobDb::transform_read_by_pk(&key, &state.pool).await?;
-      state.emit_normal_native_action(&job, NativeEventAction::Stop);
       Ok::<_, IoError>(())
     })
   }

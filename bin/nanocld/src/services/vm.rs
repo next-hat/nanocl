@@ -383,6 +383,7 @@ mod tests {
     assert!(vms.iter().any(|i| i.spec.name == name));
     let res = client.delete(&format!("/vms/{name}")).send().await.unwrap();
     test_status_code!(res.status(), http::StatusCode::OK, "delete vm");
+    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
     system.state.wait_event_loop().await;
   }
 }
