@@ -142,9 +142,7 @@ async fn _emit(
         &state.pool,
       )
       .await?;
-      let job = JobDb::read_by_pk(kind_key, &state.pool)
-        .await?
-        .try_to_spec()?;
+      let job = JobDb::transform_read_by_pk(kind_key, &state.pool).await?;
       state.emit_normal_native_action(&job, action);
     }
   }
@@ -156,7 +154,7 @@ pub async fn create_instance(
   kind: &ProcessKind,
   name: &str,
   kind_key: &str,
-  item: Config,
+  item: &Config,
   state: &SystemState,
 ) -> HttpResult<Process> {
   let mut config = item.clone();
@@ -235,7 +233,7 @@ async fn execute_cargo_before(
         &ProcessKind::Cargo,
         &name,
         &cargo.spec.cargo_key,
-        before,
+        &before,
         state,
       )
       .await?;
@@ -385,7 +383,7 @@ pub async fn create_cargo(
           &ProcessKind::Cargo,
           &name,
           &cargo.spec.cargo_key,
-          new_process,
+          &new_process,
           state,
         ).await
       }
@@ -698,25 +696,24 @@ pub async fn create_vm_instance(
     ..Default::default()
   };
   let name = format!("{}.v", &vm.spec.vm_key);
-  create_instance(&ProcessKind::Vm, &name, &vm.spec.vm_key, spec, state)
+  create_instance(&ProcessKind::Vm, &name, &vm.spec.vm_key, &spec, state)
     .await?;
   Ok(())
 }
 
-pub async fn create_job_instance(
+async fn create_job_instance(
   name: &str,
+  index: usize,
   container: &Config,
   state: &SystemState,
 ) -> HttpResult<Process> {
   let mut container = container.clone();
   let mut labels = container.labels.clone().unwrap_or_default();
   labels.insert("io.nanocl.j".to_owned(), name.to_owned());
-  labels.insert("io.nanocl".to_owned(), "enabled".to_owned());
-  labels.insert("io.nanocl.kind".to_owned(), "job".to_owned());
   container.labels = Some(labels);
   let short_id = super::key::generate_short_id(6);
-  let container_name = format!("{name}-{short_id}.j");
-  create_instance(&ProcessKind::Job, &container_name, name, container, state)
+  let container_name = format!("{name}-{index}-{short_id}.j");
+  create_instance(&ProcessKind::Job, &container_name, name, &container, state)
     .await
 }
 
@@ -725,10 +722,11 @@ pub async fn create_job(
   state: &SystemState,
 ) -> HttpResult<Vec<Process>> {
   let mut processes = Vec::new();
-  for container in &job.containers {
+  for (index, container) in job.containers.iter().enumerate() {
     download_image(&container.image.clone().unwrap_or_default(), job, state)
       .await?;
-    let process = create_job_instance(&job.name, container, state).await?;
+    let process =
+      create_job_instance(&job.name, index, container, state).await?;
     processes.push(process);
   }
   Ok(processes)
@@ -744,17 +742,22 @@ pub async fn emit_start(
 ) -> HttpResult<()> {
   log::debug!("starting {kind:?} {kind_key}");
   let current_status = ObjPsStatusDb::read_by_pk(kind_key, &state.pool).await?;
-  if current_status.actual == ObjPsStatusKind::Start.to_string() {
+  let wanted = if ProcessKind::Job == *kind {
+    ObjPsStatusKind::Finish
+  } else {
+    ObjPsStatusKind::Start
+  }
+  .to_string();
+  if ProcessKind::Cargo == *kind && current_status.actual == wanted {
     log::debug!("{kind:?} {kind_key} already running",);
     return Ok(());
   }
   let status_update = ObjPsStatusUpdate {
-    wanted: Some(ObjPsStatusKind::Start.to_string()),
+    wanted: Some(wanted),
     prev_wanted: Some(current_status.wanted),
     actual: Some(ObjPsStatusKind::Starting.to_string()),
     prev_actual: Some(current_status.actual),
   };
-  log::debug!("update status {kind:?} {kind_key}");
   ObjPsStatusDb::update_pk(kind_key, status_update, &state.pool).await?;
   _emit(kind_key, kind, NativeEventAction::Starting, state).await?;
   Ok(())
@@ -780,7 +783,6 @@ pub async fn emit_stop(
     actual: Some(ObjPsStatusKind::Stopping.to_string()),
     prev_actual: Some(current_status.actual),
   };
-  log::debug!("update status {kind:?} {kind_key}");
   ObjPsStatusDb::update_pk(kind_key, status_update, &state.pool).await?;
   _emit(kind_key, kind, NativeEventAction::Stopping, state).await?;
   Ok(())

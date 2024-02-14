@@ -3,14 +3,16 @@ use std::str::FromStr;
 use ntex::rt;
 
 use nanocl_error::io::IoResult;
-use nanocl_stubs::system::{Event, EventActor, EventActorKind, NativeEventAction};
+use nanocl_stubs::system::{
+  Event, EventActor, EventActorKind, NativeEventAction, ObjPsStatusKind,
+};
 
 use crate::{
-  utils,
-  tasks::generic::*,
+  models::{CargoDb, JobDb, ObjPsStatusDb, ProcessDb, SystemState},
   objects::generic::*,
   repositories::generic::*,
-  models::{SystemState, JobDb, ProcessDb, CargoDb},
+  tasks::generic::*,
+  utils,
 };
 
 /// Remove a job after when finished and ttl is set
@@ -21,9 +23,7 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
     Some(job_id) => job_id.as_str().unwrap_or_default(),
   };
   log::debug!("event::job_ttl: {job_id}");
-  let job = JobDb::read_by_pk(job_id, &state.pool)
-    .await?
-    .try_to_spec()?;
+  let job = JobDb::transform_read_by_pk(job_id, &state.pool).await?;
   let instances = ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
   let (_, instance_failed, _, running) =
     utils::container::count_status(&instances);
@@ -35,9 +35,22 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
     return Ok(());
   }
   if instance_failed > 0 {
+    ObjPsStatusDb::update_actual_status(
+      &job.name,
+      &ObjPsStatusKind::Fail,
+      &state.pool,
+    )
+    .await?;
     state.emit_normal_native_action(&job, NativeEventAction::Fail);
+  } else {
+    ObjPsStatusDb::update_actual_status(
+      &job.name,
+      &ObjPsStatusKind::Finish,
+      &state.pool,
+    )
+    .await?;
+    state.emit_normal_native_action(&job, NativeEventAction::Finish);
   }
-  state.emit_normal_native_action(&job, NativeEventAction::Finish);
   let ttl = match job.ttl {
     None => return Ok(()),
     Some(ttl) => ttl,

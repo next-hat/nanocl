@@ -308,7 +308,6 @@ fn parse_build_args(
       }
       "Boolean" => {
         let value = matches.get_flag(&name);
-        println!("Boolean {value}");
         args.insert(name, Value::Bool(value));
       }
       "Number" => {
@@ -497,7 +496,6 @@ async fn exec_state_apply(
   let obj_hashmap = gen_obj_hashmap(&state_file);
   let obj_hashmap = Arc::new(Mutex::new(obj_hashmap));
   let obj_hashmap_ptr = obj_hashmap.clone();
-  println!("Executing event in background future");
   let fut = ntex::rt::spawn(async move {
     let mut ev_stream = client_ptr.watch_events().await?;
     while let Some(ev) = ev_stream.next().await {
@@ -508,7 +506,6 @@ async fn exec_state_apply(
         }
         Ok(ev) => ev,
       };
-      println!("receving event {ev:#?}");
       let Some(actor) = ev.actor else {
         continue;
       };
@@ -804,7 +801,6 @@ async fn exec_state_remove(
     }
   }
   if !obj_hashmap.lock().unwrap().clone().values().all(|v| *v) {
-    println!("waiting event future");
     fut.await??;
   }
   Ok(())

@@ -28,10 +28,10 @@ impl ObjCreate for JobDb {
       actual: ObjPsStatusKind::Create,
       prev_actual: ObjPsStatusKind::Create,
     };
-    ObjPsStatusDb::create_from(status, &state.pool).await?;
+    let status = ObjPsStatusDb::create_from(status, &state.pool).await?;
     let job = JobDb::create_from(db_model, &state.pool)
       .await?
-      .to_spec(obj);
+      .try_to_spec(&status)?;
     if let Some(schedule) = &job.schedule {
       utils::cron::add_cron_rule(&job, schedule, state).await?;
     }
@@ -52,7 +52,7 @@ impl ObjDelByPk for JobDb {
     _opts: &Self::ObjDelOpts,
     state: &crate::models::SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let job = JobDb::read_by_pk(pk, &state.pool).await?.try_to_spec()?;
+    let job = JobDb::transform_read_by_pk(pk, &state.pool).await?;
     Ok(job)
   }
 }
@@ -64,7 +64,7 @@ impl ObjInspectByPk for JobDb {
     pk: &str,
     state: &crate::models::SystemState,
   ) -> HttpResult<Self::ObjInspectOut> {
-    let job = JobDb::read_by_pk(pk, &state.pool).await?.try_to_spec()?;
+    let job = JobDb::transform_read_by_pk(pk, &state.pool).await?;
     let instances = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
     let (instance_total, instance_failed, instance_success, instance_running) =
       utils::container::count_status(&instances);

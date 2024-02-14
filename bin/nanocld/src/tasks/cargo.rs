@@ -10,7 +10,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{CargoDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, SystemState},
+  models::{CargoDb, ObjPsStatusDb, ProcessDb, SystemState},
 };
 
 use super::generic::*;
@@ -32,16 +32,12 @@ impl ObjTaskStart for CargoDb {
           .start_container(&process.key, None::<StartContainerOptions<String>>)
           .await;
       }
-      let cur_status =
-        ObjPsStatusDb::read_by_pk(&cargo.spec.cargo_key, &state.pool).await?;
-      let new_status = ObjPsStatusUpdate {
-        wanted: Some(ObjPsStatusKind::Start.to_string()),
-        prev_wanted: Some(cur_status.wanted),
-        actual: Some(ObjPsStatusKind::Start.to_string()),
-        prev_actual: Some(cur_status.actual),
-      };
-      ObjPsStatusDb::update_pk(&cargo.spec.cargo_key, new_status, &state.pool)
-        .await?;
+      ObjPsStatusDb::update_actual_status(
+        &key,
+        &ObjPsStatusKind::Start,
+        &state.pool,
+      )
+      .await?;
       state.emit_normal_native_action(&cargo, NativeEventAction::Start);
       Ok::<_, IoError>(())
     })
@@ -118,13 +114,23 @@ impl ObjTaskUpdate for CargoDb {
         }
         Ok(_) => {
           // Delete old containers
-          utils::container::delete_instances(
-            &processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>(),
-            &state,
-          )
-          .await?;
+          let state_ptr_ptr = state.clone();
+          rt::spawn(async move {
+            ntex::time::sleep(std::time::Duration::from_secs(2)).await;
+            let _ = utils::container::delete_instances(
+              &processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>(),
+              &state_ptr_ptr,
+            )
+            .await;
+          });
         }
       }
+      ObjPsStatusDb::update_actual_status(
+        &key,
+        &ObjPsStatusKind::Start,
+        &state.pool,
+      )
+      .await?;
       state.emit_normal_native_action(&cargo, NativeEventAction::Start);
       Ok::<_, IoError>(())
     })
@@ -138,14 +144,12 @@ impl ObjTaskStop for CargoDb {
     Box::pin(async move {
       utils::container::stop_instances(&key, &ProcessKind::Cargo, &state)
         .await?;
-      let curr_status = ObjPsStatusDb::read_by_pk(&key, &state.pool).await?;
-      let new_status = ObjPsStatusUpdate {
-        wanted: Some(ObjPsStatusKind::Stop.to_string()),
-        prev_wanted: Some(curr_status.wanted),
-        actual: Some(ObjPsStatusKind::Stop.to_string()),
-        prev_actual: Some(curr_status.actual),
-      };
-      ObjPsStatusDb::update_pk(&key, new_status, &state.pool).await?;
+      ObjPsStatusDb::update_actual_status(
+        &key,
+        &ObjPsStatusKind::Stop,
+        &state.pool,
+      )
+      .await?;
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
       state.emit_normal_native_action(&cargo, NativeEventAction::Stop);
       Ok::<_, IoError>(())

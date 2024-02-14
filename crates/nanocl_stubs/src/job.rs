@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 use bollard_next::container::Config;
 
 use crate::process::Process;
-use crate::system::{EventActorKind, EventActor};
+use crate::system::{EventActor, EventActorKind, ObjPsStatus};
 
 /// Job partial is used to create a new job
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -73,6 +73,8 @@ pub struct Job {
   pub created_at: chrono::NaiveDateTime,
   /// When the job have been updated
   pub updated_at: chrono::NaiveDateTime,
+  /// Status of the job
+  pub status: ObjPsStatus,
   /// Secrets to load as environment variables
   #[cfg_attr(
     feature = "serde",

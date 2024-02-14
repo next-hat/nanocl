@@ -51,6 +51,7 @@ pub enum ObjPsStatusKind {
   Stopping,
   Stop,
   Fail,
+  Finish,
   Unknown,
 }
 
@@ -69,6 +70,7 @@ impl FromStr for ObjPsStatusKind {
       "stopping" => Ok(Self::Stopping),
       "stop" => Ok(Self::Stop),
       "fail" => Ok(Self::Fail),
+      "finish" => Ok(Self::Finish),
       _ => Ok(Self::Unknown),
     }
   }
@@ -87,13 +89,14 @@ impl ToString for ObjPsStatusKind {
       Self::Stopping => "stopping",
       Self::Stop => "stop",
       Self::Fail => "fail",
+      Self::Finish => "finish",
       Self::Unknown => "<unknown>",
     }
     .to_owned()
   }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

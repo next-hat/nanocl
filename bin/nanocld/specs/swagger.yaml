@@ -3871,6 +3871,7 @@ components:
       - Name
       - CreatedAt
       - UpdatedAt
+      - Status
       - Containers
       properties:
         Name:
@@ -3884,6 +3885,8 @@ components:
           type: string
           format: date-time
           description: When the job have been updated
+        Status:
+          $ref: '#/components/schemas/ObjPsStatus'
         Secrets:
           type: array
           items:
