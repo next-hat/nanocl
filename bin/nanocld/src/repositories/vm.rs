@@ -147,9 +147,10 @@ impl VmDb {
     Ok(vm_summaries)
   }
 
-  pub async fn clear(pk: &str, pool: &Pool) -> IoResult<()> {
+  pub async fn clear_by_pk(pk: &str, pool: &Pool) -> IoResult<()> {
     VmDb::del_by_pk(pk, pool).await?;
     SpecDb::del_by_kind_key(pk, pool).await?;
+    ObjPsStatusDb::del_by_pk(pk, pool).await?;
     Ok(())
   }
 }

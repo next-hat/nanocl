@@ -60,7 +60,7 @@ impl ObjTaskDelete for VmDb {
       )
       .await?;
       utils::vm_image::delete_by_pk(&vm.spec.disk.image, &state).await?;
-      VmDb::clear(&vm.spec.vm_key, &state.pool).await?;
+      VmDb::clear_by_pk(&vm.spec.vm_key, &state.pool).await?;
       state.emit_normal_native_action(&vm, NativeEventAction::Destroy);
       Ok::<_, IoError>(())
     })

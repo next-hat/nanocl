@@ -77,7 +77,7 @@ impl RepositoryReadByTransform for JobDb {
 }
 
 impl JobDb {
-  pub async fn clear(pk: &str, pool: &Pool) -> IoResult<()> {
+  pub async fn clear_by_pk(pk: &str, pool: &Pool) -> IoResult<()> {
     JobDb::del_by_pk(pk, pool).await?;
     ObjPsStatusDb::del_by_pk(pk, pool).await?;
     Ok(())

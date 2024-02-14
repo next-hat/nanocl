@@ -75,7 +75,7 @@ impl ObjTaskDelete for JobDb {
         &state,
       )
       .await?;
-      JobDb::clear(&job.name, &state.pool).await?;
+      JobDb::clear_by_pk(&job.name, &state.pool).await?;
       if job.schedule.is_some() {
         utils::cron::remove_cron_rule(&job, &state).await?;
       }
