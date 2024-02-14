@@ -338,7 +338,8 @@ mod tests {
 
   #[ntex::test]
   async fn basic_list() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let mut res = client.send_get("/processes", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let _ = res.json::<Vec<Process>>().await.unwrap();
@@ -346,7 +347,8 @@ mod tests {
 
   #[ntex::test]
   async fn list_by() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     // Filter by namespace
     let filter = GenericFilter::new().r#where(
       "data",

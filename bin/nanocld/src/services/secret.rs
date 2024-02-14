@@ -228,7 +228,8 @@ mod test_secret {
 
   #[ntex::test]
   async fn basic() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     test_fail_create(&client).await;
     test_create(&client).await;
     test_inspect_by_id(&client).await;

@@ -102,7 +102,8 @@ mod tests {
   #[ntex::test]
   async fn exec() {
     const CARGO_NAME: &str = "nstore";
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let mut res = client
       .send_post(
         &format!("/cargoes/{CARGO_NAME}/exec"),

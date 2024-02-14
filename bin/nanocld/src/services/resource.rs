@@ -222,7 +222,8 @@ mod tests {
     const TEST_RESOURCE: &str = "test_resource";
     const TEST_RESOURCE_KIND: &str = "test.io/test-resource";
     const TEST_RESOURCE_KIND_VERSION: &str = "v1";
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let spec = serde_json::json!({
       "Schema": {
         "title": "VpnUser",

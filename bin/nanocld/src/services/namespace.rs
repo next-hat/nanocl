@@ -171,11 +171,13 @@ mod test_namespace {
 
   #[ntex::test]
   async fn basic() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     test_fail_create(&client).await;
     create(&client).await;
     inspect_by_id(&client).await;
     list(&client).await;
     delete(&client).await;
+    system.state.wait_event_loop().await;
   }
 }

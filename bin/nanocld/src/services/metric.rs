@@ -79,7 +79,8 @@ mod tests {
 
   #[ntex::test]
   async fn basic() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let res = client
       .send_post(
         ENDPOINT,

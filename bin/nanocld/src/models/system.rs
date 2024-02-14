@@ -37,13 +37,6 @@ pub struct SystemState {
   arbiter: Arbiter,
 }
 
-// impl Drop for SystemState {
-//   fn drop(&mut self) {
-//     log::info!("system::drop: stopping the system");
-//     let _ = self.arbiter.join();
-//   }
-// }
-
 impl SystemState {
   /// Create a new instance of the system state
   /// It will create the database connection pool and the docker client
@@ -134,5 +127,11 @@ impl SystemState {
       actor: Some(actor),
     };
     self.spawn_emit_event(event);
+  }
+
+  /// Wait for the event loop to finish
+  pub async fn wait_event_loop(&self) {
+    self.event_emitter.clone().flush().await.unwrap();
+    self.arbiter.clone().join().unwrap();
   }
 }
