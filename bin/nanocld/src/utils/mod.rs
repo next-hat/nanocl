@@ -2,14 +2,11 @@ pub mod ws;
 pub mod key;
 pub mod stream;
 
-pub mod node;
 pub mod store;
 pub mod system;
-pub mod namespace;
 pub mod vm_image;
 pub mod cron;
 pub mod exec;
-pub mod resource;
 pub mod ctrl_client;
 pub mod server;
 pub mod container;
@@ -19,8 +16,8 @@ pub mod tests {
   use std::env;
   use ntex::web::{*, self};
 
-  use crate::{services, vars::VERSION, models::SystemState};
   use nanocl_stubs::config::DaemonConfig;
+  use crate::{services, vars::VERSION, models::SystemState};
 
   pub use nanocl_utils::ntex::test_client::*;
 

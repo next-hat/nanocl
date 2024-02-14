@@ -1,12 +1,14 @@
-use bollard_next::service::ExecInspectResponse;
 use ntex::web;
 
-use bollard_next::container::LogOutput;
-use bollard_next::exec::{StartExecOptions, StartExecResults, CreateExecResults};
+use bollard_next::service::ExecInspectResponse;
+
+use bollard_next::{
+  container::LogOutput,
+  exec::{StartExecOptions, StartExecResults, CreateExecResults},
+};
 
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::cargo::CreateExecOptions;
-use nanocl_stubs::process::OutputLog;
+use nanocl_stubs::{cargo::CreateExecOptions, process::OutputLog};
 
 use crate::models::SystemState;
 

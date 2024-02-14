@@ -7,7 +7,10 @@ use notify::{Config, Watcher, RecursiveMode, RecommendedWatcher};
 use nanocl_error::io::{FromIo, IoResult, IoError};
 use nanocl_stubs::config::DaemonConfig;
 
-use crate::{utils, models::SystemState};
+use crate::{
+  models::{NodeDb, SystemState},
+  utils,
+};
 
 /// Create a new thread and watch for change in the run directory
 /// and set the permission of the unix socket
@@ -119,7 +122,7 @@ pub async fn init(conf: &DaemonConfig) -> IoResult<SystemState> {
   ensure_state_dir(&conf.state_dir).await?;
   let system_state = SystemState::new(conf).await?;
   let system_ptr = system_state.clone();
-  utils::node::register(&system_ptr).await?;
+  NodeDb::register(&system_ptr).await?;
   utils::system::register_namespace("global", true, &system_ptr).await?;
   utils::system::register_namespace("system", false, &system_ptr).await?;
   rt::spawn(async move {

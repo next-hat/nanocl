@@ -8,7 +8,6 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
   objects::generic::*,
   models::{SystemState, NamespaceDb},
 };
@@ -32,7 +31,7 @@ pub async fn list_namespace(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
-  let items = utils::namespace::list(&filter, &state).await?;
+  let items = NamespaceDb::list(&filter, &state).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 

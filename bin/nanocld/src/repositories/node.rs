@@ -6,7 +6,7 @@ use nanocl_stubs::generic::GenericFilter;
 
 use crate::{
   gen_multiple, gen_where4string,
-  models::{Pool, NodeDb},
+  models::{NodeDb, Pool, SystemState},
   schema::nodes,
 };
 
@@ -54,5 +54,15 @@ impl NodeDb {
       Err(_) => NodeDb::create_from(node.clone(), pool).await,
       Ok(node) => Ok(node),
     }
+  }
+
+  pub async fn register(state: &SystemState) -> IoResult<()> {
+    let node = NodeDb {
+      name: state.config.hostname.clone(),
+      ip_address: state.config.gateway.clone(),
+      created_at: chrono::Utc::now().naive_utc(),
+    };
+    NodeDb::create_if_not_exists(&node, &state.pool).await?;
+    Ok(())
   }
 }
