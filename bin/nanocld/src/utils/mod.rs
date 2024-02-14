@@ -7,7 +7,7 @@ pub mod store;
 pub mod system;
 pub mod namespace;
 pub mod vm_image;
-pub mod job;
+pub mod cron;
 pub mod exec;
 pub mod resource;
 pub mod ctrl_client;

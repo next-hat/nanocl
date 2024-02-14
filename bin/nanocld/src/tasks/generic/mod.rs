@@ -1,10 +1,10 @@
 use std::pin::Pin;
 
 use futures_util::Future;
-use nanocl_error::io::{IoError, IoResult};
-use nanocl_stubs::system::NativeEventAction;
 
-use crate::models::{ObjTask, SystemState};
+use nanocl_error::io::IoError;
+
+use crate::models::SystemState;
 
 pub type ObjTaskFuture = Pin<Box<dyn Future<Output = Result<(), IoError>>>>;
 

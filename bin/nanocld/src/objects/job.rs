@@ -33,7 +33,7 @@ impl ObjCreate for JobDb {
       .await?
       .to_spec(obj);
     if let Some(schedule) = &job.schedule {
-      utils::job::add_cron_rule(&job, schedule, state).await?;
+      utils::cron::add_cron_rule(&job, schedule, state).await?;
     }
     Ok(job)
   }

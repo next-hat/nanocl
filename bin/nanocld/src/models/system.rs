@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ntex::rt;
+use ntex::rt::{self, Arbiter};
 use futures::channel::mpsc;
 use futures_util::{SinkExt, StreamExt};
 
@@ -33,7 +33,16 @@ pub struct SystemState {
   event_emitter: mpsc::UnboundedSender<Event>,
   /// Http event client
   event_emitter_raw: RawEventEmitter,
+  /// task event loop
+  arbiter: Arbiter,
 }
+
+// impl Drop for SystemState {
+//   fn drop(&mut self) {
+//     log::info!("system::drop: stopping the system");
+//     let _ = self.arbiter.join();
+//   }
+// }
 
 impl SystemState {
   /// Create a new instance of the system state
@@ -56,13 +65,14 @@ impl SystemState {
       event_emitter_raw: RawEventEmitter::new(),
       task_manager: TaskManager::new(),
       version: vars::VERSION.to_owned(),
+      arbiter: Arbiter::new(),
     };
     system_state.clone().run(rx);
     Ok(system_state)
   }
 
   fn run(self, mut rx: mpsc::UnboundedReceiver<Event>) {
-    rt::Arbiter::new().exec_fn(move || {
+    self.arbiter.clone().exec_fn(move || {
       rt::spawn(async move {
         while let Some(e) = rx.next().await {
           if let Err(err) = self.event_emitter_raw.emit(&e).await {

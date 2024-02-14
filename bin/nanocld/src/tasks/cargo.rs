@@ -1,8 +1,7 @@
-use futures_util::Future;
 use ntex::rt;
 use bollard_next::container::{RemoveContainerOptions, StartContainerOptions};
 
-use nanocl_error::io::{IoError, IoResult};
+use nanocl_error::io::IoError;
 use nanocl_stubs::{
   process::ProcessKind,
   system::{NativeEventAction, ObjPsStatusKind},
@@ -11,9 +10,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{
-    CargoDb, ObjPsStatusDb, ObjPsStatusUpdate, ObjTask, ProcessDb, SystemState,
-  },
+  models::{CargoDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, SystemState},
 };
 
 use super::generic::*;

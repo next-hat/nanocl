@@ -1,23 +1,16 @@
-use futures_util::{Future, StreamExt};
+use futures_util::StreamExt;
 
-use bollard_next::container::{
-  RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
-};
-use nanocl_error::{
-  io::{IoError, IoResult},
-  http::HttpError,
-};
+use bollard_next::container::{StartContainerOptions, WaitContainerOptions};
+use nanocl_error::{io::IoError, http::HttpError};
 use nanocl_stubs::{
   process::ProcessKind,
   system::{NativeEventAction, ObjPsStatusKind},
 };
 
 use crate::{
-  models::{
-    JobDb, ObjPsStatusDb, ObjPsStatusUpdate, ObjTask, ProcessDb, SystemState,
-  },
-  repositories::generic::*,
   utils,
+  repositories::generic::*,
+  models::{JobDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb, SystemState},
 };
 
 use super::generic::*;
@@ -68,21 +61,17 @@ impl ObjTaskDelete for JobDb {
         .try_to_spec()?;
       let processes =
         ProcessDb::read_by_kind_key(&key, &state_ptr.pool).await?;
-      for process in processes {
-        let _ = state_ptr
-          .docker_api
-          .remove_container(
-            &process.key,
-            Some(RemoveContainerOptions {
-              force: true,
-              ..Default::default()
-            }),
-          )
-          .await;
-      }
+      utils::container::delete_instances(
+        &processes
+          .into_iter()
+          .map(|p| p.key)
+          .collect::<Vec<String>>(),
+        &state_ptr,
+      )
+      .await?;
       JobDb::clear(&job.name, &state_ptr.pool).await?;
       if job.schedule.is_some() {
-        utils::job::remove_cron_rule(&job, &state_ptr).await?;
+        utils::cron::remove_cron_rule(&job, &state_ptr).await?;
       }
       state_ptr.emit_normal_native_action(&job, NativeEventAction::Destroy);
       Ok::<_, IoError>(())

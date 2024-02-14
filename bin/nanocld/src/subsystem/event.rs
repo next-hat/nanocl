@@ -10,7 +10,7 @@ use crate::{
   tasks::generic::*,
   objects::generic::*,
   repositories::generic::*,
-  models::{SystemState, JobDb, ProcessDb, CargoDb, ObjTask},
+  models::{SystemState, JobDb, ProcessDb, CargoDb},
 };
 
 /// Remove a job after when finished and ttl is set
@@ -147,20 +147,15 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   state.task_manager.wait_task(&task_key).await;
   let action = NativeEventAction::from_str(e.action.as_str())?;
   let task: Option<ObjTaskFuture> = match action {
-    NativeEventAction::Create => None,
     NativeEventAction::Starting => start(&key, actor, state).await?,
     NativeEventAction::Stopping => stop(&key, actor, state).await?,
     NativeEventAction::Updating => update(&key, actor, state).await?,
     NativeEventAction::Destroying => delete(&key, actor, state).await?,
-    NativeEventAction::Destroy => None,
-    NativeEventAction::Fail => None,
-    NativeEventAction::Finish => None,
-    NativeEventAction::Start => None,
-    NativeEventAction::Stop => None,
-    _ => {
+    NativeEventAction::Die => {
       job_ttl(actor, state).await?;
       None
     }
+    _ => None,
   };
   let Some(task) = task else { return Ok(()) };
   // push the task into the task manager

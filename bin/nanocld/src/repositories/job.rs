@@ -1,15 +1,22 @@
 use diesel::prelude::*;
 
-use nanocl_error::io::IoResult;
+use futures_util::StreamExt;
+use futures_util::stream::FuturesUnordered;
+
+use nanocl_error::{
+  http::{HttpError, HttpResult},
+  io::IoResult,
+};
 use nanocl_stubs::{
   generic::GenericFilter,
-  job::{Job, JobPartial},
+  job::{Job, JobPartial, JobSummary},
 };
 
 use crate::{
-  gen_multiple, gen_where4json, gen_where4string,
-  models::{JobDb, JobUpdateDb, Pool, ObjPsStatusDb},
+  utils,
   schema::jobs,
+  gen_multiple, gen_where4json, gen_where4string,
+  models::{JobDb, JobUpdateDb, ObjPsStatusDb, Pool, ProcessDb, SystemState},
 };
 
 use super::generic::*;
@@ -101,5 +108,36 @@ impl JobDb {
       ttl: p.ttl,
       containers: p.containers.clone(),
     })
+  }
+
+  /// List all jobs
+  pub async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
+    let jobs = JobDb::read_by(&GenericFilter::default(), &state.pool).await?;
+    let job_summaries = jobs
+      .iter()
+      .map(|job| async {
+        let job = job.try_to_spec()?;
+        let instances =
+          ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
+        let (
+          instance_total,
+          instance_failed,
+          instance_success,
+          instance_running,
+        ) = utils::container::count_status(&instances);
+        Ok::<_, HttpError>(JobSummary {
+          instance_total,
+          instance_success,
+          instance_running,
+          instance_failed,
+          spec: job.clone(),
+        })
+      })
+      .collect::<FuturesUnordered<_>>()
+      .collect::<Vec<HttpResult<_>>>()
+      .await
+      .into_iter()
+      .collect::<HttpResult<Vec<_>>>()?;
+    Ok(job_summaries)
   }
 }

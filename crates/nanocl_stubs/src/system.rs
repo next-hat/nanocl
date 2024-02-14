@@ -200,6 +200,7 @@ pub enum NativeEventAction {
   Restart,
   Finish,
   Fail,
+  Die,
   Other(String),
 }
 
@@ -220,6 +221,7 @@ impl FromStr for NativeEventAction {
       "restart" => Ok(NativeEventAction::Restart),
       "finish" => Ok(NativeEventAction::Finish),
       "fail" => Ok(NativeEventAction::Fail),
+      "die" => Ok(NativeEventAction::Die),
       _ => Ok(NativeEventAction::Other(s.to_owned())),
     }
   }
@@ -240,6 +242,7 @@ impl std::fmt::Display for NativeEventAction {
       NativeEventAction::Restart => write!(f, "restart"),
       NativeEventAction::Finish => write!(f, "finish"),
       NativeEventAction::Fail => write!(f, "fail"),
+      NativeEventAction::Die => write!(f, "die"),
       NativeEventAction::Other(s) => write!(f, "{}", s),
     }
   }

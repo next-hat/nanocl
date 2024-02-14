@@ -4,7 +4,6 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::job::JobPartial;
 
 use crate::{
-  utils,
   objects::generic::*,
   models::{SystemState, JobDb},
 };
@@ -23,7 +22,7 @@ pub async fn list_job(
   state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
 ) -> HttpResult<web::HttpResponse> {
-  let jobs = utils::job::list(&state).await?;
+  let jobs = JobDb::list(&state).await?;
   Ok(web::HttpResponse::Ok().json(&jobs))
 }
 
