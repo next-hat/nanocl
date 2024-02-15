@@ -16,13 +16,14 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  gen_multiple, gen_where4string, utils,
+  utils,
+  schema::cargoes,
   objects::generic::*,
+  gen_multiple, gen_where4string,
   models::{
     Pool, CargoDb, SpecDb, CargoUpdateDb, SystemState, NamespaceDb, ProcessDb,
     ObjPsStatusDb,
   },
-  schema::cargoes,
 };
 
 use super::generic::*;
@@ -82,9 +83,9 @@ impl RepositoryReadByTransform for CargoDb {
   fn transform(
     item: (CargoDb, SpecDb, ObjPsStatusDb),
   ) -> IoResult<Self::NewOutput> {
-    let (cargodb, specdb, status) = item;
-    let spec = specdb.try_to_cargo_spec()?;
-    let item = cargodb.with_spec(&(spec, status.try_into()?));
+    let (cargo_db, spec_db, status) = item;
+    let spec = spec_db.try_to_cargo_spec()?;
+    let item = cargo_db.with_spec(&(spec, status.try_into()?));
     Ok(item)
   }
 }

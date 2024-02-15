@@ -70,8 +70,8 @@ impl RepositoryReadByTransform for JobDb {
   type NewOutput = Job;
 
   fn transform(item: (JobDb, ObjPsStatusDb)) -> IoResult<Self::NewOutput> {
-    let (jobdb, status) = item;
-    let item = jobdb.try_to_spec(&status)?;
+    let (job_db, status) = item;
+    let item = job_db.try_to_spec(&status)?;
     Ok(item)
   }
 }

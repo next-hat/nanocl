@@ -130,8 +130,8 @@ impl ResourceDb {
       kind,
       spec_key: spec.key.to_owned(),
     };
-    let dbmodel = ResourceDb::create_from(new_item, pool).await?;
-    let item = dbmodel.with_spec(&spec);
+    let resource_db = ResourceDb::create_from(new_item, pool).await?;
+    let item = resource_db.with_spec(&spec);
     Ok(item)
   }
 
@@ -157,8 +157,9 @@ impl ResourceDb {
       key: None,
       spec_key: Some(spec.key.to_owned()),
     };
-    let dbmodel = ResourceDb::update_pk(&key, resource_update, pool).await?;
-    let item = dbmodel.with_spec(&spec);
+    let resource_db =
+      ResourceDb::update_pk(&key, resource_update, pool).await?;
+    let item = resource_db.with_spec(&spec);
     Ok(item)
   }
 
