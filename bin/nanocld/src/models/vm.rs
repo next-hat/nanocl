@@ -23,6 +23,8 @@ pub struct VmDb {
   pub name: String,
   /// The spec key reference
   pub spec_key: uuid::Uuid,
+  /// The status key
+  pub status_key: String,
   /// The namespace name reference
   pub namespace_name: String,
 }

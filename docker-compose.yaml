@@ -187,12 +187,14 @@ services:
       run --no-default-features \
         --features dev \
         --bin nanocld \
-        -- --hosts tcp://0.0.0.0:9443 \
+        -- \
+        --hosts unix:///run/nanocl/nanocl.sock \
         --gid 1001 \
-        --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state} \
+        --hosts tcp://0.0.0.0:9443 \
         --cert ./tests/server.crt \
         --cert-key ./tests/server.key \
-        --cert-ca ./tests/ca.crt
+        --cert-ca ./tests/ca.crt \
+        --state-dir ${STATE_DIR:-${HOME}/.nanocl_dev/state}
 
   dbeaver:
     container_name: dbeaver.system.c

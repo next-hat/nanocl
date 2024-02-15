@@ -1,30 +1,18 @@
 use std::str::FromStr;
 
 use ntex::rt;
-use futures_util::StreamExt;
-use bollard_next::container::{
-  StartContainerOptions, RemoveContainerOptions, WaitContainerOptions,
-};
 
-use nanocl_error::{
-  io::{IoResult, IoError},
-  http::HttpError,
-};
-use nanocl_stubs::{
-  process::ProcessKind,
-  system::{
-    Event, EventActor, EventActorKind, NativeEventAction, ObjPsStatusKind,
-  },
+use nanocl_error::io::IoResult;
+use nanocl_stubs::system::{
+  Event, EventActor, EventActorKind, NativeEventAction, ObjPsStatusKind,
 };
 
 use crate::{
-  utils,
+  models::{CargoDb, JobDb, ObjPsStatusDb, ProcessDb, SystemState, VmDb},
   objects::generic::*,
   repositories::generic::*,
-  models::{
-    SystemState, JobDb, ProcessDb, CargoDb, ObjPsStatusUpdate, ObjPsStatusDb,
-    ObjTask,
-  },
+  tasks::generic::*,
+  utils,
 };
 
 /// Remove a job after when finished and ttl is set
@@ -35,11 +23,17 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
     Some(job_id) => job_id.as_str().unwrap_or_default(),
   };
   log::debug!("event::job_ttl: {job_id}");
-  let job = JobDb::read_by_pk(job_id, &state.pool)
-    .await?
-    .try_to_spec()?;
+  let job = JobDb::transform_read_by_pk(job_id, &state.pool).await?;
+  match job.status.actual {
+    ObjPsStatusKind::Finish | ObjPsStatusKind::Fail => {
+      log::debug!("event::job_ttl: {job_id} is already done");
+      return Ok(());
+    }
+    _ => {}
+  }
   let instances = ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
-  let (_, _, _, running) = utils::process::count_status(&instances);
+  let (_, instance_failed, _, running) =
+    utils::container::count_status(&instances);
   log::debug!(
     "event::job_ttl: {} has {running} running instances",
     job.name
@@ -47,7 +41,23 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
   if running != 0 {
     return Ok(());
   }
-  state.emit_normal_native_action(&job, NativeEventAction::Finish);
+  if instance_failed > 0 {
+    ObjPsStatusDb::update_actual_status(
+      &job.name,
+      &ObjPsStatusKind::Fail,
+      &state.pool,
+    )
+    .await?;
+    state.emit_normal_native_action(&job, NativeEventAction::Fail);
+  } else {
+    ObjPsStatusDb::update_actual_status(
+      &job.name,
+      &ObjPsStatusKind::Finish,
+      &state.pool,
+    )
+    .await?;
+    state.emit_normal_native_action(&job, NativeEventAction::Finish);
+  }
   let ttl = match job.ttl {
     None => return Ok(()),
     Some(ttl) => ttl,
@@ -65,96 +75,18 @@ async fn start(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
-) -> IoResult<Option<ObjTask>> {
-  let key = key.to_owned();
-  let state_ptr = state.clone();
+) -> IoResult<Option<ObjTaskFuture>> {
   let task = match actor.kind {
-    EventActorKind::Cargo => {
-      let task = ObjTask::new(NativeEventAction::Starting, async move {
-        let cargo =
-          CargoDb::transform_read_by_pk(&key, &state_ptr.pool).await?;
-        let mut processes =
-          ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state_ptr.pool)
-            .await?;
-        if processes.is_empty() {
-          processes =
-            utils::cargo::create_instances(&cargo, 1, &state_ptr).await?;
-        }
-        for process in processes {
-          let _ = state_ptr
-            .docker_api
-            .start_container(
-              &process.key,
-              None::<StartContainerOptions<String>>,
-            )
-            .await;
-        }
-        let cur_status =
-          ObjPsStatusDb::read_by_pk(&cargo.spec.cargo_key, &state_ptr.pool)
-            .await?;
-        let new_status = ObjPsStatusUpdate {
-          wanted: Some(ObjPsStatusKind::Running.to_string()),
-          prev_wanted: Some(cur_status.wanted),
-          actual: Some(ObjPsStatusKind::Running.to_string()),
-          prev_actual: Some(cur_status.actual),
-        };
-        ObjPsStatusDb::update_pk(
-          &cargo.spec.cargo_key,
-          new_status,
-          &state_ptr.pool,
-        )
-        .await?;
-        state_ptr.emit_normal_native_action(&cargo, NativeEventAction::Start);
-        Ok::<_, IoError>(())
-      });
+    EventActorKind::Job => {
+      let task = JobDb::create_start_task(key, state);
       Some(task)
     }
-    EventActorKind::Vm => None,
-    EventActorKind::Job => {
-      let task = ObjTask::new(NativeEventAction::Starting, async move {
-        let job = JobDb::read_by_pk(&key, &state_ptr.pool)
-          .await?
-          .try_to_spec()?;
-        state_ptr.emit_normal_native_action(&job, NativeEventAction::Start);
-        for container in &job.containers {
-          let mut container = container.clone();
-          let job_name = job.name.clone();
-          let mut labels = container.labels.clone().unwrap_or_default();
-          labels.insert("io.nanocl.j".to_owned(), job_name.clone());
-          container.labels = Some(labels);
-          let short_id = utils::key::generate_short_id(6);
-          let name = format!("{job_name}-{short_id}.j");
-          let process = utils::container::create_process(
-            &ProcessKind::Job,
-            &name,
-            &job_name,
-            container,
-            &state_ptr,
-          )
-          .await?;
-          // When we run a sequential order we wait for the container to finish to start the next one.
-          let mut stream = state_ptr.docker_api.wait_container(
-            &process.key,
-            Some(WaitContainerOptions {
-              condition: "not-running",
-            }),
-          );
-          let _ = state_ptr
-            .docker_api
-            .start_container(
-              &process.key,
-              None::<StartContainerOptions<String>>,
-            )
-            .await;
-          while let Some(stream) = stream.next().await {
-            let result = stream.map_err(HttpError::internal_server_error)?;
-            if result.status_code == 0 {
-              break;
-            }
-          }
-        }
-        Ok::<_, IoError>(())
-      });
+    EventActorKind::Cargo => {
+      let task = CargoDb::create_start_task(key, state);
+      Some(task)
+    }
+    EventActorKind::Vm => {
+      let task = VmDb::create_start_task(key, state);
       Some(task)
     }
     _ => None,
@@ -169,62 +101,19 @@ async fn delete(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
-) -> IoResult<Option<ObjTask>> {
-  let key = key.to_owned();
-  let state_ptr = state.clone();
+) -> IoResult<Option<ObjTaskFuture>> {
   let task = match actor.kind {
     EventActorKind::Cargo => {
       log::debug!("handling delete event for cargo {key}");
-      let task = ObjTask::new(NativeEventAction::Deleting, async move {
-        let processes =
-          ProcessDb::read_by_kind_key(&key, &state_ptr.pool).await?;
-        for process in processes {
-          let _ = state_ptr
-            .docker_api
-            .remove_container(
-              &process.key,
-              Some(RemoveContainerOptions {
-                force: true,
-                ..Default::default()
-              }),
-            )
-            .await;
-        }
-        let cargo =
-          CargoDb::transform_read_by_pk(&key, &state_ptr.pool).await?;
-        CargoDb::clear_by_pk(&key, &state_ptr.pool).await?;
-        state_ptr.emit_normal_native_action(&cargo, NativeEventAction::Delete);
-        Ok::<_, IoError>(())
-      });
+      let task = CargoDb::create_delete_task(key, state);
       Some(task)
     }
-    EventActorKind::Vm => None,
+    EventActorKind::Vm => {
+      let task = VmDb::create_delete_task(key, state);
+      Some(task)
+    }
     EventActorKind::Job => {
-      let task = ObjTask::new(NativeEventAction::Deleting, async move {
-        let job = JobDb::read_by_pk(&key, &state_ptr.pool)
-          .await?
-          .try_to_spec()?;
-        let processes =
-          ProcessDb::read_by_kind_key(&key, &state_ptr.pool).await?;
-        for process in processes {
-          let _ = state_ptr
-            .docker_api
-            .remove_container(
-              &process.key,
-              Some(RemoveContainerOptions {
-                force: true,
-                ..Default::default()
-              }),
-            )
-            .await;
-        }
-        JobDb::clear(&job.name, &state_ptr.pool).await?;
-        if job.schedule.is_some() {
-          utils::job::remove_cron_rule(&job, &state_ptr).await?;
-        }
-        state_ptr.emit_normal_native_action(&job, NativeEventAction::Delete);
-        Ok::<_, IoError>(())
-      });
+      let task = JobDb::create_delete_task(key, state);
       Some(task)
     }
     _ => None,
@@ -236,64 +125,39 @@ async fn update(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
-) -> IoResult<Option<ObjTask>> {
-  let key = key.to_owned();
-  let state_ptr = state.clone();
+) -> IoResult<Option<ObjTaskFuture>> {
   let task = match actor.kind {
     EventActorKind::Cargo => {
-      let task = ObjTask::new(NativeEventAction::Updating, async move {
-        let cargo =
-          CargoDb::transform_read_by_pk(&key, &state_ptr.pool).await?;
-        let processes =
-          ProcessDb::read_by_kind_key(&key, &state_ptr.pool).await?;
-        // Create instance with the new spec
-        let new_instances =
-          match utils::cargo::create_instances(&cargo, 1, &state_ptr).await {
-            Err(err) => {
-              log::warn!(
-                "Unable to create cargo instance {} : {err}",
-                cargo.spec.cargo_key
-              );
-              Vec::default()
-            }
-            Ok(instances) => instances,
-          };
-        // start created containers
-        match CargoDb::start_process_by_kind_key(&key, &state_ptr).await {
-          Err(err) => {
-            log::error!(
-              "Unable to start cargo instance {} : {err}",
-              cargo.spec.cargo_key
-            );
-            let state_ptr_ptr = state_ptr.clone();
-            rt::spawn(async move {
-              ntex::time::sleep(std::time::Duration::from_secs(2)).await;
-              let _ = utils::cargo::delete_instances(
-                &new_instances
-                  .iter()
-                  .map(|i| i.key.clone())
-                  .collect::<Vec<_>>(),
-                &state_ptr_ptr,
-              )
-              .await;
-            });
-          }
-          Ok(_) => {
-            // Delete old containers
-            utils::cargo::delete_instances(
-              &processes.iter().map(|c| c.key.clone()).collect::<Vec<_>>(),
-              &state_ptr,
-            )
-            .await?;
-          }
-        }
-        state_ptr.emit_normal_native_action(&cargo, NativeEventAction::Update);
-        Ok::<_, IoError>(())
-      });
+      let task = CargoDb::create_update_task(key, state);
       Some(task)
     }
-    EventActorKind::Vm => None,
-    EventActorKind::Job => None,
+    EventActorKind::Vm => {
+      let task = VmDb::create_update_task(key, state);
+      Some(task)
+    }
+    _ => None,
+  };
+  Ok(task)
+}
+
+async fn stop(
+  key: &str,
+  actor: &EventActor,
+  state: &SystemState,
+) -> IoResult<Option<ObjTaskFuture>> {
+  let task = match actor.kind {
+    EventActorKind::Cargo => {
+      let task = CargoDb::create_stop_task(key, state);
+      Some(task)
+    }
+    EventActorKind::Vm => {
+      let task = VmDb::create_stop_task(key, state);
+      Some(task)
+    }
+    EventActorKind::Job => {
+      let task = JobDb::create_stop_task(key, state);
+      Some(task)
+    }
     _ => None,
   };
   Ok(task)
@@ -304,30 +168,35 @@ async fn update(
 /// The task manager will execute the action in background
 /// eg: starting, deleting, updating a living object
 pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
-  log::info!("executing event: {} {}", e.kind, e.action);
   let Some(ref actor) = e.actor else {
     return Ok(());
   };
   let key = actor.key.clone().unwrap_or_default();
-  log::info!("executing event: {} {key}", actor.kind);
+  log::info!(
+    "exec_event: {} {} {}",
+    e.kind,
+    e.action,
+    actor.key.clone().unwrap_or_default()
+  );
   // Specific key of the task for this object
   // If a task is already running for this object, we wait for it to finish
   // This is to avoid data races conditions when manipulating an object
   let task_key = format!("{}@{key}", &actor.kind);
   state.task_manager.wait_task(&task_key).await;
   let action = NativeEventAction::from_str(e.action.as_str())?;
-  let task: Option<ObjTask> = match action {
-    NativeEventAction::Create => None,
+  let task: Option<ObjTaskFuture> = match action {
     NativeEventAction::Starting => start(&key, actor, state).await?,
-    NativeEventAction::Deleting => delete(&key, actor, state).await?,
+    NativeEventAction::Stopping => stop(&key, actor, state).await?,
     NativeEventAction::Updating => update(&key, actor, state).await?,
-    _ => {
+    NativeEventAction::Destroying => delete(&key, actor, state).await?,
+    NativeEventAction::Die => {
       job_ttl(actor, state).await?;
       None
     }
+    _ => None,
   };
   let Some(task) = task else { return Ok(()) };
   // push the task into the task manager
-  state.task_manager.add_task(&task_key, task).await;
+  state.task_manager.add_task(&task_key, action, task).await;
   Ok(())
 }

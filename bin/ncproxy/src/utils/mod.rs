@@ -13,7 +13,10 @@ pub(crate) mod tests {
 
   pub use nanocl_utils::ntex::test_client::*;
   use nanocld_client::{
-    stubs::{proxy::ResourceProxyRule, cargo_spec::CargoSpecPartial},
+    stubs::{
+      cargo::CargoDeleteQuery, cargo_spec::CargoSpecPartial,
+      proxy::ResourceProxyRule,
+    },
     ConnectOpts, NanocldClient,
   };
 
@@ -57,8 +60,15 @@ pub(crate) mod tests {
     if client.inspect_cargo(CARGO_NAME, None).await.is_err() {
       return Ok(());
     }
-    client.stop_process("cargo", CARGO_NAME, None).await?;
-    client.delete_cargo(CARGO_NAME, None).await?;
+    client
+      .delete_cargo(
+        CARGO_NAME,
+        Some(&CargoDeleteQuery {
+          force: Some(true),
+          ..Default::default()
+        }),
+      )
+      .await?;
     Ok(())
   }
 

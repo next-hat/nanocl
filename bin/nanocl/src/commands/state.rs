@@ -3,10 +3,11 @@ use std::{fs, str::FromStr};
 use std::collections::HashMap;
 
 use futures::StreamExt;
-use nanocld_client::stubs::system::ObjPsStatusKind;
-use nanocld_client::ConnectOpts;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
+
+use nanocld_client::stubs::system::ObjPsStatusKind;
+use nanocld_client::ConnectOpts;
 use bollard_next::service::HostConfig;
 
 use nanocl_error::{
@@ -307,7 +308,6 @@ fn parse_build_args(
       }
       "Boolean" => {
         let value = matches.get_flag(&name);
-        println!("Boolean {value}");
         args.insert(name, Value::Bool(value));
       }
       "Number" => {
@@ -439,6 +439,41 @@ async fn execute_template(
   Ok(state_ref)
 }
 
+fn gen_obj_hashmap(state: &StateRef<Statefile>) -> HashMap<String, bool> {
+  let namespace = state.data.namespace.clone().unwrap_or("global".to_owned());
+  let mut obj_hashmap = state
+    .data
+    .cargoes
+    .clone()
+    .unwrap_or_default()
+    .into_iter()
+    .fold(HashMap::new(), |mut acc, elem| {
+      acc.insert(format!("Cargo@{}.{namespace}", elem.name), false);
+      acc
+    });
+  obj_hashmap = state
+    .data
+    .jobs
+    .clone()
+    .unwrap_or_default()
+    .into_iter()
+    .fold(obj_hashmap, |mut acc, elem| {
+      acc.insert(format!("Job@{}", elem.name), false);
+      acc
+    });
+  obj_hashmap = state
+    .data
+    .virtual_machines
+    .clone()
+    .unwrap_or_default()
+    .into_iter()
+    .fold(obj_hashmap, |mut acc, elem| {
+      acc.insert(format!("Vm@{}.{namespace}", elem.name), false);
+      acc
+    });
+  obj_hashmap
+}
+
 /// Function called when running `nanocl state apply`
 async fn exec_state_apply(
   cli_conf: &CliConfig,
@@ -458,29 +493,10 @@ async fn exec_state_apply(
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
   let client_ptr = cli_conf.client.clone();
-  let state_ptr = state_file.clone();
-  let keys = Arc::new(Mutex::new(
-    state_ptr.data.cargoes.unwrap_or_default().into_iter().fold(
-      HashMap::new(),
-      |mut acc, elem| {
-        acc.insert(
-          format!(
-            "Cargo@{}.{}",
-            elem.name,
-            state_ptr
-              .data
-              .namespace
-              .clone()
-              .unwrap_or("global".to_owned())
-          ),
-          false,
-        );
-        acc
-      },
-    ),
-  ));
-  let keys_ptr = keys.clone();
-  let event_fut = ntex::rt::spawn(async move {
+  let obj_hashmap = gen_obj_hashmap(&state_file);
+  let obj_hashmap = Arc::new(Mutex::new(obj_hashmap));
+  let obj_hashmap_ptr = obj_hashmap.clone();
+  let fut = ntex::rt::spawn(async move {
     let mut ev_stream = client_ptr.watch_events().await?;
     while let Some(ev) = ev_stream.next().await {
       let ev = match ev {
@@ -498,7 +514,7 @@ async fn exec_state_apply(
       let key = actor.key.clone().unwrap_or_default();
       let kind = actor.kind.clone();
       let entry = format!("{kind}@{key}");
-      let mut keys = keys_ptr.lock().unwrap();
+      let mut keys = obj_hashmap_ptr.lock().unwrap();
       if action == NativeEventAction::Start {
         keys.insert(entry, true);
       }
@@ -506,6 +522,7 @@ async fn exec_state_apply(
       if keys.values().all(|v| *v) {
         break;
       }
+      drop(keys);
     }
     Ok::<_, HttpError>(())
   });
@@ -556,8 +573,8 @@ async fn exec_state_apply(
             client
               .put_cargo(&cargo.name, cargo, Some(&namespace))
               .await?;
-          } else if inspect.status.actual == ObjPsStatusKind::Running {
-            keys.lock().unwrap().insert(key, true);
+          } else if inspect.status.actual == ObjPsStatusKind::Start {
+            obj_hashmap.lock().unwrap().insert(key, true);
           }
         }
       }
@@ -608,8 +625,9 @@ async fn exec_state_apply(
       }
     }
   }
-  if !keys.lock().unwrap().clone().values().all(|v| *v) {
-    event_fut.await??;
+  let values = obj_hashmap.lock().unwrap().clone();
+  if !values.values().all(|v| *v) {
+    fut.await??;
   }
   if opts.follow {
     let query = ProcessLogQuery {
@@ -680,6 +698,39 @@ async fn exec_state_remove(
     utils::dialog::confirm("Are you sure to remove this state ?")
       .map_err(|err| err.map_err_context(|| "Delete resource"))?;
   }
+  let obj_hashmap = gen_obj_hashmap(&state_file);
+  let obj_hashmap = Arc::new(Mutex::new(obj_hashmap));
+  let client_ptr = client.clone();
+  let obj_hashmap_ptr = obj_hashmap.clone();
+  let fut = ntex::rt::spawn(async move {
+    let mut ev_stream = client_ptr.watch_events().await?;
+    while let Some(ev) = ev_stream.next().await {
+      let ev = match ev {
+        Err(err) => {
+          eprintln!("Unable to read event: {err}");
+          continue;
+        }
+        Ok(ev) => ev,
+      };
+      let Some(actor) = ev.actor else {
+        continue;
+      };
+      let action = NativeEventAction::from_str(&ev.action)
+        .map_err(HttpError::bad_request)?;
+      let key = actor.key.clone().unwrap_or_default();
+      let kind = actor.kind.clone();
+      let entry = format!("{kind}@{key}");
+      let mut keys = obj_hashmap_ptr.lock().unwrap();
+      if action == NativeEventAction::Destroy {
+        keys.insert(entry, true);
+      }
+      // check if all keys are set to true
+      if keys.values().all(|v| *v) {
+        break;
+      }
+    }
+    Ok::<_, HttpError>(())
+  });
   let pg_style = utils::progress::create_spinner_style("red");
   if let Some(jobs) = state_file.data.jobs {
     for job in jobs {
@@ -748,6 +799,9 @@ async fn exec_state_remove(
         pg.finish();
       }
     }
+  }
+  if !obj_hashmap.lock().unwrap().clone().values().all(|v| *v) {
+    fut.await??;
   }
   Ok(())
 }

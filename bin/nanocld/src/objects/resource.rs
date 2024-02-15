@@ -2,7 +2,6 @@ use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::resource::{ResourcePartial, Resource};
 
 use crate::{
-  utils,
   repositories::generic::*,
   models::{ResourceDb, SystemState, SpecDb},
 };
@@ -26,7 +25,7 @@ impl ObjCreate for ResourceDb {
         &obj.name
       )));
     }
-    let obj = utils::resource::hook_create(obj, &state.pool).await?;
+    let obj = ResourceDb::hook_create(obj, &state.pool).await?;
     let resource = ResourceDb::create_from_spec(&obj, &state.pool).await?;
     Ok(resource)
   }
@@ -42,8 +41,7 @@ impl ObjDelByPk for ResourceDb {
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
     let resource = ResourceDb::transform_read_by_pk(key, &state.pool).await?;
-    if let Err(err) = utils::resource::hook_delete(&resource, &state.pool).await
-    {
+    if let Err(err) = ResourceDb::hook_delete(&resource, &state.pool).await {
       log::warn!("{err}");
     }
     ResourceDb::del_by_pk(&resource.spec.resource_key, &state.pool).await?;
@@ -62,7 +60,7 @@ impl ObjPutByPk for ResourceDb {
     state: &SystemState,
   ) -> HttpResult<Self::ObjPutOut> {
     ResourceDb::read_by_pk(pk, &state.pool).await?;
-    let resource = utils::resource::hook_create(obj, &state.pool).await?;
+    let resource = ResourceDb::hook_create(obj, &state.pool).await?;
     let resource = ResourceDb::update_from_spec(&resource, &state.pool).await?;
     Ok(resource)
   }

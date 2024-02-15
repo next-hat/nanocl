@@ -315,7 +315,8 @@ mod tests {
   /// Test to create start patch stop and delete a cargo with valid data
   #[ntex::test]
   async fn basic() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let test_cargoes = [
       "1daemon-test-cargo",
       "2another-test-cargo",
@@ -494,5 +495,7 @@ mod tests {
         "basic cargo delete"
       );
     }
+    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+    system.state.wait_event_loop().await;
   }
 }

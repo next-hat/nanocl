@@ -238,7 +238,8 @@ pub mod tests {
   use crate::utils::tests::*;
 
   async fn import_image(name: &str, path: &str) -> IoResult<()> {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let file = tokio::fs::File::open(path).await?;
     let err_msg = format!("Unable to import image {name}:{path}");
     let stream =
@@ -265,7 +266,8 @@ pub mod tests {
   }
 
   async fn inspect_image(name: &str) -> IoResult<VmImage> {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let err_msg = format!("Unable to inspect image {name}");
     let mut res = client
       .get(&format!("/vms/images/{name}/inspect"))
@@ -294,7 +296,8 @@ pub mod tests {
 
   #[ntex::test]
   async fn basic() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let name = "ubuntu-22-test-basic";
     let path = "../../tests/ubuntu-22.04-minimal-cloudimg-amd64.img";
     import_image(name, path).await.unwrap();

@@ -80,7 +80,7 @@ mod tests {
 
   #[ntex::test]
   pub async fn get_version() {
-    let client = gen_test_client(ntex_config, vars::VERSION).await;
+    let client = gen_test_system(ntex_config, vars::VERSION).await.client;
     let mut res = client.send_get("/version", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "version");
     let data = res.json::<BinaryInfo>().await.unwrap();
@@ -101,27 +101,27 @@ mod tests {
 
   #[ntex::test]
   async fn ping() {
-    let client = gen_test_client(ntex_config, vars::VERSION).await;
+    let client = gen_test_system(ntex_config, vars::VERSION).await.client;
     let res = client.send_head("/_ping", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::ACCEPTED, "ping");
   }
 
   #[ntex::test]
   async fn unhandled_route() {
-    let client = gen_test_client(ntex_config, vars::VERSION).await;
+    let client = gen_test_system(ntex_config, vars::VERSION).await.client;
     let res = client.send_get("/v0.1/unhandled", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::NOT_FOUND, "unhandled");
   }
 
   #[ntex::test]
   async fn test_wrong_version() {
-    let client = gen_test_client(ntex_config, "0.15").await;
+    let client = gen_test_system(ntex_config, "0.15").await.client;
     let res = client.send_get("/version", None::<String>).await;
     assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
     let version = res.headers().get("x-api-version");
     assert!(version.is_some());
     assert_eq!(version.unwrap(), vars::VERSION);
-    let client = gen_test_client(ntex_config, "xdlol").await;
+    let client = gen_test_system(ntex_config, "xdlol").await.client;
     let res = client.send_get("/version", None::<String>).await;
     assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
     let version = res.headers().get("x-api-version");

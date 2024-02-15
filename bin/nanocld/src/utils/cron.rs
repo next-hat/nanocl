@@ -1,21 +1,10 @@
 use ntex::web;
 use tokio::{fs, io::AsyncWriteExt};
-use futures_util::{StreamExt, stream::FuturesUnordered};
 
-use nanocl_error::{
-  io::{FromIo, IoError, IoResult},
-  http::{HttpError, HttpResult},
-};
-use nanocl_stubs::{
-  generic::GenericFilter,
-  job::{Job, JobSummary},
-};
+use nanocl_error::io::{FromIo, IoError, IoResult};
+use nanocl_stubs::job::Job;
 
-use crate::{
-  vars, utils,
-  repositories::generic::*,
-  models::{SystemState, ProcessDb, JobDb},
-};
+use crate::{vars, models::SystemState};
 
 /// Format the cron job command to start a job at a given time
 fn format_cron_job_command(job: &Job, state: &SystemState) -> String {
@@ -89,36 +78,4 @@ pub async fn remove_cron_rule(item: &Job, state: &SystemState) -> IoResult<()> {
     .map_err(|err| err.map_err_context(|| "Cron job"))?;
   exec_crontab().await?;
   Ok(())
-}
-
-/// List all jobs
-pub async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
-  let jobs = JobDb::read_by(&GenericFilter::default(), &state.pool).await?;
-  let job_summaries =
-    jobs
-      .iter()
-      .map(|job| async {
-        let job = job.try_to_spec()?;
-        let instances =
-          ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
-        let (
-          instance_total,
-          instance_failed,
-          instance_success,
-          instance_running,
-        ) = utils::process::count_status(&instances);
-        Ok::<_, HttpError>(JobSummary {
-          instance_total,
-          instance_success,
-          instance_running,
-          instance_failed,
-          spec: job.clone(),
-        })
-      })
-      .collect::<FuturesUnordered<_>>()
-      .collect::<Vec<HttpResult<_>>>()
-      .await
-      .into_iter()
-      .collect::<HttpResult<Vec<_>>>()?;
-  Ok(job_summaries)
 }

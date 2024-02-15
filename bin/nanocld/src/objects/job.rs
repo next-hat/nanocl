@@ -1,23 +1,16 @@
 use nanocl_error::http::HttpResult;
 use nanocl_stubs::{
   job::{Job, JobPartial, JobInspect},
-  process::ProcessKind,
   system::{ObjPsStatusPartial, ObjPsStatusKind, NativeEventAction},
 };
 
 use crate::{
   utils,
   repositories::generic::*,
-  models::{JobDb, ProcessDb, ObjPsStatusDb},
+  models::{JobDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb},
 };
 
 use super::generic::*;
-
-impl ObjProcess for JobDb {
-  fn get_process_kind() -> ProcessKind {
-    ProcessKind::Job
-  }
-}
 
 impl ObjCreate for JobDb {
   type ObjCreateIn = JobPartial;
@@ -30,17 +23,17 @@ impl ObjCreate for JobDb {
     let db_model = JobDb::try_from_partial(obj)?;
     let status = ObjPsStatusPartial {
       key: obj.name.clone(),
-      wanted: ObjPsStatusKind::Created,
-      prev_wanted: ObjPsStatusKind::Created,
-      actual: ObjPsStatusKind::Created,
-      prev_actual: ObjPsStatusKind::Created,
+      wanted: ObjPsStatusKind::Create,
+      prev_wanted: ObjPsStatusKind::Create,
+      actual: ObjPsStatusKind::Create,
+      prev_actual: ObjPsStatusKind::Create,
     };
-    ObjPsStatusDb::create_from(status, &state.pool).await?;
+    let status = ObjPsStatusDb::create_from(status, &state.pool).await?;
     let job = JobDb::create_from(db_model, &state.pool)
       .await?
-      .to_spec(obj);
+      .try_to_spec(&status)?;
     if let Some(schedule) = &job.schedule {
-      utils::job::add_cron_rule(&job, schedule, state).await?;
+      utils::cron::add_cron_rule(&job, schedule, state).await?;
     }
     Ok(job)
   }
@@ -51,7 +44,7 @@ impl ObjDelByPk for JobDb {
   type ObjDelOut = Job;
 
   fn get_del_event() -> NativeEventAction {
-    NativeEventAction::Deleting
+    NativeEventAction::Destroying
   }
 
   async fn fn_del_obj_by_pk(
@@ -59,7 +52,15 @@ impl ObjDelByPk for JobDb {
     _opts: &Self::ObjDelOpts,
     state: &crate::models::SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let job = JobDb::read_by_pk(pk, &state.pool).await?.try_to_spec()?;
+    let job = JobDb::transform_read_by_pk(pk, &state.pool).await?;
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
+    let new_status = ObjPsStatusUpdate {
+      wanted: Some(ObjPsStatusKind::Destroy.to_string()),
+      prev_wanted: Some(status.wanted),
+      actual: Some(ObjPsStatusKind::Destroying.to_string()),
+      prev_actual: Some(status.actual),
+    };
+    ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
     Ok(job)
   }
 }
@@ -71,10 +72,10 @@ impl ObjInspectByPk for JobDb {
     pk: &str,
     state: &crate::models::SystemState,
   ) -> HttpResult<Self::ObjInspectOut> {
-    let job = JobDb::read_by_pk(pk, &state.pool).await?.try_to_spec()?;
+    let job = JobDb::transform_read_by_pk(pk, &state.pool).await?;
     let instances = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
     let (instance_total, instance_failed, instance_success, instance_running) =
-      utils::process::count_status(&instances);
+      utils::container::count_status(&instances);
     let job_inspect = JobInspect {
       spec: job,
       instance_total,

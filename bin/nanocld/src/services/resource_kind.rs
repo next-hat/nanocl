@@ -149,7 +149,8 @@ mod tests {
 
   #[ntex::test]
   async fn test_inspect_version_not_found() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let res = client
       .send_get(
         &format!("{}/test.io/api-test/version/v12/inspect", ENDPOINT),
@@ -165,7 +166,8 @@ mod tests {
 
   #[ntex::test]
   async fn test_wrong_name() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let payload = ResourceKindPartial {
       name: "api-test".to_owned(),
       version: "v1".to_owned(),
@@ -187,7 +189,8 @@ mod tests {
 
   #[ntex::test]
   async fn test_wrong_spec() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let payload = ResourceKindPartial {
       name: "test.io/api-test".to_owned(),
       version: "v1".to_owned(),
@@ -208,7 +211,8 @@ mod tests {
   }
   #[ntex::test]
   async fn basic_list() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     // Create
     let payload = ResourceKindPartial {
       name: "test.io/api-test".to_owned(),

@@ -8,7 +8,6 @@ use nanocl_stubs::{
 };
 
 use crate::{
-  utils,
   objects::generic::*,
   models::{SystemState, NamespaceDb},
 };
@@ -32,7 +31,7 @@ pub async fn list_namespace(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
-  let items = utils::namespace::list(&filter, &state).await?;
+  let items = NamespaceDb::list(&filter, &state).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -171,11 +170,13 @@ mod test_namespace {
 
   #[ntex::test]
   async fn basic() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     test_fail_create(&client).await;
     create(&client).await;
     inspect_by_id(&client).await;
     list(&client).await;
     delete(&client).await;
+    system.state.wait_event_loop().await;
   }
 }

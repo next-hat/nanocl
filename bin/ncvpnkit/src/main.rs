@@ -129,7 +129,7 @@ async fn on_event(
         }
       }
     }
-    NativeEventAction::Delete => {
+    NativeEventAction::Destroy => {
       let attributes = actor.attributes.unwrap_or_default();
       let spec = attributes.get("Spec").cloned().ok_or_else(|| {
         IoError::invalid_data("Resource spec", "attribute not found")

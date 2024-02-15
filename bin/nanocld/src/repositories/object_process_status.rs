@@ -1,11 +1,12 @@
 use diesel::prelude::*;
 
-use nanocl_stubs::generic::GenericFilter;
+use nanocl_error::io::IoResult;
+use nanocl_stubs::{generic::GenericFilter, system::ObjPsStatusKind};
 
 use crate::{
-  models::{ObjPsStatusDb, ObjPsStatusUpdate},
+  gen_multiple, gen_where4string,
+  models::{ObjPsStatusDb, ObjPsStatusUpdate, Pool},
   schema::object_process_statuses,
-  gen_where4string, gen_multiple,
 };
 
 use super::generic::*;
@@ -56,5 +57,26 @@ impl RepositoryReadBy for ObjPsStatusDb {
       gen_multiple!(query, object_process_statuses::created_at, filter);
     }
     query
+  }
+}
+
+impl ObjPsStatusDb {
+  pub async fn update_actual_status(
+    key: &str,
+    status: &ObjPsStatusKind,
+    pool: &Pool,
+  ) -> IoResult<()> {
+    let curr_status = ObjPsStatusDb::read_by_pk(&key, pool).await?;
+    let status = status.to_string();
+    if curr_status.actual == status {
+      return Ok(());
+    }
+    let new_status = ObjPsStatusUpdate {
+      actual: Some(status),
+      prev_actual: Some(curr_status.actual),
+      ..Default::default()
+    };
+    ObjPsStatusDb::update_pk(key, new_status, pool).await?;
+    Ok(())
   }
 }

@@ -44,7 +44,8 @@ mod tests {
 
   #[ntex::test]
   async fn basic() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let resp = client.get("/events").send().await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
   }

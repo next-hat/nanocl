@@ -165,6 +165,7 @@ diesel::table! {
         created_at -> Timestamptz,
         name -> Varchar,
         spec_key -> Uuid,
+        status_key -> Varchar,
         namespace_name -> Varchar,
     }
 }
@@ -178,6 +179,7 @@ diesel::joinable!(node_group_links -> nodes (node_name));
 diesel::joinable!(resource_kinds -> specs (spec_key));
 diesel::joinable!(resources -> specs (spec_key));
 diesel::joinable!(vms -> namespaces (namespace_name));
+diesel::joinable!(vms -> object_process_statuses (status_key));
 diesel::joinable!(vms -> specs (spec_key));
 
 diesel::allow_tables_to_appear_in_same_query!(

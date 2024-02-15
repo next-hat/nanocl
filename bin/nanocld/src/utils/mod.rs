@@ -2,19 +2,12 @@ pub mod ws;
 pub mod key;
 pub mod stream;
 
-pub mod node;
 pub mod store;
 pub mod system;
-pub mod namespace;
-pub mod cargo;
-pub mod container_image;
-pub mod vm;
 pub mod vm_image;
-pub mod job;
+pub mod cron;
 pub mod exec;
-pub mod resource;
 pub mod ctrl_client;
-pub mod process;
 pub mod server;
 pub mod container;
 
@@ -23,12 +16,17 @@ pub mod tests {
   use std::env;
   use ntex::web::{*, self};
 
-  use crate::{services, vars::VERSION, models::SystemState};
   use nanocl_stubs::config::DaemonConfig;
+  use crate::{services, vars::VERSION, models::SystemState};
 
   pub use nanocl_utils::ntex::test_client::*;
 
   type Config = fn(&mut ServiceConfig);
+
+  pub struct TestSystem {
+    pub state: SystemState,
+    pub client: TestClient,
+  }
 
   /// Set the log level to info and build a test env logger for tests purpose
   pub fn before() {
@@ -42,8 +40,7 @@ pub mod tests {
       .try_init();
   }
 
-  /// Generate a test server for tests purpose
-  pub async fn gen_server(routes: Config) -> test::TestServer {
+  pub async fn gen_test_system(routes: Config, version: &str) -> TestSystem {
     before();
     // Build a test daemon config
     let home = env::var("HOME").expect("Failed to get home dir");
@@ -54,23 +51,20 @@ pub mod tests {
       docker_host,
       ..Default::default()
     };
-    let daemon_state = SystemState::new(&config).await.unwrap();
+    let state = SystemState::new(&config).await.unwrap();
+    let state_ptr = state.clone();
     // Create test server
-    test::server(move || {
+    let srv = test::server(move || {
       App::new()
-        .state(daemon_state.clone())
+        .state(state_ptr.clone())
         .configure(routes)
         .default_service(web::route().to(services::unhandled))
-    })
+    });
+    let client = TestClient::new(srv, version);
+    TestSystem { state, client }
   }
 
-  pub async fn gen_test_client(routes: Config, version: &str) -> TestClient {
-    let srv = gen_server(routes).await;
-    TestClient::new(srv, version)
-  }
-
-  pub async fn gen_default_test_client() -> TestClient {
-    let srv = gen_server(services::ntex_config).await;
-    TestClient::new(srv, VERSION)
+  pub async fn gen_default_test_system() -> TestSystem {
+    gen_test_system(services::ntex_config, VERSION).await
   }
 }

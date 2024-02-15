@@ -31,6 +31,7 @@ serde_yaml = "0.9"
 
 [dependencies]
 log = "0.4"
+num_cpus = "1"
 clap = { version = "4.4", features = ["derive"] }
 ntex = { version = "1.1", features = ["tokio", "openssl"] }
 tokio = { version = "1.36", features = ["fs"] }

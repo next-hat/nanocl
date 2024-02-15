@@ -103,14 +103,16 @@ mod tests {
 
   #[ntex::test]
   async fn watch_events() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let res = client.send_get("/events/watch", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "watch events");
   }
 
   #[ntex::test]
   async fn system_info() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let mut res = client.send_get("/info", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "system info");
     let _ = res.json::<HostInfo>().await.unwrap();
@@ -118,14 +120,14 @@ mod tests {
 
   #[ntex::test]
   async fn wrong_version() {
-    let client = gen_test_client(ntex_config, "13.44").await;
+    let client = gen_test_system(ntex_config, "13.44").await.client;
     let res = client.send_get("/info", None::<String>).await;
     test_status_code!(
       res.status(),
       http::StatusCode::NOT_FOUND,
       "wrong version 13.44"
     );
-    let client = gen_test_client(ntex_config, "5.2").await;
+    let client = gen_test_system(ntex_config, "5.2").await.client;
     let res = client.send_get("/info", None::<String>).await;
     test_status_code!(
       res.status(),
@@ -136,7 +138,8 @@ mod tests {
 
   #[ntex::test]
   async fn ping() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let res = client.send_head("/_ping", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::ACCEPTED, "ping");
   }

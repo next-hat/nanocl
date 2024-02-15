@@ -4,7 +4,6 @@ use nanocl_error::http::HttpResult;
 use nanocl_stubs::job::JobPartial;
 
 use crate::{
-  utils,
   objects::generic::*,
   models::{SystemState, JobDb},
 };
@@ -23,7 +22,7 @@ pub async fn list_job(
   state: web::types::State<SystemState>,
   _version: web::types::Path<String>,
 ) -> HttpResult<web::HttpResponse> {
-  let jobs = utils::job::list(&state).await?;
+  let jobs = JobDb::list(&state).await?;
   Ok(web::HttpResponse::Ok().json(&jobs))
 }
 
@@ -108,7 +107,8 @@ mod tests {
 
   #[ntex::test]
   async fn list_jobs() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let mut response = client.get(ENDPOINT).send().await.unwrap();
     test_status_code!(response.status(), http::StatusCode::OK, "list jobs");
     let _ = response.json::<Vec<JobSummary>>().await.unwrap();
@@ -116,7 +116,8 @@ mod tests {
 
   #[ntex::test]
   async fn wait_not_found() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let wait_res = client
       .send_get(
         &format!("{ENDPOINT}/test/wait"),
@@ -134,7 +135,8 @@ mod tests {
 
   #[ntex::test]
   async fn basic() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let state: &str = include_str!("../../../../examples/job_example.yml");
     let yaml: serde_yaml::Value = serde_yaml::from_str(state).unwrap();
     let job_spec = &yaml["Jobs"][0];
@@ -175,5 +177,7 @@ mod tests {
       format!("inspect job {}", &job.name)
     );
     let _ = client.send_delete(&job_endpoint, None::<String>).await;
+    ntex::time::sleep(std::time::Duration::from_secs(1)).await;
+    system.state.wait_event_loop().await;
   }
 }

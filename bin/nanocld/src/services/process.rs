@@ -10,8 +10,7 @@ use bollard_next::{
 use nanocl_stubs::{
   generic::{GenericNspQuery, GenericFilter, GenericListQuery},
   process::{
-    ProcessLogQuery, ProcessOutputLog, ProcessKind, ProcessWaitQuery,
-    ProcessWaitResponse,
+    ProcessLogQuery, ProcessOutputLog, ProcessWaitQuery, ProcessWaitResponse,
   },
   cargo::CargoKillOptions,
 };
@@ -19,8 +18,7 @@ use nanocl_stubs::{
 use crate::{
   utils,
   repositories::generic::*,
-  models::{SystemState, ProcessDb, VmDb, JobDb, CargoDb},
-  objects::generic::ObjProcess,
+  models::{SystemState, ProcessDb},
 };
 
 /// List process (Vm, Job, Cargo)
@@ -162,17 +160,7 @@ pub async fn start_process(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  match &kind {
-    ProcessKind::Vm => {
-      VmDb::start_process_by_kind_key(&kind_key, &state).await?;
-    }
-    ProcessKind::Job => {
-      JobDb::start_process_by_kind_key(&kind_key, &state).await?;
-    }
-    ProcessKind::Cargo => {
-      CargoDb::start_process_by_kind_key(&kind_key, &state).await?;
-    }
-  }
+  utils::container::emit_starting(&kind_key, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -199,17 +187,7 @@ pub async fn restart_process(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  match &kind {
-    ProcessKind::Vm => {
-      VmDb::restart_process_by_kind_key(&kind_pk, &state).await?;
-    }
-    ProcessKind::Job => {
-      JobDb::restart_process_by_kind_key(&kind_pk, &state).await?;
-    }
-    ProcessKind::Cargo => {
-      CargoDb::restart_process_by_kind_key(&kind_pk, &state).await?;
-    }
-  }
+  utils::container::restart_instances(&kind_pk, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -235,18 +213,8 @@ pub async fn stop_process(
 ) -> HttpResult<web::HttpResponse> {
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
-  let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  match &kind {
-    ProcessKind::Vm => {
-      VmDb::stop_process_by_kind_key(&kind_pk, &state).await?;
-    }
-    ProcessKind::Job => {
-      JobDb::stop_process_by_kind_key(&kind_pk, &state).await?;
-    }
-    ProcessKind::Cargo => {
-      CargoDb::stop_process_by_kind_key(&kind_pk, &state).await?;
-    }
-  }
+  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  utils::container::emit_stopping(&kind_key, &kind, &state).await?;
   Ok(web::HttpResponse::Accepted().finish())
 }
 
@@ -275,17 +243,7 @@ pub async fn kill_process(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_pk = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  match &kind {
-    ProcessKind::Vm => {
-      VmDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
-    }
-    ProcessKind::Job => {
-      JobDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
-    }
-    ProcessKind::Cargo => {
-      CargoDb::kill_process_by_kind_key(&kind_pk, &payload, &state).await?;
-    }
-  }
+  utils::container::kill_by_kind_key(&kind_pk, &payload, &state).await?;
   Ok(web::HttpResponse::Ok().into())
 }
 
@@ -380,7 +338,8 @@ mod tests {
 
   #[ntex::test]
   async fn basic_list() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     let mut res = client.send_get("/processes", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let _ = res.json::<Vec<Process>>().await.unwrap();
@@ -388,7 +347,8 @@ mod tests {
 
   #[ntex::test]
   async fn list_by() {
-    let client = gen_default_test_client().await;
+    let system = gen_default_test_system().await;
+    let client = system.client;
     // Filter by namespace
     let filter = GenericFilter::new().r#where(
       "data",

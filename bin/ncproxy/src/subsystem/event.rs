@@ -101,7 +101,7 @@ async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
       Ok(())
     }
     (EventActorKind::Cargo, NativeEventAction::Stop)
-    | (EventActorKind::Cargo, NativeEventAction::Delete) => {
+    | (EventActorKind::Cargo, NativeEventAction::Destroy) => {
       let (name, namespace) = get_cargo_attributes(&actor.attributes)?;
       delete_cargo_rule(&name, &namespace, state).await?;
       let _ = state.event_emitter.emit_reload().await;

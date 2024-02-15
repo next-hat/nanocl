@@ -1,20 +1,21 @@
 use diesel::prelude::*;
 
-use nanocl_error::{
-  io::{IoError, IoResult},
-  http::HttpResult,
-};
+use nanocl_error::{io::IoResult, http::HttpResult};
 
 use nanocl_stubs::{
-  generic::{GenericFilter, GenericClause},
+  generic::{GenericClause, GenericFilter},
+  system::ObjPsStatus,
   vm::{Vm, VmSummary},
-  vm_spec::{VmSpecPartial, VmSpec},
+  vm_spec::{VmSpec, VmSpecPartial},
 };
 
 use crate::{
-  gen_multiple, gen_where4string, utils,
+  utils,
   schema::vms,
-  models::{Pool, VmDb, VmUpdateDb, SpecDb, ProcessDb, NamespaceDb},
+  gen_multiple, gen_where4string,
+  models::{
+    NamespaceDb, ObjPsStatusDb, Pool, ProcessDb, SpecDb, VmDb, VmUpdateDb,
+  },
 };
 
 use super::generic::*;
@@ -30,7 +31,7 @@ impl RepositoryUpdate for VmDb {
 impl RepositoryDelByPk for VmDb {}
 
 impl RepositoryReadBy for VmDb {
-  type Output = (VmDb, SpecDb);
+  type Output = (VmDb, SpecDb, ObjPsStatusDb);
 
   fn get_pk() -> &'static str {
     "key"
@@ -47,6 +48,7 @@ impl RepositoryReadBy for VmDb {
     let r#where = filter.r#where.to_owned().unwrap_or_default();
     let mut query = vms::table
       .inner_join(crate::schema::specs::table)
+      .inner_join(crate::schema::object_process_statuses::table)
       .into_boxed();
     if let Some(value) = r#where.get("key") {
       gen_where4string!(query, vms::key, value);
@@ -67,57 +69,30 @@ impl RepositoryReadBy for VmDb {
 impl RepositoryReadByTransform for VmDb {
   type NewOutput = Vm;
 
-  fn transform(input: (VmDb, SpecDb)) -> IoResult<Self::NewOutput> {
+  fn transform(
+    input: (VmDb, SpecDb, ObjPsStatusDb),
+  ) -> IoResult<Self::NewOutput> {
     let spec = input.1.try_to_vm_spec()?;
-    let item = input.0.with_spec(&spec);
+    let item = input.0.with_spec(&(spec, input.2.try_into()?));
     Ok(item)
   }
 }
 
 impl WithSpec for VmDb {
   type Output = Vm;
-  type Relation = VmSpec;
+  type Relation = (VmSpec, ObjPsStatus);
 
   fn with_spec(self, r: &Self::Relation) -> Self::Output {
     Self::Output {
       namespace_name: self.namespace_name,
       created_at: self.created_at,
-      spec: r.clone(),
+      spec: r.0.clone(),
+      status: r.1.clone(),
     }
   }
 }
 
 impl VmDb {
-  pub async fn create_from_spec(
-    nsp: &str,
-    item: &VmSpecPartial,
-    version: &str,
-    pool: &Pool,
-  ) -> IoResult<Vm> {
-    let nsp = nsp.to_owned();
-    if item.name.contains('.') {
-      return Err(IoError::invalid_data(
-        "VmSpecPartial",
-        "Name cannot contain a dot.",
-      ));
-    }
-    let key = utils::key::gen_key(&nsp, &item.name);
-    let new_spec = SpecDb::try_from_vm_partial(&key, version, item)?;
-    let spec = SpecDb::create_from(new_spec, pool)
-      .await?
-      .try_to_vm_spec()?;
-    let new_item = VmDb {
-      key,
-      name: item.name.clone(),
-      created_at: chrono::Utc::now().naive_utc(),
-      namespace_name: nsp,
-      spec_key: spec.key,
-    };
-    let item = VmDb::create_from(new_item, pool).await?;
-    let vm = item.with_spec(&spec);
-    Ok(vm)
-  }
-
   pub async fn update_from_spec(
     key: &str,
     item: &VmSpecPartial,
@@ -160,7 +135,7 @@ impl VmDb {
       let processes =
         ProcessDb::read_by_kind_key(&vm.spec.vm_key, pool).await?;
       let (_, _, _, running_instances) =
-        utils::process::count_status(&processes);
+        utils::container::count_status(&processes);
       vm_summaries.push(VmSummary {
         created_at: vm.created_at,
         namespace_name: vm.namespace_name,
@@ -170,5 +145,12 @@ impl VmDb {
       });
     }
     Ok(vm_summaries)
+  }
+
+  pub async fn clear_by_pk(pk: &str, pool: &Pool) -> IoResult<()> {
+    VmDb::del_by_pk(pk, pool).await?;
+    SpecDb::del_by_kind_key(pk, pool).await?;
+    ObjPsStatusDb::del_by_pk(pk, pool).await?;
+    Ok(())
   }
 }
