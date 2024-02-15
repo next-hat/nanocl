@@ -77,7 +77,7 @@ where
         let event = EventPartial {
           reporting_controller: vars::CONTROLLER_NAME.to_owned(),
           reporting_node: state.config.hostname.clone(),
-          action: "download_image".to_owned(),
+          action: NativeEventAction::Fail.to_string(),
           reason: "state_sync".to_owned(),
           kind: EventKind::Error,
           actor: Some(EventActor {
@@ -97,7 +97,7 @@ where
     let event = EventPartial {
       reporting_controller: vars::CONTROLLER_NAME.to_owned(),
       reporting_node: state.config.hostname.clone(),
-      action: "download_image".to_owned(),
+      action: NativeEventAction::Downloading.to_string(),
       reason: "state_sync".to_owned(),
       kind: EventKind::Normal,
       actor: Some(EventActor {
@@ -113,6 +113,22 @@ where
     };
     state.spawn_emit_event(event);
   }
+  let event = EventPartial {
+    reporting_controller: vars::CONTROLLER_NAME.to_owned(),
+    reporting_node: state.config.hostname.clone(),
+    action: NativeEventAction::Download.to_string(),
+    reason: "state_sync".to_owned(),
+    kind: EventKind::Normal,
+    actor: Some(EventActor {
+      key: Some(image.to_owned()),
+      kind: EventActorKind::ContainerImage,
+      attributes: None,
+    }),
+    related: Some(actor.clone().into()),
+    note: Some(format!("{name}:{tag}")),
+    metadata: None,
+  };
+  state.spawn_emit_event(event);
   Ok(())
 }
 
@@ -210,11 +226,12 @@ async fn execute_cargo_before(
         .image
         .clone()
         .unwrap_or(cargo.spec.container.image.clone().unwrap());
-      before.image = Some(image);
+      before.image = Some(image.clone());
       before.host_config = Some(HostConfig {
         network_mode: Some(cargo.namespace_name.clone()),
         ..before.host_config.unwrap_or_default()
       });
+      download_image(&image, cargo, state).await?;
       let mut labels = before.labels.to_owned().unwrap_or_default();
       labels.insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
       labels.insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());

@@ -277,22 +277,33 @@ mod tests {
     assert_cli_err!("state", "apply", "-y");
   }
 
-  // TODO: RE ENABLE TEST WITH INVALID IMAGE
-  // #[ntex::test]
-  // async fn state_apply_invalid_image() {
-  //   assert_cli_err!(
-  //     "state",
-  //     "apply",
-  //     "-ys",
-  //     "../../tests/invalid_init_container_image.yml",
-  //   );
-  //   assert_cli_err!(
-  //     "state",
-  //     "apply",
-  //     "-ys",
-  //     "../../tests/invalid_container_image.yml",
-  //   );
-  // }
+  #[ntex::test]
+  async fn state_apply_invalid_image() {
+    assert_cli_err!(
+      "state",
+      "apply",
+      "-ys",
+      "../../tests/invalid_init_container_image.yml",
+    );
+    assert_cli_ok!(
+      "state",
+      "rm",
+      "-ys",
+      "../../tests/invalid_init_container_image.yml",
+    );
+    assert_cli_err!(
+      "state",
+      "apply",
+      "-ys",
+      "../../tests/invalid_container_image.yml",
+    );
+    assert_cli_ok!(
+      "state",
+      "rm",
+      "-ys",
+      "../../tests/invalid_container_image.yml",
+    );
+  }
 
   #[ntex::test]
   async fn state_apply_remote_http() {

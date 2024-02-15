@@ -1978,7 +1978,6 @@ dependencies = [
  "notify",
  "ntex 1.1.0",
  "ntex-cors",
- "num_cpus",
  "openssl",
  "rand",
  "serde",
@@ -2028,7 +2027,6 @@ dependencies = [
  "nanocl_utils",
  "nanocld_client",
  "ntex 1.1.0",
- "num_cpus",
  "openssl",
  "serde",
  "serde_json",
@@ -2053,7 +2051,6 @@ dependencies = [
  "nanocld_client",
  "notify",
  "ntex 1.1.0",
- "num_cpus",
  "openssl",
  "serde",
  "serde_json",
@@ -2651,16 +2648,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da0df0e5185db44f69b44f26786fe401b6c293d1907744beaa7fa62b2e5a517a"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "num_cpus"
-version = "1.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4161fcb6d602d4d2081af7c3a45852d875a03dd337a6bfdd6e06407b61342a43"
-dependencies = [
- "hermit-abi",
- "libc",
 ]
 
 [[package]]

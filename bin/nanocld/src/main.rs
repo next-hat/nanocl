@@ -15,9 +15,9 @@ mod services;
 mod objects;
 mod tasks;
 
-/// Provides an api to manage containers and virtual machines accross physical hosts
+/// Provides an api to manage containers and virtual machines across physical hosts
 /// There are these advantages :
-/// - It's Opensource
+/// - It's Open source
 /// - It's Easy to use
 /// - It keep an history of all your containers and virtual machines
 #[ntex::main]

@@ -105,10 +105,6 @@ pub async fn gen(
     );
   }
   log::info!("server::gen: ready");
-  // get max cpu
-  let num = num_cpus::get();
-  let workers = if num < 2 { 1 } else { num / 2 };
-  server = server.workers(workers);
   Ok(server.run())
 }
 
@@ -147,7 +143,7 @@ mod tests {
   async fn assert_config_ok(args: Cli) {
     assert!(
       test_config(args.clone()).await.is_ok(),
-      "Expected succcess for {:#?}",
+      "Expected success for {:#?}",
       args
     );
   }

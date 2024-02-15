@@ -6,7 +6,7 @@ use futures::StreamExt;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
 
-use nanocld_client::stubs::system::ObjPsStatusKind;
+use nanocld_client::stubs::system::{EventActorKind, ObjPsStatusKind};
 use nanocld_client::ConnectOpts;
 use bollard_next::service::HostConfig;
 
@@ -46,8 +46,8 @@ async fn get_from_url(url: &str) -> IoResult<StateRef<Statefile>> {
   } else {
     format!("http://{url}")
   };
-  let reqwest = ntex::http::Client::default();
-  let mut res = reqwest.get(&url).send().await.map_err(|err| {
+  let client = ntex::http::Client::default();
+  let mut res = client.get(&url).send().await.map_err(|err| {
     err.map_err_context(|| "Unable to get Statefile from url")
   })?;
   if res.status().is_redirection() {
@@ -57,7 +57,7 @@ async fn get_from_url(url: &str) -> IoResult<StateRef<Statefile>> {
       .ok_or_else(|| IoError::invalid_data("Location", "is not specified"))?
       .to_str()
       .map_err(|err| IoError::invalid_data("Location", &format!("{err}")))?;
-    res = reqwest.get(location).send().await.map_err(|err| {
+    res = client.get(location).send().await.map_err(|err| {
       err.map_err_context(|| "Unable to get Statefile from url")
     })?;
   }
@@ -496,6 +496,8 @@ async fn exec_state_apply(
   let obj_hashmap = gen_obj_hashmap(&state_file);
   let obj_hashmap = Arc::new(Mutex::new(obj_hashmap));
   let obj_hashmap_ptr = obj_hashmap.clone();
+  let error = Arc::new(Mutex::new(None::<String>));
+  let error_ptr = error.clone();
   let fut = ntex::rt::spawn(async move {
     let mut ev_stream = client_ptr.watch_events().await?;
     while let Some(ev) = ev_stream.next().await {
@@ -506,23 +508,30 @@ async fn exec_state_apply(
         }
         Ok(ev) => ev,
       };
-      let Some(actor) = ev.actor else {
+      let Some(mut actor) = ev.actor else {
         continue;
       };
       let action = NativeEventAction::from_str(&ev.action)
         .map_err(HttpError::bad_request)?;
+      let related = ev.related;
+      if actor.kind == EventActorKind::ContainerImage {
+        actor = related.unwrap();
+      }
       let key = actor.key.clone().unwrap_or_default();
       let kind = actor.kind.clone();
       let entry = format!("{kind}@{key}");
       let mut keys = obj_hashmap_ptr.lock().unwrap();
-      if action == NativeEventAction::Start {
+      if action == NativeEventAction::Fail {
+        let mut error_ptr = error_ptr.lock().unwrap();
+        *error_ptr = Some(ev.note.unwrap_or_default());
+        keys.insert(entry, true);
+      } else if action == NativeEventAction::Start {
         keys.insert(entry, true);
       }
       // check if all keys are set to true
       if keys.values().all(|v| *v) {
         break;
       }
-      drop(keys);
     }
     Ok::<_, HttpError>(())
   });
@@ -628,6 +637,9 @@ async fn exec_state_apply(
   let values = obj_hashmap.lock().unwrap().clone();
   if !values.values().all(|v| *v) {
     fut.await??;
+  }
+  if let Some(err) = error.lock().unwrap().clone() {
+    return Err(IoError::invalid_data("StateApply", err.as_str()));
   }
   if opts.follow {
     let query = ProcessLogQuery {

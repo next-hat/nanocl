@@ -44,9 +44,6 @@ pub fn gen(
     log::debug!("server::gen: dev mode http://0.0.0.0:8787");
     log::debug!("server::gen: swagger http://0.0.0.0:8787/explorer/");
   }
-  let num = num_cpus::get();
-  let workers = if num < 2 { 1 } else { num / 2 };
-  server = server.workers(workers);
   Ok(server.run())
 }
 

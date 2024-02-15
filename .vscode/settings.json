@@ -16,6 +16,7 @@
     "canonicalize",
     "certbot",
     "chrono",
+    "consts",
     "cpus",
     "crond",
     "curr",

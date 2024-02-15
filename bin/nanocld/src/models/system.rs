@@ -64,6 +64,7 @@ impl SystemState {
     Ok(system_state)
   }
 
+  /// Start the system event loop
   fn run(self, mut rx: mpsc::UnboundedReceiver<Event>) {
     self.arbiter.clone().exec_fn(move || {
       rt::spawn(async move {
@@ -80,6 +81,7 @@ impl SystemState {
     });
   }
 
+  /// Emit an event to the system event loop
   pub async fn emit_event(&self, new_ev: EventPartial) -> IoResult<()> {
     let ev: Event = EventDb::create_try_from(new_ev, &self.pool)
       .await?
@@ -90,6 +92,7 @@ impl SystemState {
     Ok(())
   }
 
+  /// Emit an event in the background to the system event loop
   pub fn spawn_emit_event(&self, event: EventPartial) {
     let self_ptr = self.clone();
     rt::spawn(async move {
@@ -99,10 +102,12 @@ impl SystemState {
     });
   }
 
+  /// Subscribe an http client to the event loop
   pub async fn subscribe_raw(&self) -> IoResult<RawEventClient> {
     self.event_emitter_raw.subscribe().await
   }
 
+  /// Emit a normal event action
   pub fn emit_normal_native_action<A>(
     &self,
     actor: &A,
