@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ntex::rt::{self, Arbiter};
+use ntex::rt;
 use futures::channel::mpsc;
 use futures_util::{SinkExt, StreamExt};
 
@@ -34,7 +34,7 @@ pub struct SystemState {
   /// Http event client
   event_emitter_raw: RawEventEmitter,
   /// task event loop
-  arbiter: Arbiter,
+  arbiter: rt::Arbiter,
 }
 
 impl SystemState {
@@ -58,7 +58,7 @@ impl SystemState {
       event_emitter_raw: RawEventEmitter::new(),
       task_manager: TaskManager::new(),
       version: vars::VERSION.to_owned(),
-      arbiter: Arbiter::new(),
+      arbiter: rt::Arbiter::new(),
     };
     system_state.clone().run(rx);
     Ok(system_state)
