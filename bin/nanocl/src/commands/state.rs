@@ -1,18 +1,24 @@
-use std::sync::{Arc, Mutex};
-use std::{fs, str::FromStr};
-use std::collections::HashMap;
+use std::{
+  fs,
+  str::FromStr,
+  sync::{Arc, Mutex},
+  collections::HashMap,
+};
 
 use futures::StreamExt;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
 
-use nanocld_client::stubs::system::{EventActorKind, ObjPsStatusKind};
-use nanocld_client::ConnectOpts;
 use bollard_next::service::HostConfig;
 
 use nanocl_error::{
-  io::{IoError, FromIo, IoResult},
   http::HttpError,
+  io::{IoError, FromIo, IoResult},
+};
+
+use nanocld_client::{
+  ConnectOpts,
+  stubs::system::{EventActorKind, EventCondition, EventKind},
 };
 
 use nanocld_client::{
@@ -144,6 +150,7 @@ async fn log_jobs(
   jobs: Vec<JobPartial>,
   query: &ProcessLogQuery,
 ) -> IoResult<()> {
+  eprintln!("logs jobs");
   let mut futures = Vec::new();
   for job in jobs {
     let client = client.clone();
@@ -492,49 +499,6 @@ async fn exec_state_apply(
     utils::dialog::confirm("Are you sure to apply this state ?")
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
-  let client_ptr = cli_conf.client.clone();
-  let obj_hashmap = gen_obj_hashmap(&state_file);
-  let obj_hashmap = Arc::new(Mutex::new(obj_hashmap));
-  let obj_hashmap_ptr = obj_hashmap.clone();
-  let error = Arc::new(Mutex::new(None::<String>));
-  let error_ptr = error.clone();
-  let fut = ntex::rt::spawn(async move {
-    let mut ev_stream = client_ptr.watch_events().await?;
-    while let Some(ev) = ev_stream.next().await {
-      let ev = match ev {
-        Err(err) => {
-          eprintln!("Unable to read event: {err}");
-          continue;
-        }
-        Ok(ev) => ev,
-      };
-      let Some(mut actor) = ev.actor else {
-        continue;
-      };
-      let action = NativeEventAction::from_str(&ev.action)
-        .map_err(HttpError::bad_request)?;
-      let related = ev.related;
-      if actor.kind == EventActorKind::ContainerImage {
-        actor = related.unwrap();
-      }
-      let key = actor.key.clone().unwrap_or_default();
-      let kind = actor.kind.clone();
-      let entry = format!("{kind}@{key}");
-      let mut keys = obj_hashmap_ptr.lock().unwrap();
-      if action == NativeEventAction::Fail {
-        let mut error_ptr = error_ptr.lock().unwrap();
-        *error_ptr = Some(ev.note.unwrap_or_default());
-        keys.insert(entry, true);
-      } else if action == NativeEventAction::Start {
-        keys.insert(entry, true);
-      }
-      // check if all keys are set to true
-      if keys.values().all(|v| *v) {
-        break;
-      }
-    }
-    Ok::<_, HttpError>(())
-  });
   let pg_style = utils::progress::create_spinner_style("green");
   if let Some(secrets) = &state_ref.data.secrets {
     for secret in secrets {
@@ -561,15 +525,32 @@ async fn exec_state_apply(
       let pg = utils::progress::create_progress(&token, &pg_style);
       if client.inspect_job(&job.name).await.is_ok() {
         client.delete_job(&job.name).await?;
+        let mut stream = client
+          .watch_events(Some(vec![EventCondition {
+            actor_kind: vec![EventActorKind::Job],
+            actor_key: vec![format!("{}", job.name)],
+            kind: vec![EventKind::Normal],
+            action: vec![NativeEventAction::Destroy],
+          }]))
+          .await?;
+        while (stream.next().await).is_some() {}
       }
       client.create_job(job).await?;
       client.start_process("job", &job.name, None).await?;
+      let mut stream = client
+        .watch_events(Some(vec![EventCondition {
+          actor_kind: vec![EventActorKind::Job],
+          actor_key: vec![format!("{}", job.name)],
+          kind: vec![EventKind::Normal],
+          action: vec![NativeEventAction::Start],
+        }]))
+        .await?;
+      while (stream.next().await).is_some() {}
       pg.finish();
     }
   }
   if let Some(cargoes) = &state_file.data.cargoes {
     for cargo in cargoes {
-      let key = format!("Cargo@{}.{}", cargo.name, namespace);
       let token = format!("cargo/{}", cargo.name);
       let pg = utils::progress::create_progress(&token, &pg_style);
       match client.inspect_cargo(&cargo.name, Some(&namespace)).await {
@@ -582,14 +563,21 @@ async fn exec_state_apply(
             client
               .put_cargo(&cargo.name, cargo, Some(&namespace))
               .await?;
-          } else if inspect.status.actual == ObjPsStatusKind::Start {
-            obj_hashmap.lock().unwrap().insert(key, true);
           }
         }
       }
+      let mut stream = client
+        .watch_events(Some(vec![EventCondition {
+          actor_kind: vec![EventActorKind::Cargo],
+          actor_key: vec![format!("{}.{}", cargo.name, namespace)],
+          kind: vec![EventKind::Normal],
+          action: vec![NativeEventAction::Start],
+        }]))
+        .await?;
       client
         .start_process("cargo", &cargo.name, Some(&namespace))
         .await?;
+      while (stream.next().await).is_some() {}
       pg.finish();
     }
     if let Some(vms) = &state_file.data.virtual_machines {
@@ -608,9 +596,18 @@ async fn exec_state_apply(
             }
           }
         }
+        let mut stream = client
+          .watch_events(Some(vec![EventCondition {
+            actor_kind: vec![EventActorKind::Vm],
+            actor_key: vec![format!("{}.{}", vm.name, namespace)],
+            kind: vec![EventKind::Normal],
+            action: vec![NativeEventAction::Start],
+          }]))
+          .await?;
         client
           .start_process("vm", &vm.name, Some(&namespace))
           .await?;
+        while (stream.next().await).is_some() {}
         pg.finish();
       }
     }
@@ -633,13 +630,6 @@ async fn exec_state_apply(
         pg.finish();
       }
     }
-  }
-  let values = obj_hashmap.lock().unwrap().clone();
-  if !values.values().all(|v| *v) {
-    fut.await??;
-  }
-  if let Some(err) = error.lock().unwrap().clone() {
-    return Err(IoError::invalid_data("StateApply", err.as_str()));
   }
   if opts.follow {
     let query = ProcessLogQuery {
@@ -715,7 +705,7 @@ async fn exec_state_remove(
   let client_ptr = client.clone();
   let obj_hashmap_ptr = obj_hashmap.clone();
   let fut = ntex::rt::spawn(async move {
-    let mut ev_stream = client_ptr.watch_events().await?;
+    let mut ev_stream = client_ptr.watch_events(None).await?;
     while let Some(ev) = ev_stream.next().await {
       let ev = match ev {
         Err(err) => {

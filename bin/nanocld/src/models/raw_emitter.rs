@@ -7,17 +7,18 @@ use std::{
 
 use futures::Stream;
 
-use ntex::{rt, web, time, util::Bytes};
+use ntex::{rt, time, web, util::Bytes};
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
 use nanocl_error::io::{IoResult, IoError};
-use nanocl_stubs::system::Event;
+
+use nanocl_stubs::system::{Event, EventCondition};
 
 /// Stream: Wrap Receiver in our own type, with correct error type
 /// This is needed to return a http stream of bytes
-pub struct RawEventClient(pub Receiver<Bytes>);
+pub struct RawEventReceiver(pub Receiver<Bytes>);
 
-impl Stream for RawEventClient {
+impl Stream for RawEventReceiver {
   type Item = Result<Bytes, web::Error>;
 
   fn poll_next(
@@ -29,6 +30,22 @@ impl Stream for RawEventClient {
       Poll::Ready(None) => Poll::Ready(None),
       Poll::Pending => Poll::Pending,
     }
+  }
+}
+
+#[derive(Clone)]
+pub struct RawEventSender(
+  pub Sender<Bytes>,
+  pub Option<Vec<EventCondition>>,
+  pub usize,
+);
+
+impl RawEventSender {
+  pub fn new(
+    condition: Option<Vec<EventCondition>>,
+  ) -> (Self, RawEventReceiver) {
+    let (tx, rx) = channel(100);
+    (Self(tx, condition, 0), RawEventReceiver(rx))
   }
 }
 
@@ -60,7 +77,7 @@ pub struct RawEventEmitter {
 /// Contains a list of clients
 #[derive(Clone, Default)]
 pub struct RawEventEmitterInner {
-  clients: Vec<Sender<Bytes>>,
+  clients: Vec<RawEventSender>,
 }
 
 impl RawEventEmitter {
@@ -79,7 +96,7 @@ impl RawEventEmitter {
       IoError::interrupted("RawEmitterMutex", err.to_string().as_str())
     })?;
     for client in &inner.clients {
-      if client.try_send(Bytes::from("")).is_err() {
+      if client.0.try_send(Bytes::from("")).is_err() {
         continue;
       }
       alive_clients.push(client.clone());
@@ -112,28 +129,42 @@ impl RawEventEmitter {
       Ok::<_, IoError>(clients)
     })
     .await?;
-    for client in clients {
-      match e.try_to_bytes() {
-        Ok(msg) => {
-          let _ = client.try_send(msg);
-        }
-        Err(err) => {
-          log::error!("raw_emitter: emit {err}");
+    let mut new_clients = Vec::new();
+    let msg = e.try_to_bytes()?;
+    for mut client in clients {
+      let conditions = client.1.clone().unwrap_or_default();
+      let _ = client.0.try_send(msg.clone());
+      if conditions.is_empty() {
+        new_clients.push(client);
+      } else if conditions.iter().any(|c| c == e) {
+        client.2 += 1;
+        if client.2 != conditions.len() {
+          new_clients.push(client);
         }
       }
     }
+    let inner = Arc::clone(&self.inner);
+    web::block(move || {
+      let mut inner = inner.lock()?;
+      inner.clients = new_clients;
+      Ok::<_, IoError>(())
+    })
+    .await?;
     Ok(())
   }
 
   /// Subscribe to events
-  pub async fn subscribe(&self) -> IoResult<RawEventClient> {
-    let (tx, rx) = channel(100);
+  pub async fn subscribe(
+    &self,
+    condition: Option<Vec<EventCondition>>,
+  ) -> IoResult<RawEventReceiver> {
+    let (tx, rx) = RawEventSender::new(condition);
     let inner = Arc::clone(&self.inner);
     web::block(move || {
       inner.lock()?.clients.push(tx);
       Ok::<_, IoError>(())
     })
     .await?;
-    Ok(RawEventClient(rx))
+    Ok(rx)
   }
 }

@@ -3,7 +3,7 @@ use ntex::channel::mpsc::Receiver;
 use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::HttpClientResult;
 
-use nanocl_stubs::system::{Event, BinaryInfo, HostInfo};
+use nanocl_stubs::system::{BinaryInfo, Event, EventCondition, HostInfo};
 
 use super::http_client::NanocldClient;
 
@@ -32,15 +32,18 @@ impl NanocldClient {
   /// use nanocld_client::NanocldClient;
   ///
   /// let client = NanocldClient::connect_to("http://localhost:8585", None);
-  /// let mut stream = client.watch_events().await?;
+  /// let mut stream = client.watch_events(None).await?;
   /// while let Some(event) = stream.next().await {
   ///  println!("{:?}", event);
   /// }
   /// ```
   pub async fn watch_events(
     &self,
+    conditions: Option<Vec<EventCondition>>,
   ) -> HttpClientResult<Receiver<HttpResult<Event>>> {
-    let res = self.send_get("/events/watch", None::<String>).await?;
+    let res = self
+      .send_post("/events/watch", conditions, None::<String>)
+      .await?;
     Ok(Self::res_stream(res).await)
   }
 
@@ -97,7 +100,7 @@ mod tests {
       url: "http://nanocl.internal:8585".into(),
       ..Default::default()
     });
-    let _stream = client.watch_events().await.unwrap();
+    let _stream = client.watch_events(None).await.unwrap();
     // Todo : find a way to test this on CI because it's limited to 2 threads
     // let _event = stream.next().await.unwrap();
   }

@@ -147,7 +147,7 @@ async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
 async fn r#loop(state: &SystemStateRef) {
   loop {
     log::info!("event::loop: subscribing to nanocld events");
-    match state.client.watch_events().await {
+    match state.client.watch_events(None).await {
       Err(err) => {
         log::warn!("event::loop: {err}");
       }

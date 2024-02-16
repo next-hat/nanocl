@@ -8,14 +8,17 @@ use nanocl_error::io::{FromIo, IoError, IoResult};
 
 use nanocl_stubs::{
   config::DaemonConfig,
-  system::{Event, EventActor, EventKind, EventPartial, NativeEventAction},
+  system::{
+    Event, EventActor, EventKind, EventPartial, EventCondition,
+    NativeEventAction,
+  },
 };
 
 use crate::{
   vars, utils,
   repositories::generic::*,
   models::{
-    EventDb, RawEventClient, RawEventEmitter, SystemState, TaskManager,
+    EventDb, RawEventReceiver, RawEventEmitter, SystemState, TaskManager,
   },
 };
 
@@ -85,8 +88,11 @@ impl SystemState {
   }
 
   /// Subscribe an http client to the event loop
-  pub async fn subscribe_raw(&self) -> IoResult<RawEventClient> {
-    self.event_emitter_raw.subscribe().await
+  pub async fn subscribe_raw(
+    &self,
+    condition: Option<Vec<EventCondition>>,
+  ) -> IoResult<RawEventReceiver> {
+    self.event_emitter_raw.subscribe(condition).await
   }
 
   /// Emit a normal event action

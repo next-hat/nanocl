@@ -39,7 +39,7 @@ async fn apply_rule(port: &VpnKitPort, vpnkit_client: &VpnKitRc) {
       port.in_path.clone().unwrap_or_default(),
     );
     if let Err(err) = vpnkit_client.expose_pipe_path(port).await {
-      log::error!("Error while creating the forwaring rule: {err}");
+      log::error!("Error while creating the forwarding rule: {err}");
     }
   } else {
     log::info!(
@@ -198,7 +198,7 @@ async fn main() -> std::io::Result<()> {
   };
   loop {
     log::info!("Subscribing to nanocl daemon events..");
-    match nanocl_client.watch_events().await {
+    match nanocl_client.watch_events(None).await {
       Err(err) => {
         log::warn!("Unable to Subscribe to nanocl daemon events: {err}");
       }

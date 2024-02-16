@@ -414,3 +414,34 @@ pub struct Event {
   )]
   pub metadata: Option<serde_json::Value>,
 }
+
+/// Condition to stop watching for events if their are meet
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct EventCondition {
+  pub kind: Vec<EventKind>,
+  pub action: Vec<NativeEventAction>,
+  pub actor_key: Vec<String>,
+  pub actor_kind: Vec<EventActorKind>,
+}
+
+impl std::cmp::PartialEq<Event> for EventCondition {
+  fn eq(&self, other: &Event) -> bool {
+    let actor = match &other.actor {
+      Some(actor) => actor,
+      None => return false,
+    };
+    let Some(key) = &actor.key else {
+      return false;
+    };
+    let Ok(action) = NativeEventAction::from_str(&other.action) else {
+      return false;
+    };
+    self.actor_kind.iter().any(|a| *a == actor.kind)
+      && self.actor_key.iter().any(|a| a == key)
+      && self.kind.iter().any(|k| *k == other.kind)
+      && self.action.iter().any(|a| *a == action)
+  }
+}

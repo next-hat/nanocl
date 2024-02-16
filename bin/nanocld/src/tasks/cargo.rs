@@ -110,14 +110,11 @@ impl ObjTaskUpdate for CargoDb {
         Ok(_) => {
           // Delete old containers
           let state_ptr_ptr = state.clone();
-          rt::spawn(async move {
-            ntex::time::sleep(std::time::Duration::from_secs(2)).await;
-            let _ = utils::container::delete_instances(
-              &processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>(),
-              &state_ptr_ptr,
-            )
-            .await;
-          });
+          let _ = utils::container::delete_instances(
+            &processes.iter().map(|p| p.key.clone()).collect::<Vec<_>>(),
+            &state_ptr_ptr,
+          )
+          .await;
         }
       }
       ObjPsStatusDb::update_actual_status(
