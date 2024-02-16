@@ -28,6 +28,7 @@ where
   type Error = Error;
 
   ntex::forward_poll_ready!(service);
+  ntex::forward_poll_shutdown!(service);
 
   async fn call(
     &self,

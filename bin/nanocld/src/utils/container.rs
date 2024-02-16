@@ -246,7 +246,7 @@ async fn execute_cargo_before(
         "init-{}-{}.{}.c",
         cargo.spec.name, short_id, cargo.namespace_name
       );
-      super::container::create_instance(
+      create_instance(
         &ProcessKind::Cargo,
         &name,
         &cargo.spec.cargo_key,
@@ -351,7 +351,7 @@ pub async fn create_cargo(
           .auto_remove
           .unwrap_or(false);
         if auto_remove {
-          return Err(HttpError::bad_request("Using autoremove for a cargo is not allowed, consider using a job instead"));
+          return Err(HttpError::bad_request("Using auto remove for a cargo is not allowed, consider using a job instead"));
         }
         let restart_policy =
           Some(
@@ -396,7 +396,7 @@ pub async fn create_cargo(
           }),
           ..container
         };
-        super::container::create_instance(
+        create_instance(
           &ProcessKind::Cargo,
           &name,
           &cargo.spec.cargo_key,
