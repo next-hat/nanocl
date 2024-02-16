@@ -204,6 +204,8 @@ pub enum NativeEventAction {
   Finish,
   Fail,
   Die,
+  Downloading,
+  Download,
   Other(String),
 }
 
@@ -225,6 +227,8 @@ impl FromStr for NativeEventAction {
       "finish" => Ok(NativeEventAction::Finish),
       "fail" => Ok(NativeEventAction::Fail),
       "die" => Ok(NativeEventAction::Die),
+      "downloading" => Ok(NativeEventAction::Downloading),
+      "download" => Ok(NativeEventAction::Download),
       _ => Ok(NativeEventAction::Other(s.to_owned())),
     }
   }
@@ -246,6 +250,8 @@ impl std::fmt::Display for NativeEventAction {
       NativeEventAction::Finish => write!(f, "finish"),
       NativeEventAction::Fail => write!(f, "fail"),
       NativeEventAction::Die => write!(f, "die"),
+      NativeEventAction::Downloading => write!(f, "downloading"),
+      NativeEventAction::Download => write!(f, "download"),
       NativeEventAction::Other(s) => write!(f, "{}", s),
     }
   }
