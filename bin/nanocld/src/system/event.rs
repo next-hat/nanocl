@@ -8,11 +8,11 @@ use nanocl_stubs::system::{
 };
 
 use crate::{
-  models::{CargoDb, JobDb, ObjPsStatusDb, ProcessDb, SystemState, VmDb},
+  utils,
+  tasks::generic::*,
   objects::generic::*,
   repositories::generic::*,
-  tasks::generic::*,
-  utils,
+  models::{CargoDb, JobDb, ObjPsStatusDb, ProcessDb, SystemState, VmDb},
 };
 
 /// Remove a job after when finished and ttl is set
@@ -71,12 +71,12 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
   Ok(())
 }
 
-async fn start(
+fn start(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
-) -> IoResult<Option<ObjTaskFuture>> {
-  let task = match actor.kind {
+) -> Option<ObjTaskFuture> {
+  match actor.kind {
     EventActorKind::Job => {
       let task = JobDb::create_start_task(key, state);
       Some(task)
@@ -90,19 +90,18 @@ async fn start(
       Some(task)
     }
     _ => None,
-  };
-  Ok(task)
+  }
 }
 
 /// Handle delete event for living objects (job, cargo, vm)
 /// by checking if the event is `NativeEventAction::Deleting`
 /// and pushing into the task manager the task to delete the object
-async fn delete(
+fn delete(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
-) -> IoResult<Option<ObjTaskFuture>> {
-  let task = match actor.kind {
+) -> Option<ObjTaskFuture> {
+  match actor.kind {
     EventActorKind::Cargo => {
       log::debug!("handling delete event for cargo {key}");
       let task = CargoDb::create_delete_task(key, state);
@@ -117,16 +116,15 @@ async fn delete(
       Some(task)
     }
     _ => None,
-  };
-  Ok(task)
+  }
 }
 
-async fn update(
+fn update(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
-) -> IoResult<Option<ObjTaskFuture>> {
-  let task = match actor.kind {
+) -> Option<ObjTaskFuture> {
+  match actor.kind {
     EventActorKind::Cargo => {
       let task = CargoDb::create_update_task(key, state);
       Some(task)
@@ -136,16 +134,15 @@ async fn update(
       Some(task)
     }
     _ => None,
-  };
-  Ok(task)
+  }
 }
 
-async fn stop(
+fn stop(
   key: &str,
   actor: &EventActor,
   state: &SystemState,
-) -> IoResult<Option<ObjTaskFuture>> {
-  let task = match actor.kind {
+) -> Option<ObjTaskFuture> {
+  match actor.kind {
     EventActorKind::Cargo => {
       let task = CargoDb::create_stop_task(key, state);
       Some(task)
@@ -159,8 +156,7 @@ async fn stop(
       Some(task)
     }
     _ => None,
-  };
-  Ok(task)
+  }
 }
 
 /// Take action when event is received
@@ -185,10 +181,10 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   state.task_manager.wait_task(&task_key).await;
   let action = NativeEventAction::from_str(e.action.as_str())?;
   let task: Option<ObjTaskFuture> = match action {
-    NativeEventAction::Starting => start(&key, actor, state).await?,
-    NativeEventAction::Stopping => stop(&key, actor, state).await?,
-    NativeEventAction::Updating => update(&key, actor, state).await?,
-    NativeEventAction::Destroying => delete(&key, actor, state).await?,
+    NativeEventAction::Starting => start(&key, actor, state),
+    NativeEventAction::Stopping => stop(&key, actor, state),
+    NativeEventAction::Updating => update(&key, actor, state),
+    NativeEventAction::Destroying => delete(&key, actor, state),
     NativeEventAction::Die => {
       job_ttl(actor, state).await?;
       None

@@ -9,7 +9,7 @@ mod schema;
 mod models;
 mod vars;
 mod utils;
-mod subsystem;
+mod system;
 mod repositories;
 mod services;
 mod objects;
@@ -40,7 +40,7 @@ async fn main() -> std::io::Result<()> {
     Ok(config) => config,
   };
   // Boot internal dependencies (database, event bus, etc...)
-  let daemon_state = match subsystem::init(&config).await {
+  let daemon_state = match system::init(&config).await {
     Err(err) => {
       err.print_and_exit();
     }

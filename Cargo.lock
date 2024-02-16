@@ -1968,6 +1968,7 @@ dependencies = [
  "futures",
  "futures-util",
  "jsonschema",
+ "lazy_static",
  "libc",
  "log",
  "metrsd_client",

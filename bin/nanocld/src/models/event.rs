@@ -3,7 +3,7 @@ use std::str::FromStr;
 use diesel::prelude::*;
 
 use nanocl_error::io::IoError;
-use nanocl_stubs::system::{Event, EventPartial, EventKind};
+use nanocl_stubs::system::{Event, EventKind, EventPartial};
 
 use crate::schema::events;
 

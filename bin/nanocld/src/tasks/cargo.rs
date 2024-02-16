@@ -15,6 +15,8 @@ use crate::{
 
 use super::generic::*;
 
+impl ObjTask for CargoDb {}
+
 impl ObjTaskStart for CargoDb {
   fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
