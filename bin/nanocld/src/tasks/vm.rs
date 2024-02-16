@@ -9,6 +9,8 @@ use crate::{
 
 use super::generic::*;
 
+impl ObjTask for VmDb {}
+
 impl ObjTaskStart for VmDb {
   fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture {
     let key = key.to_owned();
