@@ -3120,9 +3120,21 @@ components:
       required:
       - Kind
       - Action
-      - ActorKey
-      - ActorKind
       properties:
+        ActorKey:
+          type: string
+          nullable: true
+        ActorKind:
+          allOf:
+          - $ref: '#/components/schemas/EventActorKind'
+          nullable: true
+        RelatedKey:
+          type: string
+          nullable: true
+        RelatedKind:
+          allOf:
+          - $ref: '#/components/schemas/EventActorKind'
+          nullable: true
         Kind:
           type: array
           items:
@@ -3131,14 +3143,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NativeEventAction'
-        ActorKey:
-          type: array
-          items:
-            type: string
-        ActorKind:
-          type: array
-          items:
-            $ref: '#/components/schemas/EventActorKind'
     EventKind:
       type: string
       description: Kind of event (Error, Normal, Warning), new types could be added in the future.

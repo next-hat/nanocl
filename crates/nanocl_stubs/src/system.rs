@@ -416,15 +416,33 @@ pub struct Event {
 }
 
 /// Condition to stop watching for events if their are meet
-#[derive(Clone, Debug)]
+#[derive(Default, Clone, Debug)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct EventCondition {
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub actor_key: Option<String>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub actor_kind: Option<EventActorKind>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub related_key: Option<String>,
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub related_kind: Option<EventActorKind>,
   pub kind: Vec<EventKind>,
   pub action: Vec<NativeEventAction>,
-  pub actor_key: Vec<String>,
-  pub actor_kind: Vec<EventActorKind>,
 }
 
 impl std::cmp::PartialEq<Event> for EventCondition {

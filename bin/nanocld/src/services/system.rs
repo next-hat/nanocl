@@ -127,10 +127,11 @@ mod tests {
     let client = system.client;
     let client_ptr = client.clone();
     let conditions = [EventCondition {
-      actor_kind: [EventActorKind::Cargo].to_vec(),
-      actor_key: [format!("{CARGO_NAME}.global")].to_vec(),
+      actor_kind: Some(EventActorKind::Cargo),
+      actor_key: Some(format!("{CARGO_NAME}.global")),
       kind: [EventKind::Normal].to_vec(),
       action: [NativeEventAction::Start].to_vec(),
+      ..Default::default()
     }];
     let wait_task = rt::spawn(async move {
       let res = client_ptr
