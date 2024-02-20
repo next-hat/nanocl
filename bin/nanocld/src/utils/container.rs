@@ -77,7 +77,7 @@ where
         let event = EventPartial {
           reporting_controller: vars::CONTROLLER_NAME.to_owned(),
           reporting_node: state.config.hostname.clone(),
-          action: NativeEventAction::Fail.to_string(),
+          action: NativeEventAction::Downloading.to_string(),
           reason: "state_sync".to_owned(),
           kind: EventKind::Error,
           actor: Some(EventActor {
