@@ -303,13 +303,13 @@ pub async fn create_cargo(
   number: usize,
   state: &SystemState,
 ) -> HttpResult<Vec<Process>> {
+  execute_cargo_before(cargo, state).await?;
   download_image(
     &cargo.spec.container.image.clone().unwrap_or_default(),
     cargo,
     state,
   )
   .await?;
-  execute_cargo_before(cargo, state).await?;
   let mut secret_envs: Vec<String> = Vec::new();
   if let Some(secrets) = &cargo.spec.secrets {
     let filter = GenericFilter::new()

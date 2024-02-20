@@ -4,7 +4,8 @@ use ntex::rt;
 
 use nanocl_error::io::IoResult;
 use nanocl_stubs::system::{
-  Event, EventActor, EventActorKind, NativeEventAction, ObjPsStatusKind,
+  Event, EventActor, EventActorKind, EventKind, NativeEventAction,
+  ObjPsStatusKind,
 };
 
 use crate::{
@@ -164,6 +165,10 @@ fn stop(
 /// The task manager will execute the action in background
 /// eg: starting, deleting, updating a living object
 pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
+  match e.kind {
+    EventKind::Error | EventKind::Warning => return Ok(()),
+    _ => {}
+  }
   let Some(ref actor) = e.actor else {
     return Ok(());
   };
@@ -193,6 +198,13 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   };
   let Some(task) = task else { return Ok(()) };
   // push the task into the task manager
-  state.task_manager.add_task(&task_key, action, task).await;
+  let state_ptr = state.clone();
+  let actor = actor.clone();
+  state
+    .task_manager
+    .add_task(&task_key, action.clone(), task, move |err| {
+      state_ptr.emit_error_native_action(&actor, action, Some(err.to_string()));
+    })
+    .await;
   Ok(())
 }

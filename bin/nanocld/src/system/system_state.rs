@@ -57,7 +57,7 @@ impl SystemState {
           if let Err(err) = self.event_emitter_raw.emit(&e).await {
             log::error!("system::run: raw emit {err}");
           }
-          if let Err(err) = crate::system::exec_event(&e, &self).await {
+          if let Err(err) = super::exec_event(&e, &self).await {
             log::error!("system::run: exec event {err}");
           }
         }
@@ -93,6 +93,37 @@ impl SystemState {
     condition: Option<Vec<EventCondition>>,
   ) -> IoResult<RawEventReceiver> {
     self.event_emitter_raw.subscribe(condition).await
+  }
+
+  /// Emit a Error event action
+  pub fn emit_error_native_action<A>(
+    &self,
+    actor: &A,
+    action: NativeEventAction,
+    note: Option<String>,
+  ) where
+    A: Into<EventActor> + Clone,
+  {
+    let actor = actor.clone().into();
+    let event = EventPartial {
+      reporting_controller: vars::CONTROLLER_NAME.to_owned(),
+      reporting_node: self.config.hostname.clone(),
+      kind: EventKind::Error,
+      action: action.to_string(),
+      related: None,
+      reason: "state_sync".to_owned(),
+      note: match note {
+        None => Some(format!(
+          "{} {}",
+          actor.kind,
+          actor.key.clone().unwrap_or_default()
+        )),
+        Some(note) => Some(note),
+      },
+      metadata: None,
+      actor: Some(actor),
+    };
+    self.spawn_emit_event(event);
   }
 
   /// Emit a normal event action

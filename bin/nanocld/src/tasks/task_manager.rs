@@ -36,12 +36,15 @@ impl TaskManager {
     Self::default()
   }
 
-  pub async fn add_task(
+  pub async fn add_task<EC>(
     &self,
     key: &str,
     kind: NativeEventAction,
     task: ObjTaskFuture,
-  ) {
+    on_error: EC,
+  ) where
+    EC: FnOnce(IoError) + 'static,
+  {
     let key = key.to_owned();
     let key_ptr = key.clone();
     let tasks = self.tasks.clone();
@@ -49,6 +52,8 @@ impl TaskManager {
     let new_task = ObjTask::new(kind.clone(), async move {
       if let Err(err) = task.await {
         log::error!("Task failed: {kind} {key_ptr} {}", err);
+        tasks.lock().await.remove(&key_ptr);
+        on_error(err.clone());
         return Err(err);
       };
       log::debug!("Task completed: {kind} {key_ptr}");

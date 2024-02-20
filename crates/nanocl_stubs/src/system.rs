@@ -457,9 +457,17 @@ impl std::cmp::PartialEq<Event> for EventCondition {
     let Ok(action) = NativeEventAction::from_str(&other.action) else {
       return false;
     };
-    self.actor_kind.iter().any(|a| *a == actor.kind)
-      && self.actor_key.iter().any(|a| a == key)
-      && self.kind.iter().any(|k| *k == other.kind)
-      && self.action.iter().any(|a| *a == action)
+    self
+      .actor_kind
+      .clone()
+      .map(|a| a == actor.kind)
+      .unwrap_or_default()
+      && self
+        .actor_key
+        .clone()
+        .map(|a| &a == key)
+        .unwrap_or_default()
+      && self.kind.clone().into_iter().any(|k| k == other.kind)
+      && self.action.clone().into_iter().any(|a| a == action)
   }
 }
