@@ -442,13 +442,21 @@ async fn wait_process_object(
   client: &NanocldClient,
 ) -> IoResult<()> {
   let mut stream = client
-    .watch_events(Some(vec![EventCondition {
-      actor_key: Some(key.to_owned()),
-      actor_kind: Some(kind),
-      kind: vec![EventKind::Normal, EventKind::Error],
-      action,
-      ..Default::default()
-    }]))
+    .watch_events(Some(vec![
+      EventCondition {
+        kind: vec![EventKind::Normal, EventKind::Error],
+        related_key: Some(key.to_owned()),
+        related_kind: Some(kind.clone()),
+        ..Default::default()
+      },
+      EventCondition {
+        actor_key: Some(key.to_owned()),
+        actor_kind: Some(kind.clone()),
+        kind: vec![EventKind::Normal, EventKind::Error],
+        action,
+        ..Default::default()
+      },
+    ]))
     .await?;
   while let Some(event) = stream.next().await {
     let event = event?;
