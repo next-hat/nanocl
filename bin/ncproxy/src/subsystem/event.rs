@@ -87,11 +87,12 @@ async fn delete_cargo_rule(
 /// Analyze nanocld events and update nginx configuration
 async fn on_event(event: &Event, state: &SystemStateRef) -> IoResult<()> {
   let action = NativeEventAction::from_str(&event.action)?;
+  let kind = &event.kind;
   let Some(actor) = event.actor.clone() else {
     return Ok(());
   };
   let actor_kind = &actor.kind;
-  log::trace!("event::on_event: {actor_kind} {action}");
+  log::trace!("event::on_event: {kind} {action} {actor_kind}");
   match (actor_kind, action) {
     (EventActorKind::Cargo, NativeEventAction::Start)
     | (EventActorKind::Cargo, NativeEventAction::Update) => {
@@ -147,7 +148,7 @@ async fn ensure_self_config(client: &NanocldClient) -> IoResult<()> {
 async fn r#loop(state: &SystemStateRef) {
   loop {
     log::info!("event::loop: subscribing to nanocld events");
-    match state.client.watch_events().await {
+    match state.client.watch_events(None).await {
       Err(err) => {
         log::warn!("event::loop: {err}");
       }

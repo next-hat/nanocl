@@ -403,12 +403,21 @@ paths:
                 items:
                   $ref: '#/components/schemas/Event'
   /events/watch:
-    get:
+    post:
       tags:
       - System
       summary: Watch on new events using Server-Sent Events / EventSource
       description: Watch on new events using Server-Sent Events / EventSource
       operationId: watch_event
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventCondition'
+              nullable: true
+        required: false
       responses:
         '200':
           description: Event stream
@@ -3105,6 +3114,35 @@ components:
       - Secret
       - Process
       - ContainerImage
+    EventCondition:
+      type: object
+      description: Condition to stop watching for events if their are meet
+      required:
+      - Kind
+      - Action
+      properties:
+        ActorKey:
+          type: string
+          nullable: true
+        ActorKind:
+          allOf:
+          - $ref: '#/components/schemas/EventActorKind'
+          nullable: true
+        RelatedKey:
+          type: string
+          nullable: true
+        RelatedKind:
+          allOf:
+          - $ref: '#/components/schemas/EventActorKind'
+          nullable: true
+        Kind:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventKind'
+        Action:
+          type: array
+          items:
+            $ref: '#/components/schemas/NativeEventAction'
     EventKind:
       type: string
       description: Kind of event (Error, Normal, Warning), new types could be added in the future.
@@ -4729,6 +4767,60 @@ components:
           type: string
           format: date-time
           description: When the namespace was created
+    NativeEventAction:
+      oneOf:
+      - type: string
+        enum:
+        - create
+      - type: string
+        enum:
+        - starting
+      - type: string
+        enum:
+        - start
+      - type: string
+        enum:
+        - updating
+      - type: string
+        enum:
+        - update
+      - type: string
+        enum:
+        - destroying
+      - type: string
+        enum:
+        - destroy
+      - type: string
+        enum:
+        - stopping
+      - type: string
+        enum:
+        - stop
+      - type: string
+        enum:
+        - restart
+      - type: string
+        enum:
+        - finish
+      - type: string
+        enum:
+        - fail
+      - type: string
+        enum:
+        - die
+      - type: string
+        enum:
+        - downloading
+      - type: string
+        enum:
+        - download
+      - type: object
+        required:
+        - other
+        properties:
+          other:
+            type: string
+      description: Action is the action that triggered the event
     Network:
       type: object
       properties:

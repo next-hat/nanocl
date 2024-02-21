@@ -2,7 +2,7 @@
 # This is an example of a virtual machine deployment
 # It will take over a physical interface from the host
 ###
-ApiVersion: v0.12
+ApiVersion: v0.13
 
 Namespace: global
 

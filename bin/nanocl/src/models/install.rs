@@ -36,6 +36,9 @@ pub struct InstallOpts {
   /// Force repull of the nanocl components
   #[clap(short = 'p', long)]
   pub(crate) force_pull: bool,
+  /// Attach to the container logs after installation
+  #[clap(short = 'f')]
+  pub(crate) follow: bool,
 }
 
 /// Arguments for the nanocl daemon used by the install template

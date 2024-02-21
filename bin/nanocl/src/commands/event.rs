@@ -26,10 +26,10 @@ impl GenericList for EventArg {
 }
 
 /// Function that execute when running `nanocl events`
-/// Will print the events emited by the daemon
+/// Will print the events emitted by the daemon
 pub async fn watch_event(cli_conf: &CliConfig) -> IoResult<()> {
   let client = &cli_conf.client;
-  let mut stream = client.watch_events().await?;
+  let mut stream = client.watch_events(None).await?;
   while let Some(event) = stream.next().await {
     let event = event?;
     utils::print::display_format(&cli_conf.user_config.display_format, event)?;

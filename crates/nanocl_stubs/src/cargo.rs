@@ -4,9 +4,9 @@ use serde::{Serialize, Deserialize};
 use bollard_next::container::{StatsOptions, KillContainerOptions};
 
 use crate::{
-  system::{EventActor, EventActorKind, ObjPsStatus},
-  cargo_spec::CargoSpecPartial,
   process::Process,
+  cargo_spec::CargoSpecPartial,
+  system::{EventActor, EventActorKind, ObjPsStatus},
 };
 
 use super::cargo_spec::CargoSpec;

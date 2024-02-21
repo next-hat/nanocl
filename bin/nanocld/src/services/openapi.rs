@@ -40,6 +40,7 @@ use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 use nanocl_stubs::generic::{GenericCount, GenericClause, GenericFilter};
 use nanocl_stubs::system::{
   BinaryInfo, HostInfo, Event, EventActor, EventActorKind, EventKind,
+  EventCondition, NativeEventAction,
 };
 use nanocl_stubs::metric::{Metric, MetricPartial};
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
@@ -491,6 +492,8 @@ impl Modify for VersionModifier {
     EventActor,
     EventActorKind,
     EventKind,
+    EventCondition,
+    NativeEventAction,
   )),
   tags(
     (name = "CargoImages", description = "Cargo images management endpoints."),

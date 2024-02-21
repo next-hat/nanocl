@@ -77,7 +77,7 @@ where
         let event = EventPartial {
           reporting_controller: vars::CONTROLLER_NAME.to_owned(),
           reporting_node: state.config.hostname.clone(),
-          action: NativeEventAction::Fail.to_string(),
+          action: NativeEventAction::Downloading.to_string(),
           reason: "state_sync".to_owned(),
           kind: EventKind::Error,
           actor: Some(EventActor {
@@ -303,13 +303,13 @@ pub async fn create_cargo(
   number: usize,
   state: &SystemState,
 ) -> HttpResult<Vec<Process>> {
+  execute_cargo_before(cargo, state).await?;
   download_image(
     &cargo.spec.container.image.clone().unwrap_or_default(),
     cargo,
     state,
   )
   .await?;
-  execute_cargo_before(cargo, state).await?;
   let mut secret_envs: Vec<String> = Vec::new();
   if let Some(secrets) = &cargo.spec.secrets {
     let filter = GenericFilter::new()

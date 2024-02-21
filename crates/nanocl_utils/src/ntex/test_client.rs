@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use ntex::web::test::TestServer;
 use ntex::http::client::{ClientRequest, ClientResponse};
 
@@ -14,15 +16,16 @@ macro_rules! test_status_code {
 
 pub use test_status_code;
 
+#[derive(Clone)]
 pub struct TestClient {
-  srv: TestServer,
+  srv: Rc<TestServer>,
   version: String,
 }
 
 impl TestClient {
   pub fn new(srv: TestServer, version: &str) -> Self {
     Self {
-      srv,
+      srv: Rc::new(srv),
       version: version.to_owned(),
     }
   }
