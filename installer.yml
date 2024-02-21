@@ -1,4 +1,4 @@
-ApiVersion: v0.12
+ApiVersion: v0.13
 
 # This is the required component for nanocl ecosystem.
 # It is a deployment that will be parsed and used to spin up nanocl.

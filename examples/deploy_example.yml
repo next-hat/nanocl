@@ -1,4 +1,4 @@
-ApiVersion: v0.12
+ApiVersion: v0.13
 
 Secrets:
   - Name: env.deploy-example.com
@@ -16,6 +16,7 @@ Secrets:
 Resources:
   - Name: deploy-example.com
     Kind: ncproxy.io/rule
+    ## User defined metadata mostly used for plugins
     Metadata:
       CertManager: certbot
       Selector:
