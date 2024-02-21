@@ -1,10 +1,11 @@
 use std::time::Duration;
 use std::collections::HashMap;
 
+use futures::{stream::FuturesUnordered, StreamExt};
 use nix::unistd::Group;
 use bollard_next::{
+  container::{LogOutput, LogsOptions, StartContainerOptions},
   network::{CreateNetworkOptions, InspectNetworkOptions},
-  container::StartContainerOptions,
 };
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
@@ -130,7 +131,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       .map_err(|err| err.map_err_context(|| "Nanocl system network"))?;
   }
   let pg_style = utils::progress::create_spinner_style("green");
-  for cargo in cargoes {
+  for cargo in &cargoes {
     let image = cargo.container.image.clone().ok_or(IoError::invalid_data(
       format!("Cargo {} image", cargo.name),
       "is not specified".into(),
@@ -150,7 +151,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
       &pg_style,
     );
     let container = utils::docker::create_cargo_container(
-      &cargo,
+      cargo,
       &deployment.namespace.clone().unwrap_or("system".into()),
       &docker,
     )
@@ -188,6 +189,50 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     if let Err(err) = Context::r#use("desktop-linux") {
       eprintln!("WARN: Unable to use context for docker desktop: {err}");
     }
+  }
+  if args.follow {
+    cargoes
+      .into_iter()
+      .map(move |cargo| {
+        let docker_ptr = docker.clone();
+        async move {
+          let opts = LogsOptions::<String> {
+            follow: true,
+            stdout: true,
+            stderr: true,
+            ..Default::default()
+          };
+          let mut stream =
+            docker_ptr.logs(&format!("{}.system.c", cargo.name), Some(opts));
+          while let Some(log) = stream.next().await {
+            match log {
+              Ok(log) => {
+                match log {
+                  LogOutput::StdOut { message } => {
+                    let message = String::from_utf8_lossy(&message);
+                    print!("{}: {}", cargo.name, message);
+                  }
+                  LogOutput::StdErr { message } => {
+                    let message = String::from_utf8_lossy(&message);
+                    eprint!("{}: {}", cargo.name, message);
+                  }
+                  LogOutput::Console { message } => {
+                    let message = String::from_utf8_lossy(&message);
+                    print!("{}: {}", cargo.name, message);
+                  }
+                  _ => {}
+                };
+              }
+              Err(err) => {
+                eprintln!("WARN: Unable to get logs: {err}");
+              }
+            }
+          }
+        }
+      })
+      .collect::<FuturesUnordered<_>>()
+      .collect::<Vec<_>>()
+      .await;
   }
   Ok(())
 }
