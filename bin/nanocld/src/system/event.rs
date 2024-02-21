@@ -203,6 +203,13 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   state
     .task_manager
     .add_task(&task_key, action.clone(), task, move |err| {
+      let action = match action {
+        NativeEventAction::Starting => NativeEventAction::Start,
+        NativeEventAction::Stopping => NativeEventAction::Stop,
+        NativeEventAction::Updating => NativeEventAction::Start,
+        NativeEventAction::Destroying => NativeEventAction::Destroy,
+        _ => return,
+      };
       state_ptr.emit_error_native_action(&actor, action, Some(err.to_string()));
     })
     .await;
