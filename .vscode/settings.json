@@ -33,6 +33,7 @@
     "getifaddrs",
     "iface",
     "ifaddrs",
+    "indicatif",
     "Insertable",
     "ipam",
     "jsonschema",

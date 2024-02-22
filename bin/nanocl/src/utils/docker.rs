@@ -21,7 +21,7 @@ use crate::models::DockerContextMeta;
 
 /// Update progress bar for install image
 fn update_image_progress(
-  multiprogress: &MultiProgress,
+  multi_progress: &MultiProgress,
   layers: &mut HashMap<String, ProgressBar>,
   id: &str,
   progress: &ProgressDetail,
@@ -47,7 +47,7 @@ fn update_image_progress(
     .unwrap()
     .progress_chars("=> ");
     pg.set_style(style);
-    multiprogress.add(pg.to_owned());
+    multi_progress.add(pg.to_owned());
     let percent = calculate_percentage(current, total);
     pg.set_position(percent);
     layers.insert(id.to_owned(), pg);
@@ -67,8 +67,8 @@ pub async fn install_image(
   });
   let mut stream = docker_api.create_image(options, None, None);
   let mut layers: HashMap<String, ProgressBar> = HashMap::new();
-  let multiprogress = MultiProgress::new();
-  multiprogress.set_move_cursor(false);
+  let multi_progress = MultiProgress::new();
+  multi_progress.set_move_cursor(false);
   while let Some(res) = stream.next().await {
     let data = res
       .map_err(|err| err.map_err_context(|| "Install image stream failed"))?;
@@ -77,10 +77,10 @@ pub async fn install_image(
     let progress = data.progress_detail.unwrap_or_default();
     match status.as_str() {
       "Pulling fs layer" => {
-        update_image_progress(&multiprogress, &mut layers, &id, &progress);
+        update_image_progress(&multi_progress, &mut layers, &id, &progress);
       }
       "Downloading" => {
-        update_image_progress(&multiprogress, &mut layers, &id, &progress);
+        update_image_progress(&multi_progress, &mut layers, &id, &progress);
       }
       "Download complete" => {
         if let Some(pg) = layers.get(&id) {
@@ -88,11 +88,11 @@ pub async fn install_image(
         }
       }
       "Extracting" => {
-        update_image_progress(&multiprogress, &mut layers, &id, &progress);
+        update_image_progress(&multi_progress, &mut layers, &id, &progress);
       }
       _ => {
         if layers.get(&id).is_none() {
-          let _ = multiprogress.println(&status);
+          let _ = multi_progress.println(&status);
         }
       }
     };
@@ -163,41 +163,91 @@ pub fn hook_labels(
   hooked_labels
 }
 
+/// Hook cargoes binds to replace relative path with absolute path
+pub fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
+  let new_cargo = match &cargo.container.host_config {
+    None => cargo.clone(),
+    Some(host_config) => match &host_config.binds {
+      None => cargo.clone(),
+      Some(binds) => {
+        let mut new_binds = Vec::new();
+        for bind in binds {
+          let bind_split = bind.split(':').collect::<Vec<&str>>();
+          let new_bind = if bind_split.len() == 2 {
+            let host_path = bind_split[0];
+            if host_path.starts_with('.') {
+              let curr_path = std::env::current_dir()?;
+              let path = std::path::Path::new(&curr_path)
+                .join(std::path::PathBuf::from(host_path));
+              let path = path.display().to_string();
+              format!("{}:{}", path, bind_split[1])
+            } else {
+              bind.clone()
+            }
+          } else {
+            bind.clone()
+          };
+          new_binds.push(new_bind);
+        }
+        CargoSpecPartial {
+          container: Config {
+            host_config: Some(HostConfig {
+              binds: Some(new_binds),
+              ..host_config.clone()
+            }),
+            ..cargo.container.clone()
+          },
+          ..cargo.clone()
+        }
+      }
+    },
+  };
+  Ok(new_cargo)
+}
+
 /// Create a container from a cargo config
 pub async fn create_cargo_container(
   cargo: &CargoSpecPartial,
   namespace: &str,
   docker: &Docker,
 ) -> IoResult<ContainerCreateResponse> {
-  let name = &cargo.name;
-  let config = &cargo.container;
+  let hooked_cargo = hook_binds(cargo)?;
+  let name = &hooked_cargo.name;
+  let config = &hooked_cargo.container;
   let key = format!("{name}.{namespace}");
-  let hooked_config = Config {
+  let host_config = config.host_config.clone().unwrap_or_default();
+  let hooked_container = Config {
     labels: Some(hook_labels(
       &key,
       namespace,
       &config.labels.clone().unwrap_or_default(),
     )),
     host_config: Some(HostConfig {
+      network_mode: Some(
+        host_config
+          .network_mode
+          .clone()
+          .unwrap_or(namespace.to_owned()),
+      ),
       restart_policy: Some(RestartPolicy {
         name: Some(RestartPolicyNameEnum::ALWAYS),
         ..Default::default()
       }),
-      ..config.host_config.clone().unwrap_or_default()
+      ..host_config
     }),
     ..config.clone()
   };
+  println!("creating : {hooked_container:#?}");
   let container = docker
     .create_container(
       Some(CreateContainerOptions {
         name: format!("{key}.c"),
-        platform: None,
+        ..Default::default()
       }),
-      hooked_config,
+      hooked_container,
     )
     .await
     .map_err(|err| err.map_err_context(|| format!("Cargo {name}")))?;
-
   Ok(container)
 }
 

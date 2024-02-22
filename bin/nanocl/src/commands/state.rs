@@ -5,8 +5,6 @@ use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
 use futures::{StreamExt, stream::FuturesUnordered};
 
-use bollard_next::service::HostConfig;
-
 use nanocl_error::io::{IoError, FromIo, IoResult};
 
 use nanocld_client::{
@@ -20,7 +18,7 @@ use nanocld_client::{
     job::JobPartial,
     statefile::Statefile,
     process::ProcessLogQuery,
-    cargo_spec::{CargoSpecPartial, Config},
+    cargo_spec::CargoSpecPartial,
     vm_spec::{VmSpecPartial, VmSpecUpdate},
     resource::{ResourcePartial, ResourceUpdate},
     secret::{SecretUpdate, SecretPartial},
@@ -95,48 +93,6 @@ where
   Ok(state_ref)
 }
 
-/// Hook cargoes binds to replace relative path with absolute path
-fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
-  let new_cargo = match &cargo.container.host_config {
-    None => cargo.clone(),
-    Some(host_config) => match &host_config.binds {
-      None => cargo.clone(),
-      Some(binds) => {
-        let mut new_binds = Vec::new();
-        for bind in binds {
-          let bind_split = bind.split(':').collect::<Vec<&str>>();
-          let new_bind = if bind_split.len() == 2 {
-            let host_path = bind_split[0];
-            if host_path.starts_with('.') {
-              let curr_path = std::env::current_dir()?;
-              let path = std::path::Path::new(&curr_path)
-                .join(std::path::PathBuf::from(host_path));
-              let path = path.display().to_string();
-              format!("{}:{}", path, bind_split[1])
-            } else {
-              bind.clone()
-            }
-          } else {
-            bind.clone()
-          };
-          new_binds.push(new_bind);
-        }
-        CargoSpecPartial {
-          container: Config {
-            host_config: Some(HostConfig {
-              binds: Some(new_binds),
-              ..host_config.clone()
-            }),
-            ..cargo.container.clone()
-          },
-          ..cargo.clone()
-        }
-      }
-    },
-  };
-  Ok(new_cargo)
-}
-
 /// Logs existing jobs in the Statefile
 async fn log_jobs(
   client: &NanocldClient,
@@ -195,7 +151,7 @@ fn hook_cargoes(
 ) -> IoResult<Vec<CargoSpecPartial>> {
   let mut new_cargoes = Vec::new();
   for cargo in cargoes {
-    let new_cargo = hook_binds(&cargo)?;
+    let new_cargo = utils::docker::hook_binds(&cargo)?;
     new_cargoes.push(new_cargo);
   }
   Ok(new_cargoes)

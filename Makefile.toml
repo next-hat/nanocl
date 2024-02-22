@@ -136,8 +136,16 @@ command = "cargo"
 args = ["test", "--no-default-features", "--features", "test", "--nocapture"]
 
 [tasks.dev]
-command = "docker"
-args = ["compose", "up"]
+command = "cargo"
+args = [
+  "make",
+  "run-cli",
+  "install",
+  "--state-dir",
+  "${HOME}/.nanocl_dev",
+  "-ft",
+  "./Statefile.yml",
+]
 
 # Test coverage
 [tasks.cov]

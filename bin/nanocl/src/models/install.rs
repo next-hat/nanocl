@@ -23,7 +23,7 @@ pub struct InstallOpts {
   pub(crate) advertise_addr: Option<String>,
   /// The hosts to use for the nanocl daemon default is detected
   #[clap(long)]
-  pub(crate) deamon_hosts: Option<Vec<String>>,
+  pub(crate) daemon_hosts: Option<Vec<String>>,
   /// The group to use for the nanocl daemon default is nanocl
   #[clap(long)]
   pub(crate) group: Option<String>,
@@ -33,7 +33,7 @@ pub struct InstallOpts {
   /// Installation template to use for nanocl by default it's detected
   #[clap(short, long)]
   pub(crate) template: Option<String>,
-  /// Force repull of the nanocl components
+  /// Force re pull of the nanocl components
   #[clap(short = 'p', long)]
   pub(crate) force_pull: bool,
   /// Attach to the container logs after installation
