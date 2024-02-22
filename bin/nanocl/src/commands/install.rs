@@ -57,7 +57,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   };
   let group = args.group.as_deref().unwrap_or("nanocl");
   let hosts = args
-    .deamon_hosts
+    .daemon_hosts
     .clone()
     .unwrap_or(vec!["unix:///run/nanocl/nanocl.sock".into()]);
   let group = Group::from_name(group)

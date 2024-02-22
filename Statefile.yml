@@ -1,0 +1,159 @@
+## Statefile used for development and testing purposes
+## We moved away from the classic docker compose setup
+## Because we needed to have a more flexible config to enable multi node testing
+ApiVersion: v0.13
+Namespace: system
+
+Cargoes:
+- Name: nstore
+  Container:
+    Hostname: store.nanocl.internal
+    Image: cockroachdb/cockroach:v23.1.13
+    Entrypoint:
+      - /bin/sh
+    Tty: true
+    Env:
+      - STATE_DIR=${{ state_dir }}/store
+    HostConfig:
+      PortBindings:
+        26257/tcp:
+          - HostPort: "26257"
+        26258/tcp:
+          - HostPort: "26258"
+      Binds:
+        - ${{ state_dir }}/store:${{ state_dir }}/store
+    Cmd:
+     - -c
+     - |
+       echo "starting cockroachdb"
+       if [ ! -f "$STATE_DIR/ca/ca.key" ]; then
+         echo "generating certs"
+         mkdir -p $STATE_DIR/ca $STATE_DIR/certs $STATE_DIR/data
+         cockroach cert create-ca --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
+         cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
+         cockroach cert create-client root --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
+       fi
+       cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$STATE_DIR/certs --store=$STATE_DIR/data
+
+- Name: nmetrics
+  Container:
+    Image: ghcr.io/next-hat/metrsd:0.5.2
+    Tty: true
+    Env: [LOG_LEVEL=metrsd=info]
+    Cmd:
+      - --hosts
+      - unix:///run/nanocl/metrics.sock
+    HostConfig:
+      Binds:
+        - //run/guest-services/nanocl:/run/nanocl
+
+- Name: nproxy
+  Container:
+    Image: nproxy:dev
+    Tty: true
+    Env:
+      - STATE_DIR=${{ state_dir }}/proxy
+    HostConfig:
+      NetworkMode: host
+      Binds:
+        - //run/guest-services/nanocl:/run/nanocl
+        - ${{ state_dir }}/proxy:/${{ state_dir }}/proxy
+
+- Name: ncproxy
+  Container:
+    Image: ghcr.io/next-hat/nanocl-dev:dev
+    Tty: true
+    ExposedPorts:
+      8686/tcp:
+    HostConfig:
+      PortBindings:
+        8686/tcp:
+          - HostPort: "8686"
+            HostIp: "0.0.0.0"
+      Binds:
+        - ./:/project
+        - nanocl-deps:/project/target
+        - rust-cache:/usr/local/cargo/registry
+        - ${{ state_dir }}/proxy:/${{ state_dir }}/proxy
+        - //run/guest-services/nanocl:/run/nanocl
+    Cmd:
+      - watch
+      - -w
+      - /project/bin/ncproxy/src
+      - -x
+      - run --no-default-features --features dev --bin ncproxy -- --state-dir ${{ state_dir }}/proxy
+
+- Name: ndns
+  Container:
+    Image: ndns:dev
+    Tty: true
+    Env:
+      - STATE_DIR=${{ state_dir }}/dns
+    HostConfig:
+      NetworkMode: host
+      Binds:
+        - ${{ state_dir }}/dns:/${{ state_dir }}/dns
+
+- Name: ncdns
+  Container:
+    Image: ghcr.io/next-hat/nanocl-dev:dev
+    Tty: true
+    ExposedPorts:
+      8787/tcp:
+    HostConfig:
+      PortBindings:
+        8787/tcp:
+          - HostPort: "8787"
+      Binds:
+        - ./:/project
+        - nanocl-deps:/project/target
+        - rust-cache:/usr/local/cargo/registry
+        - ${{ state_dir }}/dns:/${{ state_dir }}/dns
+        - //run/guest-services/nanocl:/run/nanocl
+    Cmd:
+      - watch
+      - -w
+      - /project/bin/ncdns/src
+      - -x
+      - run --no-default-features --features dev --bin ncdns -- --state-dir ${{ state_dir }}/dns
+
+- Name: ndaemon
+  Container:
+    Image: ghcr.io/next-hat/nanocl-dev:dev
+    Tty: true
+    Hostname: nanocl.internal
+    Cmd:
+      - watch
+      - -w
+      - /project/bin/nanocld/src
+      - -x
+      - |
+        run --no-default-features \
+          --features dev \
+          --bin nanocld \
+          -- \
+          --hosts unix:///run/nanocl/nanocl.sock \
+          --gid 1001 \
+          --hosts tcp://0.0.0.0:9443 \
+          --cert ./tests/server.crt \
+          --cert-key ./tests/server.key \
+          --cert-ca ./tests/ca.crt \
+          --state-dir ${{ state_dir }}
+    ExposedPorts:
+      8585/tcp:
+      9443/tcp:
+    HostConfig:
+      PortBindings:
+        8585/tcp:
+        - HostPort: "8585"
+          HostIp: "0.0.0.0"
+        9443/tcp:
+        - HostPort: "9443"
+          HostIp: "0.0.0.0"
+      Binds:
+        - ./:/project
+        - nanocl-deps:/project/target
+        - rust-cache:/usr/local/cargo/registry
+        - //run/guest-services/nanocl:/run/nanocl
+        - ${{ state_dir }}:/${{ state_dir }}
+        - /var/run/docker.sock:/run/docker.sock
