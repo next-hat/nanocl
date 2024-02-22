@@ -49,6 +49,8 @@ We stand for robust performance and efficiency with simplicity, trimming the blo
 - [📋 Requirements](#-requirements)
 - [💾 Installation](#-installation)
 - [👨‍💻 Contributing](#-contributing)
+- [💎 Sponsors](#-sponsors)
+- [⭐️ Show your support](#️-show-your-support)
 
 ## 🚀 Key Benefits
 
@@ -108,7 +110,7 @@ Demo of `Nanocl` in action when applying `example/deploy_example.yml`:
 ## 🧿 Architecture
 
 `Nanocl` is designed in a **micro services** architecture several component are required and they are running as **container** included the `Nanocl Daemon` itself.
-The following components will be installed during `nanocl setup` and are required to ensure `Nanocl` functionnality:
+The following components will be installed during `nanocl setup` and are required to ensure `Nanocl` functionality:
 
 - `nstore` to save our state
 - `ndaemon` as **REST API** to manage everything
@@ -148,9 +150,44 @@ To install `Nanocl`, please refer to our online [installation guide][nanocl_inst
 
 Every contribution is very welcome.
 
-But to be abble to do so you need a dev environnement right ?<br />
+But to be able to do so you need a dev environnement right ?<br />
 You can learn more about it on the [contribution guide][contributing_guide].<br />
-Also don't hesitate to join the discord if you have any question!
+Also don't hesitate to join the [discord][discord] if you have any question!
+
+## 💎 Sponsors
+
+Huge thanks to our sponsors
+
+<table>
+  <tr>
+  <td align="center">
+    <a href="https://github.com/mamaicode">
+      <img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/u/102310764?v=4&h=300&w=300&fit=cover&mask=circle&maxage=7d" width="100" alt="mamaicode" />
+      <br />
+      <sub>
+        <b>
+          Mamaicode
+        </b>
+      </sub>
+    </a>
+  </td>
+  <td align="center">
+    <a href="https://github.com/xf10w">
+      <img src="https://images.weserv.nl/?url=avatars.githubusercontent.com/u/43791027?v=4&h=300&w=300&fit=cover&mask=circle&maxage=7d" width="100" alt="xf10w" />
+      <br />
+      <sub>
+        <b>
+          xf10w
+        </b>
+      </sub>
+    </a>
+  </td>
+  </tr>
+</table>
+
+## ⭐️ Show your support
+
+Give a ⭐️ if this project helped you!
 
 [contributing_guide]: ./CONTRIBUTING.md
 [documentation]: https://docs.next-hat.com
@@ -160,3 +197,4 @@ Also don't hesitate to join the discord if you have any question!
 [nanocl_cli_ref]: https://docs.next-hat.com/references/nanocl/cli
 [nanocl_daemon_ref]: https://docs.next-hat.com/references/nanocl/daemon/overview
 [docker]: https://www.docker.com
+[discord]: https://discord.gg/WV4Aac8uZg
