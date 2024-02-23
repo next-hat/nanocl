@@ -5,6 +5,8 @@ pub use bollard_next::container::Config;
 pub use bollard_next::models::HostConfig;
 pub use bollard_next::models::HealthConfig;
 
+use crate::generic::ImagePullPolicy;
+
 /// Auto is used to automatically define that the number of replicas in the cluster
 /// Number is used to manually set the number of replicas
 /// Note: auto will ensure at least 1 replica exists in the cluster
@@ -82,6 +84,12 @@ pub struct CargoSpecPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
+  /// Image pull policy of the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub image_pull_policy: Option<ImagePullPolicy>,
   /// Container specification of the cargo
   pub container: Config,
   /// Replication specification of the cargo
@@ -129,13 +137,19 @@ pub struct CargoSpecUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
-  /// New replication specification of the cargo
+  /// Image pull policy of the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub image_pull_policy: Option<ImagePullPolicy>,
+  /// New container specification of the cargo
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub container: Option<Config>,
-  /// New container specification of the cargo
+  /// New replication specification of the cargo
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -152,6 +166,7 @@ impl From<CargoSpecPartial> for CargoSpecUpdate {
       replication: spec.replication,
       metadata: spec.metadata,
       secrets: spec.secrets,
+      image_pull_policy: spec.image_pull_policy,
     }
   }
 }
@@ -194,6 +209,12 @@ pub struct CargoSpec {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
+  /// Image pull policy of the cargo
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub image_pull_policy: Option<ImagePullPolicy>,
   /// Container specification of the cargo
   pub container: Config,
   /// Replication specification of the cargo
@@ -213,6 +234,7 @@ impl From<CargoSpec> for CargoSpecPartial {
       container: spec.container,
       metadata: spec.metadata,
       secrets: spec.secrets,
+      image_pull_policy: spec.image_pull_policy,
     }
   }
 }

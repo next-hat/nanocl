@@ -37,7 +37,9 @@ use nanocl_stubs::node::Node;
 use nanocl_stubs::process::{Process, ProcessKind};
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
-use nanocl_stubs::generic::{GenericCount, GenericClause, GenericFilter};
+use nanocl_stubs::generic::{
+  GenericCount, GenericClause, GenericFilter, ImagePullPolicy,
+};
 use nanocl_stubs::system::{
   BinaryInfo, HostInfo, Event, EventActor, EventActorKind, EventKind,
   EventCondition, NativeEventAction,
@@ -487,6 +489,7 @@ impl Modify for VersionModifier {
     EmptyObject,
     GenericClause,
     GenericFilter,
+    ImagePullPolicy,
     // Event
     Event,
     EventActor,

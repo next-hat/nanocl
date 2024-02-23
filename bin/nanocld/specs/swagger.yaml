@@ -2077,6 +2077,10 @@ components:
             type: string
           description: List of secrets to use as environment variables
           nullable: true
+        ImagePullPolicy:
+          allOf:
+          - $ref: '#/components/schemas/ImagePullPolicy'
+          nullable: true
         Container:
           $ref: '#/components/schemas/Config'
         Replication:
@@ -2107,6 +2111,10 @@ components:
           items:
             type: string
           description: List of secrets to use as environment variables
+          nullable: true
+        ImagePullPolicy:
+          allOf:
+          - $ref: '#/components/schemas/ImagePullPolicy'
           nullable: true
         Container:
           $ref: '#/components/schemas/Config'
@@ -2140,6 +2148,10 @@ components:
           items:
             type: string
           description: List of secrets to use as environment variables
+          nullable: true
+        ImagePullPolicy:
+          allOf:
+          - $ref: '#/components/schemas/ImagePullPolicy'
           nullable: true
         Container:
           allOf:
@@ -3844,6 +3856,13 @@ components:
           - $ref: '#/components/schemas/UrlRedirect'
           nullable: true
       additionalProperties: false
+    ImagePullPolicy:
+      type: string
+      description: Policy for pulling images related to process objects (job, cargo, vm)
+      enum:
+      - Never
+      - Always
+      - IfNotPresent
     IndexInfo:
       type: object
       description: IndexInfo contains information about a registry.
@@ -3945,6 +3964,10 @@ components:
           description: Remove the job after (x) seconds after execution
           nullable: true
           minimum: 0
+        ImagePullPolicy:
+          allOf:
+          - $ref: '#/components/schemas/ImagePullPolicy'
+          nullable: true
         Containers:
           type: array
           items:
@@ -4014,6 +4037,10 @@ components:
           description: Remove the job after (x) seconds after execution
           nullable: true
           minimum: 0
+        ImagePullPolicy:
+          allOf:
+          - $ref: '#/components/schemas/ImagePullPolicy'
+          nullable: true
         Containers:
           type: array
           items:

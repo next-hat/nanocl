@@ -189,3 +189,18 @@ impl GenericFilter {
     self
   }
 }
+
+/// Policy for pulling images related to process objects (job, cargo, vm)
+#[derive(Default, Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum ImagePullPolicy {
+  /// Never try to pull the image (image should be loaded manually then)
+  Never,
+  /// Always try to pull image on the node before starting the cargo/job
+  Always,
+  /// Pull the image only if it not exist on the node
+  #[default]
+  IfNotPresent,
+}
