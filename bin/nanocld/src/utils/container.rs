@@ -18,7 +18,7 @@ use nanocl_error::{
 
 use nanocl_stubs::{
   cargo::{Cargo, CargoKillOptions},
-  generic::{GenericClause, GenericFilter},
+  generic::{GenericClause, GenericFilter, ImagePullPolicy},
   job::Job,
   process::{Process, ProcessKind, ProcessPartial},
   system::{
@@ -52,15 +52,23 @@ pub fn parse_img_name(name: &str) -> HttpResult<(String, String)> {
 pub async fn download_image<A>(
   image: &str,
   actor: &A,
+  policy: ImagePullPolicy,
   state: &SystemState,
 ) -> HttpResult<()>
 where
   A: Into<EventActor> + Clone,
 {
-  // In case the image is a latest and not a pined tag we download the image in every case
-  // if state.docker_api.inspect_image(image).await.is_ok() {
-  //   return Ok(());
-  // }
+  match policy {
+    ImagePullPolicy::Always => {}
+    ImagePullPolicy::IfNotPresent => {
+      if state.docker_api.inspect_image(image).await.is_ok() {
+        return Ok(());
+      }
+    }
+    ImagePullPolicy::Never => {
+      return Ok(());
+    }
+  }
   let (name, tag) = parse_img_name(image)?;
   let mut stream = state.docker_api.create_image(
     Some(bollard_next::image::CreateImageOptions {
@@ -231,7 +239,13 @@ async fn execute_cargo_before(
         network_mode: Some(cargo.namespace_name.clone()),
         ..before.host_config.unwrap_or_default()
       });
-      download_image(&image, cargo, state).await?;
+      download_image(
+        &image,
+        cargo,
+        cargo.spec.image_pull_policy.clone().unwrap_or_default(),
+        state,
+      )
+      .await?;
       let mut labels = before.labels.to_owned().unwrap_or_default();
       labels.insert("io.nanocl.c".to_owned(), cargo.spec.cargo_key.to_owned());
       labels.insert("io.nanocl.n".to_owned(), cargo.namespace_name.to_owned());
@@ -307,6 +321,7 @@ pub async fn create_cargo(
   download_image(
     &cargo.spec.container.image.clone().unwrap_or_default(),
     cargo,
+    cargo.spec.image_pull_policy.clone().unwrap_or_default(),
     state,
   )
   .await?;
@@ -684,7 +699,7 @@ pub async fn create_vm_instance(
     Some(runtime) => runtime.to_owned(),
     None => vars::VM_RUNTIME.to_owned(),
   };
-  download_image(&image, vm, state).await?;
+  download_image(&image, vm, ImagePullPolicy::IfNotPresent, state).await?;
   let spec = bollard_next::container::Config {
     image: Some(image),
     tty: Some(true),
@@ -742,8 +757,13 @@ pub async fn create_job_instances(
 ) -> HttpResult<Vec<Process>> {
   let mut processes = Vec::new();
   for (index, container) in job.containers.iter().enumerate() {
-    download_image(&container.image.clone().unwrap_or_default(), job, state)
-      .await?;
+    download_image(
+      &container.image.clone().unwrap_or_default(),
+      job,
+      job.image_pull_policy.clone().unwrap_or_default(),
+      state,
+    )
+    .await?;
     let process =
       create_job_instance(&job.name, index, container, state).await?;
     processes.push(process);

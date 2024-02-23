@@ -159,7 +159,7 @@ fn hook_cargoes(
 
 /// Generate a nanocl daemon client based on the api version specified in the Statefile
 fn gen_client(
-  host: &str,
+  cli_conf: &CliConfig,
   state_ref: &StateRef<Statefile>,
 ) -> IoResult<NanocldClient> {
   let client = match &state_ref.data.api_version {
@@ -183,9 +183,15 @@ fn gen_client(
     }
     api_version if state_ref.data.api_version.starts_with('v') => {
       NanocldClient::connect_to(&ConnectOpts {
-        url: host.into(),
+        url: cli_conf.host.clone(),
+        ssl: cli_conf
+          .context
+          .endpoints
+          .get("Nanocl")
+          .expect("Nanocl endpoint is not defined")
+          .ssl
+          .clone(),
         version: Some(api_version.clone()),
-        ..Default::default()
       })
     }
     _ => {
@@ -427,10 +433,9 @@ async fn exec_state_apply(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
 ) -> IoResult<()> {
-  let host = &cli_conf.host;
   let format = cli_conf.user_config.display_format.clone();
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
-  let client = gen_client(host, &state_ref)?;
+  let client = gen_client(cli_conf, &state_ref)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let state_file =
     execute_template(&state_ref, &args, &client, cli_conf).await?;
@@ -597,10 +602,9 @@ async fn exec_state_logs(
   cli_conf: &CliConfig,
   opts: &StateLogsOpts,
 ) -> IoResult<()> {
-  let host = &cli_conf.host;
   let format = cli_conf.user_config.display_format.clone();
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
-  let client = gen_client(host, &state_ref)?;
+  let client = gen_client(cli_conf, &state_ref)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let state_file =
     execute_template(&state_ref, &args, &client, cli_conf).await?;
@@ -633,10 +637,9 @@ async fn exec_state_remove(
   cli_conf: &CliConfig,
   opts: &StateRemoveOpts,
 ) -> IoResult<()> {
-  let host = &cli_conf.host;
   let format = cli_conf.user_config.display_format.clone();
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
-  let client = gen_client(host, &state_ref)?;
+  let client = gen_client(cli_conf, &state_ref)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let state_file =
     inject_data(&state_ref, &args, &cli_conf.context, &client).await?;

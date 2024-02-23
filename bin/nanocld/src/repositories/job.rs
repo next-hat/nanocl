@@ -107,6 +107,7 @@ impl JobDb {
       ttl: p.ttl,
       status: status.clone().try_into()?,
       containers: p.containers.clone(),
+      image_pull_policy: p.image_pull_policy.clone(),
     })
   }
 

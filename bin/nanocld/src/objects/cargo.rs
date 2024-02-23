@@ -230,6 +230,11 @@ impl ObjPatchByPk for CargoDb {
       } else {
         cargo.spec.metadata
       },
+      image_pull_policy: if obj.spec.image_pull_policy.is_some() {
+        obj.spec.image_pull_policy.clone()
+      } else {
+        cargo.spec.image_pull_policy
+      },
     };
     let obj = &CargoObjPutIn {
       spec,
