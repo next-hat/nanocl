@@ -1394,7 +1394,7 @@ dependencies = [
  "http-body",
  "hyper",
  "pin-project-lite",
- "socket2 0.5.5",
+ "socket2 0.5.6",
  "tokio",
  "tower",
  "tower-service",
@@ -1877,7 +1877,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl"
-version = "0.13.1"
+version = "0.14.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -1909,7 +1909,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_error"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bollard-next",
  "diesel",
@@ -1922,7 +1922,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_stubs"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "bollard-next",
  "chrono",
@@ -1936,7 +1936,7 @@ dependencies = [
 
 [[package]]
 name = "nanocl_utils"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "clap",
  "clap_mangen",
@@ -1990,7 +1990,7 @@ dependencies = [
 
 [[package]]
 name = "nanocld_client"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "bollard-next",
  "futures",
@@ -2015,7 +2015,7 @@ dependencies = [
 
 [[package]]
 name = "ncdns"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "clap",
  "clap_mangen",
@@ -2165,7 +2165,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "sha-1",
- "socket2 0.5.5",
+ "socket2 0.5.6",
  "thiserror",
 ]
 
@@ -3292,12 +3292,12 @@ dependencies = [
 
 [[package]]
 name = "socket2"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b5fac59a5cb5dd637972e5fca70daf0523c9067fcdc4842f053dae04a18f8e9"
+checksum = "05ffd9c0a93b7543e062e759284fcf5f5e3b098501104bfbdde4d404db792871"
 dependencies = [
  "libc",
- "windows-sys 0.48.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3476,7 +3476,7 @@ dependencies = [
  "mio",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2 0.5.5",
+ "socket2 0.5.6",
  "windows-sys 0.48.0",
 ]
 

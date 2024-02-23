@@ -305,13 +305,8 @@ async fn execute_cargo_before(
 }
 
 /// Create instances (containers) based on the cargo spec
-/// The number of containers created is based on the number of instances
-/// defined in the cargo spec
-/// If the number of instances is greater than 1, the containers will be named
-/// with the cargo key and a number
-/// Example: cargo-key-1, cargo-key-2, cargo-key-3
-/// If the number of instances is equal to 1, the container will be named with
-/// the cargo key.
+/// The number of containers created is based on the number of instances defined in the cargo spec
+/// Example: cargo-key-(random-id), cargo-key-(random-id1), cargo-key-(random-id2)
 pub async fn create_cargo(
   cargo: &Cargo,
   number: usize,

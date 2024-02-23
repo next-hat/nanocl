@@ -3,7 +3,8 @@ use nanocl_error::io::{IoResult, FromIo};
 use crate::utils;
 use crate::config::CliConfig;
 use crate::models::{
-  SecretArg, SecretCommand, SecretRow, SecretRemoveOpts, SecretInspectOpts,
+  SecretArg, SecretCommand, SecretCreateOpts, SecretInspectOpts,
+  SecretRemoveOpts, SecretRow,
 };
 
 use super::GenericList;
@@ -52,6 +53,15 @@ async fn exec_secret_inspect(
   Ok(())
 }
 
+async fn exec_secret_create(
+  cli_conf: &CliConfig,
+  opts: &SecretCreateOpts,
+) -> IoResult<()> {
+  let secret = opts.clone().try_into()?;
+  cli_conf.client.create_secret(&secret).await?;
+  Ok(())
+}
+
 /// Function that execute when running `nanocl secret`
 pub async fn exec_secret(
   cli_conf: &CliConfig,
@@ -63,5 +73,6 @@ pub async fn exec_secret(
     }
     SecretCommand::Remove(opts) => exec_secret_rm(cli_conf, opts).await,
     SecretCommand::Inspect(opts) => exec_secret_inspect(cli_conf, opts).await,
+    SecretCommand::Create(opts) => exec_secret_create(cli_conf, opts).await,
   }
 }

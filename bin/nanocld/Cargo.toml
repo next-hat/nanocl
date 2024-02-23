@@ -31,14 +31,14 @@ release = []
 [build-dependencies]
 clap = { version = "4.4", features = ["derive"] }
 clap_mangen = { version = "0.2" }
-nanocl_utils = { version = "0.4", features = ["build_tools"] }
-nanocl_stubs = { version = "0.13", features = ["clap"] }
+nanocl_utils = { version = "0.5", features = ["build_tools"] }
+nanocl_stubs = { version = "0.14", features = ["clap"] }
 
 [dev-dependencies]
 serde_yaml = "0.9"
 
 [dependencies]
-nanocl_error = { version = "0.2", features = [
+nanocl_error = { version = "0.3", features = [
   "io",
   "http",
   "http_client",
@@ -77,10 +77,10 @@ chrono = { version = "0.4", default-features = false, features = [
   "serde",
 ] }
 jsonschema = { version = "0.17", default-features = false }
-nanocld_client = { version = "0.13", features = ["tokio"] }
+nanocld_client = { version = "0.14", features = ["tokio"] }
 metrsd_client = "0.5"
-nanocl_stubs = { version = "0.13", features = ["serde", "clap"] }
-nanocl_utils = { version = "0.4", features = ["unix", "ntex", "logger"] }
+nanocl_stubs = { version = "0.14", features = ["serde", "clap"] }
+nanocl_utils = { version = "0.5", features = ["unix", "ntex", "logger"] }
 utoipa = { version = "4.2", features = ["yaml"], optional = true }
 notify = "6.1"
 ntex-cors = "0.5"

@@ -1,8 +1,10 @@
+use serde::Serialize;
 use tabled::Tabled;
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 
-use nanocld_client::stubs::secret::Secret;
+use nanocl_error::io::IoError;
+use nanocld_client::stubs::secret::{Secret, SecretPartial};
 
 use super::{DisplayFormat, GenericListOpts};
 
@@ -17,6 +19,8 @@ pub enum SecretCommand {
   List(GenericListOpts),
   /// Inspect a secret
   Inspect(SecretInspectOpts),
+  /// Create a new secret
+  Create(SecretCreateOpts),
 }
 
 /// `nanocl secret` available arguments
@@ -25,6 +29,95 @@ pub struct SecretArg {
   /// Secret command
   #[clap(subcommand)]
   pub command: SecretCommand,
+}
+
+/// Create a new nanocl.io/env secret
+#[derive(Clone, Parser)]
+pub struct EnvCreateOpts {
+  /// List of values in the form of `key=value`
+  #[clap(required = true)]
+  pub values: Vec<String>,
+}
+
+/// Create a new nanocl.io/tls secret
+#[derive(Clone, Parser, Serialize)]
+pub struct TlsCreateOpts {
+  /// Certificate
+  #[clap(long)]
+  pub certificate: String,
+  /// Certificate key
+  #[clap(long)]
+  pub certificate_key: String,
+  /// Client certificate
+  #[clap(long)]
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub certificate_client: Option<String>,
+  /// DHParam
+  #[clap(long)]
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub dhparam: Option<String>,
+  /// Verify client
+  #[clap(long)]
+  pub verify_client: bool,
+}
+
+/// Create a new nanocl.io/container-registry secret
+#[derive(Clone, Parser, Serialize)]
+pub struct ContainerRegistryCreateOpts {
+  /// Server URL
+  #[clap(long)]
+  pub server: String,
+  /// Username
+  #[clap(long)]
+  pub username: String,
+  /// Password
+  #[clap(long)]
+  pub password: String,
+  /// Email
+  #[clap(long)]
+  pub email: String,
+}
+
+impl TryFrom<SecretCreateOpts> for SecretPartial {
+  type Error = IoError;
+  fn try_from(opts: SecretCreateOpts) -> Result<Self, Self::Error> {
+    let (kind, data) = match &opts.kind {
+      SecretKindCreateCommand::Env(env) => {
+        ("nanocl.io/env", serde_json::to_value(&env.values)?)
+      }
+      SecretKindCreateCommand::Tls(tls) => {
+        ("nanocl.io/tls", serde_json::to_value(tls)?)
+      }
+      SecretKindCreateCommand::ContainerRegistry(container_registry) => (
+        "nanocl.io/container-registry",
+        serde_json::to_value(container_registry)?,
+      ),
+    };
+    Ok(Self {
+      name: opts.name,
+      kind: kind.to_string(),
+      immutable: None,
+      data,
+      metadata: None,
+    })
+  }
+}
+
+#[derive(Clone, Subcommand)]
+pub enum SecretKindCreateCommand {
+  Env(EnvCreateOpts),
+  Tls(TlsCreateOpts),
+  ContainerRegistry(ContainerRegistryCreateOpts),
+}
+
+/// `nanocl secret create` available options
+#[derive(Clone, Parser)]
+pub struct SecretCreateOpts {
+  /// Name of your secret
+  pub name: String,
+  /// Kind of secret
+  #[clap(subcommand)]
+  pub kind: SecretKindCreateCommand,
 }
 
 /// `nanocl secret list` available options
