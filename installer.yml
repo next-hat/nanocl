@@ -53,7 +53,7 @@ Cargoes:
 - Name: nproxy
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/nproxy:1.25.0-n0.10-nightly
+    Image: ghcr.io/next-hat/nproxy:1.25.4-n0.11-nightly
     # {% else %}
     Image: ghcr.io/next-hat/nproxy:1.25.0-n0.10
     # {% endif %}
@@ -74,7 +74,7 @@ Cargoes:
 - Name: ncproxy
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ncproxy:0.10.1-nightly
+    Image: ghcr.io/next-hat/ncproxy:0.11.0-nightly
     # {% else %}
     Image: ghcr.io/next-hat/ncproxy:0.10.1
     # {% endif %}
@@ -95,7 +95,7 @@ Cargoes:
 - Name: ndns
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ndns:2.89.0-n0.5-nightly
+    Image: ghcr.io/next-hat/ndns:2.90.0-n0.6-nightly
     # {% else %}
     Image: ghcr.io/next-hat/ndns:2.89.0-n0.5
     # {% endif %}
@@ -109,7 +109,7 @@ Cargoes:
 - Name: ncdns
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/ncdns:0.5.0-nightly
+    Image: ghcr.io/next-hat/ncdns:0.6.0-nightly
     # {% else %}
     Image: ghcr.io/next-hat/ncdns:0.5.0
     # {% endif %}
@@ -134,7 +134,7 @@ Cargoes:
 - Name: ndaemon
   Container:
     # {% if channel == "nightly" %}
-    Image: ghcr.io/next-hat/nanocld:0.13.0-nightly
+    Image: ghcr.io/next-hat/nanocld:0.14.0-nightly
     # {% else %}
     Image: ghcr.io/next-hat/nanocld:0.13.0
     # {% endif %}
