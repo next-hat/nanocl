@@ -64,18 +64,13 @@ pub struct TlsCreateOpts {
 /// Create a new nanocl.io/container-registry secret
 #[derive(Clone, Parser, Serialize)]
 pub struct ContainerRegistryCreateOpts {
-  /// Server URL
-  #[clap(long)]
-  pub server: String,
-  /// Username
-  #[clap(long)]
-  pub username: String,
-  /// Password
-  #[clap(long)]
-  pub password: String,
-  /// Email
-  #[clap(long)]
-  pub email: String,
+  pub username: Option<String>,
+  pub password: Option<String>,
+  pub auth: Option<String>,
+  pub email: Option<String>,
+  pub serveraddress: Option<String>,
+  pub identitytoken: Option<String>,
+  pub registrytoken: Option<String>,
 }
 
 impl TryFrom<SecretCreateOpts> for SecretPartial {

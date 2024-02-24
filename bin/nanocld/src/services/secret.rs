@@ -1,3 +1,4 @@
+use bollard_next::auth::DockerCredentials;
 /*
 * Endpoints to manipulate secrets
 */
@@ -7,8 +8,8 @@ use nanocl_error::http::{HttpError, HttpResult};
 
 use nanocl_stubs::{
   generic::{GenericFilter, GenericListQuery},
-  secret::{SecretPartial, SecretUpdate},
   proxy::ProxySslConfig,
+  secret::{SecretPartial, SecretUpdate},
 };
 
 use crate::{
@@ -87,6 +88,10 @@ pub async fn create_secret(
     }
     "nanocl.io/env" => {
       serde_json::from_value::<Vec<String>>(payload.data.clone())
+        .map_err(|e| HttpError::bad_request(e.to_string()))?;
+    }
+    "nanocl.io/container-registry" => {
+      serde_json::from_value::<DockerCredentials>(payload.data.clone())
         .map_err(|e| HttpError::bad_request(e.to_string()))?;
     }
     _ => {}

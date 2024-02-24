@@ -148,6 +148,7 @@ impl SpecDb {
       secrets: p.secrets,
       container: p.container,
       replication: p.replication,
+      image_pull_secret: p.image_pull_secret,
       image_pull_policy: p.image_pull_policy,
     };
     Ok(spec)

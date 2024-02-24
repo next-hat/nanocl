@@ -4,6 +4,7 @@ use futures::StreamExt;
 use futures_util::stream::FuturesUnordered;
 
 use bollard_next::{
+  auth::DockerCredentials,
   container::{
     Config, CreateContainerOptions, InspectContainerOptions,
     RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
@@ -51,8 +52,9 @@ pub fn parse_img_name(name: &str) -> HttpResult<(String, String)> {
 /// Download the image
 pub async fn download_image<A>(
   image: &str,
-  actor: &A,
+  secret: Option<String>,
   policy: ImagePullPolicy,
+  actor: &A,
   state: &SystemState,
 ) -> HttpResult<()>
 where
@@ -69,6 +71,15 @@ where
       return Ok(());
     }
   }
+  let credentials = match secret {
+    Some(secret) => {
+      let secret = SecretDb::read_by_pk(&secret, &state.pool).await?;
+      serde_json::from_value::<DockerCredentials>(secret.data)
+        .map(Some)
+        .map_err(|err| HttpError::bad_request(err.to_string()))?
+    }
+    None => None,
+  };
   let (name, tag) = parse_img_name(image)?;
   let mut stream = state.docker_api.create_image(
     Some(bollard_next::image::CreateImageOptions {
@@ -77,7 +88,7 @@ where
       ..Default::default()
     }),
     None,
-    None,
+    credentials,
   );
   while let Some(chunk) = stream.next().await {
     let chunk = match chunk {
@@ -241,8 +252,9 @@ async fn execute_cargo_before(
       });
       download_image(
         &image,
-        cargo,
+        cargo.spec.image_pull_secret.clone(),
         cargo.spec.image_pull_policy.clone().unwrap_or_default(),
+        cargo,
         state,
       )
       .await?;
@@ -315,8 +327,9 @@ pub async fn create_cargo(
   execute_cargo_before(cargo, state).await?;
   download_image(
     &cargo.spec.container.image.clone().unwrap_or_default(),
-    cargo,
+    cargo.spec.image_pull_secret.clone(),
     cargo.spec.image_pull_policy.clone().unwrap_or_default(),
+    cargo,
     state,
   )
   .await?;
@@ -694,7 +707,8 @@ pub async fn create_vm_instance(
     Some(runtime) => runtime.to_owned(),
     None => vars::VM_RUNTIME.to_owned(),
   };
-  download_image(&image, vm, ImagePullPolicy::IfNotPresent, state).await?;
+  download_image(&image, None, ImagePullPolicy::IfNotPresent, vm, state)
+    .await?;
   let spec = bollard_next::container::Config {
     image: Some(image),
     tty: Some(true),
@@ -754,8 +768,9 @@ pub async fn create_job_instances(
   for (index, container) in job.containers.iter().enumerate() {
     download_image(
       &container.image.clone().unwrap_or_default(),
-      job,
+      job.image_pull_secret.clone(),
       job.image_pull_policy.clone().unwrap_or_default(),
+      job,
       state,
     )
     .await?;
