@@ -1,4 +1,4 @@
-FROM nginx:1.25.0-bullseye
+FROM nginx:1.25-bullseye
 
 USER root
 

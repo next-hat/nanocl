@@ -8,8 +8,8 @@ if [ ! -f "tests/ubuntu-22.04-minimal-cloudimg-amd64.img" ]; then
 fi
 
 echo "Downloading container images.."
-docker pull cockroachdb/cockroach:v23.1.13
-docker pull ghcr.io/next-hat/metrsd:0.5.0
+docker pull cockroachdb/cockroach:v23.1.15
+docker pull ghcr.io/next-hat/metrsd:0.5.2
 docker pull ghcr.io/next-hat/nanocl-get-started:latest
 docker pull ghcr.io/next-hat/nanocl-dev:dev
 docker buildx build --load --network host -t ndns:dev -f ./bin/ndns/Dockerfile .
