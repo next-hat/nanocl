@@ -2077,6 +2077,10 @@ components:
             type: string
           description: List of secrets to use as environment variables
           nullable: true
+        ImagePullSecret:
+          type: string
+          description: Secret to use when pulling the image
+          nullable: true
         ImagePullPolicy:
           allOf:
           - $ref: '#/components/schemas/ImagePullPolicy'
@@ -2111,6 +2115,10 @@ components:
           items:
             type: string
           description: List of secrets to use as environment variables
+          nullable: true
+        ImagePullSecret:
+          type: string
+          description: Secret to use when pulling the image
           nullable: true
         ImagePullPolicy:
           allOf:
@@ -2148,6 +2156,10 @@ components:
           items:
             type: string
           description: List of secrets to use as environment variables
+          nullable: true
+        ImagePullSecret:
+          type: string
+          description: Secret to use when pulling the image
           nullable: true
         ImagePullPolicy:
           allOf:
@@ -3964,6 +3976,10 @@ components:
           description: Remove the job after (x) seconds after execution
           nullable: true
           minimum: 0
+        ImagePullSecret:
+          type: string
+          description: Secret to use when pulling the image
+          nullable: true
         ImagePullPolicy:
           allOf:
           - $ref: '#/components/schemas/ImagePullPolicy'
@@ -4037,6 +4053,10 @@ components:
           description: Remove the job after (x) seconds after execution
           nullable: true
           minimum: 0
+        ImagePullSecret:
+          type: string
+          description: Secret to use when pulling the image
+          nullable: true
         ImagePullPolicy:
           allOf:
           - $ref: '#/components/schemas/ImagePullPolicy'

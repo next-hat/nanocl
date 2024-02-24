@@ -43,6 +43,12 @@ pub struct JobPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub ttl: Option<usize>,
+  /// Secret to use when pulling the image
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub image_pull_secret: Option<String>,
   #[cfg_attr(
     feature = "serde",
     serde(skip_serializing_if = "Option::is_none")
@@ -62,6 +68,7 @@ impl From<Job> for JobPartial {
       schedule: job.schedule,
       ttl: job.ttl,
       containers: job.containers,
+      image_pull_secret: job.image_pull_secret,
       image_pull_policy: job.image_pull_policy,
     }
   }
@@ -107,6 +114,12 @@ pub struct Job {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub ttl: Option<usize>,
+  /// Secret to use when pulling the image
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub image_pull_secret: Option<String>,
   /// Image pull policy
   #[cfg_attr(
     feature = "serde",

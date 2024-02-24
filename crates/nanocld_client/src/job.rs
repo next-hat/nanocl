@@ -123,6 +123,7 @@ mod tests {
         secrets: None,
         metadata: None,
         ttl: None,
+        image_pull_secret: None,
         image_pull_policy: None,
       })
       .await

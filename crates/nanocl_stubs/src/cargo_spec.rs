@@ -84,6 +84,12 @@ pub struct CargoSpecPartial {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
+  /// Secret to use when pulling the image
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub image_pull_secret: Option<String>,
   /// Image pull policy of the cargo
   #[cfg_attr(
     feature = "serde",
@@ -137,6 +143,12 @@ pub struct CargoSpecUpdate {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
+  /// Secret to use when pulling the image
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub image_pull_secret: Option<String>,
   /// Image pull policy of the cargo
   #[cfg_attr(
     feature = "serde",
@@ -166,6 +178,7 @@ impl From<CargoSpecPartial> for CargoSpecUpdate {
       replication: spec.replication,
       metadata: spec.metadata,
       secrets: spec.secrets,
+      image_pull_secret: spec.image_pull_secret,
       image_pull_policy: spec.image_pull_policy,
     }
   }
@@ -209,6 +222,12 @@ pub struct CargoSpec {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub secrets: Option<Vec<String>>,
+  /// Secret to use when pulling the image
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub image_pull_secret: Option<String>,
   /// Image pull policy of the cargo
   #[cfg_attr(
     feature = "serde",
@@ -234,6 +253,7 @@ impl From<CargoSpec> for CargoSpecPartial {
       container: spec.container,
       metadata: spec.metadata,
       secrets: spec.secrets,
+      image_pull_secret: spec.image_pull_secret,
       image_pull_policy: spec.image_pull_policy,
     }
   }
