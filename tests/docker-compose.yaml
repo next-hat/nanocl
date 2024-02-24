@@ -12,7 +12,7 @@ services:
   nstore:
     container_name: nstore.system.c
     hostname: store.nanocl.internal
-    image: cockroachdb/cockroach:v23.1.13
+    image: cockroachdb/cockroach:v23.1.15
     entrypoint: /bin/sh
     tty: true
     ports:
@@ -44,7 +44,7 @@ services:
 
   nmetrics:
     container_name: nmetrics.system.c
-    image: ghcr.io/next-hat/metrsd:0.5.0
+    image: ghcr.io/next-hat/metrsd:0.5.2
     tty: true
     networks:
       - system
