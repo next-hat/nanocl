@@ -1,9 +1,9 @@
-FROM nginx:1.25-bullseye
+FROM ubuntu:noble-20240212
 
 USER root
 
 RUN apt-get update && \
-  apt-get install -y nginx-extras \
+  apt-get install -y nginx nginx-extras \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /tmp/* \
   && rm -rf /var/log/* \
