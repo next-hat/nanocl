@@ -70,6 +70,6 @@ nanocl_utils = { version = "0.5", features = ["unix"] }
 ctrlc = "3.3"
 toml = "0.8"
 ring = "0.17"
-nix = { version = "0.27", features = ["user"] }
+nix = { version = "0.28", features = ["user"] }
 dotenvy = "0.15"
 openssl = "0.10"
