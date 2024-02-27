@@ -237,7 +237,6 @@ pub async fn create_cargo_container(
     }),
     ..config.clone()
   };
-  println!("creating : {hooked_container:#?}");
   let container = docker
     .create_container(
       Some(CreateContainerOptions {
