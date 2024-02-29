@@ -95,7 +95,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     conf_dir,
     gateway,
     hosts,
-    hostname,
+    hostname: hostname.clone(),
     advertise_addr,
     is_docker_desktop,
     gid: group.gid.into(),
@@ -112,9 +112,10 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   let cargoes = deployment
     .cargoes
     .ok_or(IoError::invalid_data("Cargoes", "Not founds"))?;
+  let network_key = format!("system.{}", hostname);
   let docker = utils::docker::connect(&nanocld_args.docker_host)?;
   if docker
-    .inspect_network("system", None::<InspectNetworkOptions<String>>)
+    .inspect_network(&network_key, None::<InspectNetworkOptions<String>>)
     .await
     .is_err()
   {
@@ -122,7 +123,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     options.insert("com.docker.network.bridge.name", "nanocl.system");
     docker
       .create_network(CreateNetworkOptions {
-        name: "system",
+        name: network_key.as_str(),
         driver: "bridge",
         options,
         ..Default::default()
@@ -153,6 +154,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
     let container = utils::docker::create_cargo_container(
       cargo,
       &deployment.namespace.clone().unwrap_or("system".into()),
+      &hostname,
       &docker,
     )
     .await?;

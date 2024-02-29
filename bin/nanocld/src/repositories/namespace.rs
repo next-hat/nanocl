@@ -59,9 +59,10 @@ impl NamespaceDb {
         CargoDb::count_by_namespace(&item.name, &state.pool).await?;
       let processes =
         ProcessDb::list_by_namespace(&item.name, &state.pool).await?;
+      let network_pk = format!("{}.{}", &item.name, &state.config.hostname);
       let network = state
         .docker_api
-        .inspect_network(&item.name, None::<InspectNetworkOptions<String>>)
+        .inspect_network(&network_pk, None::<InspectNetworkOptions<String>>)
         .await?;
       let ipam = network.ipam.unwrap_or_default();
       let ipam_config = ipam.config.unwrap_or_default();

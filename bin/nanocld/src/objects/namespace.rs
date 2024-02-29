@@ -4,8 +4,9 @@ use nanocl_error::http::{HttpResult, HttpError};
 use nanocl_stubs::namespace::{NamespacePartial, Namespace, NamespaceInspect};
 
 use crate::{
+  utils,
   repositories::generic::*,
-  models::{NamespaceDb, SystemState, CargoDb},
+  models::{CargoDb, NamespaceDb, SystemState},
 };
 
 use super::generic::*;
@@ -27,9 +28,10 @@ impl ObjCreate for NamespaceDb {
         &obj.name
       )));
     }
+    let network_key = utils::key::gen_key(&state.config.hostname, &obj.name);
     if state
       .docker_api
-      .inspect_network(&obj.name, None::<InspectNetworkOptions<String>>)
+      .inspect_network(&network_key, None::<InspectNetworkOptions<String>>)
       .await
       .is_ok()
     {
@@ -37,7 +39,7 @@ impl ObjCreate for NamespaceDb {
       return Ok(item.into());
     }
     let config = CreateNetworkOptions {
-      name: obj.name.to_owned(),
+      name: network_key,
       driver: String::from("bridge"),
       ..Default::default()
     };
@@ -63,9 +65,11 @@ impl ObjInspectByPk for NamespaceDb {
         CargoDb::inspect_obj_by_pk(&cargo.spec.cargo_key, state).await?;
       cargoes.push(cargo);
     }
+    let network_key =
+      utils::key::gen_key(&namespace.name, &state.config.hostname);
     let network = state
       .docker_api
-      .inspect_network(pk, None::<InspectNetworkOptions<String>>)
+      .inspect_network(&network_key, None::<InspectNetworkOptions<String>>)
       .await?;
     Ok(NamespaceInspect {
       name: namespace.name,

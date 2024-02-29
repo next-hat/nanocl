@@ -6,9 +6,9 @@ use futures::StreamExt;
 use nanocl_error::io::{IoError, IoResult};
 
 use nanocld_client::{
+  NanocldClient,
   stubs::proxy::{ResourceProxyRule, ProxyRule, LocationTarget},
   bollard_next::exec::{CreateExecOptions, StartExecOptions},
-  NanocldClient,
 };
 
 use crate::models::{

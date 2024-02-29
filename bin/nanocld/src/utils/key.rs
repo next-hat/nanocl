@@ -12,8 +12,8 @@ use nanocl_error::{
 
 use nanocl_stubs::process::ProcessKind;
 
-/// Resolve the namespace from the query paramater
-/// Namespace is an optional query paramater it's resolved with value `global` if it's empty
+/// Resolve the namespace from the query parameter
+/// Namespace is an optional query parameter it's resolved with value `global` if it's empty
 pub fn resolve_nsp(nsp: &Option<String>) -> String {
   match nsp {
     None => "global",

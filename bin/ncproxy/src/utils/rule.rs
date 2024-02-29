@@ -15,12 +15,11 @@ use crate::models::{
 };
 
 /// Get public address of host
-async fn get_host_addr(client: &NanocldClient) -> IoResult<String> {
-  let info = client
-    .info()
-    .await
-    .map_err(|err| err.map_err_context(|| "Unable to get host info"))?;
-  Ok(info.host_gateway)
+fn get_host_addr() -> IoResult<String> {
+  let addr = std::env::var("NANOCL_NODE_ADDR").map_err(|err| {
+    IoError::not_found("NANOCL_NODE_ADDR", err.to_string().as_str())
+  })?;
+  Ok(addr)
 }
 
 async fn get_namespace_addr(
@@ -98,7 +97,7 @@ pub async fn get_network_addr(
   match network {
     "All" => Ok(format!("{port}")),
     "Public" => {
-      let ip = get_host_addr(client).await?;
+      let ip = get_host_addr()?;
       Ok(format!("{ip}:{port}"))
     }
     "Internal" => Ok(format!("127.0.0.1:{port}")),

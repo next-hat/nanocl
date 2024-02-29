@@ -79,11 +79,11 @@ pub async fn sync_process(
   Ok(())
 }
 
-/// Ensure existance of specific namespace in our store.
+/// Ensure existence of specific namespace in our store.
 /// We use it to be sure `system` and `global` namespace exists.
 /// system is the namespace used by internal nanocl components.
 /// where global is the namespace used by default.
-/// User can registed they own namespace to ensure better encaptusation.
+/// User can register they own namespace to ensure better encapsulation.
 pub async fn register_namespace(
   name: &str,
   create_network: bool,

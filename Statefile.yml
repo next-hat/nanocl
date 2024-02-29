@@ -134,6 +134,7 @@ Cargoes:
           -- \
           --hosts unix:///run/nanocl/nanocl.sock \
           --gid 1001 \
+          --hostname ${{ hostname }} \
           --hosts tcp://0.0.0.0:9443 \
           --cert ./tests/server.crt \
           --cert-key ./tests/server.key \

@@ -209,12 +209,14 @@ pub fn hook_binds(cargo: &CargoSpecPartial) -> IoResult<CargoSpecPartial> {
 pub async fn create_cargo_container(
   cargo: &CargoSpecPartial,
   namespace: &str,
+  hostname: &str,
   docker: &Docker,
 ) -> IoResult<ContainerCreateResponse> {
   let hooked_cargo = hook_binds(cargo)?;
   let name = &hooked_cargo.name;
   let config = &hooked_cargo.container;
   let key = format!("{name}.{namespace}");
+  let network_key = format!("{namespace}.{hostname}");
   let host_config = config.host_config.clone().unwrap_or_default();
   let hooked_container = Config {
     labels: Some(hook_labels(
@@ -227,7 +229,7 @@ pub async fn create_cargo_container(
         host_config
           .network_mode
           .clone()
-          .unwrap_or(namespace.to_owned()),
+          .unwrap_or(network_key.to_owned()),
       ),
       restart_policy: Some(RestartPolicy {
         name: Some(RestartPolicyNameEnum::ALWAYS),
