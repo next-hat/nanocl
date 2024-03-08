@@ -1,23 +1,20 @@
 ApiVersion: v0.13
 
-Cargoes:
-  - Name: test
-    Container:
-      Image: ubuntu:latest
-
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/resource
 Resources:
-  - Name: nanocl-daemon
-    Kind: ncproxy.io/rule
-    Data:
-      Rules:
-        - Protocol: Tcp
-          Port: 9443
-          Network: All
-          Ssl:
-            Certificate: /var/lib/nanocl/certs/server.crt
-            CertificateKey: /var/lib/nanocl/certs/server.key
-            VerifyClient: true
-          Target:
-            UnixPath: /run/nanocl/nanocl.sock
+- Name: nanocl-daemon
+  Kind: ncproxy.io/rule
+  Data:
+    Rules:
+    - Domain: unix.nanocl
+      Network: All
+      Ssl:
+        Certificate: /home/ubuntu/.nanocl_dev/state/proxy/certs/server.crt
+        CertificateKey: /home/ubuntu/.nanocl_dev/state/proxy/certs/server.key
+        CertificateClient: /home/ubuntu/.nanocl_dev/state/proxy/certs/ca.crt
+        VerifyClient: true
+      Locations:
+      - Path: /
+        Target:
+          UnixPath: /run/nanocl/nanocl.sock
