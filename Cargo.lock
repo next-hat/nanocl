@@ -2247,9 +2247,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-cors"
-version = "0.5.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c4049648f0125e6a71a35ee30dd86d7bf2a978d6e56191552e85249e3a98cfa"
+checksum = "33923472f6c4966b86fe07ab82b3ebb5d0b35102c10346f337ddd5d753a5f156"
 dependencies = [
  "derive_more",
  "futures",
