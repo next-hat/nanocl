@@ -120,11 +120,11 @@ impl From<JobSummary> for JobRow {
     let tz = binding.offset();
     // Convert the created_at and updated_at to the current timezone
     let created_at = tz
-      .timestamp_opt(job.spec.created_at.timestamp(), 0)
+      .timestamp_opt(job.spec.created_at.and_utc().timestamp(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     let updated_at = tz
-      .timestamp_opt(job.spec.updated_at.timestamp(), 0)
+      .timestamp_opt(job.spec.updated_at.and_utc().timestamp(), 0)
       .unwrap()
       .format("%Y-%m-%d %H:%M:%S");
     Self {
