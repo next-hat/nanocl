@@ -527,58 +527,58 @@ async fn exec_state_apply(
       waiter.await??;
       pg.finish();
     }
-    if let Some(vms) = &state_file.data.virtual_machines {
-      for vm in vms {
-        let token = format!("vm/{}", vm.name);
-        let pg = utils::progress::create_progress(&token, &pg_style);
-        match client.inspect_vm(&vm.name, Some(&namespace)).await {
-          Err(_) => {
-            client.create_vm(vm, Some(&namespace)).await?;
+  }
+  if let Some(vms) = &state_file.data.virtual_machines {
+    for vm in vms {
+      let token = format!("vm/{}", vm.name);
+      let pg = utils::progress::create_progress(&token, &pg_style);
+      match client.inspect_vm(&vm.name, Some(&namespace)).await {
+        Err(_) => {
+          client.create_vm(vm, Some(&namespace)).await?;
+        }
+        Ok(inspect) => {
+          if inspect.status.actual == ObjPsStatusKind::Start && !opts.reload {
+            pg.finish();
+            continue;
           }
-          Ok(inspect) => {
-            if inspect.status.actual == ObjPsStatusKind::Start && !opts.reload {
-              pg.finish();
-              continue;
-            }
-            let cmp: VmSpecPartial = inspect.spec.into();
-            if cmp != *vm {
-              let update: VmSpecUpdate = vm.clone().into();
-              client.patch_vm(&vm.name, &update, Some(&namespace)).await?;
-            }
+          let cmp: VmSpecPartial = inspect.spec.into();
+          if cmp != *vm {
+            let update: VmSpecUpdate = vm.clone().into();
+            client.patch_vm(&vm.name, &update, Some(&namespace)).await?;
           }
         }
-        let waiter = wait_process_object(
-          &format!("{}.{namespace}", vm.name),
-          EventActorKind::Vm,
-          vec![NativeEventAction::Start],
-          &client,
-        )
+      }
+      let waiter = wait_process_object(
+        &format!("{}.{namespace}", vm.name),
+        EventActorKind::Vm,
+        vec![NativeEventAction::Start],
+        &client,
+      )
+      .await?;
+      client
+        .start_process("vm", &vm.name, Some(&namespace))
         .await?;
-        client
-          .start_process("vm", &vm.name, Some(&namespace))
-          .await?;
-        waiter.await??;
-        pg.finish();
-      }
+      waiter.await??;
+      pg.finish();
     }
-    if let Some(resources) = &state_file.data.resources {
-      for resource in resources {
-        let token = format!("resource/{}", resource.name);
-        let pg = utils::progress::create_progress(&token, &pg_style);
-        match client.inspect_resource(&resource.name).await {
-          Err(_) => {
-            client.create_resource(resource).await?;
-          }
-          Ok(inspect) => {
-            let cmp: ResourcePartial = inspect.into();
-            if cmp != *resource {
-              let update: ResourceUpdate = resource.clone().into();
-              client.put_resource(&resource.name, &update).await?;
-            }
+  }
+  if let Some(resources) = &state_file.data.resources {
+    for resource in resources {
+      let token = format!("resource/{}", resource.name);
+      let pg = utils::progress::create_progress(&token, &pg_style);
+      match client.inspect_resource(&resource.name).await {
+        Err(_) => {
+          client.create_resource(resource).await?;
+        }
+        Ok(inspect) => {
+          let cmp: ResourcePartial = inspect.into();
+          if cmp != *resource {
+            let update: ResourceUpdate = resource.clone().into();
+            client.put_resource(&resource.name, &update).await?;
           }
         }
-        pg.finish();
       }
+      pg.finish();
     }
   }
   if opts.follow {
