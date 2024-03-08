@@ -50,7 +50,8 @@ impl TryFrom<EventPartial> for EventDb {
     Ok(EventDb {
       key: uuid::Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
-      expires_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30),
+      expires_at: chrono::Utc::now().naive_utc()
+        + chrono::Duration::try_days(30).unwrap(),
       reporting_node: value.reporting_node,
       reporting_controller: value.reporting_controller,
       kind: value.kind.to_string(),

@@ -65,7 +65,8 @@ impl From<&MetricNodePartial> for MetricDb {
     MetricDb {
       key: Uuid::new_v4(),
       created_at: chrono::Utc::now().naive_utc(),
-      expires_at: chrono::Utc::now().naive_utc() + chrono::Duration::days(30),
+      expires_at: chrono::Utc::now().naive_utc()
+        + chrono::Duration::try_days(30).unwrap(),
       node_name: p.node_name.clone(),
       kind: p.kind.clone(),
       data: p.data.clone(),
