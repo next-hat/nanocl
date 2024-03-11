@@ -67,7 +67,7 @@ nanocl_error = { version = "0.3", features = [
   "serde_yaml",
 ] }
 nanocl_utils = { version = "0.5", features = ["unix"] }
-ctrlc = "3.3"
+ctrlc = "3.4"
 toml = "0.8"
 ring = "0.17"
 nix = { version = "0.28", features = ["user"] }
