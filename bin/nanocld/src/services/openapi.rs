@@ -78,6 +78,8 @@ use nanocl_stubs::proxy::{
 };
 use nanocl_stubs::statefile::{Statefile, StatefileArg};
 
+use crate::vars;
+
 use super::{
   node, system, namespace, exec, cargo, vm, vm_image, resource, metric, secret,
   job, process, resource_kind, event,
@@ -200,7 +202,7 @@ struct VersionModifier;
 impl Modify for VersionModifier {
   fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
     let variable = utoipa::openapi::ServerVariableBuilder::default()
-      .default_value("v0.13")
+      .default_value(vars::VERSION)
       .description(Some("API version"))
       .build();
 
@@ -226,7 +228,6 @@ impl Modify for VersionModifier {
     node::node_ws,
     // System
     system::get_info,
-    system::watch_event,
     system::get_version,
     system::get_ping,
     // Namespace
@@ -301,6 +302,7 @@ impl Modify for VersionModifier {
     process::wait_process,
     // Event
     event::list_event,
+    event::watch_event,
   ),
   components(schemas(
     // Node
