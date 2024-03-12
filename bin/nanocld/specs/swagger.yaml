@@ -29,7 +29,7 @@ servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.13
+      default: 0.14.0
       description: API version
 paths:
   /_ping:
@@ -405,7 +405,7 @@ paths:
   /events/watch:
     post:
       tags:
-      - System
+      - Events
       summary: Watch on new events using Server-Sent Events / EventSource
       description: Watch on new events using Server-Sent Events / EventSource
       operationId: watch_event

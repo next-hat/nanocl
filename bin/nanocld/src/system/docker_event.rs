@@ -13,9 +13,9 @@ use nanocl_stubs::system::{
 };
 
 use crate::{
-  vars,
+  models::{CargoDb, JobDb, ProcessDb, ProcessUpdateDb, SystemState, VmDb},
   repositories::generic::*,
-  models::{SystemState, ProcessUpdateDb, ProcessDb},
+  vars,
 };
 
 /// Take actions when a docker event is received
@@ -32,6 +32,36 @@ async fn exec_docker(
   if attributes.get("io.nanocl").is_none() {
     return Ok(());
   }
+  let Some(kind) = attributes.get("io.nanocl.kind") else {
+    return Ok(());
+  };
+  let (kind, kind_key) = match kind.as_str() {
+    "cargo" => (
+      EventActorKind::Cargo,
+      attributes.get("io.nanocl.c").cloned(),
+    ),
+    "vm" => (EventActorKind::Vm, attributes.get("io.nanocl.v").cloned()),
+    "job" => (EventActorKind::Job, attributes.get("io.nanocl.j").cloned()),
+    _ => return Ok(()),
+  };
+  let Some(kind_key) = kind_key else {
+    return Ok(());
+  };
+  let metadata = match kind {
+    EventActorKind::Cargo => {
+      let cargo = CargoDb::read_by_pk(&kind_key, &state.pool).await?;
+      cargo.1.metadata
+    }
+    EventActorKind::Job => {
+      let job = JobDb::read_by_pk(&kind_key, &state.pool).await?;
+      job.0.metadata
+    }
+    EventActorKind::Vm => {
+      let vm = VmDb::read_by_pk(&kind_key, &state.pool).await?;
+      vm.1.metadata
+    }
+    _ => return Ok(()),
+  };
   let action = event.action.clone().unwrap_or_default();
   let id = actor.id.unwrap_or_default();
   let name = attributes.get("name").cloned().unwrap_or_default();
@@ -41,7 +71,11 @@ async fn exec_docker(
     reporting_node: state.config.hostname.clone(),
     kind: EventKind::Normal,
     action: NativeEventAction::Destroy.to_string(),
-    related: None,
+    related: Some(EventActor {
+      key: Some(kind_key),
+      kind,
+      attributes: metadata,
+    }),
     reason: "state_sync".to_owned(),
     note: Some(format!("Process {name}")),
     metadata: None,

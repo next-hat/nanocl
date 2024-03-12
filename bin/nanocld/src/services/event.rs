@@ -38,7 +38,7 @@ pub async fn list_event(
 /// Watch on new events using Server-Sent Events / EventSource
 #[cfg_attr(feature = "dev", utoipa::path(
   post,
-  tag = "System",
+  tag = "Events",
   path = "/events/watch",
   request_body = Option<Vec<EventCondition>>,
   responses(
