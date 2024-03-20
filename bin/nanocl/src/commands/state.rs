@@ -70,13 +70,13 @@ async fn get_from_url(url: &str) -> IoResult<StateRef<Statefile>> {
     .split('.')
     .last()
     .ok_or_else(|| IoError::invalid_data("Statefile", "has no extension"))?;
-  let state_ref = utils::state::get_state_ref(ext, data)?;
+  let state_ref = utils::state::get_state_ref(ext, data, None)?;
   Ok(state_ref)
 }
 
 /// Read Statefile from file and return a StateRef with the raw data and the format
 fn read_from_file<T>(
-  path: &std::path::Path,
+  path: &std::path::PathBuf,
   format: &DisplayFormat,
 ) -> IoResult<StateRef<T>>
 where
@@ -89,7 +89,10 @@ where
     .to_str();
   let ext = ext.unwrap_or_default();
   let data = fs::read_to_string(path)?;
-  let state_ref = utils::state::get_state_ref::<T>(ext, &data)?;
+  let mut include_path = path.clone();
+  include_path.pop();
+  let state_ref =
+    utils::state::get_state_ref::<T>(ext, &data, Some(include_path))?;
   Ok(state_ref)
 }
 
@@ -303,7 +306,7 @@ fn inject_namespace(
   let object = liquid::object!({
     "Args": args,
   });
-  let str = utils::state::compile(namespace, &object)?;
+  let str = utils::state::compile(namespace, &object, None)?;
   Ok(str)
 }
 
@@ -338,13 +341,18 @@ async fn inject_data(
     "HostGateway": info.host_gateway,
     "Namespaces": namespaces,
   });
-  let raw = utils::state::compile(&state_ref.raw, &data)?;
+  let raw = utils::state::compile(
+    &state_ref.raw,
+    &data,
+    state_ref.include_dir.clone(),
+  )?;
   let state_file =
     utils::state::serialize_ext::<Statefile>(&state_ref.format, &raw)?;
   Ok(StateRef {
     raw,
     format: state_ref.format.clone(),
     data: state_file,
+    include_dir: None,
   })
 }
 

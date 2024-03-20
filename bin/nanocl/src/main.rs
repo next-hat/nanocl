@@ -313,6 +313,17 @@ mod tests {
   }
 
   #[ntex::test]
+  async fn state_apply_include() {
+    assert_cli_ok!(
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/include_example.yml"
+    );
+    assert_cli_ok!("state", "rm", "-ys", "../../examples/include_example.yml");
+  }
+
+  #[ntex::test]
   async fn state_apply_args_advanced() {
     assert_cli_ok!(
       "state",
