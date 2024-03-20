@@ -13,10 +13,11 @@ use nanocl_utils::unix;
 use nanocld_client::stubs::statefile::Statefile;
 
 use crate::{
-  utils,
   models::{
-    InstallOpts, NanocldArg, Context, ContextMetaData, ContextEndpoint,
+    Context, ContextEndpoint, ContextMetaData, InstallOpts, NanocldArg,
+    StateRoot,
   },
+  utils,
 };
 
 /// This function is called when running `nanocl install`
@@ -104,7 +105,7 @@ pub async fn exec_install(args: &InstallOpts) -> IoResult<()> {
   };
   let installer = utils::installer::get_template(args.template.clone()).await?;
   let data: liquid::Object = nanocld_args.clone().into();
-  let installer = utils::state::compile(&installer, &data)?;
+  let installer = utils::state::compile(&installer, &data, StateRoot::None)?;
   let deployment =
     serde_yaml::from_str::<Statefile>(&installer).map_err(|err| {
       err.map_err_context(|| "Unable to extract deployment from installer")

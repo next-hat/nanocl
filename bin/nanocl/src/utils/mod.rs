@@ -7,6 +7,7 @@ pub mod dialog;
 pub mod context;
 pub mod hash;
 pub mod progress;
+pub mod liquid;
 
 #[cfg(test)]
 pub mod tests {
@@ -49,6 +50,7 @@ pub mod tests {
   #[macro_export]
   macro_rules! exec_cli {
     ([$($args: expr),+] $(,)?) => {{
+      eprintln!("exec_cli: {:?}", ["nanocl", $($args),+]);
       let args = Cli::try_parse_from(["nanocl", $($args),+]).expect("Can't parse command");
       execute_arg(&args).await
     }};

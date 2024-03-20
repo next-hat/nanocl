@@ -10,3 +10,5 @@ reorder_modules = false
 # force_multiline_blocks = true
 # brace_style = "PreferSameLine"
 # control_brace_style = "AlwaysSameLine"
+# imports_granularity = "Crate"
+# blank_lines_upper_bound = 0

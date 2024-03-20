@@ -1946,6 +1946,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml 0.8.12",
+ "url",
 ]
 
 [[package]]

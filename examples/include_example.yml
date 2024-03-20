@@ -1,0 +1,12 @@
+ApiVersion: v0.14
+Namespace: "toto"
+
+# {% assign filename = "include_example.partial.yml" %}
+# {% assign absolute = StateRoot | append: '/' | append: filename %}
+# {% assign relative = "./" | append: filename %}
+# {% assign url = "https://nhnr.io/v0.14/tests/" | append: filename %}
+
+Cargoes:
+#{% render relative, name:"include-test-file-absolute" %}
+#{% render absolute, name:"include-test-file-relative" %}
+#{% render url, name:"include-test-file-url" %}

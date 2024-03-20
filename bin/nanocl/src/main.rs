@@ -313,6 +313,28 @@ mod tests {
   }
 
   #[ntex::test]
+  async fn state_apply_include() {
+    let filename = "include_example.yml";
+    let relative_path = format!("../../examples/{filename}");
+    assert_cli_ok!("state", "apply", "-ys", &relative_path);
+    assert_cli_ok!("state", "rm", "-ys", &relative_path);
+
+    let path = env::current_dir().unwrap();
+    let path = path.as_os_str().to_str().unwrap();
+    let absolute_path = format!("{path}/{relative_path}");
+    assert_cli_ok!("state", "apply", "-ys", &absolute_path);
+    assert_cli_ok!("state", "rm", "-ys", &absolute_path);
+
+    let short_url = format!("nhnr.io/v0.14/tests/{filename}");
+    assert_cli_ok!("state", "apply", "-ys", &short_url);
+    assert_cli_ok!("state", "rm", "-ys", &short_url);
+
+    let url = format!("https://nhnr.io/v0.14/tests/{filename}");
+    assert_cli_ok!("state", "apply", "-ys", &url);
+    assert_cli_ok!("state", "rm", "-ys", &url);
+  }
+
+  #[ntex::test]
   async fn state_apply_args_advanced() {
     assert_cli_ok!(
       "state",

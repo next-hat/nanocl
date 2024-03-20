@@ -2,12 +2,62 @@ use regex::Regex;
 use liquid::ObjectView;
 
 use nanocl_error::io::{IoError, IoResult, FromIo};
+use crate::models::{DisplayFormat, StateRef, StateRoot};
 
-use crate::models::{StateRef, DisplayFormat};
+use super::liquid::StateSource;
+
+pub fn get_format<Path: AsRef<std::path::Path>>(
+  format: &DisplayFormat,
+  path: Path,
+) -> String {
+  let default_format = format.to_string();
+  let ext = path
+    .as_ref()
+    .extension()
+    .unwrap_or(std::ffi::OsStr::new(&default_format))
+    .to_str();
+  ext.unwrap_or_default().to_owned()
+}
+
+pub async fn download_statefile(url: &str) -> IoResult<(String, String)> {
+  let url = if url.starts_with("http://") || url.starts_with("https://") {
+    url.to_owned()
+  } else {
+    format!("http://{url}")
+  };
+  let client = ntex::http::Client::default();
+  let mut res = client.get(&url).send().await.map_err(|err| {
+    err.map_err_context(|| "Unable to get Statefile from url")
+  })?;
+  if res.status().is_redirection() {
+    let location = res
+      .headers()
+      .get("location")
+      .ok_or_else(|| IoError::invalid_data("Location", "is not specified"))?
+      .to_str()
+      .map_err(|err| IoError::invalid_data("Location", &format!("{err}")))?;
+    res = client.get(location).send().await.map_err(|err| {
+      err.map_err_context(|| "Unable to get Statefile from url")
+    })?;
+  }
+  let data = res
+    .body()
+    .await
+    .map_err(|err| err.map_err_context(|| "Cannot read response from url"))?
+    .to_vec();
+  let data = std::str::from_utf8(&data).map_err(|err| {
+    IoError::invalid_data("From utf8".into(), format!("{err}"))
+  })?;
+  Ok((url, data.to_owned()))
+}
 
 /// Extract metadata eg: `ApiVersion`, `Kind` from a Statefile
 /// and return a StateRef with the raw data and the format
-pub fn get_state_ref<T>(ext: &str, raw: &str) -> IoResult<StateRef<T>>
+pub fn get_state_ref<T>(
+  ext: &str,
+  raw: &str,
+  root: StateRoot,
+) -> IoResult<StateRef<T>>
 where
   T: serde::Serialize + serde::de::DeserializeOwned,
 {
@@ -20,6 +70,7 @@ where
         raw: raw.to_owned(),
         format: DisplayFormat::Yaml,
         data,
+        root,
       })
     }
     "json" => {
@@ -30,6 +81,7 @@ where
         raw: raw.to_owned(),
         format: DisplayFormat::Json,
         data,
+        root,
       })
     }
     "toml" => {
@@ -43,6 +95,7 @@ where
         raw: raw.to_owned(),
         format: DisplayFormat::Toml,
         data,
+        root,
       })
     }
     _ => Err(IoError::invalid_data(
@@ -78,15 +131,20 @@ where
 }
 
 /// Compile a template with given object using liquid syntax
-pub fn compile(raw: &str, obj: &dyn ObjectView) -> IoResult<String> {
+pub fn compile(
+  raw: &str,
+  obj: &dyn ObjectView,
+  root: StateRoot,
+) -> IoResult<String> {
   // replace "${{ }}" with "{{ }}" syntax for liquid
   let reg = Regex::new(r"\$\{\{(.+?)\}\}")
     .map_err(|err| IoError::invalid_data("Regex", &format!("{err}")))?;
-  let template = reg.replace_all(raw, "{{ $1 }}");
+  let template_file = reg.replace_all(raw, "{{ $1 }}");
   let template = liquid::ParserBuilder::with_stdlib()
+    .partials(liquid::partials::LazyCompiler::new(StateSource { root }))
     .build()
     .unwrap()
-    .parse(&template)
+    .parse(&template_file)
     .map_err(|err| {
       IoError::invalid_data("Template parsing", &format!("{err}"))
     })?;

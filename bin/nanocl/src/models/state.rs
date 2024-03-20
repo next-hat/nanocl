@@ -1,3 +1,8 @@
+use std::{
+  fmt::{Display, Formatter},
+  path::PathBuf,
+};
+
 use clap::{Parser, Subcommand};
 
 use super::DisplayFormat;
@@ -81,6 +86,26 @@ pub struct StateArg {
   pub command: StateCommand,
 }
 
+#[derive(Clone, Default, Debug)]
+pub enum StateRoot {
+  File(PathBuf),
+  Url(String),
+  #[default]
+  None,
+}
+
+impl Display for StateRoot {
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    match self {
+      StateRoot::File(path) => {
+        write!(f, "{}", path.as_os_str().to_str().expect("can't get root"))
+      }
+      StateRoot::Url(url) => write!(f, "{}", url),
+      StateRoot::None => write!(f, ""),
+    }
+  }
+}
+
 /// Reference to a Statefile with his metadata once serialized
 #[derive(Clone)]
 pub struct StateRef<T>
@@ -93,4 +118,6 @@ where
   pub format: DisplayFormat,
   /// Data of the Statefile (serialized)
   pub data: T,
+  /// Include directory of the Statefile
+  pub root: StateRoot,
 }
