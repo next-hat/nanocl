@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 use super::DisplayFormat;
@@ -96,4 +98,6 @@ where
   pub format: DisplayFormat,
   /// Data of the Statefile (serialized)
   pub data: T,
+  /// Include directory of the Statefile
+  pub include_dir: Option<PathBuf>,
 }

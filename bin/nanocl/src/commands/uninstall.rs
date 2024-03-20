@@ -31,7 +31,7 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
     "home_dir": "/tmp/random",
     "channel": version::CHANNEL.to_owned(),
   });
-  let installer = utils::state::compile(&installer, &data)?;
+  let installer = utils::state::compile(&installer, &data, None)?;
   let installer = serde_yaml::from_str::<Statefile>(&installer)
     .map_err(|err| err.map_err_context(|| "Unable to parse installer"))?;
   let cargoes = installer.cargoes.unwrap_or_default();
