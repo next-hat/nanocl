@@ -110,7 +110,7 @@ async fn logs_processes(
   )
 }
 
-/// Get logs of processes for given kind and name
+/// Get logs of a single process instance by it's name or id
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Processes",

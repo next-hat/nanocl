@@ -981,8 +981,8 @@ paths:
     get:
       tags:
       - Processes
-      summary: Get logs of processes for given kind and name
-      description: Get logs of processes for given kind and name
+      summary: Get logs of a single process instance by it's name or id
+      description: Get logs of a single process instance by it's name or id
       operationId: logs_process
       parameters:
       - name: kind
