@@ -41,8 +41,22 @@ impl NanocldClient {
     Self::res_json(res).await
   }
 
-  /// Get logs of a process
+  /// Get Log of a single process by it's name or id
+  /// Cargoes, jobs, can have multiple instances, this endpoint get logs of a single instance
   pub async fn logs_process(
+    &self,
+    name: &str,
+    query: Option<&ProcessLogQuery>,
+  ) -> HttpClientResult<Receiver<HttpResult<ProcessOutputLog>>> {
+    let res = self
+      .send_get(&format!("{}/{name}/logs", Self::PROCESS_PATH), query)
+      .await?;
+    Ok(Self::res_stream(res).await)
+  }
+
+  /// Get logs of processes for a specific object
+  /// Cargoes, jobs, can have multiple instances, this endpoint get logs all instances
+  pub async fn logs_processes(
     &self,
     kind: &str,
     name: &str,
@@ -197,7 +211,7 @@ mod tests {
       ..Default::default()
     });
     let mut rx = client
-      .logs_process(
+      .logs_processes(
         "cargo",
         "nstore",
         Some(&ProcessLogQuery::of_namespace("system")),

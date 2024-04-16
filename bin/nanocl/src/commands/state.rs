@@ -102,13 +102,45 @@ async fn log_jobs(
   jobs
     .into_iter()
     .map(|job| async move {
-      match client.logs_process("job", &job.name, Some(query)).await {
-        Err(err) => {
-          eprintln!("Cannot get job {} logs: {err}", &job.name);
-        }
-        Ok(stream) => {
-          if let Err(err) = utils::print::logs_process_stream(stream).await {
-            eprintln!("{err}");
+      let Ok(mut stream) = client.watch_events(None).await else {
+        return;
+      };
+      let mut current: usize = 0;
+      let length = job.containers.len();
+      while let Some(event) = stream.next().await {
+        let Ok(event) = event else {
+          continue;
+        };
+        if event.action != NativeEventAction::Start.to_string() {
+          continue;
+        };
+        let Some(actor) = event.actor else {
+          continue;
+        };
+        let Some(related) = event.related else {
+          continue;
+        };
+        let Some(related_key) = related.key else {
+          continue;
+        };
+        let Some(key) = actor.key else {
+          continue;
+        };
+        if related_key == job.name {
+          current += 1;
+          match client.logs_process(&key, Some(query)).await {
+            Err(err) => {
+              eprintln!("Cannot get job instance {key} logs: {err}");
+            }
+            Ok(stream) => {
+              if let Err(err) = utils::print::logs_process_stream(stream).await
+              {
+                eprintln!("{err}");
+              }
+            }
+          }
+          if current == length {
+            break;
           }
         }
       }
@@ -128,7 +160,10 @@ pub async fn log_cargoes(
   cargoes
     .into_iter()
     .map(|cargo| async move {
-      match client.logs_process("cargo", &cargo.name, Some(query)).await {
+      match client
+        .logs_processes("cargo", &cargo.name, Some(query))
+        .await
+      {
         Err(err) => {
           eprintln!("Cannot attach to cargo {}: {err}", &cargo.name);
         }

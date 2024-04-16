@@ -67,7 +67,7 @@ async fn exec_docker(
     note: Some(format!("Process {name}")),
     metadata: None,
     actor: Some(EventActor {
-      key: Some(id.clone()),
+      key: Some(name.clone()),
       kind: EventActorKind::Process,
       attributes: Some(
         serde_json::to_value(attributes)

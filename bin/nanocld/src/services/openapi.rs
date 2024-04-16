@@ -293,6 +293,7 @@ impl Modify for VersionModifier {
     metric::list_metric,
     metric::create_metric,
     // Process
+    process::logs_processes,
     process::logs_process,
     process::start_process,
     process::stop_process,

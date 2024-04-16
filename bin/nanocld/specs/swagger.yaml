@@ -797,9 +797,9 @@ paths:
     get:
       tags:
       - Processes
-      summary: Get logs of processes for given kind and name
-      description: Get logs of processes for given kind and name
-      operationId: logs_process
+      summary: Get logs of processes for all instances of given kind and name (cargo, job, vm)
+      description: Get logs of processes for all instances of given kind and name (cargo, job, vm)
+      operationId: logs_processes
       parameters:
       - name: kind
         in: path
@@ -977,6 +977,75 @@ paths:
           description: Job wait
         '404':
           description: Job does not exist
+  /processes/{name}/logs:
+    get:
+      tags:
+      - Processes
+      summary: Get logs of processes for given kind and name
+      description: Get logs of processes for given kind and name
+      operationId: logs_process
+      parameters:
+      - name: kind
+        in: path
+        description: Kind of the process
+        required: true
+        schema:
+          type: string
+        example: cargo
+      - name: name
+        in: path
+        description: Name of the process
+        required: true
+        schema:
+          type: string
+        example: deploy-example
+      - name: namespace
+        in: query
+        description: Namespace of the process
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: since
+        in: query
+        description: Only logs returned since timestamp
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: until
+        in: query
+        description: Only logs returned until timestamp
+        required: false
+        schema:
+          type: integer
+          format: int64
+          nullable: true
+      - name: timestamps
+        in: query
+        description: Add timestamps to every log line
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      - name: follow
+        in: query
+        description: Boolean to return a stream or not
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      - name: tail
+        in: query
+        description: Only return the n last (integer) or all ("all") logs
+        required: false
+        schema:
+          type: string
+          nullable: true
+      responses:
+        '200':
+          description: Process instances logs
   /resource/kinds:
     get:
       tags:
