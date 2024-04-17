@@ -1,0 +1,28 @@
+[package]
+name = "nscheduler"
+version = "0.4.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+dev = ["nanocl_utils/dev"]
+test = []
+vendored = ["openssl/vendored"]
+
+[build-dependencies]
+nanocl_utils = { version = "0.5", features = ["build_tools"] }
+
+[dependencies]
+log = "0.4"
+futures-util = "0.3"
+ntex = { version = "1.2", features = ["tokio"] }
+nanocld_client = { version = "0.14" }
+nanocl_utils = { version = "0.5", features = ["logger"] }
+serde_json = "1.0"
+nanocl_error = { version = "0.3", features = [
+  "io",
+  "http_client",
+  "serde_json",
+] }
+openssl = "0.10"

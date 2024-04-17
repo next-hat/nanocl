@@ -8,6 +8,7 @@ members = [
   "bin/ncproxy",
   "bin/ncdns",
   "bin/ncvpnkit",
+  "bin/nscheduler",
   "bin/nanocld",
   "bin/nanocl",
 ]
