@@ -73,7 +73,9 @@ async fn exec_job_logs(
     stderr: None,
     stdout: None,
   };
-  let stream = client.logs_process("job", &opts.name, Some(&query)).await?;
+  let stream = client
+    .logs_processes("job", &opts.name, Some(&query))
+    .await?;
   utils::print::logs_process_stream(stream).await?;
   Ok(())
 }

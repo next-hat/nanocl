@@ -242,7 +242,7 @@ async fn exec_cargo_logs(
     stdout: None,
   };
   let stream = client
-    .logs_process("cargo", &opts.name, Some(&query))
+    .logs_processes("cargo", &opts.name, Some(&query))
     .await?;
   utils::print::logs_process_stream(stream).await?;
   Ok(())

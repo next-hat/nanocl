@@ -45,7 +45,7 @@ pub async fn list_process(
   Ok(web::HttpResponse::Ok().json(&processes))
 }
 
-/// Get logs of processes for given kind and name
+/// Get logs of processes for all instances of given kind and name (cargo, job, vm)
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Processes",
@@ -65,7 +65,7 @@ pub async fn list_process(
   ),
 ))]
 #[web::get("/processes/{kind}/{name}/logs")]
-async fn logs_process(
+async fn logs_processes(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<ProcessLogQuery>,
@@ -99,6 +99,62 @@ async fn logs_process(
     })
     .collect::<Vec<_>>();
   let stream = select_all(futures).into_stream();
+  let stream = utils::stream::transform_stream::<
+    ProcessOutputLog,
+    ProcessOutputLog,
+  >(stream);
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("application/vdn.nanocl.raw-stream")
+      .streaming(stream),
+  )
+}
+
+/// Get logs of a single process instance by it's name or id
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Processes",
+  path = "/processes/{name}/logs",
+  params(
+    ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
+    ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
+    ("namespace" = Option<String>, Query, description = "Namespace of the process"),
+    ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
+    ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
+    ("timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
+    ("follow" = Option<bool>, Query, description = "Boolean to return a stream or not"),
+    ("tail" = Option<String>, Query, description = "Only return the n last (integer) or all (\"all\") logs"),
+  ),
+  responses(
+    (status = 200, description = "Process instances logs", content_type = "application/vdn.nanocl.raw-stream"),
+  ),
+))]
+#[web::get("/processes/{name}/logs")]
+async fn logs_process(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String)>,
+  qs: web::types::Query<ProcessLogQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, name) = path.into_inner();
+  log::debug!("process::logs_process: {name}");
+  let options: LogsOptions<String> = qs.into_inner().into();
+  let stream = state
+    .docker_api
+    .logs(
+      &name,
+      Some(LogsOptions::<String> {
+        stdout: true,
+        stderr: true,
+        ..options.clone()
+      }),
+    )
+    .map(move |elem| match elem {
+      Err(err) => Err(err),
+      Ok(elem) => Ok(ProcessOutputLog {
+        name: name.clone(),
+        log: elem.into(),
+      }),
+    });
   let stream = utils::stream::transform_stream::<
     ProcessOutputLog,
     ProcessOutputLog,
@@ -317,6 +373,7 @@ pub async fn wait_process(
 
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(list_process);
+  config.service(logs_processes);
   config.service(logs_process);
   config.service(restart_process);
   config.service(start_process);
