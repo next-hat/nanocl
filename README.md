@@ -92,7 +92,7 @@ Resources:
       Locations:
       - Path: /
         Target:
-          Key: doc.nexthat.c
+          Key: doc.global.c
           Port: 80
 ```
 
