@@ -29,7 +29,7 @@ servers:
 - url: /{Version}
   variables:
     Version:
-      default: 0.14.0
+      default: v0.14.0
       description: API version
 paths:
   /_ping:
@@ -985,13 +985,6 @@ paths:
       description: Get logs of a single process instance by it's name or id
       operationId: logs_process
       parameters:
-      - name: kind
-        in: path
-        description: Kind of the process
-        required: true
-        schema:
-          type: string
-        example: cargo
       - name: name
         in: path
         description: Name of the process
@@ -999,13 +992,6 @@ paths:
         schema:
           type: string
         example: deploy-example
-      - name: namespace
-        in: query
-        description: Namespace of the process
-        required: false
-        schema:
-          type: string
-          nullable: true
       - name: since
         in: query
         description: Only logs returned since timestamp

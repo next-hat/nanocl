@@ -3,11 +3,13 @@ use nanocl_error::io::{IoResult, FromIo, IoError};
 
 use nanocld_client::stubs::process::{ProcessLogQuery, ProcessWaitQuery};
 
-use crate::utils;
-use crate::config::CliConfig;
-use crate::models::{
-  JobArg, JobCommand, JobRow, JobRemoveOpts, JobInspectOpts, JobLogsOpts,
-  JobWaitOpts, JobStartOpts,
+use crate::{
+  utils,
+  config::CliConfig,
+  models::{
+    JobArg, JobCommand, JobRow, JobRemoveOpts, JobInspectOpts, JobLogsOpts,
+    JobWaitOpts, JobStartOpts,
+  },
 };
 
 use super::GenericList;

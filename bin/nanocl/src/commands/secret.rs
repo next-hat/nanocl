@@ -1,10 +1,12 @@
 use nanocl_error::io::{IoResult, FromIo};
 
-use crate::utils;
-use crate::config::CliConfig;
-use crate::models::{
-  SecretArg, SecretCommand, SecretCreateOpts, SecretInspectOpts,
-  SecretRemoveOpts, SecretRow,
+use crate::{
+  utils,
+  config::CliConfig,
+  models::{
+    SecretArg, SecretCommand, SecretCreateOpts, SecretInspectOpts,
+    SecretRemoveOpts, SecretRow,
+  },
 };
 
 use super::GenericList;

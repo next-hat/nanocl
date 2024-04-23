@@ -202,7 +202,7 @@ struct VersionModifier;
 impl Modify for VersionModifier {
   fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
     let variable = utoipa::openapi::ServerVariableBuilder::default()
-      .default_value(vars::VERSION)
+      .default_value(format!("v{}", vars::VERSION))
       .description(Some("API version"))
       .build();
 
@@ -212,7 +212,7 @@ impl Modify for VersionModifier {
       .build();
 
     openapi.info.title = "Nanocl Daemon".to_owned();
-    openapi.info.version = format!("v{}", env!("CARGO_PKG_VERSION"));
+    openapi.info.version = format!("v{}", vars::VERSION);
     openapi.info.description =
       Some(include_str!("../../specs/readme.md").to_owned());
     openapi.servers = Some(vec![server]);

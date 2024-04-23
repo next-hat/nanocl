@@ -8,8 +8,11 @@ use futures::{StreamExt, stream::FuturesUnordered};
 use nanocl_error::io::{IoError, FromIo, IoResult};
 
 use nanocld_client::{
-  stubs::system::{EventActorKind, EventCondition, EventKind, ObjPsStatusKind},
   ConnectOpts,
+  stubs::{
+    process::Process,
+    system::{EventActorKind, EventCondition, EventKind, ObjPsStatusKind},
+  },
 };
 
 use nanocld_client::{
@@ -93,6 +96,44 @@ where
   Ok(state_ref)
 }
 
+async fn wait_job_instance_and_log(
+  client: &NanocldClient,
+  instance: &Process,
+  query: &ProcessLogQuery,
+) {
+  let Ok(mut stream) = client.watch_events(None).await else {
+    return;
+  };
+  while let Some(event) = stream.next().await {
+    let Ok(event) = event else {
+      continue;
+    };
+    if event.action != NativeEventAction::Start.to_string() {
+      continue;
+    };
+    let Some(actor) = event.actor else {
+      continue;
+    };
+    let Some(key) = actor.key else {
+      continue;
+    };
+    if key != instance.name {
+      continue;
+    }
+    match client.logs_process(&key, Some(query)).await {
+      Err(err) => {
+        eprintln!("Cannot get job instance {key} logs: {err}");
+      }
+      Ok(stream) => {
+        if let Err(err) = utils::print::logs_process_stream(stream).await {
+          eprintln!("{err}");
+        }
+      }
+    }
+    break;
+  }
+}
+
 /// Logs existing jobs in the Statefile
 async fn log_jobs(
   client: &NanocldClient,
@@ -102,48 +143,42 @@ async fn log_jobs(
   jobs
     .into_iter()
     .map(|job| async move {
-      let Ok(mut stream) = client.watch_events(None).await else {
-        return;
+      let job = match client.inspect_job(&job.name).await {
+        Ok(job) => job,
+        Err(err) => {
+          eprintln!("Unable to inspect job {}: {err}", job.name);
+          return;
+        }
       };
-      let mut current: usize = 0;
-      let length = job.containers.len();
-      while let Some(event) = stream.next().await {
-        let Ok(event) = event else {
-          continue;
-        };
-        if event.action != NativeEventAction::Start.to_string() {
-          continue;
-        };
-        let Some(actor) = event.actor else {
-          continue;
-        };
-        let Some(related) = event.related else {
-          continue;
-        };
-        let Some(related_key) = related.key else {
-          continue;
-        };
-        let Some(key) = actor.key else {
-          continue;
-        };
-        if related_key == job.name {
-          current += 1;
-          match client.logs_process(&key, Some(query)).await {
-            Err(err) => {
-              eprintln!("Cannot get job instance {key} logs: {err}");
+      job
+        .instances
+        .into_iter()
+        .map(|instance| async move {
+          let started_at =
+            instance.clone().data.state.unwrap_or_default().started_at;
+          match started_at {
+            None => {
+              wait_job_instance_and_log(client, &instance, query).await;
             }
-            Ok(stream) => {
+            Some(started_at) => {
+              if started_at == "0001-01-01T00:00:00Z" {
+                wait_job_instance_and_log(client, &instance, query).await;
+                return;
+              }
+              let stream = client
+                .logs_process(&instance.name, Some(query))
+                .await
+                .unwrap();
               if let Err(err) = utils::print::logs_process_stream(stream).await
               {
                 eprintln!("{err}");
               }
             }
           }
-          if current == length {
-            break;
-          }
-        }
-      }
+        })
+        .collect::<FuturesUnordered<_>>()
+        .collect::<Vec<_>>()
+        .await;
     })
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
