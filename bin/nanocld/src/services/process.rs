@@ -116,9 +116,7 @@ async fn logs_processes(
   tag = "Processes",
   path = "/processes/{name}/logs",
   params(
-    ("kind" = String, Path, description = "Kind of the process", example = "cargo"),
     ("name" = String, Path, description = "Name of the process", example = "deploy-example"),
-    ("namespace" = Option<String>, Query, description = "Namespace of the process"),
     ("since" = Option<i64>, Query, description = "Only logs returned since timestamp"),
     ("until" = Option<i64>, Query, description = "Only logs returned until timestamp"),
     ("timestamps" = Option<bool>, Query, description = "Add timestamps to every log line"),
