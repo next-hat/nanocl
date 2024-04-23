@@ -1,10 +1,12 @@
 use nanocl_error::io::{IoResult, FromIo};
 
-use crate::utils;
-use crate::config::CliConfig;
-use crate::models::{
-  ResourceArg, ResourceCommand, ResourceRow, ResourceRemoveOpts,
-  ResourceInspectOpts, ResourceRevertOpts, ResourceHistoryOpts,
+use crate::{
+  utils,
+  config::CliConfig,
+  models::{
+    ResourceArg, ResourceCommand, ResourceRow, ResourceRemoveOpts,
+    ResourceInspectOpts, ResourceRevertOpts, ResourceHistoryOpts,
+  },
 };
 
 use super::GenericList;

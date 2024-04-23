@@ -8,10 +8,12 @@ use nanocl_error::io::{IoResult, FromIo};
 use nanocld_client::NanocldClient;
 use nanocld_client::stubs::vm_image::VmImageCloneStream;
 
-use crate::utils;
-
-use crate::models::{
-  VmImageArg, VmImageCreateOpts, VmImageCommand, VmImageRow, VmImageResizeOpts,
+use crate::{
+  utils,
+  models::{
+    VmImageArg, VmImageCreateOpts, VmImageCommand, VmImageRow,
+    VmImageResizeOpts,
+  },
 };
 
 use super::GenericList;

@@ -3,8 +3,7 @@ use nanocld_client::stubs::statefile::Statefile;
 
 use bollard_next::container::{InspectContainerOptions, RemoveContainerOptions};
 
-use crate::{utils, version};
-use crate::models::UninstallOpts;
+use crate::{utils, version, models::UninstallOpts};
 
 /// This function is called when running `nanocl uninstall`.
 /// It will remove nanocl system containers but not the images

@@ -2,11 +2,13 @@ use nanocld_client::NanocldClient;
 use nanocl_error::io::{IoResult, FromIo};
 
 use nanocld_client::stubs::namespace::NamespaceSummary;
-use crate::config::CliConfig;
-use crate::utils;
-use crate::models::{
-  NamespaceArg, NamespaceCommand, NamespaceOpts, NamespaceRow,
-  NamespaceDeleteOpts,
+use crate::{
+  utils,
+  config::CliConfig,
+  models::{
+    NamespaceArg, NamespaceCommand, NamespaceOpts, NamespaceRow,
+    NamespaceDeleteOpts,
+  },
 };
 
 use super::GenericList;
