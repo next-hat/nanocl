@@ -3,7 +3,10 @@ use nanocld_client::stubs::statefile::Statefile;
 
 use bollard_next::container::{InspectContainerOptions, RemoveContainerOptions};
 
-use crate::{utils, version, models::UninstallOpts};
+use crate::{
+  utils, version,
+  models::{StateRoot, UninstallOpts},
+};
 
 /// This function is called when running `nanocl uninstall`.
 /// It will remove nanocl system containers but not the images
@@ -30,7 +33,7 @@ pub async fn exec_uninstall(args: &UninstallOpts) -> IoResult<()> {
     "home_dir": "/tmp/random",
     "channel": version::CHANNEL.to_owned(),
   });
-  let installer = utils::state::compile(&installer, &data)?;
+  let installer = utils::state::compile(&installer, &data, StateRoot::None)?;
   let installer = serde_yaml::from_str::<Statefile>(&installer)
     .map_err(|err| err.map_err_context(|| "Unable to parse installer"))?;
   let cargoes = installer.cargoes.unwrap_or_default();

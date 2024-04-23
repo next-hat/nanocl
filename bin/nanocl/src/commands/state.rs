@@ -36,68 +36,48 @@ use nanocld_client::{
 };
 
 use crate::{
-  utils,
   config::CliConfig,
   models::{
-    StateArg, StateCommand, StateApplyOpts, StateRemoveOpts, DisplayFormat,
-    StateRef, Context, StateLogsOpts,
+    Context, DisplayFormat, StateApplyOpts, StateArg, StateCommand,
+    StateLogsOpts, StateRef, StateRemoveOpts, StateRoot,
   },
+  utils,
 };
 
 /// Get Statefile from url and return a StateRef with the raw data and the format
-async fn get_from_url(url: &str) -> IoResult<StateRef<Statefile>> {
-  let url = if url.starts_with("http") {
-    url.to_owned()
-  } else {
-    format!("http://{url}")
-  };
-  let client = ntex::http::Client::default();
-  let mut res = client.get(&url).send().await.map_err(|err| {
-    err.map_err_context(|| "Unable to get Statefile from url")
-  })?;
-  if res.status().is_redirection() {
-    let location = res
-      .headers()
-      .get("location")
-      .ok_or_else(|| IoError::invalid_data("Location", "is not specified"))?
-      .to_str()
-      .map_err(|err| IoError::invalid_data("Location", &format!("{err}")))?;
-    res = client.get(location).send().await.map_err(|err| {
-      err.map_err_context(|| "Unable to get Statefile from url")
-    })?;
-  }
-  let data = res
-    .body()
-    .await
-    .map_err(|err| err.map_err_context(|| "Cannot read response from url"))?
-    .to_vec();
-  let data = std::str::from_utf8(&data).map_err(|err| {
-    IoError::invalid_data("From utf8".into(), format!("{err}"))
-  })?;
-  let ext = url
-    .split('.')
-    .last()
-    .ok_or_else(|| IoError::invalid_data("Statefile", "has no extension"))?;
-  let state_ref = utils::state::get_state_ref(ext, data)?;
+async fn get_from_url(
+  url: &str,
+  format: &DisplayFormat,
+) -> IoResult<StateRef<Statefile>> {
+  let (url, data) = utils::state::download_statefile(url).await?;
+  let ext = utils::state::get_format(format, url.clone());
+  let mut root = url.split('/').map(str::to_string).collect::<Vec<String>>();
+  root.pop();
+  root.push("".to_owned());
+  let root = root.join("/");
+
+  let state_ref =
+    utils::state::get_state_ref(&ext, &data, StateRoot::Url(root))?;
   Ok(state_ref)
 }
 
 /// Read Statefile from file and return a StateRef with the raw data and the format
 fn read_from_file<T>(
-  path: &std::path::Path,
+  path: &std::path::PathBuf,
   format: &DisplayFormat,
 ) -> IoResult<StateRef<T>>
 where
   T: serde::Serialize + serde::de::DeserializeOwned,
 {
-  let default_format = format.to_string();
-  let ext = path
-    .extension()
-    .unwrap_or(std::ffi::OsStr::new(&default_format))
-    .to_str();
-  let ext = ext.unwrap_or_default();
   let data = fs::read_to_string(path)?;
-  let state_ref = utils::state::get_state_ref::<T>(ext, &data)?;
+  let mut include_path = path.clone();
+  include_path.pop();
+  let ext = utils::state::get_format(format, path);
+  let state_ref = utils::state::get_state_ref::<T>(
+    &ext,
+    &data,
+    StateRoot::File(include_path),
+  )?;
   Ok(state_ref)
 }
 
@@ -378,7 +358,7 @@ fn inject_namespace(
   let object = liquid::object!({
     "Args": args,
   });
-  let str = utils::state::compile(namespace, &object)?;
+  let str = utils::state::compile(namespace, &object, StateRoot::None)?;
   Ok(str)
 }
 
@@ -412,14 +392,17 @@ async fn inject_data(
     "Config": info.config,
     "HostGateway": info.host_gateway,
     "Namespaces": namespaces,
+    "StateRoot": state_ref.root.to_string(),
   });
-  let raw = utils::state::compile(&state_ref.raw, &data)?;
+  let raw =
+    utils::state::compile(&state_ref.raw, &data, state_ref.root.clone())?;
   let state_file =
     utils::state::serialize_ext::<Statefile>(&state_ref.format, &raw)?;
   Ok(StateRef {
     raw,
     format: state_ref.format.clone(),
     data: state_file,
+    root: state_ref.root.clone(),
   })
 }
 
@@ -435,7 +418,7 @@ async fn parse_state_file(
     {
       return read_from_file(&path, format);
     }
-    return get_from_url(path).await;
+    return get_from_url(path, format).await;
   }
   if let Ok(path) = std::path::Path::new("Statefile.yaml").canonicalize() {
     return read_from_file(&path, format);
