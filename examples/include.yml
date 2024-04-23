@@ -1,0 +1,17 @@
+ApiVersion: v0.14
+
+# SubStates:
+#   - ./sub_state.yml
+
+Jobs:
+- Name: include-example
+  Containers:
+  - Image: ubuntu:latest
+    Cmd:
+    - echo
+    - "Hello, World!"
+
+Cargoes:
+- Name: include-example
+  Container:
+    Image: ghcr.io/next-hat/nanocl-get-started:latest

@@ -24,6 +24,32 @@ pub struct StatefileArg {
   pub default: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct SubStateDef {
+  pub path: String,
+  pub args: Option<Vec<StatefileArg>>,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(untagged, deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub enum SubState {
+  Path(String),
+  Definition(SubStateDef),
+}
+
 /// Structure that represent a Statefile
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
@@ -42,6 +68,12 @@ pub struct Statefile {
     serde(skip_serializing_if = "Option::is_none")
   )]
   pub args: Option<Vec<StatefileArg>>,
+  /// Include sub states that will be applied before the current state
+  #[cfg_attr(
+    feature = "serde",
+    serde(skip_serializing_if = "Option::is_none")
+  )]
+  pub sub_states: Option<Vec<SubState>>,
   /// Set the group of defined objects default to `{name_of_directory}.{name_of_file}`
   #[cfg_attr(
     feature = "serde",

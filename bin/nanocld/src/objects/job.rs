@@ -1,4 +1,4 @@
-use nanocl_error::http::HttpResult;
+use nanocl_error::http::{HttpError, HttpResult};
 use nanocl_stubs::{
   job::{Job, JobPartial, JobInspect},
   system::{ObjPsStatusPartial, ObjPsStatusKind, NativeEventAction},
@@ -76,7 +76,11 @@ impl ObjInspectByPk for JobDb {
     let instances = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
     let (instance_total, instance_failed, instance_success, instance_running) =
       utils::container::count_status(&instances);
+    let status = ObjPsStatusDb::read_by_pk(&job.name, &state.pool).await?;
     let job_inspect = JobInspect {
+      status: status
+        .try_into()
+        .map_err(HttpError::internal_server_error)?,
       spec: job,
       instance_total,
       instance_success,

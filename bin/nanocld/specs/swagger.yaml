@@ -4048,6 +4048,7 @@ components:
       type: object
       description: Detailed information about a job
       required:
+      - Status
       - InstanceTotal
       - InstanceSuccess
       - InstanceRunning
@@ -4055,6 +4056,8 @@ components:
       - Spec
       - Instances
       properties:
+        Status:
+          $ref: '#/components/schemas/ObjPsStatus'
         InstanceTotal:
           type: integer
           description: Number of instances
@@ -6036,6 +6039,12 @@ components:
           items:
             $ref: '#/components/schemas/StatefileArg'
           description: Arguments to pass to the Statefile
+          nullable: true
+        SubStates:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubState'
+          description: Include sub states that will be applied before the current state
           nullable: true
         Group:
           type: string
