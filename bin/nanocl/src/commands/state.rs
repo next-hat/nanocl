@@ -117,20 +117,20 @@ async fn wait_job_instance_and_log(
     let Some(key) = actor.key else {
       continue;
     };
-    if key == instance.name {
-      println!("job instance name : {}/{key}", instance.name);
-      match client.logs_process(&key, Some(query)).await {
-        Err(err) => {
-          eprintln!("Cannot get job instance {key} logs: {err}");
-        }
-        Ok(stream) => {
-          if let Err(err) = utils::print::logs_process_stream(stream).await {
-            eprintln!("{err}");
-          }
+    if key != instance.name {
+      continue;
+    }
+    match client.logs_process(&key, Some(query)).await {
+      Err(err) => {
+        eprintln!("Cannot get job instance {key} logs: {err}");
+      }
+      Ok(stream) => {
+        if let Err(err) = utils::print::logs_process_stream(stream).await {
+          eprintln!("{err}");
         }
       }
-      break;
     }
+    break;
   }
 }
 
