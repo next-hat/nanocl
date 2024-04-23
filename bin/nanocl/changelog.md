@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Secrets create commands
 
+### Fixed
+
+- nanocl state logs for jobs
+
 ### Changed
 
 - PS default display only running processes
