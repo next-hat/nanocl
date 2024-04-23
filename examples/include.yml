@@ -1,10 +1,16 @@
 ApiVersion: v0.14
 
-SubStates:
-  - ./sub_state.yml
+# SubStates:
+#   - ./sub_state.yml
 
-# See all options:
-# https://docs.next-hat.com/references/nanocl/objects/cargo
+Jobs:
+- Name: include-example
+  Containers:
+  - Image: ubuntu:latest
+    Cmd:
+    - echo
+    - "Hello, World!"
+
 Cargoes:
 - Name: include-example
   Container:

@@ -503,31 +503,19 @@ async fn wait_process_object(
   Ok(fut)
 }
 
-// async fn exec_state_apply_recurr(
-//   cli_conf: &CliConfig,
-//   opts: &StateApplyOpts,
-// ) -> IoResult<StateRef<Statefile>> {
-// }
-
-/// Function called when running `nanocl state apply`
 #[async_recursion(?Send)]
-async fn exec_state_apply(
+async fn state_apply_recurr(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
-) -> IoResult<()> {
+) -> IoResult<Vec<StateRef<Statefile>>> {
   let format = cli_conf.user_config.display_format.clone();
   let state_ref = parse_state_file(&opts.state_location, &format).await?;
   let client = gen_client(cli_conf, &state_ref)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let state_file =
     render_template(&state_ref, &args, &client, cli_conf).await?;
-  if !opts.skip_confirm {
-    println!("{}", state_file.raw);
-    utils::dialog::confirm("Are you sure to apply this state ?")
-      .map_err(|err| err.map_err_context(|| "StateApply"))?;
-  }
   let sub_states = state_file.data.sub_states.clone().unwrap_or_default();
-  sub_states
+  let parsed_sub_states = sub_states
     .into_iter()
     .map(|sub_state| async move {
       let current =
@@ -546,19 +534,27 @@ async fn exec_state_apply(
         ..opts.clone()
       };
       let cli_conf = cli_conf.clone();
-      rt::spawn(async move {
-        if let Err(err) = exec_state_apply(&cli_conf, &opts).await {
-          eprint!("{err}");
-        }
-      });
+      state_apply_recurr(&cli_conf, &opts).await
     })
     .collect::<FuturesOrdered<_>>()
     .collect::<Vec<_>>()
-    .await;
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()?;
+  let mut states = vec![state_file.clone()];
+  states.append(&mut parsed_sub_states.into_iter().flatten().collect());
+  Ok(states)
+}
 
+async fn state_apply(
+  cli_conf: &CliConfig,
+  opts: &StateApplyOpts,
+  state_file: &StateRef<Statefile>,
+) -> IoResult<()> {
+  let client = &cli_conf.client;
   let namespace = state_file.data.namespace.clone().unwrap_or("global".into());
   let pg_style = utils::progress::create_spinner_style("green");
-  if let Some(secrets) = &state_ref.data.secrets {
+  if let Some(secrets) = &state_file.data.secrets {
     for secret in secrets {
       let token = format!("secret/{}", secret.name);
       let pg = utils::progress::create_progress(&token, &pg_style);
@@ -586,7 +582,7 @@ async fn exec_state_apply(
           &job.name,
           EventActorKind::Job,
           vec![NativeEventAction::Destroy],
-          &client,
+          client,
         )
         .await?;
         client.delete_job(&job.name).await?;
@@ -597,7 +593,7 @@ async fn exec_state_apply(
         &job.name,
         EventActorKind::Job,
         vec![NativeEventAction::Start],
-        &client,
+        client,
       )
       .await?;
       client.start_process("job", &job.name, None).await?;
@@ -630,7 +626,7 @@ async fn exec_state_apply(
         &format!("{}.{namespace}", cargo.name),
         EventActorKind::Cargo,
         vec![NativeEventAction::Start],
-        &client,
+        client,
       )
       .await?;
       client
@@ -664,7 +660,7 @@ async fn exec_state_apply(
         &format!("{}.{namespace}", vm.name),
         EventActorKind::Vm,
         vec![NativeEventAction::Start],
-        &client,
+        client,
       )
       .await?;
       client
@@ -693,18 +689,52 @@ async fn exec_state_apply(
       pg.finish();
     }
   }
+  println!();
+  Ok(())
+}
+
+/// Function called when running `nanocl state apply`
+async fn exec_state_apply(
+  cli_conf: &CliConfig,
+  opts: &StateApplyOpts,
+) -> IoResult<()> {
+  let mut states = state_apply_recurr(cli_conf, opts).await?;
+  states.reverse();
+  if !opts.skip_confirm {
+    let raw = states
+      .iter()
+      .map(|state| state.raw.clone())
+      .collect::<Vec<String>>()
+      .join("\n");
+    println!("{raw}");
+    utils::dialog::confirm("Are you sure to apply this state ?")
+      .map_err(|err| err.map_err_context(|| "StateApply"))?;
+  }
+  for state in states.clone() {
+    state_apply(cli_conf, opts, &state).await?;
+  }
   if opts.follow {
-    let query = ProcessLogQuery {
-      namespace: state_file.data.namespace,
-      follow: Some(true),
-      ..Default::default()
-    };
-    if let Some(cargoes) = state_file.data.cargoes {
-      log_cargoes(&client, cargoes, &query).await?;
-    }
-    if let Some(jobs) = state_file.data.jobs {
-      log_jobs(&client, jobs, &query).await?;
-    }
+    let client = cli_conf.client.clone();
+    states
+      .into_iter()
+      .map(|state| async {
+        let query = ProcessLogQuery {
+          namespace: state.data.namespace,
+          follow: Some(true),
+          ..Default::default()
+        };
+        if let Some(cargoes) = state.data.cargoes {
+          log_cargoes(&client, cargoes, &query).await?;
+        }
+        if let Some(jobs) = state.data.jobs {
+          println!("log jobs");
+          log_jobs(&client, jobs, &query).await?;
+        }
+        Ok::<_, IoError>(())
+      })
+      .collect::<FuturesUnordered<_>>()
+      .collect::<Vec<_>>()
+      .await;
   }
   Ok(())
 }
@@ -720,16 +750,11 @@ async fn exec_state_logs(
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let state_file =
     render_template(&state_ref, &args, &client, cli_conf).await?;
-  let tail_string = opts.tail.clone().unwrap_or_default();
-  let tail = tail_string.as_str();
+  let tail = opts.tail.clone();
   let log_opts = ProcessLogQuery {
     since: opts.since,
     until: opts.until,
-    tail: if tail.is_empty() {
-      None
-    } else {
-      Some(tail.to_owned())
-    },
+    tail,
     timestamps: Some(opts.timestamps),
     follow: Some(opts.follow),
     namespace: state_file.data.namespace,
