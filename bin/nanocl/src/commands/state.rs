@@ -706,12 +706,11 @@ async fn exec_state_apply(
           follow: Some(true),
           ..Default::default()
         };
+        if let Some(jobs) = state.data.jobs {
+          log_jobs(&client, jobs, &query).await?;
+        }
         if let Some(cargoes) = state.data.cargoes {
           log_cargoes(&client, cargoes, &query).await?;
-        }
-        if let Some(jobs) = state.data.jobs {
-          println!("log jobs");
-          log_jobs(&client, jobs, &query).await?;
         }
         Ok::<_, IoError>(())
       })
