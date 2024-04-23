@@ -56,6 +56,7 @@ impl UserConfig {
 /// A new `CliConfig` is created for each command.
 /// It is used to pass the configuration to the command functions.
 /// And contains the host, the client, the context and the command arguments.
+#[derive(Clone)]
 pub struct CliConfig {
   /// Nanocld host to use
   pub host: String,

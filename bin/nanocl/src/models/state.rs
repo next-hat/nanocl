@@ -3,14 +3,11 @@ use clap::{Parser, Subcommand};
 use super::DisplayFormat;
 
 /// `nanocl state apply` available options
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 pub struct StateApplyOpts {
   /// Path or Url to the Statefile
   #[clap(long, short = 's')]
   pub state_location: Option<String>,
-  /// Force pulling images even if they exist
-  #[clap(long, short = 'p')]
-  pub force_pull: bool,
   /// Follow logs of the deployed cargo
   #[clap(long, short = 'f')]
   pub follow: bool,

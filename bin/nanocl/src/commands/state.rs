@@ -1,15 +1,20 @@
-use std::{fs, collections::HashMap};
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use ntex::rt;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
-use futures::{StreamExt, stream::FuturesUnordered};
+use futures::{
+  stream::{FuturesOrdered, FuturesUnordered},
+  StreamExt,
+};
+use async_recursion::async_recursion;
 
 use nanocl_error::io::{IoError, FromIo, IoResult};
 
 use nanocld_client::{
   ConnectOpts,
   stubs::{
+    statefile::SubState,
     process::Process,
     system::{EventActorKind, EventCondition, EventKind, ObjPsStatusKind},
   },
@@ -444,7 +449,7 @@ async fn parse_state_file(
   read_from_file(&path, format)
 }
 
-async fn execute_template(
+async fn render_template(
   state_ref: &StateRef<Statefile>,
   args: &serde_json::Value,
   client: &NanocldClient,
@@ -498,7 +503,14 @@ async fn wait_process_object(
   Ok(fut)
 }
 
+// async fn exec_state_apply_recurr(
+//   cli_conf: &CliConfig,
+//   opts: &StateApplyOpts,
+// ) -> IoResult<StateRef<Statefile>> {
+// }
+
 /// Function called when running `nanocl state apply`
+#[async_recursion(?Send)]
 async fn exec_state_apply(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
@@ -508,13 +520,43 @@ async fn exec_state_apply(
   let client = gen_client(cli_conf, &state_ref)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let state_file =
-    execute_template(&state_ref, &args, &client, cli_conf).await?;
-  let namespace = state_file.data.namespace.clone().unwrap_or("global".into());
+    render_template(&state_ref, &args, &client, cli_conf).await?;
   if !opts.skip_confirm {
     println!("{}", state_file.raw);
     utils::dialog::confirm("Are you sure to apply this state ?")
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
+  let sub_states = state_file.data.sub_states.clone().unwrap_or_default();
+  sub_states
+    .into_iter()
+    .map(|sub_state| async move {
+      let current =
+        PathBuf::from(opts.state_location.clone().unwrap_or_default())
+          .canonicalize()
+          .unwrap();
+      let parent = current.parent().unwrap();
+      let path = match sub_state {
+        SubState::Path(path) => path,
+        SubState::Definition(sub_state) => sub_state.path,
+      };
+      let full_path = parent.join(path).to_str().unwrap().to_owned();
+      let opts = StateApplyOpts {
+        state_location: Some(full_path),
+        skip_confirm: true,
+        ..opts.clone()
+      };
+      let cli_conf = cli_conf.clone();
+      rt::spawn(async move {
+        if let Err(err) = exec_state_apply(&cli_conf, &opts).await {
+          eprint!("{err}");
+        }
+      });
+    })
+    .collect::<FuturesOrdered<_>>()
+    .collect::<Vec<_>>()
+    .await;
+
+  let namespace = state_file.data.namespace.clone().unwrap_or("global".into());
   let pg_style = utils::progress::create_spinner_style("green");
   if let Some(secrets) = &state_ref.data.secrets {
     for secret in secrets {
@@ -677,7 +719,7 @@ async fn exec_state_logs(
   let client = gen_client(cli_conf, &state_ref)?;
   let args = parse_build_args(&state_ref.data, opts.args.clone())?;
   let state_file =
-    execute_template(&state_ref, &args, &client, cli_conf).await?;
+    render_template(&state_ref, &args, &client, cli_conf).await?;
   let tail_string = opts.tail.clone().unwrap_or_default();
   let tail = tail_string.as_str();
   let log_opts = ProcessLogQuery {
