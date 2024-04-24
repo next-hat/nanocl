@@ -4,6 +4,7 @@ use ntex::rt;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
 use futures::{
+  join,
   stream::{FuturesOrdered, FuturesUnordered},
   StreamExt,
 };
@@ -672,7 +673,6 @@ async fn state_apply(
       pg.finish();
     }
   }
-  println!();
   Ok(())
 }
 
@@ -706,12 +706,12 @@ async fn exec_state_apply(
           follow: Some(true),
           ..Default::default()
         };
-        if let Some(jobs) = state.data.jobs {
-          log_jobs(&client, jobs, &query).await?;
-        }
-        if let Some(cargoes) = state.data.cargoes {
-          log_cargoes(&client, cargoes, &query).await?;
-        }
+        let res = join!(
+          log_jobs(&client, state.data.jobs.unwrap_or_default(), &query),
+          log_cargoes(&client, state.data.cargoes.unwrap_or_default(), &query)
+        );
+        res.0?;
+        res.1?;
         Ok::<_, IoError>(())
       })
       .collect::<FuturesUnordered<_>>()
@@ -742,12 +742,16 @@ async fn exec_state_logs(
     namespace: state_file.data.namespace,
     ..Default::default()
   };
-  if let Some(cargoes) = state_file.data.cargoes {
-    log_cargoes(&client, cargoes, &log_opts).await?;
-  }
-  if let Some(jobs) = state_file.data.jobs {
-    log_jobs(&client, jobs, &log_opts).await?;
-  }
+  let res = join!(
+    log_jobs(&client, state_file.data.jobs.unwrap_or_default(), &log_opts),
+    log_cargoes(
+      &client,
+      state_file.data.cargoes.unwrap_or_default(),
+      &log_opts
+    )
+  );
+  res.0?;
+  res.1?;
   Ok(())
 }
 

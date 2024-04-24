@@ -11,14 +11,6 @@ Jobs:
     - echo
     - "Hello, World!"
 
-Jobs:
-- Name: include-example
-  Containers:
-  - Image: ubuntu:latest
-    Cmd:
-    - echo
-    - "Hello, World!"
-
 Cargoes:
 - Name: include-example
   Container:
