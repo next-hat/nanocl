@@ -495,25 +495,32 @@ async fn parse_state_file_recurr(
   cli_args: &[String],
 ) -> IoResult<Vec<StateRef<Statefile>>> {
   let format = cli_conf.user_config.display_format.clone();
-  let state_ref = read_state_file(location, &format).await?;
-  let client = gen_client(cli_conf, &state_ref)?;
-  let args = parse_build_args(&state_ref.data, cli_args)?;
+  let state_file = read_state_file(location, &format).await?;
+  let client = gen_client(cli_conf, &state_file)?;
+  let args = parse_build_args(&state_file.data, cli_args)?;
   let state_file =
-    render_template(&state_ref, &args, &client, cli_conf).await?;
+    render_template(&state_file, &args, &client, cli_conf).await?;
   let sub_states = state_file.data.sub_states.clone().unwrap_or_default();
   let parsed_sub_states = sub_states
     .iter()
     .map(|sub_state| async move {
       let current = PathBuf::from(location.clone().unwrap_or_default())
         .canonicalize()
-        .unwrap();
+        .map_err(|err| err.map_err_context(|| "Statefile location"))?;
       let parent = current.parent().unwrap();
       let path = match sub_state {
         SubState::Path(path) => path,
         SubState::Definition(sub_state) => &sub_state.path,
       };
-      let full_path = parent.join(path).to_str().unwrap().to_owned();
-      parse_state_file_recurr(cli_conf, &Some(full_path), cli_args).await
+      let full_path = parent.join(path);
+      if current == full_path {
+        return Err(IoError::invalid_data(
+          "Statefile",
+          "Cannot include itself",
+        ));
+      }
+      let s_full_path = full_path.to_str().unwrap().to_owned();
+      parse_state_file_recurr(cli_conf, &Some(s_full_path), cli_args).await
     })
     .collect::<FuturesOrdered<_>>()
     .collect::<Vec<_>>()

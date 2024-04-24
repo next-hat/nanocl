@@ -164,6 +164,20 @@ mod tests {
     assert_cli_ok!("cargo", "rm", "-yf", CARGO_NAME);
   }
 
+  /// Test state file when then include other state files
+  #[ntex::test]
+  async fn sub_state() {
+    assert_cli_ok!("state", "apply", "-ys", "../../examples/sub_state.yml",);
+    assert_cli_ok!("state", "logs", "-s", "../../examples/sub_state.yml");
+    assert_cli_ok!("state", "rm", "-ys", "../../examples/sub_state.yml",);
+    assert_cli_err!(
+      "state",
+      "apply",
+      "-ys",
+      "../../tests/invalid_sub_state.yml",
+    );
+  }
+
   /// Test Resource commands
   #[ntex::test]
   async fn resource() {
@@ -318,17 +332,14 @@ mod tests {
     let relative_path = format!("../../examples/{filename}");
     assert_cli_ok!("state", "apply", "-ys", &relative_path);
     assert_cli_ok!("state", "rm", "-ys", &relative_path);
-
     let path = env::current_dir().unwrap();
     let path = path.as_os_str().to_str().unwrap();
     let absolute_path = format!("{path}/{relative_path}");
     assert_cli_ok!("state", "apply", "-ys", &absolute_path);
     assert_cli_ok!("state", "rm", "-ys", &absolute_path);
-
     let short_url = format!("nhnr.io/v0.14/tests/{filename}");
     assert_cli_ok!("state", "apply", "-ys", &short_url);
     assert_cli_ok!("state", "rm", "-ys", &short_url);
-
     let url = format!("https://nhnr.io/v0.14/tests/{filename}");
     assert_cli_ok!("state", "apply", "-ys", &url);
     assert_cli_ok!("state", "rm", "-ys", &url);
