@@ -73,5 +73,5 @@ ring = "0.17"
 nix = { version = "0.28", features = ["user"] }
 dotenvy = "0.15"
 openssl = "0.10"
-async-recursion = "1.1.0"
-url = "2.5.0"
+async-recursion = "1.1"
+url = "2.5"
