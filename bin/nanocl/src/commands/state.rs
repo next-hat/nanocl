@@ -1,12 +1,16 @@
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{
+  fs,
+  env::{consts, vars_os},
+  path::{Path, PathBuf},
+  collections::HashMap,
+};
 
 use ntex::rt;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
 use futures::{
-  join,
+  join, StreamExt,
   stream::{FuturesOrdered, FuturesUnordered},
-  StreamExt,
 };
 use async_recursion::async_recursion;
 
@@ -37,12 +41,12 @@ use nanocld_client::{
 };
 
 use crate::{
+  utils,
   config::CliConfig,
   models::{
     Context, DisplayFormat, StateApplyOpts, StateArg, StateCommand,
     StateLogsOpts, StateRef, StateRemoveOpts, StateRoot,
   },
-  utils,
 };
 
 /// Get Statefile from url and return a StateRef with the raw data and the format
@@ -56,7 +60,6 @@ async fn get_from_url(
   root.pop();
   root.push("".to_owned());
   let root = root.join("/");
-
   let state_ref =
     utils::state::get_state_ref(&ext, &data, StateRoot::Url(root))?;
   Ok(state_ref)
@@ -64,7 +67,7 @@ async fn get_from_url(
 
 /// Read Statefile from file and return a StateRef with the raw data and the format
 fn read_from_file<T>(
-  path: &std::path::PathBuf,
+  path: &PathBuf,
   format: &DisplayFormat,
 ) -> IoResult<StateRef<T>>
 where
@@ -125,9 +128,9 @@ async fn log_jobs(
   client: &NanocldClient,
   jobs: Vec<JobPartial>,
   query: &ProcessLogQuery,
-) -> IoResult<()> {
+) {
   jobs
-    .into_iter()
+    .iter()
     .map(|job| async move {
       let job = match client.inspect_job(&job.name).await {
         Ok(job) => job,
@@ -138,17 +141,17 @@ async fn log_jobs(
       };
       job
         .instances
-        .into_iter()
+        .iter()
         .map(|instance| async move {
           let started_at =
             instance.clone().data.state.unwrap_or_default().started_at;
           match started_at {
             None => {
-              wait_job_instance_and_log(client, &instance, query).await;
+              wait_job_instance_and_log(client, instance, query).await;
             }
             Some(started_at) => {
               if started_at == "0001-01-01T00:00:00Z" {
-                wait_job_instance_and_log(client, &instance, query).await;
+                wait_job_instance_and_log(client, instance, query).await;
                 return;
               }
               let stream = client
@@ -169,7 +172,6 @@ async fn log_jobs(
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
     .await;
-  Ok(())
 }
 
 /// Attach to a list of cargoes and print their logs
@@ -177,7 +179,7 @@ pub async fn log_cargoes(
   client: &NanocldClient,
   cargoes: Vec<CargoSpecPartial>,
   query: &ProcessLogQuery,
-) -> IoResult<()> {
+) {
   cargoes
     .into_iter()
     .map(|cargo| async move {
@@ -198,7 +200,6 @@ pub async fn log_cargoes(
     .collect::<FuturesUnordered<_>>()
     .collect::<Vec<_>>()
     .await;
-  Ok(())
 }
 
 /// Hook cargoes binds to replace relative path with absolute path
@@ -278,13 +279,13 @@ fn gen_client(
 /// Parse `Args` from a Statefile and ask the user to input their values
 fn parse_build_args(
   state_file: &Statefile,
-  args: Vec<String>,
+  args: &[String],
 ) -> IoResult<serde_json::Value> {
   let mut cmd = Command::new("nanocl state args")
     .about("Validate state args")
     .bin_name("nanocl state args --");
   // Add string nanocl state args as first element of args
-  let mut args = args;
+  let mut args = args.to_owned();
   args.insert(0, "nanocl state apply --".into());
   for build_arg in state_file.args.clone().unwrap_or_default() {
     let name = build_arg.name.to_owned();
@@ -370,8 +371,8 @@ async fn inject_data(
   context: &Context,
   client: &NanocldClient,
 ) -> IoResult<StateRef<Statefile>> {
-  let mut envs = std::collections::HashMap::new();
-  for (key, value) in std::env::vars_os() {
+  let mut envs = HashMap::new();
+  for (key, value) in vars_os() {
     let key = key.to_string_lossy().to_string();
     let value = value.to_string_lossy().to_string();
     envs.insert(key, value);
@@ -388,8 +389,8 @@ async fn inject_data(
     "Args": args,
     "Envs": envs,
     "Context": context,
-    "Os": std::env::consts::OS,
-    "OsFamily": std::env::consts::FAMILY,
+    "Os": consts::OS,
+    "OsFamily": consts::FAMILY,
     "Config": info.config,
     "HostGateway": info.host_gateway,
     "Namespaces": namespaces,
@@ -408,12 +409,12 @@ async fn inject_data(
 }
 
 /// Parse a Statefile from a path or url and return a StateRef with the raw data and the format
-async fn parse_state_file(
+async fn read_state_file(
   path: &Option<String>,
   format: &DisplayFormat,
 ) -> IoResult<StateRef<Statefile>> {
   if let Some(path) = path {
-    if let Ok(path) = std::path::Path::new(&path)
+    if let Ok(path) = Path::new(&path)
       .canonicalize()
       .map_err(|err| err.map_err_context(|| format!("Statefile {path}")))
     {
@@ -421,13 +422,13 @@ async fn parse_state_file(
     }
     return get_from_url(path, format).await;
   }
-  if let Ok(path) = std::path::Path::new("Statefile.yaml").canonicalize() {
+  if let Ok(path) = Path::new("Statefile.yaml").canonicalize() {
     return read_from_file(&path, format);
   }
-  if let Ok(path) = std::path::Path::new("Statefile").canonicalize() {
+  if let Ok(path) = Path::new("Statefile").canonicalize() {
     return read_from_file(&path, format);
   }
-  let path = std::path::Path::new("Statefile.yml")
+  let path = Path::new("Statefile.yml")
     .canonicalize()
     .map_err(|err| err.map_err_context(|| "Statefile Statefile.yml"))?;
   read_from_file(&path, format)
@@ -488,37 +489,31 @@ async fn wait_process_object(
 }
 
 #[async_recursion(?Send)]
-async fn state_apply_recurr(
+async fn parse_state_file_recurr(
   cli_conf: &CliConfig,
-  opts: &StateApplyOpts,
+  location: &Option<String>,
+  cli_args: &[String],
 ) -> IoResult<Vec<StateRef<Statefile>>> {
   let format = cli_conf.user_config.display_format.clone();
-  let state_ref = parse_state_file(&opts.state_location, &format).await?;
+  let state_ref = read_state_file(location, &format).await?;
   let client = gen_client(cli_conf, &state_ref)?;
-  let args = parse_build_args(&state_ref.data, opts.args.clone())?;
+  let args = parse_build_args(&state_ref.data, cli_args)?;
   let state_file =
     render_template(&state_ref, &args, &client, cli_conf).await?;
   let sub_states = state_file.data.sub_states.clone().unwrap_or_default();
   let parsed_sub_states = sub_states
-    .into_iter()
+    .iter()
     .map(|sub_state| async move {
-      let current =
-        PathBuf::from(opts.state_location.clone().unwrap_or_default())
-          .canonicalize()
-          .unwrap();
+      let current = PathBuf::from(location.clone().unwrap_or_default())
+        .canonicalize()
+        .unwrap();
       let parent = current.parent().unwrap();
       let path = match sub_state {
         SubState::Path(path) => path,
-        SubState::Definition(sub_state) => sub_state.path,
+        SubState::Definition(sub_state) => &sub_state.path,
       };
       let full_path = parent.join(path).to_str().unwrap().to_owned();
-      let opts = StateApplyOpts {
-        state_location: Some(full_path),
-        skip_confirm: true,
-        ..opts.clone()
-      };
-      let cli_conf = cli_conf.clone();
-      state_apply_recurr(&cli_conf, &opts).await
+      parse_state_file_recurr(cli_conf, &Some(full_path), cli_args).await
     })
     .collect::<FuturesOrdered<_>>()
     .collect::<Vec<_>>()
@@ -527,6 +522,7 @@ async fn state_apply_recurr(
     .collect::<Result<Vec<_>, _>>()?;
   let mut states = vec![state_file.clone()];
   states.append(&mut parsed_sub_states.into_iter().flatten().collect());
+  states.reverse();
   Ok(states)
 }
 
@@ -676,43 +672,42 @@ async fn state_apply(
   Ok(())
 }
 
+fn print_states(states: &[StateRef<Statefile>]) {
+  let raw = states.iter().fold(String::new(), |init, state| {
+    format!("{init}{}\n", state.raw)
+  });
+  println!("{raw}");
+}
+
 /// Function called when running `nanocl state apply`
 async fn exec_state_apply(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
 ) -> IoResult<()> {
-  let mut states = state_apply_recurr(cli_conf, opts).await?;
-  states.reverse();
+  let states =
+    parse_state_file_recurr(cli_conf, &opts.state_location, &opts.args).await?;
   if !opts.skip_confirm {
-    let raw = states
-      .iter()
-      .map(|state| state.raw.clone())
-      .collect::<Vec<String>>()
-      .join("\n");
-    println!("{raw}");
+    print_states(&states);
     utils::dialog::confirm("Are you sure to apply this state ?")
       .map_err(|err| err.map_err_context(|| "StateApply"))?;
   }
-  for state in states.clone() {
-    state_apply(cli_conf, opts, &state).await?;
+  for state in &states {
+    state_apply(cli_conf, opts, state).await?;
   }
   if opts.follow {
-    let client = cli_conf.client.clone();
     states
-      .into_iter()
+      .iter()
       .map(|state| async {
-        let query = ProcessLogQuery {
-          namespace: state.data.namespace,
-          follow: Some(true),
-          ..Default::default()
-        };
-        let res = join!(
-          log_jobs(&client, state.data.jobs.unwrap_or_default(), &query),
-          log_cargoes(&client, state.data.cargoes.unwrap_or_default(), &query)
-        );
-        res.0?;
-        res.1?;
-        Ok::<_, IoError>(())
+        state_logs(
+          cli_conf,
+          &StateLogsOpts {
+            state_location: Some(state.root.to_string()),
+            follow: true,
+            ..Default::default()
+          },
+          state,
+        )
+        .await;
       })
       .collect::<FuturesUnordered<_>>()
       .collect::<Vec<_>>()
@@ -721,17 +716,12 @@ async fn exec_state_apply(
   Ok(())
 }
 
-/// Follow logs of all cargoes in state
-async fn exec_state_logs(
+async fn state_logs(
   cli_conf: &CliConfig,
   opts: &StateLogsOpts,
-) -> IoResult<()> {
-  let format = cli_conf.user_config.display_format.clone();
-  let state_ref = parse_state_file(&opts.state_location, &format).await?;
-  let client = gen_client(cli_conf, &state_ref)?;
-  let args = parse_build_args(&state_ref.data, opts.args.clone())?;
-  let state_file =
-    render_template(&state_ref, &args, &client, cli_conf).await?;
+  state_file: &StateRef<Statefile>,
+) {
+  let client = &cli_conf.client;
   let tail = opts.tail.clone();
   let log_opts = ProcessLogQuery {
     since: opts.since,
@@ -739,41 +729,50 @@ async fn exec_state_logs(
     tail,
     timestamps: Some(opts.timestamps),
     follow: Some(opts.follow),
-    namespace: state_file.data.namespace,
+    namespace: state_file.data.namespace.clone(),
     ..Default::default()
   };
-  let res = join!(
-    log_jobs(&client, state_file.data.jobs.unwrap_or_default(), &log_opts),
+  join!(
+    log_jobs(
+      client,
+      state_file.data.jobs.clone().unwrap_or_default(),
+      &log_opts
+    ),
     log_cargoes(
-      &client,
-      state_file.data.cargoes.unwrap_or_default(),
+      client,
+      state_file.data.cargoes.clone().unwrap_or_default(),
       &log_opts
     )
   );
-  res.0?;
-  res.1?;
+}
+
+/// Follow logs of all cargoes in state
+async fn exec_state_logs(
+  cli_conf: &CliConfig,
+  opts: &StateLogsOpts,
+) -> IoResult<()> {
+  let states =
+    parse_state_file_recurr(cli_conf, &opts.state_location, &opts.args).await?;
+  states
+    .iter()
+    .map(|state| state_logs(cli_conf, opts, state))
+    .collect::<FuturesUnordered<_>>()
+    .collect::<Vec<_>>()
+    .await;
   Ok(())
 }
 
-/// Function called when running `nanocl state rm`
-async fn exec_state_remove(
+async fn state_remove(
   cli_conf: &CliConfig,
-  opts: &StateRemoveOpts,
+  state_file: &StateRef<Statefile>,
 ) -> IoResult<()> {
-  let format = cli_conf.user_config.display_format.clone();
-  let state_ref = parse_state_file(&opts.state_location, &format).await?;
-  let client = gen_client(cli_conf, &state_ref)?;
-  let args = parse_build_args(&state_ref.data, opts.args.clone())?;
-  let state_file =
-    inject_data(&state_ref, &args, &cli_conf.context, &client).await?;
-  if !opts.skip_confirm {
-    println!("{}", state_file.raw);
-    utils::dialog::confirm("Are you sure to remove this state ?")
-      .map_err(|err| err.map_err_context(|| "Delete resource"))?;
-  }
-  let namespace = state_file.data.namespace.clone().unwrap_or("global".into());
+  let client = &cli_conf.client;
+  let namespace = match &state_file.data.namespace {
+    None => "global",
+    Some(namespace) => namespace,
+  };
   let pg_style = utils::progress::create_spinner_style("red");
-  if let Some(jobs) = state_file.data.jobs {
+  if let Some(jobs) = &state_file.data.jobs {
     for job in jobs {
       let token = format!("job/{}", job.name);
       let pg = utils::progress::create_progress(&token, &pg_style);
@@ -782,7 +781,7 @@ async fn exec_state_remove(
           &job.name,
           EventActorKind::Job,
           vec![NativeEventAction::Destroy],
-          &client,
+          client,
         )
         .await?;
         client.delete_job(&job.name).await?;
@@ -791,7 +790,7 @@ async fn exec_state_remove(
       pg.finish();
     }
   }
-  if let Some(cargoes) = state_file.data.cargoes {
+  if let Some(cargoes) = &state_file.data.cargoes {
     for cargo in cargoes {
       let token = format!("cargo/{}", cargo.name);
       let pg = utils::progress::create_progress(&token, &pg_style);
@@ -804,7 +803,7 @@ async fn exec_state_remove(
           &format!("{}.{namespace}", cargo.name),
           EventActorKind::Cargo,
           vec![NativeEventAction::Destroy],
-          &client,
+          client,
         )
         .await?;
         client
@@ -820,50 +819,68 @@ async fn exec_state_remove(
       }
       pg.finish();
     }
-    if let Some(vms) = &state_file.data.virtual_machines {
-      for vm in vms {
-        let token = format!("vm/{}", vm.name);
-        let pg = utils::progress::create_progress(&token, &pg_style);
-        if client
-          .inspect_vm(&vm.name, state_file.data.namespace.as_deref())
-          .await
-          .is_ok()
-        {
-          let waiter = wait_process_object(
-            &format!("{}.{namespace}", vm.name),
-            EventActorKind::Vm,
-            vec![NativeEventAction::Destroy],
-            &client,
-          )
+  }
+  if let Some(vms) = &state_file.data.virtual_machines {
+    for vm in vms {
+      let token = format!("vm/{}", vm.name);
+      let pg = utils::progress::create_progress(&token, &pg_style);
+      if client
+        .inspect_vm(&vm.name, state_file.data.namespace.as_deref())
+        .await
+        .is_ok()
+      {
+        let waiter = wait_process_object(
+          &format!("{}.{namespace}", vm.name),
+          EventActorKind::Vm,
+          vec![NativeEventAction::Destroy],
+          client,
+        )
+        .await?;
+        client
+          .delete_vm(&vm.name, state_file.data.namespace.as_deref())
           .await?;
-          client
-            .delete_vm(&vm.name, state_file.data.namespace.as_deref())
-            .await?;
-          waiter.await??;
-        }
-        pg.finish();
+        waiter.await??;
       }
+      pg.finish();
     }
-    if let Some(resources) = &state_file.data.resources {
-      for resource in resources {
-        let token = format!("resource/{}", resource.name);
-        let pg = utils::progress::create_progress(&token, &pg_style);
-        if client.inspect_resource(&resource.name).await.is_ok() {
-          client.delete_resource(&resource.name).await?;
-        }
-        pg.finish();
+  }
+  if let Some(resources) = &state_file.data.resources {
+    for resource in resources {
+      let token = format!("resource/{}", resource.name);
+      let pg = utils::progress::create_progress(&token, &pg_style);
+      if client.inspect_resource(&resource.name).await.is_ok() {
+        client.delete_resource(&resource.name).await?;
       }
+      pg.finish();
     }
-    if let Some(secrets) = &state_file.data.secrets {
-      for secret in secrets {
-        let token = format!("secret/{}", secret.name);
-        let pg = utils::progress::create_progress(&token, &pg_style);
-        if client.inspect_secret(&secret.name).await.is_ok() {
-          client.delete_secret(&secret.name).await?;
-        }
-        pg.finish();
+  }
+  if let Some(secrets) = &state_file.data.secrets {
+    for secret in secrets {
+      let token = format!("secret/{}", secret.name);
+      let pg = utils::progress::create_progress(&token, &pg_style);
+      if client.inspect_secret(&secret.name).await.is_ok() {
+        client.delete_secret(&secret.name).await?;
       }
+      pg.finish();
     }
+  }
+  Ok(())
+}
+
+/// Function called when running `nanocl state rm`
+async fn exec_state_remove(
+  cli_conf: &CliConfig,
+  opts: &StateRemoveOpts,
+) -> IoResult<()> {
+  let state_files =
+    parse_state_file_recurr(cli_conf, &opts.state_location, &opts.args).await?;
+  if !opts.skip_confirm {
+    print_states(&state_files);
+    utils::dialog::confirm("Are you sure to remove this state ?")
+      .map_err(|err| err.map_err_context(|| "Delete resource"))?;
+  }
+  for state in &state_files {
+    state_remove(cli_conf, state).await?;
   }
   Ok(())
 }

@@ -28,7 +28,7 @@ pub struct StateApplyOpts {
 }
 
 /// `nanocl state logs` available options
-#[derive(Parser)]
+#[derive(Default, Parser)]
 pub struct StateLogsOpts {
   /// Path or Url to the Statefile
   #[clap(long, short = 's')]
