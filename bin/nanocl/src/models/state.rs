@@ -88,10 +88,10 @@ pub struct StateArg {
 
 #[derive(Clone, Default, Debug)]
 pub enum StateRoot {
-  File(PathBuf),
-  Url(String),
   #[default]
   None,
+  Url(String),
+  File(PathBuf),
 }
 
 impl Display for StateRoot {

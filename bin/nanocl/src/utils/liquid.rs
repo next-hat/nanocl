@@ -1,7 +1,9 @@
-use std::{borrow::Cow, fs, path::Path};
-use liquid::partials::PartialSource;
+use std::{fs, path::Path, borrow::Cow};
+
 use url::Url;
-use crate::{models::StateRoot, utils::state::download_statefile};
+use liquid::partials::PartialSource;
+
+use crate::{utils, models::StateRoot};
 
 #[derive(Default, Debug, Clone)]
 pub struct StateSource {
@@ -12,7 +14,7 @@ impl StateSource {
   pub fn fetch_partial<'a>(
     name: String,
     root: Option<String>,
-  ) -> std::option::Option<std::borrow::Cow<'a, str>> {
+  ) -> Option<Cow<'a, str>> {
     let url = if let Some(ref url) = root {
       Url::parse(url)
         .expect("Can't parse url ")
@@ -23,12 +25,12 @@ impl StateSource {
     }
     .as_str()
     .to_owned();
-    std::thread::spawn(|| {
+    std::thread::spawn(move || {
       ntex::rt::System::new(&url)
-        .block_on(async move { download_statefile(&url).await })
+        .block_on(async move { utils::state::download_statefile(&url).await })
     })
     .join()
-    .unwrap()
+    .expect("Can't join thread to download file")
     .ok()
     .map(|(_, data)| data.into())
   }
@@ -71,11 +73,8 @@ impl PartialSource for StateSource {
     vec![]
   }
 
-  fn try_get<'a>(
-    &'a self,
-    name: &str,
-  ) -> std::option::Option<std::borrow::Cow<'a, str>> {
-    if name.starts_with("http://") || name.starts_with("https://") {
+  fn try_get<'a>(&'a self, name: &str) -> Option<Cow<'a, str>> {
+    if name.starts_with("http") {
       return StateSource::fetch_partial(name.to_owned(), None);
     }
     match &self.root {

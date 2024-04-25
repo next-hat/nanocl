@@ -4,7 +4,7 @@ SubStates:
 - ./sub_child.yml
 
 Jobs:
-- Name: include-example
+- Name: sub-example
   Containers:
   - Image: ubuntu:latest
     Cmd:
@@ -12,6 +12,6 @@ Jobs:
     - "Hello, World!"
 
 Cargoes:
-- Name: include-example
+- Name: sub-example
   Container:
     Image: ghcr.io/next-hat/nanocl-get-started:latest

@@ -39,6 +39,7 @@ use nanocld_client::{
     system::NativeEventAction,
   },
 };
+use url::Url;
 
 use crate::{
   utils,
@@ -503,24 +504,46 @@ async fn parse_state_file_recurr(
   let sub_states = state_file.data.sub_states.clone().unwrap_or_default();
   let parsed_sub_states = sub_states
     .iter()
-    .map(|sub_state| async move {
-      let current = PathBuf::from(location.clone().unwrap_or_default())
-        .canonicalize()
-        .map_err(|err| err.map_err_context(|| "Statefile location"))?;
-      let parent = current.parent().unwrap();
-      let path = match sub_state {
-        SubState::Path(path) => path,
-        SubState::Definition(sub_state) => &sub_state.path,
-      };
-      let full_path = parent.join(path);
-      if current == full_path {
-        return Err(IoError::invalid_data(
-          "Statefile",
-          "Cannot include itself",
-        ));
+    .map(|sub_state| {
+      let root = state_file.root.clone();
+      async move {
+        let sub_state_path = match sub_state {
+          SubState::Path(path) => path,
+          SubState::Definition(sub_state) => &sub_state.path,
+        };
+        if sub_state_path.starts_with("http") {
+          return parse_state_file_recurr(
+            cli_conf,
+            &Some(sub_state_path.clone()),
+            cli_args,
+          )
+          .await;
+        }
+        let location = location.clone().unwrap_or_default();
+        let full_sub_state_path = match root {
+          StateRoot::Url(url) => Url::parse(&url)
+            .expect("Can't parse root url")
+            .join(sub_state_path)
+            .expect("Can't join url")
+            .to_string(),
+          StateRoot::File(path) => {
+            let current = PathBuf::from(location)
+              .canonicalize()
+              .map_err(|err| err.map_err_context(|| "Statefile location"))?;
+            let full_path = path.join(sub_state_path);
+            if current == full_path {
+              return Err(IoError::invalid_data(
+                "Statefile",
+                "Cannot include itself",
+              ));
+            }
+            full_path.to_str().unwrap().to_owned()
+          }
+          StateRoot::None => location,
+        };
+        parse_state_file_recurr(cli_conf, &Some(full_sub_state_path), cli_args)
+          .await
       }
-      let s_full_path = full_path.to_str().unwrap().to_owned();
-      parse_state_file_recurr(cli_conf, &Some(s_full_path), cli_args).await
     })
     .collect::<FuturesOrdered<_>>()
     .collect::<Vec<_>>()
