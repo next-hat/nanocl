@@ -2,6 +2,7 @@ ApiVersion: v0.14
 
 SubStates:
 - ./sub_child.yml
+- https://nhnr.io/v0.14/tests/sub_state.yml
 
 Jobs:
 - Name: sub-example
