@@ -167,9 +167,33 @@ mod tests {
   /// Test state file when then include other state files
   #[ntex::test]
   async fn sub_state() {
-    assert_cli_ok!("state", "apply", "-ys", "../../examples/sub_state.yml",);
-    assert_cli_ok!("state", "logs", "-s", "../../examples/sub_state.yml");
-    assert_cli_ok!("state", "rm", "-ys", "../../examples/sub_state.yml",);
+    assert_cli_ok!(
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/sub_state.yml",
+      "--",
+      "--name",
+      "cli-test"
+    );
+    assert_cli_ok!(
+      "state",
+      "logs",
+      "-s",
+      "../../examples/sub_state.yml",
+      "--",
+      "--name",
+      "cli-test"
+    );
+    assert_cli_ok!(
+      "state",
+      "rm",
+      "-ys",
+      "../../examples/sub_state.yml",
+      "--",
+      "--name",
+      "cli-test"
+    );
     assert_cli_err!(
       "state",
       "apply",

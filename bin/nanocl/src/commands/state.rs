@@ -17,12 +17,12 @@ use async_recursion::async_recursion;
 use nanocl_error::io::{IoError, FromIo, IoResult};
 
 use nanocld_client::{
-  ConnectOpts,
   stubs::{
-    statefile::SubState,
     process::Process,
+    statefile::{StatefileArgKind, SubState},
     system::{EventActorKind, EventCondition, EventKind, ObjPsStatusKind},
   },
+  ConnectOpts,
 };
 
 use nanocld_client::{
@@ -294,13 +294,13 @@ fn parse_build_args(
     let mut cmd_arg = Arg::new(arg).long(arg);
     match build_arg.default {
       Some(default) => {
-        if build_arg.kind != "Boolean" {
+        if build_arg.kind != StatefileArgKind::Boolean {
           let default_value: &'static str = Box::leak(default.into_boxed_str());
           cmd_arg = cmd_arg.default_value(default_value);
         }
       }
       None => {
-        if build_arg.kind == "Boolean" {
+        if build_arg.kind == StatefileArgKind::Boolean {
           cmd_arg = cmd_arg.action(ArgAction::SetTrue);
         } else {
           cmd_arg = cmd_arg.required(true);
@@ -314,8 +314,8 @@ fn parse_build_args(
   for build_arg in state_file.args.clone().unwrap_or_default() {
     let name = build_arg.name.to_owned();
     let arg: &'static str = Box::leak(name.to_owned().into_boxed_str());
-    match build_arg.kind.as_str() {
-      "String" => {
+    match build_arg.kind {
+      StatefileArgKind::String => {
         let value =
           matches.get_one::<String>(arg).ok_or(IoError::invalid_data(
             "BuildArg".into(),
@@ -323,11 +323,11 @@ fn parse_build_args(
           ))?;
         args.insert(name, Value::String(value.to_owned()));
       }
-      "Boolean" => {
+      StatefileArgKind::Boolean => {
         let value = matches.get_flag(&name);
         args.insert(name, Value::Bool(value));
       }
-      "Number" => {
+      StatefileArgKind::Number => {
         let value =
           matches.get_one::<String>(arg).ok_or(IoError::invalid_data(
             "BuildArg".into(),
@@ -340,12 +340,6 @@ fn parse_build_args(
           )
         })?;
         args.insert(name, Value::Number(value.into()));
-      }
-      _ => {
-        return Err(IoError::invalid_data(
-          "Statefile".into(),
-          format!("unknown type {}", build_arg.kind),
-        ))
       }
     }
   }
@@ -365,6 +359,15 @@ fn inject_namespace(
   Ok(str)
 }
 
+fn generate_envs() -> HashMap<String, String> {
+  vars_os().fold(HashMap::new(), |mut init, (key, value)| {
+    let key = key.to_string_lossy().to_string();
+    let value = value.to_string_lossy().to_string();
+    init.insert(key, value);
+    init
+  })
+}
+
 /// Inject `Args`, `Envs`, `Config`, `HostGateway` and `Namespaces` to the Statefile
 async fn inject_data(
   state_ref: &StateRef<Statefile>,
@@ -372,12 +375,7 @@ async fn inject_data(
   context: &Context,
   client: &NanocldClient,
 ) -> IoResult<StateRef<Statefile>> {
-  let mut envs = HashMap::new();
-  for (key, value) in vars_os() {
-    let key = key.to_string_lossy().to_string();
-    let value = value.to_string_lossy().to_string();
-    envs.insert(key, value);
-  }
+  let envs = generate_envs();
   let info = client.info().await?;
   let namespaces = client.list_namespace().await?.into_iter().fold(
     HashMap::new(),
@@ -495,6 +493,7 @@ async fn parse_state_file_recurr(
   location: &Option<String>,
   cli_args: &[String],
 ) -> IoResult<Vec<StateRef<Statefile>>> {
+  println!("cli args {:?}", cli_args);
   let format = cli_conf.user_config.display_format.clone();
   let state_file = read_state_file(location, &format).await?;
   let client = gen_client(cli_conf, &state_file)?;
@@ -502,20 +501,47 @@ async fn parse_state_file_recurr(
   let state_file =
     render_template(&state_file, &args, &client, cli_conf).await?;
   let sub_states = state_file.data.sub_states.clone().unwrap_or_default();
+  let envs = generate_envs();
   let parsed_sub_states = sub_states
     .iter()
     .map(|sub_state| {
       let root = state_file.root.clone();
+      let args = args.clone();
+      let envs = envs.clone();
       async move {
-        let sub_state_path = match sub_state {
-          SubState::Path(path) => path,
-          SubState::Definition(sub_state) => &sub_state.path,
+        let (sub_state_path, sub_state_args) = match sub_state {
+          SubState::Path(path) => (path, None),
+          SubState::Definition(sub_state) => {
+            (&sub_state.path, sub_state.args.clone())
+          }
+        };
+        let compiled_values = match sub_state_args {
+          Some(sub_state_args) => sub_state_args
+            .iter()
+            .map(|arg| {
+              let compiled_value = utils::state::compile(
+                &arg.value,
+                &liquid::object!({
+                  "Envs": envs,
+                  "Args": args,
+                }),
+                StateRoot::None,
+              )?;
+              Ok::<_, IoError>([format!("--{}", arg.name), compiled_value])
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .collect::<Result<Vec<_>, IoError>>()?
+            .into_iter()
+            .flatten()
+            .collect(),
+          None => Vec::new(),
         };
         if sub_state_path.starts_with("http") {
           return parse_state_file_recurr(
             cli_conf,
             &Some(sub_state_path.clone()),
-            cli_args,
+            &compiled_values,
           )
           .await;
         }
@@ -539,10 +565,14 @@ async fn parse_state_file_recurr(
             }
             full_path.to_str().unwrap().to_owned()
           }
-          StateRoot::None => location,
+          StateRoot::None => sub_state_path.clone(),
         };
-        parse_state_file_recurr(cli_conf, &Some(full_sub_state_path), cli_args)
-          .await
+        parse_state_file_recurr(
+          cli_conf,
+          &Some(full_sub_state_path),
+          &compiled_values,
+        )
+        .await
       }
     })
     .collect::<FuturesOrdered<_>>()

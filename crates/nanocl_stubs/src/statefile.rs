@@ -7,6 +7,48 @@ use crate::{
 };
 
 /// Statefile argument definition to pass to the Statefile
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub enum StatefileArgKind {
+  String,
+  Number,
+  Boolean,
+}
+
+impl std::str::FromStr for StatefileArgKind {
+  type Err = std::io::Error;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "String" => Ok(StatefileArgKind::String),
+      "Number" => Ok(StatefileArgKind::Number),
+      "Boolean" => Ok(StatefileArgKind::Boolean),
+      _ => Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        format!("Invalid StatefileArgKind {s}"),
+      )),
+    }
+  }
+}
+
+impl ToString for StatefileArgKind {
+  fn to_string(&self) -> String {
+    match self {
+      StatefileArgKind::String => "String",
+      StatefileArgKind::Number => "Number",
+      StatefileArgKind::Boolean => "Boolean",
+    }
+    .to_owned()
+  }
+}
+
+/// Statefile argument definition to pass to the Statefile
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -19,9 +61,25 @@ pub struct StatefileArg {
   /// Name of the build arg
   pub name: String,
   /// Kind of the build arg
-  pub kind: String,
+  pub kind: StatefileArgKind,
   /// Default value of the build arg
   pub default: Option<String>,
+}
+
+/// Statefile argument definition to pass to the Statefile
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub struct StatefileDefArg {
+  /// Name of the argument
+  pub name: String,
+  /// Value for the argument
+  pub value: String,
 }
 
 #[derive(Debug, Clone)]
@@ -34,7 +92,7 @@ pub struct StatefileArg {
 )]
 pub struct SubStateDef {
   pub path: String,
-  pub args: Option<Vec<StatefileArg>>,
+  pub args: Option<Vec<StatefileDefArg>>,
 }
 
 #[derive(Debug, Clone)]

@@ -1,8 +1,12 @@
 ApiVersion: v0.14
 
+Args:
+- Name: name
+  Kind: String
+
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
-- Name: sub-child-example
+- Name: ${{ Args.name }}-sub-child-example
   Container:
     Image: ghcr.io/next-hat/nanocl-get-started:latest

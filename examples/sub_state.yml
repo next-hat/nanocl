@@ -1,11 +1,18 @@
 ApiVersion: v0.14
 
+Args:
+- Name: name
+  Kind: String
+
 SubStates:
-- ./sub_child.yml
+- Path: ./sub_child.yml
+  Args:
+  - Name: name
+    Value: ${{ Args.name }} # Pass the value of Args.name to the sub-state
 - https://nhnr.io/v0.14/tests/sub_state.yml
 
 Jobs:
-- Name: sub-example
+- Name: ${{ Args.name }}-sub-example
   Containers:
   - Image: ubuntu:latest
     Cmd:
@@ -13,6 +20,6 @@ Jobs:
     - "Hello, World!"
 
 Cargoes:
-- Name: sub-example
+- Name: ${{ Args.name }}-sub-example
   Container:
     Image: ghcr.io/next-hat/nanocl-get-started:latest
