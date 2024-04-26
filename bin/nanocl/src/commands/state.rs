@@ -493,7 +493,6 @@ async fn parse_state_file_recurr(
   location: &Option<String>,
   cli_args: &[String],
 ) -> IoResult<Vec<StateRef<Statefile>>> {
-  println!("cli args {:?}", cli_args);
   let format = cli_conf.user_config.display_format.clone();
   let state_file = read_state_file(location, &format).await?;
   let client = gen_client(cli_conf, &state_file)?;
