@@ -1,6 +1,6 @@
 use std::{
-  fmt::{Display, Formatter},
   path::PathBuf,
+  fmt::{Display, Formatter},
 };
 
 use clap::{Parser, Subcommand};
@@ -120,4 +120,6 @@ where
   pub data: T,
   /// Include directory of the Statefile
   pub root: StateRoot,
+  /// Path to the Statefile
+  pub location: String,
 }

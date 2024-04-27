@@ -6096,8 +6096,7 @@ components:
           type: string
           description: Name of the build arg
         Kind:
-          type: string
-          description: Kind of the build arg
+          $ref: '#/components/schemas/StatefileArgKind'
         Default:
           type: string
           description: Default value of the build arg

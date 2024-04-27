@@ -3,6 +3,20 @@ ApiVersion: v0.14
 Args:
 - Name: name
   Kind: String
+- Name: port
+  Kind: Number
+- Name: enable_job
+  Kind: Boolean
+
+# {% if Args.enable_job %}
+Jobs:
+- Name: ${{ Args.name }}-sub-example
+  Containers:
+  - Image: ubuntu:latest
+    Cmd:
+    - echo
+    - "Hello, World!"
+# {% endif %}
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/cargo
@@ -10,3 +24,5 @@ Cargoes:
 - Name: ${{ Args.name }}-sub-child-example
   Container:
     Image: ghcr.io/next-hat/nanocl-get-started:latest
+    Env:
+    - RANDOM_PORT=${{ Args.port }}

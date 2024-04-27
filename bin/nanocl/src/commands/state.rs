@@ -19,7 +19,7 @@ use nanocl_error::io::{IoError, FromIo, IoResult};
 use nanocld_client::{
   stubs::{
     process::Process,
-    statefile::{StatefileArgKind, SubState},
+    statefile::{StatefileArgKind, SubState, SubStateValue},
     system::{EventActorKind, EventCondition, EventKind, ObjPsStatusKind},
   },
   ConnectOpts,
@@ -62,7 +62,7 @@ async fn get_from_url(
   root.push("".to_owned());
   let root = root.join("/");
   let state_ref =
-    utils::state::get_state_ref(&ext, &data, StateRoot::Url(root))?;
+    utils::state::get_state_ref(&ext, &url, &data, StateRoot::Url(root))?;
   Ok(state_ref)
 }
 
@@ -80,6 +80,7 @@ where
   let ext = utils::state::get_format(format, path);
   let state_ref = utils::state::get_state_ref::<T>(
     &ext,
+    path.to_str().unwrap(),
     &data,
     StateRoot::File(include_path),
   )?;
@@ -404,6 +405,7 @@ async fn inject_data(
     format: state_ref.format.clone(),
     data: state_file,
     root: state_ref.root.clone(),
+    location: state_ref.location.clone(),
   })
 }
 
@@ -490,23 +492,17 @@ async fn wait_process_object(
 #[async_recursion(?Send)]
 async fn parse_state_file_recurr(
   cli_conf: &CliConfig,
-  location: &Option<String>,
-  cli_args: &[String],
+  state_file: &StateRef<Statefile>,
+  args: &Value,
 ) -> IoResult<Vec<StateRef<Statefile>>> {
-  let format = cli_conf.user_config.display_format.clone();
-  let state_file = read_state_file(location, &format).await?;
-  let client = gen_client(cli_conf, &state_file)?;
-  let args = parse_build_args(&state_file.data, cli_args)?;
-  let state_file =
-    render_template(&state_file, &args, &client, cli_conf).await?;
+  let client = gen_client(cli_conf, state_file)?;
+  let state_file = render_template(state_file, args, &client, cli_conf).await?;
   let sub_states = state_file.data.sub_states.clone().unwrap_or_default();
-  let envs = generate_envs();
   let parsed_sub_states = sub_states
     .iter()
     .map(|sub_state| {
       let root = state_file.root.clone();
-      let args = args.clone();
-      let envs = envs.clone();
+      let parent_location = state_file.location.clone();
       async move {
         let (sub_state_path, sub_state_args) = match sub_state {
           SubState::Path(path) => (path, None),
@@ -515,36 +511,39 @@ async fn parse_state_file_recurr(
           }
         };
         let compiled_values = match sub_state_args {
-          Some(sub_state_args) => sub_state_args
-            .iter()
-            .map(|arg| {
-              let compiled_value = utils::state::compile(
-                &arg.value,
-                &liquid::object!({
-                  "Envs": envs,
-                  "Args": args,
-                }),
-                StateRoot::None,
-              )?;
-              Ok::<_, IoError>([format!("--{}", arg.name), compiled_value])
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
-            .collect::<Result<Vec<_>, IoError>>()?
-            .into_iter()
-            .flatten()
-            .collect(),
-          None => Vec::new(),
+          Some(sub_state_args) => {
+            sub_state_args
+              .iter()
+              .try_fold(Map::new(), |mut init, arg| {
+                match &arg.value {
+                  SubStateValue::String(value) => {
+                    init.insert(arg.name.clone(), Value::String(value.clone()));
+                  }
+                  SubStateValue::Number(value) => {
+                    init.insert(arg.name.clone(), serde_json::json!(value));
+                  }
+                  SubStateValue::Boolean(value) => {
+                    init.insert(arg.name.clone(), Value::Bool(*value));
+                  }
+                }
+                Ok::<_, IoError>(init)
+              })?
+          }
+          None => Map::new(),
         };
         if sub_state_path.starts_with("http") {
+          let state_file = read_state_file(
+            &Some(sub_state_path.clone()),
+            &cli_conf.user_config.display_format,
+          )
+          .await?;
           return parse_state_file_recurr(
             cli_conf,
-            &Some(sub_state_path.clone()),
-            &compiled_values,
+            &state_file,
+            &Value::Object(compiled_values),
           )
           .await;
         }
-        let location = location.clone().unwrap_or_default();
         let full_sub_state_path = match root {
           StateRoot::Url(url) => Url::parse(&url)
             .expect("Can't parse root url")
@@ -552,7 +551,7 @@ async fn parse_state_file_recurr(
             .expect("Can't join url")
             .to_string(),
           StateRoot::File(path) => {
-            let current = PathBuf::from(location)
+            let current = PathBuf::from(parent_location)
               .canonicalize()
               .map_err(|err| err.map_err_context(|| "Statefile location"))?;
             let full_path = path.join(sub_state_path);
@@ -562,14 +561,22 @@ async fn parse_state_file_recurr(
                 "Cannot include itself",
               ));
             }
-            full_path.to_str().unwrap().to_owned()
+            full_path
+              .to_str()
+              .expect("Can't convert full path to string")
+              .to_owned()
           }
           StateRoot::None => sub_state_path.clone(),
         };
+        let state_file = read_state_file(
+          &Some(full_sub_state_path.clone()),
+          &cli_conf.user_config.display_format,
+        )
+        .await?;
         parse_state_file_recurr(
           cli_conf,
-          &Some(full_sub_state_path),
-          &compiled_values,
+          &state_file,
+          &Value::Object(compiled_values),
         )
         .await
       }
@@ -743,8 +750,10 @@ async fn exec_state_apply(
   cli_conf: &CliConfig,
   opts: &StateApplyOpts,
 ) -> IoResult<()> {
-  let states =
-    parse_state_file_recurr(cli_conf, &opts.state_location, &opts.args).await?;
+  let format = cli_conf.user_config.display_format.clone();
+  let state_file = read_state_file(&opts.state_location, &format).await?;
+  let args = parse_build_args(&state_file.data, &opts.args)?;
+  let states = parse_state_file_recurr(cli_conf, &state_file, &args).await?;
   if !opts.skip_confirm {
     print_states(&states);
     utils::dialog::confirm("Are you sure to apply this state ?")
@@ -810,8 +819,10 @@ async fn exec_state_logs(
   cli_conf: &CliConfig,
   opts: &StateLogsOpts,
 ) -> IoResult<()> {
-  let states =
-    parse_state_file_recurr(cli_conf, &opts.state_location, &opts.args).await?;
+  let format = cli_conf.user_config.display_format.clone();
+  let state_file = read_state_file(&opts.state_location, &format).await?;
+  let args = parse_build_args(&state_file.data, &opts.args)?;
+  let states = parse_state_file_recurr(cli_conf, &state_file, &args).await?;
   states
     .iter()
     .map(|state| state_logs(cli_conf, opts, state))
@@ -931,8 +942,11 @@ async fn exec_state_remove(
   cli_conf: &CliConfig,
   opts: &StateRemoveOpts,
 ) -> IoResult<()> {
+  let format = cli_conf.user_config.display_format.clone();
+  let state_file = read_state_file(&opts.state_location, &format).await?;
+  let args = parse_build_args(&state_file.data, &opts.args)?;
   let state_files =
-    parse_state_file_recurr(cli_conf, &opts.state_location, &opts.args).await?;
+    parse_state_file_recurr(cli_conf, &state_file, &args).await?;
   if !opts.skip_confirm {
     print_states(&state_files);
     utils::dialog::confirm("Are you sure to remove this state ?")

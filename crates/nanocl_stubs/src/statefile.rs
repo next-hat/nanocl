@@ -75,11 +75,26 @@ pub struct StatefileArg {
   feature = "serde",
   serde(deny_unknown_fields, rename_all = "PascalCase")
 )]
-pub struct StatefileDefArg {
+pub struct SubStateArg {
   /// Name of the argument
   pub name: String,
   /// Value for the argument
-  pub value: String,
+  pub value: SubStateValue,
+}
+
+/// Statefile argument definition to pass to the Statefile
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+  feature = "serde",
+  serde(untagged, deny_unknown_fields, rename_all = "PascalCase")
+)]
+pub enum SubStateValue {
+  Number(f64),
+  String(String),
+  Boolean(bool),
 }
 
 #[derive(Debug, Clone)]
@@ -92,7 +107,7 @@ pub struct StatefileDefArg {
 )]
 pub struct SubStateDef {
   pub path: String,
-  pub args: Option<Vec<StatefileDefArg>>,
+  pub args: Option<Vec<SubStateArg>>,
 }
 
 #[derive(Debug, Clone)]

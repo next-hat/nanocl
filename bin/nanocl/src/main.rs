@@ -174,7 +174,9 @@ mod tests {
       "../../examples/sub_state.yml",
       "--",
       "--name",
-      "cli-test"
+      "cli-test",
+      "--port",
+      "9000"
     );
     assert_cli_ok!(
       "state",
@@ -183,7 +185,9 @@ mod tests {
       "../../examples/sub_state.yml",
       "--",
       "--name",
-      "cli-test"
+      "cli-test",
+      "--port",
+      "9000"
     );
     assert_cli_ok!(
       "state",
@@ -192,7 +196,45 @@ mod tests {
       "../../examples/sub_state.yml",
       "--",
       "--name",
-      "cli-test"
+      "cli-test",
+      "--port",
+      "9000"
+    );
+    assert_cli_ok!(
+      "state",
+      "apply",
+      "-ys",
+      "../../examples/sub_state.yml",
+      "--",
+      "--name",
+      "cli-test",
+      "--port",
+      "9000",
+      "--enable_job",
+    );
+    assert_cli_ok!(
+      "state",
+      "logs",
+      "-s",
+      "../../examples/sub_state.yml",
+      "--",
+      "--name",
+      "cli-test",
+      "--port",
+      "9000",
+      "--enable_job",
+    );
+    assert_cli_ok!(
+      "state",
+      "rm",
+      "-ys",
+      "../../examples/sub_state.yml",
+      "--",
+      "--name",
+      "cli-test",
+      "--port",
+      "9000",
+      "--enable_job",
     );
     assert_cli_err!(
       "state",
