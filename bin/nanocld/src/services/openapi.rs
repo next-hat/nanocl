@@ -76,7 +76,10 @@ use nanocl_stubs::proxy::{
   LocationTarget, HttpTarget, UrlRedirect, UpstreamTarget, ProxyRule,
   UnixTarget, ProxySslConfig,
 };
-use nanocl_stubs::statefile::{Statefile, StatefileArg};
+use nanocl_stubs::statefile::{
+  Statefile, StatefileArg, StatefileArgKind, SubState, SubStateDef,
+  SubStateArg, SubStateValue,
+};
 
 use crate::vars;
 
@@ -453,6 +456,11 @@ impl Modify for VersionModifier {
     // State
     Statefile,
     StatefileArg,
+    StatefileArgKind,
+    SubState,
+    SubStateDef,
+    SubStateArg,
+    SubStateValue,
     // ProxyRules
     ResourceProxyRule,
     ProxyRule,

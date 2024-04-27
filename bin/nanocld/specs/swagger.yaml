@@ -6102,6 +6102,13 @@ components:
           description: Default value of the build arg
           nullable: true
       additionalProperties: false
+    StatefileArgKind:
+      type: string
+      description: Statefile argument definition to pass to the Statefile
+      enum:
+      - String
+      - Number
+      - Boolean
     Stats:
       type: object
       description: Statistics for the container.
@@ -6178,6 +6185,43 @@ components:
       - $ref: '#/components/schemas/UpstreamTarget'
       - $ref: '#/components/schemas/UriTarget'
       - $ref: '#/components/schemas/UnixTarget'
+    SubState:
+      oneOf:
+      - type: string
+      - $ref: '#/components/schemas/SubStateDef'
+    SubStateArg:
+      type: object
+      description: Statefile argument definition to pass to the Statefile
+      required:
+      - Name
+      - Value
+      properties:
+        Name:
+          type: string
+          description: Name of the argument
+        Value:
+          $ref: '#/components/schemas/SubStateValue'
+      additionalProperties: false
+    SubStateDef:
+      type: object
+      required:
+      - Path
+      properties:
+        Path:
+          type: string
+        Args:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubStateArg'
+          nullable: true
+      additionalProperties: false
+    SubStateValue:
+      oneOf:
+      - type: number
+        format: double
+      - type: string
+      - type: boolean
+      description: Statefile argument definition to pass to the Statefile
     SwarmInfo:
       type: object
       description: Represents generic information about swarm.

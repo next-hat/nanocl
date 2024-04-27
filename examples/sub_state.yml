@@ -19,7 +19,6 @@ SubStates:
     Value: ${{ Args.enable_job }} # Pass the value of Args.ssl_enabled to the sub-state
 - https://nhnr.io/v0.14/tests/sub_state.yml
 
-
 Cargoes:
 - Name: ${{ Args.name }}-sub-example
   Container:
