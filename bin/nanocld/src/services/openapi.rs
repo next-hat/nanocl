@@ -207,12 +207,10 @@ impl Modify for VersionModifier {
       .default_value(format!("v{}", vars::VERSION))
       .description(Some("API version"))
       .build();
-
     let server = utoipa::openapi::ServerBuilder::default()
       .url("/{Version}")
       .parameter("Version", variable)
       .build();
-
     openapi.info.title = "Nanocl Daemon".to_owned();
     openapi.info.version = format!("v{}", vars::VERSION);
     openapi.info.description =
