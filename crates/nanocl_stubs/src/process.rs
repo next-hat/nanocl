@@ -291,7 +291,6 @@ impl std::str::FromStr for WaitCondition {
 /// Query for the process wait endpoint
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProcessWaitQuery {
   // Wait condition
   pub condition: Option<WaitCondition>,
@@ -331,7 +330,6 @@ impl ProcessWaitResponse {
 /// Stats process query
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
 pub struct ProcessStatsQuery {
   /// Name of the namespace
   pub namespace: Option<String>,
