@@ -4,15 +4,18 @@ use futures_util::{StreamExt, TryStreamExt, stream::select_all};
 use nanocl_error::http::{HttpResult, HttpError};
 
 use bollard_next::{
-  container::{LogsOptions, WaitContainerOptions, StartContainerOptions},
+  container::{
+    LogsOptions, StartContainerOptions, StatsOptions, WaitContainerOptions,
+  },
   service::ContainerWaitExitError,
 };
 use nanocl_stubs::{
-  generic::{GenericNspQuery, GenericFilter, GenericListQuery},
-  process::{
-    ProcessLogQuery, ProcessOutputLog, ProcessWaitQuery, ProcessWaitResponse,
-  },
   cargo::CargoKillOptions,
+  generic::{GenericFilter, GenericListQuery, GenericNspQuery},
+  process::{
+    ProcessLogQuery, ProcessOutputLog, ProcessStats, ProcessStatsQuery,
+    ProcessWaitQuery, ProcessWaitResponse,
+  },
 };
 
 use crate::{
@@ -34,7 +37,7 @@ use crate::{
   ),
 ))]
 #[web::get("/processes")]
-pub async fn list_process(
+pub async fn list_processes(
   state: web::types::State<SystemState>,
   qs: web::types::Query<GenericListQuery>,
 ) -> HttpResult<web::HttpResponse> {
@@ -206,7 +209,7 @@ pub async fn start_process_by_pk(
   ),
 ))]
 #[web::post("/processes/{kind}/{name}/start")]
-pub async fn start_process(
+pub async fn start_processes(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -233,7 +236,7 @@ pub async fn start_process(
   ),
 ))]
 #[web::post("/processes/{kind}/{name}/restart")]
-pub async fn restart_process(
+pub async fn restart_processes(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -260,7 +263,7 @@ pub async fn restart_process(
   ),
 ))]
 #[web::post("/processes/{kind}/{name}/stop")]
-pub async fn stop_process(
+pub async fn stop_processes(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<GenericNspQuery>,
@@ -288,7 +291,7 @@ pub async fn stop_process(
   ),
 ))]
 #[web::post("/processes/{kind}/{name}/kill")]
-pub async fn kill_process(
+pub async fn kill_processes(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   payload: web::types::Json<CargoKillOptions>,
@@ -315,7 +318,7 @@ pub async fn kill_process(
   ),
 ))]
 #[web::get("/processes/{kind}/{name}/wait")]
-pub async fn wait_process(
+pub async fn wait_processes(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String, String)>,
   qs: web::types::Query<ProcessWaitQuery>,
@@ -369,15 +372,69 @@ pub async fn wait_process(
   )
 }
 
+/// Get stats of a cargo instance
+#[cfg_attr(feature = "dev", utoipa::path(
+  get,
+  tag = "Processes",
+  path = "/processes/{kind}/{name}/stats",
+  params(
+    ("kind" = String, Path, description = "Kind of process", example = "cargo"),
+    ("name" = String, Path, description = "Name of the process group", example = "deploy-example"),
+    ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
+    ("stream" = Option<bool>, Query, description = "Return a stream of stats"),
+    ("one_shot" = Option<bool>, Query, description = "Return stats only once"),
+  ),
+  responses(
+    (status = 200, description = "Process stats", content_type = "application/vdn.nanocl.raw-stream", body = ProcessStats),
+    (status = 404, description = "Process does not exist"),
+  ),
+))]
+#[web::get("/processes/{kind}/{name}/stats")]
+pub async fn stats_processes(
+  state: web::types::State<SystemState>,
+  path: web::types::Path<(String, String, String)>,
+  qs: web::types::Query<ProcessStatsQuery>,
+) -> HttpResult<web::HttpResponse> {
+  let (_, kind, name) = path.into_inner();
+  let kind = kind.parse().map_err(HttpError::bad_request)?;
+  let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
+  let opts: StatsOptions = qs.clone().into();
+  let processes = ProcessDb::read_by_kind_key(&kind_key, &state.pool).await?;
+  let streams = processes
+    .into_iter()
+    .map(|process| {
+      state
+        .docker_api
+        .stats(&process.key, Some(opts))
+        .map(move |elem| match elem {
+          Err(err) => Err(err),
+          Ok(stats) => Ok(ProcessStats {
+            name: process.name.clone(),
+            stats,
+          }),
+        })
+    })
+    .collect::<Vec<_>>();
+  let stream = select_all(streams).into_stream();
+  Ok(
+    web::HttpResponse::Ok()
+      .content_type("application/vdn.nanocl.raw-stream")
+      .streaming(
+        utils::stream::transform_stream::<ProcessStats, ProcessStats>(stream),
+      ),
+  )
+}
+
 pub fn ntex_config(config: &mut web::ServiceConfig) {
-  config.service(list_process);
+  config.service(list_processes);
   config.service(logs_processes);
   config.service(logs_process);
-  config.service(restart_process);
-  config.service(start_process);
-  config.service(stop_process);
-  config.service(kill_process);
-  config.service(wait_process);
+  config.service(restart_processes);
+  config.service(start_processes);
+  config.service(stop_processes);
+  config.service(kill_processes);
+  config.service(wait_processes);
+  config.service(stats_processes);
 }
 
 #[cfg(test)]
@@ -387,8 +444,8 @@ mod tests {
   use crate::utils::tests::*;
 
   use nanocl_stubs::{
-    process::Process,
-    generic::{GenericFilter, GenericClause, GenericListQuery},
+    generic::{GenericClause, GenericFilter, GenericListQuery},
+    process::{Process, ProcessStatsQuery},
   };
 
   #[ntex::test]
@@ -398,6 +455,23 @@ mod tests {
     let mut res = client.send_get("/processes", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let _ = res.json::<Vec<Process>>().await.unwrap();
+  }
+
+  #[ntex::test]
+  async fn test_stats() {
+    let system = gen_default_test_system().await;
+    let client = system.client;
+    let res = client
+      .send_get(
+        "/processes/cargo/nstore/stats",
+        Some(ProcessStatsQuery {
+          namespace: Some("system".to_owned()),
+          stream: Some(false),
+          one_shot: Some(true),
+        }),
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo stats");
   }
 
   #[ntex::test]

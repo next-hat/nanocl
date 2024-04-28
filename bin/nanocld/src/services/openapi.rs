@@ -6,7 +6,7 @@ use bollard_next::exec::StartExecOptions;
 use bollard_next::container::{
   Config, ThrottlingData, CPUUsage, BlkioStatsEntry, MemoryStats,
   MemoryStatsStats, PidsStats, NetworkStats, BlkioStats, CPUStats,
-  StorageStats, MemoryStatsStatsV1, MemoryStatsStatsV2,
+  StorageStats, MemoryStatsStatsV1, MemoryStatsStatsV2, Stats,
 };
 use bollard_next::service::{
   PortBinding, MountBindOptionsPropagationEnum, MountVolumeOptionsDriverConfig,
@@ -34,7 +34,7 @@ use bollard_next::service::{
 };
 
 use nanocl_stubs::node::Node;
-use nanocl_stubs::process::{Process, ProcessKind};
+use nanocl_stubs::process::{Process, ProcessKind, ProcessStats};
 use nanocl_stubs::config::DaemonConfig;
 use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
 use nanocl_stubs::generic::{
@@ -52,7 +52,6 @@ use nanocl_stubs::namespace::{
 use nanocl_stubs::job::{Job, JobPartial, JobInspect, JobSummary};
 use nanocl_stubs::cargo::{
   Cargo, CargoInspect, CargoSummary, CargoKillOptions, CreateExecOptions,
-  CargoStats,
 };
 use nanocl_stubs::cargo_spec::{
   CargoSpec, CargoSpecPartial, CargoSpecUpdate, ReplicationMode,
@@ -208,12 +207,10 @@ impl Modify for VersionModifier {
       .default_value(format!("v{}", vars::VERSION))
       .description(Some("API version"))
       .build();
-
     let server = utoipa::openapi::ServerBuilder::default()
       .url("/{Version}")
       .parameter("Version", variable)
       .build();
-
     openapi.info.title = "Nanocl Daemon".to_owned();
     openapi.info.version = format!("v{}", vars::VERSION);
     openapi.info.description =
@@ -258,7 +255,6 @@ impl Modify for VersionModifier {
     cargo::patch_cargo,
     cargo::list_cargo_history,
     cargo::revert_cargo,
-    cargo::stats_cargo,
     // Exec
     exec::create_exec_command,
     exec::start_exec_command,
@@ -298,12 +294,13 @@ impl Modify for VersionModifier {
     // Process
     process::logs_processes,
     process::logs_process,
-    process::start_process,
-    process::stop_process,
-    process::list_process,
-    process::restart_process,
-    process::kill_process,
-    process::wait_process,
+    process::start_processes,
+    process::stop_processes,
+    process::list_processes,
+    process::restart_processes,
+    process::kill_processes,
+    process::wait_processes,
+    process::stats_processes,
     // Event
     event::list_event,
     event::watch_event,
@@ -355,6 +352,8 @@ impl Modify for VersionModifier {
     // Process
     Process,
     ProcessKind,
+    Stats,
+    ProcessStats,
     // Job
     Job,
     JobPartial,
@@ -371,7 +370,6 @@ impl Modify for VersionModifier {
     CargoSpecPartial,
     CargoSpecUpdate,
     ReplicationStatic,
-    CargoStats,
     PidsStats,
     NetworkStats,
     BlkioStats,

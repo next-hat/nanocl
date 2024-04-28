@@ -1,14 +1,18 @@
-use nanocl_error::io::IoError;
-use nanocl_stubs::cargo::CargoKillOptions;
 use ntex::channel::mpsc::Receiver;
 
-use nanocl_error::http::HttpResult;
-use nanocl_error::http_client::{HttpClientResult, HttpClientError};
+use nanocl_error::{
+  io::IoError,
+  http::HttpResult,
+  http_client::{HttpClientResult, HttpClientError},
+};
 
-use nanocl_stubs::generic::{GenericNspQuery, GenericFilter, GenericListQuery};
-use nanocl_stubs::process::{
-  Process, ProcessLogQuery, ProcessOutputLog, ProcessWaitQuery,
-  ProcessWaitResponse,
+use nanocl_stubs::{
+  cargo::CargoKillOptions,
+  generic::{GenericFilter, GenericListQuery, GenericNspQuery},
+  process::{
+    Process, ProcessLogQuery, ProcessOutputLog, ProcessStats,
+    ProcessStatsQuery, ProcessWaitQuery, ProcessWaitResponse,
+  },
 };
 
 use super::NanocldClient;
@@ -191,6 +195,22 @@ impl NanocldClient {
   ) -> HttpClientResult<Receiver<HttpResult<ProcessWaitResponse>>> {
     let res = self
       .send_get(&format!("{}/{kind}/{name}/wait", Self::PROCESS_PATH), query)
+      .await?;
+    Ok(Self::res_stream(res).await)
+  }
+
+  /// The stats are streamed as a [Receiver](Receiver) of [stats](Stats)
+  pub async fn stats_processes(
+    &self,
+    kind: &str,
+    name: &str,
+    query: Option<&ProcessStatsQuery>,
+  ) -> HttpClientResult<Receiver<HttpResult<ProcessStats>>> {
+    let res = self
+      .send_get(
+        &format!("{}/{kind}/{name}/stats", Self::PROCESS_PATH),
+        query,
+      )
       .await?;
     Ok(Self::res_stream(res).await)
   }
