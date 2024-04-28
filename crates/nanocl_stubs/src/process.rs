@@ -3,10 +3,12 @@ use std::str::FromStr;
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard_next::service::{
-  ContainerInspectResponse, ContainerWaitExitError, ContainerWaitResponse,
+use bollard_next::{
+  container::{LogOutput, LogsOptions, Stats, StatsOptions},
+  service::{
+    ContainerInspectResponse, ContainerWaitExitError, ContainerWaitResponse,
+  },
 };
-use bollard_next::container::{LogOutput, LogsOptions};
 
 /// Kind of process (Vm, Job, Cargo)
 #[derive(Clone, PartialEq, Debug)]
@@ -322,6 +324,39 @@ impl ProcessWaitResponse {
       process_name: container_name,
       status_code: response.status_code,
       error: response.error,
+    }
+  }
+}
+
+/// Stats process query
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProcessStatsQuery {
+  /// Name of the namespace
+  pub namespace: Option<String>,
+  /// Stream the output. If false, the stats will be output once and then it will disconnect.
+  pub stream: Option<bool>,
+  /// Only get a single stat instead of waiting for 2 cycles. Must be used with `stream=false`.
+  pub one_shot: Option<bool>,
+}
+
+/// Stats of a process
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "PascalCase"))]
+pub struct ProcessStats {
+  pub name: String,
+  pub stats: Stats,
+}
+
+impl From<ProcessStatsQuery> for StatsOptions {
+  fn from(query: ProcessStatsQuery) -> StatsOptions {
+    StatsOptions {
+      stream: query.stream.unwrap_or(true),
+      one_shot: query.one_shot.unwrap_or_default(),
     }
   }
 }

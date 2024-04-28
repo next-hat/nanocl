@@ -1,7 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::{Serialize, Deserialize};
 
-use bollard_next::container::{StatsOptions, KillContainerOptions};
+use bollard_next::container::KillContainerOptions;
 
 use crate::{
   process::Process,
@@ -13,7 +13,6 @@ use super::cargo_spec::CargoSpec;
 
 // Rexport some stuff from simplicity
 pub use bollard_next::exec::CreateExecOptions;
-pub use bollard_next::container::Stats as CargoStats;
 
 /// A Cargo is a replicable container
 /// It is used to run one or multiple instances of the same container
@@ -141,25 +140,4 @@ pub struct CargoDeleteQuery {
   pub namespace: Option<String>,
   /// Delete cargo even if it is running
   pub force: Option<bool>,
-}
-
-/// Stats cargo query
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct CargoStatsQuery {
-  /// Name of the namespace
-  pub namespace: Option<String>,
-  /// Stream the output. If false, the stats will be output once and then it will disconnect.
-  pub stream: Option<bool>,
-  /// Only get a single stat instead of waiting for 2 cycles. Must be used with `stream=false`.
-  pub one_shot: Option<bool>,
-}
-
-impl From<CargoStatsQuery> for StatsOptions {
-  fn from(query: CargoStatsQuery) -> StatsOptions {
-    StatsOptions {
-      stream: query.stream.unwrap_or(true),
-      one_shot: query.one_shot.unwrap_or_default(),
-    }
-  }
 }

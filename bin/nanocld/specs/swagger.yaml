@@ -333,50 +333,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CargoInspect'
-  /cargoes/{name}/stats:
-    get:
-      tags:
-      - Cargoes
-      summary: Get stats of a cargo instance
-      description: Get stats of a cargo instance
-      operationId: stats_cargo
-      parameters:
-      - name: name
-        in: path
-        description: Name of the cargo instance usually `name` or `name-number`
-        required: true
-        schema:
-          type: string
-      - name: namespace
-        in: query
-        description: Namespace where the cargo belongs
-        required: false
-        schema:
-          type: string
-          nullable: true
-      - name: stream
-        in: query
-        description: Return a stream of stats
-        required: false
-        schema:
-          type: boolean
-          nullable: true
-      - name: one_shot
-        in: query
-        description: Return stats only once
-        required: false
-        schema:
-          type: boolean
-          nullable: true
-      responses:
-        '200':
-          description: Cargo stats
-          content:
-            application/vdn.nanocl.raw-stream:
-              schema:
-                $ref: '#/components/schemas/Stats'
-        '404':
-          description: Cargo does not exist
   /events:
     get:
       tags:
@@ -736,7 +692,7 @@ paths:
       - Processes
       summary: List process (Vm, Job, Cargo)
       description: List process (Vm, Job, Cargo)
-      operationId: list_process
+      operationId: list_processes
       parameters:
       - name: filter
         in: query
@@ -761,7 +717,7 @@ paths:
       - Processes
       summary: Send a signal to processes of given kind and name
       description: Send a signal to processes of given kind and name
-      operationId: kill_process
+      operationId: kill_processes
       parameters:
       - name: kind
         in: path
@@ -868,7 +824,7 @@ paths:
       - Processes
       summary: Restart processes of given kind and name
       description: Restart processes of given kind and name
-      operationId: restart_process
+      operationId: restart_processes
       parameters:
       - name: kind
         in: path
@@ -900,7 +856,7 @@ paths:
       - Processes
       summary: Start processes of given kind and name
       description: Start processes of given kind and name
-      operationId: start_process
+      operationId: start_processes
       parameters:
       - name: kind
         in: path
@@ -926,13 +882,65 @@ paths:
       responses:
         '202':
           description: Process instances started
+  /processes/{kind}/{name}/stats:
+    get:
+      tags:
+      - Processes
+      summary: Get stats of a cargo instance
+      description: Get stats of a cargo instance
+      operationId: stats_processes
+      parameters:
+      - name: kind
+        in: path
+        description: Kind of process
+        required: true
+        schema:
+          type: string
+        example: cargo
+      - name: name
+        in: path
+        description: Name of the process group
+        required: true
+        schema:
+          type: string
+        example: deploy-example
+      - name: namespace
+        in: query
+        description: Namespace where the cargo belongs
+        required: false
+        schema:
+          type: string
+          nullable: true
+      - name: stream
+        in: query
+        description: Return a stream of stats
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      - name: one_shot
+        in: query
+        description: Return stats only once
+        required: false
+        schema:
+          type: boolean
+          nullable: true
+      responses:
+        '200':
+          description: Process stats
+          content:
+            application/vdn.nanocl.raw-stream:
+              schema:
+                $ref: '#/components/schemas/ProcessStats'
+        '404':
+          description: Process does not exist
   /processes/{kind}/{name}/stop:
     post:
       tags:
       - Processes
       summary: Stop a processes of given kind and name
       description: Stop a processes of given kind and name
-      operationId: stop_process
+      operationId: stop_processes
       parameters:
       - name: kind
         in: path
@@ -964,7 +972,7 @@ paths:
       - Processes
       summary: Wait for a job to finish
       description: Wait for a job to finish
-      operationId: wait_process
+      operationId: wait_processes
       parameters:
       - name: name
         in: path
@@ -5330,6 +5338,17 @@ components:
       - vm
       - job
       - cargo
+    ProcessStats:
+      type: object
+      description: Stats of a process
+      required:
+      - Name
+      - Stats
+      properties:
+        Name:
+          type: string
+        Stats:
+          $ref: '#/components/schemas/Stats'
     ProxyHttpLocation:
       type: object
       description: Defines a proxy rule location

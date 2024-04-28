@@ -1,16 +1,11 @@
-use ntex::channel::mpsc::Receiver;
 use bollard_next::service::ContainerSummary;
 
-use nanocl_error::http::HttpResult;
 use nanocl_error::http_client::HttpClientResult;
 
 use nanocl_stubs::{
   generic::GenericNspQuery,
   cargo_spec::{CargoSpecUpdate, CargoSpecPartial, CargoSpec},
-  cargo::{
-    Cargo, CargoSummary, CargoInspect, CargoDeleteQuery, CargoStatsQuery,
-    CargoStats,
-  },
+  cargo::{Cargo, CargoSummary, CargoInspect, CargoDeleteQuery},
 };
 
 use super::http_client::NanocldClient;
@@ -225,18 +220,6 @@ impl NanocldClient {
       )
       .await?;
     Self::res_json(res).await
-  }
-
-  /// The stats are streamed as a [Receiver](Receiver) of [cargo stats](CargoStats)
-  pub async fn stats_cargo(
-    &self,
-    name: &str,
-    query: Option<&CargoStatsQuery>,
-  ) -> HttpClientResult<Receiver<HttpResult<CargoStats>>> {
-    let res = self
-      .send_get(&format!("{}/{name}/stats", Self::CARGO_PATH), query)
-      .await?;
-    Ok(Self::res_stream(res).await)
   }
 
   /// List all the instances of a cargo by it's name and namespace

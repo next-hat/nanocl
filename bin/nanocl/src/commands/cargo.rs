@@ -1,6 +1,7 @@
 use std::process;
 use std::collections::HashMap;
 
+use nanocld_client::stubs::process::ProcessStatsQuery;
 use ntex::rt;
 use futures::channel::mpsc;
 use futures::{StreamExt, SinkExt};
@@ -11,7 +12,7 @@ use nanocl_error::io::{FromIo, IoResult};
 use nanocld_client::{
   stubs::process::{OutputKind, ProcessLogQuery},
   stubs::generic::{GenericFilter, GenericListNspQuery},
-  stubs::cargo::{CargoDeleteQuery, CargoStatsQuery, CargoSummary},
+  stubs::cargo::{CargoDeleteQuery, CargoSummary},
 };
 
 use crate::{
@@ -21,7 +22,7 @@ use crate::{
     CargoArg, CargoCreateOpts, CargoCommand, CargoRemoveOpts, CargoRow,
     CargoStartOpts, CargoStopOpts, CargoPatchOpts, CargoInspectOpts,
     CargoExecOpts, CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts,
-    CargoRunOpts, CargoRestartOpts, CargoStatsOpts, CargoStatsRow,
+    CargoRunOpts, CargoRestartOpts, CargoStatsOpts, ProcessStatsRow,
   },
 };
 
@@ -255,7 +256,7 @@ async fn exec_cargo_stats(
   opts: &CargoStatsOpts,
 ) -> IoResult<()> {
   let client = cli_conf.client.clone();
-  let query = CargoStatsQuery {
+  let query = ProcessStatsQuery {
     namespace: args.namespace.clone(),
     stream: if opts.no_stream { Some(false) } else { None },
     one_shot: Some(false),
@@ -271,7 +272,8 @@ async fn exec_cargo_stats(
       let mut tx = tx.clone();
       let client = client.clone();
       async move {
-        let Ok(mut stream) = client.stats_cargo(&name, Some(&query)).await
+        let Ok(mut stream) =
+          client.stats_processes("cargo", &name, Some(&query)).await
         else {
           return;
         };
@@ -298,8 +300,8 @@ async fn exec_cargo_stats(
     // convert stats_cargoes in a Arrays of CargoStatsRow
     let stats = stats_cargoes
       .values()
-      .map(|stats| CargoStatsRow::from(stats.clone()))
-      .collect::<Vec<CargoStatsRow>>();
+      .map(|stats| ProcessStatsRow::from(stats.clone()))
+      .collect::<Vec<ProcessStatsRow>>();
     // clear terminal
     let term = dialoguer::console::Term::stdout();
     let _ = term.clear_screen();
