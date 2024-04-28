@@ -1,6 +1,6 @@
 use std::{
-  fmt::{Display, Formatter},
   path::PathBuf,
+  fmt::{Display, Formatter},
 };
 
 use clap::{Parser, Subcommand};
@@ -28,7 +28,7 @@ pub struct StateApplyOpts {
 }
 
 /// `nanocl state logs` available options
-#[derive(Parser)]
+#[derive(Default, Parser)]
 pub struct StateLogsOpts {
   /// Path or Url to the Statefile
   #[clap(long, short = 's')]
@@ -88,10 +88,10 @@ pub struct StateArg {
 
 #[derive(Clone, Default, Debug)]
 pub enum StateRoot {
-  File(PathBuf),
-  Url(String),
   #[default]
   None,
+  Url(String),
+  File(PathBuf),
 }
 
 impl Display for StateRoot {
@@ -120,4 +120,6 @@ where
   pub data: T,
   /// Include directory of the Statefile
   pub root: StateRoot,
+  /// Path to the Statefile
+  pub location: String,
 }

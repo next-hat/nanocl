@@ -1,8 +1,25 @@
 ApiVersion: v0.14
 
-# See all options:
-# https://docs.next-hat.com/references/nanocl/objects/cargo
+Args:
+- Name: name
+  Kind: String
+- Name: port
+  Kind: Number
+- Name: enable_job
+  Kind: Boolean
+
+SubStates:
+- Path: ./sub_child.yml
+  Args:
+  - Name: name
+    Value: ${{ Args.name }} # Pass the value of Args.name to the sub-state
+  - Name: port
+    Value: ${{ Args.port }} # Pass the value of Args.port to the sub-state
+  - Name: enable_job
+    Value: ${{ Args.enable_job }} # Pass the value of Args.ssl_enabled to the sub-state
+- https://nhnr.io/v0.14/tests/sub_state.yml
+
 Cargoes:
-- Name: include-sub-example
+- Name: ${{ Args.name }}-sub-example
   Container:
     Image: ghcr.io/next-hat/nanocl-get-started:latest

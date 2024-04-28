@@ -1,7 +1,7 @@
 ApiVersion: v0.14
 
-# SubStates:
-#   - ./sub_state.yml
+SubStates:
+- ./invalid_sub_state.yml
 
 Jobs:
 - Name: include-example

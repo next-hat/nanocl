@@ -55,6 +55,7 @@ pub async fn download_statefile(url: &str) -> IoResult<(String, String)> {
 /// and return a StateRef with the raw data and the format
 pub fn get_state_ref<T>(
   ext: &str,
+  path: &str,
   raw: &str,
   root: StateRoot,
 ) -> IoResult<StateRef<T>>
@@ -70,6 +71,7 @@ where
         raw: raw.to_owned(),
         format: DisplayFormat::Yaml,
         data,
+        location: path.to_owned(),
         root,
       })
     }
@@ -81,6 +83,7 @@ where
         raw: raw.to_owned(),
         format: DisplayFormat::Json,
         data,
+        location: path.to_owned(),
         root,
       })
     }
@@ -95,6 +98,7 @@ where
         raw: raw.to_owned(),
         format: DisplayFormat::Toml,
         data,
+        location: path.to_owned(),
         root,
       })
     }

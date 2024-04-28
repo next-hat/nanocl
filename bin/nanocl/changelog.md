@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Secrets create commands
 - Include partial Statefiles by url, relative or absolute paths
+- SubStates in Statefiles to include other Statefiles
 
 ### Fixed
 
