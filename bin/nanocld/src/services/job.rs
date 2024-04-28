@@ -152,7 +152,7 @@ mod tests {
       .send_get(
         &format!("/processes/job/{}/wait", &job.name),
         Some(&serde_json::json!({
-          "Condition": "yoloh"
+          "condition": "yoloh"
         })),
       )
       .await;
