@@ -361,13 +361,6 @@ mod tests {
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "basic cargo kill");
     let res = client
-      .send_get(
-        &format!("{ENDPOINT}/{main_test_cargo}/stats"),
-        None::<String>,
-      )
-      .await;
-    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo stats");
-    let res = client
       .send_post(
         &format!("/processes/cargo/{main_test_cargo}/restart"),
         None::<String>,

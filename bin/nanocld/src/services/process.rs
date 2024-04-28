@@ -444,8 +444,8 @@ mod tests {
   use crate::utils::tests::*;
 
   use nanocl_stubs::{
-    process::Process,
-    generic::{GenericFilter, GenericClause, GenericListQuery},
+    generic::{GenericClause, GenericFilter, GenericListQuery},
+    process::{Process, ProcessStatsQuery},
   };
 
   #[ntex::test]
@@ -455,6 +455,23 @@ mod tests {
     let mut res = client.send_get("/processes", None::<String>).await;
     test_status_code!(res.status(), http::StatusCode::OK, "processes");
     let _ = res.json::<Vec<Process>>().await.unwrap();
+  }
+
+  #[ntex::test]
+  async fn test_stats() {
+    let system = gen_default_test_system().await;
+    let client = system.client;
+    let res = client
+      .send_get(
+        "/processes/cargo/nstore/stats",
+        Some(ProcessStatsQuery {
+          namespace: Some("system".to_owned()),
+          stream: Some(false),
+          one_shot: Some(true),
+        }),
+      )
+      .await;
+    test_status_code!(res.status(), http::StatusCode::OK, "basic cargo stats");
   }
 
   #[ntex::test]
