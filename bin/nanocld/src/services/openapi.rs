@@ -257,7 +257,6 @@ impl Modify for VersionModifier {
     cargo::patch_cargo,
     cargo::list_cargo_history,
     cargo::revert_cargo,
-    // cargo::stats_cargo,
     // Exec
     exec::create_exec_command,
     exec::start_exec_command,
