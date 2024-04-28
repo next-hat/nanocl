@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Secrets create commands
+- Contexts, to change the default endpoint from the default unix:///run/nanocl.sock
 - Include partial Statefiles by url, relative or absolute paths
 - SubStates in Statefiles to include other Statefiles
 
