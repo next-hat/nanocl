@@ -251,41 +251,6 @@ pub async fn revert_cargo(
   Ok(web::HttpResponse::Ok().json(&cargo))
 }
 
-// /// Get stats of a cargo instance
-// #[cfg_attr(feature = "dev", utoipa::path(
-//   get,
-//   tag = "Cargoes",
-//   path = "/cargoes/{name}/stats",
-//   params(
-//     ("name" = String, Path, description = "Name of the cargo instance usually `name` or `name-number`"),
-//     ("namespace" = Option<String>, Query, description = "Namespace where the cargo belongs"),
-//     ("stream" = Option<bool>, Query, description = "Return a stream of stats"),
-//     ("one_shot" = Option<bool>, Query, description = "Return stats only once"),
-//   ),
-//   responses(
-//     (status = 200, description = "Cargo stats", content_type = "application/vdn.nanocl.raw-stream", body = Stats),
-//     (status = 404, description = "Cargo does not exist"),
-//   ),
-// ))]
-// #[web::get("/cargoes/{name}/stats")]
-// pub async fn stats_cargo(
-//   state: web::types::State<SystemState>,
-//   path: web::types::Path<(String, String)>,
-//   qs: web::types::Query<CargoStatsQuery>,
-// ) -> HttpResult<web::HttpResponse> {
-//   let namespace = utils::key::resolve_nsp(&qs.namespace);
-//   let key = utils::key::gen_key(&namespace, &path.1);
-//   let stream = state
-//     .docker_api
-//     .stats(&format!("{key}.c"), Some(qs.clone().into()));
-//   let stream = utils::stream::transform_stream::<Stats, CargoStats>(stream);
-//   Ok(
-//     web::HttpResponse::Ok()
-//       .content_type("application/vdn.nanocl.raw-stream")
-//       .streaming(stream),
-//   )
-// }
-
 pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(create_cargo);
   config.service(delete_cargo);
@@ -295,7 +260,6 @@ pub fn ntex_config(config: &mut web::ServiceConfig) {
   config.service(inspect_cargo);
   config.service(list_cargo_history);
   config.service(revert_cargo);
-  // config.service(stats_cargo);
 }
 
 #[cfg(test)]

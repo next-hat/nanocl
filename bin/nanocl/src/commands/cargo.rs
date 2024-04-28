@@ -1,7 +1,6 @@
 use std::process;
 use std::collections::HashMap;
 
-use nanocld_client::stubs::process::ProcessStatsQuery;
 use ntex::rt;
 use futures::channel::mpsc;
 use futures::{StreamExt, SinkExt};
@@ -9,10 +8,10 @@ use futures::stream::FuturesUnordered;
 use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
 use nanocl_error::io::{FromIo, IoResult};
-use nanocld_client::{
-  stubs::process::{OutputKind, ProcessLogQuery},
-  stubs::generic::{GenericFilter, GenericListNspQuery},
-  stubs::cargo::{CargoDeleteQuery, CargoSummary},
+use nanocld_client::stubs::{
+  process::{OutputKind, ProcessLogQuery, ProcessStatsQuery},
+  generic::{GenericFilter, GenericListNspQuery},
+  cargo::{CargoDeleteQuery, CargoSummary},
 };
 
 use crate::{
