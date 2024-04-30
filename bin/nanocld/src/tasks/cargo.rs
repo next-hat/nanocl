@@ -1,7 +1,14 @@
+use futures_util::StreamExt;
+use futures::stream::FuturesUnordered;
 use ntex::rt;
-use bollard_next::container::{RemoveContainerOptions, StopContainerOptions};
+use bollard_next::container::{
+  RemoveContainerOptions, RenameContainerOptions, StopContainerOptions,
+};
 
-use nanocl_error::io::IoError;
+use nanocl_error::{
+  http::{HttpError, HttpResult},
+  io::{IoError, IoResult},
+};
 use nanocl_stubs::{
   cargo_spec::ReplicationMode,
   process::ProcessKind,
@@ -76,6 +83,27 @@ impl ObjTaskUpdate for CargoDb {
     Box::pin(async move {
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
       let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
+      // rename old instances to flag them for deletion
+      processes
+        .iter()
+        .map(|process| {
+          let docker_api = state.docker_api.clone();
+          async move {
+            let new_name = format!("tmp-{}", process.name);
+            docker_api
+              .rename_container(
+                &process.key,
+                RenameContainerOptions { name: &new_name },
+              )
+              .await?;
+            Ok::<_, HttpError>(())
+          }
+        })
+        .collect::<FuturesUnordered<_>>()
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .collect::<HttpResult<Vec<_>>>()?;
       let number = match &cargo.spec.replication {
         Some(ReplicationMode::Static(replication)) => replication.number,
         _ => 1,
@@ -112,6 +140,30 @@ impl ObjTaskUpdate for CargoDb {
               &state_ptr_ptr,
             )
             .await;
+            let res = processes
+              .iter()
+              .map(|process| {
+                let docker_api = state_ptr_ptr.docker_api.clone();
+                async move {
+                  docker_api
+                    .rename_container(
+                      &process.key,
+                      RenameContainerOptions {
+                        name: &process.name,
+                      },
+                    )
+                    .await?;
+                  Ok::<_, HttpError>(())
+                }
+              })
+              .collect::<FuturesUnordered<_>>()
+              .collect::<Vec<_>>()
+              .await
+              .into_iter()
+              .collect::<HttpResult<Vec<_>>>();
+            if let Err(err) = res {
+              log::error!("Unable to rename containers back: {err}");
+            }
           });
         }
         Ok(_) => {

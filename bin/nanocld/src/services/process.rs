@@ -81,6 +81,9 @@ async fn logs_processes(
   let options: LogsOptions<String> = qs.into_inner().into();
   let futures = processes
     .into_iter()
+    .filter(|process| !process.name.starts_with("tmp-"))
+    .collect::<Vec<_>>()
+    .into_iter()
     .map(|process| {
       state
         .docker_api

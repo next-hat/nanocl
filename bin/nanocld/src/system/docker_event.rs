@@ -101,6 +101,7 @@ async fn exec_docker(
   let new_instance = ProcessUpdateDb {
     updated_at: Some(chrono::Utc::now().naive_utc()),
     data: Some(data),
+    name: Some(name),
     ..Default::default()
   };
   ProcessDb::update_pk(&id, new_instance, &state.pool).await?;
