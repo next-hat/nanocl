@@ -122,13 +122,9 @@ impl RawEventEmitter {
   }
 
   /// Send an event to all clients
-  pub async fn emit(&self, e: &Event) -> IoResult<()> {
+  pub fn emit(&self, e: &Event) -> IoResult<()> {
     let inner = Arc::clone(&self.inner);
-    let clients = web::block(move || {
-      let clients = inner.lock()?.clients.clone();
-      Ok::<_, IoError>(clients)
-    })
-    .await?;
+    let clients = inner.lock()?.clients.clone();
     let mut new_clients = Vec::new();
     let msg = e.try_to_bytes()?;
     for mut client in clients {
@@ -143,12 +139,8 @@ impl RawEventEmitter {
       }
     }
     let inner = Arc::clone(&self.inner);
-    web::block(move || {
-      let mut inner = inner.lock()?;
-      inner.clients = new_clients;
-      Ok::<_, IoError>(())
-    })
-    .await?;
+    let mut inner = inner.lock()?;
+    inner.clients = new_clients;
     Ok(())
   }
 
