@@ -55,10 +55,10 @@ impl SystemState {
       rt::spawn(async move {
         while let Some(e) = rx.next().await {
           let this = self.clone();
+          if let Err(err) = this.event_emitter_raw.emit(&e).await {
+            log::error!("system::run: raw emit {err}");
+          }
           rt::spawn(async move {
-            if let Err(err) = this.event_emitter_raw.emit(&e).await {
-              log::error!("system::run: raw emit {err}");
-            }
             if let Err(err) = super::exec_event(&e, &this).await {
               log::error!("system::run: exec event {err}");
             }
