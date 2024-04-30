@@ -17,6 +17,8 @@ Jobs:
     Cmd:
     - -c
     - |
+      echo "initializing db cluster"
+      sleep 5
       cockroach init --insecure --host=store.local:26257
 # {% endif %}
 
@@ -35,4 +37,4 @@ Cargoes:
     - -c
     - |
       echo "starting cockroachdb"
-      cockroach start --join=store.local,1store.local,2store.local --listen-addr=:26257 --sql-addr=:26258 --insecure
+      cockroach start --join=store.local,1store.local,2store.local --advertise-addr=$(hostname -i) --listen-addr=:26257 --sql-addr=:26258 --insecure
