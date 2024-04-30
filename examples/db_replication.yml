@@ -7,6 +7,7 @@ Args:
 # {% if Args.init %}
 Jobs:
 - Name: init-db-cluster
+  Ttl: 4
   Containers:
   - Image: cockroachdb/cockroach:v23.1.15
     HostConfig:
@@ -19,7 +20,6 @@ Jobs:
       cockroach init --insecure --host=store.local:26257
 # {% endif %}
 
-# {% if Args.init == false %}
 Cargoes:
 - Name: db-replication
   Replication:
@@ -36,4 +36,3 @@ Cargoes:
     - |
       echo "starting cockroachdb"
       cockroach start --join=store.local,1store.local,2store.local --listen-addr=:26257 --sql-addr=:26258 --insecure
-# {% endif %}
