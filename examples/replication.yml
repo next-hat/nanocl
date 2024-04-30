@@ -20,7 +20,7 @@ Resources:
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/cargo
 Cargoes:
-- Name: replication-example
+- Name: replication-auto-example
   Replication:
     Mode: Auto
   Container:
@@ -28,10 +28,10 @@ Cargoes:
     Env:
     - APP=GET_STARTED1
 
-- Name: replication-example
+- Name: replication-static-example
   Replication:
-    Mode:
-      Number: 3
+    Mode: Static
+    Number: 3
   Container:
     Image: ghcr.io/next-hat/nanocl-get-started:latest
     Env:
