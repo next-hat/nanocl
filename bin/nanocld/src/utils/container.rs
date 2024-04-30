@@ -30,12 +30,12 @@ use nanocl_stubs::{
 };
 
 use crate::{
+  vars,
   models::{
     CargoDb, JobDb, JobUpdateDb, ObjPsStatusDb, ObjPsStatusUpdate, ProcessDb,
     SecretDb, SystemState, VmDb, VmImageDb,
   },
   repositories::generic::*,
-  vars,
 };
 
 /// Get the image name and tag from a string
@@ -355,6 +355,11 @@ pub async fn create_cargo(
     .map(move |current| {
       let secret_envs = secret_envs.clone();
       async move {
+        let ordinal_index = if current > 0 {
+          current.to_string()
+        } else {
+          "".to_owned()
+        };
         let short_id = super::key::generate_short_id(6);
         let name = format!("{}-{}.{}.c", cargo.spec.name, short_id, cargo.namespace_name);
         let spec = cargo.spec.clone();
@@ -388,12 +393,6 @@ pub async fn create_cargo(
         let mut env = container.env.unwrap_or_default();
         // merge cargo env with secret env
         env.extend(secret_envs);
-        let hostname = match cargo.spec.container.hostname {
-          Some(ref hostname) => {
-            format!("{hostname}-{short_id}")
-          }
-          None => name.to_owned(),
-        };
         env.push(format!("NANOCL_NODE={}", state.config.hostname));
         env.push(format!("NANOCL_NODE_ADDR={}", state.config.gateway));
         env.push(format!("NANOCL_CARGO_KEY={}", cargo.spec.cargo_key.to_owned()));
@@ -401,6 +400,10 @@ pub async fn create_cargo(
         env.push(format!("NANOCL_CARGO_INSTANCE={}", current));
         // Merge the cargo spec with the container spec
         // And set his network mode to the cargo namespace
+        let hostname = match &cargo.spec.container.hostname {
+          None => format!("{}{}", ordinal_index, cargo.spec.name),
+          Some(hostname) => format!("{}{}", ordinal_index, hostname),
+        };
         let new_process = bollard_next::container::Config {
           attach_stderr: Some(true),
           attach_stdout: Some(true),
