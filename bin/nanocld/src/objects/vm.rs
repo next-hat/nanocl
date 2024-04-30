@@ -43,7 +43,8 @@ impl ObjCreate for VmDb {
     if name.contains('.') {
       return Err(HttpError::bad_request("VM name cannot contain '.'"));
     }
-    let image = VmImageDb::read_by_pk(&vm.disk.image, &state.inner.pool).await?;
+    let image =
+      VmImageDb::read_by_pk(&vm.disk.image, &state.inner.pool).await?;
     if image.kind.as_str() != "Base" {
       return Err(HttpError::bad_request(format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image)));
     }
@@ -63,9 +64,10 @@ impl ObjCreate for VmDb {
       actual: ObjPsStatusKind::Create,
       prev_actual: ObjPsStatusKind::Create,
     };
-    let status: ObjPsStatus = ObjPsStatusDb::create_from(status, &state.inner.pool)
-      .await?
-      .try_into()?;
+    let status: ObjPsStatus =
+      ObjPsStatusDb::create_from(status, &state.inner.pool)
+        .await?
+        .try_into()?;
     let new_spec = SpecDb::try_from_vm_partial(&vm_key, version, &vm)?;
     let spec = SpecDb::create_from(new_spec, &state.inner.pool)
       .await?

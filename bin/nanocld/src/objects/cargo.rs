@@ -83,7 +83,8 @@ impl ObjDelByPk for CargoDb {
   ) -> HttpResult<Self::ObjDelOut> {
     let cargo = CargoDb::transform_read_by_pk(pk, &state.inner.pool).await?;
     let processes =
-      ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool).await?;
+      ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool)
+        .await?;
     let (_, _, _, running) = utils::container::count_status(&processes);
     if running > 0 && !opts.force.unwrap_or(false) {
       return Err(HttpError::bad_request(

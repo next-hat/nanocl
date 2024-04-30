@@ -161,7 +161,8 @@ impl CargoDb {
     namespace: &str,
     state: &SystemState,
   ) -> HttpResult<()> {
-    let namespace = NamespaceDb::read_by_pk(namespace, &state.inner.pool).await?;
+    let namespace =
+      NamespaceDb::read_by_pk(namespace, &state.inner.pool).await?;
     let cargoes =
       CargoDb::read_by_namespace(&namespace.name, &state.inner.pool).await?;
     cargoes
@@ -192,14 +193,16 @@ impl CargoDb {
       .map_err(HttpError::bad_request)?
       .r#where("namespace_name", GenericClause::Eq(namespace.clone()));
     NamespaceDb::read_by_pk(&namespace, &state.inner.pool).await?;
-    let cargoes = CargoDb::transform_read_by(&filter, &state.inner.pool).await?;
+    let cargoes =
+      CargoDb::transform_read_by(&filter, &state.inner.pool).await?;
     let mut cargo_summaries = Vec::new();
     for cargo in cargoes {
       let spec = SpecDb::read_by_pk(&cargo.spec.key, &state.inner.pool)
         .await?
         .try_to_cargo_spec()?;
       let processes =
-        ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool).await?;
+        ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool)
+          .await?;
       let (_, _, _, running) = utils::container::count_status(&processes);
       cargo_summaries.push(CargoSummary {
         created_at: cargo.created_at,

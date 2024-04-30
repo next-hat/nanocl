@@ -48,7 +48,8 @@ pub async fn create_resource_kind(
   _version: web::types::Path<String>,
   payload: web::types::Json<ResourceKindPartial>,
 ) -> HttpResult<web::HttpResponse> {
-  let item = ResourceKindDb::create_from_spec(&payload, &state.inner.pool).await?;
+  let item =
+    ResourceKindDb::create_from_spec(&payload, &state.inner.pool).await?;
   Ok(web::HttpResponse::Created().json(&item))
 }
 
@@ -120,7 +121,8 @@ pub async fn inspect_resource_kind_version(
   path: web::types::Path<(String, String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);
-  let kind_version = SpecDb::get_version(&key, &path.3, &state.inner.pool).await?;
+  let kind_version =
+    SpecDb::get_version(&key, &path.3, &state.inner.pool).await?;
   let kind_version: ResourceKindVersion = kind_version.try_into()?;
   Ok(web::HttpResponse::Ok().json(&kind_version))
 }

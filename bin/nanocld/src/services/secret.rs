@@ -60,7 +60,8 @@ pub async fn inspect_secret(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let secret = SecretDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;
+  let secret =
+    SecretDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&secret))
 }
 
