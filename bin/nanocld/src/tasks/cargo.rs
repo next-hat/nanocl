@@ -1,8 +1,9 @@
 use ntex::rt;
-use bollard_next::container::RemoveContainerOptions;
+use bollard_next::container::{RemoveContainerOptions, StopContainerOptions};
 
 use nanocl_error::io::IoError;
 use nanocl_stubs::{
+  cargo_spec::ReplicationMode,
   process::ProcessKind,
   system::{NativeEventAction, ObjPsStatusKind},
 };
@@ -26,7 +27,11 @@ impl ObjTaskStart for CargoDb {
       let processes =
         ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
       if processes.is_empty() {
-        utils::container::create_cargo(&cargo, 1, &state).await?;
+        let number = match &cargo.spec.replication {
+          Some(ReplicationMode::Static(replication)) => replication.number,
+          _ => 1,
+        };
+        utils::container::create_cargo(&cargo, number, &state).await?;
       }
       utils::container::start_instances(
         &cargo.spec.cargo_key,
@@ -49,13 +54,11 @@ impl ObjTaskDelete for CargoDb {
       for process in processes {
         let _ = state
           .docker_api
-          .remove_container(
-            &process.key,
-            Some(RemoveContainerOptions {
-              force: true,
-              ..Default::default()
-            }),
-          )
+          .stop_container(&process.key, None::<StopContainerOptions>)
+          .await;
+        let _ = state
+          .docker_api
+          .remove_container(&process.key, None::<RemoveContainerOptions>)
           .await;
       }
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
@@ -73,9 +76,13 @@ impl ObjTaskUpdate for CargoDb {
     Box::pin(async move {
       let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
       let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
+      let number = match &cargo.spec.replication {
+        Some(ReplicationMode::Static(replication)) => replication.number,
+        _ => 1,
+      };
       // Create instance with the new spec
       let new_instances =
-        match utils::container::create_cargo(&cargo, 1, &state).await {
+        match utils::container::create_cargo(&cargo, number, &state).await {
           Err(err) => {
             log::warn!(
               "Unable to create cargo instance {} : {err}",
