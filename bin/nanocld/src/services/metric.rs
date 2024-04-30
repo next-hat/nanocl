@@ -32,7 +32,7 @@ pub async fn list_metric(
   let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
     HttpError::bad_request(format!("Invalid query string: {err}"))
   })?;
-  let metrics = MetricDb::read_by(&filter, &state.pool).await?;
+  let metrics = MetricDb::read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&metrics))
 }
 
@@ -55,8 +55,8 @@ pub async fn create_metric(
     return Err(HttpError::bad_request("reserved kind nanocl.io"));
   }
   let new_metric =
-    MetricNodePartial::try_new_node(&state.config.hostname, &payload)?;
-  let metric = MetricDb::create_from(&new_metric, &state.pool).await?;
+    MetricNodePartial::try_new_node(&state.inner.config.hostname, &payload)?;
+  let metric = MetricDb::create_from(&new_metric, &state.inner.pool).await?;
   Ok(web::HttpResponse::Created().json(&metric))
 }
 

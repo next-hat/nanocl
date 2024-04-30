@@ -15,8 +15,8 @@ use crate::{
 
 /// Delete a vm image from the database and the filesystem
 pub async fn delete_by_pk(pk: &str, state: &SystemState) -> HttpResult<()> {
-  let vm_image = VmImageDb::read_by_pk(pk, &state.pool).await?;
-  let children = VmImageDb::read_by_parent(pk, &state.pool).await?;
+  let vm_image = VmImageDb::read_by_pk(pk, &state.inner.pool).await?;
+  let children = VmImageDb::read_by_parent(pk, &state.inner.pool).await?;
   if !children.is_empty() {
     return Err(HttpError::conflict(format!(
       "Vm image {pk} has children images please delete them first"
@@ -26,7 +26,7 @@ pub async fn delete_by_pk(pk: &str, state: &SystemState) -> HttpResult<()> {
   if let Err(err) = fs::remove_file(&filepath).await {
     log::warn!("Error while deleting the file {filepath}: {err}");
   }
-  VmImageDb::del_by_pk(pk, &state.pool).await?;
+  VmImageDb::del_by_pk(pk, &state.inner.pool).await?;
   Ok(())
 }
 
@@ -66,12 +66,12 @@ pub async fn create_snap(
   image: &VmImageDb,
   state: &SystemState,
 ) -> HttpResult<VmImageDb> {
-  if VmImageDb::read_by_pk(name, &state.pool).await.is_ok() {
+  if VmImageDb::read_by_pk(name, &state.inner.pool).await.is_ok() {
     return Err(HttpError::conflict(format!("Vm image {name} already used")));
   }
   let img_path = image.path.clone();
   let snapshot_path =
-    format!("{}/vms/images/{}.img", state.config.state_dir, name);
+    format!("{}/vms/images/{}.img", state.inner.config.state_dir, name);
   let output = Command::new("qemu-img")
     .args([
       "create",
@@ -121,7 +121,8 @@ pub async fn create_snap(
     size_virtual: img_info.virtual_size,
     parent: Some(image.name.clone()),
   };
-  let snap_image = VmImageDb::create_from(snap_image, &state.pool).await?;
+  let snap_image =
+    VmImageDb::create_from(snap_image, &state.inner.pool).await?;
   Ok(snap_image)
 }
 
@@ -139,14 +140,14 @@ pub async fn clone(
       "Vm image {name} is not a snapshot"
     )));
   }
-  if VmImageDb::read_by_pk(name, &state.pool).await.is_ok() {
+  if VmImageDb::read_by_pk(name, &state.inner.pool).await.is_ok() {
     return Err(HttpError::conflict(format!("Vm image {name} already used")));
   }
   let (tx, rx) = ntex::channel::mpsc::channel::<HttpResult<Bytes>>();
   let name = name.to_owned();
   let image = image.clone();
-  let daemon_conf = state.config.clone();
-  let pool = Arc::clone(&state.pool);
+  let daemon_conf = state.inner.config.clone();
+  let pool = Arc::clone(&state.inner.pool);
   rt::spawn(async move {
     let img_path = image.path.clone();
     let base_path =

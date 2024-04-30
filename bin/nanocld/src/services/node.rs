@@ -31,7 +31,8 @@ use crate::{
 pub async fn list_node(
   state: web::types::State<SystemState>,
 ) -> HttpResult<web::HttpResponse> {
-  let items = NodeDb::read_by(&GenericFilter::default(), &state.pool).await?;
+  let items =
+    NodeDb::read_by(&GenericFilter::default(), &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -45,7 +46,7 @@ async fn node_ws_service(
   let (tx, rx) = oneshot::channel();
   let con_state = Rc::new(RefCell::new(WsConState::new()));
   rt::spawn(utils::ws::heartbeat(con_state.clone(), sink.clone(), rx));
-  let message = format!("[SERVER] hello i'm {}", state.config.hostname);
+  let message = format!("[SERVER] hello i'm {}", state.inner.config.hostname);
   let _ = sink
     .send(ws::Message::Text(ByteString::from(message)))
     .await;

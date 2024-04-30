@@ -35,7 +35,7 @@ impl ObjCreate for VmDb {
     );
     let vm_key = utils::key::gen_key(namespace, name);
     let mut vm = obj.spec.clone();
-    if VmDb::read_by_pk(&vm_key, &state.pool).await.is_ok() {
+    if VmDb::read_by_pk(&vm_key, &state.inner.pool).await.is_ok() {
       return Err(HttpError::conflict(format!(
         "VM with name {name} already exists in namespace {namespace}",
       )));
@@ -43,7 +43,8 @@ impl ObjCreate for VmDb {
     if name.contains('.') {
       return Err(HttpError::bad_request("VM name cannot contain '.'"));
     }
-    let image = VmImageDb::read_by_pk(&vm.disk.image, &state.pool).await?;
+    let image =
+      VmImageDb::read_by_pk(&vm.disk.image, &state.inner.pool).await?;
     if image.kind.as_str() != "Base" {
       return Err(HttpError::bad_request(format!("Image {} is not a base image please convert the snapshot into a base image first", &vm.disk.image)));
     }
@@ -63,11 +64,12 @@ impl ObjCreate for VmDb {
       actual: ObjPsStatusKind::Create,
       prev_actual: ObjPsStatusKind::Create,
     };
-    let status: ObjPsStatus = ObjPsStatusDb::create_from(status, &state.pool)
-      .await?
-      .try_into()?;
+    let status: ObjPsStatus =
+      ObjPsStatusDb::create_from(status, &state.inner.pool)
+        .await?
+        .try_into()?;
     let new_spec = SpecDb::try_from_vm_partial(&vm_key, version, &vm)?;
-    let spec = SpecDb::create_from(new_spec, &state.pool)
+    let spec = SpecDb::create_from(new_spec, &state.inner.pool)
       .await?
       .try_to_vm_spec()?;
     let new_item = VmDb {
@@ -78,7 +80,7 @@ impl ObjCreate for VmDb {
       spec_key: spec.key,
       status_key: vm_key,
     };
-    let item = VmDb::create_from(new_item, &state.pool).await?;
+    let item = VmDb::create_from(new_item, &state.inner.pool).await?;
     let vm = item.with_spec(&(spec, status));
     Ok(vm)
   }
@@ -97,15 +99,15 @@ impl ObjDelByPk for VmDb {
     _opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
-    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
+    let vm = VmDb::transform_read_by_pk(pk, &state.inner.pool).await?;
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.inner.pool).await?;
     let new_status = ObjPsStatusUpdate {
       wanted: Some(ObjPsStatusKind::Destroy.to_string()),
       prev_wanted: Some(status.wanted),
       actual: Some(ObjPsStatusKind::Destroying.to_string()),
       prev_actual: Some(status.actual),
     };
-    ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
+    ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
     Ok(vm)
   }
 }
@@ -119,20 +121,20 @@ impl ObjPutByPk for VmDb {
     obj: &Self::ObjPutIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPutOut> {
-    let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
-    let status = ObjPsStatusDb::read_by_pk(pk, &state.pool).await?;
+    let vm = VmDb::transform_read_by_pk(pk, &state.inner.pool).await?;
+    let status = ObjPsStatusDb::read_by_pk(pk, &state.inner.pool).await?;
     let new_status = ObjPsStatusUpdate {
       wanted: Some(ObjPsStatusKind::Start.to_string()),
       prev_wanted: Some(status.wanted),
       actual: Some(ObjPsStatusKind::Updating.to_string()),
       prev_actual: Some(status.actual),
     };
-    ObjPsStatusDb::update_pk(pk, new_status, &state.pool).await?;
+    ObjPsStatusDb::update_pk(pk, new_status, &state.inner.pool).await?;
     let vm = VmDb::update_from_spec(
       &vm.spec.vm_key,
       &obj.spec,
       &obj.version,
-      &state.pool,
+      &state.inner.pool,
     )
     .await?;
     Ok(vm)
@@ -150,8 +152,8 @@ impl ObjPatchByPk for VmDb {
   ) -> HttpResult<Self::ObjPatchOut> {
     let spec = &obj.spec;
     let version = &obj.version;
-    let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
-    let old_spec = SpecDb::read_by_pk(&vm.spec.key, &state.pool)
+    let vm = VmDb::transform_read_by_pk(pk, &state.inner.pool).await?;
+    let old_spec = SpecDb::read_by_pk(&vm.spec.key, &state.inner.pool)
       .await?
       .try_to_vm_spec()?;
     let vm_partial = VmSpecPartial {
@@ -207,9 +209,9 @@ impl ObjInspectByPk for VmDb {
     pk: &str,
     state: &SystemState,
   ) -> HttpResult<Self::ObjInspectOut> {
-    let vm = VmDb::transform_read_by_pk(pk, &state.pool).await?;
+    let vm = VmDb::transform_read_by_pk(pk, &state.inner.pool).await?;
     let processes =
-      ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.pool).await?;
+      ProcessDb::read_by_kind_key(&vm.spec.vm_key, &state.inner.pool).await?;
     let (total, _, _, running_instances) =
       utils::container::count_status(&processes);
     Ok(VmInspect {

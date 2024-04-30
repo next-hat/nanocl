@@ -16,7 +16,7 @@ impl ObjCreate for ResourceDb {
     obj: &Self::ObjCreateIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjCreateOut> {
-    if ResourceDb::transform_read_by_pk(&obj.name, &state.pool)
+    if ResourceDb::transform_read_by_pk(&obj.name, &state.inner.pool)
       .await
       .is_ok()
     {
@@ -25,8 +25,9 @@ impl ObjCreate for ResourceDb {
         &obj.name
       )));
     }
-    let obj = ResourceDb::hook_create(obj, &state.pool).await?;
-    let resource = ResourceDb::create_from_spec(&obj, &state.pool).await?;
+    let obj = ResourceDb::hook_create(obj, &state.inner.pool).await?;
+    let resource =
+      ResourceDb::create_from_spec(&obj, &state.inner.pool).await?;
     Ok(resource)
   }
 }
@@ -40,12 +41,17 @@ impl ObjDelByPk for ResourceDb {
     _opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let resource = ResourceDb::transform_read_by_pk(key, &state.pool).await?;
-    if let Err(err) = ResourceDb::hook_delete(&resource, &state.pool).await {
+    let resource =
+      ResourceDb::transform_read_by_pk(key, &state.inner.pool).await?;
+    if let Err(err) =
+      ResourceDb::hook_delete(&resource, &state.inner.pool).await
+    {
       log::warn!("{err}");
     }
-    ResourceDb::del_by_pk(&resource.spec.resource_key, &state.pool).await?;
-    SpecDb::del_by_kind_key(&resource.spec.resource_key, &state.pool).await?;
+    ResourceDb::del_by_pk(&resource.spec.resource_key, &state.inner.pool)
+      .await?;
+    SpecDb::del_by_kind_key(&resource.spec.resource_key, &state.inner.pool)
+      .await?;
     Ok(resource)
   }
 }
@@ -59,9 +65,10 @@ impl ObjPutByPk for ResourceDb {
     obj: &Self::ObjPutIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPutOut> {
-    ResourceDb::read_by_pk(pk, &state.pool).await?;
-    let resource = ResourceDb::hook_create(obj, &state.pool).await?;
-    let resource = ResourceDb::update_from_spec(&resource, &state.pool).await?;
+    ResourceDb::read_by_pk(pk, &state.inner.pool).await?;
+    let resource = ResourceDb::hook_create(obj, &state.inner.pool).await?;
+    let resource =
+      ResourceDb::update_from_spec(&resource, &state.inner.pool).await?;
     Ok(resource)
   }
 }

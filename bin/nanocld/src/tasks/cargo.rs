@@ -1,7 +1,14 @@
+use futures_util::StreamExt;
+use futures::stream::FuturesUnordered;
 use ntex::rt;
-use bollard_next::container::{RemoveContainerOptions, StopContainerOptions};
+use bollard_next::container::{
+  RemoveContainerOptions, RenameContainerOptions, StopContainerOptions,
+};
 
-use nanocl_error::io::IoError;
+use nanocl_error::{
+  io::IoError,
+  http::{HttpError, HttpResult},
+};
 use nanocl_stubs::{
   cargo_spec::ReplicationMode,
   process::ProcessKind,
@@ -23,9 +30,11 @@ impl ObjTaskStart for CargoDb {
     let key = key.to_owned();
     let state = state.clone();
     Box::pin(async move {
-      let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
+      let cargo =
+        CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
       let processes =
-        ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.pool).await?;
+        ProcessDb::read_by_kind_key(&cargo.spec.cargo_key, &state.inner.pool)
+          .await?;
       if processes.is_empty() {
         let number = match &cargo.spec.replication {
           Some(ReplicationMode::Static(replication)) => replication.number,
@@ -50,19 +59,23 @@ impl ObjTaskDelete for CargoDb {
     let state = state.clone();
     log::debug!("handling delete event for cargo {key}");
     Box::pin(async move {
-      let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
+      let processes =
+        ProcessDb::read_by_kind_key(&key, &state.inner.pool).await?;
       for process in processes {
         let _ = state
+          .inner
           .docker_api
           .stop_container(&process.key, None::<StopContainerOptions>)
           .await;
         let _ = state
+          .inner
           .docker_api
           .remove_container(&process.key, None::<RemoveContainerOptions>)
           .await;
       }
-      let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
-      CargoDb::clear_by_pk(&key, &state.pool).await?;
+      let cargo =
+        CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+      CargoDb::clear_by_pk(&key, &state.inner.pool).await?;
       state.emit_normal_native_action(&cargo, NativeEventAction::Destroy);
       Ok::<_, IoError>(())
     })
@@ -74,8 +87,31 @@ impl ObjTaskUpdate for CargoDb {
     let key = key.to_owned();
     let state = state.clone();
     Box::pin(async move {
-      let cargo = CargoDb::transform_read_by_pk(&key, &state.pool).await?;
-      let processes = ProcessDb::read_by_kind_key(&key, &state.pool).await?;
+      let cargo =
+        CargoDb::transform_read_by_pk(&key, &state.inner.pool).await?;
+      let processes =
+        ProcessDb::read_by_kind_key(&key, &state.inner.pool).await?;
+      // rename old instances to flag them for deletion
+      processes
+        .iter()
+        .map(|process| {
+          let docker_api = state.inner.docker_api.clone();
+          async move {
+            let new_name = format!("tmp-{}", process.name);
+            docker_api
+              .rename_container(
+                &process.key,
+                RenameContainerOptions { name: &new_name },
+              )
+              .await?;
+            Ok::<_, HttpError>(())
+          }
+        })
+        .collect::<FuturesUnordered<_>>()
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .collect::<HttpResult<Vec<_>>>()?;
       let number = match &cargo.spec.replication {
         Some(ReplicationMode::Static(replication)) => replication.number,
         _ => 1,
@@ -112,6 +148,30 @@ impl ObjTaskUpdate for CargoDb {
               &state_ptr_ptr,
             )
             .await;
+            let res = processes
+              .iter()
+              .map(|process| {
+                let docker_api = state_ptr_ptr.inner.docker_api.clone();
+                async move {
+                  docker_api
+                    .rename_container(
+                      &process.key,
+                      RenameContainerOptions {
+                        name: &process.name,
+                      },
+                    )
+                    .await?;
+                  Ok::<_, HttpError>(())
+                }
+              })
+              .collect::<FuturesUnordered<_>>()
+              .collect::<Vec<_>>()
+              .await
+              .into_iter()
+              .collect::<HttpResult<Vec<_>>>();
+            if let Err(err) = res {
+              log::error!("Unable to rename containers back: {err}");
+            }
           });
         }
         Ok(_) => {
@@ -127,7 +187,7 @@ impl ObjTaskUpdate for CargoDb {
       ObjPsStatusDb::update_actual_status(
         &key,
         &ObjPsStatusKind::Start,
-        &state.pool,
+        &state.inner.pool,
       )
       .await?;
       state.emit_normal_native_action(&cargo, NativeEventAction::Start);

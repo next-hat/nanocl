@@ -28,7 +28,7 @@ pub async fn list_resource_kind(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::new();
   let resource_kinds =
-    ResourceKindDb::transform_read_by(&filter, &state.pool).await?;
+    ResourceKindDb::transform_read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&resource_kinds))
 }
 
@@ -48,7 +48,8 @@ pub async fn create_resource_kind(
   _version: web::types::Path<String>,
   payload: web::types::Json<ResourceKindPartial>,
 ) -> HttpResult<web::HttpResponse> {
-  let item = ResourceKindDb::create_from_spec(&payload, &state.pool).await?;
+  let item =
+    ResourceKindDb::create_from_spec(&payload, &state.inner.pool).await?;
   Ok(web::HttpResponse::Created().json(&item))
 }
 
@@ -72,9 +73,9 @@ pub async fn delete_resource_kind(
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);
-  ResourceKindDb::read_by_pk(&key, &state.pool).await?;
-  ResourceKindDb::del_by_pk(&key, &state.pool).await?;
-  SpecDb::del_by_kind_key(&key, &state.pool).await?;
+  ResourceKindDb::read_by_pk(&key, &state.inner.pool).await?;
+  ResourceKindDb::del_by_pk(&key, &state.inner.pool).await?;
+  SpecDb::del_by_kind_key(&key, &state.inner.pool).await?;
   Ok(web::HttpResponse::Accepted().into())
 }
 
@@ -97,7 +98,7 @@ pub async fn inspect_resource_kind(
   path: web::types::Path<(String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key: String = format!("{}/{}", path.1, path.2);
-  let kind = ResourceKindDb::inspect_by_pk(&key, &state.pool).await?;
+  let kind = ResourceKindDb::inspect_by_pk(&key, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&kind))
 }
 
@@ -120,7 +121,8 @@ pub async fn inspect_resource_kind_version(
   path: web::types::Path<(String, String, String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let key = format!("{}/{}", path.1, path.2);
-  let kind_version = SpecDb::get_version(&key, &path.3, &state.pool).await?;
+  let kind_version =
+    SpecDb::get_version(&key, &path.3, &state.inner.pool).await?;
   let kind_version: ResourceKindVersion = kind_version.try_into()?;
   Ok(web::HttpResponse::Ok().json(&kind_version))
 }

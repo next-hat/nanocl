@@ -38,7 +38,7 @@ pub async fn list_secret(
 ) -> HttpResult<web::HttpResponse> {
   let filter = GenericFilter::try_from(query.into_inner())
     .map_err(|err| HttpError::bad_request(err.to_string()))?;
-  let items = SecretDb::transform_read_by(&filter, &state.pool).await?;
+  let items = SecretDb::transform_read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&items))
 }
 
@@ -60,7 +60,8 @@ pub async fn inspect_secret(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
-  let secret = SecretDb::transform_read_by_pk(&path.1, &state.pool).await?;
+  let secret =
+    SecretDb::transform_read_by_pk(&path.1, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&secret))
 }
 

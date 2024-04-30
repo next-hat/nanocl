@@ -21,7 +21,11 @@ pub async fn create_exec_command(
   state: &SystemState,
 ) -> HttpResult<CreateExecResults> {
   let name = format!("{name}.c");
-  let result = state.docker_api.create_exec(&name, args.to_owned()).await?;
+  let result = state
+    .inner
+    .docker_api
+    .create_exec(&name, args.to_owned())
+    .await?;
   Ok(result)
 }
 
@@ -32,6 +36,7 @@ pub async fn start_exec_command(
   state: &SystemState,
 ) -> HttpResult<web::HttpResponse> {
   let res = state
+    .inner
     .docker_api
     .start_exec(exec_id, Some(args.to_owned()))
     .await?;
@@ -53,6 +58,6 @@ pub async fn inspect_exec_command(
   exec_id: &str,
   state: &SystemState,
 ) -> HttpResult<ExecInspectResponse> {
-  let result = state.docker_api.inspect_exec(exec_id).await?;
+  let result = state.inner.docker_api.inspect_exec(exec_id).await?;
   Ok(result)
 }

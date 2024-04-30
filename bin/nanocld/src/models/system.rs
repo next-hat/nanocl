@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ntex::rt;
 use futures::channel::mpsc;
 
@@ -8,8 +10,7 @@ use super::{Pool, RawEventEmitter, TaskManager};
 /// This structure represent the state of the system.
 /// Used to share the state between the different handlers.
 /// It contains the database connection pool, the docker client, the config and the event emitter.
-#[derive(Clone)]
-pub struct SystemState {
+pub struct SystemStateInner {
   /// The database connection pool
   pub pool: Pool,
   /// The docker client
@@ -26,4 +27,9 @@ pub struct SystemState {
   pub(crate) event_emitter_raw: RawEventEmitter,
   /// task event loop
   pub(crate) arbiter: rt::Arbiter,
+}
+
+#[derive(Clone)]
+pub struct SystemState {
+  pub inner: Arc<SystemStateInner>,
 }

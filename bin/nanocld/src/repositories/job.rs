@@ -115,12 +115,13 @@ impl JobDb {
   /// List all jobs
   pub async fn list(state: &SystemState) -> HttpResult<Vec<JobSummary>> {
     let jobs =
-      JobDb::transform_read_by(&GenericFilter::default(), &state.pool).await?;
+      JobDb::transform_read_by(&GenericFilter::default(), &state.inner.pool)
+        .await?;
     let job_summaries = jobs
       .iter()
       .map(|job| async {
         let instances =
-          ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
+          ProcessDb::read_by_kind_key(&job.name, &state.inner.pool).await?;
         let (
           instance_total,
           instance_failed,

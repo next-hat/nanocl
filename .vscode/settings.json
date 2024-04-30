@@ -25,6 +25,7 @@
     "curr",
     "dialoguer",
     "dnsmasq",
+    "Domainname",
     "dotenv",
     "dotenvy",
     "errno",

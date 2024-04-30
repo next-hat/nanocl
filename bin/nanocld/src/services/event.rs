@@ -31,7 +31,7 @@ pub async fn list_event(
   let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
     HttpError::bad_request(format!("Invalid query string: {err}"))
   })?;
-  let events = EventDb::transform_read_by(&filter, &state.pool).await?;
+  let events = EventDb::transform_read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&events))
 }
 

@@ -55,7 +55,7 @@ async fn exec_docker(
   let action = action.as_str();
   let mut event = EventPartial {
     reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-    reporting_node: state.config.hostname.clone(),
+    reporting_node: state.inner.config.hostname.clone(),
     kind: EventKind::Normal,
     action: NativeEventAction::Destroy.to_string(),
     related: Some(EventActor {
@@ -78,7 +78,7 @@ async fn exec_docker(
   match action {
     "destroy" => {
       state.spawn_emit_event(event);
-      let _ = ProcessDb::del_by_pk(&id, &state.pool).await;
+      let _ = ProcessDb::del_by_pk(&id, &state.inner.pool).await;
       return Ok(());
     }
     "create" => {
@@ -92,6 +92,7 @@ async fn exec_docker(
   }
   state.spawn_emit_event(event);
   let instance = state
+    .inner
     .docker_api
     .inspect_container(&id, None::<InspectContainerOptions>)
     .await
@@ -101,9 +102,10 @@ async fn exec_docker(
   let new_instance = ProcessUpdateDb {
     updated_at: Some(chrono::Utc::now().naive_utc()),
     data: Some(data),
+    name: Some(name),
     ..Default::default()
   };
-  ProcessDb::update_pk(&id, new_instance, &state.pool).await?;
+  ProcessDb::update_pk(&id, new_instance, &state.inner.pool).await?;
   Ok(())
 }
 
@@ -114,7 +116,7 @@ pub fn analyze(state: &SystemState) {
     rt::spawn(async move {
       loop {
         let mut streams =
-          state.docker_api.events(None::<EventsOptions<String>>);
+          state.inner.docker_api.events(None::<EventsOptions<String>>);
         log::info!("event::analyze_docker: stream connected");
         while let Some(event) = streams.next().await {
           match event {

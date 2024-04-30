@@ -53,12 +53,12 @@ pub async fn get_version() -> web::HttpResponse {
 pub async fn get_info(
   state: web::types::State<SystemState>,
 ) -> HttpResult<web::HttpResponse> {
-  let docker = state.docker_api.info().await?;
-  let host_gateway = state.config.gateway.clone();
+  let docker = state.inner.docker_api.info().await?;
+  let host_gateway = state.inner.config.gateway.clone();
   let info = HostInfo {
     docker,
     host_gateway,
-    config: state.config.clone(),
+    config: state.inner.config.clone(),
   };
   Ok(web::HttpResponse::Ok().json(&info))
 }

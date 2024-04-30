@@ -1,2 +1,40 @@
 ApiVersion: v0.14
 
+Args:
+- Name: init
+  Kind: Boolean
+
+# {% if Args.init %}
+Jobs:
+- Name: init-db-cluster
+  Ttl: 4
+  Containers:
+  - Image: cockroachdb/cockroach:v23.1.15
+    HostConfig:
+      NetworkMode: global
+    Entrypoint:
+    - /bin/sh
+    Cmd:
+    - -c
+    - |
+      echo "initializing db cluster"
+      sleep 5
+      cockroach init --insecure --host=store.local:26257
+# {% endif %}
+
+Cargoes:
+- Name: db-replication
+  Replication:
+    Mode: Static
+    Number: 3
+  Container:
+    Hostname: store.local
+    Image: cockroachdb/cockroach:v23.1.15
+    Entrypoint:
+    - /bin/sh
+    Tty: true
+    Cmd:
+    - -c
+    - |
+      echo "starting cockroachdb"
+      cockroach start --join=store.local,1store.local,2store.local --advertise-addr=$(hostname -i) --listen-addr=:26257 --sql-addr=:26258 --insecure
