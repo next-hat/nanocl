@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ntex::rt;
-use futures::channel::mpsc;
+use futures::{channel::mpsc, join};
 use futures_util::{SinkExt, StreamExt};
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
@@ -54,17 +54,16 @@ impl SystemState {
     self.arbiter.clone().exec_fn(move || {
       rt::spawn(async move {
         while let Some(e) = rx.next().await {
-          if let Err(err) = self.event_emitter_raw.emit(&e).await {
+          let res = join!(
+            self.event_emitter_raw.emit(&e),
+            super::exec_event(&e, &self)
+          );
+          if let Err(err) = res.0 {
             log::error!("system::run: raw emit {err}");
           }
-          let this = self.clone();
-          self.arbiter.exec_fn(move || {
-            rt::spawn(async move {
-              if let Err(err) = super::exec_event(&e, &this).await {
-                log::error!("system::run: exec event {err}");
-              }
-            });
-          });
+          if let Err(err) = res.1 {
+            log::error!("system::run: exec event {err}");
+          }
         }
         Ok::<(), IoError>(())
       });
