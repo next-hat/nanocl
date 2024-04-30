@@ -58,11 +58,11 @@ impl NodeDb {
 
   pub async fn register(state: &SystemState) -> IoResult<()> {
     let node = NodeDb {
-      name: state.config.hostname.clone(),
-      ip_address: state.config.gateway.clone(),
+      name: state.inner.config.hostname.clone(),
+      ip_address: state.inner.config.gateway.clone(),
       created_at: chrono::Utc::now().naive_utc(),
     };
-    NodeDb::create_if_not_exists(&node, &state.pool).await?;
+    NodeDb::create_if_not_exists(&node, &state.inner.pool).await?;
     Ok(())
   }
 }

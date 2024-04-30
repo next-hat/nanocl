@@ -52,14 +52,15 @@ impl NamespaceDb {
     filter: &GenericFilter,
     state: &SystemState,
   ) -> HttpResult<Vec<NamespaceSummary>> {
-    let items = NamespaceDb::read_by(filter, &state.pool).await?;
+    let items = NamespaceDb::read_by(filter, &state.inner.pool).await?;
     let mut new_items = Vec::new();
     for item in items {
       let cargo_count =
-        CargoDb::count_by_namespace(&item.name, &state.pool).await?;
+        CargoDb::count_by_namespace(&item.name, &state.inner.pool).await?;
       let processes =
-        ProcessDb::list_by_namespace(&item.name, &state.pool).await?;
+        ProcessDb::list_by_namespace(&item.name, &state.inner.pool).await?;
       let network = state
+        .inner
         .docker_api
         .inspect_network(&item.name, None::<InspectNetworkOptions<String>>)
         .await?;

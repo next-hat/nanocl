@@ -16,7 +16,7 @@ impl ObjCreate for SecretDb {
     obj: &Self::ObjCreateIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjCreateOut> {
-    let secret = SecretDb::create_from(obj, &state.pool).await?;
+    let secret = SecretDb::create_from(obj, &state.inner.pool).await?;
     let secret: Secret = secret.try_into()?;
     Ok(secret)
   }
@@ -31,8 +31,8 @@ impl ObjDelByPk for SecretDb {
     _opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let secret = SecretDb::transform_read_by_pk(pk, &state.pool).await?;
-    SecretDb::del_by_pk(pk, &state.pool).await?;
+    let secret = SecretDb::transform_read_by_pk(pk, &state.inner.pool).await?;
+    SecretDb::del_by_pk(pk, &state.inner.pool).await?;
     Ok(secret)
   }
 }
@@ -46,7 +46,7 @@ impl ObjPatchByPk for SecretDb {
     obj: &Self::ObjPatchIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjPatchOut> {
-    let secret = SecretDb::update_pk(pk, obj, &state.pool)
+    let secret = SecretDb::update_pk(pk, obj, &state.inner.pool)
       .await?
       .try_into()?;
     Ok(secret)

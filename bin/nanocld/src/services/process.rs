@@ -44,7 +44,8 @@ pub async fn list_processes(
   let filter = GenericFilter::try_from(qs.into_inner()).map_err(|err| {
     HttpError::bad_request(format!("Invalid query string: {err}"))
   })?;
-  let processes = ProcessDb::transform_read_by(&filter, &state.pool).await?;
+  let processes =
+    ProcessDb::transform_read_by(&filter, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&processes))
 }
 
@@ -76,7 +77,8 @@ async fn logs_processes(
   let (_, kind, name) = path.into_inner();
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
-  let processes = ProcessDb::read_by_kind_key(&kind_key, &state.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(&kind_key, &state.inner.pool).await?;
   log::debug!("process::logs_process: {kind_key}");
   let options: LogsOptions<String> = qs.into_inner().into();
   let futures = processes
@@ -86,6 +88,7 @@ async fn logs_processes(
     .into_iter()
     .map(|process| {
       state
+        .inner
         .docker_api
         .logs(
           &process.data.id.unwrap_or_default(),
@@ -143,6 +146,7 @@ async fn logs_process(
   log::debug!("process::logs_process: {name}");
   let options: LogsOptions<String> = qs.into_inner().into();
   let stream = state
+    .inner
     .docker_api
     .logs(
       &name,
@@ -189,8 +193,9 @@ pub async fn start_process_by_pk(
   path: web::types::Path<(String, String)>,
 ) -> HttpResult<web::HttpResponse> {
   let (_, pk) = path.into_inner();
-  let process = ProcessDb::read_by_pk(&pk, &state.pool).await?;
+  let process = ProcessDb::read_by_pk(&pk, &state.inner.pool).await?;
   state
+    .inner
     .docker_api
     .start_container(&process.key, None::<StartContainerOptions<String>>)
     .await?;
@@ -332,12 +337,16 @@ pub async fn wait_processes(
   let opts = WaitContainerOptions {
     condition: qs.condition.clone().unwrap_or_default(),
   };
-  let processes = ProcessDb::read_by_kind_key(&kind_pk, &state.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(&kind_pk, &state.inner.pool).await?;
   let mut streams = Vec::new();
   for process in processes {
     let options = Some(opts.clone());
-    let stream = state.docker_api.wait_container(&process.key, options).map(
-      move |wait_result| match wait_result {
+    let stream = state
+      .inner
+      .docker_api
+      .wait_container(&process.key, options)
+      .map(move |wait_result| match wait_result {
         Err(err) => {
           if let bollard_next::errors::Error::DockerContainerWaitError {
             error,
@@ -360,8 +369,7 @@ pub async fn wait_processes(
             process.name.clone(),
           ))
         }
-      },
-    );
+      });
     streams.push(stream);
   }
   let stream = select_all(streams).into_stream();
@@ -402,22 +410,23 @@ pub async fn stats_processes(
   let kind = kind.parse().map_err(HttpError::bad_request)?;
   let kind_key = utils::key::gen_kind_key(&kind, &name, &qs.namespace);
   let opts: StatsOptions = qs.clone().into();
-  let processes = ProcessDb::read_by_kind_key(&kind_key, &state.pool).await?;
-  let streams = processes
-    .into_iter()
-    .map(|process| {
-      state
-        .docker_api
-        .stats(&process.key, Some(opts))
-        .map(move |elem| match elem {
-          Err(err) => Err(err),
-          Ok(stats) => Ok(ProcessStats {
-            name: process.name.clone(),
-            stats,
-          }),
-        })
-    })
-    .collect::<Vec<_>>();
+  let processes =
+    ProcessDb::read_by_kind_key(&kind_key, &state.inner.pool).await?;
+  let streams =
+    processes
+      .into_iter()
+      .map(|process| {
+        state.inner.docker_api.stats(&process.key, Some(opts)).map(
+          move |elem| match elem {
+            Err(err) => Err(err),
+            Ok(stats) => Ok(ProcessStats {
+              name: process.name.clone(),
+              stats,
+            }),
+          },
+        )
+      })
+      .collect::<Vec<_>>();
   let stream = select_all(streams).into_stream();
   Ok(
     web::HttpResponse::Ok()

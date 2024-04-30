@@ -67,8 +67,12 @@ pub fn spawn(state: &SystemState) {
             while let Some(res) = stream.next().await {
               match res {
                 Ok(ev) => {
-                  if let Err(err) =
-                    save_metric(&state.config.hostname, &ev, &state.pool).await
+                  if let Err(err) = save_metric(
+                    &state.inner.config.hostname,
+                    &ev,
+                    &state.inner.pool,
+                  )
+                  .await
                   {
                     log::warn!("metrics::spawn_logger: {err}");
                   }

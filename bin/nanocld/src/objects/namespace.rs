@@ -18,7 +18,7 @@ impl ObjCreate for NamespaceDb {
     obj: &Self::ObjCreateIn,
     state: &SystemState,
   ) -> HttpResult<Self::ObjCreateOut> {
-    if NamespaceDb::read_by_pk(&obj.name, &state.pool)
+    if NamespaceDb::read_by_pk(&obj.name, &state.inner.pool)
       .await
       .is_ok()
     {
@@ -28,12 +28,13 @@ impl ObjCreate for NamespaceDb {
       )));
     }
     if state
+      .inner
       .docker_api
       .inspect_network(&obj.name, None::<InspectNetworkOptions<String>>)
       .await
       .is_ok()
     {
-      let item = NamespaceDb::create_from(obj, &state.pool).await?;
+      let item = NamespaceDb::create_from(obj, &state.inner.pool).await?;
       return Ok(item.into());
     }
     let config = CreateNetworkOptions {
@@ -41,8 +42,10 @@ impl ObjCreate for NamespaceDb {
       driver: String::from("bridge"),
       ..Default::default()
     };
-    state.docker_api.create_network(config).await?;
-    let item = NamespaceDb::create_from(obj, &state.pool).await?.into();
+    state.inner.docker_api.create_network(config).await?;
+    let item = NamespaceDb::create_from(obj, &state.inner.pool)
+      .await?
+      .into();
     Ok(item)
   }
 }
@@ -54,9 +57,9 @@ impl ObjInspectByPk for NamespaceDb {
     pk: &str,
     state: &SystemState,
   ) -> HttpResult<Self::ObjInspectOut> {
-    let namespace = NamespaceDb::read_by_pk(pk, &state.pool).await?;
+    let namespace = NamespaceDb::read_by_pk(pk, &state.inner.pool).await?;
     let models =
-      CargoDb::read_by_namespace(&namespace.name, &state.pool).await?;
+      CargoDb::read_by_namespace(&namespace.name, &state.inner.pool).await?;
     let mut cargoes = Vec::new();
     for cargo in models {
       let cargo =
@@ -64,6 +67,7 @@ impl ObjInspectByPk for NamespaceDb {
       cargoes.push(cargo);
     }
     let network = state
+      .inner
       .docker_api
       .inspect_network(pk, None::<InspectNetworkOptions<String>>)
       .await?;
@@ -84,10 +88,10 @@ impl ObjDelByPk for NamespaceDb {
     _opts: &Self::ObjDelOpts,
     state: &SystemState,
   ) -> HttpResult<Self::ObjDelOut> {
-    let item = NamespaceDb::read_by_pk(pk, &state.pool).await?;
+    let item = NamespaceDb::read_by_pk(pk, &state.inner.pool).await?;
     CargoDb::delete_by_namespace(pk, state).await?;
-    NamespaceDb::del_by_pk(pk, &state.pool).await?;
-    if let Err(err) = state.docker_api.remove_network(pk).await {
+    NamespaceDb::del_by_pk(pk, &state.inner.pool).await?;
+    if let Err(err) = state.inner.docker_api.remove_network(pk).await {
       log::error!("Unable to remove network {} got error: {}", pk, err);
     }
     Ok(item.into())

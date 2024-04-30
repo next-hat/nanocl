@@ -9,6 +9,7 @@ use crate::{vars, models::SystemState};
 /// Format the cron job command to start a job at a given time
 fn format_cron_job_command(job: &Job, state: &SystemState) -> String {
   let host = state
+    .inner
     .config
     .hosts
     .first()

@@ -24,7 +24,7 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
     Some(job_id) => job_id.as_str().unwrap_or_default(),
   };
   log::debug!("event::job_ttl: {job_id}");
-  let job = JobDb::transform_read_by_pk(job_id, &state.pool).await?;
+  let job = JobDb::transform_read_by_pk(job_id, &state.inner.pool).await?;
   match job.status.actual {
     ObjPsStatusKind::Finish | ObjPsStatusKind::Fail => {
       log::debug!("event::job_ttl: {job_id} is already done");
@@ -32,7 +32,8 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
     }
     _ => {}
   }
-  let instances = ProcessDb::read_by_kind_key(&job.name, &state.pool).await?;
+  let instances =
+    ProcessDb::read_by_kind_key(&job.name, &state.inner.pool).await?;
   let (_, instance_failed, _, running) =
     utils::container::count_status(&instances);
   log::debug!(
@@ -46,7 +47,7 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
     ObjPsStatusDb::update_actual_status(
       &job.name,
       &ObjPsStatusKind::Fail,
-      &state.pool,
+      &state.inner.pool,
     )
     .await?;
     state.emit_normal_native_action(&job, NativeEventAction::Fail);
@@ -54,7 +55,7 @@ async fn job_ttl(actor: &EventActor, state: &SystemState) -> IoResult<()> {
     ObjPsStatusDb::update_actual_status(
       &job.name,
       &ObjPsStatusKind::Finish,
-      &state.pool,
+      &state.inner.pool,
     )
     .await?;
     state.emit_normal_native_action(&job, NativeEventAction::Finish);
@@ -183,7 +184,7 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   // If a task is already running for this object, we wait for it to finish
   // This is to avoid data races conditions when manipulating an object
   let task_key = format!("{}@{key}", &actor.kind);
-  state.task_manager.wait_task(&task_key).await;
+  state.inner.task_manager.wait_task(&task_key).await;
   let action = NativeEventAction::from_str(e.action.as_str())?;
   let task: Option<ObjTaskFuture> = match action {
     NativeEventAction::Starting => start(&key, actor, state),
@@ -201,6 +202,7 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   let state_ptr = state.clone();
   let actor = actor.clone();
   state
+    .inner
     .task_manager
     .add_task(&task_key, action.clone(), task, move |err| {
       let action = match action {

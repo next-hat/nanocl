@@ -33,7 +33,7 @@ pub async fn gen(
       .configure(services::ntex_config)
       .default_service(web::route().to(services::unhandled))
   });
-  let config = daemon_state.config.clone();
+  let config = daemon_state.inner.config.clone();
   let mut count = 0;
   let hosts = config.hosts.clone();
   let len = hosts.len();

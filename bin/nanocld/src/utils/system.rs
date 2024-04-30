@@ -37,7 +37,8 @@ pub async fn sync_process(
   log::trace!("system::sync_process: {name}");
   let container_instance_data = serde_json::to_value(instance)
     .map_err(|err| err.map_err_context(|| "Process"))?;
-  let current_res = ProcessDb::transform_read_by_pk(&id, &state.pool).await;
+  let current_res =
+    ProcessDb::transform_read_by_pk(&id, &state.inner.pool).await;
   match current_res {
     Ok(current_instance) => {
       if current_instance.data == *instance {
@@ -50,8 +51,12 @@ pub async fn sync_process(
         data: Some(container_instance_data),
         ..Default::default()
       };
-      ProcessDb::update_pk(&current_instance.key, new_instance, &state.pool)
-        .await?;
+      ProcessDb::update_pk(
+        &current_instance.key,
+        new_instance,
+        &state.inner.pool,
+      )
+      .await?;
       log::info!("system::sync_process: {name} updated");
     }
     Err(_) => {
@@ -60,7 +65,7 @@ pub async fn sync_process(
         name: name.clone(),
         kind: kind.to_owned().try_into()?,
         data: container_instance_data.clone(),
-        node_key: state.config.hostname.clone(),
+        node_key: state.inner.config.hostname.clone(),
         kind_key: key.to_owned(),
         created_at: Some(
           chrono::NaiveDateTime::parse_from_str(
@@ -72,7 +77,7 @@ pub async fn sync_process(
           })?,
         ),
       };
-      ProcessDb::create_from(&new_instance, &state.pool).await?;
+      ProcessDb::create_from(&new_instance, &state.inner.pool).await?;
       log::info!("system::sync_process: {name} created");
     }
   }
@@ -89,7 +94,10 @@ pub async fn register_namespace(
   create_network: bool,
   state: &SystemState,
 ) -> IoResult<()> {
-  if NamespaceDb::read_by_pk(name, &state.pool).await.is_ok() {
+  if NamespaceDb::read_by_pk(name, &state.inner.pool)
+    .await
+    .is_ok()
+  {
     return Ok(());
   }
   let new_nsp = NamespacePartial {
@@ -98,7 +106,7 @@ pub async fn register_namespace(
   if create_network {
     NamespaceDb::create_obj(&new_nsp, state).await?;
   } else {
-    NamespaceDb::create_from(&new_nsp, &state.pool).await?;
+    NamespaceDb::create_from(&new_nsp, &state.inner.pool).await?;
   }
   Ok(())
 }
@@ -112,6 +120,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
     ..Default::default()
   });
   let containers = state
+    .inner
     .docker_api
     .list_containers(options)
     .await
@@ -134,6 +143,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
     };
     let id = container_summary.id.unwrap_or_default();
     let container = state
+      .inner
       .docker_api
       .inspect_container(&id, None::<InspectContainerOptions>)
       .await
@@ -159,7 +169,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
         ..Default::default()
       };
       cargo_inspected.insert(key.to_owned(), true);
-      match CargoDb::transform_read_by_pk(key, &state.pool).await {
+      match CargoDb::transform_read_by_pk(key, &state.inner.pool).await {
         // unless we create his config
         Err(_err) => {
           if let Err(err) = register_namespace(namespace, false, state).await {
@@ -188,7 +198,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
             key,
             &new_cargo,
             &format!("v{}", vars::VERSION),
-            &state.pool,
+            &state.inner.pool,
           )
           .await?;
         }
@@ -201,8 +211,11 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
       "key",
       GenericClause::NotIn(ids.iter().map(|id| id.to_owned()).collect()),
     )
-    .r#where("node_key", GenericClause::Eq(state.config.hostname.clone()));
-  ProcessDb::del_by(&filter, &state.pool).await?;
+    .r#where(
+      "node_key",
+      GenericClause::Eq(state.inner.config.hostname.clone()),
+    );
+  ProcessDb::del_by(&filter, &state.inner.pool).await?;
   log::info!("system::sync_processes: done");
   Ok(())
 }
@@ -212,7 +225,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
 pub async fn sync_vm_images(state: &SystemState) -> IoResult<()> {
   log::info!("system::sync_vm_images: start");
   let files =
-    std::fs::read_dir(format!("{}/vms/images", &state.config.state_dir))?;
+    std::fs::read_dir(format!("{}/vms/images", &state.inner.config.state_dir))?;
   for file in files {
     let file = file?;
     let file_name = file.file_name();
@@ -225,10 +238,14 @@ pub async fn sync_vm_images(state: &SystemState) -> IoResult<()> {
     };
     let file_path = file.path();
     let path = file_path.to_str().unwrap_or_default();
-    if VmImageDb::read_by_pk(&name, &state.pool).await.is_ok() {
+    if VmImageDb::read_by_pk(&name, &state.inner.pool)
+      .await
+      .is_ok()
+    {
       continue;
     }
-    if let Err(error) = utils::vm_image::create(&name, path, &state.pool).await
+    if let Err(error) =
+      utils::vm_image::create(&name, path, &state.inner.pool).await
     {
       log::warn!("system::sync_vm_images: {error}")
     }

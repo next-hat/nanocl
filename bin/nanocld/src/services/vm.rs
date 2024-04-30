@@ -47,7 +47,7 @@ pub async fn list_vm(
   qs: web::types::Query<GenericNspQuery>,
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
-  let vms = VmDb::list_by_namespace(&namespace, &state.pool).await?;
+  let vms = VmDb::list_by_namespace(&namespace, &state.inner.pool).await?;
   Ok(web::HttpResponse::Ok().json(&vms))
 }
 
@@ -154,7 +154,7 @@ pub async fn list_vm_history(
 ) -> HttpResult<web::HttpResponse> {
   let namespace = utils::key::resolve_nsp(&qs.namespace);
   let key = utils::key::gen_key(&namespace, &path.1);
-  let histories = SpecDb::read_by_kind_key(&key, &state.pool)
+  let histories = SpecDb::read_by_kind_key(&key, &state.inner.pool)
     .await?
     .into_iter()
     .map(|i| i.try_to_vm_spec())
@@ -207,6 +207,7 @@ async fn ws_attach_service(
   rt::spawn(utils::ws::heartbeat(con_state.clone(), sink.clone(), rx));
   let (scmd, mut rcmd) = mpsc::channel::<Result<Bytes, web::Error>>();
   let stream = state
+    .inner
     .docker_api
     .attach_container(
       &format!("{key}.v"),

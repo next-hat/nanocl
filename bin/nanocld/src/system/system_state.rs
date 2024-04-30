@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ntex::rt;
-use futures::{channel::mpsc, join};
+use futures::channel::mpsc;
 use futures_util::{SinkExt, StreamExt};
 
 use nanocl_error::io::{FromIo, IoError, IoResult};
@@ -18,7 +18,8 @@ use crate::{
   vars, utils,
   repositories::generic::*,
   models::{
-    EventDb, RawEventReceiver, RawEventEmitter, SystemState, TaskManager,
+    EventDb, RawEventEmitter, RawEventReceiver, SystemState, SystemStateInner,
+    TaskManager,
   },
 };
 
@@ -36,14 +37,16 @@ impl SystemState {
     let pool = utils::store::init(conf).await?;
     let (sx, rx) = mpsc::unbounded();
     let system_state = SystemState {
-      pool: Arc::clone(&pool),
-      docker_api: docker.clone(),
-      config: conf.to_owned(),
-      event_emitter: sx,
-      event_emitter_raw: RawEventEmitter::new(),
-      task_manager: TaskManager::new(),
-      version: vars::VERSION.to_owned(),
-      arbiter: rt::Arbiter::new(),
+      inner: Arc::new(SystemStateInner {
+        pool: Arc::clone(&pool),
+        docker_api: docker.clone(),
+        config: conf.to_owned(),
+        event_emitter: sx,
+        event_emitter_raw: RawEventEmitter::new(),
+        task_manager: TaskManager::new(),
+        version: vars::VERSION.to_owned(),
+        arbiter: rt::Arbiter::new(),
+      }),
     };
     system_state.clone().run(rx);
     Ok(system_state)
@@ -51,17 +54,13 @@ impl SystemState {
 
   /// Start the system event loop
   fn run(self, mut rx: mpsc::UnboundedReceiver<Event>) {
-    self.arbiter.clone().exec_fn(move || {
+    self.inner.arbiter.clone().exec_fn(move || {
       rt::spawn(async move {
         while let Some(e) = rx.next().await {
-          let res = join!(
-            self.event_emitter_raw.emit(&e),
-            super::exec_event(&e, &self)
-          );
-          if let Err(err) = res.0 {
+          if let Err(err) = self.inner.event_emitter_raw.emit(&e).await {
             log::error!("system::run: raw emit {err}");
           }
-          if let Err(err) = res.1 {
+          if let Err(err) = super::exec_event(&e, &self).await {
             log::error!("system::run: exec event {err}");
           }
         }
@@ -72,12 +71,18 @@ impl SystemState {
 
   /// Emit an event to the system event loop
   pub async fn emit_event(&self, new_ev: EventPartial) -> IoResult<()> {
-    let ev: Event = EventDb::create_try_from(new_ev, &self.pool)
+    let ev: Event = EventDb::create_try_from(new_ev, &self.inner.pool)
       .await?
       .try_into()?;
-    self.event_emitter.clone().send(ev).await.map_err(|err| {
-      IoError::interrupted("Event Emitter", err.to_string().as_str())
-    })?;
+    self
+      .inner
+      .event_emitter
+      .clone()
+      .send(ev)
+      .await
+      .map_err(|err| {
+        IoError::interrupted("Event Emitter", err.to_string().as_str())
+      })?;
     Ok(())
   }
 
@@ -96,7 +101,7 @@ impl SystemState {
     &self,
     condition: Option<Vec<EventCondition>>,
   ) -> IoResult<RawEventReceiver> {
-    self.event_emitter_raw.subscribe(condition).await
+    self.inner.event_emitter_raw.subscribe(condition).await
   }
 
   /// Emit a Error event action
@@ -111,7 +116,7 @@ impl SystemState {
     let actor = actor.clone().into();
     let event = EventPartial {
       reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-      reporting_node: self.config.hostname.clone(),
+      reporting_node: self.inner.config.hostname.clone(),
       kind: EventKind::Error,
       action: action.to_string(),
       related: None,
@@ -141,7 +146,7 @@ impl SystemState {
     let actor = actor.clone().into();
     let event = EventPartial {
       reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-      reporting_node: self.config.hostname.clone(),
+      reporting_node: self.inner.config.hostname.clone(),
       kind: EventKind::Normal,
       action: action.to_string(),
       related: None,
@@ -159,7 +164,7 @@ impl SystemState {
 
   /// Wait for the event loop to finish
   pub async fn wait_event_loop(&self) {
-    self.event_emitter.clone().flush().await.unwrap();
-    self.arbiter.clone().join().unwrap();
+    self.inner.event_emitter.clone().flush().await.unwrap();
+    self.inner.arbiter.clone().join().unwrap();
   }
 }

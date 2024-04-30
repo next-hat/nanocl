@@ -63,7 +63,7 @@ where
   match policy {
     ImagePullPolicy::Always => {}
     ImagePullPolicy::IfNotPresent => {
-      if state.docker_api.inspect_image(image).await.is_ok() {
+      if state.inner.docker_api.inspect_image(image).await.is_ok() {
         return Ok(());
       }
     }
@@ -73,7 +73,7 @@ where
   }
   let credentials = match secret {
     Some(secret) => {
-      let secret = SecretDb::read_by_pk(&secret, &state.pool).await?;
+      let secret = SecretDb::read_by_pk(&secret, &state.inner.pool).await?;
       serde_json::from_value::<DockerCredentials>(secret.data)
         .map(Some)
         .map_err(|err| HttpError::bad_request(err.to_string()))?
@@ -81,7 +81,7 @@ where
     None => None,
   };
   let (name, tag) = parse_img_name(image)?;
-  let mut stream = state.docker_api.create_image(
+  let mut stream = state.inner.docker_api.create_image(
     Some(bollard_next::image::CreateImageOptions {
       from_image: name.clone(),
       tag: tag.clone(),
@@ -95,7 +95,7 @@ where
       Err(err) => {
         let event = EventPartial {
           reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-          reporting_node: state.config.hostname.clone(),
+          reporting_node: state.inner.config.hostname.clone(),
           action: NativeEventAction::Downloading.to_string(),
           reason: "state_sync".to_owned(),
           kind: EventKind::Error,
@@ -115,7 +115,7 @@ where
     };
     let event = EventPartial {
       reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-      reporting_node: state.config.hostname.clone(),
+      reporting_node: state.inner.config.hostname.clone(),
       action: NativeEventAction::Downloading.to_string(),
       reason: "state_sync".to_owned(),
       kind: EventKind::Normal,
@@ -134,7 +134,7 @@ where
   }
   let event = EventPartial {
     reporting_controller: vars::CONTROLLER_NAME.to_owned(),
-    reporting_node: state.config.hostname.clone(),
+    reporting_node: state.inner.config.hostname.clone(),
     action: NativeEventAction::Download.to_string(),
     reason: "state_sync".to_owned(),
     kind: EventKind::Normal,
@@ -161,11 +161,12 @@ async fn _emit(
 ) -> HttpResult<()> {
   match kind {
     ProcessKind::Vm => {
-      let vm = VmDb::transform_read_by_pk(kind_key, &state.pool).await?;
+      let vm = VmDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
       state.emit_normal_native_action(&vm, action);
     }
     ProcessKind::Cargo => {
-      let cargo = CargoDb::transform_read_by_pk(kind_key, &state.pool).await?;
+      let cargo =
+        CargoDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
       state.emit_normal_native_action(&cargo, action);
     }
     ProcessKind::Job => {
@@ -174,10 +175,11 @@ async fn _emit(
         JobUpdateDb {
           updated_at: Some(chrono::Utc::now().naive_utc()),
         },
-        &state.pool,
+        &state.inner.pool,
       )
       .await?;
-      let job = JobDb::transform_read_by_pk(kind_key, &state.pool).await?;
+      let job =
+        JobDb::transform_read_by_pk(kind_key, &state.inner.pool).await?;
       state.emit_normal_native_action(&job, action);
     }
   }
@@ -198,6 +200,7 @@ pub async fn create_instance(
   labels.insert("io.nanocl.kind".to_owned(), kind.to_string());
   config.labels = Some(labels);
   let res = state
+    .inner
     .docker_api
     .create_container(
       Some(CreateContainerOptions {
@@ -208,6 +211,7 @@ pub async fn create_instance(
     )
     .await?;
   let inspect = state
+    .inner
     .docker_api
     .inspect_container(&res.id, None::<InspectContainerOptions>)
     .await?;
@@ -218,7 +222,7 @@ pub async fn create_instance(
     kind: kind.clone(),
     data: serde_json::to_value(&inspect)
       .map_err(|err| err.map_err_context(|| "CreateProcess"))?,
-    node_key: state.config.hostname.clone(),
+    node_key: state.inner.config.hostname.clone(),
     kind_key: kind_key.to_owned(),
     created_at: Some(
       chrono::NaiveDateTime::parse_from_str(
@@ -230,7 +234,8 @@ pub async fn create_instance(
       })?,
     ),
   };
-  let process = ProcessDb::create_from(&new_instance, &state.pool).await?;
+  let process =
+    ProcessDb::create_from(&new_instance, &state.inner.pool).await?;
   Process::try_from(process).map_err(HttpError::from)
 }
 
@@ -281,13 +286,14 @@ async fn execute_cargo_before(
       )
       .await?;
       state
+        .inner
         .docker_api
         .start_container(&name, None::<StartContainerOptions<String>>)
         .await?;
       let options = Some(WaitContainerOptions {
         condition: "not-running",
       });
-      let mut stream = state.docker_api.wait_container(&name, options);
+      let mut stream = state.inner.docker_api.wait_container(&name, options);
       while let Some(wait_status) = stream.next().await {
         log::trace!("init_container: wait {wait_status:?}");
         match wait_status {
@@ -338,7 +344,7 @@ pub async fn create_cargo(
     let filter = GenericFilter::new()
       .r#where("key", GenericClause::In(secrets.clone()))
       .r#where("kind", GenericClause::Eq("nanocl.io/env".to_owned()));
-    let secrets = SecretDb::transform_read_by(&filter, &state.pool)
+    let secrets = SecretDb::transform_read_by(&filter, &state.inner.pool)
       .await?
       .into_iter()
       .map(|secret| {
@@ -393,8 +399,8 @@ pub async fn create_cargo(
         let mut env = container.env.unwrap_or_default();
         // merge cargo env with secret env
         env.extend(secret_envs);
-        env.push(format!("NANOCL_NODE={}", state.config.hostname));
-        env.push(format!("NANOCL_NODE_ADDR={}", state.config.gateway));
+        env.push(format!("NANOCL_NODE={}", state.inner.config.hostname));
+        env.push(format!("NANOCL_NODE_ADDR={}", state.inner.config.gateway));
         env.push(format!("NANOCL_CARGO_KEY={}", cargo.spec.cargo_key.to_owned()));
         env.push(format!("NANOCL_CARGO_NAMESPACE={}", cargo.namespace_name));
         env.push(format!("NANOCL_CARGO_INSTANCE={}", current));
@@ -444,7 +450,7 @@ pub async fn delete_instance(
   opts: Option<RemoveContainerOptions>,
   state: &SystemState,
 ) -> HttpResult<()> {
-  match state.docker_api.remove_container(pk, opts).await {
+  match state.inner.docker_api.remove_container(pk, opts).await {
     Ok(_) => {}
     Err(err) => match &err {
       bollard_next::errors::Error::DockerResponseServerError {
@@ -460,7 +466,7 @@ pub async fn delete_instance(
       }
     },
   };
-  ProcessDb::del_by_pk(pk, &state.pool).await?;
+  ProcessDb::del_by_pk(pk, &state.inner.pool).await?;
   Ok(())
 }
 
@@ -496,9 +502,10 @@ pub async fn kill_by_kind_key(
   opts: &CargoKillOptions,
   state: &SystemState,
 ) -> HttpResult<()> {
-  let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
   for process in processes {
     state
+      .inner
       .docker_api
       .kill_container(&process.key, Some(opts.clone().into()))
       .await?;
@@ -514,9 +521,10 @@ pub async fn restart_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> HttpResult<()> {
-  let processes = ProcessDb::read_by_kind_key(pk, &state.pool).await?;
+  let processes = ProcessDb::read_by_kind_key(pk, &state.inner.pool).await?;
   for process in processes {
     state
+      .inner
       .docker_api
       .restart_container(&process.key, None)
       .await?;
@@ -533,12 +541,13 @@ pub async fn stop_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> HttpResult<()> {
-  let status = ObjPsStatusDb::read_by_pk(kind_pk, &state.pool).await?;
+  let status = ObjPsStatusDb::read_by_pk(kind_pk, &state.inner.pool).await?;
   // If the process is already stopped, return
   if status.actual == ObjPsStatusKind::Stop.to_string() {
     return Ok(());
   }
-  let processes = ProcessDb::read_by_kind_key(kind_pk, &state.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(kind_pk, &state.inner.pool).await?;
   log::debug!("stop_process_by_kind_pk: {kind_pk}");
   for process in processes {
     let process_state = process.data.state.unwrap_or_default();
@@ -546,6 +555,7 @@ pub async fn stop_instances(
       return Ok(());
     }
     state
+      .inner
       .docker_api
       .stop_container(
         &process.data.id.unwrap_or_default(),
@@ -556,7 +566,7 @@ pub async fn stop_instances(
   ObjPsStatusDb::update_actual_status(
     kind_pk,
     &ObjPsStatusKind::Stop,
-    &state.pool,
+    &state.inner.pool,
   )
   .await?;
   _emit(kind_pk, kind, NativeEventAction::Stop, state).await?;
@@ -571,18 +581,20 @@ pub async fn start_instances(
   kind: &ProcessKind,
   state: &SystemState,
 ) -> HttpResult<()> {
-  let status = ObjPsStatusDb::read_by_pk(kind_key, &state.pool).await?;
+  let status = ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
   // If the process is already running, return
   if status.actual == ObjPsStatusKind::Start.to_string() {
     return Ok(());
   }
-  let processes = ProcessDb::read_by_kind_key(kind_key, &state.pool).await?;
+  let processes =
+    ProcessDb::read_by_kind_key(kind_key, &state.inner.pool).await?;
   for process in processes {
     let process_state = process.data.state.unwrap_or_default();
     if process_state.running.unwrap_or_default() {
       continue;
     }
     state
+      .inner
       .docker_api
       .start_container(
         &process.data.id.unwrap_or_default(),
@@ -593,7 +605,7 @@ pub async fn start_instances(
   ObjPsStatusDb::update_actual_status(
     kind_key,
     &ObjPsStatusKind::Start,
-    &state.pool,
+    &state.inner.pool,
   )
   .await?;
   _emit(kind_key, kind, NativeEventAction::Start, state).await?;
@@ -646,7 +658,7 @@ pub async fn create_vm_instance(
   state: &SystemState,
 ) -> HttpResult<Process> {
   let mut labels: HashMap<String, String> = HashMap::new();
-  let img_path = format!("{}/vms/images", state.config.state_dir);
+  let img_path = format!("{}/vms/images", state.inner.config.state_dir);
   labels.insert("io.nanocl.v".to_owned(), vm.spec.vm_key.clone());
   labels.insert("io.nanocl.n".to_owned(), vm.namespace_name.clone());
   let mut args: Vec<String> =
@@ -793,7 +805,8 @@ pub async fn emit_starting(
   state: &SystemState,
 ) -> HttpResult<()> {
   log::debug!("starting {kind:?} {kind_key}");
-  let current_status = ObjPsStatusDb::read_by_pk(kind_key, &state.pool).await?;
+  let current_status =
+    ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
   let wanted = if ProcessKind::Job == *kind {
     ObjPsStatusKind::Finish
   } else {
@@ -810,7 +823,7 @@ pub async fn emit_starting(
     actual: Some(ObjPsStatusKind::Starting.to_string()),
     prev_actual: Some(current_status.actual),
   };
-  ObjPsStatusDb::update_pk(kind_key, status_update, &state.pool).await?;
+  ObjPsStatusDb::update_pk(kind_key, status_update, &state.inner.pool).await?;
   _emit(kind_key, kind, NativeEventAction::Starting, state).await?;
   Ok(())
 }
@@ -824,7 +837,8 @@ pub async fn emit_stopping(
   state: &SystemState,
 ) -> HttpResult<()> {
   log::debug!("stopping {kind:?} {kind_key}");
-  let current_status = ObjPsStatusDb::read_by_pk(kind_key, &state.pool).await?;
+  let current_status =
+    ObjPsStatusDb::read_by_pk(kind_key, &state.inner.pool).await?;
   if current_status.actual == ObjPsStatusKind::Stop.to_string() {
     log::debug!("{kind:?} {kind_key} already stopped",);
     return Ok(());
@@ -835,7 +849,7 @@ pub async fn emit_stopping(
     actual: Some(ObjPsStatusKind::Stopping.to_string()),
     prev_actual: Some(current_status.actual),
   };
-  ObjPsStatusDb::update_pk(kind_key, status_update, &state.pool).await?;
+  ObjPsStatusDb::update_pk(kind_key, status_update, &state.inner.pool).await?;
   _emit(kind_key, kind, NativeEventAction::Stopping, state).await?;
   Ok(())
 }
