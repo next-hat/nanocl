@@ -43,7 +43,7 @@ impl ObjTaskStart for JobDb {
         let mut stream = state.inner.docker_api.wait_container(
           &process.key,
           Some(WaitContainerOptions {
-            condition: "next-exit",
+            condition: "not-running",
           }),
         );
         let _ = state
@@ -53,7 +53,7 @@ impl ObjTaskStart for JobDb {
           .await;
         while let Some(stream) = stream.next().await {
           let result = stream.map_err(HttpError::internal_server_error)?;
-          if result.status_code != 0 {
+          if result.status_code == 0 {
             break;
           }
         }
