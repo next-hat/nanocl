@@ -26,4 +26,4 @@ nanocl_error = { path = "crates/nanocl_error" }
 nanocl_stubs = { path = "crates/nanocl_stubs" }
 nanocl_utils = { path = "crates/nanocl_utils" }
 nanocld_client = { path = "crates/nanocld_client" }
-bollard-next = { git = "https://github.com/leon3s/bollard", branch = "nanocl-next" }
+# bollard-next = { git = "https://github.com/leon3s/bollard", branch = "nanocl-next" }

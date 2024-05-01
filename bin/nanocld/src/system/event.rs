@@ -165,7 +165,8 @@ fn stop(
 /// and push the action into the task manager
 /// The task manager will execute the action in background
 /// eg: starting, deleting, updating a living object
-pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
+
+async fn _exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
   match e.kind {
     EventKind::Error | EventKind::Warning => return Ok(()),
     _ => {}
@@ -216,4 +217,14 @@ pub async fn exec_event(e: &Event, state: &SystemState) -> IoResult<()> {
     })
     .await;
   Ok(())
+}
+
+pub fn exec_event(e: &Event, state: &SystemState) {
+  let e = e.clone();
+  let state = state.clone();
+  rt::spawn(async move {
+    if let Err(err) = _exec_event(&e, &state).await {
+      log::error!("exec_event: {err}");
+    }
+  });
 }
