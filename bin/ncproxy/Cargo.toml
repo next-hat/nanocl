@@ -34,7 +34,7 @@ nanocl_utils = { version = "0.5", features = ["build_tools"] }
 
 [dev-dependencies]
 serde_yaml = "0.9"
-bollard-next = "0.15"
+bollard-next = "0.16.1"
 
 [dependencies]
 log = "0.4"

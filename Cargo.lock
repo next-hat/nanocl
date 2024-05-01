@@ -363,9 +363,9 @@ checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "base64"
-version = "0.22.0"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9475866fec1451be56a3c2400fd081ff546538961565ccb5b7142cbd22bc7a51"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bit-set"
@@ -425,10 +425,11 @@ dependencies = [
 
 [[package]]
 name = "bollard-next"
-version = "0.15.7"
-source = "git+https://github.com/leon3s/bollard?branch=nanocl-next#8fc5cb8e86e9d5de02e20375cb73558bf37397d6"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48d9ce66a99d0104240e2d3e0c42ceb4afaa54e0039dfed072bb3ef04baadc83"
 dependencies = [
- "base64 0.21.7",
+ "base64 0.22.1",
  "bollard-next-stubs",
  "bytes",
  "futures-core",
@@ -439,7 +440,7 @@ dependencies = [
  "hyper",
  "hyper-named-pipe",
  "hyper-util",
- "hyperlocal",
+ "hyperlocal-next",
  "log",
  "pin-project-lite",
  "schemars",
@@ -459,8 +460,9 @@ dependencies = [
 
 [[package]]
 name = "bollard-next-stubs"
-version = "1.44.0-rc.0"
-source = "git+https://github.com/leon3s/bollard?branch=nanocl-next#8fc5cb8e86e9d5de02e20375cb73558bf37397d6"
+version = "1.44.0-rc.26.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7b7ba887e79a327b3eea9086f0c054eda4aa826a62f7ab113b8216c04da40bd"
 dependencies = [
  "schemars",
  "serde",
@@ -507,9 +509,9 @@ checksum = "981520c98f422fcc584dc1a95c334e6953900b9106bc47a9839b81790009eb21"
 
 [[package]]
 name = "cc"
-version = "1.0.95"
+version = "1.0.96"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d32a725bc159af97c3e629873bb9f88fb8cf8a4867175f76dc987815ea07c83b"
+checksum = "065a29261d53ba54260972629f9ca6bffa69bac13cd1fed61420f7fa68b9f8bd"
 
 [[package]]
 name = "cfg-if"
@@ -1440,9 +1442,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "hyperlocal"
-version = "0.9.0-alpha"
-source = "git+https://github.com/softprops/hyperlocal?rev=34dc8579d74f96b68ddbd55582c76019ae18cfdc#34dc8579d74f96b68ddbd55582c76019ae18cfdc"
+name = "hyperlocal-next"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acf569d43fa9848e510358c07b80f4adf34084ddc28c6a4a651ee8474c070dcc"
 dependencies = [
  "hex",
  "http-body-util",
@@ -2172,7 +2175,7 @@ version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60807bd24e60f2a9cb17a5bcd49244a1ecfca86302145943e140d958e75ee4c9"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "bitflags 2.5.0",
  "encoding_rs",
  "httparse",
@@ -2304,9 +2307,9 @@ dependencies = [
 
 [[package]]
 name = "ntex-io"
-version = "1.0.2"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5eb860292c402d3c81cea6261d4218a88bb1e409560e4fdff1e789299153e1b9"
+checksum = "572a82ba31ee3bf49c0a5865bbd7b715f53324f263f591a18ecf2ee880291275"
 dependencies = [
  "bitflags 2.5.0",
  "log",
@@ -2688,9 +2691,9 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "pest"
-version = "2.7.9"
+version = "2.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "311fb059dee1a7b802f036316d790138c613a4e8b180c822e3925a662e9f0c95"
+checksum = "560131c633294438da9f7c4b08189194b20946c8274c6b9e38881a7874dc8ee8"
 dependencies = [
  "memchr",
  "thiserror",
@@ -2699,9 +2702,9 @@ dependencies = [
 
 [[package]]
 name = "pest_derive"
-version = "2.7.9"
+version = "2.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f73541b156d32197eecda1a4014d7f868fd2bcb3c550d5386087cfba442bf69c"
+checksum = "26293c9193fbca7b1a3bf9b79dc1e388e927e6cacaa78b4a3ab705a1d3d41459"
 dependencies = [
  "pest",
  "pest_generator",
@@ -2709,9 +2712,9 @@ dependencies = [
 
 [[package]]
 name = "pest_generator"
-version = "2.7.9"
+version = "2.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c35eeed0a3fab112f75165fdc026b3913f4183133f19b49be773ac9ea966e8bd"
+checksum = "3ec22af7d3fb470a85dd2ca96b7c577a1eb4ef6f1683a9fe9a8c16e136c04687"
 dependencies = [
  "pest",
  "pest_meta",
@@ -2722,9 +2725,9 @@ dependencies = [
 
 [[package]]
 name = "pest_meta"
-version = "2.7.9"
+version = "2.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2adbf29bb9776f28caece835398781ab24435585fe0d4dc1374a61db5accedca"
+checksum = "d7a240022f37c361ec1878d646fc5b7d7c4d28d5946e1a80ad5a7a4f4ca0bdcd"
 dependencies = [
  "once_cell",
  "pest",
@@ -3243,7 +3246,7 @@ version = "3.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ad483d2ab0149d5a5ebcd9972a3852711e0153d863bf5a5d0391d28883c4a20"
 dependencies = [
- "base64 0.22.0",
+ "base64 0.22.1",
  "chrono",
  "hex",
  "indexmap 1.9.3",
@@ -3856,9 +3859,9 @@ checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
 name = "value-bag"
-version = "1.8.1"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74797339c3b98616c009c7c3eb53a0ce41e85c8ec66bd3db96ed132d20cfdee8"
+checksum = "5a84c137d37ab0142f0f2ddfe332651fdbf252e7b7dbb4e67b6c1f1b2e925101"
 
 [[package]]
 name = "vcpkg"

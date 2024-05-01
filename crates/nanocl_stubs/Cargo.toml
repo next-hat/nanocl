@@ -23,7 +23,7 @@ test = []
 [dependencies]
 uuid = { version = "1.8" }
 serde_json = "1.0"
-bollard-next = { version = "0.15.7" }
+bollard-next = { version = "0.16.1" }
 chrono = { version = "0.4", default-features = false, features = [
   "std",
   "clock",
