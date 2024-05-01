@@ -6,6 +6,7 @@ use nanocl_error::io::{IoResult, IoError};
 pub struct LocationTemplate {
   pub path: String,
   pub upstream_key: String,
+  pub upstream_path: String,
   pub redirect: Option<String>,
   pub allowed_ips: Option<Vec<String>>,
   pub version: Option<f64>,
