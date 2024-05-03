@@ -9,7 +9,7 @@ Jobs:
 - Name: init-db-cluster
   Ttl: 4
   Containers:
-  - Image: cockroachdb/cockroach:v23.1.15
+  - Image: cockroachdb/cockroach:v23.1.20
     HostConfig:
       NetworkMode: global
     Entrypoint:
@@ -29,7 +29,7 @@ Cargoes:
     Number: 3
   Container:
     Hostname: store.local
-    Image: cockroachdb/cockroach:v23.1.15
+    Image: cockroachdb/cockroach:v23.1.20
     Entrypoint:
     - /bin/sh
     Tty: true

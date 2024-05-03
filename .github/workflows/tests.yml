@@ -48,7 +48,7 @@ jobs:
           mkdir -p $HOME/.nanocl_dev/state/proxy/sites-enabled
           mkdir -p $HOME/.nanocl_dev/state/proxy/sites-available
           sudo sh -c "echo '\n127.0.0.1 store.nanocl.internal\n127.0.0.1 nanocl.internal' >> /etc/hosts"
-          docker pull cockroachdb/cockroach:v23.1.15
+          docker pull cockroachdb/cockroach:v23.1.20
           docker pull ghcr.io/next-hat/metrsd:0.5.2
           docker pull ghcr.io/next-hat/nanocl-dev:dev
           docker pull ghcr.io/next-hat/nanocl-qemu:8.0.2.0
