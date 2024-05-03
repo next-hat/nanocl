@@ -8,7 +8,7 @@ use crate::models::SystemState;
 
 pub type ObjTaskFuture = Pin<Box<dyn Future<Output = Result<(), IoError>>>>;
 
-pub trait ObjTask {}
+// pub trait ObjTask {}
 
 pub trait ObjTaskStart {
   /// Create a task (future) that will be run when a process object (job, cargo, vm) is starting

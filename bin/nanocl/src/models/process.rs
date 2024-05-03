@@ -95,7 +95,7 @@ impl From<Process> for ProcessRow {
       .unwrap_or_default()
       .get("io.nanocl.kind")
       .cloned()
-      .unwrap_or("Unknow".to_owned());
+      .unwrap_or("Unknown".to_owned());
     let namespace = if kind.as_str() != "job" {
       names.next().unwrap_or("<none>")
     } else {
@@ -103,7 +103,7 @@ impl From<Process> for ProcessRow {
     };
     let network = container.network_settings.unwrap_or_default();
     let networks = network.networks.unwrap_or_default();
-    let mut ipaddr = if let Some(network) = networks.get(namespace) {
+    let mut ip_addr = if let Some(network) = networks.get(namespace) {
       network.ip_address.clone().unwrap_or("<none>".to_owned())
     } else {
       format!(
@@ -115,8 +115,8 @@ impl From<Process> for ProcessRow {
           .unwrap_or("<none>".to_owned())
       )
     };
-    if ipaddr.is_empty() {
-      ipaddr = "<none>".to_owned();
+    if ip_addr.is_empty() {
+      "<none>".clone_into(&mut ip_addr);
     }
     // Convert the created_at and updated_at to the current timezone
     let created_at = container.created.unwrap_or_default();
@@ -141,7 +141,7 @@ impl From<Process> for ProcessRow {
       namespace: namespace.to_owned(),
       image: config.image.unwrap_or_default(),
       status,
-      ip: ipaddr,
+      ip: ip_addr,
       created_at,
     }
   }

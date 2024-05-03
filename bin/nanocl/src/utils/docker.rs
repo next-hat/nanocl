@@ -91,7 +91,7 @@ pub async fn install_image(
         update_image_progress(&multi_progress, &mut layers, &id, &progress);
       }
       _ => {
-        if layers.get(&id).is_none() {
+        if !layers.contains_key(&id) {
           let _ = multi_progress.println(&status);
         }
       }

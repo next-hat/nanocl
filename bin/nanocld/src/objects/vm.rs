@@ -55,7 +55,7 @@ impl ObjCreate for VmDb {
       utils::vm_image::create_snap(&snap_name, size, &image, state).await?;
     log::debug!("Snapshot {snap_name} created");
     // Use the snapshot image
-    vm.disk.image = image.name.clone();
+    vm.disk.image.clone_from(&image.name);
     vm.disk.size = Some(size);
     let status = ObjPsStatusPartial {
       key: vm_key.clone(),

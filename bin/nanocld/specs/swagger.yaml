@@ -1868,10 +1868,14 @@ components:
       - type: object
         additionalProperties:
           $ref: '#/components/schemas/Any'
-      description: Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceSpec](ResourceSpec)
+      description: Helper to generate have Any type for [OpenApi](OpenApi) useful for dynamic json objects like [ResourceSpec](ResourceSpec)
     ApiError:
       type: object
-      description: When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
+      description: |-
+        When returning a [HttpError](nanocl_error::http::HttpError)
+        the status code is stripped and the error
+        is returned as a json object with the message
+        field set to the error message.
       required:
       - msg
       properties:
@@ -6819,7 +6823,7 @@ components:
       additionalProperties: false
     UpstreamTarget:
       type: object
-      description: Config for targetting a cargo or a vm
+      description: Config for targeting a cargo or a vm
       required:
       - Key
       - Port

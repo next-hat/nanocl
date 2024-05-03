@@ -22,12 +22,10 @@ servers:
 - url: /{Version}
   variables:
     Version:
-      default: v0.3
+      default: v0.6
       description: API version
       enum:
-      - v0.3
-      - v0.2
-      - v0.1
+      - v0.5
 paths:
   /rules/{name}:
     put:

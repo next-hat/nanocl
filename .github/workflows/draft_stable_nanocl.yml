@@ -15,7 +15,7 @@ env:
 jobs:
   release_image:
     runs-on: ubuntu-latest
-    container: rust:1.72.0-alpine3.18
+    container: rust:1.78.0-alpine3.19
 
     steps:
       # Install required dependencies

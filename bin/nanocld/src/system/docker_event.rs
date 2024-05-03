@@ -29,7 +29,7 @@ async fn exec_docker(
   }
   let actor = event.actor.clone().unwrap_or_default();
   let attributes = actor.attributes.unwrap_or_default();
-  if attributes.get("io.nanocl").is_none() {
+  if !attributes.contains_key("io.nanocl") {
     return Ok(());
   }
   let Some(kind) = attributes.get("io.nanocl.kind") else {
@@ -87,7 +87,7 @@ async fn exec_docker(
       return Ok(());
     }
     _ => {
-      event.action = action.to_owned();
+      action.clone_into(&mut event.action);
     }
   }
   state.spawn_emit_event(event);

@@ -8,9 +8,9 @@ use serde::{Serialize, Deserialize};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged, rename_all = "PascalCase"))]
 pub enum ProxyRule {
-  /// Redirect http trafic
+  /// Redirect http traffic
   Http(ProxyRuleHttp),
-  /// Redirect tcp and udp trafic
+  /// Redirect tcp and udp traffic
   Stream(ProxyRuleStream),
 }
 
@@ -57,7 +57,7 @@ pub enum ProxySsl {
   Secret(String),
 }
 
-/// Config for targetting a cargo or a vm
+/// Config for targeting a cargo or a vm
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -198,13 +198,16 @@ pub enum ProxyStreamProtocol {
   Udp,
 }
 
-impl ToString for ProxyStreamProtocol {
-  fn to_string(&self) -> String {
-    match self {
+/// Implement display for ProxyStreamProtocol
+/// This is used to display the protocol in the proxy rules config
+/// In a human readable format
+impl std::fmt::Display for ProxyStreamProtocol {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let data = match self {
       ProxyStreamProtocol::Tcp => "tcp",
       ProxyStreamProtocol::Udp => "udp",
-    }
-    .to_owned()
+    };
+    write!(f, "{data}")
   }
 }
 

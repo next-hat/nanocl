@@ -37,14 +37,17 @@ impl std::str::FromStr for StatefileArgKind {
   }
 }
 
-impl ToString for StatefileArgKind {
-  fn to_string(&self) -> String {
-    match self {
+/// Implement display for StatefileArgKind
+/// This is used to display the kind in the statefile args
+/// In a human readable format
+impl std::fmt::Display for StatefileArgKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let data = match self {
       StatefileArgKind::String => "String",
       StatefileArgKind::Number => "Number",
       StatefileArgKind::Boolean => "Boolean",
-    }
-    .to_owned()
+    };
+    write!(f, "{data}")
   }
 }
 

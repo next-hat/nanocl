@@ -92,16 +92,16 @@ pub trait RepositoryReadByTransform: RepositoryReadBy {
     Self::transform(output)
   }
 
-  async fn transform_read_one_by(
-    filter: &GenericFilter,
-    pool: &Pool,
-  ) -> IoResult<Self::NewOutput>
-  where
-    Self::Output: Sized + Send + 'static,
-  {
-    let output = Self::read_one_by(filter, pool).await?;
-    Self::transform(output)
-  }
+  // async fn transform_read_one_by(
+  //   filter: &GenericFilter,
+  //   pool: &Pool,
+  // ) -> IoResult<Self::NewOutput>
+  // where
+  //   Self::Output: Sized + Send + 'static,
+  // {
+  //   let output = Self::read_one_by(filter, pool).await?;
+  //   Self::transform(output)
+  // }
 
   async fn transform_read_by(
     filter: &GenericFilter,

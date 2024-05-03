@@ -56,15 +56,17 @@ impl TryFrom<String> for ProcessKind {
   }
 }
 
-/// Implement to_string for ProcessKind
-impl ToString for ProcessKind {
-  fn to_string(&self) -> String {
-    match self {
+/// Implement Display for ProcessKind
+/// This is used to display the kind of the process
+/// in a human readable format
+impl std::fmt::Display for ProcessKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let data = match self {
       Self::Vm => "vm",
       Self::Job => "job",
       Self::Cargo => "cargo",
-    }
-    .to_owned()
+    };
+    write!(f, "{data}")
   }
 }
 
