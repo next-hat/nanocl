@@ -3439,6 +3439,21 @@ components:
         Value:
           type: string
           nullable: true
+    GraphDriverData:
+      type: object
+      description: Information about the storage driver used to store the container's and image's filesystem.
+      required:
+      - Name
+      - Data
+      properties:
+        Name:
+          type: string
+          description: Name of the storage driver.
+        Data:
+          type: object
+          description: Low-level storage metadata, provided as key/value pairs.  This information is driver-specific, and depends on the storage-driver in use, and should be used for informational purposes only.
+          additionalProperties:
+            type: string
     Health:
       type: object
       description: Health stores information about the container's healthcheck results.
@@ -5156,6 +5171,41 @@ components:
           type: string
         IpAddress:
           type: string
+    ObjPsStatus:
+      type: object
+      required:
+      - UpdatedAt
+      - Wanted
+      - PrevWanted
+      - Actual
+      - PrevActual
+      properties:
+        UpdatedAt:
+          type: string
+          format: date-time
+        Wanted:
+          $ref: '#/components/schemas/ObjPsStatusKind'
+        PrevWanted:
+          $ref: '#/components/schemas/ObjPsStatusKind'
+        Actual:
+          $ref: '#/components/schemas/ObjPsStatusKind'
+        PrevActual:
+          $ref: '#/components/schemas/ObjPsStatusKind'
+    ObjPsStatusKind:
+      type: string
+      enum:
+      - create
+      - starting
+      - start
+      - updating
+      - update
+      - destroying
+      - destroy
+      - stopping
+      - stop
+      - fail
+      - finish
+      - unknown
     ObjectVersion:
       type: object
       description: The version number of the object such as node, service, etc. This is needed to avoid conflicting writes. The client must send the version number along with the modified specification when updating these objects.  This approach ensures safe concurrency and determinism in that the change on the object may not be applied if the version number has changed from the last read. In other words, if two update requests specify the same base version, only one of the requests can succeed. As a result, two separate update requests that happen at the same time will not unintentionally overwrite each other.
@@ -6030,6 +6080,18 @@ components:
           additionalProperties:
             $ref: '#/components/schemas/Any'
       additionalProperties: false
+    SslConfig:
+      type: object
+      properties:
+        Cert:
+          type: string
+          nullable: true
+        CertKey:
+          type: string
+          nullable: true
+        CertCa:
+          type: string
+          nullable: true
     StartExecOptions:
       type: object
       description: Exec configuration used in the [Create Exec API](Docker::create_exec())
@@ -7223,8 +7285,6 @@ components:
         Spec:
           $ref: '#/components/schemas/VmSpec'
 tags:
-- name: CargoImages
-  description: Cargo images management endpoints.
 - name: Namespaces
   description: Namespaces management endpoints.
 - name: Nodes

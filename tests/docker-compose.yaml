@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 
 networks:
   system:
@@ -30,21 +30,21 @@ services:
       - io.nanocl.c=nstore.system
       - io.nanocl.n=system
     command:
-    - -c
-    - |
-      echo "starting cockroachdb"
-      if [ ! -f "$$STORE_DIR/ca/ca.key" ]; then
-        echo "generating certs"
-        mkdir -p $$STORE_DIR/ca $$STORE_DIR/certs $$STORE_DIR/data
-        cockroach cert create-ca --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
-        cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
-        cockroach cert create-client root --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
-      fi
-      cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$$STORE_DIR/certs --store=$$STORE_DIR/data
+      - -c
+      - |
+        echo "starting cockroachdb"
+        if [ ! -f "$$STORE_DIR/ca/ca.key" ]; then
+          echo "generating certs"
+          mkdir -p $$STORE_DIR/ca $$STORE_DIR/certs $$STORE_DIR/data
+          cockroach cert create-ca --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
+          cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
+          cockroach cert create-client root --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
+        fi
+        cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$$STORE_DIR/certs --store=$$STORE_DIR/data
 
   nmetrics:
     container_name: nmetrics.system.c
-    image: ghcr.io/next-hat/metrsd:0.5.2
+    image: ghcr.io/next-hat/metrsd:0.5.3
     tty: true
     networks:
       - system
@@ -84,11 +84,11 @@ services:
     tty: true
     network_mode: host
     environment:
-    - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
+      - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
     labels:
-    - io.nanocl=enabled
-    - io.nanocl.kind=cargo
-    - io.nanocl.c=ndns.system
-    - io.nanocl.n=system
+      - io.nanocl=enabled
+      - io.nanocl.kind=cargo
+      - io.nanocl.c=ndns.system
+      - io.nanocl.n=system
     volumes:
-    - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
+      - ${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns:${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
