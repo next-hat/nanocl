@@ -8,7 +8,7 @@ Cargoes:
 - Name: nstore
   Container:
     Hostname: store.nanocl.internal
-    Image: cockroachdb/cockroach:v23.1.15
+    Image: cockroachdb/cockroach:v23.1.20
     Entrypoint:
       - /bin/sh
     Tty: true
