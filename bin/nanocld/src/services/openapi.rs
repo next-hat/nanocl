@@ -1,3 +1,4 @@
+use bollard_next::secret::GraphDriverData;
 use ntex::util::HashMap;
 use serde::{Serialize, Deserialize};
 use utoipa::{OpenApi, Modify, ToSchema};
@@ -41,8 +42,8 @@ use nanocl_stubs::generic::{
   GenericCount, GenericClause, GenericFilter, ImagePullPolicy,
 };
 use nanocl_stubs::system::{
-  BinaryInfo, HostInfo, Event, EventActor, EventActorKind, EventKind,
-  EventCondition, NativeEventAction,
+  BinaryInfo, Event, EventActor, EventActorKind, EventCondition, EventKind,
+  HostInfo, NativeEventAction, ObjPsStatus, ObjPsStatusKind, SslConfig,
 };
 use nanocl_stubs::metric::{Metric, MetricPartial};
 use nanocl_stubs::vm_image::{VmImage, VmImageResizePayload};
@@ -347,6 +348,7 @@ impl Modify for VersionModifier {
     SwarmSpecCaConfigExternalCasProtocolEnum,
     GenericResourcesInnerDiscreteResourceSpec,
     GenericResourcesInnerNamedResourceSpec,
+    SslConfig,
     // Namespace
     Namespace,
     NamespacePartial,
@@ -357,6 +359,8 @@ impl Modify for VersionModifier {
     ProcessKind,
     Stats,
     ProcessStats,
+    ObjPsStatus,
+    ObjPsStatusKind,
     // Job
     Job,
     JobPartial,
@@ -434,6 +438,7 @@ impl Modify for VersionModifier {
     Address,
     HealthStatusEnum,
     HealthcheckResult,
+    GraphDriverData,
     // Network
     Network,
     // Vm Image
@@ -511,7 +516,6 @@ impl Modify for VersionModifier {
     NativeEventAction,
   )),
   tags(
-    (name = "CargoImages", description = "Cargo images management endpoints."),
     (name = "Namespaces", description = "Namespaces management endpoints."),
     (name = "Nodes", description = "Nodes management endpoints."),
     (name = "Resources", description = "Resources management endpoints."),

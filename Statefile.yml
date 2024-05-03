@@ -37,7 +37,7 @@ Cargoes:
 
 - Name: nmetrics
   Container:
-    Image: ghcr.io/next-hat/metrsd:0.5.2
+    Image: ghcr.io/next-hat/metrsd:0.5.3
     Tty: true
     Env: [LOG_LEVEL=metrsd=info]
     Cmd:
