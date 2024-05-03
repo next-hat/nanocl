@@ -84,11 +84,11 @@ pub async fn sync_process(
   Ok(())
 }
 
-/// Ensure existance of specific namespace in our store.
+/// Ensure existence of specific namespace in our store.
 /// We use it to be sure `system` and `global` namespace exists.
 /// system is the namespace used by internal nanocl components.
 /// where global is the namespace used by default.
-/// User can registed they own namespace to ensure better encaptusation.
+/// User can registered they own namespace to ensure better encapsulation.
 pub async fn register_namespace(
   name: &str,
   create_network: bool,
@@ -162,7 +162,7 @@ pub async fn sync_processes(state: &SystemState) -> IoResult<()> {
       }
       let config = container.config.clone().unwrap_or_default();
       let mut config: bollard_next::container::Config = config.into();
-      config.host_config = container.host_config.clone();
+      config.host_config.clone_from(&container.host_config);
       let new_cargo = CargoSpecPartial {
         name: name.to_owned(),
         container: config.to_owned(),

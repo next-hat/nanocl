@@ -87,14 +87,17 @@ use super::{
   job, process, resource_kind, event,
 };
 
-/// When returning a [HttpError](HttpError) the status code is stripped and the error is returned as a json object with the message field set to the error message.
+/// When returning a [HttpError](nanocl_error::http::HttpError)
+/// the status code is stripped and the error
+/// is returned as a json object with the message
+/// field set to the error message.
 #[allow(dead_code)]
 #[derive(ToSchema)]
 struct ApiError {
   msg: String,
 }
 
-/// Helper to generate have Any type for [OpenApi](OpenApi) usefull for dynamic json objects like [ResourceSpec](ResourceSpec)
+/// Helper to generate have Any type for [OpenApi](OpenApi) useful for dynamic json objects like [ResourceSpec](ResourceSpec)
 #[allow(dead_code)]
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(untagged)]
@@ -211,7 +214,7 @@ impl Modify for VersionModifier {
       .url("/{Version}")
       .parameter("Version", variable)
       .build();
-    openapi.info.title = "Nanocl Daemon".to_owned();
+    "Nanocl Daemon".clone_into(&mut openapi.info.title);
     openapi.info.version = format!("v{}", vars::VERSION);
     openapi.info.description =
       Some(include_str!("../../specs/readme.md").to_owned());

@@ -17,7 +17,7 @@ use crate::{
 
 use super::generic::*;
 
-impl ObjTask for JobDb {}
+// impl ObjTask for JobDb {}
 
 impl ObjTaskStart for JobDb {
   fn create_start_task(key: &str, state: &SystemState) -> ObjTaskFuture {

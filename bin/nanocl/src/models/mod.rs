@@ -101,14 +101,13 @@ pub enum DisplayFormat {
   Json,
 }
 
-/// Convert DisplayFormat to String
-impl ToString for DisplayFormat {
-  fn to_string(&self) -> String {
-    match self {
+impl std::fmt::Display for DisplayFormat {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let data = match self {
       Self::Yaml => "yaml",
       Self::Toml => "toml",
       Self::Json => "json",
-    }
-    .to_owned()
+    };
+    write!(f, "{data}")
   }
 }

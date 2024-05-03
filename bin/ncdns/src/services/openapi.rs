@@ -10,15 +10,15 @@ struct VersionModifier;
 impl utoipa::Modify for VersionModifier {
   fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
     let variable = utoipa::openapi::ServerVariableBuilder::default()
-      .default_value("v0.3")
+      .default_value("v0.6")
       .description(Some("API version"))
-      .enum_values(Some(vec!["v0.3", "v0.2", "v0.1"]))
+      .enum_values(Some(vec!["v0.5"]))
       .build();
     let server = utoipa::openapi::ServerBuilder::default()
       .url("/{Version}")
       .parameter("Version", variable)
       .build();
-    openapi.info.title = "Nanocl Controller Dns".to_owned();
+    "Nanocl Controller Dns".clone_into(&mut openapi.info.title);
     openapi.info.version = format!("v{}", env!("CARGO_PKG_VERSION"));
     openapi.info.description =
       Some(include_str!("../../specs/readme.md").to_owned());

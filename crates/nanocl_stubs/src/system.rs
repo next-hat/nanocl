@@ -76,9 +76,9 @@ impl FromStr for ObjPsStatusKind {
   }
 }
 
-impl ToString for ObjPsStatusKind {
-  fn to_string(&self) -> String {
-    match self {
+impl std::fmt::Display for ObjPsStatusKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let data = match self {
       Self::Create => "create",
       Self::Starting => "starting",
       Self::Start => "start",
@@ -91,8 +91,8 @@ impl ToString for ObjPsStatusKind {
       Self::Fail => "fail",
       Self::Finish => "finish",
       Self::Unknown => "<unknown>",
-    }
-    .to_owned()
+    };
+    write!(f, "{data}")
   }
 }
 
