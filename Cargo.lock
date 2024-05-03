@@ -1838,18 +1838,18 @@ dependencies = [
 
 [[package]]
 name = "metrs_stubs"
-version = "0.5.1"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f3d33f65d3b5e994102830011f74a38c9ae5e7f44f91af9ff17796e10abb5d1"
+checksum = "be0cb70fc8cffbed0f99d59a017602dcf4c90bded2ab72983c9f2f77ddba0c64"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "metrsd_client"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d26216df5ef3ea8f062e1ececd8d04dc460c8e0c0a9fc51cebc3d18500fabc9"
+checksum = "49d6d743b359862d87ec9ad43ba1dca54991114a996afd327ed170852de2fa54"
 dependencies = [
  "futures",
  "metrs_stubs",

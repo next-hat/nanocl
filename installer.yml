@@ -36,7 +36,7 @@ Cargoes:
 
 - Name: nmetrics
   Container:
-    Image: ghcr.io/next-hat/metrsd:0.5.2
+    Image: ghcr.io/next-hat/metrsd:0.5.3
     Tty: true
     Cmd:
     - --hosts
