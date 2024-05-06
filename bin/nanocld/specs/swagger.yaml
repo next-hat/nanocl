@@ -37,7 +37,6 @@ paths:
       tags:
       - System
       summary: Get version information
-      description: Get version information
       operationId: get_ping
       responses:
         '202':
@@ -47,7 +46,6 @@ paths:
       tags:
       - Cargoes
       summary: List cargoes
-      description: List cargoes
       operationId: list_cargo
       parameters:
       - name: filter
@@ -78,7 +76,6 @@ paths:
       tags:
       - Cargoes
       summary: Create a new cargo
-      description: Create a new cargo
       operationId: create_cargo
       parameters:
       - name: namespace
@@ -136,7 +133,6 @@ paths:
       tags:
       - Cargoes
       summary: Create a new cargo spec and add history entry
-      description: Create a new cargo spec and add history entry
       operationId: put_cargo
       parameters:
       - name: name
@@ -171,7 +167,6 @@ paths:
       tags:
       - Cargoes
       summary: Delete a cargo
-      description: Delete a cargo
       operationId: delete_cargo
       parameters:
       - name: name
@@ -202,7 +197,6 @@ paths:
       tags:
       - Cargoes
       summary: Patch a cargo spec meaning merging current spec with the new one and add history entry
-      description: Patch a cargo spec meaning merging current spec with the new one and add history entry
       operationId: patch_cargo
       parameters:
       - name: name
@@ -238,7 +232,6 @@ paths:
       tags:
       - Cargoes
       summary: List cargo histories
-      description: List cargo histories
       operationId: list_cargo_history
       parameters:
       - name: name
@@ -270,7 +263,6 @@ paths:
       tags:
       - Cargoes
       summary: Revert a cargo to a specific history
-      description: Revert a cargo to a specific history
       operationId: revert_cargo
       parameters:
       - name: name
@@ -310,7 +302,6 @@ paths:
       tags:
       - Cargoes
       summary: Get detailed information about a cargo
-      description: Get detailed information about a cargo
       operationId: inspect_cargo
       parameters:
       - name: name
@@ -338,7 +329,6 @@ paths:
       tags:
       - Events
       summary: Get events of all peer nodes
-      description: Get events of all peer nodes
       operationId: list_event
       parameters:
       - name: filter
@@ -363,7 +353,6 @@ paths:
       tags:
       - Events
       summary: Watch on new events using Server-Sent Events / EventSource
-      description: Watch on new events using Server-Sent Events / EventSource
       operationId: watch_event
       requestBody:
         content:
@@ -386,7 +375,6 @@ paths:
       tags:
       - Exec
       summary: Inspect a command executed in a cargo
-      description: Inspect a command executed in a cargo
       operationId: inspect_exec_command
       parameters:
       - name: id
@@ -432,7 +420,6 @@ paths:
       tags:
       - System
       summary: Get host/node system information
-      description: Get host/node system information
       operationId: get_info
       responses:
         '200':
@@ -446,7 +433,6 @@ paths:
       tags:
       - Jobs
       summary: List jobs
-      description: List jobs
       operationId: list_job
       responses:
         '200':
@@ -461,7 +447,6 @@ paths:
       tags:
       - Jobs
       summary: Create a job
-      description: Create a job
       operationId: create_job
       requestBody:
         content:
@@ -481,7 +466,6 @@ paths:
       tags:
       - Jobs
       summary: Delete a job
-      description: Delete a job
       operationId: delete_job
       parameters:
       - name: name
@@ -500,7 +484,6 @@ paths:
       tags:
       - Jobs
       summary: Inspect a job
-      description: Inspect a job
       operationId: inspect_job
       parameters:
       - name: name
@@ -521,7 +504,6 @@ paths:
       tags:
       - Metrics
       summary: Get metrics of all peer nodes
-      description: Get metrics of all peer nodes
       operationId: list_metric
       parameters:
       - name: filter
@@ -563,7 +545,6 @@ paths:
       tags:
       - Namespaces
       summary: List namespaces
-      description: List namespaces
       operationId: list_namespace
       parameters:
       - name: filter
@@ -587,7 +568,6 @@ paths:
       tags:
       - Namespaces
       summary: Create a namespace
-      description: Create a namespace
       operationId: create_namespace
       requestBody:
         content:
@@ -613,7 +593,6 @@ paths:
       tags:
       - Namespaces
       summary: Delete a namespace
-      description: Delete a namespace
       operationId: delete_namespace
       parameters:
       - name: name
@@ -636,7 +615,6 @@ paths:
       tags:
       - Namespaces
       summary: Get detailed information about a namespace
-      description: Get detailed information about a namespace
       operationId: inspect_namespace
       parameters:
       - name: name
@@ -665,7 +643,6 @@ paths:
       tags:
       - Nodes
       summary: List nodes
-      description: List nodes
       operationId: list_node
       responses:
         '200':
@@ -681,7 +658,6 @@ paths:
       tags:
       - Nodes
       summary: Websocket endpoint for communication between nodes used internally
-      description: Websocket endpoint for communication between nodes used internally
       operationId: node_ws
       responses:
         '101':
@@ -691,7 +667,6 @@ paths:
       tags:
       - Processes
       summary: List process (Vm, Job, Cargo)
-      description: List process (Vm, Job, Cargo)
       operationId: list_processes
       parameters:
       - name: filter
@@ -716,7 +691,6 @@ paths:
       tags:
       - Processes
       summary: Send a signal to processes of given kind and name
-      description: Send a signal to processes of given kind and name
       operationId: kill_processes
       parameters:
       - name: kind
@@ -754,7 +728,6 @@ paths:
       tags:
       - Processes
       summary: Get logs of processes for all instances of given kind and name (cargo, job, vm)
-      description: Get logs of processes for all instances of given kind and name (cargo, job, vm)
       operationId: logs_processes
       parameters:
       - name: kind
@@ -823,7 +796,6 @@ paths:
       tags:
       - Processes
       summary: Restart processes of given kind and name
-      description: Restart processes of given kind and name
       operationId: restart_processes
       parameters:
       - name: kind
@@ -855,7 +827,6 @@ paths:
       tags:
       - Processes
       summary: Start processes of given kind and name
-      description: Start processes of given kind and name
       operationId: start_processes
       parameters:
       - name: kind
@@ -887,7 +858,6 @@ paths:
       tags:
       - Processes
       summary: Get stats of a cargo instance
-      description: Get stats of a cargo instance
       operationId: stats_processes
       parameters:
       - name: kind
@@ -939,7 +909,6 @@ paths:
       tags:
       - Processes
       summary: Stop a processes of given kind and name
-      description: Stop a processes of given kind and name
       operationId: stop_processes
       parameters:
       - name: kind
@@ -971,7 +940,6 @@ paths:
       tags:
       - Processes
       summary: Wait for a job to finish
-      description: Wait for a job to finish
       operationId: wait_processes
       parameters:
       - name: name
@@ -990,7 +958,6 @@ paths:
       tags:
       - Processes
       summary: Get logs of a single process instance by it's name or id
-      description: Get logs of a single process instance by it's name or id
       operationId: logs_process
       parameters:
       - name: name
@@ -1045,7 +1012,6 @@ paths:
       tags:
       - ResourceKinds
       summary: List resource kinds
-      description: List resource kinds
       operationId: list_resource_kind
       responses:
         '200':
@@ -1060,7 +1026,6 @@ paths:
       tags:
       - ResourceKinds
       summary: Create a resource kind
-      description: Create a resource kind
       operationId: create_resource_kind
       requestBody:
         content:
@@ -1080,7 +1045,6 @@ paths:
       tags:
       - ResourceKinds
       summary: Delete a resource kind
-      description: Delete a resource kind
       operationId: delete_resource_kind
       parameters:
       - name: domain
@@ -1105,7 +1069,6 @@ paths:
       tags:
       - ResourceKinds
       summary: Inspect a resource kind
-      description: Inspect a resource kind
       operationId: inspect_resource_kind
       parameters:
       - name: domain
@@ -1132,7 +1095,6 @@ paths:
       tags:
       - ResourceKinds
       summary: Inspect a specific version of a resource kind
-      description: Inspect a specific version of a resource kind
       operationId: inspect_resource_kind_version
       parameters:
       - name: domain
@@ -1159,7 +1121,6 @@ paths:
       tags:
       - Resources
       summary: List resources
-      description: List resources
       operationId: list_resource
       parameters:
       - name: filter
@@ -1183,7 +1144,6 @@ paths:
       tags:
       - Resources
       summary: Create a resource
-      description: Create a resource
       operationId: create_resource
       requestBody:
         content:
@@ -1203,7 +1163,6 @@ paths:
       tags:
       - Resources
       summary: Get detailed information about a resource
-      description: Get detailed information about a resource
       operationId: inspect_resource
       parameters:
       - name: name
@@ -1229,7 +1188,6 @@ paths:
       tags:
       - Resources
       summary: Create a new resource spec and add history entry
-      description: Create a new resource spec and add history entry
       operationId: put_resource
       parameters:
       - name: name
@@ -1261,7 +1219,6 @@ paths:
       tags:
       - Resources
       summary: Delete a resource
-      description: Delete a resource
       operationId: delete_resource
       parameters:
       - name: name
@@ -1284,7 +1241,6 @@ paths:
       tags:
       - Resources
       summary: List resource history
-      description: List resource history
       operationId: list_resource_history
       parameters:
       - name: name
@@ -1313,7 +1269,6 @@ paths:
       tags:
       - Resources
       summary: Revert a resource to a specific history
-      description: Revert a resource to a specific history
       operationId: revert_resource
       parameters:
       - name: name
@@ -1346,7 +1301,6 @@ paths:
       tags:
       - Secrets
       summary: List secret
-      description: List secret
       operationId: list_secret
       parameters:
       - name: filter
@@ -1370,7 +1324,6 @@ paths:
       tags:
       - Secrets
       summary: Create a secret
-      description: Create a secret
       operationId: create_secret
       requestBody:
         content:
@@ -1396,7 +1349,6 @@ paths:
       tags:
       - Secrets
       summary: Delete a secret
-      description: Delete a secret
       operationId: delete_secret
       parameters:
       - name: key
@@ -1418,7 +1370,6 @@ paths:
       tags:
       - Secrets
       summary: Update a secret
-      description: Update a secret
       operationId: patch_secret
       parameters:
       - name: key
@@ -1451,7 +1402,6 @@ paths:
       tags:
       - Secrets
       summary: Get detailed information about a secret
-      description: Get detailed information about a secret
       operationId: inspect_secret
       parameters:
       - name: key
@@ -1478,7 +1428,6 @@ paths:
       tags:
       - System
       summary: Get version information
-      description: Get version information
       operationId: get_version
       responses:
         '200':
@@ -1492,7 +1441,6 @@ paths:
       tags:
       - Vms
       summary: List virtual machines
-      description: List virtual machines
       operationId: list_vm
       parameters:
       - name: namespace
@@ -1515,7 +1463,6 @@ paths:
       tags:
       - Vms
       summary: Create a virtual machine
-      description: Create a virtual machine
       operationId: create_vm
       parameters:
       - name: namespace
@@ -1543,7 +1490,6 @@ paths:
       tags:
       - VmImages
       summary: List virtual machine images
-      description: List virtual machine images
       operationId: list_vm_images
       parameters:
       - name: filter
@@ -1568,7 +1514,6 @@ paths:
       tags:
       - VmImages
       summary: Delete a virtual machine image
-      description: Delete a virtual machine image
       operationId: delete_vm_image
       parameters:
       - name: name
@@ -1585,7 +1530,6 @@ paths:
       tags:
       - VmImages
       summary: Clone a virtual machine image
-      description: Clone a virtual machine image
       operationId: clone_vm_image
       parameters:
       - name: name
@@ -1618,7 +1562,6 @@ paths:
       tags:
       - VmImages
       summary: Import a virtual machine image from a file
-      description: Import a virtual machine image from a file
       operationId: import_vm_image
       parameters:
       - name: name
@@ -1641,7 +1584,6 @@ paths:
       tags:
       - VmImages
       summary: Resize a virtual machine image
-      description: Resize a virtual machine image
       operationId: resize_vm_image
       parameters:
       - name: name
@@ -1668,7 +1610,6 @@ paths:
       tags:
       - VmImages
       summary: Create a snapshot of a virtual machine image
-      description: Create a snapshot of a virtual machine image
       operationId: snapshot_vm_image
       parameters:
       - name: name
@@ -1701,7 +1642,6 @@ paths:
       tags:
       - Vms
       summary: Delete a virtual machine
-      description: Delete a virtual machine
       operationId: delete_vm
       parameters:
       - name: name
@@ -1724,7 +1664,6 @@ paths:
       tags:
       - Vms
       summary: Patch a virtual machine config meaning merging current config with the new one and add history entry
-      description: Patch a virtual machine config meaning merging current config with the new one and add history entry
       operationId: patch_vm
       parameters:
       - name: name
@@ -1764,7 +1703,6 @@ paths:
       tags:
       - Vms
       summary: Attach to a virtual machine via websocket
-      description: Attach to a virtual machine via websocket
       operationId: vm_attach
       parameters:
       - name: name
@@ -1788,7 +1726,6 @@ paths:
       tags:
       - Vms
       summary: List virtual machine histories
-      description: List virtual machine histories
       operationId: list_vm_history
       parameters:
       - name: name
@@ -1818,7 +1755,6 @@ paths:
       tags:
       - Vms
       summary: Inspect a virtual machine
-      description: Inspect a virtual machine
       operationId: inspect_vm
       parameters:
       - name: name

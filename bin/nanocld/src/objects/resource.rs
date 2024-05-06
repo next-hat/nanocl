@@ -1,5 +1,8 @@
 use nanocl_error::http::{HttpResult, HttpError};
-use nanocl_stubs::resource::{ResourcePartial, Resource};
+use nanocl_stubs::{
+  resource::{Resource, ResourcePartial},
+  system::NativeEventAction,
+};
 
 use crate::{
   repositories::generic::*,
@@ -59,6 +62,10 @@ impl ObjDelByPk for ResourceDb {
 impl ObjPutByPk for ResourceDb {
   type ObjPutIn = ResourcePartial;
   type ObjPutOut = Resource;
+
+  fn get_put_event() -> NativeEventAction {
+    NativeEventAction::Update
+  }
 
   async fn fn_put_obj_by_pk(
     pk: &str,
