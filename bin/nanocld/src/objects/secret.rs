@@ -1,5 +1,8 @@
 use nanocl_error::http::HttpResult;
-use nanocl_stubs::secret::{Secret, SecretPartial, SecretUpdate};
+use nanocl_stubs::{
+  secret::{Secret, SecretPartial, SecretUpdate},
+  system::NativeEventAction,
+};
 
 use crate::{
   repositories::generic::*,
@@ -40,6 +43,10 @@ impl ObjDelByPk for SecretDb {
 impl ObjPatchByPk for SecretDb {
   type ObjPatchIn = SecretUpdate;
   type ObjPatchOut = Secret;
+
+  fn get_patch_event() -> NativeEventAction {
+    NativeEventAction::Update
+  }
 
   async fn fn_patch_obj_by_pk(
     pk: &str,

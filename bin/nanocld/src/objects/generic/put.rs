@@ -7,6 +7,10 @@ pub trait ObjPutByPk {
   type ObjPutIn;
   type ObjPutOut;
 
+  fn get_put_event() -> NativeEventAction {
+    NativeEventAction::Updating
+  }
+
   async fn fn_put_obj_by_pk(
     pk: &str,
     obj: &Self::ObjPutIn,
@@ -22,7 +26,7 @@ pub trait ObjPutByPk {
     Self::ObjPutOut: Into<EventActor> + Clone,
   {
     let obj = Self::fn_put_obj_by_pk(pk, obj, state).await?;
-    state.emit_normal_native_action(&obj, NativeEventAction::Updating);
+    state.emit_normal_native_action(&obj, Self::get_put_event());
     Ok(obj)
   }
 }

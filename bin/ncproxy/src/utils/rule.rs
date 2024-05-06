@@ -132,7 +132,7 @@ pub async fn gen_ssl_config(
       let key_path = format!("{secret_path}.key");
       tokio::fs::write(&key_path, ssl_config.certificate_key.clone()).await?;
       if let Some(certificate_client) = ssl_config.certificate_client {
-        let certificate_client_path = format!("{secret_path}.client.cert");
+        let certificate_client_path = format!("{secret_path}.ca");
         tokio::fs::write(&certificate_client_path, certificate_client).await?;
         ssl_config.certificate_client = Some(certificate_client_path);
       }

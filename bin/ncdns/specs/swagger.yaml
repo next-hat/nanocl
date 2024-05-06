@@ -32,7 +32,6 @@ paths:
       tags:
       - Rules
       summary: Create/Update a new DnsRule
-      description: Create/Update a new DnsRule
       operationId: apply_rule
       parameters:
       - name: name
@@ -58,7 +57,6 @@ paths:
       tags:
       - Rules
       summary: Delete a ProxyRule
-      description: Delete a ProxyRule
       operationId: remove_rule
       parameters:
       - name: name
