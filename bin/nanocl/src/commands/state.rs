@@ -141,7 +141,6 @@ async fn log_jobs(
           return;
         }
       };
-      println!("job instance len {}", job.instances.len());
       job
         .instances
         .iter()
