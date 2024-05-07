@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use futures_util::StreamExt;
 
 use bollard_next::container::{StartContainerOptions, WaitContainerOptions};
@@ -8,6 +10,7 @@ use nanocl_stubs::{
   process::ProcessKind,
   system::{NativeEventAction, ObjPsStatusKind},
 };
+use ntex::time::sleep;
 
 use crate::{
   utils,
@@ -38,6 +41,8 @@ impl ObjTaskStart for JobDb {
       )
       .await?;
       state.emit_normal_native_action(&job, NativeEventAction::Start);
+      // Sleep to let time for the event to be received by clients
+      sleep(Duration::from_secs(2)).await;
       for process in processes {
         // We currently run a sequential order so we wait for the container to finish to start the next one.
         let mut stream = state.inner.docker_api.wait_container(

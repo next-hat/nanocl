@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ImagePullPolicy option to always pull the image or only if it doesn't exists
 - ImagePullSecret option for private registry
 
+### Fixed
+
+- Send correct event when updating a secret and a resource
+- Replication feature
+
 ## [0.13.0] - 2023-12-28
 
 ### Changed
