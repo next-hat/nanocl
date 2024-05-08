@@ -55,7 +55,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/nproxy:1.25.4-n0.11-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/nproxy:1.25.0-n0.10
+    Image: ghcr.io/next-hat/nproxy:1.25.4-n0.11
     # {% endif %}
     Tty: true
     Env:
@@ -76,7 +76,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ncproxy:0.11.0-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/ncproxy:0.10.1
+    Image: ghcr.io/next-hat/ncproxy:0.11.0
     # {% endif %}
     Tty: true
     Cmd:
@@ -97,7 +97,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ndns:2.90.0-n0.6-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/ndns:2.89.0-n0.5
+    Image: ghcr.io/next-hat/ndns:2.90.0-n0.6
     # {% endif %}
     Env:
     - STATE_DIR=${{ state_dir }}/dns
@@ -111,7 +111,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ncdns:0.6.0-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/ncdns:0.5.0
+    Image: ghcr.io/next-hat/ncdns:0.6.0
     # {% endif %}
     Tty: true
     Cmd:
@@ -136,7 +136,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/nanocld:0.14.0-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/nanocld:0.13.0
+    Image: ghcr.io/next-hat/nanocld:0.14.0
     # {% endif %}
     Tty: true
     Hostname: nanocl.internal
@@ -182,7 +182,7 @@ Cargoes:
     # {% if channel == "nightly" %}
     Image: ghcr.io/next-hat/ncvpnkit:0.4.0-nightly
     # {% else %}
-    Image: ghcr.io/next-hat/ncvpnkit:0.3.0
+    Image: ghcr.io/next-hat/ncvpnkit:0.4.0
     # {% endif %}
     Tty: true
     Hostname: ncvpnkit.nanocl.internal
