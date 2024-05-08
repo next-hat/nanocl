@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - AllowedIps to allow specific ip address to reach exposed services
 
+### Fixed
+
+- Tcp with ssl
+- Set a specific path for a target when using http
+
 ## [0.10.1] - 2023-12-30
 
 ### Fixed

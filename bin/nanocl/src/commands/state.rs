@@ -1,8 +1,9 @@
 use std::{
-  fs,
-  env::{consts, vars_os},
-  path::{Path, PathBuf},
   collections::HashMap,
+  env::{consts, vars_os},
+  fs,
+  path::{Path, PathBuf},
+  time::Duration,
 };
 
 use ntex::rt;
@@ -131,6 +132,9 @@ async fn log_jobs(
   jobs: Vec<JobPartial>,
   query: &ProcessLogQuery,
 ) {
+  // TODO: find a better way to wait for job process to start
+  // sleep for 2 seconds for job process to start
+  ntex::time::sleep(Duration::from_secs(2)).await;
   jobs
     .iter()
     .map(|job| async move {
