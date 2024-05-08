@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use futures_util::StreamExt;
 
 use bollard_next::container::{StartContainerOptions, WaitContainerOptions};
@@ -10,7 +8,6 @@ use nanocl_stubs::{
   process::ProcessKind,
   system::{NativeEventAction, ObjPsStatusKind},
 };
-use ntex::time::sleep;
 
 use crate::{
   utils,
