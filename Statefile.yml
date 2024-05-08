@@ -1,7 +1,8 @@
 ## Statefile used for development and testing purposes
 ## We moved away from the classic docker compose setup
 ## Because we needed to have a more flexible config to enable multi node testing
-ApiVersion: v0.13
+ApiVersion: v0.14
+
 Namespace: system
 
 Cargoes:

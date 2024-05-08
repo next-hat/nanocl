@@ -71,7 +71,7 @@ We stand for robust performance and efficiency with simplicity, trimming the blo
 There is an example used to deploy our [documentation][documentation]:
 
 ```yaml
-ApiVersion: v0.13
+ApiVersion: v0.14
 
 # See all options:
 # https://docs.next-hat.com/references/nanocl/objects/cargo

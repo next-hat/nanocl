@@ -1,4 +1,4 @@
-ApiVersion: v0.13
+ApiVersion: v0.14
 
 Resources:
 - Name: vpn-dns
