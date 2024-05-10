@@ -127,6 +127,8 @@ mod tests {
     let state_dir = format!("{home}/.nanocl_dev/state");
     cmd.push("--state-dir");
     cmd.push(&state_dir);
+    cmd.push("--store-addr");
+    cmd.push("postgresql://root:root@store.nanocl.internal:26258/defaultdb");
     Cli::parse_from(cmd)
   }
 
@@ -200,8 +202,6 @@ mod tests {
       "../../tests/server.key",
       "--cert-ca",
       "../../tests/ca.crt",
-      "--store-addr",
-      "postgresql://root:root@store.nanocl.internal:26258/defaultdb",
     ]);
     assert_config_ok(args).await;
     // Configure SSL/TLS settings
@@ -238,8 +238,6 @@ mod tests {
       "../../tests/server.key",
       "--cert-ca",
       "../../tests/ca.crt",
-      "--store-addr",
-      "postgresql://root:root@store.nanocl.internal:26258/defaultdb",
     ]);
     assert_config_ok(args).await;
     // Configure SSL/TLS settings
