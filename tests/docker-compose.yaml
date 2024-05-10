@@ -33,14 +33,7 @@ services:
       - -c
       - |
         echo "starting cockroachdb"
-        if [ ! -f "$$STORE_DIR/ca/ca.key" ]; then
-          echo "generating certs"
-          mkdir -p $$STORE_DIR/ca $$STORE_DIR/certs $$STORE_DIR/data
-          cockroach cert create-ca --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
-          cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
-          cockroach cert create-client root --certs-dir=$$STORE_DIR/certs --ca-key=$$STORE_DIR/ca/ca.key
-        fi
-        cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$$STORE_DIR/certs --store=$$STORE_DIR/data
+        cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --insecure --store=$$STORE_DIR/data
 
   nmetrics:
     container_name: nmetrics.system.c
