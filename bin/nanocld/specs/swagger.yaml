@@ -2868,6 +2868,10 @@ components:
         docker_host:
           type: string
           description: Docker host to use
+        store_addr:
+          type: string
+          description: Store address to connect to
+          nullable: true
         gateway:
           type: string
           description: Host gateway automatically detected to host default gateway if not set

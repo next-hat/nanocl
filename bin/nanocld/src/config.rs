@@ -53,12 +53,18 @@ fn gen_daemon_conf(
   } else {
     gateway.clone()
   };
+  let store_addr = if let Some(ref store_addr) = args.store_addr {
+    Some(store_addr.to_owned())
+  } else {
+    config.store_addr.clone()
+  };
   Ok(DaemonConfig {
     hosts,
     gateway,
     hostname,
     state_dir,
     docker_host,
+    store_addr,
     gid: args.gid,
     advertise_addr,
     nodes: args.nodes.clone(),
@@ -115,6 +121,7 @@ mod tests {
       hosts: Some(vec![String::from("unix:///run/nanocl/nanocl.sock")]),
       state_dir: Some(String::from("/var/lib/nanocl")),
       docker_host: Some(String::from("/var/run/docker.sock")),
+      store_addr: None,
       gateway: None,
       hostname: None,
     };

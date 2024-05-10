@@ -19,8 +19,6 @@ pub struct SystemStateInner {
   pub config: DaemonConfig,
   /// Manager of the tasks
   pub task_manager: TaskManager,
-  /// Latest version of the daemon
-  pub version: String,
   /// Event emitter
   pub(crate) event_emitter: mpsc::UnboundedSender<Event>,
   /// Http event client

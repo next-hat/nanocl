@@ -17,6 +17,8 @@ pub struct DaemonConfig {
   /// Docker host to use
   #[cfg_attr(feature = "serde", serde(default = "default_host"))]
   pub docker_host: String,
+  /// Store address to connect to
+  pub store_addr: Option<String>,
   /// Host gateway automatically detected to host default gateway if not set
   pub gateway: String,
   /// Hostname to use for the node automatically detected if not set
@@ -44,6 +46,8 @@ pub struct DaemonConfigFile {
   pub state_dir: Option<String>,
   /// Docker host to use
   pub docker_host: Option<String>,
+  /// Store address to connect to
+  pub store_addr: Option<String>,
   /// Host gateway automatically detected to host default gateway if not set
   pub gateway: Option<String>,
   /// Hostname to use for the node automatically detected if not set
@@ -55,6 +59,7 @@ impl Default for DaemonConfig {
     Self {
       docker_host: default_host(),
       conf_dir: "/etc/nanocl".into(),
+      store_addr: None,
       gid: 0,
       hostname: String::default(),
       hosts: vec!["/run/nanocl.sock".into()],

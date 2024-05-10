@@ -37,14 +37,14 @@ services:
       - -c
       - |
         echo "starting cockroachdb"
-        if [ ! -f "$$STATE_DIR/ca/ca.key" ]; then
-          echo "generating certs"
-          mkdir -p $$STATE_DIR/ca $$STATE_DIR/certs $$STATE_DIR/data
-          cockroach cert create-ca --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
-          cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
-          cockroach cert create-client root --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
-        fi
-        cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$$STATE_DIR/certs --store=$$STATE_DIR/data
+        # if [ ! -f "$$STATE_DIR/ca/ca.key" ]; then
+        #   echo "generating certs"
+        #   mkdir -p $$STATE_DIR/ca $$STATE_DIR/certs $$STATE_DIR/data
+        #   cockroach cert create-ca --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
+        #   cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
+        #   cockroach cert create-client root --certs-dir=$$STATE_DIR/certs --ca-key=$$STATE_DIR/ca/ca.key
+        # fi
+        cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --store=$$STATE_DIR/data --insecure
 
   nmetrics:
     container_name: nmetrics.system.c
@@ -70,6 +70,8 @@ services:
     image: nproxy:dev
     tty: true
     network_mode: host
+    profiles:
+      - proxy
     environment:
       - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/proxy
     labels:
@@ -85,6 +87,8 @@ services:
     container_name: ncproxy.system.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
+    profiles:
+      - proxy
     ports:
       - 8686:8686
     networks:
@@ -113,6 +117,8 @@ services:
     container_name: ndns.system.c
     image: ndns:dev
     tty: true
+    profiles:
+      - dns
     network_mode: host
     environment:
       - STATE_DIR=${STATE_DIR:-${HOME}/.nanocl_dev/state}/dns
@@ -128,6 +134,8 @@ services:
     container_name: ncdns.system.c
     image: ghcr.io/next-hat/nanocl-dev:dev
     tty: true
+    profiles:
+      - dns
     ports:
       - 8787:8787
     networks:
@@ -188,6 +196,7 @@ services:
           -- \
           --hosts unix:///run/nanocl/nanocl.sock \
           --gid 1001 \
+          --store-addr postgresql://root:root@store.nanocl.internal:26258/defaultdb \
           --hosts tcp://0.0.0.0:9443 \
           --cert ./tests/server.crt \
           --cert-key ./tests/server.key \

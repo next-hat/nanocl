@@ -13,15 +13,14 @@ use nanocl_stubs::config::DaemonConfig;
 use crate::models::{Pool, DBConn};
 
 /// Create a pool connection to the store `cockroachdb`
-pub async fn create_pool(
-  host: &str,
-  daemon_conf: &DaemonConfig,
-) -> IoResult<Pool> {
-  let state_dir = daemon_conf.state_dir.clone();
-  let options = format!("/defaultdb?sslmode=verify-full&sslcert={state_dir}/store/certs/client.root.crt&sslkey={state_dir}/store/certs/client.root.key&sslrootcert={state_dir}/store/certs/ca.crt");
-  let db_url = format!("postgresql://root:root@{host}{options}");
+pub async fn create_pool(store_addr: &str) -> IoResult<Pool> {
+  let store_addr = store_addr.to_owned();
+  // let store_addr = std::env::var("STORE_ADDR")
+  //   .unwrap_or("store.nanocl.internal:26258".to_owned());
+  // let options = format!("/defaultdb?sslmode=verify-full&sslcert={state_dir}/store/certs/client.root.crt&sslkey={state_dir}/store/certs/client.root.key&sslrootcert={state_dir}/store/certs/ca.crt");
+  // let db_url = format!("postgresql://root:root@{host}{options}");
   let pool = web::block(move || {
-    let manager = ConnectionManager::<PgConnection>::new(db_url);
+    let manager = ConnectionManager::<PgConnection>::new(store_addr);
     R2D2Pool::builder().build(manager)
   })
   .await
@@ -47,9 +46,23 @@ pub fn get_pool_conn(pool: &Pool) -> IoResult<DBConn> {
 
 /// Wait for store to be ready to accept tcp connection.
 /// We loop until a tcp connection can be established to the store.
-async fn wait(addr: &str) -> IoResult<()> {
+async fn wait(store_addr: &str) -> IoResult<()> {
+  let url = url::Url::parse(store_addr).map_err(|err| {
+    IoError::invalid_data(
+      "Wait store",
+      &format!("invalid address format {err}"),
+    )
+  })?;
+  let host_addr = url
+    .host_str()
+    .ok_or(IoError::invalid_data("Wait store", "Invalid store address"))?;
+  let port = url
+    .port()
+    .ok_or(IoError::invalid_data("Wait store", "Invalid store port"))?;
+  let store_addr = format!("{host_addr}:{port}");
+  log::debug!("store::wait: {store_addr}");
   // Open tcp connection to check if store is ready
-  let addr = addr
+  let addr = store_addr
     .to_socket_addrs()
     .map_err(|err| {
       IoError::invalid_data(
@@ -69,17 +82,24 @@ async fn wait(addr: &str) -> IoResult<()> {
   Ok(())
 }
 
-/// Ensure existance of a container for our store.
+/// Ensure existence of a container for our store.
 /// We use cockroachdb with a postgresql connector.
 /// We also run latest migration on our database to have the latest schema.
 /// It will return a connection Pool that will be use in our State.
 pub async fn init(daemon_conf: &DaemonConfig) -> IoResult<Pool> {
   const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
-  let store_addr = std::env::var("STORE_URL")
-    .unwrap_or("store.nanocl.internal:26258".to_owned());
+  let store_addr = match &daemon_conf.store_addr {
+    None => {
+      return Err(IoError::invalid_data(
+        "Store",
+        "Store address not specified",
+      ))
+    }
+    Some(addr) => addr,
+  };
   log::info!("store::init: {store_addr}");
-  wait(&store_addr).await?;
-  let pool = create_pool(&store_addr, daemon_conf).await?;
+  wait(store_addr).await?;
+  let pool = create_pool(store_addr).await?;
   let mut conn = get_pool_conn(&pool)?;
   log::info!("store::init: migrations running");
   conn.run_pending_migrations(MIGRATIONS).map_err(|err| {
