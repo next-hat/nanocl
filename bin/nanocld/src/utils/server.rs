@@ -200,6 +200,8 @@ mod tests {
       "../../tests/server.key",
       "--cert-ca",
       "../../tests/ca.crt",
+      "--store-addr",
+      "postgresql://root:root@store.nanocl.internal:26258/defaultdb",
     ]);
     assert_config_ok(args).await;
     // Configure SSL/TLS settings
@@ -215,7 +217,7 @@ mod tests {
       .connector(Connector::default().openssl(builder.build()).finish())
       .finish();
     let mut res = client
-      .get("https://0.0.0.0:6443/v0.13/version")
+      .get("https://0.0.0.0:6443/v0.14/version")
       .send()
       .await
       .unwrap();
@@ -236,6 +238,8 @@ mod tests {
       "../../tests/server.key",
       "--cert-ca",
       "../../tests/ca.crt",
+      "--store-addr",
+      "postgresql://root:root@store.nanocl.internal:26258/defaultdb",
     ]);
     assert_config_ok(args).await;
     // Configure SSL/TLS settings
@@ -245,7 +249,7 @@ mod tests {
       .connector(Connector::default().openssl(builder.build()).finish())
       .finish();
     let res = client
-      .get("https://0.0.0.0:4443/v0.13/version")
+      .get("https://0.0.0.0:4443/v0.14/version")
       .send()
       .await;
     assert!(res.is_err());
