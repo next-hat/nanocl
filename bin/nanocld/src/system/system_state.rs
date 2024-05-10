@@ -44,7 +44,6 @@ impl SystemState {
         event_emitter: sx,
         event_emitter_raw: RawEventEmitter::new(),
         task_manager: TaskManager::new(),
-        version: vars::VERSION.to_owned(),
         arbiter: rt::Arbiter::new(),
       }),
     };

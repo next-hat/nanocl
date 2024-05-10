@@ -14,6 +14,9 @@ pub struct Cli {
   /// Docker daemon socket to connect [default: unix:///var/run/docker.sock]
   #[clap(long)]
   pub docker_host: Option<String>,
+  /// Store address to connect to
+  #[clap(long)]
+  pub store_addr: Option<String>,
   /// State directory
   /// [default: /var/lib/nanocl]
   #[clap(long)]
@@ -46,6 +49,7 @@ impl Default for Cli {
     Self {
       hosts: None,
       docker_host: None,
+      store_addr: None,
       state_dir: None,
       conf_dir: String::from("/etc/nanocl"),
       gateway: None,

@@ -127,6 +127,8 @@ mod tests {
     let state_dir = format!("{home}/.nanocl_dev/state");
     cmd.push("--state-dir");
     cmd.push(&state_dir);
+    cmd.push("--store-addr");
+    cmd.push("postgresql://root:root@store.nanocl.internal:26258/defaultdb");
     Cli::parse_from(cmd)
   }
 
@@ -215,7 +217,7 @@ mod tests {
       .connector(Connector::default().openssl(builder.build()).finish())
       .finish();
     let mut res = client
-      .get("https://0.0.0.0:6443/v0.13/version")
+      .get("https://0.0.0.0:6443/v0.14/version")
       .send()
       .await
       .unwrap();
@@ -245,7 +247,7 @@ mod tests {
       .connector(Connector::default().openssl(builder.build()).finish())
       .finish();
     let res = client
-      .get("https://0.0.0.0:4443/v0.13/version")
+      .get("https://0.0.0.0:4443/v0.14/version")
       .send()
       .await;
     assert!(res.is_err());

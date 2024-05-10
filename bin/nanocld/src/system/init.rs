@@ -161,6 +161,10 @@ mod tests {
     let args = cli::Cli {
       gid: 0,
       state_dir: Some(format!("{home}/.nanocl_dev/state")),
+      store_addr: Some(
+        "postgresql://root:root@store.nanocl.internal:26258/defaultdb"
+          .to_owned(),
+      ),
       conf_dir: String::from("/etc/nanocl"),
       nodes: Vec::default(),
       ..Default::default()
