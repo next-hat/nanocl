@@ -19,22 +19,17 @@ Cargoes:
       PortBindings:
         26257/tcp:
           - HostPort: "26257"
+            HostIp: "0.0.0.0"
         26258/tcp:
           - HostPort: "26258"
+            HostIp: "0.0.0.0"
       Binds:
         - ${{ state_dir }}/store:${{ state_dir }}/store
     Cmd:
      - -c
      - |
        echo "starting cockroachdb"
-       if [ ! -f "$STATE_DIR/ca/ca.key" ]; then
-         echo "generating certs"
-         mkdir -p $STATE_DIR/ca $STATE_DIR/certs $STATE_DIR/data
-         cockroach cert create-ca --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
-         cockroach cert create-node 127.0.0.1 store.nanocl.internal --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
-         cockroach cert create-client root --certs-dir=$STATE_DIR/certs --ca-key=$STATE_DIR/ca/ca.key
-       fi
-       cockroach start-single-node --listen-addr=:26257 --sql-addr=:26258 --certs-dir=$STATE_DIR/certs --store=$STATE_DIR/data
+       cockroach start-single-node --insecure --store=$STATE_DIR/data
 
 - Name: nmetrics
   Container:
@@ -138,8 +133,12 @@ Cargoes:
           --hosts tcp://0.0.0.0:9443 \
           --cert ./tests/server.crt \
           --cert-key ./tests/server.key \
+          --gateway ${{ gateway }} \
+          --hostname ${{ hostname }} \
+          --advertise-addr ${{ advertise_addr }}:8585 \
           --cert-ca ./tests/ca.crt \
-          --state-dir ${{ state_dir }}
+          --state-dir ${{ state_dir }} \
+          --store-addr postgresql://root:root@store.nanocl.internal:26257/defaultdb
     ExposedPorts:
       8585/tcp:
       9443/tcp:
