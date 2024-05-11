@@ -9,7 +9,7 @@ use crate::{
   },
 };
 
-use super::{GenericList, GenericDelete};
+use super::{GenericList, GenericRemove};
 
 impl GenericList for SecretArg {
   type Item = SecretRow;
@@ -25,7 +25,7 @@ impl GenericList for SecretArg {
   }
 }
 
-impl GenericDelete<GenericDefaultOpts, String> for SecretArg {
+impl GenericRemove<GenericDefaultOpts, String> for SecretArg {
   fn object_name() -> &'static str {
     "secrets"
   }

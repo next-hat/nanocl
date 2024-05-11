@@ -51,7 +51,7 @@ where
 
 /// Generic delete options for the delete command
 #[derive(Clone, Parser)]
-pub struct GenericDeleteOpts<T = GenericDefaultOpts>
+pub struct GenericRemoveOpts<T = GenericDefaultOpts>
 where
   T: Args + Clone,
 {

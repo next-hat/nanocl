@@ -6,14 +6,14 @@ use clap::{Parser, Subcommand};
 use nanocl_error::io::IoError;
 use nanocld_client::stubs::secret::{Secret, SecretPartial};
 
-use super::{DisplayFormat, GenericDeleteOpts, GenericListOpts};
+use super::{DisplayFormat, GenericRemoveOpts, GenericListOpts};
 
 /// `nanocl resource` available commands
 #[derive(Clone, Subcommand)]
 pub enum SecretCommand {
   /// Remove existing secret
   #[clap(alias("rm"))]
-  Remove(GenericDeleteOpts),
+  Remove(GenericRemoveOpts),
   /// List existing secret
   #[clap(alias("ls"))]
   List(GenericListOpts),

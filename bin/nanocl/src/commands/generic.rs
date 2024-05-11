@@ -8,7 +8,7 @@ use nanocl_error::io::{FromIo, IoResult};
 
 use crate::{
   utils,
-  models::{GenericDeleteOpts, GenericListOpts},
+  models::{GenericRemoveOpts, GenericListOpts},
 };
 
 pub trait GenericList {
@@ -90,14 +90,14 @@ pub trait GenericList {
   }
 }
 
-pub trait GenericDelete<T, Q>
+pub trait GenericRemove<T, Q>
 where
   T: Args + Clone,
   Q: serde::Serialize,
 {
   fn object_name() -> &'static str;
 
-  fn get_query(_opts: &GenericDeleteOpts<T>) -> Option<Q>
+  fn get_query(_opts: &GenericRemoveOpts<T>) -> Option<Q>
   where
     Q: serde::Serialize,
   {
@@ -106,7 +106,7 @@ where
 
   async fn exec_rm(
     client: &NanocldClient,
-    opts: &GenericDeleteOpts<T>,
+    opts: &GenericRemoveOpts<T>,
   ) -> IoResult<()> {
     let object_name = Self::object_name();
     if !opts.skip_confirm {
