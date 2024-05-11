@@ -39,18 +39,18 @@ impl ObjTaskStart for JobDb {
       .await?;
       state.emit_normal_native_action(&job, NativeEventAction::Start);
       for process in processes {
-        // We currently run a sequential order so we wait for the container to finish to start the next one.
-        let mut stream = state.inner.docker_api.wait_container(
-          &process.key,
-          Some(WaitContainerOptions {
-            condition: "next-exit",
-          }),
-        );
         let _ = state
           .inner
           .docker_api
           .start_container(&process.key, None::<StartContainerOptions<String>>)
           .await;
+        // We currently run a sequential order so we wait for the container to finish to start the next one.
+        let mut stream = state.inner.docker_api.wait_container(
+          &process.key,
+          Some(WaitContainerOptions {
+            condition: "not-running",
+          }),
+        );
         while let Some(stream) = stream.next().await {
           let result = stream.map_err(HttpError::internal_server_error)?;
           if result.status_code == 0 {

@@ -3,7 +3,7 @@ use clap::{Args, Parser};
 use nanocld_client::stubs::generic::GenericFilter;
 
 /// An empty filter to use as default
-#[derive(Clone, Args)]
+#[derive(Clone, Default, Args)]
 pub struct GenericDefaultOpts;
 
 /// A generic filter to use in the list operations

@@ -1,13 +1,17 @@
 use clap::Args;
+use ntex::http::StatusCode;
 
 use nanocld_client::{
+  NanocldClient,
   stubs::{
     generic::{GenericFilter, GenericListQuery},
     system::{EventActorKind, NativeEventAction},
   },
-  NanocldClient,
 };
-use nanocl_error::io::{FromIo, IoResult};
+use nanocl_error::{
+  io::{FromIo, IoResult},
+  http_client::HttpClientError,
+};
 
 use crate::{
   utils,
@@ -159,6 +163,12 @@ where
         )
         .await
       {
+        if let HttpClientError::HttpError(err) = &err {
+          if err.status == StatusCode::NOT_FOUND {
+            pg.finish();
+            continue;
+          }
+        }
         pg.finish_and_clear();
         eprintln!("{err} {name}");
         continue;

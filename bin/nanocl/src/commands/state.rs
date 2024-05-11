@@ -1,18 +1,19 @@
 use std::{
-  collections::HashMap,
-  env::{consts, vars_os},
   fs,
-  path::{Path, PathBuf},
   time::Duration,
+  collections::HashMap,
+  path::{Path, PathBuf},
+  env::{consts, vars_os},
 };
 
+use url::Url;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
+use async_recursion::async_recursion;
 use futures::{
   join, StreamExt,
   stream::{FuturesOrdered, FuturesUnordered},
 };
-use async_recursion::async_recursion;
 
 use nanocl_error::io::{IoError, FromIo, IoResult};
 
@@ -39,16 +40,18 @@ use nanocld_client::{
     system::NativeEventAction,
   },
 };
-use url::Url;
 
 use crate::{
-  utils,
   config::CliConfig,
   models::{
-    Context, DisplayFormat, StateApplyOpts, StateArg, StateCommand,
-    StateLogsOpts, StateRef, StateRemoveOpts, StateRoot,
+    Context, DisplayFormat, GenericDefaultOpts, GenericRemoveOpts, JobArg,
+    StateApplyOpts, StateArg, StateCommand, StateLogsOpts, StateRef,
+    StateRemoveOpts, StateRoot,
   },
+  utils,
 };
+
+use super::GenericRemove;
 
 /// Get Statefile from url and return a StateRef with the raw data and the format
 async fn get_from_url(
@@ -816,22 +819,12 @@ async fn state_remove(
   };
   let pg_style = utils::progress::create_spinner_style("red");
   if let Some(jobs) = &state_file.data.jobs {
-    for job in jobs {
-      let token = format!("job/{}", job.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
-      if client.inspect_job(&job.name).await.is_ok() {
-        let waiter = utils::process::wait_process_state(
-          &job.name,
-          EventActorKind::Job,
-          vec![NativeEventAction::Destroy],
-          client,
-        )
-        .await?;
-        client.delete_job(&job.name).await?;
-        waiter.await??;
-      }
-      pg.finish();
-    }
+    let opts = GenericRemoveOpts::<GenericDefaultOpts> {
+      names: jobs.iter().map(|job| job.name.clone()).collect(),
+      skip_confirm: true,
+      others: GenericDefaultOpts,
+    };
+    JobArg::exec_rm(client, &opts, None).await?;
   }
   if let Some(cargoes) = &state_file.data.cargoes {
     for cargo in cargoes {
