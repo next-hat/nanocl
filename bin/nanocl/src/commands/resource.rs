@@ -78,7 +78,7 @@ pub async fn exec_resource(
       ResourceArg::exec_ls(&cli_conf.client, args, opts).await
     }
     ResourceCommand::Remove(opts) => {
-      ResourceArg::exec_rm(&cli_conf.client, opts).await
+      ResourceArg::exec_rm(&cli_conf.client, opts, None).await
     }
     ResourceCommand::Inspect(opts) => {
       exec_resource_inspect(cli_conf, opts).await

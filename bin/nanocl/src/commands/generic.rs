@@ -1,8 +1,11 @@
 use clap::Args;
 
 use nanocld_client::{
+  stubs::{
+    generic::{GenericFilter, GenericListQuery},
+    system::{EventActorKind, NativeEventAction},
+  },
   NanocldClient,
-  stubs::generic::{GenericFilter, GenericListQuery},
 };
 use nanocl_error::io::{FromIo, IoResult};
 
@@ -97,7 +100,10 @@ where
 {
   fn object_name() -> &'static str;
 
-  fn get_query(_opts: &GenericRemoveOpts<T>) -> Option<Q>
+  fn get_query(
+    _opts: &GenericRemoveOpts<T>,
+    _namespace: Option<String>,
+  ) -> Option<Q>
   where
     Q: serde::Serialize,
   {
@@ -107,6 +113,7 @@ where
   async fn exec_rm(
     client: &NanocldClient,
     opts: &GenericRemoveOpts<T>,
+    namespace: Option<String>,
   ) -> IoResult<()> {
     let object_name = Self::object_name();
     if !opts.skip_confirm {
@@ -116,13 +123,50 @@ where
       ))
       .map_err(|err| err.map_err_context(|| "Delete"))?;
     }
+    let pg_style = utils::progress::create_spinner_style("red");
     for name in &opts.names {
-      client
+      let token = format!("{object_name}/{}", name);
+      let pg = utils::progress::create_progress(&token, &pg_style);
+      let (key, waiter_kind) = match object_name {
+        "vms" => (
+          format!("{name}.{}", namespace.clone().unwrap_or_default()),
+          Some(EventActorKind::Vm),
+        ),
+        "cargoes" => (
+          format!("{name}.{}", namespace.clone().unwrap_or_default()),
+          Some(EventActorKind::Cargo),
+        ),
+        "jobs" => (name.clone(), Some(EventActorKind::Job)),
+        _ => (name.clone(), None),
+      };
+      let waiter = match waiter_kind {
+        Some(kind) => {
+          let waiter = utils::process::wait_process_state(
+            &key,
+            kind,
+            vec![NativeEventAction::Destroy],
+            client,
+          )
+          .await?;
+          Some(waiter)
+        }
+        None => None,
+      };
+      if let Err(err) = client
         .send_delete(
           &format!("/{}/{name}", Self::object_name()),
-          Self::get_query(opts),
+          Self::get_query(opts, namespace.clone()),
         )
-        .await?;
+        .await
+      {
+        pg.finish_and_clear();
+        eprintln!("{err} {name}");
+        continue;
+      }
+      if let Some(waiter) = waiter {
+        waiter.await??;
+      }
+      pg.finish();
     }
     Ok(())
   }

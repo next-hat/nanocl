@@ -64,7 +64,7 @@ pub async fn exec_secret(
       SecretArg::exec_ls(&cli_conf.client, args, opts).await
     }
     SecretCommand::Remove(opts) => {
-      SecretArg::exec_rm(&cli_conf.client, opts).await
+      SecretArg::exec_rm(&cli_conf.client, opts, None).await
     }
     SecretCommand::Inspect(opts) => exec_secret_inspect(cli_conf, opts).await,
     SecretCommand::Create(opts) => exec_secret_create(cli_conf, opts).await,

@@ -9,11 +9,11 @@ use nanocld_client::NanocldClient;
 use nanocld_client::stubs::vm_image::VmImageCloneStream;
 
 use crate::{
+  utils,
   models::{
     GenericDefaultOpts, VmImageArg, VmImageCommand, VmImageCreateOpts,
     VmImageResizeOpts, VmImageRow,
   },
-  utils,
 };
 
 use super::{GenericList, GenericRemove};
@@ -125,7 +125,9 @@ pub async fn exec_vm_image(
       exec_vm_image_create(client, options).await
     }
     VmImageCommand::List(opts) => VmImageArg::exec_ls(client, args, opts).await,
-    VmImageCommand::Remove(opts) => VmImageArg::exec_rm(client, opts).await,
+    VmImageCommand::Remove(opts) => {
+      VmImageArg::exec_rm(client, opts, None).await
+    }
     VmImageCommand::Clone { name, clone_name } => {
       exec_vm_image_clone(client, name, clone_name).await
     }

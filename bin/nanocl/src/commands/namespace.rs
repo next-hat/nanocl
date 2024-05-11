@@ -67,6 +67,8 @@ pub async fn exec_namespace(
     NamespaceCommand::Inspect(opts) => {
       exec_namespace_inspect(client, opts).await
     }
-    NamespaceCommand::Remove(opts) => NamespaceArg::exec_rm(client, opts).await,
+    NamespaceCommand::Remove(opts) => {
+      NamespaceArg::exec_rm(client, opts, None).await
+    }
   }
 }

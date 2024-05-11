@@ -6,7 +6,6 @@ use std::{
   time::Duration,
 };
 
-use ntex::rt;
 use serde_json::{Map, Value};
 use clap::{Arg, Command, ArgAction};
 use futures::{
@@ -18,12 +17,12 @@ use async_recursion::async_recursion;
 use nanocl_error::io::{IoError, FromIo, IoResult};
 
 use nanocld_client::{
+  ConnectOpts,
   stubs::{
     process::Process,
     statefile::{StatefileArgKind, SubState, SubStateValue},
-    system::{EventActorKind, EventCondition, EventKind, ObjPsStatusKind},
+    system::{EventActorKind, ObjPsStatusKind},
   },
-  ConnectOpts,
 };
 
 use nanocld_client::{
@@ -463,36 +462,6 @@ async fn render_template(
   Ok(state_ref)
 }
 
-async fn wait_process_object(
-  key: &str,
-  kind: EventActorKind,
-  action: Vec<NativeEventAction>,
-  client: &NanocldClient,
-) -> IoResult<rt::JoinHandle<IoResult<()>>> {
-  let mut stream = client
-    .watch_events(Some(vec![EventCondition {
-      actor_key: Some(key.to_owned()),
-      actor_kind: Some(kind.clone()),
-      kind: vec![EventKind::Normal, EventKind::Error],
-      action,
-      ..Default::default()
-    }]))
-    .await?;
-  let fut = rt::spawn(async move {
-    while let Some(event) = stream.next().await {
-      let event = event?;
-      if event.kind == EventKind::Error {
-        return Err(IoError::interrupted(
-          "Error",
-          &event.note.unwrap_or_default(),
-        ));
-      }
-    }
-    Ok::<_, IoError>(())
-  });
-  Ok(fut)
-}
-
 #[async_recursion(?Send)]
 async fn parse_state_file_recurr(
   cli_conf: &CliConfig,
@@ -628,7 +597,7 @@ async fn state_apply(
       let token = format!("job/{}", job.name);
       let pg = utils::progress::create_progress(&token, &pg_style);
       if client.inspect_job(&job.name).await.is_ok() {
-        let waiter = wait_process_object(
+        let waiter = utils::process::wait_process_state(
           &job.name,
           EventActorKind::Job,
           vec![NativeEventAction::Destroy],
@@ -639,7 +608,7 @@ async fn state_apply(
         waiter.await??;
       }
       client.create_job(job).await?;
-      let waiter = wait_process_object(
+      let waiter = utils::process::wait_process_state(
         &job.name,
         EventActorKind::Job,
         vec![NativeEventAction::Start],
@@ -672,7 +641,7 @@ async fn state_apply(
           }
         }
       }
-      let waiter = wait_process_object(
+      let waiter = utils::process::wait_process_state(
         &format!("{}.{namespace}", cargo.name),
         EventActorKind::Cargo,
         vec![NativeEventAction::Start],
@@ -706,7 +675,7 @@ async fn state_apply(
           }
         }
       }
-      let waiter = wait_process_object(
+      let waiter = utils::process::wait_process_state(
         &format!("{}.{namespace}", vm.name),
         EventActorKind::Vm,
         vec![NativeEventAction::Start],
@@ -851,7 +820,7 @@ async fn state_remove(
       let token = format!("job/{}", job.name);
       let pg = utils::progress::create_progress(&token, &pg_style);
       if client.inspect_job(&job.name).await.is_ok() {
-        let waiter = wait_process_object(
+        let waiter = utils::process::wait_process_state(
           &job.name,
           EventActorKind::Job,
           vec![NativeEventAction::Destroy],
@@ -873,7 +842,7 @@ async fn state_remove(
         .await
         .is_ok()
       {
-        let waiter = wait_process_object(
+        let waiter = utils::process::wait_process_state(
           &format!("{}.{namespace}", cargo.name),
           EventActorKind::Cargo,
           vec![NativeEventAction::Destroy],
@@ -903,7 +872,7 @@ async fn state_remove(
         .await
         .is_ok()
       {
-        let waiter = wait_process_object(
+        let waiter = utils::process::wait_process_state(
           &format!("{}.{namespace}", vm.name),
           EventActorKind::Vm,
           vec![NativeEventAction::Destroy],

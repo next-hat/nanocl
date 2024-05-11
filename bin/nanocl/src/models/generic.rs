@@ -49,17 +49,24 @@ where
   }
 }
 
-/// Generic delete options for the delete command
+/// Generic remove options for the remove command
 #[derive(Clone, Parser)]
 pub struct GenericRemoveOpts<T = GenericDefaultOpts>
 where
   T: Args + Clone,
 {
-  /// The names of the objects to delete
+  /// The names of the objects to remove
   pub names: Vec<String>,
-  #[clap(short = 'y')]
+  #[clap(short = 'y', long)]
   pub skip_confirm: bool,
   /// Filters
   #[clap(flatten)]
   pub others: T,
+}
+
+/// Generic force options for the remove command
+#[derive(Clone, Parser)]
+pub struct GenericRemoveForceOpts {
+  #[clap(short = 'f', long)]
+  pub force: bool,
 }
