@@ -43,7 +43,7 @@ impl ObjTaskStart for JobDb {
         let mut stream = state.inner.docker_api.wait_container(
           &process.key,
           Some(WaitContainerOptions {
-            condition: "not-running",
+            condition: "next-exit",
           }),
         );
         let _ = state
@@ -73,8 +73,8 @@ impl ObjTaskDelete for JobDb {
         ProcessDb::read_by_kind_key(&key, &state.inner.pool).await?;
       utils::container::delete_instances(
         &processes
-          .into_iter()
-          .map(|p| p.key)
+          .iter()
+          .map(|p| p.key.clone())
           .collect::<Vec<String>>(),
         &state,
       )
