@@ -115,16 +115,6 @@ pub struct SecretCreateOpts {
   pub kind: SecretKindCreateCommand,
 }
 
-/// `nanocl secret list` available options
-#[derive(Clone, Parser)]
-pub struct SecretRemoveOpts {
-  /// Skip confirmation
-  #[clap(short = 'y')]
-  pub skip_confirm: bool,
-  /// List of secret to remove
-  pub keys: Vec<String>,
-}
-
 /// `nanocl secret inspect` available options
 #[derive(Clone, Parser)]
 pub struct SecretInspectOpts {
