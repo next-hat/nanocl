@@ -36,7 +36,6 @@ use nanocld_client::{
     vm_spec::{VmSpecPartial, VmSpecUpdate},
     resource::{ResourcePartial, ResourceUpdate},
     secret::{SecretUpdate, SecretPartial},
-    cargo::CargoDeleteQuery,
     system::NativeEventAction,
   },
 };
@@ -44,9 +43,10 @@ use nanocld_client::{
 use crate::{
   config::CliConfig,
   models::{
-    Context, DisplayFormat, GenericDefaultOpts, GenericRemoveOpts, JobArg,
+    CargoArg, Context, DisplayFormat, GenericDefaultOpts,
+    GenericRemoveForceOpts, GenericRemoveOpts, JobArg, ResourceArg, SecretArg,
     StateApplyOpts, StateArg, StateCommand, StateLogsOpts, StateRef,
-    StateRemoveOpts, StateRoot,
+    StateRemoveOpts, StateRoot, VmArg,
   },
   utils,
 };
@@ -817,7 +817,6 @@ async fn state_remove(
     None => "global",
     Some(namespace) => namespace,
   };
-  let pg_style = utils::progress::create_spinner_style("red");
   if let Some(jobs) = &state_file.data.jobs {
     let opts = GenericRemoveOpts::<GenericDefaultOpts> {
       names: jobs.iter().map(|job| job.name.clone()).collect(),
@@ -827,78 +826,39 @@ async fn state_remove(
     JobArg::exec_rm(client, &opts, None).await?;
   }
   if let Some(cargoes) = &state_file.data.cargoes {
-    for cargo in cargoes {
-      let token = format!("cargo/{}", cargo.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
-      if client
-        .inspect_cargo(&cargo.name, state_file.data.namespace.as_deref())
-        .await
-        .is_ok()
-      {
-        let waiter = utils::process::wait_process_state(
-          &format!("{}.{namespace}", cargo.name),
-          EventActorKind::Cargo,
-          vec![NativeEventAction::Destroy],
-          client,
-        )
-        .await?;
-        client
-          .delete_cargo(
-            &cargo.name,
-            Some(&CargoDeleteQuery {
-              namespace: state_file.data.namespace.clone(),
-              force: Some(true),
-            }),
-          )
-          .await?;
-        waiter.await??;
-      }
-      pg.finish();
-    }
+    let opts = GenericRemoveOpts::<GenericRemoveForceOpts> {
+      names: cargoes.iter().map(|cargo| cargo.name.clone()).collect(),
+      skip_confirm: true,
+      others: GenericRemoveForceOpts { force: true },
+    };
+    let _ = CargoArg::exec_rm(client, &opts, Some(namespace.to_owned())).await;
   }
   if let Some(vms) = &state_file.data.virtual_machines {
-    for vm in vms {
-      let token = format!("vm/{}", vm.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
-      if client
-        .inspect_vm(&vm.name, state_file.data.namespace.as_deref())
-        .await
-        .is_ok()
-      {
-        let waiter = utils::process::wait_process_state(
-          &format!("{}.{namespace}", vm.name),
-          EventActorKind::Vm,
-          vec![NativeEventAction::Destroy],
-          client,
-        )
-        .await?;
-        client
-          .delete_vm(&vm.name, state_file.data.namespace.as_deref())
-          .await?;
-        waiter.await??;
-      }
-      pg.finish();
-    }
+    let opts = GenericRemoveOpts::<GenericDefaultOpts> {
+      names: vms.iter().map(|vm| vm.name.clone()).collect(),
+      skip_confirm: true,
+      others: GenericDefaultOpts,
+    };
+    let _ = VmArg::exec_rm(client, &opts, Some(namespace.to_owned())).await;
   }
   if let Some(resources) = &state_file.data.resources {
-    for resource in resources {
-      let token = format!("resource/{}", resource.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
-      if client.inspect_resource(&resource.name).await.is_ok() {
-        client.delete_resource(&resource.name).await?;
-      }
-      pg.finish();
-    }
+    let opts = GenericRemoveOpts::<GenericDefaultOpts> {
+      names: resources
+        .iter()
+        .map(|resource| resource.name.clone())
+        .collect(),
+      skip_confirm: true,
+      others: GenericDefaultOpts,
+    };
+    let _ = ResourceArg::exec_rm(client, &opts, None).await;
   }
   if let Some(secrets) = &state_file.data.secrets {
-    for secret in secrets {
-      let token = format!("secret/{}", secret.name);
-      let pg = utils::progress::create_progress(&token, &pg_style);
-      if client.inspect_secret(&secret.name).await.is_ok() {
-        client.delete_secret(&secret.name).await?;
-      }
-      pg.finish();
-    }
+    let opts = GenericRemoveOpts::<GenericDefaultOpts> {
+      names: secrets.iter().map(|secret| secret.name.clone()).collect(),
+      skip_confirm: true,
+      others: GenericDefaultOpts,
+    };
+    let _ = SecretArg::exec_rm(client, &opts, None).await;
   }
   Ok(())
 }
