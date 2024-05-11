@@ -1,15 +1,15 @@
-use nanocl_error::io::{IoResult, FromIo};
+use nanocl_error::io::IoResult;
 
 use crate::{
   utils,
   config::CliConfig,
   models::{
-    SecretArg, SecretCommand, SecretCreateOpts, SecretInspectOpts,
-    SecretRemoveOpts, SecretRow,
+    GenericDefaultOpts, SecretArg, SecretCommand, SecretCreateOpts,
+    SecretInspectOpts, SecretRow,
   },
 };
 
-use super::GenericList;
+use super::{GenericList, GenericDelete};
 
 impl GenericList for SecretArg {
   type Item = SecretRow;
@@ -25,20 +25,10 @@ impl GenericList for SecretArg {
   }
 }
 
-/// Function that execute when running `nanocl secret rm`
-async fn exec_secret_rm(
-  cli_conf: &CliConfig,
-  opts: &SecretRemoveOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  if !opts.skip_confirm {
-    utils::dialog::confirm(&format!("Delete secret {}?", opts.keys.join(",")))
-      .map_err(|err| err.map_err_context(|| "Delete secret"))?;
+impl GenericDelete<GenericDefaultOpts, String> for SecretArg {
+  fn object_name() -> &'static str {
+    "secrets"
   }
-  for key in &opts.keys {
-    client.delete_secret(key).await?;
-  }
-  Ok(())
 }
 
 /// Function that execute when running `nanocl secret inspect`
@@ -73,7 +63,9 @@ pub async fn exec_secret(
     SecretCommand::List(opts) => {
       SecretArg::exec_ls(&cli_conf.client, args, opts).await
     }
-    SecretCommand::Remove(opts) => exec_secret_rm(cli_conf, opts).await,
+    SecretCommand::Remove(opts) => {
+      SecretArg::exec_rm(&cli_conf.client, opts).await
+    }
     SecretCommand::Inspect(opts) => exec_secret_inspect(cli_conf, opts).await,
     SecretCommand::Create(opts) => exec_secret_create(cli_conf, opts).await,
   }

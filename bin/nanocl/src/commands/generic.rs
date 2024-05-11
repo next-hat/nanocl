@@ -4,9 +4,12 @@ use nanocld_client::{
   NanocldClient,
   stubs::generic::{GenericFilter, GenericListQuery},
 };
-use nanocl_error::io::IoResult;
+use nanocl_error::io::{FromIo, IoResult};
 
-use crate::{utils, models::GenericListOpts};
+use crate::{
+  utils,
+  models::{GenericDeleteOpts, GenericListOpts},
+};
 
 pub trait GenericList {
   type Item;
@@ -83,6 +86,44 @@ pub trait GenericList {
       .map(Self::Item::from)
       .collect::<Vec<Self::Item>>();
     Self::print_table(opts, rows);
+    Ok(())
+  }
+}
+
+pub trait GenericDelete<T, Q>
+where
+  T: Args + Clone,
+  Q: serde::Serialize,
+{
+  fn object_name() -> &'static str;
+
+  fn get_query(_opts: &GenericDeleteOpts<T>) -> Option<Q>
+  where
+    Q: serde::Serialize,
+  {
+    None
+  }
+
+  async fn exec_rm(
+    client: &NanocldClient,
+    opts: &GenericDeleteOpts<T>,
+  ) -> IoResult<()> {
+    let object_name = Self::object_name();
+    if !opts.skip_confirm {
+      utils::dialog::confirm(&format!(
+        "Delete {object_name} {} ?",
+        opts.names.join(",")
+      ))
+      .map_err(|err| err.map_err_context(|| "Delete"))?;
+    }
+    for name in &opts.names {
+      client
+        .send_delete(
+          &format!("/{}/{name}", Self::object_name()),
+          Self::get_query(opts),
+        )
+        .await?;
+    }
     Ok(())
   }
 }

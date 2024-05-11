@@ -2,17 +2,20 @@ use clap::{Args, Parser};
 
 use nanocld_client::stubs::generic::GenericFilter;
 
+/// An empty filter to use as default
 #[derive(Clone, Args)]
-pub struct DefaultFilter;
+pub struct GenericDefaultOpts;
 
-impl From<DefaultFilter> for GenericFilter {
-  fn from(_: DefaultFilter) -> Self {
+/// A generic filter to use in the list operations
+impl From<GenericDefaultOpts> for GenericFilter {
+  fn from(_: GenericDefaultOpts) -> Self {
     Self::default()
   }
 }
 
+/// Generic list options for the list command
 #[derive(Clone, Parser)]
-pub struct GenericListOpts<T = DefaultFilter>
+pub struct GenericListOpts<T = GenericDefaultOpts>
 where
   T: Args + Clone,
 {
@@ -32,6 +35,7 @@ where
   pub others: Option<T>,
 }
 
+/// Convert the generic list options to a generic filter
 impl<T> From<GenericListOpts<T>> for GenericFilter
 where
   T: Args + Clone,
@@ -43,4 +47,19 @@ where
       ..Default::default()
     }
   }
+}
+
+/// Generic delete options for the delete command
+#[derive(Clone, Parser)]
+pub struct GenericDeleteOpts<T = GenericDefaultOpts>
+where
+  T: Args + Clone,
+{
+  /// The names of the objects to delete
+  pub names: Vec<String>,
+  #[clap(short = 'y')]
+  pub skip_confirm: bool,
+  /// Filters
+  #[clap(flatten)]
+  pub others: T,
 }
