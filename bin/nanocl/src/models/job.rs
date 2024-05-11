@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::{job::JobSummary, process::WaitCondition};
 
-use super::{DisplayFormat, GenericListOpts};
+use super::{DisplayFormat, GenericListOpts, GenericRemoveOpts};
 
 /// `nanocl job wait` available options
 #[derive(Clone, Parser)]
@@ -14,16 +14,6 @@ pub struct JobWaitOpts {
   pub condition: Option<WaitCondition>,
   /// Name of job to wait
   pub name: String,
-}
-
-/// `nanocl job rm` available options
-#[derive(Clone, Parser)]
-pub struct JobRemoveOpts {
-  /// Name of job to remove
-  pub names: Vec<String>,
-  /// Skip confirmation
-  #[clap(short = 'y')]
-  pub skip_confirm: bool,
 }
 
 /// `nanocl job inspect` available options
@@ -66,7 +56,7 @@ pub enum JobCommand {
   List(GenericListOpts),
   /// Remove job by its name
   #[clap(alias("rm"))]
-  Remove(JobRemoveOpts),
+  Remove(GenericRemoveOpts),
   /// Inspect a job by its name
   Inspect(JobInspectOpts),
   /// Show logs of a job

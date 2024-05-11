@@ -7,12 +7,12 @@ use crate::{
   utils,
   config::CliConfig,
   models::{
-    JobArg, JobCommand, JobRow, JobRemoveOpts, JobInspectOpts, JobLogsOpts,
-    JobWaitOpts, JobStartOpts,
+    GenericDefaultOpts, JobArg, JobCommand, JobInspectOpts, JobLogsOpts,
+    JobRow, JobStartOpts, JobWaitOpts,
   },
 };
 
-use super::GenericList;
+use super::{GenericList, GenericRemove};
 
 impl GenericList for JobArg {
   type Item = JobRow;
@@ -28,20 +28,10 @@ impl GenericList for JobArg {
   }
 }
 
-/// Execute the `nanocl job rm` command to remove a job
-async fn exec_job_rm(
-  cli_conf: &CliConfig,
-  opts: &JobRemoveOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  if !opts.skip_confirm {
-    utils::dialog::confirm(&format!("Delete job  {}?", opts.names.join(",")))
-      .map_err(|err| err.map_err_context(|| "Delete job"))?;
+impl GenericRemove<GenericDefaultOpts, String> for JobArg {
+  fn object_name() -> &'static str {
+    "jobs"
   }
-  for name in &opts.names {
-    client.delete_job(name).await?;
-  }
-  Ok(())
 }
 
 /// Execute the `nanocl job inspect` command to inspect a job
@@ -134,7 +124,9 @@ pub async fn exec_job(cli_conf: &CliConfig, args: &JobArg) -> IoResult<()> {
     JobCommand::List(opts) => {
       JobArg::exec_ls(&cli_conf.client, args, opts).await
     }
-    JobCommand::Remove(opts) => exec_job_rm(cli_conf, opts).await,
+    JobCommand::Remove(opts) => {
+      JobArg::exec_rm(&cli_conf.client, opts, None).await
+    }
     JobCommand::Inspect(opts) => exec_job_inspect(cli_conf, opts).await,
     JobCommand::Logs(opts) => exec_job_logs(cli_conf, opts).await,
     JobCommand::Wait(opts) => exec_job_wait(cli_conf, opts).await,
