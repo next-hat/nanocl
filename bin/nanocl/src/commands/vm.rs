@@ -19,12 +19,12 @@ use crate::{
   utils,
   config::CliConfig,
   models::{
-    VmArg, VmCommand, VmCreateOpts, VmRow, VmRunOpts, VmPatchOpts,
-    VmInspectOpts,
+    GenericDefaultOpts, VmArg, VmCommand, VmCreateOpts, VmInspectOpts,
+    VmPatchOpts, VmRow, VmRunOpts,
   },
 };
 
-use super::GenericList;
+use super::{GenericList, GenericRemove};
 use super::vm_image::exec_vm_image;
 
 impl GenericList for VmArg {
@@ -41,6 +41,12 @@ impl GenericList for VmArg {
   }
 }
 
+impl GenericRemove<GenericDefaultOpts, String> for VmArg {
+  fn object_name() -> &'static str {
+    "vms"
+  }
+}
+
 /// Function executed when running `nanocl vm create`
 /// It will create a new virtual machine but not start it
 pub async fn exec_vm_create(
@@ -52,22 +58,6 @@ pub async fn exec_vm_create(
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
   println!("{}", &vm.spec.vm_key);
-  Ok(())
-}
-
-/// Function executed when running `nanocl vm rm`
-/// It will remove a virtual machine from the system
-pub async fn exec_vm_rm(
-  cli_conf: &CliConfig,
-  args: &VmArg,
-  names: &[String],
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  for name in names {
-    if let Err(err) = client.delete_vm(name, args.namespace.as_deref()).await {
-      eprintln!("{name}: {err}");
-    }
-  }
   Ok(())
 }
 
@@ -273,7 +263,14 @@ pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
     VmCommand::Image(args) => exec_vm_image(client, args).await,
     VmCommand::Create(options) => exec_vm_create(cli_conf, args, options).await,
     VmCommand::List(opts) => VmArg::exec_ls(client, args, opts).await,
-    VmCommand::Remove(opts) => exec_vm_rm(cli_conf, args, &opts.names).await,
+    VmCommand::Remove(opts) => {
+      VmArg::exec_rm(
+        &cli_conf.client,
+        opts,
+        Some(args.namespace.clone().unwrap_or("global".to_owned())),
+      )
+      .await
+    }
     VmCommand::Inspect(opts) => exec_vm_inspect(cli_conf, args, opts).await,
     VmCommand::Start(opts) => exec_vm_start(cli_conf, args, &opts.names).await,
     VmCommand::Stop(opts) => exec_vm_stop(cli_conf, args, &opts.names).await,
