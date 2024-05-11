@@ -817,13 +817,14 @@ async fn state_remove(
     None => "global",
     Some(namespace) => namespace,
   };
+  let mut gen_rm_opts = GenericRemoveOpts::<GenericDefaultOpts> {
+    names: Vec::default(),
+    skip_confirm: true,
+    others: GenericDefaultOpts,
+  };
   if let Some(jobs) = &state_file.data.jobs {
-    let opts = GenericRemoveOpts::<GenericDefaultOpts> {
-      names: jobs.iter().map(|job| job.name.clone()).collect(),
-      skip_confirm: true,
-      others: GenericDefaultOpts,
-    };
-    JobArg::exec_rm(client, &opts, None).await?;
+    gen_rm_opts.names = jobs.iter().map(|job| job.name.clone()).collect();
+    let _ = JobArg::exec_rm(client, &gen_rm_opts, None).await;
   }
   if let Some(cargoes) = &state_file.data.cargoes {
     let opts = GenericRemoveOpts::<GenericRemoveForceOpts> {
@@ -834,31 +835,21 @@ async fn state_remove(
     let _ = CargoArg::exec_rm(client, &opts, Some(namespace.to_owned())).await;
   }
   if let Some(vms) = &state_file.data.virtual_machines {
-    let opts = GenericRemoveOpts::<GenericDefaultOpts> {
-      names: vms.iter().map(|vm| vm.name.clone()).collect(),
-      skip_confirm: true,
-      others: GenericDefaultOpts,
-    };
-    let _ = VmArg::exec_rm(client, &opts, Some(namespace.to_owned())).await;
+    gen_rm_opts.names = vms.iter().map(|vm| vm.name.clone()).collect();
+    let _ =
+      VmArg::exec_rm(client, &gen_rm_opts, Some(namespace.to_owned())).await;
   }
   if let Some(resources) = &state_file.data.resources {
-    let opts = GenericRemoveOpts::<GenericDefaultOpts> {
-      names: resources
-        .iter()
-        .map(|resource| resource.name.clone())
-        .collect(),
-      skip_confirm: true,
-      others: GenericDefaultOpts,
-    };
-    let _ = ResourceArg::exec_rm(client, &opts, None).await;
+    gen_rm_opts.names = resources
+      .iter()
+      .map(|resource| resource.name.clone())
+      .collect();
+    let _ = ResourceArg::exec_rm(client, &gen_rm_opts, None).await;
   }
   if let Some(secrets) = &state_file.data.secrets {
-    let opts = GenericRemoveOpts::<GenericDefaultOpts> {
-      names: secrets.iter().map(|secret| secret.name.clone()).collect(),
-      skip_confirm: true,
-      others: GenericDefaultOpts,
-    };
-    let _ = SecretArg::exec_rm(client, &opts, None).await;
+    gen_rm_opts.names =
+      secrets.iter().map(|secret| secret.name.clone()).collect();
+    let _ = SecretArg::exec_rm(client, &gen_rm_opts, None).await;
   }
   Ok(())
 }
