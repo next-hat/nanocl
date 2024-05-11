@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::vm_image::{VmImage, VmImageResizePayload};
 
-use super::GenericListOpts;
+use super::{GenericListOpts, GenericRemoveOpts};
 
 /// `nanocl vm image` available commands
 #[derive(Clone, Subcommand)]
@@ -25,10 +25,7 @@ pub enum VmImageCommand {
   List(GenericListOpts),
   /// Remove a VM image
   #[clap(alias("rm"))]
-  Remove {
-    /// Names of the VM image
-    names: Vec<String>,
-  },
+  Remove(GenericRemoveOpts),
 }
 
 /// `nanocl vm image create` available options
