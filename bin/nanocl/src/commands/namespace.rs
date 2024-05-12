@@ -1,17 +1,18 @@
-use nanocld_client::NanocldClient;
+use nanocld_client::{stubs::namespace::NamespaceInspect, NanocldClient};
 use nanocl_error::io::IoResult;
 
 use nanocld_client::stubs::namespace::NamespaceSummary;
 use crate::{
-  utils,
   config::CliConfig,
   models::{
-    GenericDefaultOpts, NamespaceArg, NamespaceCommand, NamespaceOpts,
+    GenericDefaultOpts, NamespaceArg, NamespaceCommand, NamespaceCreateOpts,
     NamespaceRow,
   },
 };
 
-use super::{GenericCommand, GenericCommandLs, GenericCommandRm};
+use super::{
+  GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
+};
 
 impl GenericCommand for NamespaceArg {
   fn object_name() -> &'static str {
@@ -31,23 +32,17 @@ impl GenericCommandLs for NamespaceArg {
 
 impl GenericCommandRm<GenericDefaultOpts, String> for NamespaceArg {}
 
+impl GenericCommandInspect for NamespaceArg {
+  type ApiItem = NamespaceInspect;
+}
+
 /// Function that execute when running `nanocl namespace create`
 async fn exec_namespace_create(
   client: &NanocldClient,
-  opts: &NamespaceOpts,
+  opts: &NamespaceCreateOpts,
 ) -> IoResult<()> {
   let item = client.create_namespace(&opts.name).await?;
   println!("{}", item.name);
-  Ok(())
-}
-
-/// Function that execute when running `nanocl namespace inspect`
-async fn exec_namespace_inspect(
-  client: &NanocldClient,
-  opts: &NamespaceOpts,
-) -> IoResult<()> {
-  let namespace = client.inspect_namespace(&opts.name).await?;
-  utils::print::print_yml(namespace)?;
   Ok(())
 }
 
@@ -63,7 +58,7 @@ pub async fn exec_namespace(
     }
     NamespaceCommand::Create(opts) => exec_namespace_create(client, opts).await,
     NamespaceCommand::Inspect(opts) => {
-      exec_namespace_inspect(client, opts).await
+      NamespaceArg::exec_inspect(cli_conf, opts, None).await
     }
     NamespaceCommand::Remove(opts) => {
       NamespaceArg::exec_rm(client, opts, None).await

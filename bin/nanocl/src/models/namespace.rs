@@ -4,15 +4,15 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::namespace::NamespaceSummary;
 
-use super::{GenericRemoveOpts, GenericListOpts};
+use super::{GenericInspectOpts, GenericListOpts, GenericRemoveOpts};
 
 /// `nanocl namespace` available commands
 #[derive(Clone, Subcommand)]
 pub enum NamespaceCommand {
   /// Create new namespace
-  Create(NamespaceOpts),
+  Create(NamespaceCreateOpts),
   /// Inspect a namespace
-  Inspect(NamespaceOpts),
+  Inspect(GenericInspectOpts),
   /// Remove a namespace
   #[clap(alias("rm"))]
   Remove(GenericRemoveOpts),
@@ -41,7 +41,7 @@ pub struct NamespaceArg {
 
 /// `nanocl namespace create` and `nanocl namespace inspect` generic name option
 #[derive(Clone, Parser)]
-pub struct NamespaceOpts {
+pub struct NamespaceCreateOpts {
   /// name of the namespace to create
   pub name: String,
 }

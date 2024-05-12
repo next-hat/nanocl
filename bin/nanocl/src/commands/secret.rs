@@ -1,15 +1,16 @@
+use bollard_next::secret::Secret;
 use nanocl_error::io::IoResult;
 
 use crate::{
-  utils,
   config::CliConfig,
   models::{
-    GenericDefaultOpts, SecretArg, SecretCommand, SecretCreateOpts,
-    SecretInspectOpts, SecretRow,
+    GenericDefaultOpts, SecretArg, SecretCommand, SecretCreateOpts, SecretRow,
   },
 };
 
-use super::{GenericCommand, GenericCommandLs, GenericCommandRm};
+use super::{
+  GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
+};
 
 impl GenericCommand for SecretArg {
   fn object_name() -> &'static str {
@@ -29,18 +30,8 @@ impl GenericCommandLs for SecretArg {
 
 impl GenericCommandRm<GenericDefaultOpts, String> for SecretArg {}
 
-/// Function that execute when running `nanocl secret inspect`
-async fn exec_secret_inspect(
-  cli_conf: &CliConfig,
-  opts: &SecretInspectOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let secret = client.inspect_secret(&opts.key).await?;
-  let _ = utils::print::display_format(
-    &opts.display.clone().unwrap_or_default(),
-    secret,
-  );
-  Ok(())
+impl GenericCommandInspect for SecretArg {
+  type ApiItem = Secret;
 }
 
 async fn exec_secret_create(
@@ -64,7 +55,9 @@ pub async fn exec_secret(
     SecretCommand::Remove(opts) => {
       SecretArg::exec_rm(&cli_conf.client, opts, None).await
     }
-    SecretCommand::Inspect(opts) => exec_secret_inspect(cli_conf, opts).await,
+    SecretCommand::Inspect(opts) => {
+      SecretArg::exec_inspect(cli_conf, opts, None).await
+    }
     SecretCommand::Create(opts) => exec_secret_create(cli_conf, opts).await,
   }
 }

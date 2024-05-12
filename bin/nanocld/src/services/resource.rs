@@ -43,7 +43,7 @@ pub async fn list_resource(
 #[cfg_attr(feature = "dev", utoipa::path(
   get,
   tag = "Resources",
-  path = "/resources/{name}",
+  path = "/resources/{name}/inspect",
   params(
     ("name" = String, Path, description = "The resource name to inspect")
   ),
@@ -52,7 +52,7 @@ pub async fn list_resource(
     (status = 404, description = "Resource is not existing", body = ApiError),
   ),
 ))]
-#[web::get("/resources/{name}")]
+#[web::get("/resources/{name}/inspect")]
 pub async fn inspect_resource(
   state: web::types::State<SystemState>,
   path: web::types::Path<(String, String)>,
@@ -357,7 +357,10 @@ mod tests {
     );
     // Inspect
     let mut res = client
-      .send_get(&format!("{ENDPOINT}/{TEST_RESOURCE}"), None::<String>)
+      .send_get(
+        &format!("{ENDPOINT}/{TEST_RESOURCE}/inspect"),
+        None::<String>,
+      )
       .await;
     test_status_code!(res.status(), http::StatusCode::OK, "inspect resource");
     let resource = res.json::<Resource>().await.unwrap();

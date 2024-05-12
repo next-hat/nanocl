@@ -2,20 +2,23 @@ use clap::Args;
 use ntex::http::StatusCode;
 
 use nanocld_client::{
-  NanocldClient,
   stubs::{
-    generic::{GenericFilter, GenericListQuery},
+    generic::{GenericFilter, GenericListQuery, GenericNspQuery},
     system::{EventActorKind, NativeEventAction, ObjPsStatusKind},
   },
+  NanocldClient,
 };
 use nanocl_error::{
   io::{FromIo, IoResult},
   http_client::HttpClientError,
 };
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
+  config::CliConfig,
   models::{
-    GenericListOpts, GenericRemoveOpts, GenericStartOpts, GenericStopOpts,
+    GenericInspectOpts, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
+    GenericStopOpts,
   },
   utils,
 };
@@ -274,6 +277,34 @@ pub trait GenericCommandStop: GenericCommand {
         eprintln!("{err} {name}");
       }
     }
+    Ok(())
+  }
+}
+
+pub trait GenericCommandInspect: GenericCommand {
+  type ApiItem;
+
+  async fn exec_inspect(
+    cli_conf: &CliConfig,
+    opts: &GenericInspectOpts,
+    namespace: Option<String>,
+  ) -> IoResult<()>
+  where
+    Self::ApiItem: Serialize + DeserializeOwned + Send + 'static,
+  {
+    let res = cli_conf
+      .client
+      .send_get(
+        &format!("/{}/{}/inspect", Self::object_name(), opts.name),
+        Some(GenericNspQuery::new(namespace.as_deref())),
+      )
+      .await?;
+    let item = NanocldClient::res_json::<Self::ApiItem>(res).await?;
+    let display = opts
+      .display
+      .clone()
+      .unwrap_or(cli_conf.user_config.display_format.clone());
+    utils::print::display_format(&display, item)?;
     Ok(())
   }
 }

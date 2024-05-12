@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 use nanocld_client::stubs::resource::Resource;
 
-use super::{DisplayFormat, GenericListOpts, GenericRemoveOpts};
+use super::{GenericInspectOpts, GenericListOpts, GenericRemoveOpts};
 
 /// `nanocl resource` available commands
 #[derive(Clone, Subcommand)]
@@ -16,7 +16,7 @@ pub enum ResourceCommand {
   #[clap(alias("ls"))]
   List(GenericListOpts),
   /// Inspect a resource
-  Inspect(ResourceInspectOpts),
+  Inspect(GenericInspectOpts),
   /// Browse history of a resource
   History(ResourceHistoryOpts),
   /// Revert a resource to a specific history
@@ -68,16 +68,6 @@ impl From<Resource> for ResourceRow {
       updated_at: format!("{updated_at}"),
     }
   }
-}
-
-/// `nanocl resource inspect` available options
-#[derive(Clone, Parser)]
-pub struct ResourceInspectOpts {
-  /// Display format
-  #[clap(long)]
-  pub display: Option<DisplayFormat>,
-  /// The name of the resource to inspect
-  pub name: String,
 }
 
 /// `nanocl resource history` available options

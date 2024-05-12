@@ -10,8 +10,8 @@ use nanocld_client::stubs::{
 };
 
 use super::{
-  DisplayFormat, GenericListOpts, GenericRemoveForceOpts, GenericRemoveOpts,
-  GenericStartOpts, GenericStopOpts,
+  GenericInspectOpts, GenericListOpts, GenericRemoveForceOpts,
+  GenericRemoveOpts, GenericStartOpts, GenericStopOpts,
 };
 
 /// `nanocl cargo create` available options
@@ -104,16 +104,6 @@ pub struct CargoStartOpts {
 pub struct CargoRestartOpts {
   // List of cargo to stop
   pub names: Vec<String>,
-}
-
-/// `nanocl cargo inspect` available options
-#[derive(Clone, Parser)]
-pub struct CargoInspectOpts {
-  /// Display format
-  #[clap(long)]
-  pub display: Option<DisplayFormat>,
-  /// Name of cargo to inspect
-  pub(crate) name: String,
 }
 
 /// `nanocl cargo patch` available options
@@ -264,7 +254,7 @@ pub enum CargoCommand {
   #[clap(alias("rm"))]
   Remove(GenericRemoveOpts<GenericRemoveForceOpts>),
   /// Inspect a cargo by its name
-  Inspect(CargoInspectOpts),
+  Inspect(GenericInspectOpts),
   /// Update a cargo by its name
   Patch(CargoPatchOpts),
   /// Execute a command inside a cargo

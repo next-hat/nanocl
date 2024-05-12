@@ -1159,31 +1159,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Resource'
   /resources/{name}:
-    get:
-      tags:
-      - Resources
-      summary: Get detailed information about a resource
-      operationId: inspect_resource
-      parameters:
-      - name: name
-        in: path
-        description: The resource name to inspect
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: Detailed information about a resource
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Resource'
-        '404':
-          description: Resource is not existing
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiError'
     put:
       tags:
       - Resources
@@ -1286,6 +1261,32 @@ paths:
       responses:
         '200':
           description: The resource has been revert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Resource'
+        '404':
+          description: Resource is not existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+  /resources/{name}/inspect:
+    get:
+      tags:
+      - Resources
+      summary: Get detailed information about a resource
+      operationId: inspect_resource
+      parameters:
+      - name: name
+        in: path
+        description: The resource name to inspect
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Detailed information about a resource
           content:
             application/json:
               schema:
