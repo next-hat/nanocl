@@ -1,6 +1,7 @@
 use std::process;
 use std::collections::HashMap;
 
+use nanocld_client::stubs::system::{EventActorKind, NativeEventAction};
 use ntex::rt;
 use futures::channel::mpsc;
 use futures::{StreamExt, SinkExt};
@@ -327,12 +328,24 @@ async fn exec_cargo_run(
   opts: &CargoRunOpts,
 ) -> IoResult<()> {
   let client = &cli_conf.client;
+  let waiter = utils::process::wait_process_state(
+    &format!(
+      "{}.{}",
+      opts.name,
+      args.namespace.as_deref().unwrap_or("global")
+    ),
+    EventActorKind::Cargo,
+    [NativeEventAction::Start].to_vec(),
+    &cli_conf.client,
+  )
+  .await?;
   let cargo = client
     .create_cargo(&opts.clone().into(), args.namespace.as_deref())
     .await?;
   client
     .start_process("cargo", &cargo.spec.name, Some(&cargo.namespace_name))
     .await?;
+  waiter.await??;
   Ok(())
 }
 
