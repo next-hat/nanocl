@@ -6,13 +6,13 @@ use bollard_next::exec::{CreateExecOptions, StartExecOptions};
 
 use nanocl_error::io::IoResult;
 use nanocld_client::{
-  NanocldClient,
   stubs::{
-    cargo::{CargoDeleteQuery, CargoSummary},
+    cargo::{CargoDeleteQuery, CargoInspect, CargoSummary},
     generic::{GenericFilter, GenericListNspQuery},
     process::{OutputKind, ProcessLogQuery, ProcessStatsQuery},
     system::{EventActorKind, NativeEventAction},
   },
+  NanocldClient,
 };
 
 use crate::{
@@ -20,15 +20,15 @@ use crate::{
   config::CliConfig,
   models::{
     GenericRemoveForceOpts, GenericRemoveOpts, CargoArg, CargoCreateOpts,
-    CargoCommand, CargoRow, CargoPatchOpts, CargoInspectOpts, CargoExecOpts,
-    CargoHistoryOpts, CargoRevertOpts, CargoLogsOpts, CargoRunOpts,
-    CargoRestartOpts, CargoStatsOpts, ProcessStatsRow,
+    CargoCommand, CargoRow, CargoPatchOpts, CargoExecOpts, CargoHistoryOpts,
+    CargoRevertOpts, CargoLogsOpts, CargoRunOpts, CargoRestartOpts,
+    CargoStatsOpts, ProcessStatsRow,
   },
 };
 
 use super::{
-  GenericCommand, GenericCommandLs, GenericCommandRm, GenericCommandStart,
-  GenericCommandStop,
+  GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
+  GenericCommandStart, GenericCommandStop,
 };
 
 impl GenericCommand for CargoArg {
@@ -74,6 +74,10 @@ impl GenericCommandRm<GenericRemoveForceOpts, CargoDeleteQuery> for CargoArg {
 impl GenericCommandStart for CargoArg {}
 
 impl GenericCommandStop for CargoArg {}
+
+impl GenericCommandInspect for CargoArg {
+  type ApiItem = CargoInspect;
+}
 
 async fn wait_cargo_state(
   name: &str,
@@ -135,24 +139,6 @@ async fn exec_cargo_patch(
     .patch_cargo(&opts.name, &opts.clone().into(), args.namespace.as_deref())
     .await?;
   waiter.await??;
-  Ok(())
-}
-
-/// Execute the `nanocl cargo inspect` command to inspect a cargo
-async fn exec_cargo_inspect(
-  cli_conf: &CliConfig,
-  args: &CargoArg,
-  opts: &CargoInspectOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let cargo = client
-    .inspect_cargo(&opts.name, args.namespace.as_deref())
-    .await?;
-  let display = opts
-    .display
-    .clone()
-    .unwrap_or(cli_conf.user_config.display_format.clone());
-  utils::print::display_format(&display, cargo)?;
   Ok(())
 }
 
@@ -336,38 +322,25 @@ async fn exec_cargo_run(
 
 /// Function that execute when running `nanocl cargo`
 pub async fn exec_cargo(cli_conf: &CliConfig, args: &CargoArg) -> IoResult<()> {
+  let namespace = args.namespace.clone().unwrap_or("global".to_owned());
   match &args.command {
     CargoCommand::List(opts) => {
       CargoArg::exec_ls(&cli_conf.client, args, opts).await
     }
     CargoCommand::Create(opts) => exec_cargo_create(cli_conf, args, opts).await,
     CargoCommand::Remove(opts) => {
-      CargoArg::exec_rm(
-        &cli_conf.client,
-        opts,
-        Some(args.namespace.clone().unwrap_or("global".to_owned())),
-      )
-      .await
+      CargoArg::exec_rm(&cli_conf.client, opts, Some(namespace.clone())).await
     }
     CargoCommand::Start(opts) => {
-      CargoArg::exec_start(
-        &cli_conf.client,
-        opts,
-        Some(args.namespace.clone().unwrap_or("global".to_owned())),
-      )
-      .await
+      CargoArg::exec_start(&cli_conf.client, opts, Some(namespace.clone()))
+        .await
     }
     CargoCommand::Stop(opts) => {
-      CargoArg::exec_stop(
-        &cli_conf.client,
-        opts,
-        Some(args.namespace.clone().unwrap_or("global".to_owned())),
-      )
-      .await
+      CargoArg::exec_stop(&cli_conf.client, opts, Some(namespace.clone())).await
     }
     CargoCommand::Patch(opts) => exec_cargo_patch(cli_conf, args, opts).await,
     CargoCommand::Inspect(opts) => {
-      exec_cargo_inspect(cli_conf, args, opts).await
+      CargoArg::exec_inspect(cli_conf, opts, Some(namespace.clone())).await
     }
     CargoCommand::Exec(opts) => exec_cargo_exec(cli_conf, args, opts).await,
     CargoCommand::History(opts) => {

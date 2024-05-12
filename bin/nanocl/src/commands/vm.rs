@@ -14,26 +14,27 @@ use termios::{TCSANOW, tcsetattr, Termios, ICANON, ECHO};
 
 use nanocl_error::io::{IoResult, FromIo};
 use nanocld_client::{
-  NanocldClient,
   stubs::{
     process::{OutputKind, OutputLog},
     system::{EventActorKind, NativeEventAction},
+    vm::VmInspect,
     vm_spec::VmSpecPartial,
   },
+  NanocldClient,
 };
 
 use crate::{
   utils,
   config::CliConfig,
   models::{
-    GenericDefaultOpts, VmArg, VmCommand, VmCreateOpts, VmInspectOpts,
-    VmPatchOpts, VmRow, VmRunOpts,
+    GenericDefaultOpts, VmArg, VmCommand, VmCreateOpts, VmPatchOpts, VmRow,
+    VmRunOpts,
   },
 };
 
 use super::{
-  GenericCommand, GenericCommandLs, GenericCommandRm, GenericCommandStart,
-  GenericCommandStop,
+  GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
+  GenericCommandStart, GenericCommandStop,
 };
 use super::vm_image::exec_vm_image;
 
@@ -58,6 +59,10 @@ impl GenericCommandRm<GenericDefaultOpts, String> for VmArg {}
 impl GenericCommandStart for VmArg {}
 
 impl GenericCommandStop for VmArg {}
+
+impl GenericCommandInspect for VmArg {
+  type ApiItem = VmInspect;
+}
 
 async fn wait_vm_state(
   name: &str,
@@ -86,27 +91,6 @@ pub async fn exec_vm_create(
   let vm = options.clone().into();
   let vm = client.create_vm(&vm, args.namespace.as_deref()).await?;
   println!("{}", &vm.spec.vm_key);
-  Ok(())
-}
-
-/// Function executed when running `nanocl vm inspect`
-/// It will inspect a virtual machine
-/// and output the result on stdout as yaml, toml or json
-/// depending on user configuration
-pub async fn exec_vm_inspect(
-  cli_conf: &CliConfig,
-  args: &VmArg,
-  opts: &VmInspectOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let vm = client
-    .inspect_vm(&opts.name, args.namespace.as_deref())
-    .await?;
-  let display = opts
-    .display
-    .clone()
-    .unwrap_or(cli_conf.user_config.display_format.clone());
-  utils::print::display_format(&display, vm)?;
   Ok(())
 }
 
@@ -256,34 +240,22 @@ pub async fn exec_vm_attach(
 /// It will execute the subcommand passed as argument
 pub async fn exec_vm(cli_conf: &CliConfig, args: &VmArg) -> IoResult<()> {
   let client = &cli_conf.client;
+  let namespace = args.namespace.clone().unwrap_or("global".to_owned());
   match &args.command {
     VmCommand::Image(args) => exec_vm_image(client, args).await,
     VmCommand::Create(options) => exec_vm_create(cli_conf, args, options).await,
     VmCommand::List(opts) => VmArg::exec_ls(client, args, opts).await,
     VmCommand::Remove(opts) => {
-      VmArg::exec_rm(
-        &cli_conf.client,
-        opts,
-        Some(args.namespace.clone().unwrap_or("global".to_owned())),
-      )
-      .await
+      VmArg::exec_rm(&cli_conf.client, opts, Some(namespace.clone())).await
     }
-    VmCommand::Inspect(opts) => exec_vm_inspect(cli_conf, args, opts).await,
+    VmCommand::Inspect(opts) => {
+      VmArg::exec_inspect(cli_conf, opts, Some(namespace.clone())).await
+    }
     VmCommand::Start(opts) => {
-      VmArg::exec_start(
-        client,
-        opts,
-        Some(args.namespace.clone().unwrap_or("global".to_owned())),
-      )
-      .await
+      VmArg::exec_start(client, opts, Some(namespace.clone())).await
     }
     VmCommand::Stop(opts) => {
-      VmArg::exec_stop(
-        client,
-        opts,
-        Some(args.namespace.clone().unwrap_or("global".to_owned())),
-      )
-      .await
+      VmArg::exec_stop(client, opts, Some(namespace.clone())).await
     }
     VmCommand::Run(options) => exec_vm_run(cli_conf, args, options).await,
     VmCommand::Patch(options) => exec_vm_patch(cli_conf, args, options).await,

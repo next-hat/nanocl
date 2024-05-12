@@ -8,7 +8,7 @@ use nanocld_client::stubs::vm_spec::{
 };
 
 use super::{
-  DisplayFormat, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
+  GenericInspectOpts, GenericListOpts, GenericRemoveOpts, GenericStartOpts,
   GenericStopOpts, VmImageArg,
 };
 
@@ -28,7 +28,7 @@ pub enum VmCommand {
   #[clap(alias = "rm")]
   Remove(GenericRemoveOpts),
   /// Inspect a vm
-  Inspect(VmInspectOpts),
+  Inspect(GenericInspectOpts),
   /// Start a vm
   Start(GenericStartOpts),
   /// Stop a vm
@@ -40,16 +40,6 @@ pub enum VmCommand {
   },
   /// Patch a vm
   Patch(VmPatchOpts),
-}
-
-/// `nanocl vm inspect` available options
-#[derive(Clone, Parser)]
-pub struct VmInspectOpts {
-  /// Display format
-  #[clap(long)]
-  pub display: Option<DisplayFormat>,
-  /// Name of the vm
-  pub name: String,
 }
 
 /// `nanocl vm patch` available options

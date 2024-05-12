@@ -1,15 +1,18 @@
 use nanocl_error::io::IoResult;
+use nanocld_client::stubs::resource::Resource;
 
 use crate::{
   utils,
   config::CliConfig,
   models::{
     GenericDefaultOpts, ResourceArg, ResourceCommand, ResourceHistoryOpts,
-    ResourceInspectOpts, ResourceRevertOpts, ResourceRow,
+    ResourceRevertOpts, ResourceRow,
   },
 };
 
-use super::{GenericCommand, GenericCommandLs, GenericCommandRm};
+use super::{
+  GenericCommand, GenericCommandInspect, GenericCommandLs, GenericCommandRm,
+};
 
 impl GenericCommand for ResourceArg {
   fn object_name() -> &'static str {
@@ -29,19 +32,8 @@ impl GenericCommandLs for ResourceArg {
 
 impl GenericCommandRm<GenericDefaultOpts, String> for ResourceArg {}
 
-/// Function that execute when running `nanocl resource inspect`
-async fn exec_resource_inspect(
-  cli_conf: &CliConfig,
-  opts: &ResourceInspectOpts,
-) -> IoResult<()> {
-  let client = &cli_conf.client;
-  let resource = client.inspect_resource(&opts.name).await?;
-  let display = opts
-    .display
-    .clone()
-    .unwrap_or(cli_conf.user_config.display_format.clone());
-  utils::print::display_format(&display, resource)?;
-  Ok(())
+impl GenericCommandInspect for ResourceArg {
+  type ApiItem = Resource;
 }
 
 /// Function that execute when running `nanocl resource history`
@@ -79,7 +71,7 @@ pub async fn exec_resource(
       ResourceArg::exec_rm(&cli_conf.client, opts, None).await
     }
     ResourceCommand::Inspect(opts) => {
-      exec_resource_inspect(cli_conf, opts).await
+      ResourceArg::exec_inspect(cli_conf, opts, None).await
     }
     ResourceCommand::History(opts) => {
       exec_resource_history(cli_conf, opts).await

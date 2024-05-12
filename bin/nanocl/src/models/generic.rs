@@ -3,6 +3,8 @@ use clap::{Args, Parser};
 
 use nanocld_client::stubs::{generic::GenericFilter, system::ObjPsStatus};
 
+use super::DisplayFormat;
+
 /// An empty filter to use as default
 #[derive(Clone, Default, Args)]
 pub struct GenericDefaultOpts;
@@ -89,4 +91,14 @@ pub struct GenericStartOpts {
 #[derive(Clone, Parser)]
 pub struct GenericStopOpts {
   pub names: Vec<String>,
+}
+
+/// Generic inspect options for the inspect command
+#[derive(Clone, Parser)]
+pub struct GenericInspectOpts {
+  /// Display format
+  #[clap(long)]
+  pub display: Option<DisplayFormat>,
+  /// Name of the object to inspect
+  pub name: String,
 }

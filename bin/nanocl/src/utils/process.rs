@@ -17,7 +17,7 @@ use crate::models::GenericProcessStatus;
 
 pub fn gen_key(name: &str, namespace: Option<String>) -> String {
   match namespace {
-    Some(ns) => format!("{}/{}", ns, name),
+    Some(ns) => format!("{name}.{ns}"),
     None => name.to_owned(),
   }
 }
@@ -67,10 +67,15 @@ pub async fn wait_process_state(
       ..Default::default()
     }]))
     .await?;
+  let key = key.to_owned();
   let fut = rt::spawn(async move {
     while let Some(event) = stream.next().await {
       let event = event?;
-      if event.kind == EventKind::Error {
+      let Some(actor) = event.actor else {
+        continue;
+      };
+      if event.kind == EventKind::Error && actor.key.unwrap_or_default() == key
+      {
         return Err(IoError::interrupted(
           "Error",
           &event.note.unwrap_or_default(),

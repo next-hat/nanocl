@@ -147,7 +147,6 @@ mod tests {
     assert_cli_ok!(
       "cargo", "patch", CARGO_NAME, "--image", IMAGE_NAME, "--env", "TEST=1",
     );
-    ntex::time::sleep(std::time::Duration::from_secs(2)).await;
     assert_cli_ok!("cargo", "history", CARGO_NAME);
     let client = get_test_client();
     let history = client

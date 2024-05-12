@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 use nanocl_error::io::IoError;
 use nanocld_client::stubs::secret::{Secret, SecretPartial};
 
-use super::{DisplayFormat, GenericRemoveOpts, GenericListOpts};
+use super::{GenericInspectOpts, GenericListOpts, GenericRemoveOpts};
 
 /// `nanocl resource` available commands
 #[derive(Clone, Subcommand)]
@@ -18,7 +18,7 @@ pub enum SecretCommand {
   #[clap(alias("ls"))]
   List(GenericListOpts),
   /// Inspect a secret
-  Inspect(SecretInspectOpts),
+  Inspect(GenericInspectOpts),
   /// Create a new secret
   Create(SecretCreateOpts),
 }
@@ -113,16 +113,6 @@ pub struct SecretCreateOpts {
   /// Kind of secret
   #[clap(subcommand)]
   pub kind: SecretKindCreateCommand,
-}
-
-/// `nanocl secret inspect` available options
-#[derive(Clone, Parser)]
-pub struct SecretInspectOpts {
-  /// Name of secret to inspect
-  pub key: String,
-  /// Display format
-  #[clap(long)]
-  pub display: Option<DisplayFormat>,
 }
 
 /// A row of the secret table

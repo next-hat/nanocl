@@ -79,7 +79,10 @@ impl NanocldClient {
     key: &str,
   ) -> HttpClientResult<Resource> {
     let res = self
-      .send_get(&format!("{}/{key}", Self::RESOURCE_PATH), None::<String>)
+      .send_get(
+        &format!("{}/{key}/inspect", Self::RESOURCE_PATH),
+        None::<String>,
+      )
       .await?;
     Self::res_json(res).await
   }
